@@ -1,0 +1,55 @@
+# rust
+target/
+
+# node
+node_modules/
+*.tsbuildinfo
+
+# build outputs
+dist/
+build/
+.astro/
+
+# xcode
+*.xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+
+# android
+.gradle/
+local.properties
+
+# react native / expo / metro
+.expo/
+.metro-cache/
+
+# env / secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# os
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+
+# coverage
+coverage/
+.nyc_output/
+
+# local data
+data/
+*.db
+*.sqlite
+
+# claude code transient state (handoff is rewritten by /handoff save)
+.claude/handoff.md
