@@ -51,6 +51,7 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route_layer(middleware::from_fn_with_state(auth_state, require_token));
 
     let admin_protected = Router::new()
+        .route("/projects", get(api::admin::list_my_projects))
         .route(
             "/projects/{project_id}/issues",
             get(api::admin::list_issues),
@@ -71,6 +72,13 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/releases/{release_name}/sourcemaps",
             post(api::releases::upload_sourcemaps),
         )
+        // route_layer is inside-out: require_admin runs first (sets the
+        // AdminCaller extension), then require_project_in_org reads it
+        // and scope-checks any /projects/{uuid}/... path.
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            api::admin_auth::require_project_in_org,
+        ))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             api::admin_auth::require_admin,

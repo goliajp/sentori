@@ -7,11 +7,25 @@ use axum::{
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use serde::Deserialize;
 use serde_json::json;
+use uuid::Uuid;
 
 use crate::recent::AppState;
 use crate::session;
 
 pub const SESSION_COOKIE: &str = "sentori_session";
+
+/// Identifies who's calling an admin API. `require_admin` injects this into
+/// request extensions; `require_project_in_org` reads it to decide whether
+/// to scope-check the path's `project_id` against the user's orgs.
+#[derive(Clone, Debug)]
+pub enum AdminCaller {
+    /// Authenticated user via DB-backed session cookie.
+    User { id: Uuid, email: String },
+    /// Legacy `admin_password`-based HMAC cookie (single-tenant super-admin).
+    LegacyAdmin,
+    /// Bearer dev token (or DB-stored admin token).
+    DevToken,
+}
 
 #[derive(Deserialize)]
 pub struct LoginRequest {
@@ -59,19 +73,34 @@ pub async fn me(jar: CookieJar, State(state): State<AppState>) -> Response {
         .into_response()
 }
 
-/// Allows access if either:
-/// 1. The `sentori_session` cookie has a valid HMAC, or
-/// 2. A Bearer token in `Authorization` is accepted by `AuthState::validate`
-///    (dev token or `tokens` row).
-/// The Bearer fallback exists for tests, CLI tools, and future scripted clients.
+/// Allows access if any of:
+/// 1. The session cookie resolves to a valid DB-backed user session
+///    (Phase 13 sub-B). Caller is set to `AdminCaller::User`.
+/// 2. The session cookie has a valid `admin_password` HMAC (legacy
+///    single-tenant). Caller is set to `AdminCaller::LegacyAdmin`.
+/// 3. A Bearer token accepted by `AuthState::validate`. Caller is set
+///    to `AdminCaller::DevToken`.
+///
+/// The selected caller is stored in request extensions for downstream
+/// middleware (`require_project_in_org`) and handlers
+/// (`api::admin::list_my_projects`).
 pub async fn require_admin(
     State(state): State<AppState>,
     jar: CookieJar,
-    req: Request,
+    mut req: Request,
     next: Next,
 ) -> Response {
+    if let (Some(pool), Some(c)) = (&state.db, jar.get(SESSION_COOKIE)) {
+        if let Some((id, email)) =
+            crate::api::user_auth::current_user(pool, c.value()).await
+        {
+            req.extensions_mut().insert(AdminCaller::User { id, email });
+            return next.run(req).await;
+        }
+    }
     if let Some(c) = jar.get(SESSION_COOKIE) {
         if session::verify(&state.session_secret, c.value()) {
+            req.extensions_mut().insert(AdminCaller::LegacyAdmin);
             return next.run(req).await;
         }
     }
@@ -82,6 +111,7 @@ pub async fn require_admin(
         .and_then(|h| h.strip_prefix("Bearer "));
     if let Some(token) = bearer {
         if state.auth.validate(token).await {
+            req.extensions_mut().insert(AdminCaller::DevToken);
             return next.run(req).await;
         }
     }
@@ -90,6 +120,78 @@ pub async fn require_admin(
         Json(json!({ "error": "unauthorized" })),
     )
         .into_response()
+}
+
+/// Path-scoped middleware. Inspects the request URI for a
+/// `/projects/{uuid}/...` segment; if found and the caller is a regular
+/// user, ensures the project belongs to one of the user's orgs.
+/// `LegacyAdmin` and `DevToken` callers are super-users and pass through.
+/// Must be mounted *after* `require_admin` so the caller extension is set.
+pub async fn require_project_in_org(
+    State(state): State<AppState>,
+    req: Request,
+    next: Next,
+) -> Response {
+    let project_id = match extract_project_id_from_path(req.uri().path()) {
+        Some(id) => id,
+        None => return next.run(req).await,
+    };
+
+    let caller = match req.extensions().get::<AdminCaller>() {
+        Some(c) => c.clone(),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({ "error": "unauthorized" })),
+            )
+                .into_response();
+        }
+    };
+
+    let user_id = match caller {
+        AdminCaller::User { id, .. } => id,
+        AdminCaller::LegacyAdmin | AdminCaller::DevToken => {
+            return next.run(req).await;
+        }
+    };
+
+    let pool = match &state.db {
+        Some(p) => p.clone(),
+        None => return next.run(req).await,
+    };
+
+    let belongs: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM projects p \
+         JOIN memberships m ON m.org_id = p.org_id \
+         WHERE p.id = $1 AND m.user_id = $2)",
+    )
+    .bind(project_id)
+    .bind(user_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap_or(false);
+
+    if belongs {
+        next.run(req).await
+    } else {
+        (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "projectNotInOrg" })),
+        )
+            .into_response()
+    }
+}
+
+/// Find a UUID in the URI path immediately after a `projects` segment.
+/// Returns None for paths that don't include `/projects/<uuid>/...`.
+fn extract_project_id_from_path(path: &str) -> Option<Uuid> {
+    let mut segs = path.split('/').filter(|s| !s.is_empty());
+    while let Some(s) = segs.next() {
+        if s == "projects" {
+            return segs.next().and_then(|s| Uuid::parse_str(s).ok());
+        }
+    }
+    None
 }
 
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {

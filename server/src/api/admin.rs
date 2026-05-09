@@ -1,12 +1,60 @@
 use axum::{
-    extract::{Json, Path, Query, State},
+    extract::{Extension, Json, Path, Query, State},
 };
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+use crate::api::admin_auth::AdminCaller;
 use crate::error::AppError;
 use crate::recent::AppState;
+
+/// Phase 13 sub-D: list projects visible to the caller.
+/// - User session  → projects in any of the user's orgs.
+/// - LegacyAdmin / DevToken → all projects (super-admin).
+#[derive(Debug, Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectRow {
+    pub id: Uuid,
+    pub name: String,
+    pub org_id: Uuid,
+    pub org_slug: String,
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+}
+
+pub async fn list_my_projects(
+    State(state): State<AppState>,
+    Extension(caller): Extension<AdminCaller>,
+) -> Result<Json<Vec<ProjectRow>>, AppError> {
+    let pool = state.db.as_ref().ok_or_else(|| AppError::DatabaseUnavailable)?;
+
+    let rows: Vec<ProjectRow> = match caller {
+        AdminCaller::User { id, .. } => sqlx::query_as(
+            "SELECT p.id, p.name, p.org_id, o.slug AS org_slug, p.created_at \
+             FROM projects p \
+             JOIN orgs o ON o.id = p.org_id \
+             JOIN memberships m ON m.org_id = p.org_id \
+             WHERE m.user_id = $1 \
+             ORDER BY p.created_at DESC",
+        )
+        .bind(id)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| AppError::Internal(format!("list_my_projects: {e}")))?,
+        AdminCaller::LegacyAdmin | AdminCaller::DevToken => sqlx::query_as(
+            "SELECT p.id, p.name, p.org_id, o.slug AS org_slug, p.created_at \
+             FROM projects p \
+             JOIN orgs o ON o.id = p.org_id \
+             ORDER BY p.created_at DESC",
+        )
+        .fetch_all(pool)
+        .await
+        .map_err(|e| AppError::Internal(format!("list_my_projects: {e}")))?,
+    };
+
+    Ok(Json(rows))
+}
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
