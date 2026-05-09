@@ -111,6 +111,16 @@ export const adminApi = {
   issueDetail: (projectId: string, issueId: string) =>
     adminFetch<IssueRow>(`/projects/${projectId}/issues/${issueId}`),
 
+  patchIssue: (
+    projectId: string,
+    issueId: string,
+    body: { status?: 'active' | 'closed' | 'silenced' }
+  ) =>
+    adminFetch<IssueRow>(`/projects/${projectId}/issues/${issueId}`, {
+      body: JSON.stringify(body),
+      method: 'PATCH',
+    }),
+
   listEvents: (projectId: string, issueId: string, params: { limit?: number } = {}) => {
     const usp = new URLSearchParams()
     if (params.limit !== undefined) usp.set('limit', String(params.limit))

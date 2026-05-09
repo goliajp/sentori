@@ -53,7 +53,7 @@ pub fn build(cfg: ServerConfig) -> Router {
         )
         .route(
             "/projects/{project_id}/issues/{issue_id}",
-            get(api::admin::issue_detail),
+            get(api::admin::issue_detail).patch(api::admin::patch_issue),
         )
         .route(
             "/projects/{project_id}/issues/{issue_id}/events",

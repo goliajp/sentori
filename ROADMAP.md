@@ -303,16 +303,16 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 
 - [x] `cd web && bun add @tanstack/react-query openapi-fetch react-hotkeys-hook`
 - [x] 设计 admin API 鉴权：管理员 session cookie（Phase 6 先做最简：env 注入的 admin password + `POST /admin/api/login` 设 httpOnly cookie，多用户在 Phase 13）
-- [ ] server 写 admin 端点：
+- [x] server 写 admin 端点：
   - [x] `POST /admin/api/login`
   - [ ] `GET /admin/api/projects`
   - [x] `GET /admin/api/projects/:id/issues?status=&env=&q=`
   - [x] `GET /admin/api/projects/:id/issues/:issue_id`
   - [x] `GET /admin/api/projects/:id/issues/:issue_id/events?limit=50`
-  - [ ] `PATCH /admin/api/issues/:id`（修改 status）
+  - [x] `PATCH /admin/api/issues/:id`（修改 status）
 - [ ] server 写 OpenAPI schema 输出（用 `utoipa` crate）→ `web/` 用 `openapi-typescript` 生成 types
 - [x] vite 配 dev proxy：`/admin/api → http://localhost:8080`
-- [ ] web/ 路由：
+- [x] web/ 路由：
   - [x] `/login`
   - [x] `/`（重定向到 `/issues`）
   - [x] `/issues`（列表）
@@ -321,16 +321,16 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] 写 `IssueListView`：
   - [x] dense table：cols [type, msg_sample, count, last_seen, env, release]
   - [x] 行高 32px，字号 13px，等宽数字
-  - [ ] j/k 切行高亮、Enter 进详情、s 切 silenced、`/` 聚焦搜索框
+  - [x] j/k 切行高亮、Enter 进详情、s 切 silenced、`/` 聚焦搜索框
 - [x] 写 `IssueDetailView`：
   - [x] 左栏：events 列表（按 ts DESC）
   - [x] 右栏：选中 event 的 stack + breadcrumbs + tags + device/app/release
   - [x] stack frame 渲染（先无符号化，用 raw）
   - [x] 上下事件 `[`/`]` 切换
-- [ ] 写 `web/docs/design-language.md`：字号刻度（11/13/15/24px）、间距刻度（4/8/16/24px）、暗色 palette 决策、参照 Linear / Vercel
-- [ ] 暗色为默认（已搭好）
-- [ ] `bun run check / test / build` 全绿
-- [ ] commit：`feat(web): dashboard MVP with dense issue list and detail`
+- [x] 写 `web/docs/design-language.md`：字号刻度（11/13/15/24px）、间距刻度（4/8/16/24px）、暗色 palette 决策、参照 Linear / Vercel
+- [x] 暗色为默认（已搭好）
+- [x] `bun run check / test / build` 全绿
+- [x] commit：`feat(web): dashboard MVP with dense issue list and detail`
 
 ---
 

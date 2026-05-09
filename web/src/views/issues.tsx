@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
 import { useNavigate } from 'react-router'
@@ -15,9 +15,20 @@ export function IssuesView() {
   const [selectedIdx, setSelectedIdx] = useState(0)
   const searchRef = useRef<HTMLInputElement>(null)
 
+  const queryClient = useQueryClient()
   const { data, isLoading, error } = useQuery({
     queryFn: () => adminApi.listIssues(DEV_PROJECT_ID, { status }),
     queryKey: ['issues', DEV_PROJECT_ID, status],
+  })
+
+  const silenceMutation = useMutation({
+    mutationFn: (issueId: string) =>
+      adminApi.patchIssue(DEV_PROJECT_ID, issueId, { status: 'silenced' }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['issues', DEV_PROJECT_ID],
+      })
+    },
   })
 
   const filtered = data?.filter((i) => match(i, filter)) ?? []
@@ -45,6 +56,16 @@ export function IssuesView() {
     e.preventDefault()
     searchRef.current?.focus()
   })
+  useHotkeys(
+    's',
+    () => {
+      const issue = filtered[safeIdx]
+      if (issue && issue.status === 'active') {
+        silenceMutation.mutate(issue.id)
+      }
+    },
+    { enableOnFormTags: false }
+  )
 
   return (
     <div className="flex h-full flex-col">

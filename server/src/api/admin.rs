@@ -114,6 +114,56 @@ pub struct ListEventsQuery {
     pub limit: Option<i64>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PatchIssueRequest {
+    pub status: Option<String>,
+}
+
+const ALLOWED_STATUSES: &[&str] = &["active", "silenced", "closed"];
+
+pub async fn patch_issue(
+    State(state): State<AppState>,
+    Path((project_id, issue_id)): Path<(Uuid, Uuid)>,
+    Json(body): Json<PatchIssueRequest>,
+) -> Result<Json<IssueRow>, AppError> {
+    let pool = state.db.as_ref().ok_or(AppError::DatabaseUnavailable)?;
+
+    if let Some(status) = &body.status {
+        if !ALLOWED_STATUSES.contains(&status.as_str()) {
+            return Err(AppError::Internal(format!(
+                "invalid status '{status}'; allowed: {ALLOWED_STATUSES:?}"
+            )));
+        }
+        sqlx::query(
+            "UPDATE issues SET status = $1 WHERE project_id = $2 AND id = $3",
+        )
+        .bind(status)
+        .bind(project_id)
+        .bind(issue_id)
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    }
+
+    let row: Option<IssueRow> = sqlx::query_as(
+        r#"
+        SELECT id, fingerprint, error_type, message_sample, status,
+               first_seen, last_seen, event_count,
+               last_environment, last_release
+        FROM issues
+        WHERE project_id = $1 AND id = $2
+        "#,
+    )
+    .bind(project_id)
+    .bind(issue_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    row.map(Json).ok_or(AppError::NotFound)
+}
+
 pub async fn list_events_for_issue(
     State(state): State<AppState>,
     Path((project_id, issue_id)): Path<(Uuid, Uuid)>,
