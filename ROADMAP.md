@@ -23,6 +23,7 @@
 - [x] **Phase 14** — SaaS 自助 onboarding
 - [x] **Phase 15** — 配额 / 限流 / usage 计量（free tier）
 - [x] **Phase 16** — 生产就绪 + **公开上线 sentori.golia.jp** 🎯（substrate 落地，剩 user 一次性 secrets + push release/）
+- [ ] **Phase 17** — SDK 分发链路 + dogfood + qualcomm/insight 真接入
 
 总工时估算（1 人全职）：**约 22–30 周**（self-hosted ~14–18 周 + SaaS 上线 ~8–12 周）。
 
@@ -781,6 +782,79 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [ ] **(user-owned)** 录视频 + Lawyer review 法律文档 + 配 SPF/DKIM/DMARC + 一周 dogfooding 无 P1
 - [ ] **(user-owned)** HN 发文（周二/周三 早上 PT）
 - [ ] 🎯 **里程碑：sentori.golia.jp 正式开放**
+
+---
+
+## Phase 17 — SDK 分发链路 + dogfood + qualcomm/insight 真接入
+
+**Goal:** 让 sentori SDK / CLI 从 "git 路径安装" 提升到 "`npm install` / `npx` 一行装"；dashboard onboarding wizard 提供 RN / JavaScript 双 snippet；sentori 自家 web 三个项目接入做 dogfood；最终给 `qualcomm/insight` (Expo RN) 上 sentori。
+**Entry:** Phase 16 sub-H ✅。
+**Exit:** 任意 RN 或 web 项目能用一行 `bun add @sentori/react-native` (或 `@sentori/javascript`) 装上 + init 即工作；`qualcomm/insight` 在生产抛错能在 sentori dashboard 看到 + symbolicated stack。
+**Estimate:** 1.5–2 周。
+
+### Steps
+
+#### sub-A — `@sentori/react-native` Expo Config Plugin + npm publish
+
+- [ ] 加 `app.plugin.js` —— Expo Config Plugin，prebuild 时 autolink iOS pod + Android gradle
+- [ ] `expo-module.config.json` 注册 native module
+- [ ] `package.json` 加 `expo` 字段 + 完整 `files` whitelist
+- [ ] `.github/workflows/publish-sdk-rn.yml` —— tag `sdk-rn-v*` 触发 `npm publish`
+- [ ] 本地用 `bunx create-expo-app` 起一个 app 装 SDK 验通
+- [ ] 更新 `docs-site/src/content/docs/sdk-react-native.md` 装法
+
+#### sub-B — `@sentori/cli` 跨平台 prebuilt binary + npm 包装
+
+- [ ] `.github/workflows/release-cli.yml`：tag `cli-v*` 触发 `cargo build --release` 矩阵 (linux-x64 / linux-arm64 / darwin-arm64 / darwin-x64)，artifacts 传到 GitHub Release
+- [ ] `cli/npm/` 目录：`@sentori/cli` npm 包 thin wrapper，`postinstall` 下载本平台 binary
+- [ ] `npx @sentori/cli upload sourcemap ...` 验通
+- [ ] 文档更新
+
+#### sub-C — Dashboard onboarding wizard SDK 选择
+
+- [ ] `InstallSdkStep` 加 radio：React Native / JavaScript（默认 RN）
+- [ ] 两种 snippet 切换：install command + init code
+- [ ] 复用 `CodeBlock` 组件，保持现有 copy 体验
+
+#### sub-D — `@sentori/javascript` (web + node)
+
+- [ ] `sdk/javascript/`：bun workspace；ESM + CJS dual build
+- [ ] 共享逻辑：transport (`fetch`)、event builder、`captureError` / `captureException`、`setUser` (PII-min)、breadcrumbs
+- [ ] 浏览器 hooks：`window.onerror`、`window.unhandledrejection`、自动 `nav` breadcrumbs (`pushState`/`popstate`)、自动 `net` breadcrumbs (`fetch` 包装)
+- [ ] Node hooks：`process.on('uncaughtException' | 'unhandledRejection')`
+- [ ] zero-dep：可选解 stack 用现成 lib (`error-stack-parser` 或 vendored 几行)
+- [ ] bun:test 单测覆盖 init / capture / breadcrumb
+- [ ] `.github/workflows/publish-sdk-js.yml`：tag `sdk-js-v*` 触发 `npm publish`
+
+#### sub-E — mailrs `sentori@golia.jp` 密码改 argon2id
+
+- [ ] 用 mailrs 容器内的 argon2 算 hash（或 `cargo run -p users` 一次性脚本）
+- [ ] 替换 mailrs `/data/users.toml` 的 `password = "..."` 为 `password_hash = "$argon2id$..."`
+- [ ] mailrs 重启 + 重新 SMTP auth 探活
+- [ ] sentori 端 secret 不变，无需 redeploy
+- [ ] 在 `ops/secrets.md` 加 mailrs SMTP user 轮换 playbook
+
+#### sub-F — Sentori 自家 dogfood
+
+- [ ] 在 prod sentori 注册 `sentori-internal@golia.jp` 或类似 → 自动 bootstrap personal org
+- [ ] create 三个 project：`sentori-dashboard`、`sentori-marketing`、`sentori-docs`
+- [ ] 三个 token 入 GitHub repo `goliajp/sentori` 的 secrets 作 build-time env
+- [ ] `web/` 接 `@sentori/javascript` —— `main.tsx` `initSentori`，release=`web@<git-sha>`
+- [ ] `marketing/` 接 —— Astro `<script>` 块，release=`marketing@<git-sha>`
+- [ ] `docs-site/` 接 —— Starlight `head` 注入，release=`docs@<git-sha>`
+- [ ] 推 `release/v0.2.1` 触发 deploy
+- [ ] 在 dashboard 故意触发一个 dev 错误，确认 issue 来自 sentori-dashboard 自己
+
+#### sub-G — `qualcomm/insight` 接入（Phase 17 的真目的地）
+
+- [ ] sentori prod 注册 / 选 org → create project `qualcomm-insight`
+- [ ] `qualcomm/insight` repo：`bunx expo install @sentori/react-native`
+- [ ] app entry `initSentori({ token, ingestUrl, release, environment })`
+- [ ] iOS：`expo prebuild` + `pod install` + run on simulator → trigger test error → 验证 dashboard 看到
+- [ ] Android：同上
+- [ ] EAS build hook：上传 source map (`@sentori/cli upload sourcemap`) 到 sentori，confirm dashboard 显示原始位置
+- [ ] commit `qualcomm/insight` changes
+- [ ] 🎯 **里程碑：sentori 接住第一个真实生产 RN 应用**
 
 #### 实际部署落地（Phase 16 sub-H — 通过 devops infra 接入，而非原计划的"Hetzner + 独立 Caddy"）
 
