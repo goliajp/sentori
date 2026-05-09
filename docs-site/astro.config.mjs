@@ -33,6 +33,28 @@ export default defineConfig({
         },
       ],
       customCss: ['./src/styles/overrides.css'],
+      head: [
+        {
+          tag: 'meta',
+          attrs: { property: 'og:image', content: 'https://docs.sentori.golia.jp/og.png' },
+        },
+        {
+          tag: 'meta',
+          attrs: { property: 'og:image:width', content: '1200' },
+        },
+        {
+          tag: 'meta',
+          attrs: { property: 'og:image:height', content: '630' },
+        },
+        {
+          tag: 'meta',
+          attrs: { name: 'twitter:card', content: 'summary_large_image' },
+        },
+        {
+          tag: 'meta',
+          attrs: { name: 'twitter:image', content: 'https://docs.sentori.golia.jp/og.png' },
+        },
+      ],
     }),
   ],
 })

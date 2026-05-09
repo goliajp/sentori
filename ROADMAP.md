@@ -549,8 +549,8 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
   - [x] "Why we built Sentori" 区块（一段对比 Sentry 的思考）
 - [x] 写 `marketing/src/pages/pricing.astro`：v0.1 阶段—Self-hosted 永久免费 + SaaS Free Tier 100k events/月（"Beta：邀请制"）
 - [x] 设计语言：暗色优先、dense、参照 Linear / Vercel；不堆 emoji 不用 illustration
-- [ ] SEO：meta 标签、sitemap、robots.txt
-- [ ] OG image：用 satori 生成或手画一张
+- [x] SEO：完整 meta 标签（canonical / og:type / og:site_name / twitter:card+image）+ `@astrojs/sitemap` 生成 sitemap-index.xml + 手写 robots.txt（同时给 docs-site）
+- [x] OG image：手画 1200×630 SVG（暗色 + 紫色 accent + react-native/rust/self-hosted chips），sharp 转 PNG（39 KB），marketing/ 与 docs-site/ 各一份
 
 #### 文档站
 - [x] `cd sentori && bunx create-astro@latest docs-site --template starlight`（手搓——避开 create-astro 的交互 prompt）
