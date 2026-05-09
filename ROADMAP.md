@@ -11,7 +11,7 @@
 - [x] **Phase 2** — Server 骨架（axum 接 POST，stdout 打印）
 - [x] **Phase 3** — RN SDK JS 层（init + 全局错误捕获 + batcher）
 - [x] **Phase 4** — 端到端 smoke test 🎯（首个里程碑）
-- [ ] **Phase 5** — PG 落库 + 最小 grouping
+- [x] **Phase 5** — PG 落库 + 最小 grouping
 - [ ] **Phase 6** — Web dashboard MVP
 - [ ] **Phase 7** — RN SDK Native 层（iOS NSException + Android uncaught）
 - [ ] **Phase 8** — Sourcemap 上传 + 服务端符号化
@@ -275,7 +275,7 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
   - [x] `tokens` (id, project_id FK, token_hash, kind, created_at, revoked_at)
   - [x] `releases` (id, project_id, version, build, created_at, UNIQUE(project_id, version, build))
   - [x] `issues` (id uuid-v7, project_id FK, fingerprint, type, msg_sample, status enum('active','silenced','closed'), first_seen, last_seen, event_count, UNIQUE(project_id, fingerprint))
-  - [ ] `events` 按月 RANGE 分区 (id uuid-v7, project_id FK, issue_id FK, release_id FK?, env, payload jsonb, ts, received_at)
+  - [x] `events` 按月 RANGE 分区 (id uuid-v7, project_id FK, issue_id FK, release_id FK?, env, payload jsonb, ts, received_at)
   - [x] 索引：`events(issue_id, ts DESC)`、`issues(project_id, status, last_seen DESC)`
 - [x] 写 `server/src/db.rs`：连接池 + `sqlx::migrate!()` 启动时自动迁移
 - [x] 写 `server/src/grouping.rs`：fingerprint = `sha256(error.type + first_in_app_frame.fn + first_in_app_frame.file)` 取前 16 字节 hex
@@ -288,7 +288,7 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] 改 token 鉴权：从硬编码改为查 `tokens` 表（带 Valkey cache，TTL 60s）
 - [x] 集成测试：连续 post 5 个相同事件，断言 issues 表 1 行 + events 表 5 行
 - [x] 集成测试：rate limit 触发 429
-- [ ] commit：`feat(server): persistent storage with grouping and rate limit`
+- [x] commit：`feat(server): persistent storage with grouping and rate limit`
 
 ---
 

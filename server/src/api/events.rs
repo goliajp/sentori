@@ -67,7 +67,6 @@ async fn persist_event_row(
             (id, project_id, issue_id, occurred_at, platform, release, environment,
              error_type, error_message, payload)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        ON CONFLICT (id) DO NOTHING
         "#,
     )
     .bind(event.id)
