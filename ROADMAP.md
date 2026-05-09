@@ -794,14 +794,15 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 
 ### Steps
 
-#### sub-A — `@sentori/react-native` Expo Config Plugin + npm publish
+#### sub-A — `@goliapkg/sentori-react-native` npm publish ✅
 
-- [ ] 加 `app.plugin.js` —— Expo Config Plugin，prebuild 时 autolink iOS pod + Android gradle
-- [ ] `expo-module.config.json` 注册 native module
-- [ ] `package.json` 加 `expo` 字段 + 完整 `files` whitelist
-- [ ] `.github/workflows/publish-sdk-rn.yml` —— tag `sdk-rn-v*` 触发 `npm publish`
-- [ ] 本地用 `bunx create-expo-app` 起一个 app 装 SDK 验通
-- [ ] 更新 `docs-site/src/content/docs/sdk-react-native.md` 装法
+实际包名 `@goliapkg/sentori-react-native`（@sentori free org 必须 npmjs.com 网页手动创建；规避到 @goliapkg user-controlled scope；brand 仍是 sentori-react-native）。Expo Config Plugin 路径不需要——现有 `expo-module.config.json` + podspec + android/build.gradle 已让 `expo prebuild` autolink。
+
+- [x] `package.json`：0.0.0 → 0.1.0；license MIT、repo / bugs URL、keywords、publishConfig.access=public
+- [x] `files` whitelist 加 `android/src/`、`android/build.gradle`、`ios/`、`expo-module.config.json`、`SentoriReactNative.podspec`（86 files / 32 kB tarball）
+- [x] `npm publish` —— 0.1.0 上线；`bun add @goliapkg/sentori-react-native` 安装 verified
+- [x] 全仓搜替 `@sentori/react-native` → `@goliapkg/sentori-react-native`：web onboarding wizard 三段 snippet、`docs/{getting-started,sdk-react-native}.md`、`docs-site/src/content/docs/{index,getting-started,sdk-react-native}.{mdx,md}`
+- [ ] tag-driven `publish-sdk-rn.yml` workflow（与 sub-B 的 CLI release pipeline 一起做）
 
 #### sub-B — `@sentori/cli` 跨平台 prebuilt binary + npm 包装
 
