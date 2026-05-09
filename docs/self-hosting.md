@@ -1,0 +1,169 @@
+# Sentori — self-hosting
+
+For running Sentori on your own infra. The reference deploy is the
+docker-compose in this repo.
+
+## Architecture
+
+```
+                            ┌─────────────────┐
+       browser ──HTTPS──▶   │  reverse proxy   │   (your TLS terminator)
+                            │  caddy / nginx   │
+                            └────────┬─────────┘
+                                     │ http
+                            ┌────────▼─────────┐
+                            │   sentori-web    │  nginx + SPA bundle
+                            │   /admin/api ▶───┼──────────┐
+                            └──────────────────┘          │
+                                                          │
+                            ┌──────────────────┐          │
+SDK on phone ──HTTPS──────▶ │  sentori-server  │ ◀────────┘
+                            │  axum + Rust     │
+                            └────┬─────────┬───┘
+                                 │         │
+                  ┌──────────────▼─┐   ┌───▼─────────┐
+                  │  postgres 18   │   │  valkey 8   │
+                  │  (events,      │   │  (rate      │
+                  │   issues,      │   │   limit     │
+                  │   tokens, ...) │   │   counters) │
+                  └────────────────┘   └─────────────┘
+```
+
+Optional: SMTP relay (any provider) for new-issue email.
+
+## Required env
+
+Save to `.env` next to `docker-compose.yml`:
+
+```bash
+SENTORI_DEV_TOKEN=st_pk_$(head /dev/urandom | base32 | tr A-Z a-z | tr -d '=' | head -c 26)
+SENTORI_ADMIN_PASSWORD=$(openssl rand -hex 12)
+SENTORI_SESSION_SECRET=$(openssl rand -hex 32)
+SENTORI_PG_PASSWORD=$(openssl rand -hex 16)
+```
+
+`docker compose up` will refuse to start if any of these are unset.
+
+## Optional env (override.yml)
+
+| Var | Default | Use |
+|---|---|---|
+| `SENTORI_RATE_LIMIT_PER_MIN` | `1000` | per-token request limit |
+| `SENTORI_SMTP_HOST` | unset | enables new-issue email; if unset, no email is sent |
+| `SENTORI_SMTP_PORT` | `587` | STARTTLS |
+| `SENTORI_SMTP_USER` | unset | optional auth |
+| `SENTORI_SMTP_PASS` | unset | optional auth |
+| `SENTORI_SMTP_FROM` | `sentori@localhost` | From: address |
+| `SENTORI_DATA_DIR` | `/data` | source-map blob storage path |
+| `SENTORI_WEB_PORT` | `8000` | host port for the web container |
+| `RUST_LOG` | `info,sentori_server=info,tower_http=info` | |
+
+Copy `docker-compose.override.example.yml` to
+`docker-compose.override.yml` and edit. The override is auto-merged by
+`docker compose`.
+
+## Starting
+
+```bash
+docker compose up -d
+docker compose ps           # postgres should be "healthy"
+docker compose logs -f server
+```
+
+The web UI lives at <http://localhost:8000> by default.
+
+## Adding email recipients
+
+The recipient management UI ships in Phase 13 (multi-tenant). For v0.1,
+insert rows directly:
+
+```bash
+docker compose exec postgres psql -U sentori -d sentori -c "
+  INSERT INTO notification_recipients (id, project_id, email, on_new_issue)
+  VALUES (
+    gen_random_uuid(),
+    '019508a0-0000-7000-8000-000000000000',  -- DEV_PROJECT_ID
+    'oncall@example.com',
+    true
+  );
+"
+```
+
+Verify SMTP wiring by triggering any new fingerprint and watching the
+server logs:
+
+```bash
+docker compose logs -f server | grep -E 'new-issue|notifier'
+```
+
+## Source-map uploads
+
+After a release build:
+
+```bash
+sentori-cli upload sourcemap \
+  --release "myapp@1.2.3+456" \
+  --token "$SENTORI_DEV_TOKEN" \
+  --ingest-url "https://sentori.your-host.com" \
+  ./bundle/index.android.bundle.map
+```
+
+Files are deduped by sha256 and stored under `SENTORI_DATA_DIR/artifacts/`.
+
+## Backups
+
+Postgres is the source of truth. A nightly logical backup is the v0.1
+recommendation:
+
+```bash
+docker compose exec -T postgres pg_dump -U sentori sentori \
+  | gzip > backups/sentori-$(date +%F).sql.gz
+```
+
+Restore:
+
+```bash
+gunzip -c backups/sentori-2026-05-09.sql.gz \
+  | docker compose exec -T postgres psql -U sentori -d sentori
+```
+
+The `server-data` volume holds source-map blobs (re-uploadable from CI),
+so it's nice-to-have but not critical.
+
+## Updating
+
+```bash
+git pull
+docker compose pull        # if using prebuilt ghcr.io images
+docker compose up -d --build
+```
+
+Migrations run on server boot via `sqlx::migrate!`. v0.1 migrations are
+forward-only; for rollback, restore from a pre-update DB backup.
+
+## Behind a reverse proxy
+
+The web container speaks plain HTTP. Front it with Caddy / nginx /
+Cloudflare for TLS:
+
+```caddy
+sentori.example.com {
+    reverse_proxy localhost:8000
+}
+```
+
+The SDK ingest endpoint is the same host: SDKs send to
+`https://sentori.example.com/v1/events`, the web reverse-proxies
+`/admin/api` to the server, and `/v1/*` goes through unchanged because
+the web container only intercepts paths it knows about.
+
+## Production hardening (v0.1 → v0.2 punch list)
+
+- Pin docker images to a specific SHA tag (replace `:latest`)
+- Off-host Postgres with a read replica
+- WAL archiving + PITR
+- Run docker daemon as a non-root user
+- Cloudflare (or equivalent) in front for DDoS / WAF
+- Dedicated SMTP via Postmark / SES instead of shared providers
+
+The full Phase-16 production checklist is in `ROADMAP.md`.
