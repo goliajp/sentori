@@ -145,7 +145,106 @@ pub async fn verify(
         .execute(&pool)
         .await;
 
+    // Phase 13 sub-H: bootstrap a personal org if the user has none yet.
+    // Best-effort — if it fails, the user lands on /onboarding in the
+    // dashboard and can create one manually via the same orgs API.
+    if let Err(e) = bootstrap_personal_org(&pool, user_id).await {
+        tracing::warn!(error = %e, %user_id, "bootstrap personal org failed; user will hit /onboarding");
+    }
+
     ok_response()
+}
+
+async fn bootstrap_personal_org(pool: &PgPool, user_id: Uuid) -> Result<(), sqlx::Error> {
+    let already: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM memberships WHERE user_id = $1)",
+    )
+    .bind(user_id)
+    .fetch_one(pool)
+    .await?;
+    if already {
+        return Ok(());
+    }
+
+    let email: Option<String> =
+        sqlx::query_scalar("SELECT email FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_optional(pool)
+            .await?;
+    let email = match email {
+        Some(e) => e,
+        None => return Ok(()),
+    };
+
+    let candidate = email_to_slug_candidate(&email);
+    let slug = unique_slug(pool, &candidate).await?;
+    let name = email.split('@').next().unwrap_or(&slug).to_string();
+    let org_id = Uuid::now_v7();
+
+    let mut tx = pool.begin().await?;
+    sqlx::query("INSERT INTO orgs (id, slug, name, owner_id) VALUES ($1, $2, $3, $4)")
+        .bind(org_id)
+        .bind(&slug)
+        .bind(&name)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(
+        "INSERT INTO memberships (org_id, user_id, role) VALUES ($1, $2, 'owner')",
+    )
+    .bind(org_id)
+    .bind(user_id)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    tracing::info!(%user_id, %slug, "personal org bootstrapped");
+    Ok(())
+}
+
+/// Derive a slug candidate from the email's local part. Replaces non
+/// alphanumeric chars with '-', trims, lowercases, caps at 28 chars.
+/// Falls back to a uuid-derived stub if the result is empty, too short,
+/// or all digits.
+fn email_to_slug_candidate(email: &str) -> String {
+    let local = email.split('@').next().unwrap_or("user");
+    let cleaned: String = local
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let trimmed: String = cleaned
+        .trim_matches('-')
+        .chars()
+        .take(28)
+        .collect::<String>()
+        .replace("--", "-");
+    if trimmed.len() < 3 || trimmed.chars().all(|c| c.is_ascii_digit()) {
+        format!("user-{}", &Uuid::now_v7().to_string()[..6])
+    } else {
+        trimmed
+    }
+}
+
+async fn unique_slug(pool: &PgPool, candidate: &str) -> Result<String, sqlx::Error> {
+    let mut slug = candidate.to_string();
+    for n in 2..=100 {
+        let exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM orgs WHERE slug = $1)",
+        )
+        .bind(&slug)
+        .fetch_one(pool)
+        .await?;
+        if !exists {
+            return Ok(slug);
+        }
+        slug = format!("{candidate}-{n}");
+    }
+    Ok(format!("user-{}", &Uuid::now_v7().to_string()[..8]))
 }
 
 #[derive(Deserialize)]

@@ -615,7 +615,7 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [x] `/org/:slug/projects/{id}/settings/recipients`（`RecipientSettingsView`）：增删 `notification_recipients` + on_new_issue / on_regression toggles —— 回填 Phase 9 deferred
 - [x] server: 新 `api/recipients.rs` 4 端点（list / create / patch / delete），挂在 `/admin/api/projects/{id}/recipients`，自动经过 `require_admin` + `require_project_in_org`
 - [x] 所有 issue/project 路由前缀加 `/org/:slug` —— `/org/:slug/issues[/...]`；`OrgLayout` 提供顶栏 + `OrgCtx`；`/` 由 `RootRedirect` 跳第一个 org 或 `/onboarding`；废弃 `DEV_PROJECT_ID` 写死，`useOrg().currentProject` 给 `IssuesView` / `IssueDetailView` 用
-- [ ] onboarding：注册成功 → 自动建 personal org（slug = email 前缀）
+- [x] onboarding：verify 成功后 server 自动 bootstrap personal org（slug ← email 前缀 sanitized + 冲突自动 `-2/-3/...` 后缀，事务原子写入 orgs + memberships）；dashboard `/onboarding` 改造为 fallback 手动建 org form（只在 server 自动建失败或用户失去所有 org 时命中）
 
 #### 测试
 
