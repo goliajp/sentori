@@ -10,6 +10,12 @@ use validator::ValidationErrors;
 pub enum AppError {
     #[error("validation failed")]
     Validation(ValidationErrors),
+    #[error("internal: {0}")]
+    Internal(String),
+    #[error("not found")]
+    NotFound,
+    #[error("database unavailable")]
+    DatabaseUnavailable,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -41,6 +47,33 @@ impl IntoResponse for AppError {
                 )
                     .into_response()
             }
+            AppError::Internal(msg) => {
+                tracing::error!(error = %msg, "internal error");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorBody {
+                        error: "internal",
+                        details: vec![],
+                    }),
+                )
+                    .into_response()
+            }
+            AppError::NotFound => (
+                StatusCode::NOT_FOUND,
+                Json(ErrorBody {
+                    error: "notFound",
+                    details: vec![],
+                }),
+            )
+                .into_response(),
+            AppError::DatabaseUnavailable => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(ErrorBody {
+                    error: "databaseUnavailable",
+                    details: vec![],
+                }),
+            )
+                .into_response(),
         }
     }
 }

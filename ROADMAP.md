@@ -281,8 +281,8 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] 写 `server/src/grouping.rs`：fingerprint = `sha256(error.type + first_in_app_frame.fn + first_in_app_frame.file)` 取前 16 字节 hex
 - [x] 写 `server/src/issues.rs`：`upsert_issue(project_id, fingerprint, ...) -> issue_id`（用 ON CONFLICT 更新 last_seen + event_count）
 - [x] 改写 ingestion handler：解析 → 计 fingerprint → upsert issue → 写 events 行
-- [ ] 加 `GET /v1/projects/:id/issues?status=active` 端点
-- [ ] 加 `GET /v1/projects/:id/issues/:issue_id/events` 端点
+- [x] 加 `GET /v1/projects/:id/issues?status=active` 端点
+- [x] 加 `GET /v1/projects/:id/issues/:issue_id/events` 端点
 - [ ] 写 Valkey rate limit middleware：sliding window，1000 req/min/token，超限返回 429 + `retry_after_ms`
 - [x] 写 seed 脚本 `server/scripts/seed.rs`：创建 dev project + dev token
 - [ ] 改 token 鉴权：从硬编码改为查 `tokens` 表（带 Valkey cache，TTL 60s）

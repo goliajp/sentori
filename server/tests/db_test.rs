@@ -60,7 +60,7 @@ fn make_event(idx: u32) -> serde_json::Value {
 }
 
 #[tokio::test]
-async fn five_duplicates_create_one_issue_and_five_events() {
+async fn duplicates_group_into_one_issue_visible_via_admin() {
     let Some((addr, pool)) = setup().await else {
         eprintln!("skip: DATABASE_URL not set");
         return;
@@ -126,4 +126,66 @@ async fn five_duplicates_create_one_issue_and_five_events() {
         issue_id_on_event, issue_id,
         "events.issue_id should match issues.id"
     );
+
+    // -- admin endpoints --
+
+    // GET /v1/projects/:id/issues
+    let resp = client
+        .get(format!(
+            "http://{addr}/v1/projects/{}/issues",
+            seed::DEV_PROJECT_ID
+        ))
+        .header("Authorization", format!("Bearer {TOKEN}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let issues: serde_json::Value = resp.json().await.unwrap();
+    let issues_arr = issues.as_array().expect("issues array");
+    assert_eq!(issues_arr.len(), 1, "expected 1 issue from admin list");
+    let returned_issue_id = issues_arr[0]["id"].as_str().expect("issue id");
+    assert_eq!(returned_issue_id, issue_id.to_string());
+    assert_eq!(issues_arr[0]["eventCount"].as_i64().unwrap(), 5);
+
+    // GET /v1/projects/:id/issues/:issue_id
+    let resp = client
+        .get(format!(
+            "http://{addr}/v1/projects/{}/issues/{}",
+            seed::DEV_PROJECT_ID, issue_id
+        ))
+        .header("Authorization", format!("Bearer {TOKEN}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let issue_detail: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(issue_detail["eventCount"].as_i64().unwrap(), 5);
+    assert_eq!(issue_detail["status"].as_str().unwrap(), "active");
+
+    // GET /v1/projects/:id/issues/:issue_id/events
+    let resp = client
+        .get(format!(
+            "http://{addr}/v1/projects/{}/issues/{}/events",
+            seed::DEV_PROJECT_ID, issue_id
+        ))
+        .header("Authorization", format!("Bearer {TOKEN}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let events: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(events.as_array().unwrap().len(), 5);
+
+    // 404 on unknown issue id
+    let bogus_id = uuid::Uuid::now_v7();
+    let resp = client
+        .get(format!(
+            "http://{addr}/v1/projects/{}/issues/{}",
+            seed::DEV_PROJECT_ID, bogus_id
+        ))
+        .header("Authorization", format!("Bearer {TOKEN}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 404);
 }
