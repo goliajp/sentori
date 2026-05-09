@@ -804,12 +804,13 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [x] 全仓搜替 `@sentori/react-native` → `@goliapkg/sentori-react-native`：web onboarding wizard 三段 snippet、`docs/{getting-started,sdk-react-native}.md`、`docs-site/src/content/docs/{index,getting-started,sdk-react-native}.{mdx,md}`
 - [ ] tag-driven `publish-sdk-rn.yml` workflow（与 sub-B 的 CLI release pipeline 一起做）
 
-#### sub-B — `@sentori/cli` 跨平台 prebuilt binary + npm 包装
+#### sub-B — `@goliapkg/sentori-cli` 跨平台 prebuilt binary + npm 包装 ✅
 
-- [ ] `.github/workflows/release-cli.yml`：tag `cli-v*` 触发 `cargo build --release` 矩阵 (linux-x64 / linux-arm64 / darwin-arm64 / darwin-x64)，artifacts 传到 GitHub Release
-- [ ] `cli/npm/` 目录：`@sentori/cli` npm 包 thin wrapper，`postinstall` 下载本平台 binary
-- [ ] `npx @sentori/cli upload sourcemap ...` 验通
-- [ ] 文档更新
+- [x] `.github/workflows/release-cli.yml`：tag `cli-v*` 触发 `cargo build --release` 矩阵 (linux-x64 / linux-arm64 / darwin-arm64)，`.tar.gz` + `.sha256` 传到 GitHub Release。darwin-x64 这次跳过（GH-hosted Intel mac runners 排队 stuck）；cargo install 是 fallback
+- [x] `cli/npm/`：thin Node wrapper，bin 走 spawn 子进程，postinstall 按 `process.platform-arch` 下载 release 资产到 `vendor/`，`SENTORI_SKIP_DOWNLOAD=1` 逃生
+- [x] `npm install -D @goliapkg/sentori-cli` → 二进制下载、`./node_modules/.bin/sentori-cli --help` 正常输出 Rust CLI help
+- [x] `docs/sdk-react-native.md` + `docs-site/.../sdk-react-native.md` sourcemap upload snippet 改成 `npx @goliapkg/sentori-cli upload sourcemap ...`
+- [x] README 单独说明 bun 用户需 `bun pm trust @goliapkg/sentori-cli`
 
 #### sub-C — Dashboard onboarding wizard SDK 选择
 

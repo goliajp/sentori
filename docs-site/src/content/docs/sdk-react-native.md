@@ -137,7 +137,7 @@ Build a production bundle, then upload its `.map` so the server can
 symbolicate frames at view time:
 
 ```bash
-sentori-cli upload sourcemap \
+npx @goliapkg/sentori-cli upload sourcemap \
   --release "myapp@1.2.3+456" \
   --token "st_pk_..." \
   --ingest-url "https://sentori.your-host.com" \
