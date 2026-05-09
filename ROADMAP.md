@@ -553,11 +553,11 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [ ] OG image：用 satori 生成或手画一张
 
 #### 文档站
-- [ ] `cd sentori && bunx create-astro@latest docs-site --template starlight`
-- [ ] 把 `docs/getting-started.md`、`sdk-react-native.md`、`protocol.md`、`self-hosting.md` 迁入 `docs-site/src/content/docs/`
-- [ ] 配置侧栏导航：Quickstart / SDK / Protocol / Self-Hosting / FAQ
-- [ ] 配置内置全文搜索（Pagefind）
-- [ ] 暗色为默认
+- [x] `cd sentori && bunx create-astro@latest docs-site --template starlight`（手搓——避开 create-astro 的交互 prompt）
+- [x] 把 `docs/getting-started.md`、`sdk-react-native.md`、`protocol.md`、`self-hosting.md` 迁入 `docs-site/src/content/docs/`
+- [x] 配置侧栏导航：Guides（Getting started / Self-hosting）+ Reference（SDK / Protocol）
+- [x] 配置内置全文搜索（Pagefind）—— Starlight 默认开启，build 输出 `dist/pagefind/`，索引 1230 词
+- [x] 暗色为默认（`overrides.css` 复用 `web/` 的 palette）
 
 #### 部署
 - [ ] Cloudflare Pages 项目 1：`marketing/` → `sentori.golia.jp`

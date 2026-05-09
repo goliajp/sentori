@@ -1,0 +1,42 @@
+---
+title: Sentori
+description: Modern, RN-first error tracking. Self-hostable.
+template: splash
+hero:
+  title: Sentori
+  tagline: |
+    Modern error tracking for React Native. Single Rust binary, dense
+    Linear-style dashboard, self-hostable on a VM.
+  actions:
+    - text: Get started
+      link: /getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: Star on GitHub
+      link: https://github.com/goliajp/sentori
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components'
+
+<CardGrid>
+  <Card title="Get started" icon="rocket">
+    Five-minute quickstart from `git clone` to your first captured event.
+    [Read →](/getting-started/)
+  </Card>
+  <Card title="SDK reference" icon="seti:javascript">
+    `@sentori/react-native` — JS, iOS, Android. Capture API, ErrorBoundary,
+    native crash setup, source-map upload.
+    [Read →](/sdk-react-native/)
+  </Card>
+  <Card title="Protocol" icon="document">
+    The Sentori wire format — single JSON event, camelCase, nested cause
+    chains, intentionally without legacy.
+    [Read →](/protocol/)
+  </Card>
+  <Card title="Self-hosting" icon="setting">
+    Production deploy with docker compose, SMTP, source maps, backups,
+    reverse proxy.
+    [Read →](/self-hosting/)
+  </Card>
+</CardGrid>
