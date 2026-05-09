@@ -30,15 +30,18 @@ pub async fn handle(
     if let (IngestCaller::Token { org_id, .. }, Some(pool), Some(valkey)) =
         (&caller, &state.db, &state.valkey)
     {
-        match quotas::check_and_record(
-            pool,
-            valkey.clone(),
-            *org_id,
-            time::OffsetDateTime::now_utc(),
-        )
-        .await
-        {
-            Ok(QuotaDecision::Allowed { .. }) => {}
+        let now = time::OffsetDateTime::now_utc();
+        match quotas::check_and_record(pool, valkey.clone(), *org_id, now).await {
+            Ok(QuotaDecision::Allowed { current, limit }) => {
+                if let Some(tx) = &state.notifier_tx {
+                    if let Err(e) =
+                        quotas::maybe_warn(valkey.clone(), tx, *org_id, current, limit, now)
+                            .await
+                    {
+                        tracing::warn!(error = %e, "quota warning enqueue failed");
+                    }
+                }
+            }
             Ok(QuotaDecision::Exceeded { current, limit, reset_at }) => {
                 tracing::warn!(%org_id, current, limit, "quota exceeded — dropping event");
                 return Ok(quota_exceeded_response(reset_at));

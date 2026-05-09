@@ -34,6 +34,13 @@ pub enum NotifyEvent {
         inviter_email: String,
         link: String,
     },
+    QuotaWarning {
+        org_id: Uuid,
+        threshold: u8,
+        current: u64,
+        limit: i32,
+        reset_at: time::OffsetDateTime,
+    },
 }
 
 /// Spawn the notifier loop. Returns a sender producers can use to enqueue
@@ -165,6 +172,77 @@ async fn handle(
                 tracing::warn!(error = %e, %email, %org_name, "send invite email failed");
             } else {
                 tracing::info!(%email, %org_name, "invite email sent");
+            }
+            Ok(())
+        }
+        NotifyEvent::QuotaWarning {
+            org_id,
+            threshold,
+            current,
+            limit,
+            reset_at,
+        } => {
+            let recipients: Vec<(String, String)> = sqlx::query_as(
+                "SELECT u.email, o.name FROM users u \
+                 JOIN memberships m ON m.user_id = u.id \
+                 JOIN orgs o ON o.id = m.org_id \
+                 WHERE m.org_id = $1 AND m.role IN ('owner', 'admin')",
+            )
+            .bind(org_id)
+            .fetch_all(pool)
+            .await
+            .context("fetch quota recipients")?;
+
+            if recipients.is_empty() {
+                return Ok(());
+            }
+
+            let transport = build_transport(cfg)?;
+            let from: Mailbox = cfg.from.parse().context("parse from address")?;
+            let org_name = recipients
+                .first()
+                .map(|(_, n)| n.clone())
+                .unwrap_or_default();
+
+            let (subject, summary) = if *threshold >= 100 {
+                (
+                    format!("[Sentori] Monthly event quota reached — {org_name}"),
+                    format!(
+                        "Your Sentori org \"{org_name}\" has reached its monthly event \
+                         quota ({current} / {limit}). New events are being dropped \
+                         until the quota resets at {reset_at}."
+                    ),
+                )
+            } else {
+                (
+                    format!("[Sentori] {threshold}% of monthly event quota used — {org_name}"),
+                    format!(
+                        "Your Sentori org \"{org_name}\" is at {threshold}% of its \
+                         monthly event quota ({current} / {limit}). The counter \
+                         resets at {reset_at}."
+                    ),
+                )
+            };
+
+            for (email, _) in recipients {
+                let to: Mailbox = match email.parse() {
+                    Ok(addr) => addr,
+                    Err(e) => {
+                        tracing::warn!(error = %e, %email, "skip invalid recipient");
+                        continue;
+                    }
+                };
+                let msg = Message::builder()
+                    .from(from.clone())
+                    .to(to)
+                    .subject(subject.clone())
+                    .body(format!("{summary}\n\n— Sentori"))
+                    .context("build quota message")?;
+                if let Err(e) = transport.send(msg).await {
+                    tracing::warn!(error = %e, %email, %org_id, threshold, "send quota email failed");
+                } else {
+                    tracing::info!(%email, %org_id, threshold, "quota email sent");
+                }
             }
             Ok(())
         }

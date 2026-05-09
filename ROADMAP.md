@@ -685,7 +685,7 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
   - [x] server `GET /api/orgs/{slug}/usage` —— Valkey 优先（实时） + PG `usage_counters` fallback；返回 `{plan, eventLimitMonthly, retentionDays, periodYyyymm, eventCount, droppedCount, percentUsed, resetAt}`
   - [x] org settings 页 `UsageSection`：events used / limit + 进度条（≥80% amber，≥100% red） + dropped count
   - [x] 用量 ≥ 80% 全局 `UsageBanner`（OrgLayout 顶栏下方常驻）：amber 提示 percent，红色 "quota reached" + dropped 计数；refetchInterval 60s
-- [ ] 邮件：用量 ≥ 80% / ≥ 100% 各发一封
+- [x] 邮件：用量 ≥ 80% / ≥ 100% 各发一封 —— `quotas::maybe_warn` 检测 cross-threshold（prev<t && current>=t），用 Valkey `SET notified:<t>:<org>:<period> 1 NX EX 32d` 去重；`NotifyEvent::QuotaWarning` variant + notifier 查 owner/admin 的邮箱发模板邮件（80% warn / 100% reached）；e2e: limit=2 → event 2 单次跨 80+100 两个阈值，log 双行 + Valkey 两 flag
 - [x] 默认 plan = `free`，新 org 自动 100k 限额（`server/src/quotas.rs::ensure_default_quota`，挂在 `orgs::create_org` 与 `user_auth::bootstrap_personal_org` 的事务里，ON CONFLICT DO NOTHING）
 - [ ] **决策**：free tier 数据 30 天保留；pro / enterprise 留到付费上线
 - [ ] commit：`feat(saas): free tier quota enforcement and usage metering`

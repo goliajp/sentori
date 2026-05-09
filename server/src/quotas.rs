@@ -7,7 +7,10 @@
 use redis::AsyncCommands;
 use sqlx::{Executor, PgPool, Postgres};
 use time::{Duration, OffsetDateTime};
+use tokio::sync::mpsc::Sender;
 use uuid::Uuid;
+
+use crate::notifier::NotifyEvent;
 
 pub const FREE_EVENT_LIMIT_MONTHLY: i32 = 100_000;
 pub const FREE_RETENTION_DAYS: i32 = 30;
@@ -111,6 +114,65 @@ pub async fn check_and_record(
         let _: () = conn.expire(&usage_key, COUNTER_TTL.whole_seconds()).await?;
     }
     Ok(QuotaDecision::Allowed { current: new_count, limit })
+}
+
+/// Phase 15 sub-E: detect 80%/100% threshold crossings on the *new*
+/// usage value and enqueue at most one email per threshold per period.
+/// Dedupe is enforced via Valkey `SET ... NX EX` flag so multiple server
+/// instances or restarts can't double-send.
+pub async fn maybe_warn(
+    valkey: redis::aio::ConnectionManager,
+    notifier_tx: &Sender<NotifyEvent>,
+    org_id: Uuid,
+    current: u64,
+    limit: i32,
+    now: OffsetDateTime,
+) -> Result<(), anyhow::Error> {
+    if limit <= 0 {
+        return Ok(());
+    }
+    let limit_f = limit as f64;
+    let percent = (current as f64 / limit_f) * 100.0;
+    // The increment that brought us here was 1, so prev = current-1.
+    let prev_percent = if current == 0 {
+        0.0
+    } else {
+        (current.saturating_sub(1) as f64 / limit_f) * 100.0
+    };
+    let period = period_key(now);
+    let mut conn = valkey;
+
+    for &threshold in &[80u8, 100u8] {
+        let t = threshold as f64;
+        if !(prev_percent < t && percent >= t) {
+            continue;
+        }
+        let key = format!("notified:{threshold}:{org_id}:{period}");
+        let set_ok: Option<String> = redis::cmd("SET")
+            .arg(&key)
+            .arg(1)
+            .arg("NX")
+            .arg("EX")
+            .arg(COUNTER_TTL.whole_seconds())
+            .query_async(&mut conn)
+            .await
+            .ok()
+            .flatten();
+        if set_ok.is_none() {
+            // Either the dedupe key already existed or Valkey hiccupped;
+            // either way, don't risk a duplicate email.
+            continue;
+        }
+        let _ = notifier_tx.try_send(NotifyEvent::QuotaWarning {
+            org_id,
+            threshold,
+            current,
+            limit,
+            reset_at: next_period_start(now),
+        });
+        tracing::info!(%org_id, threshold, current, limit, "quota threshold crossed");
+    }
+    Ok(())
 }
 
 /// Spawn the periodic Valkey → PG rollup. Reads the live counters once
