@@ -1,17 +1,19 @@
 import { type FormEvent, useState } from 'react'
-import { Link, Navigate } from 'react-router'
+import { Link, Navigate, useSearchParams } from 'react-router'
 
 import { useAuth } from '@/auth/state'
 
 export function LoginView() {
   const { isAuthed, login } = useAuth()
+  const [params] = useSearchParams()
+  const next = sanitizeNext(params.get('next'))
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<null | string>(null)
   const [submitting, setSubmitting] = useState(false)
 
   if (isAuthed === true) {
-    return <Navigate replace to="/issues" />
+    return <Navigate replace to={next ?? '/'} />
   }
 
   const onSubmit = async (e: FormEvent) => {
@@ -77,7 +79,10 @@ export function LoginView() {
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
         <div className="text-fg-muted flex justify-between text-xs">
-          <Link className="hover:text-fg" to="/register">
+          <Link
+            className="hover:text-fg"
+            to={next ? `/register?next=${encodeURIComponent(next)}` : '/register'}
+          >
             Create account
           </Link>
           <Link className="hover:text-fg" to="/forgot-password">
@@ -87,4 +92,15 @@ export function LoginView() {
       </form>
     </div>
   )
+}
+
+/**
+ * Only allow same-origin paths. Drops anything that smells like an open
+ * redirect (absolute URL, protocol-relative, double-slash, etc.).
+ */
+function sanitizeNext(raw: null | string): null | string {
+  if (!raw) return null
+  if (!raw.startsWith('/')) return null
+  if (raw.startsWith('//')) return null
+  return raw
 }

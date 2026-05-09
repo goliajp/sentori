@@ -9,6 +9,7 @@ import { AuthProvider } from './auth/AuthProvider'
 import { ProtectedLayout } from './auth/ProtectedLayout'
 import { applyTheme } from './components/theme'
 import { ForgotPasswordView } from './views/forgot-password'
+import { InviteAcceptView } from './views/invite-accept'
 import { IssueDetailView } from './views/issue-detail'
 import { IssuesView } from './views/issues'
 import { LoginView } from './views/login'
@@ -32,6 +33,7 @@ const router = createBrowserRouter([
     children: [
       { element: <RootRedirect />, index: true },
       { element: <OnboardingView />, path: 'onboarding' },
+      { element: <InviteAcceptView />, path: 'invite/:token' },
       {
         children: [
           { element: <Navigate replace to="issues" />, index: true },

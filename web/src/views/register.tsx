@@ -1,9 +1,13 @@
 import { type FormEvent, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 
 import { userAuthApi } from '@/api/client'
 
 export function RegisterView() {
+  const [params] = useSearchParams()
+  const nextRaw = params.get('next')
+  const next = nextRaw && nextRaw.startsWith('/') && !nextRaw.startsWith('//') ? nextRaw : null
+  const loginHref = next ? `/login?next=${encodeURIComponent(next)}` : '/login'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<null | string>(null)
@@ -39,7 +43,7 @@ export function RegisterView() {
             We sent a verification link to <span className="text-fg font-mono">{email}</span>. Open
             it within 24 hours to activate your account, then sign in.
           </p>
-          <Link className="text-accent text-sm hover:underline" to="/login">
+          <Link className="text-accent text-sm hover:underline" to={loginHref}>
             Back to sign in
           </Link>
         </div>
@@ -89,7 +93,7 @@ export function RegisterView() {
         </button>
         <p className="text-fg-muted text-center text-xs">
           Already have one?{' '}
-          <Link className="hover:text-fg" to="/login">
+          <Link className="hover:text-fg" to={loginHref}>
             Sign in
           </Link>
         </p>

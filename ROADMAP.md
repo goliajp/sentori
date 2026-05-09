@@ -651,10 +651,11 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
   - [x] `GET /admin/api/projects/{id}/tokens` —— 列出 metadata（不含 raw）
   - [x] `DELETE /admin/api/projects/{id}/tokens/{tid}` —— 撤销（set revoked_at）；revoked token → /v1/events 401
   - [x] dashboard `/org/:slug/projects/:id/settings/tokens` (`TokenSettingsView`)：generate form (label + kind public/admin) + 一次性 reveal box（copy / dismiss）+ tokens table（label / kind / last4 / created / status / Revoke）；recipient/token settings 互相 cross-link
-- [ ] 邀请协作者流程：
-  - [ ] org settings 页"Invite member" → 输入 email + 角色 → 发邀请邮件
-  - [ ] 邀请链接 `/invite/:token` → 已登录直接加入；未注册引导注册
-- [ ] 改 marketing 的 "Get Started" 按钮 → 直链 `https://app.sentori.golia.jp/register`
+- [x] 邀请协作者流程：
+  - [x] org settings 页"Invite member"（Phase 13 sub-G 已就位）+ server `notifier::OrgInvite` 邮件含 `{base_url}/invite/{token}` 链
+  - [x] 邀请链接 `/invite/:token`（`InviteAcceptView`）：未登录 → `Navigate /login?next=/invite/{token}`；已登录 → 自动 `acceptInvite` + StrictMode-safe ref 防双调用 + navigate `/org/{slug}/issues`；错误码（mismatch/expired/used/notFound）映射到友好文案
+  - [x] login/register 互相 carry `?next=` 参数；`sanitizeNext` 拒绝跨域/双斜线开放重定向
+- [x] 改 marketing 的 "Get Started" 按钮 → 直链 `https://app.sentori.golia.jp/register`（同时保留 docs/github 次级 CTA）
 - [ ] e2e：注册 → 创建 project → 用 SDK 上报 → 看到事件，全流程
 - [ ] commit：`feat(saas): self-serve onboarding from registration to first event`
 
