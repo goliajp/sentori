@@ -46,6 +46,7 @@ pub struct AppState {
     pub admin_password: String,
     pub session_secret: String,
     pub notifier_tx: Option<tokio::sync::mpsc::Sender<crate::notifier::NotifyEvent>>,
+    pub base_url: String,
 }
 
 impl FromRef<AppState> for AuthState {

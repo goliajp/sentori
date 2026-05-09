@@ -21,6 +21,7 @@ pub struct ServerConfig {
     pub admin_password: String,
     pub session_secret: String,
     pub notifier_tx: Option<tokio::sync::mpsc::Sender<crate::notifier::NotifyEvent>>,
+    pub base_url: String,
 }
 
 pub fn build(cfg: ServerConfig) -> Router {
@@ -36,6 +37,7 @@ pub fn build(cfg: ServerConfig) -> Router {
         admin_password: cfg.admin_password,
         session_secret: cfg.session_secret,
         notifier_tx: cfg.notifier_tx,
+        base_url: cfg.base_url,
     };
 
     let ingestion = Router::new()
@@ -81,9 +83,25 @@ pub fn build(cfg: ServerConfig) -> Router {
 
     let admin = Router::new().merge(admin_protected).merge(admin_public);
 
+    // Phase 13 sub-B: user auth (separate from admin_password-based admin auth).
+    // register/login are rate-limited per-IP; verify/logout/me are open.
+    let user_auth_limited = Router::new()
+        .route("/register", post(api::user_auth::register))
+        .route("/login", post(api::user_auth::login))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::rate_limit::rate_limit_auth_middleware,
+        ));
+    let user_auth_open = Router::new()
+        .route("/verify", get(api::user_auth::verify))
+        .route("/logout", post(api::user_auth::logout))
+        .route("/me", get(api::user_auth::me));
+    let user_auth = Router::new().merge(user_auth_limited).merge(user_auth_open);
+
     Router::new()
         .merge(ingestion)
         .nest("/admin/api", admin)
+        .nest("/api/auth", user_auth)
         .layer(RequestBodyLimitLayer::new(MAX_BODY_BYTES))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())

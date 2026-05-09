@@ -85,6 +85,9 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!(%addr, "sentori-server listening");
 
+    let base_url = std::env::var("SENTORI_BASE_URL")
+        .unwrap_or_else(|_| "http://localhost:8080".to_string());
+
     let app = router::build(router::ServerConfig {
         dev_token: token,
         db: pool,
@@ -94,6 +97,7 @@ async fn main() -> anyhow::Result<()> {
         admin_password,
         session_secret,
         notifier_tx,
+        base_url,
     });
     axum::serve(listener, app).await?;
 

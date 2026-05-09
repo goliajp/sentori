@@ -4,3 +4,4 @@ pub mod events;
 pub mod events_batch;
 pub mod recent;
 pub mod releases;
+pub mod user_auth;

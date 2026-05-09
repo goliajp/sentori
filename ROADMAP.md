@@ -591,19 +591,19 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 
 #### Server
 
-- [ ] 加依赖：`argon2`（密码哈希）、`rand`
-- [ ] `server/src/auth/` 模块：
-  - [ ] `POST /api/auth/register`（email + password，发邮件验证）
-  - [ ] `GET /api/auth/verify?token=...`
-  - [ ] `POST /api/auth/login` → 设 httpOnly secure SameSite=Lax cookie session
-  - [ ] `POST /api/auth/logout`
-  - [ ] `GET /api/auth/me`
+- [x] 加依赖：`argon2 = "0.5"`（密码哈希）、`rand = "0.8"`（token 生成）
+- [x] `server/src/passwd.rs` + `server/src/api/user_auth.rs`：
+  - [x] `POST /api/auth/register`（email + password，dup → 仍 200 防 enumeration，发邮件验证 link via notifier）
+  - [x] `GET /api/auth/verify?token=...`（24h TTL）
+  - [x] `POST /api/auth/login` → DB session row + httpOnly + SameSite=Lax cookie（base_url https 时自动带 secure）
+  - [x] `POST /api/auth/logout`（DELETE sessions row + 清 cookie）
+  - [x] `GET /api/auth/me`（JOIN sessions/users，校验 expires_at）
 - [ ] `server/src/orgs.rs`：
   - [ ] org CRUD（create / get / list-mine / update / delete）
   - [ ] membership CRUD
   - [ ] 邀请流程（生成 invite token + 邮件发送 + 接受）
-- [ ] middleware：所有 admin API 校验 session + scope 到 user 所属 org
-- [ ] rate limit：注册 / 登录端点（防爆破，Valkey 计数）
+- [ ] middleware：所有 admin API 校验 session + scope 到 user 所属 org（sub-D；`current_user(pool, session_id)` helper 已就绪在 `user_auth.rs`）
+- [x] rate limit：注册 / 登录端点 per-IP（`rate_limit_auth_middleware`，30/min，Valkey INCR + 60s expire，X-Forwarded-For 解析，无 Valkey fail-open）
 - [ ] `GET /admin/api/projects`：列出当前 user 所属 org 下的 projects（**回填 Phase 6 line 308 deferred**）
 
 #### Dashboard

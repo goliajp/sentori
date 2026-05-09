@@ -55,6 +55,54 @@ fn extract_token_hash(req: &Request) -> Option<String> {
     Some(crate::auth::hash_token(token))
 }
 
+const AUTH_LIMIT_PER_MIN: u32 = 30;
+
+/// Per-IP rate limit for unauthenticated auth endpoints (register / login).
+/// Uses X-Forwarded-For when present (production behind a reverse proxy);
+/// otherwise buckets all callers under "unknown" — sufficient for dev.
+pub async fn rate_limit_auth_middleware(
+    State(state): State<AppState>,
+    req: Request,
+    next: Next,
+) -> Response {
+    let valkey = match &state.valkey {
+        Some(v) => v.clone(),
+        None => return next.run(req).await,
+    };
+
+    let ip = extract_ip(&req);
+    let key = format!("auth:{ip}");
+
+    match check_rate_limit(valkey, &key, AUTH_LIMIT_PER_MIN).await {
+        Ok(RateLimitResult::Ok) => next.run(req).await,
+        Ok(RateLimitResult::Limited { retry_after_ms }) => (
+            StatusCode::TOO_MANY_REQUESTS,
+            [(
+                header::RETRY_AFTER,
+                ((retry_after_ms / 1000) + 1).to_string(),
+            )],
+            Json(json!({
+                "error": "rateLimited",
+                "retryAfterMs": retry_after_ms,
+            })),
+        )
+            .into_response(),
+        Err(e) => {
+            tracing::error!(error = %e, "auth rate limit failed; failing open");
+            next.run(req).await
+        }
+    }
+}
+
+fn extract_ip(req: &Request) -> String {
+    req.headers()
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
 enum RateLimitResult {
     Ok,
     Limited { retry_after_ms: u64 },
@@ -62,11 +110,11 @@ enum RateLimitResult {
 
 async fn check_rate_limit(
     mut conn: ConnectionManager,
-    token_hash: &str,
+    key_prefix: &str,
     limit: u32,
 ) -> Result<RateLimitResult, redis::RedisError> {
     let bucket = current_minute_bucket();
-    let key = format!("rl:{token_hash}:{bucket}");
+    let key = format!("rl:{key_prefix}:{bucket}");
 
     let count: u32 = conn.incr(&key, 1u32).await?;
     if count == 1 {

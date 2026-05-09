@@ -24,6 +24,10 @@ pub enum NotifyEvent {
         error_type: String,
         message: String,
     },
+    EmailVerification {
+        email: String,
+        link: String,
+    },
 }
 
 /// Spawn the notifier loop. Returns a sender producers can use to enqueue
@@ -103,6 +107,29 @@ async fn handle(
                 } else {
                     tracing::info!(%email, %issue_id, "new-issue email sent");
                 }
+            }
+            Ok(())
+        }
+        NotifyEvent::EmailVerification { email, link } => {
+            let transport = build_transport(cfg)?;
+            let from: Mailbox = cfg.from.parse().context("parse from address")?;
+            let to: Mailbox = email.parse().context("parse to address")?;
+            let msg = Message::builder()
+                .from(from)
+                .to(to)
+                .subject("[Sentori] Verify your email")
+                .body(format!(
+                    "Welcome to Sentori.\n\n\
+                     Click to verify your email address:\n{link}\n\n\
+                     This link expires in 24 hours.\n\n\
+                     — Sentori"
+                ))
+                .context("build verify message")?;
+
+            if let Err(e) = transport.send(msg).await {
+                tracing::warn!(error = %e, %email, "send verification email failed");
+            } else {
+                tracing::info!(%email, "verification email sent");
             }
             Ok(())
         }

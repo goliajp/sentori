@@ -6,6 +6,7 @@ pub mod event;
 pub mod grouping;
 pub mod issues;
 pub mod notifier;
+pub mod passwd;
 pub mod rate_limit;
 pub mod recent;
 pub mod router;
