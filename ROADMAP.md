@@ -518,8 +518,8 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
   }
   ```
 
-- [x] `caddy reload`，等 Caddy 自动跑完 ACME（每个 subdomain 各一张 cert）
-- [x] 验证：`curl -vI https://app.sentori.golia.jp` 等 5 条 TLS 握手成功（503 body 也算成功）
+- [ ] `caddy reload`，等 Caddy 自动跑完 ACME（每个 subdomain 各一张 cert）
+- [ ] 验证：`curl -vI https://app.sentori.golia.jp` 等 5 条 TLS 握手成功（503 body 也算成功）
 - [ ] `sentori.golia.jp` 的 cert 由 Cloudflare Universal SSL 自动管理，无需 origin 配置；验证 `curl -vI https://sentori.golia.jp` 返回 CF 默认页或 503
 
 #### 收尾
@@ -539,16 +539,16 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 ### Steps
 
 #### Marketing 站
-- [ ] **决策**：Astro（SSG，SEO 好，bundle 小）
-- [ ] `cd sentori && bunx create-astro@latest marketing --template minimal`
-- [ ] 装 Tailwind v4：复用 `web/` 的 design tokens（共享 CSS vars）
-- [ ] 写 `marketing/src/pages/index.astro`：
-  - [ ] Hero：产品定位句 + Get Started CTA + GitHub 链接
-  - [ ] Features 网格 4 项：JS+Native 错误捕获 / 协议简洁 / 部署轻 / 现代 dashboard
-  - [ ] "Open Source & Self-Hostable" 区块
-  - [ ] "Why we built Sentori" 区块（一段对比 Sentry 的思考）
-- [ ] 写 `marketing/src/pages/pricing.astro`：v0.1 阶段—Self-hosted 永久免费 + SaaS Free Tier 100k events/月（"Beta：邀请制"）
-- [ ] 设计语言：暗色优先、dense、参照 Linear / Vercel；不堆 emoji 不用 illustration
+- [x] **决策**：Astro（SSG，SEO 好，bundle 小）
+- [x] `cd sentori && bunx create-astro@latest marketing --template minimal`
+- [x] 装 Tailwind v4：复用 `web/` 的 design tokens（共享 CSS vars）
+- [x] 写 `marketing/src/pages/index.astro`：
+  - [x] Hero：产品定位句 + Get Started CTA + GitHub 链接
+  - [x] Features 网格 4 项：JS+Native 错误捕获 / 协议简洁 / 部署轻 / 现代 dashboard
+  - [x] "Open Source & Self-Hostable" 区块
+  - [x] "Why we built Sentori" 区块（一段对比 Sentry 的思考）
+- [x] 写 `marketing/src/pages/pricing.astro`：v0.1 阶段—Self-hosted 永久免费 + SaaS Free Tier 100k events/月（"Beta：邀请制"）
+- [x] 设计语言：暗色优先、dense、参照 Linear / Vercel；不堆 emoji 不用 illustration
 - [ ] SEO：meta 标签、sitemap、robots.txt
 - [ ] OG image：用 satori 生成或手画一张
 
