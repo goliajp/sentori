@@ -4,5 +4,6 @@ pub mod events;
 pub mod events_batch;
 pub mod orgs;
 pub mod recent;
+pub mod recipients;
 pub mod releases;
 pub mod user_auth;

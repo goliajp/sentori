@@ -211,15 +211,113 @@ export type OrgRow = {
   slug: string
 }
 
-/** Phase 13 sub-C/F: orgs / memberships / invites (cookie session). */
+export type MemberRow = {
+  createdAt: string
+  email: string
+  role: OrgRole
+  userId: string
+}
+
+export type InviteRow = {
+  createdAt: string
+  email: string
+  expiresAt: string
+  role: OrgRole
+  token: string
+  usedAt: null | string
+}
+
+/** Phase 13 sub-C/F/G: orgs / memberships / invites (cookie session). */
 export const orgsApi = {
+  acceptInvite: (token: string) =>
+    orgsFetch<{ ok: true; orgSlug: string }>(`/invites/${encodeURIComponent(token)}/accept`, {
+      method: 'POST',
+    }),
+
   create: (slug: string, name: string) =>
     orgsFetch<{ id: string; name: string; role: OrgRole; slug: string }>('/orgs', {
       body: JSON.stringify({ name, slug }),
       method: 'POST',
     }),
 
+  createInvite: (slug: string, email: string, role: OrgRole) =>
+    orgsFetch<{ token: string }>(`/orgs/${slug}/invites`, {
+      body: JSON.stringify({ email, role }),
+      method: 'POST',
+    }),
+
+  deleteInvite: (slug: string, token: string) =>
+    orgsFetch<{ ok: true }>(`/orgs/${slug}/invites/${encodeURIComponent(token)}`, {
+      method: 'DELETE',
+    }),
+
+  deleteMember: (slug: string, userId: string) =>
+    orgsFetch<{ ok: true }>(`/orgs/${slug}/members/${userId}`, { method: 'DELETE' }),
+
   detail: (slug: string) => orgsFetch<OrgRow>(`/orgs/${slug}`),
 
+  listInvites: (slug: string) => orgsFetch<InviteRow[]>(`/orgs/${slug}/invites`),
+
+  listMembers: (slug: string) => orgsFetch<MemberRow[]>(`/orgs/${slug}/members`),
+
   listMine: () => orgsFetch<OrgRow[]>('/orgs'),
+
+  patchMember: (slug: string, userId: string, role: OrgRole) =>
+    orgsFetch<{ ok: true }>(`/orgs/${slug}/members/${userId}`, {
+      body: JSON.stringify({ role }),
+      method: 'PATCH',
+    }),
+
+  patchOrg: (slug: string, body: { name?: string }) =>
+    orgsFetch<{ ok: true }>(`/orgs/${slug}`, {
+      body: JSON.stringify(body),
+      method: 'PATCH',
+    }),
+}
+
+export type RecipientRow = {
+  createdAt: string
+  email: string
+  id: string
+  onNewIssue: boolean
+  onRegression: boolean
+}
+
+/** Phase 13 sub-G (回填 Phase 9): notification_recipients CRUD. */
+export const recipientsApi = {
+  create: (
+    projectId: string,
+    body: { email: string; onNewIssue?: boolean; onRegression?: boolean }
+  ) =>
+    adminFetch<{ email: string; id: string; onNewIssue: boolean; onRegression: boolean }>(
+      `/projects/${projectId}/recipients`,
+      {
+        body: JSON.stringify({
+          email: body.email,
+          onNewIssue: body.onNewIssue ?? true,
+          onRegression: body.onRegression ?? false,
+        }),
+        method: 'POST',
+      }
+    ),
+
+  delete: (projectId: string, recipientId: string) =>
+    adminFetch<{ ok: true }>(`/projects/${projectId}/recipients/${recipientId}`, {
+      method: 'DELETE',
+    }),
+
+  list: (projectId: string) => adminFetch<RecipientRow[]>(`/projects/${projectId}/recipients`),
+
+  patch: (
+    projectId: string,
+    recipientId: string,
+    body: { onNewIssue?: boolean; onRegression?: boolean }
+  ) =>
+    adminFetch<{ ok: true }>(`/projects/${projectId}/recipients/${recipientId}`, {
+      body: JSON.stringify({
+        onNewIssue: body.onNewIssue,
+        onRegression: body.onRegression,
+      }),
+      method: 'PATCH',
+    }),
 }

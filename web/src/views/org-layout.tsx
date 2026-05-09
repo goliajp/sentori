@@ -8,7 +8,10 @@ import { OrgSwitcher } from '@/components/OrgSwitcher'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useThemeEffect } from '@/components/theme'
 
-const NAV = [{ label: 'Issues', path: 'issues' }]
+const NAV = [
+  { label: 'Issues', path: 'issues' },
+  { label: 'Settings', path: 'settings' },
+]
 
 export function OrgLayout() {
   useThemeEffect()

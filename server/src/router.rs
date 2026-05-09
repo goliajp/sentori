@@ -69,6 +69,15 @@ pub fn build(cfg: ServerConfig) -> Router {
             get(api::admin::releases_for_issue),
         )
         .route(
+            "/projects/{project_id}/recipients",
+            get(api::recipients::list_recipients).post(api::recipients::create_recipient),
+        )
+        .route(
+            "/projects/{project_id}/recipients/{recipient_id}",
+            axum::routing::patch(api::recipients::patch_recipient)
+                .delete(api::recipients::delete_recipient),
+        )
+        .route(
             "/releases/{release_name}/sourcemaps",
             post(api::releases::upload_sourcemaps),
         )

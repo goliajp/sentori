@@ -14,6 +14,8 @@ import { IssuesView } from './views/issues'
 import { LoginView } from './views/login'
 import { OnboardingView } from './views/onboarding'
 import { OrgLayout } from './views/org-layout'
+import { OrgSettingsView } from './views/org-settings'
+import { RecipientSettingsView } from './views/recipient-settings'
 import { RegisterView } from './views/register'
 import { RootRedirect } from './views/root-redirect'
 import { VerifyView } from './views/verify'
@@ -34,6 +36,11 @@ const router = createBrowserRouter([
           { element: <Navigate replace to="issues" />, index: true },
           { element: <IssuesView />, path: 'issues' },
           { element: <IssueDetailView />, path: 'issues/:issueId' },
+          { element: <OrgSettingsView />, path: 'settings' },
+          {
+            element: <RecipientSettingsView />,
+            path: 'projects/:projectId/settings/recipients',
+          },
         ],
         element: <OrgLayout />,
         path: 'org/:slug',
