@@ -127,6 +127,12 @@ pub async fn require_admin(
 /// user, ensures the project belongs to one of the user's orgs.
 /// `LegacyAdmin` and `DevToken` callers are super-users and pass through.
 /// Must be mounted *after* `require_admin` so the caller extension is set.
+///
+/// Phase 18 sub-B: when the project has team bindings (rows in
+/// `project_teams`), an org member must additionally be in one of those
+/// teams. Org owner/admin always bypass the team check. Projects with
+/// no team bindings keep the original "any org member" semantics so
+/// pre-existing data stays accessible.
 pub async fn require_project_in_org(
     State(state): State<AppState>,
     req: Request,
@@ -160,10 +166,53 @@ pub async fn require_project_in_org(
         None => return next.run(req).await,
     };
 
-    let belongs: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM projects p \
+    // First check: user is in the project's org at all. role tells us whether
+    // the team filter even matters.
+    let role: Option<String> = sqlx::query_scalar(
+        "SELECT m.role FROM projects p \
          JOIN memberships m ON m.org_id = p.org_id \
-         WHERE p.id = $1 AND m.user_id = $2)",
+         WHERE p.id = $1 AND m.user_id = $2",
+    )
+    .bind(project_id)
+    .bind(user_id)
+    .fetch_optional(&pool)
+    .await
+    .ok()
+    .flatten();
+
+    let role = match role {
+        Some(r) => r,
+        None => {
+            return (
+                StatusCode::FORBIDDEN,
+                Json(json!({ "error": "projectNotInOrg" })),
+            )
+                .into_response();
+        }
+    };
+
+    // org owner/admin always pass.
+    if matches!(role.as_str(), "owner" | "admin") {
+        return next.run(req).await;
+    }
+
+    // Plain members hit the team gate when the project has team bindings.
+    let team_bound: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM project_teams WHERE project_id = $1)",
+    )
+    .bind(project_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap_or(false);
+
+    if !team_bound {
+        return next.run(req).await;
+    }
+
+    let in_team: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM project_teams pt \
+         JOIN team_memberships tm ON tm.team_id = pt.team_id \
+         WHERE pt.project_id = $1 AND tm.user_id = $2)",
     )
     .bind(project_id)
     .bind(user_id)
@@ -171,12 +220,12 @@ pub async fn require_project_in_org(
     .await
     .unwrap_or(false);
 
-    if belongs {
+    if in_team {
         next.run(req).await
     } else {
         (
             StatusCode::FORBIDDEN,
-            Json(json!({ "error": "projectNotInOrg" })),
+            Json(json!({ "error": "projectNotInTeam" })),
         )
             .into_response()
     }

@@ -7,5 +7,6 @@ pub mod projects;
 pub mod recent;
 pub mod recipients;
 pub mod releases;
+pub mod teams;
 pub mod tokens;
 pub mod user_auth;

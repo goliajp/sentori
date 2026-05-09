@@ -63,6 +63,15 @@ pub fn build(cfg: ServerConfig) -> Router {
             post(api::projects::create_project),
         )
         .route(
+            "/projects/{project_id}/teams",
+            get(api::teams::list_project_teams),
+        )
+        .route(
+            "/projects/{project_id}/teams/{team_slug}",
+            post(api::teams::assign_project_to_team)
+                .delete(api::teams::unassign_project_from_team),
+        )
+        .route(
             "/projects/{project_id}/tokens",
             get(api::tokens::list_tokens).post(api::tokens::create_token),
         )
@@ -148,6 +157,29 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route(
             "/orgs/{slug}/members/{user_id}",
             axum::routing::patch(api::orgs::patch_member).delete(api::orgs::delete_member),
+        )
+        .route(
+            "/orgs/{slug}/teams",
+            get(api::teams::list_teams).post(api::teams::create_team),
+        )
+        .route(
+            "/orgs/{slug}/teams/{team_slug}",
+            get(api::teams::get_team)
+                .patch(api::teams::patch_team)
+                .delete(api::teams::delete_team),
+        )
+        .route(
+            "/orgs/{slug}/teams/{team_slug}/members",
+            get(api::teams::list_team_members).post(api::teams::add_team_member),
+        )
+        .route(
+            "/orgs/{slug}/teams/{team_slug}/members/{user_id}",
+            axum::routing::patch(api::teams::patch_team_member)
+                .delete(api::teams::remove_team_member),
+        )
+        .route(
+            "/orgs/{slug}/teams/{team_slug}/projects",
+            get(api::teams::list_team_projects),
         )
         .route(
             "/orgs/{slug}/invites",
