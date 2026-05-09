@@ -926,15 +926,15 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 
 ### Steps
 
-#### sub-A — schema + migration
+#### sub-A — schema + migration ✅
 
-- [ ] 新表 `teams`(id uuid v7, org_id, slug, name, description, created_at)；UNIQUE(org_id, slug)
-- [ ] 新表 `team_memberships`(team_id, user_id, role: lead|member|viewer, created_at)；PK(team_id, user_id)
-- [ ] 新表 `project_teams`(project_id, team_id)；PK(project_id, team_id)；级联 ON DELETE CASCADE
-- [ ] 新表 `audit_logs`(id uuid v7, org_id, actor_user_id, action text, target_type text, target_id uuid, payload jsonb, created_at)；INDEX(org_id, created_at DESC)
-- [ ] 新表 `org_ownership_transfers`(id uuid v7, org_id, from_user_id, to_user_id, token text UNIQUE, expires_at, accepted_at NULL)
-- [ ] migration `server/migrations/00XX_phase18_orgs.sql`，BEGIN/COMMIT 包好；含外键 + 索引
-- [ ] `cargo sqlx prepare`；提交 `.sqlx/`
+- [x] 新表 `teams`(id uuid v7, org_id, slug, name, description, created_at)；UNIQUE(org_id, slug)
+- [x] 新表 `team_memberships`(team_id, user_id, role: lead|member, created_at)；PK(team_id, user_id)（viewer 由 Phase 19 sub-A 加，一并和 org 级 viewer/billing_admin 落地）
+- [x] 新表 `project_teams`(project_id, team_id)；PK(project_id, team_id)；级联 ON DELETE CASCADE
+- [x] 新表 `audit_logs`(id uuid v7, org_id, actor_user_id, action text, target_type text, target_id uuid, payload jsonb, created_at)；INDEX(org_id, created_at DESC) + actor + target
+- [x] 新表 `org_ownership_transfers`(id uuid v7, org_id, from_user_id, to_user_id, token text UNIQUE, expires_at, accepted_at NULL)
+- [x] migration `server/migrations/0010_phase18_orgs.sql`，含外键 + 索引；本地 sentori-pg 应用通过；commit `5ec39d0`
+- [ ] `cargo sqlx prepare`；提交 `.sqlx/`（推迟到 sub-B 写完 query 一并跑）
 
 #### sub-B — server: Team CRUD + ACL middleware
 
