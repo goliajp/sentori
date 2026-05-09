@@ -14,6 +14,7 @@ import {
 export function IssueDetailView() {
   const { issueId } = useParams<{ issueId: string }>()
   const navigate = useNavigate()
+  const [symbolicated, setSymbolicated] = useState(true)
 
   const issueQuery = useQuery({
     enabled: !!issueId,
@@ -23,8 +24,12 @@ export function IssueDetailView() {
 
   const eventsQuery = useQuery({
     enabled: !!issueId,
-    queryFn: () => adminApi.listEvents(DEV_PROJECT_ID, issueId!, { limit: 100 }),
-    queryKey: ['events', DEV_PROJECT_ID, issueId],
+    queryFn: () =>
+      adminApi.listEvents(DEV_PROJECT_ID, issueId!, {
+        limit: 100,
+        symbolicated,
+      }),
+    queryKey: ['events', DEV_PROJECT_ID, issueId, symbolicated],
   })
 
   const events = eventsQuery.data ?? []
@@ -91,7 +96,22 @@ export function IssueDetailView() {
 
         {selectedEvent && payload && (
           <div className="space-y-6 px-6 py-4">
-            <Section title="Stack">
+            <Section
+              title="Stack"
+              right={
+                <button
+                  className={`rounded-md px-2 py-0.5 text-[11px] tracking-wider uppercase transition-colors ${
+                    symbolicated
+                      ? 'bg-accent/10 text-accent'
+                      : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+                  }`}
+                  onClick={() => setSymbolicated((s) => !s)}
+                  type="button"
+                >
+                  {symbolicated ? 'symbolicated' : 'raw'}
+                </button>
+              }
+            >
               <StackList stack={payload.error.stack} />
               {payload.error.cause && <CauseChain error={payload.error.cause} />}
             </Section>
@@ -134,10 +154,21 @@ export function IssueDetailView() {
   )
 }
 
-function Section({ children, title }: { children: ReactNode; title: string }) {
+function Section({
+  children,
+  right,
+  title,
+}: {
+  children: ReactNode
+  right?: ReactNode
+  title: string
+}) {
   return (
     <div>
-      <h3 className="text-fg-muted mb-2 text-[11px] tracking-wider uppercase">{title}</h3>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-fg-muted text-[11px] tracking-wider uppercase">{title}</h3>
+        {right}
+      </div>
       {children}
     </div>
   )

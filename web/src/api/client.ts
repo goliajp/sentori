@@ -121,9 +121,14 @@ export const adminApi = {
       method: 'PATCH',
     }),
 
-  listEvents: (projectId: string, issueId: string, params: { limit?: number } = {}) => {
+  listEvents: (
+    projectId: string,
+    issueId: string,
+    params: { limit?: number; symbolicated?: boolean } = {}
+  ) => {
     const usp = new URLSearchParams()
     if (params.limit !== undefined) usp.set('limit', String(params.limit))
+    if (params.symbolicated !== undefined) usp.set('symbolicated', String(params.symbolicated))
     const qs = usp.toString() ? `?${usp.toString()}` : ''
     return adminFetch<EventRow[]>(`/projects/${projectId}/issues/${issueId}/events${qs}`)
   },

@@ -14,7 +14,7 @@
 - [x] **Phase 5** — PG 落库 + 最小 grouping
 - [x] **Phase 6** — Web dashboard MVP
 - [x] **Phase 7** — RN SDK Native 层（iOS NSException + Android uncaught）
-- [ ] **Phase 8** — Sourcemap 上传 + 服务端符号化
+- [x] **Phase 8** — Sourcemap 上传 + 服务端符号化
 - [ ] **Phase 9** — Release / Env / 邮件告警
 - [ ] **Phase 10** — Docker compose + 文档 + **self-hosted v0.1.0** 🎯
 - [ ] **Phase 11** — 域名 / DNS / TLS 准备（sentori.golia.jp 拓扑落地）
@@ -380,19 +380,19 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 
 ### Steps
 
-- [ ] `cd sentori && cargo new cli --bin --name sentori-cli`
-- [ ] 加依赖：`reqwest`、`clap`、`serde`、`walkdir`
-- [ ] 写 `cli/src/main.rs`：`sentori-cli upload sourcemap --release <r> --token <t> <files...>`
-- [ ] server migration `0002_releases.sql`：`release_artifacts` (id, release_id FK, kind, name, content_hash, blob_path, created_at)
-- [ ] server 端点：`POST /admin/api/releases/:r/sourcemaps`（multipart upload，落盘到 `data/artifacts/<hash>`）
-- [ ] server `src/symbolicate.rs`：
-  - [ ] 用 `sourcemap` crate 加载 .js.map
-  - [ ] 函数 `symbolicate_frame(frame, release_id) -> Frame`
-  - [ ] in-memory LRU cache（key=release_id+file，cap 50 条）
-- [ ] 改 `GET /admin/api/issues/:id/events`：返回时 lazy symbolicate 每个 frame
-- [ ] dashboard event 详情页加 toggle "raw / symbolicated"（默认 symbolicated）
+- [x] `cd sentori && cargo new cli --bin --name sentori-cli`
+- [x] 加依赖：`reqwest`、`clap`、`serde`、`walkdir`
+- [x] 写 `cli/src/main.rs`：`sentori-cli upload sourcemap --release <r> --token <t> <files...>`
+- [x] server migration `0002_releases.sql`：`release_artifacts` (id, release_id FK, kind, name, content_hash, blob_path, created_at)
+- [x] server 端点：`POST /admin/api/releases/:r/sourcemaps`（multipart upload，落盘到 `data/artifacts/<hash>`）
+- [x] server `src/symbolicate.rs`：
+  - [x] 用 `sourcemap` crate 加载 .js.map
+  - [x] 函数 `symbolicate_frame(frame, release_id) -> Frame`
+  - [x] in-memory LRU cache（key=release_id+file，cap 50 条）
+- [x] 改 `GET /admin/api/issues/:id/events`：返回时 lazy symbolicate 每个 frame
+- [x] dashboard event 详情页加 toggle "raw / symbolicated"（默认 symbolicated）
 - [ ] e2e：build minified bundle → cli 上传 sourcemap → 触发错误 → 验证 dashboard 显示原始位置
-- [ ] commit：`feat: sourcemap upload and server-side symbolication`
+- [x] commit：`feat: sourcemap upload and server-side symbolication`
 
 ---
 

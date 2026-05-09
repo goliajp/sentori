@@ -10,4 +10,5 @@ pub mod recent;
 pub mod router;
 pub mod seed;
 pub mod session;
+pub mod symbolicate;
 pub mod valkey;

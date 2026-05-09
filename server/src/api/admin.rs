@@ -112,6 +112,9 @@ pub struct EventRow {
 pub struct ListEventsQuery {
     #[serde(default)]
     pub limit: Option<i64>,
+    /// Default true. `?symbolicated=false` returns raw frames.
+    #[serde(default)]
+    pub symbolicated: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -171,8 +174,9 @@ pub async fn list_events_for_issue(
 ) -> Result<Json<Vec<EventRow>>, AppError> {
     let pool = state.db.as_ref().ok_or(AppError::DatabaseUnavailable)?;
     let limit = q.limit.unwrap_or(50).clamp(1, 200);
+    let symbolicated = q.symbolicated.unwrap_or(true);
 
-    let rows: Vec<EventRow> = sqlx::query_as(
+    let mut rows: Vec<EventRow> = sqlx::query_as(
         r#"
         SELECT id, occurred_at, received_at, platform, release, environment,
                error_type, error_message, payload
@@ -188,6 +192,18 @@ pub async fn list_events_for_issue(
     .fetch_all(pool)
     .await
     .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    if symbolicated {
+        for row in rows.iter_mut() {
+            // Best-effort: leave raw frames in place on any failure.
+            let _ = crate::symbolicate::symbolicate_payload(
+                pool,
+                &row.release,
+                &mut row.payload,
+            )
+            .await;
+        }
+    }
 
     Ok(Json(rows))
 }

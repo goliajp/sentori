@@ -59,6 +59,10 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/issues/{issue_id}/events",
             get(api::admin::list_events_for_issue),
         )
+        .route(
+            "/releases/{release_name}/sourcemaps",
+            post(api::releases::upload_sourcemaps),
+        )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             api::admin_auth::require_admin,

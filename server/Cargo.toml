@@ -14,7 +14,7 @@ name = "sentori-server"
 path = "src/main.rs"
 
 [dependencies]
-axum = "0.8"
+axum = { version = "0.8", features = ["multipart"] }
 tokio = { version = "1", features = ["full"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace", "limit"] }
@@ -33,6 +33,7 @@ hex = "0.4"
 redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
 axum-extra = { version = "0.10", features = ["cookie"] }
 hmac = "0.12"
+sourcemap = "9"
 
 [dev-dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["json"] }
