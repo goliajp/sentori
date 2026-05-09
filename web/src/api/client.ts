@@ -1,12 +1,13 @@
-const API_BASE = '/admin/api'
+const ADMIN_BASE = '/admin/api'
+const AUTH_BASE = '/api/auth'
 
 export type AdminApiError = {
   body: unknown
   status: number
 }
 
-async function adminFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const url = `${API_BASE}${path}`
+async function apiFetch<T>(base: string, path: string, init?: RequestInit): Promise<T> {
+  const url = `${base}${path}`
   const headers = new Headers(init?.headers)
   if (init?.body !== undefined && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
@@ -31,6 +32,9 @@ async function adminFetch<T>(path: string, init?: RequestInit): Promise<T> {
   }
   return (await resp.json()) as T
 }
+
+const adminFetch = <T>(path: string, init?: RequestInit) => apiFetch<T>(ADMIN_BASE, path, init)
+const authFetch = <T>(path: string, init?: RequestInit) => apiFetch<T>(AUTH_BASE, path, init)
 
 export type IssueRow = {
   errorType: string
@@ -151,21 +155,43 @@ export const adminApi = {
     return adminFetch<IssueRow[]>(`/projects/${projectId}/issues${qs}`)
   },
 
+  listProjects: () => adminFetch<ProjectRow[]>('/projects'),
+
   listReleasesForIssue: (projectId: string, issueId: string) =>
     adminFetch<string[]>(`/projects/${projectId}/issues/${issueId}/releases`),
+}
 
-  login: (password: string) =>
-    adminFetch<{ ok: true }>('/login', {
-      body: JSON.stringify({ password }),
+export type ProjectRow = {
+  createdAt: string
+  id: string
+  name: string
+  orgId: string
+  orgSlug: string
+}
+
+export type AuthUser = { email: string; id: string }
+
+/** Phase 13 sub-B/E: user-based auth (DB session cookie). */
+export const userAuthApi = {
+  forgotPassword: () => Promise.reject<never>({ body: { error: 'notImplemented' }, status: 501 }),
+
+  login: (email: string, password: string) =>
+    authFetch<{ ok: true; user: AuthUser }>('/login', {
+      body: JSON.stringify({ email, password }),
       method: 'POST',
     }),
 
-  logout: () =>
-    adminFetch<{ ok: true }>('/logout', {
+  logout: () => authFetch<{ ok: true }>('/logout', { method: 'POST' }),
+
+  me: () => authFetch<{ user: AuthUser }>('/me'),
+
+  register: (email: string, password: string) =>
+    authFetch<{ ok: true }>('/register', {
+      body: JSON.stringify({ email, password }),
       method: 'POST',
     }),
 
-  me: () => adminFetch<{ ok: true }>('/me'),
+  verify: (token: string) => authFetch<{ ok: true }>(`/verify?token=${encodeURIComponent(token)}`),
 }
 
 /** Stable dev project id, mirrors `seed::DEV_PROJECT_ID` on the server. */

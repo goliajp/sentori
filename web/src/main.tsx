@@ -8,17 +8,20 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 import { AuthProvider } from './auth/AuthProvider'
 import { ProtectedLayout } from './auth/ProtectedLayout'
 import { applyTheme } from './components/theme'
+import { ForgotPasswordView } from './views/forgot-password'
 import { IssueDetailView } from './views/issue-detail'
 import { IssuesView } from './views/issues'
 import { LoginView } from './views/login'
+import { RegisterView } from './views/register'
+import { VerifyView } from './views/verify'
 
 applyTheme()
 
 const router = createBrowserRouter([
-  {
-    element: <LoginView />,
-    path: '/login',
-  },
+  { element: <LoginView />, path: '/login' },
+  { element: <RegisterView />, path: '/register' },
+  { element: <VerifyView />, path: '/verify' },
+  { element: <ForgotPasswordView />, path: '/forgot-password' },
   {
     children: [
       { element: <Navigate replace to="/issues" />, index: true },

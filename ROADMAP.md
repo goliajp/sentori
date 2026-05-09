@@ -609,7 +609,7 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 
 #### Dashboard
 
-- [ ] 路由：`/login` / `/register` / `/verify` / `/forgot-password`（先 stub 后两者）
+- [x] 路由：`/login`（替换原 admin_password 登录为 email+password）、`/register`、`/verify?token=`、`/forgot-password`（stub）—— `userAuthApi`（`/api/auth/*`）+ `adminApi`（`/admin/api/*`）拆分；AuthProvider 升级带 `user: {id, email}`
 - [ ] 顶栏 org switcher
 - [ ] `/org/:slug/settings`：成员列表 + 邀请按钮
 - [ ] `/org/:slug/projects/:id/settings/recipients`：增删 `notification_recipients` 行（**回填 Phase 9 line 417 deferred**）

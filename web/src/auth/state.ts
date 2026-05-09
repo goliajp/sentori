@@ -1,9 +1,12 @@
 import { createContext, useContext } from 'react'
 
+import type { AuthUser } from '@/api/client'
+
 export type AuthContextValue = {
   isAuthed: boolean | null
-  login: (password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  user: AuthUser | null
 }
 
 export const AuthCtx = createContext<AuthContextValue | null>(null)

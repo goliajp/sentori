@@ -1,32 +1,41 @@
 import { type ReactNode, useEffect, useState } from 'react'
 
-import { adminApi } from '@/api/client'
+import { type AuthUser, userAuthApi } from '@/api/client'
 
 import { AuthCtx } from './state'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null)
 
   useEffect(() => {
-    adminApi
+    userAuthApi
       .me()
-      .then(() => setIsAuthed(true))
-      .catch(() => setIsAuthed(false))
+      .then((r) => {
+        setUser(r.user)
+        setIsAuthed(true)
+      })
+      .catch(() => {
+        setUser(null)
+        setIsAuthed(false)
+      })
   }, [])
 
-  const login = async (password: string) => {
-    await adminApi.login(password)
+  const login = async (email: string, password: string) => {
+    const r = await userAuthApi.login(email, password)
+    setUser(r.user)
     setIsAuthed(true)
   }
 
   const logout = async () => {
     try {
-      await adminApi.logout()
+      await userAuthApi.logout()
     } catch {
       // ignore — clear locally regardless
     }
+    setUser(null)
     setIsAuthed(false)
   }
 
-  return <AuthCtx.Provider value={{ isAuthed, login, logout }}>{children}</AuthCtx.Provider>
+  return <AuthCtx.Provider value={{ isAuthed, login, logout, user }}>{children}</AuthCtx.Provider>
 }

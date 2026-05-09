@@ -1,40 +1,50 @@
 import { type FormEvent, useState } from 'react'
-import { Link, Navigate } from 'react-router'
+import { Link } from 'react-router'
 
-import { useAuth } from '@/auth/state'
+import { userAuthApi } from '@/api/client'
 
-export function LoginView() {
-  const { isAuthed, login } = useAuth()
+export function RegisterView() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<null | string>(null)
   const [submitting, setSubmitting] = useState(false)
-
-  if (isAuthed === true) {
-    return <Navigate replace to="/issues" />
-  }
+  const [done, setDone] = useState(false)
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
     setSubmitting(true)
     try {
-      await login(email, password)
+      await userAuthApi.register(email, password)
+      setDone(true)
     } catch (err) {
-      const status = (err as { status?: number })?.status
       const body = (err as { body?: { error?: string } })?.body
-      if (status === 401) {
-        setError('Wrong email or password')
-      } else if (status === 403 && body?.error === 'emailNotVerified') {
-        setError('Please verify your email — check your inbox for the link.')
-      } else if (status === 429) {
+      const code = body?.error
+      if (code === 'invalidEmail') setError('Email looks invalid.')
+      else if (code === 'passwordTooShort') setError('Password must be at least 8 characters.')
+      else if ((err as { status?: number })?.status === 429)
         setError('Too many attempts — slow down a moment.')
-      } else {
-        setError('Login failed')
-      }
+      else setError('Registration failed.')
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (done) {
+    return (
+      <div className="bg-bg flex h-full items-center justify-center">
+        <div className="border-border bg-bg w-96 space-y-3 rounded-lg border p-6">
+          <h1 className="text-fg text-lg font-semibold">Check your inbox</h1>
+          <p className="text-fg-muted text-sm leading-relaxed">
+            We sent a verification link to <span className="text-fg font-mono">{email}</span>. Open
+            it within 24 hours to activate your account, then sign in.
+          </p>
+          <Link className="text-accent text-sm hover:underline" to="/login">
+            Back to sign in
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -44,8 +54,8 @@ export function LoginView() {
         onSubmit={onSubmit}
       >
         <div>
-          <h1 className="text-fg text-lg font-semibold">Sentori</h1>
-          <p className="text-fg-muted mt-1 text-sm">Sign in to your dashboard.</p>
+          <h1 className="text-fg text-lg font-semibold">Create account</h1>
+          <p className="text-fg-muted mt-1 text-sm">Free, self-hosted or hosted.</p>
         </div>
         <input
           autoComplete="email"
@@ -59,11 +69,12 @@ export function LoginView() {
           value={email}
         />
         <input
-          autoComplete="current-password"
+          autoComplete="new-password"
           className="border-border bg-bg-tertiary text-fg focus:ring-accent w-full rounded-md border px-3 py-2 text-sm focus:ring-1 focus:outline-none"
+          minLength={8}
           name="password"
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
+          placeholder="Password (min 8 chars)"
           required
           type="password"
           value={password}
@@ -71,19 +82,17 @@ export function LoginView() {
         {error && <p className="text-sm text-red-400">{error}</p>}
         <button
           className="bg-accent text-bg w-full rounded-md px-3 py-2 text-sm font-medium disabled:opacity-50"
-          disabled={submitting || !email || !password}
+          disabled={submitting || !email || password.length < 8}
           type="submit"
         >
-          {submitting ? 'Signing in…' : 'Sign in'}
+          {submitting ? 'Creating…' : 'Create account'}
         </button>
-        <div className="text-fg-muted flex justify-between text-xs">
-          <Link className="hover:text-fg" to="/register">
-            Create account
+        <p className="text-fg-muted text-center text-xs">
+          Already have one?{' '}
+          <Link className="hover:text-fg" to="/login">
+            Sign in
           </Link>
-          <Link className="hover:text-fg" to="/forgot-password">
-            Forgot password?
-          </Link>
-        </div>
+        </p>
       </form>
     </div>
   )
