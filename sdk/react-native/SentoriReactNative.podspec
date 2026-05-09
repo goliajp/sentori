@@ -18,4 +18,7 @@ Pod::Spec.new do |s|
   s.dependency 'ExpoModulesCore'
 
   s.source_files = 'ios/**/*.{h,m,mm,swift,hpp,cpp}'
+  # XCTest only links into test targets; including ios/Tests/** in the
+  # main pod target makes app builds fail with `no such module 'XCTest'`.
+  s.exclude_files = 'ios/Tests/**'
 end
