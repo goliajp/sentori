@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
 use anyhow::Context;
-use sentori_server::{db, notifier, quotas, retention, router, seed, valkey};
+use sentori_server::{db, metrics, notifier, quotas, retention, router, seed, valkey};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -104,6 +104,9 @@ async fn main() -> anyhow::Result<()> {
     let base_url = std::env::var("SENTORI_BASE_URL")
         .unwrap_or_else(|_| "http://localhost:8080".to_string());
 
+    let metrics_handle = metrics::install();
+    tracing::info!("prometheus metrics installed; /metrics is live");
+
     let app = router::build(router::ServerConfig {
         dev_token: token,
         db: pool,
@@ -114,6 +117,7 @@ async fn main() -> anyhow::Result<()> {
         session_secret,
         notifier_tx,
         base_url,
+        metrics: Some(metrics_handle),
     });
     axum::serve(listener, app).await?;
 

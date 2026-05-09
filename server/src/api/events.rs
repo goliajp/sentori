@@ -11,6 +11,7 @@ use validator::Validate;
 use crate::auth::IngestCaller;
 use crate::error::AppError;
 use crate::event::Event;
+use crate::metrics as m;
 use crate::quotas::{self, QuotaDecision};
 use crate::recent::AppState;
 
@@ -19,7 +20,11 @@ pub async fn handle(
     Extension(caller): Extension<IngestCaller>,
     Json(event): Json<Event>,
 ) -> Result<Response, AppError> {
-    event.validate().map_err(AppError::Validation)?;
+    let started = std::time::Instant::now();
+    event.validate().map_err(|e| {
+        m::ingest_rejected();
+        AppError::Validation(e)
+    })?;
 
     let project_id = caller_project_id(&caller, &state);
 
@@ -44,6 +49,8 @@ pub async fn handle(
             }
             Ok(QuotaDecision::Exceeded { current, limit, reset_at }) => {
                 tracing::warn!(%org_id, current, limit, "quota exceeded — dropping event");
+                m::ingest_quota_exceeded();
+                m::quota_drop();
                 return Ok(quota_exceeded_response(reset_at));
             }
             Err(e) => {
@@ -73,6 +80,9 @@ pub async fn handle(
     }
 
     state.recent.push(event);
+
+    m::ingest_accepted();
+    m::ingest_duration(started.elapsed().as_secs_f64());
 
     Ok(StatusCode::ACCEPTED.into_response())
 }

@@ -715,17 +715,18 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 
 #### 监控 / 告警
 
-- [ ] **选型**：外部 Better Stack（uptime + status 页 + on-call）+ 内部 Grafana/Prometheus（metrics 详查）
-- [ ] server `/metrics` 暴露 prometheus exporter（用 `metrics-exporter-prometheus`）
-- [ ] 关键指标：ingestion p50/p99 latency、ingestion error rate、PG pool usage、Valkey latency、disk free %
-- [ ] Grafana dashboard：起 1 个 ops 总览
-- [ ] 告警规则：
-  - [ ] ingestion error rate > 1% / 5min
-  - [ ] disk free < 20%
-  - [ ] PG pool > 80%
-  - [ ] Valkey > 10ms p99
-- [ ] Better Stack 监测 7 个 subdomain 的 200 OK + TLS 有效期
-- [ ] `status.sentori.golia.jp` 用 Better Stack status 页
+- [x] **选型**：外部 Better Stack（uptime + status 页 + on-call）+ 内部 Grafana/Prometheus（metrics 详查）
+- [x] server `/metrics` 暴露 prometheus exporter（`metrics 0.24` + `metrics-exporter-prometheus 0.16`）—— `server/src/metrics.rs` 用 `OnceLock<Counter/Histogram>` 模块级 cache（macro 直接重复调用在 0.16 + 0.24 组合下不累加，单元测试覆盖）
+- [x] 关键指标已暴露：`sentori_ingest_total{status=accepted|rejected|quota_exceeded}`、`sentori_ingest_duration_seconds` (p50/p99 histogram)、`sentori_quota_drops_total`；e2e 验证 5 accepted + 1 rejected counter 累加正确
+- [ ] PG pool / Valkey latency metrics（占位 alert 规则在 ops/prometheus-alerts.yml 已写好；exposer follow-up）
+- [x] Grafana dashboard：`ops/grafana-sentori-overview.json`（4 panel：ingest rate、p50/p99 latency、quota drops、error rate stat with thresholds）
+- [x] 告警规则（`ops/prometheus-alerts.yml`）：
+  - [x] `SentoriIngestErrorRateHigh` (rate > 1% / 5m)
+  - [x] `SentoriIngestStalled` (rate == 0 for 15m)
+  - [x] `HostDiskFreeLow` (< 20%)
+  - [x] PG pool / Valkey p99 占位规则（指标 follow-up 后即可启用）
+- [ ] **(user-owned)** Better Stack 监测 7 个 subdomain 的 200 OK + TLS 有效期
+- [ ] **(user-owned)** `status.sentori.golia.jp` 用 Better Stack status 页
 
 #### 日志 / 备份
 

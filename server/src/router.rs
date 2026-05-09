@@ -2,6 +2,7 @@ use axum::{
     Router, middleware,
     routing::{get, post},
 };
+use metrics_exporter_prometheus::PrometheusHandle;
 use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
@@ -22,6 +23,11 @@ pub struct ServerConfig {
     pub session_secret: String,
     pub notifier_tx: Option<tokio::sync::mpsc::Sender<crate::notifier::NotifyEvent>>,
     pub base_url: String,
+    /// Optional Prometheus handle. When set, `/metrics` renders the
+    /// current snapshot. Caddy is expected to scope public access in
+    /// production; we don't gate it server-side because Prometheus
+    /// scrape runs without auth on the internal network.
+    pub metrics: Option<PrometheusHandle>,
 }
 
 pub fn build(cfg: ServerConfig) -> Router {
@@ -156,11 +162,24 @@ pub fn build(cfg: ServerConfig) -> Router {
             api::user_auth::require_user,
         ));
 
+    let metrics = if let Some(handle) = cfg.metrics {
+        Router::new().route(
+            "/metrics",
+            get(move || {
+                let h = handle.clone();
+                async move { h.render() }
+            }),
+        )
+    } else {
+        Router::new()
+    };
+
     Router::new()
         .merge(ingestion)
         .nest("/admin/api", admin)
         .nest("/api/auth", user_auth)
         .nest("/api", orgs)
+        .merge(metrics)
         .layer(RequestBodyLimitLayer::new(MAX_BODY_BYTES))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())

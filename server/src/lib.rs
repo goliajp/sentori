@@ -5,6 +5,7 @@ pub mod error;
 pub mod event;
 pub mod grouping;
 pub mod issues;
+pub mod metrics;
 pub mod notifier;
 pub mod passwd;
 pub mod quotas;

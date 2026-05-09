@@ -20,6 +20,7 @@ async fn spawn() -> SocketAddr {
         session_secret: "test-secret".to_string(),
         notifier_tx: None,
         base_url: "http://localhost:8080".to_string(),
+        metrics: None,
     });
 
     tokio::spawn(async move {
