@@ -13,7 +13,7 @@
 - [x] **Phase 4** — 端到端 smoke test 🎯（首个里程碑）
 - [x] **Phase 5** — PG 落库 + 最小 grouping
 - [x] **Phase 6** — Web dashboard MVP
-- [ ] **Phase 7** — RN SDK Native 层（iOS NSException + Android uncaught）
+- [x] **Phase 7** — RN SDK Native 层（iOS NSException + Android uncaught）
 - [ ] **Phase 8** — Sourcemap 上传 + 服务端符号化
 - [ ] **Phase 9** — Release / Env / 邮件告警
 - [ ] **Phase 10** — Docker compose + 文档 + **self-hosted v0.1.0** 🎯
@@ -354,7 +354,7 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [ ] iOS 单测（XCTest）：触发 NSException → 断言 `Documents/sentori/pending/*.json` 出现 + 文件内容反序列化为合法 Event
 - [x] JS 端 `src/native-bridge.ts`：`Sentori.drainPending()` 读所有 .json，喂给 transport，逐个删文件
 - [x] `sentori.init` 在最后一步调一次 `drainPending()`
-- [ ] example app 加按钮 "Throw NSException"
+- [x] example app 加按钮 "Throw NSException"
 - [ ] iOS sim 端到端：throw → kill app → cold start → 验证 server 收到事件
 
 #### Android
@@ -364,10 +364,10 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
   - [x] `Thread.setDefaultUncaughtExceptionHandler { t, e -> writeToDisk(e); previousHandler?.uncaughtException(t, e) }`
   - [x] 写文件路径：`<filesDir>/sentori/pending/<uuid>.json`
 - [ ] Android 单测（JUnit + Robolectric）：同 iOS 双断言
-- [ ] example app 加按钮 "Throw RuntimeException"
+- [x] example app 加按钮 "Throw RuntimeException"
 - [ ] Android emu 端到端：throw → 重启 → server 收到 + dashboard 显示
 
-- [ ] commit：`feat(sdk): native uncaught exception capture (iOS + Android)`
+- [x] commit：`feat(sdk): native uncaught exception capture (iOS + Android)`
 
 ---
 

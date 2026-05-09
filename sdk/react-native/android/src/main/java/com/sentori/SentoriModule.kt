@@ -25,5 +25,15 @@ class SentoriModule : Module() {
         AsyncFunction("drainPending") {
             SentoriCrashHandler.consumePending()
         }
+
+        // Dev-only helper — schedules an uncaught RuntimeException after
+        // a tick so the JS bridge has time to return; the crash is then
+        // captured by SentoriCrashHandler and written to
+        // <filesDir>/sentori/pending/.
+        Function("triggerTestNativeCrash") {
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                throw RuntimeException("Sentori test native crash")
+            }, 50)
+        }
     }
 }

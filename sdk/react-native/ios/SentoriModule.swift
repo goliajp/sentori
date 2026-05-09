@@ -23,5 +23,21 @@ public class SentoriModule: Module {
         AsyncFunction("drainPending") { () -> [String] in
             return SentoriCrashHandler.consumePending()
         }
+
+        // Dev-only helper used by the example app to verify the
+        // crash-write / drain round-trip without writing native code in
+        // the host app. Schedules a real NSException after a tick so
+        // the JS bridge has time to return; the resulting crash hits
+        // SentoriCrashHandler and writes a JSON file under
+        // <Documents>/sentori/pending/.
+        Function("triggerTestNativeCrash") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                NSException(
+                    name: NSExceptionName("SentoriTestException"),
+                    reason: "Sentori test native crash",
+                    userInfo: nil
+                ).raise()
+            }
+        }
     }
 }

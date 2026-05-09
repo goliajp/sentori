@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 
-import { sentori } from '@sentori/react-native';
+import { sentori, triggerNativeCrash } from '@sentori/react-native';
 
 // iOS simulator can reach the host's localhost directly.
 // Android emulator must use 10.0.2.2 to reach the host.
@@ -72,6 +72,13 @@ export default function App(): React.JSX.Element {
           // expected
         }
         sentori.captureError(new Error('after a failed fetch'));
+      },
+    },
+    {
+      title: 'Native crash (closes app — relaunch to send)',
+      onPress: () => {
+        append('triggering native crash…');
+        triggerNativeCrash();
       },
     },
   ];

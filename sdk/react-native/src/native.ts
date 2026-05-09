@@ -11,6 +11,8 @@ type SentoriNativeModule = {
     release: string
     token: string
   }) => void
+  /** Dev-only — example app uses this to verify the crash flow. */
+  triggerTestNativeCrash?: () => void
 }
 
 let _native: SentoriNativeModule | null | undefined
@@ -47,5 +49,23 @@ export async function drainNativePending(): Promise<string[]> {
     return await n.drainPending()
   } catch {
     return []
+  }
+}
+
+/**
+ * Dev-only helper. Triggers a real NSException (iOS) or RuntimeException
+ * (Android) after a short delay so the host app crashes for real and the
+ * native crash handler exercises the full write-to-disk path.
+ *
+ * Usage: tap a button in the example app, watch the app close, restart it,
+ * verify the server received the event.
+ *
+ * No-op when the native module isn't installed (jest, bun test, web).
+ */
+export function triggerNativeCrash(): void {
+  try {
+    native()?.triggerTestNativeCrash?.()
+  } catch {
+    // never throw from a debugging helper
   }
 }
