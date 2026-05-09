@@ -1,9 +1,24 @@
 import './index.css'
 
+import { initSentori } from '@goliapkg/sentori-javascript'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
+
+// Phase 17 sub-F: dogfood. Reports dashboard's own JS errors back to
+// the same Sentori instance under the `sentori-dashboard` project.
+// Token is build-time injected (Vite reads VITE_*); skips silently in
+// dev / when no token is set.
+const sentoriToken = import.meta.env.VITE_SENTORI_TOKEN
+if (sentoriToken) {
+  initSentori({
+    environment: import.meta.env.MODE === 'production' ? 'prod' : 'dev',
+    ingestUrl: import.meta.env.VITE_SENTORI_INGEST ?? 'https://ingest.sentori.golia.jp',
+    release: `dashboard@${import.meta.env.VITE_GIT_SHA ?? '0.0.0'}`,
+    token: sentoriToken,
+  })
+}
 
 import { AuthProvider } from './auth/AuthProvider'
 import { ProtectedLayout } from './auth/ProtectedLayout'

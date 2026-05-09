@@ -6,6 +6,14 @@
 
 FROM oven/bun:1 AS builder
 WORKDIR /build
+# Phase 17 sub-F: dogfood build args. Vite inlines VITE_* at build
+# time, so the token has to be present here, not at runtime.
+ARG VITE_SENTORI_TOKEN
+ARG VITE_SENTORI_INGEST=https://ingest.sentori.golia.jp
+ARG VITE_GIT_SHA
+ENV VITE_SENTORI_TOKEN=$VITE_SENTORI_TOKEN \
+    VITE_SENTORI_INGEST=$VITE_SENTORI_INGEST \
+    VITE_GIT_SHA=$VITE_GIT_SHA
 COPY web/package.json web/bun.lock ./
 RUN bun install --frozen-lockfile
 COPY web ./

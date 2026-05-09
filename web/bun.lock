@@ -5,6 +5,7 @@
     "": {
       "name": "@sentori/web",
       "dependencies": {
+        "@goliapkg/sentori-javascript": "^0.1.0",
         "@tanstack/react-query": "^5.95.2",
         "axios": "^1.14.0",
         "jotai": "^2.19.0",
@@ -118,6 +119,8 @@
     "@eslint/plugin-kit": ["@eslint/plugin-kit@0.7.1", "", { "dependencies": { "@eslint/core": "^1.2.1", "levn": "^0.4.1" } }, "sha512-rZAP3aVgB9ds9KOeUSL+zZ21hPmo8dh6fnIFwRQj5EAZl9gzR7wxYbYXYysAM8CTqGmUGyp2S4kUdV17MnGuWQ=="],
 
     "@exodus/bytes": ["@exodus/bytes@1.15.0", "", { "peerDependencies": { "@noble/hashes": "^1.8.0 || ^2.0.0" }, "optionalPeers": ["@noble/hashes"] }, "sha512-UY0nlA+feH81UGSHv92sLEPLCeZFjXOuHhrIo0HQydScuQc8s0A7kL/UdgwgDq8g8ilksmuoF35YVTNphV2aBQ=="],
+
+    "@goliapkg/sentori-javascript": ["@goliapkg/sentori-javascript@0.1.0", "", {}, "sha512-kOjwQdDdc9mJfoD9RsLSDTBWGswKdGH/gf5uPgVhZ3uAz4guH8QJw/8KYtQEghTeNrlwo6de++9yg01K0b5X4Q=="],
 
     "@humanfs/core": ["@humanfs/core@0.19.2", "", { "dependencies": { "@humanfs/types": "^0.15.0" } }, "sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA=="],
 

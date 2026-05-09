@@ -45,12 +45,18 @@ jobs:
 
       - name: Build marketing (Astro static)
         working-directory: marketing
+        env:
+          PUBLIC_SENTORI_TOKEN: ${{ secrets.SENTORI_DOGFOOD_MARKETING_TOKEN }}
+          PUBLIC_GIT_SHA: ${{ github.sha }}
         run: |
           bun install --frozen-lockfile
           bun run build
 
       - name: Build docs-site (Astro Starlight)
         working-directory: docs-site
+        env:
+          PUBLIC_SENTORI_TOKEN: ${{ secrets.SENTORI_DOGFOOD_DOCS_TOKEN }}
+          PUBLIC_GIT_SHA: ${{ github.sha }}
         run: |
           bun install --frozen-lockfile
           bun run build
@@ -105,6 +111,8 @@ jobs:
           SENTORI_SMTP_PASS: ${{ secrets.SENTORI_SMTP_PASS }}
           SENTORI_SMTP_FROM: ${{ secrets.SENTORI_SMTP_FROM }}
           SENTORI_SMTP_TLS: ${{ secrets.SENTORI_SMTP_TLS }}
+          SENTORI_DOGFOOD_DASHBOARD_TOKEN: ${{ secrets.SENTORI_DOGFOOD_DASHBOARD_TOKEN }}
+          SENTORI_VERSION: ${{ github.sha }}
         run: |
           umask 077
           cat > "${REMOTE_DIR}/.env" <<EOF
@@ -118,6 +126,9 @@ jobs:
           SENTORI_SMTP_PASS=${SENTORI_SMTP_PASS}
           SENTORI_SMTP_FROM=${SENTORI_SMTP_FROM:-sentori@golia.jp}
           SENTORI_SMTP_TLS=${SENTORI_SMTP_TLS:-starttls}
+          # Phase 17 sub-F dogfood — read by docker-compose web build args
+          SENTORI_DOGFOOD_DASHBOARD_TOKEN=${SENTORI_DOGFOOD_DASHBOARD_TOKEN}
+          SENTORI_VERSION=${SENTORI_VERSION}
           RUST_LOG=info,sentori_server=info
           EOF
           chmod 600 "${REMOTE_DIR}/.env"

@@ -155,5 +155,19 @@ const features = [
         <span>Built in Tokyo.</span>
       </div>
     </footer>
+    <script>
+      // Phase 17 sub-F: dogfood. Marketing site reports its own JS
+      // errors back to Sentori prod under sentori-marketing.
+      import { initSentori } from '@goliapkg/sentori-javascript'
+      const token = import.meta.env.PUBLIC_SENTORI_TOKEN
+      if (token) {
+        initSentori({
+          token,
+          ingestUrl: 'https://ingest.sentori.golia.jp',
+          release: `marketing@${import.meta.env.PUBLIC_GIT_SHA ?? '0.0.0'}`,
+          environment: 'prod',
+        })
+      }
+    </script>
   </body>
 </html>

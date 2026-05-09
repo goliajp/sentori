@@ -13,6 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@goliapkg/sentori-javascript": "^0.1.0",
     "@tanstack/react-query": "^5.95.2",
     "axios": "^1.14.0",
     "jotai": "^2.19.0",

@@ -33,6 +33,9 @@ export default defineConfig({
         },
       ],
       customCss: ['./src/styles/overrides.css'],
+      components: {
+        Head: './src/components/Head.astro',
+      },
       head: [
         {
           tag: 'meta',

@@ -114,5 +114,17 @@ import '../styles/global.css'
         <span>Built in Tokyo.</span>
       </div>
     </footer>
+    <script>
+      import { initSentori } from '@goliapkg/sentori-javascript'
+      const token = import.meta.env.PUBLIC_SENTORI_TOKEN
+      if (token) {
+        initSentori({
+          token,
+          ingestUrl: 'https://ingest.sentori.golia.jp',
+          release: `marketing@${import.meta.env.PUBLIC_GIT_SHA ?? '0.0.0'}`,
+          environment: 'prod',
+        })
+      }
+    </script>
   </body>
 </html>
