@@ -1,0 +1,145 @@
+name: deploy
+
+# Phase 16 production deploy via the goliajp/devops infra.
+# Mirrors the goliajp/portal pattern: pushes to release/* land on the
+# self-hosted lx64 runner, rsync the source into /apps/sentori/src,
+# install services/sentori/docker-compose.yml from a fresh devops
+# checkout, write .env from repo secrets, then `docker compose up -d`.
+
+on:
+  push:
+    branches:
+      - 'release/*'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-lx64-sentori
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, lx64]
+    timeout-minutes: 45
+
+    env:
+      REMOTE_DIR: /apps/sentori
+      COMPOSE_FILE: /apps/sentori/docker-compose.yml
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract release version
+        id: ver
+        run: |
+          branch="${GITHUB_REF_NAME}"
+          version="${branch#release/}"
+          version="${version#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "==> deploying version $version"
+
+      - name: Rsync source into /apps/sentori/src
+        run: |
+          mkdir -p "${REMOTE_DIR}/src"
+          rsync -a --delete \
+            --exclude .git \
+            --exclude server/target \
+            --exclude cli/target \
+            --exclude web/node_modules \
+            --exclude web/dist \
+            --exclude marketing/node_modules \
+            --exclude marketing/dist \
+            --exclude docs-site/node_modules \
+            --exclude docs-site/dist \
+            --exclude sdk/react-native/node_modules \
+            ./ "${REMOTE_DIR}/src/"
+
+      - name: Install compose file from devops/services/sentori
+        run: |
+          DEVOPS_DIR="$HOME/workspace/goliajp/devops"
+          if [ -d "$DEVOPS_DIR/.git" ]; then
+            git -C "$DEVOPS_DIR" pull --ff-only origin develop \
+              || echo "warning: devops pull failed; using existing checkout"
+            SRC_COMPOSE="$DEVOPS_DIR/services/sentori/docker-compose.yml"
+          else
+            SRC_COMPOSE="${REMOTE_DIR}/src/devops/services/sentori/docker-compose.yml"
+          fi
+          install -m 0644 "$SRC_COMPOSE" "${COMPOSE_FILE}"
+
+      - name: Write .env
+        env:
+          SENTORI_PG_PASSWORD: ${{ secrets.SENTORI_PG_PASSWORD }}
+          SENTORI_DEV_TOKEN: ${{ secrets.SENTORI_DEV_TOKEN }}
+          SENTORI_ADMIN_PASSWORD: ${{ secrets.SENTORI_ADMIN_PASSWORD }}
+          SENTORI_SESSION_SECRET: ${{ secrets.SENTORI_SESSION_SECRET }}
+          SENTORI_SMTP_HOST: ${{ secrets.SENTORI_SMTP_HOST }}
+          SENTORI_SMTP_PORT: ${{ secrets.SENTORI_SMTP_PORT }}
+          SENTORI_SMTP_USER: ${{ secrets.SENTORI_SMTP_USER }}
+          SENTORI_SMTP_PASS: ${{ secrets.SENTORI_SMTP_PASS }}
+          SENTORI_SMTP_FROM: ${{ secrets.SENTORI_SMTP_FROM }}
+          SENTORI_SMTP_TLS: ${{ secrets.SENTORI_SMTP_TLS }}
+        run: |
+          umask 077
+          cat > "${REMOTE_DIR}/.env" <<EOF
+          SENTORI_PG_PASSWORD=${SENTORI_PG_PASSWORD}
+          SENTORI_DEV_TOKEN=${SENTORI_DEV_TOKEN}
+          SENTORI_ADMIN_PASSWORD=${SENTORI_ADMIN_PASSWORD}
+          SENTORI_SESSION_SECRET=${SENTORI_SESSION_SECRET}
+          SENTORI_SMTP_HOST=${SENTORI_SMTP_HOST}
+          SENTORI_SMTP_PORT=${SENTORI_SMTP_PORT:-587}
+          SENTORI_SMTP_USER=${SENTORI_SMTP_USER}
+          SENTORI_SMTP_PASS=${SENTORI_SMTP_PASS}
+          SENTORI_SMTP_FROM=${SENTORI_SMTP_FROM:-sentori@golia.jp}
+          SENTORI_SMTP_TLS=${SENTORI_SMTP_TLS:-starttls}
+          RUST_LOG=info,sentori_server=info
+          EOF
+          chmod 600 "${REMOTE_DIR}/.env"
+
+      - name: Build & up
+        working-directory: /apps/sentori
+        run: |
+          docker compose --env-file .env -f docker-compose.yml build server web
+          docker compose --env-file .env -f docker-compose.yml up -d
+
+      - name: Wait for /v1/events/_recent
+        env:
+          SENTORI_DEV_TOKEN: ${{ secrets.SENTORI_DEV_TOKEN }}
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS -H "Authorization: Bearer $SENTORI_DEV_TOKEN" \
+               http://127.0.0.1:18080/v1/events/_recent >/dev/null; then
+              echo "==> healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "==> health check failed — recent logs:"
+          docker compose -f "${COMPOSE_FILE}" logs --tail 100 server || true
+          exit 1
+
+      - name: Smoke test — public surface
+        env:
+          SENTORI_DEV_TOKEN: ${{ secrets.SENTORI_DEV_TOKEN }}
+        run: |
+          set -e
+          fail() { echo "smoke FAIL: $1" >&2; exit 1; }
+          # /v1/events/_recent: dev token returns 200 with []
+          recent=$(curl -fsS -H "Authorization: Bearer $SENTORI_DEV_TOKEN" \
+            http://127.0.0.1:18080/v1/events/_recent)
+          [ "$recent" = "[]" ] || fail "_recent expected [], got $recent"
+          # /metrics: prometheus exporter live
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/metrics)
+          test "$status" = "200" || fail "/metrics expected 200, got $status"
+          # /api/auth/me without cookie -> 401 (auth gate engaged)
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/api/auth/me)
+          test "$status" = "401" || fail "/api/auth/me expected 401, got $status"
+          # web container responds
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18800/)
+          test "$status" = "200" || fail "web :18800 expected 200, got $status"
+          echo "==> smoke OK"
+
+      - name: Tag version
+        run: |
+          git tag "v${{ steps.ver.outputs.version }}" || true
+          git push origin "v${{ steps.ver.outputs.version }}" || true
