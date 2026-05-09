@@ -136,6 +136,7 @@ pub fn build(cfg: ServerConfig) -> Router {
                 .patch(api::orgs::patch_org)
                 .delete(api::orgs::delete_org),
         )
+        .route("/orgs/{slug}/usage", get(api::orgs::org_usage))
         .route("/orgs/{slug}/members", get(api::orgs::list_members))
         .route(
             "/orgs/{slug}/members/{user_id}",

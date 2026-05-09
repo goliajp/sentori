@@ -19,6 +19,7 @@ use uuid::Uuid;
 
 use crate::api::user_auth::{CurrentUser, is_plausible_email, random_token};
 use crate::notifier::NotifyEvent;
+use crate::quotas;
 use crate::recent::AppState;
 
 const INVITE_TTL_DAYS: i64 = 7;
@@ -274,6 +275,109 @@ pub async fn delete_org(
     }
 
     ok_response()
+}
+
+// ---------- usage / quota (Phase 15 sub-D) ----------
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UsageRow {
+    plan: String,
+    event_limit_monthly: i32,
+    retention_days: i32,
+    period_yyyymm: String,
+    event_count: i64,
+    dropped_count: i64,
+    percent_used: f64,
+    #[serde(with = "time::serde::rfc3339")]
+    reset_at: OffsetDateTime,
+}
+
+pub async fn org_usage(
+    State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
+    Path(slug): Path<String>,
+) -> Response {
+    let pool = match &state.db {
+        Some(p) => p.clone(),
+        None => return server_error("dbNotConfigured"),
+    };
+
+    let (org_id, _role) = match resolve_membership(&pool, &slug, user.id).await {
+        Some(m) => m,
+        None => return not_found("orgNotFound"),
+    };
+
+    let quota: Option<(String, i32, i32)> = sqlx::query_as(
+        "SELECT plan::text, event_limit_monthly, retention_days \
+         FROM org_quotas WHERE org_id = $1",
+    )
+    .bind(org_id)
+    .fetch_optional(&pool)
+    .await
+    .ok()
+    .flatten();
+    let (plan, limit, retention) = quota.unwrap_or_else(|| {
+        (
+            "free".to_string(),
+            quotas::FREE_EVENT_LIMIT_MONTHLY,
+            quotas::FREE_RETENTION_DAYS,
+        )
+    });
+
+    let now = OffsetDateTime::now_utc();
+    let period = quotas::period_key(now);
+
+    // Prefer the live Valkey counters; fall back to the durable PG
+    // rollup so the widget still renders if the cache is empty (e.g.
+    // immediately after a Valkey restart, before the next 60 s flush).
+    let (event_count, dropped_count) = match &state.valkey {
+        Some(v) => {
+            let mut conn = v.clone();
+            let used: u64 = redis::AsyncCommands::get(
+                &mut conn,
+                format!("usage:{org_id}:{period}"),
+            )
+            .await
+            .unwrap_or(0);
+            let dropped: u64 = redis::AsyncCommands::get(
+                &mut conn,
+                format!("dropped:{org_id}:{period}"),
+            )
+            .await
+            .unwrap_or(0);
+            (used as i64, dropped as i64)
+        }
+        None => sqlx::query_as::<_, (i64, i64)>(
+            "SELECT event_count, dropped_count FROM usage_counters \
+             WHERE org_id = $1 AND period_yyyymm = $2",
+        )
+        .bind(org_id)
+        .bind(&period)
+        .fetch_optional(&pool)
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or((0, 0)),
+    };
+
+    let percent_used = if limit > 0 {
+        (event_count as f64 / limit as f64) * 100.0
+    } else {
+        0.0
+    };
+
+    let body = UsageRow {
+        plan,
+        event_limit_monthly: limit,
+        retention_days: retention,
+        period_yyyymm: period,
+        event_count,
+        dropped_count,
+        percent_used,
+        reset_at: quotas::next_period_start(now),
+    };
+    (StatusCode::OK, Json(body)).into_response()
 }
 
 // ---------- memberships ----------

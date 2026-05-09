@@ -681,9 +681,10 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
   - [x] `IngestCaller::Token` 扩出 `org_id` 字段（auth.rs `lookup_token_row` 单 SELECT 同时取 project_id + org_id），免去 events 路径的 projects join
   - [x] 后台 `quotas::spawn_flush_task` 每 60s `SELECT org_id FROM org_quotas` → GET valkey 双 key → UPSERT `usage_counters`；main.rs 在 db+valkey 都 ready 时 spawn
 - [x] retention 清理：`server/src/retention.rs::spawn_retention_task` 每 24h 跑一次 —— `ensure_future_partitions(6 个月)` + `drop_expired_partitions(now - max(retention_days))`，partition 名通过 regex `^events_[0-9]{4}_[0-9]{2}$` + `parse_partition_name` 双重校验防注入；e2e 验证：seed 一个 `events_2020_01` → server 起来 30s 后被 drop，同时新创 `events_2026_09 / 10` 凑齐 6 个月未来 partition
-- [ ] dashboard 配额 widget：
-  - [ ] org settings 页显示 used / limit + 进度条
-  - [ ] 用量 ≥ 80% 时全局 banner（红色）
+- [x] dashboard 配额 widget：
+  - [x] server `GET /api/orgs/{slug}/usage` —— Valkey 优先（实时） + PG `usage_counters` fallback；返回 `{plan, eventLimitMonthly, retentionDays, periodYyyymm, eventCount, droppedCount, percentUsed, resetAt}`
+  - [x] org settings 页 `UsageSection`：events used / limit + 进度条（≥80% amber，≥100% red） + dropped count
+  - [x] 用量 ≥ 80% 全局 `UsageBanner`（OrgLayout 顶栏下方常驻）：amber 提示 percent，红色 "quota reached" + dropped 计数；refetchInterval 60s
 - [ ] 邮件：用量 ≥ 80% / ≥ 100% 各发一封
 - [x] 默认 plan = `free`，新 org 自动 100k 限额（`server/src/quotas.rs::ensure_default_quota`，挂在 `orgs::create_org` 与 `user_auth::bootstrap_personal_org` 的事务里，ON CONFLICT DO NOTHING）
 - [ ] **决策**：free tier 数据 30 天保留；pro / enterprise 留到付费上线

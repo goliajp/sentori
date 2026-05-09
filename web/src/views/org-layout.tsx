@@ -8,6 +8,7 @@ import { OnboardingBadge } from '@/components/OnboardingBadge'
 import { OrgSwitcher } from '@/components/OrgSwitcher'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useThemeEffect } from '@/components/theme'
+import { UsageBanner } from '@/components/UsageBanner'
 
 const NAV = [
   { label: 'Issues', path: 'issues' },
@@ -89,6 +90,7 @@ export function OrgLayout() {
             </button>
           </div>
         </header>
+        <UsageBanner org={currentOrg} />
         <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>

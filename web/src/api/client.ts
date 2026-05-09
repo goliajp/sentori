@@ -273,6 +273,19 @@ export const orgsApi = {
       body: JSON.stringify(body),
       method: 'PATCH',
     }),
+
+  usage: (slug: string) => orgsFetch<UsageRow>(`/orgs/${slug}/usage`),
+}
+
+export type UsageRow = {
+  droppedCount: number
+  eventCount: number
+  eventLimitMonthly: number
+  percentUsed: number
+  periodYyyymm: string
+  plan: 'enterprise' | 'free' | 'pro'
+  resetAt: string
+  retentionDays: number
 }
 
 export type ProjectCreated = {

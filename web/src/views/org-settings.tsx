@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
 
-import { type OrgRole, orgsApi } from '@/api/client'
+import { type OrgRole, orgsApi, type UsageRow } from '@/api/client'
 import { useAuth } from '@/auth/state'
 import { useOrg } from '@/auth/orgContext'
 
@@ -95,6 +95,8 @@ export function OrgSettingsView() {
           Your role: <span className="text-fg font-mono uppercase">{currentOrg.role}</span>
         </p>
       </header>
+
+      <UsageSection slug={slug} />
 
       <section className="space-y-3">
         <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Org details</h2>
@@ -245,6 +247,50 @@ export function OrgSettingsView() {
             </table>
           )}
         </section>
+      )}
+    </div>
+  )
+}
+
+function UsageSection({ slug }: { slug: string }) {
+  const { data, isLoading } = useQuery({
+    queryFn: () => orgsApi.usage(slug),
+    queryKey: ['usage', slug],
+    refetchInterval: 60_000,
+  })
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Usage this month</h2>
+      {isLoading && <p className="text-fg-muted">Loading…</p>}
+      {data && <UsageWidget usage={data} />}
+    </section>
+  )
+}
+
+function UsageWidget({ usage }: { usage: UsageRow }) {
+  const pct = Math.min(100, usage.percentUsed)
+  const tone =
+    usage.percentUsed >= 100 ? 'bg-red-500' : usage.percentUsed >= 80 ? 'bg-amber-500' : 'bg-accent'
+  const reset = new Date(usage.resetAt).toISOString().slice(0, 10)
+  return (
+    <div className="space-y-2">
+      <div className="text-fg-muted flex items-baseline justify-between text-[12px]">
+        <span>
+          <span className="text-fg font-mono">{usage.eventCount.toLocaleString()}</span> /{' '}
+          {usage.eventLimitMonthly.toLocaleString()} events
+        </span>
+        <span className="font-mono">
+          {usage.plan} · resets {reset}
+        </span>
+      </div>
+      <div className="border-border bg-bg-tertiary h-2 overflow-hidden rounded-full border">
+        <div className={`h-full ${tone}`} style={{ width: `${pct}%` }} />
+      </div>
+      {usage.droppedCount > 0 && (
+        <p className="text-fg-muted text-[11px]">
+          {usage.droppedCount.toLocaleString()} events dropped this period.
+        </p>
       )}
     </div>
   )
