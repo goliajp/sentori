@@ -226,7 +226,7 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] 写 `src/index.ts`：默认 export `sentori` 对象，所有方法 namespace 化
 - [x] 写 jest 单测覆盖 transport / breadcrumbs / stack 解析
 - [x] `bun run prepack` 检查产物
-- [ ] 改 `sdk/react-native/example/App.tsx`：`sentori.init` + 一个 throw 按钮（`ingestUrl: 'http://localhost:8080'` 用于本地 dev）
+- [x] 改 `sdk/react-native/example/App.tsx`：`sentori.init` + 一个 throw 按钮（`ingestUrl: 'http://localhost:8080'` 用于本地 dev）
 - [ ] iOS：`cd example/ios && bundle exec pod install`
 - [ ] iOS：`cd example && bun run ios` 启 simulator，点击 throw，验证 server stdout 收到事件
 - [ ] Android：`cd example && bun run android` 启 emulator，同验证
