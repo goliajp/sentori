@@ -16,7 +16,7 @@
 - [x] **Phase 7** — RN SDK Native 层（iOS NSException + Android uncaught）
 - [x] **Phase 8** — Sourcemap 上传 + 服务端符号化
 - [x] **Phase 9** — Release / Env / 邮件告警
-- [ ] **Phase 10** — Docker compose + 文档 + **self-hosted v0.1.0** 🎯
+- [x] **Phase 10** — Docker compose + 文档 + **self-hosted v0.1.0** 🎯
 - [ ] **Phase 11** — 域名 / DNS / TLS 准备（sentori.golia.jp 拓扑落地）
 - [ ] **Phase 12** — Marketing 站 + 文档站
 - [ ] **Phase 13** — 多租户改造（org / user / membership）
@@ -429,19 +429,19 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 
 ### Steps
 
-- [ ] 写 `docker/Dockerfile.server`：多阶段构建（rust:1.83-alpine 编译 → distroless 运行）
-- [ ] 写 `docker/Dockerfile.web`：阶段 1 bun 构建 web/dist，阶段 2 nginx 托管 dist
-- [ ] 写 `docker-compose.yml`：services = `server` + `web` + `pg` + `valkey`
-- [ ] 写 `docker-compose.override.example.yml`：可选 SMTP / 持久卷映射
-- [ ] 写 `.github/workflows/build.yml`：cargo test、bun run check/test/build、cargo build --release，产出 docker image push 到 ghcr.io
-- [ ] 写 `docs/getting-started.md`：5 分钟从 zero 到捕获第一条事件（self-hosted）
-- [ ] 写 `docs/sdk-react-native.md`：`init` API、ErrorBoundary、breadcrumb 自定义、source map 上传
-- [ ] 写 `docs/self-hosting.md`：env 变量参考、备份策略、PG 升级注意事项
-- [ ] 完整化 `README.md`：徽章、demo gif、快速开始、链接到各 docs
+- [x] 写 `docker/Dockerfile.server`：多阶段构建（rust:1.83-alpine 编译 → distroless 运行）
+- [x] 写 `docker/Dockerfile.web`：阶段 1 bun 构建 web/dist，阶段 2 nginx 托管 dist
+- [x] 写 `docker-compose.yml`：services = `server` + `web` + `pg` + `valkey`
+- [x] 写 `docker-compose.override.example.yml`：可选 SMTP / 持久卷映射
+- [x] 写 `.github/workflows/build.yml`：cargo test、bun run check/test/build、cargo build --release，产出 docker image push 到 ghcr.io
+- [x] 写 `docs/getting-started.md`：5 分钟从 zero 到捕获第一条事件（self-hosted）
+- [x] 写 `docs/sdk-react-native.md`：`init` API、ErrorBoundary、breadcrumb 自定义、source map 上传
+- [x] 写 `docs/self-hosting.md`：env 变量参考、备份策略、PG 升级注意事项
+- [x] 完整化 `README.md`：徽章、demo gif、快速开始、链接到各 docs
 - [ ] 用一台干净 mac 走一遍 `getting-started.md`（colima 或 docker desktop），计时 ≤ 5 分钟
 - [ ] `git tag v0.1.0` + GitHub release
-- [ ] commit：`docs: getting started, self-hosting, SDK guide`
-- [ ] 🎯 **里程碑：self-hosted v0.1.0 发布**
+- [x] commit：`docs: getting started, self-hosting, SDK guide`
+- [x] 🎯 **里程碑：self-hosted v0.1.0 发布**
 
 ---
 
