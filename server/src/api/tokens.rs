@@ -165,6 +165,21 @@ pub async fn create_token(
     .await
     .unwrap_or_else(|_| OffsetDateTime::now_utc());
 
+    let actor = match &caller {
+        AdminCaller::User { id, .. } => Some(*id),
+        _ => None,
+    };
+    crate::audit::record(
+        &pool,
+        org_id,
+        actor,
+        crate::audit::actions::TOKEN_CREATED,
+        crate::audit::targets::TOKEN,
+        Some(token_id),
+        json!({ "project_id": project_id, "kind": body.kind, "last4": last4 }),
+    )
+    .await;
+
     (
         StatusCode::CREATED,
         Json(TokenCreated {
@@ -213,6 +228,35 @@ pub async fn revoke_token(
     .bind(project_id)
     .execute(pool)
     .await;
+
+    if let Ok(r) = &result
+        && r.rows_affected() > 0
+    {
+        let org_id: Option<Uuid> = sqlx::query_scalar(
+            "SELECT org_id FROM projects WHERE id = $1",
+        )
+        .bind(project_id)
+        .fetch_optional(pool)
+        .await
+        .ok()
+        .flatten();
+        let actor = match &caller {
+            AdminCaller::User { id, .. } => Some(*id),
+            _ => None,
+        };
+        if let Some(oid) = org_id {
+            crate::audit::record(
+                pool,
+                oid,
+                actor,
+                crate::audit::actions::TOKEN_REVOKED,
+                crate::audit::targets::TOKEN,
+                Some(token_id),
+                json!({ "project_id": project_id }),
+            )
+            .await;
+        }
+    }
 
     match result {
         Ok(r) if r.rows_affected() == 0 => not_found("tokenNotFound"),

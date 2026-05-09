@@ -18,6 +18,7 @@ use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
 use crate::api::user_auth::{CurrentUser, is_plausible_email, random_token};
+use crate::audit::{actions, targets};
 use crate::notifier::NotifyEvent;
 use crate::quotas;
 use crate::recent::AppState;
@@ -140,6 +141,17 @@ pub async fn create_org(
         return server_error("commitTx");
     }
 
+    crate::audit::record(
+        &pool,
+        org_id,
+        Some(user.id),
+        actions::ORG_CREATED,
+        targets::ORG,
+        Some(org_id),
+        json!({ "slug": slug, "name": name }),
+    )
+    .await;
+
     (
         StatusCode::CREATED,
         Json(json!({
@@ -242,6 +254,16 @@ pub async fn patch_org(
             tracing::error!(error = %e, "update org name failed");
             return server_error("updateOrg");
         }
+        crate::audit::record(
+            &pool,
+            org_id,
+            Some(user.id),
+            actions::ORG_PATCHED,
+            targets::ORG,
+            Some(org_id),
+            json!({ "name": name }),
+        )
+        .await;
     }
 
     ok_response()
@@ -273,6 +295,12 @@ pub async fn delete_org(
         tracing::error!(error = %e, "delete org failed");
         return server_error("deleteOrg");
     }
+
+    // Record into the org's audit log... after the org is gone the FK
+    // cascade has already wiped the table, so this is best-effort: we
+    // emit a global trace line and skip the DB row. Phase 20 will move
+    // the audit log out of the org cascade so tombstones survive.
+    tracing::info!(%org_id, actor = %user.id, action = actions::ORG_DELETED, "audit org delete");
 
     ok_response()
 }
@@ -616,7 +644,19 @@ pub async fn patch_member(
 
     match res {
         Ok(r) if r.rows_affected() == 0 => not_found("memberNotFound"),
-        Ok(_) => ok_response(),
+        Ok(_) => {
+            crate::audit::record(
+                &pool,
+                org_id,
+                Some(user.id),
+                actions::MEMBER_ROLE_PATCHED,
+                targets::MEMBER,
+                Some(target_id),
+                json!({ "role": body.role }),
+            )
+            .await;
+            ok_response()
+        }
         Err(e) => {
             tracing::error!(error = %e, "patch member failed");
             server_error("updateMembership")
@@ -682,6 +722,17 @@ pub async fn delete_member(
         tracing::error!(error = %e, "delete member failed");
         return server_error("deleteMembership");
     }
+
+    crate::audit::record(
+        &pool,
+        org_id,
+        Some(user.id),
+        actions::MEMBER_REMOVED,
+        targets::MEMBER,
+        Some(target_id),
+        json!({ "self_leave": is_self }),
+    )
+    .await;
 
     ok_response()
 }
@@ -910,6 +961,320 @@ pub async fn accept_invite(
         Json(json!({ "ok": true, "orgSlug": slug })),
     )
         .into_response()
+}
+
+// ---------- ownership transfer (Phase 18 sub-C) ----------
+
+const TRANSFER_TTL_DAYS: i64 = 7;
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateTransferBody {
+    pub to_user_id: Uuid,
+}
+
+/// POST /api/orgs/{slug}/transfer
+/// Owner-only. Creates a pending transfer + emails the target a confirm link.
+/// The target user must currently be admin or owner of the org.
+pub async fn create_transfer(
+    State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
+    Path(slug): Path<String>,
+    Json(body): Json<CreateTransferBody>,
+) -> Response {
+    let pool = match &state.db {
+        Some(p) => p.clone(),
+        None => return server_error("dbNotConfigured"),
+    };
+
+    let (org_id, role) = match resolve_membership(&pool, &slug, user.id).await {
+        Some(m) => m,
+        None => return not_found("orgNotFound"),
+    };
+    if role != "owner" {
+        return forbidden("forbidden");
+    }
+    if user.id == body.to_user_id {
+        return bad_request("cannotTransferToSelf");
+    }
+
+    let target_role: Option<String> = sqlx::query_scalar(
+        "SELECT role FROM memberships WHERE org_id = $1 AND user_id = $2",
+    )
+    .bind(org_id)
+    .bind(body.to_user_id)
+    .fetch_optional(&pool)
+    .await
+    .ok()
+    .flatten();
+    let target_role = match target_role {
+        Some(r) => r,
+        None => return bad_request("targetNotInOrg"),
+    };
+    if !matches!(target_role.as_str(), "owner" | "admin") {
+        return bad_request("targetNotEligible");
+    }
+
+    let target_email: String = sqlx::query_scalar("SELECT email FROM users WHERE id = $1")
+        .bind(body.to_user_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap_or_default();
+    if target_email.is_empty() {
+        return server_error("targetEmail");
+    }
+
+    let token = random_token(32);
+    let expires_at = OffsetDateTime::now_utc() + Duration::days(TRANSFER_TTL_DAYS);
+    let transfer_id = Uuid::now_v7();
+
+    if let Err(e) = sqlx::query(
+        "INSERT INTO org_ownership_transfers \
+            (id, org_id, from_user_id, to_user_id, token, expires_at) \
+         VALUES ($1, $2, $3, $4, $5, $6)",
+    )
+    .bind(transfer_id)
+    .bind(org_id)
+    .bind(user.id)
+    .bind(body.to_user_id)
+    .bind(&token)
+    .bind(expires_at)
+    .execute(&pool)
+    .await
+    {
+        tracing::error!(error = %e, "insert transfer failed");
+        return server_error("insertTransfer");
+    }
+
+    if let Some(tx) = &state.notifier_tx {
+        let org_name: String = sqlx::query_scalar("SELECT name FROM orgs WHERE id = $1")
+            .bind(org_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap_or_else(|_| slug.clone());
+        let link = format!(
+            "{}/transfers/{}",
+            state.base_url.trim_end_matches('/'),
+            token
+        );
+        let _ = tx.try_send(NotifyEvent::OwnershipTransferRequested {
+            to_email: target_email.clone(),
+            from_email: user.email.clone(),
+            org_name,
+            link,
+        });
+    }
+
+    crate::audit::record(
+        &pool,
+        org_id,
+        Some(user.id),
+        actions::ORG_TRANSFER_REQUESTED,
+        targets::TRANSFER,
+        Some(transfer_id),
+        json!({ "to_user_id": body.to_user_id }),
+    )
+    .await;
+
+    (
+        StatusCode::CREATED,
+        Json(json!({ "id": transfer_id, "expiresAt": expires_at })),
+    )
+        .into_response()
+}
+
+/// POST /api/orgs/transfers/{token}/accept
+/// Caller must be the to_user. Atomically swaps ownership: old owner
+/// becomes admin, new owner becomes owner, transfer marked accepted.
+pub async fn accept_transfer(
+    State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
+    Path(token): Path<String>,
+) -> Response {
+    let pool = match &state.db {
+        Some(p) => p.clone(),
+        None => return server_error("dbNotConfigured"),
+    };
+
+    let row: Option<(Uuid, Uuid, Uuid, Uuid, OffsetDateTime, Option<OffsetDateTime>)> =
+        sqlx::query_as(
+            "SELECT id, org_id, from_user_id, to_user_id, expires_at, accepted_at \
+             FROM org_ownership_transfers WHERE token = $1",
+        )
+        .bind(&token)
+        .fetch_optional(&pool)
+        .await
+        .ok()
+        .flatten();
+    let (transfer_id, org_id, from_user_id, to_user_id, expires_at, accepted_at) = match row {
+        Some(r) => r,
+        None => return not_found("transferNotFound"),
+    };
+    if accepted_at.is_some() {
+        return bad_request("transferUsed");
+    }
+    if expires_at < OffsetDateTime::now_utc() {
+        return bad_request("transferExpired");
+    }
+    if user.id != to_user_id {
+        return forbidden("forbidden");
+    }
+
+    let mut tx = match pool.begin().await {
+        Ok(t) => t,
+        Err(_) => return server_error("tx"),
+    };
+
+    // Demote old owner → admin
+    if let Err(e) = sqlx::query(
+        "UPDATE memberships SET role = 'admin' WHERE org_id = $1 AND user_id = $2",
+    )
+    .bind(org_id)
+    .bind(from_user_id)
+    .execute(&mut *tx)
+    .await
+    {
+        tracing::error!(error = %e, "demote old owner failed");
+        return server_error("demoteOldOwner");
+    }
+
+    // Promote target → owner
+    if let Err(e) = sqlx::query(
+        "UPDATE memberships SET role = 'owner' WHERE org_id = $1 AND user_id = $2",
+    )
+    .bind(org_id)
+    .bind(to_user_id)
+    .execute(&mut *tx)
+    .await
+    {
+        tracing::error!(error = %e, "promote new owner failed");
+        return server_error("promoteNewOwner");
+    }
+
+    // Mirror the owner_id column for reads that don't go through memberships.
+    if let Err(e) = sqlx::query("UPDATE orgs SET owner_id = $1 WHERE id = $2")
+        .bind(to_user_id)
+        .bind(org_id)
+        .execute(&mut *tx)
+        .await
+    {
+        tracing::error!(error = %e, "update orgs.owner_id failed");
+        return server_error("updateOrgOwner");
+    }
+
+    if let Err(e) = sqlx::query(
+        "UPDATE org_ownership_transfers SET accepted_at = now() WHERE id = $1",
+    )
+    .bind(transfer_id)
+    .execute(&mut *tx)
+    .await
+    {
+        tracing::error!(error = %e, "mark transfer accepted failed");
+        return server_error("markAccepted");
+    }
+
+    if tx.commit().await.is_err() {
+        return server_error("commitTx");
+    }
+
+    crate::audit::record(
+        &pool,
+        org_id,
+        Some(user.id),
+        actions::ORG_TRANSFER_ACCEPTED,
+        targets::TRANSFER,
+        Some(transfer_id),
+        json!({ "from_user_id": from_user_id, "to_user_id": to_user_id }),
+    )
+    .await;
+
+    (StatusCode::OK, Json(json!({ "ok": true }))).into_response()
+}
+
+// ---------- audit log listing (Phase 18 sub-C) ----------
+
+#[derive(Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+struct AuditRow {
+    id: Uuid,
+    actor_user_id: Option<Uuid>,
+    actor_email: Option<String>,
+    action: String,
+    target_type: String,
+    target_id: Option<Uuid>,
+    payload: serde_json::Value,
+    created_at: OffsetDateTime,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditQuery {
+    pub limit: Option<i64>,
+    pub before: Option<OffsetDateTime>,
+    pub action: Option<String>,
+    pub actor_user_id: Option<Uuid>,
+    pub target_type: Option<String>,
+}
+
+pub async fn list_audit(
+    State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
+    Path(slug): Path<String>,
+    axum::extract::Query(q): axum::extract::Query<AuditQuery>,
+) -> Response {
+    let pool = match &state.db {
+        Some(p) => p.clone(),
+        None => return server_error("dbNotConfigured"),
+    };
+
+    let (org_id, role) = match resolve_membership(&pool, &slug, user.id).await {
+        Some(m) => m,
+        None => return not_found("orgNotFound"),
+    };
+    if !matches!(role.as_str(), "owner" | "admin") {
+        return forbidden("forbidden");
+    }
+
+    let limit = q.limit.unwrap_or(50).clamp(1, 200);
+    let before = q.before.unwrap_or_else(OffsetDateTime::now_utc);
+
+    // Build the query incrementally so optional filters drop in cleanly.
+    let mut sql = String::from(
+        "SELECT al.id, al.actor_user_id, u.email AS actor_email, al.action, \
+                al.target_type, al.target_id, al.payload, al.created_at \
+         FROM audit_logs al \
+         LEFT JOIN users u ON u.id = al.actor_user_id \
+         WHERE al.org_id = $1 AND al.created_at < $2",
+    );
+    let mut bind_idx = 3;
+    if q.action.is_some() {
+        sql.push_str(&format!(" AND al.action = ${bind_idx}"));
+        bind_idx += 1;
+    }
+    if q.actor_user_id.is_some() {
+        sql.push_str(&format!(" AND al.actor_user_id = ${bind_idx}"));
+        bind_idx += 1;
+    }
+    if q.target_type.is_some() {
+        sql.push_str(&format!(" AND al.target_type = ${bind_idx}"));
+        bind_idx += 1;
+    }
+    sql.push_str(&format!(" ORDER BY al.created_at DESC LIMIT ${bind_idx}"));
+
+    let mut query = sqlx::query_as::<_, AuditRow>(&sql).bind(org_id).bind(before);
+    if let Some(a) = &q.action {
+        query = query.bind(a);
+    }
+    if let Some(a) = &q.actor_user_id {
+        query = query.bind(a);
+    }
+    if let Some(t) = &q.target_type {
+        query = query.bind(t);
+    }
+    query = query.bind(limit);
+
+    let rows: Vec<AuditRow> = query.fetch_all(&pool).await.unwrap_or_default();
+    (StatusCode::OK, Json(rows)).into_response()
 }
 
 // ---------- helpers ----------

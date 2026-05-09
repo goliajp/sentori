@@ -25,6 +25,7 @@ use uuid::Uuid;
 
 use crate::api::admin_auth::AdminCaller;
 use crate::api::user_auth::CurrentUser;
+use crate::audit::{actions, targets};
 use crate::recent::AppState;
 
 const SLUG_MIN: usize = 3;
@@ -156,6 +157,17 @@ pub async fn create_team(
         tracing::error!(error = %e, "insert team failed");
         return server_error("insertTeam");
     }
+
+    crate::audit::record(
+        &pool,
+        org_id,
+        Some(user.id),
+        actions::TEAM_CREATED,
+        targets::TEAM,
+        Some(team_id),
+        json!({ "slug": team_slug, "name": name }),
+    )
+    .await;
 
     (
         StatusCode::CREATED,
@@ -293,6 +305,16 @@ pub async fn delete_team(
         return forbidden("forbidden");
     }
 
+    let team_id_for_audit: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM teams WHERE org_id = $1 AND slug = $2",
+    )
+    .bind(org_id)
+    .bind(&team_slug)
+    .fetch_optional(&pool)
+    .await
+    .ok()
+    .flatten();
+
     let res = sqlx::query("DELETE FROM teams WHERE org_id = $1 AND slug = $2")
         .bind(org_id)
         .bind(&team_slug)
@@ -301,7 +323,19 @@ pub async fn delete_team(
 
     match res {
         Ok(r) if r.rows_affected() == 0 => not_found("teamNotFound"),
-        Ok(_) => ok_response(),
+        Ok(_) => {
+            crate::audit::record(
+                &pool,
+                org_id,
+                Some(user.id),
+                actions::TEAM_DELETED,
+                targets::TEAM,
+                team_id_for_audit,
+                json!({ "slug": team_slug }),
+            )
+            .await;
+            ok_response()
+        }
         Err(e) => {
             tracing::error!(error = %e, "delete team failed");
             server_error("deleteTeam")
@@ -409,6 +443,17 @@ pub async fn add_team_member(
         return server_error("insertTeamMember");
     }
 
+    crate::audit::record(
+        &pool,
+        org_id,
+        Some(user.id),
+        actions::TEAM_MEMBER_ADDED,
+        targets::TEAM_MEMBER,
+        Some(body.user_id),
+        json!({ "team_slug": team_slug, "role": body.role }),
+    )
+    .await;
+
     (StatusCode::CREATED, Json(json!({ "ok": true }))).into_response()
 }
 
@@ -500,7 +545,19 @@ pub async fn remove_team_member(
 
     match res {
         Ok(r) if r.rows_affected() == 0 => not_found("memberNotFound"),
-        Ok(_) => ok_response(),
+        Ok(_) => {
+            crate::audit::record(
+                &pool,
+                org_id,
+                Some(user.id),
+                actions::TEAM_MEMBER_REMOVED,
+                targets::TEAM_MEMBER,
+                Some(target_id),
+                json!({ "team_slug": team_slug, "self_leave": is_self }),
+            )
+            .await;
+            ok_response()
+        }
         Err(e) => {
             tracing::error!(error = %e, "delete team member failed");
             server_error("deleteTeamMember")
@@ -582,6 +639,17 @@ pub async fn assign_project_to_team(
         return server_error("bindProjectTeam");
     }
 
+    crate::audit::record(
+        &pool,
+        org_id,
+        actor_user_id(&caller),
+        actions::PROJECT_TEAM_BOUND,
+        targets::PROJECT_TEAM,
+        Some(project_id),
+        json!({ "team_slug": team_slug }),
+    )
+    .await;
+
     (StatusCode::CREATED, Json(json!({ "ok": true }))).into_response()
 }
 
@@ -619,7 +687,19 @@ pub async fn unassign_project_from_team(
     .await;
 
     match res {
-        Ok(_) => ok_response(),
+        Ok(_) => {
+            crate::audit::record(
+                &pool,
+                org_id,
+                actor_user_id(&caller),
+                actions::PROJECT_TEAM_UNBOUND,
+                targets::PROJECT_TEAM,
+                Some(project_id),
+                json!({ "team_slug": team_slug }),
+            )
+            .await;
+            ok_response()
+        }
         Err(e) => {
             tracing::error!(error = %e, "unbind project from team failed");
             server_error("unbindProjectTeam")
@@ -706,6 +786,13 @@ async fn is_team_lead(pool: &PgPool, team_id: Uuid, user_id: Uuid) -> bool {
 
 fn is_org_admin(role: &str) -> bool {
     matches!(role, "owner" | "admin")
+}
+
+fn actor_user_id(caller: &AdminCaller) -> Option<Uuid> {
+    match caller {
+        AdminCaller::User { id, .. } => Some(*id),
+        _ => None,
+    }
 }
 
 async fn caller_is_org_admin(pool: &PgPool, caller: &AdminCaller, org_id: Uuid) -> bool {

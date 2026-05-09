@@ -1,4 +1,5 @@
 pub mod api;
+pub mod audit;
 pub mod auth;
 pub mod db;
 pub mod error;

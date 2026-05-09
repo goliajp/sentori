@@ -89,6 +89,21 @@ pub async fn create_project(
             .flatten();
     let created_at = row.map(|r| r.0).unwrap_or_else(OffsetDateTime::now_utc);
 
+    let actor = match &caller {
+        AdminCaller::User { id, .. } => Some(*id),
+        _ => None,
+    };
+    crate::audit::record(
+        &pool,
+        org_id,
+        actor,
+        crate::audit::actions::PROJECT_CREATED,
+        crate::audit::targets::PROJECT,
+        Some(project_id),
+        json!({ "name": name }),
+    )
+    .await;
+
     (
         StatusCode::CREATED,
         Json(ProjectCreated {

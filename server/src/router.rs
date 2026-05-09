@@ -190,6 +190,15 @@ pub fn build(cfg: ServerConfig) -> Router {
             axum::routing::delete(api::orgs::delete_invite),
         )
         .route("/invites/{token}/accept", post(api::orgs::accept_invite))
+        .route(
+            "/orgs/{slug}/transfer",
+            post(api::orgs::create_transfer),
+        )
+        .route(
+            "/orgs/transfers/{token}/accept",
+            post(api::orgs::accept_transfer),
+        )
+        .route("/orgs/{slug}/audit", get(api::orgs::list_audit))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             api::user_auth::require_user,

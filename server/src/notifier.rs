@@ -61,6 +61,12 @@ pub enum NotifyEvent {
         limit: i32,
         reset_at: time::OffsetDateTime,
     },
+    OwnershipTransferRequested {
+        to_email: String,
+        from_email: String,
+        org_name: String,
+        link: String,
+    },
 }
 
 /// Spawn the notifier loop. Returns a sender producers can use to enqueue
@@ -263,6 +269,38 @@ async fn handle(
                 } else {
                     tracing::info!(%email, %org_id, threshold, "quota email sent");
                 }
+            }
+            Ok(())
+        }
+        NotifyEvent::OwnershipTransferRequested {
+            to_email,
+            from_email,
+            org_name,
+            link,
+        } => {
+            let transport = build_transport(cfg)?;
+            let from: Mailbox = cfg.from.parse().context("parse from address")?;
+            let to: Mailbox = to_email.parse().context("parse transfer to address")?;
+            let msg = Message::builder()
+                .from(from)
+                .to(to)
+                .subject(format!(
+                    "[Sentori] Ownership of \"{org_name}\" is being transferred to you"
+                ))
+                .body(format!(
+                    "{from_email} wants to transfer ownership of the Sentori organization \
+                     \"{org_name}\" to you.\n\n\
+                     Confirm the transfer:\n{link}\n\n\
+                     This link expires in 7 days. If you didn't expect this, ignore this \
+                     email — no change happens until you click the link.\n\n\
+                     — Sentori"
+                ))
+                .context("build transfer message")?;
+
+            if let Err(e) = transport.send(msg).await {
+                tracing::warn!(error = %e, %to_email, %org_name, "send transfer email failed");
+            } else {
+                tracing::info!(%to_email, %org_name, "transfer email sent");
             }
             Ok(())
         }
