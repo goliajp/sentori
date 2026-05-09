@@ -15,7 +15,7 @@ export const sentori = {
 
 export default sentori;
 
-export { init } from './init';
+export { init, init as initSentori } from './init';
 export { addBreadcrumb } from './breadcrumbs';
 export { setUser, getUser, captureError, captureException } from './capture';
 export { ErrorBoundary } from './error-boundary';

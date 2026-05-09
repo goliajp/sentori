@@ -854,14 +854,16 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 
 #### sub-G — `qualcomm/insight` 接入（Phase 17 的真目的地）
 
-- [ ] sentori prod 注册 / 选 org → create project `qualcomm-insight`
-- [ ] `qualcomm/insight` repo：`bunx expo install @sentori/react-native`
-- [ ] app entry `initSentori({ token, ingestUrl, release, environment })`
-- [ ] iOS：`expo prebuild` + `pod install` + run on simulator → trigger test error → 验证 dashboard 看到
-- [ ] Android：同上
-- [ ] EAS build hook：上传 source map (`@sentori/cli upload sourcemap`) 到 sentori，confirm dashboard 显示原始位置
-- [ ] commit `qualcomm/insight` changes
-- [ ] 🎯 **里程碑：sentori 接住第一个真实生产 RN 应用**
+- [x] sentori prod 注册 / 选 org → create project `qualcomm-insight`（dogfood org，project id `019e0ea2-fe14-7451-9441-a22d34e0fbaa`，public token `st_pk_byhzg0spp3xz7g0kgswk7zr4x8`）
+- [x] `qualcomm/insight` repo：`bun add @goliapkg/sentori-react-native@0.1.2`（npm scope 决策为 `@goliapkg/*`，因为 `@sentori` 在 npmjs.com 仅 web UI 可创建）
+- [x] tenant config 拓展：`TenantInput.sentori?: { ingestUrl; token }` 加到 `src/core/gen/types.ts` + defaults 透传 + `tenants/qualcomm/config.ts` 填值
+- [x] bootstrap 接线：新增 `src/core/bootstrap/scripts/sentori.ts`（prod-only `__DEV__` gate，调 `initSentori`，release 串 `${slug}@${ios.version}+${android.versionCode}`），`setup.ts` 在 sentry import 之前 `import './scripts/sentori'`
+- [x] 用 qualcomm-insight token 模拟 POST 一条事件到 `ingest.sentori.golia.jp/v1/events` → 202 → dashboard 看到 `QualcommInsightSmoke` issue（验证 token + ingest + grouping 全链路工作）
+- [x] commit `qualcomm/insight` changes（commit `0f3fa68b`，`feat: install sentori RN SDK alongside existing sentry`）
+- [ ] iOS：`expo prebuild` + `pod install` + run on simulator → trigger test error → 验证 dashboard 看到（**留给下一次 qualcomm/insight 真机/simulator build cycle**，不在自动化范围内）
+- [ ] Android：同上（同上原因）
+- [ ] EAS build hook：上传 source map (`@sentori/cli upload sourcemap`) 到 sentori，confirm dashboard 显示原始位置（**等首个 RN bundle ship 后再启用**）
+- [ ] 🎯 **里程碑：sentori 接住第一个真实生产 RN 应用**（JS-layer 已就位 + token 已 verify；待下一次 qualcomm/insight 真机 build 跑出第一条 native 事件即勾掉）
 
 #### 实际部署落地（Phase 16 sub-H — 通过 devops infra 接入，而非原计划的"Hetzner + 独立 Caddy"）
 
