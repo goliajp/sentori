@@ -936,14 +936,14 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [x] migration `server/migrations/0010_phase18_orgs.sql`，含外键 + 索引；本地 sentori-pg 应用通过；commit `5ec39d0`
 - [ ] `cargo sqlx prepare`；提交 `.sqlx/`（推迟到 sub-B 写完 query 一并跑）
 
-#### sub-B — server: Team CRUD + ACL middleware
+#### sub-B — server: Team CRUD + ACL middleware ✅
 
-- [ ] `server/src/api/teams.rs`：list / create / patch / delete + member CRUD；routes nest 在 `/admin/api/orgs/{slug}/teams`
-- [ ] `server/src/api/teams.rs`：project↔team binding endpoints（`POST/DELETE /admin/api/projects/{id}/teams/{team_slug}`）
-- [ ] `server/src/auth.rs`：`AuthCtx` 加 `team_ids_for_org(org_id) -> Vec<Uuid>` (Valkey 30s 缓存)
-- [ ] 新 extractor `RequireProjectAccess(project_id)`：检查 user 在该 project 任一关联 team 内 OR 是 org-admin；不通过 403
-- [ ] 把 `projects.rs` / `tokens.rs` / issue endpoints 全部 wrap 上该 extractor
-- [ ] tests：team 成员能读、非成员 403、org admin bypass、token 操作受同样保护
+- [x] `server/src/api/teams.rs` 团队 CRUD + member CRUD：routes 在 `/api/orgs/{slug}/teams[/{team_slug}/...]`（不是 `/admin/api/...`，因为团队是 org 概念，复用既有 `require_user` 路由分组）
+- [x] `server/src/api/teams.rs` 加 `list_team_projects / list_project_teams / assign_project_to_team / unassign_project_from_team`：project↔team 绑定 endpoints 在 `/admin/api/projects/{id}/teams[/{team_slug}]`（admin 路由，需要 owner/admin 角色）
+- [ ] ~~`server/src/auth.rs`：`AuthCtx` 加 `team_ids_for_org(org_id) -> Vec<Uuid>` (Valkey 30s 缓存)~~ — 推迟；当前 inline 两条 query 简单且 dev 流量下零成本，等 Phase 23 perf 真有压力再上缓存
+- [x] 拓展 `admin_auth::require_project_in_org`（不开新 extractor）：未绑团队 → 任意 org 成员通过；绑了团队 → 必须在某关联 team 中 OR org owner/admin
+- [x] `projects.rs / tokens.rs / issue endpoints` 已经全部走 admin 路由，自动被改造后的 middleware 覆盖
+- [x] tests：`server/tests/teams.rs` 两个 case：(1) owner 建 team 200 / plain member 建 team 403 / member 给自己加 team 403；(2) 绑团队后 in-team 成员 200 / out-of-team 成员 403 / owner 200。本地 sentori-pg `cargo test` 全 12 个测试 pass。commit `4398d4b`
 
 #### sub-C — server: Ownership transfer + audit log
 
