@@ -45,6 +45,7 @@ pub struct AppState {
     pub rate_limit_per_min: u32,
     pub admin_password: String,
     pub session_secret: String,
+    pub notifier_tx: Option<tokio::sync::mpsc::Sender<crate::notifier::NotifyEvent>>,
 }
 
 impl FromRef<AppState> for AuthState {

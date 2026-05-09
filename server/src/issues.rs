@@ -17,10 +17,12 @@ pub async fn upsert_issue(
     project_id: Uuid,
     fingerprint: &str,
     event: &Event,
-) -> Result<Uuid, sqlx::Error> {
+) -> Result<(Uuid, bool), sqlx::Error> {
     let new_id = Uuid::now_v7();
 
-    let row: (Uuid,) = sqlx::query_as(
+    // PG's `xmax` is 0 when the row was inserted (i.e. not the conflict
+    // path). Used to tell new vs. updated for the new-issue notifier.
+    let row: (Uuid, bool) = sqlx::query_as(
         r#"
         INSERT INTO issues
             (id, project_id, fingerprint, error_type, message_sample,
@@ -32,7 +34,7 @@ pub async fn upsert_issue(
             event_count      = issues.event_count + 1,
             last_environment = EXCLUDED.last_environment,
             last_release     = EXCLUDED.last_release
-        RETURNING id
+        RETURNING id, (xmax = 0) AS is_new
         "#,
     )
     .bind(new_id)
@@ -46,5 +48,5 @@ pub async fn upsert_issue(
     .fetch_one(pool)
     .await?;
 
-    Ok(row.0)
+    Ok(row)
 }

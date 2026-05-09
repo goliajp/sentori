@@ -133,13 +133,26 @@ export const adminApi = {
     return adminFetch<EventRow[]>(`/projects/${projectId}/issues/${issueId}/events${qs}`)
   },
 
-  listIssues: (projectId: string, params: { limit?: number; status?: string } = {}) => {
+  listIssues: (
+    projectId: string,
+    params: {
+      env?: string
+      limit?: number
+      release?: string
+      status?: string
+    } = {}
+  ) => {
     const usp = new URLSearchParams()
     if (params.status) usp.set('status', params.status)
     if (params.limit !== undefined) usp.set('limit', String(params.limit))
+    if (params.env) usp.set('env', params.env)
+    if (params.release) usp.set('release', params.release)
     const qs = usp.toString() ? `?${usp.toString()}` : ''
     return adminFetch<IssueRow[]>(`/projects/${projectId}/issues${qs}`)
   },
+
+  listReleasesForIssue: (projectId: string, issueId: string) =>
+    adminFetch<string[]>(`/projects/${projectId}/issues/${issueId}/releases`),
 
   login: (password: string) =>
     adminFetch<{ ok: true }>('/login', {

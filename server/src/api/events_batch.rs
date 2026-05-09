@@ -60,8 +60,8 @@ pub async fn handle(
                         serde_json::to_string_pretty(&event)
                             .unwrap_or_else(|_| "<failed to serialize>".into())
                     );
-                    if let Some(pool) = &state.db {
-                        if let Err(e) = persist_with_grouping(pool, state.project_id, &event).await {
+                    if state.db.is_some() {
+                        if let Err(e) = persist_with_grouping(&state, &event).await {
                             tracing::error!(error = %e, "failed to persist event");
                         }
                     }

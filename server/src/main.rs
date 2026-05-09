@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
 use anyhow::Context;
-use sentori_server::{db, router, seed, valkey};
+use sentori_server::{db, notifier, router, seed, valkey};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -56,6 +56,30 @@ async fn main() -> anyhow::Result<()> {
             "dev-only-do-not-use-in-prod".to_string()
         });
 
+    // SMTP notifier — optional. Spawns the loop unconditionally so callers
+    // don't need to special-case None; without SMTP_HOST every emit is a
+    // best-effort no-op.
+    let notifier_cfg = match std::env::var("SENTORI_SMTP_HOST").ok() {
+        Some(host) => Some(notifier::NotifierConfig {
+            smtp_host: host,
+            smtp_port: std::env::var("SENTORI_SMTP_PORT")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(587),
+            smtp_user: std::env::var("SENTORI_SMTP_USER").ok(),
+            smtp_pass: std::env::var("SENTORI_SMTP_PASS").ok(),
+            from: std::env::var("SENTORI_SMTP_FROM")
+                .unwrap_or_else(|_| "sentori@localhost".to_string()),
+        }),
+        None => {
+            tracing::info!("no SENTORI_SMTP_HOST set; email notifications disabled");
+            None
+        }
+    };
+    let notifier_tx = pool
+        .as_ref()
+        .map(|p| notifier::start(notifier_cfg.clone(), p.clone()));
+
     let addr: SocketAddr = "0.0.0.0:8080".parse()?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
 
@@ -69,6 +93,7 @@ async fn main() -> anyhow::Result<()> {
         rate_limit_per_min,
         admin_password,
         session_secret,
+        notifier_tx,
     });
     axum::serve(listener, app).await?;
 

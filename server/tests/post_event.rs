@@ -18,6 +18,7 @@ async fn spawn() -> SocketAddr {
         rate_limit_per_min: 10_000,
         admin_password: "test".to_string(),
         session_secret: "test-secret".to_string(),
+        notifier_tx: None,
     });
 
     tokio::spawn(async move {

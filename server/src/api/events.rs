@@ -29,8 +29,8 @@ pub async fn handle(
             .unwrap_or_else(|_| "<failed to serialize>".into())
     );
 
-    if let Some(pool) = &state.db {
-        if let Err(e) = persist_with_grouping(pool, state.project_id, &event).await {
+    if state.db.is_some() {
+        if let Err(e) = persist_with_grouping(&state, &event).await {
             tracing::error!(error = %e, "failed to persist event");
         }
     }
@@ -40,16 +40,32 @@ pub async fn handle(
     Ok(StatusCode::ACCEPTED)
 }
 
-/// Compute fingerprint, upsert the issue, then insert the event row
-/// linked to that issue.
+/// Compute fingerprint, upsert the issue, insert the event row linked
+/// to that issue, and (if the upsert was an INSERT, not a conflict)
+/// enqueue a NewIssue notification. Caller must ensure `state.db` is
+/// Some.
 pub(crate) async fn persist_with_grouping(
-    pool: &PgPool,
-    project_id: Uuid,
+    state: &AppState,
     event: &Event,
 ) -> Result<(), sqlx::Error> {
+    let pool = state.db.as_ref().expect("persist_with_grouping requires db");
     let fp = crate::grouping::fingerprint(event);
-    let issue_id = crate::issues::upsert_issue(pool, project_id, &fp, event).await?;
-    persist_event_row(pool, project_id, event, Some(issue_id)).await
+    let (issue_id, is_new) =
+        crate::issues::upsert_issue(pool, state.project_id, &fp, event).await?;
+    persist_event_row(pool, state.project_id, event, Some(issue_id)).await?;
+
+    if is_new {
+        if let Some(tx) = &state.notifier_tx {
+            let _ = tx.try_send(crate::notifier::NotifyEvent::NewIssue {
+                project_id: state.project_id,
+                issue_id,
+                error_type: event.error.r#type.clone(),
+                message: event.error.message.clone(),
+            });
+        }
+    }
+
+    Ok(())
 }
 
 async fn persist_event_row(

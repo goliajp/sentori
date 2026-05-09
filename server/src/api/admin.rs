@@ -32,6 +32,12 @@ pub struct ListIssuesQuery {
     pub status: String,
     #[serde(default)]
     pub limit: Option<i64>,
+    /// Filter on `issues.last_environment` (denormalized from latest event).
+    #[serde(default)]
+    pub env: Option<String>,
+    /// Filter on `issues.last_release` (denormalized from latest event).
+    #[serde(default)]
+    pub release: Option<String>,
 }
 
 fn default_status() -> String {
@@ -52,18 +58,46 @@ pub async fn list_issues(
                first_seen, last_seen, event_count,
                last_environment, last_release
         FROM issues
-        WHERE project_id = $1 AND status = $2
+        WHERE project_id = $1
+          AND status = $2
+          AND ($3::TEXT IS NULL OR last_environment = $3)
+          AND ($4::TEXT IS NULL OR last_release = $4)
         ORDER BY last_seen DESC
-        LIMIT $3
+        LIMIT $5
         "#,
     )
     .bind(project_id)
     .bind(&q.status)
+    .bind(q.env.as_deref())
+    .bind(q.release.as_deref())
     .bind(limit)
     .fetch_all(pool)
     .await
     .map_err(|e| AppError::Internal(e.to_string()))?;
 
+    Ok(Json(rows))
+}
+
+/// `GET /admin/api/projects/{project_id}/issues/{issue_id}/releases`
+/// Distinct release names this issue has been seen on, sorted ascending.
+pub async fn releases_for_issue(
+    State(state): State<AppState>,
+    Path((project_id, issue_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<Vec<String>>, AppError> {
+    let pool = state.db.as_ref().ok_or(AppError::DatabaseUnavailable)?;
+    let rows: Vec<String> = sqlx::query_scalar(
+        r#"
+        SELECT DISTINCT release
+        FROM events
+        WHERE project_id = $1 AND issue_id = $2
+        ORDER BY release
+        "#,
+    )
+    .bind(project_id)
+    .bind(issue_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(rows))
 }
 

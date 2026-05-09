@@ -15,7 +15,7 @@
 - [x] **Phase 6** — Web dashboard MVP
 - [x] **Phase 7** — RN SDK Native 层（iOS NSException + Android uncaught）
 - [x] **Phase 8** — Sourcemap 上传 + 服务端符号化
-- [ ] **Phase 9** — Release / Env / 邮件告警
+- [x] **Phase 9** — Release / Env / 邮件告警
 - [ ] **Phase 10** — Docker compose + 文档 + **self-hosted v0.1.0** 🎯
 - [ ] **Phase 11** — 域名 / DNS / TLS 准备（sentori.golia.jp 拓扑落地）
 - [ ] **Phase 12** — Marketing 站 + 文档站
@@ -405,18 +405,18 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 
 ### Steps
 
-- [ ] migration `0003_notifications.sql`：`notification_recipients` (id, project_id FK, email, on_new_issue, on_regression, created_at)
-- [ ] dashboard `IssueListView` 加过滤器：env 多选、release 多选、status 切换
-- [ ] dashboard `IssueDetailView` 新增"出现的 release"列表（小 chip）
-- [ ] 加依赖：`lettre`（SMTP）
-- [ ] 写 `server/src/notifier.rs`：
-  - [ ] 监听新 issue 创建事件（先用 channel + 后台 task；不引 Kafka）
-  - [ ] 拉 recipients → 渲染邮件 → `lettre` 发送
-  - [ ] 失败重试 3 次
-- [ ] 配置 SMTP via env：`SENTORI_SMTP_HOST` / `_PORT` / `_USER` / `_PASS` / `_FROM`
+- [x] migration `0003_notifications.sql`：`notification_recipients` (id, project_id FK, email, on_new_issue, on_regression, created_at)
+- [x] dashboard `IssueListView` 加过滤器：env 多选、release 多选、status 切换
+- [x] dashboard `IssueDetailView` 新增"出现的 release"列表（小 chip）
+- [x] 加依赖：`lettre`（SMTP）
+- [x] 写 `server/src/notifier.rs`：
+  - [x] 监听新 issue 创建事件（先用 channel + 后台 task；不引 Kafka）
+  - [x] 拉 recipients → 渲染邮件 → `lettre` 发送
+  - [x] 失败重试 3 次
+- [x] 配置 SMTP via env：`SENTORI_SMTP_HOST` / `_PORT` / `_USER` / `_PASS` / `_FROM`
 - [ ] dashboard project settings 页：增删 recipient
 - [ ] 集成测试：用 `mailcatcher` 容器，触发新 issue，断言邮件入箱
-- [ ] commit：`feat: release/env filters and email notifications on new issues`
+- [x] commit：`feat: release/env filters and email notifications on new issues`
 
 ---
 

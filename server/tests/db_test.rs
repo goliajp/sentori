@@ -33,6 +33,7 @@ async fn setup() -> Option<(SocketAddr, PgPool)> {
         rate_limit_per_min: 10_000,
         admin_password: "dbtest".to_string(),
         session_secret: "dbtest-secret".to_string(),
+        notifier_tx: None,
     });
 
     tokio::spawn(async move {
@@ -71,6 +72,7 @@ async fn rate_limit_returns_429_when_exceeding_threshold() {
         rate_limit_per_min: 3,
         admin_password: "rl".to_string(),
         session_secret: "rl-secret".to_string(),
+        notifier_tx: None,
     });
     tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();

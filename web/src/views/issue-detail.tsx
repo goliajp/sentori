@@ -32,6 +32,12 @@ export function IssueDetailView() {
     queryKey: ['events', DEV_PROJECT_ID, issueId, symbolicated],
   })
 
+  const releasesQuery = useQuery({
+    enabled: !!issueId,
+    queryFn: () => adminApi.listReleasesForIssue(DEV_PROJECT_ID, issueId!),
+    queryKey: ['issue-releases', DEV_PROJECT_ID, issueId],
+  })
+
   const events = eventsQuery.data ?? []
   const [selectedIdx, setSelectedIdx] = useState(0)
   const safeIdx = events.length > 0 ? Math.min(selectedIdx, events.length - 1) : 0
@@ -125,6 +131,21 @@ export function IssueDetailView() {
             {payload.tags && Object.keys(payload.tags).length > 0 && (
               <Section title="Tags">
                 <KeyValueGrid data={payload.tags} />
+              </Section>
+            )}
+
+            {releasesQuery.data && releasesQuery.data.length > 0 && (
+              <Section title="Releases">
+                <div className="flex flex-wrap gap-2">
+                  {releasesQuery.data.map((r) => (
+                    <span
+                      className="border-border bg-bg-tertiary text-fg-muted rounded-md border px-2 py-0.5 font-mono text-[12px]"
+                      key={r}
+                    >
+                      {r}
+                    </span>
+                  ))}
+                </div>
               </Section>
             )}
 

@@ -11,14 +11,21 @@ const STATUSES: readonly Status[] = ['active', 'silenced', 'closed']
 export function IssuesView() {
   const navigate = useNavigate()
   const [status, setStatus] = useState<Status>('active')
+  const [env, setEnv] = useState('')
+  const [release, setRelease] = useState('')
   const [filter, setFilter] = useState('')
   const [selectedIdx, setSelectedIdx] = useState(0)
   const searchRef = useRef<HTMLInputElement>(null)
 
   const queryClient = useQueryClient()
   const { data, isLoading, error } = useQuery({
-    queryFn: () => adminApi.listIssues(DEV_PROJECT_ID, { status }),
-    queryKey: ['issues', DEV_PROJECT_ID, status],
+    queryFn: () =>
+      adminApi.listIssues(DEV_PROJECT_ID, {
+        env: env || undefined,
+        release: release || undefined,
+        status,
+      }),
+    queryKey: ['issues', DEV_PROJECT_ID, status, env, release],
   })
 
   const silenceMutation = useMutation({
@@ -87,7 +94,19 @@ export function IssuesView() {
             </button>
           ))}
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <input
+            className="border-border bg-bg-tertiary text-fg focus:ring-accent w-24 rounded-md border px-2 py-1 text-[12px] focus:ring-1 focus:outline-none"
+            onChange={(e) => setEnv(e.target.value)}
+            placeholder="env"
+            value={env}
+          />
+          <input
+            className="border-border bg-bg-tertiary text-fg focus:ring-accent w-32 rounded-md border px-2 py-1 text-[12px] focus:ring-1 focus:outline-none"
+            onChange={(e) => setRelease(e.target.value)}
+            placeholder="release"
+            value={release}
+          />
           <input
             className="border-border bg-bg-tertiary text-fg focus:ring-accent w-56 rounded-md border px-3 py-1 text-[13px] focus:ring-1 focus:outline-none"
             onChange={(e) => setFilter(e.target.value)}

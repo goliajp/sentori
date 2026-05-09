@@ -20,6 +20,7 @@ pub struct ServerConfig {
     pub rate_limit_per_min: u32,
     pub admin_password: String,
     pub session_secret: String,
+    pub notifier_tx: Option<tokio::sync::mpsc::Sender<crate::notifier::NotifyEvent>>,
 }
 
 pub fn build(cfg: ServerConfig) -> Router {
@@ -34,6 +35,7 @@ pub fn build(cfg: ServerConfig) -> Router {
         rate_limit_per_min: cfg.rate_limit_per_min,
         admin_password: cfg.admin_password,
         session_secret: cfg.session_secret,
+        notifier_tx: cfg.notifier_tx,
     };
 
     let ingestion = Router::new()
@@ -58,6 +60,10 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route(
             "/projects/{project_id}/issues/{issue_id}/events",
             get(api::admin::list_events_for_issue),
+        )
+        .route(
+            "/projects/{project_id}/issues/{issue_id}/releases",
+            get(api::admin::releases_for_issue),
         )
         .route(
             "/releases/{release_name}/sourcemaps",
