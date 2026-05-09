@@ -77,6 +77,14 @@ export function RecipientSettingsView() {
         <p className="text-fg-muted mt-1 text-sm">
           Emails listed here receive new-issue / regression alerts for this project.
         </p>
+        <div className="text-fg-muted mt-2 flex gap-3 text-xs">
+          <Link
+            className="hover:text-fg"
+            to={`/org/${currentOrg.slug}/projects/${projectId}/settings/tokens`}
+          >
+            Tokens →
+          </Link>
+        </div>
       </header>
 
       <section className="space-y-3">

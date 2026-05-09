@@ -643,13 +643,14 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
   - [x] Step 1: "Create your first project" → name 输入 → 自动 create project + create default token，raw token 透传到下一步
   - [x] Step 2: "Install the SDK" → 显示 token + ingestUrl + bun install + initSentori snippet + copy button
   - [x] Step 3: "Send your first event" → poll `listIssues(projectId)` 每 3s，第一条 issue 出现自动 navigate to issues
-- [ ] 在 dashboard 顶部加"Onboarding pending"红点，未完成时常驻
-- [ ] 项目设置页：token 管理（生成 / 撤销 / 标签）—— 后端就绪 (sub-A)：
+- [x] 顶栏 `OnboardingBadge` 红点：当前 org 没 project 或 first project 没 events（issues count == 0）时显示，点击 → `/onboarding`；refetch 60s；RootRedirect 优先把没 project 的 user 直接跳 onboarding
+- [x] 项目设置页：token 管理（生成 / 撤销 / 标签）：
   - [x] migration `0008_tokens_meta.sql`：tokens 加 `label` + `last4`
   - [x] `POST /admin/api/orgs/{slug}/projects` —— User caller 必须是 owner/admin
   - [x] `POST /admin/api/projects/{id}/tokens` —— 返回 raw token 一次（`st_pk_<26 Crockford>` = 32 chars 总），DB 只存 sha256 hash + last4 + label
   - [x] `GET /admin/api/projects/{id}/tokens` —— 列出 metadata（不含 raw）
   - [x] `DELETE /admin/api/projects/{id}/tokens/{tid}` —— 撤销（set revoked_at）；revoked token → /v1/events 401
+  - [x] dashboard `/org/:slug/projects/:id/settings/tokens` (`TokenSettingsView`)：generate form (label + kind public/admin) + 一次性 reveal box（copy / dismiss）+ tokens table（label / kind / last4 / created / status / Revoke）；recipient/token settings 互相 cross-link
 - [ ] 邀请协作者流程：
   - [ ] org settings 页"Invite member" → 输入 email + 角色 → 发邀请邮件
   - [ ] 邀请链接 `/invite/:token` → 已登录直接加入；未注册引导注册

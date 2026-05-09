@@ -4,6 +4,7 @@ import { Link, Navigate, Outlet, useLocation, useParams } from 'react-router'
 import { adminApi, orgsApi } from '@/api/client'
 import { OrgCtx } from '@/auth/orgContext'
 import { useAuth } from '@/auth/state'
+import { OnboardingBadge } from '@/components/OnboardingBadge'
 import { OrgSwitcher } from '@/components/OrgSwitcher'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useThemeEffect } from '@/components/theme'
@@ -76,6 +77,7 @@ export function OrgLayout() {
             </nav>
           </div>
           <div className="flex items-center gap-3">
+            <OnboardingBadge project={currentProject} />
             <span className="text-fg-muted hidden text-xs sm:inline">{user?.email}</span>
             <ThemeToggle />
             <button

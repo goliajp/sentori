@@ -17,6 +17,7 @@ import { OrgLayout } from './views/org-layout'
 import { OrgSettingsView } from './views/org-settings'
 import { RecipientSettingsView } from './views/recipient-settings'
 import { RegisterView } from './views/register'
+import { TokenSettingsView } from './views/token-settings'
 import { RootRedirect } from './views/root-redirect'
 import { VerifyView } from './views/verify'
 
@@ -40,6 +41,10 @@ const router = createBrowserRouter([
           {
             element: <RecipientSettingsView />,
             path: 'projects/:projectId/settings/recipients',
+          },
+          {
+            element: <TokenSettingsView />,
+            path: 'projects/:projectId/settings/tokens',
           },
         ],
         element: <OrgLayout />,
