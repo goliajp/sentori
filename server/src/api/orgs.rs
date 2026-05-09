@@ -277,6 +277,172 @@ pub async fn delete_org(
     ok_response()
 }
 
+// ---------- data export (Phase 16 sub-D, GDPR) ----------
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportResponse {
+    org: OrgRow,
+    members: Vec<MemberRow>,
+    projects: Vec<ExportedProject>,
+    pending_invites: Vec<InviteRow>,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+struct ExportedProject {
+    id: Uuid,
+    name: String,
+    created_at: OffsetDateTime,
+    tokens: Vec<ExportedToken>,
+    recipients: Vec<ExportedRecipient>,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+struct ExportedToken {
+    id: Uuid,
+    kind: String,
+    label: Option<String>,
+    last4: Option<String>,
+    created_at: OffsetDateTime,
+    revoked_at: Option<OffsetDateTime>,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+struct ExportedRecipient {
+    id: Uuid,
+    email: String,
+    on_new_issue: bool,
+    on_regression: bool,
+    created_at: OffsetDateTime,
+}
+
+/// GET /api/orgs/{slug}/export
+/// Owner/admin-only metadata dump for GDPR / due-diligence requests.
+/// Excludes raw event payloads (potentially huge) — those are
+/// retrievable per-issue via the existing admin API.
+pub async fn export_org(
+    State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
+    Path(slug): Path<String>,
+) -> Response {
+    let pool = match &state.db {
+        Some(p) => p.clone(),
+        None => return server_error("dbNotConfigured"),
+    };
+
+    let (org_id, role) = match resolve_membership(&pool, &slug, user.id).await {
+        Some(m) => m,
+        None => return not_found("orgNotFound"),
+    };
+    if !matches!(role.as_str(), "owner" | "admin") {
+        return forbidden("forbidden");
+    }
+
+    let org_row: Option<OrgRow> = sqlx::query_as(
+        "SELECT o.id, o.slug, o.name, o.owner_id, o.created_at, m.role \
+         FROM orgs o JOIN memberships m ON m.org_id = o.id \
+         WHERE o.id = $1 AND m.user_id = $2",
+    )
+    .bind(org_id)
+    .bind(user.id)
+    .fetch_optional(&pool)
+    .await
+    .ok()
+    .flatten();
+    let org_row = match org_row {
+        Some(r) => r,
+        None => return not_found("orgNotFound"),
+    };
+
+    let members: Vec<MemberRow> = sqlx::query_as(
+        "SELECT m.user_id, u.email, m.role, m.created_at \
+         FROM memberships m JOIN users u ON u.id = m.user_id \
+         WHERE m.org_id = $1 ORDER BY m.created_at",
+    )
+    .bind(org_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap_or_default();
+
+    let pending_invites: Vec<InviteRow> = sqlx::query_as(
+        "SELECT token, email, role, expires_at, used_at, created_at \
+         FROM org_invites WHERE org_id = $1 AND used_at IS NULL \
+         ORDER BY created_at",
+    )
+    .bind(org_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap_or_default();
+
+    #[derive(sqlx::FromRow)]
+    struct PRow {
+        id: Uuid,
+        name: String,
+        created_at: OffsetDateTime,
+    }
+    let project_rows: Vec<PRow> = sqlx::query_as(
+        "SELECT id, name, created_at FROM projects \
+         WHERE org_id = $1 ORDER BY created_at",
+    )
+    .bind(org_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap_or_default();
+
+    let mut projects = Vec::with_capacity(project_rows.len());
+    for p in project_rows {
+        let tokens: Vec<ExportedToken> = sqlx::query_as(
+            "SELECT id, kind, label, last4, created_at, revoked_at \
+             FROM tokens WHERE project_id = $1 ORDER BY created_at",
+        )
+        .bind(p.id)
+        .fetch_all(&pool)
+        .await
+        .unwrap_or_default();
+        let recipients: Vec<ExportedRecipient> = sqlx::query_as(
+            "SELECT id, email, on_new_issue, on_regression, created_at \
+             FROM notification_recipients WHERE project_id = $1 \
+             ORDER BY created_at",
+        )
+        .bind(p.id)
+        .fetch_all(&pool)
+        .await
+        .unwrap_or_default();
+        projects.push(ExportedProject {
+            id: p.id,
+            name: p.name,
+            created_at: p.created_at,
+            tokens,
+            recipients,
+        });
+    }
+
+    let body = ExportResponse {
+        org: org_row,
+        members,
+        projects,
+        pending_invites,
+    };
+
+    let filename = format!(
+        "sentori-{}-{}.json",
+        slug,
+        OffsetDateTime::now_utc().date()
+    );
+    (
+        StatusCode::OK,
+        [(
+            axum::http::header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{filename}\""),
+        )],
+        Json(body),
+    )
+        .into_response()
+}
+
 // ---------- usage / quota (Phase 15 sub-D) ----------
 
 #[derive(Serialize)]

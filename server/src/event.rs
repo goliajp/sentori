@@ -125,8 +125,13 @@ pub struct Framework {
     pub version: String,
 }
 
+/// PII-minimal user identity attached to an event. The shape is
+/// intentionally limited to `{ id, anonymous }` — no email, name, IP,
+/// or other identifying fields. Phase 16 sub-D's privacy stance: the
+/// server never indexes user data and the SDK can't ship richer
+/// identities without changing this struct first.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct User {
     #[serde(default)]
     pub id: Option<String>,

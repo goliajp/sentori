@@ -740,14 +740,14 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 
 #### 安全 / 隐私
 
-- [ ] HTTPS only + HSTS（max-age=63072000; includeSubDomains; preload）
-- [ ] CORS：dashboard 限同源 + ingest 公开（`Access-Control-Allow-Origin: *`）
-- [ ] CSP 收紧：marketing/dashboard
-- [ ] secrets 管理：用 `sops` + age key（不硬编码 .env）
-- [ ] DDoS：Cloudflare 兜底
-- [ ] 写 `docs/legal/privacy.md`（隐私政策）+ `docs/legal/terms.md`（ToS）+ marketing 链接
-- [ ] PII 默认行为：SDK 不上传 user.email；只 user.id；服务端不索引 user 字段
-- [ ] 数据导出 API（GDPR 风险预防）
+- [x] HTTPS only + HSTS（max-age=63072000; includeSubDomains; preload）—— Caddyfile 全局 `security_headers` snippet (sub-A)
+- [x] CORS：dashboard 限同源 + ingest 公开 —— api./ingest. site 不同 CORS (sub-A)
+- [x] CSP 收紧：dashboard `default-src 'self'; connect-src 'self' api./ingest.` (sub-A)
+- [x] secrets 管理：`ops/secrets.md` —— sops + age cookbook（recipient 列表 in `.sops.yaml`，VM 用独立 age key，rotation 流程）
+- [ ] **(user-owned)** DDoS：Cloudflare 兜底（CF 控制台 grey/orange 切换 + WAF 规则）
+- [x] `docs/legal/privacy.md` + `docs/legal/terms.md`（draft template，需 lawyer review；marketing footer 已加 Privacy/Terms 链）
+- [x] PII 默认行为：SDK 不上传 user.email；schema enforce —— SDK `User = {id?, anonymous?}` 已就位 (Phase 1)；server `event::User` 加 `deny_unknown_fields` 强拒 PII；SDK `setUser` JSDoc 明确政策
+- [x] 数据导出 API（GDPR 风险预防）：`GET /api/orgs/{slug}/export` —— owner/admin 拿到 org + members + projects (含 tokens metadata + recipients) + pending invites 的 JSON dump，附 `Content-Disposition: attachment; filename=...`（events 全量留 V2，太大）
 
 #### Testing（回填 v0.1 deferred）
 

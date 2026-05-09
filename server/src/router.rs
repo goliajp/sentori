@@ -143,6 +143,7 @@ pub fn build(cfg: ServerConfig) -> Router {
                 .delete(api::orgs::delete_org),
         )
         .route("/orgs/{slug}/usage", get(api::orgs::org_usage))
+        .route("/orgs/{slug}/export", get(api::orgs::export_org))
         .route("/orgs/{slug}/members", get(api::orgs::list_members))
         .route(
             "/orgs/{slug}/members/{user_id}",

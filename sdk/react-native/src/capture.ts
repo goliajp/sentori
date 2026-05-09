@@ -7,6 +7,18 @@ import type { App, Device, Event, SentoriError, Tags, User } from './types';
 
 let _user: User | null = null;
 
+/**
+ * Attach a stable user identifier to events captured after this call.
+ *
+ * PII policy (Phase 16 sub-D): the User shape is intentionally limited
+ * to `{ id?, anonymous? }` — no email, name, IP, or other identifying
+ * fields. Use a hashed / pseudonymous id (e.g. uuid v4 stored in
+ * AsyncStorage on first launch). The server schema enforces the same
+ * shape, so any extra fields you tack on at the JS layer would be
+ * rejected with `validationFailed` and never persisted.
+ *
+ * Pass `null` to clear (e.g. on sign-out).
+ */
 export const setUser = (user: User | null): void => {
   _user = user;
 };
