@@ -445,6 +445,35 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 
 ---
 
+## v0.1.0 launch checklist
+
+Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v0.1.0 之前由你拾起的收尾——做完后 Phase 0–10 真正 close，进入 Phase 11（SaaS arc）。
+
+- [ ] 用一台干净 mac 跑 `docs/getting-started.md`，计时 ≤ 5 分钟（来自 Phase 10 line 441）
+- [ ] iOS simulator 端到端：`cd sdk/react-native/example && bunx expo prebuild && cd ios && bundle exec pod install && cd .. && bun run ios` → tap "Native crash" → relaunch → server stdout 收到 `platform: ios` 事件（来自 Phase 7 line 358）
+- [ ] Android emulator 端到端：`bun run android` → 同上验证 `platform: android` 事件（来自 Phase 7 line 368）
+- [ ] `git tag v0.1.0 -m "Sentori v0.1.0 — self-hosted MVP"` + 推 + 写 GitHub release notes（来自 Phase 10 line 442）
+- [ ] （可选）self-dogfooding：本地 server 接 1-2 天看 ingestion / grouping / 邮件告警
+
+## v0.1 范围内已 deferred 项（已分配到后续 phase）
+
+各 phase 实施时被明确推迟的 step 都记录在这里，避免遗漏：
+
+| 来自 | 内容 | 在哪儿拾起 |
+|---|---|---|
+| Phase 4 | `e2e/run-android.sh` + GitHub Actions simulator runner | Phase 16 Testing 段（与 simulator GUI 自动化整体一起做） |
+| Phase 6 line 308 | `GET /admin/api/projects` | Phase 13 Server 段（multi-tenant 时做 project list） |
+| Phase 6 line 313 | `utoipa` OpenAPI 自动导出 | v0.2（非阻塞，先手写 types） |
+| Phase 7 line 354 | iOS XCTest（NSException + 文件落盘） | Phase 16 Testing 段 |
+| Phase 7 line 358 | iOS simulator end-to-end | v0.1.0 launch checklist 上方 + Phase 16 Testing 段（自动化） |
+| Phase 7 line 366 | Android Robolectric | Phase 16 Testing 段 |
+| Phase 7 line 368 | Android emulator end-to-end | v0.1.0 launch checklist 上方 + Phase 16 Testing 段（自动化） |
+| Phase 8 line 394 | minified bundle → cli upload → dashboard 验证原始位置 e2e | Phase 16 Testing 段 |
+| Phase 9 line 417 | recipient 管理 UI | Phase 13 Dashboard 段（与 org settings 一起做） |
+| Phase 9 line 418 | mailcatcher 集成测试 | Phase 16 Testing 段 |
+
+---
+
 ## Phase 11 — 域名 / DNS / TLS 准备
 
 **Goal:** 通过 devops `zones.yaml` 把 `sentori.golia.jp` 主域 + 5 个 4 段 subdomain（status 留到 Phase 16）落地；origin VM 上 Caddy 自动 ACME 出 cert。
@@ -549,7 +578,7 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 
 #### 数据模型
 
-- [ ] migration `0004_multi_tenant.sql`：
+- [ ] migration `0007_multi_tenant.sql` (前 6 个 migration 已用：0001 init / 0002 issues / 0003 partition / 0004 issue_denorm / 0005 release_artifacts / 0006 notifications)：
   - [ ] `users` (id, email UNIQUE, password_hash, email_verified, created_at)
   - [ ] `orgs` (id, slug UNIQUE, name, created_at, owner_id FK)
   - [ ] `memberships` (org_id FK, user_id FK, role enum('owner','admin','member'), created_at, PK(org_id, user_id))
@@ -574,12 +603,14 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
   - [ ] 邀请流程（生成 invite token + 邮件发送 + 接受）
 - [ ] middleware：所有 admin API 校验 session + scope 到 user 所属 org
 - [ ] rate limit：注册 / 登录端点（防爆破，Valkey 计数）
+- [ ] `GET /admin/api/projects`：列出当前 user 所属 org 下的 projects（**回填 Phase 6 line 308 deferred**）
 
 #### Dashboard
 
 - [ ] 路由：`/login` / `/register` / `/verify` / `/forgot-password`（先 stub 后两者）
 - [ ] 顶栏 org switcher
 - [ ] `/org/:slug/settings`：成员列表 + 邀请按钮
+- [ ] `/org/:slug/projects/:id/settings/recipients`：增删 `notification_recipients` 行（**回填 Phase 9 line 417 deferred**）
 - [ ] 所有 issue/project 路由前缀加 `/org/:slug`
 - [ ] onboarding：注册成功 → 自动建 personal org（slug = email 前缀）
 
@@ -624,7 +655,7 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 
 ### Steps
 
-- [ ] migration `0005_quotas.sql`：
+- [ ] migration `0008_quotas.sql`：
   - [ ] `org_quotas` (org_id PK, plan enum('free','pro','enterprise'), event_limit_monthly, retention_days)
   - [ ] `usage_counters` (org_id, period_yyyymm, event_count, dropped_count, PK)
 - [ ] server ingestion 路径加 quota check：
@@ -695,6 +726,16 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [ ] 写 `docs/legal/privacy.md`（隐私政策）+ `docs/legal/terms.md`（ToS）+ marketing 链接
 - [ ] PII 默认行为：SDK 不上传 user.email；只 user.id；服务端不索引 user 字段
 - [ ] 数据导出 API（GDPR 风险预防）
+
+#### Testing（回填 v0.1 deferred）
+
+- [ ] iOS XCTest：触发 NSException → 断言 `<Documents>/sentori/pending/*.json` 出现 + 内容反序列化为合法 Event（**回填 Phase 7 line 354**）
+- [ ] Android Robolectric：触发 RuntimeException → 断言 `<filesDir>/sentori/pending/*.json` 出现（**回填 Phase 7 line 366**）
+- [ ] mailcatcher 集成测试：起 mailcatcher 容器 + 触发新 issue 通过 server → 断言邮件入箱（**回填 Phase 9 line 418**）
+- [ ] iOS simulator e2e 自动化：`xcrun simctl install` + `launch` + 通过 deep link / 按钮触发 → poll `/v1/events/_recent`（**回填 Phase 7 line 358 + Phase 4 e2e/run.sh simulator path**）
+- [ ] Android emulator e2e 自动化：`adb shell am start` 触发（**回填 Phase 7 line 368 + Phase 4 e2e/run-android.sh**）
+- [ ] minified bundle → `sentori-cli upload sourcemap` → 触发错误 → dashboard 验证显示原始位置（**回填 Phase 8 line 394**）
+- [ ] GitHub Actions：加 macOS runner 跑 iOS simulator e2e job（**回填 Phase 4 GitHub Actions simulator workflow**）
 
 #### Dogfooding
 
