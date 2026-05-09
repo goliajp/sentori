@@ -39,6 +39,32 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "==> deploying version $version"
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build marketing (Astro static)
+        working-directory: marketing
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: Build docs-site (Astro Starlight)
+        working-directory: docs-site
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: Rsync marketing/dist → /apps/sentori/marketing-dist
+        run: |
+          install -d -m 0755 "${REMOTE_DIR}/marketing-dist"
+          rsync -a --delete marketing/dist/ "${REMOTE_DIR}/marketing-dist/"
+
+      - name: Rsync docs-site/dist → /apps/sentori/docs-dist
+        run: |
+          install -d -m 0755 "${REMOTE_DIR}/docs-dist"
+          rsync -a --delete docs-site/dist/ "${REMOTE_DIR}/docs-dist/"
+
       - name: Rsync source into /apps/sentori/src
         run: |
           mkdir -p "${REMOTE_DIR}/src"
@@ -100,7 +126,8 @@ jobs:
         working-directory: /apps/sentori
         run: |
           docker compose --env-file .env -f docker-compose.yml build server web
-          docker compose --env-file .env -f docker-compose.yml up -d
+          docker compose --env-file .env -f docker-compose.yml up -d \
+            postgres valkey server web marketing docs
 
       - name: Wait for /v1/events/_recent
         env:
@@ -137,6 +164,12 @@ jobs:
           # web container responds
           status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18800/)
           test "$status" = "200" || fail "web :18800 expected 200, got $status"
+          # marketing static
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18801/)
+          test "$status" = "200" || fail "marketing :18801 expected 200, got $status"
+          # docs static
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18802/)
+          test "$status" = "200" || fail "docs :18802 expected 200, got $status"
           echo "==> smoke OK"
 
       - name: Tag version
