@@ -322,11 +322,11 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
   - [x] dense table：cols [type, msg_sample, count, last_seen, env, release]
   - [x] 行高 32px，字号 13px，等宽数字
   - [ ] j/k 切行高亮、Enter 进详情、s 切 silenced、`/` 聚焦搜索框
-- [ ] 写 `IssueDetailView`：
-  - [ ] 左栏：events 列表（按 ts DESC）
-  - [ ] 右栏：选中 event 的 stack + breadcrumbs + tags + device/app/release
-  - [ ] stack frame 渲染（先无符号化，用 raw）
-  - [ ] 上下事件 `[`/`]` 切换
+- [x] 写 `IssueDetailView`：
+  - [x] 左栏：events 列表（按 ts DESC）
+  - [x] 右栏：选中 event 的 stack + breadcrumbs + tags + device/app/release
+  - [x] stack frame 渲染（先无符号化，用 raw）
+  - [x] 上下事件 `[`/`]` 切换
 - [ ] 写 `web/docs/design-language.md`：字号刻度（11/13/15/24px）、间距刻度（4/8/16/24px）、暗色 palette 决策、参照 Linear / Vercel
 - [ ] 暗色为默认（已搭好）
 - [ ] `bun run check / test / build` 全绿

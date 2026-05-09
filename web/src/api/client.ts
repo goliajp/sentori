@@ -51,10 +51,60 @@ export type EventRow = {
   errorType: string
   id: string
   occurredAt: string
-  payload: unknown
+  payload: ServerEvent
   platform: string
   receivedAt: string
   release: string
+}
+
+/** Mirrors the server's `event::Event` (the JSON we accept on /v1/events). */
+export type ServerEvent = {
+  app: {
+    build?: string
+    framework?: { name: string; version: string }
+    version: string
+  }
+  breadcrumbs: Breadcrumb[]
+  device: {
+    locale?: string
+    model?: string
+    os: string
+    osVersion: string
+  }
+  environment: string
+  error: SentoriError
+  fingerprint: string[]
+  id: string
+  kind: 'error'
+  platform: 'android' | 'ios' | 'javascript'
+  release: string
+  spanId: null | string
+  tags: Record<string, string>
+  timestamp: string
+  traceId: null | string
+  user: null | { anonymous?: boolean; id?: string }
+}
+
+export type SentoriError = {
+  cause: null | SentoriError
+  message: string
+  stack: Frame[]
+  type: string
+}
+
+export type Frame = {
+  absolutePath?: string
+  column?: number
+  file: string
+  function?: string
+  inApp: boolean
+  line: number
+}
+
+export type Breadcrumb = {
+  data: Record<string, unknown>
+  timestamp: string
+  type: 'custom' | 'log' | 'nav' | 'net' | 'user'
 }
 
 export const adminApi = {
