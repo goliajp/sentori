@@ -43,6 +43,8 @@ pub struct AppState {
     pub valkey: Option<redis::aio::ConnectionManager>,
     pub project_id: uuid::Uuid,
     pub rate_limit_per_min: u32,
+    pub admin_password: String,
+    pub session_secret: String,
 }
 
 impl FromRef<AppState> for AuthState {

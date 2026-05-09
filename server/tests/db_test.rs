@@ -25,13 +25,15 @@ async fn setup() -> Option<(SocketAddr, PgPool)> {
 
     let listener = TcpListener::bind("127.0.0.1:0").await.ok()?;
     let addr = listener.local_addr().ok()?;
-    let app = router::build(
-        TOKEN.to_string(),
-        Some(pool.clone()),
-        None,
-        seed::DEV_PROJECT_ID,
-        10_000,
-    );
+    let app = router::build(router::ServerConfig {
+        dev_token: TOKEN.to_string(),
+        db: Some(pool.clone()),
+        valkey: None,
+        project_id: seed::DEV_PROJECT_ID,
+        rate_limit_per_min: 10_000,
+        admin_password: "dbtest".to_string(),
+        session_secret: "dbtest-secret".to_string(),
+    });
 
     tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();
@@ -61,13 +63,15 @@ async fn rate_limit_returns_429_when_exceeding_threshold() {
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
-    let app = router::build(
-        RATE_LIMIT_TOKEN.to_string(),
-        None,
-        Some(valkey),
-        seed::DEV_PROJECT_ID,
-        3,
-    );
+    let app = router::build(router::ServerConfig {
+        dev_token: RATE_LIMIT_TOKEN.to_string(),
+        db: None,
+        valkey: Some(valkey),
+        project_id: seed::DEV_PROJECT_ID,
+        rate_limit_per_min: 3,
+        admin_password: "rl".to_string(),
+        session_secret: "rl-secret".to_string(),
+    });
     tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();
     });
@@ -184,10 +188,10 @@ async fn duplicates_group_into_one_issue_visible_via_admin() {
 
     // -- admin endpoints --
 
-    // GET /v1/projects/:id/issues
+    // GET /admin/api/projects/:id/issues
     let resp = client
         .get(format!(
-            "http://{addr}/v1/projects/{}/issues",
+            "http://{addr}/admin/api/projects/{}/issues",
             seed::DEV_PROJECT_ID
         ))
         .header("Authorization", format!("Bearer {TOKEN}"))
@@ -202,10 +206,10 @@ async fn duplicates_group_into_one_issue_visible_via_admin() {
     assert_eq!(returned_issue_id, issue_id.to_string());
     assert_eq!(issues_arr[0]["eventCount"].as_i64().unwrap(), 5);
 
-    // GET /v1/projects/:id/issues/:issue_id
+    // GET /admin/api/projects/:id/issues/:issue_id
     let resp = client
         .get(format!(
-            "http://{addr}/v1/projects/{}/issues/{}",
+            "http://{addr}/admin/api/projects/{}/issues/{}",
             seed::DEV_PROJECT_ID, issue_id
         ))
         .header("Authorization", format!("Bearer {TOKEN}"))
@@ -217,10 +221,10 @@ async fn duplicates_group_into_one_issue_visible_via_admin() {
     assert_eq!(issue_detail["eventCount"].as_i64().unwrap(), 5);
     assert_eq!(issue_detail["status"].as_str().unwrap(), "active");
 
-    // GET /v1/projects/:id/issues/:issue_id/events
+    // GET /admin/api/projects/:id/issues/:issue_id/events
     let resp = client
         .get(format!(
-            "http://{addr}/v1/projects/{}/issues/{}/events",
+            "http://{addr}/admin/api/projects/{}/issues/{}/events",
             seed::DEV_PROJECT_ID, issue_id
         ))
         .header("Authorization", format!("Bearer {TOKEN}"))
@@ -235,7 +239,7 @@ async fn duplicates_group_into_one_issue_visible_via_admin() {
     let bogus_id = uuid::Uuid::now_v7();
     let resp = client
         .get(format!(
-            "http://{addr}/v1/projects/{}/issues/{}",
+            "http://{addr}/admin/api/projects/{}/issues/{}",
             seed::DEV_PROJECT_ID, bogus_id
         ))
         .header("Authorization", format!("Bearer {TOKEN}"))

@@ -31,6 +31,8 @@ sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "time
 sha2 = "0.10"
 hex = "0.4"
 redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
+axum-extra = { version = "0.10", features = ["cookie"] }
+hmac = "0.12"
 
 [dev-dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["json"] }

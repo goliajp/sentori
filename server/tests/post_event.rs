@@ -10,13 +10,15 @@ const TOKEN: &str = "st_pk_test01j5y9z3vk8x4rmt2pcq";
 async fn spawn() -> SocketAddr {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
-    let app = router::build(
-        TOKEN.to_string(),
-        None,
-        None,
-        sentori_server::seed::DEV_PROJECT_ID,
-        10_000,
-    );
+    let app = router::build(router::ServerConfig {
+        dev_token: TOKEN.to_string(),
+        db: None,
+        valkey: None,
+        project_id: sentori_server::seed::DEV_PROJECT_ID,
+        rate_limit_per_min: 10_000,
+        admin_password: "test".to_string(),
+        session_secret: "test-secret".to_string(),
+    });
 
     tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();

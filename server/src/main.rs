@@ -45,18 +45,31 @@ async fn main() -> anyhow::Result<()> {
         .and_then(|s| s.parse().ok())
         .unwrap_or(1000);
 
+    let admin_password = std::env::var("SENTORI_ADMIN_PASSWORD")
+        .unwrap_or_else(|_| {
+            tracing::warn!("SENTORI_ADMIN_PASSWORD not set; using dev default 'admin'");
+            "admin".to_string()
+        });
+    let session_secret = std::env::var("SENTORI_SESSION_SECRET")
+        .unwrap_or_else(|_| {
+            tracing::warn!("SENTORI_SESSION_SECRET not set; using dev default (insecure)");
+            "dev-only-do-not-use-in-prod".to_string()
+        });
+
     let addr: SocketAddr = "0.0.0.0:8080".parse()?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
 
     tracing::info!(%addr, "sentori-server listening");
 
-    let app = router::build(
-        token,
-        pool,
+    let app = router::build(router::ServerConfig {
+        dev_token: token,
+        db: pool,
         valkey,
-        seed::DEV_PROJECT_ID,
+        project_id: seed::DEV_PROJECT_ID,
         rate_limit_per_min,
-    );
+        admin_password,
+        session_secret,
+    });
     axum::serve(listener, app).await?;
 
     Ok(())

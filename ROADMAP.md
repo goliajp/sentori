@@ -302,13 +302,13 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 ### Steps
 
 - [ ] `cd web && bun add @tanstack/react-query openapi-fetch react-hotkeys-hook`
-- [ ] 设计 admin API 鉴权：管理员 session cookie（Phase 6 先做最简：env 注入的 admin password + `POST /admin/api/login` 设 httpOnly cookie，多用户在 Phase 13）
+- [x] 设计 admin API 鉴权：管理员 session cookie（Phase 6 先做最简：env 注入的 admin password + `POST /admin/api/login` 设 httpOnly cookie，多用户在 Phase 13）
 - [ ] server 写 admin 端点：
-  - [ ] `POST /admin/api/login`
+  - [x] `POST /admin/api/login`
   - [ ] `GET /admin/api/projects`
-  - [ ] `GET /admin/api/projects/:id/issues?status=&env=&q=`
-  - [ ] `GET /admin/api/projects/:id/issues/:issue_id`
-  - [ ] `GET /admin/api/projects/:id/issues/:issue_id/events?limit=50`
+  - [x] `GET /admin/api/projects/:id/issues?status=&env=&q=`
+  - [x] `GET /admin/api/projects/:id/issues/:issue_id`
+  - [x] `GET /admin/api/projects/:id/issues/:issue_id/events?limit=50`
   - [ ] `PATCH /admin/api/issues/:id`（修改 status）
 - [ ] server 写 OpenAPI schema 输出（用 `utoipa` crate）→ `web/` 用 `openapi-typescript` 生成 types
 - [ ] vite 配 dev proxy：`/admin/api → http://localhost:8080`
