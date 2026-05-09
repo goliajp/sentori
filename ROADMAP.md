@@ -766,10 +766,10 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 
 #### Runbook
 
-- [ ] `docs/runbook/incident-response.md`（P1/P2/P3 等级 + 谁联系谁）
-- [ ] `docs/runbook/scaling.md`（流量翻倍：横向加 server VM；PG 扩 vertical 一次到顶）
-- [ ] `docs/runbook/backup-restore.md`
-- [ ] `docs/runbook/deploy.md`（手动 promote staging → prod 的流程）
+- [x] `docs/runbook/incident-response.md` —— P1/P2/P3 ladder + on-call rotation + 60s P1 checklist + 显式 NOT-page 列表
+- [x] `docs/runbook/scaling.md` —— v0.2 capacity baseline + 横向加 app VM 步骤（更新 Caddy upstream + reload）+ PG vertical resize 阈值表 + 烫手 org 处理（quota first, compute later）+ "我们 yet 不做 autoscaler / 跨 region active-active / SDK 队列"
+- [x] `docs/runbook/backup-restore.md` —— 备份矩阵表 + 何时 restore 决策表 + 完整 failover 步骤 + quarterly drill checklist + "Last drill: never" 跟踪
+- [x] `docs/runbook/deploy.md` —— pre-flight + cut release + blue/green 滚动（每个 container 间隔 5 min 看 Grafana）+ 双步骤式 destructive migration 模式 + rollback
 
 #### 公开发布
 
