@@ -8,7 +8,7 @@
 
 - [x] **Phase 0** — 项目方向对齐（非编码决策定稿）
 - [x] **Phase 1** — Event Schema + Token/Ingest 协议初稿
-- [ ] **Phase 2** — Server 骨架（axum 接 POST，stdout 打印）
+- [x] **Phase 2** — Server 骨架（axum 接 POST，stdout 打印）
 - [ ] **Phase 3** — RN SDK JS 层（init + 全局错误捕获 + batcher）
 - [ ] **Phase 4** — 端到端 smoke test 🎯（首个里程碑）
 - [ ] **Phase 5** — PG 落库 + 最小 grouping
@@ -173,28 +173,29 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 
 ### Steps
 
-- [ ] `cd sentori && cargo new server --bin --name sentori-server`
-- [ ] 加依赖：
-  - [ ] `axum` (0.8+)
-  - [ ] `tokio` (full features)
-  - [ ] `serde` + `serde_json`
-  - [ ] `uuid` (v7)
-  - [ ] `time` 或 `chrono`
-  - [ ] `tower` + `tower-http`（CORS、tracing、limit）
-  - [ ] `tracing` + `tracing-subscriber`
-  - [ ] `anyhow` + `thiserror`
-  - [ ] `validator`（schema 校验）
-- [ ] 写 `server/src/main.rs`：tokio main + tracing init
-- [ ] 写 `server/src/event.rs`：Event / Error / Frame / Breadcrumb 的 `#[derive(Deserialize, Validate)]`，对齐 protocol.md
-- [ ] 写 `server/src/api/events.rs`：`POST /v1/events` handler
-- [ ] 写 `server/src/api/events_batch.rs`：`POST /v1/events:batch` handler
-- [ ] 写 `server/src/auth.rs`：Bearer token middleware（先硬编码读 env `SENTORI_DEV_TOKEN`，DB 查在 Phase 5）
-- [ ] 写 `server/src/router.rs`：组装 router + middleware（CORS、tracing、`tower_http::limit::RequestBodyLimitLayer` 设 1MB）
-- [ ] 写 `.env.example`：`SENTORI_DEV_TOKEN=st_pk_dev`
-- [ ] `cargo run` + curl 校验
-- [ ] 写集成测试 `tests/post_event.rs`：用 reqwest 验证 202 / 401 / 413 / 400 四种状态
-- [ ] `cargo test` 全绿
-- [ ] commit：`feat(server): minimal ingestion skeleton`
+- [x] `cd sentori && cargo new server --bin --name sentori-server`（实际手写 Cargo.toml + 拆 lib/main，效果等价）
+- [x] 加依赖：
+  - [x] `axum` 0.8
+  - [x] `tokio` (full features)
+  - [x] `serde` + `serde_json`
+  - [x] `uuid` (v7)
+  - [x] `time` (with serde-well-known，rfc3339)
+  - [x] `tower` + `tower-http` (cors / trace / limit)
+  - [x] `tracing` + `tracing-subscriber`
+  - [x] `anyhow` + `thiserror` 2
+  - [x] `validator` 0.20（schema 校验，含 nested 校验）
+- [x] 写 `server/src/main.rs`：tokio main + tracing init + `axum::serve`
+- [x] 写 `server/src/event.rs`：Event / Error / Frame / Breadcrumb / Device / App / Framework / User 的 serde + Validate，camelCase rename，对齐 protocol.md
+- [x] 写 `server/src/api/events.rs`：`POST /v1/events` handler，validate 后 stdout pretty-print
+- [x] 写 `server/src/api/events_batch.rs`：`POST /v1/events:batch` handler，含 partial failure 语义（accepted/rejected/errors[]）
+- [x] 写 `server/src/auth.rs`：Bearer token middleware（constant-time 比对，读 env `SENTORI_DEV_TOKEN`）
+- [x] 写 `server/src/router.rs`：组装 router + middleware（CORS、TraceLayer、RequestBodyLimitLayer 1 MB）
+- [x] 写 `server/src/error.rs`：AppError + IntoResponse + flatten_validation_errors（共享给 batch handler）
+- [x] 写 `.env.example`：`SENTORI_DEV_TOKEN=st_pk_dev0000000000000000000000`
+- [x] `cargo run` + curl 校验 —— 由集成测试覆盖（reqwest 端到端跑 6 个测试）
+- [x] 写集成测试 `tests/post_event.rs`：6 个测试覆盖 202 / 401×2 / 413 / 400 + batch partial failure
+- [x] `cargo test` 全绿（6/6 passed）
+- [x] commit：`feat(server): minimal ingestion skeleton`
 
 ---
 

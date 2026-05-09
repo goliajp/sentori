@@ -1,0 +1,32 @@
+[package]
+name = "sentori-server"
+version = "0.1.0"
+edition = "2024"
+description = "Sentori ingestion server (axum + Postgres + Valkey)"
+license = "TBD"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "sentori-server"
+path = "src/main.rs"
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace", "limit"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v7", "serde"] }
+time = { version = "0.3", features = ["serde-well-known"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1"
+thiserror = "2"
+validator = { version = "0.20", features = ["derive"] }
+
+[dev-dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
