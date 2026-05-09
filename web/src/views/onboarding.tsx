@@ -289,6 +289,7 @@ function InstallSdkStep({
   tokenInfo: { projectId: string; rawToken: string } | null
 }) {
   const ingestUrl = window.location.origin
+  const [sdk, setSdk] = useState<SdkChoice>('react-native')
 
   // If the user reloaded the page or got here without a freshly-minted
   // token (rare — they'd have to navigate manually), prompt them to
@@ -306,15 +307,11 @@ function InstallSdkStep({
     )
   }
 
-  const installSnippet = `bun add @goliapkg/sentori-react-native`
-  const initSnippet = `import { initSentori } from '@goliapkg/sentori-react-native'
-
-initSentori({
-  token: '${tokenInfo.rawToken}',
-  ingestUrl: '${ingestUrl}',
-  release: '${project.name}@1.0.0+1',
-  environment: 'prod',
-})`
+  const current = sdkSnippets({
+    project,
+    rawToken: tokenInfo.rawToken,
+    ingestUrl,
+  })[sdk]
 
   return (
     <div className="space-y-4">
@@ -325,9 +322,11 @@ initSentori({
         </p>
       </div>
 
+      <SdkPicker value={sdk} onChange={setSdk} />
+
       <CodeBlock label="Public token">{tokenInfo.rawToken}</CodeBlock>
-      <CodeBlock label="Install">{installSnippet}</CodeBlock>
-      <CodeBlock label="Initialize">{initSnippet}</CodeBlock>
+      <CodeBlock label="Install">{current.install}</CodeBlock>
+      <CodeBlock label="Initialize">{current.init}</CodeBlock>
 
       <PrimaryButton onClick={onDone}>I've installed it</PrimaryButton>
     </div>
@@ -382,6 +381,73 @@ captureError(new Error('hello from ${project.name}'))`}
       </button>
     </div>
   )
+}
+
+// ---------- SDK choice (Phase 17 sub-C) ----------
+
+type SdkChoice = 'javascript' | 'react-native'
+
+const SDKS: { description: string; key: SdkChoice; label: string }[] = [
+  { key: 'react-native', label: 'React Native', description: 'Expo or bare RN' },
+  { key: 'javascript', label: 'JavaScript', description: 'Browser / Node' },
+]
+
+function SdkPicker({ onChange, value }: { onChange: (s: SdkChoice) => void; value: SdkChoice }) {
+  return (
+    <div className="flex gap-2">
+      {SDKS.map((s) => (
+        <button
+          aria-pressed={value === s.key}
+          className={`flex-1 rounded-md border px-3 py-2 text-left text-[12px] transition-colors ${
+            value === s.key ? 'border-accent bg-accent/10' : 'border-border hover:bg-bg-tertiary'
+          }`}
+          key={s.key}
+          onClick={() => onChange(s.key)}
+          type="button"
+        >
+          <div className="text-fg font-medium">{s.label}</div>
+          <div className="text-fg-muted">{s.description}</div>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function sdkSnippets({
+  ingestUrl,
+  project,
+  rawToken,
+}: {
+  ingestUrl: string
+  project: ProjectRow
+  rawToken: string
+}): Record<SdkChoice, { init: string; install: string }> {
+  const release = `${project.name}@1.0.0+1`
+  return {
+    'react-native': {
+      install: `npm install @goliapkg/sentori-react-native`,
+      init: `import { initSentori } from '@goliapkg/sentori-react-native'
+
+initSentori({
+  token: '${rawToken}',
+  ingestUrl: '${ingestUrl}',
+  release: '${release}',
+  environment: 'prod',
+})`,
+    },
+    javascript: {
+      install: `npm install @goliapkg/sentori-javascript`,
+      init: `// Browser or Node — same import.
+import { initSentori } from '@goliapkg/sentori-javascript'
+
+initSentori({
+  token: '${rawToken}',
+  ingestUrl: '${ingestUrl}',
+  release: '${release}',
+  environment: 'prod',
+})`,
+    },
+  }
 }
 
 // ---------- shared atoms ----------
