@@ -945,15 +945,16 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [x] `projects.rs / tokens.rs / issue endpoints` 已经全部走 admin 路由，自动被改造后的 middleware 覆盖
 - [x] tests：`server/tests/teams.rs` 两个 case：(1) owner 建 team 200 / plain member 建 team 403 / member 给自己加 team 403；(2) 绑团队后 in-team 成员 200 / out-of-team 成员 403 / owner 200。本地 sentori-pg `cargo test` 全 12 个测试 pass。commit `4398d4b`
 
-#### sub-C — server: Ownership transfer + audit log
+#### sub-C — server: Ownership transfer + audit log ✅
 
-- [ ] `audit::record(pool, org_id, actor, action, target_type, target_id, payload)` helper（`server/src/audit.rs`）
-- [ ] 在 org / team / project / membership / token 所有 mutating endpoint 调 `audit::record`
-- [ ] `POST /admin/api/orgs/{slug}/transfer`：owner only，body `{to_user_id}`；插 transfer 行 + 发邮件
-- [ ] `POST /admin/api/orgs/transfers/{token}/accept`：to_user 登录态；事务内 swap role + audit + 标 accepted
-- [ ] `notifier` 加 `OwnershipTransferRequested` 邮件模板（含 confirm link）
-- [ ] `GET /admin/api/orgs/{slug}/audit?cursor=&limit=&action=&actor=&from=&to=` 分页 + 过滤
-- [ ] tests：transfer 成功 / token 过期 / token 复用 / 非 owner 调用 403
+- [x] `audit::record(pool, org_id, actor, action, target_type, target_id, payload)` helper：`server/src/audit.rs`，含 actions / targets 字符串常量；写失败仅 log 不阻塞业务路径
+- [x] mutating endpoint 接 `audit::record`：org create / patch, member role / remove, team create / delete / member-add / member-remove, project create, project↔team bind / unbind, token create / revoke, transfer requested / accepted；team patch / team-member patch / invite create-delete 留给 Phase 20 sub-A 一并扫
+- [x] `POST /api/orgs/{slug}/transfer`：owner only，body `{toUserId}`，target 必须当前是 admin/owner；写 `org_ownership_transfers` + 发邮件 + audit
+- [x] `POST /api/orgs/transfers/{token}/accept`：to_user 登录态；事务内 swap role + 镜像 `orgs.owner_id` + 标 accepted_at
+- [x] `notifier::OwnershipTransferRequested` 邮件模板（7-day confirm link）
+- [x] `GET /api/orgs/{slug}/audit?limit=&before=&action=&actorUserId=&targetType=`：owner/admin only，DESC by created_at，joined users.email 显示 actor
+- [x] 注：`org.deleted` 因 FK cascade 落不下 audit 行，改 emit 一条 tracing log；Phase 20 sub-A 把 audit_logs 移出 cascade
+- [x] tests：(1) happy path：role swap / owner_id 镜像 / replay 拒绝 / 错误 caller 403；(2) 非 eligible target / 非 org 用户 / 非 owner caller 全拒；(3) audit list owner 200 + 含 org.created + team.created / member 403 / `?action=team.created` 过滤生效；本地 sentori-pg `cargo test` 全 17 个 pass。commit `1fc9bc9`
 
 #### sub-D — dashboard: Team 管理 UI
 
