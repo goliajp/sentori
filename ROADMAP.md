@@ -359,10 +359,10 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 
 #### Android
 
-- [ ] `sdk/react-native/android/.../SentoriModule.kt`：注册 turbo module
-- [ ] `sdk/react-native/android/.../SentoriCrashHandler.kt`：
-  - [ ] `Thread.setDefaultUncaughtExceptionHandler { t, e -> writeToDisk(e); previousHandler?.uncaughtException(t, e) }`
-  - [ ] 写文件路径：`<filesDir>/sentori/pending/<uuid>.json`
+- [x] `sdk/react-native/android/.../SentoriModule.kt`：注册 turbo module
+- [x] `sdk/react-native/android/.../SentoriCrashHandler.kt`：
+  - [x] `Thread.setDefaultUncaughtExceptionHandler { t, e -> writeToDisk(e); previousHandler?.uncaughtException(t, e) }`
+  - [x] 写文件路径：`<filesDir>/sentori/pending/<uuid>.json`
 - [ ] Android 单测（JUnit + Robolectric）：同 iOS 双断言
 - [ ] example app 加按钮 "Throw RuntimeException"
 - [ ] Android emu 端到端：throw → 重启 → server 收到 + dashboard 显示
