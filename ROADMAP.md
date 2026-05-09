@@ -318,9 +318,9 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
   - [x] `/issues`（列表）
   - [x] `/issues/:id`（详情）
   - [ ] `/projects/:id/settings`（token、recipient 管理，留 Phase 9）
-- [ ] 写 `IssueListView`：
-  - [ ] dense table：cols [type, msg_sample, count, last_seen, env, release]
-  - [ ] 行高 32px，字号 13px，等宽数字
+- [x] 写 `IssueListView`：
+  - [x] dense table：cols [type, msg_sample, count, last_seen, env, release]
+  - [x] 行高 32px，字号 13px，等宽数字
   - [ ] j/k 切行高亮、Enter 进详情、s 切 silenced、`/` 聚焦搜索框
 - [ ] 写 `IssueDetailView`：
   - [ ] 左栏：events 列表（按 ts DESC）

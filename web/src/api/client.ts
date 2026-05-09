@@ -38,6 +38,8 @@ export type IssueRow = {
   fingerprint: string
   firstSeen: string
   id: string
+  lastEnvironment: null | string
+  lastRelease: null | string
   lastSeen: string
   messageSample: string
   status: 'active' | 'closed' | 'silenced'

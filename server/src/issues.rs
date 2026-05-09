@@ -24,11 +24,14 @@ pub async fn upsert_issue(
         r#"
         INSERT INTO issues
             (id, project_id, fingerprint, error_type, message_sample,
-             status, first_seen, last_seen, event_count)
-        VALUES ($1, $2, $3, $4, $5, 'active', $6, $6, 1)
+             status, first_seen, last_seen, event_count,
+             last_environment, last_release)
+        VALUES ($1, $2, $3, $4, $5, 'active', $6, $6, 1, $7, $8)
         ON CONFLICT (project_id, fingerprint) DO UPDATE SET
-            last_seen   = GREATEST(issues.last_seen, EXCLUDED.last_seen),
-            event_count = issues.event_count + 1
+            last_seen        = GREATEST(issues.last_seen, EXCLUDED.last_seen),
+            event_count      = issues.event_count + 1,
+            last_environment = EXCLUDED.last_environment,
+            last_release     = EXCLUDED.last_release
         RETURNING id
         "#,
     )
@@ -38,6 +41,8 @@ pub async fn upsert_issue(
     .bind(&event.error.r#type)
     .bind(&event.error.message)
     .bind(event.timestamp)
+    .bind(&event.environment)
+    .bind(&event.release)
     .fetch_one(pool)
     .await?;
 

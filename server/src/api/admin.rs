@@ -21,6 +21,8 @@ pub struct IssueRow {
     #[serde(with = "time::serde::rfc3339")]
     pub last_seen: OffsetDateTime,
     pub event_count: i64,
+    pub last_environment: Option<String>,
+    pub last_release: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -47,7 +49,8 @@ pub async fn list_issues(
     let rows: Vec<IssueRow> = sqlx::query_as(
         r#"
         SELECT id, fingerprint, error_type, message_sample, status,
-               first_seen, last_seen, event_count
+               first_seen, last_seen, event_count,
+               last_environment, last_release
         FROM issues
         WHERE project_id = $1 AND status = $2
         ORDER BY last_seen DESC
@@ -73,7 +76,8 @@ pub async fn issue_detail(
     let row: Option<IssueRow> = sqlx::query_as(
         r#"
         SELECT id, fingerprint, error_type, message_sample, status,
-               first_seen, last_seen, event_count
+               first_seen, last_seen, event_count,
+               last_environment, last_release
         FROM issues
         WHERE project_id = $1 AND id = $2
         "#,
