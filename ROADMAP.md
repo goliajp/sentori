@@ -670,9 +670,9 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 
 ### Steps
 
-- [ ] migration `0008_quotas.sql`：
-  - [ ] `org_quotas` (org_id PK, plan enum('free','pro','enterprise'), event_limit_monthly, retention_days)
-  - [ ] `usage_counters` (org_id, period_yyyymm, event_count, dropped_count, PK)
+- [x] migration `0009_quotas.sql`（0008 已用于 tokens_meta）：
+  - [x] `org_quotas` (org_id PK FK, plan `org_plan` enum, event_limit_monthly, retention_days, created_at, updated_at) + 22 个现有 org 回填 free 100k/30d
+  - [x] `usage_counters` (org_id FK, period_yyyymm, event_count, dropped_count, updated_at, PK(org_id, period_yyyymm))
 - [ ] server ingestion 路径加 quota check：
   - [ ] 入库前查 Valkey `usage:<org_id>:<yyyymm>` 计数器
   - [ ] 超限：返回 429 + body `{ "error": "quota_exceeded", "reset_at": "..." }`
@@ -683,7 +683,7 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
   - [ ] org settings 页显示 used / limit + 进度条
   - [ ] 用量 ≥ 80% 时全局 banner（红色）
 - [ ] 邮件：用量 ≥ 80% / ≥ 100% 各发一封
-- [ ] 默认 plan = `free`，新 org 自动 100k 限额
+- [x] 默认 plan = `free`，新 org 自动 100k 限额（`server/src/quotas.rs::ensure_default_quota`，挂在 `orgs::create_org` 与 `user_auth::bootstrap_personal_org` 的事务里，ON CONFLICT DO NOTHING）
 - [ ] **决策**：free tier 数据 30 天保留；pro / enterprise 留到付费上线
 - [ ] commit：`feat(saas): free tier quota enforcement and usage metering`
 

@@ -196,6 +196,7 @@ async fn bootstrap_personal_org(pool: &PgPool, user_id: Uuid) -> Result<(), sqlx
     .bind(user_id)
     .execute(&mut *tx)
     .await?;
+    crate::quotas::ensure_default_quota(&mut *tx, org_id).await?;
     tx.commit().await?;
     tracing::info!(%user_id, %slug, "personal org bootstrapped");
     Ok(())

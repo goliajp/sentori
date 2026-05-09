@@ -130,6 +130,11 @@ pub async fn create_org(
         return server_error("insertMembership");
     }
 
+    if let Err(e) = crate::quotas::ensure_default_quota(&mut *tx, org_id).await {
+        tracing::error!(error = %e, "insert default quota failed");
+        return server_error("insertQuota");
+    }
+
     if tx.commit().await.is_err() {
         return server_error("commitTx");
     }
