@@ -12,7 +12,7 @@
 - [x] **Phase 3** — RN SDK JS 层（init + 全局错误捕获 + batcher）
 - [x] **Phase 4** — 端到端 smoke test 🎯（首个里程碑）
 - [x] **Phase 5** — PG 落库 + 最小 grouping
-- [ ] **Phase 6** — Web dashboard MVP
+- [x] **Phase 6** — Web dashboard MVP
 - [ ] **Phase 7** — RN SDK Native 层（iOS NSException + Android uncaught）
 - [ ] **Phase 8** — Sourcemap 上传 + 服务端符号化
 - [ ] **Phase 9** — Release / Env / 邮件告警
