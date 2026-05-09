@@ -25,6 +25,20 @@
 - [x] **Phase 16** — 生产就绪 + **公开上线 sentori.golia.jp** 🎯（substrate 落地，剩 user 一次性 secrets + push release/）
 - [ ] **Phase 17** — SDK 分发链路 + dogfood + qualcomm/insight 真接入
 
+### v0.2（Phase 18–28）
+
+- [ ] **Phase 18** — 账户结构深化（Org / Team / Project / Ownership / Audit）
+- [ ] **Phase 19** — RBAC 全栈完善
+- [ ] **Phase 20** — Audit log 深化 + 全局活动 feed
+- [ ] **Phase 21** — SDK monorepo 抽 core + JS 矩阵扩展（react / next / expo）
+- [ ] **Phase 22** — 原生层深化（iOS dSYM / Android Proguard / ANR / Hang）
+- [ ] **Phase 23** — Release 管理 UX
+- [ ] **Phase 24** — Issues 列表 power-user 化
+- [ ] **Phase 25** — Issue 详情页 revamp
+- [ ] **Phase 26** — Health metrics（crash-free rate / sessions）
+- [ ] **Phase 27** — 告警规则引擎深化
+- [ ] **Phase 28** — 全局搜索 + Dashboard polish + a11y + 性能
+
 总工时估算（1 人全职）：**约 22–30 周**（self-hosted ~14–18 周 + SaaS 上线 ~8–12 周）。
 
 ---
@@ -880,6 +894,439 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
   - https://ingest.sentori.golia.jp/v1/events/_recent → 401（token gate 工作）
 - [x] prod e2e 通过：注册 → verify → login → 自动 bootstrap personal org → create project → create public token → POST event 到 `ingest.sentori.golia.jp` (202) → dashboard 看到 issue (grouping work)
 - [x] SMTP 走 `mail.golia.ai`（goliajp/mailrs）—— 在 mailrs `/data/users.toml` 加 `sentori@golia.jp` 作 SMTP submission user（plain pw，mailrs verifies 通过 users.toml first-tier）；6 个 `SENTORI_SMTP_*` secrets 更新指向 mailrs（mail.golia.ai:587 STARTTLS）；redeploy 后 register flow log "verification email sent"，邮件确认落到 mailrs `/data/maildir/golia.jp/<recipient>/new/` 内含正确 `[Sentori] Verify your email` subject + verify link body；DKIM/SPF 走现有 golia.jp zone 配置（`golia.jp` SPF 已含 `a:mail.golia.ai`）
+
+---
+
+## v0.2 路线图（Phase 18–28）
+
+**主线：** Phase 0–17 解决了 "能跑 + 能上 prod + 能装到一个真 RN app"。v0.2 三大板块按线性推进——
+
+1. **账户结构骨架（Phase 18–20）**：org → team → project 三层 + RBAC + audit log。先这一块的原因：所有后续 admin / project-scoped UI 都要靠它判权限，不先做后面会四处补丁。
+2. **SDK 矩阵 + 原生深度（Phase 21–22）**：抽 `sdk/core` workspace；用它衍生 `react / next / expo`；iOS dSYM + Android proguard + ANR 上提 native 通路完整度。
+3. **数据呈现（Phase 23–28）**：Release 一等公民 → Issues 列表 power-user 化 → Issue 详情 revamp → Health / 搜索 / 告警引擎 / Polish。
+
+每个 phase 内 sub-A → sub-Z 严格线性，不跳；exit 全勾才进下一 phase。下面所有 file path 是 monorepo 相对路径，绝对值 `goliajp/sentori/<path>`。
+
+---
+
+## Phase 18 — 账户结构深化（Org / Team / Project / Ownership / Audit）
+
+**Goal:** 把扁平 "org + member/owner" 升级为 "org → team → project" 三层；加 ownership 转让 + audit log。
+
+**Entry:** Phase 17 sub-G ✅。
+
+**Exit:**
+- 一个 org 可以有 N 个 team；team 有自己的成员集；project 多对多绑定到 team
+- Project 操作受 ACL：user 必须是该 project 关联 team 的成员，**或** org-admin
+- Owner 可发起转让；接收方点邮件链接确认才生效；事务原子
+- 所有写操作（create/update/delete on org/team/project/membership/token）落 audit_logs，dashboard 设置页可查
+- 邀请流支持 "邀请到 team X"，accept 时事务内同时插 membership + team_membership
+
+**Estimate:** 2.5–3 周
+
+### Steps
+
+#### sub-A — schema + migration
+
+- [ ] 新表 `teams`(id uuid v7, org_id, slug, name, description, created_at)；UNIQUE(org_id, slug)
+- [ ] 新表 `team_memberships`(team_id, user_id, role: lead|member|viewer, created_at)；PK(team_id, user_id)
+- [ ] 新表 `project_teams`(project_id, team_id)；PK(project_id, team_id)；级联 ON DELETE CASCADE
+- [ ] 新表 `audit_logs`(id uuid v7, org_id, actor_user_id, action text, target_type text, target_id uuid, payload jsonb, created_at)；INDEX(org_id, created_at DESC)
+- [ ] 新表 `org_ownership_transfers`(id uuid v7, org_id, from_user_id, to_user_id, token text UNIQUE, expires_at, accepted_at NULL)
+- [ ] migration `server/migrations/00XX_phase18_orgs.sql`，BEGIN/COMMIT 包好；含外键 + 索引
+- [ ] `cargo sqlx prepare`；提交 `.sqlx/`
+
+#### sub-B — server: Team CRUD + ACL middleware
+
+- [ ] `server/src/api/teams.rs`：list / create / patch / delete + member CRUD；routes nest 在 `/admin/api/orgs/{slug}/teams`
+- [ ] `server/src/api/teams.rs`：project↔team binding endpoints（`POST/DELETE /admin/api/projects/{id}/teams/{team_slug}`）
+- [ ] `server/src/auth.rs`：`AuthCtx` 加 `team_ids_for_org(org_id) -> Vec<Uuid>` (Valkey 30s 缓存)
+- [ ] 新 extractor `RequireProjectAccess(project_id)`：检查 user 在该 project 任一关联 team 内 OR 是 org-admin；不通过 403
+- [ ] 把 `projects.rs` / `tokens.rs` / issue endpoints 全部 wrap 上该 extractor
+- [ ] tests：team 成员能读、非成员 403、org admin bypass、token 操作受同样保护
+
+#### sub-C — server: Ownership transfer + audit log
+
+- [ ] `audit::record(pool, org_id, actor, action, target_type, target_id, payload)` helper（`server/src/audit.rs`）
+- [ ] 在 org / team / project / membership / token 所有 mutating endpoint 调 `audit::record`
+- [ ] `POST /admin/api/orgs/{slug}/transfer`：owner only，body `{to_user_id}`；插 transfer 行 + 发邮件
+- [ ] `POST /admin/api/orgs/transfers/{token}/accept`：to_user 登录态；事务内 swap role + audit + 标 accepted
+- [ ] `notifier` 加 `OwnershipTransferRequested` 邮件模板（含 confirm link）
+- [ ] `GET /admin/api/orgs/{slug}/audit?cursor=&limit=&action=&actor=&from=&to=` 分页 + 过滤
+- [ ] tests：transfer 成功 / token 过期 / token 复用 / 非 owner 调用 403
+
+#### sub-D — dashboard: Team 管理 UI
+
+- [ ] `web/src/views/team-list.tsx`：org-settings 增 Teams tab；表格 + create button
+- [ ] `web/src/views/team-detail.tsx`：成员表 + project assignments + 编辑 lead/role
+- [ ] `web/src/api/client.ts` 增 `teamsApi.{list,create,patch,delete,addMember,removeMember,assignProject,unassignProject}`
+- [ ] `OrgSwitcher` 改两层：`Org > Team`；选 team 后 issues 列表自动 filter
+
+#### sub-E — dashboard: Project ↔ Team 绑定 + 角色 chip
+
+- [ ] Project settings 加 "Teams" 段：多选 team checkbox（org-admin only）
+- [ ] Member detail modal 显示用户所属 team chips
+- [ ] role badge（admin / lead / member / viewer）design：颜色 + 缩写
+- [ ] 受限按钮按 role 隐藏：用 `useHasPermission(action, scope)` hook（scope=org|team|project）
+
+#### sub-F — Invite 流扩展
+
+- [ ] `OrgInvite` payload 加可选 `team_id`
+- [ ] dashboard invite modal 加 "Add to team" 单选
+- [ ] accept 接口事务内同时 insert memberships + team_memberships（如有）
+- [ ] tests：邀请到 team 后 invitee 自动有 team 访问
+
+#### sub-G — Ownership transfer UX
+
+- [ ] org-settings "Transfer ownership" button（owner only）
+- [ ] confirmation modal：select new owner from owner-eligible (admin) members + 输入 org slug 二次确认
+- [ ] 接收方点邮件链接 → dashboard 自动跳 `/orgs/{slug}/transfers/{token}/accept` → 显示 "Accept ownership of <Org>" 模态
+- [ ] 转让后 toast + 旧 owner 邮件通知 "ownership transferred to ..."
+
+#### sub-H — Audit log viewer
+
+- [ ] org-settings "Audit log" tab；list with actor / action / target / time + 折叠 payload JSON
+- [ ] filter UI：actor combobox / action select / date range picker
+- [ ] CSV 导出 button
+
+#### sub-I — tests + docs + 收尾
+
+- [ ] server integration tests 覆盖 sub-B/C 的 ACL 矩阵（admin × member × viewer × non-member × 4 个 endpoint）
+- [ ] dashboard e2e（playwright in `web/tests/`）：create team → assign project → invite member → 验证只看到该 team 的 project
+- [ ] `docs-site/src/content/docs/teams.md` 写法指南 + 截图
+- [ ] commit + push；勾完所有 checkbox
+
+---
+
+## Phase 19 — RBAC 全栈完善
+
+**Goal:** 把 Phase 18 的 role 列字段做成完整的 permission matrix；server endpoint 标 min role；dashboard 全 button role-aware。
+
+**Entry:** Phase 18 ✅
+
+**Exit:**
+- Roles：`org_admin / org_member / team_lead / team_member / viewer / billing_admin`（billing_admin 预留）
+- 服务端所有 endpoint 标注 min role；middleware 强制；非授权 403
+- dashboard 所有 mutating button / menu 调 `useHasPermission()`，不满足直接不渲染（不只是 disabled）
+- 角色升降级 UI（member detail modal 内）
+
+**Estimate:** 1.5 周
+
+### Steps
+
+#### sub-A — Role 字段拓展
+- [ ] `memberships.role` enum 加 `viewer` + `billing_admin`
+- [ ] `team_memberships.role` 加 `viewer`
+- [ ] migration `00XX_roles_v2.sql` + sqlx prepare
+
+#### sub-B — server middleware
+- [ ] `auth::Role` enum 全列；定义 `pub fn min_role(action: PermissionAction) -> Role`
+- [ ] `RequireRole(min_role)` extractor
+- [ ] 所有 admin api endpoint 添加 min role 标注（重构而不是新增）
+- [ ] tests：viewer 只读、不能 create token / resolve issue / invite
+
+#### sub-C — `useHasPermission` hook + UI gating
+- [ ] `web/src/auth/permissions.ts` 定义 `PermissionAction` 联合 + role → action 表
+- [ ] `useHasPermission(action: PermissionAction, scope?: { orgSlug, teamSlug?, projectId? })`
+- [ ] 全 dashboard 走查每个 button：包 `<PermissionGate action="...">{...}</PermissionGate>`
+- [ ] role badge 在 user avatar 旁
+
+#### sub-D — Role 升降级 UI
+- [ ] member detail modal：role dropdown（admin only）
+- [ ] downgrade owner / promote to admin 二次确认
+- [ ] tests + docs
+
+---
+
+## Phase 20 — Audit log 深化 + 全局活动 feed
+
+**Goal:** Phase 18 已落 audit_logs；这阶段把它做成可观察的产品功能（不是只查日志）。
+
+**Entry:** Phase 19 ✅
+
+**Exit:**
+- Audit log 全 action 类型枚举化 + 文档化
+- Per-user "我做的事" feed
+- Per-org "组织活动" 时间线
+- API 输出对接 webhook（Phase 27 才接，但 schema 这阶段定）
+
+**Estimate:** 1 周
+
+### Steps
+
+- [ ] sub-A：`AuditAction` enum 化 + i18n key 对应 human-readable 描述
+- [ ] sub-B：dashboard org-settings/audit 页：actor / action / target / time + 折叠 JSON payload
+- [ ] sub-C：dashboard user-settings/activity 页：当前 user 全 org 内的动作流
+- [ ] sub-D：webhook payload schema 写到 `docs/protocol.md`（Phase 27 实现）
+- [ ] sub-E：CSV 导出 + tests
+
+---
+
+## Phase 21 — SDK monorepo 抽 core + JS 矩阵扩展
+
+**Goal:** 抽 `sdk/core` 作为共享 workspace package；衍生 `@goliapkg/sentori-{javascript,react,next,expo,react-native}` 都依赖它。覆盖主流 web 框架。
+
+**Entry:** Phase 20 ✅
+
+**Exit:**
+- monorepo workspace 启用（root package.json + workspaces）
+- `sdk/core/` 内含 types / config / transport / breadcrumbs / capture / stack / uuid / queue
+- 所有 SDK 包仅做 framework adapter，业务逻辑在 core
+- 4 个新 npm 包：`@goliapkg/sentori-{core,react,next,expo}`，docs site 各 1 篇 reference
+- React 包：`<SentoriProvider>` + `<SentoriErrorBoundary>` + `useSentori()` + `useCaptureError()`
+- Next 包：自动 capture App Router error.tsx + Pages dir + server actions + edge runtime
+- Expo 包：Config Plugin（pod / gradle 自动） + EAS post-build hook 上传 source map
+
+**Estimate:** 2 周
+
+### Steps
+
+#### sub-A — 抽 `sdk/core/`
+- [ ] 新 workspace package `@goliapkg/sentori-core`
+- [ ] 把 javascript SDK 中通用部分（types / transport / capture / breadcrumbs / stack / uuid / config）搬到 core
+- [ ] javascript / react-native 包改成 depend `@goliapkg/sentori-core`
+- [ ] 全 SDK 包重新构建 + 测试通过；publish patch 版本（rn 0.1.4, javascript 0.1.1, core 0.1.0）
+
+#### sub-B — `@goliapkg/sentori-react`
+- [ ] 新 `sdk/react/`
+- [ ] `<SentoriProvider config={...}>` 包 init + context
+- [ ] `<SentoriErrorBoundary fallback={...}>`：React 18 ErrorBoundary 模式
+- [ ] `useSentori()` 暴露 `captureError / setUser / addBreadcrumb`
+- [ ] `useCaptureError()` 异步函数包装
+- [ ] tests + tsup build；publish 0.1.0
+
+#### sub-C — `@goliapkg/sentori-next`
+- [ ] 新 `sdk/next/`
+- [ ] `withSentori(nextConfig)`
+- [ ] App Router `app/error.tsx` template + `instrumentation.ts` 自动注入
+- [ ] `Sentori.middleware()` for edge runtime
+- [ ] `onRequestError` 接 server action
+- [ ] publish 0.1.0
+
+#### sub-D — `@goliapkg/sentori-expo`
+- [ ] 新 `sdk/expo/`
+- [ ] `app.plugin.js` Config Plugin：iOS pod link + Android gradle 自动添加
+- [ ] `expo-application` 元数据自动注入 init（bundleId / version）
+- [ ] EAS post-build hook `scripts/eas-post-build.sh`：自动调 `sentori-cli upload sourcemap`
+- [ ] publish 0.1.0
+
+#### sub-E — Vue / Svelte 设计文档（不实现）
+- [ ] `docs-site/src/content/docs/sdk-vue.md` API surface 草稿
+- [ ] `docs-site/src/content/docs/sdk-svelte.md` 草稿
+- [ ] mark "TBD v0.3+"
+
+#### sub-F — onboarding wizard 多 SDK
+- [ ] dashboard onboarding 加 React / Next / Expo / RN / vanilla JS 五选
+- [ ] 每个 SDK 一段 install + init snippet（自动注入 token）
+- [ ] tests
+
+---
+
+## Phase 22 — 原生层深化（iOS dSYM / Android Proguard / ANR / Hang）
+
+**Goal:** native crash 端到端：上传 mapping → 服务端反符号化 → dashboard 显示原始位置 + ANR / hang 检测。
+
+**Entry:** Phase 21 ✅
+
+**Exit:**
+- iOS dSYM 上传 + 服务端 atos 解析；dashboard issue 详情 frame 行显示原始 file:line
+- Android Proguard mapping 上传 + retrace；同上
+- Android ANR detection（5s main thread block）
+- iOS hang detection（best-effort，runloop 阻塞 ≥ 2s）
+- mapping/dSYM 按 release 串绑
+
+**Estimate:** 2.5 周
+
+### Steps
+
+#### sub-A — CLI: dSYM 上传
+- [ ] `cli/src/main.rs` 加 `upload dsym --project <id> --release <ver> <path>`
+- [ ] 服务端 `POST /admin/api/projects/{id}/dsyms`：multipart；存 PG bytea + metadata（uuid / arch / release）
+- [ ] dashboard release 详情显示 dSYM 列表
+
+#### sub-B — server: iOS 反符号化
+- [ ] `server/src/symbolicate.rs` 加 dSYM-based path：spawn `atos -arch arm64 -o <dsym> -l <load_addr> <pc>`
+- [ ] dSYM 临时落盘（/tmp/dsyms/{uuid}.dSYM）+ LRU 缓存
+- [ ] tests：mock dSYM（mini Mach-O）
+
+#### sub-C — CLI + server: Android proguard
+- [ ] `sentori-cli upload mapping --project <id> --release <ver> <mapping.txt>`
+- [ ] 服务端 `POST /admin/api/projects/{id}/mappings`
+- [ ] symbolicate 加 retrace（用 `proguard-rs` crate 或 spawn `proguard-retrace`）
+
+#### sub-D — Android ANR detection
+- [ ] SDK Android 加 ANR watchdog（worker thread 每 1s ping main，连续 5s 无响应 dump main thread + 上报）
+- [ ] event kind 加 "anr"；dashboard issue 列表 ANR 图标 + filter chip
+
+#### sub-E — iOS hang detection
+- [ ] main thread observer：runloop 阻塞 > 250ms warning；> 2s 上报为 "hang"
+- [ ] event kind 加 "hang"；同样 UI 处理
+
+#### sub-F — release-aware symbolication
+- [ ] dSYM/mapping 上传时按 release 串绑（uuid match）
+- [ ] dashboard release 详情显示已上传 mapping/dSYM 状态 + size + uploadedAt
+- [ ] symbolicate 拒绝跨 release lookup（按 release 隔离）
+
+---
+
+## Phase 23 — Release 管理 UX
+
+**Goal:** Release 一等公民。Dashboard 有 Releases 列表 + 详情；deploy webhook + regression detection。
+
+**Entry:** Phase 22 ✅
+
+**Exit:**
+- Releases 列表页（每 release 卡片：版本 / env / source map / dSYM / 首末次见 / regressions）
+- Release 详情页（uploaded artifacts 树 + event timeline + 比较前一 release）
+- `POST /v1/deploys` webhook + dashboard 显示 deploy timeline
+- Regression detection（issue 已 resolved 然后 release X 后又出现 → 标 regression）
+- Compare-releases 视图（diff issues：新出 / 修了 / 仍存）
+
+**Estimate:** 1.5 周
+
+### Steps
+- [ ] sub-A：`releases` 表 schema 完善（已有最小，加 deploy_at / source_maps_count / dsym_count）
+- [ ] sub-B：dashboard `web/src/views/releases.tsx` 列表
+- [ ] sub-C：dashboard `web/src/views/release-detail.tsx` 详情
+- [ ] sub-D：`POST /v1/deploys` 接口 + auth（用 token）
+- [ ] sub-E：regression 检测（cron job + on-event 双触发）
+- [ ] sub-F：compare-releases 视图
+
+---
+
+## Phase 24 — Issues 列表 power-user 化
+
+**Goal:** filter query 语法 + 列配置 + 保存视图 + 批量操作。
+
+**Entry:** Phase 23 ✅
+
+**Exit:**
+- Query 语法（`errorType:TypeError environment:prod last:7d release:1.2.3 status:unresolved`）前后端共用 parser
+- 列配置：show/hide errorType / count / lastSeen / env / release / assignee（localStorage 持久化）
+- 保存视图：个人 + 共享 org/team 内
+- Bulk select + bulk resolve / ignore / assign
+- 密度切换 compact / cozy（应用到所有表格）
+
+**Estimate:** 1.5 周
+
+### Steps
+- [ ] sub-A：query parser（`web/src/lib/query.ts` + `server/src/api/issues_query.rs` 共享 grammar）
+- [ ] sub-B：列配置 UI + persistence
+- [ ] sub-C：`saved_views` 表 + UI（org/team/personal scope）
+- [ ] sub-D：bulk action endpoint + UI
+- [ ] sub-E：density toggle global state + 应用
+
+---
+
+## Phase 25 — Issue 详情页 revamp
+
+**Goal:** 一屏调试。Tabbed 布局 / inline source / breadcrumb 时间轴 / activity log。
+
+**Entry:** Phase 24 ✅
+
+**Exit:**
+- Tabs：Stack | Events | Breadcrumbs | Tags | Activity（URL hash 保留状态）
+- Frame 行 click → inline source 抽屉（用 source map 反查）
+- Breadcrumb 时间轴：可折叠 group + 类型颜色
+- Related events 侧栏（同 fingerprint）
+- Comment thread + activity log
+- Status / assign / "mark as fixed in release X" 流
+
+**Estimate:** 2 周
+
+### Steps
+- [ ] sub-A：tab layout shell + URL hash 路由
+- [ ] sub-B：inline source 抽屉 + 服务端 `GET /admin/api/issues/{id}/frames/{idx}/source` 返回原始片段
+- [ ] sub-C：breadcrumb 时间轴组件
+- [ ] sub-D：related events 侧栏
+- [ ] sub-E：comments + activity log（attached 到 issue 的 audit_logs subset）
+- [ ] sub-F：assign / status / "fixed in release" 流（regression 联动 Phase 23）
+
+---
+
+## Phase 26 — Health metrics（crash-free rate / sessions）
+
+**Goal:** 轻量 session-aware。不做 session replay。
+
+**Entry:** Phase 25 ✅
+
+**Exit:**
+- SDK init / close 触发 session ping（open / close / errored）
+- crash-free user / session per release / per env
+- Health widget on overview page
+- Per-release health 对比
+
+**Estimate:** 1.5 周
+
+### Steps
+- [ ] sub-A：协议加 session ping（`POST /v1/sessions`）
+- [ ] sub-B：SDK lifecycle（RN: foreground 开 / background close / crash 标 errored；JS: pageshow/pagehide）
+- [ ] sub-C：`sessions` 表 + 聚合 query（5min bucket）
+- [ ] sub-D：dashboard 健康 widget on overview
+- [ ] sub-E：per-release 对比 + alerting hook（Phase 27）
+
+---
+
+## Phase 27 — 告警规则引擎深化
+
+**Goal:** 真 rule engine（不只 "新 issue 发邮件"）。
+
+**Entry:** Phase 26 ✅
+
+**Exit:**
+- Rule schema：trigger（count > N in T window / fingerprint match / regression / health drop）+ filter（env, release, fingerprint regex）+ throttle window
+- Per-rule recipient routing + 多 channel（email / webhook）
+- Webhook channel 实现（Phase 20 schema 落地）
+- Daily / weekly digest
+- Mute / snooze
+
+**Estimate:** 2 周
+
+### Steps
+- [ ] sub-A：`alert_rules` schema
+- [ ] sub-B：rule evaluator（每 min cron + on-event 双触发）
+- [ ] sub-C：UI 创建 / 编辑 rule
+- [ ] sub-D：webhook channel + signature verification
+- [ ] sub-E：digest（cron + opt-in）
+- [ ] sub-F：mute / snooze
+
+---
+
+## Phase 28 — 全局搜索 + Dashboard polish + a11y + 性能
+
+**Goal:** Cmd+K 全局；最后一公里打磨。
+
+**Entry:** Phase 27 ✅
+
+**Exit:**
+- Cmd+K palette：跨 org / team / project / issue / member 跳转 + 最近访问
+- 键盘快捷键 cheatsheet（`?` 弹出）
+- a11y audit pass（WCAG AA）
+- Bundle 分析 + code splitting；首屏 < 200KB gzip
+- Empty / loading / error state 全 dashboard 一致化
+- Theme 微调（Linear-tight density / token 化）
+
+**Estimate:** 2 周
+
+### Steps
+- [ ] sub-A：Cmd+K palette 组件 + `GET /admin/api/search?q=&types=` PG full-text
+- [ ] sub-B：键盘快捷键 system + `?` cheatsheet
+- [ ] sub-C：a11y audit + 修
+- [ ] sub-D：bundle 分析 + route-level code splitting
+- [ ] sub-E：empty / loading / error 一致化
+- [ ] sub-F：theme 微调 + 设计 token 文档化（marketing + docs + dashboard 共用）
+
+---
+
+## v0.2 范围外（Phase 29+ 待规划，不在本次 roadmap 内）
+
+下面这些**非 v0.2 工作**，提示防 scope creep：
+- Slack / JIRA / PagerDuty 集成（webhook 落地后下一步）
+- Grafana / Prometheus 数据源插件
+- CLI extras（issue resolve / list 等）
+- IPv6 ingest 优化、HTTP/3、Brotli
+- Replay / profiling
+- AI-assisted root-cause hint（事件聚类 / 可疑 commit 关联）
 
 ---
 
