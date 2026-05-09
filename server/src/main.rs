@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
 use anyhow::Context;
-use sentori_server::{db, notifier, quotas, router, seed, valkey};
+use sentori_server::{db, notifier, quotas, retention, router, seed, valkey};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -86,6 +86,14 @@ async fn main() -> anyhow::Result<()> {
     if let (Some(p), Some(v)) = (pool.as_ref(), valkey.as_ref()) {
         quotas::spawn_flush_task(p.clone(), v.clone());
         tracing::info!("quota flush task spawned (60s interval)");
+    }
+
+    // Phase 15 sub-C: daily retention pass — ensure 6 months of future
+    // events partitions exist, drop any monthly partition whose upper
+    // bound is older than the longest retention period any plan grants.
+    if let Some(p) = pool.as_ref() {
+        retention::spawn_retention_task(p.clone());
+        tracing::info!("retention task spawned (24h interval)");
     }
 
     let addr: SocketAddr = "0.0.0.0:8080".parse()?;

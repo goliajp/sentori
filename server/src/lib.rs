@@ -8,6 +8,7 @@ pub mod issues;
 pub mod notifier;
 pub mod passwd;
 pub mod quotas;
+pub mod retention;
 pub mod rate_limit;
 pub mod recent;
 pub mod router;
