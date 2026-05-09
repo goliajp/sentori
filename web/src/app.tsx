@@ -1,13 +1,15 @@
 import { Link, Outlet, useLocation } from 'react-router'
 
+import { useAuth } from './auth/state'
 import { ThemeToggle } from './components/theme-toggle'
 import { useThemeEffect } from './components/theme'
 
-const NAV = [{ label: 'Home', path: '/' }]
+const NAV = [{ label: 'Issues', path: '/issues' }]
 
 export function AppLayout() {
   useThemeEffect()
   const location = useLocation()
+  const { logout } = useAuth()
 
   const isActive = (path: string) =>
     path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
@@ -35,13 +37,20 @@ export function AppLayout() {
             ))}
           </nav>
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-1">
+          <ThemeToggle />
+          <button
+            className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-3 py-1.5 text-sm transition-colors"
+            onClick={() => void logout()}
+            type="button"
+          >
+            Sign out
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-4xl px-6 py-8">
-          <Outlet />
-        </div>
+        <Outlet />
       </main>
     </div>
   )

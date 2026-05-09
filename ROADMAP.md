@@ -301,7 +301,7 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 
 ### Steps
 
-- [ ] `cd web && bun add @tanstack/react-query openapi-fetch react-hotkeys-hook`
+- [x] `cd web && bun add @tanstack/react-query openapi-fetch react-hotkeys-hook`
 - [x] 设计 admin API 鉴权：管理员 session cookie（Phase 6 先做最简：env 注入的 admin password + `POST /admin/api/login` 设 httpOnly cookie，多用户在 Phase 13）
 - [ ] server 写 admin 端点：
   - [x] `POST /admin/api/login`
@@ -311,12 +311,12 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
   - [x] `GET /admin/api/projects/:id/issues/:issue_id/events?limit=50`
   - [ ] `PATCH /admin/api/issues/:id`（修改 status）
 - [ ] server 写 OpenAPI schema 输出（用 `utoipa` crate）→ `web/` 用 `openapi-typescript` 生成 types
-- [ ] vite 配 dev proxy：`/admin/api → http://localhost:8080`
+- [x] vite 配 dev proxy：`/admin/api → http://localhost:8080`
 - [ ] web/ 路由：
-  - [ ] `/login`
-  - [ ] `/`（重定向到 `/issues`）
-  - [ ] `/issues`（列表）
-  - [ ] `/issues/:id`（详情）
+  - [x] `/login`
+  - [x] `/`（重定向到 `/issues`）
+  - [x] `/issues`（列表）
+  - [x] `/issues/:id`（详情）
   - [ ] `/projects/:id/settings`（token、recipient 管理，留 Phase 9）
 - [ ] 写 `IssueListView`：
   - [ ] dense table：cols [type, msg_sample, count, last_seen, env, release]

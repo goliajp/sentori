@@ -10,6 +10,11 @@ export default defineConfig({
   resolve: {
     alias: { '@': resolve(import.meta.dirname, 'src') },
   },
+  server: {
+    proxy: {
+      '/admin/api': 'http://localhost:8080',
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,

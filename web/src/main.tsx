@@ -5,19 +5,28 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 
-import { AppLayout } from './app'
+import { AuthProvider } from './auth/AuthProvider'
+import { ProtectedLayout } from './auth/ProtectedLayout'
 import { applyTheme } from './components/theme'
-import { HomeView } from './views/home'
+import { IssueDetailView } from './views/issue-detail'
+import { IssuesView } from './views/issues'
+import { LoginView } from './views/login'
 
 applyTheme()
 
 const router = createBrowserRouter([
   {
+    element: <LoginView />,
+    path: '/login',
+  },
+  {
     children: [
-      { element: <HomeView />, index: true },
-      { element: <Navigate replace to="/" />, path: '*' },
+      { element: <Navigate replace to="/issues" />, index: true },
+      { element: <IssuesView />, path: 'issues' },
+      { element: <IssueDetailView />, path: 'issues/:issueId' },
+      { element: <Navigate replace to="/issues" />, path: '*' },
     ],
-    element: <AppLayout />,
+    element: <ProtectedLayout />,
     path: '/',
   },
 ])
@@ -35,7 +44,9 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
     </QueryClientProvider>
   </StrictMode>
 )
