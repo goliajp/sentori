@@ -7,6 +7,25 @@ use sqlx::PgPool;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
+/// How notifier should establish the SMTP connection. Production
+/// defaults to `Starttls` (Let's Encrypt or whatever the relay uses);
+/// dev / mailcatcher tests need `Plain` because mailcatcher doesn't
+/// negotiate STARTTLS.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SmtpTls {
+    Starttls,
+    Plain,
+}
+
+impl SmtpTls {
+    pub fn from_env(s: &str) -> Self {
+        match s.to_ascii_lowercase().as_str() {
+            "plain" | "none" | "off" => Self::Plain,
+            _ => Self::Starttls,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct NotifierConfig {
     pub smtp_host: String,
@@ -14,6 +33,7 @@ pub struct NotifierConfig {
     pub smtp_user: Option<String>,
     pub smtp_pass: Option<String>,
     pub from: String,
+    pub tls: SmtpTls,
 }
 
 #[derive(Debug, Clone)]
@@ -250,9 +270,12 @@ async fn handle(
 }
 
 fn build_transport(cfg: &NotifierConfig) -> Result<AsyncSmtpTransport<Tokio1Executor>> {
-    let mut builder = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&cfg.smtp_host)
-        .context("starttls relay")?
-        .port(cfg.smtp_port);
+    let mut builder = match cfg.tls {
+        SmtpTls::Starttls => AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&cfg.smtp_host)
+            .context("starttls relay")?,
+        SmtpTls::Plain => AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&cfg.smtp_host),
+    }
+    .port(cfg.smtp_port);
 
     if let (Some(u), Some(p)) = (&cfg.smtp_user, &cfg.smtp_pass) {
         builder = builder.credentials(Credentials::new(u.clone(), p.clone()));

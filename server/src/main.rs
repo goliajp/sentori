@@ -70,6 +70,9 @@ async fn main() -> anyhow::Result<()> {
             smtp_pass: std::env::var("SENTORI_SMTP_PASS").ok(),
             from: std::env::var("SENTORI_SMTP_FROM")
                 .unwrap_or_else(|_| "sentori@localhost".to_string()),
+            tls: std::env::var("SENTORI_SMTP_TLS")
+                .map(|s| notifier::SmtpTls::from_env(&s))
+                .unwrap_or(notifier::SmtpTls::Starttls),
         }),
         None => {
             tracing::info!("no SENTORI_SMTP_HOST set; email notifications disabled");

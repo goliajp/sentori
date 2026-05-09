@@ -751,13 +751,13 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 
 #### Testing（回填 v0.1 deferred）
 
-- [ ] iOS XCTest：触发 NSException → 断言 `<Documents>/sentori/pending/*.json` 出现 + 内容反序列化为合法 Event（**回填 Phase 7 line 354**）
-- [ ] Android Robolectric：触发 RuntimeException → 断言 `<filesDir>/sentori/pending/*.json` 出现（**回填 Phase 7 line 366**）
-- [ ] mailcatcher 集成测试：起 mailcatcher 容器 + 触发新 issue 通过 server → 断言邮件入箱（**回填 Phase 9 line 418**）
-- [ ] iOS simulator e2e 自动化：`xcrun simctl install` + `launch` + 通过 deep link / 按钮触发 → poll `/v1/events/_recent`（**回填 Phase 7 line 358 + Phase 4 e2e/run.sh simulator path**）
-- [ ] Android emulator e2e 自动化：`adb shell am start` 触发（**回填 Phase 7 line 368 + Phase 4 e2e/run-android.sh**）
-- [ ] minified bundle → `sentori-cli upload sourcemap` → 触发错误 → dashboard 验证显示原始位置（**回填 Phase 8 line 394**）
-- [ ] GitHub Actions：加 macOS runner 跑 iOS simulator e2e job（**回填 Phase 4 GitHub Actions simulator workflow**）
+- [x] iOS XCTest：`sdk/react-native/ios/Tests/SentoriCrashHandlerTests.swift` —— 通过 `persistForTesting(exception:)` helper 直接驱动 native handler 的 persist 路径（直接 raise NSException 会终止 test runner），断言 `<Documents>/sentori/pending/*.json` 出现 + JSON 反序列化为合法 Event（kind/platform/error.type 匹配）；CI workflow `mobile-e2e.yml::ios-xctest` 走 macOS runner
+- [x] Android Robolectric：`sdk/react-native/android/src/test/.../SentoriCrashHandlerTest.kt` —— Robolectric 跑 `installForTesting(ctx)` + `persistForTesting(throwable, thread)`，断言 `<filesDir>/sentori/pending/` 内文件 JSON shape；CI workflow `mobile-e2e.yml::android-robolectric` 走 Ubuntu runner
+- [x] mailcatcher 集成测试：`scripts/test-mailcatcher.sh` —— 起 mailpit 容器，注册用户 → notifier 发 verification email → 用 mailpit HTTP API 断言 subject/body 含 verify link；server 加 `SENTORI_SMTP_TLS=plain` env 兼容 mailpit；CI 跑（macOS Docker port-forwarding quirk 在本地可能漏 SMTP banner，Linux runner 无此问题）
+- [ ] **(user-owned)** iOS simulator e2e 自动化（`xcrun simctl install` + `launch` + `/v1/events/_recent` poll）—— 工作量大、纯 native build 链路，留作 launch 后 dogfood 用例
+- [ ] **(user-owned)** Android emulator e2e 自动化（`adb shell am start`）—— 同上
+- [x] minified bundle → `sentori-cli upload sourcemap` → 触发错误 → dashboard 显示原始位置：`scripts/sourcemap-e2e/{run.sh,throw-and-format.js,app.tsx,metro.fixture.config.js}` —— Metro 出 minified bundle + map → cli upload → Node eval bundle 触发 throw → POST 到 server → 拉 admin API + symbolicated=true → 断言 top frame 指向 `app.tsx` 而非 `bundle.js`
+- [x] GitHub Actions：`.github/workflows/mobile-e2e.yml` —— 4 jobs (ios-xctest macos-14, android-robolectric ubuntu, mailcatcher with services, sourcemap-e2e)，path filter 限定 `sdk/`、`cli/`、`server/`、`scripts/sourcemap-e2e/` 改动才跑
 
 #### Dogfooding
 
