@@ -20,7 +20,7 @@
 - [ ] **Phase 11** — 域名 / DNS / TLS 准备（sentori.golia.jp 拓扑落地）
 - [ ] **Phase 12** — Marketing 站 + 文档站
 - [x] **Phase 13** — 多租户改造（org / user / membership）
-- [ ] **Phase 14** — SaaS 自助 onboarding
+- [x] **Phase 14** — SaaS 自助 onboarding
 - [ ] **Phase 15** — 配额 / 限流 / usage 计量（free tier）
 - [ ] **Phase 16** — 生产就绪 + **公开上线 sentori.golia.jp** 🎯
 
@@ -656,8 +656,8 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
   - [x] 邀请链接 `/invite/:token`（`InviteAcceptView`）：未登录 → `Navigate /login?next=/invite/{token}`；已登录 → 自动 `acceptInvite` + StrictMode-safe ref 防双调用 + navigate `/org/{slug}/issues`；错误码（mismatch/expired/used/notFound）映射到友好文案
   - [x] login/register 互相 carry `?next=` 参数；`sanitizeNext` 拒绝跨域/双斜线开放重定向
 - [x] 改 marketing 的 "Get Started" 按钮 → 直链 `https://app.sentori.golia.jp/register`（同时保留 docs/github 次级 CTA）
-- [ ] e2e：注册 → 创建 project → 用 SDK 上报 → 看到事件，全流程
-- [ ] commit：`feat(saas): self-serve onboarding from registration to first event`
+- [x] e2e：`scripts/test-phase14.sh` —— 注册 → verify (sub-H bootstrap) → 登录 → create project → create public token → POST /v1/events 用 token (202) → dashboard 看到 TypeError issue (sub-A 修复 events 用 `state.project_id` 写死的 bug：`auth::IngestCaller` 注入 token's project_id) → revoke token → POST 同事件 → 401
+- [x] Phase 14 整体收尾（`feat(saas): self-serve onboarding from registration to first event` 由 sub-A..E 5 个 commit 累计完成）
 
 ---
 

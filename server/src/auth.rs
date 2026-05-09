@@ -9,6 +9,7 @@ use axum::{
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct AuthState {
@@ -20,6 +21,16 @@ struct AuthStateInner {
     db: Option<PgPool>,
 }
 
+/// Phase 14 sub-A/E: identifies who's posting events. `require_token`
+/// puts this in the request extensions so handlers know which project
+/// to attribute the event to (DevToken falls back to AppState.project_id
+/// for back-compat with single-tenant dev flows).
+#[derive(Clone, Debug)]
+pub enum IngestCaller {
+    DevToken,
+    Token { project_id: Uuid },
+}
+
 impl AuthState {
     pub fn new(dev_token: String, db: Option<PgPool>) -> Self {
         Self {
@@ -27,22 +38,29 @@ impl AuthState {
         }
     }
 
-    /// Validate a token. Accepts the dev token via constant-time compare,
-    /// or any token whose sha256 is found unrevoked in `tokens`.
-    pub async fn validate(&self, token: &str) -> bool {
+    /// Resolve a Bearer token to the calling identity. Returns None if
+    /// the token doesn't match the dev secret and isn't an unrevoked
+    /// row in `tokens`.
+    pub async fn resolve(&self, token: &str) -> Option<IngestCaller> {
         if self.matches_dev(token) {
-            return true;
+            return Some(IngestCaller::DevToken);
         }
         if let Some(pool) = &self.inner.db {
-            match self.lookup_db(pool, token).await {
-                Ok(true) => return true,
-                Ok(false) => {}
+            match self.lookup_project_id(pool, token).await {
+                Ok(Some(project_id)) => return Some(IngestCaller::Token { project_id }),
+                Ok(None) => {}
                 Err(e) => {
                     tracing::error!(error = %e, "token DB lookup failed");
                 }
             }
         }
-        false
+        None
+    }
+
+    /// Boolean form retained for `admin_auth::require_admin`'s
+    /// dev-token / DB-token fallback path.
+    pub async fn validate(&self, token: &str) -> bool {
+        self.resolve(token).await.is_some()
     }
 
     fn matches_dev(&self, token: &str) -> bool {
@@ -58,15 +76,19 @@ impl AuthState {
         diff == 0
     }
 
-    async fn lookup_db(&self, pool: &PgPool, token: &str) -> Result<bool, sqlx::Error> {
+    async fn lookup_project_id(
+        &self,
+        pool: &PgPool,
+        token: &str,
+    ) -> Result<Option<Uuid>, sqlx::Error> {
         let token_hash = hash_token(token);
-        let exists: Option<(uuid::Uuid,)> = sqlx::query_as(
-            "SELECT id FROM tokens WHERE token_hash = $1 AND revoked_at IS NULL",
+        let row: Option<(Uuid,)> = sqlx::query_as(
+            "SELECT project_id FROM tokens WHERE token_hash = $1 AND revoked_at IS NULL",
         )
         .bind(&token_hash)
         .fetch_optional(pool)
         .await?;
-        Ok(exists.is_some())
+        Ok(row.map(|(id,)| id))
     }
 }
 
@@ -85,7 +107,7 @@ struct ErrorBody {
 
 pub async fn require_token(
     State(state): State<AuthState>,
-    req: Request,
+    mut req: Request,
     next: Next,
 ) -> Response {
     let token = req
@@ -98,10 +120,11 @@ pub async fn require_token(
         return unauthorized();
     };
 
-    if !state.validate(token).await {
+    let Some(caller) = state.resolve(token).await else {
         return unauthorized();
-    }
+    };
 
+    req.extensions_mut().insert(caller);
     next.run(req).await
 }
 

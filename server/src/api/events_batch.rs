@@ -1,12 +1,13 @@
 use axum::{
-    extract::{Json, State},
+    extract::{Extension, Json, State},
     http::StatusCode,
     response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::api::events::persist_with_grouping;
+use crate::api::events::{caller_project_id, persist_with_grouping};
+use crate::auth::IngestCaller;
 use crate::error::{ValidationDetail, flatten_validation_errors};
 use crate::event::Event;
 use crate::recent::AppState;
@@ -37,6 +38,7 @@ pub struct BatchError {
 
 pub async fn handle(
     State(state): State<AppState>,
+    Extension(caller): Extension<IngestCaller>,
     Json(req): Json<BatchRequest>,
 ) -> impl IntoResponse {
     if req.events.len() > MAX_BATCH_EVENTS {
@@ -47,6 +49,7 @@ pub async fn handle(
             .into_response();
     }
 
+    let project_id = caller_project_id(&caller, &state);
     let mut accepted = 0u32;
     let mut rejected = 0u32;
     let mut errors = Vec::new();
@@ -61,7 +64,7 @@ pub async fn handle(
                             .unwrap_or_else(|_| "<failed to serialize>".into())
                     );
                     if state.db.is_some() {
-                        if let Err(e) = persist_with_grouping(&state, &event).await {
+                        if let Err(e) = persist_with_grouping(&state, project_id, &event).await {
                             tracing::error!(error = %e, "failed to persist event");
                         }
                     }
