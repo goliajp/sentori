@@ -275,6 +275,55 @@ export const orgsApi = {
     }),
 }
 
+export type ProjectCreated = {
+  createdAt: string
+  id: string
+  name: string
+  orgId: string
+  orgSlug: string
+}
+
+/** Phase 14 sub-A: project mutations (list lives on adminApi). */
+export const projectsApi = {
+  create: (orgSlug: string, name: string) =>
+    adminFetch<ProjectCreated>(`/orgs/${orgSlug}/projects`, {
+      body: JSON.stringify({ name }),
+      method: 'POST',
+    }),
+}
+
+export type TokenRow = {
+  createdAt: string
+  id: string
+  kind: 'admin' | 'public'
+  label: null | string
+  last4: null | string
+  revokedAt: null | string
+}
+
+export type TokenCreated = {
+  createdAt: string
+  id: string
+  kind: 'admin' | 'public'
+  label: null | string
+  /** Returned exactly once on create — store it now. */
+  token: string
+}
+
+/** Phase 14 sub-A: ingest token CRUD. */
+export const tokensApi = {
+  create: (projectId: string, body: { kind?: 'admin' | 'public'; label?: string }) =>
+    adminFetch<TokenCreated>(`/projects/${projectId}/tokens`, {
+      body: JSON.stringify({ kind: body.kind ?? 'public', label: body.label ?? null }),
+      method: 'POST',
+    }),
+
+  list: (projectId: string) => adminFetch<TokenRow[]>(`/projects/${projectId}/tokens`),
+
+  revoke: (projectId: string, tokenId: string) =>
+    adminFetch<{ ok: true }>(`/projects/${projectId}/tokens/${tokenId}`, { method: 'DELETE' }),
+}
+
 export type RecipientRow = {
   createdAt: string
   email: string

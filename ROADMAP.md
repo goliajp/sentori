@@ -638,10 +638,11 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 
 ### Steps
 
-- [ ] 注册成功后 onboarding wizard：
-  - [ ] Step 1: "Create your first project" → 输入 name → 自动生成 token
-  - [ ] Step 2: "Install the SDK" → 显示 SDK install snippet（动态填入 token + ingestUrl）+ "I've installed it" 按钮
-  - [ ] Step 3: "Send your first event" → poll `ingest` 直到看到事件 → 切到 dashboard
+- [x] 注册成功后 onboarding wizard（4-step in `views/onboarding.tsx`，state machine derived from server data + manual override for SDK/wait steps）：
+  - [x] Step 0: Create org（仅 user 没 membership 时命中——sub-H 自动 bootstrap 多数情况下跳过）
+  - [x] Step 1: "Create your first project" → name 输入 → 自动 create project + create default token，raw token 透传到下一步
+  - [x] Step 2: "Install the SDK" → 显示 token + ingestUrl + bun install + initSentori snippet + copy button
+  - [x] Step 3: "Send your first event" → poll `listIssues(projectId)` 每 3s，第一条 issue 出现自动 navigate to issues
 - [ ] 在 dashboard 顶部加"Onboarding pending"红点，未完成时常驻
 - [ ] 项目设置页：token 管理（生成 / 撤销 / 标签）—— 后端就绪 (sub-A)：
   - [x] migration `0008_tokens_meta.sql`：tokens 加 `label` + `last4`
