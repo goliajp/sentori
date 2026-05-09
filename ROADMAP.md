@@ -812,40 +812,45 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [x] `docs/sdk-react-native.md` + `docs-site/.../sdk-react-native.md` sourcemap upload snippet 改成 `npx @goliapkg/sentori-cli upload sourcemap ...`
 - [x] README 单独说明 bun 用户需 `bun pm trust @goliapkg/sentori-cli`
 
-#### sub-C — Dashboard onboarding wizard SDK 选择
+#### sub-C — Dashboard onboarding wizard SDK 选择 ✅
 
-- [ ] `InstallSdkStep` 加 radio：React Native / JavaScript（默认 RN）
-- [ ] 两种 snippet 切换：install command + init code
-- [ ] 复用 `CodeBlock` 组件，保持现有 copy 体验
+- [x] `InstallSdkStep` 加两按钮 picker：React Native / JavaScript（默认 RN）
+- [x] `sdkSnippets()` helper 按 SDK 分别返回 `install` + `init` 字符串；CodeBlock 复用，复制体验不变
 
-#### sub-D — `@sentori/javascript` (web + node)
+#### sub-D — `@goliapkg/sentori-javascript` (web + node) ✅
 
-- [ ] `sdk/javascript/`：bun workspace；ESM + CJS dual build
-- [ ] 共享逻辑：transport (`fetch`)、event builder、`captureError` / `captureException`、`setUser` (PII-min)、breadcrumbs
-- [ ] 浏览器 hooks：`window.onerror`、`window.unhandledrejection`、自动 `nav` breadcrumbs (`pushState`/`popstate`)、自动 `net` breadcrumbs (`fetch` 包装)
-- [ ] Node hooks：`process.on('uncaughtException' | 'unhandledRejection')`
-- [ ] zero-dep：可选解 stack 用现成 lib (`error-stack-parser` 或 vendored 几行)
-- [ ] bun:test 单测覆盖 init / capture / breadcrumb
-- [ ] `.github/workflows/publish-sdk-js.yml`：tag `sdk-js-v*` 触发 `npm publish`
+实际包名 `@goliapkg/sentori-javascript`（与 sub-A 的 scope 决定一致）。ESM-only（modern Node + browsers + Bun 都吃；CJS dual-build 收益太薄）。
 
-#### sub-E — mailrs `sentori@golia.jp` 密码改 argon2id
+- [x] `sdk/javascript/`：tsc-only build；零运行时依赖
+- [x] 核心 surface：`initSentori` / `captureError` / `captureException` / `setUser` / `getUser` / `addBreadcrumb` / `getBreadcrumbs` / `clearBreadcrumbs`
+- [x] 浏览器 hooks：`window.error` + `unhandledrejection`，idempotent
+- [x] Node hooks：`process.on('uncaughtException' | 'unhandledRejection')`，**故意不 process.exit**（host 拥 crash policy）
+- [x] uuid v7 自实现（crypto.getRandomValues + ms timestamp）；stack regex 同时认 V8 与 SpiderMonkey + URL-style file paths
+- [x] transport：browser 优先 `navigator.sendBeacon`（小 body + tab close 存活），fallback `fetch keepalive: true`；4xx/5xx silent drop（v0.1 不带 retry queue）
+- [x] bun:test 8 个单测（uuid 形态 + 唯一性、stack v8/spider/url、breadcrumb FIFO 100 cap、captureError 正确 POST shape + cause chain）
+- [x] `npm publish @goliapkg/sentori-javascript@0.1.0` 上线；`npm install` 起 ESM import + initSentori + captureError 都通
 
-- [ ] 用 mailrs 容器内的 argon2 算 hash（或 `cargo run -p users` 一次性脚本）
-- [ ] 替换 mailrs `/data/users.toml` 的 `password = "..."` 为 `password_hash = "$argon2id$..."`
-- [ ] mailrs 重启 + 重新 SMTP auth 探活
-- [ ] sentori 端 secret 不变，无需 redeploy
-- [ ] 在 `ops/secrets.md` 加 mailrs SMTP user 轮换 playbook
+#### sub-E — mailrs `sentori@golia.jp` 密码改 argon2id ✅
 
-#### sub-F — Sentori 自家 dogfood
+- [x] 用 `debian:13-slim` docker 一次性 + `argon2 -id -m 16 -t 3` 生成 hash
+- [x] `docker cp` 写入 mailrs container 的 `/data/users.toml` 替换 `password = "..."` 为 `password_hash = "$argon2id$..."`
+- [x] mailrs 重启 + STARTTLS + AUTH LOGIN 探活通
+- [x] sentori 端 SMTP_PASS secret 不变（明文密码相同），无需 redeploy
+- [x] `ops/secrets.md` 加 mailrs SMTP user 完整轮换 playbook
 
-- [ ] 在 prod sentori 注册 `sentori-internal@golia.jp` 或类似 → 自动 bootstrap personal org
-- [ ] create 三个 project：`sentori-dashboard`、`sentori-marketing`、`sentori-docs`
-- [ ] 三个 token 入 GitHub repo `goliajp/sentori` 的 secrets 作 build-time env
-- [ ] `web/` 接 `@sentori/javascript` —— `main.tsx` `initSentori`，release=`web@<git-sha>`
-- [ ] `marketing/` 接 —— Astro `<script>` 块，release=`marketing@<git-sha>`
-- [ ] `docs-site/` 接 —— Starlight `head` 注入，release=`docs@<git-sha>`
-- [ ] 推 `release/v0.2.1` 触发 deploy
-- [ ] 在 dashboard 故意触发一个 dev 错误，确认 issue 来自 sentori-dashboard 自己
+#### sub-F — Sentori 自家 dogfood ✅
+
+- [x] prod 注册 `dogfood-<ts>@golia.jp`、auto-bootstrap personal org `dogfood-<ts>`
+- [x] 创建三个 project：`sentori-dashboard`、`sentori-marketing`、`sentori-docs`，各 mint 1 个 public token
+- [x] 三个 token 入 sentori repo secrets：`SENTORI_DOGFOOD_{DASHBOARD,MARKETING,DOCS}_TOKEN`
+- [x] `web/main.tsx` `import { initSentori } from '@goliapkg/sentori-javascript'`；token 走 `import.meta.env.VITE_SENTORI_TOKEN`，dev 没 token 时 Vite tree-shake 掉 SDK
+- [x] `marketing/src/pages/{index,pricing}.astro` 各加 `<script>` 块；Astro bundle 把 SDK 编进 `_astro/*.js` 块；`PUBLIC_SENTORI_TOKEN` 内联进 source
+- [x] `docs-site/src/components/Head.astro` 重写 Starlight Head（先 import 默认再 append `<script>`）；同样 PUBLIC_SENTORI_TOKEN
+- [x] `docker/Dockerfile.web`：`ARG VITE_SENTORI_TOKEN` + `ARG VITE_GIT_SHA` + `ARG VITE_SENTORI_INGEST` → ENV → COPY → `bun run build`，token 在镜像 build 时被 Vite inline
+- [x] `goliajp/devops` `services/sentori/docker-compose.yml` web service `build.args.{VITE_SENTORI_TOKEN, VITE_GIT_SHA}` 从 compose env 取
+- [x] `.github/workflows/deploy.yml`：marketing 与 docs build step 各加 `PUBLIC_SENTORI_*_TOKEN` + `PUBLIC_GIT_SHA` env；Write `.env` step 写 `SENTORI_DOGFOOD_DASHBOARD_TOKEN` + `SENTORI_VERSION` 给 docker compose 用
+- [x] release/v0.2.0 force-FF 到 main HEAD + `gh workflow run` 触发部署，build/health/smoke 全绿
+- [x] 实测：用 marketing 的 build-time inlined token POST `/v1/events` (DogfoodSmokeError) → 落进 `sentori-marketing` project，dashboard listIssues 能看到
 
 #### sub-G — `qualcomm/insight` 接入（Phase 17 的真目的地）
 
