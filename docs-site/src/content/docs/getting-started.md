@@ -53,7 +53,7 @@ button; the search box accepts `/` to focus.
 In a React Native app:
 
 ```ts
-import { sentori } from '@sentori/react-native'
+import { sentori } from '@goliapkg/sentori-react-native'
 
 sentori.init({
   token: 'st_pk_dev0000000000000000000000',

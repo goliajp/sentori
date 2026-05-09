@@ -1,9 +1,9 @@
 ---
-title: '@sentori/react-native'
+title: '@goliapkg/sentori-react-native'
 description: React Native SDK reference
 ---
 
-# @sentori/react-native
+# @goliapkg/sentori-react-native
 
 React Native SDK for Sentori. Captures JS errors, iOS `NSException`,
 Android uncaught Java/Kotlin exceptions, and ships them through a
@@ -12,7 +12,7 @@ batched HTTP transport.
 ## Install
 
 ```bash
-bun add @sentori/react-native
+bun add @goliapkg/sentori-react-native
 # or npm / yarn / pnpm
 ```
 
@@ -31,7 +31,7 @@ is supported, just without native crash capture.
 ## Initialize
 
 ```ts
-import { sentori } from '@sentori/react-native'
+import { sentori } from '@goliapkg/sentori-react-native'
 
 sentori.init({
   token: 'st_pk_<your project token>',
@@ -124,7 +124,7 @@ events through the same HTTP transport as JS errors.
 For testing the round-trip:
 
 ```ts
-import { triggerNativeCrash } from '@sentori/react-native'
+import { triggerNativeCrash } from '@goliapkg/sentori-react-native'
 triggerNativeCrash()  // closes the app on real crashes
 ```
 

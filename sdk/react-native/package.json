@@ -1,12 +1,35 @@
 {
-  "name": "@sentori/react-native",
-  "version": "0.0.0",
-  "description": "Sentori SDK for React Native — JS-layer error capture and batched transport",
+  "name": "@goliapkg/sentori-react-native",
+  "version": "0.1.0",
+  "description": "Sentori SDK for React Native — JS-layer error capture, native crash handlers (iOS / Android), batched transport.",
+  "license": "MIT",
+  "homepage": "https://sentori.golia.jp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/goliajp/sentori.git",
+    "directory": "sdk/react-native"
+  },
+  "bugs": {
+    "url": "https://github.com/goliajp/sentori/issues"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "error-tracking",
+    "crash-reporting",
+    "monitoring",
+    "sentori"
+  ],
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "files": [
     "lib/",
     "src/",
+    "android/src/",
+    "android/build.gradle",
+    "ios/",
+    "expo-module.config.json",
+    "SentoriReactNative.podspec",
     "README.md"
   ],
   "scripts": {
@@ -36,5 +59,8 @@
     "@types/bun": "latest",
     "@types/react": "^19",
     "typescript": "^5"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

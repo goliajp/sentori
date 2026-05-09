@@ -306,8 +306,8 @@ function InstallSdkStep({
     )
   }
 
-  const installSnippet = `bun add @sentori/react-native`
-  const initSnippet = `import { initSentori } from '@sentori/react-native'
+  const installSnippet = `bun add @goliapkg/sentori-react-native`
+  const initSnippet = `import { initSentori } from '@goliapkg/sentori-react-native'
 
 initSentori({
   token: '${tokenInfo.rawToken}',
@@ -367,7 +367,7 @@ function WaitEventStep({
       <div className="border-border/60 bg-bg-tertiary/40 rounded-md border p-4 text-[12px]">
         <div className="text-fg-muted mb-1 tracking-wider uppercase">Quick-test snippet (JS)</div>
         <pre className="text-fg overflow-x-auto font-mono text-[11px] leading-relaxed">
-          {`import { captureError } from '@sentori/react-native'
+          {`import { captureError } from '@goliapkg/sentori-react-native'
 captureError(new Error('hello from ${project.name}'))`}
         </pre>
       </div>
