@@ -9,13 +9,13 @@ import '../styles/global.css'
     <meta name="viewport" content="width=device-width" />
     <meta
       name="description"
-      content="Sentori pricing. Self-hosted is free forever. SaaS free tier 100k events/month, beta invite-only at v0.1."
+      content="Sentori pricing. Self-hosted is free forever. SaaS free tier 100k events/month, sign up at sentori.golia.jp."
     />
     <link rel="canonical" href="https://sentori.golia.jp/pricing/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Sentori" />
     <meta property="og:title" content="Pricing — Sentori" />
-    <meta property="og:description" content="Self-hosted is free forever. SaaS free tier 100k events/month, beta invite-only at v0.1." />
+    <meta property="og:description" content="Self-hosted is free forever. SaaS free tier 100k events/month, open registration." />
     <meta property="og:url" content="https://sentori.golia.jp/pricing/" />
     <meta property="og:image" content="https://sentori.golia.jp/og.png" />
     <meta property="og:image:width" content="1200" />
@@ -73,27 +73,27 @@ import '../styles/global.css'
 
         <div class="border-accent/40 bg-accent/5 rounded-lg border p-8">
           <div class="text-fg-muted text-xs tracking-wider uppercase">
-            SaaS — beta
+            SaaS — Free
           </div>
-          <div class="text-fg mt-2 text-3xl font-semibold">Invite-only</div>
+          <div class="text-fg mt-2 text-3xl font-semibold">$0</div>
           <p class="text-fg-muted mt-4 text-sm leading-relaxed">
-            Hosted at <span class="text-fg font-mono">sentori.golia.jp</span>
-            when v0.2 ships. Free tier covers 100k events / month with
-            30-day retention. Pro / enterprise pricing comes after the
-            beta period.
+            Hosted at <span class="text-fg font-mono">sentori.golia.jp</span>.
+            100k events / month, 30-day retention, multi-org. No card
+            required. Pro / enterprise pricing lands after we've stayed
+            up reliably for a while.
           </p>
           <ul class="text-fg-muted mt-6 space-y-2 text-sm">
-            <li>• 100k events / month, free tier</li>
+            <li>• 100k events / month</li>
             <li>• 30-day retention</li>
             <li>• Multi-org, role-based</li>
             <li>• Same dashboard, zero ops</li>
-            <li>• Beta: invite-only during the launch month</li>
+            <li>• Email alerts on new issues + quota</li>
           </ul>
           <a
-            href="mailto:hello@sentori.golia.jp?subject=Sentori%20SaaS%20beta%20access"
+            href="https://app.sentori.golia.jp/register"
             class="bg-accent text-bg mt-8 inline-block rounded-md px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90"
           >
-            Request beta access →
+            Sign up — free →
           </a>
         </div>
       </div>
@@ -107,7 +107,10 @@ import '../styles/global.css'
 
     <footer class="border-border border-t">
       <div class="text-fg-muted mx-auto flex max-w-5xl items-center justify-between px-6 py-8 text-xs">
-        <span>Sentori v0.1.0</span>
+        <div class="flex gap-4">
+          <a class="hover:text-fg" href="/legal/privacy">Privacy</a>
+          <a class="hover:text-fg" href="/legal/terms">Terms</a>
+        </div>
         <span>Built in Tokyo.</span>
       </div>
     </footer>

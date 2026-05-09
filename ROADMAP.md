@@ -773,11 +773,13 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 
 #### 公开发布
 
-- [ ] 改 `marketing/pricing.astro`：去掉 "Beta 邀请制"，开放注册
-- [ ] 写 launch 文章 draft（Hacker News Show HN / dev.to）
-- [ ] 准备 demo 视频（30s 录屏：从注册到看到第一条事件）
-- [ ] tag `v0.2.0` + GitHub release
-- [ ] HN 发文（周二/周三 早上 PT）
+- [x] 改 `marketing/pricing.astro`：去掉 "Beta 邀请制"，开放注册（"$0" 标价 + "Sign up — free →" 直链 `app.sentori.golia.jp/register`，footer 加 Privacy/Terms）
+- [x] 写 launch 文章 draft：`docs/launch/show-hn-draft.md`（80 字符 HN 标题 + 体 + 反 obvious-question prep + 跨平台节奏指引）
+- [x] 准备 demo 视频脚本：`docs/launch/demo-script.md`（30 秒 storyboard，注册→onboarding wizard→token→dashboard→issue 出现，无 voiceover、burn-in caption）
+- [x] 整合 launch checklist：`docs/launch/checklist.md` —— `[code]` vs `[ops]` 标注，跨 Phase 11/12/16 user-owned 全部 inventory
+- [ ] **(user-owned)** tag `v0.2.0` + GitHub release notes
+- [ ] **(user-owned)** 录视频 + Lawyer review 法律文档 + 配 SPF/DKIM/DMARC + 一周 dogfooding 无 P1
+- [ ] **(user-owned)** HN 发文（周二/周三 早上 PT）
 - [ ] 🎯 **里程碑：sentori.golia.jp 正式开放**
 
 ---
