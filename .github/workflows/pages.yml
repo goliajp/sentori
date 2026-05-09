@@ -1,0 +1,65 @@
+name: deploy-pages
+
+# Deploys the marketing site and the docs site to Cloudflare Pages.
+# Both jobs run on every push to main that touches the relevant tree;
+# CF treats no-op deploys as cheap so we don't bother with a path-filter
+# matrix.
+#
+# Required repo secrets (set under Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN  — token with "Cloudflare Pages: Edit" permission
+#   CLOUDFLARE_ACCOUNT_ID — the account containing the two Pages projects
+#
+# Required CF Pages projects (created once via dashboard):
+#   sentori-marketing → custom domain sentori.golia.jp
+#   sentori-docs      → custom domain docs.sentori.golia.jp
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'marketing/**'
+      - 'docs-site/**'
+      - 'docs/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+jobs:
+  marketing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install
+        working-directory: marketing
+        run: bun install --frozen-lockfile
+      - name: Build
+        working-directory: marketing
+        run: bun run build
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy marketing/dist --project-name=sentori-marketing --branch=main
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install
+        working-directory: docs-site
+        run: bun install --frozen-lockfile
+      - name: Build
+        working-directory: docs-site
+        run: bun run build
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy docs-site/dist --project-name=sentori-docs --branch=main

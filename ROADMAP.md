@@ -560,10 +560,11 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [x] 暗色为默认（`overrides.css` 复用 `web/` 的 palette）
 
 #### 部署
-- [ ] Cloudflare Pages 项目 1：`marketing/` → `sentori.golia.jp`
-- [ ] Cloudflare Pages 项目 2：`docs-site/` → `docs.sentori.golia.jp`
-- [ ] GitHub Actions：每个 main commit 自动 deploy
-- [ ] commit：`feat: marketing landing page and docs site`
+- [x] GitHub Actions：`.github/workflows/pages.yml` —— `wrangler pages deploy` 双 job（marketing + docs），trigger 限定 marketing/ docs-site/ docs/ 改动
+- [ ] **(user-owned)** Cloudflare 控制台开两个 Pages 项目：`sentori-marketing` + `sentori-docs`（项目名与 workflow 写死的 `--project-name` 对齐）
+- [ ] **(user-owned)** 在每个 Pages 项目里绑 custom domain：`sentori.golia.jp` / `docs.sentori.golia.jp`（DNS 已在 zones.yaml 准备好；CF Pages 加域名时会自动签 cert）
+- [ ] **(user-owned)** GitHub repo Secrets：`CLOUDFLARE_API_TOKEN`（scope=Pages: Edit）+ `CLOUDFLARE_ACCOUNT_ID`
+- [ ] **(user-owned)** 首次手动触发 workflow_dispatch（或推一个改动）验证 deploy 通；之后 main commit 自动 deploy
 
 ---
 
