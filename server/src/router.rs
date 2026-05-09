@@ -53,6 +53,18 @@ pub fn build(cfg: ServerConfig) -> Router {
     let admin_protected = Router::new()
         .route("/projects", get(api::admin::list_my_projects))
         .route(
+            "/orgs/{slug}/projects",
+            post(api::projects::create_project),
+        )
+        .route(
+            "/projects/{project_id}/tokens",
+            get(api::tokens::list_tokens).post(api::tokens::create_token),
+        )
+        .route(
+            "/projects/{project_id}/tokens/{token_id}",
+            axum::routing::delete(api::tokens::revoke_token),
+        )
+        .route(
             "/projects/{project_id}/issues",
             get(api::admin::list_issues),
         )

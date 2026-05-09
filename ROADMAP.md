@@ -643,7 +643,12 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
   - [ ] Step 2: "Install the SDK" → 显示 SDK install snippet（动态填入 token + ingestUrl）+ "I've installed it" 按钮
   - [ ] Step 3: "Send your first event" → poll `ingest` 直到看到事件 → 切到 dashboard
 - [ ] 在 dashboard 顶部加"Onboarding pending"红点，未完成时常驻
-- [ ] 项目设置页：token 管理（生成 / 撤销 / 标签）
+- [ ] 项目设置页：token 管理（生成 / 撤销 / 标签）—— 后端就绪 (sub-A)：
+  - [x] migration `0008_tokens_meta.sql`：tokens 加 `label` + `last4`
+  - [x] `POST /admin/api/orgs/{slug}/projects` —— User caller 必须是 owner/admin
+  - [x] `POST /admin/api/projects/{id}/tokens` —— 返回 raw token 一次（`st_pk_<26 Crockford>` = 32 chars 总），DB 只存 sha256 hash + last4 + label
+  - [x] `GET /admin/api/projects/{id}/tokens` —— 列出 metadata（不含 raw）
+  - [x] `DELETE /admin/api/projects/{id}/tokens/{tid}` —— 撤销（set revoked_at）；revoked token → /v1/events 401
 - [ ] 邀请协作者流程：
   - [ ] org settings 页"Invite member" → 输入 email + 角色 → 发邀请邮件
   - [ ] 邀请链接 `/invite/:token` → 已登录直接加入；未注册引导注册
