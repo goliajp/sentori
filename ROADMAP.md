@@ -796,6 +796,7 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
   - https://api.sentori.golia.jp/api/auth/me → 401（auth gate 工作）
   - https://ingest.sentori.golia.jp/v1/events/_recent → 401（token gate 工作）
 - [x] prod e2e 通过：注册 → verify → login → 自动 bootstrap personal org → create project → create public token → POST event 到 `ingest.sentori.golia.jp` (202) → dashboard 看到 issue (grouping work)
+- [x] SMTP 走 `mail.golia.ai`（goliajp/mailrs）—— 在 mailrs `/data/users.toml` 加 `sentori@golia.jp` 作 SMTP submission user（plain pw，mailrs verifies 通过 users.toml first-tier）；6 个 `SENTORI_SMTP_*` secrets 更新指向 mailrs（mail.golia.ai:587 STARTTLS）；redeploy 后 register flow log "verification email sent"，邮件确认落到 mailrs `/data/maildir/golia.jp/<recipient>/new/` 内含正确 `[Sentori] Verify your email` subject + verify link body；DKIM/SPF 走现有 golia.jp zone 配置（`golia.jp` SPF 已含 `a:mail.golia.ai`）
 
 ---
 
