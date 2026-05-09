@@ -208,24 +208,24 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 
 ### Steps
 
-- [ ] `cd sentori/sdk && bunx create-react-native-library@latest react-native`（包名 `@sentori/react-native`，类型 turbo-module，语言 kotlin + objc/swift）
-- [ ] 删除模板示例代码（保留构建配置）
-- [ ] 写 `src/types.ts`：Event / SentoriError / Frame / Breadcrumb，对齐 `docs/protocol.md`
-- [ ] 写 `src/init.ts`：`sentori.init({ token, release, env?, ingestUrl? })` —— 校验 token 前缀（`st_pk_`），ingestUrl 默认 `https://ingest.sentori.golia.jp`，env 默认从 `__DEV__` 推断，写入全局 config singleton
-- [ ] 写 `src/handlers/global.ts`：`ErrorUtils.setGlobalHandler` 包装 + 保留原 handler
-- [ ] 写 `src/handlers/promise.ts`：`HermesInternal.enablePromiseRejectionTracker` 接入
-- [ ] 写 `src/handlers/network.ts`：fetch / XHR 拦截 → 写 breadcrumb（不阻断原请求）
-- [ ] 写 `src/breadcrumbs.ts`：ring buffer，cap 100 条，类型枚举对齐 protocol
-- [ ] 写 `src/transport.ts`：
-  - [ ] batcher：5 秒或 10 条触发 flush
-  - [ ] retry：指数退避 1s/2s/4s 上限 3 次
-  - [ ] offline queue：AsyncStorage 落盘，下次启动 drain
-  - [ ] header：`Authorization` + `Sentori-Sdk: react-native/<pkg.version>`
-- [ ] 写 `src/error-boundary.tsx`：React `<sentori.ErrorBoundary fallback>`
-- [ ] 写 `src/stack.ts`：解析 RN error stack 字符串 → `Frame[]`（先不做 sourcemap，留 raw 给 Phase 8 处理）
-- [ ] 写 `src/index.ts`：默认 export `sentori` 对象，所有方法 namespace 化
-- [ ] 写 jest 单测覆盖 transport / breadcrumbs / stack 解析
-- [ ] `bun run prepack` 检查产物
+- [x] `cd sentori/sdk && bunx create-react-native-library@latest react-native`（包名 `@sentori/react-native`，类型 turbo-module，语言 kotlin + objc/swift）
+- [x] 删除模板示例代码（保留构建配置）
+- [x] 写 `src/types.ts`：Event / SentoriError / Frame / Breadcrumb，对齐 `docs/protocol.md`
+- [x] 写 `src/init.ts`：`sentori.init({ token, release, env?, ingestUrl? })` —— 校验 token 前缀（`st_pk_`），ingestUrl 默认 `https://ingest.sentori.golia.jp`，env 默认从 `__DEV__` 推断，写入全局 config singleton
+- [x] 写 `src/handlers/global.ts`：`ErrorUtils.setGlobalHandler` 包装 + 保留原 handler
+- [x] 写 `src/handlers/promise.ts`：`HermesInternal.enablePromiseRejectionTracker` 接入
+- [x] 写 `src/handlers/network.ts`：fetch / XHR 拦截 → 写 breadcrumb（不阻断原请求）
+- [x] 写 `src/breadcrumbs.ts`：ring buffer，cap 100 条，类型枚举对齐 protocol
+- [x] 写 `src/transport.ts`：
+  - [x] batcher：5 秒或 10 条触发 flush
+  - [x] retry：指数退避 1s/2s/4s 上限 3 次
+  - [x] offline queue：AsyncStorage 落盘，下次启动 drain
+  - [x] header：`Authorization` + `Sentori-Sdk: react-native/<pkg.version>`
+- [x] 写 `src/error-boundary.tsx`：React `<sentori.ErrorBoundary fallback>`
+- [x] 写 `src/stack.ts`：解析 RN error stack 字符串 → `Frame[]`（先不做 sourcemap，留 raw 给 Phase 8 处理）
+- [x] 写 `src/index.ts`：默认 export `sentori` 对象，所有方法 namespace 化
+- [x] 写 jest 单测覆盖 transport / breadcrumbs / stack 解析
+- [x] `bun run prepack` 检查产物
 - [ ] 改 `sdk/react-native/example/App.tsx`：`sentori.init` + 一个 throw 按钮（`ingestUrl: 'http://localhost:8080'` 用于本地 dev）
 - [ ] iOS：`cd example/ios && bundle exec pod install`
 - [ ] iOS：`cd example && bun run ios` 启 simulator，点击 throw，验证 server stdout 收到事件
