@@ -19,7 +19,7 @@
 - [x] **Phase 10** — Docker compose + 文档 + **self-hosted v0.1.0** 🎯
 - [ ] **Phase 11** — 域名 / DNS / TLS 准备（sentori.golia.jp 拓扑落地）
 - [ ] **Phase 12** — Marketing 站 + 文档站
-- [ ] **Phase 13** — 多租户改造（org / user / membership）
+- [x] **Phase 13** — 多租户改造（org / user / membership）
 - [ ] **Phase 14** — SaaS 自助 onboarding
 - [ ] **Phase 15** — 配额 / 限流 / usage 计量（free tier）
 - [ ] **Phase 16** — 生产就绪 + **公开上线 sentori.golia.jp** 🎯
@@ -619,9 +619,13 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 
 #### 测试
 
-- [ ] 集成测试：A 用户登录后访问 B 用户 org 下的 issue → 403
-- [ ] 集成测试：邀请 → 接受 → 看到目标 org 的项目
-- [ ] commit：`feat: multi-tenant orgs, users, memberships`
+- [x] 集成测试 + commit：`scripts/test-phase13.sh` —— 重跑安全（fixture suffix 用 `date +%s%N`），覆盖：
+  - [x] register / verify / login + sub-H bootstrap personal org
+  - [x] cross-org `GET /admin/api/projects` 隔离（alice ≠ bob 的 projects 列表）
+  - [x] alice GET bob's project issues → 403；反向 → 403；本人 → 200；dev token super-admin → 200
+  - [x] alice 邀请 bob → bob accept → bob 现在能看 alice 的 project issues（隔离解除）
+  - [x] mismatched-email invite → 403 inviteEmailMismatch
+- [x] Phase 13 整体收尾（`feat: multi-tenant orgs, users, memberships` 由 sub-A..I 8 个 commit 累计完成）
 
 ---
 
