@@ -75,3 +75,53 @@ The next deploy picks up the new ciphertext.
 - Anything that can be public (DNS records, Caddyfile, alert rules).
 - The age private keys themselves — those live outside git.
 - Backup *artifacts* — those live in R2, not in git.
+
+## mailrs SMTP submission user (sentori@golia.jp)
+
+Sentori's notifier signs in to the goliajp/mailrs server at
+`mail.golia.ai:587` STARTTLS as `sentori@golia.jp`. The credentials
+live in `gh secret set SENTORI_SMTP_USER / SMTP_PASS` on the sentori
+repo (sub-A picked them); the matching account lives in mailrs's
+`users.toml` (a TOML file inside the running mailrs container's
+volume — see notes below).
+
+### Rotating the password (recommended yearly + on suspected leak)
+
+```sh
+# 1. Generate a new password.
+NEW=$(openssl rand -base64 24 | tr -d '+/=')
+
+# 2. Hash with argon2id. mailrs's users.toml accepts either a plain
+#    `password = "..."` or `password_hash = "$argon2id$..."`. We
+#    always store the hash.
+HASH=$(docker run --rm -i debian:13-slim bash -c '
+  apt-get update -qq >/dev/null 2>&1
+  apt-get install -y -qq argon2 >/dev/null 2>&1
+  read pw
+  salt=$(head -c 16 /dev/urandom | base64 | tr -d "/+" | head -c 16)
+  echo -n "$pw" | argon2 "$salt" -id -m 16 -t 3 -p 1 -e
+' <<<"$NEW")
+
+# 3. Write new file inside the mailrs container's named volume.
+#    The live compose does NOT bind-mount users.toml; `docker cp`
+#    into the volume is the only working path.
+TMP=$(mktemp)
+cat > "$TMP" <<EOF
+[users."sentori@golia.jp"]
+password_hash = "$HASH"
+EOF
+scp "$TMP" t02:/tmp/sentori-users.toml
+ssh t02 'docker cp /tmp/sentori-users.toml mailrs:/data/users.toml \
+        && cd /apps/mailrs && docker compose restart mailrs'
+
+# 4. Update sentori secrets so the deploy uses the new password.
+gh secret set SENTORI_SMTP_PASS --repo goliajp/sentori --body "$NEW"
+
+# 5. Re-trigger the sentori deploy so server containers pick up the
+#    new SMTP_PASS env.
+gh workflow run deploy --repo goliajp/sentori --ref release/v0.2.0
+```
+
+Verify the rotation by registering a fresh user on
+`https://app.sentori.golia.jp/register` and watching for the
+verification email to land in the recipient's inbox.
