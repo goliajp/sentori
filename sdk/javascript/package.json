@@ -1,0 +1,54 @@
+{
+  "name": "@goliapkg/sentori-javascript",
+  "version": "0.1.0",
+  "description": "Sentori SDK for browsers and Node — error capture, breadcrumbs, and HTTP transport. Same wire protocol as @goliapkg/sentori-react-native.",
+  "license": "MIT",
+  "homepage": "https://sentori.golia.jp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/goliajp/sentori.git",
+    "directory": "sdk/javascript"
+  },
+  "bugs": {
+    "url": "https://github.com/goliajp/sentori/issues"
+  },
+  "keywords": [
+    "sentori",
+    "error-tracking",
+    "crash-reporting",
+    "monitoring",
+    "javascript",
+    "browser",
+    "node"
+  ],
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "import": "./lib/index.js"
+    }
+  },
+  "files": [
+    "lib/",
+    "src/",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "prepack": "bun run build"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

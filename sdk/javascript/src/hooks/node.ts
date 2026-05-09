@@ -1,0 +1,34 @@
+import { captureError } from '../capture.js'
+
+let installed = false
+
+/**
+ * Wire process.on('uncaughtException') + 'unhandledRejection'.
+ * Idempotent. Returns false if not running on Node (no `process.on`).
+ *
+ * Node policy notes:
+ *   - We do NOT call process.exit on uncaughtException; Sentori doesn't
+ *     own the host's crash strategy. The host's existing handler
+ *     (default: log + exit 1) runs after ours.
+ *   - Bun + Deno expose process.on for compatibility; the same code
+ *     path covers them.
+ */
+export function installNodeHooks(): boolean {
+  if (installed) return true
+  const p = (globalThis as { process?: NodeJS.Process }).process
+  if (!p || typeof p.on !== 'function') return false
+
+  p.on('uncaughtException', (err: Error) => {
+    captureError(err)
+  })
+  p.on('unhandledRejection', (reason: unknown) => {
+    if (reason instanceof Error) captureError(reason)
+    else captureError(new Error(typeof reason === 'string' ? reason : 'unhandled rejection'))
+  })
+  installed = true
+  return true
+}
+
+export function _resetNodeHooksForTesting(): void {
+  installed = false
+}
