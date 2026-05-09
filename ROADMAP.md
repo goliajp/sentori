@@ -788,8 +788,14 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [x] `goliajp/devops` repo `devices/cloud/t01/caddy/Caddyfile` 加 5 个站点（apex sentori / app / api / ingest / docs），通过 `devops caddy deploy t01` push + reload + LE 证书 provision 完成
 - [x] DNS 5 个 CNAME records (`sentori`, `app.sentori`, `api.sentori`, `ingest.sentori`, `docs.sentori` → `t01.golia.jp.`) 通过 devops API + `devops dns sync golia.jp` 推到 Cloudflare live
 - [x] `goliajp/sentori` repo `.github/workflows/deploy.yml`：lx64 self-hosted runner 监听 push 到 `release/*`，rsync source + build marketing/docs + 写 .env + `docker compose build && up -d` + 健康检查 + 公开 surface smoke (server `/v1/events/_recent`、`/metrics`、`/api/auth/me`、web、marketing、docs 全 200/401)
-- [ ] **(user-owned)** `gh secret set` 一次性配 `SENTORI_PG_PASSWORD` / `SENTORI_DEV_TOKEN` / `SENTORI_ADMIN_PASSWORD` / `SENTORI_SESSION_SECRET` / SMTP 5 项
-- [ ] **(user-owned)** `git push origin release/v0.2.0` 触发首次 deploy；workflow 跑完后 5 个 sentori 子域 HTTPS 应该全 live
+- [x] `gh secret set` 一次性配 8 个 secrets（PG / DEV_TOKEN / ADMIN / SESSION + SMTP 4 项预填空，user 后续可自行填真 SMTP）；org-level runner group 开 `allows_public_repositories=true`
+- [x] `git push origin main:release/v0.2.0` + `gh workflow run deploy --ref release/v0.2.0` 触发 deploy；workflow 全绿，5 个子域 live：
+  - https://sentori.golia.jp → marketing 200
+  - https://docs.sentori.golia.jp → Starlight 200
+  - https://app.sentori.golia.jp → dashboard SPA 200
+  - https://api.sentori.golia.jp/api/auth/me → 401（auth gate 工作）
+  - https://ingest.sentori.golia.jp/v1/events/_recent → 401（token gate 工作）
+- [x] prod e2e 通过：注册 → verify → login → 自动 bootstrap personal org → create project → create public token → POST event 到 `ingest.sentori.golia.jp` (202) → dashboard 看到 issue (grouping work)
 
 ---
 
