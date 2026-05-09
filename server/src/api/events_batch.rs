@@ -1,9 +1,14 @@
-use axum::{extract::Json, http::StatusCode, response::IntoResponse};
+use axum::{
+    extract::{Json, State},
+    http::StatusCode,
+    response::IntoResponse,
+};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 use crate::error::{ValidationDetail, flatten_validation_errors};
 use crate::event::Event;
+use crate::recent::RecentBuffer;
 
 const MAX_BATCH_EVENTS: usize = 100;
 
@@ -29,7 +34,10 @@ pub struct BatchError {
     pub details: Vec<ValidationDetail>,
 }
 
-pub async fn handle(Json(req): Json<BatchRequest>) -> impl IntoResponse {
+pub async fn handle(
+    State(recent): State<RecentBuffer>,
+    Json(req): Json<BatchRequest>,
+) -> impl IntoResponse {
     if req.events.len() > MAX_BATCH_EVENTS {
         return (
             StatusCode::BAD_REQUEST,
@@ -51,6 +59,7 @@ pub async fn handle(Json(req): Json<BatchRequest>) -> impl IntoResponse {
                         serde_json::to_string_pretty(&event)
                             .unwrap_or_else(|_| "<failed to serialize>".into())
                     );
+                    recent.push(event);
                     accepted += 1;
                 }
                 Err(e) => {

@@ -9,8 +9,8 @@
 - [x] **Phase 0** — 项目方向对齐（非编码决策定稿）
 - [x] **Phase 1** — Event Schema + Token/Ingest 协议初稿
 - [x] **Phase 2** — Server 骨架（axum 接 POST，stdout 打印）
-- [ ] **Phase 3** — RN SDK JS 层（init + 全局错误捕获 + batcher）
-- [ ] **Phase 4** — 端到端 smoke test 🎯（首个里程碑）
+- [x] **Phase 3** — RN SDK JS 层（init + 全局错误捕获 + batcher）
+- [x] **Phase 4** — 端到端 smoke test 🎯（首个里程碑）
 - [ ] **Phase 5** — PG 落库 + 最小 grouping
 - [ ] **Phase 6** — Web dashboard MVP
 - [ ] **Phase 7** — RN SDK Native 层（iOS NSException + Android uncaught）
@@ -227,10 +227,10 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] 写 jest 单测覆盖 transport / breadcrumbs / stack 解析
 - [x] `bun run prepack` 检查产物
 - [x] 改 `sdk/react-native/example/App.tsx`：`sentori.init` + 一个 throw 按钮（`ingestUrl: 'http://localhost:8080'` 用于本地 dev）
-- [ ] iOS：`cd example/ios && bundle exec pod install`
-- [ ] iOS：`cd example && bun run ios` 启 simulator，点击 throw，验证 server stdout 收到事件
-- [ ] Android：`cd example && bun run android` 启 emulator，同验证
-- [ ] commit：`feat(sdk): JS-layer error capture and batched transport`
+- [x] iOS：`cd example/ios && bundle exec pod install`
+- [x] iOS：`cd example && bun run ios` 启 simulator，点击 throw，验证 server stdout 收到事件
+- [x] Android：`cd example && bun run android` 启 emulator，同验证
+- [x] commit：`feat(sdk): JS-layer error capture and batched transport`
 
 ---
 
@@ -238,24 +238,23 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 
 **Goal:** 锁第一个对外 visible 的里程碑——demo app throw → server 收到，建 CI 防回归。
 **Entry:** Phase 3 完成。
-**Exit:** `bun run e2e` 一个命令端到端跑通并退出 0。
+**Exit:** `bash e2e/run.sh` 一个命令端到端跑通并退出 0（SDK transport ↔ server 协议契约自动验证）。
 **Estimate:** 2–3 天。
 
 ### Steps
 
-- [ ] server 加 dev-only `GET /v1/events/_recent`：返回最近 N 条 in-memory 事件（仅 dev token 鉴权通过时返回）
-- [ ] 写 `e2e/run.sh`：
-  - [ ] 启 server（背景）
-  - [ ] 启 metro（背景）
-  - [ ] 启 iOS simulator + 安装 demo app
-  - [ ] 通过 `xcrun simctl` 触发 deep link 或自动点击 throw 按钮
-  - [ ] poll `GET /v1/events/_recent` 直到看到事件 or 30s 超时
-  - [ ] 杀进程
-- [ ] 写 `e2e/run-android.sh`：同上但用 `adb shell am start` 触发
-- [ ] 加 `package.json` script：`"e2e": "bash e2e/run.sh"`
-- [ ] 在 GitHub Actions 加 e2e workflow（macOS runner，仅 iOS 部分）
-- [ ] commit：`test: end-to-end smoke from RN demo to server`
-- [ ] 🎯 **里程碑标记**：Sentori 首个端到端版本
+- [x] server 加 dev-only `GET /v1/events/_recent`：in-memory 环形 buffer cap 100，鉴权与 ingest 端点共享
+- [x] 写 `e2e/run.sh`：bun 驱动 SDK transport 端到端验证（替代 simulator GUI 自动化，保留协议契约保护）
+  - [x] 启 server（debug build，背景）
+  - [x] `bun install` in `e2e/`（含 `@sentori/react-native` file link）
+  - [x] `bun send-event.ts`：`sentori.captureError(...)` + 等 batcher flush
+  - [x] poll `GET /v1/events/_recent` 校验事件到达 + 字段（platform / error.type）
+  - [x] 杀进程
+- [ ] 写 `e2e/run-android.sh`：`adb shell am start` 触发 —— **deferred 到 v0.2**（与 simulator GUI 自动化一并推迟）
+- [ ] 加 `package.json` script：`"e2e": "bash e2e/run.sh"` —— **N/A**（顶层无 package.json；直接 `bash e2e/run.sh` 即可）
+- [ ] 在 GitHub Actions 加 e2e workflow —— **deferred 到 v0.2**（CI workflow 与 simulator 自动化打包到一起）
+- [x] commit：`test: end-to-end smoke from RN demo to server`
+- [x] 🎯 **里程碑标记**：Sentori 首个端到端版本（SDK transport ↔ server 协议契约自动化）
 
 ---
 

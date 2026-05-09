@@ -142,3 +142,52 @@ async fn batch_accepts_valid_rejects_invalid() {
     assert_eq!(body["accepted"], 1);
     assert_eq!(body["rejected"], 1);
 }
+
+#[tokio::test]
+async fn recent_returns_pushed_events() {
+    let addr = spawn().await;
+    let client = reqwest::Client::new();
+
+    let resp = client
+        .get(format!("http://{addr}/v1/events/_recent"))
+        .header("Authorization", format!("Bearer {TOKEN}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    let events: Vec<serde_json::Value> = resp.json().await.unwrap();
+    assert!(events.is_empty());
+
+    let posted = valid_event();
+    let resp = client
+        .post(format!("http://{addr}/v1/events"))
+        .header("Authorization", format!("Bearer {TOKEN}"))
+        .json(&posted)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 202);
+
+    let resp = client
+        .get(format!("http://{addr}/v1/events/_recent"))
+        .header("Authorization", format!("Bearer {TOKEN}"))
+        .send()
+        .await
+        .unwrap();
+    let events: Vec<serde_json::Value> = resp.json().await.unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0]["id"], posted["id"]);
+}
+
+#[tokio::test]
+async fn recent_requires_auth() {
+    let addr = spawn().await;
+    let client = reqwest::Client::new();
+
+    let resp = client
+        .get(format!("http://{addr}/v1/events/_recent"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 401);
+}
