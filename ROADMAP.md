@@ -730,12 +730,13 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 
 #### 日志 / 备份
 
-- [ ] 日志：server stdout → docker → journald；用 `vector` 转 Grafana Cloud Loki（免费 50GB）
-- [ ] PG 备份：
-  - [ ] `pg_dump` 每天凌晨 → Cloudflare R2（30 天保留）
-  - [ ] WAL archiving 到 R2（增量恢复用）
-  - [ ] 写 `restore.sh` 脚本
-- [ ] 演练：测试一次完整恢复（从备份重建 PG → 应用数据完整）
+- [x] 日志：`ops/vector.toml` —— journald (docker.service / caddy.service) → vector → Grafana Cloud Loki，static labels service/env/unit；JSON parse 提取 tracing 字段；5 MB / 5 s 批
+- [x] PG 备份脚本就绪：
+  - [x] `ops/backup.sh` —— `pg_dump --format=custom --no-owner --no-acl` → R2 daily/，`rclone delete --min-age 30d` 自动 retention
+  - [x] `ops/postgresql.archive.conf` —— `archive_mode=on` + `archive_timeout=300` + `archive_command='rclone copyto %p r2:.../wal/%f'` 给 ≤ 5 min RPO 的 PITR
+  - [x] `ops/restore.sh` —— 从 R2 拉 latest 或指定 stamp，DROP+CREATE+pg_restore，强制交互式 `yes` 确认
+  - [x] `ops/README.backup.md` —— PG VM / app VM 一次性 setup + recovery drill checklist
+- [ ] **(user-owned)** 演练：在 fresh VM 跑一次完整 restore，记下分钟数到 `docs/runbook/backup-restore.md`
 
 #### 安全 / 隐私
 
