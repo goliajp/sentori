@@ -267,24 +267,24 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 
 ### Steps
 
-- [ ] 加依赖：`sqlx` (postgres + uuid + time + json features) + `sqlx-cli`（dev）+ `redis`/`fred` (Valkey)
-- [ ] 起本地 PG 18：`docker run -d --name sentori-pg -p 5432:5432 -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=sentori postgres:18-alpine`
-- [ ] 起本地 Valkey：`docker run -d --name sentori-vk -p 6379:6379 valkey/valkey:8-alpine`
-- [ ] 写 `server/migrations/0001_init.sql`：
-  - [ ] `projects` (id, name, created_at)
-  - [ ] `tokens` (id, project_id FK, token_hash, kind, created_at, revoked_at)
+- [x] 加依赖：`sqlx` (postgres + uuid + time + json features) + `sqlx-cli`（dev）+ `redis`/`fred` (Valkey)
+- [x] 起本地 PG 18：`docker run -d --name sentori-pg -p 5432:5432 -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=sentori postgres:18-alpine`
+- [x] 起本地 Valkey：`docker run -d --name sentori-vk -p 6379:6379 valkey/valkey:8-alpine`
+- [x] 写 `server/migrations/0001_init.sql`：
+  - [x] `projects` (id, name, created_at)
+  - [x] `tokens` (id, project_id FK, token_hash, kind, created_at, revoked_at)
   - [ ] `releases` (id, project_id, version, build, created_at, UNIQUE(project_id, version, build))
   - [ ] `issues` (id uuid-v7, project_id FK, fingerprint, type, msg_sample, status enum('active','silenced','closed'), first_seen, last_seen, event_count, UNIQUE(project_id, fingerprint))
   - [ ] `events` 按月 RANGE 分区 (id uuid-v7, project_id FK, issue_id FK, release_id FK?, env, payload jsonb, ts, received_at)
   - [ ] 索引：`events(issue_id, ts DESC)`、`issues(project_id, status, last_seen DESC)`
-- [ ] 写 `server/src/db.rs`：连接池 + `sqlx::migrate!()` 启动时自动迁移
+- [x] 写 `server/src/db.rs`：连接池 + `sqlx::migrate!()` 启动时自动迁移
 - [ ] 写 `server/src/grouping.rs`：fingerprint = `sha256(error.type + first_in_app_frame.fn + first_in_app_frame.file)` 取前 16 字节 hex
 - [ ] 写 `server/src/issues.rs`：`upsert_issue(project_id, fingerprint, ...) -> issue_id`（用 ON CONFLICT 更新 last_seen + event_count）
 - [ ] 改写 ingestion handler：解析 → 计 fingerprint → upsert issue → 写 events 行
 - [ ] 加 `GET /v1/projects/:id/issues?status=active` 端点
 - [ ] 加 `GET /v1/projects/:id/issues/:issue_id/events` 端点
 - [ ] 写 Valkey rate limit middleware：sliding window，1000 req/min/token，超限返回 429 + `retry_after_ms`
-- [ ] 写 seed 脚本 `server/scripts/seed.rs`：创建 dev project + dev token
+- [x] 写 seed 脚本 `server/scripts/seed.rs`：创建 dev project + dev token
 - [ ] 改 token 鉴权：从硬编码改为查 `tokens` 表（带 Valkey cache，TTL 60s）
 - [ ] 集成测试：连续 post 5 个相同事件，断言 issues 表 1 行 + events 表 5 行
 - [ ] 集成测试：rate limit 触发 429

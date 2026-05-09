@@ -12,12 +12,18 @@ use crate::recent::{AppState, RecentBuffer};
 
 const MAX_BODY_BYTES: usize = 1024 * 1024; // 1 MB per protocol.md size limits
 
-pub fn build(dev_token: String) -> Router {
+pub fn build(
+    dev_token: String,
+    db: Option<sqlx::PgPool>,
+    project_id: uuid::Uuid,
+) -> Router {
     let auth_state = AuthState::new(dev_token);
     let recent = RecentBuffer::new();
     let state = AppState {
         auth: auth_state.clone(),
         recent,
+        db,
+        project_id,
     };
 
     Router::new()

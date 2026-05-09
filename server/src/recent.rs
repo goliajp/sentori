@@ -39,6 +39,8 @@ impl RecentBuffer {
 pub struct AppState {
     pub auth: AuthState,
     pub recent: RecentBuffer,
+    pub db: Option<sqlx::PgPool>,
+    pub project_id: uuid::Uuid,
 }
 
 impl FromRef<AppState> for AuthState {

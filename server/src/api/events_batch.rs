@@ -6,9 +6,10 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
+use crate::api::events::persist_event;
 use crate::error::{ValidationDetail, flatten_validation_errors};
 use crate::event::Event;
-use crate::recent::RecentBuffer;
+use crate::recent::AppState;
 
 const MAX_BATCH_EVENTS: usize = 100;
 
@@ -35,7 +36,7 @@ pub struct BatchError {
 }
 
 pub async fn handle(
-    State(recent): State<RecentBuffer>,
+    State(state): State<AppState>,
     Json(req): Json<BatchRequest>,
 ) -> impl IntoResponse {
     if req.events.len() > MAX_BATCH_EVENTS {
@@ -59,7 +60,12 @@ pub async fn handle(
                         serde_json::to_string_pretty(&event)
                             .unwrap_or_else(|_| "<failed to serialize>".into())
                     );
-                    recent.push(event);
+                    if let Some(pool) = &state.db {
+                        if let Err(e) = persist_event(pool, state.project_id, &event).await {
+                            tracing::error!(error = %e, "failed to persist event");
+                        }
+                    }
+                    state.recent.push(event);
                     accepted += 1;
                 }
                 Err(e) => {

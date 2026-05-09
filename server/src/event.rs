@@ -64,6 +64,16 @@ pub enum Platform {
     Android,
 }
 
+impl Platform {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Platform::Javascript => "javascript",
+            Platform::Ios => "ios",
+            Platform::Android => "android",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, Validate)]
 #[serde(rename_all = "camelCase")]
 pub struct Device {
