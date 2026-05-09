@@ -2,7 +2,9 @@ import { setConfig } from './config';
 import { installGlobalHandler } from './handlers/global';
 import { installPromiseHandler } from './handlers/promise';
 import { installNetworkHandler } from './handlers/network';
-import { startTransport, drainOfflineQueue } from './transport';
+import { drainNativePending, setNativeConfig } from './native';
+import { drainOfflineQueue, enqueue, startTransport } from './transport';
+import type { Event } from './types';
 
 declare const __DEV__: boolean | undefined;
 
@@ -45,6 +47,14 @@ export const init = (options: InitOptions): void => {
     enabled: true,
   });
 
+  // Tell the native crash handler about the config so the JSON it writes
+  // on the next NSException / Java uncaught carries release + env.
+  setNativeConfig({
+    token: options.token,
+    release: options.release,
+    environment: env,
+  });
+
   startTransport();
 
   const capture = options.capture ?? {};
@@ -52,6 +62,19 @@ export const init = (options: InitOptions): void => {
   if (capture.promiseRejections !== false) installPromiseHandler();
   if (capture.network !== false) installNetworkHandler();
 
-  // Drain events persisted from previous session (best-effort).
+  // Drain events persisted from previous session (best-effort):
+  // - native crashes from <Documents>/sentori/pending/*.json
+  // - JS transport offline queue from AsyncStorage
+  drainNativePending()
+    .then((items) => {
+      for (const json of items) {
+        try {
+          enqueue(JSON.parse(json) as Event);
+        } catch {
+          // skip malformed
+        }
+      }
+    })
+    .catch(() => {});
   drainOfflineQueue().catch(() => {});
 };

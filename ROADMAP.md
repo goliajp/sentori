@@ -345,15 +345,15 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 
 #### iOS
 
-- [ ] `sdk/react-native/ios/SentoriModule.swift`：注册 turbo module，提供 `drainPending()` 给 JS 调
-- [ ] `sdk/react-native/ios/SentoriCrashHandler.swift`：
-  - [ ] `NSSetUncaughtExceptionHandler { ex in writeToDisk(ex) }`
-  - [ ] 写文件路径：`<Documents>/sentori/pending/<uuid>.json`
-  - [ ] 文件 schema：与 protocol Event 一致（src=ios）
-- [ ] `sdk/react-native/ios/Sentori.h` + `Sentori.m`（暴露给 RN）
+- [x] `sdk/react-native/ios/SentoriModule.swift`：注册 turbo module，提供 `drainPending()` 给 JS 调
+- [x] `sdk/react-native/ios/SentoriCrashHandler.swift`：
+  - [x] `NSSetUncaughtExceptionHandler { ex in writeToDisk(ex) }`
+  - [x] 写文件路径：`<Documents>/sentori/pending/<uuid>.json`
+  - [x] 文件 schema：与 protocol Event 一致（src=ios）
+- [x] `sdk/react-native/ios/Sentori.h` + `Sentori.m`（暴露给 RN）
 - [ ] iOS 单测（XCTest）：触发 NSException → 断言 `Documents/sentori/pending/*.json` 出现 + 文件内容反序列化为合法 Event
-- [ ] JS 端 `src/native-bridge.ts`：`Sentori.drainPending()` 读所有 .json，喂给 transport，逐个删文件
-- [ ] `sentori.init` 在最后一步调一次 `drainPending()`
+- [x] JS 端 `src/native-bridge.ts`：`Sentori.drainPending()` 读所有 .json，喂给 transport，逐个删文件
+- [x] `sentori.init` 在最后一步调一次 `drainPending()`
 - [ ] example app 加按钮 "Throw NSException"
 - [ ] iOS sim 端到端：throw → kill app → cold start → 验证 server 收到事件
 

@@ -16,16 +16,21 @@
     "prepack": "bun run build"
   },
   "peerDependencies": {
+    "expo-modules-core": ">=2.0",
     "react": ">=18",
     "react-native": ">=0.74"
   },
   "peerDependenciesMeta": {
     "@react-native-async-storage/async-storage": {
       "optional": true
+    },
+    "expo-modules-core": {
+      "optional": true
     }
   },
   "optionalDependencies": {
-    "@react-native-async-storage/async-storage": ">=1.23"
+    "@react-native-async-storage/async-storage": ">=1.23",
+    "expo-modules-core": ">=2.0"
   },
   "devDependencies": {
     "@types/bun": "latest",
