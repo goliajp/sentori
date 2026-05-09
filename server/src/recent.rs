@@ -40,7 +40,9 @@ pub struct AppState {
     pub auth: AuthState,
     pub recent: RecentBuffer,
     pub db: Option<sqlx::PgPool>,
+    pub valkey: Option<redis::aio::ConnectionManager>,
     pub project_id: uuid::Uuid,
+    pub rate_limit_per_min: u32,
 }
 
 impl FromRef<AppState> for AuthState {

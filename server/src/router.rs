@@ -15,15 +15,19 @@ const MAX_BODY_BYTES: usize = 1024 * 1024; // 1 MB per protocol.md size limits
 pub fn build(
     dev_token: String,
     db: Option<sqlx::PgPool>,
+    valkey: Option<redis::aio::ConnectionManager>,
     project_id: uuid::Uuid,
+    rate_limit_per_min: u32,
 ) -> Router {
-    let auth_state = AuthState::new(dev_token);
+    let auth_state = AuthState::new(dev_token, db.clone());
     let recent = RecentBuffer::new();
     let state = AppState {
         auth: auth_state.clone(),
         recent,
         db,
+        valkey,
         project_id,
+        rate_limit_per_min,
     };
 
     Router::new()
@@ -42,6 +46,10 @@ pub fn build(
             "/v1/projects/{project_id}/issues/{issue_id}/events",
             get(api::admin::list_events_for_issue),
         )
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::rate_limit::rate_limit_middleware,
+        ))
         .route_layer(middleware::from_fn_with_state(auth_state, require_token))
         .layer(RequestBodyLimitLayer::new(MAX_BODY_BYTES))
         .layer(CorsLayer::permissive())

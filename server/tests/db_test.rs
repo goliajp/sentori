@@ -28,7 +28,9 @@ async fn setup() -> Option<(SocketAddr, PgPool)> {
     let app = router::build(
         TOKEN.to_string(),
         Some(pool.clone()),
+        None,
         seed::DEV_PROJECT_ID,
+        10_000,
     );
 
     tokio::spawn(async move {
@@ -36,6 +38,59 @@ async fn setup() -> Option<(SocketAddr, PgPool)> {
     });
 
     Some((addr, pool))
+}
+
+const RATE_LIMIT_TOKEN: &str = "st_pk_ratelim00000000000000000";
+
+#[tokio::test]
+async fn rate_limit_returns_429_when_exceeding_threshold() {
+    let valkey_url = match std::env::var("VALKEY_URL") {
+        Ok(u) => u,
+        Err(_) => {
+            eprintln!("skip: VALKEY_URL not set");
+            return;
+        }
+    };
+    let valkey = match sentori_server::valkey::connect(&valkey_url).await {
+        Ok(v) => v,
+        Err(_) => {
+            eprintln!("skip: cannot connect to valkey");
+            return;
+        }
+    };
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let app = router::build(
+        RATE_LIMIT_TOKEN.to_string(),
+        None,
+        Some(valkey),
+        seed::DEV_PROJECT_ID,
+        3,
+    );
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let event = make_event(0);
+
+    let mut statuses = Vec::new();
+    for _ in 0..6 {
+        let resp = client
+            .post(format!("http://{addr}/v1/events"))
+            .header("Authorization", format!("Bearer {RATE_LIMIT_TOKEN}"))
+            .json(&event)
+            .send()
+            .await
+            .unwrap();
+        statuses.push(resp.status().as_u16());
+    }
+
+    assert!(
+        statuses.iter().any(|&s| s == 429),
+        "expected 429 in {statuses:?} (limit=3, sent=6)"
+    );
 }
 
 fn make_event(idx: u32) -> serde_json::Value {

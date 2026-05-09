@@ -13,7 +13,9 @@ async fn spawn() -> SocketAddr {
     let app = router::build(
         TOKEN.to_string(),
         None,
+        None,
         sentori_server::seed::DEV_PROJECT_ID,
+        10_000,
     );
 
     tokio::spawn(async move {

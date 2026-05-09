@@ -283,11 +283,11 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] 改写 ingestion handler：解析 → 计 fingerprint → upsert issue → 写 events 行
 - [x] 加 `GET /v1/projects/:id/issues?status=active` 端点
 - [x] 加 `GET /v1/projects/:id/issues/:issue_id/events` 端点
-- [ ] 写 Valkey rate limit middleware：sliding window，1000 req/min/token，超限返回 429 + `retry_after_ms`
+- [x] 写 Valkey rate limit middleware：sliding window，1000 req/min/token，超限返回 429 + `retry_after_ms`
 - [x] 写 seed 脚本 `server/scripts/seed.rs`：创建 dev project + dev token
-- [ ] 改 token 鉴权：从硬编码改为查 `tokens` 表（带 Valkey cache，TTL 60s）
+- [x] 改 token 鉴权：从硬编码改为查 `tokens` 表（带 Valkey cache，TTL 60s）
 - [x] 集成测试：连续 post 5 个相同事件，断言 issues 表 1 行 + events 表 5 行
-- [ ] 集成测试：rate limit 触发 429
+- [x] 集成测试：rate limit 触发 429
 - [ ] commit：`feat(server): persistent storage with grouping and rate limit`
 
 ---

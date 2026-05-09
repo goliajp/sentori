@@ -5,6 +5,8 @@ pub mod error;
 pub mod event;
 pub mod grouping;
 pub mod issues;
+pub mod rate_limit;
 pub mod recent;
 pub mod router;
 pub mod seed;
+pub mod valkey;
