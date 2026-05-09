@@ -6,7 +6,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::api::events::persist_event;
+use crate::api::events::persist_with_grouping;
 use crate::error::{ValidationDetail, flatten_validation_errors};
 use crate::event::Event;
 use crate::recent::AppState;
@@ -61,7 +61,7 @@ pub async fn handle(
                             .unwrap_or_else(|_| "<failed to serialize>".into())
                     );
                     if let Some(pool) = &state.db {
-                        if let Err(e) = persist_event(pool, state.project_id, &event).await {
+                        if let Err(e) = persist_with_grouping(pool, state.project_id, &event).await {
                             tracing::error!(error = %e, "failed to persist event");
                         }
                     }

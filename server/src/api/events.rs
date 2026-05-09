@@ -30,7 +30,7 @@ pub async fn handle(
     );
 
     if let Some(pool) = &state.db {
-        if let Err(e) = persist_event(pool, state.project_id, &event).await {
+        if let Err(e) = persist_with_grouping(pool, state.project_id, &event).await {
             tracing::error!(error = %e, "failed to persist event");
         }
     }
@@ -40,10 +40,23 @@ pub async fn handle(
     Ok(StatusCode::ACCEPTED)
 }
 
-pub(crate) async fn persist_event(
+/// Compute fingerprint, upsert the issue, then insert the event row
+/// linked to that issue.
+pub(crate) async fn persist_with_grouping(
     pool: &PgPool,
     project_id: Uuid,
     event: &Event,
+) -> Result<(), sqlx::Error> {
+    let fp = crate::grouping::fingerprint(event);
+    let issue_id = crate::issues::upsert_issue(pool, project_id, &fp, event).await?;
+    persist_event_row(pool, project_id, event, Some(issue_id)).await
+}
+
+async fn persist_event_row(
+    pool: &PgPool,
+    project_id: Uuid,
+    event: &Event,
+    issue_id: Option<Uuid>,
 ) -> Result<(), sqlx::Error> {
     let payload = serde_json::to_value(event)
         .expect("Event serialization should never fail");
@@ -51,14 +64,15 @@ pub(crate) async fn persist_event(
     sqlx::query(
         r#"
         INSERT INTO events
-            (id, project_id, occurred_at, platform, release, environment,
+            (id, project_id, issue_id, occurred_at, platform, release, environment,
              error_type, error_message, payload)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT (id) DO NOTHING
         "#,
     )
     .bind(event.id)
     .bind(project_id)
+    .bind(issue_id)
     .bind(event.timestamp)
     .bind(event.platform.as_str())
     .bind(&event.release)

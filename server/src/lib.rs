@@ -3,6 +3,8 @@ pub mod auth;
 pub mod db;
 pub mod error;
 pub mod event;
+pub mod grouping;
+pub mod issues;
 pub mod recent;
 pub mod router;
 pub mod seed;

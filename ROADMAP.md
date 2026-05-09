@@ -273,20 +273,20 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] 写 `server/migrations/0001_init.sql`：
   - [x] `projects` (id, name, created_at)
   - [x] `tokens` (id, project_id FK, token_hash, kind, created_at, revoked_at)
-  - [ ] `releases` (id, project_id, version, build, created_at, UNIQUE(project_id, version, build))
-  - [ ] `issues` (id uuid-v7, project_id FK, fingerprint, type, msg_sample, status enum('active','silenced','closed'), first_seen, last_seen, event_count, UNIQUE(project_id, fingerprint))
+  - [x] `releases` (id, project_id, version, build, created_at, UNIQUE(project_id, version, build))
+  - [x] `issues` (id uuid-v7, project_id FK, fingerprint, type, msg_sample, status enum('active','silenced','closed'), first_seen, last_seen, event_count, UNIQUE(project_id, fingerprint))
   - [ ] `events` 按月 RANGE 分区 (id uuid-v7, project_id FK, issue_id FK, release_id FK?, env, payload jsonb, ts, received_at)
-  - [ ] 索引：`events(issue_id, ts DESC)`、`issues(project_id, status, last_seen DESC)`
+  - [x] 索引：`events(issue_id, ts DESC)`、`issues(project_id, status, last_seen DESC)`
 - [x] 写 `server/src/db.rs`：连接池 + `sqlx::migrate!()` 启动时自动迁移
-- [ ] 写 `server/src/grouping.rs`：fingerprint = `sha256(error.type + first_in_app_frame.fn + first_in_app_frame.file)` 取前 16 字节 hex
-- [ ] 写 `server/src/issues.rs`：`upsert_issue(project_id, fingerprint, ...) -> issue_id`（用 ON CONFLICT 更新 last_seen + event_count）
-- [ ] 改写 ingestion handler：解析 → 计 fingerprint → upsert issue → 写 events 行
+- [x] 写 `server/src/grouping.rs`：fingerprint = `sha256(error.type + first_in_app_frame.fn + first_in_app_frame.file)` 取前 16 字节 hex
+- [x] 写 `server/src/issues.rs`：`upsert_issue(project_id, fingerprint, ...) -> issue_id`（用 ON CONFLICT 更新 last_seen + event_count）
+- [x] 改写 ingestion handler：解析 → 计 fingerprint → upsert issue → 写 events 行
 - [ ] 加 `GET /v1/projects/:id/issues?status=active` 端点
 - [ ] 加 `GET /v1/projects/:id/issues/:issue_id/events` 端点
 - [ ] 写 Valkey rate limit middleware：sliding window，1000 req/min/token，超限返回 429 + `retry_after_ms`
 - [x] 写 seed 脚本 `server/scripts/seed.rs`：创建 dev project + dev token
 - [ ] 改 token 鉴权：从硬编码改为查 `tokens` 表（带 Valkey cache，TTL 60s）
-- [ ] 集成测试：连续 post 5 个相同事件，断言 issues 表 1 行 + events 表 5 行
+- [x] 集成测试：连续 post 5 个相同事件，断言 issues 表 1 行 + events 表 5 行
 - [ ] 集成测试：rate limit 触发 429
 - [ ] commit：`feat(server): persistent storage with grouping and rate limit`
 
