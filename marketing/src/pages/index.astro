@@ -1,0 +1,136 @@
+---
+import '../styles/global.css'
+
+const features = [
+  {
+    title: 'JS + Native error capture',
+    body: 'ErrorUtils + Hermes promise tracker on the JS side; NSException on iOS, Java/Kotlin uncaught on Android. One SDK, three runtimes, one dashboard.',
+  },
+  {
+    title: 'Schema without legacy',
+    body: 'Single JSON event per request, camelCase wire format, nested cause chains, uuid v7 ids. No envelope, no exceptions[] arrays. Designed in 2026 — not retrofitted from 2012.',
+  },
+  {
+    title: 'One binary, one compose',
+    body: 'axum + Postgres + Valkey, in one Rust binary. docker compose up. No Kafka, no ClickHouse, no Snuba. Self-hostable on a single VM.',
+  },
+  {
+    title: 'Dense, keyboard-first dashboard',
+    body: 'Issues are a 32px-row table with j / k / Enter / s / / / [ / ]. Tabular nums, mono release strings. Designed against Linear and Modal, not Sentry.',
+  },
+]
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta
+      name="description"
+      content="Modern, RN-first error tracking. Self-hostable. Single Rust binary, single docker compose, dense Linear-style dashboard."
+    />
+    <meta property="og:title" content="Sentori — modern error tracking for React Native" />
+    <meta property="og:description" content="Modern, RN-first error tracking. Self-hostable. Single Rust binary, single docker compose, dense Linear-style dashboard." />
+    <meta property="og:url" content="https://sentori.golia.jp" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <title>Sentori — modern error tracking for React Native</title>
+  </head>
+  <body class="bg-bg text-fg min-h-screen">
+    <header class="border-border border-b">
+      <nav class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4 text-sm">
+        <a href="/" class="text-fg font-semibold">Sentori</a>
+        <div class="text-fg-muted flex gap-6">
+          <a href="/pricing" class="hover:text-fg transition-colors">Pricing</a>
+          <a href="https://docs.sentori.golia.jp" class="hover:text-fg transition-colors">Docs</a>
+          <a href="https://github.com/goliajp/sentori" class="hover:text-fg transition-colors">GitHub</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="mx-auto max-w-5xl px-6">
+      <section class="pt-24 pb-32">
+        <h1 class="text-fg max-w-3xl text-5xl leading-tight font-semibold tracking-tight">
+          Error tracking for the apps you actually ship.
+        </h1>
+        <p class="text-fg-muted mt-6 max-w-2xl text-lg leading-relaxed">
+          Sentori captures JavaScript errors, iOS NSException, and Android
+          uncaught exceptions from your React Native apps. Modern protocol,
+          dense Linear-style dashboard, single-binary deploy. Self-host on
+          a VM today; SaaS at
+          <span class="text-fg font-mono text-base">sentori.golia.jp</span>
+          when it opens.
+        </p>
+        <div class="mt-10 flex flex-wrap gap-3">
+          <a
+            href="https://docs.sentori.golia.jp/getting-started"
+            class="bg-accent text-bg rounded-md px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90"
+          >
+            Get started →
+          </a>
+          <a
+            href="https://github.com/goliajp/sentori"
+            class="border-border text-fg hover:bg-bg-tertiary rounded-md border px-4 py-2 text-sm transition-colors"
+          >
+            Star on GitHub
+          </a>
+        </div>
+      </section>
+
+      <section class="border-border grid grid-cols-1 gap-x-12 gap-y-10 border-t pt-16 md:grid-cols-2">
+        {
+          features.map((f) => (
+            <div>
+              <h3 class="text-fg text-base font-semibold">{f.title}</h3>
+              <p class="text-fg-muted mt-2 text-sm leading-relaxed">{f.body}</p>
+            </div>
+          ))
+        }
+      </section>
+
+      <section class="border-border mt-24 border-t pt-16">
+        <h2 class="text-fg text-2xl font-semibold tracking-tight">
+          Open source. Self-hostable forever.
+        </h2>
+        <p class="text-fg-muted mt-4 max-w-2xl leading-relaxed">
+          v0.1.0 ships as a single
+          <code class="text-fg font-mono text-sm">docker compose up</code>:
+          postgres, valkey, one Rust server binary, one nginx-served SPA.
+          The hosted SaaS uses the same binary on the same compose, just
+          with multi-tenant migrations turned on.
+        </p>
+        <p class="text-fg-muted mt-3 max-w-2xl leading-relaxed">
+          Source on GitHub. License TBD before v1.0.
+        </p>
+      </section>
+
+      <section class="border-border mt-24 border-t pt-16 pb-24">
+        <h2 class="text-fg text-2xl font-semibold tracking-tight">
+          Why we built this
+        </h2>
+        <p class="text-fg-muted mt-4 max-w-2xl leading-relaxed">
+          Sentry's wire format is from 2012 and shows it: envelope
+          multipart, <code class="text-fg font-mono text-sm">exceptions[]</code>
+          arrays where a recursive cause object would do, deeply nested
+          <code class="text-fg font-mono text-sm">contexts</code>. The
+          deploy is Kafka + ClickHouse + Snuba + a Django monolith. Modern
+          teams shouldn't need to learn that architecture to read a stack
+          trace.
+        </p>
+        <p class="text-fg-muted mt-3 max-w-2xl leading-relaxed">
+          Sentori is a clean-room rebuild: single-JSON events, camelCase
+          wire, sourcemaps stored as content-hashed blobs, dense
+          keyboard-first dashboard. Built ground-up for React Native, in
+          2026, intentionally without legacy.
+        </p>
+      </section>
+    </main>
+
+    <footer class="border-border border-t">
+      <div class="text-fg-muted mx-auto flex max-w-5xl items-center justify-between px-6 py-8 text-xs">
+        <span>Sentori v0.1.0</span>
+        <span>Built in Tokyo.</span>
+      </div>
+    </footer>
+  </body>
+</html>

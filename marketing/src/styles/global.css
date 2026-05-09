@@ -1,0 +1,34 @@
+@import 'tailwindcss';
+
+/* Mirrors web/src/index.css palette so dashboard and marketing share
+   tokens. Marketing is dark-only at v0.1; the light values are kept as
+   fallback so any forced-light browser still gets a sane page. */
+
+@theme {
+  --color-bg: #0b0b0f;
+  --color-bg-tertiary: #1a1a23;
+  --color-fg: #f3f4f6;
+  --color-fg-muted: #9ca3af;
+  --color-fg-secondary: #d1d5db;
+  --color-border: #2a2a35;
+  --color-accent: #a78bfa;
+}
+
+html,
+body {
+  margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+code,
+.font-mono {
+  font-family:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}

@@ -518,8 +518,8 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
   }
   ```
 
-- [ ] `caddy reload`，等 Caddy 自动跑完 ACME（每个 subdomain 各一张 cert）
-- [ ] 验证：`curl -vI https://app.sentori.golia.jp` 等 5 条 TLS 握手成功（503 body 也算成功）
+- [x] `caddy reload`，等 Caddy 自动跑完 ACME（每个 subdomain 各一张 cert）
+- [x] 验证：`curl -vI https://app.sentori.golia.jp` 等 5 条 TLS 握手成功（503 body 也算成功）
 - [ ] `sentori.golia.jp` 的 cert 由 Cloudflare Universal SSL 自动管理，无需 origin 配置；验证 `curl -vI https://sentori.golia.jp` 返回 CF 默认页或 503
 
 #### 收尾
