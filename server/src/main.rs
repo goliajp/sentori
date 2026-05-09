@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
 use anyhow::Context;
-use sentori_server::{db, notifier, router, seed, valkey};
+use sentori_server::{db, notifier, quotas, router, seed, valkey};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -79,6 +79,14 @@ async fn main() -> anyhow::Result<()> {
     let notifier_tx = pool
         .as_ref()
         .map(|p| notifier::start(notifier_cfg.clone(), p.clone()));
+
+    // Phase 15 sub-B: rollup the Valkey usage counters into PG every
+    // 60s so dashboard / billing / monthly reports always read fresh
+    // numbers. Only spawned when both backing stores are configured.
+    if let (Some(p), Some(v)) = (pool.as_ref(), valkey.as_ref()) {
+        quotas::spawn_flush_task(p.clone(), v.clone());
+        tracing::info!("quota flush task spawned (60s interval)");
+    }
 
     let addr: SocketAddr = "0.0.0.0:8080".parse()?;
     let listener = tokio::net::TcpListener::bind(addr).await?;

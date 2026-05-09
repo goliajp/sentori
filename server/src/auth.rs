@@ -25,10 +25,13 @@ struct AuthStateInner {
 /// puts this in the request extensions so handlers know which project
 /// to attribute the event to (DevToken falls back to AppState.project_id
 /// for back-compat with single-tenant dev flows).
+///
+/// Phase 15 sub-B adds `org_id` to the Token variant so the quota check
+/// can run without an extra projects-join per event.
 #[derive(Clone, Debug)]
 pub enum IngestCaller {
     DevToken,
-    Token { project_id: Uuid },
+    Token { org_id: Uuid, project_id: Uuid },
 }
 
 impl AuthState {
@@ -46,8 +49,10 @@ impl AuthState {
             return Some(IngestCaller::DevToken);
         }
         if let Some(pool) = &self.inner.db {
-            match self.lookup_project_id(pool, token).await {
-                Ok(Some(project_id)) => return Some(IngestCaller::Token { project_id }),
+            match self.lookup_token_row(pool, token).await {
+                Ok(Some((project_id, org_id))) => {
+                    return Some(IngestCaller::Token { org_id, project_id });
+                }
                 Ok(None) => {}
                 Err(e) => {
                     tracing::error!(error = %e, "token DB lookup failed");
@@ -76,19 +81,20 @@ impl AuthState {
         diff == 0
     }
 
-    async fn lookup_project_id(
+    async fn lookup_token_row(
         &self,
         pool: &PgPool,
         token: &str,
-    ) -> Result<Option<Uuid>, sqlx::Error> {
+    ) -> Result<Option<(Uuid, Uuid)>, sqlx::Error> {
         let token_hash = hash_token(token);
-        let row: Option<(Uuid,)> = sqlx::query_as(
-            "SELECT project_id FROM tokens WHERE token_hash = $1 AND revoked_at IS NULL",
+        let row: Option<(Uuid, Uuid)> = sqlx::query_as(
+            "SELECT project_id, org_id FROM tokens \
+             WHERE token_hash = $1 AND revoked_at IS NULL",
         )
         .bind(&token_hash)
         .fetch_optional(pool)
         .await?;
-        Ok(row.map(|(id,)| id))
+        Ok(row)
     }
 }
 

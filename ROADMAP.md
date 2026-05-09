@@ -673,11 +673,13 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [x] migration `0009_quotas.sql`（0008 已用于 tokens_meta）：
   - [x] `org_quotas` (org_id PK FK, plan `org_plan` enum, event_limit_monthly, retention_days, created_at, updated_at) + 22 个现有 org 回填 free 100k/30d
   - [x] `usage_counters` (org_id FK, period_yyyymm, event_count, dropped_count, updated_at, PK(org_id, period_yyyymm))
-- [ ] server ingestion 路径加 quota check：
-  - [ ] 入库前查 Valkey `usage:<org_id>:<yyyymm>` 计数器
-  - [ ] 超限：返回 429 + body `{ "error": "quota_exceeded", "reset_at": "..." }`
-  - [ ] 入库后 Valkey `INCR`
-  - [ ] 后台 task 每 60s flush Valkey 计数器到 PG
+- [x] server ingestion 路径加 quota check（`quotas::check_and_record`）：
+  - [x] 入库前查 Valkey `usage:<org_id>:<yyyymm>`；缺 quota row 时按 free 默认；DevToken / 无 Valkey → 跳过 fail-open
+  - [x] 超限 → 429 + body `{"error":"quotaExceeded","resetAt":"<RFC3339 next-month UTC>"}` + INCR `dropped:<org_id>:<yyyymm>`
+  - [x] 未超限 INCR `usage:` 并设 32d TTL；返回 Allowed{current,limit}
+  - [x] events handler + events_batch handler 都接入（batch 内逐条 gate，超限那条算 rejected error="quotaExceeded"）
+  - [x] `IngestCaller::Token` 扩出 `org_id` 字段（auth.rs `lookup_token_row` 单 SELECT 同时取 project_id + org_id），免去 events 路径的 projects join
+  - [x] 后台 `quotas::spawn_flush_task` 每 60s `SELECT org_id FROM org_quotas` → GET valkey 双 key → UPSERT `usage_counters`；main.rs 在 db+valkey 都 ready 时 spawn
 - [ ] retention 清理：定时 task 每天 drop 超过 retention_days 的 events 分区
 - [ ] dashboard 配额 widget：
   - [ ] org settings 页显示 used / limit + 进度条

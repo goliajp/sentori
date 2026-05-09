@@ -10,6 +10,7 @@ use crate::api::events::{caller_project_id, persist_with_grouping};
 use crate::auth::IngestCaller;
 use crate::error::{ValidationDetail, flatten_validation_errors};
 use crate::event::Event;
+use crate::quotas::{self, QuotaDecision};
 use crate::recent::AppState;
 
 const MAX_BATCH_EVENTS: usize = 100;
@@ -58,6 +59,15 @@ pub async fn handle(
         match serde_json::from_value::<Event>(raw) {
             Ok(event) => match event.validate() {
                 Ok(()) => {
+                    if !batch_quota_allows(&state, &caller).await {
+                        rejected += 1;
+                        errors.push(BatchError {
+                            index: i as u32,
+                            error: "quotaExceeded",
+                            details: vec![],
+                        });
+                        continue;
+                    }
                     println!(
                         "{}",
                         serde_json::to_string_pretty(&event)
@@ -103,4 +113,29 @@ pub async fn handle(
         }),
     )
         .into_response()
+}
+
+/// Batch entries are quota-checked one at a time so a single over-the-line
+/// batch admits only what fits and rejects the rest. DevToken / no-Valkey
+/// configurations skip the gate (fail-open, mirrors single-event handler).
+async fn batch_quota_allows(state: &AppState, caller: &IngestCaller) -> bool {
+    let (org_id, pool, valkey) = match (caller, &state.db, &state.valkey) {
+        (IngestCaller::Token { org_id, .. }, Some(p), Some(v)) => (*org_id, p, v),
+        _ => return true,
+    };
+    match quotas::check_and_record(
+        pool,
+        valkey.clone(),
+        org_id,
+        time::OffsetDateTime::now_utc(),
+    )
+    .await
+    {
+        Ok(QuotaDecision::Allowed { .. }) => true,
+        Ok(QuotaDecision::Exceeded { .. }) => false,
+        Err(e) => {
+            tracing::error!(error = %e, "batch quota check failed; admitting");
+            true
+        }
+    }
 }
