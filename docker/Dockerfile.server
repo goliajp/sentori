@@ -1,0 +1,27 @@
+# Multi-stage. Build with the official Rust image; run on distroless cc.
+# Migrations are embedded into the binary by sqlx::migrate! at compile time
+# so the runtime image does not need them.
+#
+# Build context: repo root.
+#   docker build -f docker/Dockerfile.server -t sentori-server .
+
+FROM rust:1-bookworm AS builder
+WORKDIR /build/server
+
+# Pre-fetch deps to a separate layer for better caching.
+COPY server/Cargo.toml server/Cargo.lock ./
+RUN mkdir -p src && echo 'fn main(){}' > src/main.rs \
+    && cargo build --release --bin sentori-server || true \
+    && rm -rf src
+
+# Real build.
+COPY server/src ./src
+COPY server/migrations ./migrations
+RUN touch src/main.rs && cargo build --release --bin sentori-server
+
+# Runtime: distroless cc (glibc + libgcc + libstdc++, no shell).
+FROM gcr.io/distroless/cc-debian12
+WORKDIR /app
+COPY --from=builder /build/server/target/release/sentori-server /app/sentori-server
+EXPOSE 8080
+ENTRYPOINT ["/app/sentori-server"]
