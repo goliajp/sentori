@@ -98,10 +98,39 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route("/me", get(api::user_auth::me));
     let user_auth = Router::new().merge(user_auth_limited).merge(user_auth_open);
 
+    // Phase 13 sub-C: orgs / memberships / invites. All require_user.
+    let orgs = Router::new()
+        .route("/orgs", post(api::orgs::create_org).get(api::orgs::list_my_orgs))
+        .route(
+            "/orgs/{slug}",
+            get(api::orgs::get_org)
+                .patch(api::orgs::patch_org)
+                .delete(api::orgs::delete_org),
+        )
+        .route("/orgs/{slug}/members", get(api::orgs::list_members))
+        .route(
+            "/orgs/{slug}/members/{user_id}",
+            axum::routing::patch(api::orgs::patch_member).delete(api::orgs::delete_member),
+        )
+        .route(
+            "/orgs/{slug}/invites",
+            post(api::orgs::create_invite).get(api::orgs::list_invites),
+        )
+        .route(
+            "/orgs/{slug}/invites/{token}",
+            axum::routing::delete(api::orgs::delete_invite),
+        )
+        .route("/invites/{token}/accept", post(api::orgs::accept_invite))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            api::user_auth::require_user,
+        ));
+
     Router::new()
         .merge(ingestion)
         .nest("/admin/api", admin)
         .nest("/api/auth", user_auth)
+        .nest("/api", orgs)
         .layer(RequestBodyLimitLayer::new(MAX_BODY_BYTES))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())

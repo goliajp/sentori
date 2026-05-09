@@ -28,6 +28,12 @@ pub enum NotifyEvent {
         email: String,
         link: String,
     },
+    OrgInvite {
+        email: String,
+        org_name: String,
+        inviter_email: String,
+        link: String,
+    },
 }
 
 /// Spawn the notifier loop. Returns a sender producers can use to enqueue
@@ -130,6 +136,35 @@ async fn handle(
                 tracing::warn!(error = %e, %email, "send verification email failed");
             } else {
                 tracing::info!(%email, "verification email sent");
+            }
+            Ok(())
+        }
+        NotifyEvent::OrgInvite {
+            email,
+            org_name,
+            inviter_email,
+            link,
+        } => {
+            let transport = build_transport(cfg)?;
+            let from: Mailbox = cfg.from.parse().context("parse from address")?;
+            let to: Mailbox = email.parse().context("parse invite to address")?;
+            let msg = Message::builder()
+                .from(from)
+                .to(to)
+                .subject(format!("[Sentori] You're invited to {org_name}"))
+                .body(format!(
+                    "{inviter_email} invited you to join the \"{org_name}\" \
+                     organization on Sentori.\n\n\
+                     Accept the invite:\n{link}\n\n\
+                     This link expires in 7 days.\n\n\
+                     — Sentori"
+                ))
+                .context("build invite message")?;
+
+            if let Err(e) = transport.send(msg).await {
+                tracing::warn!(error = %e, %email, %org_name, "send invite email failed");
+            } else {
+                tracing::info!(%email, %org_name, "invite email sent");
             }
             Ok(())
         }

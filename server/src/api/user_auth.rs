@@ -3,8 +3,9 @@
 // only carries the random session id.
 
 use axum::{
-    extract::{Json, Query, State},
+    extract::{Json, Query, Request, State},
     http::{HeaderMap, StatusCode},
+    middleware::Next,
     response::{IntoResponse, Response},
 };
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
@@ -294,6 +295,41 @@ pub async fn me(State(state): State<AppState>, jar: CookieJar) -> Response {
         .into_response()
 }
 
+/// Identifying information for the user behind the active session.
+/// Inserted into request extensions by `require_user`; endpoints pull it
+/// out via `Extension<CurrentUser>`.
+#[derive(Clone, Debug)]
+pub struct CurrentUser {
+    pub id: Uuid,
+    pub email: String,
+}
+
+/// Middleware guarding any endpoint that needs an authenticated user.
+/// Reads the session cookie, resolves it through `current_user`, and
+/// stores a `CurrentUser` extension so downstream handlers can extract it.
+pub async fn require_user(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    mut req: Request,
+    next: Next,
+) -> Response {
+    let pool = match &state.db {
+        Some(p) => p.clone(),
+        None => return unauthorized(),
+    };
+    let session_id = match jar.get(SESSION_COOKIE) {
+        Some(c) => c.value().to_string(),
+        None => return unauthorized(),
+    };
+    match current_user(&pool, &session_id).await {
+        Some((id, email)) => {
+            req.extensions_mut().insert(CurrentUser { id, email });
+            next.run(req).await
+        }
+        None => unauthorized(),
+    }
+}
+
 /// Resolve the user behind the session cookie. Returns Some((user_id, email))
 /// on a valid, unexpired session; None otherwise. Used by sub-D's middleware
 /// to scope admin requests to the calling user's orgs.
@@ -315,14 +351,16 @@ pub async fn current_user(pool: &PgPool, session_id: &str) -> Option<(Uuid, Stri
     Some((id, email))
 }
 
-fn is_plausible_email(s: &str) -> bool {
+/// Cheap structural validation — just enough to keep obvious garbage out of
+/// the DB. Real verification happens via the email link.
+pub fn is_plausible_email(s: &str) -> bool {
     !s.is_empty()
         && s.len() <= EMAIL_MAX_LEN
         && s.contains('@')
         && !s.contains(char::is_whitespace)
 }
 
-fn random_token(byte_len: usize) -> String {
+pub fn random_token(byte_len: usize) -> String {
     use rand::RngCore;
     let mut buf = vec![0u8; byte_len];
     rand::thread_rng().fill_bytes(&mut buf);

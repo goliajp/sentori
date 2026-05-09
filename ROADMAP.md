@@ -598,10 +598,11 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
   - [x] `POST /api/auth/login` → DB session row + httpOnly + SameSite=Lax cookie（base_url https 时自动带 secure）
   - [x] `POST /api/auth/logout`（DELETE sessions row + 清 cookie）
   - [x] `GET /api/auth/me`（JOIN sessions/users，校验 expires_at）
-- [ ] `server/src/orgs.rs`：
-  - [ ] org CRUD（create / get / list-mine / update / delete）
-  - [ ] membership CRUD
-  - [ ] 邀请流程（生成 invite token + 邮件发送 + 接受）
+- [x] `server/src/api/orgs.rs` (12 endpoints, all guarded by `require_user`)：
+  - [x] org CRUD：`POST /api/orgs`（创建 + 自动 owner membership，事务原子）/ `GET /api/orgs`（list-mine）/ `GET|PATCH|DELETE /api/orgs/{slug}`
+  - [x] membership：`GET /api/orgs/{slug}/members` / `PATCH /api/orgs/{slug}/members/{user_id}`（owner only，禁止自降级）/ `DELETE /api/orgs/{slug}/members/{user_id}`（self-leave 任何成员可，他人需 admin/owner，最后一位 owner 不可删）
+  - [x] 邀请流程：`POST /api/orgs/{slug}/invites`（admin/owner，禁邀 owner 角色）/ `GET /api/orgs/{slug}/invites`（未用） / `DELETE /api/orgs/{slug}/invites/{token}` / `POST /api/invites/{token}/accept`（已登录用户接受，校验 email match + 过期 + 未用，写入 membership 事务原子）
+  - [x] notifier：新 `NotifyEvent::OrgInvite` variant 发邀请邮件
 - [ ] middleware：所有 admin API 校验 session + scope 到 user 所属 org（sub-D；`current_user(pool, session_id)` helper 已就绪在 `user_auth.rs`）
 - [x] rate limit：注册 / 登录端点 per-IP（`rate_limit_auth_middleware`，30/min，Valkey INCR + 60s expire，X-Forwarded-For 解析，无 Valkey fail-open）
 - [ ] `GET /admin/api/projects`：列出当前 user 所属 org 下的 projects（**回填 Phase 6 line 308 deferred**）
