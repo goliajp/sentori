@@ -22,7 +22,7 @@
 - [x] **Phase 13** — 多租户改造（org / user / membership）
 - [x] **Phase 14** — SaaS 自助 onboarding
 - [x] **Phase 15** — 配额 / 限流 / usage 计量（free tier）
-- [ ] **Phase 16** — 生产就绪 + **公开上线 sentori.golia.jp** 🎯
+- [x] **Phase 16** — 生产就绪 + **公开上线 sentori.golia.jp** 🎯（substrate 落地，剩 user 一次性 secrets + push release/）
 
 总工时估算（1 人全职）：**约 22–30 周**（self-hosted ~14–18 周 + SaaS 上线 ~8–12 周）。
 
@@ -781,6 +781,15 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [ ] **(user-owned)** 录视频 + Lawyer review 法律文档 + 配 SPF/DKIM/DMARC + 一周 dogfooding 无 P1
 - [ ] **(user-owned)** HN 发文（周二/周三 早上 PT）
 - [ ] 🎯 **里程碑：sentori.golia.jp 正式开放**
+
+#### 实际部署落地（Phase 16 sub-H — 通过 devops infra 接入，而非原计划的"Hetzner + 独立 Caddy"）
+
+- [x] `goliajp/devops` repo `services/sentori/{docker-compose.yml, README.md}`：postgres + valkey + sentori-server + sentori-web + marketing nginx + docs nginx，类比 portal/tasks 部署形态
+- [x] `goliajp/devops` repo `devices/cloud/t01/caddy/Caddyfile` 加 5 个站点（apex sentori / app / api / ingest / docs），通过 `devops caddy deploy t01` push + reload + LE 证书 provision 完成
+- [x] DNS 5 个 CNAME records (`sentori`, `app.sentori`, `api.sentori`, `ingest.sentori`, `docs.sentori` → `t01.golia.jp.`) 通过 devops API + `devops dns sync golia.jp` 推到 Cloudflare live
+- [x] `goliajp/sentori` repo `.github/workflows/deploy.yml`：lx64 self-hosted runner 监听 push 到 `release/*`，rsync source + build marketing/docs + 写 .env + `docker compose build && up -d` + 健康检查 + 公开 surface smoke (server `/v1/events/_recent`、`/metrics`、`/api/auth/me`、web、marketing、docs 全 200/401)
+- [ ] **(user-owned)** `gh secret set` 一次性配 `SENTORI_PG_PASSWORD` / `SENTORI_DEV_TOKEN` / `SENTORI_ADMIN_PASSWORD` / `SENTORI_SESSION_SECRET` / SMTP 5 项
+- [ ] **(user-owned)** `git push origin release/v0.2.0` 触发首次 deploy；workflow 跑完后 5 个 sentori 子域 HTTPS 应该全 live
 
 ---
 
