@@ -579,15 +579,15 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 
 #### 数据模型
 
-- [ ] migration `0007_multi_tenant.sql` (前 6 个 migration 已用：0001 init / 0002 issues / 0003 partition / 0004 issue_denorm / 0005 release_artifacts / 0006 notifications)：
-  - [ ] `users` (id, email UNIQUE, password_hash, email_verified, created_at)
-  - [ ] `orgs` (id, slug UNIQUE, name, created_at, owner_id FK)
-  - [ ] `memberships` (org_id FK, user_id FK, role enum('owner','admin','member'), created_at, PK(org_id, user_id))
-  - [ ] `projects.org_id` 加 FK + 回填默认 org（数据迁移）
-  - [ ] `tokens.org_id` 加 FK + 回填
-  - [ ] `email_verifications` (token, user_id, expires_at)
-  - [ ] `sessions` (id, user_id, expires_at, ip, user_agent)
-  - [ ] `org_invites` (token, org_id, email, role, expires_at, used_at)
+- [x] migration `0007_multi_tenant.sql` (前 6 个 migration 已用：0001 init / 0002 issues / 0003 partition / 0004 issue_denorm / 0005 release_artifacts / 0006 notifications)：
+  - [x] `users` (id, email UNIQUE, password_hash, email_verified, created_at)
+  - [x] `orgs` (id, slug UNIQUE, name, created_at, owner_id FK)
+  - [x] `memberships` (org_id FK, user_id FK, role enum('owner','admin','member'), created_at, PK(org_id, user_id))
+  - [x] `projects.org_id` 加 FK + 回填默认 org（dev system org `019508a0-0001-...`，password_hash 占位非合法 argon2 → 不可登录）
+  - [x] `tokens.org_id` 加 FK + 回填
+  - [x] `email_verifications` (token, user_id, expires_at)
+  - [x] `sessions` (id, user_id, expires_at, ip, user_agent)
+  - [x] `org_invites` (token, org_id, email, role, expires_at, used_at)
 
 #### Server
 
