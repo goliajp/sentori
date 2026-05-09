@@ -6,8 +6,8 @@
 
 ## 当前进度索引
 
-- [ ] **Phase 0** — 项目方向对齐（非编码决策定稿）
-- [ ] **Phase 1** — Event Schema + Token/Ingest 协议初稿
+- [x] **Phase 0** — 项目方向对齐（非编码决策定稿）
+- [x] **Phase 1** — Event Schema + Token/Ingest 协议初稿
 - [ ] **Phase 2** — Server 骨架（axum 接 POST，stdout 打印）
 - [ ] **Phase 3** — RN SDK JS 层（init + 全局错误捕获 + batcher）
 - [ ] **Phase 4** — 端到端 smoke test 🎯（首个里程碑）
@@ -95,9 +95,9 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 
 ### Steps
 
-- [ ] **决策**：项目名 `sentori` 保留（不改）
-- [ ] **决策**：公网域名 `sentori.golia.jp`，subdomain 拓扑见上表
-- [ ] **决策**：monorepo 布局如下（创建空目录占位）
+- [x] **决策**：项目名 `sentori` 保留（不改）
+- [x] **决策**：公网域名 `sentori.golia.jp`，subdomain 拓扑见上表
+- [x] **决策**：monorepo 布局如下（创建空目录占位）
 
   ```
   sentori/
@@ -116,14 +116,14 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
   └── README.md
   ```
 
-- [ ] **决策**：token 格式 `st_pk_<26 字符 base32 of uuid-v7>`（`pk` 项目公钥；保留 `sk_` 给后续 admin secret key）
-- [ ] **决策**：UI 栈不改——React 19 + Vite + Tailwind v4 + jotai + react-router 继续
-- [ ] **决策**：SDK 包名 `@sentori/react-native`（与 `@sentori/web` 同 namespace）
-- [ ] 删除 `.claude/commands/newlab.md`（labs 残留，对 sentori 无意义）
-- [ ] 写顶层 `.gitignore`：覆盖 Rust `target/`、Node `node_modules/`、Vite `dist/`、Xcode `build/` & `*.xcuserdata`、Android `build/` & `.gradle/`、`.env`、macOS `.DS_Store`
-- [ ] 写顶层 `README.md` 占位：项目目标 + 状态 + 链接到 ROADMAP.md
-- [ ] `git init`
-- [ ] 第一个 commit：`chore: bootstrap sentori monorepo`
+- [x] **决策**：token 格式 `st_pk_<26 字符 base32 of uuid-v7>`（`pk` 项目公钥；保留 `sk_` 给后续 admin secret key）
+- [x] **决策**：UI 栈不改——React 19 + Vite + Tailwind v4 + jotai + react-router 继续
+- [x] **决策**：SDK 包名 `@sentori/react-native`（与 `@sentori/web` 同 namespace）
+- [x] 删除 `.claude/commands/newlab.md`（labs 残留，对 sentori 无意义）
+- [x] 写顶层 `.gitignore`：覆盖 Rust `target/`、Node `node_modules/`、Vite `dist/`、Xcode `build/` & `*.xcuserdata`、Android `build/` & `.gradle/`、`.env`、macOS `.DS_Store` + `.claude/handoff.md`
+- [x] 写顶层 `README.md` 占位：项目目标 + 状态 + 链接到 ROADMAP.md
+- [x] `git init`
+- [x] 第一个 commit：`chore: bootstrap sentori monorepo`（51b6ae0）
 
 ---
 
@@ -136,31 +136,31 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 
 ### Steps
 
-- [ ] 写 `docs/protocol.md` 主体框架（章节：Endpoints / Auth / Token & Ingest URL / Event / Error / Frame / Breadcrumb / Batch / Errors & Rate Limit）
-- [ ] 章节：Token / Ingest URL 设计
-  - [ ] token 格式 `st_pk_<base32-uuid-v7>`
-  - [ ] ingestUrl 默认值 `https://ingest.sentori.golia.jp`
-  - [ ] 显式说明**不复用 Sentry DSN URL 编码方案**及理由
-  - [ ] env 变量约定：`SENTORI_TOKEN` + `SENTORI_INGEST_URL`
-- [ ] 章节：HTTP 端点
-  - [ ] `POST /v1/events` —— 单条
-  - [ ] `POST /v1/events:batch` —— 数组
-  - [ ] 响应码语义：`202 Accepted` / `400 Bad Request` / `401 Unauthorized` / `413 Payload Too Large` / `429 Too Many Requests`
-- [ ] 章节：鉴权头
-  - [ ] `Authorization: Bearer st_pk_xxx`
-  - [ ] `Sentori-Sdk: react-native/0.1.0`
-  - [ ] `Content-Type: application/json`（不接受 multipart）
-- [ ] 章节：Event 顶层 schema（id / ts / kind / src / release / env / device / app / user / tags / breadcrumbs / error / fingerprint?）
-- [ ] 章节：Error subobject（type / msg / stack[] / cause?）
-- [ ] 章节：Stack frame（fn / file / line / col / in_app / abs_path? / pre_context? / post_context?）
-- [ ] 章节：Breadcrumb 类型枚举（`nav` / `net` / `log` / `user` / `custom`）+ 各自 data 字段
-- [ ] 章节：Batch 包装（`{ events: [...] }`）+ 单批 size cap（建议 1MB / 100 条）
-- [ ] 章节：Rate limit 响应（`429` body 带 `retry_after_ms`）
-- [ ] 写 example 1：JS `TypeError`（含 breadcrumbs、release、user）
-- [ ] 写 example 2：iOS `NSException`（src=ios，stack 有 abs_path）
-- [ ] 写 example 3：Android `RuntimeException`（src=android，含 cause chain）
-- [ ] 跟用户过一遍 review，记录修改并迭代到 v0
-- [ ] commit：`docs: protocol v0`
+- [x] 写 `docs/protocol.md` 主体框架（最终包含：Design principles / Versioning / Endpoints / Auth / Token + Ingest URL / Response codes / Event schema / Device / App / Framework / User / Error / Frame / Breadcrumb / Batch / Size limits / Rate limits / Examples / Compatibility promises）
+- [x] 章节：Token / Ingest URL 设计
+  - [x] token 格式 `st_pk_<26 chars Crockford base32 of uuid-v7>`
+  - [x] ingestUrl 默认值 `https://ingest.sentori.golia.jp`
+  - [x] 显式说明**不复用 Sentry DSN URL 编码方案**及理由
+  - [x] env 变量约定：`SENTORI_TOKEN` + `SENTORI_INGEST_URL`
+- [x] 章节：HTTP 端点
+  - [x] `POST /v1/events` —— 单条
+  - [x] `POST /v1/events:batch` —— 数组
+  - [x] 响应码语义：`202 Accepted` / `400 Bad Request` / `401 Unauthorized` / `413 Payload Too Large` / `429 Too Many Requests`
+- [x] 章节：鉴权头
+  - [x] `Authorization: Bearer st_pk_xxx`
+  - [x] `Sentori-Sdk: react-native/0.1.0`
+  - [x] `Content-Type: application/json`（不接受 multipart）
+- [x] 章节：Event 顶层 schema（id / timestamp / kind / platform / release / environment / device / app / user / tags / breadcrumbs / error / fingerprint? / traceId? / spanId?）—— **review 期决议**：camelCase + 完整词 + src→platform + app.rn→app.framework + 加 traceId/spanId 扩展位
+- [x] 章节：Error subobject（type / message / stack[] / cause?）
+- [x] 章节：Stack frame（function / file / line / column / inApp / absolutePath? / preContext? / postContext?）
+- [x] 章节：Breadcrumb 类型枚举（`nav` / `net` / `log` / `user` / `custom`）+ 各自 data 字段
+- [x] 章节：Batch 包装（`{ events: [...] }`）+ 单批 size cap（1MB / 100 条）+ 部分失败语义（accepted/rejected/errors[]）
+- [x] 章节：Rate limit 响应（`429` body 带 `retryAfterMs`，默认 5000 req/min）
+- [x] 写 example 1：JS `TypeError`（含 breadcrumbs、release、user）
+- [x] 写 example 2：iOS `NSException`（platform=ios，stack 有 absolutePath）
+- [x] 写 example 3：Android `RuntimeException`（platform=android，含 cause chain）
+- [x] 跟用户过一遍 review，记录修改并迭代到 v0 —— 用户授权"我来定，新和专业、无历史负担"，按 modern conventions 全面重写
+- [x] commit：`docs: protocol v0`
 
 ---
 
