@@ -1,9 +1,11 @@
-import { Navigate } from 'react-router'
-
-import { AppLayout } from '@/app'
+import { Navigate, Outlet } from 'react-router'
 
 import { useAuth } from './state'
 
+/**
+ * Auth guard only. Renders <Outlet /> so child routes pick their own layout
+ * (OrgLayout for /org/:slug/*, the bare onboarding stub for /onboarding).
+ */
 export function ProtectedLayout() {
   const { isAuthed } = useAuth()
   if (isAuthed === null) {
@@ -14,5 +16,5 @@ export function ProtectedLayout() {
   if (!isAuthed) {
     return <Navigate replace to="/login" />
   }
-  return <AppLayout />
+  return <Outlet />
 }

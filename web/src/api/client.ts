@@ -33,8 +33,11 @@ async function apiFetch<T>(base: string, path: string, init?: RequestInit): Prom
   return (await resp.json()) as T
 }
 
+const ORGS_BASE = '/api'
+
 const adminFetch = <T>(path: string, init?: RequestInit) => apiFetch<T>(ADMIN_BASE, path, init)
 const authFetch = <T>(path: string, init?: RequestInit) => apiFetch<T>(AUTH_BASE, path, init)
+const orgsFetch = <T>(path: string, init?: RequestInit) => apiFetch<T>(ORGS_BASE, path, init)
 
 export type IssueRow = {
   errorType: string
@@ -196,3 +199,27 @@ export const userAuthApi = {
 
 /** Stable dev project id, mirrors `seed::DEV_PROJECT_ID` on the server. */
 export const DEV_PROJECT_ID = '019508a0-0000-7000-8000-000000000000'
+
+export type OrgRole = 'admin' | 'member' | 'owner'
+
+export type OrgRow = {
+  createdAt: string
+  id: string
+  name: string
+  ownerId: string
+  role: OrgRole
+  slug: string
+}
+
+/** Phase 13 sub-C/F: orgs / memberships / invites (cookie session). */
+export const orgsApi = {
+  create: (slug: string, name: string) =>
+    orgsFetch<{ id: string; name: string; role: OrgRole; slug: string }>('/orgs', {
+      body: JSON.stringify({ name, slug }),
+      method: 'POST',
+    }),
+
+  detail: (slug: string) => orgsFetch<OrgRow>(`/orgs/${slug}`),
+
+  listMine: () => orgsFetch<OrgRow[]>('/orgs'),
+}

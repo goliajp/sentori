@@ -3,13 +3,15 @@ import { useRef, useState } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
 import { useNavigate } from 'react-router'
 
-import { adminApi, DEV_PROJECT_ID, type IssueRow } from '@/api/client'
+import { adminApi, type IssueRow } from '@/api/client'
+import { useOrg } from '@/auth/orgContext'
 
 type Status = 'active' | 'closed' | 'silenced'
 const STATUSES: readonly Status[] = ['active', 'silenced', 'closed']
 
 export function IssuesView() {
   const navigate = useNavigate()
+  const { currentOrg, currentProject } = useOrg()
   const [status, setStatus] = useState<Status>('active')
   const [env, setEnv] = useState('')
   const [release, setRelease] = useState('')
@@ -17,23 +19,26 @@ export function IssuesView() {
   const [selectedIdx, setSelectedIdx] = useState(0)
   const searchRef = useRef<HTMLInputElement>(null)
 
+  const projectId = currentProject?.id ?? null
+
   const queryClient = useQueryClient()
   const { data, isLoading, error } = useQuery({
+    enabled: !!projectId,
     queryFn: () =>
-      adminApi.listIssues(DEV_PROJECT_ID, {
+      adminApi.listIssues(projectId!, {
         env: env || undefined,
         release: release || undefined,
         status,
       }),
-    queryKey: ['issues', DEV_PROJECT_ID, status, env, release],
+    queryKey: ['issues', projectId, status, env, release],
   })
 
   const silenceMutation = useMutation({
     mutationFn: (issueId: string) =>
-      adminApi.patchIssue(DEV_PROJECT_ID, issueId, { status: 'silenced' }),
+      adminApi.patchIssue(projectId!, issueId, { status: 'silenced' }),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ['issues', DEV_PROJECT_ID],
+        queryKey: ['issues', projectId],
       })
     },
   })
@@ -55,7 +60,7 @@ export function IssuesView() {
     'enter',
     () => {
       const issue = filtered[safeIdx]
-      if (issue) navigate(`/issues/${issue.id}`)
+      if (issue) navigate(`/org/${currentOrg.slug}/issues/${issue.id}`)
     },
     { enableOnFormTags: false }
   )
@@ -117,8 +122,15 @@ export function IssuesView() {
         </div>
       </div>
 
-      {isLoading && <div className="text-fg-muted px-6 py-6 text-sm">Loading…</div>}
-      {error && <div className="px-6 py-6 text-sm text-red-400">Failed to load issues.</div>}
+      {!projectId && (
+        <div className="text-fg-muted px-6 py-6 text-sm">
+          No project in this org yet. Create one to start ingesting events.
+        </div>
+      )}
+      {projectId && isLoading && <div className="text-fg-muted px-6 py-6 text-sm">Loading…</div>}
+      {projectId && error && (
+        <div className="px-6 py-6 text-sm text-red-400">Failed to load issues.</div>
+      )}
       {!isLoading && !error && filtered.length === 0 && (
         <div className="text-fg-muted px-6 py-6 text-sm">
           No {status} issues{filter ? ' match the filter.' : '.'}
@@ -146,7 +158,7 @@ export function IssuesView() {
                   key={issue.id}
                   onClick={() => {
                     setSelectedIdx(idx)
-                    navigate(`/issues/${issue.id}`)
+                    navigate(`/org/${currentOrg.slug}/issues/${issue.id}`)
                   }}
                 >
                   <td className="text-fg px-6 font-medium whitespace-nowrap">{issue.errorType}</td>

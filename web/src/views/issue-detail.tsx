@@ -3,39 +3,37 @@ import { type ReactNode, useState } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
 import { useNavigate, useParams } from 'react-router'
 
-import {
-  adminApi,
-  type Breadcrumb,
-  DEV_PROJECT_ID,
-  type Frame,
-  type SentoriError,
-} from '@/api/client'
+import { adminApi, type Breadcrumb, type Frame, type SentoriError } from '@/api/client'
+import { useOrg } from '@/auth/orgContext'
 
 export function IssueDetailView() {
   const { issueId } = useParams<{ issueId: string }>()
   const navigate = useNavigate()
+  const { currentOrg, currentProject } = useOrg()
   const [symbolicated, setSymbolicated] = useState(true)
+  const projectId = currentProject?.id ?? null
+  const issuesPath = `/org/${currentOrg.slug}/issues`
 
   const issueQuery = useQuery({
-    enabled: !!issueId,
-    queryFn: () => adminApi.issueDetail(DEV_PROJECT_ID, issueId!),
-    queryKey: ['issue', DEV_PROJECT_ID, issueId],
+    enabled: !!issueId && !!projectId,
+    queryFn: () => adminApi.issueDetail(projectId!, issueId!),
+    queryKey: ['issue', projectId, issueId],
   })
 
   const eventsQuery = useQuery({
-    enabled: !!issueId,
+    enabled: !!issueId && !!projectId,
     queryFn: () =>
-      adminApi.listEvents(DEV_PROJECT_ID, issueId!, {
+      adminApi.listEvents(projectId!, issueId!, {
         limit: 100,
         symbolicated,
       }),
-    queryKey: ['events', DEV_PROJECT_ID, issueId, symbolicated],
+    queryKey: ['events', projectId, issueId, symbolicated],
   })
 
   const releasesQuery = useQuery({
-    enabled: !!issueId,
-    queryFn: () => adminApi.listReleasesForIssue(DEV_PROJECT_ID, issueId!),
-    queryKey: ['issue-releases', DEV_PROJECT_ID, issueId],
+    enabled: !!issueId && !!projectId,
+    queryFn: () => adminApi.listReleasesForIssue(projectId!, issueId!),
+    queryKey: ['issue-releases', projectId, issueId],
   })
 
   const events = eventsQuery.data ?? []
@@ -46,7 +44,7 @@ export function IssueDetailView() {
 
   useHotkeys('[', () => setSelectedIdx((i) => Math.max(0, i - 1)))
   useHotkeys(']', () => setSelectedIdx((i) => Math.min(events.length - 1, i + 1)))
-  useHotkeys('escape', () => navigate('/issues'))
+  useHotkeys('escape', () => navigate(issuesPath))
 
   if (!issueId) return null
 
@@ -66,7 +64,7 @@ export function IssueDetailView() {
         <div className="border-border flex h-12 items-center border-b px-4">
           <button
             className="text-fg-muted hover:text-fg text-sm"
-            onClick={() => navigate('/issues')}
+            onClick={() => navigate(issuesPath)}
             type="button"
           >
             ← Back

@@ -610,10 +610,10 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 #### Dashboard
 
 - [x] 路由：`/login`（替换原 admin_password 登录为 email+password）、`/register`、`/verify?token=`、`/forgot-password`（stub）—— `userAuthApi`（`/api/auth/*`）+ `adminApi`（`/admin/api/*`）拆分；AuthProvider 升级带 `user: {id, email}`
-- [ ] 顶栏 org switcher
+- [x] 顶栏 org switcher（`OrgSwitcher` native select；切换 → `navigate('/org/{slug}/issues')`）
 - [ ] `/org/:slug/settings`：成员列表 + 邀请按钮
 - [ ] `/org/:slug/projects/:id/settings/recipients`：增删 `notification_recipients` 行（**回填 Phase 9 line 417 deferred**）
-- [ ] 所有 issue/project 路由前缀加 `/org/:slug`
+- [x] 所有 issue/project 路由前缀加 `/org/:slug` —— `/org/:slug/issues[/...]`；`OrgLayout` 提供顶栏 + `OrgCtx`；`/` 由 `RootRedirect` 跳第一个 org 或 `/onboarding`；废弃 `DEV_PROJECT_ID` 写死，`useOrg().currentProject` 给 `IssuesView` / `IssueDetailView` 用
 - [ ] onboarding：注册成功 → 自动建 personal org（slug = email 前缀）
 
 #### 测试

@@ -12,7 +12,10 @@ import { ForgotPasswordView } from './views/forgot-password'
 import { IssueDetailView } from './views/issue-detail'
 import { IssuesView } from './views/issues'
 import { LoginView } from './views/login'
+import { OnboardingView } from './views/onboarding'
+import { OrgLayout } from './views/org-layout'
 import { RegisterView } from './views/register'
+import { RootRedirect } from './views/root-redirect'
 import { VerifyView } from './views/verify'
 
 applyTheme()
@@ -24,10 +27,18 @@ const router = createBrowserRouter([
   { element: <ForgotPasswordView />, path: '/forgot-password' },
   {
     children: [
-      { element: <Navigate replace to="/issues" />, index: true },
-      { element: <IssuesView />, path: 'issues' },
-      { element: <IssueDetailView />, path: 'issues/:issueId' },
-      { element: <Navigate replace to="/issues" />, path: '*' },
+      { element: <RootRedirect />, index: true },
+      { element: <OnboardingView />, path: 'onboarding' },
+      {
+        children: [
+          { element: <Navigate replace to="issues" />, index: true },
+          { element: <IssuesView />, path: 'issues' },
+          { element: <IssueDetailView />, path: 'issues/:issueId' },
+        ],
+        element: <OrgLayout />,
+        path: 'org/:slug',
+      },
+      { element: <Navigate replace to="/" />, path: '*' },
     ],
     element: <ProtectedLayout />,
     path: '/',
