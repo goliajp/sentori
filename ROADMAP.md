@@ -707,10 +707,11 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [ ] **决策**：起步 Hetzner CCX23（4 vCPU / 16GB RAM / 80GB SSD）× 2（主备） + 1 个独立 PG VM（CPX21）
 - [ ] **决策**：v0.1 不上 k8s，docker compose 即可（简单 + 易调试）
 - [ ] **决策**：边缘 Caddy（自动 ACME、HTTP/3）替 nginx
-- [ ] 写 `docker/production-compose.yml`：server×2 + caddy + valkey；PG 在独立 VM
-- [ ] 写 Caddyfile：domain → server upstream，自动 TLS
-- [ ] 配置 Cloudflare：DNS → VM IP（保留 proxy 兜 DDoS）
-- [ ] 部署：用 `docker compose pull && up -d` 流程
+- [x] 写 `docker/production-compose.yml`：blue/green 双 server + caddy + valkey；PG 通过 `DATABASE_URL` 指向独立 VM
+- [x] 写 `docker/Caddyfile`：app./api./ingest. 三个 site，自动 ACME TLS、`ip_hash` lb（blue/green session 粘附）+ `/v1/events/_recent` 健康检查、HSTS+CSP+CORS（dashboard 限同源、ingest 公开）
+- [x] 写 `docker/README.production.md`：day-zero 部署、blue/green 滚动、回滚步骤
+- [ ] **(user-owned)** 配置 Cloudflare：DNS → VM IP（grey cloud, Caddy 出 TLS；apex 仍走 CF Pages 兜 marketing）
+- [ ] **(user-owned)** 部署：`docker compose -f production-compose.yml pull && up -d`
 
 #### 监控 / 告警
 
