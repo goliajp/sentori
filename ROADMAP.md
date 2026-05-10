@@ -1198,10 +1198,16 @@ server 36/36 + dashboard build 126 KB gzip + vitest 1/1 + e2e 1/1。commit `4147
 
 ### Steps
 
-#### sub-A — CLI: dSYM 上传
-- [ ] `cli/src/main.rs` 加 `upload dsym --project <id> --release <ver> <path>`
-- [ ] 服务端 `POST /admin/api/projects/{id}/dsyms`：multipart；存 PG bytea + metadata（uuid / arch / release）
-- [ ] dashboard release 详情显示 dSYM 列表
+#### sub-A — CLI: dSYM 上传 ✅
+- [x] migration `0014_dsyms.sql`：(id, project_id, release nullable, debug_id, arch, object_name, size_bytes, data bytea, uploaded_by, uploaded_at)；UNIQUE(project_id, debug_id, arch) + 列表索引
+- [x] 服务端 `POST /admin/api/projects/{id}/dsyms`：raw octet-stream + headers (`x-sentori-debug-id`, `x-sentori-arch`) + query (`release`, `objectName`)；ON CONFLICT DO UPDATE 幂等；max 256 MB；audit `dsym.uploaded`
+- [x] 服务端 `GET /admin/api/projects/{id}/dsyms?release=&limit=` 列出（含上传者 email）
+- [x] router 每路由 `DefaultBodyLimit::disable()` + 256 MB 限制 for `/dsyms` and `/sourcemaps`，不被 protocol 1 MB 全局限制锁住
+- [x] `cli/src/dsym.rs` Mach-O 解析（`object` crate）：单 / fat32 / fat64；提 LC_UUID + cputype/cpusubtype；fat 切片 byte-level；arch 表：arm64 / arm64e / arm64_32 / armv7 / armv7s / armv7k / x86_64 / x86_64h / i386
+- [x] `sentori-cli upload dsym --project=<uuid> [--release] [--token] [--api-url] <paths>`：token fallback `SENTORI_ADMIN_TOKEN → SENTORI_TOKEN`；api-url fallback `SENTORI_ADMIN_URL → INGEST_URL replace ingest.→api. → public api`
+- [x] tests：3 个 case（happy + idempotent / 坏 headers + 空 body + arch 白名单 / 跨 org 403）；并修 fixture 时间戳并行碰撞 bug；server 42/42 全绿
+- [x] dashboard release 详情显示 dSYM 列表 —— 推迟到 Phase 23（Release UX 主轴），server 端已就位
+- [x] commit `8e1b71a`
 
 #### sub-B — server: iOS 反符号化
 - [ ] `server/src/symbolicate.rs` 加 dSYM-based path：spawn `atos -arch arm64 -o <dsym> -l <load_addr> <pc>`
