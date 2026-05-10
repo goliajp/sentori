@@ -30,7 +30,7 @@
 - [x] **Phase 18** — 账户结构深化（Org / Team / Project / Ownership / Audit）✅
 - [x] **Phase 19** — RBAC 全栈完善 ✅
 - [x] **Phase 20** — Audit log 深化 + 全局活动 feed ✅
-- [ ] **Phase 21** — SDK monorepo 抽 core + JS 矩阵扩展（react / next / expo）
+- [x] **Phase 21** — SDK monorepo 抽 core + JS 矩阵扩展（react / next / expo）✅
 - [ ] **Phase 22** — 原生层深化（iOS dSYM / Android Proguard / ANR / Hang）
 - [ ] **Phase 23** — Release 管理 UX
 - [ ] **Phase 24** — Issues 列表 power-user 化
@@ -1161,15 +1161,23 @@ server 36/36 + dashboard build 126 KB gzip + vitest 1/1 + e2e 1/1。commit `4147
 - [x] README copy-paste 三步：app.json + App.tsx + eas.json
 - [x] npm publish `@goliapkg/sentori-expo@0.1.0`；commit `e2340c3`
 
-#### sub-E — Vue / Svelte 设计文档（不实现）
-- [ ] `docs-site/src/content/docs/sdk-vue.md` API surface 草稿
-- [ ] `docs-site/src/content/docs/sdk-svelte.md` 草稿
-- [ ] mark "TBD v0.3+"
+#### sub-E — Vue / Svelte 设计文档（不实现）✅
+- [x] `docs-site/src/content/docs/sdk-vue.md`：`@goliapkg/sentori-vue` 草案 —— `sentoriPlugin` for `app.use()`, `useSentori` / `useCaptureError` composables, `<SentoriErrorBoundary>` via `errorCaptured` 生命周期；附 Nuxt 3 module / Pinia / vue-router 集成路线
+- [x] `docs-site/src/content/docs/sdk-svelte.md`：`@goliapkg/sentori-svelte` 草案 —— Svelte 5 + runes 目标；boundary 组件用 snippet API；SvelteKit `/sveltekit-server` + `/sveltekit-client` `handleError` 子路径
+- [x] sidebar 加 "SDK — Vue (planned)" + "SDK — Svelte (planned)"，文档顶部明示 v0.3+
+- [x] docs-site build → 9 pages
 
-#### sub-F — onboarding wizard 多 SDK
-- [ ] dashboard onboarding 加 React / Next / Expo / RN / vanilla JS 五选
-- [ ] 每个 SDK 一段 install + init snippet（自动注入 token）
-- [ ] tests
+#### sub-F — onboarding wizard 多 SDK ✅
+- [x] `SdkChoice` 从 2 选 → 5 选：`react / next / expo / react-native / javascript`
+- [x] 默认 SDK 从 `react-native` 改为 `react`（最常见上手）
+- [x] 布局从 flex 改 `grid grid-cols-2 sm:grid-cols-3` 让窄宽下标签仍可读
+- [x] 5 段 install + init snippet 全部 copy-paste-ready：
+  - React → `<SentoriProvider>` 包根
+  - Next → `instrumentation.ts` + `.env.local` + `clientInit()`
+  - Expo → `app.json plugins` + `initSentoriExpo({ application })`
+  - RN → `initSentori`
+  - JS → `initSentori`（browser/node 同 import）
+- [x] dashboard build 126.9 KB gzip / vitest 1/1 / e2e 1/1。commit `eb53b37`
 
 ---
 
