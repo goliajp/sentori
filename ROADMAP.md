@@ -1238,9 +1238,14 @@ server 36/36 + dashboard build 126 KB gzip + vitest 1/1 + e2e 1/1。commit `4147
 - [x] docs/protocol.md + docs-site kind 行更新；server 14 unit + 31 integration 全绿；core 11 + rn 18 SDK tests 全绿
 - [x] npm publish core 0.2.0 + react-native 0.3.0；commit `b02b7bb`
 
-#### sub-E — iOS hang detection
-- [ ] main thread observer：runloop 阻塞 > 250ms warning；> 2s 上报为 "hang"
-- [ ] event kind 加 "hang"；同样 UI 处理
+#### sub-E — iOS hang detection ✅
+- [x] `SentoriHangWatchdog.swift`：DispatchSourceTimer 后台 queue 每 1s post 到 main，未 ack ≥ 2s 即报；single-shot per hang；`#if DEBUG` 默认关；写盘到既有 pending dir
+- [x] `SentoriModule.swift` 加 `Function("startAnrWatchdog")` + `stopAnrWatchdog`，**和 Android 共用同一 JS 函数名** —— host 一行 `startAnrWatchdog()` 双平台开
+- [x] 复用 `kind = "anr"`（不另开 `"hang"` —— dashboard ANR badge 已 work；区分靠 `tags.source = sentori.hangWatchdog`）
+- [x] iOS 2s/1s vs Android 5s/1s 默认：iOS 没有等价系统级 ANR 信号，更严格捕短 stutter；Android 跟系统 5s 一致
+- [x] **Caveat**：Thread.callStackSymbols 只回 caller-thread 栈；watchdog 在 background queue 上跑，跨线程取 main 真实栈需要 Mach API（thread_state_t / vmread）—— App Store review 容易判 reject。今天 capture 是 watchdog timing path 栈，sub-F 或后续 phase 上 proper main-thread sampler
+- [x] `native.ts` 类型 + JS export 已是 sub-D 留下的 `startAnrWatchdog`；本 sub 仅文档区分双平台 default
+- [x] `sdk/react-native@0.3.1` 发到 npm；commit `601066a` + `dfc3a5d`
 
 #### sub-F — release-aware symbolication
 - [ ] dSYM/mapping 上传时按 release 串绑（uuid match）
