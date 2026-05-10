@@ -1139,13 +1139,17 @@ server 36/36 + dashboard build 126 KB gzip + vitest 1/1 + e2e 1/1。commit `4147
 - [x] tests：4 个 case 跑 happy-dom + bunfig preload，fetch + sendBeacon 全 stub；`bun run build` + `bun test` 全绿
 - [x] npm publish `@goliapkg/sentori-react@0.1.0`；commit `390bdf7`
 
-#### sub-C — `@goliapkg/sentori-next`
-- [ ] 新 `sdk/next/`
-- [ ] `withSentori(nextConfig)`
-- [ ] App Router `app/error.tsx` template + `instrumentation.ts` 自动注入
-- [ ] `Sentori.middleware()` for edge runtime
-- [ ] `onRequestError` 接 server action
-- [ ] publish 0.1.0
+#### sub-C — `@goliapkg/sentori-next` ✅
+- [x] 新 `sdk/next/` workspace；3 个 sub-path exports：`/client` / `/server` / `/instrumentation`；deps `core@0.1.0 + javascript@0.2.0 + react@0.1.0`；peer `next>=14, react>=18`
+- [x] `clientInit(cfg?)`：浏览器侧 idempotent init；从 `NEXT_PUBLIC_SENTORI_*` 读 env；React Refresh / fast-reload 不重复注册
+- [x] `serverInit(cfg?)`：node 侧 idempotent init；guard `NEXT_RUNTIME==='nodejs'` 避免 edge runtime 拉 Node deps
+- [x] `onRequestError(err, req, ctx)`：匹配 Next 15 instrumentation.ts:onRequestError 签名；自动加 `next.method / next.route / next.routeType / next.runtime / source=next.requestError` tags
+- [x] `/instrumentation` 一行 drop-in：`export { register, onRequestError } from '@goliapkg/sentori-next/instrumentation'`
+- [x] env 解析 `src/config.ts`：client 只看 NEXT_PUBLIC_SENTORI_*；server 优先 SENTORI_*，缺时 fallback NEXT_PUBLIC_*；显式 cfg 字段 always wins；缺必填字段 throw 含具体 env 名
+- [x] `~~withSentori(nextConfig)~~` —— 不实现：现阶段 nextConfig 不需要 webpack plugin（无 source map upload、无 build-time codegen）；Phase 22 接 sourcemap upload 时再加
+- [x] tests：9 个 case（config matrix + onRequestError 三场景 + non-Error wrap）；`bun test` 全绿
+- [x] README：4 个文件（instrumentation.ts / app/layout.tsx / app/error.tsx / app/global-error.tsx）copy-paste-ready
+- [x] npm publish `@goliapkg/sentori-next@0.1.0`；commit `0432d58`
 
 #### sub-D — `@goliapkg/sentori-expo`
 - [ ] 新 `sdk/expo/`
