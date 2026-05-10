@@ -31,6 +31,7 @@ import { LoginView } from './views/login'
 import { OnboardingView } from './views/onboarding'
 import { OrgLayout } from './views/org-layout'
 import { OrgSettingsView } from './views/org-settings'
+import { ProjectTeamSettingsView } from './views/project-team-settings'
 import { RecipientSettingsView } from './views/recipient-settings'
 import { RegisterView } from './views/register'
 import { TeamDetailView } from './views/team-detail'
@@ -66,6 +67,10 @@ const router = createBrowserRouter([
           {
             element: <TokenSettingsView />,
             path: 'projects/:projectId/settings/tokens',
+          },
+          {
+            element: <ProjectTeamSettingsView />,
+            path: 'projects/:projectId/settings/teams',
           },
         ],
         element: <OrgLayout />,

@@ -84,6 +84,12 @@ export function RecipientSettingsView() {
           >
             Tokens →
           </Link>
+          <Link
+            className="hover:text-fg"
+            to={`/org/${currentOrg.slug}/projects/${projectId}/settings/teams`}
+          >
+            Team access →
+          </Link>
         </div>
       </header>
 

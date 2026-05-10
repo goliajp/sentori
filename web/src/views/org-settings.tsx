@@ -1,9 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
 
-import { type OrgRole, orgsApi, type UsageRow } from '@/api/client'
+import { type OrgRole, orgsApi, teamsApi, type TeamRow, type UsageRow } from '@/api/client'
 import { useAuth } from '@/auth/state'
 import { useOrg } from '@/auth/orgContext'
+import { RoleBadge } from '@/components/RoleBadge'
 
 const ROLES: readonly OrgRole[] = ['admin', 'member']
 
@@ -18,6 +19,30 @@ export function OrgSettingsView() {
   const membersQuery = useQuery({
     queryFn: () => orgsApi.listMembers(slug),
     queryKey: ['members', slug],
+  })
+  const teamsQuery = useQuery({
+    queryFn: () => teamsApi.list(slug),
+    queryKey: ['teams', slug],
+  })
+
+  // Build a userId → teams map by fetching each team's members in parallel.
+  // O(N teams) requests; fine for the 1–10 teams the dashboard typically
+  // sees. Move to a server-side join if N grows past ~50.
+  const teamMembersQueries = useQueries({
+    queries: (teamsQuery.data ?? []).map((t) => ({
+      queryFn: () => teamsApi.listMembers(slug, t.slug),
+      queryKey: ['team-members', slug, t.slug] as const,
+    })),
+  })
+  const userTeams = new Map<string, TeamRow[]>()
+  ;(teamsQuery.data ?? []).forEach((t, i) => {
+    const members = teamMembersQueries[i]?.data
+    if (!members) return
+    for (const m of members) {
+      const list = userTeams.get(m.userId) ?? []
+      list.push(t)
+      userTeams.set(m.userId, list)
+    }
   })
   const invitesQuery = useQuery({
     enabled: canManage,
@@ -135,9 +160,23 @@ export function OrgSettingsView() {
             <tbody>
               {membersQuery.data.map((m) => {
                 const isSelf = user?.id === m.userId
+                const teamsForUser = userTeams.get(m.userId) ?? []
                 return (
                   <tr className="border-border/40 h-9 border-b" key={m.userId}>
-                    <td className="text-fg px-2 font-mono">{m.email}</td>
+                    <td className="text-fg px-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono">{m.email}</span>
+                        {teamsForUser.map((t) => (
+                          <span
+                            className="border-border bg-bg-tertiary text-fg-muted rounded border px-1.5 py-0.5 text-[10px] font-medium"
+                            key={t.id}
+                            title={t.name}
+                          >
+                            {t.slug}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
                     <td className="px-2">
                       {isOwner && !isSelf ? (
                         <select
@@ -155,7 +194,7 @@ export function OrgSettingsView() {
                           <option value="member">member</option>
                         </select>
                       ) : (
-                        <span className="text-fg-muted font-mono uppercase">{m.role}</span>
+                        <RoleBadge role={m.role} />
                       )}
                     </td>
                     <td className="px-2 text-right">

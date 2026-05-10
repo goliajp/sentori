@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 
-import type { OrgRow, ProjectRow } from '@/api/client'
+import type { OrgRow, ProjectRow, TeamRow } from '@/api/client'
 
 export type OrgContextValue = {
   currentOrg: OrgRow
@@ -9,9 +9,17 @@ export type OrgContextValue = {
    * a project switcher comes later.
    */
   currentProject: null | ProjectRow
+  /**
+   * Phase 18 sub-E: optional team filter. When set, IssuesView narrows
+   * the project list to projects bound to this team. Persisted via the
+   * `team` query param on the issues route.
+   */
+  currentTeamSlug: null | string
   orgs: OrgRow[]
   /** Projects belonging to currentOrg. */
   projects: ProjectRow[]
+  /** All teams in the current org (used by OrgSwitcher and gating UI). */
+  teams: TeamRow[]
 }
 
 export const OrgCtx = createContext<null | OrgContextValue>(null)

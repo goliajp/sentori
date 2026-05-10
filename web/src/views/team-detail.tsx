@@ -4,6 +4,7 @@ import { Link, Navigate, useParams } from 'react-router'
 
 import { adminApi, orgsApi, teamsApi, type TeamRole } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
+import { RoleBadge } from '@/components/RoleBadge'
 
 const ROLES: readonly TeamRole[] = ['lead', 'member']
 
@@ -204,7 +205,7 @@ export function TeamDetailView() {
                         ))}
                       </select>
                     ) : (
-                      <span className="text-fg-muted text-[12px]">{m.role}</span>
+                      <RoleBadge role={m.role} />
                     )}
                   </td>
                   <td className="text-fg-muted px-2 py-2 text-[12px] tabular-nums">
