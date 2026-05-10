@@ -956,12 +956,13 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [x] 注：`org.deleted` 因 FK cascade 落不下 audit 行，改 emit 一条 tracing log；Phase 20 sub-A 把 audit_logs 移出 cascade
 - [x] tests：(1) happy path：role swap / owner_id 镜像 / replay 拒绝 / 错误 caller 403；(2) 非 eligible target / 非 org 用户 / 非 owner caller 全拒；(3) audit list owner 200 + 含 org.created + team.created / member 403 / `?action=team.created` 过滤生效；本地 sentori-pg `cargo test` 全 17 个 pass。commit `1fc9bc9`
 
-#### sub-D — dashboard: Team 管理 UI
+#### sub-D — dashboard: Team 管理 UI ✅
 
-- [ ] `web/src/views/team-list.tsx`：org-settings 增 Teams tab；表格 + create button
-- [ ] `web/src/views/team-detail.tsx`：成员表 + project assignments + 编辑 lead/role
-- [ ] `web/src/api/client.ts` 增 `teamsApi.{list,create,patch,delete,addMember,removeMember,assignProject,unassignProject}`
-- [ ] `OrgSwitcher` 改两层：`Org > Team`；选 team 后 issues 列表自动 filter
+- [x] `web/src/views/team-list.tsx`：路由 `/org/{slug}/teams`，含 admin/owner 创建表单（slug + name + description）+ 团队列表 + 删除按钮（带 confirm 警告"删除后项目权限会回到全 org 开放"）
+- [x] `web/src/views/team-detail.tsx`：路由 `/org/{slug}/teams/{teamSlug}`，两段：Members（dropdown 加成员 / 行内换 role / 删除）+ Projects（dropdown 绑项目 / 按钮解绑），plain member 只读
+- [x] `web/src/api/client.ts` 增 `teamsApi`（list/create/get/patch/delete/listMembers/addMember/patchMember/removeMember/listProjects/listProjectTeams/bindProject/unbindProject）+ `auditApi.list` + `transfersApi.{create,accept}`
+- [x] `OrgLayout.NAV` 加 `Teams` 项夹在 Issues 和 Settings 之间
+- [ ] ~~`OrgSwitcher` 改两层：`Org > Team`；选 team 后 issues 列表自动 filter~~ — 推迟到 sub-E 跟 role chip / permission gate UI 一起做。`bun run build` + `bun run test` 全绿；commit `78defab`
 
 #### sub-E — dashboard: Project ↔ Team 绑定 + 角色 chip
 
