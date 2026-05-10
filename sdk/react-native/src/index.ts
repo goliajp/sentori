@@ -19,7 +19,11 @@ export { init, init as initSentori } from './init';
 export { addBreadcrumb } from './breadcrumbs';
 export { setUser, getUser, captureError, captureException } from './capture';
 export { ErrorBoundary } from './error-boundary';
-export { triggerNativeCrash } from './native';
+export {
+  startAnrWatchdog,
+  stopAnrWatchdog,
+  triggerNativeCrash,
+} from './native';
 
 export type {
   Event,

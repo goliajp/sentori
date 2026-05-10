@@ -16,6 +16,7 @@ export function IssuesView() {
   const [env, setEnv] = useState('')
   const [release, setRelease] = useState('')
   const [filter, setFilter] = useState('')
+  const [anrOnly, setAnrOnly] = useState(false)
   const [selectedIdx, setSelectedIdx] = useState(0)
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -43,7 +44,7 @@ export function IssuesView() {
     },
   })
 
-  const filtered = data?.filter((i) => match(i, filter)) ?? []
+  const filtered = data?.filter((i) => match(i, filter) && (!anrOnly || isAnr(i.errorType))) ?? []
 
   // Clamp at render time rather than reset via effect (avoids
   // react-hooks/set-state-in-effect; selectedIdx is allowed to drift past
@@ -100,6 +101,19 @@ export function IssuesView() {
           ))}
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <button
+            aria-pressed={anrOnly}
+            className={`rounded-md px-2.5 py-1 text-[12px] transition-colors ${
+              anrOnly
+                ? 'bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30'
+                : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+            }`}
+            onClick={() => setAnrOnly((v) => !v)}
+            title="Show only Application Not Responding events"
+            type="button"
+          >
+            ANR
+          </button>
           <input
             className="border-border bg-bg-tertiary text-fg focus:ring-accent w-24 rounded-md border px-2 py-1 text-[12px] focus:ring-1 focus:outline-none"
             onChange={(e) => setEnv(e.target.value)}
@@ -161,7 +175,19 @@ export function IssuesView() {
                     navigate(`/org/${currentOrg.slug}/issues/${issue.id}`)
                   }}
                 >
-                  <td className="text-fg px-6 font-medium whitespace-nowrap">{issue.errorType}</td>
+                  <td className="text-fg px-6 font-medium whitespace-nowrap">
+                    <span className="inline-flex items-center gap-2">
+                      {issue.errorType}
+                      {isAnr(issue.errorType) && (
+                        <span
+                          className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-300 uppercase ring-1 ring-amber-500/30"
+                          title="Application Not Responding — main thread blocked ≥ 5 s"
+                        >
+                          ANR
+                        </span>
+                      )}
+                    </span>
+                  </td>
                   <td className="text-fg-muted max-w-md truncate px-6">{issue.messageSample}</td>
                   <td className="text-fg px-6 text-right font-mono tabular-nums">
                     {issue.eventCount}
@@ -181,6 +207,17 @@ export function IssuesView() {
       )}
     </div>
   )
+}
+
+/**
+ * ANRs and iOS hangs land in the issues table with errorType
+ * "ApplicationNotResponding" (Android, Phase 22 sub-D) — the same
+ * string sub-E will use for iOS hangs. We pivot the badge on the
+ * errorType rather than introducing a new IssueRow column so the
+ * server schema doesn't change for cosmetic UI.
+ */
+function isAnr(errorType: string): boolean {
+  return errorType === 'ApplicationNotResponding'
 }
 
 function match(issue: IssueRow, filter: string): boolean {

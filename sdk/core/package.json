@@ -1,6 +1,6 @@
 {
   "name": "@goliapkg/sentori-core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Sentori SDK core — wire-format types, uuid v7, breadcrumb ring, stack parsers shared across @goliapkg/sentori-* SDKs.",
   "license": "MIT",
   "homepage": "https://sentori.golia.jp",

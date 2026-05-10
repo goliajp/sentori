@@ -54,6 +54,11 @@ pub struct Event {
 #[serde(rename_all = "camelCase")]
 pub enum EventKind {
     Error,
+    /// Phase 22 sub-D: Android ANR (≥ 5 s main-thread freeze). The
+    /// SDK posts an event-shaped payload with `kind = "anr"` and a
+    /// captured main-thread stack. iOS hangs (sub-E) will share this
+    /// kind once the dedicated detector lands.
+    Anr,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]

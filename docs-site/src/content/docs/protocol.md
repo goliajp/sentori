@@ -132,7 +132,7 @@ A single event is a JSON object with these top-level fields:
 |---|---|---|---|
 | `id` | string (uuid-v7) | yes | client-generated; server uses as idempotency key |
 | `timestamp` | string (ISO 8601, UTC, ms precision) | yes | when the error occurred (not when reported) |
-| `kind` | enum | yes | `"error"` (the only kind in v0.1) |
+| `kind` | enum | yes | `"error"` for any throwable; `"anr"` for Android ANR / iOS hang reports (Phase 22 sub-D / sub-E). New variants are additive — receivers MUST treat unknown values as `"error"` for grouping purposes. |
 | `platform` | enum | yes | `"javascript"` / `"ios"` / `"android"` (v0.2 may add `"web"`, `"node"`) |
 | `release` | string | yes | format: `<app-name>@<version>+<build>` (e.g. `myapp@1.2.3+456`) |
 | `environment` | string | yes | typically `"prod"`, `"staging"`, `"dev"` |

@@ -8,6 +8,8 @@ import expo.modules.kotlin.modules.ModuleDefinition
  * as the iOS module:
  *   - setConfig({ token, release, environment })
  *   - drainPending() -> List<String>  (JSON bodies)
+ *   - startAnrWatchdog({ timeoutMs?, intervalMs?, force? })
+ *   - stopAnrWatchdog()
  */
 class SentoriModule : Module() {
     override fun definition() = ModuleDefinition {
@@ -24,6 +26,22 @@ class SentoriModule : Module() {
 
         AsyncFunction("drainPending") {
             SentoriCrashHandler.consumePending()
+        }
+
+        // Watchdog is opt-in from JS so the host app picks the
+        // trade-off — stricter detection vs noise from the Metro
+        // debugger pausing the main thread. Pass `force: true` to
+        // run in debug builds.
+        Function("startAnrWatchdog") { options: Map<String, Any?>? ->
+            val ctx = appContext.reactContext ?: return@Function
+            val timeoutMs = (options?.get("timeoutMs") as? Number)?.toLong() ?: 5_000L
+            val intervalMs = (options?.get("intervalMs") as? Number)?.toLong() ?: 1_000L
+            val force = (options?.get("force") as? Boolean) ?: false
+            SentoriAnrWatchdog.start(ctx, timeoutMs, intervalMs, force)
+        }
+
+        Function("stopAnrWatchdog") {
+            SentoriAnrWatchdog.stop()
         }
 
         // Dev-only helper — schedules an uncaught RuntimeException after
