@@ -27,12 +27,20 @@ import Foundation
     private static var timer: DispatchSourceTimer?
     private static let lock = NSLock()
 
-    /// Start the watchdog. Idempotent.
+    /// Start the watchdog. Idempotent. **Must be called from the main
+    /// thread** so the sampler can capture main's mach port; if called
+    /// from a background thread the sampler stays uninstalled and the
+    /// watchdog falls back to `Thread.callStackSymbols`.
     @objc public static func start(timeoutMs: Int, intervalMs: Int, force: Bool) {
         lock.lock()
         defer { lock.unlock() }
         if running { return }
         if isDebug() && !force { return }
+
+        // Capture main's mach port for the Phase 29 sub-A sampler. No-op
+        // if we're not on main; sampler will then return [] and we
+        // gracefully fall back at capture time.
+        SentoriThreadSampler.installMainThreadHandle()
 
         let q = DispatchQueue(label: "com.sentori.hangWatchdog", qos: .utility)
         let t = DispatchSource.makeTimerSource(queue: q)
@@ -97,33 +105,50 @@ import Foundation
         let release = (cfg["release"] as? String) ?? "unknown"
         let environment = (cfg["environment"] as? String) ?? "prod"
 
-        // Thread.callStackSymbols on the main thread is what we want;
-        // cross-thread inspection requires Mach APIs that App Store
-        // review tends to flag. Posting onto main blocks if main is
-        // wedged — we want the wedged stack, but we can't get it
-        // without main cooperation. Best-effort: capture this thread's
-        // stack (the watchdog) which is at least informative about
-        // the timing path. Phase 22 sub-F gets a proper main-thread
-        // stack via thread_state_t when we sit down with mach.
-        let frames = Thread.callStackSymbols.map { sym -> [String: Any] in
-            let parts = sym.split(
-                separator: " ", omittingEmptySubsequences: true
-            ).map(String.init)
-            let module = parts.count > 1 ? parts[1] : "<unknown>"
-            let function =
-                parts.count > 3
-                ? parts.dropFirst(3).joined(separator: " ")
-                : "<anonymous>"
-            return [
-                "function": function,
-                "file": module,
-                "line": 0,
-                "inApp": !module.contains("UIKit")
-                    && !module.contains("Foundation")
-                    && !module.contains("CoreFoundation")
-                    && !module.contains("libsystem")
-                    && !module.contains("libobjc"),
-            ]
+        // Phase 29 sub-A: try the Mach-based main-thread sampler first.
+        // It walks main's frame pointer chain via thread_get_state +
+        // vm_read_overwrite (see PRIVACY_AND_REVIEW.md). Returns [] on
+        // non-arm64 platforms or if installMainThreadHandle was never
+        // called from main; we then fall back to this thread's own
+        // stack — biased toward dispatch machinery but better than
+        // nothing.
+        let pcs = SentoriThreadSampler.captureMainThreadFrames(maxFrames: 64)
+        let frames: [[String: Any]]
+        let stackSource: String
+        if !pcs.isEmpty {
+            frames = pcs.map { pc -> [String: Any] in
+                return [
+                    "function": "<unsymbolicated>",
+                    "file": "<unknown>",
+                    "line": 0,
+                    "instructionAddress": String(format: "0x%llx", pc.uint64Value),
+                    "arch": "arm64",
+                    "inApp": true,
+                ]
+            }
+            stackSource = "sentori.hangWatchdog.sampler"
+        } else {
+            frames = Thread.callStackSymbols.map { sym -> [String: Any] in
+                let parts = sym.split(
+                    separator: " ", omittingEmptySubsequences: true
+                ).map(String.init)
+                let module = parts.count > 1 ? parts[1] : "<unknown>"
+                let function =
+                    parts.count > 3
+                    ? parts.dropFirst(3).joined(separator: " ")
+                    : "<anonymous>"
+                return [
+                    "function": function,
+                    "file": module,
+                    "line": 0,
+                    "inApp": !module.contains("UIKit")
+                        && !module.contains("Foundation")
+                        && !module.contains("CoreFoundation")
+                        && !module.contains("libsystem")
+                        && !module.contains("libobjc"),
+                ]
+            }
+            stackSource = "sentori.hangWatchdog.no-sampler"
         }
 
         let event: [String: Any] = [
@@ -140,7 +165,7 @@ import Foundation
             ],
             "app": appInfo(),
             "user": NSNull(),
-            "tags": ["source": "sentori.hangWatchdog"],
+            "tags": ["source": stackSource],
             "breadcrumbs": [Any](),
             "error": [
                 "type": "ApplicationNotResponding",
