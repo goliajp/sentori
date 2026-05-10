@@ -288,6 +288,10 @@ pub fn build(cfg: ServerConfig) -> Router {
             axum::routing::patch(api::alert_rules::patch_rule)
                 .delete(api::alert_rules::delete_rule),
         )
+        .route(
+            "/orgs/{slug}/alert-rules/{rule_id}/deliveries",
+            get(api::alert_rules::list_deliveries),
+        )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             api::user_auth::require_user,

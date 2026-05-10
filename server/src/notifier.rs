@@ -483,9 +483,14 @@ async fn handle(
                         }
                     }
                     "webhook" => {
-                        // Phase 27 sub-D: signed POST to the rule's
-                        // configured URL. Best-effort once; persistent
-                        // retry queue lands later.
+                        // Phase 29 sub-B: enqueue into webhook_deliveries.
+                        // The dispatcher (webhook_dispatch::spawn_cron) picks
+                        // up pending rows on its next sweep, signs + sends,
+                        // and retries on [60s, 5m, 30m, 2h, 12h, 24h] up to
+                        // six attempts before marking failed. We don't even
+                        // try to send synchronously anymore — losing a
+                        // notifier shutdown to an in-flight HTTP roundtrip
+                        // isn't worth it.
                         let url = ch
                             .get("url")
                             .and_then(|v| v.as_str())
@@ -500,7 +505,7 @@ async fn handle(
                             tracing::warn!(%rule_id, "webhook channel missing url/secret");
                             continue;
                         }
-                        let payload = serde_json::to_vec(&serde_json::json!({
+                        let payload = serde_json::json!({
                             "id":         uuid::Uuid::now_v7(),
                             "kind":       "alert.fired",
                             "ruleId":     rule_id,
@@ -511,23 +516,13 @@ async fn handle(
                             "firedAt":    time::OffsetDateTime::now_utc()
                                 .format(&time::format_description::well_known::Rfc3339)
                                 .unwrap_or_default(),
-                        }))
-                        .unwrap_or_default();
-                        let delivery = crate::webhook::WebhookDelivery {
-                            body: payload,
-                            event: "alert.fired",
-                            secret,
-                            url,
-                        };
-                        match crate::webhook::send(&delivery).await {
-                            Ok(s) if s.is_success() => {
-                                tracing::info!(%rule_id, status = %s, "webhook delivered");
-                            }
-                            Ok(s) => {
-                                tracing::warn!(%rule_id, status = %s, "webhook non-2xx");
+                        });
+                        match crate::webhook::enqueue(pool, *rule_id, payload, url, secret).await {
+                            Ok(delivery_id) => {
+                                tracing::info!(%rule_id, %delivery_id, "webhook enqueued");
                             }
                             Err(e) => {
-                                tracing::warn!(error = %e, %rule_id, "webhook send failed");
+                                tracing::warn!(error = %e, %rule_id, "webhook enqueue failed");
                             }
                         }
                     }

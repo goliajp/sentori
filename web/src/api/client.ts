@@ -399,6 +399,18 @@ export type AlertRuleInput = {
   triggerKind?: AlertTriggerKind
 }
 
+// Phase 29 sub-B — webhook delivery attempt row for the rule expand.
+export type AlertRuleDelivery = {
+  attempt: number
+  createdAt: string
+  deliveredAt: null | string
+  id: string
+  lastError: null | string
+  lastStatus: null | number
+  nextAttemptAt: string
+  status: 'delivered' | 'failed' | 'pending'
+}
+
 // Phase 24 sub-C — saved views.
 export type SavedViewScope = 'org' | 'personal' | 'team'
 
@@ -601,6 +613,10 @@ export const orgsApi = {
     }),
   deleteAlertRule: (orgSlug: string, id: string) =>
     orgsFetch<null>(`/orgs/${orgSlug}/alert-rules/${id}`, { method: 'DELETE' }),
+
+  // Phase 29 sub-B — webhook delivery history per rule (last 10).
+  listAlertRuleDeliveries: (orgSlug: string, ruleId: string) =>
+    orgsFetch<AlertRuleDelivery[]>(`/orgs/${orgSlug}/alert-rules/${ruleId}/deliveries`),
 
   // Phase 24 sub-C — saved views.
   listViews: (orgSlug: string, target = 'issues') =>

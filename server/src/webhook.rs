@@ -9,16 +9,19 @@
 //   sentori-signature: t=<unix-seconds>,v1=<hex hmac-sha256>
 //   covers: f"{timestamp}.{raw_body}"
 //
-// v0.2 retry policy is **best-effort once + log**. The persistent
-// retry queue (`at_*` schedule from the audit-webhook spec) lands in
-// a follow-up sub when the alert-spam pressure justifies it; the
-// audit log already captures rule-fire history so we don't lose
-// "did the rule fire" even when delivery itself drops.
+// Delivery is two-phase: notifier::AlertFired calls `enqueue` to land a
+// row in `webhook_deliveries` and webhook_dispatch::spawn_cron picks it
+// up on a 30s sweep, calling `send` and updating attempt / next /
+// status per the retry schedule. The schedule + dispatcher live in
+// webhook_dispatch.rs; this file owns only the HTTP send + HMAC sign +
+// the enqueue helper.
 
 use std::time::Duration;
 
 use hmac::{Hmac, Mac};
+use serde_json::Value;
 use sha2::Sha256;
+use sqlx::PgPool;
 use uuid::Uuid;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -72,6 +75,35 @@ pub async fn send(d: &WebhookDelivery) -> Result<reqwest::StatusCode, anyhow::Er
         .send()
         .await?;
     Ok(resp.status())
+}
+
+/// Persist a pending webhook delivery for the background dispatcher to
+/// pick up on its next sweep. Returns the new row's id.
+///
+/// Phase 29 sub-B. `payload` is the JSON body the receiver should
+/// observe; the dispatcher re-serializes it on each attempt so the HMAC
+/// signature is fresh per attempt (the timestamp changes).
+pub async fn enqueue(
+    pool: &PgPool,
+    rule_id: Uuid,
+    payload: Value,
+    target_url: String,
+    secret: String,
+) -> Result<Uuid, anyhow::Error> {
+    let id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO webhook_deliveries \
+         (id, rule_id, payload, target_url, secret) \
+         VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(id)
+    .bind(rule_id)
+    .bind(payload)
+    .bind(target_url)
+    .bind(secret)
+    .execute(pool)
+    .await?;
+    Ok(id)
 }
 
 #[cfg(test)]

@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use anyhow::Context;
 use sentori_server::{
     db, digest, metrics, notifier, quotas, regression, retention, router, rule_eval, seed, valkey,
+    webhook_dispatch,
 };
 
 #[tokio::main]
@@ -123,6 +124,14 @@ async fn main() -> anyhow::Result<()> {
     if let Some(p) = pool.as_ref() {
         digest::spawn_cron(p.clone(), notifier_tx.clone());
         tracing::info!("digest cron spawned (1h interval)");
+    }
+
+    // Phase 29 sub-B: webhook persistent retry queue dispatcher.
+    // notifier::AlertFired enqueues into webhook_deliveries; this task
+    // sweeps pending rows every 30s and applies the retry schedule.
+    if let Some(p) = pool.as_ref() {
+        webhook_dispatch::spawn_cron(p.clone());
+        tracing::info!("webhook dispatch cron spawned (30s interval)");
     }
 
     let addr: SocketAddr = "0.0.0.0:8080".parse()?;

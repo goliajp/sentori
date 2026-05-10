@@ -404,6 +404,77 @@ pub async fn delete_rule(
     (StatusCode::NO_CONTENT, ()).into_response()
 }
 
+#[derive(Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct WebhookDeliveryRow {
+    pub id: Uuid,
+    pub attempt: i32,
+    pub status: String,
+    pub last_status: Option<i32>,
+    pub last_error: Option<String>,
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub delivered_at: Option<OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339")]
+    pub next_attempt_at: OffsetDateTime,
+}
+
+/// Phase 29 sub-B: last 10 webhook delivery attempts for a rule.
+///
+/// Org-scoped — any member of the rule's org can read; mirrors the
+/// list_rules authz so the dashboard surface lines up with the rest of
+/// the alerts page.
+pub async fn list_deliveries(
+    State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
+    Path((slug, rule_id)): Path<(String, Uuid)>,
+) -> Response {
+    let pool = match &state.db {
+        Some(p) => p.clone(),
+        None => return server_error("dbNotConfigured"),
+    };
+    let (org_id, _role) = match resolve_membership(&pool, &slug, user.id).await {
+        Some(m) => m,
+        None => return not_found("orgNotFound"),
+    };
+
+    // Make sure the rule belongs to this org before we leak its
+    // deliveries. (FK CASCADE means cross-org probes would otherwise
+    // get an empty list, which is fine, but explicit 404 keeps the
+    // shape consistent with patch / delete.)
+    let owned: Option<(Uuid,)> = sqlx::query_as(
+        "SELECT id FROM alert_rules WHERE id = $1 AND org_id = $2",
+    )
+    .bind(rule_id)
+    .bind(org_id)
+    .fetch_optional(&pool)
+    .await
+    .ok()
+    .flatten();
+    if owned.is_none() {
+        return not_found("ruleNotFound");
+    }
+
+    let rows: Vec<WebhookDeliveryRow> = match sqlx::query_as(
+        "SELECT id, attempt, status, last_status, last_error, \
+                created_at, delivered_at, next_attempt_at \
+         FROM webhook_deliveries \
+         WHERE rule_id = $1 \
+         ORDER BY created_at DESC \
+         LIMIT 10",
+    )
+    .bind(rule_id)
+    .fetch_all(&pool)
+    .await
+    {
+        Ok(r) => r,
+        Err(_) => return server_error("queryFailed"),
+    };
+
+    (StatusCode::OK, Json(rows)).into_response()
+}
+
 fn bad_request(error: &str) -> Response {
     (StatusCode::BAD_REQUEST, Json(json!({ "error": error }))).into_response()
 }

@@ -110,15 +110,15 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] sentori-react-native bump 0.4.0、`bun publish --access public`、commit `phase 29 sub-A: ios main thread sampler`
 
 ### sub-B — webhook persistent retry queue（Phase 27 sub-D 留尾）
-- [ ] migration `0025_webhook_deliveries.sql`：`webhook_deliveries(id PK uuid v7, rule_id FK CASCADE, payload jsonb, target_url text, secret text, attempt int default 0, next_attempt_at timestamptz, last_status int, last_error text, status text CHECK in (pending,delivered,failed) default 'pending', created_at, delivered_at)` + partial 索引 `(status, next_attempt_at) WHERE status='pending'`
-- [ ] `server/src/webhook.rs` 新增 `pub async fn enqueue(pool, rule_id, payload, url, secret) -> Result<Uuid>`：插一行 pending + `next_attempt_at = now()`
-- [ ] `server/src/notifier.rs` 的 `AlertFired` webhook channel 路径改用 `webhook::enqueue`，原 `webhook::send` 保留给 dispatcher
-- [ ] 新 `server/src/webhook_dispatch.rs`：`spawn_cron(pool, interval=30s)` 扫 `WHERE status='pending' AND next_attempt_at <= now() ORDER BY next_attempt_at LIMIT 50`；逐行 try `send`；2xx → `delivered_at=now() / status='delivered'`；其它 → `attempt += 1`，按 schedule `[60s, 5m, 30m, 2h, 12h, 24h]` 推 `next_attempt_at`，attempt ≥ 6 → `status='failed'`
-- [ ] `main.rs` spawn dispatcher cron task
-- [ ] 集成测试 1：mock receiver 第一次 503 第二次 200 → sweep 两轮，断言 `attempt=2 / status='delivered'`
-- [ ] 集成测试 2：mock receiver 永久 500 → sweep 7 轮，断言 6 次后 `status='failed'`，第 7 轮无新尝试
-- [ ] dashboard：`<AlertsView>` rule row 加"Recent deliveries"展开块（最近 10 条），显示 status / attempt / last_status / last_error
-- [ ] commit `phase 29 sub-B: webhook persistent retry queue`
+- [x] migration `0025_webhook_deliveries.sql`：full schema + partial index `(status, next_attempt_at) WHERE status='pending'` + secondary index `(rule_id, created_at DESC)` for the dashboard expand query
+- [x] `server/src/webhook.rs` 新增 `pub async fn enqueue(pool, rule_id, payload, url, secret) -> Result<Uuid>`
+- [x] `server/src/notifier.rs` 的 `AlertFired` webhook channel 路径改用 `webhook::enqueue`，原 `webhook::send` 保留给 dispatcher
+- [x] 新 `server/src/webhook_dispatch.rs`：`spawn_cron(pool, interval=30s)` + `sweep_once(pool)`（test-exposed）；retry schedule [60s, 5m, 30m, 2h, 12h, 24h]；MAX_ATTEMPTS=6（第 6 次失败标 failed；24h 末项目前未触达）
+- [x] `main.rs` spawn dispatcher cron task
+- [x] 集成测试 1：mock receiver 503-then-200 → 2 sweeps → attempt=2 + status='delivered' ✅ 真 DB 跑通
+- [x] 集成测试 2：mock receiver 永久 500 → 7 sweeps → 6 attempt 后 failed、第 7 轮 no POST ✅ 真 DB 跑通
+- [x] dashboard：`<AlertsView>` 加 `<DeliveriesRow>` 展开块（chevron 在 Name cell，hasWebhook 才显示）+ 服务端 `GET /api/orgs/{slug}/alert-rules/{rule_id}/deliveries` endpoint（最近 10 条，status chip / attempt N/6 / last HTTP / last error）
+- [x] commit `phase 29 sub-B: webhook persistent retry queue` — 注：本 sub 跑测试期间发现 v0.2 commit 留下两个独立 bug（sessions 表命名冲突 / `bun run check` 17 lint error），不在 sub-B 范围、单独跟进
 
 ### sub-C — server `OffsetDateTime` serde sweep
 - [ ] `rg "OffsetDateTime" server/src/api/ server/src/` 列出所有 struct 字段

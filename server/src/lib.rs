@@ -25,3 +25,4 @@ pub mod symbolicate_android;
 pub mod symbolicate_ios;
 pub mod valkey;
 pub mod webhook;
+pub mod webhook_dispatch;

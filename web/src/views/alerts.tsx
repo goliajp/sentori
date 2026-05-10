@@ -30,6 +30,8 @@ export function AlertsView() {
   const { currentOrg } = useOrg()
   const canManage = useHasPermission('alert.manage')
   const [editing, setEditing] = useState<AlertRule | null | undefined>(undefined)
+  // Phase 29 sub-B: expand state for the "Recent deliveries" sub-row.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const dCls = densityClasses(useDensity().density)
 
   const queryClient = useQueryClient()
@@ -111,104 +113,140 @@ export function AlertsView() {
             </tr>
           </thead>
           <tbody>
-            {rules.map((r) => (
-              <tr className={`border-border/40 border-b ${dCls.rowClass}`} key={r.id}>
-                <td className="px-2">
-                  <input
-                    aria-label="Enabled"
-                    checked={r.enabled}
-                    disabled={!canManage || toggleMutation.isPending}
-                    onChange={(e) => toggleMutation.mutate({ enabled: e.target.checked, id: r.id })}
-                    type="checkbox"
-                  />
-                </td>
-                <td className="text-fg px-3 font-medium">
-                  <span>{r.name}</span>
-                  {r.muted && (
-                    <span
-                      className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-300 uppercase ring-1 ring-amber-500/30"
-                      title="Muted — manual unmute required"
-                    >
-                      Muted
-                    </span>
-                  )}
-                  {!r.muted && r.snoozedUntil && new Date(r.snoozedUntil) > new Date() && (
-                    <span
-                      className="ml-2 rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-blue-300 uppercase ring-1 ring-blue-500/30"
-                      title={`Snoozed until ${new Date(r.snoozedUntil).toLocaleString()}`}
-                    >
-                      Snoozed
-                    </span>
-                  )}
-                </td>
-                <td className="text-fg-muted px-3">
-                  <span className="bg-bg-tertiary text-fg-muted rounded px-1.5 py-0.5 text-[11px]">
-                    {TRIGGER_LABELS[r.triggerKind]}
-                  </span>
-                  <TriggerSummary kind={r.triggerKind} cfg={r.triggerConfig} />
-                </td>
-                <td className="text-fg-muted truncate px-3 font-mono text-[11px]">
-                  {filterSummary(r.filterConfig)}
-                </td>
-                <td className="text-fg-muted px-3 text-right font-mono tabular-nums">
-                  {r.throttleMinutes}m
-                </td>
-                <td className="text-fg-muted px-3 font-mono text-[11px] tabular-nums">
-                  {r.lastFiredAt ? relativeTime(r.lastFiredAt) : '—'}
-                </td>
-                {canManage && (
-                  <td className="space-x-2 px-3 text-right">
-                    <button
-                      className="text-fg-muted hover:text-fg text-[11px]"
-                      onClick={() => muteMutation.mutate({ id: r.id, muted: !r.muted })}
-                      title={r.muted ? 'Unmute this rule' : 'Mute this rule indefinitely'}
-                      type="button"
-                    >
-                      {r.muted ? 'Unmute' : 'Mute'}
-                    </button>
-                    {!r.muted && (
+            {rules.flatMap((r) => {
+              const hasWebhook = r.channels.some((c) => c.type === 'webhook')
+              const isOpen = expanded.has(r.id)
+              const colCount = canManage ? 7 : 6
+              const ruleRow = (
+                <tr className={`border-border/40 border-b ${dCls.rowClass}`} key={r.id}>
+                  <td className="px-2">
+                    <input
+                      aria-label="Enabled"
+                      checked={r.enabled}
+                      disabled={!canManage || toggleMutation.isPending}
+                      onChange={(e) =>
+                        toggleMutation.mutate({ enabled: e.target.checked, id: r.id })
+                      }
+                      type="checkbox"
+                    />
+                  </td>
+                  <td className="text-fg px-3 font-medium">
+                    {hasWebhook && (
                       <button
-                        className="text-fg-muted hover:text-fg text-[11px]"
-                        onClick={() => {
-                          const isSnoozed = r.snoozedUntil && new Date(r.snoozedUntil) > new Date()
-                          if (isSnoozed) {
-                            snoozeMutation.mutate({ hours: null, id: r.id })
-                            return
-                          }
-                          const choice = prompt('Snooze for how many hours?', '1')
-                          const n = choice ? Number.parseFloat(choice) : NaN
-                          if (Number.isFinite(n) && n > 0) {
-                            snoozeMutation.mutate({ hours: n, id: r.id })
-                          }
-                        }}
-                        title="Snooze for N hours"
+                        aria-expanded={isOpen}
+                        aria-label={isOpen ? 'Hide recent deliveries' : 'Show recent deliveries'}
+                        className="text-fg-muted hover:text-fg mr-1.5 inline-flex h-4 w-4 items-center justify-center font-mono text-[10px]"
+                        onClick={() =>
+                          setExpanded((prev) => {
+                            const next = new Set(prev)
+                            if (next.has(r.id)) next.delete(r.id)
+                            else next.add(r.id)
+                            return next
+                          })
+                        }
                         type="button"
                       >
-                        {r.snoozedUntil && new Date(r.snoozedUntil) > new Date()
-                          ? 'Wake'
-                          : 'Snooze'}
+                        {isOpen ? '▾' : '▸'}
                       </button>
                     )}
-                    <button
-                      className="text-fg-muted hover:text-fg text-[11px]"
-                      onClick={() => setEditing(r)}
-                      type="button"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="text-fg-muted text-[11px] hover:text-red-400"
-                      onClick={() => {
-                        if (confirm(`Delete rule "${r.name}"?`)) deleteMutation.mutate(r.id)
-                      }}
-                      type="button"
-                    >
-                      Delete
-                    </button>
+                    <span>{r.name}</span>
+                    {r.muted && (
+                      <span
+                        className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-300 uppercase ring-1 ring-amber-500/30"
+                        title="Muted — manual unmute required"
+                      >
+                        Muted
+                      </span>
+                    )}
+                    {!r.muted && r.snoozedUntil && new Date(r.snoozedUntil) > new Date() && (
+                      <span
+                        className="ml-2 rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-blue-300 uppercase ring-1 ring-blue-500/30"
+                        title={`Snoozed until ${new Date(r.snoozedUntil).toLocaleString()}`}
+                      >
+                        Snoozed
+                      </span>
+                    )}
                   </td>
-                )}
-              </tr>
-            ))}
+                  <td className="text-fg-muted px-3">
+                    <span className="bg-bg-tertiary text-fg-muted rounded px-1.5 py-0.5 text-[11px]">
+                      {TRIGGER_LABELS[r.triggerKind]}
+                    </span>
+                    <TriggerSummary kind={r.triggerKind} cfg={r.triggerConfig} />
+                  </td>
+                  <td className="text-fg-muted truncate px-3 font-mono text-[11px]">
+                    {filterSummary(r.filterConfig)}
+                  </td>
+                  <td className="text-fg-muted px-3 text-right font-mono tabular-nums">
+                    {r.throttleMinutes}m
+                  </td>
+                  <td className="text-fg-muted px-3 font-mono text-[11px] tabular-nums">
+                    {r.lastFiredAt ? relativeTime(r.lastFiredAt) : '—'}
+                  </td>
+                  {canManage && (
+                    <td className="space-x-2 px-3 text-right">
+                      <button
+                        className="text-fg-muted hover:text-fg text-[11px]"
+                        onClick={() => muteMutation.mutate({ id: r.id, muted: !r.muted })}
+                        title={r.muted ? 'Unmute this rule' : 'Mute this rule indefinitely'}
+                        type="button"
+                      >
+                        {r.muted ? 'Unmute' : 'Mute'}
+                      </button>
+                      {!r.muted && (
+                        <button
+                          className="text-fg-muted hover:text-fg text-[11px]"
+                          onClick={() => {
+                            const isSnoozed =
+                              r.snoozedUntil && new Date(r.snoozedUntil) > new Date()
+                            if (isSnoozed) {
+                              snoozeMutation.mutate({ hours: null, id: r.id })
+                              return
+                            }
+                            const choice = prompt('Snooze for how many hours?', '1')
+                            const n = choice ? Number.parseFloat(choice) : NaN
+                            if (Number.isFinite(n) && n > 0) {
+                              snoozeMutation.mutate({ hours: n, id: r.id })
+                            }
+                          }}
+                          title="Snooze for N hours"
+                          type="button"
+                        >
+                          {r.snoozedUntil && new Date(r.snoozedUntil) > new Date()
+                            ? 'Wake'
+                            : 'Snooze'}
+                        </button>
+                      )}
+                      <button
+                        className="text-fg-muted hover:text-fg text-[11px]"
+                        onClick={() => setEditing(r)}
+                        type="button"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="text-fg-muted text-[11px] hover:text-red-400"
+                        onClick={() => {
+                          if (confirm(`Delete rule "${r.name}"?`)) deleteMutation.mutate(r.id)
+                        }}
+                        type="button"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              )
+              if (!isOpen || !hasWebhook) return [ruleRow]
+              return [
+                ruleRow,
+                <DeliveriesRow
+                  colSpan={colCount}
+                  key={`${r.id}-deliveries`}
+                  orgSlug={currentOrg.slug}
+                  ruleId={r.id}
+                />,
+              ]
+            })}
           </tbody>
         </table>
       )}
@@ -227,6 +265,83 @@ export function AlertsView() {
         />
       )}
     </div>
+  )
+}
+
+function DeliveriesRow({
+  colSpan,
+  orgSlug,
+  ruleId,
+}: {
+  colSpan: number
+  orgSlug: string
+  ruleId: string
+}) {
+  const { data, error, isLoading } = useQuery({
+    queryFn: () => orgsApi.listAlertRuleDeliveries(orgSlug, ruleId),
+    queryKey: ['alert-rule-deliveries', orgSlug, ruleId],
+  })
+  return (
+    <tr className="bg-bg-tertiary/40">
+      <td className="px-3 py-2" colSpan={colSpan}>
+        <div className="text-fg-muted mb-1 text-[10px] tracking-wider uppercase">
+          Recent webhook deliveries
+        </div>
+        {isLoading && <span className="text-fg-muted text-[12px]">loading…</span>}
+        {error && <span className="text-[12px] text-red-400">failed to load deliveries</span>}
+        {data && data.length === 0 && (
+          <span className="text-fg-muted text-[12px] italic">
+            No deliveries yet — webhook will fire on the next rule match.
+          </span>
+        )}
+        {data && data.length > 0 && (
+          <table className="w-full text-[11px] tabular-nums">
+            <thead>
+              <tr className="text-fg-muted text-left">
+                <th className="px-2 py-0.5 font-normal">When</th>
+                <th className="px-2 py-0.5 font-normal">Status</th>
+                <th className="px-2 py-0.5 font-normal">Attempt</th>
+                <th className="px-2 py-0.5 font-normal">HTTP</th>
+                <th className="px-2 py-0.5 font-normal">Last error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((d) => (
+                <tr key={d.id}>
+                  <td className="text-fg-muted px-2 py-0.5 font-mono">
+                    {relativeTime(d.createdAt)}
+                  </td>
+                  <td className="px-2 py-0.5">
+                    <StatusChip status={d.status} />
+                  </td>
+                  <td className="text-fg-muted px-2 py-0.5">{d.attempt} / 6</td>
+                  <td className="text-fg-muted px-2 py-0.5">{d.lastStatus ?? '—'}</td>
+                  <td className="text-fg-muted max-w-xs truncate px-2 py-0.5">
+                    {d.lastError ?? '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </td>
+    </tr>
+  )
+}
+
+function StatusChip({ status }: { status: 'delivered' | 'failed' | 'pending' }) {
+  const cls =
+    status === 'delivered'
+      ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30'
+      : status === 'failed'
+        ? 'bg-red-500/15 text-red-300 ring-red-500/30'
+        : 'bg-amber-500/15 text-amber-300 ring-amber-500/30'
+  return (
+    <span
+      className={`rounded px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase ring-1 ${cls}`}
+    >
+      {status}
+    </span>
   )
 }
 
