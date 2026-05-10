@@ -8,7 +8,11 @@ import {
   View,
 } from 'react-native';
 
-import { sentori, triggerNativeCrash } from '@sentori/react-native';
+import {
+  sentori,
+  startAnrWatchdog,
+  triggerNativeCrash,
+} from '@goliapkg/sentori-react-native';
 
 // iOS simulator can reach the host's localhost directly.
 // Android emulator must use 10.0.2.2 to reach the host.
@@ -23,6 +27,11 @@ sentori.init({
   environment: 'dev',
   ingestUrl: INGEST_URL,
 });
+
+// Phase 29 sub-A e2e: start the hang watchdog with force=true so it
+// runs in this debug build. 2 s timeout means a 5-second main-thread
+// busy loop trips it; 500 ms tick interval keeps detection prompt.
+startAnrWatchdog({ force: true, timeoutMs: 2000, intervalMs: 500 });
 
 type LogLine = { id: number; text: string };
 
@@ -79,6 +88,20 @@ export default function App(): React.JSX.Element {
       onPress: () => {
         append('triggering native crash…');
         triggerNativeCrash();
+      },
+    },
+    {
+      title: 'Hang main thread (5s — Phase 29 sub-A)',
+      onPress: () => {
+        append('hanging main for 5s…');
+        const start = Date.now();
+        // Busy-loop on the JS thread (= iOS RN main thread). The
+        // watchdog tick runs on a background dispatch queue, sees
+        // main hasn't ack'd within 2s, and fires the sampler.
+        while (Date.now() - start < 5000) {
+          // intentionally empty
+        }
+        append('main resumed');
       },
     },
   ];

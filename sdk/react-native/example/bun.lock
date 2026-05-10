@@ -5,8 +5,8 @@
     "": {
       "name": "sentori-example",
       "dependencies": {
+        "@goliapkg/sentori-react-native": "file:..",
         "@react-native-async-storage/async-storage": "2.1.2",
-        "@sentori/react-native": "file:..",
         "expo": "~54.0.33",
         "expo-status-bar": "~3.0.9",
         "react": "19.1.0",
@@ -257,6 +257,10 @@
 
     "@expo/xcpretty": ["@expo/xcpretty@4.4.4", "", { "dependencies": { "@babel/code-frame": "^7.20.0", "chalk": "^4.1.0", "js-yaml": "^4.1.0" }, "bin": { "excpretty": "build/cli.js" } }, "sha512-4aQzz9vgxcNXFfo/iyNgDDYfsU5XGKKxWxZopw0cVotHiW+U8IJbIxMaxsINs6bHhtkG3StKNPcOrn3eBuxKPw=="],
 
+    "@goliapkg/sentori-core": ["@goliapkg/sentori-core@0.2.0", "", {}, "sha512-uBuXU4Lb6WMMnLJxjX9f2W9Ft1+HNTV5Q/y/7hEg1pf+HIrJZ6DAQmRIXCCL9rGN2cE3/s1+jOZuBHhH2SDBfQ=="],
+
+    "@goliapkg/sentori-react-native": ["@goliapkg/sentori-react-native@file:..", { "dependencies": { "@goliapkg/sentori-core": "0.2.0" }, "devDependencies": { "@types/bun": "latest", "@types/react": "^19", "typescript": "^5" }, "optionalDependencies": { "@react-native-async-storage/async-storage": ">=1.23", "expo-modules-core": ">=2.0" }, "peerDependencies": { "expo-modules-core": ">=2.0", "react": ">=18", "react-native": ">=0.74" }, "optionalPeers": ["expo-modules-core"] }],
+
     "@isaacs/fs-minipass": ["@isaacs/fs-minipass@4.0.1", "", { "dependencies": { "minipass": "^7.0.4" } }, "sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w=="],
 
     "@isaacs/ttlcache": ["@isaacs/ttlcache@1.4.1", "", {}, "sha512-RQgQ4uQ+pLbqXfOmieB91ejmLwvSgv9nLx6sT6sD83s7umBypgg+OIBOBbEUiJXrfpnp9j0mRhYYdzp9uqq3lA=="],
@@ -312,8 +316,6 @@
     "@react-native/normalize-colors": ["@react-native/normalize-colors@0.81.5", "", {}, "sha512-0HuJ8YtqlTVRXGZuGeBejLE04wSQsibpTI+RGOyVqxZvgtlLLC/Ssw0UmbHhT4lYMp2fhdtvKZSs5emWB1zR/g=="],
 
     "@react-native/virtualized-lists": ["@react-native/virtualized-lists@0.81.5", "", { "dependencies": { "invariant": "^2.2.4", "nullthrows": "^1.1.1" }, "peerDependencies": { "@types/react": "^19.1.0", "react": "*", "react-native": "*" }, "optionalPeers": ["@types/react"] }, "sha512-UVXgV/db25OPIvwZySeToXD/9sKKhOdkcWmmf4Jh8iBZuyfML+/5CasaZ1E7Lqg6g3uqVQq75NqIwkYmORJMPw=="],
-
-    "@sentori/react-native": ["@sentori/react-native@file:..", { "devDependencies": { "@types/bun": "latest", "@types/react": "^19", "typescript": "^5" }, "optionalDependencies": { "@react-native-async-storage/async-storage": ">=1.23" }, "peerDependencies": { "react": ">=18", "react-native": ">=0.74" } }],
 
     "@sinclair/typebox": ["@sinclair/typebox@0.27.10", "", {}, "sha512-MTBk/3jGLNB2tVxv6uLlFh1iu64iYOQ2PbdOSK3NW8JZsmlaOh2q6sdtKowBhfw8QFLmYNzTW4/oK4uATIi6ZA=="],
 

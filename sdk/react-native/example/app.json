@@ -18,7 +18,8 @@
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         }
-      }
+      },
+      "bundleIdentifier": "com.goliapanda.sentori-example"
     },
     "android": {
       "adaptiveIcon": {
