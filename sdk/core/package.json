@@ -1,13 +1,13 @@
 {
-  "name": "@goliapkg/sentori-javascript",
-  "version": "0.2.0",
-  "description": "Sentori SDK for browsers and Node — error capture, breadcrumbs, and HTTP transport. Same wire protocol as @goliapkg/sentori-react-native.",
+  "name": "@goliapkg/sentori-core",
+  "version": "0.1.0",
+  "description": "Sentori SDK core — wire-format types, uuid v7, breadcrumb ring, stack parsers shared across @goliapkg/sentori-* SDKs.",
   "license": "MIT",
   "homepage": "https://sentori.golia.jp",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/goliajp/sentori.git",
-    "directory": "sdk/javascript"
+    "directory": "sdk/core"
   },
   "bugs": {
     "url": "https://github.com/goliajp/sentori/issues"
@@ -15,19 +15,16 @@
   "keywords": [
     "sentori",
     "error-tracking",
-    "crash-reporting",
     "monitoring",
-    "javascript",
-    "browser",
-    "node"
+    "core"
   ],
   "type": "module",
-  "main": "lib/index.js",
-  "types": "lib/index.d.ts",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
   "exports": {
     ".": {
       "types": "./lib/index.d.ts",
-      "import": "./lib/index.js"
+      "default": "./lib/index.js"
     }
   },
   "files": [
@@ -35,9 +32,6 @@
     "src/",
     "README.md"
   ],
-  "dependencies": {
-    "@goliapkg/sentori-core": "0.1.0"
-  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
@@ -47,9 +41,6 @@
   "devDependencies": {
     "@types/bun": "latest",
     "typescript": "^5"
-  },
-  "engines": {
-    "node": ">=18"
   },
   "publishConfig": {
     "access": "public"

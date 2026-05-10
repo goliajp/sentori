@@ -17,12 +17,14 @@ describe('parseStack', () => {
     at onPress (src/components/Button.tsx:15:5)`;
     const frames = parseStack(stack);
     expect(frames).toHaveLength(2);
-    expect(frames[0]).toEqual({
-      function: 'handleSubmit',
-      file: 'src/screens/Checkout.tsx',
-      line: 42,
+    // Phase 21: core's parseStack also populates absolutePath, so we
+    // match the subset of fields rather than full equality.
+    expect(frames[0]).toMatchObject({
       column: 10,
+      file: 'src/screens/Checkout.tsx',
+      function: 'handleSubmit',
       inApp: true,
+      line: 42,
     });
     expect(frames[1]?.function).toBe('onPress');
   });

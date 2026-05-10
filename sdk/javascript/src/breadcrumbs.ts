@@ -1,7 +1,13 @@
-import type { Breadcrumb, BreadcrumbType } from './types.js'
+// Phase 21: ring buffer logic lives in @goliapkg/sentori-core. The
+// public surface here keeps its object-form `addBreadcrumb({ type,
+// data })` so existing callers don't break.
+import {
+  addBreadcrumb as addBreadcrumbCore,
+  clearBreadcrumbs,
+  getBreadcrumbs,
+} from '@goliapkg/sentori-core'
 
-const MAX = 100
-const buf: Breadcrumb[] = []
+import type { BreadcrumbType } from './types.js'
 
 export type AddBreadcrumbInput = {
   data?: Record<string, unknown>
@@ -9,19 +15,7 @@ export type AddBreadcrumbInput = {
 }
 
 export function addBreadcrumb(input: AddBreadcrumbInput): void {
-  const crumb: Breadcrumb = {
-    data: input.data ?? {},
-    timestamp: new Date().toISOString(),
-    type: input.type,
-  }
-  buf.push(crumb)
-  if (buf.length > MAX) buf.shift()
+  addBreadcrumbCore(input.type, input.data ?? {})
 }
 
-export function getBreadcrumbs(): Breadcrumb[] {
-  return [...buf]
-}
-
-export function clearBreadcrumbs(): void {
-  buf.length = 0
-}
+export { clearBreadcrumbs, getBreadcrumbs }

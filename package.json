@@ -1,0 +1,14 @@
+{
+  "name": "@goliapkg/sentori-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "workspaces": [
+    "sdk/core",
+    "sdk/javascript",
+    "sdk/react-native"
+  ],
+  "scripts": {
+    "build:sdks": "bun run --filter '@goliapkg/sentori-*' build",
+    "test:sdks": "bun run --filter '@goliapkg/sentori-*' test"
+  }
+}
