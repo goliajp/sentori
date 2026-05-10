@@ -79,8 +79,9 @@ The web UI lives at <http://localhost:8000> by default.
 
 ## Adding email recipients
 
-The recipient management UI ships in Phase 13 (multi-tenant). For v0.1,
-insert rows directly:
+Each project's settings page in the dashboard has a **Recipients**
+panel for managing notification emails. For a quick CLI route you can
+also insert rows directly:
 
 ```bash
 docker compose exec postgres psql -U sentori -d sentori -c "
@@ -162,7 +163,7 @@ The SDK ingest endpoint is the same host: SDKs send to
 `/admin/api` to the server, and `/v1/*` goes through unchanged because
 the web container only intercepts paths it knows about.
 
-## Production hardening (v0.1 → v0.2 punch list)
+## Production hardening checklist
 
 - Pin docker images to a specific SHA tag (replace `:latest`)
 - Off-host Postgres with a read replica
@@ -171,4 +172,4 @@ the web container only intercepts paths it knows about.
 - Cloudflare (or equivalent) in front for DDoS / WAF
 - Dedicated SMTP via Postmark / SES instead of shared providers
 
-The full Phase-16 production checklist is in `ROADMAP.md`.
+For the production setup history, see the [CHANGELOG](https://github.com/goliajp/sentori/blob/main/CHANGELOG.md) (v0.1.x — Phase 16).

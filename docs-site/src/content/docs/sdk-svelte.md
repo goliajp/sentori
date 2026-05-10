@@ -1,11 +1,11 @@
 ---
 title: SDK — Svelte (planned)
-description: Svelte 5 / runes API surface design — TBD v0.3+
+description: Svelte 5 / runes API surface design — TBD v0.4+
 ---
 
 # Svelte SDK — design preview
 
-Status: **planned for v0.3+**. Surface locked here so the eventual
+Status: **planned for v0.4+**. Surface locked here so the eventual
 implementation stays minimal.
 
 Svelte 5 with runes is the target. The SDK will adapt
@@ -93,4 +93,4 @@ Each `handleError` follows SvelteKit's signature
   `process.on(...)`. The SDK detects this and skips Node hooks the
   same way `sentori-next/server` does on the edge.
 
-Track v0.3 progress in the [ROADMAP](https://github.com/goliajp/sentori/blob/main/ROADMAP.md).
+Track progress in the [ROADMAP](https://github.com/goliajp/sentori/blob/main/ROADMAP.md).

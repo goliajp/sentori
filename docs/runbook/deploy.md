@@ -21,8 +21,8 @@ Before you cut a tag:
 ```sh
 # On your laptop, on a clean main:
 git pull
-git tag v0.2.<n>
-git push origin v0.2.<n>
+git tag v<X.Y.Z>
+git push origin v<X.Y.Z>
 ```
 
 The `pages` GitHub Actions workflow auto-deploys marketing + docs on push to `main`. The server + web images are built and pushed to GHCR by `build.yml` — wait until both are green before continuing.
@@ -33,7 +33,7 @@ On the app VM:
 
 ```sh
 cd /etc/sentori
-export SENTORI_VERSION=v0.2.<n>
+export SENTORI_VERSION=v<X.Y.Z>
 
 # Pull the new image (doesn't touch running containers)
 docker compose -f /etc/sentori/production-compose.yml --env-file ./.env pull
@@ -75,7 +75,7 @@ Wait at least one full backup cycle (24h) between N and N+1 so you have a clean 
 ## Rollback
 
 ```sh
-SENTORI_VERSION=v0.2.<n-1> \
+SENTORI_VERSION=v<X.Y.Z-prev> \
   docker compose -f /etc/sentori/production-compose.yml --env-file ./.env \
     up -d --no-deps server-blue server-green
 ```
@@ -87,5 +87,5 @@ If a migration was applied and the rollback puts you on code that doesn't know a
 ## After-deploy
 
 - Update the Better Stack status page if there was any user-visible blip.
-- Post the rolled-out tag in `#sentori-ops` ("v0.2.<n> deployed; smoke green; rolling next thing in 24h" or similar).
+- Post the rolled-out tag in `#sentori-ops` ("v<X.Y.Z> deployed; smoke green; rolling next thing in 24h" or similar).
 - If anything surprised you, write it down in the postmortem dir even if it didn't reach P1/P2 — silent surprises are how production gets surprising.

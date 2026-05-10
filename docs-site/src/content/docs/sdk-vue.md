@@ -1,11 +1,11 @@
 ---
 title: SDK — Vue (planned)
-description: Vue 3 / Composition API surface design — TBD v0.3+
+description: Vue 3 / Composition API surface design — TBD v0.4+
 ---
 
 # Vue SDK — design preview
 
-Status: **planned for v0.3+**. This page locks the public surface so
+Status: **planned for v0.4+**. This page locks the public surface so
 the implementation stays small when it lands.
 
 The Vue SDK will be a thin adapter on top of
@@ -88,7 +88,7 @@ slot. `reset` is a function that clears the captured state.
 
 - **Nuxt 3 module**: similar to `@goliapkg/sentori-next`. Likely
   ships as `@goliapkg/sentori-nuxt` with a single `nuxt.config.ts`
-  module entry that wires both server and client. Defer to v0.3+
+  module entry that wires both server and client. Defer to v0.4+
   alongside the Vue SDK.
 - **Pinia integration**: opt-in plugin that emits a breadcrumb on
   every mutation. Probably a separate `@goliapkg/sentori-pinia`
@@ -96,4 +96,4 @@ slot. `reset` is a function that clears the captured state.
 - **Router error capture**: hook into `vueRouter.onError` so
   navigation guard failures land too. Lives in the Vue SDK directly.
 
-Track v0.3 progress in the [ROADMAP](https://github.com/goliajp/sentori/blob/main/ROADMAP.md).
+Track progress in the [ROADMAP](https://github.com/goliajp/sentori/blob/main/ROADMAP.md).
