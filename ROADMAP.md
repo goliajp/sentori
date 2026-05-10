@@ -1219,10 +1219,15 @@ server 36/36 + dashboard build 126 KB gzip + vitest 1/1 + e2e 1/1。commit `4147
 - [x] 真实 DWARF 端到端测试推迟到 sub-F（release-aware）—— 需要 checked-in 迷你 Mach-O fixture
 - [x] commit `6fe7139`
 
-#### sub-C — CLI + server: Android proguard
-- [ ] `sentori-cli upload mapping --project <id> --release <ver> <mapping.txt>`
-- [ ] 服务端 `POST /admin/api/projects/{id}/mappings`
-- [ ] symbolicate 加 retrace（用 `proguard-rs` crate 或 spawn `proguard-retrace`）
+#### sub-C — CLI + server: Android proguard ✅
+- [x] migration `0015_proguard_mappings.sql`：(id, project_id, release, debug_id, size_bytes, data, uploaded_by, uploaded_at)；按 (project, debug_id) 和 (project, release, time) 索引
+- [x] `POST /admin/api/projects/{id}/mappings` 与 `GET ...` —— raw octet-stream，optional `?release=` + `x-sentori-debug-id`；服务端从 mapping header sniff `# pg_map_id:`；每次 insert 新行，per-build 历史保留
+- [x] `sentori-cli upload mapping --project=<uuid> [--release] [--token] [--api-url] <path>`：env fallback chain 同 dsym
+- [x] `server/src/symbolicate_android.rs`：用 getsentry `proguard@5.10` crate 的 `ProguardMapper::new(ProguardMapping)` retrace；按 frame.debugId 优先 / fallback 到 release；只动 function 含 `.` 的帧，JS 帧自然 no-op；50-entry cache
+- [x] `admin.rs`: 第三道 symbolicate pass（JS sourcemap → iOS DWARF → Android proguard），每 pass 对不属于自己的帧 no-op
+- [x] tests：integration 2（sniff debug_id + list / 空 body 400），unit 1（proguard crate sample 解析回原 class.method）
+- [x] server suite 14 unit + 31 integration = **45 server tests** 全绿；CLI `upload --help` 列出第三个子命令 `mapping`
+- [x] commit `e3eca45`
 
 #### sub-D — Android ANR detection
 - [ ] SDK Android 加 ANR watchdog（worker thread 每 1s ping main，连续 5s 无响应 dump main thread + 上报）
