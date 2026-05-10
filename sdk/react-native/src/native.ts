@@ -12,10 +12,12 @@ type SentoriNativeModule = {
     token: string
   }) => void
   /**
-   * Phase 22 sub-D: opt-in Android ANR watchdog. Posts a tick to the
-   * main looper every `intervalMs`; if not acknowledged within
-   * `timeoutMs`, captures the main-thread stack as an `anr` event.
-   * No-op on iOS today — iOS hang detection lands in sub-E.
+   * Phase 22 sub-D / sub-E: cross-platform main-thread watchdog.
+   * Android: 5 s / 1 s defaults (matches the OS ANR threshold).
+   * iOS: 2 s / 1 s (more aggressive — iOS has no system-level
+   * watchdog signal we can lean on, so we surface stutter Apple's
+   * own runtime never flags).
+   * Reports a `kind = "anr"` event when the main thread is wedged.
    */
   startAnrWatchdog?: (options?: {
     force?: boolean
@@ -83,14 +85,15 @@ export function triggerNativeCrash(): void {
 }
 
 /**
- * Phase 22 sub-D: start the Android ANR watchdog.
+ * Phase 22 sub-D / sub-E: cross-platform main-thread watchdog.
+ * Single JS call covers both Android ANR and iOS hang detection.
  *
- *     startAnrWatchdog()                       // default 5s/1s, prod-only
+ *     startAnrWatchdog()                       // platform defaults, prod-only
  *     startAnrWatchdog({ force: true })        // include debug builds
  *     startAnrWatchdog({ timeoutMs: 3000 })    // tighter threshold
  *
- * Returns silently on iOS / web / jest. iOS hang detection (sub-E)
- * will hook the same JS function once landed.
+ * Defaults: Android 5 s / 1 s tick; iOS 2 s / 1 s tick. Returns
+ * silently on web / jest / unsupported runtimes.
  */
 export function startAnrWatchdog(options?: {
   force?: boolean
