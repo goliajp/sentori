@@ -991,11 +991,14 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [x] server `NotifyEvent::OwnershipTransferCompleted` 邮件模板 + `accept_transfer` 在事务 commit 后发邮件给老 owner（查 user email + org name）；安抚文案明示 demoted to admin、可联系 support 如非本人操作
 - [x] bun run build → 124 KB gzip / tsc clean / server 19/19。commit `0cab6c9`
 
-#### sub-H — Audit log viewer
+#### sub-H — Audit log viewer ✅
 
-- [ ] org-settings "Audit log" tab；list with actor / action / target / time + 折叠 payload JSON
-- [ ] filter UI：actor combobox / action select / date range picker
-- [ ] CSV 导出 button
+- [x] 新视图 `web/src/views/audit-log.tsx`，路由 `/org/{slug}/audit`，owner/admin only（普通成员看到"permission denied"一行）；OrgLayout NAV 加 `adminOnly` flag 把 "Audit" 项 gating
+- [x] 表格：time / actor (email or "system") / action / target_type+id / payload（Show/Hide 折叠 JSON，empty 显 —）
+- [x] filter bar：action select（硬编码 17 个动作，注释指向 Phase 20 sub-A 替换为 codegen）+ actor select（拉 listMembers）+ datetime-local before；任一 filter 激活时显示 "Clear filters"
+- [x] cursor 分页：底部 "Load older →" 用最旧 row 的 createdAt 推 `before` cursor（匹配服务端 DESC + before 语义）
+- [x] CSV 导出：当前可见集，header 含 timestamp/actor/action/target_type/target_id/payload，正确 escape 逗号/引号/换行
+- [x] bun run build → 125.8 KB gzip；tsc + test green。commit `65f100b`
 
 #### sub-I — tests + docs + 收尾
 
