@@ -13,6 +13,12 @@ export default defineConfig({
   server: {
     proxy: {
       '/admin/api': 'http://localhost:8080',
+      // Phase 18 sub-I-2: dashboard issues /api/auth/login, /api/orgs/...
+      // as same-origin relative paths; in production Caddy forwards both
+      // /admin/api/* and /api/* to the server. Match that here so vite
+      // dev (and `bun run preview`, used by playwright e2e) works without
+      // a fronting proxy.
+      '/api': 'http://localhost:8080',
     },
   },
   test: {

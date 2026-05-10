@@ -1,0 +1,59 @@
+import { defineConfig, devices } from '@playwright/test'
+
+// Phase 18 sub-I-2.
+//
+// Spec layout: `e2e/*.spec.ts`. Specs talk to the dashboard at
+// http://127.0.0.1:5173 (vite dev) which proxies /api/* and /admin/api/*
+// to the rust server at :8080.
+//
+// Prerequisites for running locally / in CI:
+//   - Postgres on 127.0.0.1:55434 with user=postgres pw=dev db=sentori
+//   - (no Valkey required — server tolerates VALKEY_URL unset)
+//   - cargo on PATH so the webServer can build & run sentori-server
+//
+// Trigger via `bun run test:e2e`.
+
+const SERVER_ENV = {
+  DATABASE_URL: 'postgres://postgres:dev@127.0.0.1:55434/sentori',
+  SENTORI_DEV_TOKEN: 'st_pk_e2etest00000000000000000000',
+  SENTORI_ADMIN_PASSWORD: 'e2e-admin',
+  SENTORI_SESSION_SECRET: 'e2e-secret-please-rotate',
+  SENTORI_BASE_URL: 'http://127.0.0.1:5173',
+  RUST_LOG: 'warn,sentori_server=info',
+} as const
+
+export default defineConfig({
+  testDir: './e2e',
+  timeout: 30_000,
+  expect: { timeout: 5_000 },
+  fullyParallel: false, // share one server / one DB
+  retries: 0,
+  workers: 1,
+  reporter: 'list',
+  use: {
+    baseURL: 'http://127.0.0.1:5173',
+    trace: 'on-first-retry',
+  },
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+  ],
+  webServer: [
+    {
+      command: 'cd ../server && cargo run --quiet',
+      url: 'http://127.0.0.1:8080/v1/events/_recent',
+      env: SERVER_ENV,
+      reuseExistingServer: true,
+      timeout: 300_000, // first cargo build is slow
+      stdout: 'ignore',
+      stderr: 'pipe',
+    },
+    {
+      command: 'bun run dev -- --host 127.0.0.1 --port 5173',
+      url: 'http://127.0.0.1:5173',
+      reuseExistingServer: true,
+      timeout: 60_000,
+      stdout: 'ignore',
+      stderr: 'pipe',
+    },
+  ],
+})

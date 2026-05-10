@@ -22,6 +22,7 @@ export default defineConfig({
           items: [
             { label: 'Getting started', slug: 'getting-started' },
             { label: 'Self-hosting', slug: 'self-hosting' },
+            { label: 'Teams & ownership', slug: 'teams' },
           ],
         },
         {
