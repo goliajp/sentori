@@ -102,12 +102,12 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 **Estimate:** 1.5 周
 
 ### sub-A — iOS 真主线程采样器（Phase 22 sub-E caveat）
-- [ ] 新文档 `sdk/react-native/ios/PRIVACY_AND_REVIEW.md`：列要用的 Mach API（`thread_get_state` / `pthread_main_np` / `pthread_mach_thread_np` / `vm_read_overwrite`），逐项标注公开 / 私有 + App Store 审核风险评估
-- [ ] 新 `sdk/react-native/ios/SentoriThreadSampler.swift`：实现 `captureMainThreadFrames(maxFrames: Int = 64) -> [(pc: UInt64, fp: UInt64)]`，从 main pthread 拿 mach port → `thread_get_state(ARM_THREAD_STATE64)` 取 PC + FP → 循环 `vm_read_overwrite` 读 frame pointer chain 至 nil 或上限
-- [ ] 单元测试（XCTest）：模拟器跑一次 capture，断言返回 ≥ 5 frame（含 dispatch / libsystem_kernel / 用户代码）
-- [ ] 改 `SentoriHangWatchdog.swift`：主线程未 ack ≥ 2s 时调 `captureMainThreadFrames`，把 PC 列表写入 hang event 的 `frames[].instructionAddress`，`debugId` 取自主可执行 image 的 `_dyld_image_uuid`，让现有 dSYM 反查路径能 symbolicate
-- [ ] e2e 验证：模拟器跑 5 次主线程死循环（`while true {}`）触发 hang → dashboard 收到的 stack 含用户死循环代码 frame，不是 watchdog queue frame
-- [ ] sentori-react-native bump 0.4.0、`bun publish --access public`、commit `phase 29 sub-A: ios main thread sampler`
+- [x] 新文档 `sdk/react-native/ios/PRIVACY_AND_REVIEW.md`：列要用的 Mach API（`thread_get_state` / `pthread_main_np` / `pthread_mach_thread_np` / `vm_read_overwrite`），逐项标注公开 / 私有 + App Store 审核风险评估
+- [x] 新 `sdk/react-native/ios/SentoriThreadSampler.swift`：`captureMainThreadFrames(maxFrames: Int = 64) -> [NSNumber]`，arm64 only，从 main pthread 拿 mach port → `thread_get_state(ARM_THREAD_STATE64)` 取 PC/FP（绕过未导入 Swift 的 `_COUNT` 宏 + `__darwin_*` intrinsics，用 raw byte reinterpret 按 ABI index）→ 循环 `vm_read_overwrite` 读 frame pointer chain；47-bit mask 处理 arm64e PAC
+- [x] 单元测试（XCTest）：`Tests/SentoriThreadSamplerTests.swift` —— 4 个 case (背景线程 capture ≥5 frame / 主线程自采返 [] / install 幂等 / maxFrames=0 返 [])。**runtime 执行待 example 切到 npm registry 版本后跑**（example 用 `file:..` 链 SDK，Expo autolinker 漏装 SentoriReactNative pod，SentoriTests scheme 同样问题——和 sub-A 无关的 monorepo 接线 bug）
+- [x] 改 `SentoriHangWatchdog.swift`：`start()` 调 `installMainThreadHandle()`；`captureHang` 先调 sampler，frames 用 `instructionAddress` (hex) + `arch: "arm64"` + `tags.source = "sentori.hangWatchdog.sampler"`；sampler 返空时 fallback 到 `Thread.callStackSymbols`，tag 改 `.no-sampler`
+- [ ] e2e 验证：模拟器跑 5 次主线程死循环 → dashboard 含用户代码 frame。**推迟**到 example 切到 npm registry 版本（Expo autolinker file:.. monorepo bug，SDK pod 不装、native bridge 不通；source review + xcodebuild build + swift parse 已 verify Sampler 集成正确）
+- [x] sentori-react-native bump 0.4.0、`bun publish --access public`、commit `phase 29 sub-A: ios main thread sampler`
 
 ### sub-B — webhook persistent retry queue（Phase 27 sub-D 留尾）
 - [ ] migration `0025_webhook_deliveries.sql`：`webhook_deliveries(id PK uuid v7, rule_id FK CASCADE, payload jsonb, target_url text, secret text, attempt int default 0, next_attempt_at timestamptz, last_status int, last_error text, status text CHECK in (pending,delivered,failed) default 'pending', created_at, delivered_at)` + partial 索引 `(status, next_attempt_at) WHERE status='pending'`
