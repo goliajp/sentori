@@ -199,6 +199,15 @@ Sentry uses `exceptions[]` to express cause chains. Sentori uses **nested `cause
 | `absolutePath` | string | no | absolute file path (used by iOS / Android frames) |
 | `preContext` | array<string> | no | source lines before, max 5 |
 | `postContext` | array<string> | no | source lines after, max 5 |
+| `debugId` | string | no | LC_UUID of the binary (32 hex, dashes optional). When present together with `instructionAddress`, the server symbolicates this frame against the matching uploaded dSYM. Phase 22 sub-B. |
+| `arch` | string | no | atos arch family — `arm64` / `arm64e` / `x86_64` / `arm64_32` / `armv7` / `armv7s` / `armv7k` / `x86_64h` / `i386`. Required if `debugId` is set. |
+| `instructionAddress` | int or string | no | PC at crash time. Decimal int or `"0x..."` hex. |
+| `imageAddress` | int or string | no | base address the binary was loaded at (ASLR slide). Same encoding as `instructionAddress`. The server resolves `instructionAddress - imageAddress` against the DWARF tables. |
+
+When the server resolves a native frame it overwrites `function`,
+`file`, and `line` with the DWARF lookup result and flips `inApp` to
+true. The native fields stay on the frame for re-symbolication after
+later dSYM uploads.
 
 ## Breadcrumb schema
 

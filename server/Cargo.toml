@@ -34,6 +34,13 @@ redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
 axum-extra = { version = "0.10", features = ["cookie"] }
 hmac = "0.12"
 sourcemap = "9"
+# Phase 22 sub-B: iOS DWARF symbolication. atos is macOS-only — we use
+# pure-Rust addr2line + object so resolution works on the Linux
+# production server. addr2line returns a parsed Context that maps
+# instruction addresses to function/file/line via the DWARF embedded
+# in the dSYM's Mach-O.
+addr2line = { version = "0.24", default-features = false, features = ["rustc-demangle", "cpp_demangle", "fallible-iterator", "smallvec", "loader"] }
+object = { version = "0.36", default-features = false, features = ["read", "macho", "std"] }
 lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1-rustls-tls"] }
 argon2 = "0.5"
 rand = "0.8"
