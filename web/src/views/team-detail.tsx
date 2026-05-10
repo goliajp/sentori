@@ -11,34 +11,42 @@ import { densityClasses, useDensity } from '@/lib/density'
 const ROLES: readonly TeamRole[] = ['lead', 'member']
 
 export function TeamDetailView() {
-  const { slug, teamSlug } = useParams<{ slug: string; teamSlug: string }>()
+  const params = useParams<{ slug: string; teamSlug: string }>()
+  const slug = params.slug
+  // Route guarantees teamSlug is present; fall back to '' for the
+  // hooks below (each useQuery is gated by `!!teamSlug`) so all
+  // hooks run unconditionally before the redirect-on-missing return
+  // at the end of the function body.
+  const teamSlug = params.teamSlug ?? ''
+
   const { currentOrg } = useOrg()
   const orgSlug = currentOrg.slug
   const dCls = densityClasses(useDensity().density)
   const canManage = useHasPermission('team.member.manage')
   const queryClient = useQueryClient()
 
-  if (!teamSlug) return <Navigate replace to={`/org/${slug}/teams`} />
-
   const teamQuery = useQuery({
+    enabled: !!teamSlug,
     queryFn: () => teamsApi.detail(orgSlug, teamSlug),
     queryKey: ['team', orgSlug, teamSlug],
   })
   const membersQuery = useQuery({
+    enabled: !!teamSlug,
     queryFn: () => teamsApi.listMembers(orgSlug, teamSlug),
     queryKey: ['team-members', orgSlug, teamSlug],
   })
   const projectsQuery = useQuery({
+    enabled: !!teamSlug,
     queryFn: () => teamsApi.listProjects(orgSlug, teamSlug),
     queryKey: ['team-projects', orgSlug, teamSlug],
   })
   const orgMembersQuery = useQuery({
-    enabled: canManage,
+    enabled: canManage && !!teamSlug,
     queryFn: () => orgsApi.listMembers(orgSlug),
     queryKey: ['members', orgSlug],
   })
   const allProjectsQuery = useQuery({
-    enabled: canManage,
+    enabled: canManage && !!teamSlug,
     queryFn: adminApi.listProjects,
     queryKey: ['projects'],
   })
@@ -98,6 +106,10 @@ export function TeamDetailView() {
     onSuccess: () =>
       void queryClient.invalidateQueries({ queryKey: ['team-projects', orgSlug, teamSlug] }),
   })
+
+  // Redirect-on-missing comes AFTER all hooks so React's
+  // rules-of-hooks holds (every render path runs the same hook order).
+  if (!params.teamSlug) return <Navigate replace to={`/org/${slug}/teams`} />
 
   const team = teamQuery.data
   const members = membersQuery.data ?? []

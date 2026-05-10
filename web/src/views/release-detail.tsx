@@ -132,9 +132,14 @@ export function ReleaseDetailView() {
  * pointing at the SDK rather than misleading "0%" numbers.
  */
 function ReleaseHealthPanel({ projectId, release }: { projectId: string; release: string }) {
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString()
   const { data, isLoading } = useQuery({
-    queryFn: () => adminApi.health(projectId, { bucket: '1d', from: sevenDaysAgo, release }),
+    queryFn: () => {
+      // Compute the window inside queryFn so Date.now() runs at fetch
+      // time, not during render. Keeps react-hooks/purity satisfied
+      // and means a re-fetch picks up the rolling 7-day window.
+      const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString()
+      return adminApi.health(projectId, { bucket: '1d', from: sevenDaysAgo, release })
+    },
     queryKey: ['health', projectId, release, '7d'],
     staleTime: 60_000,
   })

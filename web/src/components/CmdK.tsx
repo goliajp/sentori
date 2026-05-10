@@ -78,10 +78,16 @@ export function CmdK() {
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
 
-  // Auto-focus + reset on open.
+  // Auto-focus + reset on open. The setQ/setSelectedIdx calls trigger
+  // a cascade (effect → setState → re-render), but they're exactly
+  // what we want here — every time the palette opens we need a clean
+  // input + focused row 0. Disabling react-hooks/set-state-in-effect
+  // for this intentional case.
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setQ('')
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedIdx(0)
       // Defer to let the input mount.
       const t = setTimeout(() => inputRef.current?.focus(), 0)
