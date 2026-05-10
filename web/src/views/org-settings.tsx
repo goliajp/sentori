@@ -1,7 +1,14 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
 
-import { type OrgRole, orgsApi, teamsApi, type TeamRow, type UsageRow } from '@/api/client'
+import {
+  type OrgRole,
+  orgsApi,
+  teamsApi,
+  type TeamRow,
+  transfersApi,
+  type UsageRow,
+} from '@/api/client'
 import { useAuth } from '@/auth/state'
 import { useOrg } from '@/auth/orgContext'
 import { RoleBadge } from '@/components/RoleBadge'
@@ -271,7 +278,7 @@ export function OrgSettingsView() {
           </form>
           {inviteMsg && <p className="text-fg-muted text-xs">{inviteMsg}</p>}
 
-          {invitesQuery.data && invitesQuery.data.length > 0 && (
+          {invitesQuery.data && invitesQuery.data.length > 0 ? (
             <table className="mt-4 w-full border-collapse">
               <thead>
                 <tr className="text-fg-muted border-border h-7 border-b text-left text-[11px] tracking-wider uppercase">
@@ -314,10 +321,103 @@ export function OrgSettingsView() {
                 ))}
               </tbody>
             </table>
-          )}
+          ) : null}
         </section>
       )}
+
+      {isOwner && <TransferOwnershipSection />}
     </div>
+  )
+}
+
+function TransferOwnershipSection() {
+  const { currentOrg } = useOrg()
+  const { user } = useAuth()
+  const slug = currentOrg.slug
+  const queryClient = useQueryClient()
+
+  const membersQuery = useQuery({
+    queryFn: () => orgsApi.listMembers(slug),
+    queryKey: ['members', slug],
+  })
+
+  const eligible = (membersQuery.data ?? []).filter(
+    (m) => m.userId !== user?.id && (m.role === 'admin' || m.role === 'owner')
+  )
+
+  const [target, setTarget] = useState('')
+  const [confirmSlug, setConfirmSlug] = useState('')
+  const [msg, setMsg] = useState<null | string>(null)
+
+  const transfer = useMutation({
+    mutationFn: () => transfersApi.create(slug, target),
+    onError: (err: { body?: { error?: string } }) => {
+      setMsg(err.body?.error ?? 'Transfer failed')
+    },
+    onSuccess: () => {
+      setTarget('')
+      setConfirmSlug('')
+      setMsg('Transfer initiated — recipient will receive an email.')
+      void queryClient.invalidateQueries({ queryKey: ['audit', slug] })
+    },
+  })
+
+  const onSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    setMsg(null)
+    transfer.mutate()
+  }
+
+  const ready = !!target && confirmSlug.trim() === slug
+
+  return (
+    <section className="border-danger/30 space-y-3 rounded-lg border border-dashed p-4">
+      <header>
+        <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Transfer ownership</h2>
+        <p className="text-fg-muted mt-1 text-xs">
+          Hand this org over to another admin. Your role drops to admin; the recipient must confirm
+          via the email link before anything changes.
+        </p>
+      </header>
+      {eligible.length === 0 ? (
+        <p className="text-fg-muted text-xs">
+          Promote a member to admin first — only admins are eligible to receive ownership.
+        </p>
+      ) : (
+        <form className="space-y-3" onSubmit={onSubmit}>
+          <select
+            className="border-border bg-bg-tertiary text-fg w-full rounded-md border px-3 py-1.5 text-sm"
+            onChange={(e) => setTarget(e.target.value)}
+            required
+            value={target}
+          >
+            <option value="">Pick the new owner…</option>
+            {eligible.map((m) => (
+              <option key={m.userId} value={m.userId}>
+                {m.email} ({m.role})
+              </option>
+            ))}
+          </select>
+          <input
+            autoComplete="off"
+            className="border-border bg-bg-tertiary text-fg w-full rounded-md border px-3 py-1.5 text-sm"
+            onChange={(e) => setConfirmSlug(e.target.value)}
+            placeholder={`Type "${slug}" to confirm`}
+            value={confirmSlug}
+          />
+          <div className="flex items-center gap-3">
+            <button
+              className="bg-danger/90 text-bg rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+              disabled={!ready || transfer.isPending}
+              type="submit"
+            >
+              {transfer.isPending ? 'Sending…' : 'Initiate transfer'}
+            </button>
+            {msg && <span className="text-fg-muted text-xs">{msg}</span>}
+          </div>
+        </form>
+      )}
+    </section>
   )
 }
 

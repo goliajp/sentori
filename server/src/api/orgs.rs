@@ -1243,6 +1243,28 @@ pub async fn accept_transfer(
     )
     .await;
 
+    if let Some(tx) = &state.notifier_tx {
+        let old_owner_email: Option<String> =
+            sqlx::query_scalar("SELECT email FROM users WHERE id = $1")
+                .bind(from_user_id)
+                .fetch_optional(&pool)
+                .await
+                .ok()
+                .flatten();
+        let org_name: String = sqlx::query_scalar("SELECT name FROM orgs WHERE id = $1")
+            .bind(org_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap_or_default();
+        if let Some(addr) = old_owner_email {
+            let _ = tx.try_send(NotifyEvent::OwnershipTransferCompleted {
+                new_owner_email: user.email.clone(),
+                old_owner_email: addr,
+                org_name,
+            });
+        }
+    }
+
     (StatusCode::OK, Json(json!({ "ok": true }))).into_response()
 }
 

@@ -67,6 +67,11 @@ pub enum NotifyEvent {
         org_name: String,
         link: String,
     },
+    OwnershipTransferCompleted {
+        old_owner_email: String,
+        new_owner_email: String,
+        org_name: String,
+    },
 }
 
 /// Spawn the notifier loop. Returns a sender producers can use to enqueue
@@ -301,6 +306,40 @@ async fn handle(
                 tracing::warn!(error = %e, %to_email, %org_name, "send transfer email failed");
             } else {
                 tracing::info!(%to_email, %org_name, "transfer email sent");
+            }
+            Ok(())
+        }
+        NotifyEvent::OwnershipTransferCompleted {
+            old_owner_email,
+            new_owner_email,
+            org_name,
+        } => {
+            let transport = build_transport(cfg)?;
+            let from: Mailbox = cfg.from.parse().context("parse from address")?;
+            let to: Mailbox = old_owner_email
+                .parse()
+                .context("parse old owner address")?;
+            let msg = Message::builder()
+                .from(from)
+                .to(to)
+                .subject(format!(
+                    "[Sentori] Ownership of \"{org_name}\" transferred to {new_owner_email}"
+                ))
+                .body(format!(
+                    "You've successfully transferred ownership of the Sentori organization \
+                     \"{org_name}\" to {new_owner_email}.\n\n\
+                     Your role has been moved to admin. You can still manage members and \
+                     projects, but only {new_owner_email} can now delete the org or transfer \
+                     it again.\n\n\
+                     If this wasn't you, contact support@sentori.golia.jp immediately.\n\n\
+                     — Sentori"
+                ))
+                .context("build transfer-completed message")?;
+
+            if let Err(e) = transport.send(msg).await {
+                tracing::warn!(error = %e, %old_owner_email, %org_name, "send transfer-completed email failed");
+            } else {
+                tracing::info!(%old_owner_email, %org_name, "transfer-completed email sent");
             }
             Ok(())
         }
