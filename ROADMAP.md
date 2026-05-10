@@ -964,12 +964,14 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [x] `OrgLayout.NAV` 加 `Teams` 项夹在 Issues 和 Settings 之间
 - [ ] ~~`OrgSwitcher` 改两层：`Org > Team`；选 team 后 issues 列表自动 filter~~ — 推迟到 sub-E 跟 role chip / permission gate UI 一起做。`bun run build` + `bun run test` 全绿；commit `78defab`
 
-#### sub-E — dashboard: Project ↔ Team 绑定 + 角色 chip
+#### sub-E — dashboard: Project ↔ Team 绑定 + 角色 chip ✅
 
-- [ ] Project settings 加 "Teams" 段：多选 team checkbox（org-admin only）
-- [ ] Member detail modal 显示用户所属 team chips
-- [ ] role badge（admin / lead / member / viewer）design：颜色 + 缩写
-- [ ] 受限按钮按 role 隐藏：用 `useHasPermission(action, scope)` hook（scope=org|team|project）
+- [x] 新视图 `web/src/views/project-team-settings.tsx`，路由 `/org/{slug}/projects/{id}/settings/teams`：列出 org 内所有 team，admin 单击 Bind/Unbind 即可绑定；普通成员看到 Bound/Not bound chip；headline 文案根据是否有绑定切换"全 org 开放" vs "team-scoped"；token-settings + recipient-settings 加交叉链接
+- [x] org-settings members 表行内显示用户所属 team-slug chip（`useQueries` N 并发拉每 team 的成员，client-side 聚合，1-10 团队规模零成本）
+- [x] `web/src/components/RoleBadge.tsx`：颜色编码 chip（owner=emerald / admin=accent / lead=amber / member=neutral）；用在 org-settings 和 team-detail
+- [x] 权限层：`auth/permissions.ts` 定义 `PermissionAction` enum + role matrix；`auth/useHasPermission.ts` 钩子；`components/PermissionGate.tsx` 包按钮；server 仍是 authz 真理来源，UI 只决定"按钮渲不渲染"
+- [x] OrgSwitcher 两层 `Org / Team` 下拉；选 team 写 `?team=<slug>` 到 URL；`OrgLayout` 读取后并发查每个 project 的团队绑定，把 `currentProjects` 缩到匹配集；`OrgCtx` 加 `currentTeamSlug` + `teams[]`
+- [x] bun run build → 123 KB gzip / bun run test green / tsc clean。commit `5fcd2cf`
 
 #### sub-F — Invite 流扩展
 
