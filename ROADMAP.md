@@ -1151,12 +1151,15 @@ server 36/36 + dashboard build 126 KB gzip + vitest 1/1 + e2e 1/1。commit `4147
 - [x] README：4 个文件（instrumentation.ts / app/layout.tsx / app/error.tsx / app/global-error.tsx）copy-paste-ready
 - [x] npm publish `@goliapkg/sentori-next@0.1.0`；commit `0432d58`
 
-#### sub-D — `@goliapkg/sentori-expo`
-- [ ] 新 `sdk/expo/`
-- [ ] `app.plugin.js` Config Plugin：iOS pod link + Android gradle 自动添加
-- [ ] `expo-application` 元数据自动注入 init（bundleId / version）
-- [ ] EAS post-build hook `scripts/eas-post-build.sh`：自动调 `sentori-cli upload sourcemap`
-- [ ] publish 0.1.0
+#### sub-D — `@goliapkg/sentori-expo` ✅
+- [x] 新 `sdk/expo/` workspace；peer `expo>=50, expo-application>=5 (optional), react-native>=0.74, sentori-react-native>=0.2.0`
+- [x] `app.plugin.js` CommonJS Config Plugin：marker + withInfoPlist 写 SentoriSdkVersion；native autolink 由 RN SDK 自带的 expo-module.config.json/podspec/gradle 解决，plugin 留作未来扩展点
+- [x] `initSentoriExpo({ token, application?, release?, environment?, ingestUrl? })`：用户传 `import * as Application from 'expo-application'`（避免本包硬依赖 expo-application）；自动派生 `applicationId@version+build`；`__DEV__` 决定 environment；fallback 到 public ingest
+- [x] `deriveRelease(app)` 单独 export 给非 init 场景（tag / log prefix）
+- [x] `scripts/eas-post-build.mjs`：EAS postPublish hook，shell 调 `@goliapkg/sentori-cli upload sourcemap`；CLI 未装时友好 warn + exit 0（Phase 22 sub-A 落 sourcemap subcommand 后自动接通）
+- [x] 4 tests：full / partial / missing / null fields；`bun test` 全绿
+- [x] README copy-paste 三步：app.json + App.tsx + eas.json
+- [x] npm publish `@goliapkg/sentori-expo@0.1.0`；commit `e2340c3`
 
 #### sub-E — Vue / Svelte 设计文档（不实现）
 - [ ] `docs-site/src/content/docs/sdk-vue.md` API surface 草稿
