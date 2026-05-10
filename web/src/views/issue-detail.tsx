@@ -147,6 +147,8 @@ export function IssueDetailView() {
               </Section>
             )}
 
+            <ReleaseArtifactsPanel projectId={projectId!} release={payload.release} />
+
             <Section title="Context">
               <KeyValueGrid
                 data={{
@@ -171,6 +173,60 @@ export function IssueDetailView() {
       </section>
     </div>
   )
+}
+
+/**
+ * Phase 22 sub-F: read the release-artifacts summary and surface
+ * what's been uploaded for the current event's release. Helps a
+ * triage user spot "this stack is unsymbolicated because we never
+ * uploaded the dSYM" at a glance.
+ */
+function ReleaseArtifactsPanel({ projectId, release }: { projectId: string; release: string }) {
+  const { data, isLoading } = useQuery({
+    enabled: !!release,
+    queryFn: () => adminApi.releaseArtifacts(projectId, release),
+    queryKey: ['release-artifacts', projectId, release],
+    staleTime: 60_000,
+  })
+  if (isLoading || !data) return null
+  const total = data.sourcemaps.length + data.dsyms.length + data.mappings.length
+  if (total === 0) return null
+
+  return (
+    <Section title={`Release artifacts — ${release}`}>
+      <div className="space-y-1.5 text-[12px]">
+        {data.sourcemaps.length > 0 && (
+          <div className="text-fg-muted">
+            <span className="text-fg font-medium">Source maps:</span> {data.sourcemaps.length} file
+            {data.sourcemaps.length === 1 ? '' : 's'}
+          </div>
+        )}
+        {data.dsyms.length > 0 && (
+          <div className="text-fg-muted">
+            <span className="text-fg font-medium">iOS dSYMs:</span> {data.dsyms.length} slice
+            {data.dsyms.length === 1 ? '' : 's'} (
+            {Array.from(new Set(data.dsyms.map((d) => d.arch)))
+              .sort()
+              .join(', ')}
+            )
+          </div>
+        )}
+        {data.mappings.length > 0 && (
+          <div className="text-fg-muted">
+            <span className="text-fg font-medium">ProGuard mappings:</span> {data.mappings.length}{' '}
+            upload
+            {data.mappings.length === 1 ? '' : 's'} ({humanBytes(data.mappings[0]!.sizeBytes)})
+          </div>
+        )}
+      </div>
+    </Section>
+  )
+}
+
+function humanBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 
 function Section({

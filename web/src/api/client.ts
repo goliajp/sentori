@@ -82,7 +82,7 @@ export type ServerEvent = {
   error: SentoriError
   fingerprint: string[]
   id: string
-  kind: 'error'
+  kind: 'anr' | 'error'
   platform: 'android' | 'ios' | 'javascript'
   release: string
   spanId: null | string
@@ -162,6 +162,45 @@ export const adminApi = {
 
   listReleasesForIssue: (projectId: string, issueId: string) =>
     adminFetch<string[]>(`/projects/${projectId}/issues/${issueId}/releases`),
+
+  /** Phase 22 sub-F — unified artifact summary for one release. */
+  releaseArtifacts: (projectId: string, release: string) =>
+    adminFetch<ReleaseArtifacts>(
+      `/projects/${projectId}/releases/${encodeURIComponent(release)}/artifacts`
+    ),
+}
+
+export type ReleaseArtifacts = {
+  dsyms: ReleaseDsym[]
+  mappings: ReleaseMapping[]
+  release: string
+  sourcemaps: ReleaseSourcemap[]
+}
+
+export type ReleaseDsym = {
+  arch: string
+  debugId: string
+  id: string
+  objectName: null | string
+  sizeBytes: number
+  uploadedAt: string
+  uploadedByEmail: null | string
+}
+
+export type ReleaseMapping = {
+  debugId: null | string
+  id: string
+  sizeBytes: number
+  uploadedAt: string
+  uploadedByEmail: null | string
+}
+
+export type ReleaseSourcemap = {
+  contentHash: string
+  createdAt: string
+  id: string
+  kind: string
+  name: string
 }
 
 export type ProjectRow = {

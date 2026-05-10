@@ -285,3 +285,88 @@ async fn upload_blocked_for_outsider() {
         "non-org-member blocked by require_project_in_org"
     );
 }
+
+#[tokio::test]
+async fn release_artifacts_unifies_dsym_and_mapping() {
+    let Some((addr, pool)) = setup().await else {
+        eprintln!("skipping (DATABASE_URL not set)");
+        return;
+    };
+    let suffix = Uuid::now_v7().simple().to_string();
+    let email = format!("ds-art-owner-{}@golia.test", &suffix[12..28]);
+    let org_slug = format!("org-da-{}", &suffix[12..28]);
+    let (_uid, cookie) = register_user(&addr, &pool, &email).await;
+
+    Client::new()
+        .post(format!("http://{addr}/api/orgs"))
+        .header("cookie", &cookie)
+        .json(&json!({ "slug": org_slug, "name": org_slug }))
+        .send()
+        .await
+        .unwrap();
+    let proj_resp = Client::new()
+        .post(format!("http://{addr}/admin/api/orgs/{org_slug}/projects"))
+        .header("cookie", &cookie)
+        .json(&json!({ "name": "p1" }))
+        .send()
+        .await
+        .unwrap();
+    let proj: Value = proj_resp.json().await.unwrap();
+    let project_id = proj["id"].as_str().unwrap();
+
+    let release = "myapp@1.2.3+42";
+    let release_enc = release.replace('@', "%40").replace('+', "%2B");
+
+    // Upload a dSYM and a mapping for the same release.
+    Client::new()
+        .post(format!(
+            "http://{addr}/admin/api/projects/{project_id}/dsyms?release={release_enc}"
+        ))
+        .header("cookie", &cookie)
+        .header("x-sentori-debug-id", FAKE_DEBUG_ID)
+        .header("x-sentori-arch", "arm64")
+        .body(FAKE_BODY.to_vec())
+        .send()
+        .await
+        .unwrap();
+    Client::new()
+        .post(format!(
+            "http://{addr}/admin/api/projects/{project_id}/mappings?release={release_enc}"
+        ))
+        .header("cookie", &cookie)
+        .body(b"# pg_map_id: cafe-babe\nfoo -> a:\n".to_vec())
+        .send()
+        .await
+        .unwrap();
+
+    // Unified summary should return both, plus an empty sourcemaps array.
+    let r = Client::new()
+        .get(format!(
+            "http://{addr}/admin/api/projects/{project_id}/releases/{release_enc}/artifacts"
+        ))
+        .header("cookie", &cookie)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200);
+    let body: Value = r.json().await.unwrap();
+    assert_eq!(body["release"].as_str().unwrap(), release);
+    assert_eq!(body["dsyms"].as_array().unwrap().len(), 1);
+    assert_eq!(body["mappings"].as_array().unwrap().len(), 1);
+    assert_eq!(body["sourcemaps"].as_array().unwrap().len(), 0);
+
+    // A different release returns empty arrays for everything.
+    let other = "other%401.0.0";
+    let r = Client::new()
+        .get(format!(
+            "http://{addr}/admin/api/projects/{project_id}/releases/{other}/artifacts"
+        ))
+        .header("cookie", &cookie)
+        .send()
+        .await
+        .unwrap();
+    let body: Value = r.json().await.unwrap();
+    assert_eq!(body["dsyms"].as_array().unwrap().len(), 0);
+    assert_eq!(body["mappings"].as_array().unwrap().len(), 0);
+    assert_eq!(body["sourcemaps"].as_array().unwrap().len(), 0);
+}

@@ -178,6 +178,103 @@ struct DsymRow {
     uploaded_by_email: Option<String>,
 }
 
+/// `GET /admin/api/projects/{project_id}/releases/{release}/artifacts`
+/// Phase 22 sub-F: unified summary returning every artifact uploaded
+/// for a given release — JS sourcemaps + iOS dSYMs + Android mappings.
+/// Dashboard release detail page reads this; the per-table list
+/// endpoints stay around for narrower views.
+pub async fn release_artifacts(
+    State(state): State<AppState>,
+    Path((project_id, release)): Path<(Uuid, String)>,
+) -> Response {
+    let pool = match &state.db {
+        Some(p) => p.clone(),
+        None => return server_error("dbNotConfigured"),
+    };
+
+    #[derive(Serialize, sqlx::FromRow)]
+    #[serde(rename_all = "camelCase")]
+    struct DsymRow {
+        arch: String,
+        debug_id: String,
+        id: Uuid,
+        object_name: Option<String>,
+        size_bytes: i32,
+        uploaded_at: OffsetDateTime,
+        uploaded_by_email: Option<String>,
+    }
+
+    #[derive(Serialize, sqlx::FromRow)]
+    #[serde(rename_all = "camelCase")]
+    struct MappingRow {
+        debug_id: Option<String>,
+        id: Uuid,
+        size_bytes: i32,
+        uploaded_at: OffsetDateTime,
+        uploaded_by_email: Option<String>,
+    }
+
+    #[derive(Serialize, sqlx::FromRow)]
+    #[serde(rename_all = "camelCase")]
+    struct SourcemapRow {
+        content_hash: String,
+        created_at: OffsetDateTime,
+        id: Uuid,
+        kind: String,
+        name: String,
+    }
+
+    let dsyms: Vec<DsymRow> = sqlx::query_as(
+        "SELECT d.id, d.debug_id, d.arch, d.object_name, d.size_bytes, \
+                d.uploaded_at, u.email AS uploaded_by_email \
+         FROM dsyms d LEFT JOIN users u ON u.id = d.uploaded_by \
+         WHERE d.project_id = $1 AND d.release = $2 \
+         ORDER BY d.uploaded_at DESC",
+    )
+    .bind(project_id)
+    .bind(&release)
+    .fetch_all(&pool)
+    .await
+    .unwrap_or_default();
+
+    let mappings: Vec<MappingRow> = sqlx::query_as(
+        "SELECT m.id, m.debug_id, m.size_bytes, m.uploaded_at, \
+                u.email AS uploaded_by_email \
+         FROM proguard_mappings m LEFT JOIN users u ON u.id = m.uploaded_by \
+         WHERE m.project_id = $1 AND m.release = $2 \
+         ORDER BY m.uploaded_at DESC",
+    )
+    .bind(project_id)
+    .bind(&release)
+    .fetch_all(&pool)
+    .await
+    .unwrap_or_default();
+
+    let sourcemaps: Vec<SourcemapRow> = sqlx::query_as(
+        "SELECT ra.id, ra.kind, ra.name, ra.content_hash, ra.created_at \
+         FROM release_artifacts ra \
+         JOIN releases r ON r.id = ra.release_id \
+         WHERE r.project_id = $1 AND r.name = $2 \
+         ORDER BY ra.created_at DESC",
+    )
+    .bind(project_id)
+    .bind(&release)
+    .fetch_all(&pool)
+    .await
+    .unwrap_or_default();
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "release":    release,
+            "sourcemaps": sourcemaps,
+            "dsyms":      dsyms,
+            "mappings":   mappings,
+        })),
+    )
+        .into_response()
+}
+
 /// `GET /admin/api/projects/{project_id}/dsyms?release=&limit=`
 pub async fn list_dsyms(
     State(state): State<AppState>,
