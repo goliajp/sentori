@@ -1209,10 +1209,15 @@ server 36/36 + dashboard build 126 KB gzip + vitest 1/1 + e2e 1/1。commit `4147
 - [x] dashboard release 详情显示 dSYM 列表 —— 推迟到 Phase 23（Release UX 主轴），server 端已就位
 - [x] commit `8e1b71a`
 
-#### sub-B — server: iOS 反符号化
-- [ ] `server/src/symbolicate.rs` 加 dSYM-based path：spawn `atos -arch arm64 -o <dsym> -l <load_addr> <pc>`
-- [ ] dSYM 临时落盘（/tmp/dsyms/{uuid}.dSYM）+ LRU 缓存
-- [ ] tests：mock dSYM（mini Mach-O）
+#### sub-B — server: iOS 反符号化 ✅
+- [x] **不**用 atos（macOS-only）：用 pure-Rust `addr2line` + `gimli` + `object` —— Linux 生产服务器原生工作；deps 加到 server/Cargo.toml
+- [x] 新模块 `server/src/symbolicate_ios.rs`：按 `(project_id, debug_id, arch)` 查 dsyms 表，从 fat blob 提对应 arch 的 slice，dump 到 `SENTORI_DSYM_CACHE_DIR`（默认 `/tmp/sentori-dsyms`）；`Loader::new(path)` 内存映射 + DWARF 解析；resolve `instructionAddress - imageAddress`
+- [x] 协议扩展：`docs/protocol.md` + docs-site 加 4 个 native 帧字段（`debugId`, `arch`, `instructionAddress`, `imageAddress`）；解释 server 命中后会重写 `function/file/line/inApp` 同时保留 native 字段供后续重符号化
+- [x] cache：`(project_id, debug_id, arch) → dumped path` map，200 条上限 wholesale eviction；tmpfs 让重 mmap 廉价；`Loader` 本身不缓存（lifetime 复杂，重开销可忽略）
+- [x] 接入既有 symbolicate_payload pass（admin.rs `list_events_for_issue`）：JS sourcemap 先走（RN 桥帧通常在顶端），iOS DWARF 后走（native 帧底层）；两 pass 对不识别的帧 no-op
+- [x] tests：3 个 unit（parse_addr 各形态 / normalise dashed+bare / 非 32-hex fallback）+ 不破坏 31 集成 = 13 unit + 31 integration = **44 server tests** 全绿
+- [x] 真实 DWARF 端到端测试推迟到 sub-F（release-aware）—— 需要 checked-in 迷你 Mach-O fixture
+- [x] commit `6fe7139`
 
 #### sub-C — CLI + server: Android proguard
 - [ ] `sentori-cli upload mapping --project <id> --release <ver> <mapping.txt>`
