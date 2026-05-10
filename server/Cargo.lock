@@ -1225,6 +1225,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "leb128"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6cc46bac87ef8093eed6f272babb833b6443374399985ac8ed28471ee0918545"
+
+[[package]]
 name = "leb128fmt"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1718,6 +1724,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "proguard"
+version = "5.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1000670719a375fcecd479087740ad350d217e761c135436c06c16e0e4307ee"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "watto",
+]
+
+[[package]]
 name = "quanta"
 version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2131,6 +2149,7 @@ dependencies = [
  "metrics",
  "metrics-exporter-prometheus",
  "object",
+ "proguard",
  "rand 0.8.6",
  "redis",
  "reqwest",
@@ -3191,6 +3210,17 @@ dependencies = [
  "hashbrown 0.15.5",
  "indexmap",
  "semver",
+]
+
+[[package]]
+name = "watto"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfbc1480663d640f8c9f7a1ac70922eea60ac16fea79df883177df3bc7bb8b49"
+dependencies = [
+ "hashbrown 0.15.5",
+ "leb128",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

@@ -71,6 +71,26 @@ enum UploadKind {
         /// Directories are walked for any `*.dSYM` matches.
         paths: Vec<PathBuf>,
     },
+    /// Upload an Android ProGuard / R8 mapping.txt. The server sniffs
+    /// `# pg_map_id:` from the mapping header for the debug-id;
+    /// `--release` lets the retracer match by release name when the
+    /// mapping has no embedded id.
+    Mapping {
+        /// Project UUID.
+        #[arg(long = "project")]
+        project_id: String,
+        /// Release name, e.g. `myapp@1.2.3+456`.
+        #[arg(long)]
+        release: Option<String>,
+        /// Admin token. Same env-fallback chain as `dsym`.
+        #[arg(long)]
+        token: Option<String>,
+        /// Admin API base. Same fallback chain as `dsym`.
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        /// `mapping.txt` path.
+        path: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -91,8 +111,69 @@ async fn main() -> Result<()> {
                 api_url,
                 paths,
             } => upload_dsym(project_id, release, token, api_url, paths).await,
+            UploadKind::Mapping {
+                project_id,
+                release,
+                token,
+                api_url,
+                path,
+            } => upload_mapping(project_id, release, token, api_url, path).await,
         },
     }
+}
+
+async fn upload_mapping(
+    project_id: String,
+    release: Option<String>,
+    token: Option<String>,
+    api_url: Option<String>,
+    path: PathBuf,
+) -> Result<()> {
+    let token = token
+        .or_else(|| std::env::var("SENTORI_ADMIN_TOKEN").ok())
+        .or_else(|| std::env::var("SENTORI_TOKEN").ok())
+        .context("token: pass --token or set SENTORI_ADMIN_TOKEN / SENTORI_TOKEN")?;
+
+    let base = api_url
+        .or_else(|| std::env::var("SENTORI_ADMIN_URL").ok())
+        .or_else(|| {
+            std::env::var("SENTORI_INGEST_URL")
+                .ok()
+                .map(|s| s.replace("ingest.", "api."))
+        })
+        .unwrap_or_else(|| "https://api.sentori.golia.jp".to_string());
+
+    if !path.is_file() {
+        anyhow::bail!("mapping path is not a file: {}", path.display());
+    }
+    let bytes = tokio::fs::read(&path)
+        .await
+        .with_context(|| format!("reading {}", path.display()))?;
+
+    let mut url = format!(
+        "{}/admin/api/projects/{}/mappings",
+        base.trim_end_matches('/'),
+        project_id
+    );
+    if let Some(r) = release.as_deref() {
+        url.push_str(&format!("?release={}", urlencoding(r)));
+    }
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(&url)
+        .bearer_auth(&token)
+        .header("content-type", "application/octet-stream")
+        .body(bytes)
+        .send()
+        .await?;
+    let status = resp.status();
+    let body = resp.text().await.unwrap_or_default();
+    if !status.is_success() {
+        anyhow::bail!("upload failed: {status} {body}");
+    }
+    println!("OK ({status}): {body}");
+    Ok(())
 }
 
 async fn upload_dsym(

@@ -278,11 +278,11 @@ pub async fn list_events_for_issue(
     if symbolicated {
         for row in rows.iter_mut() {
             // Best-effort: leave raw frames in place on any failure.
-            // JS sourcemap pass first — JS frames often dominate the
-            // top of an iOS RN crash because the bridge calls in via
-            // a JS handler. Then iOS DWARF pass for the native frames
-            // beneath that. Both passes are no-ops on frames whose
-            // metadata they don't recognise.
+            // Three passes, layered so each pass is a no-op on frames
+            // it doesn't own:
+            //   1. JS sourcemap   — RN bridge frames sitting at the top
+            //   2. iOS DWARF      — native frames with debugId/instr
+            //   3. Android proguard — JVM frames with class.method shape
             let _ = crate::symbolicate::symbolicate_payload(
                 pool,
                 &row.release,
@@ -291,6 +291,13 @@ pub async fn list_events_for_issue(
             .await;
             crate::symbolicate_ios::symbolicate_payload(pool, project_id, &mut row.payload)
                 .await;
+            crate::symbolicate_android::symbolicate_payload(
+                pool,
+                project_id,
+                Some(&row.release),
+                &mut row.payload,
+            )
+            .await;
         }
     }
 

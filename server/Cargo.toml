@@ -41,6 +41,10 @@ sourcemap = "9"
 # in the dSYM's Mach-O.
 addr2line = { version = "0.24", default-features = false, features = ["rustc-demangle", "cpp_demangle", "fallible-iterator", "smallvec", "loader"] }
 object = { version = "0.36", default-features = false, features = ["read", "macho", "std"] }
+# Phase 22 sub-C: Android ProGuard / R8 mapping retrace. Sentry's
+# `proguard` crate handles the full mapping format including R8's
+# inline-method expansion and synthesised line ranges.
+proguard = "5"
 lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1-rustls-tls"] }
 argon2 = "0.5"
 rand = "0.8"

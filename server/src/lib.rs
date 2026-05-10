@@ -18,5 +18,6 @@ pub mod router;
 pub mod seed;
 pub mod session;
 pub mod symbolicate;
+pub mod symbolicate_android;
 pub mod symbolicate_ios;
 pub mod valkey;

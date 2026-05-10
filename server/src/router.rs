@@ -109,6 +109,13 @@ pub fn build(cfg: ServerConfig) -> Router {
             )),
         )
         .route(
+            "/projects/{project_id}/mappings",
+            get(api::mappings::list_mappings).post(api::mappings::upload_mapping).layer((
+                DefaultBodyLimit::disable(),
+                RequestBodyLimitLayer::new(MAX_ADMIN_UPLOAD_BYTES),
+            )),
+        )
+        .route(
             "/projects/{project_id}/recipients",
             get(api::recipients::list_recipients).post(api::recipients::create_recipient),
         )
