@@ -277,6 +277,129 @@ export const orgsApi = {
   usage: (slug: string) => orgsFetch<UsageRow>(`/orgs/${slug}/usage`),
 }
 
+export type TeamRole = 'lead' | 'member'
+
+export type TeamRow = {
+  createdAt: string
+  description: null | string
+  id: string
+  name: string
+  orgId: string
+  slug: string
+}
+
+export type TeamMemberRow = {
+  createdAt: string
+  email: string
+  role: TeamRole
+  userId: string
+}
+
+export type TeamProjectRow = {
+  createdAt: string
+  id: string
+  name: string
+}
+
+/** Phase 18 sub-B/C/D: teams + project↔team binding + ownership transfer + audit. */
+export const teamsApi = {
+  addMember: (orgSlug: string, teamSlug: string, userId: string, role: TeamRole) =>
+    orgsFetch<{ ok: true }>(`/orgs/${orgSlug}/teams/${teamSlug}/members`, {
+      body: JSON.stringify({ role, userId }),
+      method: 'POST',
+    }),
+
+  bindProject: (projectId: string, teamSlug: string) =>
+    adminFetch<{ ok: true }>(`/projects/${projectId}/teams/${teamSlug}`, { method: 'POST' }),
+
+  create: (orgSlug: string, body: { description?: string; name: string; slug: string }) =>
+    orgsFetch<TeamRow>(`/orgs/${orgSlug}/teams`, {
+      body: JSON.stringify(body),
+      method: 'POST',
+    }),
+
+  delete: (orgSlug: string, teamSlug: string) =>
+    orgsFetch<{ ok: true }>(`/orgs/${orgSlug}/teams/${teamSlug}`, { method: 'DELETE' }),
+
+  detail: (orgSlug: string, teamSlug: string) =>
+    orgsFetch<TeamRow>(`/orgs/${orgSlug}/teams/${teamSlug}`),
+
+  list: (orgSlug: string) => orgsFetch<TeamRow[]>(`/orgs/${orgSlug}/teams`),
+
+  listMembers: (orgSlug: string, teamSlug: string) =>
+    orgsFetch<TeamMemberRow[]>(`/orgs/${orgSlug}/teams/${teamSlug}/members`),
+
+  listProjectTeams: (projectId: string) => adminFetch<TeamRow[]>(`/projects/${projectId}/teams`),
+
+  listProjects: (orgSlug: string, teamSlug: string) =>
+    orgsFetch<TeamProjectRow[]>(`/orgs/${orgSlug}/teams/${teamSlug}/projects`),
+
+  patch: (orgSlug: string, teamSlug: string, body: { description?: string; name?: string }) =>
+    orgsFetch<{ ok: true }>(`/orgs/${orgSlug}/teams/${teamSlug}`, {
+      body: JSON.stringify(body),
+      method: 'PATCH',
+    }),
+
+  patchMember: (orgSlug: string, teamSlug: string, userId: string, role: TeamRole) =>
+    orgsFetch<{ ok: true }>(`/orgs/${orgSlug}/teams/${teamSlug}/members/${userId}`, {
+      body: JSON.stringify({ role }),
+      method: 'PATCH',
+    }),
+
+  removeMember: (orgSlug: string, teamSlug: string, userId: string) =>
+    orgsFetch<{ ok: true }>(`/orgs/${orgSlug}/teams/${teamSlug}/members/${userId}`, {
+      method: 'DELETE',
+    }),
+
+  unbindProject: (projectId: string, teamSlug: string) =>
+    adminFetch<{ ok: true }>(`/projects/${projectId}/teams/${teamSlug}`, { method: 'DELETE' }),
+}
+
+export type AuditRow = {
+  action: string
+  actorEmail: null | string
+  actorUserId: null | string
+  createdAt: string
+  id: string
+  payload: unknown
+  targetId: null | string
+  targetType: string
+}
+
+export const auditApi = {
+  list: (
+    orgSlug: string,
+    params?: {
+      action?: string
+      actorUserId?: string
+      before?: string
+      limit?: number
+      targetType?: string
+    }
+  ) => {
+    const qs = new URLSearchParams()
+    if (params?.action) qs.set('action', params.action)
+    if (params?.actorUserId) qs.set('actorUserId', params.actorUserId)
+    if (params?.before) qs.set('before', params.before)
+    if (params?.limit) qs.set('limit', String(params.limit))
+    if (params?.targetType) qs.set('targetType', params.targetType)
+    const suffix = qs.toString() ? `?${qs}` : ''
+    return orgsFetch<AuditRow[]>(`/orgs/${orgSlug}/audit${suffix}`)
+  },
+}
+
+export const transfersApi = {
+  accept: (token: string) =>
+    orgsFetch<{ ok: true }>(`/orgs/transfers/${encodeURIComponent(token)}/accept`, {
+      method: 'POST',
+    }),
+  create: (orgSlug: string, toUserId: string) =>
+    orgsFetch<{ expiresAt: string; id: string }>(`/orgs/${orgSlug}/transfer`, {
+      body: JSON.stringify({ toUserId }),
+      method: 'POST',
+    }),
+}
+
 export type UsageRow = {
   droppedCount: number
   eventCount: number

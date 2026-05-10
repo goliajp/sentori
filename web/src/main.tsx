@@ -33,6 +33,8 @@ import { OrgLayout } from './views/org-layout'
 import { OrgSettingsView } from './views/org-settings'
 import { RecipientSettingsView } from './views/recipient-settings'
 import { RegisterView } from './views/register'
+import { TeamDetailView } from './views/team-detail'
+import { TeamListView } from './views/team-list'
 import { TokenSettingsView } from './views/token-settings'
 import { RootRedirect } from './views/root-redirect'
 import { VerifyView } from './views/verify'
@@ -55,6 +57,8 @@ const router = createBrowserRouter([
           { element: <IssuesView />, path: 'issues' },
           { element: <IssueDetailView />, path: 'issues/:issueId' },
           { element: <OrgSettingsView />, path: 'settings' },
+          { element: <TeamListView />, path: 'teams' },
+          { element: <TeamDetailView />, path: 'teams/:teamSlug' },
           {
             element: <RecipientSettingsView />,
             path: 'projects/:projectId/settings/recipients',

@@ -12,6 +12,7 @@ import { UsageBanner } from '@/components/UsageBanner'
 
 const NAV = [
   { label: 'Issues', path: 'issues' },
+  { label: 'Teams', path: 'teams' },
   { label: 'Settings', path: 'settings' },
 ]
 
