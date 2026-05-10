@@ -1130,13 +1130,14 @@ server 36/36 + dashboard build 126 KB gzip + vitest 1/1 + e2e 1/1。commit `4147
 - [x] core 11 tests + js 8 + rn 18 = 37 SDK tests 全绿
 - [x] npm publish 全 3 包：core 0.1.0 / javascript 0.2.0 / react-native 0.2.0。commit `59f13f4` + `4c94d8d`
 
-#### sub-B — `@goliapkg/sentori-react`
-- [ ] 新 `sdk/react/`
-- [ ] `<SentoriProvider config={...}>` 包 init + context
-- [ ] `<SentoriErrorBoundary fallback={...}>`：React 18 ErrorBoundary 模式
-- [ ] `useSentori()` 暴露 `captureError / setUser / addBreadcrumb`
-- [ ] `useCaptureError()` 异步函数包装
-- [ ] tests + tsup build；publish 0.1.0
+#### sub-B — `@goliapkg/sentori-react` ✅
+- [x] 新 `sdk/react/` workspace；deps `@goliapkg/sentori-core@0.1.0` + `@goliapkg/sentori-javascript@0.2.0`；peer `react>=18`
+- [x] `<SentoriProvider config={...}>`：one-shot init via ref（StrictMode double-mount 安全）；提供 context；misconfig 走 console.error 不炸树
+- [x] `<SentoriErrorBoundary fallback={({ error, reset }) => ...}>`：React 19 class component；`componentDidCatch` 调 captureError 加 `tags.source = 'react.errorBoundary'`；fallback 收 `reset` callback；可选 `onError` hook 给二级 logger
+- [x] `useSentori()` 返回完整 context（capture / setUser / setTags / addBreadcrumb / initialised）；`useCaptureError(fn, extras?)` async 包装捕错 + rethrow，保留调用者 try/catch 语义
+- [x] provider-scoped `setTags(tags)` 合并到 per-call extras（per-call wins 冲突）—— 同 Sentry precedence
+- [x] tests：4 个 case 跑 happy-dom + bunfig preload，fetch + sendBeacon 全 stub；`bun run build` + `bun test` 全绿
+- [x] npm publish `@goliapkg/sentori-react@0.1.0`；commit `390bdf7`
 
 #### sub-C — `@goliapkg/sentori-next`
 - [ ] 新 `sdk/next/`
