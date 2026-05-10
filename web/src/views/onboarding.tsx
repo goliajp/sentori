@@ -289,7 +289,7 @@ function InstallSdkStep({
   tokenInfo: { projectId: string; rawToken: string } | null
 }) {
   const ingestUrl = window.location.origin
-  const [sdk, setSdk] = useState<SdkChoice>('react-native')
+  const [sdk, setSdk] = useState<SdkChoice>('react')
 
   // If the user reloaded the page or got here without a freshly-minted
   // token (rare — they'd have to navigate manually), prompt them to
@@ -383,22 +383,25 @@ captureError(new Error('hello from ${project.name}'))`}
   )
 }
 
-// ---------- SDK choice (Phase 17 sub-C) ----------
+// ---------- SDK choice (Phase 17 sub-C / Phase 21 sub-F) ----------
 
-type SdkChoice = 'javascript' | 'react-native'
+type SdkChoice = 'expo' | 'javascript' | 'next' | 'react' | 'react-native'
 
 const SDKS: { description: string; key: SdkChoice; label: string }[] = [
-  { key: 'react-native', label: 'React Native', description: 'Expo or bare RN' },
-  { key: 'javascript', label: 'JavaScript', description: 'Browser / Node' },
+  { key: 'react', label: 'React', description: 'Browser SPA / CRA' },
+  { key: 'next', label: 'Next.js', description: 'App Router ≥ 14' },
+  { key: 'expo', label: 'Expo', description: 'Managed RN workflow' },
+  { key: 'react-native', label: 'React Native', description: 'Bare RN / non-Expo' },
+  { key: 'javascript', label: 'JavaScript', description: 'Browser / Node, no framework' },
 ]
 
 function SdkPicker({ onChange, value }: { onChange: (s: SdkChoice) => void; value: SdkChoice }) {
   return (
-    <div className="flex gap-2">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
       {SDKS.map((s) => (
         <button
           aria-pressed={value === s.key}
-          className={`flex-1 rounded-md border px-3 py-2 text-left text-[12px] transition-colors ${
+          className={`rounded-md border px-3 py-2 text-left text-[12px] transition-colors ${
             value === s.key ? 'border-accent bg-accent/10' : 'border-border hover:bg-bg-tertiary'
           }`}
           key={s.key}
@@ -424,9 +427,66 @@ function sdkSnippets({
 }): Record<SdkChoice, { init: string; install: string }> {
   const release = `${project.name}@1.0.0+1`
   return {
+    react: {
+      install: `npm install @goliapkg/sentori-react @goliapkg/sentori-javascript`,
+      init: `// main.tsx
+import { SentoriProvider } from '@goliapkg/sentori-react'
+import { createRoot } from 'react-dom/client'
+import App from './App'
+
+const config = {
+  token: '${rawToken}',
+  ingestUrl: '${ingestUrl}',
+  release: '${release}',
+  environment: 'prod',
+}
+
+createRoot(document.getElementById('root')!).render(
+  <SentoriProvider config={config}>
+    <App />
+  </SentoriProvider>,
+)`,
+    },
+    next: {
+      install: `npm install @goliapkg/sentori-next`,
+      init: `// instrumentation.ts (project root)
+export { register, onRequestError } from '@goliapkg/sentori-next/instrumentation'
+
+// .env.local
+NEXT_PUBLIC_SENTORI_TOKEN=${rawToken}
+NEXT_PUBLIC_SENTORI_INGEST_URL=${ingestUrl}
+NEXT_PUBLIC_SENTORI_RELEASE=${release}
+NEXT_PUBLIC_SENTORI_ENVIRONMENT=prod
+
+// app/layout.tsx (top of file, before the default export)
+'use client'
+import { clientInit } from '@goliapkg/sentori-next/client'
+clientInit()`,
+    },
+    expo: {
+      install: `bunx expo install @goliapkg/sentori-expo @goliapkg/sentori-react-native expo-application`,
+      init: `// app.json — add to plugins array
+{
+  "expo": {
+    "plugins": ["@goliapkg/sentori-expo"]
+  }
+}
+
+// App.tsx
+import * as Application from 'expo-application'
+import { initSentoriExpo } from '@goliapkg/sentori-expo'
+
+initSentoriExpo({
+  application: Application,
+  token: '${rawToken}',
+  ingestUrl: '${ingestUrl}',
+  // release auto-derived from expo-application
+})`,
+    },
     'react-native': {
       install: `npm install @goliapkg/sentori-react-native`,
-      init: `import { initSentori } from '@goliapkg/sentori-react-native'
+      init: `// App.tsx
+import { initSentori } from '@goliapkg/sentori-react-native'
 
 initSentori({
   token: '${rawToken}',

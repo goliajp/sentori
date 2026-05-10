@@ -29,6 +29,8 @@ export default defineConfig({
           label: 'Reference',
           items: [
             { label: 'SDK — React Native', slug: 'sdk-react-native' },
+            { label: 'SDK — Vue (planned)', slug: 'sdk-vue' },
+            { label: 'SDK — Svelte (planned)', slug: 'sdk-svelte' },
             { label: 'Protocol', slug: 'protocol' },
           ],
         },
