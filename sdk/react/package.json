@@ -1,0 +1,60 @@
+{
+  "name": "@goliapkg/sentori-react",
+  "version": "0.1.0",
+  "description": "React adapter for Sentori — Provider, ErrorBoundary, and hooks built on @goliapkg/sentori-javascript.",
+  "license": "MIT",
+  "homepage": "https://sentori.golia.jp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/goliajp/sentori.git",
+    "directory": "sdk/react"
+  },
+  "bugs": {
+    "url": "https://github.com/goliajp/sentori/issues"
+  },
+  "keywords": [
+    "sentori",
+    "error-tracking",
+    "react",
+    "error-boundary"
+  ],
+  "type": "module",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    }
+  },
+  "files": [
+    "lib/",
+    "src/",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "prepack": "bun run build"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "dependencies": {
+    "@goliapkg/sentori-core": "0.1.0",
+    "@goliapkg/sentori-javascript": "0.2.0"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "^17",
+    "@testing-library/react": "^16",
+    "@types/bun": "latest",
+    "@types/react": "^19",
+    "react": "^19",
+    "react-dom": "^19",
+    "typescript": "^5"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
