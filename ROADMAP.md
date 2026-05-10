@@ -29,7 +29,7 @@
 
 - [x] **Phase 18** — 账户结构深化（Org / Team / Project / Ownership / Audit）✅
 - [x] **Phase 19** — RBAC 全栈完善 ✅
-- [ ] **Phase 20** — Audit log 深化 + 全局活动 feed
+- [x] **Phase 20** — Audit log 深化 + 全局活动 feed ✅
 - [ ] **Phase 21** — SDK monorepo 抽 core + JS 矩阵扩展（react / next / expo）
 - [ ] **Phase 22** — 原生层深化（iOS dSYM / Android Proguard / ANR / Hang）
 - [ ] **Phase 23** — Release 管理 UX
@@ -1058,27 +1058,47 @@ server 36/36 + dashboard build 126 KB gzip + vitest 1/1 + e2e 1/1。commit `4147
 
 ---
 
-## Phase 20 — Audit log 深化 + 全局活动 feed
+## Phase 20 — Audit log 深化 + 全局活动 feed ✅
 
 **Goal:** Phase 18 已落 audit_logs；这阶段把它做成可观察的产品功能（不是只查日志）。
 
 **Entry:** Phase 19 ✅
 
 **Exit:**
-- Audit log 全 action 类型枚举化 + 文档化
-- Per-user "我做的事" feed
-- Per-org "组织活动" 时间线
-- API 输出对接 webhook（Phase 27 才接，但 schema 这阶段定）
+- Audit log 全 action 字符串集中在 `audit::all_labels`；dashboard 从 `/api/audit/actions` 拉而非硬编码
+- Per-user "我做的事" feed `/me/activity`；含 tombstoned org（org_id NULL → "deleted org"）
+- Org 内 audit log（已在 Phase 18 sub-H 做完）
+- Webhook payload schema 已在 `docs/protocol.md` + docs-site 同步落定，等 Phase 27 实现 delivery + signing
 
-**Estimate:** 1 周
+**Estimate:** 1 周（实际 1 session）
 
 ### Steps
 
-- [ ] sub-A：`AuditAction` enum 化 + i18n key 对应 human-readable 描述
-- [ ] sub-B：dashboard org-settings/audit 页：actor / action / target / time + 折叠 JSON payload
-- [ ] sub-C：dashboard user-settings/activity 页：当前 user 全 org 内的动作流
-- [ ] sub-D：webhook payload schema 写到 `docs/protocol.md`（Phase 27 实现）
-- [ ] sub-E：CSV 导出 + tests
+#### sub-A — Audit i18n + tombstone ✅
+- [x] migration `0013_audit_tombstone.sql`：`audit_logs.org_id` 改 nullable + FK SET NULL；删 org 后 audit 行保留，org_id 自动 null
+- [x] `delete_org` 在 DELETE 之前先 record audit 行，payload 含 slug + name；cascade 之后 org_id 自动变 NULL
+- [x] `audit::label_for(action) -> &str` + `audit::all_labels() -> Vec<(code, label)>`：英文 i18n 标签（未来加 locale 表）
+- [x] 新端点 `GET /api/audit/actions`：dashboard 拉 catalog 而非硬编码
+- [x] `audit-log.tsx` 用 `auditApi.actions()` 替代 `ACTION_OPTIONS` 常量
+
+#### sub-B — Dashboard audit log 页（已在 Phase 18 sub-H 落地，本阶段仅 catalog 接入升级）
+- [x] sub-H 已做：actor / action / target / time + 折叠 JSON payload + filter + cursor 分页 + CSV 导出
+- [x] 本阶段：action filter 改用 `auditApi.actions()` 动态 catalog
+
+#### sub-C — Per-user activity feed ✅
+- [x] `GET /api/users/me/activity?limit=&before=`：actor=caller across 所有 orgs，LEFT JOIN orgs 让 tombstoned 行也出现
+- [x] 视图 `web/src/views/user-activity.tsx`，路由 `/me/activity`：时间轴样式，每条带 org link 或 "deleted org" 斜体
+- [x] OrgLayout 头部 user-email chip 改成 `<Link to="/me/activity">` 入口
+
+#### sub-D — Webhook payload schema 落定（Phase 27 实现）✅
+- [x] `docs/protocol.md` + `docs-site/src/content/docs/protocol.md` 加 "Audit-event webhook payload (forward-looking, Phase 27)" 段
+- [x] 锁定 headers（含 `sentori-signature: t=<unix>,v1=<hmac-sha256>` 5min anti-replay + v2 rotation lane）+ body（含 actor / org / target / payload）+ per-action required keys 表 + retry 1m/5m/30m/2h x6 + dedup by uuid v7
+- [x] 文档版本号 `v0.1`
+
+#### sub-E — CSV 导出 + tests（已在 Phase 18 sub-H + Phase 20 测试中覆盖）✅
+- [x] CSV 导出：sub-H 已做（quoted, escaped）
+- [x] 新 `tests/user_activity.rs` 3 个 test：catalog endpoint / activity feed 含 org slug / tombstone-after-delete 仍可见
+- [x] server 39/39 + dashboard build 126 KB gzip + vitest 1/1 + e2e 1/1。commit `1c47429` + `cca4814`
 
 ---
 
