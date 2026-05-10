@@ -121,12 +121,12 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 29 sub-B: webhook persistent retry queue` — 注：本 sub 跑测试期间发现 v0.2 commit 留下两个独立 bug（sessions 表命名冲突 / `bun run check` 17 lint error），不在 sub-B 范围、单独跟进
 
 ### sub-C — server `OffsetDateTime` serde sweep
-- [ ] `rg "OffsetDateTime" server/src/api/ server/src/` 列出所有 struct 字段
-- [ ] 给每个未带 `#[serde(with)]` 注解的字段加 `#[serde(with = "time::serde::rfc3339")]`（`Option<OffsetDateTime>` 用 `time::serde::rfc3339::option`）
-- [ ] `cargo test` 全套 server integration test 全绿
-- [ ] 写脚本 `scripts/check-rfc3339.sh`：grep `pub .*: OffsetDateTime` 不带 `with =` 即 fail
-- [ ] 把脚本接进 CI（`.github/workflows/check.yml` 或 `bun run check`）
-- [ ] commit `phase 29 sub-C: server OffsetDateTime rfc3339 sweep`
+- [x] grep + struct/enum 上下文 + `#[derive(Serialize|Deserialize)]` 过滤，识别需要注解的 struct field（fn params + 内部 enum 都正确跳过）
+- [x] 给所有 serde-derive struct 内未注解的 `OffsetDateTime` / `Option<OffsetDateTime>` 字段加 `#[serde(with = "time::serde::rfc3339")]` 或 `::option`（共 23 处：dsyms 4 + recipients 1 + mappings 1 + projects 1 + teams 3 + orgs 13）
+- [x] cargo lib test 全套绿（18 passed）+ webhook_retry 仍通过；server integration test 整体被 task 16 的 sessions 表 bug 卡住跟 sub-C 无关
+- [x] `scripts/check-rfc3339.sh`（Python 跑 brace-depth + derive 过滤，只 flag serde-derived struct 内未注解的字段；fn params / 内部 enum 不误报）
+- [x] CI 接入：`.github/workflows/build.yml` server job 的 `cargo test` 步骤前加一条 `bash scripts/check-rfc3339.sh`
+- [x] commit `phase 29 sub-C: server OffsetDateTime rfc3339 sweep`
 
 ### sub-D — UUID prefix collision sweep
 - [ ] `rg 'simple\(\)\.to_string\(\)\[\.\.[0-9]+\]' server/tests/` 列出所有用 `[..N]` 取 UUID v7 timestamp prefix 的测试

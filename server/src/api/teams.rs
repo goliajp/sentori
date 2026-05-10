@@ -45,6 +45,7 @@ struct TeamRow {
     slug: String,
     name: String,
     description: Option<String>,
+    #[serde(with = "time::serde::rfc3339")]
     created_at: OffsetDateTime,
 }
 
@@ -54,6 +55,7 @@ struct TeamMemberRow {
     user_id: Uuid,
     email: String,
     role: String,
+    #[serde(with = "time::serde::rfc3339")]
     created_at: OffsetDateTime,
 }
 
@@ -62,6 +64,7 @@ struct TeamMemberRow {
 struct ProjectRow {
     id: Uuid,
     name: String,
+    #[serde(with = "time::serde::rfc3339")]
     created_at: OffsetDateTime,
 }
 

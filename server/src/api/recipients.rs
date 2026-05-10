@@ -21,6 +21,7 @@ struct RecipientRow {
     email: String,
     on_new_issue: bool,
     on_regression: bool,
+    #[serde(with = "time::serde::rfc3339")]
     created_at: OffsetDateTime,
 }
 

@@ -39,6 +39,7 @@ struct OrgRow {
     slug: String,
     name: String,
     owner_id: Uuid,
+    #[serde(with = "time::serde::rfc3339")]
     created_at: OffsetDateTime,
     role: String,
 }
@@ -49,6 +50,7 @@ struct MemberRow {
     user_id: Uuid,
     email: String,
     role: String,
+    #[serde(with = "time::serde::rfc3339")]
     created_at: OffsetDateTime,
 }
 
@@ -58,8 +60,11 @@ struct InviteRow {
     token: String,
     email: String,
     role: String,
+    #[serde(with = "time::serde::rfc3339")]
     expires_at: OffsetDateTime,
+    #[serde(default, with = "time::serde::rfc3339::option")]
     used_at: Option<OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339")]
     created_at: OffsetDateTime,
     team_slug: Option<String>,
 }
@@ -337,6 +342,7 @@ struct ExportResponse {
 struct ExportedProject {
     id: Uuid,
     name: String,
+    #[serde(with = "time::serde::rfc3339")]
     created_at: OffsetDateTime,
     tokens: Vec<ExportedToken>,
     recipients: Vec<ExportedRecipient>,
@@ -349,7 +355,9 @@ struct ExportedToken {
     kind: String,
     label: Option<String>,
     last4: Option<String>,
+    #[serde(with = "time::serde::rfc3339")]
     created_at: OffsetDateTime,
+    #[serde(default, with = "time::serde::rfc3339::option")]
     revoked_at: Option<OffsetDateTime>,
 }
 
@@ -360,6 +368,7 @@ struct ExportedRecipient {
     email: String,
     on_new_issue: bool,
     on_regression: bool,
+    #[serde(with = "time::serde::rfc3339")]
     created_at: OffsetDateTime,
 }
 
@@ -1318,12 +1327,14 @@ struct UserActivityRow {
     target_type: String,
     target_id: Option<Uuid>,
     payload: serde_json::Value,
+    #[serde(with = "time::serde::rfc3339")]
     created_at: OffsetDateTime,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserActivityQuery {
+    #[serde(default, with = "time::serde::rfc3339::option")]
     pub before: Option<OffsetDateTime>,
     pub limit: Option<i64>,
 }
@@ -1375,6 +1386,7 @@ struct AuditRow {
     target_type: String,
     target_id: Option<Uuid>,
     payload: serde_json::Value,
+    #[serde(with = "time::serde::rfc3339")]
     created_at: OffsetDateTime,
 }
 
@@ -1382,6 +1394,7 @@ struct AuditRow {
 #[serde(rename_all = "camelCase")]
 pub struct AuditQuery {
     pub limit: Option<i64>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
     pub before: Option<OffsetDateTime>,
     pub action: Option<String>,
     pub actor_user_id: Option<Uuid>,

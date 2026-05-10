@@ -26,6 +26,7 @@ pub struct CreateProjectBody {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectCreated {
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
     pub id: Uuid,
     pub name: String,

@@ -174,6 +174,7 @@ struct DsymRow {
     object_name: Option<String>,
     release: Option<String>,
     size_bytes: i32,
+    #[serde(with = "time::serde::rfc3339")]
     uploaded_at: OffsetDateTime,
     uploaded_by_email: Option<String>,
 }
@@ -200,6 +201,7 @@ pub async fn release_artifacts(
         id: Uuid,
         object_name: Option<String>,
         size_bytes: i32,
+        #[serde(with = "time::serde::rfc3339")]
         uploaded_at: OffsetDateTime,
         uploaded_by_email: Option<String>,
     }
@@ -210,6 +212,7 @@ pub async fn release_artifacts(
         debug_id: Option<String>,
         id: Uuid,
         size_bytes: i32,
+        #[serde(with = "time::serde::rfc3339")]
         uploaded_at: OffsetDateTime,
         uploaded_by_email: Option<String>,
     }
@@ -218,6 +221,7 @@ pub async fn release_artifacts(
     #[serde(rename_all = "camelCase")]
     struct SourcemapRow {
         content_hash: String,
+        #[serde(with = "time::serde::rfc3339")]
         created_at: OffsetDateTime,
         id: Uuid,
         kind: String,

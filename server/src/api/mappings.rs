@@ -151,6 +151,7 @@ struct MappingRow {
     debug_id: Option<String>,
     release: Option<String>,
     size_bytes: i32,
+    #[serde(with = "time::serde::rfc3339")]
     uploaded_at: OffsetDateTime,
     uploaded_by_email: Option<String>,
 }
