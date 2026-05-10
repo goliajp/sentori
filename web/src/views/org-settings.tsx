@@ -76,15 +76,18 @@ export function OrgSettingsView() {
 
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<OrgRole>('member')
+  const [inviteTeamSlug, setInviteTeamSlug] = useState<string>('')
   const [inviteMsg, setInviteMsg] = useState<null | string>(null)
   const inviteMutation = useMutation({
-    mutationFn: () => orgsApi.createInvite(slug, inviteEmail.trim(), inviteRole),
+    mutationFn: () =>
+      orgsApi.createInvite(slug, inviteEmail.trim(), inviteRole, inviteTeamSlug || null),
     onError: (err: { body?: { error?: string } }) => {
       setInviteMsg(err.body?.error ?? 'Invite failed')
     },
     onSuccess: () => {
       setInviteEmail('')
       setInviteRole('member')
+      setInviteTeamSlug('')
       setInviteMsg('Invite sent')
       void queryClient.invalidateQueries({ queryKey: ['invites', slug] })
     },
@@ -243,6 +246,21 @@ export function OrgSettingsView() {
                 </option>
               ))}
             </select>
+            {teamsQuery.data && teamsQuery.data.length > 0 && (
+              <select
+                className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1.5 text-sm"
+                onChange={(e) => setInviteTeamSlug(e.target.value)}
+                title="Add to team on accept (optional)"
+                value={inviteTeamSlug}
+              >
+                <option value="">No team</option>
+                {teamsQuery.data.map((t) => (
+                  <option key={t.id} value={t.slug}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               className="bg-accent text-bg rounded-md px-3 py-1.5 text-sm disabled:opacity-50"
               disabled={inviteMutation.isPending || !inviteEmail.trim()}
@@ -266,7 +284,19 @@ export function OrgSettingsView() {
               <tbody>
                 {invitesQuery.data.map((inv) => (
                   <tr className="border-border/40 h-9 border-b" key={inv.token}>
-                    <td className="text-fg px-2 font-mono">{inv.email}</td>
+                    <td className="text-fg px-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono">{inv.email}</span>
+                        {inv.teamSlug && (
+                          <span
+                            className="border-border bg-bg-tertiary text-fg-muted rounded border px-1.5 py-0.5 text-[10px] font-medium"
+                            title={`Will join team ${inv.teamSlug}`}
+                          >
+                            {inv.teamSlug}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="text-fg-muted px-2 font-mono uppercase">{inv.role}</td>
                     <td className="text-fg-muted px-2 font-mono text-[11px] tabular-nums">
                       {new Date(inv.expiresAt).toISOString().slice(0, 10)}

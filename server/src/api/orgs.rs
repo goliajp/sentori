@@ -61,6 +61,7 @@ struct InviteRow {
     expires_at: OffsetDateTime,
     used_at: Option<OffsetDateTime>,
     created_at: OffsetDateTime,
+    team_slug: Option<String>,
 }
 
 // ---------- org CRUD ----------
@@ -396,9 +397,10 @@ pub async fn export_org(
     .unwrap_or_default();
 
     let pending_invites: Vec<InviteRow> = sqlx::query_as(
-        "SELECT token, email, role, expires_at, used_at, created_at \
-         FROM org_invites WHERE org_id = $1 AND used_at IS NULL \
-         ORDER BY created_at",
+        "SELECT i.token, i.email, i.role, i.expires_at, i.used_at, i.created_at, t.slug AS team_slug \
+         FROM org_invites i LEFT JOIN teams t ON t.id = i.team_id \
+         WHERE i.org_id = $1 AND i.used_at IS NULL \
+         ORDER BY i.created_at",
     )
     .bind(org_id)
     .fetch_all(&pool)
@@ -740,9 +742,13 @@ pub async fn delete_member(
 // ---------- invites ----------
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateInviteBody {
     pub email: String,
     pub role: String,
+    /// Optional team slug. When set, accept_invite atomically inserts a
+    /// team_memberships row alongside the org membership.
+    pub team_slug: Option<String>,
 }
 
 pub async fn create_invite(
@@ -777,18 +783,42 @@ pub async fn create_invite(
         return bad_request("cannotInviteAsOwner");
     }
 
+    let team_id: Option<Uuid> = if let Some(team_slug) = body.team_slug.as_ref() {
+        let s = team_slug.trim();
+        if s.is_empty() {
+            None
+        } else {
+            let id: Option<Uuid> = sqlx::query_scalar(
+                "SELECT id FROM teams WHERE org_id = $1 AND slug = $2",
+            )
+            .bind(org_id)
+            .bind(s)
+            .fetch_optional(&pool)
+            .await
+            .ok()
+            .flatten();
+            match id {
+                Some(id) => Some(id),
+                None => return bad_request("teamNotFound"),
+            }
+        }
+    } else {
+        None
+    };
+
     let token = random_token(32);
     let expires_at = OffsetDateTime::now_utc() + Duration::days(INVITE_TTL_DAYS);
 
     if let Err(e) = sqlx::query(
-        "INSERT INTO org_invites (token, org_id, email, role, expires_at) \
-         VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO org_invites (token, org_id, email, role, expires_at, team_id) \
+         VALUES ($1, $2, $3, $4, $5, $6)",
     )
     .bind(&token)
     .bind(org_id)
     .bind(&email)
     .bind(&body.role)
     .bind(expires_at)
+    .bind(team_id)
     .execute(&pool)
     .await
     {
@@ -837,9 +867,10 @@ pub async fn list_invites(
     }
 
     let rows: Vec<InviteRow> = sqlx::query_as(
-        "SELECT token, email, role, expires_at, used_at, created_at \
-         FROM org_invites WHERE org_id = $1 AND used_at IS NULL \
-         ORDER BY created_at DESC",
+        "SELECT i.token, i.email, i.role, i.expires_at, i.used_at, i.created_at, t.slug AS team_slug \
+         FROM org_invites i LEFT JOIN teams t ON t.id = i.team_id \
+         WHERE i.org_id = $1 AND i.used_at IS NULL \
+         ORDER BY i.created_at DESC",
     )
     .bind(org_id)
     .fetch_all(&pool)
@@ -893,18 +924,24 @@ pub async fn accept_invite(
         None => return server_error("dbNotConfigured"),
     };
 
-    let row: Option<(Uuid, String, String, OffsetDateTime, Option<OffsetDateTime>)> =
-        sqlx::query_as(
-            "SELECT org_id, email, role, expires_at, used_at \
-             FROM org_invites WHERE token = $1",
-        )
-        .bind(&token)
-        .fetch_optional(&pool)
-        .await
-        .ok()
-        .flatten();
+    let row: Option<(
+        Uuid,
+        String,
+        String,
+        OffsetDateTime,
+        Option<OffsetDateTime>,
+        Option<Uuid>,
+    )> = sqlx::query_as(
+        "SELECT org_id, email, role, expires_at, used_at, team_id \
+         FROM org_invites WHERE token = $1",
+    )
+    .bind(&token)
+    .fetch_optional(&pool)
+    .await
+    .ok()
+    .flatten();
 
-    let (org_id, invite_email, role, expires_at, used_at) = match row {
+    let (org_id, invite_email, role, expires_at, used_at, team_id) = match row {
         Some(r) => r,
         None => return not_found("inviteNotFound"),
     };
@@ -935,6 +972,24 @@ pub async fn accept_invite(
     if let Err(e) = insert {
         tracing::error!(error = %e, "insert membership failed");
         return server_error("insertMembership");
+    }
+
+    // Attach to the invited team in the same transaction. If the team
+    // was deleted while the invite sat in the inbox, team_id is NULL
+    // (FK ON DELETE SET NULL) and we silently fall back to org-only.
+    if let Some(tid) = team_id {
+        if let Err(e) = sqlx::query(
+            "INSERT INTO team_memberships (team_id, user_id, role) VALUES ($1, $2, 'member') \
+             ON CONFLICT (team_id, user_id) DO NOTHING",
+        )
+        .bind(tid)
+        .bind(user.id)
+        .execute(&mut *tx)
+        .await
+        {
+            tracing::error!(error = %e, "insert team membership failed");
+            return server_error("insertTeamMembership");
+        }
     }
 
     if let Err(e) = sqlx::query("UPDATE org_invites SET used_at = now() WHERE token = $1")

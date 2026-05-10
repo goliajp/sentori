@@ -223,6 +223,7 @@ export type InviteRow = {
   email: string
   expiresAt: string
   role: OrgRole
+  teamSlug: null | string
   token: string
   usedAt: null | string
 }
@@ -240,9 +241,13 @@ export const orgsApi = {
       method: 'POST',
     }),
 
-  createInvite: (slug: string, email: string, role: OrgRole) =>
+  createInvite: (slug: string, email: string, role: OrgRole, teamSlug?: null | string) =>
     orgsFetch<{ token: string }>(`/orgs/${slug}/invites`, {
-      body: JSON.stringify({ email, role }),
+      body: JSON.stringify({
+        email,
+        role,
+        ...(teamSlug ? { teamSlug } : {}),
+      }),
       method: 'POST',
     }),
 
