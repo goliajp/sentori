@@ -135,12 +135,12 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 29 sub-D: stop UUID v7 prefix collisions in tests`
 
 ### sub-E — CLI extras
-- [ ] `cli/src/main.rs` 加 subcommand `issue`，分发到 `cli/src/issue.rs`
-- [ ] `cli/src/issue.rs`：`issue list --status=active --release=X --limit=N --json` / `issue resolve <issue-uuid> [--in-release=X]` / `issue silence <issue-uuid>`，全用 admin token via `SENTORI_ADMIN_TOKEN` env
-- [ ] 3 个 unit test：clap 解析三 subcommand 各一组合 / `--json` 输出格式 / 缺 token env 报清晰错误
-- [ ] `docs/getting-started.md` + 镜像加 "CLI: list / resolve / silence" 段
-- [ ] cli 包 bump 0.2.0 + `npm publish --access public`
-- [ ] commit `phase 29 sub-E: cli issue list/resolve/silence`
+- [x] `cli/src/main.rs` 加 `Issue` subcommand + 3 `IssueKind` 变体，分发到 `cli/src/issue.rs`
+- [x] `cli/src/issue.rs`：`issue list / resolve / silence`，admin token via `SENTORI_ADMIN_TOKEN` → `SENTORI_TOKEN` fallback；API URL 同 dsym/mapping 的 fallback 链；`--json` 旁路直出，否则格式化为 dense 单行表
+- [x] 3 unit test：clap 三 subcommand 解析（list+resolve+silence 一个组合调用各覆盖一次）/ `format_issues_table` 渲染（empty + full row）/ 缺 token 错误包含 `SENTORI_ADMIN_TOKEN` + `SENTORI_TOKEN` —— 用 env_lookup injection 避免 std::env::set_var 在并行测试里 race。3/3 pass
+- [x] `docs/getting-started.md` + `docs-site` 镜像加 "6. Triage issues from CI" 段（list / resolve / silence 三段示例）
+- [x] cli npm 包 bump 0.1.0 → 0.2.0（`npm publish --access public` 由 user 跑，需要 npm credentials）
+- [x] commit `phase 29 sub-E: cli issue list/resolve/silence`
 
 ## Phase 30 — Insight (RN) onboarding polish
 

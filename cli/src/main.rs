@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 use walkdir::WalkDir;
 
 mod dsym;
+mod issue;
 
 const DEFAULT_INGEST_URL: &str = "https://ingest.sentori.golia.jp";
 
@@ -25,6 +26,66 @@ enum Command {
     Upload {
         #[command(subcommand)]
         kind: UploadKind,
+    },
+    /// Operate on issues — list, resolve, silence. Reads admin token from
+    /// the same env-fallback chain as `upload dsym`.
+    Issue {
+        #[command(subcommand)]
+        kind: IssueKind,
+    },
+}
+
+#[derive(Subcommand)]
+enum IssueKind {
+    /// List issues for a project.
+    List {
+        /// Project UUID.
+        #[arg(long = "project")]
+        project_id: String,
+        /// Filter by issue status. Defaults to `active`. `all` to skip.
+        #[arg(long, default_value = "active")]
+        status: String,
+        /// Filter by release tag.
+        #[arg(long)]
+        release: Option<String>,
+        /// Max rows returned.
+        #[arg(long, default_value_t = 20)]
+        limit: u32,
+        /// Print the server JSON as-is instead of the dense table.
+        #[arg(long)]
+        json: bool,
+        /// Admin / user-session token. Defaults to `SENTORI_ADMIN_TOKEN`
+        /// then `SENTORI_TOKEN`.
+        #[arg(long)]
+        token: Option<String>,
+        /// Admin API base. Same fallback chain as `upload dsym`.
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
+    /// Mark an issue resolved (optionally tag the release that fixed it).
+    Resolve {
+        /// Issue UUID.
+        issue_id: String,
+        /// Project UUID.
+        #[arg(long = "project")]
+        project_id: String,
+        /// Release tag where the fix landed, e.g. `myapp@1.2.4+457`.
+        #[arg(long = "in-release")]
+        in_release: Option<String>,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
+    /// Silence an issue (no notifications; events still ingested).
+    Silence {
+        issue_id: String,
+        #[arg(long = "project")]
+        project_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
     },
 }
 
@@ -118,6 +179,30 @@ async fn main() -> Result<()> {
                 api_url,
                 path,
             } => upload_mapping(project_id, release, token, api_url, path).await,
+        },
+        Command::Issue { kind } => match kind {
+            IssueKind::List {
+                project_id,
+                status,
+                release,
+                limit,
+                json,
+                token,
+                api_url,
+            } => issue::list(project_id, status, release, limit, json, token, api_url).await,
+            IssueKind::Resolve {
+                issue_id,
+                project_id,
+                in_release,
+                token,
+                api_url,
+            } => issue::resolve(issue_id, project_id, in_release, token, api_url).await,
+            IssueKind::Silence {
+                issue_id,
+                project_id,
+                token,
+                api_url,
+            } => issue::silence(issue_id, project_id, token, api_url).await,
         },
     }
 }
@@ -376,7 +461,7 @@ fn collect_files(paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
     Ok(out)
 }
 
-fn urlencoding(s: &str) -> String {
+pub(crate) fn urlencoding(s: &str) -> String {
     // Just escape what we need for the release segment (`@`, `+`, `/`, ` `).
     s.chars()
         .flat_map(|c| match c {

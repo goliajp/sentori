@@ -101,6 +101,39 @@ curl -fsS -X POST "$SENTORI_INGEST_URL/v1/deploys" \
 Idempotent — re-running the same `release` just refreshes the
 `deployAt` timestamp, so re-running a flaky CI job is safe.
 
+## 6. Triage issues from CI (optional)
+
+Once you have a release-cut workflow, you can also drive issue state
+from it. `sentori-cli` has three issue subcommands that all read
+`SENTORI_ADMIN_TOKEN` from the environment (`SENTORI_TOKEN` is a
+fallback) and POST to the admin API:
+
+```bash
+# Latest 20 active issues for a project — dense one-line-per-issue.
+npx @goliapkg/sentori-cli issue list \
+  --project 019508a0-0000-0000-0000-000000000000 \
+  --status active \
+  --limit 20
+
+# Same, but emit the raw JSON the dashboard sees (good for piping into jq).
+npx @goliapkg/sentori-cli issue list \
+  --project $PROJECT_ID --json
+
+# Mark an issue resolved, tagging the release the fix landed in. The
+# dashboard's regression detector will flip it back to `regressed` if a
+# matching event lands after this release.
+npx @goliapkg/sentori-cli issue resolve <issue-uuid> \
+  --project $PROJECT_ID \
+  --in-release myapp@1.2.4+457
+
+# Silence a noisy issue (still ingested, but no alerts / no badges).
+npx @goliapkg/sentori-cli issue silence <issue-uuid> \
+  --project $PROJECT_ID
+```
+
+The admin token is the `sk_` token from project settings → tokens, or
+your user-session cookie if you're calling from a logged-in machine.
+
 ## What's next
 
 - [SDK reference](./sdk-react-native.md) — full `sentori.init`, capture
