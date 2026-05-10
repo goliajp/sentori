@@ -10,9 +10,12 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { useThemeEffect } from '@/components/theme'
 import { UsageBanner } from '@/components/UsageBanner'
 
-const NAV = [
+type NavItem = { adminOnly?: boolean; label: string; path: string }
+
+const NAV: NavItem[] = [
   { label: 'Issues', path: 'issues' },
   { label: 'Teams', path: 'teams' },
+  { adminOnly: true, label: 'Audit', path: 'audit' },
   { label: 'Settings', path: 'settings' },
 ]
 
@@ -105,7 +108,10 @@ export function OrgLayout() {
               teams={teams ?? []}
             />
             <nav className="flex items-center gap-1">
-              {NAV.map((item) => (
+              {NAV.filter(
+                (item) =>
+                  !item.adminOnly || currentOrg.role === 'owner' || currentOrg.role === 'admin'
+              ).map((item) => (
                 <Link
                   className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
                     isActive(item.path)

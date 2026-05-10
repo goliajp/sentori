@@ -28,6 +28,7 @@ import { InviteAcceptView } from './views/invite-accept'
 import { IssueDetailView } from './views/issue-detail'
 import { IssuesView } from './views/issues'
 import { LoginView } from './views/login'
+import { AuditLogView } from './views/audit-log'
 import { OnboardingView } from './views/onboarding'
 import { OrgLayout } from './views/org-layout'
 import { OrgSettingsView } from './views/org-settings'
@@ -62,6 +63,7 @@ const router = createBrowserRouter([
           { element: <OrgSettingsView />, path: 'settings' },
           { element: <TeamListView />, path: 'teams' },
           { element: <TeamDetailView />, path: 'teams/:teamSlug' },
+          { element: <AuditLogView />, path: 'audit' },
           {
             element: <RecipientSettingsView />,
             path: 'projects/:projectId/settings/recipients',
