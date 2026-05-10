@@ -16,7 +16,11 @@ use axum::{
     routing::post,
 };
 use reqwest::Client;
-use sentori_server::{db, notifier::NotifyEvent, router, rule_eval, webhook};
+use sentori_server::{
+    db,
+    notifier::{NotifierConfig, NotifyEvent, SmtpTls},
+    router, rule_eval, webhook, webhook_dispatch,
+};
 use serde_json::{Value, json};
 use sqlx::{PgPool, types::Uuid};
 use tokio::net::TcpListener;
@@ -75,9 +79,20 @@ async fn setup_server() -> Option<(SocketAddr, PgPool, mpsc::Sender<NotifyEvent>
     let listener = TcpListener::bind("127.0.0.1:0").await.ok()?;
     let addr = listener.local_addr().ok()?;
     // Real notifier task: handles NotifyEvent::AlertFired, including
-    // the webhook channel branch. We don't need SMTP since the rule's
-    // channel array is webhook-only for this test.
-    let tx = sentori_server::notifier::start(None, pool.clone());
+    // the webhook channel branch. The rule's channel array is
+    // webhook-only here, so SMTP never actually sends — but
+    // `notifier::handle` returns early when `cfg` is `None`, so we
+    // pass a stub config (valid From address; SMTP host unreachable
+    // but never dialed because no email channel fires).
+    let cfg = NotifierConfig {
+        smtp_host: "stub.invalid".to_string(),
+        smtp_port: 0,
+        smtp_user: None,
+        smtp_pass: None,
+        from: "test@test.invalid".to_string(),
+        tls: SmtpTls::Plain,
+    };
+    let tx = sentori_server::notifier::start(Some(cfg), pool.clone());
     let app = router::build(router::ServerConfig {
         dev_token: "st_pk_webhook0000000000000000".to_string(),
         db: Some(pool.clone()),
@@ -195,8 +210,26 @@ async fn webhook_channel_signs_and_delivers() {
 
     rule_eval::sweep_once(&pool, Some(&tx)).await.unwrap();
 
-    // Notifier ships pings on its own task — wait briefly for the
-    // mock receiver to capture the POST.
+    // Phase 29 sub-B changed the notifier's webhook path from a direct
+    // `webhook::send` to `webhook::enqueue` — the actual POST now ships
+    // from `webhook_dispatch::sweep_once`. Wait for the notifier task to
+    // run AlertFired (it's on a tokio::spawn loop reading the mpsc), then
+    // drive the dispatcher once to flush the row.
+    for _ in 0..50 {
+        let pending: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM webhook_deliveries WHERE status = 'pending'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        if pending > 0 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    webhook_dispatch::sweep_once(&pool).await.unwrap();
+
+    // Now the mock receiver should have the POST.
     for _ in 0..50 {
         if !captured.inner.lock().await.is_empty() {
             break;

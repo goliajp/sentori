@@ -119,8 +119,7 @@ async fn team_admin_can_create_member_cant() {
         return;
     };
 
-    let suffix = format!("{}", std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
+    let suffix = Uuid::now_v7().simple().to_string();
     let admin_email = format!("team-admin-{suffix}@golia.test");
     let member_email = format!("team-member-{suffix}@golia.test");
     let org_slug = format!("org-tac-{}", &suffix[12..28]);
@@ -186,8 +185,7 @@ async fn team_bound_project_gates_non_team_member() {
         return;
     };
 
-    let suffix = format!("{}", std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
+    let suffix = Uuid::now_v7().simple().to_string();
     let owner_email = format!("team-owner-{suffix}@golia.test");
     let in_team_email = format!("in-team-{suffix}@golia.test");
     let out_team_email = format!("out-team-{suffix}@golia.test");

@@ -312,7 +312,7 @@ pub async fn login(
         .map(|s| s.to_string());
 
     if let Err(e) = sqlx::query(
-        "INSERT INTO sessions (id, user_id, expires_at, ip, user_agent) \
+        "INSERT INTO auth_sessions (id, user_id, expires_at, ip, user_agent) \
          VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(&session_id)
@@ -349,7 +349,7 @@ pub async fn login(
 
 pub async fn logout(State(state): State<AppState>, jar: CookieJar) -> Response {
     if let (Some(pool), Some(c)) = (&state.db, jar.get(SESSION_COOKIE)) {
-        let _ = sqlx::query("DELETE FROM sessions WHERE id = $1")
+        let _ = sqlx::query("DELETE FROM auth_sessions WHERE id = $1")
             .bind(c.value())
             .execute(pool)
             .await;
@@ -371,7 +371,7 @@ pub async fn me(State(state): State<AppState>, jar: CookieJar) -> Response {
 
     let row: Option<(Uuid, String, OffsetDateTime)> = sqlx::query_as(
         "SELECT u.id, u.email, s.expires_at \
-         FROM sessions s JOIN users u ON u.id = s.user_id \
+         FROM auth_sessions s JOIN users u ON u.id = s.user_id \
          WHERE s.id = $1",
     )
     .bind(&session_id)
@@ -436,7 +436,7 @@ pub async fn require_user(
 pub async fn current_user(pool: &PgPool, session_id: &str) -> Option<(Uuid, String)> {
     let row: Option<(Uuid, String, OffsetDateTime)> = sqlx::query_as(
         "SELECT u.id, u.email, s.expires_at \
-         FROM sessions s JOIN users u ON u.id = s.user_id \
+         FROM auth_sessions s JOIN users u ON u.id = s.user_id \
          WHERE s.id = $1",
     )
     .bind(session_id)

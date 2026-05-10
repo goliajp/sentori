@@ -82,8 +82,7 @@ async fn invite_with_team_attaches_user_to_team() {
         return;
     };
 
-    let suffix = format!("{}", std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
+    let suffix = Uuid::now_v7().simple().to_string();
     let owner_email = format!("inv-owner-{suffix}@golia.test");
     let invitee_email = format!("inv-target-{suffix}@golia.test");
     let org_slug = format!("org-iv-{}", &suffix[12..28]);
@@ -194,8 +193,7 @@ async fn invite_with_dropped_team_falls_back_to_org_only() {
         return;
     };
 
-    let suffix = format!("{}", std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
+    let suffix = Uuid::now_v7().simple().to_string();
     let owner_email = format!("inv-owner2-{suffix}@golia.test");
     let invitee_email = format!("inv-target2-{suffix}@golia.test");
     let org_slug = format!("org-id-{}", &suffix[12..28]);

@@ -131,8 +131,7 @@ async fn ownership_transfer_happy_path() {
         return;
     };
 
-    let suffix = format!("{}", std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
+    let suffix = Uuid::now_v7().simple().to_string();
     let owner_email = format!("xfer-owner-{suffix}@golia.test");
     let admin_email = format!("xfer-admin-{suffix}@golia.test");
     let org_slug = format!("org-xh-{}", &suffix[12..28]);
@@ -221,8 +220,7 @@ async fn ownership_transfer_rejects_non_eligible_target() {
         return;
     };
 
-    let suffix = format!("{}", std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
+    let suffix = Uuid::now_v7().simple().to_string();
     let owner_email = format!("xfer-owner2-{suffix}@golia.test");
     let member_email = format!("xfer-member-{suffix}@golia.test");
     let outsider_email = format!("xfer-outsider-{suffix}@golia.test");
@@ -273,8 +271,7 @@ async fn audit_log_records_team_actions() {
         return;
     };
 
-    let suffix = format!("{}", std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
+    let suffix = Uuid::now_v7().simple().to_string();
     let owner_email = format!("audit-owner-{suffix}@golia.test");
     let member_email = format!("audit-member-{suffix}@golia.test");
     let org_slug = format!("org-au-{}", &suffix[12..28]);
