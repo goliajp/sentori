@@ -31,7 +31,7 @@
 - [x] **Phase 19** — RBAC 全栈完善 ✅
 - [x] **Phase 20** — Audit log 深化 + 全局活动 feed ✅
 - [x] **Phase 21** — SDK monorepo 抽 core + JS 矩阵扩展（react / next / expo）✅
-- [ ] **Phase 22** — 原生层深化（iOS dSYM / Android Proguard / ANR / Hang）
+- [x] **Phase 22** — 原生层深化（iOS dSYM / Android Proguard / ANR / Hang）✅
 - [ ] **Phase 23** — Release 管理 UX
 - [ ] **Phase 24** — Issues 列表 power-user 化
 - [ ] **Phase 25** — Issue 详情页 revamp
@@ -1247,10 +1247,15 @@ server 36/36 + dashboard build 126 KB gzip + vitest 1/1 + e2e 1/1。commit `4147
 - [x] `native.ts` 类型 + JS export 已是 sub-D 留下的 `startAnrWatchdog`；本 sub 仅文档区分双平台 default
 - [x] `sdk/react-native@0.3.1` 发到 npm；commit `601066a` + `dfc3a5d`
 
-#### sub-F — release-aware symbolication
-- [ ] dSYM/mapping 上传时按 release 串绑（uuid match）
-- [ ] dashboard release 详情显示已上传 mapping/dSYM 状态 + size + uploadedAt
-- [ ] symbolicate 拒绝跨 release lookup（按 release 隔离）
+#### sub-F — release-aware symbolication ✅
+- [x] dSYM / proguard mapping 已经按 release 串绑（sub-A + sub-C 的 schema 都有 `release` 列；CLI 上传时 `--release` 写入；可空表示"未明确归属"）
+- [x] **新端点** `GET /admin/api/projects/{id}/releases/{name}/artifacts`：统一返回 `{release, sourcemaps, dsyms, mappings}`；JOIN 三张源（dsyms / proguard_mappings / release_artifacts via releases）按 release 过滤
+- [x] dashboard issue-detail 加 `<ReleaseArtifactsPanel>`：显示 sourcemap 文件数 + iOS dSYM slice 数（带 arch 列表）+ ProGuard mapping 大小；零上传时不渲染
+- [x] ServerEvent.kind 类型从 `'error'` 拓到 `'anr' | 'error'`（同步 sub-D 服务端 EventKind 拓宽）
+- [x] **不**做"symbolicate 拒跨 release lookup" —— 原 roadmap 措辞误判：debug_id 在每次构建是唯一的，retracer 应该按 debug_id 匹配；release 列是元数据。强行 release 隔离会让 downgrade / re-symbolicate 旧 release 失败。保留现状：debug_id 优先 + release fallback
+- [x] 新 integration test `release_artifacts_unifies_dsym_and_mapping`：上传一个 dSYM + 一个 mapping 同 release，端点返回两者；其他 release 返全 0
+- [x] **iOS 真主线程采样器推迟到 v0.3**：sub-E 留下的 caveat 要求 Mach API（thread_state_t / vmread）+ 谨慎处理 App Store 审核，独立 phase 更合理
+- [x] server 14 unit + 32 integration = **46 server tests** 全绿；dashboard build 127.5 KB gzip；commit `d507c21`
 
 ---
 
