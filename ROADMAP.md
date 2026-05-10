@@ -1275,12 +1275,11 @@ server 36/36 + dashboard build 126 KB gzip + vitest 1/1 + e2e 1/1。commit `4147
 **Estimate:** 1.5 周
 
 ### Steps
-- [ ] sub-A：`releases` 表 schema 完善（已有最小，加 deploy_at / source_maps_count / dsym_count）
-- [ ] sub-B：dashboard `web/src/views/releases.tsx` 列表
-- [ ] sub-C：dashboard `web/src/views/release-detail.tsx` 详情
-- [ ] sub-D：`POST /v1/deploys` 接口 + auth（用 token）
-- [ ] sub-E：regression 检测（cron job + on-event 双触发）
-- [ ] sub-F：compare-releases 视图
+- [x] **sub-A**：`releases` 表 schema 加 `deploy_at`（migration 0016，回填到 `created_at`）；新端点 `GET /admin/api/projects/{id}/releases` 返回每个 release 的 event_count + first/last_seen + sourcemap/dsym/mapping count（live JOIN，预期 ≤ 1k releases/project）；dashboard 路由 `/org/{slug}/releases` + `<ReleasesView>` 卡片列表（deploy 时间 / event 数 / 三种 artifact 上传数 muted-when-0 + first→last seen 行）；OrgLayout NAV 加 "Releases"；`adminApi.listReleases` + `ReleaseListRow` 类型；server tests 47/47 全绿；dashboard build 128 KB gzip。commit `85c941c`
+- [ ] sub-B：dashboard `web/src/views/release-detail.tsx` 详情（artifact 文件树 + uploadedAt + uploader + size）
+- [ ] sub-C：`POST /v1/deploys` 接口 + auth（用 token），让 CI 显式标 deploy_at
+- [ ] sub-D：regression 检测（cron job + on-event 双触发）
+- [ ] sub-E：compare-releases 视图（diff issues：新出 / 修了 / 仍存）
 
 ---
 
