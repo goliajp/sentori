@@ -1229,9 +1229,14 @@ server 36/36 + dashboard build 126 KB gzip + vitest 1/1 + e2e 1/1。commit `4147
 - [x] server suite 14 unit + 31 integration = **45 server tests** 全绿；CLI `upload --help` 列出第三个子命令 `mapping`
 - [x] commit `e3eca45`
 
-#### sub-D — Android ANR detection
-- [ ] SDK Android 加 ANR watchdog（worker thread 每 1s ping main，连续 5s 无响应 dump main thread + 上报）
-- [ ] event kind 加 "anr"；dashboard issue 列表 ANR 图标 + filter chip
+#### sub-D — Android ANR detection ✅
+- [x] `SentoriAnrWatchdog.kt`：worker thread post tick / 5 s timeout / 单次报告（防止抖屏期间洪水）/ daemon 不阻塞退出 / debug-build 默认关（避免 Metro debugger 暂停 main 引发误报）；写盘到既有 pending dir 复用 drain 流
+- [x] `SentoriModule.kt` 加 `startAnrWatchdog({ timeoutMs?, intervalMs?, force? })` + `stopAnrWatchdog()`；JS opt-in 让 host 选时机
+- [x] `sdk/react-native@0.3.0`：`native.ts` 类型 + index 出口；wire 完成
+- [x] EventKind 加 `'anr'`：`sdk/core@0.2.0` types + server `event::EventKind`；wire-format 加性，receiver 未识别按 `error` 处理
+- [x] dashboard `issues.tsx`：行内 amber `ANR` chip（`errorType === 'ApplicationNotResponding'`）+ 顶部 `ANR` 过滤按钮（pressed 时仅显示 ANR 行）；不破 IssueRow schema
+- [x] docs/protocol.md + docs-site kind 行更新；server 14 unit + 31 integration 全绿；core 11 + rn 18 SDK tests 全绿
+- [x] npm publish core 0.2.0 + react-native 0.3.0；commit `b02b7bb`
 
 #### sub-E — iOS hang detection
 - [ ] main thread observer：runloop 阻塞 > 250ms warning；> 2s 上报为 "hang"
