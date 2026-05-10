@@ -1121,11 +1121,14 @@ server 36/36 + dashboard build 126 KB gzip + vitest 1/1 + e2e 1/1。commit `4147
 
 ### Steps
 
-#### sub-A — 抽 `sdk/core/`
-- [ ] 新 workspace package `@goliapkg/sentori-core`
-- [ ] 把 javascript SDK 中通用部分（types / transport / capture / breadcrumbs / stack / uuid / config）搬到 core
-- [ ] javascript / react-native 包改成 depend `@goliapkg/sentori-core`
-- [ ] 全 SDK 包重新构建 + 测试通过；publish patch 版本（rn 0.1.4, javascript 0.1.1, core 0.1.0）
+#### sub-A — 抽 `sdk/core/` ✅
+- [x] 新 workspace package `@goliapkg/sentori-core@0.1.0`：types / uuid / breadcrumbs (+ BreadcrumbBuffer class) / stack (含 shortFilenames opt-in) / index re-exports
+- [x] **保留** transport / capture / config / init 在各 SDK 内部 —— 这些含 platform-specific 行为（fetch vs sendBeacon, RN AsyncStorage offline queue, native module bridge），强行抽进 core 会破语义
+- [x] root `package.json` 加 bun workspaces；`sdk/core` 依赖图先于 js/rn install
+- [x] `sdk/javascript@0.2.0`：types/uuid/breadcrumbs/stack 退化为 re-export shim；object-form `addBreadcrumb({ type, data })` 公开 API 不变；**bug fix 顺路落**：`detectDevice()` 之前发 `os: 'macos' | 'windows' | 'unknown'` 全被服务端 `validationFailed` 静默拒绝，现在按 protocol 收紧到 `web | other`，OS 细节走 `model`
+- [x] `sdk/react-native@0.2.0`：同 shim 模式；保留 long path（Hermes 路径已经短，native symbolication 需要绝对路径）；`addBreadcrumb` timestamp override 用 private shadow buffer 兜底
+- [x] core 11 tests + js 8 + rn 18 = 37 SDK tests 全绿
+- [x] npm publish 全 3 包：core 0.1.0 / javascript 0.2.0 / react-native 0.2.0。commit `59f13f4` + `4c94d8d`
 
 #### sub-B — `@goliapkg/sentori-react`
 - [ ] 新 `sdk/react/`
