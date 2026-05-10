@@ -973,12 +973,14 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [x] OrgSwitcher 两层 `Org / Team` 下拉；选 team 写 `?team=<slug>` 到 URL；`OrgLayout` 读取后并发查每个 project 的团队绑定，把 `currentProjects` 缩到匹配集；`OrgCtx` 加 `currentTeamSlug` + `teams[]`
 - [x] bun run build → 123 KB gzip / bun run test green / tsc clean。commit `5fcd2cf`
 
-#### sub-F — Invite 流扩展
+#### sub-F — Invite 流扩展 ✅
 
-- [ ] `OrgInvite` payload 加可选 `team_id`
-- [ ] dashboard invite modal 加 "Add to team" 单选
-- [ ] accept 接口事务内同时 insert memberships + team_memberships（如有）
-- [ ] tests：邀请到 team 后 invitee 自动有 team 访问
+- [x] migration `0011_invite_team.sql`：`org_invites` 加 nullable `team_id` FK ON DELETE SET NULL（团队删除不毁邀请）
+- [x] `CreateInviteBody.teamSlug` 可选 camelCase；服务端验证 team 存在于该 org，否则 400 `teamNotFound`
+- [x] `accept_invite` 事务内同时 insert `memberships` + `team_memberships`（role=member）；team 中途被删则 team_id 已 SET NULL，邀请仍可接受退化为只入 org
+- [x] `list_invites` / `export_org` 返回 `teamSlug`（LEFT JOIN teams）；前端 `InviteRow` 类型同步加字段
+- [x] dashboard：org-settings invite 表单条件渲染 "team" dropdown（仅当 org 有团队时出现）；待接受邀请列表行内显示 team-slug chip；`orgsApi.createInvite(slug, email, role, teamSlug?)` 第四参可选
+- [x] tests：(1) `invite_with_team_attaches_user_to_team` 端到端：bad slug 400 / list 含 teamSlug / accept 后 org+team 双成员均落库；(2) `invite_with_dropped_team_falls_back_to_org_only`：邀请发出后删 team，accept 仍 200，仅落 org 成员。全 19 server tests + dashboard build 通过。commit `7bbd9ff`
 
 #### sub-G — Ownership transfer UX
 
