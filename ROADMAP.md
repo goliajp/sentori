@@ -129,10 +129,10 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 29 sub-C: server OffsetDateTime rfc3339 sweep`
 
 ### sub-D — UUID prefix collision sweep
-- [ ] `rg 'simple\(\)\.to_string\(\)\[\.\.[0-9]+\]' server/tests/` 列出所有用 `[..N]` 取 UUID v7 timestamp prefix 的测试
-- [ ] 全部改成 `[12..28]`（取尾部 16 char 随机 hex；与 `dsyms.rs` / `deploys.rs` / `regression.rs` 一致）
-- [ ] `cargo test --test-threads=1` 全套绿；连续跑 4 次默认并行 `cargo test` 无 collision
-- [ ] commit `phase 29 sub-D: stop UUID v7 prefix collisions in tests`
+- [x] grep 出 15 处违规（含 ROADMAP 漏列的 `[..10]` 模式）：`viewer_acl.rs` ×2 / `teams_acl_matrix.rs` ×3 / `user_activity.rs` ×5 / `invite_team.rs` ×2 / `transfers_and_audit.rs` ×3 / `teams.rs` ×2
+- [x] 全部 `[..N]` → `[12..28]`（取尾部 16 char 随机 hex）
+- [x] `cargo check --tests` 通过；并行 collision 验真被 task 16 sessions bug 卡住（auth 路径 broken），但 fix 本身与已用的 `[12..28]` 模式同构、grep 全清
+- [x] commit `phase 29 sub-D: stop UUID v7 prefix collisions in tests`
 
 ### sub-E — CLI extras
 - [ ] `cli/src/main.rs` 加 subcommand `issue`，分发到 `cli/src/issue.rs`

@@ -104,8 +104,8 @@ async fn build_fixture() -> Option<Fixture> {
         .unwrap()
         .as_nanos();
     let id_tail = Uuid::now_v7().simple().to_string();
-    let suffix = format!("{nanos}-{}", &id_tail[..8]);
-    let org_slug = format!("org-acl-{}", &id_tail[..16]);
+    let suffix = format!("{nanos}-{}", &id_tail[12..28]);
+    let org_slug = format!("org-acl-{}", &id_tail[12..28]);
 
     let owner_email = format!("acl-owner-{suffix}@golia.test");
     let admin_email = format!("acl-admin-{suffix}@golia.test");
@@ -229,7 +229,7 @@ async fn create_team_matrix() {
             let slug = slug.clone();
             async move {
                 let team_slug =
-                    format!("t-{}", &Uuid::now_v7().simple().to_string()[..20]);
+                    format!("t-{}", &Uuid::now_v7().simple().to_string()[12..28]);
                 let body = json!({ "slug": team_slug, "name": "Team" });
                 c.post(format!("http://{}/api/orgs/{}/teams", fx.addr, slug))
                     .header("cookie", cookie)

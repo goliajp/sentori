@@ -123,7 +123,7 @@ async fn team_admin_can_create_member_cant() {
         .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
     let admin_email = format!("team-admin-{suffix}@golia.test");
     let member_email = format!("team-member-{suffix}@golia.test");
-    let org_slug = format!("org-tac-{}", &suffix[..10]);
+    let org_slug = format!("org-tac-{}", &suffix[12..28]);
 
     let (_admin_id, admin_cookie) = register_user(&addr, &pool, &admin_email).await;
     let (member_id, member_cookie) = register_user(&addr, &pool, &member_email).await;
@@ -191,7 +191,7 @@ async fn team_bound_project_gates_non_team_member() {
     let owner_email = format!("team-owner-{suffix}@golia.test");
     let in_team_email = format!("in-team-{suffix}@golia.test");
     let out_team_email = format!("out-team-{suffix}@golia.test");
-    let org_slug = format!("org-tbp-{}", &suffix[..10]);
+    let org_slug = format!("org-tbp-{}", &suffix[12..28]);
 
     let (_owner_id, owner_cookie) = register_user(&addr, &pool, &owner_email).await;
     let (in_id, in_cookie) = register_user(&addr, &pool, &in_team_email).await;

@@ -135,7 +135,7 @@ async fn ownership_transfer_happy_path() {
         .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
     let owner_email = format!("xfer-owner-{suffix}@golia.test");
     let admin_email = format!("xfer-admin-{suffix}@golia.test");
-    let org_slug = format!("org-xh-{}", &suffix[..10]);
+    let org_slug = format!("org-xh-{}", &suffix[12..28]);
 
     let (owner_id, owner_cookie) = register_user(&addr, &pool, &owner_email).await;
     let (admin_id, admin_cookie) = register_user(&addr, &pool, &admin_email).await;
@@ -226,7 +226,7 @@ async fn ownership_transfer_rejects_non_eligible_target() {
     let owner_email = format!("xfer-owner2-{suffix}@golia.test");
     let member_email = format!("xfer-member-{suffix}@golia.test");
     let outsider_email = format!("xfer-outsider-{suffix}@golia.test");
-    let org_slug = format!("org-xn-{}", &suffix[..10]);
+    let org_slug = format!("org-xn-{}", &suffix[12..28]);
 
     let (_owner_id, owner_cookie) = register_user(&addr, &pool, &owner_email).await;
     let (member_id, member_cookie) = register_user(&addr, &pool, &member_email).await;
@@ -277,7 +277,7 @@ async fn audit_log_records_team_actions() {
         .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
     let owner_email = format!("audit-owner-{suffix}@golia.test");
     let member_email = format!("audit-member-{suffix}@golia.test");
-    let org_slug = format!("org-au-{}", &suffix[..10]);
+    let org_slug = format!("org-au-{}", &suffix[12..28]);
 
     let (_owner_id, owner_cookie) = register_user(&addr, &pool, &owner_email).await;
     let (_member_id, member_cookie) = register_user(&addr, &pool, &member_email).await;

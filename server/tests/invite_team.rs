@@ -86,7 +86,7 @@ async fn invite_with_team_attaches_user_to_team() {
         .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
     let owner_email = format!("inv-owner-{suffix}@golia.test");
     let invitee_email = format!("inv-target-{suffix}@golia.test");
-    let org_slug = format!("org-iv-{}", &suffix[..10]);
+    let org_slug = format!("org-iv-{}", &suffix[12..28]);
 
     let (_owner_id, owner_cookie) = register_user(&addr, &pool, &owner_email).await;
     let (invitee_id, invitee_cookie) = register_user(&addr, &pool, &invitee_email).await;
@@ -198,7 +198,7 @@ async fn invite_with_dropped_team_falls_back_to_org_only() {
         .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
     let owner_email = format!("inv-owner2-{suffix}@golia.test");
     let invitee_email = format!("inv-target2-{suffix}@golia.test");
-    let org_slug = format!("org-id-{}", &suffix[..10]);
+    let org_slug = format!("org-id-{}", &suffix[12..28]);
 
     let (_owner_id, owner_cookie) = register_user(&addr, &pool, &owner_email).await;
     let (invitee_id, invitee_cookie) = register_user(&addr, &pool, &invitee_email).await;

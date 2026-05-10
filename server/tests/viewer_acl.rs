@@ -91,11 +91,11 @@ async fn viewer_is_read_only_across_endpoints() {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos(),
-        &Uuid::now_v7().simple().to_string()[..8],
+        &Uuid::now_v7().simple().to_string()[12..28],
     );
     let owner_email = format!("vw-owner-{suffix}@golia.test");
     let viewer_email = format!("vw-viewer-{suffix}@golia.test");
-    let org_slug = format!("org-vw-{}", &Uuid::now_v7().simple().to_string()[..16]);
+    let org_slug = format!("org-vw-{}", &Uuid::now_v7().simple().to_string()[12..28]);
 
     let (_owner_id, owner_c) = register_user(&addr, &pool, &owner_email).await;
     let (_viewer_id, viewer_c) = register_user(&addr, &pool, &viewer_email).await;

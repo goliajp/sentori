@@ -88,7 +88,7 @@ async fn audit_actions_endpoint_returns_catalog() {
     };
     // Need a session — endpoint is under /api which requires require_user.
     let suffix = Uuid::now_v7().simple().to_string();
-    let email = format!("ua-cat-{}@golia.test", &suffix[..8]);
+    let email = format!("ua-cat-{}@golia.test", &suffix[12..28]);
     let pool_url = std::env::var("DATABASE_URL").unwrap();
     let pool = db::connect(&pool_url).await.unwrap();
     let (_, cookie) = register_user(&addr, &pool, &email).await;
@@ -118,8 +118,8 @@ async fn activity_returns_caller_rows() {
         return;
     };
     let suffix = Uuid::now_v7().simple().to_string();
-    let email = format!("ua-feed-{}@golia.test", &suffix[..8]);
-    let org_slug = format!("org-ua-{}", &suffix[..16]);
+    let email = format!("ua-feed-{}@golia.test", &suffix[12..28]);
+    let org_slug = format!("org-ua-{}", &suffix[12..28]);
     let (_uid, cookie) = register_user(&addr, &pool, &email).await;
 
     Client::new()
@@ -165,8 +165,8 @@ async fn audit_log_survives_org_delete_with_null_org_id() {
         return;
     };
     let suffix = Uuid::now_v7().simple().to_string();
-    let email = format!("ua-tomb-{}@golia.test", &suffix[..8]);
-    let org_slug = format!("org-ut-{}", &suffix[..16]);
+    let email = format!("ua-tomb-{}@golia.test", &suffix[12..28]);
+    let org_slug = format!("org-ut-{}", &suffix[12..28]);
     let (uid, cookie) = register_user(&addr, &pool, &email).await;
 
     Client::new()
