@@ -466,6 +466,114 @@ When hit:
 }
 ```
 
+## Audit-event webhook payload (forward-looking, Phase 27)
+
+Sentori does not deliver webhooks today. This section locks the
+contract so the audit trail and the eventual rule engine agree on the
+wire format before either side ships its half. Phase 27 implements
+delivery + signing; Phase 20 records the schema.
+
+Endpoint: configured per-rule in the dashboard — anything that accepts
+`POST application/json`. Sentori sends an HTTPS POST with a 5-second
+connection timeout, 10-second read timeout, and at-least-once delivery
+backed by an `at_*` retry queue (linear: 1m / 5m / 30m / 2h / give up
+after 6 attempts).
+
+### Headers
+
+```
+content-type:        application/json
+sentori-event:       audit.org.transfer.accepted   # the action code
+sentori-delivery-id: 019e0ea2-fe14-7451-9441-a22d34e0fbaa
+sentori-timestamp:   1768502431                    # unix seconds, UTC
+sentori-signature:   t=1768502431,v1=<hex-hmac-sha256>
+user-agent:          sentori/<version>
+```
+
+The signature covers `<timestamp>.<raw-body>` with HMAC-SHA-256 keyed
+by the per-rule signing secret (revealed once at rule creation, like a
+public token). `t=` prevents replay — receivers MUST reject deliveries
+where the timestamp is older than 5 minutes from server time. The
+`v1=` prefix exists so we can rotate to `v2=<eddsa-...>` later without
+breaking existing receivers.
+
+### Body shape
+
+```json
+{
+  "id":          "019e0ea2-fe14-7451-9441-a22d34e0fbaa",
+  "action":      "org.transfer.accepted",
+  "actionLabel": "Ownership transfer accepted",
+  "occurredAt":  "2026-05-09T22:00:31Z",
+  "actor": {
+    "id":    "019e0e92-b22c-7302-a109-e30e00738b9c",
+    "email": "old-owner@example.com"
+  },
+  "org": {
+    "id":   "019e0e92-b4c3-7860-9b09-452d3704f90f",
+    "slug": "acme",
+    "name": "Acme Inc"
+  },
+  "target": {
+    "type": "transfer",
+    "id":   "019e0ea2-fe14-7451-9441-a22d34e0fbaa"
+  },
+  "payload": {
+    "from_user_id": "019e0e92-b22c-7302-a109-e30e00738b9c",
+    "to_user_id":   "019e0ea0-1111-7000-8000-aaaaaaaaaaaa"
+  }
+}
+```
+
+- `action` is the canonical code from `server/src/audit.rs::actions`,
+  identical to what the audit log endpoint returns.
+- `actionLabel` is the English-only human label from
+  `audit::label_for`; localised receivers should ignore it.
+- `occurredAt` is RFC 3339 in UTC, same as event timestamps elsewhere.
+- `actor` is null when the action came from system code (none today).
+- `org` is **null when the org has been deleted** between the action
+  and webhook delivery — receivers should display "deleted org" or
+  drop on the floor.
+- `target.type` is one of `org / member / team / team_member /
+  project / project_team / token / transfer` — the same enum the
+  dashboard's audit log displays.
+- `payload` is opaque JSON; its exact keys depend on `action` (see
+  the table below). New keys may be added without bumping the wire
+  version — receivers MUST ignore unknown keys.
+
+### Payload contracts per action
+
+| Action                       | Required keys                              |
+|------------------------------|--------------------------------------------|
+| `org.created`                | `slug`, `name`                             |
+| `org.patched`                | `name`                                     |
+| `org.deleted`                | `slug`, `name`                             |
+| `org.transfer.requested`     | `to_user_id`                               |
+| `org.transfer.accepted`      | `from_user_id`, `to_user_id`               |
+| `member.role_patched`        | `role`                                     |
+| `member.removed`             | `self_leave: bool`                         |
+| `team.created`               | `slug`, `name`                             |
+| `team.deleted`               | `slug`                                     |
+| `team.member.added`          | `team_slug`, `role`                        |
+| `team.member.removed`        | `team_slug`, `self_leave: bool`            |
+| `project.created`            | `name`                                     |
+| `project.team.bound`         | `team_slug`                                |
+| `project.team.unbound`       | `team_slug`                                |
+| `token.created`              | `project_id`, `kind`, `last4`              |
+| `token.revoked`              | `project_id`                               |
+
+### Delivery semantics
+
+- **Order**: best-effort timestamp order; not strict. Receivers that
+  need ordering should sort by `occurredAt` after dedup.
+- **Dedup key**: `id` (uuid v7) is unique per audit row; safe to use
+  as the natural key.
+- **Retry**: a non-2xx response counts as a failure. Sentori retries
+  up to 6 times with the schedule above; after that the delivery is
+  marked `failed` and surfaces in the rule's recent-deliveries pane.
+- **Body size**: payload is bounded by `audit_logs.payload` (jsonb), so
+  practically < 4 KB per delivery.
+
 ## Open questions deferred
 
 These are intentionally **not** specified in v0.1:
@@ -473,7 +581,7 @@ These are intentionally **not** specified in v0.1:
 - Source map upload format and `POST /admin/api/releases/:r/sourcemaps` endpoint shape — Phase 8
 - dSYM / ProGuard mapping upload format — post-v0.1 per ROADMAP "explicitly out"
 - Server-side fingerprint override rules / per-project grouping config — Phase 5 (initial), refined later
-- Webhook payload format for alerting — Phase 9
+- ~~Webhook payload format for alerting~~ — locked above (Phase 20); delivery / signing implementation in Phase 27
 - Live event tail (WebSocket / SSE) for dashboard — not in v0.1
 - gRPC ingestion — not in v0.1 (HTTP/JSON only)
 - Replay / profiling / native crash signal handler payloads — explicitly out per ROADMAP
@@ -492,3 +600,4 @@ Within `/v1/`:
 ## Document history
 
 - **v0** — 2026-05-09 — initial draft (Phase 1 of ROADMAP).
+- **v0.1** — 2026-05-10 — locked the audit-event webhook payload (Phase 20 sub-D).
