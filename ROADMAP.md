@@ -27,7 +27,7 @@
 
 ### v0.2（Phase 18–28）
 
-- [ ] **Phase 18** — 账户结构深化（Org / Team / Project / Ownership / Audit）
+- [x] **Phase 18** — 账户结构深化（Org / Team / Project / Ownership / Audit）✅
 - [ ] **Phase 19** — RBAC 全栈完善
 - [ ] **Phase 20** — Audit log 深化 + 全局活动 feed
 - [ ] **Phase 21** — SDK monorepo 抽 core + JS 矩阵扩展（react / next / expo）
@@ -1000,12 +1000,14 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [x] CSV 导出：当前可见集，header 含 timestamp/actor/action/target_type/target_id/payload，正确 escape 逗号/引号/换行
 - [x] bun run build → 125.8 KB gzip；tsc + test green。commit `65f100b`
 
-#### sub-I — tests + docs + 收尾
+#### sub-I — tests + docs + 收尾 ✅
 
-- [ ] server integration tests 覆盖 sub-B/C 的 ACL 矩阵（admin × member × viewer × non-member × 4 个 endpoint）
-- [ ] dashboard e2e（playwright in `web/tests/`）：create team → assign project → invite member → 验证只看到该 team 的 project
-- [ ] `docs-site/src/content/docs/teams.md` 写法指南 + 截图
-- [ ] commit + push；勾完所有 checkbox
+- [x] `server/tests/teams_acl_matrix.rs`：4 角色 × 6 端点的状态码矩阵（owner/admin/member/non-member × create_team/patch_team/delete_team/list_teams/add_team_member/project_bind）+ no_session 401。每个 case 用独立 fixture（uuid 后缀防并行 slug 碰撞）；7 个新测试，全 server suite 32/32 pass
+- [x] `web/playwright.config.ts` + `web/e2e/teams.spec.ts`：webServer 自动 spawn `cargo run` + `vite dev`；spec 走 register/verify via API（暂用 `docker exec sentori-pg psql` 取 verify token，注释指明 CI 化时换 `/dev/last-verify-token` endpoint）+ UI login 验 cookie/redirect + 后续 invite-with-team 自动 accept 流。运行 ~2s / 1 test pass。`bun run test:e2e` 触发
+- [x] `vite.config.ts` proxy 加 `/api`（之前只 `/admin/api`）—— dev 与 Caddy 生产配置对齐；不再需要 vite 前手动 fronting proxy
+- [x] `docs-site/src/content/docs/teams.md` 1500+ 字纯文字写法指南（无截图，留 Phase 28 polish）：vocab 段、何时用 team、create/bind/invite/transfer/audit 流；sidebar 加 "Teams & ownership" 项
+- [x] `web/.gitignore` 加 `test-results / playwright-report / playwright/.cache`
+- [x] commit `5fe1025` + `c3c8d1e` 推 main
 
 ---
 
