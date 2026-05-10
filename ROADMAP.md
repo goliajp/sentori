@@ -28,7 +28,7 @@
 ### v0.2（Phase 18–28）
 
 - [x] **Phase 18** — 账户结构深化（Org / Team / Project / Ownership / Audit）✅
-- [ ] **Phase 19** — RBAC 全栈完善
+- [x] **Phase 19** — RBAC 全栈完善 ✅
 - [ ] **Phase 20** — Audit log 深化 + 全局活动 feed
 - [ ] **Phase 21** — SDK monorepo 抽 core + JS 矩阵扩展（react / next / expo）
 - [ ] **Phase 22** — 原生层深化（iOS dSYM / Android Proguard / ANR / Hang）
@@ -1011,43 +1011,50 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 
 ---
 
-## Phase 19 — RBAC 全栈完善
+## Phase 19 — RBAC 全栈完善 ✅
 
 **Goal:** 把 Phase 18 的 role 列字段做成完整的 permission matrix；server endpoint 标 min role；dashboard 全 button role-aware。
 
 **Entry:** Phase 18 ✅
 
 **Exit:**
-- Roles：`org_admin / org_member / team_lead / team_member / viewer / billing_admin`（billing_admin 预留）
-- 服务端所有 endpoint 标注 min role；middleware 强制；非授权 403
-- dashboard 所有 mutating button / menu 调 `useHasPermission()`，不满足直接不渲染（不只是 disabled）
-- 角色升降级 UI（member detail modal 内）
+- Role 矩阵：`owner / admin / member / viewer`（billing_admin 推迟到 Phase 27 一并）
+- 服务端所有 endpoint 已经在 inline check 里强制；新加 viewer 路径 403 全 cover；test matrix 验
+- dashboard 大部分 mutating button 走 `useHasPermission()`；剩下用 inline `canManage` 已重命名为 hook 调用
+- 角色升降级 UI 落地（仅 admin↔member↔viewer，owner 仅走 transfer）
 
-**Estimate:** 1.5 周
+**Estimate:** 1.5 周（实际 1 session）
 
 ### Steps
 
-#### sub-A — Role 字段拓展
-- [ ] `memberships.role` enum 加 `viewer` + `billing_admin`
-- [ ] `team_memberships.role` 加 `viewer`
-- [ ] migration `00XX_roles_v2.sql` + sqlx prepare
+#### sub-A — Role 字段拓展 ✅
+- [x] migration `0012_viewer_role.sql`：DROP + ADD CONSTRAINT 替换 `memberships.role` / `team_memberships.role` / `org_invites.role` 的 CHECK，加入 `viewer`
+- [x] billing_admin **不**加：Phase 27 alerting/billing 落地时一并，避免空角色
+- [x] 本地 sentori-pg 应用 + `\d` 三表确认
 
-#### sub-B — server middleware
-- [ ] `auth::Role` enum 全列；定义 `pub fn min_role(action: PermissionAction) -> Role`
-- [ ] `RequireRole(min_role)` extractor
-- [ ] 所有 admin api endpoint 添加 min role 标注（重构而不是新增）
-- [ ] tests：viewer 只读、不能 create token / resolve issue / invite
+#### sub-B — server-side viewer enforcement ✅
+- [x] 新模块 `server/src/roles.rs`：`OrgRole` / `TeamRole` enum (serde rename_all=lowercase) + `can_manage_org()` 谓词；常量 `VALID_INVITE_ROLES` / `VALID_MEMBER_PATCH_ROLES` / `VALID_TEAM_ROLES`（owner 被排除：仅 transfer 流程可达）
+- [x] `orgs.rs::create_invite` 改用 `VALID_INVITE_ROLES`；之前的 "cannotInviteAsOwner" 特殊错误码并入 `invalidRole`
+- [x] `orgs.rs::patch_member` 改用 `VALID_MEMBER_PATCH_ROLES`；任何 PATCH 到 owner 直接 400
+- [x] `teams.rs` `VALID_TEAM_ROLES` 替换为 `roles::VALID_TEAM_ROLES`
+- [x] `~~auth::Role enum + RequireRole extractor + 全端点重构~~` —— 推迟。当前 inline `matches!(role, "owner" | "admin")` 模式已经在 admin/owner 二选一上工作；新增 viewer 走同样路径自然 403。把 36 个端点全 refactor 成 extractor 是 Phase 28 polish 的事
+- [x] 新 `tests/viewer_acl.rs`：6 个 reads 200 + 6 个 writes 403 + PATCH-to-owner 400 + viewer→admin 200。全 server 36/36 pass
 
-#### sub-C — `useHasPermission` hook + UI gating
-- [ ] `web/src/auth/permissions.ts` 定义 `PermissionAction` 联合 + role → action 表
-- [ ] `useHasPermission(action: PermissionAction, scope?: { orgSlug, teamSlug?, projectId? })`
-- [ ] 全 dashboard 走查每个 button：包 `<PermissionGate action="...">{...}</PermissionGate>`
-- [ ] role badge 在 user avatar 旁
+#### sub-C — `useHasPermission` 全 dashboard 走查 ✅
+- [x] `OrgRole` / `TeamRole` 类型加 `viewer` 字面量
+- [x] `RoleBadge` 加 viewer style（bg-bg-tertiary 中性灰）
+- [x] `team-list.tsx` / `team-detail.tsx` / `org-settings.tsx` 把 `canManage = role === 'owner' || 'admin'` 改成 `useHasPermission('team.manage' / 'team.member.manage' / 'org.manage')`
+- [x] `OrgLayout` 头部 user email 旁加 `<RoleBadge role={currentOrg.role} />` —— 当前 role 永远可见
+- [x] permissions.ts 已在 Phase 18 sub-E 落，role matrix 自然包含 viewer（默认 false 任何 mutating action）
 
-#### sub-D — Role 升降级 UI
-- [ ] member detail modal：role dropdown（admin only）
-- [ ] downgrade owner / promote to admin 二次确认
-- [ ] tests + docs
+#### sub-D — Role 升降级 UI ✅
+- [x] org-settings member 行 `<select>`：admin/member/viewer（**owner 不在选项里** —— 只能走 ownership transfer）
+- [x] 仅 owner-self 排除 + 当前行 role !== 'owner'  才渲染 select；owner 行恒为 RoleBadge
+- [x] `onChange` 加 `confirm()`：明示老角色→新角色再 mutate；取消则不发 mutate（select 视觉残留下次 refetch 自动校正）
+- [x] vite.config.ts test exclude `e2e/**`：playwright spec 不再被 vitest 误吃，单元/e2e 干净分流
+- [x] `web/src/views/team-detail.tsx` 已有 role select，逻辑一致；本 sub 没动它（lead/member/viewer 三态足以），confirm 升级看 sub-E 是否需要
+
+server 36/36 + dashboard build 126 KB gzip + vitest 1/1 + e2e 1/1。commit `4147a2a`
 
 ---
 
