@@ -371,7 +371,36 @@ export type AuditRow = {
   targetType: string
 }
 
+export type AuditActionInfo = { code: string; label: string }
+
+export type UserActivityRow = {
+  action: string
+  createdAt: string
+  id: string
+  orgId: null | string
+  orgName: null | string
+  orgSlug: null | string
+  payload: unknown
+  targetId: null | string
+  targetType: string
+}
+
+export const userActivityApi = {
+  list: (params?: { before?: string; limit?: number }) => {
+    const qs = new URLSearchParams()
+    if (params?.before) qs.set('before', params.before)
+    if (params?.limit) qs.set('limit', String(params.limit))
+    const suffix = qs.toString() ? `?${qs}` : ''
+    return orgsFetch<UserActivityRow[]>(`/users/me/activity${suffix}`)
+  },
+}
+
 export const auditApi = {
+  /** Phase 20 sub-A: catalog of (code, label) for the action filter
+   *  dropdown. Single source of truth lives in
+   *  `server/src/audit.rs::all_labels`. */
+  actions: () => orgsFetch<AuditActionInfo[]>('/audit/actions'),
+
   list: (
     orgSlug: string,
     params?: {

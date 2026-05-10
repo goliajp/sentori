@@ -5,30 +5,6 @@ import { auditApi, type AuditRow, orgsApi } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { useHasPermission } from '@/auth/useHasPermission'
 
-// Mirrors server/src/audit.rs::actions. Kept in sync by hand for now;
-// Phase 20 sub-A turns this into a generated enum so the UI list never
-// drifts from what the server records.
-const ACTION_OPTIONS: { label: string; value: string }[] = [
-  { label: 'All actions', value: '' },
-  { label: 'org.created', value: 'org.created' },
-  { label: 'org.patched', value: 'org.patched' },
-  { label: 'org.deleted', value: 'org.deleted' },
-  { label: 'org.transfer.requested', value: 'org.transfer.requested' },
-  { label: 'org.transfer.accepted', value: 'org.transfer.accepted' },
-  { label: 'member.role_patched', value: 'member.role_patched' },
-  { label: 'member.removed', value: 'member.removed' },
-  { label: 'team.created', value: 'team.created' },
-  { label: 'team.patched', value: 'team.patched' },
-  { label: 'team.deleted', value: 'team.deleted' },
-  { label: 'team.member.added', value: 'team.member.added' },
-  { label: 'team.member.removed', value: 'team.member.removed' },
-  { label: 'project.created', value: 'project.created' },
-  { label: 'project.team.bound', value: 'project.team.bound' },
-  { label: 'project.team.unbound', value: 'project.team.unbound' },
-  { label: 'token.created', value: 'token.created' },
-  { label: 'token.revoked', value: 'token.revoked' },
-]
-
 const PAGE_LIMIT = 100
 
 export function AuditLogView() {
@@ -45,6 +21,13 @@ export function AuditLogView() {
     enabled: allowed,
     queryFn: () => orgsApi.listMembers(slug),
     queryKey: ['members', slug],
+  })
+  // Phase 20 sub-A: catalog comes from the server so adding a new
+  // action server-side appears here without a dashboard release.
+  const actionsCatalog = useQuery({
+    queryFn: () => auditApi.actions(),
+    queryKey: ['audit-actions'],
+    staleTime: 5 * 60_000,
   })
 
   const params = useMemo(
@@ -127,9 +110,10 @@ export function AuditLogView() {
           onChange={(e) => setAction(e.target.value)}
           value={action}
         >
-          {ACTION_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
+          <option value="">All actions</option>
+          {(actionsCatalog.data ?? []).map((a) => (
+            <option key={a.code} value={a.code}>
+              {a.label}
             </option>
           ))}
         </select>

@@ -288,6 +288,27 @@ pub async fn delete_org(
         return forbidden("forbidden");
     }
 
+    // Phase 20 sub-A: audit_logs is now ON DELETE SET NULL, so writing
+    // the tombstone *before* the DELETE keeps the row's org_id pointing
+    // at the live id while the parent still exists; the cascade nulls
+    // it afterwards. Capture slug + name in payload so post-delete
+    // viewers still see what was deleted.
+    let org_name: String = sqlx::query_scalar("SELECT name FROM orgs WHERE id = $1")
+        .bind(org_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap_or_default();
+    crate::audit::record(
+        &pool,
+        org_id,
+        Some(user.id),
+        actions::ORG_DELETED,
+        targets::ORG,
+        Some(org_id),
+        json!({ "slug": slug, "name": org_name }),
+    )
+    .await;
+
     if let Err(e) = sqlx::query("DELETE FROM orgs WHERE id = $1")
         .bind(org_id)
         .execute(&pool)
@@ -296,12 +317,6 @@ pub async fn delete_org(
         tracing::error!(error = %e, "delete org failed");
         return server_error("deleteOrg");
     }
-
-    // Record into the org's audit log... after the org is gone the FK
-    // cascade has already wiped the table, so this is best-effort: we
-    // emit a global trace line and skip the DB row. Phase 20 will move
-    // the audit log out of the org cascade so tombstones survive.
-    tracing::info!(%org_id, actor = %user.id, action = actions::ORG_DELETED, "audit org delete");
 
     ok_response()
 }
@@ -1270,6 +1285,85 @@ pub async fn accept_transfer(
 }
 
 // ---------- audit log listing (Phase 18 sub-C) ----------
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AuditAction {
+    code: &'static str,
+    label: &'static str,
+}
+
+/// GET /api/audit/actions — catalog of every action code the server can
+/// emit, paired with its human-readable English label. Public-ish: the
+/// dashboard's audit-log filter dropdown calls this on mount so it
+/// doesn't drift when a new action is added on the server.
+pub async fn list_audit_actions() -> Response {
+    let body: Vec<AuditAction> = crate::audit::all_labels()
+        .into_iter()
+        .map(|(code, label)| AuditAction { code, label })
+        .collect();
+    (StatusCode::OK, Json(body)).into_response()
+}
+
+// ---------- per-user activity feed (Phase 20 sub-C) ----------
+
+#[derive(Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+struct UserActivityRow {
+    id: Uuid,
+    org_id: Option<Uuid>,
+    org_slug: Option<String>,
+    org_name: Option<String>,
+    action: String,
+    target_type: String,
+    target_id: Option<Uuid>,
+    payload: serde_json::Value,
+    created_at: OffsetDateTime,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserActivityQuery {
+    pub before: Option<OffsetDateTime>,
+    pub limit: Option<i64>,
+}
+
+/// GET /api/users/me/activity?limit=&before=
+/// Returns audit_logs scoped to the caller across every org they're
+/// currently a member of. Tombstoned entries (org_id IS NULL) appear
+/// only when the caller authored them — nobody else has a meaningful
+/// claim on a deleted org's history.
+pub async fn list_my_activity(
+    State(state): State<AppState>,
+    Extension(user): Extension<CurrentUser>,
+    axum::extract::Query(q): axum::extract::Query<UserActivityQuery>,
+) -> Response {
+    let pool = match &state.db {
+        Some(p) => p.clone(),
+        None => return server_error("dbNotConfigured"),
+    };
+
+    let limit = q.limit.unwrap_or(50).clamp(1, 200);
+    let before = q.before.unwrap_or_else(OffsetDateTime::now_utc);
+
+    let rows: Vec<UserActivityRow> = sqlx::query_as(
+        "SELECT al.id, al.org_id, o.slug AS org_slug, o.name AS org_name, \
+                al.action, al.target_type, al.target_id, al.payload, al.created_at \
+         FROM audit_logs al \
+         LEFT JOIN orgs o ON o.id = al.org_id \
+         WHERE al.actor_user_id = $1 AND al.created_at < $2 \
+         ORDER BY al.created_at DESC \
+         LIMIT $3",
+    )
+    .bind(user.id)
+    .bind(before)
+    .bind(limit)
+    .fetch_all(&pool)
+    .await
+    .unwrap_or_default();
+
+    (StatusCode::OK, Json(rows)).into_response()
+}
 
 #[derive(Serialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]

@@ -199,6 +199,8 @@ pub fn build(cfg: ServerConfig) -> Router {
             post(api::orgs::accept_transfer),
         )
         .route("/orgs/{slug}/audit", get(api::orgs::list_audit))
+        .route("/audit/actions", get(api::orgs::list_audit_actions))
+        .route("/users/me/activity", get(api::orgs::list_my_activity))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             api::user_auth::require_user,

@@ -129,10 +129,14 @@ export function OrgLayout() {
           </div>
           <div className="flex items-center gap-3">
             <OnboardingBadge project={currentProject} />
-            <span className="text-fg-muted hidden items-center gap-1.5 text-xs sm:inline-flex">
+            <Link
+              className="text-fg-muted hover:text-fg hidden items-center gap-1.5 text-xs sm:inline-flex"
+              title="My activity"
+              to="/me/activity"
+            >
               {user?.email}
               <RoleBadge role={currentOrg.role} />
-            </span>
+            </Link>
             <ThemeToggle />
             <button
               className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-3 py-1.5 text-sm transition-colors"

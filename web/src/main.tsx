@@ -38,6 +38,7 @@ import { RegisterView } from './views/register'
 import { TeamDetailView } from './views/team-detail'
 import { TeamListView } from './views/team-list'
 import { TransferAcceptView } from './views/transfer-accept'
+import { UserActivityView } from './views/user-activity'
 import { TokenSettingsView } from './views/token-settings'
 import { RootRedirect } from './views/root-redirect'
 import { VerifyView } from './views/verify'
@@ -53,6 +54,7 @@ const router = createBrowserRouter([
     children: [
       { element: <RootRedirect />, index: true },
       { element: <OnboardingView />, path: 'onboarding' },
+      { element: <UserActivityView />, path: 'me/activity' },
       { element: <InviteAcceptView />, path: 'invite/:token' },
       { element: <TransferAcceptView />, path: 'transfers/:token' },
       {
