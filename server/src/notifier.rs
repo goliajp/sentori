@@ -44,6 +44,16 @@ pub enum NotifyEvent {
         error_type: String,
         message: String,
     },
+    /// Phase 23 sub-D: previously-resolved issue had a fresh event,
+    /// flipping `status` back to `regressed`. Goes to recipients with
+    /// `on_regression = TRUE`.
+    Regression {
+        project_id: Uuid,
+        issue_id: Uuid,
+        error_type: String,
+        message: String,
+        release: String,
+    },
     EmailVerification {
         email: String,
         link: String,
@@ -71,6 +81,30 @@ pub enum NotifyEvent {
         old_owner_email: String,
         new_owner_email: String,
         org_name: String,
+    },
+    /// Phase 27 sub-B: rule evaluator fired an alert. The notifier
+    /// fans out to every channel in `channels` (email today, webhook
+    /// in sub-D). `summary` is a one-line subject the channels can
+    /// reuse; `body` is multi-line context for email rendering.
+    AlertFired {
+        rule_id: Uuid,
+        rule_name: String,
+        org_id: Uuid,
+        channels: serde_json::Value,
+        summary: String,
+        body: String,
+    },
+    /// Phase 27 sub-E: opt-in digest sent by the hourly evaluator.
+    /// One per (user, org, frequency) — same summary text goes to
+    /// each subscribed user but as their own email so unsubscribing
+    /// doesn't ripple.
+    DigestEmail {
+        to: String,
+        org_name: String,
+        org_slug: String,
+        frequency: String,
+        summary_lines: Vec<String>,
+        window_hours: u32,
     },
 }
 
@@ -150,6 +184,59 @@ async fn handle(
                     tracing::warn!(error = %e, %email, %issue_id, "send email failed");
                 } else {
                     tracing::info!(%email, %issue_id, "new-issue email sent");
+                }
+            }
+            Ok(())
+        }
+        NotifyEvent::Regression {
+            project_id,
+            issue_id,
+            error_type,
+            message,
+            release,
+        } => {
+            let recipients: Vec<String> = sqlx::query_scalar(
+                "SELECT email FROM notification_recipients \
+                 WHERE project_id = $1 AND on_regression = TRUE",
+            )
+            .bind(project_id)
+            .fetch_all(pool)
+            .await
+            .context("fetch regression recipients")?;
+
+            if recipients.is_empty() {
+                return Ok(());
+            }
+
+            let transport = build_transport(cfg)?;
+            let from: Mailbox = cfg.from.parse().context("parse from address")?;
+
+            for email in recipients {
+                let to: Mailbox = match email.parse() {
+                    Ok(addr) => addr,
+                    Err(e) => {
+                        tracing::warn!(error = %e, %email, "skip invalid recipient");
+                        continue;
+                    }
+                };
+                let msg = Message::builder()
+                    .from(from.clone())
+                    .to(to)
+                    .subject(format!("[Sentori] Regression: {error_type}"))
+                    .body(format!(
+                        "An issue you previously marked resolved has come back.\n\n\
+                         Type:    {error_type}\n\
+                         Message: {message}\n\
+                         Release: {release}\n\
+                         Issue:   {issue_id}\n\n\
+                         — Sentori"
+                    ))
+                    .context("build regression message")?;
+
+                if let Err(e) = transport.send(msg).await {
+                    tracing::warn!(error = %e, %email, %issue_id, "send regression email failed");
+                } else {
+                    tracing::info!(%email, %issue_id, "regression email sent");
                 }
             }
             Ok(())
@@ -340,6 +427,150 @@ async fn handle(
                 tracing::warn!(error = %e, %old_owner_email, %org_name, "send transfer-completed email failed");
             } else {
                 tracing::info!(%old_owner_email, %org_name, "transfer-completed email sent");
+            }
+            Ok(())
+        }
+        NotifyEvent::AlertFired {
+            rule_id,
+            rule_name,
+            channels,
+            summary,
+            body,
+            org_id,
+        } => {
+            // Iterate channels[]; today only `email` is implemented.
+            // Webhook channel handler lands in Phase 27 sub-D.
+            let Some(arr) = channels.as_array() else {
+                return Ok(());
+            };
+            let transport = build_transport(cfg)?;
+            let from: Mailbox = cfg.from.parse().context("parse from address")?;
+
+            for ch in arr {
+                let kind = ch.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                match kind {
+                    "email" => {
+                        let Some(to_arr) = ch.get("to").and_then(|v| v.as_array()) else {
+                            continue;
+                        };
+                        for to_v in to_arr {
+                            let Some(addr) = to_v.as_str() else {
+                                continue;
+                            };
+                            let to: Mailbox = match addr.parse() {
+                                Ok(m) => m,
+                                Err(e) => {
+                                    tracing::warn!(error = %e, %addr, "skip invalid alert recipient");
+                                    continue;
+                                }
+                            };
+                            let msg = Message::builder()
+                                .from(from.clone())
+                                .to(to)
+                                .subject(format!("[Sentori] Alert: {rule_name} — {summary}"))
+                                .body(format!(
+                                    "{body}\n\n\
+                                     Rule:    {rule_name}\n\
+                                     Rule id: {rule_id}\n\n\
+                                     — Sentori"
+                                ))
+                                .context("build alert message")?;
+                            if let Err(e) = transport.send(msg).await {
+                                tracing::warn!(error = %e, %addr, %rule_id, "send alert email failed");
+                            } else {
+                                tracing::info!(%addr, %rule_id, "alert email sent");
+                            }
+                        }
+                    }
+                    "webhook" => {
+                        // Phase 27 sub-D: signed POST to the rule's
+                        // configured URL. Best-effort once; persistent
+                        // retry queue lands later.
+                        let url = ch
+                            .get("url")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or_default()
+                            .to_string();
+                        let secret = ch
+                            .get("secret")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or_default()
+                            .to_string();
+                        if url.is_empty() || secret.is_empty() {
+                            tracing::warn!(%rule_id, "webhook channel missing url/secret");
+                            continue;
+                        }
+                        let payload = serde_json::to_vec(&serde_json::json!({
+                            "id":         uuid::Uuid::now_v7(),
+                            "kind":       "alert.fired",
+                            "ruleId":     rule_id,
+                            "ruleName":   rule_name,
+                            "orgId":      org_id,
+                            "summary":    summary,
+                            "body":       body,
+                            "firedAt":    time::OffsetDateTime::now_utc()
+                                .format(&time::format_description::well_known::Rfc3339)
+                                .unwrap_or_default(),
+                        }))
+                        .unwrap_or_default();
+                        let delivery = crate::webhook::WebhookDelivery {
+                            body: payload,
+                            event: "alert.fired",
+                            secret,
+                            url,
+                        };
+                        match crate::webhook::send(&delivery).await {
+                            Ok(s) if s.is_success() => {
+                                tracing::info!(%rule_id, status = %s, "webhook delivered");
+                            }
+                            Ok(s) => {
+                                tracing::warn!(%rule_id, status = %s, "webhook non-2xx");
+                            }
+                            Err(e) => {
+                                tracing::warn!(error = %e, %rule_id, "webhook send failed");
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Ok(())
+        }
+        NotifyEvent::DigestEmail {
+            to,
+            org_name,
+            org_slug,
+            frequency,
+            summary_lines,
+            window_hours,
+        } => {
+            let transport = build_transport(cfg)?;
+            let from: Mailbox = cfg.from.parse().context("parse from address")?;
+            let to_addr: Mailbox = match to.parse() {
+                Ok(m) => m,
+                Err(e) => {
+                    tracing::warn!(error = %e, %to, "skip invalid digest recipient");
+                    return Ok(());
+                }
+            };
+            let lines = summary_lines.join("\n");
+            let frequency_label = if frequency == "weekly" { "Weekly" } else { "Daily" };
+            let msg = Message::builder()
+                .from(from)
+                .to(to_addr)
+                .subject(format!("[Sentori] {frequency_label} digest — {org_name}"))
+                .body(format!(
+                    "{frequency_label} summary for {org_name} (slug: {org_slug}).\n\
+                     Window covers the last {window_hours}h.\n\n\
+                     {lines}\n\n\
+                     Manage subscriptions in your Sentori settings.\n\n\
+                     — Sentori"
+                ))
+                .context("build digest message")?;
+            if let Err(e) = transport.send(msg).await {
+                tracing::warn!(error = %e, %to, "send digest email failed");
+            } else {
+                tracing::info!(%to, %frequency, "digest email sent");
             }
             Ok(())
         }

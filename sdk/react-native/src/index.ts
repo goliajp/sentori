@@ -2,6 +2,11 @@ import { init } from './init';
 import { addBreadcrumb } from './breadcrumbs';
 import { setUser, getUser, captureError, captureException } from './capture';
 import { ErrorBoundary } from './error-boundary';
+import {
+  endSession,
+  markSessionCrashed,
+  startSession,
+} from './session-tracker';
 
 export const sentori = {
   init,
@@ -11,6 +16,9 @@ export const sentori = {
   captureError,
   captureException,
   ErrorBoundary,
+  startSession,
+  endSession,
+  markSessionCrashed,
 };
 
 export default sentori;
@@ -24,6 +32,11 @@ export {
   stopAnrWatchdog,
   triggerNativeCrash,
 } from './native';
+export {
+  endSession,
+  markSessionCrashed,
+  startSession,
+} from './session-tracker';
 
 export type {
   Event,

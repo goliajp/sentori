@@ -1,7 +1,9 @@
 use std::net::SocketAddr;
 
 use anyhow::Context;
-use sentori_server::{db, metrics, notifier, quotas, retention, router, seed, valkey};
+use sentori_server::{
+    db, digest, metrics, notifier, quotas, regression, retention, router, rule_eval, seed, valkey,
+};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -97,6 +99,30 @@ async fn main() -> anyhow::Result<()> {
     if let Some(p) = pool.as_ref() {
         retention::spawn_retention_task(p.clone());
         tracing::info!("retention task spawned (24h interval)");
+    }
+
+    // Phase 23 sub-D: regression sweeper safety net. The ingest path
+    // already flips resolved → regressed atomically on every event;
+    // this catches rows missed by that path (pre-migration legacy,
+    // backfill writes).
+    if let Some(p) = pool.as_ref() {
+        regression::spawn_sweeper(p.clone());
+        tracing::info!("regression sweeper spawned (5m interval)");
+    }
+
+    // Phase 27 sub-B: alert rule evaluator. Every 60s scans
+    // event_count + crash_free_drop rules; on-event triggers fire
+    // synchronously from the ingest path.
+    if let Some(p) = pool.as_ref() {
+        rule_eval::spawn_cron(p.clone(), notifier_tx.clone());
+        tracing::info!("alert rule cron spawned (60s interval)");
+    }
+
+    // Phase 27 sub-E: digest evaluator. Hourly, ships opt-in
+    // summary emails for daily / weekly subscribers.
+    if let Some(p) = pool.as_ref() {
+        digest::spawn_cron(p.clone(), notifier_tx.clone());
+        tracing::info!("digest cron spawned (1h interval)");
     }
 
     let addr: SocketAddr = "0.0.0.0:8080".parse()?;

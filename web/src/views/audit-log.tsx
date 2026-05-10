@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { auditApi, type AuditRow, orgsApi } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { useHasPermission } from '@/auth/useHasPermission'
+import { type Density, densityClasses, useDensity } from '@/lib/density'
 
 const PAGE_LIMIT = 100
 
@@ -11,6 +12,7 @@ export function AuditLogView() {
   const { currentOrg } = useOrg()
   const slug = currentOrg.slug
   const allowed = useHasPermission('audit.read')
+  const { density } = useDensity()
 
   const [action, setAction] = useState('')
   const [actorUserId, setActorUserId] = useState('')
@@ -169,7 +171,7 @@ export function AuditLogView() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <AuditRowItem key={r.id} row={r} />
+                <AuditRowItem density={density} key={r.id} row={r} />
               ))}
             </tbody>
           </table>
@@ -188,14 +190,15 @@ export function AuditLogView() {
   )
 }
 
-function AuditRowItem({ row }: { row: AuditRow }) {
+function AuditRowItem({ density, row }: { density: Density; row: AuditRow }) {
+  const dCls = densityClasses(density)
   const [open, setOpen] = useState(false)
   const payloadStr = JSON.stringify(row.payload, null, 2)
   const empty = payloadStr === '{}' || payloadStr === 'null'
 
   return (
     <>
-      <tr className="border-border/50 border-b align-top">
+      <tr className={`border-border/50 border-b align-top ${dCls.rowClass}`}>
         <td className="text-fg-muted px-2 py-2 font-mono text-[11px] tabular-nums">
           {new Date(row.createdAt).toISOString().replace('T', ' ').slice(0, 19)}
         </td>

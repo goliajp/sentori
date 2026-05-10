@@ -12,6 +12,7 @@
 import type { OrgRole, TeamRole } from '@/api/client'
 
 export type PermissionAction =
+  | 'alert.manage'
   | 'audit.read'
   | 'invite.manage'
   | 'member.manage'
@@ -41,6 +42,7 @@ export function hasPermission(action: PermissionAction, scope: Scope): boolean {
   const { orgRole, teamRole } = scope
 
   switch (action) {
+    case 'alert.manage':
     case 'audit.read':
     case 'invite.manage':
     case 'member.manage':

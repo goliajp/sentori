@@ -1,4 +1,5 @@
 import { captureError } from '../capture.js'
+import { endSession } from '../session-tracker.js'
 
 let installed = false
 
@@ -33,6 +34,10 @@ export function installBrowserHooks(): boolean {
 
   w.addEventListener('error', onError)
   w.addEventListener('unhandledrejection', onRejection)
+  // Phase 26 sub-B: pagehide is the right unload event in modern
+  // browsers (fires on bfcache → background, full unload, and tab
+  // close). beforeunload is unreliable on mobile Safari.
+  w.addEventListener('pagehide', () => endSession())
   installed = true
   return true
 }

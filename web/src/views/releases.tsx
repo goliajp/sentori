@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 
 import { adminApi, type ReleaseListRow } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
+import { EmptyState, ErrorState, LoadingState } from '@/components/states'
 
 /**
  * Phase 23 sub-A: project releases list. Card per release with the
@@ -27,21 +28,27 @@ export function ReleasesView() {
 
   if (!projectId) {
     return (
-      <div className="text-fg-muted px-6 py-6 text-sm">
-        No project in this org yet. Create one to see releases.
-      </div>
+      <EmptyState
+        hint="Create one in your org settings to see releases."
+        title="No project in this org yet"
+      />
     )
   }
-  if (isLoading) return <div className="text-fg-muted px-6 py-6 text-sm">Loading…</div>
-  if (error) return <div className="px-6 py-6 text-sm text-red-400">Failed to load releases.</div>
+  if (isLoading) return <LoadingState />
+  if (error) return <ErrorState label="Failed to load releases." />
 
   const rows = data ?? []
   if (rows.length === 0) {
     return (
-      <div className="text-fg-muted px-6 py-6 text-sm">
-        No releases yet — they're created automatically when an event arrives or when{' '}
-        <code className="font-mono">sentori-cli upload</code> runs against this project.
-      </div>
+      <EmptyState
+        hint={
+          <>
+            Releases land here automatically when an event arrives, or when{' '}
+            <code className="font-mono">sentori-cli upload</code> runs against this project.
+          </>
+        }
+        title="No releases yet"
+      />
     )
   }
 

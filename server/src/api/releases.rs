@@ -126,6 +126,117 @@ pub async fn list_releases(
     Ok(Json(rows))
 }
 
+/// `GET /admin/api/projects/{project_id}/releases/{base}/compare/{target}`
+///
+/// Phase 23 sub-E: diff two releases. Returns each issue that appeared
+/// in either release, bucketed:
+///
+///  - `added`      → seen in `target`, not in `base`     (new regression risk)
+///  - `fixed`      → seen in `base`, not in `target`     (regression candidates)
+///  - `persisting` → seen in both                        (still failing)
+///
+/// "Seen in release X" = at least one event row with `release = X` and
+/// a non-null `issue_id`. We don't gate on `issues.status` — a closed
+/// issue that recurred in `target` still shows up as `added`, which is
+/// the correct read for a release health diff.
+///
+/// Order: each bucket sorted by `last_seen DESC` so the freshest signal
+/// is at the top. The dashboard renders three lists.
+#[derive(Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct CompareIssueRow {
+    pub bucket: String,
+    pub error_type: String,
+    pub event_count: i64,
+    pub id: Uuid,
+    #[serde(with = "time::serde::rfc3339")]
+    pub last_seen: time::OffsetDateTime,
+    pub message_sample: String,
+    pub status: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompareResponse {
+    pub base: String,
+    pub target: String,
+    pub added: Vec<CompareIssueRow>,
+    pub fixed: Vec<CompareIssueRow>,
+    pub persisting: Vec<CompareIssueRow>,
+}
+
+pub async fn compare_releases(
+    State(state): State<AppState>,
+    Path((project_id, base, target)): Path<(Uuid, String, String)>,
+) -> Result<Json<CompareResponse>, AppError> {
+    let pool = state.db.as_ref().ok_or(AppError::DatabaseUnavailable)?;
+
+    if base == target {
+        return Err(AppError::Internal(
+            "compare requires two different releases".into(),
+        ));
+    }
+
+    let rows: Vec<CompareIssueRow> = sqlx::query_as(
+        r#"
+        WITH base_issues AS (
+            SELECT DISTINCT issue_id
+            FROM events
+            WHERE project_id = $1 AND release = $2 AND issue_id IS NOT NULL
+        ),
+        target_issues AS (
+            SELECT DISTINCT issue_id
+            FROM events
+            WHERE project_id = $1 AND release = $3 AND issue_id IS NOT NULL
+        )
+        SELECT
+            i.id,
+            i.error_type,
+            i.message_sample,
+            i.status,
+            i.last_seen,
+            i.event_count,
+            CASE
+                WHEN bi.issue_id IS NULL THEN 'added'
+                WHEN ti.issue_id IS NULL THEN 'fixed'
+                ELSE 'persisting'
+            END AS bucket
+        FROM issues i
+        LEFT JOIN base_issues   bi ON bi.issue_id = i.id
+        LEFT JOIN target_issues ti ON ti.issue_id = i.id
+        WHERE i.project_id = $1
+          AND (bi.issue_id IS NOT NULL OR ti.issue_id IS NOT NULL)
+        ORDER BY i.last_seen DESC
+        "#,
+    )
+    .bind(project_id)
+    .bind(&base)
+    .bind(&target)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::Internal(format!("compare releases: {e}")))?;
+
+    let mut added = Vec::new();
+    let mut fixed = Vec::new();
+    let mut persisting = Vec::new();
+    for r in rows {
+        match r.bucket.as_str() {
+            "added" => added.push(r),
+            "fixed" => fixed.push(r),
+            "persisting" => persisting.push(r),
+            _ => {}
+        }
+    }
+
+    Ok(Json(CompareResponse {
+        base,
+        target,
+        added,
+        fixed,
+        persisting,
+    }))
+}
+
 /// `POST /admin/api/releases/{release_name}/sourcemaps`
 ///
 /// multipart/form-data upload. Each part is a single artifact file.

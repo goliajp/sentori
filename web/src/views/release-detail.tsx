@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 
 import {
   adminApi,
@@ -9,6 +9,7 @@ import {
   type ReleaseSourcemap,
 } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
+import { ErrorState, LoadingState } from '@/components/states'
 
 /**
  * Phase 23 sub-B: per-release artifact tree.
@@ -26,6 +27,7 @@ import { useOrg } from '@/auth/orgContext'
 export function ReleaseDetailView() {
   const { releaseName } = useParams<{ releaseName: string }>()
   const { currentOrg, currentProject } = useOrg()
+  const navigate = useNavigate()
   const projectId = currentProject?.id ?? null
 
   const { data, error, isLoading } = useQuery({
@@ -34,15 +36,22 @@ export function ReleaseDetailView() {
     queryKey: ['release-artifacts', projectId, releaseName],
   })
 
-  if (!releaseName || !projectId) {
-    return <div className="text-fg-muted px-6 py-6 text-sm">Missing release context.</div>
-  }
-  if (isLoading) return <div className="text-fg-muted px-6 py-6 text-sm">Loading…</div>
-  if (error)
-    return <div className="px-6 py-6 text-sm text-red-400">Failed to load release artifacts.</div>
+  // Phase 23 sub-E: pull the full release list so the compare-with
+  // selector knows what's available. Cached separately because it's
+  // also used by `/releases`.
+  const { data: allReleases } = useQuery({
+    enabled: !!projectId,
+    queryFn: () => adminApi.listReleases(projectId!),
+    queryKey: ['releases', projectId],
+  })
+
+  if (!releaseName || !projectId) return <ErrorState label="Missing release context." />
+  if (isLoading) return <LoadingState />
+  if (error) return <ErrorState label="Failed to load release artifacts." />
   if (!data) return null
 
   const artifactCount = data.sourcemaps.length + data.dsyms.length + data.mappings.length
+  const otherReleases = (allReleases ?? []).filter((r) => r.name !== releaseName)
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
@@ -53,13 +62,37 @@ export function ReleaseDetailView() {
         >
           ← All releases
         </Link>
-        <h1 className="text-fg mt-2 truncate font-mono text-[18px] font-semibold">
-          {data.release}
-        </h1>
+        <div className="mt-2 flex items-baseline justify-between gap-4">
+          <h1 className="text-fg truncate font-mono text-[18px] font-semibold">{data.release}</h1>
+          {otherReleases.length > 0 && (
+            <select
+              aria-label="Compare with"
+              className="border-border bg-bg-tertiary text-fg max-w-[260px] shrink-0 rounded-md border px-2 py-1 font-mono text-[12px]"
+              defaultValue=""
+              onChange={(e) => {
+                if (!e.target.value) return
+                navigate(
+                  `/org/${currentOrg.slug}/releases/${encodeURIComponent(
+                    releaseName
+                  )}/compare/${encodeURIComponent(e.target.value)}`
+                )
+              }}
+            >
+              <option value="">Compare with…</option>
+              {otherReleases.map((r) => (
+                <option key={r.id} value={r.name}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
         <p className="text-fg-muted mt-1 text-[12px]">
           {artifactCount} artifact{artifactCount === 1 ? '' : 's'} uploaded for this release.
         </p>
       </header>
+
+      <ReleaseHealthPanel projectId={projectId} release={data.release} />
 
       <ArtifactSection
         emptyHint={
@@ -84,6 +117,89 @@ export function ReleaseDetailView() {
       <MappingSection mappings={data.mappings} release={data.release} />
     </div>
   )
+}
+
+/**
+ * Phase 26 sub-E: per-release crash-free metrics.
+ *
+ * Same `health` endpoint as the overview widget, scoped by `?release=`.
+ * v0.2 window is the last 7 days — short enough to feel current, long
+ * enough to dwarf single-bucket noise on low-traffic releases. The
+ * dashboard's overview widget uses 24h; we deliberately diverge here
+ * because per-release sample sizes need a wider window to be useful.
+ *
+ * If the release has no session pings, we render a one-line hint
+ * pointing at the SDK rather than misleading "0%" numbers.
+ */
+function ReleaseHealthPanel({ projectId, release }: { projectId: string; release: string }) {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString()
+  const { data, isLoading } = useQuery({
+    queryFn: () => adminApi.health(projectId, { bucket: '1d', from: sevenDaysAgo, release }),
+    queryKey: ['health', projectId, release, '7d'],
+    staleTime: 60_000,
+  })
+  if (isLoading || !data) return null
+
+  return (
+    <section>
+      <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Health · last 7 days</h2>
+      {data.summary.totalSessions === 0 ? (
+        <p className="text-fg-muted mt-2 text-[12px]">No session pings on this release yet.</p>
+      ) : (
+        <dl className="border-border mt-2 grid grid-cols-2 gap-x-6 gap-y-1 rounded-md border p-4 sm:grid-cols-4">
+          <HealthStat
+            label="Crash-free sessions"
+            tone={rateTone(data.summary.crashFreeSessionRate, 0.99)}
+            value={formatRate(data.summary.crashFreeSessionRate)}
+          />
+          <HealthStat
+            label="Crash-free users"
+            tone={rateTone(data.summary.crashFreeUserRate, 0.995)}
+            value={formatRate(data.summary.crashFreeUserRate)}
+          />
+          <HealthStat
+            label="Sessions"
+            tone="neutral"
+            value={data.summary.totalSessions.toLocaleString()}
+          />
+          <HealthStat
+            label="Crashed"
+            tone={data.summary.crashedSessions > 0 ? 'warn' : 'neutral'}
+            value={data.summary.crashedSessions.toLocaleString()}
+          />
+        </dl>
+      )}
+    </section>
+  )
+}
+
+function HealthStat({
+  label,
+  tone,
+  value,
+}: {
+  label: string
+  tone: 'good' | 'neutral' | 'warn'
+  value: string
+}) {
+  const valueClass =
+    tone === 'good' ? 'text-green-300' : tone === 'warn' ? 'text-amber-300' : 'text-fg'
+  return (
+    <div>
+      <dt className="text-fg-muted text-[10px] tracking-wider uppercase">{label}</dt>
+      <dd className={`mt-1 font-mono text-[14px] tabular-nums ${valueClass}`}>{value}</dd>
+    </div>
+  )
+}
+
+function formatRate(rate: null | number): string {
+  if (rate == null) return '—'
+  return `${(rate * 100).toFixed(2)}%`
+}
+
+function rateTone(rate: null | number, threshold: number): 'good' | 'neutral' | 'warn' {
+  if (rate == null) return 'neutral'
+  return rate >= threshold ? 'good' : 'warn'
 }
 
 function DsymSection({ dsyms, release }: { dsyms: ReleaseDsym[]; release: string }) {

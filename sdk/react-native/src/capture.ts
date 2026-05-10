@@ -1,5 +1,6 @@
 import { getConfig, isInitialized } from './config';
 import { getBreadcrumbs } from './breadcrumbs';
+import { markSessionErrored } from './session-tracker';
 import { parseStack } from './stack';
 import { enqueue } from './transport';
 import { uuidV7 } from './uuid';
@@ -52,6 +53,9 @@ export const captureError = (error: Error, extras?: CaptureExtras): void => {
     fingerprint: extras?.fingerprint,
   };
 
+  // Phase 26 sub-B: a captured error promotes the current session to
+  // `errored` so the next AppState=background ping reports unhealthy.
+  markSessionErrored();
   enqueue(event);
 };
 

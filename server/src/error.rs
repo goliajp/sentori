@@ -16,6 +16,8 @@ pub enum AppError {
     NotFound,
     #[error("database unavailable")]
     DatabaseUnavailable,
+    #[error("forbidden")]
+    Forbidden,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -70,6 +72,14 @@ impl IntoResponse for AppError {
                 StatusCode::SERVICE_UNAVAILABLE,
                 Json(ErrorBody {
                     error: "databaseUnavailable",
+                    details: vec![],
+                }),
+            )
+                .into_response(),
+            AppError::Forbidden => (
+                StatusCode::FORBIDDEN,
+                Json(ErrorBody {
+                    error: "forbidden",
                     details: vec![],
                 }),
             )

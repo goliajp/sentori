@@ -3,26 +3,42 @@ use uuid::Uuid;
 
 use crate::event::Event;
 
-/// Upsert an issue keyed on `(project_id, fingerprint)`. Returns the
-/// canonical issue id.
+/// Outcome of an upsert — events.rs uses this to decide what
+/// notification to enqueue (NewIssue / Regression / nothing).
+#[derive(Debug, Clone, Copy)]
+pub struct UpsertOutcome {
+    pub issue_id: Uuid,
+    pub is_new: bool,
+    /// Phase 23 sub-D: row existed in `resolved` status when this event
+    /// arrived; the upsert SQL flipped it to `regressed` atomically.
+    pub regressed: bool,
+}
+
+/// Upsert an issue keyed on `(project_id, fingerprint)`.
 ///
 /// On insert: error_type / message_sample seeded from the first event;
 /// first_seen = last_seen = event timestamp; event_count = 1.
 ///
-/// On conflict: only `last_seen` (max) and `event_count` (+1) are
-/// updated. `error_type` and `message_sample` stay at first-event values
-/// in v0.1; later sub-sections may add a "most recent sample" path.
+/// On conflict: bumps `last_seen` (max) and `event_count`, refreshes
+/// `last_environment` / `last_release`. **Phase 23 sub-D**: if the row
+/// was in `status = 'resolved'`, the same UPDATE flips it to
+/// `regressed`, stamps `regressed_at` with the event timestamp, and
+/// records `regressed_in_release` from the event payload. Atomic — no
+/// read-then-write window where the dashboard could see a stale
+/// `resolved` after the regression event landed.
 pub async fn upsert_issue(
     pool: &PgPool,
     project_id: Uuid,
     fingerprint: &str,
     event: &Event,
-) -> Result<(Uuid, bool), sqlx::Error> {
+) -> Result<UpsertOutcome, sqlx::Error> {
     let new_id = Uuid::now_v7();
 
-    // PG's `xmax` is 0 when the row was inserted (i.e. not the conflict
-    // path). Used to tell new vs. updated for the new-issue notifier.
-    let row: (Uuid, bool) = sqlx::query_as(
+    // `xmax = 0` ⇒ row was inserted, not the conflict path. The
+    // regressed flag distinguishes "this UPDATE flipped status" from
+    // "row was already regressed before this event" by checking that
+    // `regressed_at` matches the event's own timestamp.
+    let row: (Uuid, bool, bool) = sqlx::query_as(
         r#"
         INSERT INTO issues
             (id, project_id, fingerprint, error_type, message_sample,
@@ -33,8 +49,24 @@ pub async fn upsert_issue(
             last_seen        = GREATEST(issues.last_seen, EXCLUDED.last_seen),
             event_count      = issues.event_count + 1,
             last_environment = EXCLUDED.last_environment,
-            last_release     = EXCLUDED.last_release
-        RETURNING id, (xmax = 0) AS is_new
+            last_release     = EXCLUDED.last_release,
+            status           = CASE WHEN issues.status = 'resolved'
+                                    THEN 'regressed'
+                                    ELSE issues.status
+                               END,
+            regressed_at     = CASE WHEN issues.status = 'resolved'
+                                    THEN EXCLUDED.last_seen
+                                    ELSE issues.regressed_at
+                               END,
+            regressed_in_release = CASE WHEN issues.status = 'resolved'
+                                        THEN EXCLUDED.last_release
+                                        ELSE issues.regressed_in_release
+                                   END
+        RETURNING
+            id,
+            (xmax = 0) AS is_new,
+            (xmax <> 0 AND status = 'regressed' AND regressed_at = $6)
+                AS regressed
         "#,
     )
     .bind(new_id)
@@ -48,5 +80,9 @@ pub async fn upsert_issue(
     .fetch_one(pool)
     .await?;
 
-    Ok(row)
+    Ok(UpsertOutcome {
+        issue_id: row.0,
+        is_new: row.1,
+        regressed: row.2,
+    })
 }

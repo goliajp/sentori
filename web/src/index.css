@@ -1,5 +1,15 @@
 @import 'tailwindcss';
 
+/*
+ * Phase 28 sub-F: design tokens.
+ *
+ * The single source of truth for these values is `docs/design-tokens.md`
+ * in the repo root. Marketing (`marketing/src/styles/global.css`) and
+ * docs (`docs-site/src/styles/overrides.css`) carry the same palette
+ * — when changing a token, update all three files plus the doc table
+ * in the same commit.
+ */
+
 @theme {
   --color-bg: #ffffff;
   --color-bg-tertiary: #f3f4f6;
@@ -41,4 +51,49 @@ body {
     'Segoe UI',
     Roboto,
     sans-serif;
+}
+
+/*
+ * Phase 28 sub-C: a11y baseline.
+ *
+ * Default focus-visible ring on every interactive element.
+ * `:focus-visible` (not `:focus`) so mouse clicks don't trigger the
+ * ring — keyboard users still get the indicator.
+ */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Skip-to-content link only renders when focused (keyboard users). */
+.skip-to-content {
+  position: absolute;
+  left: 0.5rem;
+  top: 0.5rem;
+  z-index: 100;
+  padding: 0.25rem 0.75rem;
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+  border: 1px solid var(--color-accent);
+  border-radius: 0.25rem;
+  font-size: 12px;
+  transform: translateY(-200%);
+  transition: transform 0.15s;
+}
+.skip-to-content:focus-visible {
+  transform: translateY(0);
+  outline: none;
+}
+
+/* Respect prefers-reduced-motion: kill non-essential transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -56,6 +56,8 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route("/v1/events", post(api::events::handle))
         .route("/v1/events:batch", post(api::events_batch::handle))
         .route("/v1/events/_recent", get(api::recent::handle))
+        .route("/v1/deploys", post(api::deploys::handle))
+        .route("/v1/sessions", post(api::sessions::handle))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             crate::rate_limit::rate_limit_middleware,
@@ -64,6 +66,7 @@ pub fn build(cfg: ServerConfig) -> Router {
 
     let admin_protected = Router::new()
         .route("/projects", get(api::admin::list_my_projects))
+        .route("/search", get(api::search::handle))
         .route(
             "/orgs/{slug}/projects",
             post(api::projects::create_project),
@@ -88,6 +91,30 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route(
             "/projects/{project_id}/issues",
             get(api::admin::list_issues),
+        )
+        .route(
+            "/projects/{project_id}/issues:bulk",
+            post(api::admin::bulk_patch_issues),
+        )
+        .route(
+            "/projects/{project_id}/health",
+            get(api::health::handle),
+        )
+        .route(
+            "/projects/{project_id}/events/{event_id}/source",
+            get(api::admin::frame_source),
+        )
+        .route(
+            "/projects/{project_id}/issues/{issue_id}/activity",
+            get(api::admin::list_issue_activity),
+        )
+        .route(
+            "/projects/{project_id}/issues/{issue_id}/comments",
+            post(api::admin::create_issue_comment),
+        )
+        .route(
+            "/projects/{project_id}/issues/{issue_id}/comments/{comment_id}",
+            axum::routing::delete(api::admin::delete_issue_comment),
         )
         .route(
             "/projects/{project_id}/issues/{issue_id}",
@@ -122,6 +149,10 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route(
             "/projects/{project_id}/releases/{release}/artifacts",
             get(api::dsyms::release_artifacts),
+        )
+        .route(
+            "/projects/{project_id}/releases/{base}/compare/{target}",
+            get(api::releases::compare_releases),
         )
         .route(
             "/projects/{project_id}/recipients",
@@ -232,6 +263,31 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route("/orgs/{slug}/audit", get(api::orgs::list_audit))
         .route("/audit/actions", get(api::orgs::list_audit_actions))
         .route("/users/me/activity", get(api::orgs::list_my_activity))
+        .route(
+            "/users/me/digests",
+            get(api::digests::list_my_digests).post(api::digests::subscribe),
+        )
+        .route(
+            "/users/me/digests/{org_slug}/{frequency}",
+            axum::routing::delete(api::digests::unsubscribe),
+        )
+        .route(
+            "/orgs/{slug}/views",
+            get(api::views::list_views).post(api::views::create_view),
+        )
+        .route(
+            "/orgs/{slug}/views/{id}",
+            axum::routing::delete(api::views::delete_view),
+        )
+        .route(
+            "/orgs/{slug}/alert-rules",
+            get(api::alert_rules::list_rules).post(api::alert_rules::create_rule),
+        )
+        .route(
+            "/orgs/{slug}/alert-rules/{id}",
+            axum::routing::patch(api::alert_rules::patch_rule)
+                .delete(api::alert_rules::delete_rule),
+        )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             api::user_auth::require_user,

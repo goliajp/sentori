@@ -4,12 +4,14 @@ import { Link, useParams } from 'react-router'
 
 import { recipientsApi } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
+import { densityClasses, useDensity } from '@/lib/density'
 
 export function RecipientSettingsView() {
   const { projectId } = useParams<{ projectId: string }>()
   const { currentOrg, projects } = useOrg()
   const project = projects.find((p) => p.id === projectId)
   const queryClient = useQueryClient()
+  const dCls = densityClasses(useDensity().density)
 
   const recipientsQuery = useQuery({
     enabled: !!projectId,
@@ -147,7 +149,7 @@ export function RecipientSettingsView() {
             </thead>
             <tbody>
               {recipientsQuery.data.map((r) => (
-                <tr className="border-border/40 h-9 border-b" key={r.id}>
+                <tr className={`border-border/40 border-b ${dCls.rowClass}`} key={r.id}>
                   <td className="text-fg px-2 font-mono">{r.email}</td>
                   <td className="px-2 text-center">
                     <input

@@ -121,19 +121,56 @@ pub(crate) async fn persist_with_grouping(
 ) -> Result<(), sqlx::Error> {
     let pool = state.db.as_ref().expect("persist_with_grouping requires db");
     let fp = crate::grouping::fingerprint(event);
-    let (issue_id, is_new) =
-        crate::issues::upsert_issue(pool, project_id, &fp, event).await?;
-    persist_event_row(pool, project_id, event, Some(issue_id)).await?;
+    let outcome = crate::issues::upsert_issue(pool, project_id, &fp, event).await?;
+    persist_event_row(pool, project_id, event, Some(outcome.issue_id)).await?;
 
-    if is_new {
+    if outcome.is_new {
         if let Some(tx) = &state.notifier_tx {
             let _ = tx.try_send(crate::notifier::NotifyEvent::NewIssue {
                 project_id,
-                issue_id,
+                issue_id: outcome.issue_id,
                 error_type: event.error.r#type.clone(),
                 message: event.error.message.clone(),
             });
         }
+        // Phase 27 sub-B: also evaluate `new_issue` alert rules.
+        crate::rule_eval::try_fire_on_event(
+            pool,
+            state.notifier_tx.as_ref(),
+            project_id,
+            outcome.issue_id,
+            &event.error.r#type,
+            &event.environment,
+            &event.release,
+            false,
+        )
+        .await;
+    } else if outcome.regressed {
+        // Phase 23 sub-D: regression — issue had been resolved, this
+        // event flipped it back to `regressed`. Notify on_regression
+        // recipients so engineers find out before users do.
+        if let Some(tx) = &state.notifier_tx {
+            let _ = tx.try_send(crate::notifier::NotifyEvent::Regression {
+                project_id,
+                issue_id: outcome.issue_id,
+                error_type: event.error.r#type.clone(),
+                message: event.error.message.clone(),
+                release: event.release.clone(),
+            });
+        }
+        m::issue_regressed();
+        // Phase 27 sub-B: also evaluate `regression` alert rules.
+        crate::rule_eval::try_fire_on_event(
+            pool,
+            state.notifier_tx.as_ref(),
+            project_id,
+            outcome.issue_id,
+            &event.error.r#type,
+            &event.environment,
+            &event.release,
+            true,
+        )
+        .await;
     }
 
     Ok(())

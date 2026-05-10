@@ -13,11 +13,13 @@ import { useAuth } from '@/auth/state'
 import { useOrg } from '@/auth/orgContext'
 import { useHasPermission } from '@/auth/useHasPermission'
 import { RoleBadge } from '@/components/RoleBadge'
+import { densityClasses, useDensity } from '@/lib/density'
 
 const ROLES: readonly OrgRole[] = ['admin', 'member', 'viewer']
 
 export function OrgSettingsView() {
   const { currentOrg } = useOrg()
+  const dCls = densityClasses(useDensity().density)
   const { user } = useAuth()
   const slug = currentOrg.slug
   const canManage = useHasPermission('org.manage')
@@ -173,7 +175,7 @@ export function OrgSettingsView() {
                 const isSelf = user?.id === m.userId
                 const teamsForUser = userTeams.get(m.userId) ?? []
                 return (
-                  <tr className="border-border/40 h-9 border-b" key={m.userId}>
+                  <tr className={`border-border/40 border-b ${dCls.rowClass}`} key={m.userId}>
                     <td className="text-fg px-2">
                       <div className="flex items-center gap-2">
                         <span className="font-mono">{m.email}</span>
@@ -302,7 +304,7 @@ export function OrgSettingsView() {
               </thead>
               <tbody>
                 {invitesQuery.data.map((inv) => (
-                  <tr className="border-border/40 h-9 border-b" key={inv.token}>
+                  <tr className={`border-border/40 border-b ${dCls.rowClass}`} key={inv.token}>
                     <td className="text-fg px-2">
                       <div className="flex items-center gap-2">
                         <span className="font-mono">{inv.email}</span>

@@ -5,11 +5,13 @@ import { Link } from 'react-router'
 import { teamsApi } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { useHasPermission } from '@/auth/useHasPermission'
+import { densityClasses, useDensity } from '@/lib/density'
 
 export function TeamListView() {
   const { currentOrg } = useOrg()
   const slug = currentOrg.slug
   const canManage = useHasPermission('team.manage')
+  const dCls = densityClasses(useDensity().density)
   const queryClient = useQueryClient()
 
   const teamsQuery = useQuery({
@@ -127,7 +129,10 @@ export function TeamListView() {
             </thead>
             <tbody>
               {teams.map((t) => (
-                <tr className="border-border hover:bg-bg-tertiary border-b" key={t.id}>
+                <tr
+                  className={`border-border hover:bg-bg-tertiary border-b ${dCls.rowClass}`}
+                  key={t.id}
+                >
                   <td className="px-2 py-2">
                     <Link
                       className="text-accent font-mono text-[12px] hover:underline"

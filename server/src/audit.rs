@@ -34,6 +34,12 @@ pub mod actions {
 
     pub const TOKEN_CREATED: &str = "token.created";
     pub const TOKEN_REVOKED: &str = "token.revoked";
+
+    pub const RELEASE_DEPLOYED: &str = "release.deployed";
+
+    pub const ALERT_RULE_CREATED: &str = "alert_rule.created";
+    pub const ALERT_RULE_PATCHED: &str = "alert_rule.patched";
+    pub const ALERT_RULE_DELETED: &str = "alert_rule.deleted";
 }
 
 pub mod targets {
@@ -45,6 +51,8 @@ pub mod targets {
     pub const PROJECT_TEAM: &str = "project_team";
     pub const TOKEN: &str = "token";
     pub const TRANSFER: &str = "transfer";
+    pub const RELEASE: &str = "release";
+    pub const ALERT_RULE: &str = "alert_rule";
 }
 
 /// Phase 20 sub-A: human-readable English labels for the action codes,
@@ -76,6 +84,10 @@ pub fn label_for(action: &str) -> &str {
         actions::PROJECT_TEAM_UNBOUND => "Project unbound from team",
         actions::TOKEN_CREATED => "Token created",
         actions::TOKEN_REVOKED => "Token revoked",
+        actions::RELEASE_DEPLOYED => "Release deployed",
+        actions::ALERT_RULE_CREATED => "Alert rule created",
+        actions::ALERT_RULE_PATCHED => "Alert rule updated",
+        actions::ALERT_RULE_DELETED => "Alert rule deleted",
         // Unknown code — fall back to the raw input so the UI shows
         // *something* instead of crashing. The lifetime borrows from the
         // caller's &str.
@@ -106,6 +118,10 @@ pub fn all_labels() -> Vec<(&'static str, &'static str)> {
         actions::PROJECT_TEAM_UNBOUND,
         actions::TOKEN_CREATED,
         actions::TOKEN_REVOKED,
+        actions::RELEASE_DEPLOYED,
+        actions::ALERT_RULE_CREATED,
+        actions::ALERT_RULE_PATCHED,
+        actions::ALERT_RULE_DELETED,
     ]
     .iter()
     .map(|c| (*c, label_for(c)))

@@ -1,5 +1,6 @@
 import { getBreadcrumbs } from './breadcrumbs.js';
 import { getConfig, isInitialized } from './config.js';
+import { markSessionErrored } from './session-tracker.js';
 import { parseStack } from './stack.js';
 import { send } from './transport.js';
 import { uuidV7 } from './uuid.js';
@@ -36,6 +37,9 @@ export function captureError(error, extras) {
         timestamp: new Date().toISOString(),
         user: extras?.user ?? _user,
     };
+    // Phase 26 sub-B: a captured error promotes the current session to
+    // `errored` so the next end-of-session ping reports unhealthy.
+    markSessionErrored();
     void send({ ingestUrl: cfg.ingestUrl, token: cfg.token }, event);
 }
 export const captureException = captureError;

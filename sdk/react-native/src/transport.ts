@@ -162,3 +162,30 @@ export const __resetForTests = (): void => {
 };
 
 export const __peekQueue = (): readonly Event[] => _queue;
+
+/**
+ * Phase 26 sub-B: session ping transport. Best-effort; we don't queue
+ * pings the way we queue events because they fire on background and
+ * AsyncStorage writes during background can be killed by the OS. If
+ * the network's down, the ping is lost — the session counters tolerate
+ * this.
+ */
+export const sendSessionPing = async (
+  ingestUrl: string,
+  token: string,
+  ping: unknown
+): Promise<void> => {
+  try {
+    await fetch(`${ingestUrl}/v1/sessions`, {
+      body: JSON.stringify(ping),
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Sentori-Sdk': `react-native/${SDK_VERSION}`,
+      },
+      method: 'POST',
+    });
+  } catch {
+    // best-effort
+  }
+};

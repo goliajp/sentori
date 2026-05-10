@@ -25,3 +25,10 @@ export {
 } from './breadcrumbs.js'
 
 export { parseStack, type ParseStackOptions } from './stack.js'
+
+export {
+  type SessionContext,
+  type SessionPing,
+  type SessionStatus,
+  SessionTracker,
+} from './session.js'

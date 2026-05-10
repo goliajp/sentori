@@ -28,12 +28,14 @@ pub fn install() -> PrometheusHandle {
 const INGEST_TOTAL: &str = "sentori_ingest_total";
 const INGEST_DURATION: &str = "sentori_ingest_duration_seconds";
 const QUOTA_DROPS: &str = "sentori_quota_drops_total";
+const ISSUE_REGRESSED: &str = "sentori_issue_regressed_total";
 
 static INGEST_ACCEPTED: OnceLock<Counter> = OnceLock::new();
 static INGEST_REJECTED: OnceLock<Counter> = OnceLock::new();
 static INGEST_QUOTA: OnceLock<Counter> = OnceLock::new();
 static QUOTA_DROP: OnceLock<Counter> = OnceLock::new();
 static INGEST_DUR: OnceLock<Histogram> = OnceLock::new();
+static ISSUE_REGRESSED_C: OnceLock<Counter> = OnceLock::new();
 
 pub fn ingest_accepted() {
     INGEST_ACCEPTED
@@ -63,6 +65,12 @@ pub fn ingest_duration(secs: f64) {
     INGEST_DUR
         .get_or_init(|| metrics::histogram!(INGEST_DURATION))
         .record(secs);
+}
+
+pub fn issue_regressed() {
+    ISSUE_REGRESSED_C
+        .get_or_init(|| metrics::counter!(ISSUE_REGRESSED))
+        .increment(1);
 }
 
 #[cfg(test)]

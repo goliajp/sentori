@@ -1,8 +1,14 @@
 @import 'tailwindcss';
 
-/* Mirrors web/src/index.css palette so dashboard and marketing share
-   tokens. Marketing is dark-only at v0.1; the light values are kept as
-   fallback so any forced-light browser still gets a sane page. */
+/*
+ * Phase 28 sub-F: design tokens.
+ *
+ * Mirrors web/src/index.css palette so dashboard and marketing share
+ * tokens. Marketing is dark-only — only the dark values land here.
+ * Single source of truth: docs/design-tokens.md. Changing a token
+ * requires updating all three CSS surfaces + the doc in the same
+ * commit.
+ */
 
 @theme {
   --color-bg: #0b0b0f;

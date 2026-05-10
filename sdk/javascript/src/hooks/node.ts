@@ -1,4 +1,5 @@
 import { captureError } from '../capture.js'
+import { endSession } from '../session-tracker.js'
 
 let installed = false
 
@@ -25,6 +26,10 @@ export function installNodeHooks(): boolean {
     if (reason instanceof Error) captureError(reason)
     else captureError(new Error(typeof reason === 'string' ? reason : 'unhandled rejection'))
   })
+  // Phase 26 sub-B: ship a session ping on graceful exit.
+  // beforeExit fires when the loop is about to drain — our last
+  // chance to send while fetch is still functional.
+  p.on('beforeExit', () => endSession('exited'))
   installed = true
   return true
 }

@@ -1,5 +1,6 @@
 use axum::{
     extract::{Extension, Json, Path, Query, State},
+    http,
 };
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
@@ -71,6 +72,17 @@ pub struct IssueRow {
     pub event_count: i64,
     pub last_environment: Option<String>,
     pub last_release: Option<String>,
+    // Phase 23 sub-D: regression bookkeeping. All four are NULL until a
+    // resolve / regression has happened.
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub resolved_at: Option<OffsetDateTime>,
+    pub resolved_in_release: Option<String>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub regressed_at: Option<OffsetDateTime>,
+    pub regressed_in_release: Option<String>,
+    // Phase 25 sub-F: assignee. NULL when nobody owns this issue.
+    pub assignee_user_id: Option<Uuid>,
+    pub assignee_email: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -86,6 +98,14 @@ pub struct ListIssuesQuery {
     /// Filter on `issues.last_release` (denormalized from latest event).
     #[serde(default)]
     pub release: Option<String>,
+    /// Phase 24 sub-A: filter on `issues.error_type` (exact match).
+    #[serde(default)]
+    pub error_type: Option<String>,
+    /// Phase 24 sub-A: only return rows whose `last_seen >= this`. Sent
+    /// by the dashboard after parsing `last:24h` / `last:7d` style query
+    /// tokens — RFC 3339 string parsed by serde via `OffsetDateTime`.
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub last_seen_after: Option<time::OffsetDateTime>,
 }
 
 fn default_status() -> String {
@@ -102,22 +122,31 @@ pub async fn list_issues(
 
     let rows: Vec<IssueRow> = sqlx::query_as(
         r#"
-        SELECT id, fingerprint, error_type, message_sample, status,
-               first_seen, last_seen, event_count,
-               last_environment, last_release
-        FROM issues
-        WHERE project_id = $1
-          AND status = $2
-          AND ($3::TEXT IS NULL OR last_environment = $3)
-          AND ($4::TEXT IS NULL OR last_release = $4)
-        ORDER BY last_seen DESC
-        LIMIT $5
+        SELECT i.id, i.fingerprint, i.error_type, i.message_sample, i.status,
+               i.first_seen, i.last_seen, i.event_count,
+               i.last_environment, i.last_release,
+               i.resolved_at, i.resolved_in_release,
+               i.regressed_at, i.regressed_in_release,
+               i.assignee_user_id,
+               u.email AS assignee_email
+        FROM issues i
+        LEFT JOIN users u ON u.id = i.assignee_user_id
+        WHERE i.project_id = $1
+          AND i.status = $2
+          AND ($3::TEXT IS NULL OR i.last_environment = $3)
+          AND ($4::TEXT IS NULL OR i.last_release = $4)
+          AND ($5::TEXT IS NULL OR i.error_type = $5)
+          AND ($6::TIMESTAMPTZ IS NULL OR i.last_seen >= $6)
+        ORDER BY i.last_seen DESC
+        LIMIT $7
         "#,
     )
     .bind(project_id)
     .bind(&q.status)
     .bind(q.env.as_deref())
     .bind(q.release.as_deref())
+    .bind(q.error_type.as_deref())
+    .bind(q.last_seen_after)
     .bind(limit)
     .fetch_all(pool)
     .await
@@ -157,11 +186,16 @@ pub async fn issue_detail(
 
     let row: Option<IssueRow> = sqlx::query_as(
         r#"
-        SELECT id, fingerprint, error_type, message_sample, status,
-               first_seen, last_seen, event_count,
-               last_environment, last_release
-        FROM issues
-        WHERE project_id = $1 AND id = $2
+        SELECT i.id, i.fingerprint, i.error_type, i.message_sample, i.status,
+               i.first_seen, i.last_seen, i.event_count,
+               i.last_environment, i.last_release,
+               i.resolved_at, i.resolved_in_release,
+               i.regressed_at, i.regressed_in_release,
+               i.assignee_user_id,
+               u.email AS assignee_email
+        FROM issues i
+        LEFT JOIN users u ON u.id = i.assignee_user_id
+        WHERE i.project_id = $1 AND i.id = $2
         "#,
     )
     .bind(project_id)
@@ -200,12 +234,50 @@ pub struct ListEventsQuery {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct PatchIssueRequest {
     pub status: Option<String>,
+    /// Phase 25 sub-F. Use `Some(Some(uuid))` to assign, `Some(None)`
+    /// to unassign, `None` (omitted) to leave alone. Serde double-
+    /// option lets the dashboard send `assigneeUserId: null` distinctly
+    /// from omitting the field.
+    #[serde(default, deserialize_with = "deserialize_double_option")]
+    pub assignee_user_id: Option<Option<Uuid>>,
+    /// Phase 25 sub-F. When the caller is moving the issue to
+    /// `resolved`, override `resolved_in_release` with this string
+    /// instead of taking `last_release`. Same double-option semantics.
+    #[serde(default, deserialize_with = "deserialize_double_option")]
+    pub resolved_in_release: Option<Option<String>>,
 }
 
-const ALLOWED_STATUSES: &[&str] = &["active", "silenced", "closed"];
+impl Default for PatchIssueRequest {
+    fn default() -> Self {
+        Self {
+            assignee_user_id: None,
+            resolved_in_release: None,
+            status: None,
+        }
+    }
+}
+
+/// Distinguish "field not present" from "field present with null". The
+/// inner `Option<T>` carries the value (None = explicit null), the
+/// outer `Option<...>` says whether the field was sent at all.
+fn deserialize_double_option<'de, T, D>(
+    deserializer: D,
+) -> Result<Option<Option<T>>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
+}
+
+// `regressed` is intentionally NOT in the allow-list — that state is
+// produced only by the ingest path catching a `resolved` issue with a
+// fresh event. Patching to `resolved` clears any stale `regressed_at`
+// markers so the timeline reads correctly on the next regression.
+const ALLOWED_STATUSES: &[&str] = &["active", "silenced", "closed", "resolved"];
 
 pub async fn patch_issue(
     State(state): State<AppState>,
@@ -220,24 +292,61 @@ pub async fn patch_issue(
                 "invalid status '{status}'; allowed: {ALLOWED_STATUSES:?}"
             )));
         }
+        // Phase 25 sub-F: caller may pin the resolve to a specific
+        // release with `resolvedInRelease`. If unspecified, fall back
+        // to last_release as before. The override only applies when
+        // we're actually moving to `resolved`.
+        let release_override = body
+            .resolved_in_release
+            .as_ref()
+            .and_then(|o| o.as_ref().cloned());
         sqlx::query(
-            "UPDATE issues SET status = $1 WHERE project_id = $2 AND id = $3",
+            r#"
+            UPDATE issues SET
+                status = $1,
+                resolved_at = CASE WHEN $1 = 'resolved' THEN now() ELSE NULL END,
+                resolved_in_release = CASE
+                    WHEN $1 = 'resolved' THEN COALESCE($4::TEXT, last_release)
+                    ELSE NULL
+                END,
+                regressed_at = CASE WHEN $1 = 'resolved' THEN NULL ELSE regressed_at END,
+                regressed_in_release = CASE WHEN $1 = 'resolved' THEN NULL ELSE regressed_in_release END
+            WHERE project_id = $2 AND id = $3
+            "#,
         )
         .bind(status)
         .bind(project_id)
         .bind(issue_id)
+        .bind(release_override.as_deref())
         .execute(pool)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     }
 
+    // Phase 25 sub-F: assignee patch is independent of status.
+    // `Some(None)` clears, `Some(Some(uuid))` sets, `None` leaves alone.
+    if let Some(opt) = &body.assignee_user_id {
+        sqlx::query("UPDATE issues SET assignee_user_id = $1 WHERE project_id = $2 AND id = $3")
+            .bind(opt.as_ref())
+            .bind(project_id)
+            .bind(issue_id)
+            .execute(pool)
+            .await
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+    }
+
     let row: Option<IssueRow> = sqlx::query_as(
         r#"
-        SELECT id, fingerprint, error_type, message_sample, status,
-               first_seen, last_seen, event_count,
-               last_environment, last_release
-        FROM issues
-        WHERE project_id = $1 AND id = $2
+        SELECT i.id, i.fingerprint, i.error_type, i.message_sample, i.status,
+               i.first_seen, i.last_seen, i.event_count,
+               i.last_environment, i.last_release,
+               i.resolved_at, i.resolved_in_release,
+               i.regressed_at, i.regressed_in_release,
+               i.assignee_user_id,
+               u.email AS assignee_email
+        FROM issues i
+        LEFT JOIN users u ON u.id = i.assignee_user_id
+        WHERE i.project_id = $1 AND i.id = $2
         "#,
     )
     .bind(project_id)
@@ -247,6 +356,446 @@ pub async fn patch_issue(
     .map_err(|e| AppError::Internal(e.to_string()))?;
 
     row.map(Json).ok_or(AppError::NotFound)
+}
+
+// Phase 24 sub-D: bulk action on multiple issues at once. Mirrors the
+// single-row CASE bookkeeping (resolved_at + resolved_in_release stamp /
+// clear; regressed_* clear when leaving resolved) so a multi-select
+// resolve produces the same downstream regression behaviour.
+//
+// Capped at BULK_LIMIT to keep the UPDATE bounded — the dashboard sends
+// the visible page (≤100), so 200 leaves headroom for "Select all
+// across pages" if we ever add it.
+
+const BULK_LIMIT: usize = 200;
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct BulkPatchRequest {
+    pub issue_ids: Vec<Uuid>,
+    /// One of `resolve` / `silence` / `close` / `reopen` / `assign`.
+    /// Map to the corresponding `status` value server-side rather than
+    /// letting the client pick the raw status — keeps the action
+    /// vocabulary fixed and rejects e.g. a hand-crafted bulk-`regressed`
+    /// request.
+    pub action: String,
+    /// Phase 25 sub-F: only meaningful when `action == "assign"`.
+    /// Send a uuid to assign N issues to a user; send `null` (explicit)
+    /// to bulk-unassign.
+    #[serde(default, deserialize_with = "deserialize_double_option")]
+    pub assignee_user_id: Option<Option<Uuid>>,
+}
+
+impl Default for BulkPatchRequest {
+    fn default() -> Self {
+        Self {
+            action: String::new(),
+            assignee_user_id: None,
+            issue_ids: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkPatchResponse {
+    pub updated: u64,
+}
+
+pub async fn bulk_patch_issues(
+    State(state): State<AppState>,
+    Path(project_id): Path<Uuid>,
+    Json(body): Json<BulkPatchRequest>,
+) -> Result<Json<BulkPatchResponse>, AppError> {
+    let pool = state.db.as_ref().ok_or(AppError::DatabaseUnavailable)?;
+
+    if body.issue_ids.is_empty() {
+        return Err(AppError::Internal("issueIds is empty".into()));
+    }
+    if body.issue_ids.len() > BULK_LIMIT {
+        return Err(AppError::Internal(format!(
+            "too many: {} > {}",
+            body.issue_ids.len(),
+            BULK_LIMIT
+        )));
+    }
+    // Assign action takes the assignee uuid (or explicit null) instead
+    // of touching `status`.
+    if body.action == "assign" {
+        let assignee = body
+            .assignee_user_id
+            .as_ref()
+            .ok_or_else(|| AppError::Internal("assigneeUserId required for assign".into()))?;
+        let result = sqlx::query(
+            "UPDATE issues SET assignee_user_id = $1 \
+             WHERE project_id = $2 AND id = ANY($3::uuid[])",
+        )
+        .bind(assignee.as_ref())
+        .bind(project_id)
+        .bind(&body.issue_ids)
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+        return Ok(Json(BulkPatchResponse {
+            updated: result.rows_affected(),
+        }));
+    }
+
+    let target_status = match body.action.as_str() {
+        "resolve" => "resolved",
+        "silence" => "silenced",
+        "close" => "closed",
+        "reopen" => "active",
+        other => {
+            return Err(AppError::Internal(format!("invalid action '{other}'")));
+        }
+    };
+
+    let result = sqlx::query(
+        r#"
+        UPDATE issues SET
+            status = $1,
+            resolved_at = CASE WHEN $1 = 'resolved' THEN now() ELSE NULL END,
+            resolved_in_release = CASE WHEN $1 = 'resolved' THEN last_release ELSE NULL END,
+            regressed_at = CASE WHEN $1 = 'resolved' THEN NULL ELSE regressed_at END,
+            regressed_in_release = CASE WHEN $1 = 'resolved' THEN NULL ELSE regressed_in_release END
+        WHERE project_id = $2 AND id = ANY($3::uuid[])
+        "#,
+    )
+    .bind(target_status)
+    .bind(project_id)
+    .bind(&body.issue_ids)
+    .execute(pool)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(BulkPatchResponse {
+        updated: result.rows_affected(),
+    }))
+}
+
+// Phase 25 sub-B: source preview for a stack frame.
+//
+// The dashboard pops a drawer when the user clicks a frame; this
+// endpoint returns ±N lines of the original source around the line
+// the raw frame reverse-maps to. We always read the *raw* line/col
+// (the dashboard sends the frame index as it appears in the rendered
+// stack — index is stable because symbolication rewrites in place).
+//
+// `cause` is the depth in the cause chain — 0 = primary error,
+// 1 = first cause, etc. Capped at 10 (matches protocol's nesting
+// limit).
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FrameSourceQuery {
+    pub frame: usize,
+    #[serde(default)]
+    pub cause: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FrameSourceResponse {
+    pub file: String,
+    pub line: u32,
+    pub column: u32,
+    pub before: Vec<String>,
+    pub at: String,
+    pub after: Vec<String>,
+}
+
+const FRAME_SOURCE_CONTEXT_LINES: usize = 5;
+const CAUSE_CHAIN_MAX: usize = 10;
+
+pub async fn frame_source(
+    State(state): State<AppState>,
+    Path((project_id, event_id)): Path<(Uuid, Uuid)>,
+    Query(q): Query<FrameSourceQuery>,
+) -> Result<Json<FrameSourceResponse>, AppError> {
+    let pool = state.db.as_ref().ok_or(AppError::DatabaseUnavailable)?;
+    if q.cause > CAUSE_CHAIN_MAX {
+        return Err(AppError::Internal(format!(
+            "cause depth {} > {}",
+            q.cause, CAUSE_CHAIN_MAX
+        )));
+    }
+
+    // Pull the raw payload — symbolicate hasn't been applied yet, so
+    // the line/col we read are pre-sourcemap (= the JS bundle line/col).
+    let row: Option<(String, serde_json::Value)> = sqlx::query_as(
+        "SELECT release, payload FROM events WHERE project_id = $1 AND id = $2",
+    )
+    .bind(project_id)
+    .bind(event_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+    let (release, payload) = row.ok_or(AppError::NotFound)?;
+
+    // Walk the cause chain `q.cause` hops, then index into stack.
+    let mut node = payload
+        .get("error")
+        .ok_or_else(|| AppError::Internal("event has no error".into()))?;
+    for _ in 0..q.cause {
+        node = match node.get("cause") {
+            Some(c) if !c.is_null() => c,
+            _ => return Err(AppError::NotFound),
+        };
+    }
+    let stack = node
+        .get("stack")
+        .and_then(|s| s.as_array())
+        .ok_or(AppError::NotFound)?;
+    let frame = stack.get(q.frame).ok_or(AppError::NotFound)?;
+    let line = frame.get("line").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+    let column = frame.get("column").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+    if line == 0 {
+        return Err(AppError::NotFound);
+    }
+
+    let window = crate::symbolicate::source_for_frame(
+        pool,
+        &release,
+        line,
+        column,
+        FRAME_SOURCE_CONTEXT_LINES,
+    )
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?
+    .ok_or(AppError::NotFound)?;
+
+    Ok(Json(FrameSourceResponse {
+        after: window.after,
+        at: window.at,
+        before: window.before,
+        column: window.column,
+        file: window.file,
+        line: window.line,
+    }))
+}
+
+// Phase 25 sub-E: per-issue comment thread + activity log.
+//
+// `activity` is a unified stream merging:
+//   - kind="comment": rows from issue_comments
+//   - kind="resolved" / "regressed": derived from issues.resolved_at /
+//     regressed_at + the *_in_release columns.
+//
+// Sorted by `at` ascending — comments stay in chronological order
+// alongside the status flips from sub-D's regression detection. We
+// don't read audit_logs here: those are org-level, comments are
+// per-issue, and conflating them muddies both. When a future sub adds
+// per-issue audit (assign / fix-in-release), it'll layer on top of
+// this stream cleanly.
+
+const COMMENT_BODY_MIN: usize = 1;
+const COMMENT_BODY_MAX: usize = 2000;
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+struct CommentRow {
+    id: Uuid,
+    body: String,
+    author_id: Option<Uuid>,
+    author_email: Option<String>,
+    #[serde(with = "time::serde::rfc3339")]
+    created_at: OffsetDateTime,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "kind")]
+pub enum ActivityEntry {
+    #[serde(rename = "comment", rename_all = "camelCase")]
+    Comment {
+        id: Uuid,
+        body: String,
+        author_id: Option<Uuid>,
+        author_email: Option<String>,
+        #[serde(with = "time::serde::rfc3339")]
+        at: OffsetDateTime,
+    },
+    #[serde(rename = "resolved", rename_all = "camelCase")]
+    Resolved {
+        #[serde(with = "time::serde::rfc3339")]
+        at: OffsetDateTime,
+        release: Option<String>,
+    },
+    #[serde(rename = "regressed", rename_all = "camelCase")]
+    Regressed {
+        #[serde(with = "time::serde::rfc3339")]
+        at: OffsetDateTime,
+        release: Option<String>,
+    },
+}
+
+impl ActivityEntry {
+    fn at(&self) -> OffsetDateTime {
+        match self {
+            ActivityEntry::Comment { at, .. }
+            | ActivityEntry::Resolved { at, .. }
+            | ActivityEntry::Regressed { at, .. } => *at,
+        }
+    }
+}
+
+pub async fn list_issue_activity(
+    State(state): State<AppState>,
+    Path((project_id, issue_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<Vec<ActivityEntry>>, AppError> {
+    let pool = state.db.as_ref().ok_or(AppError::DatabaseUnavailable)?;
+
+    // Project scoping is enforced upstream by require_project_in_org.
+    let comments: Vec<CommentRow> = sqlx::query_as(
+        r#"
+        SELECT c.id, c.body, c.author_id, u.email AS author_email, c.created_at
+        FROM issue_comments c
+        LEFT JOIN users u ON u.id = c.author_id
+        JOIN issues i ON i.id = c.issue_id
+        WHERE c.issue_id = $1 AND i.project_id = $2
+        ORDER BY c.created_at ASC
+        "#,
+    )
+    .bind(issue_id)
+    .bind(project_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    let issue_status: Option<(
+        Option<OffsetDateTime>,
+        Option<String>,
+        Option<OffsetDateTime>,
+        Option<String>,
+    )> = sqlx::query_as(
+        "SELECT resolved_at, resolved_in_release, regressed_at, regressed_in_release \
+         FROM issues WHERE id = $1 AND project_id = $2",
+    )
+    .bind(issue_id)
+    .bind(project_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    let mut out: Vec<ActivityEntry> = comments
+        .into_iter()
+        .map(|c| ActivityEntry::Comment {
+            at: c.created_at,
+            author_email: c.author_email,
+            author_id: c.author_id,
+            body: c.body,
+            id: c.id,
+        })
+        .collect();
+    if let Some((res_at, res_rel, reg_at, reg_rel)) = issue_status {
+        if let Some(at) = res_at {
+            out.push(ActivityEntry::Resolved { at, release: res_rel });
+        }
+        if let Some(at) = reg_at {
+            out.push(ActivityEntry::Regressed { at, release: reg_rel });
+        }
+    }
+    out.sort_by_key(ActivityEntry::at);
+    Ok(Json(out))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCommentRequest {
+    pub body: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCommentResponse {
+    pub id: Uuid,
+}
+
+pub async fn create_issue_comment(
+    State(state): State<AppState>,
+    Extension(caller): Extension<AdminCaller>,
+    Path((project_id, issue_id)): Path<(Uuid, Uuid)>,
+    Json(body): Json<CreateCommentRequest>,
+) -> Result<(http::StatusCode, Json<CreateCommentResponse>), AppError> {
+    let pool = state.db.as_ref().ok_or(AppError::DatabaseUnavailable)?;
+    let trimmed = body.body.trim();
+    let len = trimmed.chars().count();
+    if len < COMMENT_BODY_MIN || len > COMMENT_BODY_MAX {
+        return Err(AppError::Internal(format!(
+            "comment body length {len} not in [{COMMENT_BODY_MIN}, {COMMENT_BODY_MAX}]"
+        )));
+    }
+
+    let author_id = match caller {
+        AdminCaller::User { id, .. } => id,
+        // Tokens / legacy admin can't author — comments need a user.
+        _ => return Err(AppError::Forbidden),
+    };
+
+    // Verify the issue actually belongs to this project (require_project_in_org
+    // gates project_id but we still want issue ↔ project FK confirmed).
+    let exists: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM issues WHERE id = $1 AND project_id = $2",
+    )
+    .bind(issue_id)
+    .bind(project_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+    if exists.is_none() {
+        return Err(AppError::NotFound);
+    }
+
+    let id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO issue_comments (id, issue_id, author_id, body) VALUES ($1, $2, $3, $4)",
+    )
+    .bind(id)
+    .bind(issue_id)
+    .bind(author_id)
+    .bind(trimmed)
+    .execute(pool)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok((http::StatusCode::CREATED, Json(CreateCommentResponse { id })))
+}
+
+pub async fn delete_issue_comment(
+    State(state): State<AppState>,
+    Extension(caller): Extension<AdminCaller>,
+    Path((project_id, issue_id, comment_id)): Path<(Uuid, Uuid, Uuid)>,
+) -> Result<http::StatusCode, AppError> {
+    let pool = state.db.as_ref().ok_or(AppError::DatabaseUnavailable)?;
+    let row: Option<(Option<Uuid>, Uuid)> = sqlx::query_as(
+        "SELECT c.author_id, i.project_id \
+         FROM issue_comments c JOIN issues i ON i.id = c.issue_id \
+         WHERE c.id = $1 AND c.issue_id = $2",
+    )
+    .bind(comment_id)
+    .bind(issue_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+    let (author_id, comment_project_id) = row.ok_or(AppError::NotFound)?;
+    if comment_project_id != project_id {
+        return Err(AppError::NotFound);
+    }
+
+    let allowed = match caller {
+        AdminCaller::User { id, .. } => Some(id) == author_id,
+        AdminCaller::LegacyAdmin | AdminCaller::DevToken => true,
+    };
+    if !allowed {
+        return Err(AppError::Forbidden);
+    }
+
+    sqlx::query("DELETE FROM issue_comments WHERE id = $1")
+        .bind(comment_id)
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(http::StatusCode::NO_CONTENT)
 }
 
 pub async fn list_events_for_issue(

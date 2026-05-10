@@ -6,6 +6,7 @@ import { adminApi, orgsApi, teamsApi, type TeamRole } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { useHasPermission } from '@/auth/useHasPermission'
 import { RoleBadge } from '@/components/RoleBadge'
+import { densityClasses, useDensity } from '@/lib/density'
 
 const ROLES: readonly TeamRole[] = ['lead', 'member']
 
@@ -13,6 +14,7 @@ export function TeamDetailView() {
   const { slug, teamSlug } = useParams<{ slug: string; teamSlug: string }>()
   const { currentOrg } = useOrg()
   const orgSlug = currentOrg.slug
+  const dCls = densityClasses(useDensity().density)
   const canManage = useHasPermission('team.member.manage')
   const queryClient = useQueryClient()
 
@@ -185,7 +187,7 @@ export function TeamDetailView() {
             </thead>
             <tbody>
               {members.map((m) => (
-                <tr className="border-border border-b" key={m.userId}>
+                <tr className={`border-border border-b ${dCls.rowClass}`} key={m.userId}>
                   <td className="text-fg px-2 py-2 text-[13px]">{m.email}</td>
                   <td className="px-2 py-2">
                     {canManage ? (

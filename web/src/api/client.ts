@@ -39,7 +39,12 @@ const adminFetch = <T>(path: string, init?: RequestInit) => apiFetch<T>(ADMIN_BA
 const authFetch = <T>(path: string, init?: RequestInit) => apiFetch<T>(AUTH_BASE, path, init)
 const orgsFetch = <T>(path: string, init?: RequestInit) => apiFetch<T>(ORGS_BASE, path, init)
 
+export type IssueStatus = 'active' | 'closed' | 'regressed' | 'resolved' | 'silenced'
+
 export type IssueRow = {
+  /** Phase 25 sub-F: NULL when nobody owns this issue. */
+  assigneeEmail: null | string
+  assigneeUserId: null | string
   errorType: string
   eventCount: number
   fingerprint: string
@@ -49,7 +54,12 @@ export type IssueRow = {
   lastRelease: null | string
   lastSeen: string
   messageSample: string
-  status: 'active' | 'closed' | 'silenced'
+  /** Phase 23 sub-D: set when the issue was resolved at some point. */
+  regressedAt: null | string
+  regressedInRelease: null | string
+  resolvedAt: null | string
+  resolvedInRelease: null | string
+  status: IssueStatus
 }
 
 export type EventRow = {
@@ -121,12 +131,55 @@ export const adminApi = {
   patchIssue: (
     projectId: string,
     issueId: string,
-    body: { status?: 'active' | 'closed' | 'silenced' }
+    body: {
+      assigneeUserId?: null | string
+      resolvedInRelease?: null | string
+      status?: 'active' | 'closed' | 'resolved' | 'silenced'
+    }
   ) =>
     adminFetch<IssueRow>(`/projects/${projectId}/issues/${issueId}`, {
       body: JSON.stringify(body),
       method: 'PATCH',
     }),
+
+  /** Phase 24 sub-D / Phase 25 sub-F — bulk status / assign. */
+  bulkPatchIssues: (
+    projectId: string,
+    body:
+      | { action: 'close' | 'reopen' | 'resolve' | 'silence'; issueIds: string[] }
+      | { action: 'assign'; assigneeUserId: null | string; issueIds: string[] }
+  ) =>
+    adminFetch<{ updated: number }>(`/projects/${projectId}/issues:bulk`, {
+      body: JSON.stringify(body),
+      method: 'POST',
+    }),
+
+  /** Phase 25 sub-E — unified activity stream (comments + status changes). */
+  listIssueActivity: (projectId: string, issueId: string) =>
+    adminFetch<ActivityEntry[]>(`/projects/${projectId}/issues/${issueId}/activity`),
+
+  /** Phase 25 sub-E — post a new comment on an issue. */
+  createIssueComment: (projectId: string, issueId: string, body: string) =>
+    adminFetch<{ id: string }>(`/projects/${projectId}/issues/${issueId}/comments`, {
+      body: JSON.stringify({ body }),
+      method: 'POST',
+    }),
+
+  /** Phase 25 sub-E — delete a comment (author only, plus admins). */
+  deleteIssueComment: (projectId: string, issueId: string, commentId: string) =>
+    adminFetch<null>(`/projects/${projectId}/issues/${issueId}/comments/${commentId}`, {
+      method: 'DELETE',
+    }),
+
+  /** Phase 25 sub-B — original source window for one stack frame. */
+  frameSource: (projectId: string, eventId: string, params: { cause?: number; frame: number }) => {
+    const usp = new URLSearchParams()
+    usp.set('frame', String(params.frame))
+    if (params.cause !== undefined) usp.set('cause', String(params.cause))
+    return adminFetch<FrameSource>(
+      `/projects/${projectId}/events/${eventId}/source?${usp.toString()}`
+    )
+  },
 
   listEvents: (
     projectId: string,
@@ -144,6 +197,8 @@ export const adminApi = {
     projectId: string,
     params: {
       env?: string
+      errorType?: string
+      lastSeenAfter?: string
       limit?: number
       release?: string
       status?: string
@@ -154,6 +209,8 @@ export const adminApi = {
     if (params.limit !== undefined) usp.set('limit', String(params.limit))
     if (params.env) usp.set('env', params.env)
     if (params.release) usp.set('release', params.release)
+    if (params.errorType) usp.set('errorType', params.errorType)
+    if (params.lastSeenAfter) usp.set('lastSeenAfter', params.lastSeenAfter)
     const qs = usp.toString() ? `?${usp.toString()}` : ''
     return adminFetch<IssueRow[]>(`/projects/${projectId}/issues${qs}`)
   },
@@ -177,6 +234,194 @@ export const adminApi = {
     adminFetch<ReleaseArtifacts>(
       `/projects/${projectId}/releases/${encodeURIComponent(release)}/artifacts`
     ),
+
+  /** Phase 23 sub-E — diff issues between two releases. */
+  compareReleases: (projectId: string, base: string, target: string) =>
+    adminFetch<ReleaseCompare>(
+      `/projects/${projectId}/releases/${encodeURIComponent(base)}/compare/${encodeURIComponent(target)}`
+    ),
+
+  /** Phase 28 sub-A — Cmd+K cross-entity search. */
+  search: (q: string, types?: string) => {
+    const usp = new URLSearchParams()
+    usp.set('q', q)
+    if (types) usp.set('types', types)
+    return adminFetch<SearchHit[]>(`/search?${usp.toString()}`)
+  },
+
+  /** Phase 26 sub-C — session health aggregates. */
+  health: (
+    projectId: string,
+    params: {
+      bucket?: '1d' | '1h' | '5m'
+      environment?: string
+      from?: string
+      release?: string
+      to?: string
+    } = {}
+  ) => {
+    const usp = new URLSearchParams()
+    if (params.from) usp.set('from', params.from)
+    if (params.to) usp.set('to', params.to)
+    if (params.bucket) usp.set('bucket', params.bucket)
+    if (params.release) usp.set('release', params.release)
+    if (params.environment) usp.set('environment', params.environment)
+    const qs = usp.toString() ? `?${usp.toString()}` : ''
+    return adminFetch<HealthResponse>(`/projects/${projectId}/health${qs}`)
+  },
+}
+
+export type HealthResponse = {
+  bucket: string
+  buckets: HealthBucket[]
+  from: string
+  summary: HealthSummary
+  to: string
+}
+
+export type HealthSummary = {
+  crashedSessions: number
+  crashedUsers: number
+  crashFreeSessionRate: null | number
+  crashFreeUserRate: null | number
+  erroredSessions: number
+  totalSessions: number
+  totalUsers: number
+}
+
+export type HealthBucket = {
+  at: string
+  crashed: number
+  errored: number
+  total: number
+}
+
+export type ReleaseCompareRow = {
+  bucket: 'added' | 'fixed' | 'persisting'
+  errorType: string
+  eventCount: number
+  id: string
+  lastSeen: string
+  messageSample: string
+  status: IssueStatus
+}
+
+export type ReleaseCompare = {
+  added: ReleaseCompareRow[]
+  base: string
+  fixed: ReleaseCompareRow[]
+  persisting: ReleaseCompareRow[]
+  target: string
+}
+
+// Phase 28 sub-A — Cmd+K palette result.
+export type SearchHit = {
+  id: string
+  label: string
+  sublabel: null | string
+  type: 'issue' | 'member' | 'org' | 'project' | 'team'
+  url: string
+}
+
+// Phase 25 sub-B — frame source preview window.
+export type FrameSource = {
+  after: string[]
+  at: string
+  before: string[]
+  column: number
+  file: string
+  line: number
+}
+
+// Phase 25 sub-E — issue activity stream entries.
+export type ActivityEntry =
+  | { at: string; kind: 'regressed'; release: null | string }
+  | { at: string; kind: 'resolved'; release: null | string }
+  | {
+      at: string
+      authorEmail: null | string
+      authorId: null | string
+      body: string
+      id: string
+      kind: 'comment'
+    }
+
+// Phase 27 sub-A/C — alert rule shapes.
+export type AlertTriggerKind = 'crash_free_drop' | 'event_count' | 'new_issue' | 'regression'
+
+export type AlertChannel =
+  | { secret: string; type: 'webhook'; url: string }
+  | { to: string[]; type: 'email' }
+
+export type AlertFilter = {
+  environment?: string
+  errorTypeRegex?: string
+  release?: string
+}
+
+export type AlertTriggerConfig = {
+  count?: number
+  threshold?: number
+  windowMinutes?: number
+}
+
+export type AlertRule = {
+  channels: AlertChannel[]
+  createdAt: string
+  createdBy: null | string
+  enabled: boolean
+  filterConfig: AlertFilter
+  id: string
+  lastFiredAt: null | string
+  /** Phase 27 sub-F: explicit silence (open-ended). */
+  muted: boolean
+  name: string
+  orgId: string
+  projectId: null | string
+  /** Phase 27 sub-F: temporary silence (RFC 3339 timestamp). */
+  snoozedUntil: null | string
+  throttleMinutes: number
+  triggerConfig: AlertTriggerConfig
+  triggerKind: AlertTriggerKind
+  updatedAt: string
+}
+
+export type AlertRuleInput = {
+  channels?: AlertChannel[]
+  enabled?: boolean
+  filterConfig?: AlertFilter
+  muted?: boolean
+  name?: string
+  projectId?: null | string
+  snoozedUntil?: null | string
+  throttleMinutes?: number
+  triggerConfig?: AlertTriggerConfig
+  triggerKind?: AlertTriggerKind
+}
+
+// Phase 24 sub-C — saved views.
+export type SavedViewScope = 'org' | 'personal' | 'team'
+
+export type SavedView = {
+  createdAt: string
+  createdBy: null | string
+  createdByEmail: null | string
+  id: string
+  name: string
+  payload: SavedViewPayload
+  scope: SavedViewScope
+  target: string
+  teamId: null | string
+  teamSlug: null | string
+  updatedAt: string
+  userId: null | string
+}
+
+/** Free-form on the wire; the dashboard picks specific keys per target. */
+export type SavedViewPayload = {
+  columns?: Record<string, boolean>
+  query?: string
+  status?: string
 }
 
 export type ReleaseListRow = {
@@ -341,6 +586,43 @@ export const orgsApi = {
     }),
 
   usage: (slug: string) => orgsFetch<UsageRow>(`/orgs/${slug}/usage`),
+
+  // Phase 27 sub-A/C — alert rules.
+  listAlertRules: (orgSlug: string) => orgsFetch<AlertRule[]>(`/orgs/${orgSlug}/alert-rules`),
+  createAlertRule: (orgSlug: string, body: AlertRuleInput) =>
+    orgsFetch<{ id: string }>(`/orgs/${orgSlug}/alert-rules`, {
+      body: JSON.stringify(body),
+      method: 'POST',
+    }),
+  patchAlertRule: (orgSlug: string, id: string, body: Partial<AlertRuleInput>) =>
+    orgsFetch<{ ok: true }>(`/orgs/${orgSlug}/alert-rules/${id}`, {
+      body: JSON.stringify(body),
+      method: 'PATCH',
+    }),
+  deleteAlertRule: (orgSlug: string, id: string) =>
+    orgsFetch<null>(`/orgs/${orgSlug}/alert-rules/${id}`, { method: 'DELETE' }),
+
+  // Phase 24 sub-C — saved views.
+  listViews: (orgSlug: string, target = 'issues') =>
+    orgsFetch<SavedView[]>(`/orgs/${orgSlug}/views?target=${encodeURIComponent(target)}`),
+
+  createView: (
+    orgSlug: string,
+    body: {
+      name: string
+      payload: SavedViewPayload
+      scope: SavedViewScope
+      target?: string
+      teamSlug?: string
+    }
+  ) =>
+    orgsFetch<{ id: string }>(`/orgs/${orgSlug}/views`, {
+      body: JSON.stringify(body),
+      method: 'POST',
+    }),
+
+  deleteView: (orgSlug: string, id: string) =>
+    orgsFetch<null>(`/orgs/${orgSlug}/views/${id}`, { method: 'DELETE' }),
 }
 
 export type TeamRole = 'lead' | 'member' | 'viewer'

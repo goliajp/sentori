@@ -1,10 +1,22 @@
+const SDK_HEADER = 'sentori-javascript/0.1.0';
 export async function send(cfg, event) {
-    const url = `${cfg.ingestUrl.replace(/\/+$/, '')}/v1/events`;
-    const body = JSON.stringify(event);
+    await postJson(cfg, '/v1/events', JSON.stringify(event));
+}
+/**
+ * Phase 26 sub-B: session ping. Same beacon → fetch fallback as `send`,
+ * because sessions almost always close on the same path that closes
+ * the tab — beacon survives that, fetch with `keepalive: true` is the
+ * fallback when beacon is unavailable.
+ */
+export async function sendSession(cfg, ping) {
+    await postJson(cfg, '/v1/sessions', JSON.stringify(ping));
+}
+async function postJson(cfg, path, body) {
+    const url = `${cfg.ingestUrl.replace(/\/+$/, '')}${path}`;
     const headers = {
         Authorization: `Bearer ${cfg.token}`,
         'Content-Type': 'application/json',
-        'Sentori-Sdk': 'sentori-javascript/0.1.0',
+        'Sentori-Sdk': SDK_HEADER,
     };
     // Browser: navigator.sendBeacon is fire-and-forget and survives
     // tab close. Bound by user-agent quotas (~64KB), so we feature-detect

@@ -37,7 +37,7 @@
       "name": "@goliapkg/sentori-javascript",
       "version": "0.2.0",
       "dependencies": {
-        "@goliapkg/sentori-core": "0.1.0",
+        "@goliapkg/sentori-core": "0.2.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -85,7 +85,7 @@
     },
     "sdk/react-native": {
       "name": "@goliapkg/sentori-react-native",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "@goliapkg/sentori-core": "0.1.0",
       },
@@ -1186,8 +1186,6 @@
     "@expo/require-utils/@babel/code-frame": ["@babel/code-frame@7.29.0", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.28.5", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-9NhCeYjq9+3uxgdtp20LSiJXJvN0FeCtNGpJxuMFZ1Kv3cWUNb6DOhJwUvcVCzKGR66cw4njwM6hrJLqgOwbcw=="],
 
     "@expo/xcpretty/@babel/code-frame": ["@babel/code-frame@7.29.0", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.28.5", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-9NhCeYjq9+3uxgdtp20LSiJXJvN0FeCtNGpJxuMFZ1Kv3cWUNb6DOhJwUvcVCzKGR66cw4njwM6hrJLqgOwbcw=="],
-
-    "@goliapkg/sentori-javascript/@goliapkg/sentori-core": ["@goliapkg/sentori-core@0.1.0", "", {}, "sha512-+ncS5qJWlBKo4e4Mlx2bbE5OJFXXmXzs8jAYlgeSUsNl0/h2FWW3qHymmHzW4lb+eeX3YQpxtzfZH7lf0xp11w=="],
 
     "@goliapkg/sentori-next/@goliapkg/sentori-core": ["@goliapkg/sentori-core@0.1.0", "", {}, "sha512-+ncS5qJWlBKo4e4Mlx2bbE5OJFXXmXzs8jAYlgeSUsNl0/h2FWW3qHymmHzW4lb+eeX3YQpxtzfZH7lf0xp11w=="],
 

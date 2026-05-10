@@ -4,19 +4,24 @@ import { Link, Navigate, Outlet, useLocation, useParams, useSearchParams } from 
 import { adminApi, orgsApi, teamsApi } from '@/api/client'
 import { OrgCtx } from '@/auth/orgContext'
 import { useAuth } from '@/auth/state'
+import { CmdK } from '@/components/CmdK'
+import { KeyboardCheatsheet } from '@/components/KeyboardCheatsheet'
 import { OnboardingBadge } from '@/components/OnboardingBadge'
 import { OrgSwitcher } from '@/components/OrgSwitcher'
 import { RoleBadge } from '@/components/RoleBadge'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useThemeEffect } from '@/components/theme'
 import { UsageBanner } from '@/components/UsageBanner'
+import { useDensity } from '@/lib/density'
 
 type NavItem = { adminOnly?: boolean; label: string; path: string }
 
 const NAV: NavItem[] = [
+  { label: 'Overview', path: 'overview' },
   { label: 'Issues', path: 'issues' },
   { label: 'Releases', path: 'releases' },
   { label: 'Teams', path: 'teams' },
+  { adminOnly: true, label: 'Alerts', path: 'alerts' },
   { adminOnly: true, label: 'Audit', path: 'audit' },
   { label: 'Settings', path: 'settings' },
 ]
@@ -98,6 +103,9 @@ export function OrgLayout() {
       }}
     >
       <div className="flex h-full flex-col">
+        <a className="skip-to-content" href="#sentori-main">
+          Skip to content
+        </a>
         <header className="border-border bg-bg/80 flex h-12 shrink-0 items-center justify-between border-b px-6 backdrop-blur-xl">
           <div className="flex items-center gap-4">
             <Link className="text-fg text-sm font-semibold" to="/">
@@ -138,6 +146,7 @@ export function OrgLayout() {
               {user?.email}
               <RoleBadge role={currentOrg.role} />
             </Link>
+            <DensityToggle />
             <ThemeToggle />
             <button
               className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-3 py-1.5 text-sm transition-colors"
@@ -149,10 +158,27 @@ export function OrgLayout() {
           </div>
         </header>
         <UsageBanner org={currentOrg} />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto" id="sentori-main">
           <Outlet />
         </main>
+        <CmdK />
+        <KeyboardCheatsheet />
       </div>
     </OrgCtx.Provider>
+  )
+}
+
+function DensityToggle() {
+  const { density, toggle } = useDensity()
+  return (
+    <button
+      aria-label={`Density: ${density}. Click to toggle.`}
+      className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-2 py-1.5 text-xs transition-colors"
+      onClick={toggle}
+      title={`Density: ${density} — click to toggle`}
+      type="button"
+    >
+      {density === 'compact' ? '☰' : '≡'}
+    </button>
   )
 }

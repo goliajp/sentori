@@ -4,12 +4,14 @@ import { Link, useParams } from 'react-router'
 
 import { type TokenCreated, tokensApi } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
+import { densityClasses, useDensity } from '@/lib/density'
 
 export function TokenSettingsView() {
   const { projectId } = useParams<{ projectId: string }>()
   const { currentOrg, projects } = useOrg()
   const project = projects.find((p) => p.id === projectId)
   const queryClient = useQueryClient()
+  const dCls = densityClasses(useDensity().density)
 
   const tokensQuery = useQuery({
     enabled: !!projectId,
@@ -153,7 +155,7 @@ export function TokenSettingsView() {
             </thead>
             <tbody>
               {tokensQuery.data.map((t) => (
-                <tr className="border-border/40 h-9 border-b" key={t.id}>
+                <tr className={`border-border/40 border-b ${dCls.rowClass}`} key={t.id}>
                   <td className="text-fg px-2 font-mono">{t.label ?? '(unlabeled)'}</td>
                   <td className="text-fg-muted px-2 font-mono uppercase">{t.kind}</td>
                   <td className="text-fg-muted px-2 font-mono">{t.last4 ? `…${t.last4}` : '—'}</td>

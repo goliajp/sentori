@@ -1,5 +1,11 @@
-/* Tighten Starlight defaults to match Sentori's design language:
-   denser body text, slightly smaller headings, monospace-leaning palette. */
+/*
+ * Tighten Starlight defaults to match Sentori's design language:
+ * denser body text, slightly smaller headings, monospace-leaning palette.
+ *
+ * Phase 28 sub-F: palette values mirror docs/design-tokens.md.
+ * Update that doc + web/src/index.css + marketing/src/styles/global.css
+ * in the same commit when tweaking a token.
+ */
 
 :root {
   --sl-font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,

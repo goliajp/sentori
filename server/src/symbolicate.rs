@@ -86,6 +86,81 @@ fn symbolicate_frame_inplace(sm: &SourceMap, frame: &mut serde_json::Value) {
     frame["inApp"] = serde_json::Value::Bool(true);
 }
 
+/// Phase 25 sub-B: lift a window of original source around the
+/// position the (raw) `line:column` reverse-maps to. Returns the
+/// resolved file path (whatever the sourcemap names — usually a
+/// `webpack:///src/...` style URL), 1-indexed `line` / `column` in
+/// that file, and `before` / `at` / `after` line slices.
+///
+/// Source text comes from the sourcemap's embedded `sourcesContent`;
+/// if the toolchain didn't embed it (rare for production source maps
+/// since they default to `sourcesContent: true` on every modern
+/// bundler), we return Ok(None) so the dashboard renders an "upload
+/// a source-map with sourcesContent" hint instead of crashing.
+#[derive(Debug)]
+pub struct FrameSourceWindow {
+    pub file: String,
+    pub line: u32,
+    pub column: u32,
+    pub before: Vec<String>,
+    pub at: String,
+    pub after: Vec<String>,
+}
+
+pub async fn source_for_frame(
+    pool: &PgPool,
+    release_name: &str,
+    raw_line: u32,
+    raw_col: u32,
+    context_lines: usize,
+) -> anyhow::Result<Option<FrameSourceWindow>> {
+    let release_id: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM releases WHERE name = $1 LIMIT 1",
+    )
+    .bind(release_name)
+    .fetch_optional(pool)
+    .await?;
+    let Some(release_id) = release_id else {
+        return Ok(None);
+    };
+    let Some(sm) = load_sourcemap_for_release(pool, release_id).await? else {
+        return Ok(None);
+    };
+    Ok(window_from_sourcemap(&sm, raw_line, raw_col, context_lines))
+}
+
+/// Window-extraction helper that doesn't touch the DB — split out so
+/// it's directly unit-testable. Same shape `source_for_frame` returns
+/// after the DB / cache lookup resolves to a `SourceMap`.
+fn window_from_sourcemap(
+    sm: &SourceMap,
+    raw_line: u32,
+    raw_col: u32,
+    context_lines: usize,
+) -> Option<FrameSourceWindow> {
+    let token = sm.lookup_token(raw_line.saturating_sub(1), raw_col)?;
+    let src_line = token.get_src_line();
+    let src_col = token.get_src_col();
+    let file = token.get_source().map(|s| s.to_string()).unwrap_or_default();
+    let view = sm.get_source_view(token.get_src_id())?;
+    let source = view.source();
+    let lines: Vec<&str> = source.lines().collect();
+    if (src_line as usize) >= lines.len() {
+        return None;
+    }
+    let center = src_line as usize;
+    let start = center.saturating_sub(context_lines);
+    let end = (center + context_lines + 1).min(lines.len());
+    Some(FrameSourceWindow {
+        after: lines[(center + 1)..end].iter().map(|s| s.to_string()).collect(),
+        at: lines[center].to_string(),
+        before: lines[start..center].iter().map(|s| s.to_string()).collect(),
+        column: src_col + 1,
+        file,
+        line: src_line + 1,
+    })
+}
+
 async fn load_sourcemap_for_release(
     pool: &PgPool,
     release_id: Uuid,
@@ -118,4 +193,58 @@ async fn load_sourcemap_for_release(
     }
     c.insert(release_id, arc.clone());
     Ok(Some(arc))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sourcemap::SourceMapBuilder;
+
+    const SRC: &str = concat!(
+        "// header\n",
+        "function alpha() {\n",
+        "  return 'a'\n",
+        "}\n",
+        "function beta() {\n",
+        "  throw new Error('boom')\n",
+        "}\n",
+        "// footer\n",
+    );
+
+    fn synthetic_sourcemap() -> SourceMap {
+        // bundle row 0 → original line 2 ("function alpha…")
+        // bundle row 1 → original line 6 ("  throw new Error…")
+        let mut b = SourceMapBuilder::new(Some("bundle.js"));
+        let src_id = b.add_source("src/foo.ts");
+        b.set_source_contents(src_id, Some(SRC));
+        b.add_raw(0, 0, 1, 0, Some(src_id), None, false);
+        b.add_raw(1, 0, 5, 0, Some(src_id), None, false);
+        b.into_sourcemap()
+    }
+
+    #[test]
+    fn window_returns_lines_around_resolved_position() {
+        let sm = synthetic_sourcemap();
+        // Bundle line 2 (1-indexed) → bundle row 1 → original line 6.
+        let w = window_from_sourcemap(&sm, 2, 0, 2).expect("token resolves");
+        assert_eq!(w.file, "src/foo.ts");
+        assert_eq!(w.line, 6);
+        assert_eq!(w.at, "  throw new Error('boom')");
+        // 2 lines of context above → "}" closing alpha + the beta header.
+        assert_eq!(
+            w.before,
+            vec!["}".to_string(), "function beta() {".to_string()],
+        );
+        assert!(w.after.first().is_some_and(|s| s.contains('}')));
+    }
+
+    #[test]
+    fn window_clamps_at_file_boundaries() {
+        let sm = synthetic_sourcemap();
+        // Bundle line 1 → original line 2; with 5-line context, before is
+        // clamped to the single line that exists above (line 1).
+        let w = window_from_sourcemap(&sm, 1, 0, 5).expect("token resolves");
+        assert_eq!(w.before.len(), 1, "before clamped at start of file");
+        assert!(!w.after.is_empty());
+    }
 }
