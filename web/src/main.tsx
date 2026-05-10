@@ -34,6 +34,7 @@ import { OrgLayout } from './views/org-layout'
 import { OrgSettingsView } from './views/org-settings'
 import { ProjectTeamSettingsView } from './views/project-team-settings'
 import { RecipientSettingsView } from './views/recipient-settings'
+import { ReleaseDetailView } from './views/release-detail'
 import { ReleasesView } from './views/releases'
 import { RegisterView } from './views/register'
 import { TeamDetailView } from './views/team-detail'
@@ -64,6 +65,7 @@ const router = createBrowserRouter([
           { element: <IssuesView />, path: 'issues' },
           { element: <IssueDetailView />, path: 'issues/:issueId' },
           { element: <ReleasesView />, path: 'releases' },
+          { element: <ReleaseDetailView />, path: 'releases/:releaseName' },
           { element: <OrgSettingsView />, path: 'settings' },
           { element: <TeamListView />, path: 'teams' },
           { element: <TeamDetailView />, path: 'teams/:teamSlug' },

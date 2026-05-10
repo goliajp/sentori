@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router'
 
 import { adminApi, type ReleaseListRow } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
@@ -15,7 +16,7 @@ import { useOrg } from '@/auth/orgContext'
  * gets layered on top of the card here when it lands.
  */
 export function ReleasesView() {
-  const { currentProject } = useOrg()
+  const { currentOrg, currentProject } = useOrg()
   const projectId = currentProject?.id ?? null
 
   const { data, error, isLoading } = useQuery({
@@ -53,38 +54,43 @@ export function ReleasesView() {
 
       <ul className="space-y-2">
         {rows.map((r) => (
-          <ReleaseCard key={r.id} row={r} />
+          <ReleaseCard key={r.id} orgSlug={currentOrg.slug} row={r} />
         ))}
       </ul>
     </div>
   )
 }
 
-function ReleaseCard({ row }: { row: ReleaseListRow }) {
+function ReleaseCard({ orgSlug, row }: { orgSlug: string; row: ReleaseListRow }) {
   const deployStamp = row.deployAt ?? row.firstSeen ?? row.createdAt
   return (
-    <li className="border-border hover:bg-bg-tertiary/40 rounded-md border p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-fg truncate font-mono text-[13px] font-semibold">{row.name}</h2>
-        <time
-          className="text-fg-muted shrink-0 font-mono text-[11px] tabular-nums"
-          dateTime={deployStamp}
-          title={new Date(deployStamp).toISOString()}
-        >
-          {relativeDay(deployStamp)}
-        </time>
-      </div>
-      <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-[12px] sm:grid-cols-4">
-        <Stat label="Events" value={row.eventCount.toLocaleString()} />
-        <Stat label="Source maps" value={row.sourcemapCount} muted={row.sourcemapCount === 0} />
-        <Stat label="iOS dSYMs" value={row.dsymCount} muted={row.dsymCount === 0} />
-        <Stat label="ProGuard" value={row.mappingCount} muted={row.mappingCount === 0} />
-      </dl>
-      {row.firstSeen && row.lastSeen && (
-        <p className="text-fg-muted mt-2 text-[11px]">
-          {relativeDay(row.firstSeen)} → {relativeDay(row.lastSeen)}
-        </p>
-      )}
+    <li>
+      <Link
+        className="border-border hover:bg-bg-tertiary/40 block rounded-md border p-4"
+        to={`/org/${orgSlug}/releases/${encodeURIComponent(row.name)}`}
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-fg truncate font-mono text-[13px] font-semibold">{row.name}</h2>
+          <time
+            className="text-fg-muted shrink-0 font-mono text-[11px] tabular-nums"
+            dateTime={deployStamp}
+            title={new Date(deployStamp).toISOString()}
+          >
+            {relativeDay(deployStamp)}
+          </time>
+        </div>
+        <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-[12px] sm:grid-cols-4">
+          <Stat label="Events" value={row.eventCount.toLocaleString()} />
+          <Stat label="Source maps" value={row.sourcemapCount} muted={row.sourcemapCount === 0} />
+          <Stat label="iOS dSYMs" value={row.dsymCount} muted={row.dsymCount === 0} />
+          <Stat label="ProGuard" value={row.mappingCount} muted={row.mappingCount === 0} />
+        </dl>
+        {row.firstSeen && row.lastSeen && (
+          <p className="text-fg-muted mt-2 text-[11px]">
+            {relativeDay(row.firstSeen)} → {relativeDay(row.lastSeen)}
+          </p>
+        )}
+      </Link>
     </li>
   )
 }
