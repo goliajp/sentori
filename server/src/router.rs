@@ -1,5 +1,7 @@
 use axum::{
-    Router, middleware,
+    Router,
+    extract::DefaultBodyLimit,
+    middleware,
     routing::{get, post},
 };
 use metrics_exporter_prometheus::PrometheusHandle;
@@ -12,6 +14,10 @@ use crate::auth::{AuthState, require_token};
 use crate::recent::{AppState, RecentBuffer};
 
 const MAX_BODY_BYTES: usize = 1024 * 1024; // 1 MB per protocol.md size limits
+// Phase 22 sub-A: dSYM uploads can run up to ~256 MB per arch slice;
+// release / sourcemap / dsym admin routes opt out of the 1 MB cap
+// via DefaultBodyLimit::disable() and rely on per-handler validation.
+const MAX_ADMIN_UPLOAD_BYTES: usize = 256 * 1024 * 1024;
 
 pub struct ServerConfig {
     pub dev_token: String,
@@ -96,6 +102,13 @@ pub fn build(cfg: ServerConfig) -> Router {
             get(api::admin::releases_for_issue),
         )
         .route(
+            "/projects/{project_id}/dsyms",
+            get(api::dsyms::list_dsyms).post(api::dsyms::upload_dsym).layer((
+                DefaultBodyLimit::disable(),
+                RequestBodyLimitLayer::new(MAX_ADMIN_UPLOAD_BYTES),
+            )),
+        )
+        .route(
             "/projects/{project_id}/recipients",
             get(api::recipients::list_recipients).post(api::recipients::create_recipient),
         )
@@ -106,7 +119,10 @@ pub fn build(cfg: ServerConfig) -> Router {
         )
         .route(
             "/releases/{release_name}/sourcemaps",
-            post(api::releases::upload_sourcemaps),
+            post(api::releases::upload_sourcemaps).layer((
+                DefaultBodyLimit::disable(),
+                RequestBodyLimitLayer::new(MAX_ADMIN_UPLOAD_BYTES),
+            )),
         )
         // route_layer is inside-out: require_admin runs first (sets the
         // AdminCaller extension), then require_project_in_org reads it

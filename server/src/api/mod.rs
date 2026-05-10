@@ -1,5 +1,6 @@
 pub mod admin;
 pub mod admin_auth;
+pub mod dsyms;
 pub mod events;
 pub mod events_batch;
 pub mod orgs;
