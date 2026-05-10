@@ -163,11 +163,33 @@ export const adminApi = {
   listReleasesForIssue: (projectId: string, issueId: string) =>
     adminFetch<string[]>(`/projects/${projectId}/issues/${issueId}/releases`),
 
+  /** Phase 23 sub-A — list releases for the project, enriched with
+   *  event / sourcemap / dSYM / mapping counts. */
+  listReleases: (projectId: string, params: { limit?: number } = {}) => {
+    const usp = new URLSearchParams()
+    if (params.limit !== undefined) usp.set('limit', String(params.limit))
+    const qs = usp.toString() ? `?${usp.toString()}` : ''
+    return adminFetch<ReleaseListRow[]>(`/projects/${projectId}/releases${qs}`)
+  },
+
   /** Phase 22 sub-F — unified artifact summary for one release. */
   releaseArtifacts: (projectId: string, release: string) =>
     adminFetch<ReleaseArtifacts>(
       `/projects/${projectId}/releases/${encodeURIComponent(release)}/artifacts`
     ),
+}
+
+export type ReleaseListRow = {
+  createdAt: string
+  deployAt: null | string
+  dsymCount: number
+  eventCount: number
+  firstSeen: null | string
+  id: string
+  lastSeen: null | string
+  mappingCount: number
+  name: string
+  sourcemapCount: number
 }
 
 export type ReleaseArtifacts = {

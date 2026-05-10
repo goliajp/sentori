@@ -116,6 +116,10 @@ pub fn build(cfg: ServerConfig) -> Router {
             )),
         )
         .route(
+            "/projects/{project_id}/releases",
+            get(api::releases::list_releases),
+        )
+        .route(
             "/projects/{project_id}/releases/{release}/artifacts",
             get(api::dsyms::release_artifacts),
         )

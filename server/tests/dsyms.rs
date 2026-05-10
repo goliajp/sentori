@@ -287,6 +287,89 @@ async fn upload_blocked_for_outsider() {
 }
 
 #[tokio::test]
+async fn list_releases_returns_enriched_rows() {
+    let Some((addr, pool)) = setup().await else {
+        eprintln!("skipping (DATABASE_URL not set)");
+        return;
+    };
+    let suffix = Uuid::now_v7().simple().to_string();
+    let email = format!("rel-list-{}@golia.test", &suffix[12..28]);
+    let org_slug = format!("org-rl-{}", &suffix[12..28]);
+    let (_uid, cookie) = register_user(&addr, &pool, &email).await;
+
+    Client::new()
+        .post(format!("http://{addr}/api/orgs"))
+        .header("cookie", &cookie)
+        .json(&json!({ "slug": org_slug, "name": org_slug }))
+        .send()
+        .await
+        .unwrap();
+    let proj_resp = Client::new()
+        .post(format!("http://{addr}/admin/api/orgs/{org_slug}/projects"))
+        .header("cookie", &cookie)
+        .json(&json!({ "name": "p1" }))
+        .send()
+        .await
+        .unwrap();
+    let proj: Value = proj_resp.json().await.unwrap();
+    let project_id = proj["id"].as_str().unwrap();
+    let project_uuid = Uuid::parse_str(project_id).unwrap();
+
+    // Pre-create two releases by hand (mirroring how the events
+    // pipeline would create them) so the JOIN aggregates have rows
+    // to enumerate without spinning up event ingestion.
+    sqlx::query("INSERT INTO releases (id, project_id, name, deploy_at) VALUES ($1, $2, $3, now())")
+        .bind(Uuid::now_v7())
+        .bind(project_uuid)
+        .bind("alpha@1.0.0")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO releases (id, project_id, name) VALUES ($1, $2, $3)")
+        .bind(Uuid::now_v7())
+        .bind(project_uuid)
+        .bind("beta@1.1.0")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // Upload a dSYM tagged for alpha so the count flows through.
+    Client::new()
+        .post(format!(
+            "http://{addr}/admin/api/projects/{project_id}/dsyms?release=alpha%401.0.0"
+        ))
+        .header("cookie", &cookie)
+        .header("x-sentori-debug-id", FAKE_DEBUG_ID)
+        .header("x-sentori-arch", "arm64")
+        .body(FAKE_BODY.to_vec())
+        .send()
+        .await
+        .unwrap();
+
+    let r = Client::new()
+        .get(format!("http://{addr}/admin/api/projects/{project_id}/releases"))
+        .header("cookie", &cookie)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200);
+    let rows: Vec<Value> = r.json().await.unwrap();
+    assert_eq!(rows.len(), 2);
+    let alpha = rows.iter().find(|r| r["name"] == "alpha@1.0.0").unwrap();
+    assert_eq!(alpha["dsymCount"].as_i64().unwrap(), 1);
+    assert_eq!(alpha["sourcemapCount"].as_i64().unwrap(), 0);
+    let beta = rows.iter().find(|r| r["name"] == "beta@1.1.0").unwrap();
+    assert_eq!(beta["dsymCount"].as_i64().unwrap(), 0);
+    assert_eq!(beta["eventCount"].as_i64().unwrap(), 0);
+    // alpha has explicit deploy_at; beta does not (deployAt null).
+    // alpha has explicit deploy_at (non-null); beta does not.
+    // Serialization format is left to serde defaults — the dashboard
+    // doesn't care about the wire shape, only is-it-set.
+    assert!(!alpha["deployAt"].is_null(), "alpha deployAt set: {alpha}");
+    assert!(beta["deployAt"].is_null(), "beta deployAt unset: {beta}");
+}
+
+#[tokio::test]
 async fn release_artifacts_unifies_dsym_and_mapping() {
     let Some((addr, pool)) = setup().await else {
         eprintln!("skipping (DATABASE_URL not set)");
