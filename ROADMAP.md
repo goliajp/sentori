@@ -982,12 +982,14 @@ Phase 0–10 代码层面全部完成（26 commits 落地）。下面是发布 v
 - [x] dashboard：org-settings invite 表单条件渲染 "team" dropdown（仅当 org 有团队时出现）；待接受邀请列表行内显示 team-slug chip；`orgsApi.createInvite(slug, email, role, teamSlug?)` 第四参可选
 - [x] tests：(1) `invite_with_team_attaches_user_to_team` 端到端：bad slug 400 / list 含 teamSlug / accept 后 org+team 双成员均落库；(2) `invite_with_dropped_team_falls_back_to_org_only`：邀请发出后删 team，accept 仍 200，仅落 org 成员。全 19 server tests + dashboard build 通过。commit `7bbd9ff`
 
-#### sub-G — Ownership transfer UX
+#### sub-G — Ownership transfer UX ✅
 
-- [ ] org-settings "Transfer ownership" button（owner only）
-- [ ] confirmation modal：select new owner from owner-eligible (admin) members + 输入 org slug 二次确认
-- [ ] 接收方点邮件链接 → dashboard 自动跳 `/orgs/{slug}/transfers/{token}/accept` → 显示 "Accept ownership of <Org>" 模态
-- [ ] 转让后 toast + 旧 owner 邮件通知 "ownership transferred to ..."
+- [x] org-settings owner-only `<TransferOwnershipSection>`：danger 虚线边框 + 选 admin-eligible member（排除 self）+ 必须输入 org slug 二次确认才能 enable submit；空状态提示先把成员升级到 admin
+- [x] 新视图 `web/src/views/transfer-accept.tsx`，路由 `/transfers/:token`（直接走根，不用 `/orgs/{slug}/...` 包，匹配邮件 link `{base_url}/transfers/{token}` 形态）；server 错误码 `transferUsed/Expired/forbidden/transferNotFound` 映射人话
+- [x] 未登录访问该路径自动 `/login?next=/transfers/<token>` bounce 回来
+- [x] 接受后 navigate('/')，让 OrgLayout 重新加载 orgs（角色已变）；msg-only toast 替代旧 owner 端 UI 通知
+- [x] server `NotifyEvent::OwnershipTransferCompleted` 邮件模板 + `accept_transfer` 在事务 commit 后发邮件给老 owner（查 user email + org name）；安抚文案明示 demoted to admin、可联系 support 如非本人操作
+- [x] bun run build → 124 KB gzip / tsc clean / server 19/19。commit `0cab6c9`
 
 #### sub-H — Audit log viewer
 
