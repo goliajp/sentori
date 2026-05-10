@@ -11,15 +11,16 @@ import {
 } from '@/api/client'
 import { useAuth } from '@/auth/state'
 import { useOrg } from '@/auth/orgContext'
+import { useHasPermission } from '@/auth/useHasPermission'
 import { RoleBadge } from '@/components/RoleBadge'
 
-const ROLES: readonly OrgRole[] = ['admin', 'member']
+const ROLES: readonly OrgRole[] = ['admin', 'member', 'viewer']
 
 export function OrgSettingsView() {
   const { currentOrg } = useOrg()
   const { user } = useAuth()
   const slug = currentOrg.slug
-  const canManage = currentOrg.role === 'owner' || currentOrg.role === 'admin'
+  const canManage = useHasPermission('org.manage')
   const isOwner = currentOrg.role === 'owner'
   const queryClient = useQueryClient()
 
@@ -188,20 +189,31 @@ export function OrgSettingsView() {
                       </div>
                     </td>
                     <td className="px-2">
-                      {isOwner && !isSelf ? (
+                      {isOwner && !isSelf && m.role !== 'owner' ? (
                         <select
                           className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-0.5 text-xs"
-                          onChange={(e) =>
-                            changeRole.mutate({
-                              role: e.target.value as OrgRole,
-                              userId: m.userId,
-                            })
-                          }
+                          onChange={(e) => {
+                            const next = e.target.value as OrgRole
+                            if (next === m.role) return
+                            // Owner is reachable only via the ownership-
+                            // transfer flow; anything else is an inline
+                            // confirm because the action is reversible
+                            // and reversing it just means another swap.
+                            const ok = confirm(`Change ${m.email} from ${m.role} to ${next}?`)
+                            if (!ok) {
+                              // React doesn't let us actually undo the
+                              // <select> selection, but the mutation is
+                              // skipped — re-rendering on the next role
+                              // refetch will snap it back.
+                              return
+                            }
+                            changeRole.mutate({ role: next, userId: m.userId })
+                          }}
                           value={m.role}
                         >
-                          <option value="owner">owner</option>
                           <option value="admin">admin</option>
                           <option value="member">member</option>
+                          <option value="viewer">viewer</option>
                         </select>
                       ) : (
                         <RoleBadge role={m.role} />

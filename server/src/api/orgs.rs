@@ -22,13 +22,13 @@ use crate::audit::{actions, targets};
 use crate::notifier::NotifyEvent;
 use crate::quotas;
 use crate::recent::AppState;
+use crate::roles::{VALID_INVITE_ROLES, VALID_MEMBER_PATCH_ROLES};
 
 const INVITE_TTL_DAYS: i64 = 7;
 const SLUG_MIN: usize = 3;
 const SLUG_MAX: usize = 32;
 const NAME_MIN: usize = 1;
 const NAME_MAX: usize = 64;
-const VALID_ROLES: &[&str] = &["owner", "admin", "member"];
 
 // ---------- response shapes ----------
 
@@ -630,10 +630,13 @@ pub async fn patch_member(
         return forbidden("forbidden");
     }
 
-    if !VALID_ROLES.contains(&body.role.as_str()) {
+    // Owner is reachable only via the ownership-transfer flow; PATCH
+    // can swap admin / member / viewer freely. Self-demote is rejected
+    // — it could orphan the only-owner check elsewhere.
+    if !VALID_MEMBER_PATCH_ROLES.contains(&body.role.as_str()) {
         return bad_request("invalidRole");
     }
-    if user.id == target_id && body.role != "owner" {
+    if user.id == target_id {
         return bad_request("cannotDemoteSelf");
     }
 
@@ -774,13 +777,11 @@ pub async fn create_invite(
     if !is_plausible_email(&email) {
         return bad_request("invalidEmail");
     }
-    if !VALID_ROLES.contains(&body.role.as_str()) {
+    // VALID_INVITE_ROLES already excludes "owner" — owner is only
+    // reachable via the ownership-transfer flow. Reject anything else
+    // outright instead of mapping owner → cannotInviteAsOwner.
+    if !VALID_INVITE_ROLES.contains(&body.role.as_str()) {
         return bad_request("invalidRole");
-    }
-    if body.role == "owner" {
-        // Inviting someone as a co-owner is intentionally not exposed via
-        // this endpoint — promote them to owner via PATCH after they join.
-        return bad_request("cannotInviteAsOwner");
     }
 
     let team_id: Option<Uuid> = if let Some(team_slug) = body.team_slug.as_ref() {

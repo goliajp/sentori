@@ -23,6 +23,9 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // Vitest auto-globs *.spec.ts; e2e/* is for Playwright and uses
+    // @playwright/test which would otherwise import-fail under vitest.
+    exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
   },

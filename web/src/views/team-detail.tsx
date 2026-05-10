@@ -4,6 +4,7 @@ import { Link, Navigate, useParams } from 'react-router'
 
 import { adminApi, orgsApi, teamsApi, type TeamRole } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
+import { useHasPermission } from '@/auth/useHasPermission'
 import { RoleBadge } from '@/components/RoleBadge'
 
 const ROLES: readonly TeamRole[] = ['lead', 'member']
@@ -12,7 +13,7 @@ export function TeamDetailView() {
   const { slug, teamSlug } = useParams<{ slug: string; teamSlug: string }>()
   const { currentOrg } = useOrg()
   const orgSlug = currentOrg.slug
-  const canManage = currentOrg.role === 'owner' || currentOrg.role === 'admin'
+  const canManage = useHasPermission('team.member.manage')
   const queryClient = useQueryClient()
 
   if (!teamSlug) return <Navigate replace to={`/org/${slug}/teams`} />

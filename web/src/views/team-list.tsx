@@ -4,11 +4,12 @@ import { Link } from 'react-router'
 
 import { teamsApi } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
+import { useHasPermission } from '@/auth/useHasPermission'
 
 export function TeamListView() {
   const { currentOrg } = useOrg()
   const slug = currentOrg.slug
-  const canManage = currentOrg.role === 'owner' || currentOrg.role === 'admin'
+  const canManage = useHasPermission('team.manage')
   const queryClient = useQueryClient()
 
   const teamsQuery = useQuery({

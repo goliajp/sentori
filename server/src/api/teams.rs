@@ -27,13 +27,13 @@ use crate::api::admin_auth::AdminCaller;
 use crate::api::user_auth::CurrentUser;
 use crate::audit::{actions, targets};
 use crate::recent::AppState;
+use crate::roles::VALID_TEAM_ROLES as TEAM_ROLES;
 
 const SLUG_MIN: usize = 3;
 const SLUG_MAX: usize = 32;
 const NAME_MIN: usize = 1;
 const NAME_MAX: usize = 64;
 const DESC_MAX: usize = 280;
-const VALID_TEAM_ROLES: &[&str] = &["lead", "member"];
 
 // ---------- response shapes ----------
 
@@ -411,7 +411,7 @@ pub async fn add_team_member(
         return forbidden("forbidden");
     }
 
-    if !VALID_TEAM_ROLES.contains(&body.role.as_str()) {
+    if !TEAM_ROLES.contains(&body.role.as_str()) {
         return bad_request("invalidRole");
     }
 
@@ -484,7 +484,7 @@ pub async fn patch_team_member(
     if !(is_org_admin(&role) || is_team_lead(&pool, team_id, user.id).await) {
         return forbidden("forbidden");
     }
-    if !VALID_TEAM_ROLES.contains(&body.role.as_str()) {
+    if !TEAM_ROLES.contains(&body.role.as_str()) {
         return bad_request("invalidRole");
     }
 

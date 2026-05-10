@@ -6,6 +6,7 @@ import { OrgCtx } from '@/auth/orgContext'
 import { useAuth } from '@/auth/state'
 import { OnboardingBadge } from '@/components/OnboardingBadge'
 import { OrgSwitcher } from '@/components/OrgSwitcher'
+import { RoleBadge } from '@/components/RoleBadge'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useThemeEffect } from '@/components/theme'
 import { UsageBanner } from '@/components/UsageBanner'
@@ -128,7 +129,10 @@ export function OrgLayout() {
           </div>
           <div className="flex items-center gap-3">
             <OnboardingBadge project={currentProject} />
-            <span className="text-fg-muted hidden text-xs sm:inline">{user?.email}</span>
+            <span className="text-fg-muted hidden items-center gap-1.5 text-xs sm:inline-flex">
+              {user?.email}
+              <RoleBadge role={currentOrg.role} />
+            </span>
             <ThemeToggle />
             <button
               className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-3 py-1.5 text-sm transition-colors"

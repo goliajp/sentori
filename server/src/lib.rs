@@ -13,6 +13,7 @@ pub mod quotas;
 pub mod retention;
 pub mod rate_limit;
 pub mod recent;
+pub mod roles;
 pub mod router;
 pub mod seed;
 pub mod session;

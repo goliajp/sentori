@@ -200,7 +200,7 @@ export const userAuthApi = {
 /** Stable dev project id, mirrors `seed::DEV_PROJECT_ID` on the server. */
 export const DEV_PROJECT_ID = '019508a0-0000-7000-8000-000000000000'
 
-export type OrgRole = 'admin' | 'member' | 'owner'
+export type OrgRole = 'admin' | 'member' | 'owner' | 'viewer'
 
 export type OrgRow = {
   createdAt: string
@@ -282,7 +282,7 @@ export const orgsApi = {
   usage: (slug: string) => orgsFetch<UsageRow>(`/orgs/${slug}/usage`),
 }
 
-export type TeamRole = 'lead' | 'member'
+export type TeamRole = 'lead' | 'member' | 'viewer'
 
 export type TeamRow = {
   createdAt: string

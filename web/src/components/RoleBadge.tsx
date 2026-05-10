@@ -5,6 +5,7 @@ const ROLE_STYLES: Record<OrgRole | TeamRole, string> = {
   lead: 'bg-amber-500/15 text-amber-300 ring-amber-500/30',
   member: 'bg-fg/10 text-fg-muted ring-fg/20',
   owner: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30',
+  viewer: 'bg-bg-tertiary text-fg-muted ring-border',
 }
 
 export function RoleBadge({ role }: { role: OrgRole | TeamRole }) {
