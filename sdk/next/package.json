@@ -1,0 +1,72 @@
+{
+  "name": "@goliapkg/sentori-next",
+  "version": "0.1.0",
+  "description": "Next.js adapter for Sentori — instrumentation.ts hooks, App Router error boundary, env-driven provider built on @goliapkg/sentori-react.",
+  "license": "MIT",
+  "homepage": "https://sentori.golia.jp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/goliajp/sentori.git",
+    "directory": "sdk/next"
+  },
+  "bugs": {
+    "url": "https://github.com/goliajp/sentori/issues"
+  },
+  "keywords": [
+    "sentori",
+    "error-tracking",
+    "next",
+    "nextjs",
+    "app-router"
+  ],
+  "type": "module",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/client.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./server": {
+      "types": "./lib/server.d.ts",
+      "default": "./lib/server.js"
+    },
+    "./instrumentation": {
+      "types": "./lib/instrumentation.d.ts",
+      "default": "./lib/instrumentation.js"
+    }
+  },
+  "files": [
+    "lib/",
+    "src/",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "prepack": "bun run build"
+  },
+  "peerDependencies": {
+    "next": ">=14",
+    "react": ">=18"
+  },
+  "dependencies": {
+    "@goliapkg/sentori-core": "0.1.0",
+    "@goliapkg/sentori-javascript": "0.2.0",
+    "@goliapkg/sentori-react": "0.1.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^19",
+    "react": "^19",
+    "typescript": "^5"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

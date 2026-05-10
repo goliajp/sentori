@@ -5,6 +5,7 @@
   "workspaces": [
     "sdk/core",
     "sdk/javascript",
+    "sdk/next",
     "sdk/react",
     "sdk/react-native"
   ],
