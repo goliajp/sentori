@@ -24,6 +24,25 @@ public class SentoriModule: Module {
             return SentoriCrashHandler.consumePending()
         }
 
+        // Phase 22 sub-E: opt-in iOS hang watchdog. Same JS function
+        // name as Android (sub-D) so the host app calls
+        // `startAnrWatchdog(...)` once, both platforms react.
+        // Defaults: 2 s timeout, 1 s tick interval, debug-build off.
+        Function("startAnrWatchdog") { (options: [String: Any]?) in
+            let timeoutMs = (options?["timeoutMs"] as? Int) ?? 2000
+            let intervalMs = (options?["intervalMs"] as? Int) ?? 1000
+            let force = (options?["force"] as? Bool) ?? false
+            SentoriHangWatchdog.start(
+                timeoutMs: timeoutMs,
+                intervalMs: intervalMs,
+                force: force
+            )
+        }
+
+        Function("stopAnrWatchdog") {
+            SentoriHangWatchdog.stop()
+        }
+
         // Dev-only helper used by the example app to verify the
         // crash-write / drain round-trip without writing native code in
         // the host app. Schedules a real NSException after a tick so
