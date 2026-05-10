@@ -56,13 +56,17 @@ function parseRelease(release) {
     return { build: m?.[2], version: m?.[1] ?? '0.0.0' };
 }
 function detectDevice() {
-    // Browser: light-touch UA sniff. We deliberately avoid full
-    // fingerprinting — the field is for grouping context, not analytics.
+    // The server's device.os is a strict enum: `ios | android | web | other`
+    // (see docs/protocol.md). Browser → web; Node + everything else → other.
+    // The pre-Phase-21 build sent free-form values like "macos" / "windows"
+    // which the server quietly rejected with `validationFailed`. Detail
+    // about the underlying OS family rides along in `model` instead.
     const w = globalThis.navigator;
     if (w?.userAgent) {
         return {
             locale: w.language,
-            os: detectBrowserOs(w.userAgent),
+            model: detectBrowserOs(w.userAgent),
+            os: 'web',
             osVersion: '0',
         };
     }
@@ -70,11 +74,12 @@ function detectDevice() {
     const p = globalThis.process;
     if (p?.platform) {
         return {
-            os: p.platform,
+            model: p.platform,
+            os: 'other',
             osVersion: p.version?.replace(/^v/, '') ?? '0',
         };
     }
-    return { os: 'unknown', osVersion: '0' };
+    return { os: 'other', osVersion: '0' };
 }
 function detectBrowserOs(ua) {
     if (ua.includes('Mac OS X') || ua.includes('Macintosh'))

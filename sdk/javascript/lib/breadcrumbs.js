@@ -1,19 +1,9 @@
-const MAX = 100;
-const buf = [];
+// Phase 21: ring buffer logic lives in @goliapkg/sentori-core. The
+// public surface here keeps its object-form `addBreadcrumb({ type,
+// data })` so existing callers don't break.
+import { addBreadcrumb as addBreadcrumbCore, clearBreadcrumbs, getBreadcrumbs, } from '@goliapkg/sentori-core';
 export function addBreadcrumb(input) {
-    const crumb = {
-        data: input.data ?? {},
-        timestamp: new Date().toISOString(),
-        type: input.type,
-    };
-    buf.push(crumb);
-    if (buf.length > MAX)
-        buf.shift();
+    addBreadcrumbCore(input.type, input.data ?? {});
 }
-export function getBreadcrumbs() {
-    return [...buf];
-}
-export function clearBreadcrumbs() {
-    buf.length = 0;
-}
+export { clearBreadcrumbs, getBreadcrumbs };
 //# sourceMappingURL=breadcrumbs.js.map
