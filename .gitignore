@@ -51,5 +51,6 @@ data/
 *.db
 *.sqlite
 
-# claude code transient state (handoff is rewritten by /handoff save)
+# claude code transient state (rewritten by harness on each run)
 .claude/handoff.md
+.claude/scheduled_tasks.lock
