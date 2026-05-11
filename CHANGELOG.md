@@ -6,6 +6,47 @@
 
 ---
 
+## v0.4 — Distributed Tracing（Phase 34-38）
+
+**Goal:** Protocol 早就留好的 `traceId` / `spanId` 槽真正用起来。从 RN client 一路追踪到后端 API，dashboard 看 waterfall。反 Sentry envelope-bloat：单 JSON span ingest，所有 root + child 是同一个 spans schema，靠 `parentSpanId == null` 区分；不上 transactions[] 嵌套 / measurements 浮点矩阵；waterfall 纯表格 + 缩进，不画 SVG bar。
+
+### Phase 34 — Protocol + storage 准备 ✅
+
+- **sub-A** Span 协议：`docs/protocol.md` 加 `## Span schema` 14 字段表 + 命名约定（http.client/server / db.query/transaction / cache.get/set / react.render/navigation / app.cold-start）+ "什么不做" 反 Sentry/OTel 子节；`POST /v1/spans` + `/v1/spans:batch` (200/batch) endpoint；Event schema 的 `traceId`/`spanId` 从 v0.1 占位升为 v0.4 in-use 语义
+- **sub-B** Schema：migration `0026_spans.sql` partitioned by `received_at`（PK `(received_at, id)` 复合）+ 4 索引（trace_id / parent_span_id partial / project_id+received_at / project_id+op）+ migration `0027_trace_meta.sql` `traces` 物化表（trace_id PK + project_id + root_op/name + first/last_seen + span_count + status worst-of + duration_ms）；不分区因为 trace 数是 span 的 1/200
+- **sub-C** Ingest endpoint：`server/src/api/spans.rs` single + batch handler（≤ 200/batch），validate 7 项（op/name 长度 / status enum / duration 24h / tags ≤ 50 keys 必 string / data 16KB），`persist_span` tx 内 INSERT spans + UPSERT traces 维护 worst-of status；quota 共享 events bucket
+- **sub-D** EXPLAIN baseline：5000 trace × 200 span = 100k spans (SQL bulk INSERT 1s)；Q1 trace list 0.075ms / Q2 trace detail 0.68ms / Q3 span search top-50 5.64ms；`tools/seed-spans.ts` 实际 HTTP path tool；`docs/performance/baseline-v0.4-phase34.md`
+
+### Phase 35 — SDK 端：RN + JS + React ✅
+
+**5 个 npm 包 publish**：sentori-core 0.3.0 / sentori-javascript 0.3.0 / sentori-react 0.4.0 / sentori-react-native 0.5.0 / sentori-next 0.2.0
+
+- **sub-A** `sdk/core` span buffer + trace-context：`SpanHandle` + `SpanBuffer` ring (cap 1000) + `startSpan` / `withSpan` / `activeSpan`；Node 路径 lazy require AsyncLocalStorage（await 跨 continuation 保持 context）/ browser/RN fallback save-and-restore；40 单测
+- **sub-B** JS SDK fetch hook：`installFetchInstrumentation` monkey-patch globalThis.fetch + W3C traceparent header 注入（`toTraceparent` 16-hex truncate）+ status 映射（4xx/5xx → error / AbortError → cancelled）；20 单测
+- **sub-C** RN SDK fetch + react-navigation：handler/network.ts 扩展现有 fetch hook 同时 emit breadcrumb + span；`useTraceNavigation(navigationRef)` hook duck-typed 不绑 `@react-navigation/native` 保持 optional peer；34 单测
+- **sub-D** `<TraceRender>` React component：useMemo([], startSpan) + useEffect cleanup finish；re-render 不重开 span；同时修两 latent bug（sentori-core 版本 pin / SentoriSuspense 漏 export）；20 单测
+- **sub-E** Publish 5 包 + dashboard dogfood：web/src/auth/ProtectedLayout 加 `useSentoriRouter()`；SentoriProvider 走 initSentori → fetch hook auto-install；每个 `/admin/api/...` 请求产 http.client span — **first end-to-end dogfood trace**；bundle +1.15 KB gzip
+
+### Phase 36 — Dashboard：Trace List + Trace Detail ✅
+
+- **sub-A** Trace list view：`web/src/views/traces.tsx` 6 列表格 + status pill 三色 + keyboard nav j/k/Enter + useInfiniteQuery + IntersectionObserver；server `list_traces` 同款 keyset cursor `(last_seen, trace_id)`；sidebar 加入口
+- **sub-B** Trace detail waterfall：`web/src/views/trace-detail.tsx` 纯表格 + 缩进 `depth*16px`（**不**画 SVG bar）；hover 行 `ancestorIds` 走 parentSpanId chain 高亮 root→leaf；click 行打开右侧 drawer（id / parent / duration / tags grid / data pretty-print JSON）；orphan span 当 root 兜底
+- **sub-C** Span ↔ Event 联动：migration `0028_event_trace.sql` events 表加 trace_id / span_id 列 + partial index；ingest pipeline 写两列；Issue detail "In trace →" pill + Trace detail "N event(s)" 红 chip 反向跳转
+- **sub-D** Search-token parser：`parseTraceQuery` 同 `parseIssueQuery` 模式 — `op:` / `status:` / `duration:>Nms|>Ns`；单 search box 替换 3 dropdown；11 vitest 覆盖
+
+### Phase 37 — Cross-cutting：W3C TraceContext 后端联动 ✅
+
+- **sub-A** sentori-server 自身 instrument：`SpanEmitter` buffer + 30s flush task + 200-span 突发 flush；axum middleware 包 handler 抓 method/path/traceparent → emit `http.server` span；`router::build` 加 `self_trace` 可选 layer；`main.rs` 读 env `SENTORI_SELF_TRACE_PROJECT_ID`；7 单测 + live smoke 验证跨进程 stitch 通过
+- **sub-B** Node SDK middleware：3 framework adapter（Express / Hono / Fastify）+ 共享 `parseTraceparent`；subpath export `@goliapkg/sentori-javascript/tracing`；Hono 用 `withSpan(next)` 让 handler 内 startSpan 自动 child；15 新单测
+- **sub-C** Recipe doc：`recipes/distributed-tracing.md` 三层全栈走读（RN → Node Hono → Postgres）+ ASCII 拓扑图 + SDK ↔ 协议 crosswalk 表 + 跨系统 stitch lossy 说明
+
+### Phase 38 — Polish + Performance + 发布 ✅
+
+- **sub-A** 1M span EXPLAIN 复测：5000 traces × 200 spans (~15s SQL bulk INSERT)；Q1 0.131ms / Q2 1.16ms / Q3 0.11ms / Q4 40.7ms（7.2× sub-linear scaling，plan-shape 均未变 → 不触发 regression policy）；`docs/performance/baseline-v0.4-phase38.md`；deferred 2 项 action item（partition prune hint / Q4 composite index）留 v0.5
+- **sub-B** CHANGELOG + tag v0.4.0 + GitHub Release + marketing hero 加副标题 "Distributed tracing built in"
+
+---
+
 ## v0.3 — React-first via dogfood（Phase 29-33，进行中）
 
 **Goal:** 用 Insight (RN) + 一个 React Web 项目作为真实流量源，把 SDK / dashboard / 文档在两个生态里都打磨到 polish 程度，把"React / RN 第一选择"做实。不开新轴。营销不主动推广，只把 docs 打磨到可口口相传。
