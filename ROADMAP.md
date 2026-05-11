@@ -301,8 +301,9 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-C — 文档 + recipe
 
-- [ ] 新 `docs-site/src/content/docs/recipes/distributed-tracing.md`：RN 客户端 → Node 后端 → 数据库 三层 trace 全栈示意
-- [ ] commit `phase 37 sub-C: distributed tracing recipe`
+- [x] 新 `docs-site/src/content/docs/recipes/distributed-tracing.md`：三层 trace 全栈示意 + ASCII 拓扑 + 三 framework middleware + dashboard 过滤查询 + W3C traceparent stitch 半 lossy 说明 + SDK ↔ 协议 crosswalk 表
+- [x] sidebar 加 entry；mirror 到 `docs/recipes/distributed-tracing.md`；docs-site build 24 page
+- [x] commit `phase 37 sub-C: distributed tracing recipe`
 
 ## Phase 38 — Polish + Performance + 发布
 
