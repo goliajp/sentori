@@ -13,7 +13,7 @@ This protocol is intentionally **without legacy**. It does not maintain compatib
 - **Nested `cause`** for error chains, not `exceptions[]` arrays.
 - **uuid-v7** for all client-generated IDs (RFC 9562, includes timestamp; sortable; modern).
 - **ISO 8601 UTC, millisecond precision** for all timestamps.
-- **Reserved extension slots** for `traceId` / `spanId` (distributed tracing, not implemented in v0.1).
+- **Distributed tracing (v0.4)** — `traceId` / `spanId` are used. Every observation is a single span; there is no separate transaction object. Root vs child is `parentSpanId == null`. No nested `transactions[]`, no `measurements`, no separate envelopes. See [Span schema](#span-schema) and [`POST /v1/spans`](#post-v1spans).
 
 ## Versioning
 
@@ -70,6 +70,44 @@ low. v0.3 may add `/v1/sessions:batch` if backlogs become a problem.
 This endpoint does **not** track active or in-progress sessions: the
 SDK fires exactly once at close. Active-session UI lives in a future
 phase that adds a heartbeat/init ping if we ever need it.
+
+### `POST /v1/spans`
+Single span ingestion (Phase 34, v0.4). Used by SDK auto-instrumentation
+(fetch wrapper, react-navigation hook, server middleware) and by manual
+`sentori.startSpan(...)` callers. Auth shares the public ingest token;
+the call counts against the same per-token rate limit as `/v1/events`.
+
+Body — see [Span schema](#span-schema) for the full field list. Minimum
+required example:
+
+```json
+{
+  "id":            "019e1f00-0000-7300-8000-000000000001",
+  "traceId":       "019e1f00-0000-7100-8000-000000000099",
+  "parentSpanId":  null,
+  "op":            "http.client",
+  "name":          "GET /v1/users/me",
+  "startedAt":     "2026-05-11T12:30:00.123Z",
+  "durationMs":    142,
+  "status":        "ok",
+  "tags":          { "http.method": "GET", "http.status": "200" }
+}
+```
+
+Response: `202 Accepted`, `{ "id": "<uuid>" }`.
+
+### `POST /v1/spans:batch`
+Batched span ingestion. Body:
+
+```json
+{ "spans": [ /* up to 200 Span objects */ ] }
+```
+
+SDKs flush every N spans or every M seconds. Each batch must come from
+one project (single `Authorization` header). Mixed `traceId` values are
+allowed in one batch — spans from different traces ride the same HTTP
+trip if they happen to flush together. Response shape matches
+`/v1/events:batch` (per-span accepted/rejected counts).
 
 ### `POST /v1/deploys`
 Deploy hook (Phase 23 sub-C). Called by CI right after a build reaches users so the
@@ -220,8 +258,8 @@ A single event is a JSON object with these top-level fields:
 | `breadcrumbs` | array<Breadcrumb> | no | up to 100 entries |
 | `error` | Error | yes | the actual error |
 | `fingerprint` | array<string> | no | client-suggested grouping; server may override per project rules |
-| `traceId` | string \| null | no | reserved for distributed tracing (v0.1 always null/omitted) |
-| `spanId` | string \| null | no | reserved for distributed tracing (v0.1 always null/omitted) |
+| `traceId` | string \| null | no | uuid v7 of the surrounding trace. Set by SDK when the error fires inside an active span; links back to a row on `/admin/api/traces/<traceId>`. v0.4+. |
+| `spanId` | string \| null | no | uuid v7 of the span the error happened inside (often the innermost active span). The dashboard renders an "In trace →" pill on the issue page that jumps to the trace detail view, scrolled to this span. v0.4+. |
 
 ### Device
 
@@ -328,7 +366,65 @@ later dSYM uploads.
 { "anything": "user-defined" }
 ```
 
+## Span schema
+
+A span is one observed unit of work. Every observation — an HTTP
+request, a DB query, a React render, a navigation transition, a server
+handler — is **a single span**, never a "transaction wrapping
+spans" (Sentry) and never a "transaction with measurements"
+(OpenTelemetry envelopes). Root vs child is determined by
+`parentSpanId == null`.
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string (uuid v7) | yes | this span's id. Client-generated. Server treats duplicates as no-ops via `ON CONFLICT DO NOTHING`. |
+| `traceId` | string (uuid v7) | yes | shared by every span in the same trace. SDKs generate one trace id per root span, propagate via W3C `traceparent` header. |
+| `parentSpanId` | string (uuid v7) or `null` | yes | `null` marks the root span of a trace. Non-null must point to another span with the same `traceId`. |
+| `op` | string | yes | machine-readable category. Convention: `<domain>.<verb>` — `http.client`, `http.server`, `db.query`, `db.transaction`, `cache.get`, `react.render`, `react.navigation`, `app.cold-start`. Free-form for app-specific ops (`checkout.charge`). ≤ 64 chars. |
+| `name` | string | yes | human-readable label, displayed in the trace detail view. Often the URL / SQL / route name. ≤ 200 chars. |
+| `startedAt` | string (ISO 8601, ms) | yes | when this unit of work began. Server uses for time-bucket queries and partition routing. |
+| `durationMs` | integer (u32) | yes | duration in milliseconds. Capped at `24 * 3600 * 1000` server-side to discard clock-skew bugs. `0` is legal (instantaneous spans). |
+| `status` | enum | yes | `"ok"` / `"error"` / `"cancelled"`. `cancelled` is for user-aborted work (a cancelled `fetch` AbortController), not for failed work. |
+| `tags` | object | no | flat `Record<string, string>`. Same limits as event tags (≤ 50 keys, ≤ 200 chars value, ≤ 64 chars key). Used for dashboard filtering (`op:http.client status:error tag:http.method=POST`). |
+| `data` | object | no | nested `Record<string, unknown>` for span-specific fields that don't make sense to filter on (request body sketch, response headers, query plan). Max 16 KB after JSON encode. |
+| `traceparent` | string | no | the original W3C TraceContext header value, if this span inherited a trace context across a process boundary. Server keeps it for cross-system correlation; not displayed in the dashboard. |
+
+### Conventions for `op`
+
+The dashboard's filter chips key off `op`, so consistency matters.
+Recommended namespace:
+
+| `op` | When |
+|---|---|
+| `http.client` | outbound HTTP request from this process |
+| `http.server` | inbound HTTP request handled by this process (server side) |
+| `db.query` | one SQL statement |
+| `db.transaction` | one `BEGIN ... COMMIT` block |
+| `cache.get` / `cache.set` | Redis / Valkey / memcached |
+| `react.render` | manual `<TraceRender op=...>` for a sub-tree |
+| `react.navigation` | route change in react-router / @react-navigation |
+| `app.cold-start` | from process start until first frame |
+
+SDKs auto-instrument the first six; the last two are wrappers consumers
+opt in to.
+
+### What we deliberately don't do
+
+- **No `transactions[]`** — a "transaction" in Sentry is just the root
+  span; we model that as `parentSpanId == null`. Removes one layer of
+  schema.
+- **No `measurements`** — Sentry's `measurements: { fp: { value: 1234, unit: 'ms' } }` map for vitals is replaced by ordinary `tags` /
+  `data`. If you want web vitals, send them as `op: 'web.vital'` spans.
+- **No separate `transaction.name` vs `span.description`** — there is
+  one `name` field. Apps that want to expose route vs URL keep them in
+  `tags.route` and `name`.
+- **No `op: 'navigation'` automatic flush** — RN nav span ends when
+  the route is mounted; web nav span ends after first paint of the
+  new route. No magic continuation across routes.
+
 ## Batch wrapper
+
+### Events batch
 
 `POST /v1/events:batch` body:
 
@@ -341,6 +437,21 @@ Constraints:
 - ≤ 100 events per batch
 - All events MUST belong to the same project (single `Authorization` header)
 - Mixed `platform` values are allowed within one batch
+
+### Spans batch
+
+`POST /v1/spans:batch` body:
+
+```json
+{ "spans": [ /* up to 200 Span objects */ ] }
+```
+
+Constraints:
+- batch body ≤ 1 MB (after gzip decode)
+- ≤ 200 spans per batch (spans are smaller than events — typically
+  200–400 bytes vs an event's 1–10 KB — so the per-batch cap is higher)
+- All spans MUST belong to the same project
+- Mixed `traceId` values are allowed; mixed `op` values are allowed
 
 If any single event fails validation, **only** that event is rejected (the batch is not failed wholesale). Response body lists per-event status:
 
@@ -370,6 +481,12 @@ Single-event endpoint always returns `202` with empty body, or one of the error 
 | tag keys per event | 50 |
 | tag value length | 200 chars |
 | tag key length | 64 chars |
+| single span payload (decoded) | 64 KB |
+| spans per batch | 200 |
+| span `data` blob size (after JSON encode) | 16 KB |
+| span `op` length | 64 chars |
+| span `name` length | 200 chars |
+| span `durationMs` | ≤ 86 400 000 (24 h) — anything past this is a clock-skew bug |
 
 Events exceeding any of these are rejected with `400` listing the violated limit in `details`.
 

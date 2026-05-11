@@ -131,10 +131,15 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-A — Span protocol
 
-- [ ] 写 span schema：`id: uuid`（span_id）/ `traceId: uuid` / `parentSpanId: null | uuid` / `projectId: uuid` / `op: string`（e.g. `http.client`, `db.query`, `react.render`, `react.navigation`） / `name: string` / `startedAt: rfc3339` / `durationMs: u32` / `status: 'ok' | 'error' | 'cancelled'` / `tags: Record<string, string>` / `data: Record<string, unknown>` 可选
-- [ ] **不**做：嵌套 transactions[] / measurements 浮点矩阵 / 单独的 transaction vs span 区分。所有 root + child 都是 span，靠 `parentSpanId == null` 区分 root
-- [ ] Update `docs/protocol.md` + `docs-site/src/content/docs/protocol.md` 镜像
-- [ ] commit `phase 34 sub-A: span protocol`
+- [x] `## Span schema` 章节：14 字段表（id / traceId / parentSpanId / op / name / startedAt / durationMs / status / tags / data / traceparent + types/required/notes）；projectId 从 token 推（不在 body）；`status` enum 含 `cancelled` 给 AbortController 场景；`op` 命名约定子表（http.client/server / db.query/transaction / cache.get/set / react.render/navigation / app.cold-start）
+- [x] "What we deliberately don't do" 子节明文反 Sentry/OTel：no transactions[]（root 就是 parentSpanId==null）/ no measurements 浮点矩阵（用 tags+data）/ no transaction.name vs span.description（只有 name）/ no nav 自动跨路由续约
+- [x] Endpoints 章节加 `### POST /v1/spans` + `### POST /v1/spans:batch`（200 spans/batch 上限，比 events 100 高因为 span ~200-400B vs event 1-10KB）
+- [x] Design principles line 16 重写：从"reserved extension slot"改成 v0.4 实际实施声明
+- [x] Event schema 的 `traceId` / `spanId` 字段从 "reserved (v0.1 always null/omitted)" 改成 v0.4+ 实际语义 + 提到 dashboard "In trace →" pill 跳转
+- [x] Size limits 表加 5 行 span 相关 limit（单 payload 64KB / batch 200 / data 16KB / op 64 char / name 200 char / durationMs ≤ 24h）
+- [x] Batch wrapper 章节拆 "Events batch" + "Spans batch" 子节
+- [x] 镜像到 `docs-site/src/content/docs/protocol.md`（保留 5 行 starlight frontmatter）；docs build 23 page 通过
+- [x] commit `phase 34 sub-A: span protocol`
 
 ### sub-B — Server schema + migration
 
