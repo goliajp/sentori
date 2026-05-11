@@ -86,6 +86,15 @@ export function TraceDetailView() {
     return m
   }, [detail.data])
 
+  const eventsBySpan = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const e of detail.data?.events ?? []) {
+      if (!e.spanId) continue
+      m.set(e.spanId, (m.get(e.spanId) ?? 0) + 1)
+    }
+    return m
+  }, [detail.data])
+
   const highlightChain = useMemo(
     () => (hoveredId ? ancestorIds(byId, hoveredId) : new Set<string>()),
     [byId, hoveredId]
@@ -154,6 +163,15 @@ export function TraceDetailView() {
                   </td>
                   <td className="px-4 py-1">
                     <StatusPill status={n.span.status} />
+                    {(eventsBySpan.get(n.span.id) ?? 0) > 0 && (
+                      <span
+                        className="ml-2 inline-block rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-400 tabular-nums"
+                        title="Events captured on this span"
+                      >
+                        {eventsBySpan.get(n.span.id)} event
+                        {eventsBySpan.get(n.span.id) === 1 ? '' : 's'}
+                      </span>
+                    )}
                   </td>
                 </tr>
               )

@@ -255,10 +255,13 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-C — Span ↔ Event 联动
 
-- [ ] events 表加 `trace_id: uuid nullable` + `span_id: uuid nullable`（migration `0028_event_trace.sql`）；server ingest 时从 event payload 解出 traceparent
-- [ ] Issue detail 页 frame 列旁加"In trace →"按钮链 trace detail
-- [ ] Trace detail 反向：每个 span 右侧"events on this span"小 chip
-- [ ] commit `phase 36 sub-C: event-span correlation`
+- [x] migration `0028_event_trace.sql`：`ALTER TABLE events ADD COLUMN IF NOT EXISTS trace_id UUID, span_id UUID`（partitioned parent ALTER 自动传播到 children）+ partial index `events_trace_idx ON events (trace_id) WHERE trace_id IS NOT NULL`（多数 row NULL 用 partial 省空间）
+- [x] ingest pipeline (`persist_event_row`)：parse `event.trace_id` / `event.span_id` (Option<String>) → `Uuid::parse_str` → INSERT 携带两列；不存在 trace 上下文时仍正常写入（NULL）
+- [x] `EventRow` 扩 `trace_id: Option<Uuid>` + `span_id: Option<Uuid>`；`list_events_for_issue` SQL 加 SELECT 两列；dashboard `EventRow` type 加 `traceId?` + `spanId?`
+- [x] Issue detail：在 `<UnsymbolicatedHint>` 下方加 trace pill — `event.traceId` 存在时显示 "Captured inside trace 019e2000 · In trace →" link 跳 `/org/{slug}/traces/{traceId}`
+- [x] 反向链接：server `trace_detail` endpoint 返回 `{trace, spans, events[]}` 数组（events 同 trace 的所有，含 issue_id + span_id + error_type）；trace-detail.tsx 用 useMemo 构 `eventsBySpan: Map<spanId, count>` → 每行 status 列右侧加红色小 chip `{n} event(s)`，title 提示
+- [x] 验证：cargo build 通过 / dashboard check 0 error / build OK；main bundle 不变（dashboard 改动都在 issue-detail + trace-detail lazy chunk）
+- [x] commit `phase 36 sub-C: event-span correlation`
 
 ### sub-D — 过滤 + 搜索
 

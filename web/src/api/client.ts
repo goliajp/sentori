@@ -90,7 +90,15 @@ export type SpanRow = {
   traceId: string
 }
 
+export type TraceEventRef = {
+  errorType: string
+  id: string
+  issueId: null | string
+  spanId: null | string
+}
+
 export type TraceDetail = {
+  events: TraceEventRef[]
   spans: SpanRow[]
   trace: TraceRow
 }
@@ -105,6 +113,11 @@ export type EventRow = {
   platform: string
   receivedAt: string
   release: string
+  /** Phase 36 sub-C: set when this event was captured inside an active
+   *  span. Dashboard renders an "In trace →" pill that jumps to the
+   *  trace detail view. */
+  spanId?: null | string
+  traceId?: null | string
 }
 
 /** Mirrors the server's `event::Event` (the JSON we accept on /v1/events). */

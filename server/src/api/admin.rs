@@ -274,6 +274,10 @@ pub struct EventRow {
     pub error_type: String,
     pub error_message: String,
     pub payload: serde_json::Value,
+    /// Phase 36 sub-C: link to the surrounding trace, if any. Set when
+    /// the event was captured inside an active span.
+    pub trace_id: Option<Uuid>,
+    pub span_id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -868,7 +872,7 @@ pub async fn list_events_for_issue(
     let mut rows: Vec<EventRow> = sqlx::query_as(
         r#"
         SELECT id, occurred_at, received_at, platform, release, environment,
-               error_type, error_message, payload
+               error_type, error_message, payload, trace_id, span_id
         FROM events
         WHERE project_id = $1
           AND issue_id = $2

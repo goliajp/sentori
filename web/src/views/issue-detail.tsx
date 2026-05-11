@@ -390,6 +390,20 @@ function StackTab({
           projectId={projectId}
           release={event.release}
         />
+        {event.traceId && (
+          <div className="border-border bg-bg-tertiary/30 mb-3 flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-[12px]">
+            <span className="text-fg-muted">
+              Captured inside trace{' '}
+              <span className="text-fg font-mono">{event.traceId.slice(0, 8)}</span>
+            </span>
+            <Link
+              className="text-accent hover:text-accent/80 shrink-0 self-center text-[12px] whitespace-nowrap"
+              to={`/org/${orgSlug}/traces/${event.traceId}`}
+            >
+              In trace →
+            </Link>
+          </div>
+        )}
         <StackList
           onFrameClick={(idx) => setOpenFrame({ cause: 0, frame: idx })}
           stack={payload.error.stack}

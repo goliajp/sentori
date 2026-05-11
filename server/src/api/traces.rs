@@ -132,6 +132,19 @@ fn parse_cursor(s: &str) -> Option<(OffsetDateTime, Uuid)> {
 pub struct TraceDetail {
     pub trace: TraceRow,
     pub spans: Vec<SpanRow>,
+    /// Phase 36 sub-C: events with this trace_id, exposing issue_id +
+    /// span_id so the dashboard can render "events on this span" chips
+    /// on trace detail without an extra round-trip.
+    pub events: Vec<TraceEventRef>,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct TraceEventRef {
+    pub id: Uuid,
+    pub issue_id: Option<Uuid>,
+    pub span_id: Option<Uuid>,
+    pub error_type: String,
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
@@ -187,5 +200,19 @@ pub async fn trace_detail(
     .await
     .map_err(|e| AppError::Internal(e.to_string()))?;
 
-    Ok(Json(TraceDetail { trace, spans }))
+    let events: Vec<TraceEventRef> = sqlx::query_as(
+        r#"
+        SELECT id, issue_id, span_id, error_type
+        FROM events
+        WHERE trace_id = $1 AND project_id = $2
+        ORDER BY received_at ASC
+        "#,
+    )
+    .bind(trace_id)
+    .bind(project_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(TraceDetail { trace, spans, events }))
 }
