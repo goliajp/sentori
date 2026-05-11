@@ -143,9 +143,10 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-B — Server schema + migration
 
-- [ ] migration `0026_spans.sql`：`spans` 按 `received_at` monthly partition；列对应 sub-A schema；索引 `(trace_id)` 走 trace detail / `(project_id, received_at DESC)` 走 trace list / `(parent_span_id)` 走 waterfall build
-- [ ] migration `0027_trace_meta.sql`：物化表 `traces`（per-trace summary）—— `trace_id (pk) / project_id / root_op / root_name / first_seen / last_seen / span_count / status / duration_ms`；ingest 时维护
-- [ ] commit `phase 34 sub-B: spans + traces schema`
+- [x] migration `0026_spans.sql`：`spans` `PARTITION BY RANGE (received_at)`，PK `(received_at, id)` 复合（partition key 必须在 PK），bootstrap 2026_05..2026_08 + default partition；4 索引 — `trace_id` 走 trace detail / `(parent_span_id) WHERE parent_span_id IS NOT NULL` 走 waterfall build（partial 排掉 root 行节约空间）/ `(project_id, received_at DESC)` 走 trace list / `(project_id, op)` 走 span search
+- [x] migration `0027_trace_meta.sql`：`traces` per-trace 物化 summary（`trace_id PK + project_id + root_op + root_name + first_seen + last_seen + span_count + status check 三选一 + duration_ms`）；**不**分区（trace 数是 span 的 ~1/200，10M 行内 PG 单表 OK，留到真实流量 push past 时再分）；keyset 索引 `(project_id, last_seen DESC, trace_id DESC)` 给 trace list 分页
+- [x] 应用到 dev DB 验证：6 个 CREATE TABLE + 5 个 CREATE INDEX + traces 表 1 个 CREATE TABLE + 2 indices；`spans / spans_2026_05 / spans_default / traces` 全部存在；cargo test --lib 18/18 仍绿
+- [x] commit `phase 34 sub-B: spans + traces schema`
 
 ### sub-C — `/v1/spans` ingest endpoint
 
