@@ -198,9 +198,13 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-C — RN SDK auto-instrument fetch + react-navigation
 
-- [ ] RN SDK 用同样 monkey-patch fetch（XMLHttpRequest 走 React Native polyfill 内部，patch fetch 够覆盖）
-- [ ] 新 `sdk/react-native/src/navigation.ts`：`useTraceNavigation()` hook（peer dep `@react-navigation/native >= 6` optional），路由变更产 `react.navigation` span
-- [ ] commit `phase 35 sub-C: rn sdk fetch + navigation tracing`
+- [x] `sdk/react-native/src/handlers/network.ts` 扩展：原 `addBreadcrumb('net')` 路径保留，加 `startSpan('http.client')` + traceparent header 注入；status 映射 同 sub-B JS SDK（4xx/5xx → error / AbortError → cancelled / 其它 throw → error + error.message tag）；URL scrub 仍跑（token/secret 不进 span tags）
+- [x] 新 `sdk/react-native/src/navigation.ts`：`useTraceNavigation(navigationRef)` hook，接受任何 `{ addListener('state', cb), getCurrentRoute() }` 形状（**duck-typed** 不绑死 `@react-navigation/native` 类型，让 peer dep 真正 optional——consumer 不装 react-navigation 也能编译）；初次 mount 不发 span（参考 sentori-react `useSentoriRouter`）；每次 route 变 → 关闭上一 span，开新 `react.navigation` span `name = "<from> → <to>"` + tags `{nav.from, nav.to}`；unmount 时 close 剩余 open span 不泄露
+- [x] 测试：`handlers/network.ts` 6 个（emit http.client span / traceparent header / 5xx → error / NetworkError → error + tag / AbortError → cancelled / caller headers 保留）；`navigation.ts` 5 个（hook export shape / 初次 mount 无 span / 单 hop / same-route 去重 / 链式 hops / cleanup close open span）；用 FakeNav class 模拟 react-navigation ref 避免装 react-test-renderer
+- [x] **install-once 测试陷阱解决**：原 beforeEach 重置 globalThis.fetch 破坏 wrapped fetch（wrapper 在 install 时 capture original，后续 globalThis.fetch 重写绕过 wrapper）。改成 beforeAll 一次 install + module-level 静态 recorder + 测试间只改 recorderQueue
+- [x] `sdk/react-native/src/index.ts` export `useTraceNavigation` + `NavigationRefLike` 类型
+- [x] **bun test 34/34 pass**（was 22 + 12 = 34；6 tracing + 5 navigation - 1 hook-shape sanity = 12 net new）；全 SDK suite 复跑绿
+- [x] commit `phase 35 sub-C: rn sdk fetch + navigation tracing`
 
 ### sub-D — `sdk/react/src` 加 component render span
 

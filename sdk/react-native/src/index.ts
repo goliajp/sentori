@@ -37,6 +37,7 @@ export {
   markSessionCrashed,
   startSession,
 } from './session-tracker';
+export { type NavigationRefLike, useTraceNavigation } from './navigation';
 
 export type {
   Event,
