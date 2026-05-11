@@ -325,10 +325,10 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 33 sub-D: sdk offline reliability`
 
 ### sub-E — Performance baseline 文档
-- [ ] 新 `docs/performance.md`：列每个 baseline 指标（query plan / latency / throughput）
-- [ ] 设回归对照规则："任何 query plan / latency 退化 > 20% 在 PR 描述里说明原因"
-- [ ] 加进 review checklist 顶部
-- [ ] commit `phase 33 sub-E: performance baseline doc`
+- [x] 新 `docs/performance.md`：headline 表 9 行（5 query × EXPLAIN + 4 ingest endpoint × load test）含 SLO target + headroom 倍数；按 surface 链接到 3 个 detail doc（baseline-v0.3-phase30 / baseline-v0.3-phase33 / ingest-load-test）；"How to re-measure" 给重复 bun 命令；out-of-scope for v0.3 章节（symbolication latency / 并发连接 / 存储增长率 — 留 v0.4）
+- [x] 回归对照规则正式写下：(1) headline 数字 > 20% 退化 = regression（loose threshold 因 wall-clock 有 buffer cache 噪声） (2) EXPLAIN plan shape 变（新 Seq Scan / Sort / Hash Join / partition pruning 丢失）= regression（tight threshold 因 plan-shape 是结构性的）；reviewer 三选一：PR 描述解释 / 跟进 commit 修回去 / 显式更新 baseline
+- [x] 加 `.github/PULL_REQUEST_TEMPLATE.md`：Summary + Reviewer checklist（4 条：performance / tests / docs / migrations）+ Test plan
+- [x] commit `phase 33 sub-E: performance baseline doc`
 
 ---
 
