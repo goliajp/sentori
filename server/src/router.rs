@@ -35,11 +35,16 @@ pub struct ServerConfig {
     /// production; we don't gate it server-side because Prometheus
     /// scrape runs without auth on the internal network.
     pub metrics: Option<PrometheusHandle>,
+    /// Phase 37 sub-A: if set, every request emits an `http.server`
+    /// span into the trace buffer, batched + persisted to spans /
+    /// traces tables by the emitter's background flush task.
+    pub self_trace: Option<crate::trace_emit::SpanEmitter>,
 }
 
 pub fn build(cfg: ServerConfig) -> Router {
     let auth_state = AuthState::new(cfg.dev_token, cfg.db.clone());
     let recent = RecentBuffer::new();
+    let cfg_self_trace_clone = cfg.self_trace.clone();
     let state = AppState {
         auth: auth_state.clone(),
         recent,
@@ -327,6 +332,22 @@ pub fn build(cfg: ServerConfig) -> Router {
         .nest("/api", orgs)
         .merge(metrics)
         .layer(RequestBodyLimitLayer::new(MAX_BODY_BYTES))
+        // Phase 37 sub-A: self-instrument span emission. Wrap last so
+        // the wrapped future runs once per top-level request — inner
+        // layers (auth, rate limit) execute inside the span's time
+        // window and contribute to its duration.
+        .layer({
+            let emitter = cfg_self_trace_clone.clone();
+            middleware::from_fn(move |req, next| {
+                let emitter = emitter.clone();
+                async move {
+                    match emitter {
+                        Some(e) => crate::tracing_middleware::tracing_middleware(e, req, next).await,
+                        None => next.run(req).await,
+                    }
+                }
+            })
+        })
         .layer(
             CorsLayer::permissive()
                 // Phase 33 sub-B: list_issues returns the next-page

@@ -2,8 +2,8 @@ use std::net::SocketAddr;
 
 use anyhow::Context;
 use sentori_server::{
-    db, digest, metrics, notifier, quotas, regression, retention, router, rule_eval, seed, valkey,
-    webhook_dispatch,
+    db, digest, metrics, notifier, quotas, regression, retention, router, rule_eval, seed,
+    trace_emit, valkey, webhook_dispatch,
 };
 
 #[tokio::main]
@@ -145,6 +145,29 @@ async fn main() -> anyhow::Result<()> {
     let metrics_handle = metrics::install();
     tracing::info!("prometheus metrics installed; /metrics is live");
 
+    // Phase 37 sub-A: self-trace emitter. Only enable when both a DB
+    // pool is available and the operator has nominated a target
+    // project via SENTORI_SELF_TRACE_PROJECT_ID. Skipping silently is
+    // the right posture for self-hosted single-tenant setups that
+    // don't want self-tracing noise.
+    let self_trace =
+        match (pool.as_ref(), std::env::var("SENTORI_SELF_TRACE_PROJECT_ID").ok()) {
+            (Some(p), Some(id_str)) => match uuid::Uuid::parse_str(&id_str) {
+                Ok(id) => {
+                    tracing::info!(%id, "self-trace emitter armed");
+                    Some(trace_emit::SpanEmitter::spawn(p.clone(), id))
+                }
+                Err(_) => {
+                    tracing::warn!(
+                        value = %id_str,
+                        "SENTORI_SELF_TRACE_PROJECT_ID not a UUID; self-trace disabled",
+                    );
+                    None
+                }
+            },
+            _ => None,
+        };
+
     let app = router::build(router::ServerConfig {
         dev_token: token,
         db: pool,
@@ -156,6 +179,7 @@ async fn main() -> anyhow::Result<()> {
         notifier_tx,
         base_url,
         metrics: Some(metrics_handle),
+        self_trace,
     });
     axum::serve(listener, app).await?;
 

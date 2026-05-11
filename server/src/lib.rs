@@ -23,6 +23,8 @@ pub mod session;
 pub mod symbolicate;
 pub mod symbolicate_android;
 pub mod symbolicate_ios;
+pub mod trace_emit;
+pub mod tracing_middleware;
 pub mod valkey;
 pub mod webhook;
 pub mod webhook_dispatch;
