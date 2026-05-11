@@ -16,6 +16,7 @@ use axum::{
 };
 use sentori_server::{db, webhook, webhook_dispatch};
 use serde_json::json;
+use serial_test::serial;
 use sqlx::PgPool;
 use sqlx::types::Uuid;
 use tokio::net::TcpListener;
@@ -141,6 +142,7 @@ async fn fetch_row(pool: &PgPool, id: Uuid) -> DeliveryRow {
 }
 
 #[tokio::test]
+#[serial]
 async fn retry_succeeds_after_one_failure() {
     let Some(pool) = make_pool().await else {
         return;
@@ -182,6 +184,7 @@ async fn retry_succeeds_after_one_failure() {
 }
 
 #[tokio::test]
+#[serial]
 async fn retries_give_up_after_six_attempts() {
     let Some(pool) = make_pool().await else {
         return;
