@@ -328,10 +328,11 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-B — CHANGELOG + release notes + tag
 
-- [ ] CHANGELOG.md v0.4 section
-- [ ] GitHub Release v0.4.0 + release notes 高亮：distributed tracing + 5 个 SDK bump + protocol stable v1 (no breakage from v0.1)
-- [ ] marketing/index.astro hero 加副标题 "Distributed tracing built in"（不替换 React-first 主标）
-- [ ] commit `phase 38 sub-B: v0.4.0 release`
+- [x] CHANGELOG.md v0.4 section：Goal 段反 Sentry envelope-bloat 立场陈述 + Phase 34/35/36/37/38 各 sub 一行 condensed summary；放在 v0.3 之上、最近优先；5 npm package version 标黑
+- [x] marketing hero 加副标题 `v0.4 · Distributed tracing built in.`（accent-coloured，h1 和 sub-hero 之间）；主 hero "Error tracking, built React-first." 不动
+- [x] ROADMAP 顶部状态：v0.4 🚧 → ✅ + 加 v0.5 📐 待规划占位
+- [x] git tag v0.4.0 + push；GitHub Release `gh release create v0.4.0` 含完整 release notes（distributed tracing / 5 SDK bumps / performance baseline 数字 / 协议 stable 声明 / "what we didn't do" / docs link）→ https://github.com/goliajp/sentori/releases/tag/v0.4.0
+- [x] commit `phase 38 sub-B: v0.4.0 release`
 
 ---
 
