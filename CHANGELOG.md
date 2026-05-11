@@ -6,6 +6,50 @@
 
 ---
 
+## v0.3 — React-first via dogfood（Phase 29-33，进行中）
+
+**Goal:** 用 Insight (RN) + 一个 React Web 项目作为真实流量源，把 SDK / dashboard / 文档在两个生态里都打磨到 polish 程度，把"React / RN 第一选择"做实。不开新轴。营销不主动推广，只把 docs 打磨到可口口相传。
+
+### Phase 29 — v0.2 deferred sweep ✅
+
+5 sub 全完成：
+
+- **sub-A** iOS 真主线程采样器：`SentoriThreadSampler.swift` 用 raw byte reinterpret 按 ABI index 取 PC/FP（绕过 Swift 未导入的 `_COUNT` 宏和 `__darwin_*` intrinsics）；4 个 XCTest case 覆盖；`HangWatchdog` 用 sampler 输出 + 47-bit PAC mask；e2e 推迟到 example 切到 npm registry 版本（Expo autolinker file:.. monorepo bug）
+- **sub-B** webhook 持久化重试队列：migration 0025 + `webhook_dispatch.rs` 的 30s sweep + 6 次重试（[60s, 5m, 30m, 2h, 12h, 24h]）；dashboard `<DeliveriesRow>` 展开块
+- **sub-C** server `OffsetDateTime` serde rfc3339 sweep：23 处 serde-derived struct 字段加注解；`scripts/check-rfc3339.sh` 接入 CI 防回归
+- **sub-D** UUID prefix collision sweep：15 处 `[..N]` 改 `[12..28]` 取尾部 16 char hex
+- **sub-E** CLI `issue list/resolve/silence`：3 unit test 覆盖 clap parse / format / 缺 token 错误；sentori-cli@0.2.0 publish + GH Release with 3 平台 prebuilt 二进制
+
+### Phase 30 — Insight (RN) onboarding polish（进行中）
+
+- **sub-A** Insight 接入秒表 ⏸ blocked（等用户在 Insight 项目实际跑）
+- **sub-B** 摩擦点修复 ⏸ blocked on sub-A
+- **sub-C** ✅ `tools/seed-events.ts`：UUID v7 + 10 errorType + weighted env + 5% ANR + regression simulation；`docs/self-hosting.md` 加 Populate dev data 章节
+- **sub-D** ✅ EXPLAIN ANALYZE baseline：5000 events / 987 issues / 117 sessions 下 5 query 合计 0.55ms execution，全部命中既有索引或被正确 Seq-Scan；`docs/performance/baseline-v0.3-phase30.md`
+- **sub-E** ✅ 索引补齐：5k 规模本质上无需新索引；唯一实施项是 `list_events_for_issue` 的 partition-pruning hint（`?days=` query param，默认 90，clamp 1..365）；EXPLAIN 验证 plan 从 9 partition 降到 7；`alert_rules` partial index 推迟到 1M 复跑后再决定
+
+### Phase 31 — `sentori-react` SDK polish ✅
+
+7 sub 全完成，**`@goliapkg/sentori-react@0.3.0` 已 publish**：
+
+- **sub-A** ErrorBoundary v2：`fallback` 接受 `ReactNode | (props: {error, reset}) => ReactNode`；`resetKeys: unknown[]` 浅比较自动 reset；7 test 覆盖（含嵌套 boundary 不冒泡）；`docs-site/sdk-react.md` + 3 个 recipe
+- **sub-B** react-router 集成：`useSentoriRouter` hook（subpath export `/router`，optional peer dep `react-router >= 7`）；MemoryRouter 测试初次 mount 不发 + 后续转换 emit `{from, to}` breadcrumb
+- **sub-C** Suspense + RSC：`<SentoriSuspense fallback errorFallback?>` 单组件组合 Suspense + ErrorBoundary；`sdk/next/app-router.ts` 加 `useNextRouter` + `useReportNextError`（subpath export `/app-router`）；`error.tsx` recipe 进 sdk/next/README.md
+- **sub-D** dashboard 升级到 sentori-react：把 `web/` 加进 root workspaces；`web/src/main.tsx` 删 imperative `initSentori`，改用 `<SentoriProvider>` + `<SentoriErrorBoundary fallback={<ErrorState />}>`；bundle +4KB gzip
+- **sub-E** Recipe docs：`recipes/nextjs.md`（App Router + Pages Router + GH Actions yml）/ `recipes/remix.md`（v2 Vite-based + classic esbuild 兼容说明）/ `recipes/vite.md`（minimal SPA + sourcemap CLI）；docs-site sidebar 加 Recipes 分组；13 page build
+- **sub-F** Symbolication UX：`<UnsymbolicatedHint>` banner 在未上传对应 artifact 时显示"Open release →"链；server 加 `sentori_symbolicate_duration_seconds{cache="cold|warm"}` histogram instrument 3 条路径；优化暂不做（先 instrument 后调优）
+- **sub-G** Publish：`sentori-react@0.3.0` 发到 npm（package size 14.57 KB packed / 50.58 KB unpacked / 45 files）
+
+### Phase 32 — Docs + onboarding 完整化（未开始）
+
+4-path getting-started 重做 / 5 分钟秒表实测 / React 专区深度 recipe / Troubleshooting / Marketing hero copy 微调。
+
+### Phase 33 — Performance / scale 验真（未开始）
+
+1M event EXPLAIN baseline 复跑 / Cursor pagination + virtualization / Ingest 压测 / SDK offline 压测 / `docs/performance.md` baseline 文档。
+
+---
+
 ## v0.2 — 账户结构 + SDK 矩阵 + 数据呈现（Phase 18-28）
 
 三大板块按线性推进：**账户结构骨架**（Phase 18-20）—— org/team/project 三层 + RBAC + audit log；**SDK 矩阵 + 原生深度**（Phase 21-22）—— sdk/core 衍生 react/next/expo + iOS dSYM/Android proguard/ANR/Hang 完整化；**数据呈现**（Phase 23-28）—— Release 一等公民 + Issues 列表 power-user 化 + Issue 详情 revamp + Health/搜索/告警/Polish。
