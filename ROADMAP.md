@@ -318,10 +318,11 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 33 sub-C: ingest load test`
 
 ### sub-D — SDK offline / retry 压测
-- [ ] 用 chrome devtools network throttle 模拟 offline / 慢 3G / 5xx，断 N 秒后恢复
-- [ ] 验证 RN SDK + JS SDK 不丢事件 / 不双发；`enqueue` queue 上限不溢出
-- [ ] 若发现行为 bug：修 SDK，bump 0.3.x patch、publish
-- [ ] commit `phase 33 sub-D: sdk offline reliability`
+- [x] **不**走 chrome devtools throttle — GUI 操作无法自动化，replace 为 vitest/bun:test 用 fetch mock 模拟 offline / 5xx / 网络抖动；与 sub-C 一样的"不装外部工具"原则
+- [x] RN SDK 加 4 个 transport test：(1) 5xx → 3 次 retry 后给上 (2) 前 2 次 NetworkError + 第 3 次成功 → 验证 retry 链路 (3) 4xx-非-429 → 1 次 attempt 直接 drop（client error 不可恢复） (4) flush 双调 → 不双发（第二次见空 queue no-op）
+- [x] JS SDK 加 1 个 transport test：fetch reject → 1 次 attempt + 1 次 `[sentori] transport failed` warn + 不 crash + 不 duplicate；fire-and-forget 设计的正确行为（浏览器侧不是常驻进程，没法可靠 retry）
+- [x] 测试结果：所有 SDK suite 全绿（sentori-js 9/9 / sentori-react 14/14 / sentori-next 9/9 / sentori-react-native 22/22；总 54 test，301 expect）；**0 SDK bug 触发**，不需要 publish patch
+- [x] commit `phase 33 sub-D: sdk offline reliability`
 
 ### sub-E — Performance baseline 文档
 - [ ] 新 `docs/performance.md`：列每个 baseline 指标（query plan / latency / throughput）

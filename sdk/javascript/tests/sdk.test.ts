@@ -113,4 +113,33 @@ describe('captureError', () => {
     const ev = sent[0]!
     expect(ev.error.cause?.message).toBe('root cause')
   })
+
+  // Phase 33 sub-D: offline behavior. The JS SDK is fire-and-forget
+  // (browser-side; no resident process to retry on). Verify it
+  // surfaces the failure to console without crashing the app and
+  // does not double-send on a single failure.
+  test('does not crash when fetch rejects (offline)', async () => {
+    const calls: unknown[] = []
+    const warnings: unknown[] = []
+    const originalWarn = console.warn
+    console.warn = (...args: unknown[]) => warnings.push(args)
+    ;(globalThis as { fetch: typeof fetch }).fetch = (async (
+      url: string | URL | Request,
+    ) => {
+      calls.push(String(url))
+      throw new TypeError('NetworkError: offline')
+    }) as unknown as typeof fetch
+
+    try {
+      captureError(new Error('boom while offline'))
+      await Promise.resolve()
+      await Promise.resolve()
+    } finally {
+      console.warn = originalWarn
+    }
+
+    expect(calls.length).toBe(1)
+    expect(warnings.length).toBe(1)
+    expect(String(warnings[0])).toContain('[sentori] transport failed')
+  })
 })

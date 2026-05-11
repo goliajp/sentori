@@ -109,4 +109,62 @@ describe('transport', () => {
     expect(capturedHeaders?.Authorization).toBe('Bearer st_pk_test');
     expect(capturedHeaders?.['Sentori-Sdk']).toMatch(/^react-native\//);
   });
+
+  // Phase 33 sub-D: offline / retry behavior.
+
+  it('retries up to MAX_RETRY (3) on a 5xx, then gives up', async () => {
+    let attempts = 0;
+    globalThis.fetch = mock(async () => {
+      attempts++;
+      return new Response('boom', { status: 503 });
+    }) as typeof fetch;
+
+    enqueue(makeEvent('a'));
+    // flush swallows the final throw (and falls through to persist).
+    // We're verifying the retry count, not the throw.
+    await flush();
+    expect(attempts).toBe(3);
+  });
+
+  it('retries on network error (fetch throw), succeeds when recovered', async () => {
+    let attempts = 0;
+    globalThis.fetch = mock(async () => {
+      attempts++;
+      if (attempts < 3) throw new TypeError('NetworkError: offline');
+      return new Response(null, { status: 202 });
+    }) as typeof fetch;
+
+    enqueue(makeEvent('a'));
+    await flush();
+    expect(attempts).toBe(3);
+  });
+
+  it('drops 4xx-other-than-429 without retry (client errors are unrecoverable)', async () => {
+    let attempts = 0;
+    globalThis.fetch = mock(async () => {
+      attempts++;
+      return new Response(null, { status: 400 });
+    }) as typeof fetch;
+
+    enqueue(makeEvent('a'));
+    await flush();
+    // sendOnce treats 4xx-other-than-429 as a no-throw exit, so the
+    // retry loop also exits — one attempt, no double-send.
+    expect(attempts).toBe(1);
+  });
+
+  it('does not duplicate events when flush is called twice in a row', async () => {
+    let attempts = 0;
+    globalThis.fetch = mock(async () => {
+      attempts++;
+      return new Response(null, { status: 202 });
+    }) as typeof fetch;
+
+    enqueue(makeEvent('a'));
+    enqueue(makeEvent('b'));
+    await flush();
+    await flush(); // second flush sees an empty queue and no-ops
+    expect(attempts).toBe(1);
+    expect(__peekQueue()).toHaveLength(0);
+  });
 });
