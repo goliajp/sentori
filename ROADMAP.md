@@ -279,10 +279,12 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 32 sub-D: troubleshooting`
 
 ### sub-E — Marketing hero copy 微调
-- [ ] `marketing/src/pages/index.astro` hero h1 改成强调 React + RN（候选 copy："Error tracking, built React-first."），不重做布局
-- [ ] sub-hero 保留对 platform-agnostic 协议的强调，避免显得不支持其它平台
-- [ ] marketing build 部署到 staging 检视
-- [ ] commit `phase 32 sub-E: marketing hero copy`
+- [x] `marketing/src/pages/index.astro` hero h1 改为 "Error tracking, built React-first."（按 ROADMAP 候选 copy 字面采用），布局 / 配色 / 按钮 全部不动
+- [x] Sub-hero 改成 "First-class SDKs for React, React Native, and Next.js — and a camelCase wire protocol any other platform can speak." — 主体强调 React 三件套，副句留 "wire protocol any other platform can speak" 一句保留 platform-agnostic 立场不显得 React-only
+- [x] Meta tags (description + og:title + og:description + twitter:title/description + `<title>`) 同步更新到新 copy；防止 social card 跟 hero 不一致
+- [x] marketing build smoke pass（2 page in 305ms）
+- [x] staging deploy review — **defer**：本地 build 验证文案 OK，actual deploy 需要 push 到 cloudflare pages / staging branch，留给运维流程
+- [x] commit `phase 32 sub-E: marketing hero copy`
 
 ## Phase 33 — Performance / scale 验真
 
