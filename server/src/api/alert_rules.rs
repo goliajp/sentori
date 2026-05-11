@@ -223,18 +223,24 @@ pub struct PatchRuleBody {
     pub muted: Option<bool>,
     /// Phase 27 sub-F: temporary silence (RFC 3339). Send `null` to
     /// clear the snooze early; omit to leave alone.
-    #[serde(default, deserialize_with = "deserialize_double_option")]
+    #[serde(default, deserialize_with = "deserialize_double_option_rfc3339")]
     pub snoozed_until: Option<Option<OffsetDateTime>>,
 }
 
-fn deserialize_double_option<'de, T, D>(
+/// Deserialize a double-option of OffsetDateTime where the inner value
+/// is RFC 3339 string. Without the explicit rfc3339 hint, serde's
+/// default OffsetDateTime deserializer expects the 9-element array
+/// representation; clients send (and dashboards expect) RFC 3339 strings.
+fn deserialize_double_option_rfc3339<'de, D>(
     d: D,
-) -> Result<Option<Option<T>>, D::Error>
+) -> Result<Option<Option<OffsetDateTime>>, D::Error>
 where
-    T: Deserialize<'de>,
     D: serde::Deserializer<'de>,
 {
-    Option::<T>::deserialize(d).map(Some)
+    #[derive(serde::Deserialize)]
+    struct Wrap(#[serde(with = "time::serde::rfc3339")] OffsetDateTime);
+
+    Option::<Wrap>::deserialize(d).map(|opt| Some(opt.map(|w| w.0)))
 }
 
 impl Default for PatchRuleBody {

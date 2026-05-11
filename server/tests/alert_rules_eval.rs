@@ -144,7 +144,7 @@ async fn new_issue_rule_fires_on_first_event_with_filter_match() {
     let (project_id, ingest, cookie, org_slug) = project_with_token(&addr, &pool).await;
 
     // Arm a new_issue rule scoped to env=prod, errorTypeRegex matching `Type.*`.
-    Client::new()
+    let resp = Client::new()
         .post(format!("http://{addr}/api/orgs/{org_slug}/alert-rules"))
         .header("cookie", &cookie)
         .json(&json!({
@@ -157,19 +157,28 @@ async fn new_issue_rule_fires_on_first_event_with_filter_match() {
         .send()
         .await
         .unwrap();
+    let body: Value = resp.json().await.unwrap();
+    let rule_id = Uuid::parse_str(body["id"].as_str().unwrap()).unwrap();
 
     // Drain anything from setup.
     let _ = drain(&mut rx).await;
 
-    // staging event → should NOT match (env mismatch).
+    // The new_issue trigger fires only when a fresh fingerprint shows
+    // up (Phase 5: fingerprint = hash(error_type + frame.fn + frame.file),
+    // env not included). So if event 1 and event 3 share error_type
+    // they'll dedup and event 3 won't be a "new issue" — leaving the
+    // filter assertion with nothing to match. Use distinct error_types
+    // here so each event creates its own issue.
+    //
+    // event 1: staging "StagingErr" — new issue, but env filter rejects
     Client::new()
         .post(format!("http://{addr}/v1/events"))
         .bearer_auth(&ingest)
-        .json(&payload("TypeError", "staging"))
+        .json(&payload("StagingErr", "staging"))
         .send()
         .await
         .unwrap();
-    // prod, but errorType "OtherError" → regex mismatch.
+    // event 2: prod "OtherError" — new issue, but regex ^Type rejects
     Client::new()
         .post(format!("http://{addr}/v1/events"))
         .bearer_auth(&ingest)
@@ -177,7 +186,7 @@ async fn new_issue_rule_fires_on_first_event_with_filter_match() {
         .send()
         .await
         .unwrap();
-    // matching event.
+    // event 3: prod "TypeError" — new issue, filter matches → AlertFired
     Client::new()
         .post(format!("http://{addr}/v1/events"))
         .bearer_auth(&ingest)
@@ -191,9 +200,9 @@ async fn new_issue_rule_fires_on_first_event_with_filter_match() {
     let events = drain(&mut rx).await;
     let alerts: Vec<_> = events
         .iter()
-        .filter(|e| matches!(e, NotifyEvent::AlertFired { .. }))
+        .filter(|e| matches!(e, NotifyEvent::AlertFired { rule_id: id, .. } if *id == rule_id))
         .collect();
-    assert_eq!(alerts.len(), 1, "exactly one AlertFired: {events:?}");
+    assert_eq!(alerts.len(), 1, "exactly one AlertFired for rule {rule_id}: {events:?}");
     if let NotifyEvent::AlertFired { rule_name, .. } = alerts[0] {
         assert_eq!(rule_name, "Page on TypeErrors");
     }
@@ -207,7 +216,10 @@ async fn event_count_rule_fires_when_threshold_crossed() {
     };
     let (project_id, _ingest, cookie, org_slug) = project_with_token(&_addr, &pool).await;
 
-    Client::new()
+    // Tests share the DB; other tests' stale Burst rules + events can
+    // still trip a global sweep. Capture this rule's id so we filter
+    // alerts down to the rule under test.
+    let resp = Client::new()
         .post(format!("http://{_addr}/api/orgs/{org_slug}/alert-rules"))
         .header("cookie", &cookie)
         .json(&json!({
@@ -220,6 +232,8 @@ async fn event_count_rule_fires_when_threshold_crossed() {
         .send()
         .await
         .unwrap();
+    let body: Value = resp.json().await.unwrap();
+    let rule_id = Uuid::parse_str(body["id"].as_str().unwrap()).unwrap();
 
     // Insert events directly with controlled timestamps so the count
     // is deterministic. Two inside the window, threshold not met.
@@ -239,7 +253,13 @@ async fn event_count_rule_fires_when_threshold_crossed() {
     }
     let _ = drain(&mut rx).await;
     rule_eval::sweep_once(&pool, Some(&tx)).await.unwrap();
-    assert!(drain(&mut rx).await.is_empty(), "below threshold");
+    let leaked: Vec<_> = drain(&mut rx).await.into_iter()
+        .filter(|e| match e {
+            NotifyEvent::AlertFired { rule_id: id, .. } => *id == rule_id,
+            _ => false,
+        })
+        .collect();
+    assert!(leaked.is_empty(), "below threshold: leaked={leaked:?}");
 
     // Third event tips us over. Sweep again.
     sqlx::query(
@@ -256,7 +276,10 @@ async fn event_count_rule_fires_when_threshold_crossed() {
     rule_eval::sweep_once(&pool, Some(&tx)).await.unwrap();
     let alerts: Vec<_> = drain(&mut rx).await
         .into_iter()
-        .filter(|e| matches!(e, NotifyEvent::AlertFired { .. }))
+        .filter(|e| match e {
+            NotifyEvent::AlertFired { rule_id: id, .. } => *id == rule_id,
+            _ => false,
+        })
         .collect();
     assert_eq!(alerts.len(), 1, "fired exactly once");
 }
@@ -269,7 +292,9 @@ async fn throttle_blocks_repeat_fires() {
     };
     let (project_id, _ingest, cookie, org_slug) = project_with_token(&addr, &pool).await;
 
-    Client::new()
+    // Capture rule_id so the assertions are scoped to the rule under
+    // test (the DB carries stale Throttled rules from prior runs).
+    let resp = Client::new()
         .post(format!("http://{addr}/api/orgs/{org_slug}/alert-rules"))
         .header("cookie", &cookie)
         .json(&json!({
@@ -282,6 +307,8 @@ async fn throttle_blocks_repeat_fires() {
         .send()
         .await
         .unwrap();
+    let body: Value = resp.json().await.unwrap();
+    let rule_id = Uuid::parse_str(body["id"].as_str().unwrap()).unwrap();
 
     let now = time::OffsetDateTime::now_utc();
     sqlx::query(
@@ -299,13 +326,12 @@ async fn throttle_blocks_repeat_fires() {
 
     rule_eval::sweep_once(&pool, Some(&tx)).await.unwrap();
     let first = drain(&mut rx).await;
-    assert!(first.iter().any(|e| matches!(e, NotifyEvent::AlertFired { .. })));
+    assert!(first.iter().any(|e| matches!(e, NotifyEvent::AlertFired { rule_id: id, .. } if *id == rule_id)));
 
-    // Second sweep within throttle window: nothing.
+    // Second sweep within throttle window: nothing for THIS rule.
     rule_eval::sweep_once(&pool, Some(&tx)).await.unwrap();
-    let second = drain(&mut rx).await;
-    assert!(
-        !second.iter().any(|e| matches!(e, NotifyEvent::AlertFired { .. })),
-        "throttle held: {second:?}",
-    );
+    let second: Vec<_> = drain(&mut rx).await.into_iter()
+        .filter(|e| matches!(e, NotifyEvent::AlertFired { rule_id: id, .. } if *id == rule_id))
+        .collect();
+    assert!(second.is_empty(), "throttle held: {second:?}");
 }

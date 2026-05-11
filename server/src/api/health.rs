@@ -101,7 +101,7 @@ pub async fn handle(
     let buckets: Vec<HealthBucket> = sqlx::query_as(
         r#"
         SELECT
-            date_bin($4::INTERVAL, received_at, TIMESTAMP '1970-01-01') AT TIME ZONE 'UTC' AS at,
+            date_bin($4::INTERVAL, received_at, TIMESTAMPTZ '1970-01-01 00:00:00+00') AS at,
             COUNT(*)::BIGINT AS total,
             COUNT(*) FILTER (WHERE status = 'crashed')::BIGINT AS crashed,
             COUNT(*) FILTER (WHERE status = 'errored')::BIGINT AS errored

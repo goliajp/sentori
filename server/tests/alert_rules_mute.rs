@@ -109,7 +109,8 @@ async fn mute_blocks_fire_until_unmuted() {
     let proj: Value = proj_resp.json().await.unwrap();
     let project_id = Uuid::parse_str(proj["id"].as_str().unwrap()).unwrap();
 
-    // Easy event_count rule: 1 event in 5m fires.
+    // Easy event_count rule: 1 event in 5m fires. CreateRuleBody
+    // doesn't accept `muted` at creation; PATCH it on after.
     let r = Client::new()
         .post(format!("http://{addr}/api/orgs/{org_slug}/alert-rules"))
         .header("cookie", &cookie)
@@ -119,12 +120,20 @@ async fn mute_blocks_fire_until_unmuted() {
             "triggerConfig": { "count": 1, "windowMinutes": 5 },
             "channels": [{ "type": "email", "to": ["x@example.com"] }],
             "throttleMinutes": 0,
-            "muted": true,
         }))
         .send()
         .await
         .unwrap();
-    let rule_id = r.json::<Value>().await.unwrap()["id"].as_str().unwrap().to_string();
+    let rule_id_str = r.json::<Value>().await.unwrap()["id"].as_str().unwrap().to_string();
+    let rule_id = Uuid::parse_str(&rule_id_str).unwrap();
+    let r = Client::new()
+        .patch(format!("http://{addr}/api/orgs/{org_slug}/alert-rules/{rule_id_str}"))
+        .header("cookie", &cookie)
+        .json(&json!({ "muted": true }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200, "mute patch must succeed");
 
     let now = time::OffsetDateTime::now_utc();
     sqlx::query(
@@ -141,11 +150,14 @@ async fn mute_blocks_fire_until_unmuted() {
     let _ = drain_alerts(&mut rx).await;
 
     rule_eval::sweep_once(&pool, Some(&tx)).await.unwrap();
-    assert!(drain_alerts(&mut rx).await.is_empty(), "muted rule does not fire");
+    let alerts: Vec<_> = drain_alerts(&mut rx).await.into_iter()
+        .filter(|e| matches!(e, NotifyEvent::AlertFired { rule_id: id, .. } if *id == rule_id))
+        .collect();
+    assert!(alerts.is_empty(), "muted rule does not fire: {alerts:?}");
 
     // Unmute and re-sweep — fires.
     let r = Client::new()
-        .patch(format!("http://{addr}/api/orgs/{org_slug}/alert-rules/{rule_id}"))
+        .patch(format!("http://{addr}/api/orgs/{org_slug}/alert-rules/{rule_id_str}"))
         .header("cookie", &cookie)
         .json(&json!({ "muted": false }))
         .send()
@@ -153,7 +165,10 @@ async fn mute_blocks_fire_until_unmuted() {
         .unwrap();
     assert_eq!(r.status(), 200);
     rule_eval::sweep_once(&pool, Some(&tx)).await.unwrap();
-    assert_eq!(drain_alerts(&mut rx).await.len(), 1, "unmuted fires");
+    let alerts: Vec<_> = drain_alerts(&mut rx).await.into_iter()
+        .filter(|e| matches!(e, NotifyEvent::AlertFired { rule_id: id, .. } if *id == rule_id))
+        .collect();
+    assert_eq!(alerts.len(), 1, "unmuted fires");
 }
 
 #[tokio::test]
@@ -198,13 +213,14 @@ async fn snooze_until_blocks_then_clears_when_passed() {
         .send()
         .await
         .unwrap();
-    let rule_id = r.json::<Value>().await.unwrap()["id"].as_str().unwrap().to_string();
+    let rule_id_str = r.json::<Value>().await.unwrap()["id"].as_str().unwrap().to_string();
+    let rule_id = Uuid::parse_str(&rule_id_str).unwrap();
 
     // Snooze until 1h from now (active).
     let until = time::OffsetDateTime::now_utc() + time::Duration::hours(1);
     let until_iso = until.format(&time::format_description::well_known::Rfc3339).unwrap();
     Client::new()
-        .patch(format!("http://{addr}/api/orgs/{org_slug}/alert-rules/{rule_id}"))
+        .patch(format!("http://{addr}/api/orgs/{org_slug}/alert-rules/{rule_id_str}"))
         .header("cookie", &cookie)
         .json(&json!({ "snoozedUntil": until_iso }))
         .send()
@@ -226,16 +242,22 @@ async fn snooze_until_blocks_then_clears_when_passed() {
     let _ = drain_alerts(&mut rx).await;
 
     rule_eval::sweep_once(&pool, Some(&tx)).await.unwrap();
-    assert!(drain_alerts(&mut rx).await.is_empty(), "snooze active");
+    let alerts: Vec<_> = drain_alerts(&mut rx).await.into_iter()
+        .filter(|e| matches!(e, NotifyEvent::AlertFired { rule_id: id, .. } if *id == rule_id))
+        .collect();
+    assert!(alerts.is_empty(), "snooze active: {alerts:?}");
 
     // Clear snooze with explicit null → fires.
     Client::new()
-        .patch(format!("http://{addr}/api/orgs/{org_slug}/alert-rules/{rule_id}"))
+        .patch(format!("http://{addr}/api/orgs/{org_slug}/alert-rules/{rule_id_str}"))
         .header("cookie", &cookie)
         .json(&json!({ "snoozedUntil": null }))
         .send()
         .await
         .unwrap();
     rule_eval::sweep_once(&pool, Some(&tx)).await.unwrap();
-    assert_eq!(drain_alerts(&mut rx).await.len(), 1, "cleared snooze fires");
+    let alerts: Vec<_> = drain_alerts(&mut rx).await.into_iter()
+        .filter(|e| matches!(e, NotifyEvent::AlertFired { rule_id: id, .. } if *id == rule_id))
+        .collect();
+    assert_eq!(alerts.len(), 1, "cleared snooze fires");
 }
