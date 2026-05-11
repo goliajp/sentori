@@ -189,12 +189,12 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 **Estimate:** 2 周
 
 ### sub-A — `<ErrorBoundary>` 升级
-- [ ] `sdk/react/src/error-boundary.tsx` 加 props：`fallback?: ReactNode | (props: { error, reset }) => ReactNode` / `onError?: (err, info) => void` / `resetKeys?: unknown[]`
-- [ ] 实现 reset：state 加 `error` field，`reset()` 清；`resetKeys` 浅比较变更触发自动 reset
-- [ ] 嵌套 boundary：内层 caught 不冒泡到外层（默认 React 行为，写测试覆盖）
-- [ ] 4 个 vitest：catch + render fallback / `reset()` 清错误 / `resetKeys` 变更触发 reset / `onError` 接到 error+info
-- [ ] 文档化 props + 给 3 个 recipe（per-route fallback / retry button / "report this" button）
-- [ ] commit `phase 31 sub-A: error boundary v2`
+- [x] `sdk/react/src/SentoriErrorBoundary.tsx` props：`fallback: ReactNode | (props: { error, reset }) => ReactNode` / `onError?: (err, info) => void` / `resetKeys?: unknown[]`（原文件位置是 `SentoriErrorBoundary.tsx` 而非 ROADMAP 里写的 `error-boundary.tsx`，沿用既有命名）
+- [x] reset：state 已有 `error: Error | null`，`reset()` 清；`componentDidUpdate` 用 `Object.is` 浅比较 `resetKeys` 元素，发现变更且当前 errored 时自动 reset；不引入额外依赖
+- [x] 嵌套 boundary：内层 caught 不冒泡 — `silenceConsoleErrorDuring` + sibling 仍渲染 + outer onError 未触发，三处断言确认
+- [x] 测试 7 case（superset of ROADMAP 要求的 4）：children pass-through / fallback render-prop / fallback ReactNode / `reset()` 清 / `resetKeys` 变 / `onError` 收 error+info / 嵌套 inner 拦截不冒泡。`bun test` 9/9 pass（含 hooks test 2 个）
+- [x] `docs-site/src/content/docs/sdk-react.md` 起草：Install / Provider / ErrorBoundary props 表 / 3 recipe（per-route fallback + resetKeys=pathname / retry button render-prop / "report this" 用 onError + crypto.randomUUID）/ hooks。镜像到 `docs/sdk-react.md`。sidebar 加入口
+- [x] commit `phase 31 sub-A: error boundary v2`
 
 ### sub-B — react-router 集成
 - [ ] 新 `sdk/react/src/router.ts`：`useSentoriRouter()` hook 走 `react-router` 的 `useLocation`，pathname 变即 `addBreadcrumb({ type: 'nav', data: { from, to } })`
