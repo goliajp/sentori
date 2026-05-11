@@ -208,9 +208,12 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-D — `sdk/react/src` 加 component render span
 
-- [ ] 新 `<TraceRender op="...">` 组件：render 期开 span，effect 卸载结 span
-- [ ] 单测 + recipe doc
-- [ ] commit `phase 35 sub-D: react render tracing`
+- [x] 新 `sdk/react/src/SentoriTrace.tsx` 暴露 `<TraceRender op="..." name? data? tags?>`：first render 用 `useMemo([])` 一次性 startSpan，effect cleanup 在 unmount 时 finish；re-render 不重开 span（lifespan 是 component instance，不是 props）；StrictMode 双 invoke 由 SpanHandle 的 double-finish no-op 兜底
+- [x] 6 个单测：render children / 开-关 span shape / 自定义 op+tags+data 全传到 sealed span / name 默认 op / 多 mount 独立 / re-render 不重开
+- [x] 同时修两个 latent bug 暴露：(1) sdk/react/package.json 把 `@goliapkg/sentori-core` 从 `0.1.0` bump 到 `0.2.0` —— 否则 bun 解到 npm registry 0.1.0（无 startSpan API）而非 workspace 内的 0.2.0；(2) sdk/react/src/index.ts 历史上漏 export `SentoriSuspense`（lib/ 编译出来但 index.ts 没暴露顶层，consumers 拿不到）—— 一并补上 + 顺手加 `TraceRender` export
+- [x] sdk/next/package.json 同步：`sentori-core: 0.1.0 → 0.2.0` + `sentori-react: 0.1.0 → 0.3.0` 跟当前 workspace 版本对齐
+- [x] **bun test 20/20 pass**（was 14，+6）；全 SDK suite 复跑：core 40 / javascript 20 / react 20 / next 9 / react-native 34 全绿
+- [x] commit `phase 35 sub-D: react render tracing`
 
 ### sub-E — bump + publish + dogfood
 
