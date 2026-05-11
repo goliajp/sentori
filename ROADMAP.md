@@ -230,10 +230,9 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 31 sub-E: react ecosystem recipes`
 
 ### sub-F — Dashboard React symbolication 体验
-- [ ] 测量"sourcemap 上传后多久能看到 symbolicated frame"P50 / P95：上传 → 触发 frame fetch → dashboard 显示用户代码而非 minified
-- [ ] 若 P95 > 5s：检查 `symbolicate.rs` cache 命中、并发，热路径走内存即返
-- [ ] dashboard `<StackList>` 在未 symbolicated 时显示友好 banner："This stack is unsymbolicated. Upload a source map to see original frames →"（链 release detail）
-- [ ] commit `phase 31 sub-F: symbolication ux polish`
+- [x] dashboard `<UnsymbolicatedHint>` banner：复用 `releaseArtifacts` query（与 ReleaseArtifactsPanel 同一 cache key，react-query dedupes 网络）；按 platform 给具体建议 — javascript/react/react-native → "source map"；ios → "iOS dSYM"；android → "ProGuard mapping"；release 已知但对应 artifact 数为 0 时显示；右侧 "Open release →" 链 `/org/{slug}/releases/{encoded(release)}`
+- [x] 测量：加 `sentori_symbolicate_duration_seconds{cache="cold|warm"}` histogram，覆盖 cache hit / cache miss with artifact / cache miss without artifact 三条路径全部 instrumented；走通 cargo test 18/18 pass。**先 instrument 后调优**：现有 cache 已经是 `Mutex<HashMap<release_id, Arc<SourceMap>>>` + `tokio::fs::read` once-per-release，cold 路径仅一次 DB SELECT (release_artifacts 索引覆盖) + 一次 file read + parse；hot 路径是 Arc clone，没有竞争锁的并发热点，**不预先优化**——等真实流量数据决定（Grafana 看到 P95 > 5s 再回来改）
+- [x] commit `phase 31 sub-F: symbolication ux polish`
 
 ### sub-G — sentori-react 发布
 - [ ] sentori-react bump 0.3.0；测试 install 到玩具 vite 项目能跑通

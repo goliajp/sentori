@@ -384,6 +384,12 @@ function StackTab({
         }
         title="Stack"
       >
+        <UnsymbolicatedHint
+          orgSlug={orgSlug}
+          platform={payload.platform}
+          projectId={projectId}
+          release={event.release}
+        />
         <StackList
           onFrameClick={(idx) => setOpenFrame({ cause: 0, frame: idx })}
           stack={payload.error.stack}
@@ -691,6 +697,64 @@ function RelatedIssuesPanel({
         ))}
       </ul>
     </Section>
+  )
+}
+
+/**
+ * Phase 31 sub-F: when an event's release has no artifacts of the
+ * relevant kind for its platform, the stack frames will be raw and
+ * the most useful next action is "upload the source map / dSYM /
+ * mapping." Render a banner above the stack pointing at the release
+ * detail page where the upload command is shown verbatim.
+ *
+ * Uses the same `releaseArtifacts` query as ReleaseArtifactsPanel
+ * below — react-query dedupes the network call.
+ */
+function UnsymbolicatedHint({
+  orgSlug,
+  platform,
+  projectId,
+  release,
+}: {
+  orgSlug: string
+  platform: string
+  projectId: string
+  release: string
+}) {
+  const { data } = useQuery({
+    enabled: !!release && !!projectId,
+    queryFn: () => adminApi.releaseArtifacts(projectId, release),
+    queryKey: ['release-artifacts', projectId, release],
+    staleTime: 60_000,
+  })
+  if (!data) return null
+  const needsSourcemap =
+    (platform === 'javascript' || platform === 'react' || platform === 'react-native') &&
+    data.sourcemaps.length === 0
+  const needsDsym = platform === 'ios' && data.dsyms.length === 0
+  const needsMapping = platform === 'android' && data.mappings.length === 0
+  if (!needsSourcemap && !needsDsym && !needsMapping) return null
+
+  const what = needsSourcemap ? 'source map' : needsDsym ? 'iOS dSYM' : 'ProGuard mapping'
+  return (
+    <div
+      className="border-border bg-bg-tertiary/30 mb-3 flex items-start justify-between gap-3 rounded-md border px-3 py-2 text-[12px]"
+      role="status"
+    >
+      <div>
+        <p className="text-fg font-medium">This stack is unsymbolicated.</p>
+        <p className="text-fg-muted mt-0.5">
+          Upload the {what} for <span className="text-fg font-mono">{release}</span> to see original
+          frames.
+        </p>
+      </div>
+      <Link
+        className="text-accent hover:text-accent/80 shrink-0 self-center text-[12px] whitespace-nowrap"
+        to={`/org/${orgSlug}/releases/${encodeURIComponent(release)}`}
+      >
+        Open release →
+      </Link>
+    </div>
   )
 }
 

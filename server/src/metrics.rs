@@ -29,6 +29,7 @@ const INGEST_TOTAL: &str = "sentori_ingest_total";
 const INGEST_DURATION: &str = "sentori_ingest_duration_seconds";
 const QUOTA_DROPS: &str = "sentori_quota_drops_total";
 const ISSUE_REGRESSED: &str = "sentori_issue_regressed_total";
+const SYMB_LATENCY: &str = "sentori_symbolicate_duration_seconds";
 
 static INGEST_ACCEPTED: OnceLock<Counter> = OnceLock::new();
 static INGEST_REJECTED: OnceLock<Counter> = OnceLock::new();
@@ -36,6 +37,8 @@ static INGEST_QUOTA: OnceLock<Counter> = OnceLock::new();
 static QUOTA_DROP: OnceLock<Counter> = OnceLock::new();
 static INGEST_DUR: OnceLock<Histogram> = OnceLock::new();
 static ISSUE_REGRESSED_C: OnceLock<Counter> = OnceLock::new();
+static SYMB_COLD: OnceLock<Histogram> = OnceLock::new();
+static SYMB_WARM: OnceLock<Histogram> = OnceLock::new();
 
 pub fn ingest_accepted() {
     INGEST_ACCEPTED
@@ -71,6 +74,21 @@ pub fn issue_regressed() {
     ISSUE_REGRESSED_C
         .get_or_init(|| metrics::counter!(ISSUE_REGRESSED))
         .increment(1);
+}
+
+/// Record source map load latency. `cold = true` for the first
+/// access per release (DB lookup + file read + parse); `false` for
+/// the cached path (Arc clone out of a Mutex<HashMap>).
+pub fn symbolicate_duration(cold: bool, secs: f64) {
+    if cold {
+        SYMB_COLD
+            .get_or_init(|| metrics::histogram!(SYMB_LATENCY, "cache" => "cold"))
+            .record(secs);
+    } else {
+        SYMB_WARM
+            .get_or_init(|| metrics::histogram!(SYMB_LATENCY, "cache" => "warm"))
+            .record(secs);
+    }
 }
 
 #[cfg(test)]

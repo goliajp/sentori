@@ -165,7 +165,9 @@ async fn load_sourcemap_for_release(
     pool: &PgPool,
     release_id: Uuid,
 ) -> anyhow::Result<Option<Arc<SourceMap>>> {
+    let start = std::time::Instant::now();
     if let Some(sm) = cache().lock().unwrap().get(&release_id).cloned() {
+        crate::metrics::symbolicate_duration(false, start.elapsed().as_secs_f64());
         return Ok(Some(sm));
     }
 
@@ -180,7 +182,10 @@ async fn load_sourcemap_for_release(
 
     let blob_path = match row {
         Some((p,)) => p,
-        None => return Ok(None),
+        None => {
+            crate::metrics::symbolicate_duration(true, start.elapsed().as_secs_f64());
+            return Ok(None);
+        }
     };
 
     let bytes = tokio::fs::read(&blob_path).await?;
@@ -192,6 +197,7 @@ async fn load_sourcemap_for_release(
         c.clear();
     }
     c.insert(release_id, arc.clone());
+    crate::metrics::symbolicate_duration(true, start.elapsed().as_secs_f64());
     Ok(Some(arc))
 }
 
