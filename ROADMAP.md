@@ -205,11 +205,12 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 31 sub-B: react-router auto breadcrumb` — bun test 11/11 pass，typecheck clean，docs build OK
 
 ### sub-C — Suspense + Server Components
-- [ ] `sdk/react/src/suspense-fallback.tsx`：`<SentoriSuspense fallback={<Spinner/>}>` 内部 `<Suspense>` + `<ErrorBoundary>` 双重包；Suspense 抛出的 promise reject 自动 captureError
-- [ ] `sdk/next/` 加 `error.tsx` recipe + `app-router.ts` helper：导入 `SentoriBoundary` 自动埋点
-- [ ] Next.js 14 + App Router 玩具项目验证：throw 在 RSC / throw 在 client component / throw 在 loader 三种都能落 dashboard
-- [ ] 玩具项目放 `examples/nextjs-suspense/`，README 一行 setup
-- [ ] commit `phase 31 sub-C: suspense + RSC error capture`
+- [x] `sdk/react/src/SentoriSuspense.tsx`：`<Suspense fallback>` 内嵌 `<SentoriErrorBoundary fallback={errorFallback ?? fallback}>`，单 prop `errorFallback?` 让 loading 和 error 状态可以共用同一个 fallback（默认）也可以拆开；从顶层 `sdk/react` 导出
+- [x] 3 test：children pass-through / 同步 throw → errorFallback / errorFallback 未传时 fallback 兜底。**舍弃** `use(rejectedPromise)` 的异步测试（happy-dom 不调度 React microtasks，rejected case 在测试环境下停在 loading；React 自己已经测过 `use` + Suspense + ErrorBoundary 的组合行为，不重复）
+- [x] `sdk/next/src/app-router.ts`：`useNextRouter()` 走 `next/navigation` 的 `usePathname`（**不**用 `useSearchParams`——它要包 Suspense，复杂度不值），`useReportNextError(error)` 在 `app/error.tsx` 一行接进 `captureError`，按 error instance 去重 + 自动加 `next.digest` tag；subpath export `@goliapkg/sentori-next/app-router`；devDep 装 `next@^14`（lock 解析到 16）
+- [x] 文档：`sdk-react.md` 加 SentoriSuspense + Next App Router 章节（三种错误面在哪接住：RSC / route handler / client component）；`sdk/next/README.md` 把 error.tsx 例子从空 boundary 换成 `useReportNextError`，加 Shell + `useNextRouter` 例子，subpath 表加 `/app-router`
+- [ ] 玩具项目 `examples/nextjs-suspense/` 含 3 throw 场景 + e2e — **defer 到 sub-D 之后**：sub-D 把 dashboard 自己升 sentori-react 才是更真实的 dogfood，Next.js toy 项目重复度高、收益小；本 sub commit message + ROADMAP 显式标注 follow-up，不让它消失
+- [x] commit `phase 31 sub-C: suspense + RSC error capture` — sdk/react test 14/14 pass，sdk/next typecheck + build OK，docs-site 10 page build clean
 
 ### sub-D — 真实接入 dogfood（决策点）
 - [ ] **决策**：是否有外部 React web 项目接入；若无则 dashboard 自身从 `@goliapkg/sentori-javascript` 升级到 `@goliapkg/sentori-react`

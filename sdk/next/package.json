@@ -38,6 +38,10 @@
     "./instrumentation": {
       "types": "./lib/instrumentation.d.ts",
       "default": "./lib/instrumentation.js"
+    },
+    "./app-router": {
+      "types": "./lib/app-router.d.ts",
+      "default": "./lib/app-router.js"
     }
   },
   "files": [

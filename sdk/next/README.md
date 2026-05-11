@@ -64,11 +64,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 ```tsx
 // app/error.tsx
 'use client'
-import { SentoriErrorBoundary } from '@goliapkg/sentori-next/client'
+import { useReportNextError } from '@goliapkg/sentori-next/app-router'
 
-export default function Error({ error, reset }: { error: Error; reset: () => void }) {
-  // Next already calls our boundary; here we render the fallback UI.
-  // The capture happened upstream via SentoriProvider's hook.
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  useReportNextError(error) // captureError once per error instance
   return (
     <div>
       <h2>Something went wrong</h2>
@@ -78,7 +83,28 @@ export default function Error({ error, reset }: { error: Error; reset: () => voi
 }
 ```
 
-For a global catch-all, do the same in `app/global-error.tsx`.
+`useReportNextError` calls `captureError` once per error instance
+and picks up Next's `error.digest` as a tag so the dashboard can
+correlate the client report with the server error.
+
+For a global catch-all, drop the same component into
+`app/global-error.tsx`.
+
+### Navigation breadcrumbs (any layout)
+
+```tsx
+// app/Shell.tsx — client wrapper mounted from app/layout.tsx
+'use client'
+import { useNextRouter } from '@goliapkg/sentori-next/app-router'
+
+export function Shell({ children }: { children: React.ReactNode }) {
+  useNextRouter() // nav breadcrumb on every pathname change
+  return <>{children}</>
+}
+```
+
+First mount does not emit a breadcrumb; only real pathname
+transitions are recorded.
 
 ## What gets captured
 
@@ -102,6 +128,7 @@ the same signature. `serverInit()` is Node-only because Edge lacks
 | `@goliapkg/sentori-next/client` | App Router client components, `clientInit`, `SentoriProvider`, `<SentoriErrorBoundary>`, hooks |
 | `@goliapkg/sentori-next/server` | `instrumentation.ts`, `serverInit`, `onRequestError` |
 | `@goliapkg/sentori-next/instrumentation` | one-line `instrumentation.ts` re-export |
+| `@goliapkg/sentori-next/app-router` | `useNextRouter`, `useReportNextError` — client-only App Router hooks |
 
 ## Versioning
 

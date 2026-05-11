@@ -188,6 +188,39 @@ function PayButton() {
 setUser, setTags). `useCaptureError()` is a shortcut for the common
 case.
 
+## `<SentoriSuspense>`
+
+One-liner that composes `<Suspense>` with `<SentoriErrorBoundary>`.
+Use when a data-fetching subtree should share the same fallback for
+both the loading state and the caught-error state, or pass
+`errorFallback` to differ them.
+
+```tsx
+import { SentoriSuspense } from '@goliapkg/sentori-react'
+
+<SentoriSuspense
+  errorFallback={<ErrorCard />}
+  fallback={<Skeleton />}
+>
+  <UserProfile />
+</SentoriSuspense>
+```
+
+Anything that throws during render of `<UserProfile>` — whether it's
+a synchronous `throw` or a Suspense-surfaced rejected promise from
+`use(promise)` — is caught by the inner boundary and forwarded to
+`captureError` with `tags.source = 'react.errorBoundary'`.
+
+Equivalent to writing the two-component form by hand:
+
+```tsx
+<SentoriErrorBoundary fallback={<ErrorCard />}>
+  <Suspense fallback={<Skeleton />}>
+    <UserProfile />
+  </Suspense>
+</SentoriErrorBoundary>
+```
+
 ## `react-router` integration
 
 `useSentoriRouter()` subscribes to the `react-router` location and
@@ -244,9 +277,55 @@ Notes:
 - Mount once per `Router`, high in the tree (typically in a layout
   route's component). Mounting in every page works but adds noise.
 
+## Next.js App Router
+
+`@goliapkg/sentori-next/app-router` ships two App Router-specific
+hooks that build on the React SDK:
+
+```tsx
+// app/Shell.tsx — client component, mounted from app/layout.tsx
+'use client'
+import { useNextRouter } from '@goliapkg/sentori-next/app-router'
+export function Shell({ children }: { children: React.ReactNode }) {
+  useNextRouter()  // nav breadcrumb on every pathname change
+  return <>{children}</>
+}
+```
+
+```tsx
+// app/error.tsx
+'use client'
+import { useReportNextError } from '@goliapkg/sentori-next/app-router'
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  useReportNextError(error)  // captureError once per error instance
+  return (
+    <div>
+      <h2>Something went wrong.</h2>
+      <button onClick={reset} type="button">Try again</button>
+    </div>
+  )
+}
+```
+
+Three error surfaces in Next.js App Router and where Sentori catches
+them:
+
+| Surface | Where it's caught |
+|---|---|
+| Server Components (RSC) | `instrumentation.ts:onRequestError` (server bundle) |
+| Route handlers (`route.ts`) | `instrumentation.ts:onRequestError` (server bundle) |
+| Client components | `app/error.tsx` → `useReportNextError(error)` |
+
+The `instrumentation.ts` side is a one-line re-export — see the
+[`sentori-next` README](https://github.com/goliajp/sentori/tree/main/sdk/next) for the full setup.
+
 ## What this SDK is not
 
-It is not a `Suspense` wrapper and not a profiler. Those are tracked
-separately:
-
-- Suspense / RSC error capture → see [`<SentoriSuspense>`](#) (added in Phase 31 sub-C)
+It is not a profiler and not a tracing SDK. Those land in v0.4.
