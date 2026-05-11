@@ -40,13 +40,25 @@
 - **sub-F** Symbolication UX：`<UnsymbolicatedHint>` banner 在未上传对应 artifact 时显示"Open release →"链；server 加 `sentori_symbolicate_duration_seconds{cache="cold|warm"}` histogram instrument 3 条路径；优化暂不做（先 instrument 后调优）
 - **sub-G** Publish：`sentori-react@0.3.0` 发到 npm（package size 14.57 KB packed / 50.58 KB unpacked / 45 files）
 
-### Phase 32 — Docs + onboarding 完整化（未开始）
+### Phase 32 — Docs + onboarding 完整化 ✅
 
-4-path getting-started 重做 / 5 分钟秒表实测 / React 专区深度 recipe / Troubleshooting / Marketing hero copy 微调。
+5 sub 全完成：
 
-### Phase 33 — Performance / scale 验真（未开始）
+- **sub-A** getting-started 4-path 重做：旧单页拆为 hub + `getting-started/react.md` / `getting-started/react-native.md` / `getting-started/nextjs.md` / `getting-started/node.md`；每篇 Prerequisites / Install / Configure / Capture first error / View on dashboard / Next steps 6 段；docs build 13 → 17 page
+- **sub-B** 5 分钟秒表实测：Vite + React 33s（npm registry sentori-react@0.3.0 整链路）/ Node.js (bun) 47s；Next.js + React Native defer 到 dogfood 时实测；`docs/dogfood/onboarding-times.md` 记数据；4 path docs 0 修订
+- **sub-C** React 专区 5 篇深度 recipe：`recipes/state-management.md`（Redux/Zustand/TanStack Query + 4 capture-point 边界） / `recipes/suspense-rsc.md`（5 React 19 错误 surface 表）/ `recipes/sourcemap-upload.md`（GitHub Actions + GitLab CI + Vercel build hook 全 yml）/ `recipes/release-versioning.md`（4 平台 inject + semver regression 规则）/ `recipes/multi-environment.md`（single-token vs per-env tradeoff）；sidebar Recipes 组 3 → 8；docs build 17 → 22 page
+- **sub-D** Troubleshooting：10 项 Q + Diagnose + Fix（dashboard 无事件 5 status code 表 / minified stack / dSYM uuid 不匹配 / token 401 hint 5 种 / webhook 签名 Node verify() / crash-free 0% / regression / hook 错误 / CI 慢 / dev 淹掉 dashboard）；sidebar Reference 组加入口；docs build 22 → 23 page
+- **sub-E** Marketing hero copy：`marketing/src/pages/index.astro` h1 改 "Error tracking, built React-first."；sub-hero 强调 React 三件套 + 保留 platform-agnostic 立场；meta tags（OG/Twitter/title）同步；布局不动
 
-1M event EXPLAIN baseline 复跑 / Cursor pagination + virtualization / Ingest 压测 / SDK offline 压测 / `docs/performance.md` baseline 文档。
+### Phase 33 — Performance / scale 验真 ✅
+
+5 sub 全完成：
+
+- **sub-A** 1M event EXPLAIN baseline：走 SQL bulk INSERT 路径（HTTP 660 ev/s 太慢）20s 内 seed 1.02M events；5 query 合计 0.55ms → 1.24ms 在 200× 数据下 2.3× — sub-millisecond 预算完整；`docs/performance/baseline-v0.3-phase33.md`；`tools/seed-events.ts BATCH_SIZE 100 → 500`；deferred 索引仍不实施
+- **sub-B** Cursor pagination + infinite scroll：`list_issues` 加 `cursor` query param + `X-Next-Cursor` response header（不破坏 JSON array body）；keyset 复合 `(last_seen, id)`；CORS expose_headers；`<IssuesView>` useInfiniteQuery + `<LoadMoreSentinel>` IntersectionObserver（300px rootMargin prefetch + button fallback）；react-window 不上（1k 行仍 OK）
+- **sub-C** Ingest 压测：bun-native `tools/load-test.ts` open-loop scheduler；60s × 50 req/s × 4 endpoint = 3000 request；P99 12.6ms (events) / 33.5ms (batch) / 5.7ms (sessions) / 6.2ms (deploys)；**TOTAL P99 29.1ms，6.8× SLO headroom**，0 errors；10min staging 复跑 defer
+- **sub-D** SDK offline / retry：RN SDK 4 个 retry test（5xx × 3 retry / NetworkError 中途恢复 / 4xx 不重试 / 双 flush 不双发）+ JS SDK 1 个 offline test（warn 一次不 crash 不重发）；54 SDK test 全绿；0 bug surfaced，不发 patch
+- **sub-E** `docs/performance.md` baseline 汇总：9 个 headline 数字 + SLO target + headroom 倍数；3 个 detail doc 链接；regression policy（数字 +20% loose / plan-shape 变 tight）；`.github/PULL_REQUEST_TEMPLATE.md` 加 4 项 Reviewer checklist（performance / tests / docs / migrations）
 
 ---
 
