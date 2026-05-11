@@ -1,6 +1,7 @@
 use axum::{
     extract::{Extension, Json, Path, Query, State},
-    http,
+    http::{self, HeaderValue},
+    response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
@@ -106,6 +107,13 @@ pub struct ListIssuesQuery {
     /// tokens — RFC 3339 string parsed by serde via `OffsetDateTime`.
     #[serde(default, with = "time::serde::rfc3339::option")]
     pub last_seen_after: Option<time::OffsetDateTime>,
+    /// Phase 33 sub-B: keyset pagination cursor. Format
+    /// `<rfc3339-last-seen>|<uuid>`. The dashboard reads
+    /// `X-Next-Cursor` off the previous page's response and feeds
+    /// it back here to fetch the next slice. Falls back to OFFSET-0
+    /// when unset.
+    #[serde(default)]
+    pub cursor: Option<String>,
 }
 
 fn default_status() -> String {
@@ -116,9 +124,13 @@ pub async fn list_issues(
     State(state): State<AppState>,
     Path(project_id): Path<Uuid>,
     Query(q): Query<ListIssuesQuery>,
-) -> Result<Json<Vec<IssueRow>>, AppError> {
+) -> Result<Response, AppError> {
     let pool = state.db.as_ref().ok_or(AppError::DatabaseUnavailable)?;
     let limit = q.limit.unwrap_or(100).clamp(1, 500);
+
+    // Decode cursor (last_seen, id). Unset → unbounded; bad format
+    // → ignored (forward-compat with future cursor schemes).
+    let cursor: Option<(OffsetDateTime, Uuid)> = q.cursor.as_deref().and_then(parse_cursor);
 
     let rows: Vec<IssueRow> = sqlx::query_as(
         r#"
@@ -137,8 +149,13 @@ pub async fn list_issues(
           AND ($4::TEXT IS NULL OR i.last_release = $4)
           AND ($5::TEXT IS NULL OR i.error_type = $5)
           AND ($6::TIMESTAMPTZ IS NULL OR i.last_seen >= $6)
-        ORDER BY i.last_seen DESC
-        LIMIT $7
+          AND (
+            $7::TIMESTAMPTZ IS NULL
+            OR i.last_seen < $7::TIMESTAMPTZ
+            OR (i.last_seen = $7::TIMESTAMPTZ AND i.id < $8::UUID)
+          )
+        ORDER BY i.last_seen DESC, i.id DESC
+        LIMIT $9
         "#,
     )
     .bind(project_id)
@@ -147,12 +164,48 @@ pub async fn list_issues(
     .bind(q.release.as_deref())
     .bind(q.error_type.as_deref())
     .bind(q.last_seen_after)
+    .bind(cursor.map(|c| c.0))
+    .bind(cursor.map(|c| c.1))
     .bind(limit)
     .fetch_all(pool)
     .await
     .map_err(|e| AppError::Internal(e.to_string()))?;
 
-    Ok(Json(rows))
+    // Build the response. If the page is exactly `limit` long there
+    // *might* be more; emit `X-Next-Cursor` from the last row so the
+    // client can keyset-paginate. Shorter than limit → caller has seen
+    // everything, no cursor.
+    let mut response = Json(&rows).into_response();
+    if rows.len() as i64 == limit {
+        if let Some(last) = rows.last() {
+            let cursor_value = encode_cursor(last.last_seen, last.id);
+            if let Ok(header) = HeaderValue::from_str(&cursor_value) {
+                response.headers_mut().insert("X-Next-Cursor", header);
+            }
+        }
+    }
+    Ok(response)
+}
+
+/// Cursor format: `<rfc3339-last-seen>|<uuid>`. RFC 3339 contains
+/// `:` so we use `|` as the separator. URL-safe without encoding
+/// because `|` is in the unreserved set per RFC 3986 when sent as a
+/// query value, and the header value rejects bad characters anyway.
+fn encode_cursor(last_seen: OffsetDateTime, id: Uuid) -> String {
+    format!(
+        "{}|{}",
+        last_seen
+            .format(&time::format_description::well_known::Rfc3339)
+            .unwrap_or_default(),
+        id
+    )
+}
+
+fn parse_cursor(s: &str) -> Option<(OffsetDateTime, Uuid)> {
+    let (ts, id) = s.split_once('|')?;
+    let last_seen = OffsetDateTime::parse(ts, &time::format_description::well_known::Rfc3339).ok()?;
+    let id = Uuid::parse_str(id).ok()?;
+    Some((last_seen, id))
 }
 
 /// `GET /admin/api/projects/{project_id}/issues/{issue_id}/releases`

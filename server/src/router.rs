@@ -1,6 +1,7 @@
 use axum::{
     Router,
     extract::DefaultBodyLimit,
+    http,
     middleware,
     routing::{get, post},
 };
@@ -316,7 +317,13 @@ pub fn build(cfg: ServerConfig) -> Router {
         .nest("/api", orgs)
         .merge(metrics)
         .layer(RequestBodyLimitLayer::new(MAX_BODY_BYTES))
-        .layer(CorsLayer::permissive())
+        .layer(
+            CorsLayer::permissive()
+                // Phase 33 sub-B: list_issues returns the next-page
+                // cursor in this header; browsers won't expose it to
+                // JS without this allow-list.
+                .expose_headers([http::HeaderName::from_static("x-next-cursor")]),
+        )
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

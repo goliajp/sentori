@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
 import { useNavigate } from 'react-router'
@@ -118,13 +118,23 @@ export function IssuesView() {
   const effectiveStatus: Status = parsed.status ?? statusTab
 
   const queryClient = useQueryClient()
-  const { data, isLoading, error } = useQuery({
+  // Phase 33 sub-B: keyset pagination via useInfiniteQuery. Each page
+  // returns up to PAGE_SIZE issues + an optional next cursor; an
+  // IntersectionObserver near the bottom of the list triggers
+  // fetchNextPage.
+  const PAGE_SIZE = 100
+  type IssuesPage = Awaited<ReturnType<typeof adminApi.listIssuesPage>>
+  const issuesInfinite = useInfiniteQuery({
     enabled: !!projectId,
-    queryFn: () =>
-      adminApi.listIssues(projectId!, {
+    getNextPageParam: (last: IssuesPage) => last.nextCursor ?? undefined,
+    initialPageParam: null as null | string,
+    queryFn: ({ pageParam }: { pageParam: null | string }) =>
+      adminApi.listIssuesPage(projectId!, {
+        cursor: pageParam,
         env: parsed.environment,
         errorType: parsed.errorType,
         lastSeenAfter: parsed.lastSeenAfter,
+        limit: PAGE_SIZE,
         release: parsed.release,
         status: effectiveStatus,
       }),
@@ -138,6 +148,12 @@ export function IssuesView() {
       parsed.lastSeenAfter,
     ],
   })
+  const data = useMemo(
+    () => issuesInfinite.data?.pages.flatMap((p: IssuesPage) => p.issues),
+    [issuesInfinite.data]
+  )
+  const isLoading = issuesInfinite.isLoading
+  const error = issuesInfinite.error
 
   const silenceMutation = useMutation({
     mutationFn: (issueId: string) =>
@@ -618,8 +634,59 @@ export function IssuesView() {
               ))}
             </tbody>
           </table>
+          <LoadMoreSentinel
+            hasMore={issuesInfinite.hasNextPage}
+            isFetching={issuesInfinite.isFetchingNextPage}
+            onLoadMore={() => void issuesInfinite.fetchNextPage()}
+          />
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Phase 33 sub-B: bottom-of-list sentinel that triggers
+ * fetchNextPage via IntersectionObserver. Falls back to a
+ * keyboard-accessible button when the observer is unavailable (older
+ * browsers / a11y users tabbing in). One sentinel per IssuesView is
+ * enough — react-query dedupes concurrent fetches.
+ */
+function LoadMoreSentinel({
+  hasMore,
+  isFetching,
+  onLoadMore,
+}: {
+  hasMore: boolean
+  isFetching: boolean
+  onLoadMore: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!hasMore || isFetching) return
+    const el = ref.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) onLoadMore()
+      },
+      { rootMargin: '300px' } // prefetch one viewport ahead
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMore, isFetching, onLoadMore])
+
+  if (!hasMore) return null
+  return (
+    <div className="border-border/40 flex items-center justify-center border-t py-3" ref={ref}>
+      <button
+        className="text-fg-muted hover:text-fg text-[12px]"
+        disabled={isFetching}
+        onClick={onLoadMore}
+        type="button"
+      >
+        {isFetching ? 'Loading…' : 'Load more'}
+      </button>
     </div>
   )
 }

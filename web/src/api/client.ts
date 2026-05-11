@@ -215,6 +215,50 @@ export const adminApi = {
     return adminFetch<IssueRow[]>(`/projects/${projectId}/issues${qs}`)
   },
 
+  /**
+   * Phase 33 sub-B: keyset-paginated variant of `listIssues`. Pass
+   * `cursor` from the previous page's `nextCursor` to keep scrolling.
+   * Returns `nextCursor: null` once the server stops emitting the
+   * `X-Next-Cursor` header (i.e. the last page was shorter than
+   * `limit`).
+   */
+  listIssuesPage: async (
+    projectId: string,
+    params: {
+      cursor?: null | string
+      env?: string
+      errorType?: string
+      lastSeenAfter?: string
+      limit?: number
+      release?: string
+      status?: string
+    } = {}
+  ): Promise<{ issues: IssueRow[]; nextCursor: null | string }> => {
+    const usp = new URLSearchParams()
+    if (params.status) usp.set('status', params.status)
+    if (params.limit !== undefined) usp.set('limit', String(params.limit))
+    if (params.env) usp.set('env', params.env)
+    if (params.release) usp.set('release', params.release)
+    if (params.errorType) usp.set('errorType', params.errorType)
+    if (params.lastSeenAfter) usp.set('lastSeenAfter', params.lastSeenAfter)
+    if (params.cursor) usp.set('cursor', params.cursor)
+    const qs = usp.toString() ? `?${usp.toString()}` : ''
+    const resp = await fetch(`${ADMIN_BASE}/projects/${projectId}/issues${qs}`, {
+      credentials: 'include',
+    })
+    if (!resp.ok) {
+      let body: unknown
+      try {
+        body = await resp.json()
+      } catch {
+        body = await resp.text()
+      }
+      throw { body, status: resp.status } as AdminApiError
+    }
+    const issues = (await resp.json()) as IssueRow[]
+    return { issues, nextCursor: resp.headers.get('X-Next-Cursor') }
+  },
+
   listProjects: () => adminFetch<ProjectRow[]>('/projects'),
 
   listReleasesForIssue: (projectId: string, issueId: string) =>

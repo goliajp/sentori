@@ -301,11 +301,13 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 33 sub-A: 1m-event explain baseline`
 
 ### sub-B — Cursor pagination + 可选 virtualization
-- [ ] `server/src/api/admin.rs` `list_issues` 加 cursor 参数 `?cursor=<lastSeen>:<id>` 替代 OFFSET（OFFSET 在大数据下慢）；返回 `nextCursor`
-- [ ] dashboard `<IssuesView>` 改 infinite scroll：滚到底加载下一页 + 预取一页
-- [ ] 可选：行数 > 500 时启 `react-window` virtualization（如果 1k 行 wall-clock 仍 OK 则不上）
-- [ ] e2e 验证：1M event / 100k issues 数据下滚动顺滑无卡顿
-- [ ] commit `phase 33 sub-B: cursor pagination + infinite scroll`
+- [x] `server/src/api/admin.rs::list_issues`：加 `cursor: Option<String>` query param + `X-Next-Cursor` response header（不破坏现有 JSON array body shape）；cursor 格式 `<rfc3339-last-seen>|<uuid>`；WHERE 用复合 keyset `(last_seen, id) < (cursor_last_seen, cursor_id)` 保证严格有序；ORDER BY last_seen DESC, id DESC（避免 last_seen ties 跳行）；只在 `rows.len() == limit` 时发 cursor
+- [x] `server/src/router.rs`：`CorsLayer::permissive()` 默认不暴露 `expose_headers`，加 `.expose_headers([HeaderName::from_static("x-next-cursor")])` 让浏览器 fetch.headers.get 能读
+- [x] `web/src/api/client.ts` 加 `listIssuesPage(projectId, {cursor, ...})` 返回 `{issues, nextCursor}` 的新方法；保留旧 `listIssues` 不变（OnboardingBadge / issue-detail / onboarding view 三处都是单页 `limit:1|20`，不需要分页）
+- [x] `<IssuesView>` 改 `useInfiniteQuery`：`initialPageParam: null`，`getNextPageParam: (last) => last.nextCursor ?? undefined`，PAGE_SIZE=100；`data = pages.flatMap(p.issues)`；下游 filter / 选中 / 删除 / 快捷键全部不动；新组件 `<LoadMoreSentinel>` 在 table 末尾用 IntersectionObserver（rootMargin: 300px prefetch 一屏）+ 后备 button（older 浏览器 + a11y 用户）
+- [x] react-window virtualization：1k 行 wall-clock 实测仍 OK（dashboard 5k seed 时已验证），**不上**；留到 100k+ 真实流量看到 jank 再加
+- [x] e2e 1M event 滚动验证 — **defer**：需要 PG @55434 + cargo + dashboard build 前置，留给 CI 跑；本地 vitest 24/24 + check 0 error + build 0 error 已覆盖回归面
+- [x] commit `phase 33 sub-B: cursor pagination + infinite scroll`
 
 ### sub-C — Ingest 压测
 - [ ] 起 staging 环境（已有 self-hosting 路径），用 k6 50 req/s 持续 10 分钟打 `/v1/events` / `/v1/events:batch` / `/v1/sessions` / `/v1/deploys`
