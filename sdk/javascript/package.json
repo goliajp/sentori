@@ -28,6 +28,10 @@
     ".": {
       "types": "./lib/index.d.ts",
       "import": "./lib/index.js"
+    },
+    "./tracing": {
+      "types": "./lib/tracing-middleware.d.ts",
+      "import": "./lib/tracing-middleware.js"
     }
   },
   "files": [
