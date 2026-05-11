@@ -13,14 +13,13 @@ name: deploy-pages
 #   sentori-marketing → custom domain sentori.golia.jp
 #   sentori-docs      → custom domain docs.sentori.golia.jp
 
+# v0.4 CI sweep: `push` trigger temporarily disabled — auto-deploy
+# was failing on every commit because CLOUDFLARE_API_TOKEN /
+# CLOUDFLARE_ACCOUNT_ID secrets aren't set yet, generating a flood of
+# fail emails. Manual dispatch still works once the secrets are
+# configured under Settings → Secrets and variables → Actions. Then
+# restore the `push` trigger block above this comment.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'marketing/**'
-      - 'docs-site/**'
-      - 'docs/**'
-      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 jobs:

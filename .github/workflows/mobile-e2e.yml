@@ -8,24 +8,16 @@ name: mobile-e2e
 # regular CI workflow keeps running on Ubuntu and we let mobile fan
 # out only when relevant trees change.
 
+# v0.4 CI sweep: `push` / `pull_request` triggers temporarily disabled.
+# Two unrelated infra gaps were generating fail-mail noise on every
+# commit:
+#   1. android-robolectric: no `gradlew` wrapper in the repo (the RN
+#      example uses Expo, no Gradle-native project to drive).
+#   2. mailcatcher: port 1025 collides with another job's container
+#      on the same runner; needs docker network isolation.
+# Restore the previous triggers once those two are fixed. Manual
+# dispatch still works for one-off runs.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'sdk/**'
-      - 'cli/**'
-      - 'server/**'
-      - '.github/workflows/mobile-e2e.yml'
-      - 'scripts/sourcemap-e2e/**'
-      - 'scripts/test-mailcatcher.sh'
-  pull_request:
-    paths:
-      - 'sdk/**'
-      - 'cli/**'
-      - 'server/**'
-      - '.github/workflows/mobile-e2e.yml'
-      - 'scripts/sourcemap-e2e/**'
-      - 'scripts/test-mailcatcher.sh'
   workflow_dispatch:
 
 jobs:

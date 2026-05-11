@@ -10,6 +10,7 @@ use std::net::SocketAddr;
 use reqwest::Client;
 use sentori_server::{db, notifier::NotifyEvent, router, rule_eval};
 use serde_json::{Value, json};
+use serial_test::serial;
 use sqlx::{PgPool, types::Uuid};
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
@@ -136,6 +137,7 @@ async fn drain(rx: &mut mpsc::Receiver<NotifyEvent>) -> Vec<NotifyEvent> {
 }
 
 #[tokio::test]
+#[serial]
 async fn new_issue_rule_fires_on_first_event_with_filter_match() {
     let Some((addr, pool, _tx, mut rx)) = setup().await else {
         eprintln!("skipping (DATABASE_URL not set)");
@@ -209,6 +211,7 @@ async fn new_issue_rule_fires_on_first_event_with_filter_match() {
 }
 
 #[tokio::test]
+#[serial]
 async fn event_count_rule_fires_when_threshold_crossed() {
     let Some((_addr, pool, tx, mut rx)) = setup().await else {
         eprintln!("skipping (DATABASE_URL not set)");
@@ -285,6 +288,7 @@ async fn event_count_rule_fires_when_threshold_crossed() {
 }
 
 #[tokio::test]
+#[serial]
 async fn throttle_blocks_repeat_fires() {
     let Some((addr, pool, tx, mut rx)) = setup().await else {
         eprintln!("skipping (DATABASE_URL not set)");

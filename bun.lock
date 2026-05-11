@@ -65,7 +65,7 @@
     },
     "sdk/react": {
       "name": "@goliapkg/sentori-react",
-      "version": "0.1.0",
+      "version": "0.3.0",
       "dependencies": {
         "@goliapkg/sentori-core": "0.1.0",
         "@goliapkg/sentori-javascript": "0.2.0",
@@ -1659,6 +1659,8 @@
     "@expo/xcpretty/@babel/code-frame": ["@babel/code-frame@7.29.0", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.28.5", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-9NhCeYjq9+3uxgdtp20LSiJXJvN0FeCtNGpJxuMFZ1Kv3cWUNb6DOhJwUvcVCzKGR66cw4njwM6hrJLqgOwbcw=="],
 
     "@goliapkg/sentori-next/@goliapkg/sentori-core": ["@goliapkg/sentori-core@0.1.0", "", {}, "sha512-+ncS5qJWlBKo4e4Mlx2bbE5OJFXXmXzs8jAYlgeSUsNl0/h2FWW3qHymmHzW4lb+eeX3YQpxtzfZH7lf0xp11w=="],
+
+    "@goliapkg/sentori-next/@goliapkg/sentori-react": ["@goliapkg/sentori-react@0.1.0", "", { "dependencies": { "@goliapkg/sentori-core": "0.1.0", "@goliapkg/sentori-javascript": "0.2.0" }, "peerDependencies": { "react": ">=18" } }, "sha512-MTVAPH/UOpWHi11d9DNK+q4IsZH8KA78R56SUmGbLHAPB9jtTarT99BgXN43rr4hQ1HCPy0kGw6VEEitCoJGJg=="],
 
     "@goliapkg/sentori-react/@goliapkg/sentori-core": ["@goliapkg/sentori-core@0.1.0", "", {}, "sha512-+ncS5qJWlBKo4e4Mlx2bbE5OJFXXmXzs8jAYlgeSUsNl0/h2FWW3qHymmHzW4lb+eeX3YQpxtzfZH7lf0xp11w=="],
 
