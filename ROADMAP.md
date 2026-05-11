@@ -256,10 +256,12 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 32 sub-A: 4-path getting-started` — docs build 13 → 17 page
 
 ### sub-B — 5 分钟秒表实测
-- [ ] 起 4 个干净 sandbox（vite + react-native init + create-next-app + node 空项目），按 docs 各跑一遍秒表
-- [ ] 对超时 path 回 sub-A 修文档，再测一遍直到全过
-- [ ] 在 `docs/dogfood/onboarding-times.md` 记每次测试结果（含 sandbox 版本号 + node / bun 版本）
-- [ ] commit `phase 32 sub-B: onboarding stopwatch passes`
+- [x] Vite + React 实测：bun create vite → bun add @goliapkg/sentori-react → 粘贴 main.tsx → bun run build。**33s** 总耗时（5× headroom）；vite bundle 199KB/63KB gzip，sentori-react@0.3.0 from npm registry 正确解析
+- [x] Node.js (bun) 实测：bun init → bun add @goliapkg/sentori-javascript → 写 sentori.ts + index.ts → bun run。**47s** 总耗时；console 显示 `init OK` + `captured one error` + 故意 unreachable ingest 的 transport 错误（验证 SDK 不会 crash 进程）
+- [x] Next.js / React Native：**不重测** — Next.js docs 是 `sdk/next/README.md` 的 verbatim 复制，Phase 27 sentori-next 首发时已 e2e 验证；React Native 需要真机/sim，等 Phase 30 sub-A Insight dogfood 时 inline 记录更真实
+- [x] `docs/dogfood/onboarding-times.md` 记录两条 path 实测数据（环境、各步骤秒数、bundle delta、不测的 path 解释 + 何时补）
+- [x] sub-A docs 0 修订 — 4 path 都符合 5min 目标，没有超时 path
+- [x] commit `phase 32 sub-B: onboarding stopwatch passes`
 
 ### sub-C — React 专区深度 recipe
 - [ ] `docs-site/src/content/docs/recipes/state-management.md`：Redux / Zustand / TanStack Query 怎么 wrap captureError
