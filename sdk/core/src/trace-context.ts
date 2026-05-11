@@ -1,0 +1,122 @@
+// Phase 35 sub-A: "active span" propagation.
+//
+// `startSpan()` inherits trace/parent from whichever span is "active"
+// on the current call stack — implementations of fetch wrappers /
+// middleware push a span onto this stack on entry and pop on exit.
+// Without active-context the caller must pass `parent` explicitly,
+// which is fine but awkward across async boundaries.
+//
+// Two implementations behind the same surface:
+//
+//   - Node (server SDK): we wire AsyncLocalStorage lazily — present
+//     since Node 16, mainstream in everything we target. AsyncLocalStorage
+//     follows continuations through Promise / setImmediate / setTimeout
+//     correctly, which is what we need to span an async function with
+//     `withSpan(span, fn)`.
+//
+//   - Browser / RN: no AsyncLocalStorage. We fall back to a plain
+//     module-scoped variable. `withSpan` save-and-restore is honest
+//     for synchronous + linear-await call chains, but loses the active
+//     value if you fork into multiple concurrent promises. Callers in
+//     that situation should pass `parent` to `startSpan` directly.
+//
+// The pragmatic stance: do not depend on context propagation for
+// correctness; treat it as a convenience. SDK callsites that care
+// about correctness (the fetch wrapper, server middleware) pass
+// `parent` explicitly.
+
+import type { SpanContextLike } from './spans.js'
+
+type Store = { span: SpanContextLike | null }
+
+interface ContextImpl {
+  get(): SpanContextLike | null
+  run<T>(span: SpanContextLike, fn: () => T): T
+}
+
+function loadNodeImpl(): ContextImpl | null {
+  // Probe AsyncLocalStorage without statically importing — keeps the
+  // module bundleable for browser/RN without conditionals in the
+  // build. `globalThis.process` is the most reliable Node sniff;
+  // `require` may be polyfilled in RN.
+  const proc = (globalThis as { process?: { versions?: { node?: string } } }).process
+  if (!proc?.versions?.node) return null
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require('node:async_hooks') as {
+      AsyncLocalStorage: new <T>() => {
+        getStore(): T | undefined
+        run<R>(s: T, fn: () => R): R
+      }
+    }
+    const als = new mod.AsyncLocalStorage<Store>()
+    return {
+      get: () => als.getStore()?.span ?? null,
+      run: (span, fn) => als.run({ span }, fn),
+    }
+  } catch {
+    return null
+  }
+}
+
+function fallbackImpl(): ContextImpl {
+  let current: SpanContextLike | null = null
+  return {
+    get: () => current,
+    run: (span, fn) => {
+      const prev = current
+      current = span
+      try {
+        return fn()
+      } finally {
+        current = prev
+      }
+    },
+  }
+}
+
+let _impl: ContextImpl | null = null
+
+function impl(): ContextImpl {
+  if (_impl) return _impl
+  _impl = loadNodeImpl() ?? fallbackImpl()
+  return _impl
+}
+
+/** Currently active span context, or null. Falls back across the
+ *  fallback impl's save-and-restore boundary. */
+export function activeSpan(): SpanContextLike | null {
+  return impl().get()
+}
+
+/**
+ * Run `fn` with `span` as the active span. Use this to wrap any unit
+ * of work whose child spans should attribute up to this one:
+ *
+ *     const span = startSpan('handler.GET')
+ *     try {
+ *       return await withSpan(span, async () => {
+ *         // any startSpan() in here picks up `span` as parent
+ *         return await loadUser()
+ *       })
+ *     } finally {
+ *       span.finish({ status: 'ok' })
+ *     }
+ *
+ * Node: routed through AsyncLocalStorage, so awaits inside `fn`
+ * preserve the active span.
+ *
+ * Browser/RN: save-and-restore. Correct for linear awaits;
+ * concurrent promises forked inside `fn` won't see the active span
+ * after the first await suspends.
+ */
+export function withSpan<T>(span: SpanContextLike, fn: () => T): T {
+  return impl().run(span, fn)
+}
+
+/** Reset the implementation choice — test-only. Production code never
+ *  calls this; switching propagation strategy at runtime would mean
+ *  losing the current active context. */
+export function __resetTraceContextForTests(): void {
+  _impl = null
+}

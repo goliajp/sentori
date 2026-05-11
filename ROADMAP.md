@@ -177,10 +177,14 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-A — `sdk/core` 加 span buffer
 
-- [ ] `sdk/core/src/spans.ts`：`startSpan(op, name?, parent?)` → `Span { spanId, traceId, finish(status?, tags?) }`；ring buffer 类似 breadcrumb，cap 1000
-- [ ] `sdk/core/src/trace-context.ts`：`activeTrace()` / `withTrace(traceId, parent, fn)` —— 用 AsyncLocalStorage (Node) / per-request store (RN)
-- [ ] 单测：嵌套 span / parent_span_id 链 / finish 后 push 到 buffer
-- [ ] commit `phase 35 sub-A: core span api`
+- [x] `sdk/core/src/types.ts` 加 `SpanStatus` enum + `Span` wire-format type，对应 sub-A 协议 schema 11 field（id / traceId / parentSpanId / op / name / startedAt / durationMs / status / tags / data? / traceparent?）
+- [x] `sdk/core/src/spans.ts`：`SpanHandle` class — `startSpan(op, opts?)` 返回 mutable handle，`setName / setTag / setData / finish({status?, tags?})`；`finish` 二次调用 no-op；`SpanBuffer` ring buffer cap=1000（同 breadcrumb 模式 + 多一个 `drain()` 方法给 transport flush）；模块级 `_global` 默认 buffer，可传 custom buffer
+- [x] `sdk/core/src/trace-context.ts`：`withSpan(span, fn)` + `activeSpan()`；Node 路径 lazy require `node:async_hooks` AsyncLocalStorage（处理 await 后 context 保留）；browser/RN fallback 用 save-and-restore module variable（线性 await OK，并发 promise 分叉会丢——文档明示用户在 fork 时显式传 parent）；feature-detect via `globalThis.process?.versions?.node`
+- [x] `startSpan` 优先级：`opts.traceId` > `opts.parent?.traceId` > `activeSpan()?.traceId` > 新 trace（`uuidV7`）；`opts.parent: null` 显式 detach（覆盖 active context）；`opts.parent` 接受任何 `{spanId, traceId}` 形状（SpanHandle / decoded traceparent / 字面量）
+- [x] 21 个单测覆盖：root no-parent / 嵌套 parent inherits / `opts.traceId` 覆盖 / `parent: null` 强 detach / `name` 默认 op / setName-setTag-setData / finish 推 buffer / status passthrough / durationMs = end-start / finish 二次 no-op / custom buffer / cap drop 最老 / drain 清空 / activeSpan null 默认 / withSpan 嵌套 + restore / throw 时 restore 不漏。`bun test` 40/40 pass（was 19，+21）
+- [x] `sdk/core/src/index.ts` export `Span` / `SpanStatus` / `SpanHandle` / `SpanBuffer` / `SpanContextLike` / `StartSpanOptions` / `startSpan` / `getSpans` / `drainSpans` / `clearSpans` / `activeSpan` / `withSpan` / `__resetTraceContextForTests`
+- [x] 全 SDK suite 复跑：sentori-core 40 / javascript 9 / react 14 / next 9 / react-native 22 / expo（无 test）— 全绿，core schema 加 Span 类型不破坏下游
+- [x] commit `phase 35 sub-A: core span api`
 
 ### sub-B — JS SDK auto-instrument fetch
 

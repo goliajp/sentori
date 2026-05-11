@@ -80,6 +80,23 @@ export type CaptureExtras = {
     tags?: Tags;
     user?: User;
 };
+/** Phase 34 sub-A: span wire format. See docs/protocol.md#span-schema. */
+export type SpanStatus = 'cancelled' | 'error' | 'ok';
+export type Span = {
+    data?: Record<string, unknown>;
+    durationMs: number;
+    id: string;
+    name: string;
+    op: string;
+    parentSpanId: null | string;
+    startedAt: string;
+    status: SpanStatus;
+    tags: Record<string, string>;
+    /** Original W3C traceparent header value if this span continues a
+     *  trace from another process. Optional. */
+    traceparent?: string;
+    traceId: string;
+};
 /** Subset of init options that every SDK accepts. SDKs may extend. */
 export type CommonInitOptions = {
     /** "prod" / "dev" / "staging" / whatever you want. */

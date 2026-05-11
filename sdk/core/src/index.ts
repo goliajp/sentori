@@ -11,6 +11,8 @@ export type {
   Frame,
   Platform,
   SentoriError,
+  Span,
+  SpanStatus,
   Tags,
   User,
 } from './types.js'
@@ -32,3 +34,20 @@ export {
   type SessionStatus,
   SessionTracker,
 } from './session.js'
+
+export {
+  SpanBuffer,
+  SpanHandle,
+  type SpanContextLike,
+  type StartSpanOptions,
+  clearSpans,
+  drainSpans,
+  getSpans,
+  startSpan,
+} from './spans.js'
+
+export {
+  __resetTraceContextForTests,
+  activeSpan,
+  withSpan,
+} from './trace-context.js'
