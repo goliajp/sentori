@@ -1,5 +1,6 @@
 import { setConfig } from './config.js'
 import { installBrowserHooks } from './hooks/browser.js'
+import { installFetchInstrumentation } from './hooks/fetch.js'
 import { installNodeHooks } from './hooks/node.js'
 import { startSession } from './session-tracker.js'
 import type { InitOptions } from './types.js'
@@ -24,5 +25,9 @@ export function initSentori(options: InitOptions): void {
   // Browser comes first because both globals can exist in some
   // bundlers' shims; we want browser semantics on the web.
   if (!installBrowserHooks()) installNodeHooks()
+  // Phase 35 sub-B: fetch instrumentation auto-emits http.client
+  // spans for every outbound request + propagates the W3C
+  // traceparent header so server-side instrumentation can stitch.
+  installFetchInstrumentation()
   startSession()
 }

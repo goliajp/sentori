@@ -188,10 +188,13 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-B — JS SDK auto-instrument fetch
 
-- [ ] `sdk/javascript/src/hooks/fetch.ts`：monkey-patch `globalThis.fetch`；包成 `startSpan('http.client') → fetch → finish(status, tags={url, method, status})`
-- [ ] 透传 `traceparent` header（W3C TraceContext 格式 `00-<traceId32hex>-<spanId16hex>-01`）
-- [ ] 单测：fetch 包后 buffer 有 span + traceparent header 注入正确
-- [ ] commit `phase 35 sub-B: js sdk auto-instrument fetch`
+- [x] `sdk/javascript/src/hooks/fetch.ts`：monkey-patch `globalThis.fetch` 包成 `startSpan('http.client')` + traceparent header 注入；`installFetchInstrumentation()` 幂等；`uninstallFetchInstrumentation()` 还原原始 fetch reference（**不**用 `.bind()`，否则 reference equality 丢，callers 持旧 ref 失败）；`extractMethodAndUrl` 同时处理 string / URL / Request 三种 input；`mergeHeaders` 让 caller 的 headers 同时保留（traceparent 不挤掉 Authorization 等）
+- [x] `toTraceparent(traceId, spanId)` 导出 + 单测：strip `-` 转 lowercase，traceId 全 32 hex 保留，spanId 截 16 hex（uuidv7 高位 8 字节是时间戳前缀，区分度足够）；header 输出 `00-<32hex>-<16hex>-01` 标准 W3C
+- [x] 状态映射：HTTP < 400 → `ok` / ≥ 400 → `error`（4xx 5xx 都标 error，dashboard trace list 直接看到失败）；fetch 抛 `AbortError` → `cancelled`（user-aborted 不是 failure）；其它 throw → `error` + `error.message` tag
+- [x] `init.ts` 在 enableGlobalHooks 路径里 `installFetchInstrumentation()`，跟 browser/node hooks + session 并列；`enableGlobalHooks: false` 全跳过
+- [x] 10 个新 test：toTraceparent 字符串 case 2 个 / install 幂等 / uninstall 复 ref / span 含 http.method + url + status / traceparent header 注入 + 形状 / Authorization 等 caller header 不丢 / 503 → status='error' / NetworkError → status='error' + error.message / AbortError → status='cancelled' / URL + Request 输入形状各支持。**bun test 20/20 pass**（was 10，+10）
+- [x] 全 SDK 复跑：sentori-core 40 / javascript 20 / react 14 / next 9 / react-native 22 全绿
+- [x] commit `phase 35 sub-B: js sdk auto-instrument fetch`
 
 ### sub-C — RN SDK auto-instrument fetch + react-navigation
 
