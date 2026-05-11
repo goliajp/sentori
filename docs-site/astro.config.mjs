@@ -26,6 +26,14 @@ export default defineConfig({
           ],
         },
         {
+          label: 'Recipes',
+          items: [
+            { label: 'Next.js', slug: 'recipes/nextjs' },
+            { label: 'Remix', slug: 'recipes/remix' },
+            { label: 'Vite + React', slug: 'recipes/vite' },
+          ],
+        },
+        {
           label: 'Reference',
           items: [
             { label: 'SDK — React', slug: 'sdk-react' },

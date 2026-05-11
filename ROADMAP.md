@@ -221,12 +221,13 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 31 sub-D: dashboard upgrades to sentori-react`
 
 ### sub-E — Recipe docs
-- [ ] `docs-site/src/content/docs/sdk-react.md`（sub-B 起草，本 sub 完整化）
-- [ ] `docs-site/src/content/docs/recipes/nextjs.md`：app router + page router 双版本 + sourcemap upload via `next.config.js` + GitHub Actions yaml
-- [ ] `docs-site/src/content/docs/recipes/remix.md`：root.tsx ErrorBoundary 接入 + sourcemap upload via `remix.config.js`
-- [ ] `docs-site/src/content/docs/recipes/vite.md`：plugin-react + ErrorBoundary 包 App + sourcemap upload via CLI 步骤
-- [ ] `docs/` 主仓镜像同步
-- [ ] commit `phase 31 sub-E: react ecosystem recipes`
+- [x] `sdk-react.md` 完整化已经在 sub-A/B/C 一路增量完成：Install / Provider / `<SentoriErrorBoundary>` 含 3 recipe / Hooks / `<SentoriSuspense>` / `react-router` integration / Next.js App Router 章节俱全；本 sub 不再 touch（再多内容反而打散注意力）
+- [x] `recipes/nextjs.md`：App Router (instrumentation.ts / app/layout.tsx / app/error.tsx / app/Shell 5 文件) + Pages Router (pages/_app.tsx / pages/_error.tsx / pages/api 复用 onRequestError) + `next.config.js` 开 `productionBrowserSourceMaps` + GitHub Actions yaml 完整 deploy workflow + "What gets captured" 5 行 surface 表
+- [x] `recipes/remix.md`：Remix v2 Vite-based 主线（entry.client / entry.server / root.tsx ErrorBoundary 用 SentoriErrorBoundary 包 Outlet）+ `handleError` 接 captureError + Vite 默认 sourcemap 路径（build/client/assets/） + classic esbuild Remix 兼容说明
+- [x] `recipes/vite.md`：minimal vite + react SPA（main.tsx + StrictMode + Provider + Boundary）+ optional `useSentoriRouter` + `vite.config.ts` build.sourcemap + GitHub Actions deploy yml；末尾给出"dashboard 自身实测 +4KB gzip"作为预算锚点
+- [x] `docs-site/astro.config.mjs` sidebar 加 "Recipes" 分组，3 个 slug 进入口；docs build 从 10 page 涨到 13 page
+- [x] 3 文件全部镜像到 `docs/recipes/`
+- [x] commit `phase 31 sub-E: react ecosystem recipes`
 
 ### sub-F — Dashboard React symbolication 体验
 - [ ] 测量"sourcemap 上传后多久能看到 symbolicated frame"P50 / P95：上传 → 触发 frame fetch → dashboard 显示用户代码而非 minified
