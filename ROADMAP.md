@@ -217,10 +217,12 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-E — bump + publish + dogfood
 
-- [ ] sentori-react-native 0.4.0 → 0.5.0；sentori-javascript 0.2.0 → 0.3.0；sentori-react 0.3.0 → 0.4.0；sentori-next 0.1.0 → 0.2.0
-- [ ] `bun publish --access public` × 4
-- [ ] dashboard 自己 dogfood：装 `useSentoriRouter` 已经有 nav breadcrumb，这次也开 fetch instrumentation；commit 提到"first dogfood trace"
-- [ ] commit `phase 35 sub-E: span sdks publish`
+- [x] Bump 5 包（实际是 5 个而非 ROADMAP 写的 4 个 —— sentori-core 也加了 `Span`/`SpanHandle`/`startSpan`/`withSpan` 新 API，必须 bump 否则下游 `"@goliapkg/sentori-core": "0.2.0"` 拿到旧 npm 版本 missing API）：core 0.2.0 → 0.3.0 / javascript 0.2.0 → 0.3.0 / react 0.3.0 → 0.4.0 / react-native 0.4.0 → 0.5.0 / next 0.1.0 → 0.2.0；inter-deps 同步 bump 让 workspace 解析正确
+- [x] sdk/react/package.json#exports 加 `./trace` subpath（`@goliapkg/sentori-react/trace` → `<TraceRender>`）；不挤 top-level export，保留 tree-shake
+- [x] `bun publish --access public` × 5 全部成功；npm registry 5 包 latest tag 都已更新
+- [x] Dashboard dogfood：`web/src/auth/ProtectedLayout.tsx` 加 `useSentoriRouter()` from `@goliapkg/sentori-react/router`，每次 nav 产 breadcrumb；SentoriProvider 在 main.tsx 已经把 initSentori 走过 → fetch hook 自动注入 → 每个 `/admin/api/...` 请求产 `http.client` span + traceparent header（**first end-to-end dogfood trace**）
+- [x] Bundle 影响：dashboard 主 bundle 336.42 KB → 339.66 KB（gzip 106.78 KB → 107.93 KB，+1.15 KB gzip），fetch hook + router hook 的代价合理
+- [x] commit `phase 35 sub-E: span sdks publish + dashboard dogfood`
 
 ## Phase 36 — Dashboard：Trace List + Trace Detail
 
