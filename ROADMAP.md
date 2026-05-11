@@ -313,10 +313,17 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-A — 1M span 复测
 
-- [ ] `tools/seed-spans.ts --spans 1000000`（SQL bulk INSERT 路径，参考 Phase 33 sub-A）
-- [ ] EXPLAIN trace list / trace detail / event-span join 三 query；任何 plan-shape 变 = 触发 regression policy
-- [ ] 输出 `docs/performance/baseline-v0.4-phase38.md`
-- [ ] commit `phase 38 sub-A: 1m span explain baseline`
+- [x] SQL bulk INSERT 模式（参考 Phase 33 sub-A）：5000 traces + 5000 root spans + 995,000 children = 1,000,046 spans / 5007 traces / spans 表 284 MB；总耗时 ~15s
+- [x] 跑 4 个 hot-path query EXPLAIN（不止 ROADMAP 列的三个，加 Q4 span search 看 op+duration top-N 行为）：
+  - **Q1 trace list 0.131ms**（was 0.075ms / +75% / Index Scan 同 plan）
+  - **Q2 trace detail 1.157ms**（was 0.684ms / +69% / Bitmap Index Scan 同 plan，planning time 1.96ms 是新 bottleneck）
+  - **Q3 events on trace 0.106ms**（新增 — Phase 36 sub-C 的 `events_trace_idx` partial index 起效；planning 6.80ms 是 events 表跨分区 planner 开销）
+  - **Q4 span search op+duration top 50 40.7ms**（was 5.64ms / 7.2× sub-linear / 166k 候选 → in-memory Sort）
+- [x] 写 `docs/performance/baseline-v0.4-phase38.md`：4 query 完整 plan + 对比表 + methodology + "什么没测"（跨月 partition / 高 fan-out / 并发读）+ regression policy crosscheck（plan-shape 均未变 → 不触发 v0.3 性能门槛）
+- [x] 行动项：Q2/Q3 `received_at>=N days` partition prune hint（partition 数到 12+ 月再做）/ Q4 `(project_id, op, duration_ms DESC)` 复合 index（v0.5 候选，6 月真实流量后评估）
+- [x] 清理 bulk-1m-v04 synthetic（DELETE 1,000,000 spans + 5,000 traces）；保留 46 spans / 7 traces 来自 sub-C/D 等先前 smoke
+- [x] 决定：v0.4 release 不需要 index migration，sub-B 可以 tag + ship
+- [x] commit `phase 38 sub-A: 1m span explain baseline`
 
 ### sub-B — CHANGELOG + release notes + tag
 
