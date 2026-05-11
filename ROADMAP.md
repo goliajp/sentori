@@ -243,10 +243,15 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-B — Trace detail (waterfall)
 
-- [ ] 新 `web/src/views/trace-detail.tsx`：拉一棵 span tree，按 parent_span_id 排列；缩进表示嵌套层级；右侧 column 显示 op/name/duration/status；hover row 高亮 root → leaf 链路
-- [ ] **不**画 SVG bar / timeline overlay —— 太重，纯表格 + duration column 已经够看出热点
-- [ ] 点 span 展开 data/tags drawer
-- [ ] commit `phase 36 sub-B: trace detail waterfall`
+- [x] server `GET /admin/api/projects/{project_id}/traces/{trace_id}` 返回 `{ trace, spans[] }`；spans ORDER BY started_at ASC, id ASC（client 一遍构树）；404 走 AppError::NotFound 已有 IntoResponse mapper
+- [x] 新 `web/src/views/trace-detail.tsx`：`buildTree` 由 parent_span_id 二次遍历构 tree，DFS `flatten` 得 row 数组；orphan span（parent 缺失）当 root 兜底，UI 仍显示
+- [x] 渲染：3 列表格（Op / Name / Duration / Status）+ 缩进 `n.depth * 16px` 表示嵌套；**不**画 SVG bar / timeline overlay，纯表格 + duration column 已够看出热点
+- [x] hover 行：`hoveredId` state + `ancestorIds(byId, hoveredId)` 走 parentSpanId chain 一层一层向上 → 给行加 `bg-bg-tertiary/40` 高亮 root→leaf 全链路
+- [x] click 行打开右侧 drawer：id / parent / duration / status / startedAt + tags grid + data `<pre>` JSON pretty-print；`✕` 关；点别的行切换
+- [x] `web/src/api/client.ts` 加 `SpanRow` / `TraceDetail` types + `getTraceDetail(projectId, traceId)`
+- [x] router 加 `traces/:traceId` lazy route；trace-list 行 onClick → navigate('/org/{slug}/traces/{traceId}') 已在 sub-A 接通
+- [x] dashboard `bun run check` 0 errors / `bun run build` OK；main bundle 339.94 → 340.16 KB（trace-detail 独立 lazy chunk）
+- [x] commit `phase 36 sub-B: trace detail waterfall`
 
 ### sub-C — Span ↔ Event 联动
 

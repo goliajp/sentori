@@ -11,6 +11,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -119,4 +120,72 @@ fn parse_cursor(s: &str) -> Option<(OffsetDateTime, Uuid)> {
     let last_seen = OffsetDateTime::parse(ts, &time::format_description::well_known::Rfc3339).ok()?;
     let id = Uuid::parse_str(id).ok()?;
     Some((last_seen, id))
+}
+
+/// Phase 36 sub-B: trace detail. Returns:
+///   { trace: {trace_id, root_op, ...}, spans: [...] }
+/// `spans` is the full set for that trace_id, sorted by started_at
+/// asc so the client can build the parent_span_id tree in one pass.
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TraceDetail {
+    pub trace: TraceRow,
+    pub spans: Vec<SpanRow>,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct SpanRow {
+    pub id: Uuid,
+    pub trace_id: Uuid,
+    pub parent_span_id: Option<Uuid>,
+    pub op: String,
+    pub name: String,
+    #[serde(with = "time::serde::rfc3339")]
+    pub started_at: OffsetDateTime,
+    pub duration_ms: i32,
+    pub status: String,
+    pub tags: JsonValue,
+    pub data: Option<JsonValue>,
+}
+
+pub async fn trace_detail(
+    State(state): State<AppState>,
+    Path((project_id, trace_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<TraceDetail>, AppError> {
+    let pool = state.db.as_ref().ok_or(AppError::DatabaseUnavailable)?;
+
+    let trace: Option<TraceRow> = sqlx::query_as(
+        r#"
+        SELECT trace_id, root_op, root_name, span_count, status, duration_ms,
+               first_seen, last_seen
+        FROM traces
+        WHERE trace_id = $1 AND project_id = $2
+        "#,
+    )
+    .bind(trace_id)
+    .bind(project_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    let trace = trace.ok_or(AppError::NotFound)?;
+
+    let spans: Vec<SpanRow> = sqlx::query_as(
+        r#"
+        SELECT id, trace_id, parent_span_id, op, name, started_at,
+               duration_ms, status, tags, data
+        FROM spans
+        WHERE trace_id = $1 AND project_id = $2
+        ORDER BY started_at ASC, id ASC
+        "#,
+    )
+    .bind(trace_id)
+    .bind(project_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(TraceDetail { trace, spans }))
 }

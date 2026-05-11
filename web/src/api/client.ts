@@ -75,6 +75,26 @@ export type TraceRow = {
   traceId: string
 }
 
+// Phase 36 sub-B: trace detail. Server returns `{ trace, spans[] }`;
+// the client builds the parent_span_id tree.
+export type SpanRow = {
+  data: null | Record<string, unknown>
+  durationMs: number
+  id: string
+  name: string
+  op: string
+  parentSpanId: null | string
+  startedAt: string
+  status: TraceStatus
+  tags: Record<string, string>
+  traceId: string
+}
+
+export type TraceDetail = {
+  spans: SpanRow[]
+  trace: TraceRow
+}
+
 export type EventRow = {
   environment: string
   errorMessage: string
@@ -306,6 +326,12 @@ export const adminApi = {
     const traces = (await resp.json()) as TraceRow[]
     return { nextCursor: resp.headers.get('X-Next-Cursor'), traces }
   },
+
+  /** Phase 36 sub-B: one trace + all its spans, server returns the
+   *  set sorted by started_at asc (the client builds the
+   *  parent_span_id tree). */
+  getTraceDetail: (projectId: string, traceId: string) =>
+    adminFetch<TraceDetail>(`/projects/${projectId}/traces/${traceId}`),
 
   listProjects: () => adminFetch<ProjectRow[]>('/projects'),
 
