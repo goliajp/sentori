@@ -291,9 +291,13 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-B — Node SDK middleware（Express/Hono/Fastify）
 
-- [ ] `sdk/javascript` 暴露 `tracingMiddleware()` for Express + `tracingHandler()` for Hono / Fastify
-- [ ] 读 traceparent header → 开 root span → 包 next() → finish
-- [ ] commit `phase 37 sub-B: node tracing middleware`
+- [x] `sdk/javascript/src/tracing-middleware.ts` 暴露 3 framework adapter + 共享 `parseTraceparent`；subpath export `@goliapkg/sentori-javascript/tracing`
+- [x] Express: 监听 `finish`+`close` 双重 idempotent；不能 withSpan 因 callback-style next 不能传 context — 但 http.server span 仍正确 emit
+- [x] Hono: async withSpan(next) 让 handler 内 startSpan 自动 child；try/catch throw → status=error + error.message tag + re-throw
+- [x] Fastify: plugin-style `installFastifyTracing(fastify)` 注册 onRequest + onResponse hook，req.sentoriSpan 槽传 span 跨 hook
+- [x] 5xx → error / 4xx → ok（client 错不是 server fail）；inbound traceparent 解 + 继承
+- [x] 15 个新单测覆盖 parseTraceparent 边界 / 各 framework lifecycle / traceparent 继承 / throw 处理。**bun test 35/35 pass**（was 20，+15）
+- [x] commit `phase 37 sub-B: node tracing middleware`
 
 ### sub-C — 文档 + recipe
 
