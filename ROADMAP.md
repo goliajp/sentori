@@ -197,11 +197,12 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 31 sub-A: error boundary v2`
 
 ### sub-B — react-router 集成
-- [ ] 新 `sdk/react/src/router.ts`：`useSentoriRouter()` hook 走 `react-router` 的 `useLocation`，pathname 变即 `addBreadcrumb({ type: 'nav', data: { from, to } })`
-- [ ] `sdk/react/src/index.ts` 导出 hook
-- [ ] 单元测试用 `MemoryRouter` 跑 nav，断言 breadcrumb buffer 收到 nav entry
-- [ ] docs site 新文件 `sdk-react.md`：用法 + 注意 `react-router` 版本 7+ 的 peer dep
-- [ ] commit `phase 31 sub-B: react-router auto breadcrumb`
+- [x] 新 `sdk/react/src/router.ts`：`useSentoriRouter()` 走 `react-router` 的 `useLocation`；用 `useEffect` + `useRef` 维护 prev location（pathname + search + hash），变更时 `addBreadcrumb('nav', { from, to })`；**初次 mount 不发**（prevRef 初始 null）
+- [x] **不**从顶层 `sdk/react/src/index.ts` 导出（react-router 是 optional peer，顶层 export 会让没装 react-router 的项目报模块解析错）；改为 subpath export `@goliapkg/sentori-react/router`，`package.json#exports` 加 `./router` 入口
+- [x] `package.json#peerDependencies` 加 `react-router >= 7` + `peerDependenciesMeta.optional=true`；devDeps 装 `react-router@^7` 用于测试
+- [x] 单元测试用 `MemoryRouter` + `<Link>`：初次 mount 0 个 nav breadcrumb / 点 2 次链接 → 2 个 nav breadcrumb，断言 `{ from, to }` 完全匹配。注意要 `cleanup()` 跨测试清 DOM（@testing-library/react 不自动清，bun:test 也不会重置 happy-dom 全局），不然第二个 describe 会"found multiple elements"
+- [x] `docs-site/src/content/docs/sdk-react.md` 加 "react-router integration" 章节：用法 / breadcrumb shape JSON / peer dep 注意（>= 7、不支持 v6、optional）；镜像到 `docs/`
+- [x] commit `phase 31 sub-B: react-router auto breadcrumb` — bun test 11/11 pass，typecheck clean，docs build OK
 
 ### sub-C — Suspense + Server Components
 - [ ] `sdk/react/src/suspense-fallback.tsx`：`<SentoriSuspense fallback={<Spinner/>}>` 内部 `<Suspense>` + `<ErrorBoundary>` 双重包；Suspense 抛出的 promise reject 自动 captureError

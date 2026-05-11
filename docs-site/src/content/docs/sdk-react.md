@@ -188,10 +188,65 @@ function PayButton() {
 setUser, setTags). `useCaptureError()` is a shortcut for the common
 case.
 
+## `react-router` integration
+
+`useSentoriRouter()` subscribes to the `react-router` location and
+emits a `nav` breadcrumb on every transition. Imported from the
+`/router` subpath so apps that don't use `react-router` don't pay
+the peer-dependency cost:
+
+```tsx
+import { BrowserRouter, Outlet, Route, Routes } from 'react-router'
+import { SentoriProvider } from '@goliapkg/sentori-react'
+import { useSentoriRouter } from '@goliapkg/sentori-react/router'
+
+function Shell() {
+  useSentoriRouter()
+  return <Outlet />
+}
+
+export function App() {
+  return (
+    <SentoriProvider config={config}>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<Shell />}>
+            <Route element={<Home />} path="/" />
+            <Route element={<Orders />} path="/orders" />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </SentoriProvider>
+  )
+}
+```
+
+Breadcrumb shape:
+
+```json
+{
+  "type": "nav",
+  "data": { "from": "/", "to": "/orders?status=open" },
+  "timestamp": "2026-05-11T13:24:09.421Z"
+}
+```
+
+Notes:
+
+- **Peer dependency**: `react-router >= 7`. Earlier versions split
+  the package into `react-router-dom`; if you're still on v6, alias
+  the import or upgrade — Sentori does not maintain a v6 shim.
+- The hook is `optional` in `peerDependenciesMeta`, so npm/bun
+  install will not warn if `react-router` isn't in your tree.
+- First mount does **not** emit a breadcrumb — only real transitions
+  (pathname / search / hash change) do. This avoids polluting the
+  ring buffer with the initial route on every page load.
+- Mount once per `Router`, high in the tree (typically in a layout
+  route's component). Mounting in every page works but adds noise.
+
 ## What this SDK is not
 
-It is not a `Suspense` wrapper, not a router integration, and not a
-profiler. Those are tracked separately:
+It is not a `Suspense` wrapper and not a profiler. Those are tracked
+separately:
 
-- Router auto-breadcrumbs → see [`react-router` integration](#) (added in Phase 31 sub-B)
 - Suspense / RSC error capture → see [`<SentoriSuspense>`](#) (added in Phase 31 sub-C)
