@@ -280,10 +280,14 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-A — sentori-server 自身 instrumentation
 
-- [ ] `server/src/lib.rs` middleware：每个 axum handler 进来读 `traceparent` header；没 header 就开新 trace
-- [ ] 内部 sqlx query / cache fetch 开 child span
-- [ ] Spans 由 server 自己产，POST 到自己的 `/v1/spans`（dogfood 闭环）
-- [ ] commit `phase 37 sub-A: server self-instrument`
+- [x] `server/src/trace_emit.rs`：`SpanEmitter` 模块 — `spawn(pool, project_id)` 启 buffer (Arc<Mutex<Vec>>) + 30s 周期 flush + 200-span 突发 flush；`flush_batch` 一 tx 内 INSERT spans + UPSERT traces，复用 `/v1/spans` 同款逻辑；`try_push` 异步进 buffer 不阻塞热路径
+- [x] `parse_traceparent(header)` 解 W3C 格式：32-hex traceId → uuid / 16-hex parent-id → 32-hex uuid 零右填（lossy 但跨系统 stitching 足够）；7 单测覆盖各种错位
+- [x] `server/src/tracing_middleware.rs`：axum middleware 包 handler，request 进入 → 读 traceparent 或开新 trace → Instant 计时 → next.run → 决定 status（5xx error / 4xx ok 因 client 错 / 2xx ok）→ try_push 含 http.method / http.path / http.status tag
+- [x] `router::build` 加 `cfg.self_trace: Option<SpanEmitter>`，最外层 layer；`main.rs` 读 env `SENTORI_SELF_TRACE_PROJECT_ID`（UUID），不设默认 None
+- [x] **不**做内部 sqlx query span / cache fetch child span（侵入性大，需 sqlx interceptor，留 Phase 38 polish 或 v0.5）
+- [x] Live smoke：3 GET + 1 GET with traceparent → 等 30s flush → DB 33 spans + 32 traces 落入；带 header 的请求 trace_id `aaaaaaaa-...` + parent_span_id `bbbbbbbb-bbbb-bbbb-0000-...` (16→32 hex 零填) 跨系统 stitching 验证通过
+- [x] `cargo test --lib` 33/33 pass（was 26，+7）；`docker build` OK
+- [x] commit `phase 37 sub-A: server self-instrument`
 
 ### sub-B — Node SDK middleware（Express/Hono/Fastify）
 
