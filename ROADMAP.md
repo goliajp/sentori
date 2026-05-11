@@ -248,10 +248,12 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 **Estimate:** 1 周
 
 ### sub-A — getting-started 4-path 重做
-- [ ] `docs-site/src/content/docs/getting-started.md` 拆成 4 篇：`getting-started/react.md` / `getting-started/react-native.md` / `getting-started/nextjs.md` / `getting-started/node.md`，每篇独立可读
-- [ ] 每篇结构：Prerequisites / Install / Configure / Capture first error / View on dashboard / Next steps，目标每条 path 5 分钟到 dashboard 看到 event
-- [ ] `docs/` 镜像同步
-- [ ] commit `phase 32 sub-A: 4-path getting-started`
+- [x] 4 篇独立 quickstart：`getting-started/react.md`（Vite SPA install+config+Boom+useCaptureError+5min check）/ `getting-started/react-native.md`（bare RN + Expo prebuild + sentori.init top-of-entry + 全 native artifact 上传命令）/ `getting-started/nextjs.md`（App Router 主线 + Pages Router 末尾）/ `getting-started/node.md`（Express/Hono/Fastify/Bun 全平台 + 早期 init 模式）
+- [x] 每篇结构：Prerequisites / Install / Configure / Capture first error / View on dashboard / Next steps；React-Native 加 Source maps + native symbols 单独章节
+- [x] 老 `getting-started.md` 改为 hub："Pick your stack" 4 link 表 + 仍保留 curl-only 后端验证示例 / deploy ping / sentori-cli issue triage 通用章节（这些跨 path 共用）
+- [x] `docs-site/astro.config.mjs` sidebar `Guides` 嵌套 `Quickstarts` 子组（collapsed: false）4 link 入口
+- [x] `docs/` 镜像同步全部 5 文件（hub + 4 path）
+- [x] commit `phase 32 sub-A: 4-path getting-started` — docs build 13 → 17 page
 
 ### sub-B — 5 分钟秒表实测
 - [ ] 起 4 个干净 sandbox（vite + react-native init + create-next-app + node 空项目），按 docs 各跑一遍秒表

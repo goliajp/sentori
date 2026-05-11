@@ -21,6 +21,16 @@ export default defineConfig({
           label: 'Guides',
           items: [
             { label: 'Getting started', slug: 'getting-started' },
+            {
+              label: 'Quickstarts',
+              collapsed: false,
+              items: [
+                { label: 'React', slug: 'getting-started/react' },
+                { label: 'React Native', slug: 'getting-started/react-native' },
+                { label: 'Next.js', slug: 'getting-started/nextjs' },
+                { label: 'Node.js', slug: 'getting-started/node' },
+              ],
+            },
             { label: 'Self-hosting', slug: 'self-hosting' },
             { label: 'Teams & ownership', slug: 'teams' },
           ],

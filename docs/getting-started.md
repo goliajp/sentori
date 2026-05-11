@@ -1,69 +1,43 @@
-# Sentori — getting started
+---
+title: Getting started
+description: Pick the 5-minute quickstart that matches your stack
+---
 
-Five minutes from `git clone` to your first event in the dashboard.
+# Getting started
 
-## Prerequisites
+Sentori is an error-tracking + APM platform. There's a 5-minute
+quickstart for each supported stack — pick yours:
 
-- Docker with the `docker compose` plugin
-- An app to instrument (or use `sdk/react-native/example/` in this repo)
+| Stack | Quickstart |
+|---|---|
+| **React** (Vite / CRA / any bundler) | [getting-started/react](./getting-started/react.md) |
+| **React Native** (bare or Expo) | [getting-started/react-native](./getting-started/react-native.md) |
+| **Next.js** (App Router or Pages) | [getting-started/nextjs](./getting-started/nextjs.md) |
+| **Node.js / Bun** (Express, Hono, Fastify, scripts) | [getting-started/node](./getting-started/node.md) |
 
-## 1. Clone & configure
+All four assume you already have:
 
-```bash
-git clone <repo> sentori
-cd sentori
-```
+- a **token** (`st_pk_...`)
+- an **ingest URL**
 
-Create `.env` with these values:
+For SaaS: sign up at <https://sentori.golia.jp> and copy from
+project settings. For self-hosted: see [Self-hosting](./self-hosting.md).
 
-```bash
-cat > .env <<EOF
-SENTORI_DEV_TOKEN=st_pk_dev0000000000000000000000
-SENTORI_ADMIN_PASSWORD=changeme
-SENTORI_SESSION_SECRET=$(openssl rand -hex 32)
-SENTORI_PG_PASSWORD=$(openssl rand -hex 16)
-EOF
-```
+Don't have a backend yet?
 
-For SMTP, rate-limit, log-level overrides, copy
-`docker-compose.override.example.yml` to `docker-compose.override.yml`.
+- [Self-hosting](./self-hosting.md) — one `docker compose up` on
+  your own VM
+- The SaaS at <https://sentori.golia.jp> is the same binary +
+  same schema, just multi-tenant
 
-## 2. Start
+## Working without an SDK
 
-```bash
-docker compose up -d
-docker compose ps                # postgres should be "healthy"
-docker compose logs -f server    # confirm "sentori-server listening"
-```
-
-## 3. Sign in to the dashboard
-
-Open <http://localhost:8000>. Sign in with `SENTORI_ADMIN_PASSWORD`.
-
-You should see the empty Issues list. The header has a `Sign out`
-button; the search box accepts `/` to focus.
-
-## 4. Send your first event
-
-In a React Native app:
-
-```ts
-import { sentori } from '@goliapkg/sentori-react-native'
-
-sentori.init({
-  token: 'st_pk_dev0000000000000000000000',
-  release: 'myapp@0.1.0+1',
-  ingestUrl: 'http://<your-host>:8080',
-})
-
-throw new TypeError('hello sentori')
-```
-
-Or quickly from a shell:
+If you're prototyping or writing your own client, you can POST
+directly to the ingest endpoint:
 
 ```bash
-curl -X POST http://localhost:8080/v1/events \
-  -H "Authorization: Bearer st_pk_dev0000000000000000000000" \
+curl -X POST "$SENTORI_INGEST_URL/v1/events" \
+  -H "Authorization: Bearer $SENTORI_TOKEN" \
   -H "Sentori-Sdk: curl/0.0.0" \
   -H "Content-Type: application/json" \
   -d '{
@@ -83,13 +57,20 @@ curl -X POST http://localhost:8080/v1/events \
   }'
 ```
 
-Refresh the dashboard — the issue should appear within a few seconds.
+See the [Protocol reference](./protocol.md) for the full schema.
 
-## 5. Tell Sentori when you ship (optional)
+## After you have events flowing
 
-Add one line to your CI right after the build is uploaded to users. The
-dashboard's release timeline highlights the moment so regression charts
-line up with the actual deploy.
+- [Notify Sentori of deploys](#deploy-pings) — one curl in CI keeps
+  the release timeline accurate
+- [Triage from CI with sentori-cli](#triage-from-ci) — `issue
+  list / resolve / silence`
+- [Sourcemap / dSYM / Proguard upload](./recipes/vite.md#5-source-maps) —
+  see frame-level user code instead of minified output
+
+### Deploy pings
+
+Add one line to your CI right after the build is uploaded:
 
 ```bash
 curl -fsS -X POST "$SENTORI_INGEST_URL/v1/deploys" \
@@ -98,47 +79,34 @@ curl -fsS -X POST "$SENTORI_INGEST_URL/v1/deploys" \
   -d "{\"release\":\"myapp@$VERSION+$BUILD\",\"environment\":\"prod\"}"
 ```
 
-Idempotent — re-running the same `release` just refreshes the
-`deployAt` timestamp, so re-running a flaky CI job is safe.
+Idempotent — re-running the same release just refreshes
+`deployAt`, so flaky-CI retry is safe.
 
-## 6. Triage issues from CI (optional)
-
-Once you have a release-cut workflow, you can also drive issue state
-from it. `sentori-cli` has three issue subcommands that all read
-`SENTORI_ADMIN_TOKEN` from the environment (`SENTORI_TOKEN` is a
-fallback) and POST to the admin API:
+### Triage from CI
 
 ```bash
-# Latest 20 active issues for a project — dense one-line-per-issue.
+# Latest 20 active issues — one line per issue.
 npx @goliapkg/sentori-cli issue list \
-  --project 019508a0-0000-0000-0000-000000000000 \
-  --status active \
-  --limit 20
+  --project "$PROJECT_ID" --status active --limit 20
 
-# Same, but emit the raw JSON the dashboard sees (good for piping into jq).
-npx @goliapkg/sentori-cli issue list \
-  --project $PROJECT_ID --json
-
-# Mark an issue resolved, tagging the release the fix landed in. The
-# dashboard's regression detector will flip it back to `regressed` if a
-# matching event lands after this release.
+# Mark resolved, tagging the fix release. The dashboard's regression
+# detector flips it back to `regressed` if a matching event lands later.
 npx @goliapkg/sentori-cli issue resolve <issue-uuid> \
-  --project $PROJECT_ID \
-  --in-release myapp@1.2.4+457
+  --project "$PROJECT_ID" \
+  --in-release "myapp@1.2.4+457"
 
-# Silence a noisy issue (still ingested, but no alerts / no badges).
+# Silence a known-noisy issue.
 npx @goliapkg/sentori-cli issue silence <issue-uuid> \
-  --project $PROJECT_ID
+  --project "$PROJECT_ID"
 ```
 
-The admin token is the `sk_` token from project settings → tokens, or
-your user-session cookie if you're calling from a logged-in machine.
+The admin token (`SENTORI_ADMIN_TOKEN`, `sk_` prefix) is in project
+settings → tokens.
 
-## What's next
+## Reference
 
-- [SDK reference](./sdk-react-native.md) — full `sentori.init`, capture
-  helpers, ErrorBoundary, native crash capture, source-map upload
-- [Self-hosting guide](./self-hosting.md) — production deploy, SMTP,
+- [Protocol](./protocol.md) — wire format, if you're writing your
+  own SDK or just curious
+- [Self-hosting](./self-hosting.md) — production deploy, SMTP,
   backups, behind a reverse proxy
-- [Protocol](./protocol.md) — wire format, if you're writing your own
-  SDK or just curious
+- [SDK — React](./sdk-react.md) / [SDK — React Native](./sdk-react-native.md)
