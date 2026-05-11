@@ -273,9 +273,10 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 32 sub-C: react deep recipes` — docs build 17 → 22 page
 
 ### sub-D — Troubleshooting 章节
-- [ ] 新 `docs-site/src/content/docs/troubleshooting.md`：典型坑 8-10 项，每项 Q + diagnosis 步骤 + fix
-- [ ] 候选 Q：`stack 是 minified 怎么办` / `release 不匹配 sourcemap` / `token 401` / `dSYM 上传成功但 frame 仍未 symbolicate` / `dashboard 看不到事件` / `webhook 收到但签名不对` / `crash-free rate 一直 0%` / `regression 没触发`
-- [ ] commit `phase 32 sub-D: troubleshooting`
+- [x] 新 `docs-site/src/content/docs/troubleshooting.md`：10 项典型坑，每项 Diagnose + Fix 双小节：(1) dashboard 看不到事件（curl 五种 status code 表）/ (2) stack 是 minified（unsymbolicated banner 引导）/ (3) dSYM 已传但仍 minified（uuid 不匹配定位 + `mdfind` 找正确 dSYM）/ (4) token 401（5 种 hint 解码表）/ (5) webhook 签名不验证（re-serialize / 用错 secret / 非 constant-time 比较 + Node 示例代码）/ (6) crash-free 卡 0%（web 无 session ping 是预期 + RN logcat/log stream 看 session: started）/ (7) regression 没触发（semver+build 忽略规则 + 1min cron 等待）/ (8) hook 错误（test/storybook 加 Provider）/ (9) CI sourcemap 上传慢（dedupe 已存在 + parallel deploy）/ (10) dev 淹掉 dashboard（NODE_ENV / __DEV__ 跳过 init）
+- [x] sidebar Reference 组加入口；docs build 22 → 23 page
+- [x] 镜像到 `docs/troubleshooting.md`
+- [x] commit `phase 32 sub-D: troubleshooting`
 
 ### sub-E — Marketing hero copy 微调
 - [ ] `marketing/src/pages/index.astro` hero h1 改成强调 React + RN（候选 copy："Error tracking, built React-first."），不重做布局

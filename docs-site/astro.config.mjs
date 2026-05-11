@@ -56,6 +56,7 @@ export default defineConfig({
             { label: 'SDK — Vue (planned)', slug: 'sdk-vue' },
             { label: 'SDK — Svelte (planned)', slug: 'sdk-svelte' },
             { label: 'Protocol', slug: 'protocol' },
+            { label: 'Troubleshooting', slug: 'troubleshooting' },
           ],
         },
       ],
