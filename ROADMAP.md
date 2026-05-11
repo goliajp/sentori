@@ -265,8 +265,12 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-D — 过滤 + 搜索
 
-- [ ] Trace list toolbar 加 `op:http.client` / `duration:>500ms` / `status:error` 三类 token，复用 issues `parseIssueQuery` 同款 parser
-- [ ] commit `phase 36 sub-D: trace search tokens`
+- [x] 新 `web/src/lib/trace-query.ts` 同 `parseIssueQuery` 模式：`parseTraceQuery(input)` 解析 `KEY:VALUE` term — `op:` 自由字符串 exact match / `status:` enum 限 ok|error|cancelled / `duration:>Nms` 或 `>Ns`（require `>` prefix 强制语义清晰，未来加 `<` 也不会歧义）；free text 直接 warning 不丢
+- [x] `parseDurationFilter`：正则 `^>(\d+)(ms|s)$` 拒绝 missing prefix / zero / 负数 / unknown unit；返回 ms float
+- [x] `TracesView` 退掉 sub-A 的 3 个 select/input 替换成单 search box（与 IssuesView 一致的"搜索条"心智模型）；warnings 数 > 0 时显示 amber 小提示 + `title` 列举原因
+- [x] 11 个 vitest unit test（trace-query.test.ts）覆盖：3 token 联合 / 秒单位 / free text 警告 / unknown key / bad status / bad duration / empty input / parseDurationFilter 单独覆盖 prefix / zero / negative / unit
+- [x] dashboard `bun run check` 0 errors / build OK；vitest **35/35 pass**（was 24，+11）
+- [x] commit `phase 36 sub-D: trace search tokens`
 
 ## Phase 37 — Cross-cutting：W3C TraceContext + 后端联动
 

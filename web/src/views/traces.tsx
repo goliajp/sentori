@@ -13,29 +13,20 @@ import { adminApi, type TraceRow } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
 import { densityClasses, useDensity } from '@/lib/density'
+import { parseTraceQuery } from '@/lib/trace-query'
 
 const PAGE_SIZE = 100
-
-const STATUS_OPTIONS = ['ok', 'error', 'cancelled'] as const
-type StatusFilter = 'all' | (typeof STATUS_OPTIONS)[number]
-
-const OP_OPTIONS = [
-  'http.client',
-  'http.server',
-  'db.query',
-  'db.transaction',
-  'cache.get',
-  'react.render',
-  'react.navigation',
-] as const
 
 export function TracesView() {
   const navigate = useNavigate()
   const { currentOrg, currentProject } = useOrg()
   const projectId = currentProject?.id ?? null
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [opFilter, setOpFilter] = useState<string>('')
-  const [minDurationMs, setMinDurationMs] = useState<number | null>(null)
+  // Phase 36 sub-D: single search box for `op:` / `status:` /
+  // `duration:>Nms`. Dropdown + number-input UI from sub-A is retired
+  // in favour of the same search bar IssuesView uses, so the dashboard
+  // doesn't carry two parallel filter idioms across two pages.
+  const [queryText, setQueryText] = useState('')
+  const parsed = useMemo(() => parseTraceQuery(queryText), [queryText])
   const [selectedIdx, setSelectedIdx] = useState(0)
   const { density } = useDensity()
   const dCls = densityClasses(density)
@@ -48,12 +39,12 @@ export function TracesView() {
     queryFn: ({ pageParam }: { pageParam: null | string }) =>
       adminApi.listTracesPage(projectId!, {
         cursor: pageParam,
-        durationMs: minDurationMs ?? undefined,
+        durationMs: parsed.minDurationMs ?? undefined,
         limit: PAGE_SIZE,
-        op: opFilter || undefined,
-        status: statusFilter === 'all' ? undefined : statusFilter,
+        op: parsed.op,
+        status: parsed.status,
       }),
-    queryKey: ['traces', projectId, statusFilter, opFilter, minDurationMs],
+    queryKey: ['traces', projectId, parsed.status, parsed.op, parsed.minDurationMs],
   })
 
   const traces = useMemo(
@@ -68,7 +59,7 @@ export function TracesView() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedIdx(0)
-  }, [statusFilter, opFilter, minDurationMs, projectId])
+  }, [parsed.status, parsed.op, parsed.minDurationMs, projectId])
 
   const open = (row: TraceRow) => {
     navigate(`/org/${currentOrg.slug}/traces/${row.traceId}`)
@@ -100,42 +91,18 @@ export function TracesView() {
         <span className="text-fg-muted text-[12px]">{traces.length} loaded</span>
 
         <div className="ml-auto flex items-center gap-2">
-          <select
-            className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 text-[12px]"
-            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-            value={statusFilter}
-          >
-            <option value="all">all status</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 text-[12px]"
-            onChange={(e) => setOpFilter(e.target.value)}
-            value={opFilter}
-          >
-            <option value="">all ops</option>
-            {OP_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
-
           <input
-            className="border-border bg-bg-tertiary text-fg w-24 rounded-md border px-2 py-1 text-[12px]"
-            onChange={(e) => {
-              const v = Number.parseInt(e.target.value, 10)
-              setMinDurationMs(Number.isFinite(v) ? v : null)
-            }}
-            placeholder="≥ ms"
-            type="number"
-            value={minDurationMs ?? ''}
+            className="border-border bg-bg-tertiary text-fg w-80 rounded-md border px-3 py-1 text-[12px]"
+            onChange={(e) => setQueryText(e.target.value)}
+            placeholder="op:http.client status:error duration:>500ms"
+            type="text"
+            value={queryText}
           />
+          {parsed.warnings.length > 0 && (
+            <span className="text-[11px] text-amber-400" title={parsed.warnings.join('\n')}>
+              {parsed.warnings.length} warning{parsed.warnings.length === 1 ? '' : 's'}
+            </span>
+          )}
         </div>
       </header>
 
