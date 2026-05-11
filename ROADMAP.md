@@ -213,11 +213,12 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 31 sub-C: suspense + RSC error capture` — sdk/react test 14/14 pass，sdk/next typecheck + build OK，docs-site 10 page build clean
 
 ### sub-D — 真实接入 dogfood（决策点）
-- [ ] **决策**：是否有外部 React web 项目接入；若无则 dashboard 自身从 `@goliapkg/sentori-javascript` 升级到 `@goliapkg/sentori-react`
-- [ ] 改 `web/package.json`：`sentori-javascript` → `sentori-react@workspace:*`
-- [ ] 改 `web/src/main.tsx`：`initSentori` import 切到 react 包；`<App>` 包进 `<ErrorBoundary fallback={<ErrorState />}>`（复用 v0.2 sub-E 抽的 ErrorState）
-- [ ] dashboard build 通过、e2e 全绿；故意触发一个错误验证 sentori-react 上报到 sentori-dashboard project
-- [ ] commit `phase 31 sub-D: dashboard upgrades to sentori-react`
+- [x] **决策**：当前没有外部 React web 项目接入（仅 RN 侧 Insight），按 ROADMAP 第二条路径走 — dashboard 自身从 `@goliapkg/sentori-javascript` 升级到 `@goliapkg/sentori-react`
+- [x] 把 `web/` 加进 root `package.json#workspaces`（之前 web 不在 workspace 里），改 `web/package.json` 用 `"@goliapkg/sentori-react": "workspace:*"` 直链 sdk/react（不依赖 npm publish；sentori-react 还是 0.1.0，sub-G 才发 0.3.0）
+- [x] `web/src/main.tsx`：删 imperative `initSentori(...)` 调用 + sentori-javascript import，改用 `<SentoriProvider config={...}>` + `<SentoriErrorBoundary fallback={<ErrorState ... />}>` 双层包在 `<QueryClientProvider>` 外（Boundary 仍能拿到 Provider 的 captureError）；token 缺失时用 `'st_pk_unconfigured...'` 占位 + `127.0.0.1:0` unreachable ingest，让 Provider init 在 try/catch 里 fail，Boundary 仍可用、不外发任何事件
+- [x] 验证矩阵：`bun run check`（0 error，仅余 react-refresh 警告，与 sub-D 无关）/ `vite build`（主 bundle 328→336KB，gzip 103→107KB，+4KB 为 Provider+Boundary）/ vitest 5 file 24 test 全过 / `vite dev` smoke curl 拿 main.tsx 确认 `from "/@fs/.../sdk/react/lib/index.js"` workspace 链路通
+- [x] **defer**：playwright e2e (cargo + PG@55434) 需 ~5min 前置 — 留给 CI；staging deploy 后手动触发一个 dashboard error 验证 ingest 收到 + Insight project ✅ — 单独跟进
+- [x] commit `phase 31 sub-D: dashboard upgrades to sentori-react`
 
 ### sub-E — Recipe docs
 - [ ] `docs-site/src/content/docs/sdk-react.md`（sub-B 起草，本 sub 完整化）

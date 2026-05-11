@@ -1,23 +1,29 @@
 import './index.css'
 
-import { initSentori } from '@goliapkg/sentori-javascript'
+import { SentoriErrorBoundary, SentoriProvider } from '@goliapkg/sentori-react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { lazy, StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 
+import { ErrorState } from './components/states'
+
 // Phase 17 sub-F: dogfood. Reports dashboard's own JS errors back to
 // the same Sentori instance under the `sentori-dashboard` project.
-// Token is build-time injected (Vite reads VITE_*); skips silently in
-// dev / when no token is set.
+// Phase 31 sub-D: migrated from imperative initSentori() to
+// <SentoriProvider> so the boundary below shares context. When
+// VITE_SENTORI_TOKEN is unset (dev runs without a token), the
+// provider is fed a placeholder config — init fails fast inside the
+// provider's try/catch, the boundary still functions, and no events
+// are actually sent because the ingest URL is unreachable.
 const sentoriToken = import.meta.env.VITE_SENTORI_TOKEN
-if (sentoriToken) {
-  initSentori({
-    environment: import.meta.env.MODE === 'production' ? 'prod' : 'dev',
-    ingestUrl: import.meta.env.VITE_SENTORI_INGEST ?? 'https://ingest.sentori.golia.jp',
-    release: `dashboard@${import.meta.env.VITE_GIT_SHA ?? '0.0.0'}`,
-    token: sentoriToken,
-  })
+const sentoriConfig = {
+  environment: import.meta.env.MODE === 'production' ? 'prod' : 'dev',
+  ingestUrl: sentoriToken
+    ? (import.meta.env.VITE_SENTORI_INGEST ?? 'https://ingest.sentori.golia.jp')
+    : 'http://127.0.0.1:0',
+  release: `dashboard@${import.meta.env.VITE_GIT_SHA ?? '0.0.0'}`,
+  token: sentoriToken ?? 'st_pk_unconfigured00000000000',
 }
 
 import { AuthProvider } from './auth/AuthProvider'
@@ -175,12 +181,23 @@ const queryClient = new QueryClient({
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <DensityProvider>
-          <RouterProvider router={router} />
-        </DensityProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <SentoriProvider config={sentoriConfig}>
+      <SentoriErrorBoundary
+        fallback={
+          <ErrorState
+            detail="The dashboard hit an unexpected error. Refresh the page or contact support if it persists."
+            label="Dashboard crashed"
+          />
+        }
+      >
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <DensityProvider>
+              <RouterProvider router={router} />
+            </DensityProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </SentoriErrorBoundary>
+    </SentoriProvider>
   </StrictMode>
 )

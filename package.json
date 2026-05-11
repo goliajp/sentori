@@ -8,7 +8,8 @@
     "sdk/javascript",
     "sdk/next",
     "sdk/react",
-    "sdk/react-native"
+    "sdk/react-native",
+    "web"
   ],
   "scripts": {
     "build:sdks": "bun run --filter '@goliapkg/sentori-*' build",
