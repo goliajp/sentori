@@ -162,10 +162,12 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-D — EXPLAIN baseline
 
-- [ ] `tools/seed-spans.ts`：注入 100k spans（500 trace × 200 span avg）
-- [ ] EXPLAIN 三个 hot query：trace list（GET /admin/api/projects/{id}/traces?limit=100）/ trace detail（GET /admin/api/traces/{trace_id} → 一棵树）/ span search（按 op + duration > N）
-- [ ] 输出 `docs/performance/baseline-v0.4-phase34.md`
-- [ ] commit `phase 34 sub-D: span ingest explain baseline`
+- [x] `tools/seed-spans.ts`：HTTP-path 工具，500 trace × 200 spans batch via `/v1/spans:batch`；10×5 smoke 跑通（510 sp/s，0 rejected）；real-ingest 测试时用此（走完整 quota / validation / trace materialization 链路）
+- [x] EXPLAIN baseline 数据准备走 SQL bulk INSERT（HTTP 100k 需 3min，SQL 1s）：3 步 `generate_series` — 500 traces + 500 root spans + 99,500 children（CROSS JOIN generate_series(1, 199)）→ 100,050 spans / 510 traces；遇 2 个 SQL bug：(1) `random()*N+1::int` 在 random≈1 时四舍五入到 N+1 数组越界 → 用 `floor(...)::int + 1` (2) interval 字面值用科学计数法被 PG 拒 → 用 `(floor(random()*1000)::int || ' milliseconds')::interval`
+- [x] 3 query EXPLAIN：(Q1 trace list) **0.075ms** Index Scan on `traces_project_last_seen_idx` / (Q2 trace detail 200 spans) **0.68ms** Bitmap Heap Scan via `spans_2026_05_trace_id_idx` / (Q3 span search op+duration top-50) **5.64ms** Bitmap Heap Scan + 16887 candidate rows + in-memory sort — 最慢的一项但仍远低于任何 SLO
+- [x] `docs/performance/baseline-v0.4-phase34.md`：每 query 完整 plan + headline 表 + methodology（SQL bulk vs HTTP tool 用途分工）+ 不覆盖项（跨 partition trace / 不均匀分布 / cold start）+ 2 项 action items deferred（Q3 加 `(project_id, op, duration_ms DESC)` 复合索引 / Q2 partition-pruning hint，留到真实流量证明值得才上）
+- [x] 清理 dev DB 的 bulk-100k 数据（100k spans + 500 traces）；保留 50 spans / 10 traces 来自 seed-spans 工具 smoke 作工具有效证据
+- [x] commit `phase 34 sub-D: span ingest explain baseline`
 
 ## Phase 35 — SDK 端：RN + JS + React
 
