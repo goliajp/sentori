@@ -163,10 +163,10 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [ ] 每个修一独立 commit `phase 30 sub-B: <friction>` 便于 cherry-pick
 
 ### sub-C — 模拟流量脚本
-- [ ] 新文件 `tools/seed-events.ts`：CLI 接受 `--token=<dev-token> --events=5000 --users=200 --releases=10 --include-anr --include-regression`
-- [ ] 实现：随机生成 N events，跨 multiple errorType / release / env / userId；按 timestamp 散布在 last 7 days；含 5% ANR、3% regression（先建 → 标 resolve → 再发同 fingerprint 触发）
-- [ ] `docs/self-hosting.md` + 镜像加"populate dev data"章节，引用脚本
-- [ ] commit `phase 30 sub-C: tools/seed-events.ts`
+- [x] 新文件 `tools/seed-events.ts`：bun CLI 接受 `--token --events --users --releases --include-anr --include-regression --admin-token --project-id --ingest-url --api-url`
+- [x] 实现：UUID v7 ID、10 个 errorType pool（含 iOS / Android / JS）、weighted env（70% prod / 20% staging / 10% dev）、tags 标 `synthetic: seed-events` 便于清理；timestamps 在 last 7 days（60% bias 到 last 24h 让 dashboard 默认窗口有量）；5% ANR；regression simulation 需 admin token + project_id（不传时 warn skip）
+- [x] `docs/self-hosting.md` + `docs-site` 镜像加 "Populate dev data" 章节
+- [x] commit `phase 30 sub-C: tools/seed-events.ts` — 本地 smoke pass（100 events / 0.2s / 5 ANR / 3 releases / 10 users / 10 err_types 全 verified）
 
 ### sub-D — Dashboard 性能 audit
 - [ ] 跑 `seed-events.ts` 注入 5k 事件 / ~1k issues

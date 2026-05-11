@@ -116,6 +116,43 @@ sentori-cli upload sourcemap \
 
 Files are deduped by sha256 and stored under `SENTORI_DATA_DIR/artifacts/`.
 
+## Populate dev data
+
+For local development — dashboard polish, query EXPLAIN baselines,
+performance audits — `tools/seed-events.ts` posts synthetic events
+directly to the ingest endpoint so you can see the dashboard with
+realistic shape without waiting on production users.
+
+```bash
+# 5,000 events across 200 user IDs and 10 release tags, last 7 days,
+# with ~5% ANR mixed in.
+bun tools/seed-events.ts \
+  --token "$SENTORI_DEV_TOKEN" \
+  --events 5000 --users 200 --releases 10 \
+  --include-anr \
+  --ingest-url http://localhost:8080
+```
+
+Each event is tagged `synthetic: seed-events` so you can clean up
+later with:
+
+```bash
+docker compose exec postgres psql -U sentori -d sentori -c \
+  "DELETE FROM events WHERE payload->'tags'->>'synthetic' = 'seed-events'"
+```
+
+To also simulate regressions (resolve some issues then re-post their
+fingerprints so the server flips them to `regressed`), pass an admin
+token + project ID:
+
+```bash
+bun tools/seed-events.ts ... \
+  --include-regression \
+  --admin-token "$SENTORI_ADMIN_TOKEN" \
+  --project-id 019508a0-0000-0000-0000-000000000000 \
+  --api-url http://localhost:8080
+```
+
 ## Backups
 
 Postgres is the source of truth. A nightly logical backup is the v0.1
