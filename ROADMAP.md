@@ -264,12 +264,13 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 32 sub-B: onboarding stopwatch passes`
 
 ### sub-C — React 专区深度 recipe
-- [ ] `docs-site/src/content/docs/recipes/state-management.md`：Redux / Zustand / TanStack Query 怎么 wrap captureError
-- [ ] `docs-site/src/content/docs/recipes/suspense-rsc.md`：Suspense / RSC / streaming 错误捕获边界
-- [ ] `docs-site/src/content/docs/recipes/sourcemap-upload.md`：CI 自动化（GitHub / GitLab / Vercel build hook）
-- [ ] `docs-site/src/content/docs/recipes/release-versioning.md`：`<app>@<version>+<build>` 跨 web / mobile 一致性
-- [ ] `docs-site/src/content/docs/recipes/multi-environment.md`：staging / prod 同 token 不同 env filter
-- [ ] commit `phase 32 sub-C: react deep recipes`
+- [x] `recipes/state-management.md`：Redux middleware (action.type as tag + re-throw) / Zustand withSentori wrapper / TanStack Query QueryCache+MutationCache onError；末尾 "Don't double-capture" 说明 4 个捕获点边界（reducer/store/query/render）各负其责
+- [x] `recipes/suspense-rsc.md`：`<SentoriSuspense>` / `instrumentation.ts:onRequestError` 兜 RSC / streaming subtree `error.tsx` + `useReportNextError` 用 `next.digest` 关联；surface 表 5 行；"Don't put Sentori inside Suspense fallback" 反例
+- [x] `recipes/sourcemap-upload.md`：sentori-cli upload 一行说明 + GitHub Actions（full yml）+ GitLab CI（stages + needs + rules）+ Vercel build hook（package.json scripts.build 串 `next build && upload-sourcemaps`）+ 末尾 "Verifying" 章节给 release detail page 视觉验真
+- [x] `recipes/release-versioning.md`：`<app>@<version>+<build>` 格式表 + Vite/Next.js/Expo/bare RN 4 平台 inject 示例 + "Why per-platform app names"（dashboard artifact 不混淆）+ regression detection semver rule（app+version 比较，build 忽略）+ "Don't change mid-stream" 反例
+- [x] `recipes/multi-environment.md`：environment field 5 推荐值 / Vite/Next.js/RN auto-detect / "Should you send dev events"（默认 no）/ token 策略 single-vs-per-env tradeoff（推荐 single）/ dashboard env filter 持久化 URL
+- [x] `docs/recipes/` 镜像 5 文件；sidebar Recipes 组扩到 8 entry（3 framework + 5 deep）
+- [x] commit `phase 32 sub-C: react deep recipes` — docs build 17 → 22 page
 
 ### sub-D — Troubleshooting 章节
 - [ ] 新 `docs-site/src/content/docs/troubleshooting.md`：典型坑 8-10 项，每项 Q + diagnosis 步骤 + fix

@@ -41,6 +41,11 @@ export default defineConfig({
             { label: 'Next.js', slug: 'recipes/nextjs' },
             { label: 'Remix', slug: 'recipes/remix' },
             { label: 'Vite + React', slug: 'recipes/vite' },
+            { label: 'State management', slug: 'recipes/state-management' },
+            { label: 'Suspense, RSC, streaming', slug: 'recipes/suspense-rsc' },
+            { label: 'Source map upload (CI)', slug: 'recipes/sourcemap-upload' },
+            { label: 'Release versioning', slug: 'recipes/release-versioning' },
+            { label: 'Multi-environment', slug: 'recipes/multi-environment' },
           ],
         },
         {
