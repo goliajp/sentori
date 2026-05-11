@@ -232,10 +232,14 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-A — Trace list view
 
-- [ ] 新 `web/src/views/traces.tsx`：列 root_op / name / status / duration / span_count / received_at；和 issues list 同款 32px 行 + keyboard nav
-- [ ] `adminApi.listTraces(projectId, {cursor, op, status, durationMs})`；server 端 `list_traces` 同款 keyset cursor pagination
-- [ ] sidebar 加入口
-- [ ] commit `phase 36 sub-A: trace list view`
+- [x] `server/src/api/traces.rs`：`list_traces` handler 同款 keyset cursor pagination（参考 list_issues Phase 33 sub-B）— JSON array body + `X-Next-Cursor` header；filter 三种 query param: `?op=` exact match / `?status=` / `?durationMs=N` 表示 ≥ N ms；WHERE 用复合 keyset `(last_seen, trace_id) < (cursor_last, cursor_id)` 保严格有序；ORDER BY last_seen DESC, trace_id DESC
+- [x] `server/src/api/mod.rs` `pub mod traces`；`server/src/router.rs` 挂 `/projects/{project_id}/traces`
+- [x] `web/src/api/client.ts` 加 `TraceRow` type + `listTracesPage(projectId, {cursor, op, status, durationMs, limit})`，与 listIssuesPage 同接口；用 raw fetch + 读 `X-Next-Cursor` header
+- [x] 新 `web/src/views/traces.tsx`：6 列 table（Op / Name / Span count / Duration / Status / Last seen）+ status pill 三色（ok 绿 / error 红 / cancelled 黄）；`useInfiniteQuery` + `<LoadMoreSentinel>` 同 IssuesView 模式；keyboard nav j/k/Enter + 三个 filter（status select / op select / min duration ms input）；filter 变 reset selectedIdx 用单点 `eslint-disable-next-line react-hooks/set-state-in-effect`（rule false positive，one-shot reset 不是 derive）
+- [x] `web/src/views/org-layout.tsx` NAV 表加 `{ label: 'Traces', path: 'traces' }`，位置在 Issues 后；`web/src/main.tsx` lazy import + router 路由 `traces` path
+- [x] **format 工具**：`formatDuration`（<1ms / ms / s 三档）+ `formatRelative`（s/m/h/d ago）独立 helper
+- [x] dashboard `bun run check` 0 errors / `bun run build` OK / vitest 24/24；bundle 339.66 → 339.94 KB（gzip 107.93 → 108.01 KB，+0.08 KB —— Traces view 独立 lazy chunk 不进 main bundle）
+- [x] commit `phase 36 sub-A: trace list view`
 
 ### sub-B — Trace detail (waterfall)
 

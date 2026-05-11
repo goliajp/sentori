@@ -77,6 +77,7 @@ const IssueDetailView = lazy(() =>
 const ReleasesView = lazy(() =>
   import('./views/releases').then((m) => ({ default: m.ReleasesView }))
 )
+const TracesView = lazy(() => import('./views/traces').then((m) => ({ default: m.TracesView })))
 const ReleaseDetailView = lazy(() =>
   import('./views/release-detail').then((m) => ({ default: m.ReleaseDetailView }))
 )
@@ -139,6 +140,7 @@ const router = createBrowserRouter([
           { element: lazyEl(<IssuesView />), path: 'issues' },
           { element: lazyEl(<IssueDetailView />), path: 'issues/:issueId' },
           { element: lazyEl(<ReleasesView />), path: 'releases' },
+          { element: lazyEl(<TracesView />), path: 'traces' },
           { element: lazyEl(<ReleaseDetailView />), path: 'releases/:releaseName' },
           { element: lazyEl(<ReleaseCompareView />), path: 'releases/:target/compare/:base' },
           { element: lazyEl(<OrgSettingsView />), path: 'settings' },

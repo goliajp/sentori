@@ -62,6 +62,19 @@ export type IssueRow = {
   status: IssueStatus
 }
 
+// Phase 36 sub-A: trace list row, mirrors server/src/api/traces.rs#TraceRow.
+export type TraceStatus = 'cancelled' | 'error' | 'ok'
+export type TraceRow = {
+  durationMs: number
+  firstSeen: string
+  lastSeen: string
+  rootName: null | string
+  rootOp: null | string
+  spanCount: number
+  status: TraceStatus
+  traceId: string
+}
+
 export type EventRow = {
   environment: string
   errorMessage: string
@@ -257,6 +270,41 @@ export const adminApi = {
     }
     const issues = (await resp.json()) as IssueRow[]
     return { issues, nextCursor: resp.headers.get('X-Next-Cursor') }
+  },
+
+  /** Phase 36 sub-A: keyset-paginated trace list. Same X-Next-Cursor
+   *  contract as listIssuesPage. */
+  listTracesPage: async (
+    projectId: string,
+    params: {
+      cursor?: null | string
+      durationMs?: number
+      limit?: number
+      op?: string
+      status?: TraceStatus
+    } = {}
+  ): Promise<{ nextCursor: null | string; traces: TraceRow[] }> => {
+    const usp = new URLSearchParams()
+    if (params.limit !== undefined) usp.set('limit', String(params.limit))
+    if (params.op) usp.set('op', params.op)
+    if (params.status) usp.set('status', params.status)
+    if (params.durationMs !== undefined) usp.set('durationMs', String(params.durationMs))
+    if (params.cursor) usp.set('cursor', params.cursor)
+    const qs = usp.toString() ? `?${usp.toString()}` : ''
+    const resp = await fetch(`${ADMIN_BASE}/projects/${projectId}/traces${qs}`, {
+      credentials: 'include',
+    })
+    if (!resp.ok) {
+      let body: unknown
+      try {
+        body = await resp.json()
+      } catch {
+        body = await resp.text()
+      }
+      throw { body, status: resp.status } as AdminApiError
+    }
+    const traces = (await resp.json()) as TraceRow[]
+    return { nextCursor: resp.headers.get('X-Next-Cursor'), traces }
   },
 
   listProjects: () => adminFetch<ProjectRow[]>('/projects'),

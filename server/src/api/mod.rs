@@ -17,6 +17,7 @@ pub mod search;
 pub mod sessions;
 pub mod spans;
 pub mod teams;
+pub mod traces;
 pub mod tokens;
 pub mod user_auth;
 pub mod views;

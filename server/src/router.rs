@@ -96,6 +96,10 @@ pub fn build(cfg: ServerConfig) -> Router {
             get(api::admin::list_issues),
         )
         .route(
+            "/projects/{project_id}/traces",
+            get(api::traces::list_traces),
+        )
+        .route(
             "/projects/{project_id}/issues:bulk",
             post(api::admin::bulk_patch_issues),
         )

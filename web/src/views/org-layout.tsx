@@ -19,6 +19,7 @@ type NavItem = { adminOnly?: boolean; label: string; path: string }
 const NAV: NavItem[] = [
   { label: 'Overview', path: 'overview' },
   { label: 'Issues', path: 'issues' },
+  { label: 'Traces', path: 'traces' },
   { label: 'Releases', path: 'releases' },
   { label: 'Teams', path: 'teams' },
   { adminOnly: true, label: 'Alerts', path: 'alerts' },
