@@ -293,10 +293,12 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 **Estimate:** 1.5 周
 
 ### sub-A — 1M event 数据准备 + EXPLAIN
-- [ ] `tools/seed-events.ts --events=1000000` 注入百万事件（分批 batch，避免 OOM；每批 5k）
-- [ ] 跑 issue list / events / sessions health 各核心 query 的 `EXPLAIN (ANALYZE, BUFFERS)`
-- [ ] 列拐点：哪个 query 在哪个数据规模处崩
-- [ ] commit `phase 33 sub-A: 1m-event explain baseline`
+- [x] 数据准备走 SQL bulk INSERT 路径而非 HTTP（HTTP 全链路 server inline 处理 ~660 ev/s，1M 要 25min；SQL 直接 `generate_series` 100k 一批跑 10 次只要 ~20s）；`tools/seed-events.ts BATCH_SIZE 100 → 500` 顺手优化（减少 HTTP request 数 5x，对压测后续 sub 有意义）
+- [x] 1.02M events 测全 5 个 hot-path query EXPLAIN，对比 Phase 30 sub-D 的 5k baseline 写入对比表：Q1 issue list 0.18→0.23ms / Q2 events for issue 0.17→0.46ms / Q3 sessions health 0.08→0.21ms / Q4 alert sweep 0.06→0.29ms / Q5 webhook 0.05→0.05ms。**Total exec 0.55ms→1.24ms 在 200× 数据下 2.3× — sub-millisecond 预算完整**
+- [x] 写 `docs/performance/baseline-v0.3-phase33.md`：对比表 + 每条 query plan + methodology（bulk insert SQL + DELETE 清理）+ 拐点分析（无拐点；Q2 planning time 2.65ms 是最大占比，由 partition pruning + planner overhead 主导）+ sub-B/sub-E action items
+- [x] 决定 deferred 索引仍不实施：`list_events_for_issue` partition pruning（7 partition 还没到拐点），`alert_rules` partial index（115 rules 远没到 500 临界值）
+- [x] 清理 1M synthetic 行（`DELETE FROM events WHERE payload->'tags'->>'synthetic' = 'bulk-1m'`）
+- [x] commit `phase 33 sub-A: 1m-event explain baseline`
 
 ### sub-B — Cursor pagination + 可选 virtualization
 - [ ] `server/src/api/admin.rs` `list_issues` 加 cursor 参数 `?cursor=<lastSeen>:<id>` 替代 OFFSET（OFFSET 在大数据下慢）；返回 `nextCursor`

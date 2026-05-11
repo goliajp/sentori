@@ -295,7 +295,7 @@ async function main() {
     userIds: Array.from({ length: args.users }, (_, i) => `u_${i.toString().padStart(4, '0')}`),
   }
 
-  const BATCH_SIZE = 100
+  const BATCH_SIZE = 500
   let posted = 0
   let regressionsFired = 0
   const startedAt = Date.now()
