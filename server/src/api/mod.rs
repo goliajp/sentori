@@ -15,6 +15,7 @@ pub mod recipients;
 pub mod releases;
 pub mod search;
 pub mod sessions;
+pub mod spans;
 pub mod teams;
 pub mod tokens;
 pub mod user_auth;

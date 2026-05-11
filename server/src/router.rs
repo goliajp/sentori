@@ -59,6 +59,8 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route("/v1/events/_recent", get(api::recent::handle))
         .route("/v1/deploys", post(api::deploys::handle))
         .route("/v1/sessions", post(api::sessions::handle))
+        .route("/v1/spans", post(api::spans::handle))
+        .route("/v1/spans:batch", post(api::spans::handle_batch))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             crate::rate_limit::rate_limit_middleware,

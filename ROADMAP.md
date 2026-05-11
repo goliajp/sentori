@@ -150,12 +150,15 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ### sub-C — `/v1/spans` ingest endpoint
 
-- [ ] `server/src/api/spans.rs`：`POST /v1/spans` 接受 single span；`POST /v1/spans:batch` 接受 `{spans: [...]}`
-- [ ] 验证：trace_id 必填、parent_span_id 可为 null、duration_ms < 24h（防 clock skew）、tags/data 大小限制
-- [ ] INSERT spans + UPSERT traces 元数据（root_op + span_count + duration_ms 累加）
-- [ ] Quota 走和 events 一样的 per-token rate limit（共享桶）
-- [ ] `server/src/router.rs` 挂路由
-- [ ] commit `phase 34 sub-C: spans ingest endpoint`
+- [x] `server/src/api/spans.rs`：`handle()` 单 span + `handle_batch()`（≤ 200/batch）；shared `SpanInput` deserialize；`SpanAck { id }` / `SpansBatchResponse { accepted, rejected, errors[] }` 同 events:batch 模式；per-span error 不 fail 整个 batch
+- [x] `validate()` 7 项：op 长度 0..=64 / name 长度 0..=200 / status enum / duration_ms 0..=24h / tags ≤ 50 keys 且 value 必须 string / tag key 长度 / data JSON encode ≤ 16 KB
+- [x] `persist_span()` 用 tx 跨 spans + traces 两次写：spans INSERT；traces `ON CONFLICT (trace_id) DO UPDATE SET` 维护 `last_seen = GREATEST` / `span_count += 1` / `root_op = COALESCE(EXCLUDED, traces.root_op)`（root 才设）/ `duration_ms = GREATEST` / `status = CASE worst-of (error > cancelled > ok)`
+- [x] Quota 共享 `quotas::check_and_record` per-org bucket（DevToken 不查；batch 整体算一次 ingest write，单 span 一次）；`Valkey unset/DB unset` fail-open posture 同 events
+- [x] `server/src/router.rs`：`POST /v1/spans` + `POST /v1/spans:batch` 两路由挂在 ingest token group；`server/src/api/mod.rs` 加 `pub mod spans`
+- [x] 8 个单测 `mod tests`：accept minimal / reject empty op / 过长 op / unknown status / negative duration / 24h+1 duration / non-string tag value / root null parent。cargo test --lib **26/26 pass**（was 18，+8）
+- [x] 真 server smoke 通过：(1) single root → 202 ack (2) child same trace → 202 + DB 看到 parent_span_id 链 (3) batch 3 → `{accepted:3, rejected:0}` (4) trace 状态 worst-of 验真：3 个 batch span 含 1 个 status=error → trace.status 翻成 error (5) 混合 batch bad/good → bad 由 index 报 `validationFailed:invalidOp`，good 仍 accept
+- [x] 清理 dev DB 的 6 个 smoke spans + 3 traces
+- [x] commit `phase 34 sub-C: spans ingest endpoint`
 
 ### sub-D — EXPLAIN baseline
 
