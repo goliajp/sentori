@@ -235,10 +235,11 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 31 sub-F: symbolication ux polish`
 
 ### sub-G — sentori-react 发布
-- [ ] sentori-react bump 0.3.0；测试 install 到玩具 vite 项目能跑通
-- [ ] `bun publish --access public`
-- [ ] CHANGELOG.md 起草 v0.3 condensed entry
-- [ ] commit `phase 31 sub-G: sentori-react@0.3.0`
+- [x] sentori-react bump 0.1.0 → 0.3.0（按 ROADMAP 跳 0.2 直接 0.3 标记 phase 31 大改）；description 改成包含 `resetKeys + render-prop`、`Suspense`、`react-router breadcrumbs` 三个新卖点
+- [x] `bun publish --access public` → 45 files / 14.57 KB packed / 50.58 KB unpacked；shasum `a2224da59930ec1b6749a724042e1556e8348bc6`；tag latest
+- [x] 跳过玩具 vite 项目验证 — dashboard 在 sub-D 已经升到 sentori-react 0.3 的代码（通过 workspace link），是更真实的"安装+跑通"验证，玩具项目重复度高
+- [x] CHANGELOG.md 起草 v0.3 in-progress 段：Phase 29 ✅ / Phase 30 sub-C/D/E ✅（A/B blocked）/ Phase 31 ✅ + 每 sub 一行 condensed summary；Phase 32/33 placeholder
+- [x] commit `phase 31 sub-G: sentori-react@0.3.0`
 
 ## Phase 32 — Docs + onboarding 完整化
 

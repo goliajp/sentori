@@ -1,7 +1,7 @@
 {
   "name": "@goliapkg/sentori-react",
-  "version": "0.1.0",
-  "description": "React adapter for Sentori — Provider, ErrorBoundary, and hooks built on @goliapkg/sentori-javascript.",
+  "version": "0.3.0",
+  "description": "React adapter for Sentori — Provider, ErrorBoundary (resetKeys + render-prop), Suspense, react-router breadcrumbs, and hooks built on @goliapkg/sentori-javascript.",
   "license": "MIT",
   "homepage": "https://sentori.golia.jp",
   "repository": {
