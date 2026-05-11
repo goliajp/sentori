@@ -23,6 +23,7 @@ interface Args {
   events: number
   users: number
   releases: number
+  issues: number
   ingestUrl: string
   apiUrl: string | null
   adminToken: string | null
@@ -56,6 +57,7 @@ function parseArgs(): Args {
     events: Number.parseInt(get('events') ?? '5000', 10),
     users: Number.parseInt(get('users') ?? '200', 10),
     releases: Number.parseInt(get('releases') ?? '10', 10),
+    issues: Number.parseInt(get('issues') ?? '100', 10),
     ingestUrl,
     apiUrl:
       get('api-url') ??
@@ -149,8 +151,19 @@ interface GenContext {
   userIds: string[]
 }
 
-function makeEvent(ctx: GenContext, includeAnr: boolean): Record<string, unknown> {
-  const proto = pick(ERROR_TYPES)
+function makeEvent(
+  ctx: GenContext,
+  includeAnr: boolean,
+  issueDiversity: number,
+): Record<string, unknown> {
+  // Fingerprint = sha256(error.type + frame.fn + frame.file). For
+  // issue-shape diversity we deterministically synthesize a (fn, file)
+  // pair per "issue id" 0..N-1, then pick error.type from the pool
+  // indexed by the same id. That gives ~N distinct fingerprints
+  // regardless of the ERROR_TYPES pool size, which is what sub-D's
+  // 5k-event / ~1k-issue baseline needs.
+  const issueId = Math.floor(Math.random() * issueDiversity)
+  const proto = ERROR_TYPES[issueId % ERROR_TYPES.length]!
   const isAnr = includeAnr && Math.random() < 0.05
   const platform =
     isAnr && Math.random() < 0.5 ? 'ios' : isAnr ? 'android' : proto.platform
@@ -168,6 +181,10 @@ function makeEvent(ctx: GenContext, includeAnr: boolean): Record<string, unknown
       : Math.random() * 7 * 86_400_000 // last 7 days
   const tsMs = nowMs - ageMs
 
+  // Per-issue synthesized stack frame so issueId fully determines the
+  // fingerprint.
+  const fnSlot = issueId
+  const fileSlot = Math.floor(issueId / 10)
   return {
     id: uuidV7(tsMs),
     timestamp: new Date(tsMs).toISOString(),
@@ -190,8 +207,8 @@ function makeEvent(ctx: GenContext, includeAnr: boolean): Record<string, unknown
         : `${proto.type}: ${pick(['cannot read property', 'undefined is not a function', 'index out of range', 'network unreachable'])}`,
       stack: [
         {
-          function: proto.fn,
-          file: proto.file,
+          function: `${proto.fn}_v${fnSlot}`,
+          file: `${proto.file.replace(/(\.[a-z]+)$/, `_v${fileSlot}$1`)}`,
           line: Math.floor(10 + Math.random() * 200),
           inApp: true,
         },
@@ -285,7 +302,7 @@ async function main() {
   let nextBatch: object[] = []
 
   for (let i = 0; i < args.events; i++) {
-    nextBatch.push(makeEvent(ctx, args.includeAnr))
+    nextBatch.push(makeEvent(ctx, args.includeAnr, args.issues))
     if (nextBatch.length === BATCH_SIZE) {
       await postBatch(nextBatch, args)
       posted += nextBatch.length
@@ -313,7 +330,7 @@ async function main() {
       for (const proto of sample) {
         const resolved = await simulateRegression(args, proto.type)
         if (resolved) {
-          await postBatch([makeEvent(ctx, false)], args)
+          await postBatch([makeEvent(ctx, false, args.issues)], args)
           regressionsFired++
         }
       }

@@ -169,12 +169,11 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 30 sub-C: tools/seed-events.ts` — 本地 smoke pass（100 events / 0.2s / 5 ANR / 3 releases / 10 users / 10 err_types 全 verified）
 
 ### sub-D — Dashboard 性能 audit
-- [ ] 跑 `seed-events.ts` 注入 5k 事件 / ~1k issues
-- [ ] PG `EXPLAIN (ANALYZE, BUFFERS) SELECT ... FROM issues WHERE project_id = $1 AND status = 'active' ORDER BY last_seen DESC LIMIT 100;` 记录 P50 / P95 / P99 + buffers
-- [ ] 同样跑 `events` 表 `list_events_for_issue` + `sessions` 健康聚合 query
-- [ ] 输出 `docs/performance/baseline-v0.3-phase30.md`：每 query 的 plan / 拐点 / 慢路径
-- [ ] 标记需 sub-E 加索引的 query
-- [ ] commit `phase 30 sub-D: explain analyze baseline`
+- [x] 跑 `seed-events.ts` 注入 5000 events / 987 issues / 117 sessions（`--events 5000 --issues 1000 --include-anr`）
+- [x] EXPLAIN (ANALYZE, BUFFERS) 全部 5 个 hot-path query：issue list / list_events_for_issue / health bucket aggregate / alert rule cron sweep / webhook dispatch pending sweep
+- [x] 输出 `docs/performance/baseline-v0.3-phase30.md`：每 query 的 plan summary + bottleneck + 5k 规模下行为分析
+- [x] sub-E 行动项：5k 规模基本无需改动；标记 2 项 1M 复跑前的候选（list_events_for_issue 的 partition pruning hint + alert_rules 大 org 的 partial index）
+- [x] commit `phase 30 sub-D: explain analyze baseline` — 五条 query 合计 0.55ms execution；dashboard 感知延迟在 5k 规模上由 React/网络决定，不是 PG
 
 ### sub-E — 索引补齐
 - [ ] migration `0026_perf_indexes.sql`：根据 sub-D 输出加缺失索引（候选：`issues (project_id, last_seen DESC) WHERE status='active'` 部分索引；`events (project_id, received_at DESC, issue_id)` 复合索引；其它按 EXPLAIN 决定）
