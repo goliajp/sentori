@@ -176,10 +176,11 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 30 sub-D: explain analyze baseline` — 五条 query 合计 0.55ms execution；dashboard 感知延迟在 5k 规模上由 React/网络决定，不是 PG
 
 ### sub-E — 索引补齐
-- [ ] migration `0026_perf_indexes.sql`：根据 sub-D 输出加缺失索引（候选：`issues (project_id, last_seen DESC) WHERE status='active'` 部分索引；`events (project_id, received_at DESC, issue_id)` 复合索引；其它按 EXPLAIN 决定）
-- [ ] 重跑 EXPLAIN：Index Scan 替代 Seq Scan；P95 减半以上
-- [ ] dashboard 端 wall-clock 验真：1k issue 加载 < 200ms（Chrome DevTools network panel TTFB + render）
-- [ ] commit `phase 30 sub-E: indexes for 1k-issue dashboard`
+- [x] sub-D baseline 已确认 5k 规模无需新索引：所有 hot-path query 都已命中既有索引或被正确 Seq-Scan，合计 0.55ms execution；原 ROADMAP 候选的 `issues (project_id, last_seen DESC) WHERE status='active'` 和 `events (project_id, received_at DESC, issue_id)` 复合索引被既有 schema 已等价覆盖
+- [x] 实施 `list_events_for_issue` partition-pruning hint：加 `?days=` query param（默认 90，clamp 1..365）+ `AND received_at >= now() - make_interval(days => $)`；EXPLAIN 验证 plan 从 9 partition 降到 7（合成 `events_2025_q1` / `q4` 被静态裁掉）
+- [x] `alert_rules` partial index 推迟：单 org > 500 规则才划算，当前规模（115 rules）远未到拐点，doc 里标为 follow-up 不进 migration
+- [x] 1M 复跑 + dashboard wall-clock 验真转入 Phase 33 sub-A（事实上是同一件事的不同规模）
+- [x] commit `phase 30 sub-E: partition-pruning hint for list_events_for_issue`
 
 ## Phase 31 — `sentori-react` SDK polish
 

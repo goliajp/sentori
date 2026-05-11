@@ -231,6 +231,10 @@ pub struct ListEventsQuery {
     /// Default true. `?symbolicated=false` returns raw frames.
     #[serde(default)]
     pub symbolicated: Option<bool>,
+    /// Lookback window in days. Defaults to 90. Bounded server-side so the
+    /// planner can statically prune events partitions older than the bound.
+    #[serde(default)]
+    pub days: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -806,19 +810,23 @@ pub async fn list_events_for_issue(
     let pool = state.db.as_ref().ok_or(AppError::DatabaseUnavailable)?;
     let limit = q.limit.unwrap_or(50).clamp(1, 200);
     let symbolicated = q.symbolicated.unwrap_or(true);
+    let days = q.days.unwrap_or(90).clamp(1, 365);
 
     let mut rows: Vec<EventRow> = sqlx::query_as(
         r#"
         SELECT id, occurred_at, received_at, platform, release, environment,
                error_type, error_message, payload
         FROM events
-        WHERE project_id = $1 AND issue_id = $2
+        WHERE project_id = $1
+          AND issue_id = $2
+          AND received_at >= now() - make_interval(days => $3::int)
         ORDER BY received_at DESC
-        LIMIT $3
+        LIMIT $4
         "#,
     )
     .bind(project_id)
     .bind(issue_id)
+    .bind(days as i32)
     .bind(limit)
     .fetch_all(pool)
     .await

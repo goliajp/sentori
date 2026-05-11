@@ -70,6 +70,17 @@ Planning Time: 2.679 ms  ← noteworthy
   time substantially when the partition count grows. Code change is
   in `server/src/api/admin.rs::list_events_for_issue`.
 
+  **Implemented in Phase 30 sub-E.** Verified with a synthetic
+  `events_2025_q1` + `events_2025_q4` partition pair created against
+  the dev DB: the query plan **dropped from 9 partitions scanned to
+  7** with the hint in place (both 2025 partitions pruned). Planning
+  time fell from 3.52 ms → 3.16 ms at this scale; the win scales with
+  partition count, so the larger return is once the cluster carries
+  12+ months of partitions in production. The lookback is exposed as
+  a server-bounded `?days=` query param (default 90, clamp 1..365)
+  so the dashboard can still ask for older windows when investigating
+  long-tail issues.
+
 ## Q3 — Health aggregate (5-minute bucket, last 24h)
 
 `GET /admin/api/projects/{id}/health` — overview widget.
@@ -153,18 +164,20 @@ docker exec sentori-pg psql -U postgres -d sentori \
 
 Sub-E (索引补齐) is **mostly a no-op at the 5k-event baseline** —
 every hot-path query already lands on its intended index. The two
-items worth implementing now, even before the 1M re-baseline:
+items considered:
 
-1. **`list_events_for_issue` partition pruning hint** — add an
-   optional `--from` time bound (default 90 days) so the planner can
-   prune partitions statically and cut planning time. Affects every
-   issue detail page click as the events table grows past 12 months.
+1. ✅ **`list_events_for_issue` partition pruning hint** — implemented.
+   Added a server-bounded `?days=` query param (default 90, clamp
+   1..365) and `AND received_at >= now() - make_interval(days => $)`
+   to the SQL. Verified the planner statically prunes events
+   partitions older than the bound (see Q2 implementation note).
 
-2. **`alert_rules` partial index for cron sweep** — only adds value
-   above ~500 rules in a single org. Worth deferring until that
-   signal shows up; tracked as a follow-up note rather than a sub-E
-   migration.
+2. ⏸ **`alert_rules` partial index for cron sweep** — deferred. Only
+   adds value above ~500 rules in a single org and the current dev
+   shape (115 rules, of which 72 match the cron predicate) doesn't
+   meet that bar. Tracked as a follow-up note in the Q4 section above
+   rather than a sub-E migration.
 
 The 1M-event re-baseline (Phase 33 sub-A) is the next opportunity to
-catch regressions and decide whether the deferred items above need to
-land.
+catch regressions and decide whether the deferred item above needs to
+land as a migration.
