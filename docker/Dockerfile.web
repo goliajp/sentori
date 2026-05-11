@@ -3,6 +3,14 @@
 #
 # Build context: repo root.
 #   docker build -f docker/Dockerfile.web -t sentori-web .
+#
+# Phase 31 sub-D moved web/ into the root `workspaces:` array, so
+# `bun install` from web/ alone now fails — `@goliapkg/sentori-react`
+# is referenced as `workspace:*` and only resolves when bun can see
+# the sdk/ tree alongside the root lockfile. The COPY block below
+# brings just enough of the monorepo into the image to make the
+# resolution work, while still preserving layer-cache friendliness:
+# only manifests + lockfile in the first layer, then sources.
 
 FROM oven/bun:1 AS builder
 WORKDIR /build
@@ -14,12 +22,26 @@ ARG VITE_GIT_SHA
 ENV VITE_SENTORI_TOKEN=$VITE_SENTORI_TOKEN \
     VITE_SENTORI_INGEST=$VITE_SENTORI_INGEST \
     VITE_GIT_SHA=$VITE_GIT_SHA
-COPY web/package.json web/bun.lock ./
+
+# Manifest layer — cached unless a package.json or the lockfile changes.
+COPY package.json bun.lock ./
+COPY sdk/core/package.json ./sdk/core/
+COPY sdk/javascript/package.json ./sdk/javascript/
+COPY sdk/react/package.json ./sdk/react/
+COPY sdk/next/package.json ./sdk/next/
+COPY sdk/react-native/package.json ./sdk/react-native/
+COPY sdk/expo/package.json ./sdk/expo/
+COPY web/package.json ./web/
 RUN bun install --frozen-lockfile
-COPY web ./
+
+# Source layer — re-runs on any file change.
+COPY sdk ./sdk
+COPY web ./web
+
+WORKDIR /build/web
 RUN bun run build
 
 FROM nginx:1.27-alpine
-COPY --from=builder /build/dist /usr/share/nginx/html
+COPY --from=builder /build/web/dist /usr/share/nginx/html
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
