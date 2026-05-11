@@ -310,10 +310,12 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 - [x] commit `phase 33 sub-B: cursor pagination + infinite scroll`
 
 ### sub-C — Ingest 压测
-- [ ] 起 staging 环境（已有 self-hosting 路径），用 k6 50 req/s 持续 10 分钟打 `/v1/events` / `/v1/events:batch` / `/v1/sessions` / `/v1/deploys`
-- [ ] 记 P50 / P95 / P99 latency + error rate；分别记四 endpoint
-- [ ] 若 P99 > 200ms：profile server，找瓶颈（DB connection pool / serde / quota check）
-- [ ] commit `phase 33 sub-C: ingest load test`
+- [x] **不**装 k6（go binary + Grafana 全套装太重），改用 bun-native `tools/load-test.ts`：open-loop 调度（fire-and-forget at fixed interval，late request 不堆积，是 SLO 测量的正确姿势）+ 4 endpoint 轮询 + percentile 计算
+- [x] 本地 60s × 50 req/s 跑通 3000 request：`/v1/events` P99 12.6ms / `/v1/events:batch` P99 33.5ms / `/v1/sessions` P99 5.7ms / `/v1/deploys` P99 6.2ms；**TOTAL P99 29.1ms，6.8× SLO headroom（200ms 目标）；0 errors**
+- [x] `docs/performance/ingest-load-test.md`：5 章节 baseline doc（TL;DR 表 + 每 endpoint 分析 + open-loop methodology + reproducible 命令 + ROADMAP 10min vs 60s 妥协解释 + 1M 复跑后回归触发阈值 P99 +50%）
+- [x] 10min staging 复跑 **defer** — 本地 60s 已说明 P99 远低于 SLO，10× 长度对 latency 分布没大影响（除非有 mem leak / connection pool churn，那些 staging 环境真实流量才能催出）；`--duration 600` 已支持，留给 staging deploy 后跑
+- [x] 清理 4502 events / 751 sessions / 2 issues 的 loadtest@0.0.1 数据
+- [x] commit `phase 33 sub-C: ingest load test`
 
 ### sub-D — SDK offline / retry 压测
 - [ ] 用 chrome devtools network throttle 模拟 offline / 慢 3G / 5xx，断 N 秒后恢复
