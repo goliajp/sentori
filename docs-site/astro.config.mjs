@@ -43,6 +43,7 @@ export default defineConfig({
             { label: 'Vite + React', slug: 'recipes/vite' },
             { label: 'State management', slug: 'recipes/state-management' },
             { label: 'Suspense, RSC, streaming', slug: 'recipes/suspense-rsc' },
+            { label: 'Distributed tracing', slug: 'recipes/distributed-tracing' },
             { label: 'Source map upload (CI)', slug: 'recipes/sourcemap-upload' },
             { label: 'Release versioning', slug: 'recipes/release-versioning' },
             { label: 'Multi-environment', slug: 'recipes/multi-environment' },
