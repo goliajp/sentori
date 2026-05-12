@@ -56,11 +56,33 @@ SENTORI_PG_PASSWORD=$(openssl rand -hex 16)
 | `SENTORI_SMTP_FROM` | `sentori@localhost` | From: address |
 | `SENTORI_DATA_DIR` | `/data` | source-map blob storage path |
 | `SENTORI_WEB_PORT` | `8000` | host port for the web container |
+| `SENTORI_TRACE_RETENTION_DAYS` | `14` | how long spans + traces are kept (see *Data retention* below) |
+| `SENTORI_SELF_TRACE_PROJECT_ID` | unset | if set to a project UUID, the server emits its own `http.server` spans into that project |
 | `RUST_LOG` | `info,sentori_server=info,tower_http=info` | |
 
 Copy `docker-compose.override.example.yml` to
 `docker-compose.override.yml` and edit. The override is auto-merged by
 `docker compose`.
+
+## Data retention
+
+A daily background pass (`retention.rs`) manages the time-partitioned
+tables:
+
+- **events** are kept for the longest plan retention across all orgs,
+  floor 30 days. Errors are the high-value signal — keep them.
+- **spans + traces** are kept for `SENTORI_TRACE_RETENTION_DAYS`
+  (default 14). Traces are high-volume and lower-value than errors, so
+  a short hard window keeps storage bounded; recent traces stay 100%
+  complete (Sentori does **not** sample at ingest). Set it longer if
+  you have the disk; set it shorter to be aggressive.
+
+The same pass keeps ~6 months of empty monthly partitions ahead of
+"now" so writes never spill into the `*_default` catch-all partition —
+so don't stop the server for months at a time and expect partition
+hygiene to keep up. Expired monthly partitions are `DROP TABLE`-d (an
+instant metadata op); the `traces` table (not partitioned) is pruned
+with a delete.
 
 ## Starting
 

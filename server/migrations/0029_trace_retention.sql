@@ -1,0 +1,14 @@
+-- Phase 39 sub-C: trace retention.
+--
+-- spans is already RANGE-partitioned by received_at (migration 0026),
+-- so the daily retention task drops old span partitions the same way
+-- it drops old events partitions — nothing to add here for spans.
+--
+-- traces is NOT partitioned and (deliberately) can't be: the ingest
+-- UPSERT does `ON CONFLICT (trace_id) DO UPDATE`, which needs a unique
+-- index on trace_id alone — impossible on a partitioned table, whose
+-- unique indexes must include the partition key. So traces is pruned
+-- with a plain `DELETE WHERE last_seen < cutoff` in the retention
+-- pass. This index makes that delete an index scan instead of a seq
+-- scan over the whole table.
+CREATE INDEX IF NOT EXISTS traces_last_seen_idx ON traces (last_seen);
