@@ -94,17 +94,18 @@ export function TracesView() {
           <input
             className="border-border bg-bg-tertiary text-fg w-80 rounded-md border px-3 py-1 text-[12px]"
             onChange={(e) => setQueryText(e.target.value)}
-            placeholder="op:http.client status:error duration:>500ms"
+            placeholder="op:http.client status:error duration:>500ms …"
             type="text"
             value={queryText}
           />
-          {parsed.warnings.length > 0 && (
-            <span className="text-[11px] text-amber-400" title={parsed.warnings.join('\n')}>
-              {parsed.warnings.length} warning{parsed.warnings.length === 1 ? '' : 's'}
-            </span>
-          )}
         </div>
       </header>
+
+      {parsed.warnings.length > 0 && (
+        <div className="border-border bg-amber-500/5 border-b px-6 py-2 text-[11px] text-amber-300">
+          {parsed.warnings.join(' · ')}
+        </div>
+      )}
 
       {traces.length === 0 ? (
         <EmptyState
