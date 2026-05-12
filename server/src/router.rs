@@ -20,6 +20,7 @@ const MAX_BODY_BYTES: usize = 1024 * 1024; // 1 MB per protocol.md size limits
 // via DefaultBodyLimit::disable() and rely on per-handler validation.
 const MAX_ADMIN_UPLOAD_BYTES: usize = 256 * 1024 * 1024;
 
+#[derive(Default)]
 pub struct ServerConfig {
     pub dev_token: String,
     pub db: Option<sqlx::PgPool>,

@@ -32,8 +32,7 @@ async fn setup() -> Option<(SocketAddr, PgPool, mpsc::Sender<NotifyEvent>, mpsc:
         session_secret: "ae-secret".to_string(),
         notifier_tx: Some(tx.clone()),
         base_url: "http://localhost:8080".to_string(),
-        metrics: None,
-        self_trace: None,
+        ..Default::default()
     });
     tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();

@@ -27,8 +27,7 @@ async fn setup() -> Option<(SocketAddr, PgPool)> {
         session_secret: "viewer-secret".to_string(),
         notifier_tx: None,
         base_url: "http://localhost:8080".to_string(),
-        metrics: None,
-        self_trace: None,
+        ..Default::default()
     });
     tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();
