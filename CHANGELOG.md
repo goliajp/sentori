@@ -45,6 +45,16 @@
 - **sub-A** 1M span EXPLAIN 复测：5000 traces × 200 spans (~15s SQL bulk INSERT)；Q1 0.131ms / Q2 1.16ms / Q3 0.11ms / Q4 40.7ms（7.2× sub-linear scaling，plan-shape 均未变 → 不触发 regression policy）；`docs/performance/baseline-v0.4-phase38.md`；deferred 2 项 action item（partition prune hint / Q4 composite index）留 v0.5
 - **sub-B** CHANGELOG + tag v0.4.0 + GitHub Release + marketing hero 加副标题 "Distributed tracing built in"
 
+### v0.4.1 patch — XHR instrumentation
+
+dogfood 发现：sentori-rn / sentori-js 的自动 tracing 只 patch `globalThis.fetch`，但 axios（RN 上默认 `xhr` adapter / 浏览器同）走 `XMLHttpRequest` 不经 fetch — 用 axios 的 app（如 Insight）几乎不产 http.client span。Phase 35 sub-C 的注释 "RN polyfills XHR over fetch internally" 是错的，RN 的 XHR 是原生实现。
+
+- `sdk/react-native/src/handlers/network.ts` 拆 `patchFetch()` + `patchXhr()`，后者 patch `XMLHttpRequest.prototype.open/send` — open 时存 method/url，send 时开 span + 注 traceparent header + 监听 `loadend`（status 0/4xx/5xx → error）和 `abort`（→ cancelled）
+- 新 `sdk/javascript/src/hooks/xhr.ts`：`installXhrInstrumentation` 同款 prototype patch；`init.ts` 在 `installFetchInstrumentation` 后也调它
+- 测试：JS SDK +9（XHR lifecycle / traceparent / 5xx / status 0 / abort / URL input / 并发独立 span）；RN SDK +5（同款用 FakeXHR）；JS suite 44/44，RN suite 39/39
+- publish 4 包（core 无改动不 bump）：sentori-javascript 0.3.0 → 0.3.1 / sentori-react-native 0.5.0 → 0.5.1 / sentori-react 0.4.0 → 0.4.1（dep js→0.3.1）/ sentori-next 0.2.0 → 0.2.1（dep js→0.3.1 + react→0.4.1）
+- Insight 升到 sentori-react-native@0.5.1 即可不改代码拿到 axios trace
+
 ---
 
 ## v0.3 — React-first via dogfood（Phase 29-33，进行中）

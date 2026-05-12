@@ -1,7 +1,7 @@
 {
   "name": "@goliapkg/sentori-react-native",
-  "version": "0.5.0",
-  "description": "Sentori SDK for React Native — JS-layer error capture, native crash handlers (iOS / Android), batched transport, fetch + react-navigation tracing.",
+  "version": "0.5.1",
+  "description": "Sentori SDK for React Native \u2014 JS-layer error capture, native crash handlers (iOS / Android), batched transport, fetch + react-navigation tracing.",
   "license": "MIT",
   "homepage": "https://sentori.golia.jp",
   "repository": {

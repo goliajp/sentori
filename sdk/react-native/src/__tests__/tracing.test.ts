@@ -33,9 +33,38 @@ const recorder = (async (input: Request | string | URL, init?: RequestInit) => {
   return new Response('', { status: r.status });
 }) as unknown as typeof fetch;
 
+// Fake XMLHttpRequest so installNetworkHandler()'s patchXhr() has a
+// prototype to patch. RN's native XHR isn't present in bun:test.
+type FakeListener = () => void;
+class FakeXHR {
+  status = 0;
+  private listeners: Record<string, FakeListener[]> = {};
+  private requestHeaders: Record<string, string> = {};
+  private opened = false;
+
+  open(_method: string, _url: string | URL): void {
+    this.opened = true;
+  }
+  setRequestHeader(name: string, value: string): void {
+    if (!this.opened) throw new Error('setRequestHeader before open');
+    this.requestHeaders[name.toLowerCase()] = value;
+  }
+  send(_body?: unknown): void {}
+  addEventListener(event: string, fn: FakeListener): void {
+    (this.listeners[event] ??= []).push(fn);
+  }
+  getHeader(name: string): string | undefined {
+    return this.requestHeaders[name.toLowerCase()];
+  }
+  fire(event: string): void {
+    for (const fn of this.listeners[event] ?? []) fn();
+  }
+}
+
 beforeAll(() => {
   (globalThis as { fetch: typeof fetch }).fetch = recorder;
-  installNetworkHandler();
+  (globalThis as { XMLHttpRequest: unknown }).XMLHttpRequest = FakeXHR as unknown;
+  installNetworkHandler(); // patches globalThis.fetch + XMLHttpRequest.prototype
 });
 
 beforeEach(() => {
@@ -104,5 +133,60 @@ describe('RN network handler tracing', () => {
     expect(h.get('authorization')).toBe('Bearer xyz');
     expect(h.get('x-custom')).toBe('1');
     expect(h.get('traceparent')).toBeTruthy();
+  });
+});
+
+describe('RN XHR tracing (axios goes through XHR on RN)', () => {
+  test('patched XHR emits an http.client span on loadend', () => {
+    const x = new FakeXHR();
+    x.open('POST', 'https://api.example.com/v1/orders');
+    x.send('{}');
+    x.status = 201;
+    x.fire('loadend');
+
+    const sp = drainSpans()[0]!;
+    expect(sp.op).toBe('http.client');
+    expect(sp.name).toBe('POST https://api.example.com/v1/orders');
+    expect(sp.tags).toMatchObject({
+      'http.method': 'POST',
+      'http.status': '201',
+      'http.url': 'https://api.example.com/v1/orders',
+    });
+    expect(sp.status).toBe('ok');
+  });
+
+  test('injects W3C traceparent request header', () => {
+    const x = new FakeXHR();
+    x.open('GET', 'https://api.example.com/x');
+    x.send();
+    expect(x.getHeader('traceparent')).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
+    x.status = 200;
+    x.fire('loadend');
+  });
+
+  test('5xx → span.status = "error"', () => {
+    const x = new FakeXHR();
+    x.open('GET', 'https://api.example.com/x');
+    x.send();
+    x.status = 502;
+    x.fire('loadend');
+    expect(drainSpans()[0]?.status).toBe('error');
+  });
+
+  test('status 0 → span.status = "error"', () => {
+    const x = new FakeXHR();
+    x.open('GET', 'https://api.example.com/x');
+    x.send();
+    x.status = 0;
+    x.fire('loadend');
+    expect(drainSpans()[0]?.status).toBe('error');
+  });
+
+  test('abort → span.status = "cancelled"', () => {
+    const x = new FakeXHR();
+    x.open('GET', 'https://api.example.com/x');
+    x.send();
+    x.fire('abort');
+    expect(drainSpans()[0]?.status).toBe('cancelled');
   });
 });
