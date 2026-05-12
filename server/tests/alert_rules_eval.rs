@@ -143,7 +143,7 @@ async fn new_issue_rule_fires_on_first_event_with_filter_match() {
         eprintln!("skipping (DATABASE_URL not set)");
         return;
     };
-    let (project_id, ingest, cookie, org_slug) = project_with_token(&addr, &pool).await;
+    let (_project_id, ingest, cookie, org_slug) = project_with_token(&addr, &pool).await;
 
     // Arm a new_issue rule scoped to env=prod, errorTypeRegex matching `Type.*`.
     let resp = Client::new()

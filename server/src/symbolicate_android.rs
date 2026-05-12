@@ -250,7 +250,7 @@ com.example.OriginalClass -> com.example.a:
     fn symbolicate_skips_non_jvm_frames() {
         // A frame whose function lacks a dot looks like JS or a bare
         // function name — leave it alone.
-        let mut payload = json!({
+        let payload = json!({
             "error": {
                 "stack": [
                     { "function": "handleClick", "file": "App.tsx", "line": 1, "inApp": true }
