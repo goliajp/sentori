@@ -32,6 +32,12 @@ type Store = { span: SpanContextLike | null }
 interface ContextImpl {
   get(): SpanContextLike | null
   run<T>(span: SpanContextLike, fn: () => T): T
+  /** Set the active span without a scope — for long-lived contexts
+   *  (screen navigation) that aren't a single `fn` call. No-op on the
+   *  AsyncLocalStorage impl: ALS has no clean "set and leave", and the
+   *  only caller (navigation) runs on browser/RN, where the fallback
+   *  impl is in effect. */
+  set(span: SpanContextLike | null): void
 }
 
 function loadNodeImpl(): ContextImpl | null {
@@ -53,6 +59,9 @@ function loadNodeImpl(): ContextImpl | null {
     return {
       get: () => als.getStore()?.span ?? null,
       run: (span, fn) => als.run({ span }, fn),
+      set: () => {
+        // No-op — see ContextImpl.set doc. Navigation is browser/RN.
+      },
     }
   } catch {
     return null
@@ -71,6 +80,9 @@ function fallbackImpl(): ContextImpl {
       } finally {
         current = prev
       }
+    },
+    set: (span) => {
+      current = span
     },
   }
 }
@@ -114,9 +126,36 @@ export function withSpan<T>(span: SpanContextLike, fn: () => T): T {
   return impl().run(span, fn)
 }
 
+/**
+ * Set (or clear, with `null`) the active span outside of a `withSpan`
+ * scope. For long-lived contexts where a `fn` wrapper doesn't fit —
+ * specifically screen navigation: `useTraceNavigation` opens a
+ * `react.navigation` span when a screen is entered and leaves it
+ * active for that screen's lifetime, so the screen's `http.client`
+ * spans become children (one trace per screen instead of one per
+ * request).
+ *
+ * Browser/RN only in practice — no-op on the Node/AsyncLocalStorage
+ * impl (ALS can't "set and leave" cleanly). Don't reach for this in
+ * async server code; `withSpan` is the scoped tool there.
+ */
+export function setActiveSpan(span: SpanContextLike | null): void {
+  impl().set(span)
+}
+
 /** Reset the implementation choice — test-only. Production code never
  *  calls this; switching propagation strategy at runtime would mean
  *  losing the current active context. */
 export function __resetTraceContextForTests(): void {
   _impl = null
+}
+
+/** Test-only: force the module-variable fallback impl regardless of
+ *  environment. `bun test` runs as Node (so the ALS impl is picked),
+ *  but navigation — the one feature that relies on `setActiveSpan` —
+ *  only runs on browser/RN, where the fallback is in effect. Tests of
+ *  that path call this so they exercise the impl that actually ships
+ *  there. */
+export function __useFallbackTraceContextForTests(): void {
+  _impl = fallbackImpl()
 }

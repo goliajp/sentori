@@ -50,6 +50,8 @@ export {
 
 export {
   __resetTraceContextForTests,
+  __useFallbackTraceContextForTests,
   activeSpan,
+  setActiveSpan,
   withSpan,
 } from './trace-context.js'

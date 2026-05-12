@@ -5,5 +5,5 @@ export { parseStack, type ParseStackOptions } from './stack.js';
 export { normalizeUrl } from './url.js';
 export { type SessionContext, type SessionPing, type SessionStatus, SessionTracker, } from './session.js';
 export { SpanBuffer, SpanHandle, type SpanContextLike, type StartSpanOptions, clearSpans, drainSpans, getSpans, startSpan, } from './spans.js';
-export { __resetTraceContextForTests, activeSpan, withSpan, } from './trace-context.js';
+export { __resetTraceContextForTests, __useFallbackTraceContextForTests, activeSpan, setActiveSpan, withSpan, } from './trace-context.js';
 //# sourceMappingURL=index.d.ts.map

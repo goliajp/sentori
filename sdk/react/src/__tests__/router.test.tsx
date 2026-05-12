@@ -1,5 +1,12 @@
+import {
+  __resetTraceContextForTests,
+  __useFallbackTraceContextForTests,
+  clearSpans,
+  drainSpans,
+  setActiveSpan,
+} from '@goliapkg/sentori-core'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { Link, MemoryRouter, Route, Routes } from 'react-router'
 
 import { clearBreadcrumbs, getBreadcrumbs } from '@goliapkg/sentori-javascript'
@@ -31,11 +38,23 @@ function Shell() {
   )
 }
 
+const navSpans = () => drainSpans().filter((s) => s.op === 'react.navigation')
+
 describe('useSentoriRouter', () => {
-  beforeEach(() => clearBreadcrumbs())
+  beforeEach(() => {
+    __useFallbackTraceContextForTests() // see navigation.test.ts
+    clearBreadcrumbs()
+    clearSpans()
+    setActiveSpan(null)
+  })
   afterEach(() => {
     cleanup()
     clearBreadcrumbs()
+    clearSpans()
+    setActiveSpan(null)
+  })
+  afterAll(() => {
+    __resetTraceContextForTests()
   })
 
   test('initial mount does NOT emit a nav breadcrumb', () => {
@@ -72,5 +91,25 @@ describe('useSentoriRouter', () => {
     const navsAfter = getBreadcrumbs().filter((b) => b.type === 'nav')
     expect(navsAfter).toHaveLength(2)
     expect(navsAfter[1]?.data).toEqual({ from: '/orders', to: '/billing' })
+  })
+
+  test('opens a react.navigation span per route (initial + each transition)', () => {
+    render(
+      <SentoriProvider {...PROVIDER_PROPS}>
+        <MemoryRouter initialEntries={['/']}>
+          <Shell />
+        </MemoryRouter>
+      </SentoriProvider>,
+    )
+    fireEvent.click(screen.getByText('orders'))
+    fireEvent.click(screen.getByText('billing'))
+    cleanup() // unmount → finishes the last open span
+
+    const spans = navSpans()
+    expect(spans.map((s) => s.name)).toEqual(['/', '/ → /orders', '/orders → /billing'])
+    // each route is its own trace root
+    expect(spans.every((s) => s.parentSpanId === null)).toBe(true)
+    expect(new Set(spans.map((s) => s.traceId)).size).toBe(3)
+    expect(spans[1]?.tags).toEqual({ 'nav.from': '/', 'nav.to': '/orders' })
   })
 })
