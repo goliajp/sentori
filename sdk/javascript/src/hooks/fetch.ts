@@ -10,7 +10,7 @@
 // (default `xhr` adapter) and older XHR-only callers don't go through
 // fetch, so the fetch hook alone would miss them.
 
-import { startSpan } from '@goliapkg/sentori-core'
+import { normalizeUrl, startSpan } from '@goliapkg/sentori-core'
 
 import { getConfig } from '../config.js'
 
@@ -58,7 +58,7 @@ async function wrappedFetch(
   const { method, url } = extractMethodAndUrl(input, init)
   if (isIngestUrl(url)) return original(input as RequestInfo, init)
   const span = startSpan('http.client', {
-    name: `${method} ${url}`,
+    name: `${method} ${normalizeUrl(url)}`,
     tags: { 'http.method': method, 'http.url': url },
   })
 

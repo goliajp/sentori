@@ -9,7 +9,7 @@
 // XMLHttpRequest is instrumented separately in hooks/xhr.ts — axios
 // (default `xhr` adapter) and older XHR-only callers don't go through
 // fetch, so the fetch hook alone would miss them.
-import { startSpan } from '@goliapkg/sentori-core';
+import { normalizeUrl, startSpan } from '@goliapkg/sentori-core';
 import { getConfig } from '../config.js';
 // Don't trace requests to our own ingest endpoint — span uploads
 // would otherwise spawn http.client spans recursively.
@@ -51,7 +51,7 @@ async function wrappedFetch(input, init) {
     if (isIngestUrl(url))
         return original(input, init);
     const span = startSpan('http.client', {
-        name: `${method} ${url}`,
+        name: `${method} ${normalizeUrl(url)}`,
         tags: { 'http.method': method, 'http.url': url },
     });
     // Inject traceparent into outgoing headers. The Headers constructor

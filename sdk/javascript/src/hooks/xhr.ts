@@ -11,7 +11,7 @@
 // native XHR polyfill, and any other XHR shim. State is stashed on the
 // instance between open() and the terminal `loadend` event.
 
-import { startSpan } from '@goliapkg/sentori-core'
+import { normalizeUrl, startSpan } from '@goliapkg/sentori-core'
 
 import { getConfig } from '../config.js'
 import { toTraceparent } from './fetch.js'
@@ -65,7 +65,7 @@ export function installXhrInstrumentation(): boolean {
     const method = this.__sentoriMethod ?? 'GET'
     const url = this.__sentoriUrl ?? ''
     const span = startSpan('http.client', {
-      name: `${method} ${url}`,
+      name: `${method} ${normalizeUrl(url)}`,
       tags: { 'http.method': method, 'http.url': url },
     })
     this.__sentoriSpan = span

@@ -105,6 +105,15 @@ describe('RN network handler tracing', () => {
     expect(tp).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
   });
 
+  test('span name normalizes id-like segments; tag keeps full scrubbed url', async () => {
+    await fetch('https://api.example.com/users/123/orders/456?token=abc');
+    const sp = drainSpans()[0]!;
+    expect(sp.name).toBe('GET https://api.example.com/users/{id}/orders/{id}');
+    // RN's scrubUrl redacts auth params in the tag, but keeps path + host.
+    expect(sp.tags['http.url']).toContain('https://api.example.com/users/123/orders/456');
+    expect(sp.tags['http.url']).not.toContain('token=abc');
+  });
+
   test('5xx → span.status = "error"', async () => {
     recorderQueue = [{ status: 503 }];
     await fetch('https://api.example.com/x');

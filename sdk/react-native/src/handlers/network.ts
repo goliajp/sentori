@@ -1,4 +1,4 @@
-import { startSpan } from '@goliapkg/sentori-core';
+import { normalizeUrl, startSpan } from '@goliapkg/sentori-core';
 
 import { addBreadcrumb } from '../breadcrumbs';
 import { getConfig } from '../config';
@@ -42,7 +42,7 @@ function patchFetch(): void {
     // attached to error events at capture time and serve a different
     // surface (the "last 100 things" timeline on the issue page).
     const span = startSpan('http.client', {
-      name: `${method.toUpperCase()} ${scrubbed}`,
+      name: `${method.toUpperCase()} ${normalizeUrl(scrubbed)}`,
       tags: { 'http.method': method.toUpperCase(), 'http.url': scrubbed },
     });
 
@@ -130,7 +130,7 @@ function patchXhr(): void {
     const method = this.__sentoriMethod ?? 'GET';
     const url = scrubUrl(this.__sentoriUrl ?? '');
     const span = startSpan('http.client', {
-      name: `${method} ${url}`,
+      name: `${method} ${normalizeUrl(url)}`,
       tags: { 'http.method': method, 'http.url': url },
     });
     this.__sentoriSpan = span;

@@ -172,6 +172,19 @@ describe('wrapped fetch', () => {
     expect(sp.status).toBe('cancelled')
   })
 
+  test('span name normalizes id-like path segments (full url stays in tag)', async () => {
+    const recorder = makeRecorder()
+    globalThis.fetch = recorder.fn
+    installFetchInstrumentation()
+
+    await fetch('https://api.example.com/devices/69ef2dc5c11ea3820b7cfd1d?token=secret', {
+      method: 'GET',
+    })
+    const sp = drainSpans()[0]!
+    expect(sp.name).toBe('GET https://api.example.com/devices/{id}')
+    expect(sp.tags['http.url']).toBe('https://api.example.com/devices/69ef2dc5c11ea3820b7cfd1d?token=secret')
+  })
+
   test('does not trace requests to the configured ingest URL', async () => {
     setConfig({
       environment: 'test',

@@ -28,6 +28,8 @@ export {
 
 export { parseStack, type ParseStackOptions } from './stack.js'
 
+export { normalizeUrl } from './url.js'
+
 export {
   type SessionContext,
   type SessionPing,
