@@ -184,8 +184,9 @@ headline table):
 - ⏸ Q2 / Q3 `received_at >=` partition-pruning hint — apply when
   events / spans partition count reaches 12+ months. Same code
   pattern as Phase 30 sub-E.
-- ⏸ Q4 `(project_id, op, duration_ms DESC)` composite — v0.5
-  candidate. Re-evaluate after 6 months of real production traffic.
+- ✅ Q4 `(project_id, op, duration_ms DESC)` composite — done in
+  v0.5 Phase 39 sub-E (migration 0030). 43 ms → 0.4 ms at 1M; see
+  [baseline-v0.5-phase39.md](./baseline-v0.5-phase39.md).
 - ✅ v0.4 release proceeds without index migration; sub-B can tag
   and ship.
 
