@@ -10,7 +10,8 @@
 - **v0.2** ✅ 账户结构 + SDK 矩阵 + 数据呈现（Phase 18-28）—— 详见 CHANGELOG.md
 - **v0.3** ✅ React-first via dogfood（Phase 29-33，25/27 sub done）—— 详见 CHANGELOG.md；Phase 30 sub-A/B 待 Insight dogfood 数据，见下方 "v0.3 收尾"
 - **v0.4** ✅ Distributed Tracing（Phase 34-38，全部完成；5 npm SDK publish + tag v0.4.0）—— 详见 [CHANGELOG.md](./CHANGELOG.md#v04--distributed-tracingphase-34-38)
-- **v0.5** 📐 待规划
+- **v0.4.x** ✅ patch：v0.4.1 XHR instrumentation / v0.4.2 client span flush + self-trace 防套娃 —— 详见 CHANGELOG
+- **v0.5** 🚧 Scale + Readable Errors + Dashboard refresh（Phase 39-41，规划中，见下方 "v0.5 ROADMAP"）
 
 公开 surface：`sentori.golia.jp`（marketing） / `app.sentori.golia.jp`（dashboard） / `api.sentori.golia.jp` / `ingest.sentori.golia.jp` / `docs.sentori.golia.jp`。
 
@@ -90,9 +91,9 @@ Self-hosted 用户改 `ingestUrl` 即可指向自己的 host；token 不变。
 
 ---
 
-# v0.3 收尾（user-blocked，可与 v0.4 并行）
+# v0.3 收尾（已解封 — Insight 自 2026-05 起在用 Sentori）
 
-Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目跑 dogfood 才能落地。做完任何一个都可以增量 commit 进 v0.3.x patch，不阻塞 v0.4 启动。
+Phase 30 sub-A/B 当时 user-blocked，等 Insight dogfood。现在 Insight 已接 `sentori-react-native@0.5.2` 并产出真实 trace/error 数据 → 解封。这两个 sub 的内容（onboarding 秒表、摩擦点修复，候选 top-1/2 是 "sourcemap upload 发现性差" + "token 401 信息不清"）与 v0.5 Phase 40（可读错误）高度重叠 —— 直接吸收进 Phase 40 的 dogfood 步骤，不再单列。下面的原始 checklist 保留作素材参考。
 
 ## Phase 30 sub-A — Insight 接入流程秒表
 
@@ -354,9 +355,167 @@ Phase 30 sub-A/B 是 v0.3 唯一未完成的部分，等用户在 Insight 项目
 
 ---
 
-## v0.5+ 远期候选（无承诺、无优先级）
+# v0.5 ROADMAP — Scale + Readable Errors + Dashboard refresh
 
-以下议题在 v0.4 完成后由当时的 dogfood 信号 + 用户反馈决定哪个先做：
+**三条主线**（线性执行，不并行）：
+
+1. **Trace 上量管控** —— Insight dogfood 暴露：现在每个 fetch 都是独立 root trace（SPAN COUNT 全是 1），上量后 `traces` 汇总表行数爆、列表没法看，span 还跟高价值 error event 抢同一个 ingest 配额。修法选定为**时间硬保留窗口 + 窗口内 100% 不采样**（不默认上 head-based sampling，留作 SDK 开关给真扛不住单机的人），配 span name 路径归一化、navigation span 自动当父、span 独立 rate cap、Phase 38 defer 的 Q4 复合 index。目标量级：~10w 用户、单台 Postgres。
+2. **可读的 JS/RN 错误** —— Insight dogfood 暴露：JS 错误栈是 `index.bundle:1:288432` 这种不可读形态。基础设施大半已有（`server/src/symbolicate.rs` 有 sourcemap 解析 + source-context，`/admin/api/releases/{name}/sourcemaps` 上传端点也有，`Frame` 类型已含 `column?`/`function?`），缺的是「`symbolicate_payload` 没接 ingest、只在 admin on-demand 调」和「构建期没人上传 sourcemap」。做成端到端：SDK 抓全帧 → CLI 构建期组合上传 sourcemap（tag 到同一 release 串）→ server ingest 时符号化并存源码片段 + 按符号化帧重新 fingerprint → dashboard 渲染源码片段 + 折叠 vendor 帧 + 标注没符号化的原因。
+3. **Dashboard 左侧导航重构** —— 现在是顶部横排 NAV（Overview/Issues/Traces/Releases/Teams/Alerts/Audit/Settings），上量后条目变多挤不下。改成左侧 sidebar（Linear/Vercel/Sentry 范式）：顶部 org/project 切换器，主导航竖排，次要项收进可折叠分组，底部用户菜单 + 主题切换；窄屏折叠成图标轨。
+
+**反 Sentry 立场延续**：保留时间硬窗口比 Sentry 那套多层采样简单且省掉「采样把出错的也丢了」的复杂度（schema 简 / 部署轻）；不做 tail-based sampling collector（stateful、跟轻部署冲突）。
+
+**Entry**：v0.4 ✅ + v0.4.2 已 publish。每条 step 动词 + 目标 + 文件 + 验收；跨 phase 严格线性。
+
+## Phase 39 — Trace 上量管控
+
+**Goal:** trace 数据在 ~10w 用户量级可控：cardinality 收敛、保留有界、span 不挤占 event 配额。
+**Entry:** v0.4 ✅. **Exit:** span name 路径已归一化；navigation 下的 http 请求挂成 child；`SENTORI_TRACE_RETENTION_DAYS` 生效 + 老分区自动 drop；span 有独立 rate cap；Q4 在 ~1300w 行规模复测有 baseline；SDK bump + publish + Insight dogfood 验证。
+**Estimate:** 2-3 周
+
+### sub-A — span name 路径归一化（SDK）
+
+- [ ] `sdk/react-native/src/handlers/network.ts` + `sdk/javascript/src/hooks/fetch.ts` + `sdk/javascript/src/hooks/xhr.ts`：抽一个共享 `normalizePath(url)` —— 路径段里纯数字 / uuid / hex(≥16) → `{id}`，query string 整个砍掉；span **name** 用归一化后的 `"<METHOD> <normalized-path>"`，但 `http.url` tag 仍存完整原 url（scrub 过 auth 参数的）；常见前缀也归一（`/v1/`、`/api/` 保留，后面的 id 段替换）
+- [ ] 归一化逻辑放 `sdk/core`（`sdk/core/src/url.ts` 或并进现有工具）让三个 SDK 共用，避免三份漂移
+- [ ] 单测：`/users/123` → `/users/{id}` / `/devices/69ef2dc5c11ea3820b7cfd1d` → `/devices/{id}` / `/a/b?x=1` → `/a/b` / `/v1/orders/abc-def-123` → `/v1/orders/{id}` / 不含 id 段不动 / `http.url` tag 保完整
+- [ ] commit `phase 39 sub-A: span name path normalization`
+
+### sub-B — navigation span 自动当父
+
+- [ ] `sdk/react-native/src/navigation.ts` `useTraceNavigation`：route 变时开的 `react.navigation` span 同时压进 active-span context（用 sdk/core 的 `withSpan` / 等价的 save-and-restore），这样这一屏期间的 `http.client` span 自动 `parent = nav span` → 一屏 ~30 请求收成 1 条 trace（1 个汇总表行而非 30 个）；下一次 route 变先 finish 旧 nav span 再开新的（context 一并切换）
+- [ ] `sdk/react/src` 的 `useSentoriRouter`（react-router 那条）做同样处理：route 变开 `react.navigation` span 并设为 active，页面内 fetch 自动 child
+- [ ] 注意 RN 的 active-span 是 module variable（线性 await OK、并发分叉会丢）—— 文档明示：跨 setTimeout / 后台轮询 的请求如果想挂到当前屏，要显式 `startSpan(op, { parent: activeSpan() })`
+- [ ] 更新 `docs-site/.../recipes/distributed-tracing.md`：加 "navigation 自动续约" 小节 + 上面那条 caveat
+- [ ] 测试：nav span 设为 active / 该屏内 startSpan 自动 child / route 切换 context 切换 / 无 active 时仍是 root
+- [ ] commit `phase 39 sub-B: navigation span as active parent`
+
+### sub-C — 时间硬保留 + 老分区 drop（server）
+
+- [ ] migration `0029_trace_retention.sql`：`traces` 表改 `PARTITION BY RANGE (last_seen)`（现在没分区；新建分区表 + 迁移现有行 + bootstrap 当月起 ~3 月 + default partition）—— 或如果迁移成本高，保持非分区 + 定时 `DELETE WHERE last_seen < ...`，二选一在 sub-C 实施时按数据量定
+- [ ] `server/src/retention.rs`（新）：后台 task，读 env `SENTORI_TRACE_RETENTION_DAYS`（默认 14），周期（每日）`DROP TABLE` 掉 `spans_*` / `traces_*` 里 range 上界 < `now() - retention` 的分区；同时确保「未来分区」滚动创建（已有 events 的滚动逻辑可参考 / 复用）；`main.rs` 起这个 task；不设 env 时用默认 14、不关闭（要关把值设很大）
+- [ ] 文档：`docs/protocol.md` 或 ops 文档加一节说明 trace 保留窗口默认 14 天、怎么调、self-hosted 注意分区滚动
+- [ ] 测试：单测 retention task 的「算出该 drop 哪些分区」纯函数；smoke：插几个跨日期的 trace → 调 retention → 老的没了新的在
+- [ ] commit `phase 39 sub-C: trace retention window`
+
+### sub-D — span 独立 rate cap（server）
+
+- [ ] `server/src/rate_limit.rs` / quotas：给 `/v1/spans` + `/v1/spans:batch` 一个**独立于 events 的** token bucket（per-org），env `SENTORI_SPANS_RATE_LIMIT`（默认值定个比 events 宽松些的、按 sub-A baseline 推算的数）；span 超限 → 429 + `retryAfterMs`，**不**消耗 events 的配额；DevToken / Valkey unset 仍 fail-open 同现状
+- [ ] dashboard 项目设置页（如有 rate limit 展示）加一行 span rate；releases / overview 卡片如展示 ingest 量，spans 单独一栏
+- [ ] 测试：span 打爆其桶后 event 仍能进；event 打爆后 span 仍能进（两桶隔离）；429 body 形状同 events
+- [ ] commit `phase 39 sub-D: separate span rate limit`
+
+### sub-E — Q4 复合 index + 大规模复测
+
+- [ ] migration `0030_spans_op_duration_idx.sql`：`CREATE INDEX CONCURRENTLY spans_project_op_duration_idx ON spans (project_id, op, duration_ms DESC)`（Phase 38 sub-A defer 的那条；分区表上 index 自动传播到 children）
+- [ ] SQL bulk INSERT 造 ~1300w spans（14 天 × ~180w/天 的量级）；跑 Phase 38 那 4 个 hot-path query EXPLAIN，重点看 Q4 加 index 后从「166k 候选 + in-memory Sort」变成什么；trace list / detail 在汇总表归一化**之前**和**之后**（如果能模拟归一化效果）的行数对比
+- [ ] `docs/performance/baseline-v0.5-phase39.md`：4 query 完整 plan + 与 v0.4-phase38 baseline 对比 + Q4 index 前后对比 + regression policy crosscheck + 清理 synthetic 数据
+- [ ] commit `phase 39 sub-E: Q4 index + 13M span baseline`
+
+### sub-F — bump + publish + Insight dogfood
+
+- [ ] bump 涉及改动的 SDK 包（sdk/core 若加了 `normalizePath` → bump；javascript / react-native / react / next 跟随 + inter-dep 同步）；`bun publish --access public`；CHANGELOG 加 v0.5 patch 段或等 Phase 41 收尾一起进 v0.5 section
+- [ ] Insight 升到新版本 → 观察：Traces 列表是否按归一化路由聚合、一屏请求是否挂成一棵树、span 量是否在 rate cap 内；记进 `docs/dogfood/insight-friction.md`（吸收原 Phase 30 sub-A 的秒表内容）
+- [ ] ROADMAP 勾掉 Phase 39
+- [ ] commit `phase 39 sub-F: publish + dogfood`
+
+## Phase 40 — 可读的 JS/RN 错误（sourcemap 符号化端到端）
+
+**Goal:** 错误直接显示「哪个 release 的 src 哪个文件、哪段代码」+ 源码片段，而不是 `index.bundle:1:288432`。吸收原 v0.3 Phase 30 sub-A/B 的 dogfood + 摩擦点修复（候选 top-1/2 就是 sourcemap 发现性 + token 401 信息）。
+**Entry:** Phase 39 ✅. **Exit:** SDK 抓全 column/function；`sentori-cli` 能组合上传 Hermes/Metro sourcemap；server ingest 时符号化 + 存源码片段 + 按符号化帧 fingerprint；dashboard issue 详情显示源码片段 + 折叠 vendor 帧 + 标注没符号化原因；Insight prod 错误验证可读。
+**Estimate:** 3-4 周
+
+### sub-A — SDK 抓全帧信息
+
+- [ ] `sdk/core` 的 `parseStack`：确认对 RN/Hermes 帧形态（bytecode offset / `address at` 行）也能解出 `function` + `line` + `column`；浏览器帧（Chrome/Safari/Firefox 各异）column 也要抓全；缺 column 时不丢帧（只是符号化精度降到行级）
+- [ ] `Frame` 已有 `column?` / `function?` —— 检查 RN/JS 两个 SDK 的 capture 路径真的把它们填进 event，而不是中途丢掉
+- [ ] 测试：各浏览器 + Hermes 的 stack 字符串 fixture → 解出含 column/function 的 Frame[]
+- [ ] commit `phase 40 sub-A: full stack frame capture`
+
+### sub-B — `sentori-cli`：组合 + 上传 sourcemap
+
+- [ ] 新包 `@goliapkg/sentori-cli`（或先做成 `sdk/javascript` 里的 bin 脚本，看体量）：`sentori sourcemaps upload --release <release> --token <st_pk_...> --ingest-url <...> <bundle-dir>` —— 自动找 Metro 出的 `.bundle` + `.map`；RN release build 走 Hermes 时**自动调 Hermes 的 `compose-source-maps.js`** 把 metro map + hermes map 合成最终 map（用户不该手动跑），再 POST 到 `/admin/api/releases/{release}/sourcemaps`
+- [ ] Recipe：`docs-site/.../recipes/sourcemaps.md` —— Expo / EAS build hook 一份、bare RN（gradle build phase / xcode run script / npm postbuild）一份、纯 web（Vite/webpack）一份；**核心契约用大字标注**：上传的 `--release` 必须 === SDK `init({ release })` 上报的串，不一致 = 符号化静默失效
+- [ ] 吸收原 Phase 30 sub-B top-2：server `401` response body 加 `hint` 字段（token 不是 `st_pk_` 前缀 / 已 revoke / project 不匹配 各给清晰文案）—— 上传 CLI 和 ingest 都受益
+- [ ] 测试：CLI 对一个 fixture bundle dir 能找到 + 合成 + （mock）上传；release 串校验逻辑
+- [ ] commit `phase 40 sub-B: sentori-cli sourcemap upload`
+
+### sub-C — server 在 ingest 时符号化
+
+- [ ] ingest pipeline（`server/src/api/events.rs` 的 `persist_event_row` 附近）：事件含 JS 帧 + 该 release 有 sourcemap → 调 `crate::symbolicate::symbolicate_payload`（现成的）把帧重写成原始 `{file: 'src/...', line, column, function}`，并 attach `context: {pre:[...], line:'...', post:[...]}` 源码片段（来自 sourcemap 的 `sourcesContent`，复用现成的 `source_for_frame` / `window_from_sourcemap`）；**保留 raw 帧**（折叠存一份原始的）以便后补 sourcemap 时 re-symbolicate
+- [ ] fingerprint：issue 分组改用**符号化后**的 top-in-app 帧（`src/screens/Home.tsx:42:handleSubmit`），不是 minified 的 `index.bundle:1:288432` —— 注意这会改变现有 issue 的分组，需要 migration 策略（新事件用新 fingerprint / 旧 issue 不动 / 或提供一次性 re-fingerprint 任务，sub-C 实施时定）
+- [ ] sourcemap 缓存（`symbolicate.rs` 已有 per-release 进程缓存）—— 确认 ingest 高频路径下缓存命中、不每次 load+parse
+- [ ] 测试：带 minified 帧的事件 + 预置 sourcemap → 入库后帧已符号化 + 有 context；无 sourcemap → 帧原样 + 标记未符号化；fingerprint 用符号化帧
+- [ ] commit `phase 40 sub-C: symbolicate at ingest`
+
+### sub-D — dashboard issue 详情渲染源码
+
+- [ ] `web/src/views/issue-detail.tsx`：栈渲染 —— in-app 帧默认展开、带 ±5 行源码片段（出错行高亮），vendor / node_modules 帧折叠成一行（点击展开）；frame header 显示 `function · file:line:col`
+- [ ] 没符号化成功的帧标注**原因**：`no sourcemap uploaded for release <X>` / `release mismatch: event reported <X>, sourcemap uploaded for <Y>` / `frame outside sourcemap range` —— 这个诊断信息本身就值钱，省得用户瞎猜（吸收原 Phase 30 sub-B「错误信息看不懂的瞬间」）
+- [ ] 可选：frame 链接到对应 commit 的 git 源码（release 串或上传时附带的 `commit` 元数据 → 仓库 URL 模板，project 设置里配）
+- [ ] `<UnsymbolicatedHint>` 组件（现有）更新文案 + 链到 sourcemaps recipe
+- [ ] vitest / playwright 覆盖：符号化帧渲染 + 源码片段 / 未符号化帧的原因提示 / vendor 帧折叠
+- [ ] commit `phase 40 sub-D: source snippet in issue detail`
+
+### sub-E — dev mode 可读（可选）
+
+- [ ] `sdk/react-native`：`__DEV__` 下，发事件前先 POST 原始帧给 Metro dev server 的 `/symbolicate` 端点（RN 的 LogBox 用的就是它）拿到原始位置 —— 这样不依赖上传、dev 错误也立刻可读；Metro 不在（生产 / 离线）时跳过
+- [ ] 测试：mock Metro `/symbolicate` 响应 → 帧被替换；Metro 不可达 → 原样发送不报错
+- [ ] commit `phase 40 sub-E: dev-mode metro symbolicate`
+
+### sub-F — 文档 + bump + publish + Insight dogfood
+
+- [ ] `docs/getting-started.md` + `docs-site` 对应页：加 "让错误可读：上传 sourcemap" 一节，链到 sub-B 的 recipe；`docs/protocol.md` 把 release 串约定 `<app>@<version>+<build>` 正式文档化（吸收原 Phase 30 sub-B top-3）
+- [ ] bump SDK + CLI 包；`bun publish --access public`
+- [ ] Insight：build 流程接上 `sentori-cli sourcemaps upload`（prod build）→ 制造一个真实 prod 错误 → dashboard 上确认显示 `src/...` + 源码片段；记进 `docs/dogfood/insight-friction.md`
+- [ ] ROADMAP 勾掉 Phase 40
+- [ ] commit `phase 40 sub-F: docs + publish + dogfood`
+
+## Phase 41 — Dashboard 左侧导航重构
+
+**Goal:** 导航从顶部横排改成左侧 sidebar（Linear/Vercel/Sentry 范式），为条目增多做准备，顺带整体视觉对齐设计宪法。
+**Entry:** Phase 40 ✅. **Exit:** 左侧 sidebar 上线，所有现有 view 路由不变；窄屏折叠成图标轨；vitest/playwright 通过；bundle 不显著增大。
+**Estimate:** 1-2 周
+
+### sub-A — 左侧 sidebar 组件
+
+- [ ] 新 `web/src/components/sidebar.tsx`：竖排导航 —— 顶部 org/project 切换器（复用现有 `useOrg` 的切换逻辑）；主导航项 Overview / Issues / Traces / Releases（带图标）；次要项 Teams / Alerts / Audit / Settings 收进一个可折叠的 "More" 分组或放底部；最底部用户菜单（邮箱 + OWNER badge + Sign out）+ 主题切换（现在在右上角的那个 ☀/🖥/🌙）
+- [ ] active state：当前路由项高亮（左边一道 accent 竖条 + 背景），参考 Linear
+- [ ] 宽度固定（~220px），内容区相应让位
+- [ ] commit `phase 41 sub-A: left sidebar component`
+
+### sub-B — layout 重构 + 响应式
+
+- [ ] `web/src/views/org-layout.tsx`：把顶部横排 NAV 拆掉，改成 `<Sidebar>` + 主内容区两栏；顶部留一条很薄的 context bar（面包屑 / 当前 view 标题 / 全局搜索入口）或直接不留
+- [ ] 窄屏（< md）：sidebar 折叠成只剩图标的窄轨（hover / 点击展开），或抽屉式；保证移动端也能用
+- [ ] keyboard：`g i` / `g t` 等 "go to" 快捷键跳各 view（参考 Linear 的 `g` 前缀）；`[` `]` 折叠/展开 sidebar
+- [ ] 所有现有路由路径不变（`/org/{slug}/issues` 等），只是 chrome 换了
+- [ ] commit `phase 41 sub-B: layout restructure + responsive`
+
+### sub-C — 视觉打磨 + 测试 + 收尾
+
+- [ ] 对齐设计宪法（Linear/Vercel/Modal）：间距 / 字号 / 图标一致性 / dark+light 两套都过一遍 / density 设置仍生效
+- [ ] vitest 更新（org-layout / sidebar 的渲染 + 导航）；playwright e2e 跑通主流程（登录 → 各 view 跳转 → 折叠 sidebar）
+- [ ] `bun run check` 0 error / `bun run build` OK / bundle 对比（sidebar 组件进 main bundle，控制增量）
+- [ ] CHANGELOG.md v0.5 section（Phase 39/40/41 各 sub 一行 condensed summary）；marketing / docs 截图如有 dashboard 图，更新成新 chrome
+- [ ] ROADMAP 顶部状态 v0.5 🚧 → ✅；git tag v0.5.0 + GitHub Release
+- [ ] commit `phase 41 sub-C: dashboard chrome polish + v0.5.0 release`
+
+---
+
+## v0.5 显式不在范围内
+
+- ❌ head-based / tail-based 采样的默认开启 —— `tracesSampleRate` 留作 SDK 开关，但默认 1.0；tail-based collector 不做（stateful、跟轻部署冲突）
+- ❌ Metrics / Logs / Profiling —— 仍是 v0.6+
+- ❌ OTLP receiver / OpenTelemetry SDK 全兼容 —— 仍只用 W3C TraceContext header
+- ❌ Session Replay / Vue / Svelte / Python / Go SDK
+- ❌ Slack / Linear / GitHub PR 集成、Stripe 计费、AI root-cause、多区域 —— 仍是远期
+- ❌ 主动推广 —— v0.5 有 "可读错误" + "trace 上量不崩" 两个 talking point，看那时声誉值再决定
+
+---
+
+## v0.6+ 远期候选（无承诺、无优先级）
+
+以下议题在 v0.5 完成后由当时的 dogfood 信号 + 用户反馈决定哪个先做：
 
 - Metrics / Logs / Profiling — 完整 observability 三件套
 - OpenTelemetry SDK 兼容层（OTLP receiver）
