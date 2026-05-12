@@ -102,7 +102,7 @@ export function TracesView() {
       </header>
 
       {parsed.warnings.length > 0 && (
-        <div className="border-border bg-amber-500/5 border-b px-6 py-2 text-[11px] text-amber-300">
+        <div className="border-border border-b bg-amber-500/5 px-6 py-2 text-[11px] text-amber-300">
           {parsed.warnings.join(' · ')}
         </div>
       )}
