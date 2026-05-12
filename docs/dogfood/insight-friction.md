@@ -1,6 +1,29 @@
+# Insight dogfood — friction log
+
+> Real-traffic source: **`qualcomm/insight`** (Expo + RN), running
+> Sentori (`@goliapkg/sentori-react-native`) since 2026-05. Two
+> purposes: (1) a chronology of fixes that *came out of* dogfood, and
+> (2) the Phase 30 sub-A onboarding stopwatch (still TODO — needs a
+> clean re-onboard run with timing).
+
+## Dogfood-driven changes (chronology)
+
+| When | Symptom | Fix |
+|---|---|---|
+| v0.4.1 | Traces page nearly empty despite the SDK being installed | Auto-instrumentation only patched `globalThis.fetch`, but Insight uses **axios** — default adapter is `XMLHttpRequest`, not built on fetch on RN. Added XHR-prototype instrumentation (`sentori-react-native` + `sentori-javascript`). |
+| v0.4.2 | Traces *still* empty | SDKs never **sent** client spans — `finish()` only pushed to the in-memory `SpanBuffer`; no transport drained it to `/v1/spans:batch`. Added a span-flush timer to both transports (+ a self-trace guard so span uploads don't recursively spawn `http.client` spans). |
+| v0.5 Phase 39 sub-A | Traces list unusable — every request to a different id (`/devices/69ef2dc5…`) is its own row; `traces` summary table cardinality unbounded | `normalizeUrl` in `sentori-core`: span `name` collapses id-like path segments to `{id}` (full URL kept in the `http.url` tag). |
+| v0.5 Phase 39 sub-B | Every fetch was its own root trace — a screen's 20-40 requests = 20-40 separate traces | `useTraceNavigation` / `useSentoriRouter` open a `react.navigation` span per screen and keep it the *active* span, so the screen's requests become children: one trace per screen. |
+| v0.5 Phase 40 (planned) | JS error stacks unreadable (`index.bundle:1:288432`) | End-to-end sourcemap symbolication — SDK captures column/function, `sentori-cli` uploads composed Hermes/Metro maps tagged to the release, server symbolicates at ingest + re-fingerprints, dashboard renders source snippets. |
+
+**Pending the user:** bump Insight to `@goliapkg/sentori-react-native@0.5.3`,
+re-run, and record here whether the Traces list now aggregates by route
+and whether a screen's requests show up as one trace.
+
+---
+
 # Phase 30 sub-A — Insight onboarding stopwatch & friction log
 
-> Real-traffic source: **`qualcomm/insight`** (Expo + RN).
 > Goal: measure end-to-end time from `bun remove` (old SDK) to "first
 > event visible in `app.sentori.golia.jp` dashboard" against
 > `@goliapkg/sentori-react-native@latest`, log every speed bump along
@@ -15,8 +38,8 @@
 | Host | macOS / Xcode 26.x / iPhone 17 Pro simulator |
 | Insight repo | `/Users/doracawl/workspace/qualcomm/insight` |
 | Sentori dashboard | https://app.sentori.golia.jp |
-| SDK before | `@goliapkg/sentori-react-native@0.1.3` |
-| SDK after | `@goliapkg/sentori-react-native@0.4.0` |
+| SDK before | `@goliapkg/sentori-react-native@0.1.3` (last pre-tracing) |
+| SDK after | `@goliapkg/sentori-react-native@latest` (≥ 0.5.3) |
 | Total elapsed | TODO seconds (north-star: ≤ 300 s = 5 min) |
 
 ## Stopwatch table

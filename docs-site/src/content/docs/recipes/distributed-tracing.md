@@ -58,11 +58,28 @@ export default function App() {
 
 What you get for free:
 
-- Every `fetch()` call emits an `http.client` span and injects a
-  `traceparent` header (`00-<32hex traceId>-<16hex spanId>-01`).
-- Every navigation transition emits a `react.navigation` span. If
-  the user taps "Checkout," any fetches that fire on the new screen
-  inherit that screen's trace context.
+- Every `fetch()` / `XMLHttpRequest` call (so `axios` too) emits an
+  `http.client` span and injects a `traceparent` header
+  (`00-<32hex traceId>-<16hex spanId>-01`). The span `name` is the
+  HTTP method + URL with id-like path segments collapsed to `{id}`
+  (`GET https://api.example.com/users/{id}`), so the Traces list
+  aggregates by route; the full URL is in the `http.url` tag.
+- Every screen — including the one the app launches on — gets a
+  `react.navigation` span (a fresh trace root), and that span stays
+  *active* while the screen is current. So the screen's `http.client`
+  spans become its children: **one trace per screen**, not one per
+  request. `react.navigation` spans are named `<from> → <to>`.
+
+> **Caveat — RN's active span is a module variable.** A request fired
+> from a `setTimeout` / background poll / detached promise *after* the
+> screen settled may not see the nav span as active. If you want such
+> a request parented to the current screen, pass it explicitly:
+> `startSpan(op, { parent: activeSpan() })`.
+
+For **react-router** (web) the equivalent is `useSentoriRouter()` from
+`@goliapkg/sentori-react/router` — mount it once inside your `Router`
+and it does the same: a `nav` breadcrumb + a per-route
+`react.navigation` span set active for that route.
 
 ## 2. Backend (Node + Hono)
 
