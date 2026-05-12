@@ -116,6 +116,60 @@ pub async fn check_and_record(
     Ok(QuotaDecision::Allowed { current: new_count, limit })
 }
 
+/// Default monthly span-ingest budget. Spans are far higher volume than
+/// error events; they're auto-pruned (`SENTORI_TRACE_RETENTION_DAYS`)
+/// and not a billed dimension, so this is generous. `0` = unlimited.
+pub const DEFAULT_SPAN_LIMIT_MONTHLY: i64 = 10_000_000;
+
+/// Read `SENTORI_SPAN_LIMIT_MONTHLY` (default 10M, `0` = unlimited).
+pub fn span_limit_monthly() -> i64 {
+    std::env::var("SENTORI_SPAN_LIMIT_MONTHLY")
+        .ok()
+        .and_then(|v| v.trim().parse::<i64>().ok())
+        .filter(|&n| n >= 0)
+        .unwrap_or(DEFAULT_SPAN_LIMIT_MONTHLY)
+}
+
+/// Span ingest gate — a *separate* monthly budget from error events
+/// (`spans_usage:` / `spans_dropped:` Valkey counters, limit from
+/// `SENTORI_SPAN_LIMIT_MONTHLY`). A span flood therefore can't exhaust
+/// an org's error-event quota. `limit == 0` → unlimited (no Valkey
+/// round-trip). Same fail-open posture as `check_and_record`: callers
+/// admit the span on `Err`.
+pub async fn check_and_record_spans(
+    valkey: redis::aio::ConnectionManager,
+    org_id: Uuid,
+    now: OffsetDateTime,
+) -> Result<QuotaDecision, anyhow::Error> {
+    let limit = span_limit_monthly();
+    if limit == 0 {
+        return Ok(QuotaDecision::Allowed { current: 0, limit: 0 });
+    }
+    let limit_i32 = i32::try_from(limit).unwrap_or(i32::MAX);
+
+    let period = period_key(now);
+    let usage_key = format!("spans_usage:{org_id}:{period}");
+    let dropped_key = format!("spans_dropped:{org_id}:{period}");
+    let mut conn = valkey;
+
+    let current: u64 = conn.get(&usage_key).await.unwrap_or(0);
+    if current >= limit as u64 {
+        let _: u64 = conn.incr(&dropped_key, 1u64).await?;
+        let _: () = conn.expire(&dropped_key, COUNTER_TTL.whole_seconds()).await?;
+        return Ok(QuotaDecision::Exceeded {
+            current,
+            limit: limit_i32,
+            reset_at: next_period_start(now),
+        });
+    }
+
+    let new_count: u64 = conn.incr(&usage_key, 1u64).await?;
+    if new_count == 1 {
+        let _: () = conn.expire(&usage_key, COUNTER_TTL.whole_seconds()).await?;
+    }
+    Ok(QuotaDecision::Allowed { current: new_count, limit: limit_i32 })
+}
+
 /// Phase 15 sub-E: detect 80%/100% threshold crossings on the *new*
 /// usage value and enqueue at most one email per threshold per period.
 /// Dedupe is enforced via Valkey `SET ... NX EX` flag so multiple server
@@ -263,5 +317,11 @@ mod tests {
             next_period_start(datetime!(2026-05-09 12:34 UTC)),
             datetime!(2026-06-01 00:00 UTC),
         );
+    }
+
+    #[test]
+    fn span_limit_defaults_when_env_unset() {
+        // CI / dev never set SENTORI_SPAN_LIMIT_MONTHLY; this only reads.
+        assert_eq!(span_limit_monthly(), DEFAULT_SPAN_LIMIT_MONTHLY);
     }
 }

@@ -57,6 +57,7 @@ SENTORI_PG_PASSWORD=$(openssl rand -hex 16)
 | `SENTORI_DATA_DIR` | `/data` | source-map blob storage path |
 | `SENTORI_WEB_PORT` | `8000` | host port for the web container |
 | `SENTORI_TRACE_RETENTION_DAYS` | `14` | how long spans + traces are kept (see *Data retention* below) |
+| `SENTORI_SPAN_LIMIT_MONTHLY` | `10000000` | per-org monthly span-ingest budget, separate from the error-event quota; `0` = unlimited |
 | `SENTORI_SELF_TRACE_PROJECT_ID` | unset | if set to a project UUID, the server emits its own `http.server` spans into that project |
 | `RUST_LOG` | `info,sentori_server=info,tower_http=info` | |
 

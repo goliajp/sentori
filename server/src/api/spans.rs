@@ -91,19 +91,18 @@ pub async fn handle(
         return bad_request(reason);
     }
 
-    // Quota gate — same per-org bucket as /v1/events. Skipped for the
-    // dev token to keep single-tenant local flow unconstrained.
-    if let (IngestCaller::Token { org_id, .. }, Some(pool), Some(valkey)) =
-        (&caller, &state.db, &state.valkey)
-    {
+    // Quota gate — a *separate* monthly budget from /v1/events
+    // (SENTORI_SPAN_LIMIT_MONTHLY), so a span flood can't eat into an
+    // org's error-event quota. Skipped for the dev token.
+    if let (IngestCaller::Token { org_id, .. }, Some(valkey)) = (&caller, &state.valkey) {
         let now = OffsetDateTime::now_utc();
-        match quotas::check_and_record(pool, valkey.clone(), *org_id, now).await {
+        match quotas::check_and_record_spans(valkey.clone(), *org_id, now).await {
             Ok(QuotaDecision::Allowed { .. }) => {}
             Ok(QuotaDecision::Exceeded { reset_at, .. }) => {
                 return quota_exceeded_response(reset_at);
             }
             Err(e) => {
-                tracing::error!(error = %e, "quota check failed; admitting span");
+                tracing::error!(error = %e, "span quota check failed; admitting span");
             }
         }
     }
@@ -137,14 +136,12 @@ pub async fn handle_batch(
     let mut rejected = 0u32;
     let mut errors = Vec::new();
 
-    // Quota check once per batch — same posture as events:batch (the
-    // batch counts as a single ingest write).
-    if let (IngestCaller::Token { org_id, .. }, Some(pool), Some(valkey)) =
-        (&caller, &state.db, &state.valkey)
-    {
+    // Span quota — separate monthly budget; one batch counts as one
+    // ingest write (same posture events:batch has).
+    if let (IngestCaller::Token { org_id, .. }, Some(valkey)) = (&caller, &state.valkey) {
         let now = OffsetDateTime::now_utc();
         if let Ok(QuotaDecision::Exceeded { reset_at, .. }) =
-            quotas::check_and_record(pool, valkey.clone(), *org_id, now).await
+            quotas::check_and_record_spans(valkey.clone(), *org_id, now).await
         {
             return quota_exceeded_response(reset_at);
         }
