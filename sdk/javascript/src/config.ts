@@ -13,3 +13,7 @@ export function getConfig(): InitOptions | null {
 export function isInitialized(): boolean {
   return _cfg !== null
 }
+
+export function __resetForTests(): void {
+  _cfg = null
+}

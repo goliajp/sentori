@@ -11,7 +11,12 @@
 // native XHR polyfill, and any other XHR shim. State is stashed on the
 // instance between open() and the terminal `loadend` event.
 import { startSpan } from '@goliapkg/sentori-core';
+import { getConfig } from '../config.js';
 import { toTraceparent } from './fetch.js';
+function isIngestUrl(url) {
+    const base = getConfig()?.ingestUrl;
+    return !!base && url.startsWith(base);
+}
 let _installed = false;
 export function installXhrInstrumentation() {
     if (_installed)
@@ -36,6 +41,8 @@ export function installXhrInstrumentation() {
         return originalOpen.call(this, method, url, ...rest);
     };
     proto.send = function (body) {
+        if (isIngestUrl(this.__sentoriUrl ?? ''))
+            return originalSend.call(this, body);
         const method = this.__sentoriMethod ?? 'GET';
         const url = this.__sentoriUrl ?? '';
         const span = startSpan('http.client', {

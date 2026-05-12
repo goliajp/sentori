@@ -8,4 +8,7 @@ export function getConfig() {
 export function isInitialized() {
     return _cfg !== null;
 }
+export function __resetForTests() {
+    _cfg = null;
+}
 //# sourceMappingURL=config.js.map

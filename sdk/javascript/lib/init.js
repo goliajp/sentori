@@ -4,6 +4,7 @@ import { installFetchInstrumentation } from './hooks/fetch.js';
 import { installNodeHooks } from './hooks/node.js';
 import { installXhrInstrumentation } from './hooks/xhr.js';
 import { startSession } from './session-tracker.js';
+import { flushSpans, startSpanFlush } from './transport.js';
 /**
  * Configure the SDK and (by default) wire global error handlers.
  *
@@ -33,5 +34,13 @@ export function initSentori(options) {
     installFetchInstrumentation();
     installXhrInstrumentation();
     startSession();
+    // Drain finished spans to /v1/spans:batch on a timer, plus once more
+    // on page-hide so the last batch isn't lost when the tab closes.
+    startSpanFlush();
+    if (typeof addEventListener === 'function') {
+        addEventListener('pagehide', () => {
+            void flushSpans();
+        });
+    }
 }
 //# sourceMappingURL=init.js.map

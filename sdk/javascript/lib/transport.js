@@ -1,3 +1,5 @@
+import { drainSpans } from '@goliapkg/sentori-core';
+import { getConfig } from './config.js';
 const SDK_HEADER = 'sentori-javascript/0.1.0';
 export async function send(cfg, event) {
     await postJson(cfg, '/v1/events', JSON.stringify(event));
@@ -10,6 +12,60 @@ export async function send(cfg, event) {
  */
 export async function sendSession(cfg, ping) {
     await postJson(cfg, '/v1/sessions', JSON.stringify(ping));
+}
+// ── span flush ─────────────────────────────────────────────────────
+//
+// http.client / react.render / navigation spans pile up in the core
+// SpanBuffer as work happens; this drains them on a timer and POSTs to
+// /v1/spans:batch (server caps a batch at 200). Spans are best-effort:
+// no retry, no offline queue — a dropped span just doesn't show in the
+// waterfall.
+const SPAN_FLUSH_INTERVAL_MS = 5_000;
+const SPAN_BATCH_MAX = 200;
+let _spanTimer = null;
+export function startSpanFlush() {
+    if (_spanTimer)
+        return;
+    _spanTimer = setInterval(() => {
+        void flushSpans();
+    }, SPAN_FLUSH_INTERVAL_MS);
+    _spanTimer.unref?.();
+}
+export function stopSpanFlush() {
+    if (_spanTimer)
+        clearInterval(_spanTimer);
+    _spanTimer = null;
+}
+export async function flushSpans() {
+    const cfg = getConfig();
+    if (!cfg)
+        return;
+    const spans = drainSpans();
+    if (spans.length === 0)
+        return;
+    const base = cfg.ingestUrl.replace(/\/+$/, '');
+    for (let i = 0; i < spans.length; i += SPAN_BATCH_MAX) {
+        const chunk = spans.slice(i, i + SPAN_BATCH_MAX);
+        try {
+            const resp = await fetch(`${base}/v1/spans:batch`, {
+                body: JSON.stringify({ spans: chunk }),
+                headers: {
+                    Authorization: `Bearer ${cfg.token}`,
+                    'Content-Type': 'application/json',
+                    'Sentori-Sdk': SDK_HEADER,
+                },
+                keepalive: true,
+                method: 'POST',
+            });
+            // 5xx: server's struggling — stop sending the rest of the batch.
+            // 4xx: drop too (bad token / quota / oversized) — also stop.
+            if (resp.status >= 400)
+                break;
+        }
+        catch {
+            break;
+        }
+    }
 }
 async function postJson(cfg, path, body) {
     const url = `${cfg.ingestUrl.replace(/\/+$/, '')}${path}`;

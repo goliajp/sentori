@@ -1,10 +1,18 @@
 import { startSpan } from '@goliapkg/sentori-core';
 
 import { addBreadcrumb } from '../breadcrumbs';
+import { getConfig } from '../config';
 
 let _installed = false;
 
 const AUTH_PARAMS = ['token', 'key', 'password', 'secret', 'access_token'];
+
+// Requests to our own ingest endpoint shouldn't be traced — otherwise
+// every span upload spawns another http.client span, and so on.
+const isIngestUrl = (url: string): boolean => {
+  const base = getConfig()?.ingestUrl;
+  return !!base && url.startsWith(base);
+};
 
 export const installNetworkHandler = (): void => {
   if (_installed) return;
@@ -22,6 +30,7 @@ function patchFetch(): void {
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const start = Date.now();
     const url = extractUrl(input);
+    if (isIngestUrl(url)) return original(input, init);
     const scrubbed = scrubUrl(url);
     const method = (init?.method ??
       (typeof input !== 'string' && 'method' in (input as Request)
@@ -117,6 +126,7 @@ function patchXhr(): void {
   };
 
   proto.send = function (this: TracedXhr, body?: Document | XMLHttpRequestBodyInit | null): void {
+    if (isIngestUrl(this.__sentoriUrl ?? '')) return originalSend.call(this, body);
     const method = this.__sentoriMethod ?? 'GET';
     const url = scrubUrl(this.__sentoriUrl ?? '');
     const span = startSpan('http.client', {

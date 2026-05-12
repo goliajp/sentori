@@ -1,6 +1,7 @@
 import { clearSpans, drainSpans } from '@goliapkg/sentori-core'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 
+import { setConfig, __resetForTests as resetConfig } from '../src/config.js'
 import {
   installFetchInstrumentation,
   toTraceparent,
@@ -42,6 +43,7 @@ afterEach(() => {
   uninstallFetchInstrumentation()
   if (originalFetch) globalThis.fetch = originalFetch
   clearSpans()
+  resetConfig()
 })
 
 describe('toTraceparent', () => {
@@ -168,6 +170,28 @@ describe('wrapped fetch', () => {
     await expect(fetch('https://api.example.com/x')).rejects.toThrow('aborted')
     const sp = drainSpans()[0]!
     expect(sp.status).toBe('cancelled')
+  })
+
+  test('does not trace requests to the configured ingest URL', async () => {
+    setConfig({
+      environment: 'test',
+      ingestUrl: 'https://ingest.example.com',
+      release: 'app@1.0.0+1',
+      token: 'st_pk_test',
+    })
+    const recorder = makeRecorder()
+    globalThis.fetch = recorder.fn
+    installFetchInstrumentation()
+
+    await fetch('https://ingest.example.com/v1/spans:batch', { method: 'POST' })
+    // request still went through, but no span and no traceparent header
+    expect(recorder.calls).toHaveLength(1)
+    expect(new Headers(recorder.calls[0]?.init?.headers).get('traceparent')).toBeNull()
+    expect(drainSpans()).toHaveLength(0)
+
+    // a non-ingest request is still instrumented
+    await fetch('https://api.example.com/x')
+    expect(drainSpans()).toHaveLength(1)
   })
 
   test('accepts URL instance + Request input shapes', async () => {

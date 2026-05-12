@@ -55,6 +55,16 @@ dogfood 发现：sentori-rn / sentori-js 的自动 tracing 只 patch `globalThis
 - publish 4 包（core 无改动不 bump）：sentori-javascript 0.3.0 → 0.3.1 / sentori-react-native 0.5.0 → 0.5.1 / sentori-react 0.4.0 → 0.4.1（dep js→0.3.1）/ sentori-next 0.2.0 → 0.2.1（dep js→0.3.1 + react→0.4.1）
 - Insight 升到 sentori-react-native@0.5.1 即可不改代码拿到 axios trace
 
+### v0.4.2 patch — client span flush（critical fix）
+
+dogfood 第二个坑，比 v0.4.1 更严重：**SDK 从来没有把 client span 发出去**。`installNetworkHandler` / fetch / xhr hook 都正常 `startSpan().finish()`，但只把 span push 进 `sdk/core` 的内存 ring buffer；RN / JS 的 transport 只发 `/v1/events`、`/v1/sessions`，没人 drain 那个 buffer 去 POST `/v1/spans:batch`。结果：所有 client span 都堆在设备内存里，Traces 页面只看得到 server 自身的 `http.server` span。文档 `docs/recipes/distributed-tracing.md` 早就写了"span 经 `/v1/spans:batch` 上报"，代码却没实现。
+
+- `sdk/react-native/src/transport.ts` + `sdk/javascript/src/transport.ts`：加 span flush —— `drainSpans()` → POST `{spans}` 到 `/v1/spans:batch`，每批 ≤200（server 上限），失败即丢（不重试、不离线持久化；span 是 best-effort）。RN 用 10s `setInterval`（`startTransport` 里起）；JS 用 5s `setInterval`（`unref` 掉，不阻止 Node 退出）+ `pagehide` 时再 flush 一次
+- `installNetworkHandler` / fetch / xhr hook 现在跳过指向 `getConfig().ingestUrl` 的请求 —— 否则 span 上报本身又会产 `http.client` span，无限套娃
+- 测试：RN transport +4（POST batch / 空 buffer no-op / >200 分批 / 5xx 即停）；JS +6（同款 + 未配置 no-op + ingest-URL 不被 trace）；全 SDK sweep 绿（core 40 / js 50 / rn 43 / react 20 / next 9 / expo 4）
+- publish 4 包（core 无改动不 bump）：sentori-javascript 0.3.1 → 0.3.2 / sentori-react-native 0.5.1 → 0.5.2 / sentori-react 0.4.1 → 0.4.2（dep js→0.3.2）/ sentori-next 0.2.1 → 0.2.2（dep js→0.3.2 + react→0.4.2）
+- Insight 升到 sentori-react-native@0.5.2 后 Traces 页面才会真的有 client span
+
 ---
 
 ## v0.3 — React-first via dogfood（Phase 29-33，进行中）

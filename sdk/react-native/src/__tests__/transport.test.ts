@@ -7,10 +7,13 @@ import {
   mock,
 } from 'bun:test';
 
+import { clearSpans, startSpan } from '@goliapkg/sentori-core';
+
 import { setConfig, __resetForTests as resetConfig } from '../config';
 import {
   enqueue,
   flush,
+  flushSpans,
   startTransport,
   __resetForTests as resetTransport,
   __peekQueue,
@@ -166,5 +169,79 @@ describe('transport', () => {
     await flush(); // second flush sees an empty queue and no-ops
     expect(attempts).toBe(1);
     expect(__peekQueue()).toHaveLength(0);
+  });
+});
+
+describe('span flush', () => {
+  beforeEach(() => {
+    resetConfig();
+    resetTransport();
+    clearSpans();
+    setConfig({
+      token: 'st_pk_test',
+      release: 'app@1.0.0+1',
+      environment: 'test',
+      ingestUrl: 'http://localhost:8080',
+      enabled: true,
+    });
+    startTransport();
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    clearSpans();
+  });
+
+  it('POSTs buffered spans to /v1/spans:batch', async () => {
+    const calls: { url: string; init?: RequestInit }[] = [];
+    globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init });
+      return new Response(null, { status: 202 });
+    }) as typeof fetch;
+
+    startSpan('http.client', { name: 'GET /a' }).finish({ status: 'ok' });
+    startSpan('http.client', { name: 'GET /b' }).finish({ status: 'error' });
+    await flushSpans();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe('http://localhost:8080/v1/spans:batch');
+    const body = JSON.parse((calls[0]?.init?.body as string) ?? '{}');
+    expect(body.spans).toHaveLength(2);
+    expect(body.spans[0]).toMatchObject({ op: 'http.client', name: 'GET /a', status: 'ok' });
+  });
+
+  it('no-op when the span buffer is empty', async () => {
+    let attempts = 0;
+    globalThis.fetch = mock(async () => {
+      attempts++;
+      return new Response(null, { status: 202 });
+    }) as typeof fetch;
+    await flushSpans();
+    expect(attempts).toBe(0);
+  });
+
+  it('splits >200 spans into multiple batches', async () => {
+    const sizes: number[] = [];
+    globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse((init?.body as string) ?? '{}');
+      sizes.push(body.spans.length);
+      return new Response(null, { status: 202 });
+    }) as typeof fetch;
+
+    for (let i = 0; i < 450; i++) startSpan('http.client', { name: `GET /${i}` }).finish();
+    await flushSpans();
+
+    expect(sizes).toEqual([200, 200, 50]);
+  });
+
+  it('drops on 5xx without retrying', async () => {
+    let attempts = 0;
+    globalThis.fetch = mock(async () => {
+      attempts++;
+      return new Response('boom', { status: 503 });
+    }) as typeof fetch;
+
+    startSpan('http.client', { name: 'GET /a' }).finish();
+    await flushSpans();
+    expect(attempts).toBe(1);
   });
 });

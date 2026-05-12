@@ -1,4 +1,4 @@
-import type { SessionPing } from '@goliapkg/sentori-core';
+import { type SessionPing } from '@goliapkg/sentori-core';
 import type { Event } from './types.js';
 /**
  * Minimal HTTP transport. POST /v1/events with a Bearer token.
@@ -22,4 +22,7 @@ export declare function send(cfg: TransportConfig, event: Event): Promise<void>;
  * fallback when beacon is unavailable.
  */
 export declare function sendSession(cfg: TransportConfig, ping: SessionPing): Promise<void>;
+export declare function startSpanFlush(): void;
+export declare function stopSpanFlush(): void;
+export declare function flushSpans(): Promise<void>;
 //# sourceMappingURL=transport.d.ts.map

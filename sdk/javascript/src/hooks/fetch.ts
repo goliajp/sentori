@@ -6,12 +6,20 @@
 // original fetch back — only used by tests; production callers
 // install once and leave it alone.
 //
-// We don't wrap XMLHttpRequest. RN polyfills XHR over fetch
-// internally, so patching fetch covers RN too. Browsers used to
-// have plenty of XHR-only callsites; in 2026 fetch is the practical
-// default and `axios` etc. delegate to fetch on modern targets.
+// XMLHttpRequest is instrumented separately in hooks/xhr.ts — axios
+// (default `xhr` adapter) and older XHR-only callers don't go through
+// fetch, so the fetch hook alone would miss them.
 
 import { startSpan } from '@goliapkg/sentori-core'
+
+import { getConfig } from '../config.js'
+
+// Don't trace requests to our own ingest endpoint — span uploads
+// would otherwise spawn http.client spans recursively.
+function isIngestUrl(url: string): boolean {
+  const base = getConfig()?.ingestUrl
+  return !!base && url.startsWith(base)
+}
 
 let _originalFetch: typeof fetch | null = null
 let _installed = false
@@ -48,6 +56,7 @@ async function wrappedFetch(
   }
 
   const { method, url } = extractMethodAndUrl(input, init)
+  if (isIngestUrl(url)) return original(input as RequestInfo, init)
   const span = startSpan('http.client', {
     name: `${method} ${url}`,
     tags: { 'http.method': method, 'http.url': url },

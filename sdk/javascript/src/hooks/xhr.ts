@@ -13,7 +13,13 @@
 
 import { startSpan } from '@goliapkg/sentori-core'
 
+import { getConfig } from '../config.js'
 import { toTraceparent } from './fetch.js'
+
+function isIngestUrl(url: string): boolean {
+  const base = getConfig()?.ingestUrl
+  return !!base && url.startsWith(base)
+}
 
 type TracedXhr = XMLHttpRequest & {
   __sentoriMethod?: string
@@ -55,6 +61,7 @@ export function installXhrInstrumentation(): boolean {
     this: TracedXhr,
     body?: Document | XMLHttpRequestBodyInit | null,
   ): void {
+    if (isIngestUrl(this.__sentoriUrl ?? '')) return originalSend.call(this, body)
     const method = this.__sentoriMethod ?? 'GET'
     const url = this.__sentoriUrl ?? ''
     const span = startSpan('http.client', {

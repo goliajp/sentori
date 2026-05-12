@@ -1,3 +1,5 @@
+import { drainSpans } from '@goliapkg/sentori-core';
+
 import { getConfig } from './config';
 import type { Event } from './types';
 
@@ -7,8 +9,15 @@ const MAX_RETRY = 3;
 const STORAGE_KEY = '@sentori/pending';
 const MAX_PERSISTED = 1000;
 
+// Spans are higher-volume and lower-value than error events: we batch
+// them on their own timer, cap each request at the server's per-batch
+// limit, and drop on failure rather than persisting offline.
+const SPAN_FLUSH_INTERVAL_MS = 10_000;
+const SPAN_BATCH_MAX = 200;
+
 let _queue: Event[] = [];
 let _flushTimer: ReturnType<typeof setTimeout> | null = null;
+let _spanTimer: ReturnType<typeof setInterval> | null = null;
 let _started = false;
 
 const SDK_VERSION = '0.0.0';
@@ -27,6 +36,47 @@ export const enqueue = (event: Event): void => {
 
 export const startTransport = (): void => {
   _started = true;
+  if (!_spanTimer) {
+    _spanTimer = setInterval(() => {
+      void flushSpans();
+    }, SPAN_FLUSH_INTERVAL_MS);
+  }
+};
+
+export const flushSpans = async (): Promise<void> => {
+  if (!_started) return;
+  const spans = drainSpans();
+  if (spans.length === 0) return;
+  const config = getConfig();
+  if (!config) return;
+  for (let i = 0; i < spans.length; i += SPAN_BATCH_MAX) {
+    const chunk = spans.slice(i, i + SPAN_BATCH_MAX);
+    try {
+      await sendSpansOnce(chunk, config.ingestUrl, config.token);
+    } catch {
+      // drop the remaining chunks — span uploads aren't worth retrying
+      break;
+    }
+  }
+};
+
+const sendSpansOnce = async (
+  spans: unknown[],
+  ingestUrl: string,
+  token: string,
+): Promise<void> => {
+  const resp = await fetch(`${ingestUrl}/v1/spans:batch`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      'Sentori-Sdk': `react-native/${SDK_VERSION}`,
+    },
+    body: JSON.stringify({ spans }),
+  });
+  // 5xx: server overloaded. 4xx (bad token / quota / oversized): also
+  // pointless to keep sending. Either way, stop the rest of the batch.
+  if (resp.status >= 400) throw new Error(`spans-${resp.status}`);
 };
 
 export const flush = async (): Promise<void> => {
@@ -158,6 +208,8 @@ export const __resetForTests = (): void => {
   _queue = [];
   if (_flushTimer) clearTimeout(_flushTimer);
   _flushTimer = null;
+  if (_spanTimer) clearInterval(_spanTimer);
+  _spanTimer = null;
   _started = false;
 };
 
