@@ -55,14 +55,14 @@
 - Server：`AttachmentKind` 加 `'sessionTrail'`，migration 0035 扩 event_attachments.kind CHECK，application/json 白名单
 - Dashboard `<SessionTrailViewer>`：左栏 step list + 右栏 detail（label、相对 crash 时间、breadcrumb、可选 screenshot/viewTree 链接），← → 键步进，默认 focus 最后一步（最接近 crash）。AttachmentGallery 自动渲染为可展开 `<details>` 卡
 
-### Phase 47 — Polish 收尾 ✅（部分）
+### Phase 47 — Polish 收尾 ✅
 
 - 47.01 Related Issues panel：server `GET /admin/api/projects/{p}/issues/{i}/related` 返回同 project / 同 error_type 的 sibling issue（capped 5，按 last_seen DESC），dashboard `<RelatedIssuesPanel>` 渲染为 header 下的 chip row + 已 resolved/closed 的 muted 渲染
+- 47.02 hover frame ↔ tree node 联动：`web/src/lib/frame-hover.tsx` FrameHoverContext，stack frame hover 用 `file:line` 发布，ViewTreePanel 翻译成 nodeId Set 高亮 + `scrollIntoView({ block: 'nearest' })` 滚到第一个匹配节点。与既有 search highlight 用不同 palette（hover 是 `bg-accent/20 ring-1`，search 是 `bg-accent/10`），ancestor 链对两者都自动展开
 - 47.04 SDK perf benchmark：`sdk/core/src/__tests__/perf.bench.ts` 给 uuidV7 / shouldSample / shouldSampleTrace / breadcrumb / TrailBuffer.push / sealTrail 各一条 wall-clock 预算（10x 实测 margin，CI-safe）。`bun run bench` 跑这条
+- 47.05 Dashboard LCP gate：`web/lighthouserc.cjs` + `bun run lhci`，LCP < 1200ms 是 hard build-breaker，FCP/TBT/CLS 是 warn。手动跑：`cd web && bun run build && bun run preview & bun run lhci`。CI 接入文档见 `docs/performance/dashboard-lcp.md`
 - 47.06 ROADMAP + CHANGELOG v0.7 整段（本节）
-- 47.02 hover frame ↔ tree node 联动：deferred — 单独 follow-up
-- 47.05 Dashboard LCP gate：deferred — 需要 Lighthouse infra
-- 47.07 v0.7 tag + npm publish：等 Insight 验证后一次性走
+- 47.07 v0.7 tag + npm publish：**等用户授权后执行**（npm 不可逆 + git tag push 影响 shared state，所以不自动跑）
 
 ---
 

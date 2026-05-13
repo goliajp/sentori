@@ -23,6 +23,7 @@ import { RelatedIssuesPanel } from '@/components/RelatedIssuesPanel'
 import { OpenInEditorButton } from '@/components/OpenInEditorButton'
 import { SourceCode } from '@/components/SourceCode'
 import { ErrorState } from '@/components/states'
+import { FrameHoverProvider, frameKey, useFrameHover } from '@/lib/frame-hover'
 import { packageOf } from '@/lib/frame-package'
 import { roleOf } from '@/lib/frame-role'
 import { frameToSourceUrl } from '@/lib/source-link'
@@ -399,135 +400,137 @@ function StackTab({
   const [openFrame, setOpenFrame] = useState<null | { cause: number; frame: number }>(null)
 
   return (
-    <div className="space-y-6">
-      <Section
-        right={
-          <button
-            className={`rounded-md px-2 py-0.5 text-[11px] tracking-wider uppercase transition-colors ${
-              symbolicated
-                ? 'bg-accent/10 text-accent'
-                : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
-            }`}
-            onClick={onToggleSymbolicated}
-            type="button"
-          >
-            {symbolicated ? 'symbolicated' : 'raw'}
-          </button>
-        }
-        title="Stack"
-      >
-        {/* Phase 42 sub-H.04: ANR / hang events get a violet banner
+    <FrameHoverProvider>
+      <div className="space-y-6">
+        <Section
+          right={
+            <button
+              className={`rounded-md px-2 py-0.5 text-[11px] tracking-wider uppercase transition-colors ${
+                symbolicated
+                  ? 'bg-accent/10 text-accent'
+                  : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+              }`}
+              onClick={onToggleSymbolicated}
+              type="button"
+            >
+              {symbolicated ? 'symbolicated' : 'raw'}
+            </button>
+          }
+          title="Stack"
+        >
+          {/* Phase 42 sub-H.04: ANR / hang events get a violet banner
             at the top of the stack so a triage user immediately
             knows this isn't a thrown error — main thread was wedged
             for ≥ the watchdog threshold. */}
-        {payload.kind === 'anr' && (
-          <div className="bg-accent/10 text-fg border-accent/40 mb-3 rounded-md border-l-4 px-3 py-2 text-[12px]">
-            <span className="text-accent mr-2 font-mono text-[11px] tracking-wider uppercase">
-              ⏸ {payload.platform === 'ios' ? 'Hang' : 'ANR'}
-            </span>
-            <span className="text-fg-muted">
-              Main thread blocked. Stack below is what the thread was running when the watchdog
-              fired — not a thrown exception.
-            </span>
-          </div>
-        )}
-        <UnsymbolicatedHint
-          orgSlug={orgSlug}
-          platform={payload.platform}
-          projectId={projectId}
-          release={event.release}
-          stack={payload.error.stack}
-          symbolication={payload.symbolication}
-        />
-        {event.traceId && (
-          <div className="border-border bg-bg-tertiary/30 mb-3 flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-[12px]">
-            <span className="text-fg-muted">
-              Captured inside trace{' '}
-              <span className="text-fg font-mono">{event.traceId.slice(0, 8)}</span>
-            </span>
-            <Link
-              className="text-accent hover:text-accent/80 shrink-0 self-center text-[12px] whitespace-nowrap"
-              to={`/org/${orgSlug}/traces/${event.traceId}`}
-            >
-              In trace →
-            </Link>
-          </div>
-        )}
-        <StackList
-          onFrameClick={(idx) => setOpenFrame({ cause: 0, frame: idx })}
-          platform={payload.platform}
-          sourceRepoUrl={sourceRepoUrl}
-          stack={payload.error.stack}
-          symbolication={payload.symbolication}
-        />
-        {payload.error.cause && (
-          <CauseChain
-            depth={1}
-            error={payload.error.cause}
-            onFrameClick={(cause, frame) => setOpenFrame({ cause, frame })}
+          {payload.kind === 'anr' && (
+            <div className="bg-accent/10 text-fg border-accent/40 mb-3 rounded-md border-l-4 px-3 py-2 text-[12px]">
+              <span className="text-accent mr-2 font-mono text-[11px] tracking-wider uppercase">
+                ⏸ {payload.platform === 'ios' ? 'Hang' : 'ANR'}
+              </span>
+              <span className="text-fg-muted">
+                Main thread blocked. Stack below is what the thread was running when the watchdog
+                fired — not a thrown exception.
+              </span>
+            </div>
+          )}
+          <UnsymbolicatedHint
+            orgSlug={orgSlug}
             platform={payload.platform}
-            sourceRepoUrl={sourceRepoUrl}
+            projectId={projectId}
+            release={event.release}
+            stack={payload.error.stack}
             symbolication={payload.symbolication}
           />
-        )}
-      </Section>
-
-      {openFrame && (
-        <FrameSourceDrawer
-          cause={openFrame.cause}
-          eventId={event.id}
-          frame={openFrame.frame}
-          onClose={() => setOpenFrame(null)}
-          projectId={projectId}
-        />
-      )}
-
-      {releases && releases.length > 0 && (
-        <Section title="Releases">
-          <div className="flex flex-wrap gap-2">
-            {releases.map((r) => (
-              <span
-                className="border-border bg-bg-tertiary text-fg-muted rounded-md border px-2 py-0.5 font-mono text-[12px]"
-                key={r}
-              >
-                {r}
+          {event.traceId && (
+            <div className="border-border bg-bg-tertiary/30 mb-3 flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-[12px]">
+              <span className="text-fg-muted">
+                Captured inside trace{' '}
+                <span className="text-fg font-mono">{event.traceId.slice(0, 8)}</span>
               </span>
-            ))}
-          </div>
+              <Link
+                className="text-accent hover:text-accent/80 shrink-0 self-center text-[12px] whitespace-nowrap"
+                to={`/org/${orgSlug}/traces/${event.traceId}`}
+              >
+                In trace →
+              </Link>
+            </div>
+          )}
+          <StackList
+            onFrameClick={(idx) => setOpenFrame({ cause: 0, frame: idx })}
+            platform={payload.platform}
+            sourceRepoUrl={sourceRepoUrl}
+            stack={payload.error.stack}
+            symbolication={payload.symbolication}
+          />
+          {payload.error.cause && (
+            <CauseChain
+              depth={1}
+              error={payload.error.cause}
+              onFrameClick={(cause, frame) => setOpenFrame({ cause, frame })}
+              platform={payload.platform}
+              sourceRepoUrl={sourceRepoUrl}
+              symbolication={payload.symbolication}
+            />
+          )}
         </Section>
-      )}
 
-      <AttachmentGallery attachments={payload.attachments} eventId={event.id} />
+        {openFrame && (
+          <FrameSourceDrawer
+            cause={openFrame.cause}
+            eventId={event.id}
+            frame={openFrame.frame}
+            onClose={() => setOpenFrame(null)}
+            projectId={projectId}
+          />
+        )}
 
-      <ReleaseArtifactsPanel projectId={projectId} release={payload.release} />
+        {releases && releases.length > 0 && (
+          <Section title="Releases">
+            <div className="flex flex-wrap gap-2">
+              {releases.map((r) => (
+                <span
+                  className="border-border bg-bg-tertiary text-fg-muted rounded-md border px-2 py-0.5 font-mono text-[12px]"
+                  key={r}
+                >
+                  {r}
+                </span>
+              ))}
+            </div>
+          </Section>
+        )}
 
-      <OtherIssuesInReleasePanel
-        currentIssueId={issueId}
-        orgSlug={orgSlug}
-        projectId={projectId}
-        release={payload.release}
-      />
+        <AttachmentGallery attachments={payload.attachments} eventId={event.id} />
 
-      <Section title="Context">
-        <KeyValueGrid
-          data={{
-            'app.build': payload.app.build ?? '',
-            'app.framework': payload.app.framework
-              ? `${payload.app.framework.name} ${payload.app.framework.version}`
-              : '',
-            'app.version': payload.app.version,
-            'device.locale': payload.device.locale ?? '',
-            'device.model': payload.device.model ?? '',
-            'device.os': payload.device.os,
-            'device.osVersion': payload.device.osVersion,
-            environment: payload.environment,
-            platform: payload.platform,
-            release: payload.release,
-            'user.id': payload.user?.id ?? '(anonymous)',
-          }}
+        <ReleaseArtifactsPanel projectId={projectId} release={payload.release} />
+
+        <OtherIssuesInReleasePanel
+          currentIssueId={issueId}
+          orgSlug={orgSlug}
+          projectId={projectId}
+          release={payload.release}
         />
-      </Section>
-    </div>
+
+        <Section title="Context">
+          <KeyValueGrid
+            data={{
+              'app.build': payload.app.build ?? '',
+              'app.framework': payload.app.framework
+                ? `${payload.app.framework.name} ${payload.app.framework.version}`
+                : '',
+              'app.version': payload.app.version,
+              'device.locale': payload.device.locale ?? '',
+              'device.model': payload.device.model ?? '',
+              'device.os': payload.device.os,
+              'device.osVersion': payload.device.osVersion,
+              environment: payload.environment,
+              platform: payload.platform,
+              release: payload.release,
+              'user.id': payload.user?.id ?? '(anonymous)',
+            }}
+          />
+        </Section>
+      </div>
+    </FrameHoverProvider>
   )
 }
 
@@ -988,8 +991,21 @@ function FrameRow({
   const firstNo = frame.line - pre.length
   const language = languageOf(frame.file)
   const repoUrl = frameToSourceUrl({ file: frame.file, line: frame.line, sourceRepoUrl })
+  // Phase 47.02: publish hover into the FrameHoverContext so the
+  // sibling <ViewTreePanel> can highlight the matching node. Only
+  // frames with a real file:line are publishable — placeholder
+  // frames (e.g. `<unknown>:0` from unsymbolicated native crashes)
+  // would create spurious matches against arbitrary "0" lines.
+  const { setHoveredKey } = useFrameHover()
+  const hoverEnabled = !!frame.file && frame.line > 0
   return (
-    <div className={`border-border/40 border-b last:border-b-0 ${frame.inApp ? 'bg-bg' : ''}`}>
+    <div
+      className={`border-border/40 border-b last:border-b-0 ${frame.inApp ? 'bg-bg' : ''}`}
+      onMouseEnter={
+        hoverEnabled ? () => setHoveredKey(frameKey(frame.file, frame.line)) : undefined
+      }
+      onMouseLeave={hoverEnabled ? () => setHoveredKey(null) : undefined}
+    >
       <div className="hover:bg-bg-tertiary/60 flex w-full items-baseline gap-3 px-3 py-1.5 text-[12px]">
         <button
           className="flex flex-1 items-baseline gap-3 text-left"

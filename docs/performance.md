@@ -42,6 +42,10 @@ something."
   ingest endpoints at 50 req/s open-loop scheduler for 60 s.
   Per-endpoint P50/P95/P99/max latency table + per-endpoint
   analysis. 0 errors out of 3,000 requests.
+- [`dashboard-lcp.md`](./performance/dashboard-lcp.md) — Lighthouse
+  CI assertion gate for the dashboard. LCP < 1.2 s is a hard
+  build-breaker; TBT / FCP / CLS emit warnings. Run with
+  `cd web && bun run build && bun run preview & bun run lhci`.
 
 ## Regression policy
 

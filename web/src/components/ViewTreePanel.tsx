@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { frameKey, useFrameHover } from '@/lib/frame-hover'
 
 /**
  * Phase 42 sub-G.07/08/09 — render an event's `viewTree` attachment.
@@ -68,6 +70,12 @@ export function ViewTreePanel({
 
   const [query, setQuery] = useState('')
   const [openSet, setOpenSet] = useState<null | Set<string>>(null)
+  // Phase 47.02: sibling hover state from <FrameRow>. We turn the
+  // hoveredKey ("file:line") into the set of node ids whose
+  // `file + line` match, and highlight them on top of the search
+  // highlight palette. Independent state slot so the search filter
+  // and the frame hover don't fight.
+  const { hoveredKey } = useFrameHover()
 
   // Default open: root + its direct children. Computed once when
   // the tree first arrives.
@@ -107,6 +115,33 @@ export function ViewTreePanel({
     return matched
   }, [data, query])
 
+  // Phase 47.02: nodes matching the hovered stack frame's file:line.
+  // Recomputed only when `hoveredKey` changes — Object.entries scan
+  // is cheap for the ≤ a few hundred nodes we typically see.
+  const hoverHighlight = useMemo(() => {
+    if (!data || !hoveredKey) return null
+    const matched = new Set<string>()
+    for (const [id, n] of Object.entries(data.nodes)) {
+      if (n.file && n.line !== undefined && frameKey(n.file, n.line) === hoveredKey) {
+        matched.add(id)
+      }
+    }
+    return matched.size > 0 ? matched : null
+  }, [data, hoveredKey])
+
+  // Auto-scroll the first hovered node into view. `scrollIntoView` on
+  // an inner button without `block: 'nearest'` triggers the *outer*
+  // scroll container too (the issue-detail tab body), which would
+  // jolt the user away from the stack — so we scope to the panel's
+  // own viewport and stay inside `nearest` to avoid yo-yoing.
+  const panelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!hoverHighlight || hoverHighlight.size === 0 || !panelRef.current) return
+    const firstId = hoverHighlight.values().next().value
+    const el = panelRef.current.querySelector<HTMLElement>(`[data-node-id="${firstId}"]`)
+    el?.scrollIntoView({ block: 'nearest' })
+  }, [hoverHighlight])
+
   if (isLoading) {
     return <p className="text-fg-muted px-2 py-4 text-[12px]">Loading view tree…</p>
   }
@@ -130,10 +165,14 @@ export function ViewTreePanel({
           value={query}
         />
       </div>
-      <div className="border-border bg-bg-tertiary/30 max-h-[60vh] overflow-auto rounded-md border p-2 font-mono text-[11px]">
+      <div
+        className="border-border bg-bg-tertiary/30 max-h-[60vh] overflow-auto rounded-md border p-2 font-mono text-[11px]"
+        ref={panelRef}
+      >
         <TreeNode
           depth={0}
           highlight={visibleHighlight}
+          hoverHighlight={hoverHighlight}
           id={data.rootId}
           nodes={data.nodes}
           onToggle={toggle}
@@ -147,6 +186,7 @@ export function ViewTreePanel({
 function TreeNode({
   depth,
   highlight,
+  hoverHighlight,
   id,
   nodes,
   onToggle,
@@ -154,6 +194,7 @@ function TreeNode({
 }: {
   depth: number
   highlight: null | Set<string>
+  hoverHighlight: null | Set<string>
   id: string
   nodes: Record<string, ViewNode>
   onToggle: (id: string) => void
@@ -163,31 +204,39 @@ function TreeNode({
   // Auto-expand any node on the path to a matched descendant. Hook
   // must run unconditionally — derive a stable input list even when
   // the node is missing so the early-return below doesn't violate
-  // rules-of-hooks.
+  // rules-of-hooks. Both the search highlight and the frame-hover
+  // highlight should force open the ancestor chain.
   const childrenForExpand: string[] = n?.children ?? []
   const hasMatchedDescendant = useMemo(() => {
-    if (!highlight) return false
+    const sources: Array<null | Set<string>> = [highlight, hoverHighlight]
+    if (sources.every((s) => !s)) return false
     const stack = [...childrenForExpand]
     while (stack.length > 0) {
       const cid = stack.pop()!
-      if (highlight.has(cid)) return true
+      for (const s of sources) if (s?.has(cid)) return true
       const c = nodes[cid]
       if (c) stack.push(...c.children)
     }
     return false
-  }, [highlight, childrenForExpand, nodes])
+  }, [highlight, hoverHighlight, childrenForExpand, nodes])
   if (!n) return null
   const hasChildren = n.children.length > 0
   const isOpen = open.has(id)
   const isMatched = highlight?.has(id) ?? false
+  const isHovered = hoverHighlight?.has(id) ?? false
   const reallyOpen = isOpen || hasMatchedDescendant
 
   return (
     <div>
       <button
         className={`hover:bg-bg-tertiary/60 flex w-full items-baseline gap-1 rounded px-1 py-0.5 text-left ${
-          isMatched ? 'text-fg bg-accent/10' : 'text-fg-muted'
+          isHovered
+            ? 'text-fg ring-accent/60 bg-accent/20 ring-1'
+            : isMatched
+              ? 'text-fg bg-accent/10'
+              : 'text-fg-muted'
         }`}
+        data-node-id={id}
         onClick={() => hasChildren && onToggle(id)}
         style={{ paddingLeft: depth * 12 }}
         type="button"
@@ -209,6 +258,7 @@ function TreeNode({
           <TreeNode
             depth={depth + 1}
             highlight={highlight}
+            hoverHighlight={hoverHighlight}
             id={cid}
             key={cid}
             nodes={nodes}
