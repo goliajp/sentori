@@ -53,5 +53,5 @@ type NavigatingLike = null | {
     };
 };
 export declare function traceNavigation(navigating: NavigatingLike): void;
-export { addBreadcrumb, captureException, captureException as captureError, getUser, setUser, } from '@goliapkg/sentori-javascript';
+export { addBreadcrumb, captureException, captureException as captureError, captureStep, getUser, setUser, } from '@goliapkg/sentori-javascript';
 //# sourceMappingURL=index.d.ts.map

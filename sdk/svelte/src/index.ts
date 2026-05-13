@@ -26,6 +26,7 @@
 
 import {
   captureException as captureExceptionJs,
+  captureStep,
   initSentori as initSentoriJs,
   type InitOptions,
 } from '@goliapkg/sentori-javascript'
@@ -83,6 +84,9 @@ export function traceNavigation(navigating: NavigatingLike): void {
     })
     _active = span
     setActiveSpan(span)
+    captureStep(`route:${to}`, {
+      breadcrumb: { type: 'navigation', message: `${from} → ${to}` },
+    })
   } else if (_active) {
     _active.finish({ status: 'ok' })
     _active = null
@@ -93,6 +97,7 @@ export {
   addBreadcrumb,
   captureException,
   captureException as captureError,
+  captureStep,
   getUser,
   setUser,
 } from '@goliapkg/sentori-javascript'

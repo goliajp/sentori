@@ -1,4 +1,4 @@
-import { type SessionPing } from '@goliapkg/sentori-core';
+import { type AttachmentKind, type AttachmentMeta, type SessionPing } from '@goliapkg/sentori-core';
 import type { Event } from './types.js';
 /**
  * Minimal HTTP transport. POST /v1/events with a Bearer token.
@@ -25,4 +25,17 @@ export declare function sendSession(cfg: TransportConfig, ping: SessionPing): Pr
 export declare function startSpanFlush(): void;
 export declare function stopSpanFlush(): void;
 export declare function flushSpans(): Promise<void>;
+/**
+ * Phase 46 — upload an attachment blob (used for `sessionTrail` and
+ * any future per-event JSON blobs the Web SDK wants to ship).
+ *
+ * Mirrors the RN SDK's `uploadAttachment` shape but uses the browser's
+ * native `Blob` instead of base64-roundtripping. Returns the server-
+ * issued ref UUID on success, `null` on any failure (we ship the rest
+ * of the event regardless).
+ */
+export declare function uploadAttachment(cfg: TransportConfig, eventId: string, kind: AttachmentKind, blob: {
+    body: string;
+    mediaType: string;
+}): Promise<AttachmentMeta | null>;
 //# sourceMappingURL=transport.d.ts.map

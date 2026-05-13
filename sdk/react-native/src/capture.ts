@@ -1,4 +1,4 @@
-import { shouldSample } from '@goliapkg/sentori-core';
+import { sealTrail, shouldSample } from '@goliapkg/sentori-core';
 
 import { addBreadcrumb, getBreadcrumbs } from './breadcrumbs';
 import { getConfig, isInitialized } from './config';
@@ -6,9 +6,12 @@ import { symbolicateErrorViaMetro } from './handlers/dev-symbolicate';
 import { captureScreenshot } from './handlers/screenshot';
 import { markSessionErrored } from './session-tracker';
 import { parseStack } from './stack';
+import { getTrailBuffer } from './trail';
 import { enqueue, uploadAttachment } from './transport';
 import { uuidV7 } from './uuid';
 import type { App, AttachmentMeta, Device, Event, SentoriError, Tags, User } from './types';
+
+export { captureStep, __resetTrailForTests } from './trail';
 
 declare const __DEV__: boolean | undefined;
 
@@ -107,10 +110,48 @@ export const captureError = (error: Error, extras?: CaptureExtras): void => {
     if (wantScreenshot) {
       await captureAndAttachScreenshot(event);
     }
+    const trail = getTrailBuffer();
+    if (config.sessionTrailEnabled && trail.size() > 0) {
+      await captureAndAttachSessionTrail(event);
+    }
     enqueue(event);
   };
   void pipeline();
 };
+
+/**
+ * Phase 46 — seal the trail buffer, upload it as a `sessionTrail`
+ * attachment, attach the ref. Best-effort: any failure leaves a
+ * breadcrumb and lets the event ship without the trail.
+ *
+ * The trail is **always cleared** after `captureException`, even if
+ * upload fails — we don't want a stale 30-step buffer leaking into
+ * the next crash's trail.
+ */
+async function captureAndAttachSessionTrail(event: Event): Promise<void> {
+  const trail = getTrailBuffer();
+  const payload = sealTrail(trail);
+  trail.clear();
+  const json = JSON.stringify(payload);
+  // base64 the JSON for the `data:` URI multipart bridge (same
+  // trick the screenshot path uses).
+  const base64 =
+    typeof globalThis.btoa === 'function'
+      ? globalThis.btoa(unescape(encodeURIComponent(json)))
+      : Buffer.from(json, 'utf-8').toString('base64');
+  const attachment = await uploadAttachment(
+    event.id,
+    'sessionTrail',
+    { base64, mediaType: 'application/json' },
+    { source: 'js' },
+  );
+  if (!attachment) {
+    addBreadcrumb({ type: 'custom', data: { reason: 'session-trail-upload-failed' } });
+    return;
+  }
+  if (!event.attachments) event.attachments = [];
+  event.attachments.push(attachment);
+}
 
 export const captureException = captureError;
 

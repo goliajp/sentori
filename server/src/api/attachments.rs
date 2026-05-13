@@ -34,7 +34,13 @@ use crate::auth::IngestCaller;
 use crate::recent::AppState;
 
 const MAX_ATTACHMENT_BYTES: usize = 500 * 1024;
-const ALLOWED_KINDS: &[&str] = &["screenshot", "viewTree", "stateSnapshot", "logTail"];
+const ALLOWED_KINDS: &[&str] = &[
+    "screenshot",
+    "viewTree",
+    "stateSnapshot",
+    "logTail",
+    "sessionTrail",
+];
 const ALLOWED_SOURCES: &[&str] = &["js", "ios", "android"];
 
 /// Per-kind media-type whitelist. Screenshots are images, the JSON
@@ -43,7 +49,7 @@ const ALLOWED_SOURCES: &[&str] = &["js", "ios", "android"];
 fn allowed_media_types(kind: &str) -> &'static [&'static str] {
     match kind {
         "screenshot" => &["image/webp", "image/png", "image/jpeg"],
-        "viewTree" | "stateSnapshot" => &["application/json"],
+        "viewTree" | "stateSnapshot" | "sessionTrail" => &["application/json"],
         "logTail" => &["application/json", "text/plain"],
         _ => &[],
     }

@@ -33,4 +33,9 @@ export type InitOptions = CommonInitOptions & {
     errors?: null | number
     traces?: null | number
   }
+  /** Phase 46 — opt in to recording a session-trail buffer that
+   *  uploads alongside the next `captureException`. */
+  capture?: {
+    sessionTrail?: boolean
+  }
 }

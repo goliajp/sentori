@@ -38,6 +38,11 @@ export type InitOptions = {
      *  installed and `<MaskRegion>` placed over any sensitive UI. The
      *  image is webp q=70 480 px max, < 100 KB typical. */
     screenshot?: boolean;
+    /** Phase 46: record the last N steps (route changes, custom
+     *  breadcrumbs) leading up to a crash. On `captureException`
+     *  the buffer is sealed and uploaded as a `sessionTrail`
+     *  attachment. Defaults to false. */
+    sessionTrail?: boolean;
   };
   /** Phase 44 sub-B: client-side sampling. Each rate is `[0, 1]`;
    *  absent / null keeps everything. Defaults to 1.0 for both
@@ -74,6 +79,7 @@ export const init = (options: InitOptions): void => {
     screenshotsEnabled: options.capture?.screenshot === true,
     errorSampleRate: options.sampling?.errors ?? null,
     traceSampleRate: options.sampling?.traces ?? null,
+    sessionTrailEnabled: options.capture?.sessionTrail === true,
   });
 
   // Tell the native crash handler about the config so the JSON it writes

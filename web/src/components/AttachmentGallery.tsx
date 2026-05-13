@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import type { Attachment } from '@/api/client'
 
+import { SessionTrailViewer } from './SessionTrailViewer'
 import { ViewTreePanel } from './ViewTreePanel'
 
 /**
@@ -33,8 +34,15 @@ export function AttachmentGallery({
     () => (attachments ?? []).filter((a) => a.kind === 'viewTree'),
     [attachments]
   )
+  const sessionTrails = useMemo(
+    () => (attachments ?? []).filter((a) => a.kind === 'sessionTrail'),
+    [attachments]
+  )
   const others = useMemo(
-    () => (attachments ?? []).filter((a) => a.kind !== 'screenshot' && a.kind !== 'viewTree'),
+    () =>
+      (attachments ?? []).filter(
+        (a) => a.kind !== 'screenshot' && a.kind !== 'viewTree' && a.kind !== 'sessionTrail'
+      ),
     [attachments]
   )
   const [openIdx, setOpenIdx] = useState<null | number>(null)
@@ -75,6 +83,21 @@ export function AttachmentGallery({
           </summary>
           <div className="px-3 pb-3">
             <ViewTreePanel attachmentRef={a.ref} eventId={eventId} />
+          </div>
+        </details>
+      ))}
+      {sessionTrails.map((a) => (
+        <details
+          className="border-border bg-bg-tertiary/30 rounded-md border"
+          key={a.ref}
+          open={sessionTrails.length === 1}
+        >
+          <summary className="text-fg cursor-pointer px-3 py-2 text-[12px]">
+            Session trail
+            <span className="text-fg-muted ml-2 text-[10px]">steps leading up to the error</span>
+          </summary>
+          <div className="px-3 pb-3">
+            <SessionTrailViewer attachmentRef={a.ref} eventId={eventId} />
           </div>
         </details>
       ))}

@@ -65,6 +65,7 @@ export {
   addBreadcrumb,
   captureException,
   captureException as captureError,
+  captureStep,
   getUser,
   setUser,
 } from '@goliapkg/sentori-javascript'

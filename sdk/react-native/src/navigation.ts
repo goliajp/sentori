@@ -24,6 +24,8 @@ import { useEffect, useRef } from 'react';
 
 import { setActiveSpan, startSpan, type SpanHandle } from '@goliapkg/sentori-core';
 
+import { captureStep } from './trail';
+
 /** Minimal contract: anything with `addListener('state', cb)` and
  *  `getCurrentRoute()` works. The real @react-navigation/native
  *  NavigationContainer ref matches this shape. */
@@ -72,6 +74,12 @@ export function useTraceNavigation(navigationRef: NavigationRefLike): void {
       openSpanRef.current = span;
       setActiveSpan(span);
       lastRouteRef.current = to;
+      // Phase 46 — record the screen transition into the session trail.
+      // No-op when sessionTrail isn't enabled (the buffer just grows
+      // unbounded until cleared by captureException, but stays cheap).
+      captureStep(`screen:${to}`, {
+        breadcrumb: { type: 'navigation', message: from ? `${from} → ${to}` : to },
+      });
     };
 
     // Open a span for the initial screen so its requests are grouped

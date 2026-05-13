@@ -1,4 +1,14 @@
+import { type TrailStep } from '@goliapkg/sentori-core';
 import type { CaptureExtras, User } from './types.js';
+/**
+ * Phase 46 — record a step into the session-trail buffer. The buffer
+ * is a fixed-size FIFO; pushing past capacity drops the oldest.
+ * Uploaded as a `sessionTrail` attachment on the next
+ * `captureException` only when `init({ capture: { sessionTrail:
+ * true } })` is on.
+ */
+export declare function captureStep(label: string, opts?: Partial<TrailStep>): void;
+export declare function __resetTrailForTests(): void;
 /**
  * Attach a stable user identifier to events captured after this call.
  *

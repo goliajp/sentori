@@ -239,6 +239,55 @@ retention sweep drops the rows + blobs on the events partition
 schedule (default 30 days). Self-hosted operators: see
 `SENTORI_ATTACHMENT_DIR` in `docs/self-hosting.md`.
 
+## Session trail (opt-in)
+
+Phase 46 — record the last 30 steps (route changes, custom
+breadcrumbs) leading up to a crash and ship them as a `sessionTrail`
+attachment alongside the next `captureException`. The dashboard
+renders the buffer as a scrubbable timeline so you can step through
+"what the user was doing in the 8 seconds before this NPE".
+
+Off by default; flip it on in `init`:
+
+```ts
+sentori.init({
+  token: 'st_pk_…',
+  release: 'myapp@1.2.3+456',
+  capture: { sessionTrail: true },
+})
+```
+
+### Auto-recorded steps
+
+When you mount `useTraceNavigation(navigationRef)` (see Navigation
+tracing above), every screen transition pushes a step like
+`screen:Home` into the trail. No extra wiring needed.
+
+### Manual steps
+
+```ts
+import { captureStep } from '@goliapkg/sentori-react-native'
+
+captureStep('checkout:tapped-pay', {
+  breadcrumb: { type: 'custom', message: 'cart $42.10, 3 items' },
+})
+```
+
+`captureStep` is a no-op when sessionTrail isn't enabled — the
+buffer just stays empty and is cleared after each captureException.
+You can leave the calls in production safely.
+
+### Privacy + size
+
+- Trail JSON is < 5 KB for 30 steps without screenshots.
+- Screenshots are **not** auto-attached to steps. If you want one,
+  pass `screenshotRef` explicitly after a separate
+  `captureScreenshot` upload.
+- The buffer is **per-process**, in-memory only; nothing is
+  persisted to AsyncStorage or disk.
+- One trail per crash: the buffer is sealed and cleared inside
+  `captureException`, so successive crashes get fresh trails.
+
 ## What this SDK does NOT do (v0.1)
 
 - Native signal-based crashes (SIGSEGV / SIGABRT) — only `NSException`

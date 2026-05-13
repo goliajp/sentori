@@ -160,7 +160,7 @@ export type ServerEvent = {
 
 export type Attachment = {
   ref: string
-  kind: 'logTail' | 'screenshot' | 'stateSnapshot' | 'viewTree'
+  kind: 'logTail' | 'screenshot' | 'sessionTrail' | 'stateSnapshot' | 'viewTree'
   mediaType?: string
   sizeBytes?: number
   source?: 'android' | 'ios' | 'js'

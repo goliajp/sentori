@@ -1,14 +1,40 @@
-import { shouldSample } from '@goliapkg/sentori-core'
+import {
+  TrailBuffer,
+  sealTrail,
+  shouldSample,
+  type TrailStep,
+} from '@goliapkg/sentori-core'
 
 import { addBreadcrumb, getBreadcrumbs } from './breadcrumbs.js'
 import { getConfig, isInitialized } from './config.js'
 import { markSessionErrored } from './session-tracker.js'
 import { parseStack } from './stack.js'
-import { send } from './transport.js'
+import { send, uploadAttachment } from './transport.js'
 import type { CaptureExtras, Event, SentoriError, User } from './types.js'
 import { uuidV7 } from './uuid.js'
 
 let _user: User | null = null
+
+const _trail = new TrailBuffer(30)
+
+/**
+ * Phase 46 — record a step into the session-trail buffer. The buffer
+ * is a fixed-size FIFO; pushing past capacity drops the oldest.
+ * Uploaded as a `sessionTrail` attachment on the next
+ * `captureException` only when `init({ capture: { sessionTrail:
+ * true } })` is on.
+ */
+export function captureStep(label: string, opts?: Partial<TrailStep>): void {
+  _trail.push({
+    ts: Date.now(),
+    label,
+    ...(opts ?? {}),
+  })
+}
+
+export function __resetTrailForTests(): void {
+  _trail.clear()
+}
 
 /**
  * Attach a stable user identifier to events captured after this call.
@@ -52,7 +78,28 @@ export function captureError(error: Error, extras?: CaptureExtras): void {
   // Phase 26 sub-B: a captured error promotes the current session to
   // `errored` so the next end-of-session ping reports unhealthy.
   markSessionErrored()
-  void send({ ingestUrl: cfg.ingestUrl, token: cfg.token }, event)
+
+  const transportCfg = { ingestUrl: cfg.ingestUrl, token: cfg.token }
+  const pipeline = async (): Promise<void> => {
+    // Phase 46 — seal + upload the session trail (best-effort) before
+    // shipping the event so `event.attachments[]` carries the ref the
+    // dashboard renders. Trail is cleared after every captureException
+    // regardless of upload outcome, to keep "trail per crash" clean.
+    if (cfg.capture?.sessionTrail && _trail.size() > 0) {
+      const payload = sealTrail(_trail)
+      _trail.clear()
+      const meta = await uploadAttachment(transportCfg, event.id, 'sessionTrail' as const, {
+        body: JSON.stringify(payload),
+        mediaType: 'application/json',
+      })
+      if (meta) {
+        if (!event.attachments) event.attachments = []
+        event.attachments.push(meta)
+      }
+    }
+    await send(transportCfg, event)
+  }
+  void pipeline()
 }
 
 export const captureException = captureError

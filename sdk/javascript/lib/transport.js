@@ -1,4 +1,4 @@
-import { drainSpans } from '@goliapkg/sentori-core';
+import { drainSpans, } from '@goliapkg/sentori-core';
 import { getConfig } from './config.js';
 const SDK_HEADER = 'sentori-javascript/0.1.0';
 export async function send(cfg, event) {
@@ -65,6 +65,39 @@ export async function flushSpans() {
         catch {
             break;
         }
+    }
+}
+/**
+ * Phase 46 — upload an attachment blob (used for `sessionTrail` and
+ * any future per-event JSON blobs the Web SDK wants to ship).
+ *
+ * Mirrors the RN SDK's `uploadAttachment` shape but uses the browser's
+ * native `Blob` instead of base64-roundtripping. Returns the server-
+ * issued ref UUID on success, `null` on any failure (we ship the rest
+ * of the event regardless).
+ */
+export async function uploadAttachment(cfg, eventId, kind, blob) {
+    const base = cfg.ingestUrl.replace(/\/+$/, '');
+    const url = `${base}/v1/events/${encodeURIComponent(eventId)}/attachments/${encodeURIComponent(kind)}`;
+    const form = new FormData();
+    form.append('file', new Blob([blob.body], { type: blob.mediaType }), `${kind}.json`);
+    form.append('source', 'js');
+    try {
+        const resp = await fetch(url, {
+            body: form,
+            headers: {
+                Authorization: `Bearer ${cfg.token}`,
+                'Sentori-Sdk': SDK_HEADER,
+            },
+            method: 'POST',
+        });
+        if (resp.status !== 201)
+            return null;
+        const j = (await resp.json());
+        return { kind, mediaType: j.mediaType, ref: j.refId, sizeBytes: j.sizeBytes, source: 'js' };
+    }
+    catch {
+        return null;
     }
 }
 async function postJson(cfg, path, body) {

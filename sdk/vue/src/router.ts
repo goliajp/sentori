@@ -13,6 +13,7 @@
 // screen's network requests cluster into one trace.
 
 import { setActiveSpan, startSpan, type SpanHandle } from '@goliapkg/sentori-core'
+import { captureStep } from '@goliapkg/sentori-javascript'
 
 // Minimal duck type — accept anything that exposes `beforeEach` +
 // `afterEach`. Avoids hard-coding a vue-router version.
@@ -39,6 +40,11 @@ export function setupTraceNavigation(router: RouterLike): void {
     })
     _active = span
     setActiveSpan(span)
+    // Phase 46 — also record into the session-trail buffer; no-op
+    // unless `init({ capture: { sessionTrail: true } })`.
+    captureStep(`route:${to.path || '/'}`, {
+      breadcrumb: { type: 'navigation', message: name },
+    })
   })
   router.afterEach(() => {
     if (_active) {

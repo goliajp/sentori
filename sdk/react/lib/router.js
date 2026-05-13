@@ -1,4 +1,5 @@
 import { setActiveSpan, startSpan } from '@goliapkg/sentori-core';
+import { captureStep } from '@goliapkg/sentori-javascript';
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router';
 import { useSentoriCtx } from './SentoriProvider.js';
@@ -48,6 +49,11 @@ export function useSentoriRouter() {
         });
         openSpanRef.current = span;
         setActiveSpan(span);
+        // Phase 46 — session-trail step. No-op unless
+        // `init({ capture: { sessionTrail: true } })`.
+        captureStep(`route:${next}`, {
+            breadcrumb: { type: 'navigation', message: prev ? `${prev} → ${next}` : next },
+        });
         prevRef.current = next;
     }, [addBreadcrumb, next]);
     useEffect(() => () => {

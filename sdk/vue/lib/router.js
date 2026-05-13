@@ -12,6 +12,7 @@
 // `@goliapkg/sentori-javascript` automatically nest into it so each
 // screen's network requests cluster into one trace.
 import { setActiveSpan, startSpan } from '@goliapkg/sentori-core';
+import { captureStep } from '@goliapkg/sentori-javascript';
 let _active = null;
 export function setupTraceNavigation(router) {
     router.beforeEach((to, from) => {
@@ -29,6 +30,11 @@ export function setupTraceNavigation(router) {
         });
         _active = span;
         setActiveSpan(span);
+        // Phase 46 — also record into the session-trail buffer; no-op
+        // unless `init({ capture: { sessionTrail: true } })`.
+        captureStep(`route:${to.path || '/'}`, {
+            breadcrumb: { type: 'navigation', message: name },
+        });
     });
     router.afterEach(() => {
         if (_active) {

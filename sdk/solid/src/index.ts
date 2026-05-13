@@ -27,6 +27,7 @@
 import { setActiveSpan, startSpan, type SpanHandle } from '@goliapkg/sentori-core'
 import {
   captureException as captureExceptionJs,
+  captureStep,
   initSentori as initSentoriJs,
   type InitOptions,
 } from '@goliapkg/sentori-javascript'
@@ -84,6 +85,9 @@ export function traceSolidRouter(pathname: string): void {
   })
   _active = span
   setActiveSpan(span)
+  captureStep(`route:${pathname}`, {
+    breadcrumb: { type: 'navigation', message: `${from} → ${pathname}` },
+  })
   _lastPath = pathname
 }
 
@@ -91,6 +95,7 @@ export {
   addBreadcrumb,
   captureException,
   captureException as captureError,
+  captureStep,
   getUser,
   setUser,
 } from '@goliapkg/sentori-javascript'

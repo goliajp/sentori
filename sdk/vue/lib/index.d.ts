@@ -31,6 +31,6 @@ export type SentoriVueOptions = InitOptions;
 declare const plugin: Plugin;
 export default plugin;
 export { plugin as sentori };
-export { addBreadcrumb, captureException, captureException as captureError, getUser, setUser, } from '@goliapkg/sentori-javascript';
+export { addBreadcrumb, captureException, captureException as captureError, captureStep, getUser, setUser, } from '@goliapkg/sentori-javascript';
 export { SentoriErrorBoundary } from './ErrorBoundary.js';
 //# sourceMappingURL=index.d.ts.map

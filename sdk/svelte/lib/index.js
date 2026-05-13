@@ -23,7 +23,7 @@
  * root + use the `<svelte:boundary>` element (Svelte 5+) or
  * `onError` prop on your top-level component.
  */
-import { captureException as captureExceptionJs, initSentori as initSentoriJs, } from '@goliapkg/sentori-javascript';
+import { captureException as captureExceptionJs, captureStep, initSentori as initSentoriJs, } from '@goliapkg/sentori-javascript';
 import { setActiveSpan, startSpan } from '@goliapkg/sentori-core';
 export function initSentori(options) {
     initSentoriJs(options);
@@ -67,11 +67,14 @@ export function traceNavigation(navigating) {
         });
         _active = span;
         setActiveSpan(span);
+        captureStep(`route:${to}`, {
+            breadcrumb: { type: 'navigation', message: `${from} → ${to}` },
+        });
     }
     else if (_active) {
         _active.finish({ status: 'ok' });
         _active = null;
     }
 }
-export { addBreadcrumb, captureException, captureException as captureError, getUser, setUser, } from '@goliapkg/sentori-javascript';
+export { addBreadcrumb, captureException, captureException as captureError, captureStep, getUser, setUser, } from '@goliapkg/sentori-javascript';
 //# sourceMappingURL=index.js.map

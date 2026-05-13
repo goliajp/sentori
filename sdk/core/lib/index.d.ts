@@ -7,4 +7,5 @@ export { normalizeUrl } from './url.js';
 export { type SessionContext, type SessionPing, type SessionStatus, SessionTracker, } from './session.js';
 export { SpanBuffer, SpanHandle, type SpanContextLike, type StartSpanOptions, clearSpans, drainSpans, getSpans, startSpan, } from './spans.js';
 export { __resetTraceContextForTests, __useFallbackTraceContextForTests, activeSpan, setActiveSpan, withSpan, } from './trace-context.js';
+export { TrailBuffer, sealTrail, type SessionTrailPayload, type TrailStep, } from './trail.js';
 //# sourceMappingURL=index.d.ts.map

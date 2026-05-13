@@ -10,6 +10,10 @@ export type Config = {
    *  `null` = keep everything (default). */
   errorSampleRate: null | number;
   traceSampleRate: null | number;
+  /** Phase 46: when true, every `captureException` seals the
+   *  session-trail buffer and uploads it as a `sessionTrail`
+   *  attachment. Defaults to false. */
+  sessionTrailEnabled: boolean;
 };
 
 let _config: Config | null = null;

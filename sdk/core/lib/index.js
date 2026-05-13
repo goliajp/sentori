@@ -6,4 +6,5 @@ export { normalizeUrl } from './url.js';
 export { SessionTracker, } from './session.js';
 export { SpanBuffer, SpanHandle, clearSpans, drainSpans, getSpans, startSpan, } from './spans.js';
 export { __resetTraceContextForTests, __useFallbackTraceContextForTests, activeSpan, setActiveSpan, withSpan, } from './trace-context.js';
+export { TrailBuffer, sealTrail, } from './trail.js';
 //# sourceMappingURL=index.js.map

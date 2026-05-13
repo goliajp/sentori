@@ -43,5 +43,5 @@ export declare function initSentori(options: SentoriSolidOptions): void;
  */
 export declare function sentoriOnCatch(err: unknown): void;
 export declare function traceSolidRouter(pathname: string): void;
-export { addBreadcrumb, captureException, captureException as captureError, getUser, setUser, } from '@goliapkg/sentori-javascript';
+export { addBreadcrumb, captureException, captureException as captureError, captureStep, getUser, setUser, } from '@goliapkg/sentori-javascript';
 //# sourceMappingURL=index.d.ts.map

@@ -61,3 +61,10 @@ export {
   setActiveSpan,
   withSpan,
 } from './trace-context.js'
+
+export {
+  TrailBuffer,
+  sealTrail,
+  type SessionTrailPayload,
+  type TrailStep,
+} from './trail.js'
