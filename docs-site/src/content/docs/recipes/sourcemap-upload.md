@@ -179,30 +179,36 @@ module.exports = {
 A React Native release build is double-minified: Metro bundles your JS
 (emitting `*.packager.map`), then Hermes compiles that to bytecode
 (emitting `*.hbc.map`). The frames you get in production point at the
-*bytecode* offset, so you need the **composed** map.
+*bytecode* offset, so the **composed** map is what Sentori needs.
+`sentori-cli react-native upload` does the compose + upload in one step:
 
 ```bash
-# 1. produce the bundle + the Metro source map
+# produce the bundle + the Metro source map (the native iOS/Android
+# build then compiles to Hermes and writes main.jsbundle.hbc.map)
 npx react-native bundle \
   --platform ios --dev false --entry-file index.js \
   --bundle-output main.jsbundle \
   --sourcemap-output main.jsbundle.packager.map
-# (Hermes compilation runs as part of the iOS/Android build and writes
-#  main.jsbundle.hbc.map alongside main.jsbundle.hbc.)
 
-# 2. compose them into one usable map
-node node_modules/react-native/scripts/compose-source-maps.js \
-  main.jsbundle.packager.map main.jsbundle.hbc.map \
-  -o main.jsbundle.map
-
-# 3. upload — release must equal init({ release }) in your app
-npx @goliapkg/sentori-cli@latest upload sourcemap \
-  --release "myapp@$(node -p "require('./app.json').expo.version")+$BUILD_NUMBER" \
-  --token "$SENTORI_TOKEN" \
-  main.jsbundle.map main.jsbundle
+# compose (Metro + Hermes maps) and upload — one command
+npx @goliapkg/sentori-cli@latest react-native upload \
+  --release "myapp@$VERSION+$BUILD" --token "$SENTORI_TOKEN" \
+  --metro-map main.jsbundle.packager.map \
+  --hermes-map main.jsbundle.hbc.map \
+  --bundle main.jsbundle
 ```
 
-Do this once per platform (the iOS and Android bundles differ).
+Do this once per platform (the iOS and Android bundles differ). The
+`--release` value must equal what the app passes to `init({ release })`.
+
+If you'd rather compose by hand and upload separately:
+
+```bash
+node node_modules/react-native/scripts/compose-source-maps.js \
+  main.jsbundle.packager.map main.jsbundle.hbc.map -o main.jsbundle.map
+npx @goliapkg/sentori-cli@latest upload sourcemap \
+  --release "myapp@$VERSION+$BUILD" main.jsbundle.map main.jsbundle
+```
 
 **Expo / EAS:** `@goliapkg/sentori-expo` ships an EAS post-build hook
 (`@goliapkg/sentori-expo/eas-post-build`) that runs step 3 against

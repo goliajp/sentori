@@ -464,13 +464,21 @@ Phase 40 sub-A/B/C 完成。剩下的（dashboard 渲染、dev-mode、publish、
 
 > ## ⚑ Insight 配合点：**等本阶段全做完再接**（他们明确说要等 cleaner 集成）
 >
-> 服务端 ingest 时符号化已上线、`@goliapkg/sentori-cli` 已 publish —— 技术上现在就能接，但要手写 `compose-source-maps.js` 那套脚本。Insight 想等"干净"的集成，所以本阶段加了 **Day 4：Expo source-map config plugin**（`"plugins": [["@goliapkg/sentori-expo", { token }]]` 一行，构建时自动 compose + upload，EAS 和 bare prebuild 都覆盖）。
+> Day 4 把 RN sourcemap 上传收成一行命令：`sentori-cli react-native upload`（自动 compose Metro+Hermes 两份 map 再传），不用再手写 `compose-source-maps.js`。本阶段做完后给 Insight 的 ask：
+> 1. `bun add @goliapkg/sentori-react-native@latest`（session pings；零代码）
+> 2. release 构建里加一步（EAS 用 `package.json` 的 `"eas-build-on-success"` script，普通 CI 用对应 stage）：
+>    ```
+>    npx react-native bundle --platform $PLATFORM --dev false --entry-file index.js \
+>      --bundle-output main.jsbundle --sourcemap-output main.jsbundle.packager.map
+>    npx @goliapkg/sentori-cli react-native upload \
+>      --release "<和 init({release}) 一字不差>" --token "$SENTORI_ADMIN_TOKEN" \
+>      --metro-map main.jsbundle.packager.map --hermes-map main.jsbundle.hbc.map \
+>      --bundle main.jsbundle
+>    ```
+>    （iOS/Android 各一次。`--hermes-map` 路径因 RN/EAS 版本而异，确切位置 Insight 接的时候按他们的构建确定 —— 我可以帮看。）
 >
-> 本阶段（Phase 40 + Phase 41 全部 day）做完后，给 Insight 的 ask 就两件、都零脚本：
-> 1. `bun add @goliapkg/sentori-react-native@latest @goliapkg/sentori-expo@latest`
-> 2. `app.json`：`"plugins": [["@goliapkg/sentori-expo", { "sourcemapUpload": { "token": "<sk_… admin token 或 EXPO_PUBLIC env>" } }]]`（确切 prop 名 Day 4 实现时定）
->
-> 然后下次构建自动传 sourcemap，dashboard 上该 release 的错误就是 `src/Foo.tsx:42`，点帧出源码。结果记进 `docs/dogfood/insight-friction.md`。
+> 然后该 release 的错误 dashboard 上就是 `src/Foo.tsx:42`，点帧出源码。结果记进 `docs/dogfood/insight-friction.md`。
+> （**defer**：把上面这两步收成 `app.json` `"plugins": [...]` 一行的 Expo config plugin —— 改原生构建步骤、风险大，要 zero-config 时单独做。）
 
 ### Day 1 — publish parseStack 修复 + getting-started sourcemap 章节 ✅
 
@@ -496,15 +504,14 @@ Phase 40 sub-A/B/C 完成。剩下的（dashboard 渲染、dev-mode、publish、
 - [x] 测试：新 `web/src/views/issue-detail-stack.test.tsx` 5 个（in-app 帧渲内联源码 + 行号 / vendor run 折叠成 "2 library frames" / 没 map → "upload a source map" + cli 命令 / 有 map 但没解析 → "didn't resolve through it" / 空 stack → "No frames."）。`bun run check` 0 error / `bun run test` 40/40（was 35，+5）/ `bun run build` OK。server `cargo test --lib` 37/37（symbolicate 测试加了对 pre/context/post 的断言）/ `--all-targets --no-run` 通过
 - [x] commit `v0.5 day 3: inline source snippets + vendor fold + symbolication diagnostics`
 
-### Day 4 — Expo source-map config plugin（Phase 40 收尾：cleaner 集成）
+### Day 4 — `sentori-cli react-native upload`（compose + upload 一行；cleaner 集成）✅
 
-- [ ] `sdk/expo`：扩 config plugin（`app.plugin.js` / 新增一个 `withSentoriSourcemaps`）—— 接受 `{ token, apiUrl?, autoUpload? }` props；EAS 路径接 `postPublish` hook（复用 `eas-post-build.mjs`，并让它在 Hermes build 时自己跑 `react-native bundle --sourcemap-output` + `compose-source-maps.js` 再 upload，不再要求用户手写）；bare prebuild 路径用 `withXcodeProject` / `withAppBuildGradle` 注一个 build phase 干同样的事（参考 sentry expo plugin 的做法）；token 走 prop 或 `process.env.SENTORI_ADMIN_TOKEN`
-- [ ] `sentori-cli`：补一个 `sentori-cli react-native bundle-and-upload --platform <ios|android> --release <r>`（封装 `react-native bundle` → `compose-source-maps.js` → `upload sourcemap` 三步），plugin 直接调它 —— 用户/CI 也能手敲一行
-- [ ] docs：`recipes/sourcemap-upload.md` RN/Expo 一节改成"加 plugin、完事"为主，手动三步降级为附录；`docs/getting-started/react-native.md` 里 SDK 安装那段加 plugin 一行
-- [ ] 测试：`sentori-cli` 的 `bundle-and-upload`（mock 掉子进程 + fetch）；config plugin（用 `@expo/config-plugins` 的 mock config 跑一遍，断言 hook/build-phase 被注入）。`sentori-cli` 自身测试 + sdk/expo typecheck/test 绿
-- [ ] bump + publish `@goliapkg/sentori-cli`（+`sentori-expo` patch）
-- [ ] commit `v0.5 day 4: expo source-map config plugin + cli bundle-and-upload`
-- ⚑ **这之后 Insight 可以接了**（plugin 一行 + 装两个包，零脚本）
+- [x] `sdk/cli` 新增 `react-native upload` 命令 + `src/react-native.ts`：`resolveComposeScript()` 从 cwd 的 node_modules 解析 `react-native/scripts/compose-source-maps.js`（找不到给清晰报错）；`composeSourceMaps(metroMap, hermesMap)` shell out `node <script> <metro> <hermes> -o <tmp>`；`reactNativeUpload({release, token, apiUrl, metroMap, hermesMap, bundle?, dryRun?})` = compose → 复用 `uploadSourcemaps([composed, bundle?])` → 清临时文件。`src/index.ts` 重构成双命令 dispatch（`upload sourcemap` / `react-native upload`），共享 option 解析（`parseCommon`）。无新运行时依赖（仍纯 Node）
+- [x] docs：`recipes/sourcemap-upload.md`（+ docs-site 镜像）RN/Hermes 一节改成 `npx @goliapkg/sentori-cli react-native upload --metro-map … --hermes-map … --bundle …` 一行（compose+upload），手动 compose + `upload sourcemap` 降级为附录
+- [x] 测试：`sdk/cli/src/__tests__/react-native.test.ts` 3（`resolveComposeScript` 无 RN 时 null / `composeSourceMaps` 缺文件 throw / 无 RN 时给 helpful 报错）。CLI 测试 11/11、typecheck 干净、bin 烟测（`react-native upload` 缺 `--release`→2 / 缺文件→1 / bad cmd→help）
+- [x] bump + publish `@goliapkg/sentori-cli@0.3.0`
+- [x] commit `v0.5 day 4: sentori-cli react-native upload`
+- ⚑ **defer：Expo config plugin 的 build-phase 自动注入（zero-config）** —— 改 Xcode/gradle 构建步骤、且没 Expo 项目实测，风险大于价值；Insight 用 `react-native upload` 一行（接进 `eas-build-on-success` npm script 或 CI）已足够干净。要真 zero-config 时单独做 + 仔细测（参考 `@sentry/react-native/expo` plugin）
 
 ### Day 5 — Phase 40 sub-E：dev-mode Metro symbolicate
 

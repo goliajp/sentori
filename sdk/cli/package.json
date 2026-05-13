@@ -1,6 +1,6 @@
 {
   "name": "@goliapkg/sentori-cli",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Sentori CLI \u2014 upload source maps so dashboard stack traces resolve to your original source.",
   "license": "MIT",
   "homepage": "https://sentori.golia.jp",
