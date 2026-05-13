@@ -568,6 +568,7 @@ v0.5 完成 + 部署上线，但**没有等到 Insight 真实接入产出的 dog
 - **issue 个人订阅 / "watch this"**（目前只有 project-wide 通知，没法"我盯这一条"）
 - **dashboard 上 fingerprint 重写**（手动 group / split issue —— 默认 fingerprint 总有错的时候）
 - **event payload 全文搜索**（issues 列表只能按 errorType / status / release 过滤；payload 内的字符串搜不到）
+- **Metro lazy-bundle URL 路径段提取**（Insight 0.5.7 hotfix dogfood 发现：RN 0.83 + Metro lazy bundling 下 frame.file 形如 `http://host:8081/src/dev-utils/perf-pulse/pulse-atom.bundle/...&...`，URL 段里就藏着源文件路径。dashboard 可以提取 `src/...` 段优先显示，让 0.5.6 时代遗留 event + 任何 SDK dev-symbolicate 失败的 fallback 也能肉眼读 —— SDK 升 0.5.7 后新 event 不会有这个问题，所以这是给旧/失败 event 的 UX 兜底，不紧急）
 
 理由：每条都小、可独立 ship、跟 Insight 实际会用的工作流接得上；不需要新协议 / 新观测维度。挑 3 条就是一个 phase，dogfood 反馈进来再 reorder。
 
