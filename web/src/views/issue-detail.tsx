@@ -1225,9 +1225,18 @@ function FrameSourceDrawer({
   onClose: () => void
   projectId: string
 }) {
+  // Phase 42 sub-B.02: default to a tight ±5 window (the server's
+  // default), let the user click "expand" to ±20. Cache-Control on
+  // the server marks the response immutable + 1h, so flipping
+  // between widths is essentially free after first fetch.
+  const [contextLines, setContextLines] = useState(5)
   const { data, error, isLoading } = useQuery({
-    queryFn: () => adminApi.frameSource(projectId, eventId, { cause, frame }),
-    queryKey: ['frame-source', projectId, eventId, cause, frame],
+    // staleWhileRevalidate-ish: keep the existing source visible while
+    // refetching the wider window, no flash to a loading state.
+    placeholderData: (prev) => prev,
+    queryFn: () => adminApi.frameSource(projectId, eventId, { cause, frame, lines: contextLines }),
+    queryKey: ['frame-source', projectId, eventId, cause, frame, contextLines],
+    staleTime: 60 * 60 * 1000,
   })
 
   // Esc closes the drawer.
@@ -1249,9 +1258,28 @@ function FrameSourceDrawer({
           <div className="text-fg-muted truncate text-[11px] tracking-wider uppercase">
             Source · cause {cause} · frame {frame}
           </div>
+          {/* Phase 42 sub-B.02: expand-context toggle. ±5 / ±20 / ±50.
+              Server caches each window immutable + 1h so re-fetch is free. */}
+          <div className="ml-auto flex items-center gap-1">
+            {[5, 20, 50].map((n) => (
+              <button
+                aria-label={`Show ±${n} lines`}
+                className={`rounded-md px-2 py-0.5 text-[11px] transition-colors ${
+                  contextLines === n
+                    ? 'bg-accent/10 text-accent'
+                    : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+                }`}
+                key={n}
+                onClick={() => setContextLines(n)}
+                type="button"
+              >
+                ±{n}
+              </button>
+            ))}
+          </div>
           <button
             aria-label="Close"
-            className="text-fg-muted hover:text-fg ml-auto rounded-md px-2 py-1 text-[12px]"
+            className="text-fg-muted hover:text-fg rounded-md px-2 py-1 text-[12px]"
             onClick={onClose}
             type="button"
           >

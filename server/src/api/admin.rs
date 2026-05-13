@@ -568,6 +568,12 @@ pub struct FrameSourceQuery {
     pub frame: usize,
     #[serde(default)]
     pub cause: usize,
+    /// Phase 42 sub-B.02: caller-controlled context window. Default
+    /// 5; capped at 50 so a runaway query can't dump the entire
+    /// source file. The dashboard ships an "Expand context" button
+    /// that bumps this to 20.
+    #[serde(default)]
+    pub lines: Option<usize>,
 }
 
 #[derive(Debug, Serialize)]
@@ -581,14 +587,15 @@ pub struct FrameSourceResponse {
     pub after: Vec<String>,
 }
 
-const FRAME_SOURCE_CONTEXT_LINES: usize = 5;
+const FRAME_SOURCE_CONTEXT_LINES_DEFAULT: usize = 5;
+const FRAME_SOURCE_CONTEXT_LINES_MAX: usize = 50;
 const CAUSE_CHAIN_MAX: usize = 10;
 
 pub async fn frame_source(
     State(state): State<AppState>,
     Path((project_id, event_id)): Path<(Uuid, Uuid)>,
     Query(q): Query<FrameSourceQuery>,
-) -> Result<Json<FrameSourceResponse>, AppError> {
+) -> Result<Response, AppError> {
     let pool = state.db.as_ref().ok_or(AppError::DatabaseUnavailable)?;
     if q.cause > CAUSE_CHAIN_MAX {
         return Err(AppError::Internal(format!(
@@ -640,25 +647,41 @@ pub async fn frame_source(
         return Err(AppError::NotFound);
     }
 
+    let context_lines = q
+        .lines
+        .unwrap_or(FRAME_SOURCE_CONTEXT_LINES_DEFAULT)
+        .min(FRAME_SOURCE_CONTEXT_LINES_MAX);
+
     let window = crate::symbolicate::source_for_frame(
         pool,
         &release,
         line,
         column,
-        FRAME_SOURCE_CONTEXT_LINES,
+        context_lines,
     )
     .await
     .map_err(|e| AppError::Internal(e.to_string()))?
     .ok_or(AppError::NotFound)?;
 
-    Ok(Json(FrameSourceResponse {
+    // Phase 42 sub-B.03: the resolved source for a given (event, frame)
+    // never changes — the event payload is immutable after ingest and
+    // the release artifacts are content-addressed. Give the dashboard
+    // a long aggressive cache so the "expand context" round-trip is
+    // free on retry, and so re-opening the drawer doesn't re-fetch.
+    let body = Json(FrameSourceResponse {
         after: window.after,
         at: window.at,
         before: window.before,
         column: window.column,
         file: window.file,
         line: window.line,
-    }))
+    });
+    let mut response = body.into_response();
+    response.headers_mut().insert(
+        axum::http::header::CACHE_CONTROL,
+        axum::http::HeaderValue::from_static("private, max-age=3600, immutable"),
+    );
+    Ok(response)
 }
 
 // Phase 25 sub-E: per-issue comment thread + activity log.

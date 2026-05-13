@@ -250,10 +250,15 @@ export const adminApi = {
     }),
 
   /** Phase 25 sub-B — original source window for one stack frame. */
-  frameSource: (projectId: string, eventId: string, params: { cause?: number; frame: number }) => {
+  frameSource: (
+    projectId: string,
+    eventId: string,
+    params: { cause?: number; frame: number; lines?: number }
+  ) => {
     const usp = new URLSearchParams()
     usp.set('frame', String(params.frame))
     if (params.cause !== undefined) usp.set('cause', String(params.cause))
+    if (params.lines !== undefined) usp.set('lines', String(params.lines))
     return adminFetch<FrameSource>(
       `/projects/${projectId}/events/${eventId}/source?${usp.toString()}`
     )

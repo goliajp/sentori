@@ -134,8 +134,14 @@ pub(crate) fn symbolicate_error_object(sm: &SourceMap, error: &mut ErrorObject) 
     }
 }
 
-/// ±5 lines is plenty for the dashboard's inline snippet.
-const FRAME_CONTEXT_LINES: usize = 5;
+/// Phase 42 sub-B.01: stored inline context window. ±3 lines is the
+/// snippet the issue list / stack viewer renders by default — small
+/// enough that a 20-frame stack only adds ~5 KB to the event payload.
+/// The `<FrameSourceDrawer>` opens an on-demand endpoint
+/// (`/admin/api/projects/.../events/.../source?lines=20`) for the
+/// wider window when the operator actually clicks a frame, so we
+/// don't pay the bytes on every issue-detail page-load.
+const FRAME_CONTEXT_LINES: usize = 3;
 
 fn symbolicate_frame_typed(sm: &SourceMap, frame: &mut Frame) {
     if frame.line == 0 {
@@ -400,9 +406,9 @@ mod tests {
         assert!(f0.in_app, "a frame that resolved through the map is in-app");
         // Inline source context comes from the map's sourcesContent.
         assert_eq!(f0.context_line.as_deref(), Some("  throw new Error('boom')"));
-        // line 6 (1-indexed) → 5 lines before clamp to the 5 above it,
-        // 5 after clamp to the 2 that exist.
-        assert_eq!(f0.pre_context.len(), 5);
+        // line 6 (1-indexed) → 3 lines before (sub-B.01 narrowed window),
+        // 3 after clamp to the 2 that exist.
+        assert_eq!(f0.pre_context.len(), 3);
         assert_eq!(f0.pre_context.last().map(String::as_str), Some("function beta() {"));
         assert_eq!(f0.post_context, vec!["}".to_string(), "// footer".to_string()]);
 
