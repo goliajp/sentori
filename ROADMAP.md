@@ -513,11 +513,13 @@ Phase 40 sub-A/B/C 完成。剩下的（dashboard 渲染、dev-mode、publish、
 - [x] commit `v0.5 day 4: sentori-cli react-native upload`
 - ⚑ **defer：Expo config plugin 的 build-phase 自动注入（zero-config）** —— 改 Xcode/gradle 构建步骤、且没 Expo 项目实测，风险大于价值；Insight 用 `react-native upload` 一行（接进 `eas-build-on-success` npm script 或 CI）已足够干净。要真 zero-config 时单独做 + 仔细测（参考 `@sentry/react-native/expo` plugin）
 
-### Day 5 — Phase 40 sub-E：dev-mode Metro symbolicate
+### Day 5 — Phase 40 sub-E：dev-mode Metro symbolicate ✅
 
-- [ ] `sdk/react-native`：`__DEV__` 下发事件前先 POST 原始帧给 Metro dev server 的 `/symbolicate`（RN LogBox 用的就是它）拿原始位置；Metro 不在就跳过、原样发不报错；超时短（dev only，不阻 UI）。这样 Insight 现在 dashboard 上那些 `_temp5` / `anonymous` 的 dev 错误也立刻可读
-- [ ] 测试：mock Metro `/symbolicate` 响应 → 帧被替换 / Metro 不可达 → 原样发不报错。SDK sweep + typecheck 绿；bump + publish `sentori-react-native`（+ 依赖透传）
-- [ ] commit `v0.5 day 5: dev-mode metro symbolicate`
+- [x] `sdk/react-native/src/handlers/dev-symbolicate.ts`：`metroSymbolicateUrl()` 从 `NativeModules.SourceCode.scriptURL` 取 dev server origin（release build 是 `file://` → null）；`symbolicateStackViaMetro(frames, {url?})` POST `{stack: [{file,lineNumber,column,methodName}]}` 给 `<devServer>/symbolicate`，response 按 Metro 帧形态映回 `Frame[]`（`collapse` / `node_modules` → `inApp=false`；Metro 没解析的帧（file null）→ 保留原帧）；2s timeout（`AbortController`）；任何失败 → null、不抛。`symbolicateErrorViaMetro(err, {url?})` 原地替换 `err.stack` + 递归 cause 链。`capture.ts` 在 `__DEV__` 下 `symbolicateErrorViaMetro(event.error).catch(()=>{}).then(()=>enqueue(event))`，非 dev 直接 `enqueue`
+- [x] 测试：`dev-symbolicate.test.ts` 9（无 URL → null / 空 stack → null / 映回 SDK 帧 + 用 Metro 帧形态发请求 / Metro 没解析的帧保留 / 非 2xx → null / fetch throw → null / 长度不匹配 → null；`symbolicateErrorViaMetro` 替换 + 递归 cause / 失败时原样）。RN SDK 54/54、typecheck 干净；全 SDK sweep 绿
+- [x] docs：`docs/sdk-react-native.md`（+ docs-site 镜像）"Source maps" 一节加 "__DEV__ 下自动走 Metro /symbolicate" + release build 用 `sentori-cli react-native upload`
+- [x] bump + publish `@goliapkg/sentori-react-native@0.5.6`（仅 rn 改动，无依赖链 re-publish）
+- [x] commit `v0.5 day 5: dev-mode metro symbolicate`
 
 ### Day 6 — Phase 41 sub-A：左侧 sidebar 组件
 

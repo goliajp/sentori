@@ -1,10 +1,13 @@
 import { getConfig, isInitialized } from './config';
 import { getBreadcrumbs } from './breadcrumbs';
+import { symbolicateErrorViaMetro } from './handlers/dev-symbolicate';
 import { markSessionErrored } from './session-tracker';
 import { parseStack } from './stack';
 import { enqueue } from './transport';
 import { uuidV7 } from './uuid';
 import type { App, Device, Event, SentoriError, Tags, User } from './types';
+
+declare const __DEV__: boolean | undefined;
 
 let _user: User | null = null;
 
@@ -56,7 +59,18 @@ export const captureError = (error: Error, extras?: CaptureExtras): void => {
   // Phase 26 sub-B: a captured error promotes the current session to
   // `errored` so the next AppState=background ping reports unhealthy.
   markSessionErrored();
-  enqueue(event);
+
+  // Phase 40 sub-E: in dev there's no uploaded source map, so ask
+  // Metro to symbolicate the stack before we send it (best-effort,
+  // short timeout). Release builds skip straight to enqueue and let
+  // the server symbolicate at ingest against the uploaded map.
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    void symbolicateErrorViaMetro(event.error)
+      .catch(() => {})
+      .then(() => enqueue(event));
+  } else {
+    enqueue(event);
+  }
 };
 
 export const captureException = captureError;

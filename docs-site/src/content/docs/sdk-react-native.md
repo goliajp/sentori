@@ -133,19 +133,29 @@ After the relaunch, the server stdout (and dashboard) shows a
 
 ## Source maps
 
-Build a production bundle, then upload its `.map` so the server can
-symbolicate frames at view time:
+**In `__DEV__`**, the SDK asks Metro's `/symbolicate` to resolve the
+stack before sending — so dev errors land in the dashboard already
+pointing at `src/Foo.tsx:42` (the same thing RN's LogBox does). Nothing
+to configure; if Metro isn't reachable the raw stack is sent.
+
+**For a release build**, Hermes double-minifies the bundle, so upload
+the *composed* (Metro + Hermes) source map tagged to the release —
+`sentori-cli react-native upload` does the compose + upload in one
+step:
 
 ```bash
-npx @goliapkg/sentori-cli upload sourcemap \
-  --release "myapp@1.2.3+456" \
-  --token "st_pk_..." \
-  --ingest-url "https://sentori.your-host.com" \
-  ./bundle/index.android.bundle.map
+npx react-native bundle --platform ios --dev false --entry-file index.js \
+  --bundle-output main.jsbundle --sourcemap-output main.jsbundle.packager.map
+# (the iOS/Android build then compiles to Hermes → main.jsbundle.hbc.map)
+npx @goliapkg/sentori-cli react-native upload \
+  --release "myapp@1.2.3+456" --token "$SENTORI_ADMIN_TOKEN" \
+  --metro-map main.jsbundle.packager.map --hermes-map main.jsbundle.hbc.map \
+  --bundle main.jsbundle
 ```
 
-The dashboard's issue detail Stack section has a `symbolicated / raw`
-toggle (default symbolicated).
+`--release` must equal `init({ release })`. The server symbolicates
+matching events at ingest and groups the issue on the original-source
+frame. Full CI / EAS recipe: docs → Recipes → "Source map upload".
 
 ## What this SDK does NOT do (v0.1)
 
