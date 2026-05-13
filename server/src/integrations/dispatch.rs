@@ -11,6 +11,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::linear::LinearAdapter;
+use super::slack::SlackAdapter;
 use super::{IntegrationAdapter, IntegrationError, IssueContext, IssueLifecycleEvent};
 
 /// Build the (issue, project, event) context once, share between
@@ -111,6 +112,7 @@ pub async fn on_status_change(
 fn build_adapter(kind: &str) -> Option<Box<dyn IntegrationAdapter>> {
     match kind {
         "linear" => LinearAdapter::from_env().map(|a| Box::new(a) as Box<dyn IntegrationAdapter>),
+        "slack" => Some(Box::new(SlackAdapter::new()) as Box<dyn IntegrationAdapter>),
         _ => None,
     }
 }

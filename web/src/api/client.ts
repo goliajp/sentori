@@ -214,6 +214,13 @@ export const adminApi = {
     adminFetch<null>(`/integrations/${kind}?orgSlug=${encodeURIComponent(orgSlug)}`, {
       method: 'DELETE',
     }),
+  /** Phase 43 sub-E.02: manual config (Slack). Body is
+   *  `{ orgSlug, ...adapter-specific fields }`. */
+  configureIntegration: (kind: string, body: Record<string, unknown> & { orgSlug: string }) =>
+    adminFetch<null>(`/integrations/${kind}/configure`, {
+      body: JSON.stringify(body),
+      method: 'POST',
+    }),
 
   issueDetail: (projectId: string, issueId: string) =>
     adminFetch<IssueRow>(`/projects/${projectId}/issues/${issueId}`),

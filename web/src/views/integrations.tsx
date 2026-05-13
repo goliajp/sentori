@@ -6,6 +6,30 @@ import { adminApi, type IntegrationRow } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { ErrorState, LoadingState } from '@/components/states'
 
+type ConnectMode = 'manual' | 'oauth'
+
+const KNOWN_ADAPTERS_DETAIL: {
+  kind: 'linear' | 'slack'
+  label: string
+  description: string
+  mode: ConnectMode
+}[] = [
+  {
+    description:
+      'Auto-create Linear tickets from new Sentori issues; comment when resolved / regressed; webhook back-syncs Linear close → Sentori resolve.',
+    kind: 'linear',
+    label: 'Linear',
+    mode: 'oauth',
+  },
+  {
+    description:
+      'Post Block Kit notifications on new issue / regression / resolved via an incoming webhook URL (no OAuth needed).',
+    kind: 'slack',
+    label: 'Slack',
+    mode: 'manual',
+  },
+]
+
 /**
  * Phase 43 sub-C — org-level integrations panel.
  *
@@ -19,19 +43,7 @@ import { ErrorState, LoadingState } from '@/components/states'
  * land they go in both places.
  */
 
-const KNOWN_ADAPTERS: { kind: 'linear' | 'slack'; label: string; description: string }[] = [
-  {
-    description:
-      'Auto-create Linear tickets from new Sentori issues; comment when resolved / regressed.',
-    kind: 'linear',
-    label: 'Linear',
-  },
-  {
-    description: 'Post Block Kit notifications on new issue / regression / resolved.',
-    kind: 'slack',
-    label: 'Slack',
-  },
-]
+const KNOWN_ADAPTERS = KNOWN_ADAPTERS_DETAIL
 
 export function IntegrationsView() {
   const { currentOrg } = useOrg()
@@ -139,13 +151,20 @@ export function IntegrationsView() {
                   >
                     Disconnect
                   </button>
-                ) : (
+                ) : a.mode === 'oauth' ? (
                   <a
                     className="border-border hover:border-accent/60 hover:text-fg text-fg-muted rounded-md border px-3 py-1 text-[11px]"
                     href={adminApi.integrationConnectUrl(a.kind, currentOrg.slug)}
                   >
                     Connect →
                   </a>
+                ) : (
+                  <SlackConfigureForm
+                    onConfigured={() =>
+                      queryClient.invalidateQueries({ queryKey: ['integrations'] })
+                    }
+                    orgSlug={currentOrg.slug}
+                  />
                 )}
               </div>
             </li>
@@ -153,5 +172,100 @@ export function IntegrationsView() {
         })}
       </ul>
     </div>
+  )
+}
+
+/**
+ * Phase 43 sub-E.02 — inline "paste webhook URL" form for Slack.
+ * Toggle open via "Configure →" button; submits to
+ * `POST /admin/api/integrations/slack/configure`.
+ */
+function SlackConfigureForm({
+  onConfigured,
+  orgSlug,
+}: {
+  onConfigured: () => void
+  orgSlug: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [webhookUrl, setWebhookUrl] = useState('')
+  const [channelLabel, setChannelLabel] = useState('')
+  const [error, setError] = useState<null | string>(null)
+
+  const submit = useMutation({
+    mutationFn: () =>
+      adminApi.configureIntegration('slack', {
+        channelLabel: channelLabel.trim() || undefined,
+        orgSlug,
+        webhookUrl: webhookUrl.trim(),
+      }),
+    onError: (e: unknown) => {
+      const body = (e as { body?: { detail?: string } } | undefined)?.body
+      setError(body?.detail ?? 'invalid config')
+    },
+    onSuccess: () => {
+      setOpen(false)
+      setWebhookUrl('')
+      setChannelLabel('')
+      setError(null)
+      onConfigured()
+    },
+  })
+
+  if (!open) {
+    return (
+      <button
+        className="border-border hover:border-accent/60 hover:text-fg text-fg-muted rounded-md border px-3 py-1 text-[11px]"
+        onClick={() => setOpen(true)}
+        type="button"
+      >
+        Configure →
+      </button>
+    )
+  }
+  return (
+    <form
+      className="flex w-72 flex-col gap-2"
+      onSubmit={(e) => {
+        e.preventDefault()
+        submit.mutate()
+      }}
+    >
+      <input
+        aria-label="Slack incoming webhook URL"
+        className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 font-mono text-[10px]"
+        onChange={(e) => setWebhookUrl(e.target.value)}
+        placeholder="https://hooks.slack.com/services/T…/B…/…"
+        required
+        spellCheck={false}
+        type="url"
+        value={webhookUrl}
+      />
+      <input
+        aria-label="Channel label (display only)"
+        className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 text-[11px]"
+        onChange={(e) => setChannelLabel(e.target.value)}
+        placeholder="#sentori-alerts (optional)"
+        type="text"
+        value={channelLabel}
+      />
+      {error && <p className="text-[10px] text-red-300">{error}</p>}
+      <div className="flex justify-end gap-2">
+        <button
+          className="text-fg-muted hover:text-fg text-[11px]"
+          onClick={() => setOpen(false)}
+          type="button"
+        >
+          Cancel
+        </button>
+        <button
+          className="border-accent/60 text-accent hover:bg-accent/10 rounded-md border px-2 py-1 text-[11px] disabled:opacity-50"
+          disabled={submit.isPending || !webhookUrl.trim()}
+          type="submit"
+        >
+          {submit.isPending ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </form>
   )
 }

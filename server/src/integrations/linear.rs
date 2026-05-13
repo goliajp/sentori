@@ -43,6 +43,12 @@ pub struct LinearConfig {
 pub struct LinearAdapter {
     pub client_id: String,
     pub client_secret: String,
+    /// Webhook signing secret — used by sub-D's webhook receiver to
+    /// verify `Linear-Signature` header. Configured on the Linear
+    /// OAuth app's webhook page and pasted into env. Optional: when
+    /// unset, the webhook receiver returns 503 so it's obvious a
+    /// missed env var is the cause.
+    pub webhook_secret: Option<String>,
 }
 
 impl LinearAdapter {
@@ -54,11 +60,48 @@ impl LinearAdapter {
         if id.is_empty() || secret.is_empty() {
             return None;
         }
+        let webhook_secret = std::env::var("SENTORI_LINEAR_WEBHOOK_SECRET")
+            .ok()
+            .filter(|s| !s.is_empty());
         Some(Self {
             client_id: id,
             client_secret: secret,
+            webhook_secret,
         })
     }
+
+    /// Phase 43 sub-D.01 — verify the `Linear-Signature` header is a
+    /// constant-time HMAC-SHA-256 of the raw body using
+    /// `webhook_secret`. Returns false when the secret isn't
+    /// configured — caller surfaces that as 503 so the operator
+    /// knows the missed env var is the cause.
+    pub fn verify_webhook_signature(&self, body: &[u8], signature_hex: &str) -> bool {
+        use hmac::{Hmac, Mac};
+        use sha2::Sha256;
+        let Some(secret) = self.webhook_secret.as_deref() else {
+            return false;
+        };
+        let Ok(mut mac) = <Hmac<Sha256> as Mac>::new_from_slice(secret.as_bytes()) else {
+            return false;
+        };
+        mac.update(body);
+        let expected = mac.finalize().into_bytes();
+        let Ok(provided) = hex::decode(signature_hex) else {
+            return false;
+        };
+        constant_time_eq(expected.as_slice(), provided.as_slice())
+    }
+}
+
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
 }
 
 #[async_trait]
@@ -394,13 +437,26 @@ fn build_description(ctx: &IssueContext) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+
+    fn adapter(webhook_secret: Option<&str>) -> LinearAdapter {
+        LinearAdapter {
+            client_id: "cid".into(),
+            client_secret: "sec".into(),
+            webhook_secret: webhook_secret.map(str::to_string),
+        }
+    }
+
+    fn sign(body: &[u8], secret: &str) -> String {
+        let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(secret.as_bytes()).unwrap();
+        mac.update(body);
+        hex::encode(mac.finalize().into_bytes())
+    }
 
     #[test]
     fn oauth_authorise_url_has_required_params() {
-        let a = LinearAdapter {
-            client_id: "cid".into(),
-            client_secret: "sec".into(),
-        };
+        let a = adapter(None);
         let url = a.oauth_authorise_url("abc", "https://app/cb");
         assert!(url.contains("client_id=cid"));
         assert!(url.contains("state=abc"));
@@ -412,6 +468,45 @@ mod tests {
     fn truncate_keeps_short_strings_intact() {
         assert_eq!(truncate("hi", 10), "hi");
         assert_eq!(truncate("hello world", 5), "hello…");
+    }
+
+    #[test]
+    fn verify_webhook_signature_accepts_valid_hmac() {
+        let body = br#"{"action":"update","type":"Issue"}"#;
+        let secret = "topsecret";
+        let sig = sign(body, secret);
+        assert!(adapter(Some(secret)).verify_webhook_signature(body, &sig));
+    }
+
+    #[test]
+    fn verify_webhook_signature_rejects_wrong_secret() {
+        let body = br#"{"x":1}"#;
+        let sig = sign(body, "real");
+        assert!(!adapter(Some("wrong")).verify_webhook_signature(body, &sig));
+    }
+
+    #[test]
+    fn verify_webhook_signature_rejects_tampered_body() {
+        let real_body = br#"{"action":"update"}"#;
+        let secret = "s";
+        let sig = sign(real_body, secret);
+        let tampered = br#"{"action":"delete"}"#;
+        assert!(!adapter(Some(secret)).verify_webhook_signature(tampered, &sig));
+    }
+
+    #[test]
+    fn verify_webhook_signature_false_when_secret_not_configured() {
+        let body = br#"{}"#;
+        let sig = sign(body, "any");
+        // Adapter has no webhook_secret → always false (caller turns
+        // that into a 503 so missing env var is obvious).
+        assert!(!adapter(None).verify_webhook_signature(body, &sig));
+    }
+
+    #[test]
+    fn verify_webhook_signature_handles_malformed_hex() {
+        let body = br#"{}"#;
+        assert!(!adapter(Some("s")).verify_webhook_signature(body, "not-hex"));
     }
 
     #[test]

@@ -21,8 +21,9 @@
 use std::sync::Arc;
 
 use axum::{
+    body::Bytes,
     extract::{Extension, Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Redirect, Response},
     Json,
 };
@@ -36,7 +37,10 @@ use uuid::Uuid;
 
 use crate::api::admin_auth::AdminCaller;
 use crate::error::AppError;
-use crate::integrations::{linear::LinearAdapter, IntegrationAdapter, IntegrationError};
+use crate::integrations::{
+    linear::LinearAdapter, slack::SlackAdapter, ConnectMode, IntegrationAdapter,
+    IntegrationError,
+};
 use crate::recent::AppState;
 
 const STATE_TTL_SECS: i64 = 600;
@@ -50,6 +54,7 @@ const STATE_KEY_PREFIX: &str = "oauth_state";
 fn adapter_for(kind: &str) -> Option<Arc<dyn IntegrationAdapter>> {
     match kind {
         "linear" => LinearAdapter::from_env().map(|a| Arc::new(a) as Arc<dyn IntegrationAdapter>),
+        "slack" => Some(Arc::new(SlackAdapter::new()) as Arc<dyn IntegrationAdapter>),
         _ => None,
     }
 }
@@ -125,13 +130,91 @@ pub async fn list_integrations(
 /// Pluck non-secret summary fields out of `config` for dashboard
 /// display. Anything not on the allowlist is dropped.
 fn redact_display(kind: &str, config: &serde_json::Value) -> serde_json::Value {
+    // Never echo back webhook URLs / access tokens / secrets.
     match kind {
         "linear" => json!({
             "workspaceName": config.get("workspaceName"),
             "defaultTeamName": config.get("defaultTeamName"),
         }),
+        "slack" => json!({
+            "channelLabel": config.get("channelLabel"),
+        }),
         _ => json!({}),
     }
+}
+
+// ────────────────────────────── manual configure ────────────────────
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigureBody {
+    pub org_slug: String,
+    #[serde(flatten)]
+    pub form: serde_json::Value,
+}
+
+/// `POST /admin/api/integrations/{kind}/configure` — for adapters
+/// whose `connect_mode == Manual` (Slack incoming webhook today).
+/// Body is `{ orgSlug, ...adapter-specific fields }`; adapter
+/// validates + returns the JSON to persist into `integrations.config`.
+pub async fn configure(
+    State(state): State<AppState>,
+    Extension(caller): Extension<AdminCaller>,
+    Path(kind): Path<String>,
+    Json(body): Json<ConfigureBody>,
+) -> Result<Response, AppError> {
+    let pool = state.db.as_ref().ok_or(AppError::DatabaseUnavailable)?;
+    let adapter = match adapter_for(&kind) {
+        Some(a) if a.is_configured() => a,
+        Some(_) => return Ok(disabled_response(&kind, "adapter disabled")),
+        None => return Ok(not_found_response()),
+    };
+    if adapter.connect_mode() != ConnectMode::Manual {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": "useOAuthConnect",
+                "connectUrl": format!("/admin/api/integrations/{kind}/connect"),
+            })),
+        )
+            .into_response());
+    }
+
+    let org = resolve_org(pool, &body.org_slug, &caller).await?;
+    let Some((org_id, role)) = org else {
+        return Ok(not_found_response());
+    };
+    if !matches!(role.as_str(), "owner" | "admin") {
+        return Ok(forbidden_response());
+    }
+
+    let cfg = match adapter.accept_manual_config(body.form).await {
+        Ok(c) => c,
+        Err(e) => {
+            return Ok((
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "invalidConfig", "detail": e.to_string() })),
+            )
+                .into_response());
+        }
+    };
+
+    upsert_integration(pool, org_id, &kind, &cfg)
+        .await
+        .map_err(|e| AppError::Internal(format!("upsert integration: {e}")))?;
+
+    crate::audit::record(
+        pool,
+        org_id,
+        None,
+        "integration.connected",
+        crate::audit::targets::ORG,
+        Some(org_id),
+        json!({ "kind": kind, "mode": "manual" }),
+    )
+    .await;
+
+    Ok((StatusCode::NO_CONTENT, ()).into_response())
 }
 
 // ────────────────────────────── connect ──────────────────────────────
@@ -158,6 +241,20 @@ pub async fn connect(
         Some(_) => return Ok(disabled_response(&kind, "not configured (set SENTORI_LINEAR_CLIENT_ID + _SECRET)")),
         None => return Ok(not_found_response()),
     };
+
+    // Phase 43 sub-E: adapters using manual config (Slack) don't
+    // have an OAuth URL to redirect to. Tell the caller to POST
+    // /configure instead.
+    if adapter.connect_mode() == ConnectMode::Manual {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": "useManualConfigure",
+                "configureUrl": format!("/admin/api/integrations/{kind}/configure"),
+            })),
+        )
+            .into_response());
+    }
 
     let org = resolve_org(pool, &q.org_slug, &caller).await?;
     let Some((org_id, role)) = org else {
@@ -266,6 +363,170 @@ pub async fn callback(
     .await;
 
     Ok(redirect_with_success(&state, &kind))
+}
+
+// ────────────────────────────── webhook ──────────────────────────────
+
+/// `POST /v1/integrations/linear/webhook`
+///
+/// Linear posts here on any Issue / Comment / Project change with a
+/// JSON payload + `Linear-Signature` header (hex HMAC-SHA-256 of
+/// the body with the OAuth app's webhook secret).
+///
+/// What we honour today (sub-D scope):
+///   - `type=Issue, action=update`:
+///     - state.type → "completed" or "canceled"  → Sentori resolve
+///     - state.type → "started" / "unstarted" / "backlog" while the
+///       linked Sentori issue is `resolved`        → Sentori regression
+///
+/// Everything else is acked (200) but ignored — Linear retries on
+/// non-2xx, and we want to silently drop comments / project events
+/// without driving retries.
+pub async fn linear_webhook(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let Some(pool) = state.db.as_ref() else {
+        return server_error("dbNotConfigured");
+    };
+    let adapter = match LinearAdapter::from_env() {
+        Some(a) => a,
+        None => return server_error("adapterDisabled"),
+    };
+
+    // Linear uses `Linear-Signature` (hex SHA-256 HMAC).
+    let sig = headers
+        .get("linear-signature")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if !adapter.verify_webhook_signature(&body, sig) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "error": "badSignature" })),
+        )
+            .into_response();
+    }
+
+    let payload: serde_json::Value = match serde_json::from_slice(&body) {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!(error = %e, "linear webhook: bad json");
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "badJson" })),
+            )
+                .into_response();
+        }
+    };
+
+    // We only care about Issue update events for now.
+    let kind = payload.get("type").and_then(|v| v.as_str()).unwrap_or("");
+    let action = payload.get("action").and_then(|v| v.as_str()).unwrap_or("");
+    if !(kind == "Issue" && action == "update") {
+        return StatusCode::OK.into_response();
+    }
+    let data = match payload.get("data") {
+        Some(d) => d,
+        None => return StatusCode::OK.into_response(),
+    };
+    let linear_id = data.get("id").and_then(|v| v.as_str()).unwrap_or("");
+    if linear_id.is_empty() {
+        return StatusCode::OK.into_response();
+    }
+    let state_type = data
+        .get("state")
+        .and_then(|s| s.get("type"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    // Map Linear state → Sentori status.
+    let new_status = match state_type {
+        "completed" | "canceled" => Some("resolved"),
+        "started" | "unstarted" | "backlog" | "triage" => Some("active"),
+        _ => None,
+    };
+    let Some(target_status) = new_status else {
+        return StatusCode::OK.into_response();
+    };
+
+    // Find the linked Sentori issue. Skip silently if no link.
+    let row: Option<(uuid::Uuid, String)> = sqlx::query_as(
+        "SELECT i.id, i.status FROM issues i \
+         JOIN issue_integration_links l ON l.issue_id = i.id \
+         WHERE l.integration_kind = 'linear' AND l.external_id = $1",
+    )
+    .bind(linear_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    let Some((issue_id, current_status)) = row else {
+        return StatusCode::OK.into_response();
+    };
+    if current_status == target_status {
+        // No-op: stops the comment loop (sub-B posts on resolve →
+        // Linear could re-fire webhook → we'd UPDATE → no change).
+        return StatusCode::OK.into_response();
+    }
+
+    if let Err(e) = sqlx::query(
+        "UPDATE issues SET \
+             status = $1, \
+             resolved_at = CASE WHEN $1 = 'resolved' THEN now() ELSE NULL END, \
+             regressed_at = CASE WHEN $1 = 'resolved' THEN NULL ELSE regressed_at END \
+         WHERE id = $2",
+    )
+    .bind(target_status)
+    .bind(issue_id)
+    .execute(pool)
+    .await
+    {
+        tracing::error!(error = %e, %issue_id, "linear webhook: status update failed");
+        return server_error("dbError");
+    }
+
+    // Audit — origin "integration:linear" so a triage user can see
+    // why an issue moved without anyone clicking in dashboard.
+    if let Ok(proj_id) = sqlx::query_scalar::<_, uuid::Uuid>(
+        "SELECT project_id FROM issues WHERE id = $1",
+    )
+    .bind(issue_id)
+    .fetch_one(pool)
+    .await
+    {
+        if let Ok(org_id) = sqlx::query_scalar::<_, uuid::Uuid>(
+            "SELECT org_id FROM projects WHERE id = $1",
+        )
+        .bind(proj_id)
+        .fetch_one(pool)
+        .await
+        {
+            crate::audit::record(
+                pool,
+                org_id,
+                None,
+                "issue.status.reverse_sync",
+                "issue",
+                Some(issue_id),
+                json!({
+                    "from": current_status,
+                    "to": target_status,
+                    "source": "linear",
+                    "externalId": linear_id,
+                }),
+            )
+            .await;
+        }
+    }
+
+    tracing::info!(
+        %issue_id,
+        from = %current_status,
+        to = %target_status,
+        external = %linear_id,
+        "linear webhook drove sentori status change"
+    );
+    StatusCode::OK.into_response()
 }
 
 // ────────────────────────────── revoke ───────────────────────────────
@@ -398,6 +659,14 @@ fn not_found_response() -> Response {
 
 fn forbidden_response() -> Response {
     (StatusCode::FORBIDDEN, Json(json!({ "error": "forbidden" }))).into_response()
+}
+
+fn server_error(error: &str) -> Response {
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(json!({ "error": error })),
+    )
+        .into_response()
 }
 
 fn random_hex(bytes: usize) -> String {

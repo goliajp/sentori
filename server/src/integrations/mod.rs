@@ -24,6 +24,7 @@ use uuid::Uuid;
 
 pub mod dispatch;
 pub mod linear;
+pub mod slack;
 
 #[derive(Debug, thiserror::Error)]
 pub enum IntegrationError {
@@ -79,6 +80,16 @@ pub enum IssueLifecycleEvent {
     Resolved,
 }
 
+/// How a user goes from "not connected" → "connected" for a given
+/// adapter. OAuth (Linear) launches a redirect; Manual (Slack
+/// incoming webhook) takes a JSON form submission.
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ConnectMode {
+    OAuth,
+    Manual,
+}
+
 #[async_trait]
 pub trait IntegrationAdapter: Send + Sync {
     /// Lowercase kind ("linear", "slack", …). Used as the
@@ -90,8 +101,18 @@ pub trait IntegrationAdapter: Send + Sync {
     /// `create_issue` all return `NotConfigured`.
     fn is_configured(&self) -> bool;
 
+    /// Phase 43 sub-E: how this adapter wants to be connected.
+    /// Default `OAuth` matches the historic Linear path; Slack
+    /// overrides to `Manual` because incoming-webhook URLs aren't an
+    /// OAuth flow.
+    fn connect_mode(&self) -> ConnectMode {
+        ConnectMode::OAuth
+    }
+
     /// Build the OAuth authorise URL the user should visit. `state`
     /// is the CSRF token the api layer already minted + stored.
+    /// Adapters with `connect_mode() == Manual` may return an empty
+    /// string — the dispatcher routes around them.
     fn oauth_authorise_url(&self, state: &str, redirect_uri: &str) -> String;
 
     /// Exchange an OAuth `code` for an access token + whatever else
@@ -102,6 +123,19 @@ pub trait IntegrationAdapter: Send + Sync {
         code: &str,
         redirect_uri: &str,
     ) -> Result<serde_json::Value, IntegrationError>;
+
+    /// Phase 43 sub-E.02 — manual config path: take whatever JSON
+    /// the dashboard form submits, validate, return what goes in
+    /// `integrations.config`. Default impl errors so OAuth-only
+    /// adapters don't accidentally pretend to support this.
+    async fn accept_manual_config(
+        &self,
+        _form: serde_json::Value,
+    ) -> Result<serde_json::Value, IntegrationError> {
+        Err(IntegrationError::Upstream(
+            "this adapter doesn't support manual config".into(),
+        ))
+    }
 
     /// Create the upstream item for a Sentori issue and return the
     /// (id, url) the dashboard can store + render as a back-link.

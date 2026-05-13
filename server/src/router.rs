@@ -109,6 +109,10 @@ pub fn build(cfg: ServerConfig) -> Router {
             axum::routing::delete(api::integrations::revoke),
         )
         .route(
+            "/integrations/{kind}/configure",
+            post(api::integrations::configure),
+        )
+        .route(
             "/projects/{project_id}/teams",
             get(api::teams::list_project_teams),
         )
@@ -358,8 +362,18 @@ pub fn build(cfg: ServerConfig) -> Router {
         Router::new()
     };
 
+    // Phase 43 sub-D.01: Linear / Slack incoming webhooks. No token
+    // auth — Linear posts here directly + signs with HMAC-SHA-256
+    // (verified per-adapter). Route lives outside the `require_token`
+    // group; the body has to stay raw bytes for the signature check.
+    let integrations_public = Router::new().route(
+        "/v1/integrations/linear/webhook",
+        post(api::integrations::linear_webhook),
+    );
+
     Router::new()
         .merge(ingestion)
+        .merge(integrations_public)
         .nest("/admin/api", admin)
         .nest("/api/auth", user_auth)
         .nest("/api", orgs)
