@@ -28,6 +28,12 @@ export function TracesView() {
   const [queryText, setQueryText] = useState('')
   const parsed = useMemo(() => parseTraceQuery(queryText), [queryText])
   const [selectedIdx, setSelectedIdx] = useState(0)
+  // Phase 0.5.7 hotfix: hide "orphan" traces by default — rows where
+  // children landed but the root span never did. Most commonly a
+  // dev-mode fast-refresh artifact (the SDK's useTraceNavigation
+  // useRef is reset before the span finishes). Toggle on when
+  // debugging SDK lifecycle.
+  const [showOrphans, setShowOrphans] = useState(false)
   const { density } = useDensity()
   const dCls = densityClasses(density)
 
@@ -40,11 +46,14 @@ export function TracesView() {
       adminApi.listTracesPage(projectId!, {
         cursor: pageParam,
         durationMs: parsed.minDurationMs ?? undefined,
+        // `true` → server filters to traces with root_op set.
+        // `undefined` (toggle on) → server returns everything.
+        hasRoot: showOrphans ? undefined : true,
         limit: PAGE_SIZE,
         op: parsed.op,
         status: parsed.status,
       }),
-    queryKey: ['traces', projectId, parsed.status, parsed.op, parsed.minDurationMs],
+    queryKey: ['traces', projectId, parsed.status, parsed.op, parsed.minDurationMs, showOrphans],
   })
 
   const traces = useMemo(
@@ -59,7 +68,7 @@ export function TracesView() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedIdx(0)
-  }, [parsed.status, parsed.op, parsed.minDurationMs, projectId])
+  }, [parsed.status, parsed.op, parsed.minDurationMs, projectId, showOrphans])
 
   const open = (row: TraceRow) => {
     navigate(`/org/${currentOrg.slug}/traces/${row.traceId}`)
@@ -91,6 +100,19 @@ export function TracesView() {
         <span className="text-fg-muted text-[12px]">{traces.length} loaded</span>
 
         <div className="ml-auto flex items-center gap-2">
+          <button
+            aria-pressed={showOrphans}
+            className={`rounded-md px-2 py-1 text-[11px] tracking-wider uppercase transition-colors ${
+              showOrphans
+                ? 'bg-accent/10 text-accent'
+                : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+            }`}
+            onClick={() => setShowOrphans((s) => !s)}
+            title="Show 'orphan' traces — children landed but the root span never arrived (commonly dev-mode fast-refresh artifacts)."
+            type="button"
+          >
+            {showOrphans ? 'incl. orphans' : 'hide orphans'}
+          </button>
           <input
             className="border-border bg-bg-tertiary text-fg w-80 rounded-md border px-3 py-1 text-[12px]"
             onChange={(e) => setQueryText(e.target.value)}

@@ -321,6 +321,10 @@ export const adminApi = {
     params: {
       cursor?: null | string
       durationMs?: number
+      /** `true` → hide orphan traces (no root span — the typical
+       *  fast-refresh artifact). `false` → show only orphans. Omit
+       *  to include both. Dashboard default is `true`. */
+      hasRoot?: boolean
       limit?: number
       op?: string
       status?: TraceStatus
@@ -331,6 +335,7 @@ export const adminApi = {
     if (params.op) usp.set('op', params.op)
     if (params.status) usp.set('status', params.status)
     if (params.durationMs !== undefined) usp.set('durationMs', String(params.durationMs))
+    if (params.hasRoot !== undefined) usp.set('hasRoot', String(params.hasRoot))
     if (params.cursor) usp.set('cursor', params.cursor)
     const qs = usp.toString() ? `?${usp.toString()}` : ''
     const resp = await fetch(`${ADMIN_BASE}/projects/${projectId}/traces${qs}`, {

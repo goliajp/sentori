@@ -48,6 +48,14 @@ pub struct ListTracesQuery {
     /// traces ≥ 500 ms. Used to surface slow requests in the list.
     #[serde(default)]
     pub duration_ms: Option<i32>,
+    /// Filter on root-span presence. `hasRoot=true` hides "orphaned"
+    /// traces — rows where child spans landed but the root never
+    /// arrived (most often: dev-mode fast-refresh racing the SDK's
+    /// useTraceNavigation hook, so the nav root span never finishes).
+    /// Dashboard defaults to `true`; flip to `false` (or omit) to also
+    /// surface orphans when debugging SDK lifecycle.
+    #[serde(default)]
+    pub has_root: Option<bool>,
     /// Keyset cursor — `<rfc3339-last-seen>|<uuid>`, same format as
     /// `list_issues`.
     #[serde(default)]
@@ -74,18 +82,24 @@ pub async fn list_traces(
           AND ($3::TEXT IS NULL OR status = $3)
           AND ($4::INT  IS NULL OR duration_ms >= $4)
           AND (
-            $5::TIMESTAMPTZ IS NULL
-            OR last_seen < $5::TIMESTAMPTZ
-            OR (last_seen = $5::TIMESTAMPTZ AND trace_id < $6::UUID)
+            $5::BOOLEAN IS NULL
+            OR ($5 = TRUE  AND root_op IS NOT NULL)
+            OR ($5 = FALSE AND root_op IS NULL)
+          )
+          AND (
+            $6::TIMESTAMPTZ IS NULL
+            OR last_seen < $6::TIMESTAMPTZ
+            OR (last_seen = $6::TIMESTAMPTZ AND trace_id < $7::UUID)
           )
         ORDER BY last_seen DESC, trace_id DESC
-        LIMIT $7
+        LIMIT $8
         "#,
     )
     .bind(project_id)
     .bind(q.op.as_deref())
     .bind(q.status.as_deref())
     .bind(q.duration_ms)
+    .bind(q.has_root)
     .bind(cursor.map(|c| c.0))
     .bind(cursor.map(|c| c.1))
     .bind(limit)
