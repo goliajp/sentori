@@ -58,6 +58,7 @@
     "@expo/config-plugins": "^9 || ^10"
   },
   "devDependencies": {
+    "@goliapkg/sentori-react-native": "*",
     "@types/bun": "latest",
     "typescript": "^5"
   },
