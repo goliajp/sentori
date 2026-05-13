@@ -14,6 +14,7 @@
 - **v0.5** ✅ Scale + Readable Errors + Dashboard sidebar（Phase 39-41 全部完成；7 npm 包 publish + tag v0.5.0）—— 详见 [CHANGELOG.md](./CHANGELOG.md#v05--scale--readable-errors--dashboard-sidebarphase-39-41)
 - **v0.5.x** ✅ post-release polish：sidebar 折叠图标轨 + `g <letter>` 跳转快捷键 + `sentori-cli` 命令面齐全（`issue list|resolve|silence|close` + `upload dsym|mapping`）+ deploy 修通
 - **v0.6** ✅ Phase 42 — Issue Detail 诊断深度（sub-A → sub-I 9 个 sub-phase 全部完成；SDK `@goliapkg/sentori-core@0.5.0` + `@goliapkg/sentori-react-native@0.6.1` published；dashboard 9 deploys；sub-H 留两小项 v0.6.x patch：cross-stack cause chain + related issues panel）—— 详见 [CHANGELOG.md](./CHANGELOG.md)
+- **v0.7** 🚧 综合升级：Phase 43 Linear 双向集成 + Phase 44 Sampling/数据分析 + Phase 45 Web SDK 矩阵（Vue/Svelte/Solid）+ Phase 46 Session-trail 轻量回放 + Phase 47 v0.6.x patches。~5 周（设计 + checklist 在下方"v0.7 综合升级"段）
 
 公开 surface：`sentori.golia.jp`（marketing） / `app.sentori.golia.jp`（dashboard） / `api.sentori.golia.jp` / `ingest.sentori.golia.jp` / `docs.sentori.golia.jp`。
 
@@ -761,4 +762,200 @@ type Attachment = {
 ### 总工程量
 
 12 天，SDK 一次 minor（0.6.0）+ 可能一次 patch（0.6.1 for sub-G）。
+
+---
+
+## v0.7 — 综合升级（Phases 43–47）🚧
+
+四个产品轴 + v0.6.x 留尾一起做，~5 周。设计协调四条铁律：
+
+1. **`sentori-core` 单一真相源** — Linear adapter 类型 / sampling 配置 / sessionTrail attachment kind 都在 core，所有 SDK 共享
+2. **复用 v0.6 attachment 框架** — sessionTrail 是新 `kind`，路径同 screenshot / viewTree
+3. **复用 v0.2 sub-D webhook** — Linear / Slack 都是 typed adapter 而非新 ingest 路径
+4. **Sampling 跨 SDK 单一 API** — `init({ sampling: { errors, traces } })`
+
+执行顺序按"最快兑现 → 最大基础设施"排：
+
+### Phase 43 — Linear 双向集成（1 周）
+
+跟 Insight 现有工作流接最近，最早能让用户实际用上。
+
+#### sub-A — Server Linear adapter（2 天）
+
+- [ ] A.01 Migration `0033_integrations.sql`：`integrations (id PK, org_id, kind, config_jsonb, created_at, revoked_at)`；kind in ('linear', 'slack', ...)
+- [ ] A.02 Rust crate-level `integrations::linear::Adapter` 结构 + `IntegrationAdapter` trait
+- [ ] A.03 OAuth 2.0 flow: GET `/admin/api/integrations/linear/connect` → Linear OAuth URL；callback `/admin/api/integrations/linear/callback` → 存 access_token in `integrations.config_jsonb`
+- [ ] A.04 `integrations::linear::create_issue(state, issue_id, title, description, labels)` 调 Linear GraphQL `issueCreate` mutation
+- [ ] A.05 测试：mock Linear API + 单元测 token 加密存储
+
+#### sub-B — Issue → Linear ticket 自动创建（1.5 天）
+
+- [ ] B.01 New issue notification 路径加 Linear adapter hook（在 notifier 旁，不阻塞 ingest）
+- [ ] B.02 `issue_linear_links (issue_id PK, linear_issue_id, created_at)` 表
+- [ ] B.03 Project settings: 哪些 release / errorType / fingerprint 自动创建 Linear ticket（默认全部 new issue）
+- [ ] B.04 idempotency: 同 issue 不重复创建
+- [ ] B.05 测试 + 错误 fallback（Linear API down → 不阻塞 issue persist）
+
+#### sub-C — Dashboard 项目设置 Linear 面板（1 天）
+
+- [ ] C.01 `<IntegrationsPanel>` 在 project settings：connect / disconnect / auto-create rule 配置
+- [ ] C.02 "Open in Linear" 链接：issue 详情 header 加按钮，已 link 的 issue 跳 Linear；未 link 加 "Create Linear ticket"
+- [ ] C.03 测试 + UI states (connected / disconnected / error)
+
+#### sub-D — 双向状态同步（1.5 天）
+
+- [ ] D.01 Linear webhook receiver `/v1/integrations/linear/webhook`（Linear → Sentori）
+- [ ] D.02 Linear issue close → Sentori resolve（match by issue_linear_links）
+- [ ] D.03 Sentori resolve → Linear comment + close（如果 auto-close 配置开）
+- [ ] D.04 Sentori regression → Linear re-open + comment
+- [ ] D.05 测试：webhook signature 验证 / cross-reference
+
+#### sub-E — Slack 顺手补一刀（1 天）
+
+- [ ] E.01 Slack webhook adapter（复用 v0.2 outbound webhook + Block Kit payload）
+- [ ] E.02 New issue / regression / resolved 三种 message 模板
+- [ ] E.03 Project settings UI + alert rule 接入
+- [ ] E.04 文档 + Insight 通知
+
+---
+
+### Phase 44 — Sampling + 数据分析（1 周）
+
+v0.6 留的债 + 流量上量准备。
+
+#### sub-A — `sampling` core 配置（1 天）
+
+- [ ] A.01 `sentori-core/src/types.ts` 加 `SamplingConfig { errors?: number; traces?: number }`，0.0–1.0
+- [ ] A.02 `sentori-core/src/sampling.ts`：`shouldSample(rate)` helper（Math.random < rate）+ traceId-based deterministic sampling for traces（保证同 trace 内全采全弃）
+- [ ] A.03 单测：deterministic, 0/1 边界, rate=null fallback to 1.0
+
+#### sub-B — SDK 接入 sampling（1 天）
+
+- [ ] B.01 `sentori-react-native` `init({ sampling: ... })` → `shouldSample` 包 captureException 入口
+- [ ] B.02 `sentori-javascript` 同 + traces sampling 在 startSpan
+- [ ] B.03 `sentori-next` 共享 javascript
+- [ ] B.04 dropped events 计数器（breadcrumb-level metric）
+- [ ] B.05 测试：sampling rate=0.5 时统计学验证
+
+#### sub-C — Dashboard fingerprint 手动 rewrite（1.5 天）
+
+- [ ] C.01 Server: `POST /admin/api/issues/<id>:merge` 把多个 issue 合并到一个 fingerprint，`POST /admin/api/issues/<id>:split` 按字段拆分
+- [ ] C.02 Audit log entry
+- [ ] C.03 Dashboard: issue detail "Merge with..." / "Split by..." menu
+- [ ] C.04 测试：merge idempotency, split validation
+
+#### sub-D — Event payload 全文搜索（1.5 天）
+
+- [ ] D.01 Migration `0034_events_fulltext_index.sql`：`tsvector` generated column over message + tags + file paths + 加 GIN index
+- [ ] D.02 Issues list query 加 `?search=foo`，跨 message / tags / stack file
+- [ ] D.03 Dashboard search bar 加 free-text mode
+- [ ] D.04 测试 + perf budget < 50ms 95p over 1M events
+
+#### sub-E — Cross-stack cause chain（v0.6 H.01 收尾）（1 天）
+
+- [ ] E.01 Event protocol 加 `nativeError?: { issueId, type, message }`
+- [ ] E.02 SDK: native crash 时如果 JS error 还能抓，写 nativeError 进 JS event payload
+- [ ] E.03 Dashboard cause chain 嵌入 native issue 卡片 + 跳链接
+
+---
+
+### Phase 45 — Web SDK 矩阵（1.5 周）
+
+Vue / Svelte / Solid 三个新 SDK，共享 `sentori-javascript` 的通用 framework adapter base。
+
+#### sub-A — Shared adapter base（0.5 天）
+
+- [ ] A.01 `sentori-javascript/src/framework-adapter.ts`：`installErrorBoundary` / `useTrace` 抽象，框架特定的钩子由各 SDK 实现
+- [ ] A.02 文档约定：每个 framework SDK = `~150 LOC adapter` 在 javascript core 之上
+
+#### sub-B — `@goliapkg/sentori-vue`（2 天）
+
+- [ ] B.01 `sdk/vue/` 工作区 + package.json + tsconfig
+- [ ] B.02 `initSentori` Vue plugin (`app.use(sentori, { token, release })`) → 调 sentori-javascript init
+- [ ] B.03 `app.config.errorHandler` 全局错误捕获
+- [ ] B.04 Vue Router 集成：trace navigation 转译 router.afterEach
+- [ ] B.05 `<SentoriErrorBoundary>` component
+- [ ] B.06 Unit tests + example app
+- [ ] B.07 docs/sdk-vue.md + recipes
+
+#### sub-C — `@goliapkg/sentori-svelte`（2 天）
+
+- [ ] C.01 `sdk/svelte/` 工作区
+- [ ] C.02 SvelteKit `hooks.client.ts` + `hooks.server.ts` 集成
+- [ ] C.03 `<ErrorBoundary>` Svelte component
+- [ ] C.04 SvelteKit Router trace navigation
+- [ ] C.05 Tests + example
+- [ ] C.06 docs/sdk-svelte.md
+
+#### sub-D — `@goliapkg/sentori-solid`（2 天）
+
+- [ ] D.01 `sdk/solid/` 工作区
+- [ ] D.02 `ErrorBoundary` Solid component + global error handler
+- [ ] D.03 Solid Router trace navigation
+- [ ] D.04 Tests + example
+- [ ] D.05 docs/sdk-solid.md
+
+#### sub-E — 矩阵 release（0.5 天）
+
+- [ ] E.01 sentori-vue / svelte / solid 各 0.1.0 publish to npm
+- [ ] E.02 marketing 站 SDKs 矩阵更新
+- [ ] E.03 CHANGELOG 段
+
+---
+
+### Phase 46 — Session-trail 轻量回放（1.5 周）
+
+Phase 42 attachment 框架的下一步价值兑现。比 Sentry session replay 简化 10x：不录视频，只在 crash 时回看错误前 N 步的 (screenshot? + view tree + breadcrumb) 序列。
+
+#### sub-A — 协议 + storage（1 天）
+
+- [ ] A.01 `AttachmentKind` 加 `'sessionTrail'`
+- [ ] A.02 Storage layout: `<dir>/<project>/<event>/trail/{step-N}.json` + 可选 `step-N.jpg`
+- [ ] A.03 Server 验证 + retention 同其他 attachment
+
+#### sub-B — SDK ring buffer of trail steps（2 天）
+
+- [ ] B.01 `sentori-core/src/trail.ts`：ring buffer max 30 steps；每步 = `{ ts, breadcrumb?, viewTreeRef?, screenshotRef? }`
+- [ ] B.02 RN: 每次 navigation / 显式 captureStep 时记一步（含可选 lightweight viewTree dump）
+- [ ] B.03 Web: 每次 route change / 显式 captureStep 时记一步（含 DOM mutation summary）
+- [ ] B.04 captureException 时把过去 N 步打包成 sessionTrail JSON 上传
+
+#### sub-C — 触发条件 + 配额（1 天）
+
+- [ ] C.01 `init({ capture: { sessionTrail: true, trailScreenshotEveryNStep: 3 } })`
+- [ ] C.02 Per-session quota: 1 trail per session（避免上量爆炸）
+- [ ] C.03 Privacy：MaskRegion 沿用
+
+#### sub-D — Dashboard `<SessionTrailViewer>`（2 天）
+
+- [ ] D.01 Timeline 控件 scrub 一条；每步显示截图 + view tree + breadcrumb
+- [ ] D.02 与 Stack tab 联动：hover step → 高亮当时 trace 状态
+- [ ] D.03 keyboard ← / → 步进
+
+#### sub-E — Release + 文档（1 天）
+
+- [ ] E.01 SDK bump：core 0.6, react-native 0.7
+- [ ] E.02 docs：sessionTrail 章节 + 隐私 + 配额
+- [ ] E.03 Insight 通知
+
+---
+
+### Phase 47 — v0.6.x patches + polish 收尾（3 天）
+
+- [ ] 47.01 H.03 Related issues panel：server endpoint `/admin/api/issues/<id>/related` + dashboard side panel
+- [ ] 47.02 G.10 hover frame ↔ tree node 联动
+- [ ] 47.03 G.02-04 SDK JS Fiber walker（如果 Phase 46 不够覆盖）
+- [ ] 47.04 SDK perf benchmark < 100ms（vitest + bench api）
+- [ ] 47.05 Dashboard LCP < 1.2s gate (lighthouse-style snapshot)
+- [ ] 47.06 ROADMAP + CHANGELOG v0.7 完整 summary
+- [ ] 47.07 v0.7 tag + GitHub release
+
+### 总工程量
+
+~5 周。SDK release 节奏：
+- core: 0.5.0 → 0.6.0（Phase 44 sampling + 46 trail）
+- react-native: 0.6.1 → 0.7.0
+- javascript / react / next: 各 minor bump
+- vue / svelte / solid: 各 0.1.0 首次 release
+- 7 npm packages 在 v0.7 tag 同步
 
