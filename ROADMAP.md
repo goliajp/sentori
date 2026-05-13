@@ -13,7 +13,7 @@
 - **v0.4.x** ✅ patch：v0.4.1 XHR instrumentation / v0.4.2 client span flush + self-trace 防套娃 —— 详见 CHANGELOG
 - **v0.5** ✅ Scale + Readable Errors + Dashboard sidebar（Phase 39-41 全部完成；7 npm 包 publish + tag v0.5.0）—— 详见 [CHANGELOG.md](./CHANGELOG.md#v05--scale--readable-errors--dashboard-sidebarphase-39-41)
 - **v0.5.x** ✅ post-release polish：sidebar 折叠图标轨 + `g <letter>` 跳转快捷键 + `sentori-cli` 命令面齐全（`issue list|resolve|silence|close` + `upload dsym|mapping`）+ deploy 修通
-- **v0.6** 🚧 Phase 42 — Issue Detail 诊断深度：源码语法高亮 + 智能调用链 fold + JS/iOS/Android 截图 + view tree skeleton + cross-stack 串联（设计：见下方"Phase 42 — Issue Detail 诊断深度"段）
+- **v0.6** ✅ Phase 42 — Issue Detail 诊断深度（sub-A → sub-I 9 个 sub-phase 全部完成；SDK `@goliapkg/sentori-core@0.5.0` + `@goliapkg/sentori-react-native@0.6.1` published；dashboard 9 deploys；sub-H 留两小项 v0.6.x patch：cross-stack cause chain + related issues panel）—— 详见 [CHANGELOG.md](./CHANGELOG.md)
 
 公开 surface：`sentori.golia.jp`（marketing） / `app.sentori.golia.jp`（dashboard） / `api.sentori.golia.jp` / `ingest.sentori.golia.jp` / `docs.sentori.golia.jp`。
 
@@ -637,126 +637,126 @@ type Attachment = {
 
 #### sub-A — Dashboard 视觉强化（1.5d，无 SDK 改动）
 
-- [ ] A.01 装 `@wooorm/starry-night` + `hast-util-to-jsx-runtime` 到 `web/`；grammar 子集 ts/tsx/js/jsx/swift/kotlin/java/objc
-- [ ] A.02 新建 `web/src/components/SourceCode.tsx` —— `<SourceCode language code highlightLines={[42]} />`
-- [ ] A.03 GitHub Dark / One Dark 配色对应当前 theme（暗色优先，亮色后跟）
-- [ ] A.04 `FrameRow` inline source（±3 行）改用 `<SourceCode>`，红底高亮迁移到 `highlightLines`
-- [ ] A.05 `FrameSourceDrawer` 全文用 `<SourceCode>` + auto-scroll 到出错行 + `#L42` anchor
-- [ ] A.06 `web/src/lib/frame-package.ts` 实现 `packageOf(file)` 解析 `node_modules/<pkg>/...`、`Libraries/react-native/...`、`@scope/pkg`
-- [ ] A.07 `VendorFold` 改造：按 package group，显示 "react-native (8) · expo-router (3)"
-- [ ] A.08 `<FrameRoleBadge role={'you'|'framework'|'lib'|'boundary'} />` 颜色编码
-- [ ] A.09 Frame role 推断：`you=inApp`，`framework=react-native|react|expo`，`lib=其他 node_modules`
-- [ ] A.10 `CauseChain` 视觉重做：卡片 + "caused by →" 标题 + tinted border
-- [ ] A.11 Project settings schema 加 `source_repo_url TEXT NULL`（migration + admin endpoint + UI 表单）
-- [ ] A.12 `<GithubLink frame={frame} repo={...} />`：frame 文件名 click 跳 `<repo>/blob/<sha?>/<file>#L<line>`
-- [ ] A.13 Issue 详情顶部 "Open in editor" 按钮（`vscode://file/<path>:<line>:<col>`）
-- [ ] A.14 Issue 详情页 React Suspense + skeleton（stack / events / context 各自灰条）
-- [ ] A.15 Tests: `packageOf` 单元、SourceCode 渲染快照、GithubLink URL 构造
-- [ ] A.16 Web `bun run check && bun run test` 全过
-- [ ] A.17 Commit + release/v0.5.0 push 触发 deploy
+- [x] A.01 装 `@wooorm/starry-night` + `hast-util-to-jsx-runtime` 到 `web/`；grammar 子集 ts/tsx/js/jsx/swift/kotlin/java/objc
+- [x] A.02 新建 `web/src/components/SourceCode.tsx` —— `<SourceCode language code highlightLines={[42]} />`
+- [x] A.03 GitHub Dark / One Dark 配色对应当前 theme（暗色优先，亮色后跟）
+- [x] A.04 `FrameRow` inline source（±3 行）改用 `<SourceCode>`，红底高亮迁移到 `highlightLines`
+- [x] A.05 `FrameSourceDrawer` 全文用 `<SourceCode>` + auto-scroll 到出错行 + `#L42` anchor
+- [x] A.06 `web/src/lib/frame-package.ts` 实现 `packageOf(file)` 解析 `node_modules/<pkg>/...`、`Libraries/react-native/...`、`@scope/pkg`
+- [x] A.07 `VendorFold` 改造：按 package group，显示 "react-native (8) · expo-router (3)"
+- [x] A.08 `<FrameRoleBadge role={'you'|'framework'|'lib'|'boundary'} />` 颜色编码
+- [x] A.09 Frame role 推断：`you=inApp`，`framework=react-native|react|expo`，`lib=其他 node_modules`
+- [x] A.10 `CauseChain` 视觉重做：卡片 + "caused by →" 标题 + tinted border
+- [x] A.11 Project settings schema 加 `source_repo_url TEXT NULL`（migration + admin endpoint + UI 表单）
+- [x] A.12 `<GithubLink frame={frame} repo={...} />`：frame 文件名 click 跳 `<repo>/blob/<sha?>/<file>#L<line>`
+- [x] A.13 Issue 详情顶部 "Open in editor" 按钮（`vscode://file/<path>:<line>:<col>`）
+- [x] A.14 Issue 详情页 React Suspense + skeleton（stack / events / context 各自灰条）
+- [x] A.15 Tests: `packageOf` 单元、SourceCode 渲染快照、GithubLink URL 构造
+- [x] A.16 Web `bun run check && bun run test` 全过
+- [x] A.17 Commit + release/v0.5.0 push 触发 deploy
 
 #### sub-B — Source / context lazy load（0.5d）
 
-- [ ] B.01 Server: events ingest preContext/postContext 缩短到 ±3 行
-- [ ] B.02 Dashboard FrameSourceDrawer "expand context" 按钮：调 `GET /admin/api/events/<id>/frame/<n>/source?lines=20`
-- [ ] B.03 Server: source endpoint 加 `Cache-Control: max-age=3600, immutable`
-- [ ] B.04 Dashboard: react-query stale-while-revalidate
-- [ ] B.05 Tests + commit + deploy
+- [x] B.01 Server: events ingest preContext/postContext 缩短到 ±3 行
+- [x] B.02 Dashboard FrameSourceDrawer "expand context" 按钮：调 `GET /admin/api/events/<id>/frame/<n>/source?lines=20`
+- [x] B.03 Server: source endpoint 加 `Cache-Control: max-age=3600, immutable`
+- [x] B.04 Dashboard: react-query stale-while-revalidate
+- [x] B.05 Tests + commit + deploy
 
 #### sub-C — Attachment 基础设施（1.5d，server + dashboard）
 
-- [ ] C.01 Migration `0031_event_attachments.sql`：`event_attachments (ref PK, event_id, kind, media_type, size, captured_at, source)`
-- [ ] C.02 Rust trait `AttachmentStore { put / get / delete }`
-- [ ] C.03 `LocalFsAttachmentStore` —— `{SENTORI_ATTACHMENT_DIR}/<project_id>/<event_id>/<kind>.<ext>`
-- [ ] C.04 `POST /v1/events/<event_id>/attachments/<kind>` multipart 端点：限 500KB + mediaType 白名单
-- [ ] C.05 Ingest 时 `event.attachments[].ref` 校验：必须是该 event 已经签发的 ref
-- [ ] C.06 `GET /admin/api/events/<id>/attachments/<ref>` admin session 校验 + stream 响应
-- [ ] C.07 Retention sweep：partition drop 时一并 `AttachmentStore::delete`
-- [ ] C.08 Tests: 502KB 拒绝、跨 event 引用拒绝、retention 删除验证
-- [ ] C.09 Dashboard: `<AttachmentGallery event={...} />` 骨架（先空实现）
-- [ ] C.10 Commit + deploy
+- [x] C.01 Migration `0031_event_attachments.sql`：`event_attachments (ref PK, event_id, kind, media_type, size, captured_at, source)`
+- [x] C.02 Rust trait `AttachmentStore { put / get / delete }`
+- [x] C.03 `LocalFsAttachmentStore` —— `{SENTORI_ATTACHMENT_DIR}/<project_id>/<event_id>/<kind>.<ext>`
+- [x] C.04 `POST /v1/events/<event_id>/attachments/<kind>` multipart 端点：限 500KB + mediaType 白名单
+- [x] C.05 Ingest 时 `event.attachments[].ref` 校验：必须是该 event 已经签发的 ref
+- [x] C.06 `GET /admin/api/events/<id>/attachments/<ref>` admin session 校验 + stream 响应
+- [x] C.07 Retention sweep：partition drop 时一并 `AttachmentStore::delete`
+- [x] C.08 Tests: 502KB 拒绝、跨 event 引用拒绝、retention 删除验证
+- [x] C.09 Dashboard: `<AttachmentGallery event={...} />` 骨架（先空实现）
+- [x] C.10 Commit + deploy
 
 #### sub-D — JS / RN 截图（2d，SDK 0.6.0 minor）
 
-- [ ] D.01 `@goliapkg/sentori-react-native` peerDep + optionalDep `react-native-view-shot`
-- [ ] D.02 `sdk/core/src/types.ts` 加 `Attachment` 类型 + `event.attachments?: AttachmentMeta[]`
-- [ ] D.03 `sdk/react-native/src/handlers/screenshot.ts`：`captureRef` → resize 480px → webp q=70 → base64
-- [ ] D.04 性能护栏：`InteractionManager.runAfterInteractions(() => requestAnimationFrame(() => ...))`
-- [ ] D.05 `sdk/react-native/src/transport.ts` 加 attachment upload pipeline
-- [ ] D.06 Upload 失败 silent drop + 内部 metric breadcrumb
-- [ ] D.07 `init({ capture: { screenshot: true } })` opt-in；`captureException(err, { screenshot: false })` 单次禁用
-- [ ] D.08 配额：单 session max 10 张（防递归截图）
-- [ ] D.09 `<MaskRegion>` + `useMaskedRef()` —— 自动黑掉敏感区
-- [ ] D.10 `setMaskedNode(node)` imperative API
-- [ ] D.11 Dashboard `<AttachmentGallery>` 显示缩略图 + click lightbox
-- [ ] D.12 Lightbox：esc / 左右 / 下载
-- [ ] D.13 SDK tests: 抓屏 < 16ms / 配额触达 / mask 验证
-- [ ] D.14 Dashboard tests: gallery + lightbox
-- [ ] D.15 `docs/sdk-react-native.md` "Screenshot capture" 章节
-- [ ] D.16 SDK 0.6.0 publish + deploy
+- [x] D.01 `@goliapkg/sentori-react-native` peerDep + optionalDep `react-native-view-shot`
+- [x] D.02 `sdk/core/src/types.ts` 加 `Attachment` 类型 + `event.attachments?: AttachmentMeta[]`
+- [x] D.03 `sdk/react-native/src/handlers/screenshot.ts`：`captureRef` → resize 480px → webp q=70 → base64
+- [x] D.04 性能护栏：`InteractionManager.runAfterInteractions(() => requestAnimationFrame(() => ...))`
+- [x] D.05 `sdk/react-native/src/transport.ts` 加 attachment upload pipeline
+- [x] D.06 Upload 失败 silent drop + 内部 metric breadcrumb
+- [x] D.07 `init({ capture: { screenshot: true } })` opt-in；`captureException(err, { screenshot: false })` 单次禁用
+- [x] D.08 配额：单 session max 10 张（防递归截图）
+- [x] D.09 `<MaskRegion>` + `useMaskedRef()` —— 自动黑掉敏感区
+- [x] D.10 `setMaskedNode(node)` imperative API
+- [x] D.11 Dashboard `<AttachmentGallery>` 显示缩略图 + click lightbox
+- [x] D.12 Lightbox：esc / 左右 / 下载
+- [x] D.13 SDK tests: 抓屏 < 16ms / 配额触达 / mask 验证
+- [x] D.14 Dashboard tests: gallery + lightbox
+- [x] D.15 `docs/sdk-react-native.md` "Screenshot capture" 章节
+- [x] D.16 SDK 0.6.0 publish + deploy
 
 #### sub-E — iOS native（1.5d）
 
-- [ ] E.01 `sdk/react-native/ios/SentoriScreenshotCache.swift` —— background queue 每 5s 抓 key window snapshot 缓存
-- [ ] E.02 `UIGraphicsImageRenderer` 渲染（iOS 10+）
-- [ ] E.03 PNG → WebP via libwebp (SPM dep)
-- [ ] E.04 Native crash handler 触发时序列化 `cachedSnapshot` 到 `Documents/sentori-pending-screenshot.webp`
-- [ ] E.05 App 下次启动 SDK init 检测 pending file 上传 + 删
-- [ ] E.06 View tree：UIView 递归走 subviews，记 `{ className, accessibilityLabel, frame, alpha, isHidden, children }` depth 10
-- [ ] E.07 同样写 pending file 下次上传（kind=viewTree）
-- [ ] E.08 Bridge expose `captureNativeScreenshot()` 给 JS（非 crash 路径的 native error）
-- [ ] E.09 性能护栏：每次抓屏后 `usleep(50_000)` 让 CPU
-- [ ] E.10 XCTest unit：抓屏 + webp encode < 30ms 95p
-- [ ] E.11 Manual smoke：触发 native crash → 重启 → dashboard 看到 attachment
+- [x] E.01 `sdk/react-native/ios/SentoriScreenshotCache.swift` —— background queue 每 5s 抓 key window snapshot 缓存
+- [x] E.02 `UIGraphicsImageRenderer` 渲染（iOS 10+）
+- [x] E.03 PNG → WebP via libwebp (SPM dep)
+- [x] E.04 Native crash handler 触发时序列化 `cachedSnapshot` 到 `Documents/sentori-pending-screenshot.webp`
+- [x] E.05 App 下次启动 SDK init 检测 pending file 上传 + 删
+- [x] E.06 View tree：UIView 递归走 subviews，记 `{ className, accessibilityLabel, frame, alpha, isHidden, children }` depth 10
+- [x] E.07 同样写 pending file 下次上传（kind=viewTree）
+- [x] E.08 Bridge expose `captureNativeScreenshot()` 给 JS（非 crash 路径的 native error）
+- [x] E.09 性能护栏：每次抓屏后 `usleep(50_000)` 让 CPU
+- [x] E.10 XCTest unit：抓屏 + webp encode < 30ms 95p
+- [x] E.11 Manual smoke：触发 native crash → 重启 → dashboard 看到 attachment
 
 #### sub-F — Android native（1.5d）
 
-- [ ] F.01 `sdk/react-native/android/.../SentoriScreenshotCache.kt`
-- [ ] F.02 `PixelCopy.request` 异步抓屏（不阻塞主线程）
-- [ ] F.03 Bitmap → WebP via `Bitmap.compress(WEBP_LOSSY, 70, stream)` (Android 11+)
-- [ ] F.04 5s 后台缓存写文件 `getFilesDir()/sentori-pending-screenshot.webp`
-- [ ] F.05 JVM crash handler 触发时 in-memory bitmap 落盘
-- [ ] F.06 NDK crash：signal handler 仅记 timestamp，view 信息从最近 cache 拿
-- [ ] F.07 **ANR 抓屏**：Phase 22 ANR detector trigger → 调 PixelCopy（非主线程能跑）
-- [ ] F.08 View tree：`Activity.getWindow().getDecorView()` 递归 children，记 `{ className, contentDescription, bounds, visibility, children }`
-- [ ] F.09 App 下次启动检测 pending file 上传 + delete
-- [ ] F.10 Instrumented test：PixelCopy 抓屏 < 50ms 95p
-- [ ] F.11 Manual smoke：模拟 ANR（Debug.sleep 6s）→ ANR issue 带 screenshot
+- [x] F.01 `sdk/react-native/android/.../SentoriScreenshotCache.kt`
+- [x] F.02 `PixelCopy.request` 异步抓屏（不阻塞主线程）
+- [x] F.03 Bitmap → WebP via `Bitmap.compress(WEBP_LOSSY, 70, stream)` (Android 11+)
+- [x] F.04 5s 后台缓存写文件 `getFilesDir()/sentori-pending-screenshot.webp`
+- [x] F.05 JVM crash handler 触发时 in-memory bitmap 落盘
+- [x] F.06 NDK crash：signal handler 仅记 timestamp，view 信息从最近 cache 拿
+- [x] F.07 **ANR 抓屏**：Phase 22 ANR detector trigger → 调 PixelCopy（非主线程能跑）
+- [x] F.08 View tree：`Activity.getWindow().getDecorView()` 递归 children，记 `{ className, contentDescription, bounds, visibility, children }`
+- [x] F.09 App 下次启动检测 pending file 上传 + delete
+- [x] F.10 Instrumented test：PixelCopy 抓屏 < 50ms 95p
+- [x] F.11 Manual smoke：模拟 ANR（Debug.sleep 6s）→ ANR issue 带 screenshot
 
 #### sub-G — UI Tree Skeleton dashboard（2d）
 
-- [ ] G.01 协议 schema：`viewTree: { rootId, nodes: { [id]: { type, name, props_summary, children: id[], file?, line? } } }`
-- [ ] G.02 SDK JS：React DevTools-style Fiber walker（仅 public unstable API，参考 react-devtools-core）
-- [ ] G.03 SDK JS 抓 tree 用 `requestIdleCallback` polyfill，时间预算 5ms，超 deadline cut 标 `…`
-- [ ] G.04 SDK JS 敏感 prop 默认 redact：`password`/`token`/`secret`/`apiKey`/`creditCard`（regex），值 → `'<redacted>'`
-- [ ] G.05 iOS / Android 用 native tree（sub-E.06 / sub-F.08）payload
-- [ ] G.06 Server: viewTree 作为 attachment kind 上传（不塞 event JSON）
-- [ ] G.07 Dashboard `<ViewTreePanel attachmentRef={...} />`，issue 详情新 tab "View at error"
-- [ ] G.08 react-window virtualization 支持 1000+ nodes
-- [ ] G.09 Tree 功能：折叠 / 展开 / 搜索（节点名 + 文件名） / 高亮当前 stack frame
-- [ ] G.10 Hover 联动：hover stack frame ↔ view tree node（基于 file + line 匹配）
-- [ ] G.11 Tests: 1000-node 渲染 < 100ms, search 即时响应
-- [ ] G.12 Tests: 敏感 prop redact 单元
-- [ ] G.13 Deploy
+- [x] G.01 协议 schema：`viewTree: { rootId, nodes: { [id]: { type, name, props_summary, children: id[], file?, line? } } }`
+- [x] G.02 SDK JS：React DevTools-style Fiber walker（仅 public unstable API，参考 react-devtools-core）
+- [x] G.03 SDK JS 抓 tree 用 `requestIdleCallback` polyfill，时间预算 5ms，超 deadline cut 标 `…`
+- [x] G.04 SDK JS 敏感 prop 默认 redact：`password`/`token`/`secret`/`apiKey`/`creditCard`（regex），值 → `'<redacted>'`
+- [x] G.05 iOS / Android 用 native tree（sub-E.06 / sub-F.08）payload
+- [x] G.06 Server: viewTree 作为 attachment kind 上传（不塞 event JSON）
+- [x] G.07 Dashboard `<ViewTreePanel attachmentRef={...} />`，issue 详情新 tab "View at error"
+- [x] G.08 react-window virtualization 支持 1000+ nodes
+- [x] G.09 Tree 功能：折叠 / 展开 / 搜索（节点名 + 文件名） / 高亮当前 stack frame
+- [x] G.10 Hover 联动：hover stack frame ↔ view tree node（基于 file + line 匹配）
+- [x] G.11 Tests: 1000-node 渲染 < 100ms, search 即时响应
+- [x] G.12 Tests: 敏感 prop redact 单元
+- [x] G.13 Deploy
 
 #### sub-H — Cross-stack + AI-export + 抛光（1d）
 
-- [ ] H.01 Cross-stack cause chain：event 加 `nativeError?: { issueId }`，dashboard 嵌入 native issue 卡片
-- [ ] H.02 "Copy as markdown" 按钮 —— stack + 源码 ±10 + breadcrumbs + view tree 自动生成描述
-- [ ] H.03 关联 issue 推荐 side panel：同文件 / 同 fingerprint stem / 同 release（`/admin/api/issues/<id>/related`）
-- [ ] H.04 ANR / hang 专用 banner：`kind=anr|hang` 时顶部紫色卡片 "Frozen for 5.2s on main thread"
-- [ ] H.05 Trace ↔ issue 双跳：trace 详情每 event 加 "→ issue" 链接
-- [ ] H.06 Keyboard shortcut：`o` open in editor, `g h` go to github, `c` copy markdown
-- [ ] H.07 Tests + deploy
+- [x] H.01 Cross-stack cause chain：event 加 `nativeError?: { issueId }`，dashboard 嵌入 native issue 卡片
+- [x] H.02 "Copy as markdown" 按钮 —— stack + 源码 ±10 + breadcrumbs + view tree 自动生成描述
+- [x] H.03 关联 issue 推荐 side panel：同文件 / 同 fingerprint stem / 同 release（`/admin/api/issues/<id>/related`）
+- [x] H.04 ANR / hang 专用 banner：`kind=anr|hang` 时顶部紫色卡片 "Frozen for 5.2s on main thread"
+- [x] H.05 Trace ↔ issue 双跳：trace 详情每 event 加 "→ issue" 链接
+- [x] H.06 Keyboard shortcut：`o` open in editor, `g h` go to github, `c` copy markdown
+- [x] H.07 Tests + deploy
 
 #### sub-I — 性能 / 隐私 / 文档收尾（0.5d）
 
-- [ ] I.01 SDK perf benchmark：`captureException + screenshot + viewTree` 整链 < 100ms（assert）
-- [ ] I.02 Dashboard perf：issue 详情 LCP < 1.2s（lazy load 所有 attachment）
-- [ ] I.03 `docs/sdk-react-native.md` 专章 "Diagnostics in depth: screenshots, view trees, IDE jump"
-- [ ] I.04 `docs/self-hosting.md` 加 `SENTORI_ATTACHMENT_DIR` + 截图存储 quota 设置
-- [ ] I.05 ROADMAP.md + CHANGELOG.md 写 Phase 42 完整 summary
-- [ ] I.06 Insight 通知：升 0.6.0 SDK + 享受新功能
+- [x] I.01 SDK perf benchmark：`captureException + screenshot + viewTree` 整链 < 100ms（assert）
+- [x] I.02 Dashboard perf：issue 详情 LCP < 1.2s（lazy load 所有 attachment）
+- [x] I.03 `docs/sdk-react-native.md` 专章 "Diagnostics in depth: screenshots, view trees, IDE jump"
+- [x] I.04 `docs/self-hosting.md` 加 `SENTORI_ATTACHMENT_DIR` + 截图存储 quota 设置
+- [x] I.05 ROADMAP.md + CHANGELOG.md 写 Phase 42 完整 summary
+- [x] I.06 Insight 通知：升 0.6.0 SDK + 享受新功能
 
 ### 总工程量
 

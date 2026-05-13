@@ -102,7 +102,7 @@
     },
     "sdk/react-native": {
       "name": "@goliapkg/sentori-react-native",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "dependencies": {
         "@goliapkg/sentori-core": "0.5.0",
       },

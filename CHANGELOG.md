@@ -6,6 +6,101 @@
 
 ---
 
+## v0.6 — Phase 42 — Issue Detail 诊断深度
+
+**Goal:** Issue 详情从「stack + 朴素文本源码」升级成「stack + 高亮源码 + 智能调用链 + 出错截图 + UI tree + cross-stack 串联 + AI export」。覆盖 JS / RN / iOS native / Android native 全栈。9 个 sub-phase (A → I)，每个独立 commit + 多数独立 deploy。
+
+**npm 包**：`@goliapkg/sentori-core@0.5.0`（加 `AttachmentMeta` 类型）+ `@goliapkg/sentori-react-native@0.6.0` (sub-D JS 截图) → `0.6.1` (sub-E iOS native + sub-F Android native)。
+
+**设计原则四条铁律**：零热路径成本 / 跨 native+JS 统一表达 / 隐私默认安全 / 可扩展 attachment 模型。
+
+### sub-A — Dashboard 视觉强化（无 SDK 改动）✅
+
+- `@wooorm/starry-night` syntax highlighting，GitHub-tone 配色，按 `data-theme` 而非 `prefers-color-scheme` 切换；`<SourceCode>` 组件每行 div + 行号 + `#L<n>` anchor
+- `FrameRow` ±3 行 inline source + `FrameSourceDrawer` 全文 + auto-scroll
+- `packageOf(file)` 推断 npm package（@scope、react-native 双布局、Metro lazy-bundle %2F 编码）
+- `VendorFold` 按 package group："react-native (8 frames)" 而非 "11 library frames"
+- `<FrameRoleBadge>` you / framework / lib 颜色编码
+- `CauseChain` accent-tinted 卡片 + "↪ caused by" 标签
+- `source_repo_url` per-project（migration 0031 + PATCH endpoint）+ frame 旁 "↗ src" 链接（GitHub/GitLab/Bitbucket/Gitea 通用 `/blob/<ref>/<path>#L<line>`）
+- `<OpenInEditorButton>` URI scheme jump，per-user 8 内置 IDE + Custom 模板（Insight 反馈后加，原 vscode:// hardcoded → user-pickable）
+- `<IssueDetailSkeleton>` 替代 LoadingState
+
+### sub-B — Source / context lazy load ✅
+
+- ingest 时存 ±3 行（缩自 ±5），event payload 缩 40%
+- frame source endpoint 加 `lines` query 参数（默认 5、上限 50），Cache-Control immutable+1h
+- `<FrameSourceDrawer>` ±5/±20/±50 toggle，`placeholderData: prev` 切换无 loading flash
+
+### sub-C — Attachment 基础设施 ✅
+
+- migration 0032 `event_attachments` 表
+- `AttachmentStore` trait + `LocalFsAttachmentStore` (`$SENTORI_ATTACHMENT_DIR`) + `NoopAttachmentStore` (env 未设 → 503)
+- `POST /v1/events/{id}/attachments/{kind}` multipart 500KB 限 + mediaType 白名单按 kind
+- `GET /admin/api/events/{id}/attachments/{ref}` admin gate + Cache-Control immutable
+- ingest 校验 `event.attachments[].ref` 必须签发给同一 (event_id, project_id)，不匹配静默丢
+- retention sweep `prune_attachments`：events_cutoff 之前同步清 DB 行 + 磁盘 blob
+
+### sub-D — JS / RN 截图 (SDK 0.6.0) ✅
+
+- `init({ capture: { screenshot: true } })` opt-in
+- `captureScreenshot()` `InteractionManager` + `rAF` 双 yield，1.5s timeout，480px JPEG q=70
+- `uploadAttachment` RN-style FormData (`{uri,type,name}`)
+- prod 配额 10 张/session，dev 不限
+- `<MaskRegion>` 声明式 + `setMaskedNode`/`unsetMaskedNode` 命令式
+- dashboard `<AttachmentGallery>` + `<Lightbox>` (esc / ← → / download)
+
+### sub-E — iOS native (SDK 0.6.1) ✅
+
+- `SentoriScreenshotCapture.swift`：`UIGraphicsImageRenderer` 抓 key window，480px → JPEG q=70；`UIView` 递归 view tree depth=10 / 1500 nodes 上限，accessibilityLabel 200B 截断
+- NSException handler 同步抓屏 + view tree → event JSON 里塞 `_pendingAttachments` → JS 下次启动 drain 时上传 → 写回 `event.attachments[].ref` → enqueue
+- XCTest stub（XCTest 在 CLI Swift 缺 UIKit/XCTest module，IDE 内 ⌘U 跑）
+
+### sub-F — Android native (SDK 0.6.1) ✅
+
+- `SentoriScreenshotCapture.kt`：`ActivityLifecycleCallbacks` 跟踪 foreground Activity；`PixelCopy.request` API 24+ GPU 异步抓（不阻塞主线程，ANR 时也能抓）；Android 11+ `WEBP_LOSSY` / 老版本 JPEG；DecorView 递归 view tree
+- 接入 `SentoriCrashHandler` + `SentoriAnrWatchdog`（ANR detector trigger 也走 attachPending）
+- Robolectric 单测（GPU/PixelCopy 部分留 instrumentation test）
+
+### sub-G — View Tree Skeleton dashboard ✅
+
+- `<ViewTreePanel>` 折叠树 + 文本搜索（name / accessibilityLabel / contentDescription），命中祖先链自动展开
+- props_summary 内联前两项（a11y label / frame / alpha / hidden）
+- `<AttachmentGallery>` 把 viewTree kind 从 pill 升级为内联 `<details>` 包 `<ViewTreePanel>`
+
+### sub-H — Cross-stack + AI-export + 抛光 ✅（H.01 / H.03 留 v0.6.x patch）
+
+- `<CopyMarkdownButton>` 把 event 渲染成 paste-into-AI Markdown（meta + 5 in-app frames 带语法 fence + ±5 行源码 + 红箭头标 at-line + breadcrumbs 尾 8 条）；clipboard 失败 fallback `prompt()`
+- ANR / hang 紫色 banner：`payload.kind === 'anr'` 时 stack 区顶部加 accent-tinted 卡片 + "Hang"(iOS) / "ANR"(Android) 标签
+- trace 详情 span aside 加 "Events on this span" → issue 反链
+- `c` 快捷键触发 Copy as markdown
+
+### sub-I — 性能 / 隐私 / 文档收尾 ✅
+
+- `docs/sdk-react-native.md` "Screenshot capture (opt-in)" 章节 + docs-site mirror
+- `docs/self-hosting.md` `SENTORI_ATTACHMENT_DIR` + Data retention 段含 attachments 行 + 容量估算
+- ROADMAP + CHANGELOG 完整 summary（这条）
+
+### 显式延后到 v0.6.x patch
+
+- **H.01 Cross-stack cause chain**：`event.nativeError?: {issueId}` 协议字段 + dashboard 嵌入 native issue 卡片 —— 需要 SDK + server + dashboard 三处协议改动，工作量大于抛光级别
+- **H.03 Related issues panel**：新 server endpoint `/admin/api/issues/<id>/related`（同 fingerprint stem / 同 file / 同 release）+ side panel UI
+- **G.10 hover frame ↔ tree node 联动**：UI polish，等 Insight 真实用 view tree 后看是否要
+- **G.02-G.04 SDK JS Fiber walker**：native 已给 RN/Fabric tree；纯 JS walker 是 nice-to-have
+- **I.01 SDK perf benchmark < 100ms / I.02 Dashboard LCP < 1.2s**：需要 perf 测试基础设施，待 Insight 真实流量进来后基于实际 P95 调
+
+### Insight 升级路径
+
+```sh
+bun add @goliapkg/sentori-react-native@latest   # 0.6.1
+# opt-in 截图：init({ capture: { screenshot: true } })
+# 用 <MaskRegion> 包敏感 UI（信用卡 / 私聊 / OTP 输入框）
+```
+
+服务端：`SENTORI_ATTACHMENT_DIR=/apps/sentori/attachments` 设上让 multipart endpoint 进入工作状态（未设 → 503 `attachmentsDisabled` SDK 端 silent drop，attachments 不影响 event 本身落地）。
+
+---
+
 ## v0.5.7 — `sentori-react-native` hotfix: RN 0.83 new-arch dev-symbolicate
 
 **Reported by Insight dogfood (RN 0.83.6 + Hermes + Fabric/TurboModule new arch).** Dev-mode errors were arriving in dashboard as fully minified stacks (`_temp5`, `anonymous`, `_performTransitionSideEffects`) despite 0.5.6 advertising automatic Metro `/symbolicate`. Root cause: SDK read `NativeModules.SourceCode.scriptURL`, which on the new architecture is `undefined` (constants are not hoisted onto the module object — they live behind `getConstants()`). With `scriptURL` undefined, `metroSymbolicateUrl()` returned null and the SDK silently skipped symbolication.
