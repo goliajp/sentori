@@ -6,6 +6,16 @@
 
 ---
 
+## v0.5.7 — `sentori-react-native` hotfix: RN 0.83 new-arch dev-symbolicate
+
+**Reported by Insight dogfood (RN 0.83.6 + Hermes + Fabric/TurboModule new arch).** Dev-mode errors were arriving in dashboard as fully minified stacks (`_temp5`, `anonymous`, `_performTransitionSideEffects`) despite 0.5.6 advertising automatic Metro `/symbolicate`. Root cause: SDK read `NativeModules.SourceCode.scriptURL`, which on the new architecture is `undefined` (constants are not hoisted onto the module object — they live behind `getConstants()`). With `scriptURL` undefined, `metroSymbolicateUrl()` returned null and the SDK silently skipped symbolication.
+
+**Fix:** prefer `react-native/Libraries/Core/Devtools/getDevServer`, the same helper RN's own LogBox and `symbolicateStackTrace` use internally. It calls `NativeSourceCode.getConstants().scriptURL` under the hood and works on both old and new arch. Falls back to `NativeModules.SourceCode.getConstants().scriptURL` and then the legacy `.scriptURL` property for older RN versions.
+
+**npm**: `@goliapkg/sentori-react-native@0.5.7` (no other packages changed).
+
+---
+
 ## v0.5 — Scale + Readable Errors + Dashboard sidebar（Phase 39-41）
 
 **Goal:** Insight dogfood 把 v0.4 的盲区都打了出来 —— trace 不归组、错误栈不可读、左侧没导航。v0.5 三条主线就是补这些洞，对应 dashboard 上一线员工真能用的 traces 列表、`src/Foo.tsx:42` 的栈渲染、Linear 风左侧 sidebar。

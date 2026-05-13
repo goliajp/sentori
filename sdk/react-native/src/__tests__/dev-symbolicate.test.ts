@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 
 import { symbolicateErrorViaMetro, symbolicateStackViaMetro } from '../handlers/dev-symbolicate';
 import type { Frame, SentoriError } from '../types';
@@ -104,6 +104,39 @@ describe('symbolicateStackViaMetro', () => {
         status: 200,
       })) as typeof fetch;
     expect(await symbolicateStackViaMetro([minified(1), minified(2)], { url: URL })).toBeNull();
+  });
+});
+
+describe('metroSymbolicateUrl resolution (RN 0.83 new-arch regression)', () => {
+  // Without `opts.url`, the function must resolve a real Metro URL.
+  // RN 0.83 + new architecture leaves `NativeModules.SourceCode.scriptURL`
+  // undefined; the fix is to prefer RN's own `getDevServer()` helper,
+  // which internally calls `NativeSourceCode.getConstants().scriptURL`
+  // and works on both old and new arch.
+  test('prefers getDevServer() when available (works on new arch)', async () => {
+    mock.module('react-native/Libraries/Core/Devtools/getDevServer', () => ({
+      default: () => ({ bundleLoadedFromServer: true, url: 'http://192.168.1.100:8081/' }),
+    }));
+    const calls: string[] = [];
+    globalThis.fetch = (async (url: Request | string | URL) => {
+      calls.push(String(url));
+      return new Response(metroReply([{ col: 1, file: '/proj/src/a.ts', fn: 'a', line: 5 }]), {
+        headers: { 'content-type': 'application/json' },
+        status: 200,
+      });
+    }) as typeof fetch;
+
+    const out = await symbolicateStackViaMetro([minified(1)]);
+    expect(calls[0]).toBe('http://192.168.1.100:8081/symbolicate');
+    expect(out![0]?.file).toBe('/proj/src/a.ts');
+  });
+
+  test('returns null when getDevServer says bundle was not loaded from Metro', async () => {
+    mock.module('react-native/Libraries/Core/Devtools/getDevServer', () => ({
+      default: () => ({ bundleLoadedFromServer: false, url: 'http://localhost:8081/' }),
+    }));
+    // No fallback chain hit either (NativeModules require still throws in bun env)
+    expect(await symbolicateStackViaMetro([minified(1)])).toBeNull();
   });
 });
 

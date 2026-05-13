@@ -21,16 +21,47 @@ type MetroFrame = {
 };
 
 /** Resolve `<devServer>/symbolicate`, or null if we're not running
- *  from a Metro dev server (release build, or not in RN). */
+ *  from a Metro dev server (release build, or not in RN).
+ *
+ *  Order matters:
+ *    1. `react-native/Libraries/Core/Devtools/getDevServer` — the same
+ *       helper LogBox + RN's own symbolicateStackTrace use. Works under
+ *       both the legacy bridge and the new architecture (TurboModule),
+ *       because internally it calls `NativeSourceCode.getConstants()`
+ *       which is the correct path on new arch.
+ *    2. `NativeModules.SourceCode.getConstants().scriptURL` — direct
+ *       TurboModule fallback if (1) ever moves.
+ *    3. `NativeModules.SourceCode.scriptURL` — legacy bridge (pre-new-
+ *       arch RN). On new arch this property is `undefined` because
+ *       constants aren't hoisted onto the module object — which is
+ *       exactly the symptom Insight hit on RN 0.83 + new arch.
+ */
 function metroSymbolicateUrl(): null | string {
   try {
-    // NativeModules.SourceCode.scriptURL is the bundle URL — an
-    // http(s) URL in dev, a `file://` path in a release build.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require('react-native/Libraries/Core/Devtools/getDevServer') as {
+      default?: () => { bundleLoadedFromServer: boolean; url: string };
+    };
+    const getDevServer = mod.default ?? (mod as unknown as () => { bundleLoadedFromServer: boolean; url: string });
+    const ds = getDevServer();
+    if (ds.bundleLoadedFromServer && typeof ds.url === 'string') {
+      return ds.url.replace(/\/$/, '') + '/symbolicate';
+    }
+  } catch {
+    // Older RN / non-RN runtime / path moved → fall through to NativeModules.
+  }
+  try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const rn = require('react-native') as {
-      NativeModules?: { SourceCode?: { scriptURL?: string } };
+      NativeModules?: {
+        SourceCode?: {
+          getConstants?: () => { scriptURL?: string };
+          scriptURL?: string;
+        };
+      };
     };
-    const scriptURL = rn.NativeModules?.SourceCode?.scriptURL;
+    const sc = rn.NativeModules?.SourceCode;
+    const scriptURL = sc?.scriptURL ?? sc?.getConstants?.()?.scriptURL;
     if (!scriptURL || !/^https?:\/\//.test(scriptURL)) return null;
     const u = new URL(scriptURL);
     return `${u.protocol}//${u.host}/symbolicate`;
