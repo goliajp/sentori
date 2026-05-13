@@ -19,6 +19,13 @@ export type BreadcrumbType = 'custom' | 'log' | 'nav' | 'net' | 'user'
 
 export type Event = {
   app: App
+  /** Phase 42 sub-C.05 / sub-D.02: references to blobs previously
+   *  uploaded via `POST /v1/events/<id>/attachments/<kind>`. Server
+   *  validates each `ref` matches a row it issued for this event_id;
+   *  unknown refs are silently dropped (the rest of the event still
+   *  lands). Empty / absent on every event today; sub-D / E / F / G
+   *  populate this as native + JS layers ship attachment capture. */
+  attachments?: AttachmentMeta[]
   breadcrumbs?: Breadcrumb[]
   device: Device
   environment: string
@@ -33,6 +40,26 @@ export type Event = {
   timestamp: string
   traceId?: null | string
   user?: null | User
+}
+
+/**
+ * Phase 42 sub-D.02 — wire-format reference to an already-uploaded
+ * blob. The SDK uploads the binary first (multipart POST), the
+ * server returns a `ref` (UUID it generated), and the SDK echoes
+ * the ref back inside the next `event.attachments[]`.
+ */
+export type AttachmentKind = 'logTail' | 'screenshot' | 'stateSnapshot' | 'viewTree'
+export type AttachmentSource = 'android' | 'ios' | 'js'
+
+export type AttachmentMeta = {
+  /** Server-issued UUID — the only field ingest actually trusts. */
+  ref: string
+  kind: AttachmentKind
+  /** Echoed back so the dashboard can render the right viewer
+   *  without a second round-trip. */
+  mediaType?: string
+  sizeBytes?: number
+  source?: AttachmentSource
 }
 
 export type Device = {

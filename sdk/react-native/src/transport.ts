@@ -241,3 +241,80 @@ export const sendSessionPing = async (
     // best-effort
   }
 };
+
+// ──────────────────────────────────────────────────────────────────
+// Phase 42 sub-D.05 — attachment upload pipeline
+// ──────────────────────────────────────────────────────────────────
+
+/**
+ * Upload a base64-encoded binary blob as an attachment for a known
+ * event. The event must NOT have been POSTed yet — the server-side
+ * ingest validation in events.rs only honours `event.attachments[].ref`
+ * when the matching `event_attachments` row already exists for the
+ * same (event_id, project_id). Caller's contract:
+ *
+ *   1. Generate `event.id` (uuidV7).
+ *   2. Build the blob (e.g. via `captureScreenshot`).
+ *   3. `await uploadAttachment(...)` → get `{ ref, sizeBytes, mediaType }`.
+ *   4. Push `{ ref, kind, ... }` into `event.attachments` then enqueue.
+ *
+ * Returns `null` on any non-fatal failure (network down, store
+ * disabled, 4xx, timeout). The error event still ships without the
+ * attachment so we never lose the actual crash.
+ */
+export const uploadAttachment = async (
+  eventId: string,
+  kind: import('./types').AttachmentMeta['kind'],
+  blob: { base64: string; mediaType: string },
+  opts: { source?: 'android' | 'ios' | 'js' } = {},
+): Promise<import('./types').AttachmentMeta | null> => {
+  const config = getConfig();
+  if (!config) return null;
+  const url = `${config.ingestUrl}/v1/events/${encodeURIComponent(eventId)}/attachments/${encodeURIComponent(kind)}`;
+
+  // RN-style multipart: `{ uri, type, name }` is what the native
+  // FormData implementation expects for a file part — the bridge
+  // serializes a data: URI without us having to allocate a Blob.
+  const form = new FormData();
+  form.append(
+    'file',
+    {
+      name: filenameFor(kind, blob.mediaType),
+      type: blob.mediaType,
+      uri: `data:${blob.mediaType};base64,${blob.base64}`,
+    } as unknown as Blob,
+  );
+  form.append('source', opts.source ?? 'js');
+
+  try {
+    const resp = await fetch(url, {
+      body: form,
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        'Sentori-Sdk': `react-native/${SDK_VERSION}`,
+      },
+      method: 'POST',
+    });
+    if (resp.status !== 201) return null;
+    const j = (await resp.json()) as {
+      refId: string;
+      sizeBytes: number;
+      mediaType: string;
+      kind: string;
+    };
+    return {
+      kind,
+      mediaType: j.mediaType,
+      ref: j.refId,
+      sizeBytes: j.sizeBytes,
+      source: opts.source ?? 'js',
+    };
+  } catch {
+    return null;
+  }
+};
+
+function filenameFor(kind: string, mediaType: string): string {
+  const ext = mediaType.split('/')[1] ?? 'bin';
+  return `${kind}.${ext}`;
+}

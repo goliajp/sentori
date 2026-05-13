@@ -1,5 +1,8 @@
 export type {
   App,
+  AttachmentKind,
+  AttachmentMeta,
+  AttachmentSource,
   Breadcrumb,
   BreadcrumbType,
   CaptureExtras,

@@ -28,6 +28,11 @@ export type InitOptions = {
      *  foreground (`AppState` → `active`), ends it on background.
      *  Drives crash-free rate. Set `false` to opt out. */
     sessions?: boolean;
+    /** Phase 42 sub-D.07: capture a screenshot of the current screen
+     *  on `captureException`. Opt-in — requires `react-native-view-shot`
+     *  installed and `<MaskRegion>` placed over any sensitive UI. The
+     *  image is webp q=70 480 px max, < 100 KB typical. */
+    screenshot?: boolean;
   };
 };
 
@@ -51,6 +56,7 @@ export const init = (options: InitOptions): void => {
     environment: env,
     ingestUrl: options.ingestUrl ?? DEFAULT_INGEST_URL,
     enabled: true,
+    screenshotsEnabled: options.capture?.screenshot === true,
   });
 
   // Tell the native crash handler about the config so the JSON it writes

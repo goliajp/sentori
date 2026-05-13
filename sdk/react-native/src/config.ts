@@ -4,6 +4,8 @@ export type Config = {
   environment: string;
   ingestUrl: string;
   enabled: boolean;
+  /** Phase 42 sub-D.07: opt-in screenshot capture on captureException. */
+  screenshotsEnabled: boolean;
 };
 
 let _config: Config | null = null;

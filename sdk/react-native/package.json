@@ -41,7 +41,8 @@
   "peerDependencies": {
     "expo-modules-core": ">=2.0",
     "react": ">=18",
-    "react-native": ">=0.74"
+    "react-native": ">=0.74",
+    "react-native-view-shot": ">=3.8"
   },
   "peerDependenciesMeta": {
     "@react-native-async-storage/async-storage": {
@@ -49,11 +50,15 @@
     },
     "expo-modules-core": {
       "optional": true
+    },
+    "react-native-view-shot": {
+      "optional": true
     }
   },
   "optionalDependencies": {
     "@react-native-async-storage/async-storage": ">=1.23",
-    "expo-modules-core": ">=2.0"
+    "expo-modules-core": ">=2.0",
+    "react-native-view-shot": ">=3.8"
   },
   "devDependencies": {
     "@types/bun": "latest",
