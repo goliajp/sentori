@@ -1,6 +1,7 @@
 pub mod api;
 pub mod attachments;
 pub mod audit;
+pub mod integrations;
 pub mod auth;
 pub mod db;
 pub mod digest;

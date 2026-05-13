@@ -94,6 +94,20 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}",
             patch(api::projects::patch_project),
         )
+        // Phase 43 sub-A.03: typed integration adapters.
+        .route("/integrations", get(api::integrations::list_integrations))
+        .route(
+            "/integrations/{kind}/connect",
+            get(api::integrations::connect),
+        )
+        .route(
+            "/integrations/{kind}/callback",
+            get(api::integrations::callback),
+        )
+        .route(
+            "/integrations/{kind}",
+            axum::routing::delete(api::integrations::revoke),
+        )
         .route(
             "/projects/{project_id}/teams",
             get(api::teams::list_project_teams),

@@ -59,6 +59,9 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 # fine for static dispatch but the AttachmentStore is held as a
 # trait object so we use async_trait.
 async-trait = "0.1"
+# Phase 43 sub-A.04: percent-encode OAuth redirect / state in the
+# Linear authorise URL builder. Tiny crate, no transitive deps.
+urlencoding = "2"
 
 [dev-dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["json"] }
