@@ -389,6 +389,8 @@ function StackTab({
           platform={payload.platform}
           projectId={projectId}
           release={event.release}
+          stack={payload.error.stack}
+          symbolication={payload.symbolication}
         />
         {event.traceId && (
           <div className="border-border bg-bg-tertiary/30 mb-3 flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-[12px]">
@@ -406,6 +408,7 @@ function StackTab({
         )}
         <StackList
           onFrameClick={(idx) => setOpenFrame({ cause: 0, frame: idx })}
+          platform={payload.platform}
           stack={payload.error.stack}
           symbolication={payload.symbolication}
         />
@@ -414,6 +417,7 @@ function StackTab({
             depth={1}
             error={payload.error.cause}
             onFrameClick={(cause, frame) => setOpenFrame({ cause, frame })}
+            platform={payload.platform}
             symbolication={payload.symbolication}
           />
         )}
@@ -731,11 +735,15 @@ function UnsymbolicatedHint({
   platform,
   projectId,
   release,
+  stack,
+  symbolication,
 }: {
   orgSlug: string
   platform: string
   projectId: string
   release: string
+  stack: Frame[]
+  symbolication: Symbolication
 }) {
   const { data } = useQuery({
     enabled: !!release && !!projectId,
@@ -744,6 +752,16 @@ function UnsymbolicatedHint({
     staleTime: 60_000,
   })
   if (!data) return null
+  // Already symbolicated server-side against an uploaded release map.
+  if (symbolication?.releaseHasMap) return null
+  // For JS / RN, the stack can also be symbolicated client-side — in
+  // dev mode the SDK asks Metro's `/symbolicate` before sending, so
+  // frames arrive with `src/...` paths even though the release has no
+  // uploaded map. Detect by the *absence* of any bundle-URL frame:
+  // raw stacks always carry at least one `http(s)://...bundle?...` or
+  // `*.jsbundle` frame.
+  if (stackLooksSymbolicated(platform, stack)) return null
+
   const needsSourcemap =
     (platform === 'javascript' || platform === 'react' || platform === 'react-native') &&
     data.sourcemaps.length === 0
@@ -863,6 +881,35 @@ function Section({
 
 type Symbolication = { releaseHasMap: boolean } | undefined
 
+/**
+ * Heuristic: does this stack already look symbolicated?
+ *
+ * For JS / RN, a *raw* stack always carries at least one frame whose
+ * `file` is a Metro bundle URL (`http(s)://…/index.bundle?…`) or a
+ * `*.jsbundle` / `*.bundle` local path (Hermes bytecode). If none of
+ * the frames match those shapes, every frame has a real-looking source
+ * path — either server-side symbolicated against an uploaded release
+ * map, or client-side symbolicated by the SDK in dev mode (Metro
+ * `/symbolicate`). Both cases mean the "upload a source map" prompts
+ * are unhelpful and should be suppressed.
+ *
+ * For other platforms (iOS / Android native) the absence of a bundle
+ * frame doesn't imply symbolication — raw native frames are addresses,
+ * not bundle URLs — so we conservatively return false and let the
+ * artifact-based check decide.
+ */
+function stackLooksSymbolicated(platform: string | undefined, stack: Frame[]): boolean {
+  if (stack.length === 0) return false
+  if (platform !== 'javascript' && platform !== 'react' && platform !== 'react-native') {
+    return false
+  }
+  return !stack.some(
+    (f) =>
+      typeof f.file === 'string' &&
+      (/^https?:\/\/.*\.bundle/.test(f.file) || /\.(?:jsbundle|bundle)$/.test(f.file))
+  )
+}
+
 /** Frame header + (for in-app frames) an inline source snippet from
  *  `pre/context/postContext`. Clicking opens the full-file drawer. */
 function FrameRow({ frame, idx, onClick }: { frame: Frame; idx: number; onClick?: () => void }) {
@@ -967,10 +1014,12 @@ function VendorFold({
 
 export function StackList({
   onFrameClick,
+  platform,
   stack,
   symbolication,
 }: {
   onFrameClick?: (frameIdx: number) => void
+  platform?: string
   stack: Frame[]
   symbolication?: Symbolication
 }) {
@@ -993,6 +1042,14 @@ export function StackList({
     }
   }
   const anyInAppMissingSource = stack.some((f) => f.inApp && f.contextLine === undefined)
+  // In dev mode the SDK runs Metro `/symbolicate` itself, so frames
+  // arrive with `src/...` paths but no `contextLine` (the SDK can't
+  // read source files off the dev machine). The "upload a source map"
+  // hint is misleading here — there's nothing to upload for a dev
+  // build. Suppress the hint when the stack already looks symbolicated
+  // and the server says no release map exists.
+  const clientSideSymbolicated =
+    !symbolication?.releaseHasMap && stackLooksSymbolicated(platform, stack)
   return (
     <div>
       <div className="border-border overflow-hidden rounded-md border">
@@ -1004,7 +1061,7 @@ export function StackList({
           )
         )}
       </div>
-      {anyInAppMissingSource && (
+      {anyInAppMissingSource && !clientSideSymbolicated && (
         <p className="text-fg-muted mt-1.5 text-[11px]">
           {symbolication?.releaseHasMap
             ? 'No inline source for some frames — a source map is uploaded for this release, but these frames didn’t resolve through it (wrong build, or outside the map).'
@@ -1024,11 +1081,13 @@ function CauseChain({
   depth,
   error,
   onFrameClick,
+  platform,
   symbolication,
 }: {
   depth: number
   error: SentoriError
   onFrameClick?: (cause: number, frameIdx: number) => void
+  platform?: string
   symbolication?: Symbolication
 }) {
   return (
@@ -1039,6 +1098,7 @@ function CauseChain({
       <div className="mt-2">
         <StackList
           onFrameClick={(i) => onFrameClick?.(depth, i)}
+          platform={platform}
           stack={error.stack}
           symbolication={symbolication}
         />
@@ -1048,6 +1108,7 @@ function CauseChain({
           depth={depth + 1}
           error={error.cause}
           onFrameClick={onFrameClick}
+          platform={platform}
           symbolication={symbolication}
         />
       )}
