@@ -1,6 +1,6 @@
 {
   "name": "@goliapkg/sentori-react",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "React adapter for Sentori \u2014 Provider, ErrorBoundary (resetKeys + render-prop), Suspense, TraceRender, react-router breadcrumbs + auto-tracing.",
   "license": "MIT",
   "homepage": "https://sentori.golia.jp",

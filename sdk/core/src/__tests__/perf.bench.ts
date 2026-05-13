@@ -57,7 +57,7 @@ describe('SDK perf budget', () => {
   test('addBreadcrumb + getBreadcrumbs round-trip < 10 µs/op', () => {
     clearBreadcrumbs()
     const perOp = timed('breadcrumb round-trip', 20_000, () => {
-      addBreadcrumb({ data: { x: 1 }, type: 'custom' })
+      addBreadcrumb('custom', { x: 1 })
       getBreadcrumbs()
     })
     expect(perOp).toBeLessThan(10)
