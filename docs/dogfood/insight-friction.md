@@ -17,10 +17,31 @@
 | v0.5.4 | Dashboard: "No session pings on this release yet" — Insight calls `initSentori` but no sessions ever start | `sentori-react-native`'s `init` didn't wire session lifecycle (the `handlers/lifecycle.ts` AppState binding existed but was never installed). Now `init` opens the cold-start session + installs the AppState binding (`active` → start, `background` → end). Opt out with `capture: { sessions: false }`. **Insight just needs to bump to ≥ 0.5.4** — no app-side code. |
 | v0.5 Phase 40 (planned) | JS error stacks unreadable (`index.bundle:1:288432`); dashboard's "SOURCE MAPS" card prompts `sentori-cli` which doesn't exist yet | End-to-end sourcemap symbolication — SDK captures column/function, `sentori-cli` (new) uploads composed Hermes/Metro maps tagged to the release, server symbolicates at ingest + re-fingerprints, dashboard renders source snippets. Interim: raw `curl` upload to `/admin/api/releases/{name}/sourcemaps` after a `compose-source-maps.js` step. |
 
-**Pending the user:** bump Insight to `@goliapkg/sentori-react-native@0.5.4`,
-re-run, and record here: (a) Traces list aggregates by route? (b) a
-screen's requests show up as one trace? (c) "Health · last 7 days" now
-shows session pings / a crash-free rate?
+**v0.5 finished — the ask for Insight is now two zero-script steps:**
+
+1. `bun add @goliapkg/sentori-react-native@latest` (≥ 0.5.6). Bumping
+   the SDK gets you (a) session pings + crash-free rate (auto-wired in
+   `init`), (b) auto-symbolicated dev errors via Metro `/symbolicate`
+   (so the `_temp5` / `anonymous` frames you saw before become
+   `src/Foo.tsx:42` immediately, no upload needed for dev).
+2. Add one step to your release-build pipeline (per platform):
+   ```bash
+   npx react-native bundle --platform $PLATFORM --dev false --entry-file index.js \
+     --bundle-output main.jsbundle --sourcemap-output main.jsbundle.packager.map
+   npx @goliapkg/sentori-cli react-native upload \
+     --release "<byte-for-byte your init({ release })>" --token "$SENTORI_TOKEN" \
+     --metro-map main.jsbundle.packager.map --hermes-map main.jsbundle.hbc.map \
+     --bundle main.jsbundle
+   ```
+   (`--hermes-map` path may differ by EAS profile / RN version; happy
+   to help locate it.)
+
+After both, prod errors for that release land in the dashboard with
+`src/Foo.tsx:42` titles and inline source snippets ±5 lines around the
+failing line, with vendor frames folded. The Traces list aggregates by
+normalized route, and one screen's requests group into one trace.
+
+Record observations below.
 
 ---
 

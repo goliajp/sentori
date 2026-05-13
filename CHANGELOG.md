@@ -6,6 +6,45 @@
 
 ---
 
+## v0.5 — Scale + Readable Errors + Dashboard sidebar（Phase 39-41）
+
+**Goal:** Insight dogfood 把 v0.4 的盲区都打了出来 —— trace 不归组、错误栈不可读、左侧没导航。v0.5 三条主线就是补这些洞，对应 dashboard 上一线员工真能用的 traces 列表、`src/Foo.tsx:42` 的栈渲染、Linear 风左侧 sidebar。
+
+**反 Sentry 立场延续：** trace 用「时间硬保留窗口 + 窗口内 100% 不采样」，不默认开 head-based / tail-based 采样（schema 简、部署轻、不丢有错的 trace）；source-map 符号化在 ingest 时一次做完 + 按符号化帧重新分组 issue，不靠"on-demand at view"绕一圈。
+
+**npm 包**：sentori-core 0.4.1 / sentori-javascript 0.3.4 / sentori-react 0.4.4 / sentori-react-native 0.5.6 / sentori-next 0.2.4 / sentori-cli **0.3.0**（新发布）/ sentori-expo 0.1.1。
+
+### Phase 39 — Trace 上量管控 ✅
+
+- **sub-A** `sdk/core/normalizeUrl(url)` —— path id-like 段 → `{id}`（pure-numeric / uuid / 长 hex / 长 opaque token），砍 query+fragment；三个 hook（RN fetch+xhr / JS fetch+xhr）接上 —— span `name` 收敛成路由，`http.url` tag 保完整
+- **sub-B** navigation span 自动当父：`useTraceNavigation` / `useSentoriRouter` 每屏开一个 `react.navigation` span（含初始屏，各自 trace root），并 `setActiveSpan` 让它常驻 active；该屏的 `http.client` span 自动成 child —— **一屏一 trace** 而不是一请求一 trace
+- **sub-C** 时间硬保留：`SENTORI_TRACE_RETENTION_DAYS`（默认 14）；`retention.rs` 泛化成同时管 events + spans 分区滚动/drop；`traces` 不分区（UPSERT 冲突）走 DELETE + 新 `traces_last_seen_idx`（migration 0029）
+- **sub-D** span 独立月度配额：`check_and_record_spans`（`SENTORI_SPAN_LIMIT_MONTHLY` 默认 10M）—— span 洪水不再吃 error event 的配额
+- **sub-E** Q4 复合 index（migration 0030 `(project_id, op, duration_ms DESC)`）：实测 1M spans **43ms → 0.40ms**（~100×，plan 从 seq+heapsort → per-partition index seek）；baseline doc `docs/performance/baseline-v0.5-phase39.md`
+- **sub-F** publish 5 包 + inter-dep pin 同步避免 version-pin trap；dogfood 记录
+
+### Phase 40 — 可读的 JS/RN 错误（sourcemap 端到端）✅
+
+- **sub-A** `parseStack` 修 Hermes 字节码帧：`at fn (address at /path/main.jsbundle:1:N)` 剥前缀；`(native)` 无位置帧丢弃
+- **sub-B** `@goliapkg/sentori-cli` 新发布 —— `upload sourcemap` + `react-native upload`（一行 compose Metro+Hermes + upload）；Node ≥18 / 零运行时依赖；EAS post-build hook 修
+- **sub-C** server 在 ingest 时符号化：`symbolicate_event` 用上传的 sourcemap 把 `Event.error.stack`（+ cause 链）重写成原始 source，`Frame` 加 `rawLine`/`rawColumn` 保 bundle 坐标（"show source" 反查需要）；issue **按符号化后的 in-app top 帧重新 fingerprint**（一个 release 第一次传 map → 老 issue 静、新 issue 冒出，同 Sentry），没传 map 的 release 行为不变
+- **Day 2** 401 hint：admin auth / ingest auth 的 `401` body 加 `hint` 字段（无 Bearer / 错前缀 / revoked 各文案）；`Event.symbolication: { releaseHasMap }` server-set meta
+- **Day 3** dashboard issue 详情：in-app 帧默认展开带 ±5 行内联源码（出错行红底高亮），连续 vendor 帧折叠成 `▸ N library frames`；in-app 帧若没解析按 `releaseHasMap` 标原因（"upload a source map: `npx sentori-cli upload sourcemap …`" / "wrong build / outside the map"）；`UnsymbolicatedHint` 链 docs recipe；server `symbolicate_frame_typed` 顺手填 `pre/context/postContext` 不用每帧 fetch
+- **Day 5（sub-E）** dev-mode Metro：`__DEV__` 下 SDK 发事件前先 POST 给 `<devServer>/symbolicate`（RN LogBox 那条），dev 错误也立刻可读
+
+### Phase 41 — Dashboard 左侧 sidebar ✅
+
+- **Day 6** 新 `web/src/components/sidebar.tsx`：顶 Sentori + OnboardingBadge + OrgSwitcher；主导航（带 16px inline-SVG icon）+ 次要项（admin-only 自动隐藏）+ 底部 footer（用户邮箱 + RoleBadge + density toggle + ThemeToggle + Sign out）；`md+` 持久 `w-56` 边栏 / 窄屏 fixed hamburger → overlay drawer（route 变自动关）。`org-layout.tsx` 去掉顶部横排 NAV，改成 `<Sidebar/>` + 内容区两栏；所有路由路径不动
+- **Day 7** sidebar.test.tsx +5（主/次导航渲出、active 高亮、非 admin 隐藏 Alerts/Audit、hamburger 存在）；CHANGELOG + tag v0.5.0
+
+### v0.5 显式 defer 到 v0.6 / 按需
+
+- ❌ head-based / tail-based 采样默认开启（`tracesSampleRate` 留 SDK 开关，默认 1.0）；tail-based stateful collector 不做
+- ❌ "Expo zero-config config plugin" 自动注入 Xcode/gradle build phase —— Insight 用 `sentori-cli react-native upload` 接进 `eas-build-on-success` script 一行已足够干净；真要 zero-config 时单独做 + 仔细测
+- ❌ `g i` / `g t` "go to" 快捷键、sidebar 折叠到图标轨 —— polish，没收到诉求再加
+
+---
+
 ## v0.4 — Distributed Tracing（Phase 34-38）
 
 **Goal:** Protocol 早就留好的 `traceId` / `spanId` 槽真正用起来。从 RN client 一路追踪到后端 API，dashboard 看 waterfall。反 Sentry envelope-bloat：单 JSON span ingest，所有 root + child 是同一个 spans schema，靠 `parentSpanId == null` 区分；不上 transactions[] 嵌套 / measurements 浮点矩阵；waterfall 纯表格 + 缩进，不画 SVG bar。
