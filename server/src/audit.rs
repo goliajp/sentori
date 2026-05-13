@@ -29,6 +29,7 @@ pub mod actions {
     pub const TEAM_MEMBER_REMOVED: &str = "team.member.removed";
 
     pub const PROJECT_CREATED: &str = "project.created";
+    pub const PROJECT_UPDATED: &str = "project.updated";
     pub const PROJECT_TEAM_BOUND: &str = "project.team.bound";
     pub const PROJECT_TEAM_UNBOUND: &str = "project.team.unbound";
 
@@ -80,6 +81,7 @@ pub fn label_for(action: &str) -> &str {
         actions::TEAM_MEMBER_PATCHED => "Team member role changed",
         actions::TEAM_MEMBER_REMOVED => "Team member removed",
         actions::PROJECT_CREATED => "Project created",
+        actions::PROJECT_UPDATED => "Project updated",
         actions::PROJECT_TEAM_BOUND => "Project bound to team",
         actions::PROJECT_TEAM_UNBOUND => "Project unbound from team",
         actions::TOKEN_CREATED => "Token created",

@@ -183,6 +183,15 @@ export const adminApi = {
   issueDetail: (projectId: string, issueId: string) =>
     adminFetch<IssueRow>(`/projects/${projectId}/issues/${issueId}`),
 
+  /** Phase 42 sub-A.11: update project settings.
+   *  `sourceRepoUrl: null` clears the value; omit the key to leave
+   *  it untouched. */
+  patchProject: (projectId: string, body: { sourceRepoUrl?: null | string }) =>
+    adminFetch<null>(`/projects/${projectId}`, {
+      body: JSON.stringify(body),
+      method: 'PATCH',
+    }),
+
   patchIssue: (
     projectId: string,
     issueId: string,
@@ -633,6 +642,12 @@ export type ProjectRow = {
   name: string
   orgId: string
   orgSlug: string
+  /** Phase 42 sub-A.11: optional repo root URL (e.g.
+   *  `https://github.com/goliajp/sentori`). When set, the dashboard
+   *  links frame paths to the matching blob on GitHub-compatible
+   *  hosts (GitLab, Bitbucket Cloud, Gitea all follow the same
+   *  `/blob/<ref>/<file>#L<line>` shape). `null` hides the link. */
+  sourceRepoUrl?: null | string
 }
 
 export type AuthUser = { email: string; id: string }

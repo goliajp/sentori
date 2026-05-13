@@ -3,7 +3,7 @@ use axum::{
     extract::DefaultBodyLimit,
     http,
     middleware,
-    routing::{get, post},
+    routing::{get, patch, post},
 };
 use metrics_exporter_prometheus::PrometheusHandle;
 use tower_http::cors::CorsLayer;
@@ -79,6 +79,10 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route(
             "/orgs/{slug}/projects",
             post(api::projects::create_project),
+        )
+        .route(
+            "/projects/{project_id}",
+            patch(api::projects::patch_project),
         )
         .route(
             "/projects/{project_id}/teams",

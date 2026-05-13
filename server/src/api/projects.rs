@@ -118,6 +118,119 @@ pub async fn create_project(
         .into_response()
 }
 
+// ──────────────────────────────────────────────────────────────────
+// Phase 42 sub-A.11 — PATCH /admin/api/projects/{id}
+// ──────────────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PatchProjectBody {
+    /// Set / clear `source_repo_url`. `Some(Some(url))` writes the
+    /// url; `Some(None)` clears; absent leaves it untouched.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(deserialize_with = "deserialize_optional_field")]
+    pub source_repo_url: Option<Option<String>>,
+}
+
+// serde idiom for distinguishing absent vs explicit null: deserialize
+// `Some(value)` for present (whether the value is null or a string).
+fn deserialize_optional_field<'de, D>(de: D) -> Result<Option<Option<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Some(Option::<String>::deserialize(de)?))
+}
+
+/// PATCH /admin/api/projects/{project_id}
+/// Update a project's settings. Currently only `source_repo_url` is
+/// editable; the field doesn't change the data model so PATCH is
+/// open to any user with org-admin / org-owner role over the
+/// project's org (same gate as `create_project`).
+pub async fn patch_project(
+    State(state): State<AppState>,
+    Extension(caller): Extension<AdminCaller>,
+    Path(project_id): Path<Uuid>,
+    Json(body): Json<PatchProjectBody>,
+) -> Response {
+    let pool = match &state.db {
+        Some(p) => p.clone(),
+        None => return server_error("dbNotConfigured"),
+    };
+
+    // Validate URL shape if present + non-null.
+    if let Some(Some(ref url)) = body.source_repo_url {
+        let trimmed = url.trim();
+        if trimmed.is_empty() {
+            // Treat empty string as "clear".
+        } else if !(trimmed.starts_with("https://") || trimmed.starts_with("http://")) {
+            return bad_request("sourceRepoUrlMustBeHttp");
+        } else if trimmed.len() > 512 {
+            return bad_request("sourceRepoUrlTooLong");
+        }
+    }
+
+    // Resolve the project's org + caller role.
+    let project_org: Option<(Uuid,)> =
+        sqlx::query_as("SELECT org_id FROM projects WHERE id = $1")
+            .bind(project_id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
+    let Some((org_id,)) = project_org else {
+        return not_found("projectNotFound");
+    };
+
+    let role: Option<String> = match &caller {
+        AdminCaller::User { id, .. } => sqlx::query_scalar(
+            "SELECT role FROM memberships WHERE org_id = $1 AND user_id = $2",
+        )
+        .bind(org_id)
+        .bind(id)
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or(None),
+        AdminCaller::LegacyAdmin | AdminCaller::DevToken => Some("owner".to_string()),
+    };
+    let role = match role {
+        Some(r) if matches!(r.as_str(), "owner" | "admin") => r,
+        _ => return forbidden("forbidden"),
+    };
+    let _ = role; // silence unused warning; gate above uses it.
+
+    if let Some(opt) = body.source_repo_url {
+        // Empty string → clear. Anything else stored verbatim.
+        let value = opt.and_then(|s| {
+            let t = s.trim();
+            if t.is_empty() { None } else { Some(t.to_string()) }
+        });
+        if let Err(e) = sqlx::query("UPDATE projects SET source_repo_url = $1 WHERE id = $2")
+            .bind(value.as_deref())
+            .bind(project_id)
+            .execute(&pool)
+            .await
+        {
+            tracing::error!(error = %e, %project_id, "patch_project failed");
+            return server_error("dbError");
+        }
+        let actor = match &caller {
+            AdminCaller::User { id, .. } => Some(*id),
+            _ => None,
+        };
+        crate::audit::record(
+            &pool,
+            org_id,
+            actor,
+            crate::audit::actions::PROJECT_UPDATED,
+            crate::audit::targets::PROJECT,
+            Some(project_id),
+            json!({ "sourceRepoUrl": value }),
+        )
+        .await;
+    }
+
+    (StatusCode::NO_CONTENT, ()).into_response()
+}
+
 /// Returns (org_id, role) where role is "owner"/"admin"/"member" for User
 /// callers, or the synthetic "owner" for super-admin callers (so the
 /// downstream role check passes).

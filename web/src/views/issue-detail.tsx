@@ -14,7 +14,15 @@ import {
 } from '@/api/client'
 import { useAuth } from '@/auth/state'
 import { useOrg } from '@/auth/orgContext'
-import { ErrorState, LoadingState } from '@/components/states'
+import { FrameRoleBadge } from '@/components/FrameRoleBadge'
+import { IssueDetailSkeleton } from '@/components/IssueDetailSkeleton'
+import { OpenInEditorButton } from '@/components/OpenInEditorButton'
+import { SourceCode } from '@/components/SourceCode'
+import { ErrorState } from '@/components/states'
+import { packageOf } from '@/lib/frame-package'
+import { roleOf } from '@/lib/frame-role'
+import { frameToSourceUrl } from '@/lib/source-link'
+import { languageOf } from '@/lib/source-language'
 import { BreadcrumbTimeline } from './breadcrumb-timeline'
 
 /**
@@ -113,7 +121,7 @@ export function IssueDetailView() {
 
   if (!issueId) return null
 
-  if (issueQuery.isLoading || eventsQuery.isLoading) return <LoadingState />
+  if (issueQuery.isLoading || eventsQuery.isLoading) return <IssueDetailSkeleton />
   if (issueQuery.error) return <ErrorState label="Failed to load issue." />
 
   const issue = issueQuery.data
@@ -133,6 +141,12 @@ export function IssueDetailView() {
         <span className="text-fg-muted ml-1 truncate text-sm">{issue.messageSample}</span>
         <StatusBadge issue={issue} />
         <div className="ml-auto flex items-center gap-2">
+          {/* Phase 42 sub-A.13: jump straight to the crash site in the
+              user's IDE. Disabled when the first in-app frame's file
+              isn't an absolute local path (e.g. unsymbolicated stacks). */}
+          <OpenInEditorButton
+            frame={selectedEvent?.payload.error.stack.find((f) => f.inApp) ?? null}
+          />
           <IssueActions
             currentUserId={user?.id ?? null}
             issue={issue}
@@ -185,6 +199,7 @@ export function IssueDetailView() {
             orgSlug={currentOrg.slug}
             projectId={projectId!}
             releases={releasesQuery.data}
+            sourceRepoUrl={currentProject?.sourceRepoUrl}
             symbolicated={symbolicated}
           />
         ) : tab === 'events' ? (
@@ -350,6 +365,7 @@ function StackTab({
   orgSlug,
   projectId,
   releases,
+  sourceRepoUrl,
   symbolicated,
 }: {
   event: EventRow
@@ -358,6 +374,7 @@ function StackTab({
   orgSlug: string
   projectId: string
   releases: string[] | undefined
+  sourceRepoUrl: null | string | undefined
   symbolicated: boolean
 }) {
   const payload = event.payload
@@ -409,6 +426,7 @@ function StackTab({
         <StackList
           onFrameClick={(idx) => setOpenFrame({ cause: 0, frame: idx })}
           platform={payload.platform}
+          sourceRepoUrl={sourceRepoUrl}
           stack={payload.error.stack}
           symbolication={payload.symbolication}
         />
@@ -418,6 +436,7 @@ function StackTab({
             error={payload.error.cause}
             onFrameClick={(cause, frame) => setOpenFrame({ cause, frame })}
             platform={payload.platform}
+            sourceRepoUrl={sourceRepoUrl}
             symbolication={payload.symbolication}
           />
         )}
@@ -911,83 +930,121 @@ function stackLooksSymbolicated(platform: string | undefined, stack: Frame[]): b
 }
 
 /** Frame header + (for in-app frames) an inline source snippet from
- *  `pre/context/postContext`. Clicking opens the full-file drawer. */
-function FrameRow({ frame, idx, onClick }: { frame: Frame; idx: number; onClick?: () => void }) {
+ *  `pre/context/postContext`. Clicking opens the full-file drawer.
+ *
+ *  Phase 42 sub-A.04: the snippet was a hand-rolled `<pre>` of plain
+ *  lines; it now goes through `<SourceCode>` which lazy-loads
+ *  starry-night and tokenises by language. The red-bg highlight on
+ *  the at-line is passed via `highlightLines` instead of being
+ *  rendered as a separate row, keeping line-number alignment intact.
+ */
+function FrameRow({
+  frame,
+  idx,
+  onClick,
+  sourceRepoUrl,
+}: {
+  frame: Frame
+  idx: number
+  onClick?: () => void
+  sourceRepoUrl?: null | string
+}) {
   const hasSnippet = frame.contextLine !== undefined
   const pre = frame.preContext ?? []
   const post = frame.postContext ?? []
-  // First pre-context line's number: `line` is the at-line.
+  const snippet = hasSnippet ? [...pre, frame.contextLine ?? '', ...post].join('\n') : ''
   const firstNo = frame.line - pre.length
-  const lineNo = (n: number) => (
-    <span className="text-fg-muted/60 mr-3 inline-block w-10 shrink-0 text-right tabular-nums select-none">
-      {n}
-    </span>
-  )
+  const language = languageOf(frame.file)
+  const repoUrl = frameToSourceUrl({ file: frame.file, line: frame.line, sourceRepoUrl })
   return (
     <div className={`border-border/40 border-b last:border-b-0 ${frame.inApp ? 'bg-bg' : ''}`}>
-      <button
-        className="hover:bg-bg-tertiary/60 flex w-full items-baseline gap-3 px-3 py-1.5 text-left text-[12px]"
-        onClick={onClick}
-        type="button"
-      >
-        <span className="text-fg-muted w-6 shrink-0 text-right text-[11px] tabular-nums">
-          {idx}
-        </span>
-        <span
-          className={`font-mono whitespace-nowrap ${frame.inApp ? 'text-fg' : 'text-fg-muted'}`}
+      <div className="hover:bg-bg-tertiary/60 flex w-full items-baseline gap-3 px-3 py-1.5 text-[12px]">
+        <button
+          className="flex flex-1 items-baseline gap-3 text-left"
+          onClick={onClick}
+          type="button"
         >
-          {frame.function ?? '<anonymous>'}
-        </span>
-        <span className="text-fg-muted truncate font-mono">
-          {frame.file}:{frame.line}
-          {frame.column !== undefined ? `:${frame.column}` : ''}
-        </span>
-      </button>
+          <span className="text-fg-muted w-6 shrink-0 text-right text-[11px] tabular-nums">
+            {idx}
+          </span>
+          <FrameRoleBadge role={roleOf(frame)} />
+          <span
+            className={`font-mono whitespace-nowrap ${frame.inApp ? 'text-fg' : 'text-fg-muted'}`}
+          >
+            {frame.function ?? '<anonymous>'}
+          </span>
+          <span className="text-fg-muted truncate font-mono">
+            {frame.file}:{frame.line}
+            {frame.column !== undefined ? `:${frame.column}` : ''}
+          </span>
+        </button>
+        {repoUrl && (
+          <a
+            aria-label="Open on the source host"
+            className="text-fg-muted hover:text-fg shrink-0 self-center text-[10px] tracking-wider uppercase"
+            href={repoUrl}
+            onClick={(e) => e.stopPropagation()}
+            rel="noopener noreferrer"
+            target="_blank"
+            title="Open this line on the configured source host"
+          >
+            ↗ src
+          </a>
+        )}
+      </div>
       {hasSnippet && (
-        <pre className="bg-bg-tertiary/30 overflow-x-auto px-3 pb-2 font-mono text-[11px] leading-[1.5]">
-          {pre.map((l, i) => (
-            <div className="text-fg-muted/80" key={`p${i}`}>
-              {lineNo(firstNo + i)}
-              {l || ' '}
-            </div>
-          ))}
-          <div className="text-fg -mx-3 bg-red-500/10 px-3">
-            {lineNo(frame.line)}
-            {frame.contextLine || ' '}
-          </div>
-          {post.map((l, i) => (
-            <div className="text-fg-muted/80" key={`q${i}`}>
-              {lineNo(frame.line + 1 + i)}
-              {l || ' '}
-            </div>
-          ))}
-        </pre>
+        <div className="px-3 pb-2">
+          <SourceCode
+            code={snippet}
+            highlightLines={[frame.line]}
+            language={language}
+            startLine={firstNo}
+          />
+        </div>
       )}
     </div>
   )
 }
 
-/** A run of consecutive vendor frames, collapsed by default. */
+/** A run of consecutive vendor frames, collapsed by default.
+ *  Phase 42 sub-A.07: when all frames in the run share a package
+ *  (e.g. `react-native`), the fold header names it; otherwise it
+ *  falls back to the generic "N library frames" wording. */
 function VendorFold({
   base,
   frames,
   onFrameClick,
+  pkg,
 }: {
   /** index of `frames[0]` within the full stack */
   base: number
   frames: Frame[]
   onFrameClick?: (frameIdx: number) => void
+  /** Common package across all frames; null if heterogeneous. */
+  pkg?: null | string
 }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="border-border/40 border-b last:border-b-0">
       <button
-        className="text-fg-muted hover:bg-bg-tertiary/40 hover:text-fg flex w-full items-center gap-1 px-3 py-1 text-left text-[11px]"
+        className="text-fg-muted hover:bg-bg-tertiary/40 hover:text-fg flex w-full items-center gap-2 px-3 py-1 text-left text-[11px]"
         onClick={() => setOpen((o) => !o)}
         type="button"
       >
         <span className="inline-block w-3">{open ? '▾' : '▸'}</span>
-        {frames.length} library frame{frames.length === 1 ? '' : 's'}
+        <FrameRoleBadge role={roleOf(frames[0]!)} />
+        {pkg ? (
+          <>
+            <span className="text-fg font-mono">{pkg}</span>
+            <span>
+              ({frames.length} frame{frames.length === 1 ? '' : 's'})
+            </span>
+          </>
+        ) : (
+          <span>
+            {frames.length} library frame{frames.length === 1 ? '' : 's'}
+          </span>
+        )}
       </button>
       {open && (
         <div className="bg-bg-tertiary/20">
@@ -1015,30 +1072,42 @@ function VendorFold({
 export function StackList({
   onFrameClick,
   platform,
+  sourceRepoUrl,
   stack,
   symbolication,
 }: {
   onFrameClick?: (frameIdx: number) => void
   platform?: string
+  /** Phase 42 sub-A.12: forwarded so FrameRow can render the
+   *  "↗ src" link to the configured source host. */
+  sourceRepoUrl?: null | string
   stack: Frame[]
   symbolication?: Symbolication
 }) {
   if (stack.length === 0) {
     return <p className="text-fg-muted text-sm">No frames.</p>
   }
-  // Run-length: emit in-app frames as FrameRow, collapse runs of vendor frames.
+  // Run-length: emit in-app frames as FrameRow, collapse vendor runs.
+  // Phase 42 sub-A.07: vendor runs split by `packageOf(frame.file)` —
+  // a stretch of `react-native` core frames followed by `expo-router`
+  // frames are now two folds, each labelled, instead of "11 library
+  // frames" you have to expand to read.
   const groups: (
     | { kind: 'app'; at: number; frame: Frame }
-    | { kind: 'vendor'; at: number; frames: Frame[] }
+    | { kind: 'vendor'; at: number; frames: Frame[]; pkg: null | string }
   )[] = []
   for (let i = 0; i < stack.length; i++) {
     const f = stack[i]!
     if (f.inApp) {
       groups.push({ kind: 'app', at: i, frame: f })
+      continue
+    }
+    const pkg = packageOf(f.file)
+    const last = groups[groups.length - 1]
+    if (last && last.kind === 'vendor' && last.pkg === pkg) {
+      last.frames.push(f)
     } else {
-      const last = groups[groups.length - 1]
-      if (last && last.kind === 'vendor') last.frames.push(f)
-      else groups.push({ kind: 'vendor', at: i, frames: [f] })
+      groups.push({ kind: 'vendor', at: i, frames: [f], pkg })
     }
   }
   const anyInAppMissingSource = stack.some((f) => f.inApp && f.contextLine === undefined)
@@ -1055,9 +1124,21 @@ export function StackList({
       <div className="border-border overflow-hidden rounded-md border">
         {groups.map((g) =>
           g.kind === 'app' ? (
-            <FrameRow frame={g.frame} idx={g.at} key={g.at} onClick={() => onFrameClick?.(g.at)} />
+            <FrameRow
+              frame={g.frame}
+              idx={g.at}
+              key={g.at}
+              onClick={() => onFrameClick?.(g.at)}
+              sourceRepoUrl={sourceRepoUrl}
+            />
           ) : (
-            <VendorFold base={g.at} frames={g.frames} key={g.at} onFrameClick={onFrameClick} />
+            <VendorFold
+              base={g.at}
+              frames={g.frames}
+              key={g.at}
+              onFrameClick={onFrameClick}
+              pkg={g.pkg}
+            />
           )
         )}
       </div>
@@ -1082,23 +1163,34 @@ function CauseChain({
   error,
   onFrameClick,
   platform,
+  sourceRepoUrl,
   symbolication,
 }: {
   depth: number
   error: SentoriError
   onFrameClick?: (cause: number, frameIdx: number) => void
   platform?: string
+  sourceRepoUrl?: null | string
   symbolication?: Symbolication
 }) {
+  // Phase 42 sub-A.10: cause chain is presented as a tinted card with
+  // an "↪ caused by" prefix. The previous thin left-border was easy
+  // to miss against the surrounding panels; an accent-tinted box with
+  // explicit label survives long traces with many causes.
   return (
-    <div className="border-border/40 mt-3 border-l-2 pl-3">
-      <p className="text-fg text-[12px]">
-        <span className="text-fg-muted">caused by</span> {error.type}: {error.message}
+    <div className="border-accent/40 bg-accent/[0.04] mt-4 rounded-md border-l-4 p-3">
+      <p className="text-fg text-[12px] leading-relaxed">
+        <span className="text-accent mr-1.5 inline-block font-mono text-[11px] tracking-wider uppercase">
+          ↪ caused by
+        </span>
+        <span className="text-fg-muted font-mono">{error.type}:</span>{' '}
+        <span className="text-fg">{error.message}</span>
       </p>
-      <div className="mt-2">
+      <div className="mt-3">
         <StackList
           onFrameClick={(i) => onFrameClick?.(depth, i)}
           platform={platform}
+          sourceRepoUrl={sourceRepoUrl}
           stack={error.stack}
           symbolication={symbolication}
         />
@@ -1109,6 +1201,7 @@ function CauseChain({
           error={error.cause}
           onFrameClick={onFrameClick}
           platform={platform}
+          sourceRepoUrl={sourceRepoUrl}
           symbolication={symbolication}
         />
       )}
@@ -1174,29 +1267,29 @@ function FrameSourceDrawer({
 
 function FrameSourceBody({ source }: { source: FrameSource }) {
   const offset = source.line - source.before.length
-  const lines = [...source.before, source.at, ...source.after]
+  const code = [...source.before, source.at, ...source.after].join('\n')
+  const language = languageOf(source.file)
+  // Auto-scroll the at-line into view once SourceCode has rendered.
+  // Anchor uses the FrameSource line so the id is stable across
+  // re-renders (`#src-L<line>` is also link-shareable).
+  useEffect(() => {
+    const el = document.getElementById(`src-L${source.line}`)
+    if (el) el.scrollIntoView({ block: 'center' })
+  }, [source.line, source.file])
   return (
     <div className="px-4 py-3 text-[12px]">
       <p className="text-fg-muted truncate font-mono">
         {source.file}:{source.line}:{source.column}
       </p>
-      <pre className="border-border bg-bg-tertiary/40 mt-3 overflow-x-auto rounded-md border font-mono leading-5">
-        {lines.map((line, i) => {
-          const ln = offset + i
-          const isAt = ln === source.line
-          return (
-            <div
-              className={`flex items-baseline gap-3 px-3 py-0.5 ${
-                isAt ? 'bg-accent/10 text-fg' : 'text-fg-muted'
-              }`}
-              key={i}
-            >
-              <span className="text-fg-muted w-10 shrink-0 text-right tabular-nums">{ln}</span>
-              <span className="whitespace-pre">{line || ' '}</span>
-            </div>
-          )
-        })}
-      </pre>
+      <div className="border-border bg-bg-tertiary/40 mt-3 overflow-hidden rounded-md border">
+        <SourceCode
+          code={code}
+          highlightLines={[source.line]}
+          language={language}
+          lineAnchorPrefix="src-"
+          startLine={offset}
+        />
+      </div>
     </div>
   )
 }

@@ -16,7 +16,9 @@
   "dependencies": {
     "@goliapkg/sentori-react": "workspace:*",
     "@tanstack/react-query": "^5.95.2",
+    "@wooorm/starry-night": "^3.9.0",
     "axios": "^1.14.0",
+    "hast-util-to-jsx-runtime": "^2.3.6",
     "jotai": "^2.19.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

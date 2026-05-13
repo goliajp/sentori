@@ -37,11 +37,28 @@ describe('StackList', () => {
     expect(screen.getByText('142')).toBeInTheDocument()
   })
 
-  it('collapses a run of vendor frames into a fold', () => {
+  it('collapses a run of same-package vendor frames into a labelled fold', () => {
     render(<StackList stack={[appFrame(), vendorFrame(), vendorFrame({ function: 'b' })]} />)
     // not expanded by default → the vendor function isn't visible yet
     expect(screen.queryByText('handleException')).not.toBeInTheDocument()
-    expect(screen.getByText(/2 library frames/)).toBeInTheDocument()
+    // Phase 42 sub-A.07: same-package run is named after the package.
+    expect(screen.getByText('react-native')).toBeInTheDocument()
+    expect(screen.getByText(/2 frames/)).toBeInTheDocument()
+  })
+
+  it('splits vendor runs by package boundary', () => {
+    render(
+      <StackList
+        stack={[
+          appFrame(),
+          vendorFrame(),
+          vendorFrame({ file: 'node_modules/expo-router/entry.js', function: 'init' }),
+        ]}
+      />
+    )
+    // Two separate folds, one per package.
+    expect(screen.getByText('react-native')).toBeInTheDocument()
+    expect(screen.getByText('expo-router')).toBeInTheDocument()
   })
 
   it('shows "upload a source map" when an in-app frame has no inline source and no map exists', () => {

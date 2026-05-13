@@ -23,6 +23,10 @@ pub struct ProjectRow {
     pub org_slug: String,
     #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
+    /// Phase 42 sub-A.11: optional repo root URL (e.g.
+    /// `https://github.com/goliajp/sentori`). Used by the dashboard's
+    /// per-frame "open on GitHub" link.
+    pub source_repo_url: Option<String>,
 }
 
 pub async fn list_my_projects(
@@ -33,7 +37,8 @@ pub async fn list_my_projects(
 
     let rows: Vec<ProjectRow> = match caller {
         AdminCaller::User { id, .. } => sqlx::query_as(
-            "SELECT p.id, p.name, p.org_id, o.slug AS org_slug, p.created_at \
+            "SELECT p.id, p.name, p.org_id, o.slug AS org_slug, p.created_at, \
+                    p.source_repo_url \
              FROM projects p \
              JOIN orgs o ON o.id = p.org_id \
              JOIN memberships m ON m.org_id = p.org_id \
@@ -45,7 +50,8 @@ pub async fn list_my_projects(
         .await
         .map_err(|e| AppError::Internal(format!("list_my_projects: {e}")))?,
         AdminCaller::LegacyAdmin | AdminCaller::DevToken => sqlx::query_as(
-            "SELECT p.id, p.name, p.org_id, o.slug AS org_slug, p.created_at \
+            "SELECT p.id, p.name, p.org_id, o.slug AS org_slug, p.created_at, \
+                    p.source_repo_url \
              FROM projects p \
              JOIN orgs o ON o.id = p.org_id \
              ORDER BY p.created_at DESC",
