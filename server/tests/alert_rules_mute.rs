@@ -4,6 +4,7 @@
 // and that PATCHing snoozed_until: null clears the snooze early.
 
 use std::net::SocketAddr;
+use serial_test::serial;
 
 use reqwest::Client;
 use sentori_server::{db, notifier::NotifyEvent, router, rule_eval};
@@ -81,6 +82,7 @@ async fn drain_alerts(rx: &mut mpsc::Receiver<NotifyEvent>) -> Vec<NotifyEvent> 
 }
 
 #[tokio::test]
+#[serial]
 async fn mute_blocks_fire_until_unmuted() {
     let Some((addr, pool, tx, mut rx)) = setup().await else {
         eprintln!("skipping (DATABASE_URL not set)");
@@ -172,6 +174,7 @@ async fn mute_blocks_fire_until_unmuted() {
 }
 
 #[tokio::test]
+#[serial]
 async fn snooze_until_blocks_then_clears_when_passed() {
     let Some((addr, pool, tx, mut rx)) = setup().await else {
         eprintln!("skipping (DATABASE_URL not set)");

@@ -4,6 +4,7 @@
 // captures DigestEmail events from a notifier-tx stub.
 
 use std::net::SocketAddr;
+use serial_test::serial;
 
 use reqwest::Client;
 use sentori_server::{db, digest, notifier::NotifyEvent, router};
@@ -71,6 +72,7 @@ async fn register(addr: &SocketAddr, pool: &PgPool, email: &str) -> String {
 }
 
 #[tokio::test]
+#[serial]
 async fn subscribe_then_sweep_then_unsubscribe() {
     let Some((addr, pool, tx, mut rx)) = setup().await else {
         eprintln!("skipping (DATABASE_URL not set)");
@@ -158,6 +160,7 @@ async fn subscribe_then_sweep_then_unsubscribe() {
 }
 
 #[tokio::test]
+#[serial]
 async fn subscribe_rejects_unknown_org_or_frequency() {
     let Some((addr, pool, _tx, _rx)) = setup().await else {
         eprintln!("skipping (DATABASE_URL not set)");

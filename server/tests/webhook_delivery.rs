@@ -5,6 +5,7 @@
 // and verifies the receiver got a signed POST with the right shape.
 
 use std::net::SocketAddr;
+use serial_test::serial;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -146,6 +147,7 @@ async fn register(addr: &SocketAddr, pool: &PgPool, email: &str) -> String {
 }
 
 #[tokio::test]
+#[serial]
 async fn webhook_channel_signs_and_delivers() {
     let Some((addr, pool, tx)) = setup_server().await else {
         eprintln!("skipping (DATABASE_URL not set)");
