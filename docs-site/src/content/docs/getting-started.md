@@ -65,8 +65,8 @@ See the [Protocol reference](./protocol.md) for the full schema.
   the release timeline accurate
 - [Triage from CI with sentori-cli](#triage-from-ci) — `issue
   list / resolve / silence`
-- [Sourcemap / dSYM / Proguard upload](./recipes/vite.md#5-source-maps) —
-  see frame-level user code instead of minified output
+- [Make errors readable: upload source maps](#source-maps) —
+  see `src/Foo.tsx:42` instead of `index.bundle:1:288432`
 
 ### Deploy pings
 
@@ -102,6 +102,24 @@ npx @goliapkg/sentori-cli issue silence <issue-uuid> \
 
 The admin token (`SENTORI_ADMIN_TOKEN`, `sk_` prefix) is in project
 settings → tokens.
+
+### Source maps
+
+So a stack trace points at `src/Foo.tsx:42`, not `index.bundle:1:288432`.
+After a release build, upload the source map tagged to the release —
+**byte-for-byte the same string you pass to `init({ release })`**:
+
+```bash
+npx @goliapkg/sentori-cli@latest upload sourcemap \
+  --release "myapp@$VERSION+$BUILD" --token "$SENTORI_TOKEN" \
+  dist/assets/            # a build dir, or specific .map / .js files
+```
+
+The server symbolicates matching events at ingest and groups the issue
+on the original-source frame. React Native (Hermes) needs the Metro
+and Hermes maps composed first — see
+[Source map upload](./recipes/sourcemap-upload.md) for the per-platform
+steps and CI recipes (GitHub Actions / GitLab / Vercel / EAS).
 
 ## Reference
 

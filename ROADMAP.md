@@ -483,12 +483,12 @@ Phase 40 sub-A/B/C 完成。剩下的（dashboard 渲染、dev-mode、publish、
 >
 > 注意：parseStack 的 Hermes `address at` 前缀修复（sub-A）目前只在 workspace、还没 publish（Day 1 才发）—— 但它**不影响符号化能否成功**（服务端按 `line:col` 查 token，不看 `file` 字段；`file` 会被符号化后的源文件名覆盖），只影响"符号化失败时 `file` 字段是否干净"。所以 Insight 不用等 Day 1。
 
-### Day 1 — publish parseStack 修复 + getting-started sourcemap 章节
+### Day 1 — publish parseStack 修复 + getting-started sourcemap 章节 ✅
 
-- [ ] bump + publish 链（同 Phase 39 sub-F 的做法，inter-dep pin 同步）：core 0.4.0 → **0.4.1**（sub-A 的 parseStack Hermes 修复）/ javascript 0.3.3 → **0.3.4**（dep core）/ react-native 0.5.4 → **0.5.5**（dep core；含 parseStack 修复）/ react 0.4.3 → **0.4.4**（dep core+js）/ next 0.2.3 → **0.2.4**（dep）；expo / cli 不动（这次没改）；`npm publish` × 5；`bun install` 同步 lockfile + rebuild lib
-- [ ] `docs/getting-started.md` + `docs-site/.../getting-started.md`：加 "让错误可读：上传 source map" 一节（一句话 + 链到 recipes/sourcemap-upload）；`docs/protocol.md`（+ 镜像）正式文档化 release 串约定 `<app>@<version>+<build>`（吸收原 Phase 30 sub-B top-3）
-- [ ] commit `v0.5 day 1: publish parseStack fix + getting-started sourcemap section`
-- ✅ Insight 这之后升 `sentori-react-native@0.5.5`（更干净的 Hermes 帧），但**不是必须**——上面 ⚑ 已说明
+- [x] bump + publish 链（inter-dep pin 同步）：core 0.4.0 → **0.4.1**（sub-A parseStack Hermes 修复）/ javascript 0.3.3 → **0.3.4**（dep core）/ react-native 0.5.4 → **0.5.5**（dep core；含修复）/ react 0.4.3 → **0.4.4**（dep core+js）/ next 0.2.3 → **0.2.4**（dep）；expo/cli 不动；`npm publish` × 5；`bun install`（无 lockfile 变化）；全 SDK sweep 绿（core 51 / js 51 / rn 45 / react 21 / next 9 / expo 4）+ typecheck 干净
+- [x] `docs/getting-started.md`（+ docs-site 镜像）：第二段列表里 "Sourcemap / dSYM / Proguard" 那条改成指向 `recipes/sourcemap-upload.md` 的 `#source-maps`；新增 `### Source maps` 子节（`npx @goliapkg/sentori-cli upload sourcemap --release "<和 init 一字不差>"`，server ingest 时符号化 + 按源帧分组，Hermes 链到 recipe）。`docs/protocol.md` 的 release 串约定 `<app-name>@<version>+<build>` 早已在 Event schema 表里文档化 + sub-C 的 symbolication 段也提了"必须 === event 的 release"——无需再加
+- [x] commit `v0.5 day 1: publish parseStack fix + getting-started sourcemap section`
+- ✅ Insight 这之后可升 `sentori-react-native@0.5.5`（更干净的 Hermes 帧），但**不是必须**——上面 ⚑ 已说明
 
 ### Day 2 — server 401 hint + 符号化失败诊断
 
