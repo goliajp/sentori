@@ -1,8 +1,10 @@
 import { setConfig } from './config';
 import { installGlobalHandler } from './handlers/global';
+import { installLifecycleHandler } from './handlers/lifecycle';
 import { installPromiseHandler } from './handlers/promise';
 import { installNetworkHandler } from './handlers/network';
 import { drainNativePending, setNativeConfig } from './native';
+import { startSession } from './session-tracker';
 import { drainOfflineQueue, enqueue, startTransport } from './transport';
 import type { Event } from './types';
 
@@ -22,6 +24,10 @@ export type InitOptions = {
     globalErrors?: boolean;
     promiseRejections?: boolean;
     network?: boolean;
+    /** Session tracking: opens a session on init and on each
+     *  foreground (`AppState` → `active`), ends it on background.
+     *  Drives crash-free rate. Set `false` to opt out. */
+    sessions?: boolean;
   };
 };
 
@@ -61,6 +67,13 @@ export const init = (options: InitOptions): void => {
   if (capture.globalErrors !== false) installGlobalHandler();
   if (capture.promiseRejections !== false) installPromiseHandler();
   if (capture.network !== false) installNetworkHandler();
+  if (capture.sessions !== false) {
+    // Open the cold-start session now (RN doesn't fire an AppState
+    // `change` for the initial `active` state), then bind AppState so
+    // background ends it and the next foreground opens a fresh one.
+    startSession();
+    installLifecycleHandler();
+  }
 
   // Drain events persisted from previous session (best-effort):
   // - native crashes from <Documents>/sentori/pending/*.json

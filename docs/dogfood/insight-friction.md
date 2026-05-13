@@ -14,11 +14,13 @@
 | v0.4.2 | Traces *still* empty | SDKs never **sent** client spans — `finish()` only pushed to the in-memory `SpanBuffer`; no transport drained it to `/v1/spans:batch`. Added a span-flush timer to both transports (+ a self-trace guard so span uploads don't recursively spawn `http.client` spans). |
 | v0.5 Phase 39 sub-A | Traces list unusable — every request to a different id (`/devices/69ef2dc5…`) is its own row; `traces` summary table cardinality unbounded | `normalizeUrl` in `sentori-core`: span `name` collapses id-like path segments to `{id}` (full URL kept in the `http.url` tag). |
 | v0.5 Phase 39 sub-B | Every fetch was its own root trace — a screen's 20-40 requests = 20-40 separate traces | `useTraceNavigation` / `useSentoriRouter` open a `react.navigation` span per screen and keep it the *active* span, so the screen's requests become children: one trace per screen. |
-| v0.5 Phase 40 (planned) | JS error stacks unreadable (`index.bundle:1:288432`) | End-to-end sourcemap symbolication — SDK captures column/function, `sentori-cli` uploads composed Hermes/Metro maps tagged to the release, server symbolicates at ingest + re-fingerprints, dashboard renders source snippets. |
+| v0.5.4 | Dashboard: "No session pings on this release yet" — Insight calls `initSentori` but no sessions ever start | `sentori-react-native`'s `init` didn't wire session lifecycle (the `handlers/lifecycle.ts` AppState binding existed but was never installed). Now `init` opens the cold-start session + installs the AppState binding (`active` → start, `background` → end). Opt out with `capture: { sessions: false }`. **Insight just needs to bump to ≥ 0.5.4** — no app-side code. |
+| v0.5 Phase 40 (planned) | JS error stacks unreadable (`index.bundle:1:288432`); dashboard's "SOURCE MAPS" card prompts `sentori-cli` which doesn't exist yet | End-to-end sourcemap symbolication — SDK captures column/function, `sentori-cli` (new) uploads composed Hermes/Metro maps tagged to the release, server symbolicates at ingest + re-fingerprints, dashboard renders source snippets. Interim: raw `curl` upload to `/admin/api/releases/{name}/sourcemaps` after a `compose-source-maps.js` step. |
 
-**Pending the user:** bump Insight to `@goliapkg/sentori-react-native@0.5.3`,
-re-run, and record here whether the Traces list now aggregates by route
-and whether a screen's requests show up as one trace.
+**Pending the user:** bump Insight to `@goliapkg/sentori-react-native@0.5.4`,
+re-run, and record here: (a) Traces list aggregates by route? (b) a
+screen's requests show up as one trace? (c) "Health · last 7 days" now
+shows session pings / a crash-free rate?
 
 ---
 
