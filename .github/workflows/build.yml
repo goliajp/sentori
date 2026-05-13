@@ -111,6 +111,15 @@ jobs:
       - name: install workspace
         run: bun install --frozen-lockfile
 
+      # Build every SDK's lib/ first. Each matrix cell is isolated —
+      # without this, packages that import a sibling SDK (e.g. expo
+      # imports from sentori-react-native) can't resolve the workspace
+      # symlink to a `.d.ts` because the sibling cell hasn't built yet.
+      # `build:sdks` is defined at root and fan-outs over all
+      # @goliapkg/sentori-* packages.
+      - name: build all SDKs (resolve cross-package type refs)
+        run: bun run build:sdks
+
       - name: ${{ matrix.package }} — typecheck + test + build
         working-directory: ${{ matrix.package }}
         run: |

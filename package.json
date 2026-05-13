@@ -16,7 +16,7 @@
     "web"
   ],
   "scripts": {
-    "build:sdks": "bun run --filter '@goliapkg/sentori-*' build",
+    "build:sdks": "bun run --filter '@goliapkg/sentori-core' build && bun run --filter '@goliapkg/sentori-javascript' build && bun run --filter '@goliapkg/sentori-react-native' build && bun run --filter '@goliapkg/sentori-react' build && bun run --filter '@goliapkg/sentori-next' build && bun run --filter '@goliapkg/sentori-vue' build && bun run --filter '@goliapkg/sentori-svelte' build && bun run --filter '@goliapkg/sentori-solid' build && bun run --filter '@goliapkg/sentori-expo' build && bun run --filter '@goliapkg/sentori-cli' build",
     "test:sdks": "bun run --filter '@goliapkg/sentori-*' test"
   }
 }
