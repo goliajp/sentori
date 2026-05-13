@@ -12,6 +12,8 @@
 - **v0.4** ✅ Distributed Tracing（Phase 34-38，全部完成；5 npm SDK publish + tag v0.4.0）—— 详见 [CHANGELOG.md](./CHANGELOG.md#v04--distributed-tracingphase-34-38)
 - **v0.4.x** ✅ patch：v0.4.1 XHR instrumentation / v0.4.2 client span flush + self-trace 防套娃 —— 详见 CHANGELOG
 - **v0.5** ✅ Scale + Readable Errors + Dashboard sidebar（Phase 39-41 全部完成；7 npm 包 publish + tag v0.5.0）—— 详见 [CHANGELOG.md](./CHANGELOG.md#v05--scale--readable-errors--dashboard-sidebarphase-39-41)
+- **v0.5.x** ✅ post-release polish：sidebar 折叠图标轨 + `g <letter>` 跳转快捷键 + `sentori-cli` 命令面齐全（`issue list|resolve|silence|close` + `upload dsym|mapping`）+ deploy 修通
+- **v0.6** 📐 待规划（主轴待选，见下方"v0.6 规划占位"）
 
 公开 surface：`sentori.golia.jp`（marketing） / `app.sentori.golia.jp`（dashboard） / `api.sentori.golia.jp` / `ingest.sentori.golia.jp` / `docs.sentori.golia.jp`。
 
@@ -553,17 +555,37 @@ Phase 40 sub-A/B/C 完成。剩下的（dashboard 渲染、dev-mode、publish、
 
 ---
 
-## v0.6+ 远期候选（无承诺、无优先级）
+## v0.6 规划占位 — 主轴待选
 
-以下议题在 v0.5 完成后由当时的 dogfood 信号 + 用户反馈决定哪个先做：
+v0.5 完成 + 部署上线，但**没有等到 Insight 真实接入产出的 dogfood 信号**（他们说要等整个阶段完才接，目前还在 0.5.6 + cli upload 这一步前）。在没有真实信号之前给 v0.6 定主轴是赌博 —— 候选列表如下，按"对项目方向 + Sentori 调性的契合度"我个人排了序。
 
-- Metrics / Logs / Profiling — 完整 observability 三件套
-- OpenTelemetry SDK 兼容层（OTLP receiver）
-- Session Replay
-- Vue / Svelte SDK
-- Python / Go / Rust SDK
-- Slack / Linear / GitHub PR 集成
-- Stripe + 自动化计费 metering
-- AI root-cause hint
-- 多区域部署 / regional ingest
-- 主动推广（Show HN / Twitter launch / blog series）
+### 推荐主轴：**"Insight dogfood-driven 深化"**（小而碎，等真实反馈再细化）
+
+不开新观测轴（不上 Metrics / Logs / Profiling 三件套，那违反"反 Sentry 复杂度"宪法）。继续按 RN-first 的"少而精"路径，深化已有功能：
+
+- **head-based `tracesSampleRate` SDK 开关**（v0.5 默认 1.0；要真到 10w 用户量级，可选采样必备 —— SDK 加一行 + 文档）
+- **Linear 集成**（webhook 已有；做一个 first-class "auto-create Linear issue on new Sentori issue + 双向链接" —— 跟用户的实际研发流程接上）
+- **issue 个人订阅 / "watch this"**（目前只有 project-wide 通知，没法"我盯这一条"）
+- **dashboard 上 fingerprint 重写**（手动 group / split issue —— 默认 fingerprint 总有错的时候）
+- **event payload 全文搜索**（issues 列表只能按 errorType / status / release 过滤；payload 内的字符串搜不到）
+
+理由：每条都小、可独立 ship、跟 Insight 实际会用的工作流接得上；不需要新协议 / 新观测维度。挑 3 条就是一个 phase，dogfood 反馈进来再 reorder。
+
+### 其它候选（每条都有自己的赌注）
+
+| 候选 | 调性 | 工作量 | 何时合理 |
+|---|---|---|---|
+| Vue / Svelte SDK | ✅ 自然延伸 React SDK | 中 | 想做 web framework 全覆盖时 |
+| Session Replay | ⚠️ Sentry 牌照 / 隐私 / bundle 重 | 大 | 真有人要求 |
+| Slack / GitHub PR 集成 | ⚠️ Linear 已涵盖最有价值场景 | 中 | 客户结构里 GitHub workflow 重 |
+| Metrics / Logs / Profiling | ❌ 三件套破"schema 简"宪法 | 极大 | 不建议 |
+| OTLP receiver | ❌ 同上 | 极大 | 不建议 |
+| Python / Go / Rust SDK | ⚠️ 跟 RN-first 立场偏 | 大 | 真有非 JS 后端用户 |
+| Stripe billing | ⚠️ 假设 SaaS pivot | 大 | 决定 SaaS 化时 |
+| AI root-cause | ⚠️ 概念模糊 / 难做好 | ? | 不建议盲做 |
+| 多区域部署 | ❌ 早期 premature | 大 | 用户规模实际到了 |
+| 主动推广（HN / blog） | 营销轴，不是 phase | 小 | 真有 talking point 时 |
+
+### Pending：Insight dogfood
+
+记忆 + ROADMAP "v0.5 后续线性 checklist" 顶部的 `⚑ Insight 配合点` 写了 ask（升 `sentori-react-native@0.5.6` + 加一行 `sentori-cli react-native upload`）。等接上 + 真实错误进来后，`docs/dogfood/insight-friction.md` 会有数据 —— 那时再具体定 v0.6 三条 sub-phase。
