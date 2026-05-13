@@ -28,6 +28,11 @@ const EVENTS_RETENTION_FLOOR_DAYS: i64 = 30;
 const DEFAULT_TRACE_RETENTION_DAYS: i64 = 14;
 /// Tables this task manages monthly partitions for.
 const PARTITIONED_TABLES: &[&str] = &["events", "spans"];
+/// How long after the last child span before an orphan trace
+/// (root_op IS NULL) is fair game to delete. A grace window so a
+/// temporarily-late root span (slow network, retry) can still patch
+/// the row before it disappears.
+const ORPHAN_TRACE_PRUNE_DELAY_HOURS: i64 = 1;
 
 pub fn spawn_retention_task(pool: PgPool) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
@@ -77,18 +82,20 @@ pub async fn run_once(pool: &PgPool) -> Result<RetentionStats, anyhow::Error> {
     dropped += drop_expired_partitions(pool, "spans", trace_cutoff).await?;
 
     let traces_deleted = prune_traces(pool, trace_cutoff).await?;
+    let orphan_traces_deleted = prune_orphan_traces(pool, now).await?;
 
-    if created > 0 || dropped > 0 || traces_deleted > 0 {
+    if created > 0 || dropped > 0 || traces_deleted > 0 || orphan_traces_deleted > 0 {
         tracing::info!(
             created,
             dropped,
             traces_deleted,
+            orphan_traces_deleted,
             events_retention_days = max_days.max(EVENTS_RETENTION_FLOOR_DAYS),
             trace_retention_days = trace_days,
             "retention pass complete"
         );
     }
-    Ok(RetentionStats { created, dropped, traces_deleted })
+    Ok(RetentionStats { created, dropped, traces_deleted, orphan_traces_deleted })
 }
 
 #[derive(Debug)]
@@ -96,6 +103,7 @@ pub struct RetentionStats {
     pub created: u32,
     pub dropped: u32,
     pub traces_deleted: u64,
+    pub orphan_traces_deleted: u64,
 }
 
 /// Delete `traces` rows with `last_seen` older than `cutoff`. (traces
@@ -103,6 +111,34 @@ pub struct RetentionStats {
 /// `traces_last_seen_idx`.) Returns the row count.
 pub async fn prune_traces(pool: &PgPool, cutoff: OffsetDateTime) -> Result<u64, sqlx::Error> {
     Ok(sqlx::query("DELETE FROM traces WHERE last_seen < $1")
+        .bind(cutoff)
+        .execute(pool)
+        .await?
+        .rows_affected())
+}
+
+/// Delete `traces` rows where the root span never arrived — i.e.
+/// `root_op IS NULL`. These are "orphan" traces: child spans landed
+/// and built up the row's span_count + status, but no INSERT was
+/// ever issued for the root span. The classic shape is a dev-mode
+/// fast-refresh race in the SDK's useTraceNavigation hook (Insight
+/// reported 2026-05-13): React drops the nav span's useRef during
+/// hot-reload before its cleanup runs `finish()`, leaving the child
+/// fetch spans pointing at a span_id that will never exist.
+///
+/// Waits `ORPHAN_TRACE_PRUNE_DELAY_HOURS` past the last child before
+/// deleting, so a temporarily-late root span (slow network, retry)
+/// can still patch the row instead of being deleted as orphan.
+///
+/// Child spans in the `spans` table aren't touched here — they fall
+/// off naturally with `spans` partition drops at
+/// `SENTORI_TRACE_RETENTION_DAYS` (14 by default).
+pub async fn prune_orphan_traces(
+    pool: &PgPool,
+    now: OffsetDateTime,
+) -> Result<u64, sqlx::Error> {
+    let cutoff = now - Duration::hours(ORPHAN_TRACE_PRUNE_DELAY_HOURS);
+    Ok(sqlx::query("DELETE FROM traces WHERE root_op IS NULL AND last_seen < $1")
         .bind(cutoff)
         .execute(pool)
         .await?
