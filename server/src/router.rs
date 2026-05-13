@@ -40,6 +40,9 @@ pub struct ServerConfig {
     /// span into the trace buffer, batched + persisted to spans /
     /// traces tables by the emitter's background flush task.
     pub self_trace: Option<crate::trace_emit::SpanEmitter>,
+    /// Phase 42 sub-C.02: attachment backing store. `Default` puts
+    /// a `NoopAttachmentStore` here so tests don't need to wire it.
+    pub attachments: Option<crate::attachments::SharedAttachmentStore>,
 }
 
 pub fn build(cfg: ServerConfig) -> Router {
@@ -57,6 +60,9 @@ pub fn build(cfg: ServerConfig) -> Router {
         session_secret: cfg.session_secret,
         notifier_tx: cfg.notifier_tx,
         base_url: cfg.base_url,
+        attachments: cfg
+            .attachments
+            .unwrap_or_else(|| std::sync::Arc::new(crate::attachments::NoopAttachmentStore)),
     };
 
     let ingestion = Router::new()
@@ -67,6 +73,10 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route("/v1/sessions", post(api::sessions::handle))
         .route("/v1/spans", post(api::spans::handle))
         .route("/v1/spans:batch", post(api::spans::handle_batch))
+        .route(
+            "/v1/events/{event_id}/attachments/{kind}",
+            post(api::attachments::upload),
+        )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             crate::rate_limit::rate_limit_middleware,
@@ -124,6 +134,10 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route(
             "/projects/{project_id}/events/{event_id}/source",
             get(api::admin::frame_source),
+        )
+        .route(
+            "/events/{event_id}/attachments/{ref_id}",
+            get(api::attachments::fetch),
         )
         .route(
             "/projects/{project_id}/issues/{issue_id}/activity",

@@ -34,13 +34,16 @@ const PARTITIONED_TABLES: &[&str] = &["events", "spans"];
 /// the row before it disappears.
 const ORPHAN_TRACE_PRUNE_DELAY_HOURS: i64 = 1;
 
-pub fn spawn_retention_task(pool: PgPool) -> tokio::task::JoinHandle<()> {
+pub fn spawn_retention_task(
+    pool: PgPool,
+    attachments: crate::attachments::SharedAttachmentStore,
+) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         // Slight delay so server-start logs aren't intermingled with
         // partition-management chatter.
         tokio::time::sleep(std::time::Duration::from_secs(30)).await;
         loop {
-            if let Err(e) = run_once(&pool).await {
+            if let Err(e) = run_once(&pool, &attachments).await {
                 tracing::error!(error = %e, "retention pass failed");
             }
             tokio::time::sleep(std::time::Duration::from_secs(60 * 60 * 24)).await;
@@ -57,7 +60,10 @@ pub fn trace_retention_days() -> i64 {
         .unwrap_or(DEFAULT_TRACE_RETENTION_DAYS)
 }
 
-pub async fn run_once(pool: &PgPool) -> Result<RetentionStats, anyhow::Error> {
+pub async fn run_once(
+    pool: &PgPool,
+    attachments: &crate::attachments::SharedAttachmentStore,
+) -> Result<RetentionStats, anyhow::Error> {
     let now = OffsetDateTime::now_utc();
 
     let mut created = 0u32;
@@ -83,19 +89,32 @@ pub async fn run_once(pool: &PgPool) -> Result<RetentionStats, anyhow::Error> {
 
     let traces_deleted = prune_traces(pool, trace_cutoff).await?;
     let orphan_traces_deleted = prune_orphan_traces(pool, now).await?;
+    let attachments_deleted = prune_attachments(pool, attachments, events_cutoff).await?;
 
-    if created > 0 || dropped > 0 || traces_deleted > 0 || orphan_traces_deleted > 0 {
+    if created > 0
+        || dropped > 0
+        || traces_deleted > 0
+        || orphan_traces_deleted > 0
+        || attachments_deleted > 0
+    {
         tracing::info!(
             created,
             dropped,
             traces_deleted,
             orphan_traces_deleted,
+            attachments_deleted,
             events_retention_days = max_days.max(EVENTS_RETENTION_FLOOR_DAYS),
             trace_retention_days = trace_days,
             "retention pass complete"
         );
     }
-    Ok(RetentionStats { created, dropped, traces_deleted, orphan_traces_deleted })
+    Ok(RetentionStats {
+        created,
+        dropped,
+        traces_deleted,
+        orphan_traces_deleted,
+        attachments_deleted,
+    })
 }
 
 #[derive(Debug)]
@@ -104,6 +123,7 @@ pub struct RetentionStats {
     pub dropped: u32,
     pub traces_deleted: u64,
     pub orphan_traces_deleted: u64,
+    pub attachments_deleted: u64,
 }
 
 /// Delete `traces` rows with `last_seen` older than `cutoff`. (traces
@@ -115,6 +135,49 @@ pub async fn prune_traces(pool: &PgPool, cutoff: OffsetDateTime) -> Result<u64, 
         .execute(pool)
         .await?
         .rows_affected())
+}
+
+/// Phase 42 sub-C.07 — drop attachment rows + on-disk blobs older
+/// than the events retention cutoff. Run as part of the daily sweep
+/// so a partition drop doesn't leave dangling screenshots on disk.
+///
+/// Algorithm:
+///   1. SELECT (project_id, event_id) over `event_attachments` with
+///      `received_at < cutoff`, deduped to one delete call per event.
+///   2. Call `AttachmentStore::delete_event` for each — single
+///      directory remove on `LocalFsAttachmentStore`.
+///   3. DELETE the rows. Best-effort: a transient store failure on
+///      step 2 still lets step 3 run so we don't pile up tombstones.
+pub async fn prune_attachments(
+    pool: &PgPool,
+    store: &crate::attachments::SharedAttachmentStore,
+    cutoff: OffsetDateTime,
+) -> Result<u64, anyhow::Error> {
+    let rows: Vec<(uuid::Uuid, uuid::Uuid)> = sqlx::query_as(
+        "SELECT DISTINCT project_id, event_id FROM event_attachments \
+         WHERE received_at < $1",
+    )
+    .bind(cutoff)
+    .fetch_all(pool)
+    .await?;
+
+    for (project_id, event_id) in &rows {
+        if let Err(e) = store.delete_event(*project_id, *event_id).await {
+            tracing::warn!(
+                error = %e,
+                %project_id,
+                %event_id,
+                "attachment blob delete failed; continuing with row delete"
+            );
+        }
+    }
+
+    let deleted = sqlx::query("DELETE FROM event_attachments WHERE received_at < $1")
+        .bind(cutoff)
+        .execute(pool)
+        .await?
+        .rows_affected();
+    Ok(deleted)
 }
 
 /// Delete `traces` rows where the root span never arrived — i.e.

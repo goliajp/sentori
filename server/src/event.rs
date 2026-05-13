@@ -55,6 +55,27 @@ pub struct Event {
     /// range). Clients never send this.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub symbolication: Option<SymbolicationInfo>,
+
+    /// Phase 42 sub-C.05: references to blobs previously uploaded to
+    /// `/v1/events/{id}/attachments/<kind>`. The `ref` field is the
+    /// only one we trust — server looks it up in `event_attachments`
+    /// to verify it was issued for this (event_id, project_id) tuple.
+    /// Other fields are echoed back to the dashboard for display.
+    #[serde(default)]
+    pub attachments: Vec<AttachmentRef>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttachmentRef {
+    pub r#ref: Uuid,
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size_bytes: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

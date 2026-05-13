@@ -47,6 +47,11 @@ pub struct AppState {
     pub session_secret: String,
     pub notifier_tx: Option<tokio::sync::mpsc::Sender<crate::notifier::NotifyEvent>>,
     pub base_url: String,
+    /// Phase 42 sub-C.02: pluggable storage for screenshots / view
+    /// trees / state snapshots. When `SENTORI_ATTACHMENT_DIR` isn't
+    /// set this is a `NoopAttachmentStore` and uploads return 503
+    /// `attachmentsDisabled`.
+    pub attachments: crate::attachments::SharedAttachmentStore,
 }
 
 impl FromRef<AppState> for AuthState {

@@ -14,6 +14,7 @@ import {
 } from '@/api/client'
 import { useAuth } from '@/auth/state'
 import { useOrg } from '@/auth/orgContext'
+import { AttachmentGallery } from '@/components/AttachmentGallery'
 import { FrameRoleBadge } from '@/components/FrameRoleBadge'
 import { IssueDetailSkeleton } from '@/components/IssueDetailSkeleton'
 import { OpenInEditorButton } from '@/components/OpenInEditorButton'
@@ -466,6 +467,8 @@ function StackTab({
           </div>
         </Section>
       )}
+
+      <AttachmentGallery attachments={payload.attachments} eventId={event.id} />
 
       <ReleaseArtifactsPanel projectId={projectId} release={payload.release} />
 

@@ -150,6 +150,20 @@ export type ServerEvent = {
   timestamp: string
   traceId: null | string
   user: null | { anonymous?: boolean; id?: string }
+  /** Phase 42 sub-C.09: SDK-uploaded attachments (screenshots, view
+   *  trees, state snapshots). Each `ref` is server-issued; the
+   *  dashboard fetches the blob via
+   *  `GET /admin/api/events/<id>/attachments/<ref>`. Empty / absent
+   *  on every event today; sub-D / sub-E / sub-F wire the SDK side. */
+  attachments?: Attachment[]
+}
+
+export type Attachment = {
+  ref: string
+  kind: 'logTail' | 'screenshot' | 'stateSnapshot' | 'viewTree'
+  mediaType?: string
+  sizeBytes?: number
+  source?: 'android' | 'ios' | 'js'
 }
 
 export type SentoriError = {

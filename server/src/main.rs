@@ -98,7 +98,10 @@ async fn main() -> anyhow::Result<()> {
     // events partitions exist, drop any monthly partition whose upper
     // bound is older than the longest retention period any plan grants.
     if let Some(p) = pool.as_ref() {
-        retention::spawn_retention_task(p.clone());
+        retention::spawn_retention_task(
+            p.clone(),
+            sentori_server::attachments::build_default_store(),
+        );
         tracing::info!("retention task spawned (24h interval)");
     }
 
@@ -180,6 +183,7 @@ async fn main() -> anyhow::Result<()> {
         base_url,
         metrics: Some(metrics_handle),
         self_trace,
+        attachments: Some(sentori_server::attachments::build_default_store()),
     });
     axum::serve(listener, app).await?;
 

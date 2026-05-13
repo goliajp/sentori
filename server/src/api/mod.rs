@@ -1,6 +1,7 @@
 pub mod admin;
 pub mod admin_auth;
 pub mod alert_rules;
+pub mod attachments;
 pub mod deploys;
 pub mod digests;
 pub mod dsyms;

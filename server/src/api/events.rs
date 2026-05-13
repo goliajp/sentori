@@ -120,6 +120,15 @@ pub(crate) async fn persist_with_grouping(
     event: &mut Event,
 ) -> Result<(), sqlx::Error> {
     let pool = state.db.as_ref().expect("persist_with_grouping requires db");
+    // Phase 42 sub-C.05: every claimed attachment ref must match a
+    // row we issued for this (event_id, project_id). A mismatch means
+    // either a forged ref or a cross-event swap — drop the bad refs
+    // (not the whole event) so the dashboard still gets the error
+    // text + stack. Single-path: lives here so both /v1/events and
+    // /v1/events:batch run the check.
+    if !event.attachments.is_empty() {
+        event.attachments = filter_valid_attachments(pool, project_id, event).await;
+    }
     // Phase 40 sub-C: if a source map is uploaded for this release,
     // rewrite the stack to original source *before* grouping — so the
     // issue keys on `src/Foo.tsx:42` not `index.bundle:1:288432`, and
@@ -219,4 +228,49 @@ async fn persist_event_row(
     .await?;
 
     Ok(())
+}
+
+
+/// Phase 42 sub-C.05 — drop any `event.attachments[].ref` we don't
+/// have a matching `event_attachments` row for. The row must match
+/// both the event_id and project_id we'd associate this event with.
+/// Returns the surviving refs in input order.
+async fn filter_valid_attachments(
+    pool: &sqlx::PgPool,
+    project_id: Uuid,
+    event: &Event,
+) -> Vec<crate::event::AttachmentRef> {
+    if event.attachments.is_empty() {
+        return Vec::new();
+    }
+    let refs: Vec<Uuid> = event.attachments.iter().map(|a| a.r#ref).collect();
+    let found: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT ref FROM event_attachments \
+         WHERE ref = ANY($1) AND event_id = $2 AND project_id = $3",
+    )
+    .bind(&refs)
+    .bind(event.id)
+    .bind(project_id)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+    let valid: std::collections::HashSet<Uuid> = found.into_iter().collect();
+    let mut out = Vec::with_capacity(event.attachments.len());
+    let mut dropped = 0u32;
+    for a in &event.attachments {
+        if valid.contains(&a.r#ref) {
+            out.push(a.clone());
+        } else {
+            dropped += 1;
+        }
+    }
+    if dropped > 0 {
+        tracing::warn!(
+            event_id = %event.id,
+            %project_id,
+            dropped,
+            "dropped attachment refs not matching any row"
+        );
+    }
+    out
 }
