@@ -25,6 +25,7 @@ ENV VITE_SENTORI_TOKEN=$VITE_SENTORI_TOKEN \
 
 # Manifest layer — cached unless a package.json or the lockfile changes.
 COPY package.json bun.lock ./
+COPY sdk/cli/package.json ./sdk/cli/
 COPY sdk/core/package.json ./sdk/core/
 COPY sdk/javascript/package.json ./sdk/javascript/
 COPY sdk/react/package.json ./sdk/react/
