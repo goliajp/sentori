@@ -30,6 +30,7 @@ pub mod actions {
 
     pub const PROJECT_CREATED: &str = "project.created";
     pub const PROJECT_UPDATED: &str = "project.updated";
+    pub const ISSUE_MERGED: &str = "issue.merged";
     pub const PROJECT_TEAM_BOUND: &str = "project.team.bound";
     pub const PROJECT_TEAM_UNBOUND: &str = "project.team.unbound";
 

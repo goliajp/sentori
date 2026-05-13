@@ -136,6 +136,9 @@ export function IssuesView() {
         lastSeenAfter: parsed.lastSeenAfter,
         limit: PAGE_SIZE,
         release: parsed.release,
+        // Phase 44 sub-D: server-side full-text. Bare tokens in the
+        // search bar (e.g. "TypeError" / "boom") flow into `search`.
+        search: parsed.freeText,
         status: effectiveStatus,
       }),
     queryKey: [
@@ -146,6 +149,7 @@ export function IssuesView() {
       parsed.release,
       parsed.errorType,
       parsed.lastSeenAfter,
+      parsed.freeText ?? '',
     ],
   })
   const data = useMemo(

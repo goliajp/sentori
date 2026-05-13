@@ -1,4 +1,5 @@
-import { getBreadcrumbs } from './breadcrumbs.js';
+import { shouldSample } from '@goliapkg/sentori-core';
+import { addBreadcrumb, getBreadcrumbs } from './breadcrumbs.js';
 import { getConfig, isInitialized } from './config.js';
 import { markSessionErrored } from './session-tracker.js';
 import { parseStack } from './stack.js';
@@ -22,6 +23,12 @@ export function captureError(error, extras) {
     if (!isInitialized())
         return;
     const cfg = getConfig();
+    // Phase 44 sub-B: client-side sampling. Drop sampled-out events
+    // before any work (breadcrumbs / transport).
+    if (!shouldSample(cfg.sampling?.errors ?? null)) {
+        addBreadcrumb({ data: { kind: 'error', reason: 'sampled-out' }, type: 'custom' });
+        return;
+    }
     const event = {
         app: { version: parseRelease(cfg.release).version },
         breadcrumbs: getBreadcrumbs(),

@@ -1,3 +1,5 @@
+import { shouldSample } from '@goliapkg/sentori-core';
+
 import { addBreadcrumb, getBreadcrumbs } from './breadcrumbs';
 import { getConfig, isInitialized } from './config';
 import { symbolicateErrorViaMetro } from './handlers/dev-symbolicate';
@@ -59,6 +61,14 @@ export const captureError = (error: Error, extras?: CaptureExtras): void => {
   if (!isInitialized()) return;
   const config = getConfig();
   if (!config) return;
+
+  // Phase 44 sub-B: client-side sampling. Skip the whole pipeline
+  // (no screenshot capture either) when the sample dice come up
+  // wrong. Default rate = null = keep, so existing callers unaffected.
+  if (!shouldSample(config.errorSampleRate)) {
+    addBreadcrumb({ type: 'custom', data: { reason: 'sampled-out', kind: 'error' } });
+    return;
+  }
 
   const event: Event = {
     id: uuidV7(),

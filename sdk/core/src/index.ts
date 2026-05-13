@@ -13,12 +13,15 @@ export type {
   EventKind,
   Frame,
   Platform,
+  SamplingConfig,
   SentoriError,
   Span,
   SpanStatus,
   Tags,
   User,
 } from './types.js'
+
+export { shouldSample, shouldSampleTrace } from './sampling.js'
 
 export { uuidV7 } from './uuid.js'
 

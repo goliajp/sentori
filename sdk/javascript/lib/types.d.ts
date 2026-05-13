@@ -9,5 +9,12 @@ import type { CommonInitOptions } from '@goliapkg/sentori-core';
 export type InitOptions = CommonInitOptions & {
     /** Override automatic global hooks. Default: true on browser + node. */
     enableGlobalHooks?: boolean;
+    /** Phase 44 sub-B — client-side sampling rates `[0, 1]`. Absent /
+     *  null → 1.0 (keep everything). `traces` is deterministic over
+     *  traceId so all spans of a trace share the same decision. */
+    sampling?: {
+        errors?: null | number;
+        traces?: null | number;
+    };
 };
 //# sourceMappingURL=types.d.ts.map

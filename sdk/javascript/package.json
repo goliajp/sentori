@@ -40,7 +40,7 @@
     "README.md"
   ],
   "dependencies": {
-    "@goliapkg/sentori-core": "0.4.1"
+    "@goliapkg/sentori-core": "0.5.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

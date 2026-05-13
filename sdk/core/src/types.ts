@@ -142,3 +142,23 @@ export type CommonInitOptions = {
   /** Public token, format `st_pk_<26 base32 chars>`. */
   token: string
 }
+
+/**
+ * Phase 44 sub-A — per-event-class client-side sampling. Each rate
+ * is in `[0, 1]`; absent / null → 1.0 (keep everything). The
+ * **client** drops sampled-out events before they ever leave the
+ * device, so a 10w-user app can dial down trace volume by 10x
+ * without ingest-side budget changes.
+ *
+ * `traces` is sampled deterministically over `traceId` so every
+ * span in the same trace shares the same decision — you never get
+ * the root-span-without-children / half-trace shape.
+ *
+ * `errors` is sampled uniformly per event (no notion of "session"
+ * here); apps that want a session-keyed decision can pre-compute
+ * a derived rate per session and feed it through.
+ */
+export type SamplingConfig = {
+  errors?: null | number
+  traces?: null | number
+}

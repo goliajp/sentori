@@ -196,6 +196,34 @@ pub struct ErrorObject {
 
     #[serde(default)]
     pub cause: Option<Box<ErrorObject>>,
+
+    /// Phase 44 sub-E — cross-stack cause chain. When the SDK
+    /// recognises that this error was triggered by an earlier
+    /// native crash (or the native crash bridge bubbled up into JS),
+    /// the SDK stamps a pointer into the related issue here. The
+    /// dashboard renders it as the deepest "caused by" card with a
+    /// link to the native issue's own detail page.
+    ///
+    /// Server side is **purely pass-through**: we don't validate
+    /// the issueId resolves to an existing native issue (it might
+    /// have been deleted / not arrived yet); the dashboard handles
+    /// the broken-link case. Fields are kept tight (no full stack)
+    /// so events don't double in size when SDK starts populating it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_error: Option<NativeErrorRef>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Validate)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeErrorRef {
+    /// Issue id of the native crash — `issues.id` UUID. Dashboard
+    /// builds the back-link from this.
+    pub issue_id: uuid::Uuid,
+    /// Echoed for dashboard rendering without a second round-trip.
+    #[validate(length(max = 256))]
+    pub r#type: String,
+    #[validate(length(max = 4096))]
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Validate)]

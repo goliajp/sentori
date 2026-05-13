@@ -171,6 +171,18 @@ export type SentoriError = {
   message: string
   stack: Frame[]
   type: string
+  /** Phase 44 sub-E: SDK-asserted pointer to a related native crash
+   *  issue. When set, the dashboard appends a final "caused by →
+   *  native crash" card to the cause chain that links to the
+   *  native issue's detail page. Server pass-through only; the
+   *  dashboard validates the link itself. */
+  nativeError?: null | NativeErrorRef
+}
+
+export type NativeErrorRef = {
+  issueId: string
+  type: string
+  message: string
 }
 
 export type Frame = {
@@ -247,6 +259,17 @@ export const adminApi = {
       body: JSON.stringify(body),
       method: 'PATCH',
     }),
+
+  /** Phase 44 sub-C: merge `sourceIssueId`'s events into
+   *  `targetIssueId` and delete the source. */
+  mergeIssue: (projectId: string, sourceIssueId: string, targetIssueId: string) =>
+    adminFetch<{ eventsMoved: number; targetIssueId: string }>(
+      `/projects/${projectId}/issues/${sourceIssueId}/merge`,
+      {
+        body: JSON.stringify({ targetIssueId }),
+        method: 'POST',
+      }
+    ),
 
   /** Phase 24 sub-D / Phase 25 sub-F — bulk status / assign. */
   bulkPatchIssues: (
@@ -342,6 +365,9 @@ export const adminApi = {
       lastSeenAfter?: string
       limit?: number
       release?: string
+      /** Phase 44 sub-D: free-text search across `error_type +
+       *  message_sample` on `issues`. Multiple words → AND. */
+      search?: string
       status?: string
     } = {}
   ): Promise<{ issues: IssueRow[]; nextCursor: null | string }> => {
@@ -352,6 +378,7 @@ export const adminApi = {
     if (params.release) usp.set('release', params.release)
     if (params.errorType) usp.set('errorType', params.errorType)
     if (params.lastSeenAfter) usp.set('lastSeenAfter', params.lastSeenAfter)
+    if (params.search) usp.set('search', params.search)
     if (params.cursor) usp.set('cursor', params.cursor)
     const qs = usp.toString() ? `?${usp.toString()}` : ''
     const resp = await fetch(`${ADMIN_BASE}/projects/${projectId}/issues${qs}`, {

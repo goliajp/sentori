@@ -18,6 +18,7 @@ import { AttachmentGallery } from '@/components/AttachmentGallery'
 import { FrameRoleBadge } from '@/components/FrameRoleBadge'
 import { IssueDetailSkeleton } from '@/components/IssueDetailSkeleton'
 import { CopyMarkdownButton } from '@/components/CopyMarkdownButton'
+import { MergeIssueButton } from '@/components/MergeIssueButton'
 import { OpenInEditorButton } from '@/components/OpenInEditorButton'
 import { SourceCode } from '@/components/SourceCode'
 import { ErrorState } from '@/components/states'
@@ -154,6 +155,7 @@ export function IssueDetailView() {
               user's IDE. Disabled when the first in-app frame's file
               isn't an absolute local path (e.g. unsymbolicated stacks). */}
           <CopyMarkdownButton event={selectedEvent} issue={issue} orgSlug={currentOrg.slug} />
+          <MergeIssueButton issueId={issueId} orgSlug={currentOrg.slug} projectId={projectId!} />
           <OpenInEditorButton
             frame={selectedEvent?.payload.error.stack.find((f) => f.inApp) ?? null}
           />
@@ -1232,7 +1234,37 @@ function CauseChain({
           symbolication={symbolication}
         />
       )}
+      {/* Phase 44 sub-E: cross-stack cause — SDK-asserted pointer to
+          a native crash issue. Renders below the JS cause chain so
+          the operator sees "the JS error stemmed from this native
+          crash, click to see its stack". */}
+      {error.nativeError && <NativeErrorCard nativeError={error.nativeError} />}
     </div>
+  )
+}
+
+function NativeErrorCard({
+  nativeError,
+}: {
+  nativeError: NonNullable<SentoriError['nativeError']>
+}) {
+  const { currentOrg } = useOrg()
+  return (
+    <Link
+      className="mt-4 block rounded-md border-l-4 border-amber-500/40 bg-amber-500/[0.04] p-3 transition-colors hover:border-amber-500/60"
+      to={`/org/${currentOrg.slug}/issues/${nativeError.issueId}`}
+    >
+      <p className="text-fg text-[12px] leading-relaxed">
+        <span className="mr-1.5 inline-block font-mono text-[11px] tracking-wider text-amber-300 uppercase">
+          ↪ caused by native crash
+        </span>
+        <span className="text-fg-muted font-mono">{nativeError.type}:</span>{' '}
+        <span className="text-fg">{nativeError.message}</span>
+      </p>
+      <p className="text-fg-muted mt-1 text-[11px]">
+        Open native issue → <span className="font-mono">{nativeError.issueId.slice(0, 8)}</span>
+      </p>
+    </Link>
   )
 }
 

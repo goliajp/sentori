@@ -120,6 +120,14 @@ pub struct ListIssuesQuery {
     /// when unset.
     #[serde(default)]
     pub cursor: Option<String>,
+    /// Phase 44 sub-D: free-text search across `error_type +
+    /// message_sample` via the `search_vector` GIN index on
+    /// `issues`. Sent by the dashboard search bar when the user
+    /// types a `query` token that isn't a known field. Uses
+    /// Postgres `plainto_tsquery('simple', ...)` so callers don't
+    /// have to learn tsquery syntax; multiple words become an AND.
+    #[serde(default)]
+    pub search: Option<String>,
 }
 
 fn default_status() -> String {
@@ -147,6 +155,14 @@ pub async fn list_issues(
     // → ignored (forward-compat with future cursor schemes).
     let cursor: Option<(OffsetDateTime, Uuid)> = q.cursor.as_deref().and_then(parse_cursor);
 
+    // Phase 44 sub-D: normalize search input. Empty / whitespace-only
+    // → None so we don't bother the tsquery planner.
+    let search_filter: Option<&str> = q
+        .search
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+
     let rows: Vec<IssueRow> = sqlx::query_as(
         r#"
         SELECT i.id, i.fingerprint, i.error_type, i.message_sample, i.status,
@@ -169,6 +185,8 @@ pub async fn list_issues(
             OR i.last_seen < $7::TIMESTAMPTZ
             OR (i.last_seen = $7::TIMESTAMPTZ AND i.id < $8::UUID)
           )
+          AND ($10::TEXT IS NULL
+               OR i.search_vector @@ plainto_tsquery('simple', $10))
         ORDER BY i.last_seen DESC, i.id DESC
         LIMIT $9
         "#,
@@ -182,6 +200,7 @@ pub async fn list_issues(
     .bind(cursor.map(|c| c.0))
     .bind(cursor.map(|c| c.1))
     .bind(limit)
+    .bind(search_filter)
     .fetch_all(pool)
     .await
     .map_err(|e| AppError::Internal(e.to_string()))?;
@@ -354,6 +373,146 @@ where
 // fresh event. Patching to `resolved` clears any stale `regressed_at`
 // markers so the timeline reads correctly on the next regression.
 const ALLOWED_STATUSES: &[&str] = &["active", "silenced", "closed", "resolved"];
+
+// ───────────────────── Phase 44 sub-C — issue merge ─────────────────
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeIssueBody {
+    /// Issue id to absorb this one's events into. Must live in the
+    /// same project (we never cross-project merge).
+    pub target_issue_id: Uuid,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeIssueResponse {
+    /// How many events were re-pointed.
+    pub events_moved: i64,
+    /// Surviving issue id (the target).
+    pub target_issue_id: Uuid,
+}
+
+/// `POST /admin/api/projects/{project_id}/issues/{issue_id}/merge`
+///
+/// Move every event from `issue_id` to `target_issue_id` then delete
+/// the source row. Both issues must be in the same project. Used to
+/// rejoin issues that the auto-fingerprinter split apart (e.g. a
+/// minor stack-trace variation that should logically group).
+///
+/// Implementation:
+///   1. UPDATE events SET issue_id = target WHERE issue_id = source
+///   2. UPDATE target.event_count + last_seen/first_seen window
+///   3. DELETE source row
+/// All in one transaction so a crash mid-merge can't strand events
+/// pointed at a deleted issue.
+pub async fn merge_issue(
+    State(state): State<AppState>,
+    Extension(caller): Extension<crate::api::admin_auth::AdminCaller>,
+    Path((project_id, issue_id)): Path<(Uuid, Uuid)>,
+    Json(body): Json<MergeIssueBody>,
+) -> Result<Response, AppError> {
+    let pool = state.db.as_ref().ok_or(AppError::DatabaseUnavailable)?;
+
+    if issue_id == body.target_issue_id {
+        return Ok((
+            axum::http::StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "selfMerge" })),
+        )
+            .into_response());
+    }
+
+    // Both issues must exist in the same project.
+    let both: Vec<(Uuid,)> = sqlx::query_as(
+        "SELECT id FROM issues WHERE project_id = $1 AND id = ANY($2::UUID[])",
+    )
+    .bind(project_id)
+    .bind(vec![issue_id, body.target_issue_id])
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+    if both.len() < 2 {
+        return Ok((
+            axum::http::StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "issueNotFound" })),
+        )
+            .into_response());
+    }
+
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    let moved: i64 = sqlx::query_scalar(
+        "WITH moved AS (\
+             UPDATE events SET issue_id = $1 WHERE issue_id = $2 \
+             RETURNING 1\
+         ) SELECT COUNT(*) FROM moved",
+    )
+    .bind(body.target_issue_id)
+    .bind(issue_id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    sqlx::query(
+        "UPDATE issues \
+         SET event_count = event_count + $2, \
+             first_seen = LEAST(first_seen, (SELECT first_seen FROM issues WHERE id = $3)), \
+             last_seen = GREATEST(last_seen, (SELECT last_seen FROM issues WHERE id = $3)) \
+         WHERE id = $1",
+    )
+    .bind(body.target_issue_id)
+    .bind(moved)
+    .bind(issue_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    sqlx::query("DELETE FROM issues WHERE id = $1")
+        .bind(issue_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    if let Ok(org_id) = sqlx::query_scalar::<_, Uuid>(
+        "SELECT org_id FROM projects WHERE id = $1",
+    )
+    .bind(project_id)
+    .fetch_one(pool)
+    .await
+    {
+        let actor = match &caller {
+            crate::api::admin_auth::AdminCaller::User { id, .. } => Some(*id),
+            _ => None,
+        };
+        crate::audit::record(
+            pool,
+            org_id,
+            actor,
+            crate::audit::actions::ISSUE_MERGED,
+            crate::audit::targets::PROJECT,
+            Some(project_id),
+            serde_json::json!({
+                "source": issue_id,
+                "target": body.target_issue_id,
+                "eventsMoved": moved,
+            }),
+        )
+        .await;
+    }
+
+    Ok(Json(MergeIssueResponse {
+        events_moved: moved,
+        target_issue_id: body.target_issue_id,
+    })
+    .into_response())
+}
 
 pub async fn patch_issue(
     State(state): State<AppState>,

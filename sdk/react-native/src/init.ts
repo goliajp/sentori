@@ -39,6 +39,16 @@ export type InitOptions = {
      *  image is webp q=70 480 px max, < 100 KB typical. */
     screenshot?: boolean;
   };
+  /** Phase 44 sub-B: client-side sampling. Each rate is `[0, 1]`;
+   *  absent / null keeps everything. Defaults to 1.0 for both
+   *  (no drop). Set traces to e.g. 0.1 once the app's at user
+   *  volume to keep ingest budget under control without changing
+   *  the server-side quota. Decisions are made per-event for
+   *  errors and per-trace (all spans together) for traces. */
+  sampling?: {
+    errors?: null | number;
+    traces?: null | number;
+  };
 };
 
 const DEFAULT_INGEST_URL = 'https://ingest.sentori.golia.jp';
@@ -62,6 +72,8 @@ export const init = (options: InitOptions): void => {
     ingestUrl: options.ingestUrl ?? DEFAULT_INGEST_URL,
     enabled: true,
     screenshotsEnabled: options.capture?.screenshot === true,
+    errorSampleRate: options.sampling?.errors ?? null,
+    traceSampleRate: options.sampling?.traces ?? null,
   });
 
   // Tell the native crash handler about the config so the JSON it writes

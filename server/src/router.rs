@@ -173,6 +173,12 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/issues/{issue_id}",
             get(api::admin::issue_detail).patch(api::admin::patch_issue),
         )
+        // Phase 44 sub-C: manual fingerprint rewrite — merge one
+        // issue's events into another.
+        .route(
+            "/projects/{project_id}/issues/{issue_id}/merge",
+            post(api::admin::merge_issue),
+        )
         .route(
             "/projects/{project_id}/issues/{issue_id}/events",
             get(api::admin::list_events_for_issue),
