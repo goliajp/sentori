@@ -490,12 +490,13 @@ Phase 40 sub-A/B/C 完成。剩下的（dashboard 渲染、dev-mode、publish、
 - [x] commit `v0.5 day 1: publish parseStack fix + getting-started sourcemap section`
 - ✅ Insight 这之后可升 `sentori-react-native@0.5.5`（更干净的 Hermes 帧），但**不是必须**——上面 ⚑ 已说明
 
-### Day 2 — server 401 hint + 符号化失败诊断
+### Day 2 — server 401 hint + 符号化状态 meta ✅
 
-- [ ] server：admin auth / ingest auth 的 `401` response body 加 `hint` 字段（`token must start with st_pk_` / `token revoked` / `token does not belong to this project` 各给清晰文案）—— 吸收原 Phase 30 sub-B top-2，上传 CLI 和 SDK ingest 都受益
-- [ ] server：`symbolicate_event` 返回的不只是 bool —— 给事件存一个 `symbolication` meta（`{ status: "ok" | "no_sourcemap" | "no_releases_match" | "partial", release, sourcemapReleases?: [...] }`）放进 payload，供 dashboard 区分"该 release 没传 sourcemap" vs "传了别的 release（mismatch）" vs "传了但部分帧落在 map 外"
-- [ ] 测试：401 body 形状（lib / 集成）；`symbolicate_event` 各状态。`cargo test --lib` / `--all-targets --no-run` 绿
-- [ ] commit `v0.5 day 2: 401 hint + symbolication status meta`
+- [x] `server/src/auth.rs`：`require_token`（ingest）+ `require_admin` 的 `401` body 加 `hint` 字段；`token_hint(token)` helper 按前缀给文案 —— 无 `Bearer` header / 错前缀（不是 `st_pk_`/`sk_`，可能贴成了 org slug 或 project id）/ 对前缀但不识别（revoked 或别的 project）/ admin 还可以 "log in via dashboard"。`ErrorBody` 加 `hint` 字段（现有 401 测试只查 status code，不破）
+- [x] `server/src/event.rs`：`Event` 加 server-set 的 `symbolication: Option<SymbolicationInfo>`（`{ releaseHasMap: bool }`，`#[serde(default, skip_serializing_if=Option::is_none)]`）；`persist_with_grouping` 把 `symbolicate_event` 的返回（"该 release 有没有 sourcemap"）写进去 —— dashboard（Day 3）就能区分"没传 sourcemap" vs "传了但帧没解析（map 不匹配/帧在 map 外）"。（"传了别的 release" 这种 mismatch 检测需要查别的 release 的 map，留 Day 3 dashboard 那边按需做）
+- [x] docs：`docs/protocol.md`（+ docs-site 镜像）401 行加 `hint` 说明；Event schema 加 `symbolication` 行
+- [x] 测试：`auth.rs` +1（`token_hint` 区分形状 vs 值）。`cargo test --lib` 36→37、`--all-targets --no-run` 通过
+- [x] commit `v0.5 day 2: 401 hint + symbolication status meta`
 
 ### Day 3 — ingest 时填源码片段 + dashboard 内联渲染 + vendor 折叠
 

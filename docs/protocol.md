@@ -214,7 +214,7 @@ Documentation **must not** use the term "DSN". Always say "token + ingest URL".
 |---|---|---|
 | `202 Accepted` | Event(s) accepted (not necessarily persisted yet) | `{}` |
 | `400 Bad Request` | Schema validation failed | see below |
-| `401 Unauthorized` | Missing, malformed, or unknown token | `{ "error": "unauthorized" }` |
+| `401 Unauthorized` | Missing, malformed, or unknown token | `{ "error": "unauthorized", "hint": "<what's likely wrong>" }` — the `hint` distinguishes "no `Authorization: Bearer` header", "token has the wrong prefix (not `st_pk_`/`sk_`)", and "right shape but unrecognized (revoked / wrong project)" |
 | `413 Payload Too Large` | Event > 1 MB or batch > 1 MB | `{ "error": "payloadTooLarge" }` |
 | `429 Too Many Requests` | Rate limit hit | see below; `Retry-After` header set |
 | `500 Internal Server Error` | Server fault; SDK should retry with backoff | `{ "error": "internal" }` |
@@ -260,6 +260,7 @@ A single event is a JSON object with these top-level fields:
 | `fingerprint` | array<string> | no | client-suggested grouping; server may override per project rules |
 | `traceId` | string \| null | no | uuid v7 of the surrounding trace. Set by SDK when the error fires inside an active span; links back to a row on `/admin/api/traces/<traceId>`. v0.4+. |
 | `spanId` | string \| null | no | uuid v7 of the span the error happened inside (often the innermost active span). The dashboard renders an "In trace →" pill on the issue page that jumps to the trace detail view, scrolled to this span. v0.4+. |
+| `symbolication` | object \| absent | **server-set** | `{ "releaseHasMap": bool }` — set at ingest. `true` means a `kind: sourcemap` artifact exists for this `release`; if frames are still raw despite `true`, the uploaded map likely doesn't match this build (or the frames fall outside it). Lets the dashboard say *why* a stack is unsymbolicated. Clients never send this. v0.5+. |
 
 ### Device
 

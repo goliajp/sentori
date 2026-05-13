@@ -48,6 +48,21 @@ pub struct Event {
 
     #[serde(default)]
     pub span_id: Option<String>,
+
+    /// Server-set at ingest. Lets the dashboard tell apart "no source
+    /// map uploaded for this release" from "a map exists but these
+    /// frames didn't resolve through it" (wrong build / frame outside
+    /// range). Clients never send this.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symbolication: Option<SymbolicationInfo>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SymbolicationInfo {
+    /// True if a `kind: sourcemap` artifact is uploaded for this
+    /// event's `release`.
+    pub release_has_map: bool,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]

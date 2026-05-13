@@ -115,9 +115,13 @@ pub async fn require_admin(
             return next.run(req).await;
         }
     }
+    let hint = match bearer {
+        Some(token) => crate::auth::token_hint(token),
+        None => "log in via the dashboard, or send `Authorization: Bearer <sk_… admin token>` (project settings → tokens)",
+    };
     (
         StatusCode::UNAUTHORIZED,
-        Json(json!({ "error": "unauthorized" })),
+        Json(json!({ "error": "unauthorized", "hint": hint })),
     )
         .into_response()
 }

@@ -109,6 +109,7 @@ pub fn hash_token(token: &str) -> String {
 #[derive(Serialize)]
 struct ErrorBody {
     error: &'static str,
+    hint: &'static str,
 }
 
 pub async fn require_token(
@@ -123,23 +124,46 @@ pub async fn require_token(
         .and_then(|h| h.strip_prefix("Bearer "));
 
     let Some(token) = token else {
-        return unauthorized();
+        return unauthorized("send `Authorization: Bearer <st_pk_… token>` — find it in the dashboard under project settings → tokens");
     };
 
     let Some(caller) = state.resolve(token).await else {
-        return unauthorized();
+        return unauthorized(token_hint(token));
     };
 
     req.extensions_mut().insert(caller);
     next.run(req).await
 }
 
-fn unauthorized() -> Response {
+/// Pick a 401 hint by inspecting the rejected token's shape.
+pub(crate) fn token_hint(token: &str) -> &'static str {
+    if token.starts_with("st_pk_") || token.starts_with("sk_") {
+        "token has the right prefix but wasn't recognized — it may have been revoked, or it belongs to a different project"
+    } else {
+        "token must start with `st_pk_` (ingest) or `sk_` (admin) — you may have pasted the wrong value (e.g. an org slug or project id)"
+    }
+}
+
+fn unauthorized(hint: &'static str) -> Response {
     (
         StatusCode::UNAUTHORIZED,
-        Json(ErrorBody {
-            error: "unauthorized",
-        }),
+        Json(ErrorBody { error: "unauthorized", hint }),
     )
         .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::token_hint;
+
+    #[test]
+    fn token_hint_distinguishes_shape_from_value() {
+        // Right prefix, wrong value → "revoked / wrong project".
+        assert!(token_hint("st_pk_deadbeef").contains("revoked"));
+        assert!(token_hint("sk_abc123").contains("revoked"));
+        // Not a token at all → "must start with st_pk_ / sk_".
+        assert!(token_hint("my-org-slug").contains("must start with"));
+        assert!(token_hint("019508a0-0001-7000-8000-000000000000").contains("must start with"));
+        assert!(token_hint("").contains("must start with"));
+    }
 }

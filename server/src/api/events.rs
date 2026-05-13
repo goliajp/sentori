@@ -124,9 +124,14 @@ pub(crate) async fn persist_with_grouping(
     // rewrite the stack to original source *before* grouping — so the
     // issue keys on `src/Foo.tsx:42` not `index.bundle:1:288432`, and
     // the stored payload is already symbolicated. Best-effort.
-    if let Err(e) = crate::symbolicate::symbolicate_event(pool, event).await {
-        tracing::warn!(error = %e, release = %event.release, "symbolicate at ingest failed; storing raw");
-    }
+    let release_has_map = match crate::symbolicate::symbolicate_event(pool, event).await {
+        Ok(has_map) => has_map,
+        Err(e) => {
+            tracing::warn!(error = %e, release = %event.release, "symbolicate at ingest failed; storing raw");
+            false
+        }
+    };
+    event.symbolication = Some(crate::event::SymbolicationInfo { release_has_map });
     let fp = crate::grouping::fingerprint(event);
     let outcome = crate::issues::upsert_issue(pool, project_id, &fp, event).await?;
     persist_event_row(pool, project_id, event, Some(outcome.issue_id)).await?;
