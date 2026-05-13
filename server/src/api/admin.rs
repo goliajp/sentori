@@ -128,6 +128,15 @@ pub async fn list_issues(
     let pool = state.db.as_ref().ok_or(AppError::DatabaseUnavailable)?;
     let limit = q.limit.unwrap_or(100).clamp(1, 500);
 
+    // `status="any"` (or empty) skips the filter — used by the
+    // dashboard's onboarding-pending check, which needs "has this
+    // project ever received an event?" and shouldn't disappear once
+    // the only issue is resolved.
+    let status_filter: Option<&str> = match q.status.as_str() {
+        "" | "any" => None,
+        s => Some(s),
+    };
+
     // Decode cursor (last_seen, id). Unset → unbounded; bad format
     // → ignored (forward-compat with future cursor schemes).
     let cursor: Option<(OffsetDateTime, Uuid)> = q.cursor.as_deref().and_then(parse_cursor);
@@ -144,7 +153,7 @@ pub async fn list_issues(
         FROM issues i
         LEFT JOIN users u ON u.id = i.assignee_user_id
         WHERE i.project_id = $1
-          AND i.status = $2
+          AND ($2::TEXT IS NULL OR i.status = $2)
           AND ($3::TEXT IS NULL OR i.last_environment = $3)
           AND ($4::TEXT IS NULL OR i.last_release = $4)
           AND ($5::TEXT IS NULL OR i.error_type = $5)
@@ -159,7 +168,7 @@ pub async fn list_issues(
         "#,
     )
     .bind(project_id)
-    .bind(&q.status)
+    .bind(status_filter)
     .bind(q.env.as_deref())
     .bind(q.release.as_deref())
     .bind(q.error_type.as_deref())

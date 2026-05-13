@@ -9,13 +9,17 @@ import { adminApi, type ProjectRow } from '@/api/client'
  * any events yet). Click → /onboarding picks back up.
  *
  * "Has the project received events" is approximated as
- * `listIssues(project, limit:1).length > 0`. Issues are only created
- * by the ingest path, so this is a stable signal.
+ * `listIssues(project, status:'any', limit:1).length > 0`. The
+ * `status:'any'` is load-bearing — the server defaults to `'active'`,
+ * which would make the badge re-appear the moment the user resolves
+ * the only issue they have. Issues are only created by the ingest
+ * path, so the existence of any issue (regardless of status) is a
+ * stable "this project has been wired up" signal.
  */
 export function OnboardingBadge({ project }: { project: null | ProjectRow }) {
   const { data: issues } = useQuery({
     enabled: !!project,
-    queryFn: () => adminApi.listIssues(project!.id, { limit: 1 }),
+    queryFn: () => adminApi.listIssues(project!.id, { limit: 1, status: 'any' }),
     queryKey: ['onboarding-check', project?.id],
     refetchInterval: 60_000,
     staleTime: 60_000,

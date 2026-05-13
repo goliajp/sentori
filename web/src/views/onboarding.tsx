@@ -345,7 +345,10 @@ function WaitEventStep({
   tokenInfo: { projectId: string; rawToken: string } | null
 }) {
   const issuesQuery = useQuery({
-    queryFn: () => adminApi.listIssues(project.id, { limit: 1 }),
+    // `status:'any'` so a freshly captured issue counts even if the
+    // user has flipped through statuses (e.g. resolved the smoke-test
+    // error before returning here). The server defaults to 'active'.
+    queryFn: () => adminApi.listIssues(project.id, { limit: 1, status: 'any' }),
     queryKey: ['issues', project.id, 'wait-onboarding'],
     refetchInterval: 3000,
   })
