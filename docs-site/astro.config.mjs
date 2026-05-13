@@ -54,8 +54,9 @@ export default defineConfig({
           items: [
             { label: 'SDK — React', slug: 'sdk-react' },
             { label: 'SDK — React Native', slug: 'sdk-react-native' },
-            { label: 'SDK — Vue (planned)', slug: 'sdk-vue' },
-            { label: 'SDK — Svelte (planned)', slug: 'sdk-svelte' },
+            { label: 'SDK — Vue', slug: 'sdk-vue' },
+            { label: 'SDK — Svelte', slug: 'sdk-svelte' },
+            { label: 'SDK — SolidJS', slug: 'sdk-solid' },
             { label: 'Protocol', slug: 'protocol' },
             { label: 'Troubleshooting', slug: 'troubleshooting' },
           ],

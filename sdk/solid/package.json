@@ -1,22 +1,22 @@
 {
-  "name": "@goliapkg/sentori-react",
-  "version": "0.4.4",
-  "description": "React adapter for Sentori \u2014 Provider, ErrorBoundary (resetKeys + render-prop), Suspense, TraceRender, react-router breadcrumbs + auto-tracing.",
+  "name": "@goliapkg/sentori-solid",
+  "version": "0.1.0",
+  "description": "SolidJS adapter for Sentori — ErrorBoundary helper, solid-router navigation tracing.",
   "license": "MIT",
   "homepage": "https://sentori.golia.jp",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/goliajp/sentori.git",
-    "directory": "sdk/react"
+    "directory": "sdk/solid"
   },
   "bugs": {
     "url": "https://github.com/goliajp/sentori/issues"
   },
   "keywords": [
     "sentori",
-    "error-tracking",
-    "react",
-    "error-boundary"
+    "solid",
+    "solidjs",
+    "error-tracking"
   ],
   "type": "module",
   "main": "./lib/index.js",
@@ -25,14 +25,6 @@
     ".": {
       "types": "./lib/index.d.ts",
       "default": "./lib/index.js"
-    },
-    "./router": {
-      "types": "./lib/router.d.ts",
-      "default": "./lib/router.js"
-    },
-    "./trace": {
-      "types": "./lib/SentoriTrace.d.ts",
-      "default": "./lib/SentoriTrace.js"
     }
   },
   "files": [
@@ -47,11 +39,10 @@
     "prepack": "bun run build"
   },
   "peerDependencies": {
-    "react": ">=18",
-    "react-router": ">=7"
+    "solid-js": ">=1.8"
   },
   "peerDependenciesMeta": {
-    "react-router": {
+    "solid-js": {
       "optional": true
     }
   },
@@ -60,13 +51,7 @@
     "@goliapkg/sentori-javascript": "0.4.0"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^17",
-    "@testing-library/react": "^16",
     "@types/bun": "latest",
-    "@types/react": "^19",
-    "react": "^19",
-    "react-dom": "^19",
-    "react-router": "^7",
     "typescript": "^5"
   },
   "publishConfig": {

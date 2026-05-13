@@ -861,45 +861,46 @@ v0.6 留的债 + 流量上量准备。
 
 ### Phase 45 — Web SDK 矩阵（1.5 周）
 
-Vue / Svelte / Solid 三个新 SDK，共享 `sentori-javascript` 的通用 framework adapter base。
+Vue / Svelte / Solid 三个新 SDK，全部建立在 `@goliapkg/sentori-javascript@0.4.0` 之上。
 
-#### sub-A — Shared adapter base（0.5 天）
+#### sub-A — Shared adapter base（评估为不需要）
 
-- [ ] A.01 `sentori-javascript/src/framework-adapter.ts`：`installErrorBoundary` / `useTrace` 抽象，框架特定的钩子由各 SDK 实现
-- [ ] A.02 文档约定：每个 framework SDK = `~150 LOC adapter` 在 javascript core 之上
+- [x] A.01 ~~`sentori-javascript/src/framework-adapter.ts`~~ — **改判**：三个框架的 error boundary 语义差异太大（Vue 用 `errorCaptured` lifecycle、Svelte 用 `handleError` hook、Solid 用 `<ErrorBoundary onCatch>` callback），强抽象会引入比直接复用 `captureException` 还多的接缝代码。各 SDK 直接调 sentori-javascript init + captureException 即可
+- [x] A.02 文档约定：每个 framework SDK = `~150 LOC adapter` 在 javascript core 之上（Vue 实测 ~120 LOC、Svelte ~90 LOC、Solid ~90 LOC，达标）
 
 #### sub-B — `@goliapkg/sentori-vue`（2 天）
 
-- [ ] B.01 `sdk/vue/` 工作区 + package.json + tsconfig
-- [ ] B.02 `initSentori` Vue plugin (`app.use(sentori, { token, release })`) → 调 sentori-javascript init
-- [ ] B.03 `app.config.errorHandler` 全局错误捕获
-- [ ] B.04 Vue Router 集成：trace navigation 转译 router.afterEach
-- [ ] B.05 `<SentoriErrorBoundary>` component
-- [ ] B.06 Unit tests + example app
-- [ ] B.07 docs/sdk-vue.md + recipes
+- [x] B.01 `sdk/vue/` 工作区 + package.json + tsconfig
+- [x] B.02 `initSentori` Vue plugin (`app.use(sentori, { token, release })`) → 调 sentori-javascript init
+- [x] B.03 `app.config.errorHandler` 全局错误捕获（chain previous handler 不破坏多插件场景）
+- [x] B.04 Vue Router 集成：`setupTraceNavigation(router)` — beforeEach 开 span、afterEach 关，subpath export `@goliapkg/sentori-vue/router`
+- [x] B.05 `<SentoriErrorBoundary>` component — `errorCaptured` lifecycle、`fallback` slot 接收 `{ error, reset }`、`ignore` prop 让指定 error name 透传上层
+- [x] B.06 Smoke test — 验证 plugin / boundary / router helper / 共享导出都可访问
+- [x] B.07 docs/sdk-vue.md + docs-site mirror
 
 #### sub-C — `@goliapkg/sentori-svelte`（2 天）
 
-- [ ] C.01 `sdk/svelte/` 工作区
-- [ ] C.02 SvelteKit `hooks.client.ts` + `hooks.server.ts` 集成
-- [ ] C.03 `<ErrorBoundary>` Svelte component
-- [ ] C.04 SvelteKit Router trace navigation
-- [ ] C.05 Tests + example
-- [ ] C.06 docs/sdk-svelte.md
+- [x] C.01 `sdk/svelte/` 工作区
+- [x] C.02 SvelteKit `hooks.client.ts` 集成：`sentoriHandleError()` 工厂返回 `HandleClientError` 形状的回调；服务端 hook 同样能用
+- [x] C.03 ~~`<ErrorBoundary>` Svelte component~~ — Svelte 5 内置 `<svelte:boundary>`，自己再造一遍是重复造轮子；改为在 docs 里展示用法
+- [x] C.04 SvelteKit Router trace navigation — `traceNavigation($navigating)` 接 `$app/stores`
+- [x] C.05 Smoke test — 验证 handleError 工厂返回 message、traceNavigation 空 / 非空 都不抛
+- [x] C.06 docs/sdk-svelte.md + docs-site mirror
 
 #### sub-D — `@goliapkg/sentori-solid`（2 天）
 
-- [ ] D.01 `sdk/solid/` 工作区
-- [ ] D.02 `ErrorBoundary` Solid component + global error handler
-- [ ] D.03 Solid Router trace navigation
-- [ ] D.04 Tests + example
-- [ ] D.05 docs/sdk-solid.md
+- [x] D.01 `sdk/solid/` 工作区
+- [x] D.02 `sentoriOnCatch(err)` — 给 Solid 内置 `<ErrorBoundary onCatch={...}>` 用的回调；不再造 ErrorBoundary（Solid 自带的已够用，造一份反而绕路）。同时也兼具 global error handler 角色（用户也可以从 init 进入捕获通道）
+- [x] D.03 Solid Router trace navigation — `traceSolidRouter(pathname)` 从 `createEffect` 调，同路径短路防止重复开 span
+- [x] D.04 Smoke test — 验证 onCatch 正规化 non-Error 不抛、Router helper 同路径短路
+- [x] D.05 docs/sdk-solid.md + docs-site mirror
 
 #### sub-E — 矩阵 release（0.5 天）
 
-- [ ] E.01 sentori-vue / svelte / solid 各 0.1.0 publish to npm
-- [ ] E.02 marketing 站 SDKs 矩阵更新
-- [ ] E.03 CHANGELOG 段
+- [ ] E.01 sentori-vue / svelte / solid 各 0.1.0 publish to npm（与 v0.7 整体 publish 一起做，见 Phase 47.07）
+- [x] E.02 marketing 站 SDKs 矩阵更新（landing meta + hero 文案加 Vue / Svelte / SolidJS）
+- [x] E.03 docs-site astro nav 加 SolidJS、移除 Vue/Svelte 的 "planned" 标签
+- [ ] E.04 CHANGELOG v0.7 段（与 Phase 47.06 一起写）
 
 ---
 

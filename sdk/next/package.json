@@ -60,8 +60,8 @@
     "react": ">=18"
   },
   "dependencies": {
-    "@goliapkg/sentori-core": "0.5.0",
-    "@goliapkg/sentori-javascript": "0.3.4",
+    "@goliapkg/sentori-core": "0.6.0",
+    "@goliapkg/sentori-javascript": "0.4.0",
     "@goliapkg/sentori-react": "0.4.4"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 {
   "name": "@goliapkg/sentori-javascript",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "description": "Sentori SDK for browsers and Node \u2014 error capture, breadcrumbs, distributed-tracing fetch hook (W3C traceparent), and HTTP transport.",
   "license": "MIT",
   "homepage": "https://sentori.golia.jp",
@@ -40,7 +40,7 @@
     "README.md"
   ],
   "dependencies": {
-    "@goliapkg/sentori-core": "0.5.0"
+    "@goliapkg/sentori-core": "0.6.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

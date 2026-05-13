@@ -1,21 +1,22 @@
 {
-  "name": "@goliapkg/sentori-react",
-  "version": "0.4.4",
-  "description": "React adapter for Sentori \u2014 Provider, ErrorBoundary (resetKeys + render-prop), Suspense, TraceRender, react-router breadcrumbs + auto-tracing.",
+  "name": "@goliapkg/sentori-vue",
+  "version": "0.1.0",
+  "description": "Vue 3 adapter for Sentori — plugin, errorHandler hook, Vue Router auto-trace navigation, <SentoriErrorBoundary>.",
   "license": "MIT",
   "homepage": "https://sentori.golia.jp",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/goliajp/sentori.git",
-    "directory": "sdk/react"
+    "directory": "sdk/vue"
   },
   "bugs": {
     "url": "https://github.com/goliajp/sentori/issues"
   },
   "keywords": [
     "sentori",
+    "vue",
+    "vue3",
     "error-tracking",
-    "react",
     "error-boundary"
   ],
   "type": "module",
@@ -29,10 +30,6 @@
     "./router": {
       "types": "./lib/router.d.ts",
       "default": "./lib/router.js"
-    },
-    "./trace": {
-      "types": "./lib/SentoriTrace.d.ts",
-      "default": "./lib/SentoriTrace.js"
     }
   },
   "files": [
@@ -47,11 +44,11 @@
     "prepack": "bun run build"
   },
   "peerDependencies": {
-    "react": ">=18",
-    "react-router": ">=7"
+    "vue": ">=3.4",
+    "vue-router": ">=4"
   },
   "peerDependenciesMeta": {
-    "react-router": {
+    "vue-router": {
       "optional": true
     }
   },
@@ -60,14 +57,9 @@
     "@goliapkg/sentori-javascript": "0.4.0"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^17",
-    "@testing-library/react": "^16",
     "@types/bun": "latest",
-    "@types/react": "^19",
-    "react": "^19",
-    "react-dom": "^19",
-    "react-router": "^7",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vue": "^3.4"
   },
   "publishConfig": {
     "access": "public"
