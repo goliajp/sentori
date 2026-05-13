@@ -112,9 +112,9 @@ export function ReleaseDetailView() {
         title="Source maps"
       />
 
-      <DsymSection dsyms={data.dsyms} release={data.release} />
+      <DsymSection dsyms={data.dsyms} projectId={projectId} release={data.release} />
 
-      <MappingSection mappings={data.mappings} release={data.release} />
+      <MappingSection mappings={data.mappings} projectId={projectId} release={data.release} />
     </div>
   )
 }
@@ -207,15 +207,26 @@ function rateTone(rate: null | number, threshold: number): 'good' | 'neutral' | 
   return rate >= threshold ? 'good' : 'warn'
 }
 
-function DsymSection({ dsyms, release }: { dsyms: ReleaseDsym[]; release: string }) {
+function DsymSection({
+  dsyms,
+  projectId,
+  release,
+}: {
+  dsyms: ReleaseDsym[]
+  projectId: string
+  release: string
+}) {
   return (
     <ArtifactSection
       emptyHint={
         <>
           Upload with{' '}
           <code className="font-mono">
-            sentori-cli upload dsym --release="{release}" path/to/MyApp.dSYM
-          </code>
+            sentori-cli upload dsym --project="{projectId}" --release="{release}" path/to/MyApp.dSYM
+          </code>{' '}
+          (needs Xcode CLT's <code className="font-mono">dwarfdump</code>; or pass{' '}
+          <code className="font-mono">--debug-id</code> + <code className="font-mono">--arch</code>{' '}
+          for a single slice)
         </>
       }
       rows={dsyms.map((d) => ({
@@ -238,14 +249,23 @@ function DsymSection({ dsyms, release }: { dsyms: ReleaseDsym[]; release: string
   )
 }
 
-function MappingSection({ mappings, release }: { mappings: ReleaseMapping[]; release: string }) {
+function MappingSection({
+  mappings,
+  projectId,
+  release,
+}: {
+  mappings: ReleaseMapping[]
+  projectId: string
+  release: string
+}) {
   return (
     <ArtifactSection
       emptyHint={
         <>
           Upload with{' '}
           <code className="font-mono">
-            sentori-cli upload mapping --release="{release}" path/to/mapping.txt
+            sentori-cli upload mapping --project="{projectId}" --release="{release}"
+            path/to/mapping.txt
           </code>
         </>
       }

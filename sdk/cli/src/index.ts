@@ -2,6 +2,7 @@
 import { parseArgs } from 'node:util'
 
 import { formatIssueLine, issueList, issuePatch } from './issue.js'
+import { uploadDsym, uploadMapping } from './native-artifacts.js'
 import { reactNativeUpload } from './react-native.js'
 import { uploadSourcemaps } from './upload.js'
 
@@ -18,6 +19,18 @@ Source-map upload:
       Compose a Metro packager map + a Hermes map into one source map
       and upload it (plus the bundle). Use this for a Hermes release
       build. Requires --metro-map and --hermes-map.
+
+Native artifacts (project-scoped, need --project + admin token):
+  sentori-cli upload dsym --project <uuid> [--release <r>] [--object-name <n>] [--debug-id <uuid> --arch <a>] <path>
+      Upload iOS dSYM debug info. By default walks a Foo.dSYM bundle
+      and uses "dwarfdump --uuid" to enumerate slices, uploading each.
+      Pass --debug-id and --arch to upload a single slice without
+      dwarfdump (useful in Linux CI where the toolchain isn't there).
+
+  sentori-cli upload mapping --project <uuid> [--release <r>] [--debug-id <uuid>] <mapping.txt>
+      Upload an R8 / ProGuard mapping (raw bytes). If the file starts
+      with a "# pg_map_id:" line the server sniffs the debug-id from
+      it; otherwise you can pass it explicitly.
 
 CI triage:
   sentori-cli issue list --project <uuid> [--status active|silenced|resolved|closed] [--limit N] [--error-type <t>]
@@ -328,6 +341,115 @@ async function cmdIssuePatch(
   }
 }
 
+// ── native artifact upload ────────────────────────────────────────
+
+async function cmdUploadDsym(argv: string[]): Promise<number> {
+  let parsed
+  try {
+    parsed = parseArgs({
+      allowPositionals: true,
+      args: argv,
+      options: {
+        'api-url': { type: 'string' },
+        arch: { type: 'string' },
+        'debug-id': { type: 'string' },
+        help: { short: 'h', type: 'boolean' },
+        'ingest-url': { type: 'string' },
+        'object-name': { type: 'string' },
+        project: { type: 'string' },
+        release: { type: 'string' },
+        token: { type: 'string' },
+      },
+    })
+  } catch (e) {
+    console.error(`error: ${(e as Error).message}\n${HELP}`)
+    return 2
+  }
+  if (parsed.values.help) {
+    console.log(HELP)
+    return 0
+  }
+  const cfg = parseAdminCfg(parsed.values)
+  if (!cfg) return 2
+  const path = parsed.positionals[0]
+  if (!path) {
+    console.error('error: a path to a .dSYM bundle or DWARF binary is required')
+    return 2
+  }
+  const debugId = parsed.values['debug-id']
+  const arch = parsed.values.arch
+  if ((debugId && !arch) || (arch && !debugId)) {
+    console.error('error: --debug-id and --arch must be passed together (or both omitted)')
+    return 2
+  }
+  try {
+    const r = await uploadDsym({
+      apiUrl: cfg.apiUrl,
+      arch: typeof arch === 'string' ? arch : undefined,
+      debugId: typeof debugId === 'string' ? debugId : undefined,
+      objectName: typeof parsed.values['object-name'] === 'string' ? parsed.values['object-name'] : undefined,
+      path,
+      projectId: cfg.projectId,
+      release: typeof parsed.values.release === 'string' ? parsed.values.release : undefined,
+      token: cfg.token,
+    })
+    console.log(`uploaded ${r.slices.length} dSYM slice(s):`)
+    for (const s of r.slices) console.log(`  ${s.debugId}  (${s.arch})`)
+    return 0
+  } catch (e) {
+    console.error(`dsym upload failed: ${(e as Error).message}`)
+    return 1
+  }
+}
+
+async function cmdUploadMapping(argv: string[]): Promise<number> {
+  let parsed
+  try {
+    parsed = parseArgs({
+      allowPositionals: true,
+      args: argv,
+      options: {
+        'api-url': { type: 'string' },
+        'debug-id': { type: 'string' },
+        help: { short: 'h', type: 'boolean' },
+        'ingest-url': { type: 'string' },
+        project: { type: 'string' },
+        release: { type: 'string' },
+        token: { type: 'string' },
+      },
+    })
+  } catch (e) {
+    console.error(`error: ${(e as Error).message}\n${HELP}`)
+    return 2
+  }
+  if (parsed.values.help) {
+    console.log(HELP)
+    return 0
+  }
+  const cfg = parseAdminCfg(parsed.values)
+  if (!cfg) return 2
+  const path = parsed.positionals[0]
+  if (!path) {
+    console.error('error: a path to mapping.txt is required')
+    return 2
+  }
+  try {
+    await uploadMapping({
+      apiUrl: cfg.apiUrl,
+      debugId: typeof parsed.values['debug-id'] === 'string' ? parsed.values['debug-id'] : undefined,
+      path,
+      projectId: cfg.projectId,
+      release: typeof parsed.values.release === 'string' ? parsed.values.release : undefined,
+      token: cfg.token,
+    })
+    console.log(`uploaded mapping for project ${cfg.projectId}${parsed.values.release ? ` / ${parsed.values.release}` : ''}`)
+    return 0
+  } catch (e) {
+    console.error(`mapping upload failed: ${(e as Error).message}`)
+    return 1
+  }
+}
+
 async function main(argv: string[]): Promise<number> {
   if (argv.length === 0 || argv[0] === '-h' || argv[0] === '--help') {
     console.log(HELP)
@@ -335,6 +457,8 @@ async function main(argv: string[]): Promise<number> {
   }
   const [a, b, ...rest] = argv
   if (a === 'upload' && b === 'sourcemap') return cmdUploadSourcemap(rest)
+  if (a === 'upload' && b === 'dsym') return cmdUploadDsym(rest)
+  if (a === 'upload' && b === 'mapping') return cmdUploadMapping(rest)
   if (a === 'react-native' && b === 'upload') return cmdReactNativeUpload(rest)
   if (a === 'issue' && b === 'list') return cmdIssueList(rest)
   if (a === 'issue' && b === 'resolve') return cmdIssuePatch(rest, { status: 'resolved' }, 'resolved')
