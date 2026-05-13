@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
+import { formatIssueLine, issueList, issuePatch } from './issue.js';
 import { reactNativeUpload } from './react-native.js';
 import { uploadSourcemaps } from './upload.js';
-const HELP = `sentori-cli — upload release artifacts to Sentori
+const HELP = `sentori-cli — Sentori command-line interface
 
-Usage:
+Source-map upload:
   sentori-cli upload sourcemap [options] <path...>
       Upload one or more files or directories. A directory is scanned
       (one level) for *.map / *.js / *.jsbundle / *.bundle / *.hbc;
@@ -16,14 +17,18 @@ Usage:
       and upload it (plus the bundle). Use this for a Hermes release
       build. Requires --metro-map and --hermes-map.
 
-Options (both commands):
+CI triage:
+  sentori-cli issue list --project <uuid> [--status active|silenced|resolved|closed] [--limit N] [--error-type <t>]
+  sentori-cli issue resolve <issue-uuid> --project <uuid> [--in-release <r>]
+  sentori-cli issue silence <issue-uuid> --project <uuid>
+
+Options (upload commands):
   --release <r>     release identifier — MUST equal the value the SDK
-                    reports via init({ release }). Required. A mismatch
-                    means the dashboard silently can't symbolicate.
+                    reports via init({ release }). Required.
   --token <t>       Sentori token (or set $SENTORI_TOKEN).
   --api-url <url>   Sentori API base (default https://api.sentori.golia.jp,
-                    or $SENTORI_API_URL). For a self-hosted instance,
-                    your host. (Accepts --ingest-url as an alias.)
+                    or $SENTORI_API_URL). For a self-hosted instance, your
+                    host. (Accepts --ingest-url as an alias.)
   --dry-run         describe what would be uploaded; don't upload.
   -h, --help        show this help.
 
@@ -31,6 +36,16 @@ Options (react-native upload):
   --metro-map <p>   the *.packager.map Metro emits (--sourcemap-output).
   --hermes-map <p>  the *.hbc.map the Hermes compiler emits.
   --bundle <p>      optional: also upload the bundle (.jsbundle / .bundle).
+
+Options (issue commands):
+  --project <uuid>  project id (or set $SENTORI_PROJECT_ID).
+  --token <t>       admin token, sk_… prefix (or $SENTORI_ADMIN_TOKEN /
+                    $SENTORI_TOKEN). The ingest st_pk_ token may also work
+                    on a self-hosted instance.
+  --api-url <url>   Sentori API base (same as above).
+  --in-release <r>  (resolve only) mark this release as where the fix
+                    landed; the regression detector flips the issue back
+                    to "regressed" if a matching event lands later.
 
 Hermes release build, by hand:
   npx react-native bundle --platform ios --dev false --entry-file index.js \\
@@ -172,6 +187,126 @@ function reportUpload(result, c) {
         console.log(`uploaded ${result.uploaded ?? result.files.length} file(s) for release "${c.release}" — minified stacks on this release will now resolve to source.`);
     }
 }
+function parseAdminCfg(values) {
+    const projectId = (typeof values.project === 'string' ? values.project : undefined) ??
+        process.env.SENTORI_PROJECT_ID;
+    if (!projectId) {
+        console.error('error: --project <uuid> (or $SENTORI_PROJECT_ID) is required');
+        return null;
+    }
+    const token = (typeof values.token === 'string' ? values.token : undefined) ??
+        process.env.SENTORI_ADMIN_TOKEN ??
+        process.env.SENTORI_TOKEN;
+    if (!token) {
+        console.error('error: --token (or $SENTORI_ADMIN_TOKEN / $SENTORI_TOKEN) is required for issue commands');
+        return null;
+    }
+    const apiUrl = (typeof values['api-url'] === 'string' ? values['api-url'] : undefined) ??
+        (typeof values['ingest-url'] === 'string' ? values['ingest-url'] : undefined) ??
+        process.env.SENTORI_API_URL ??
+        'https://api.sentori.golia.jp';
+    return { apiUrl, projectId, token };
+}
+async function cmdIssueList(argv) {
+    let parsed;
+    try {
+        parsed = parseArgs({
+            args: argv,
+            options: {
+                'api-url': { type: 'string' },
+                'error-type': { type: 'string' },
+                help: { short: 'h', type: 'boolean' },
+                'ingest-url': { type: 'string' },
+                limit: { type: 'string' },
+                project: { type: 'string' },
+                status: { type: 'string' },
+                token: { type: 'string' },
+            },
+        });
+    }
+    catch (e) {
+        console.error(`error: ${e.message}\n${HELP}`);
+        return 2;
+    }
+    if (parsed.values.help) {
+        console.log(HELP);
+        return 0;
+    }
+    const cfg = parseAdminCfg(parsed.values);
+    if (!cfg)
+        return 2;
+    const status = parsed.values.status;
+    if (status && !['active', 'closed', 'resolved', 'silenced'].includes(status)) {
+        console.error(`error: --status must be one of: active, silenced, resolved, closed`);
+        return 2;
+    }
+    const limitStr = parsed.values.limit;
+    const limit = limitStr ? Number.parseInt(limitStr, 10) : undefined;
+    try {
+        const rows = await issueList({
+            config: cfg,
+            errorType: parsed.values['error-type'],
+            limit,
+            status: status,
+        });
+        if (rows.length === 0) {
+            console.log('(no matching issues)');
+            return 0;
+        }
+        for (const r of rows)
+            console.log(formatIssueLine(r));
+        return 0;
+    }
+    catch (e) {
+        console.error(`issue list failed: ${e.message}`);
+        return 1;
+    }
+}
+async function cmdIssuePatch(argv, body, verb) {
+    let parsed;
+    try {
+        parsed = parseArgs({
+            allowPositionals: true,
+            args: argv,
+            options: {
+                'api-url': { type: 'string' },
+                help: { short: 'h', type: 'boolean' },
+                'in-release': { type: 'string' },
+                'ingest-url': { type: 'string' },
+                project: { type: 'string' },
+                token: { type: 'string' },
+            },
+        });
+    }
+    catch (e) {
+        console.error(`error: ${e.message}\n${HELP}`);
+        return 2;
+    }
+    if (parsed.values.help) {
+        console.log(HELP);
+        return 0;
+    }
+    const cfg = parseAdminCfg(parsed.values);
+    if (!cfg)
+        return 2;
+    const issueId = parsed.positionals[0];
+    if (!issueId) {
+        console.error('error: <issue-uuid> is required');
+        return 2;
+    }
+    if (verb === 'resolved' && typeof parsed.values['in-release'] === 'string') {
+        body.resolvedInRelease = parsed.values['in-release'];
+    }
+    try {
+        const updated = await issuePatch(cfg, issueId, body);
+        console.log(`${issueId} → ${verb}${body.resolvedInRelease ? ` (in ${body.resolvedInRelease})` : ''}: ${updated.errorType}`);
+        return 0;
+    }
+    catch (e) {
+        console.error(`issue ${verb} failed: ${e.message}`);
+        return 1;
+    }
+}
 async function main(argv) {
     if (argv.length === 0 || argv[0] === '-h' || argv[0] === '--help') {
         console.log(HELP);
@@ -182,6 +317,14 @@ async function main(argv) {
         return cmdUploadSourcemap(rest);
     if (a === 'react-native' && b === 'upload')
         return cmdReactNativeUpload(rest);
+    if (a === 'issue' && b === 'list')
+        return cmdIssueList(rest);
+    if (a === 'issue' && b === 'resolve')
+        return cmdIssuePatch(rest, { status: 'resolved' }, 'resolved');
+    if (a === 'issue' && b === 'silence')
+        return cmdIssuePatch(rest, { status: 'silenced' }, 'silenced');
+    if (a === 'issue' && b === 'close')
+        return cmdIssuePatch(rest, { status: 'closed' }, 'closed');
     console.error(`unknown command: ${[a, b].filter(Boolean).join(' ') || '(none)'}\n`);
     console.error(HELP);
     return 2;
