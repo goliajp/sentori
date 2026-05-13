@@ -5,8 +5,13 @@ import { installPromiseHandler } from './handlers/promise';
 import { installNetworkHandler } from './handlers/network';
 import { drainNativePending, setNativeConfig } from './native';
 import { startSession } from './session-tracker';
-import { drainOfflineQueue, enqueue, startTransport } from './transport';
-import type { Event } from './types';
+import {
+  drainOfflineQueue,
+  enqueue,
+  startTransport,
+  uploadAttachment,
+} from './transport';
+import type { AttachmentKind, AttachmentMeta, AttachmentSource, Event } from './types';
 
 declare const __DEV__: boolean | undefined;
 
@@ -85,10 +90,33 @@ export const init = (options: InitOptions): void => {
   // - native crashes from <Documents>/sentori/pending/*.json
   // - JS transport offline queue from AsyncStorage
   drainNativePending()
-    .then((items) => {
+    .then(async (items) => {
       for (const json of items) {
         try {
-          enqueue(JSON.parse(json) as Event);
+          const event = JSON.parse(json) as Event & {
+            _pendingAttachments?: PendingAttachment[];
+          };
+          // Phase 42 sub-E.05 / F.09: the native crash handler couldn't
+          // upload attachments at crash time (the app was dying); it
+          // base64-encoded them into `_pendingAttachments` instead.
+          // On next launch we upload each before enqueueing the event,
+          // so the dashboard sees the refs in `event.attachments[]`.
+          if (event._pendingAttachments && event._pendingAttachments.length > 0) {
+            for (const p of event._pendingAttachments) {
+              const meta = await uploadAttachment(
+                event.id,
+                p.kind,
+                { base64: p.base64, mediaType: p.mediaType },
+                { source: p.source },
+              );
+              if (meta) {
+                if (!event.attachments) event.attachments = [];
+                event.attachments.push(meta);
+              }
+            }
+            delete event._pendingAttachments;
+          }
+          enqueue(event);
         } catch {
           // skip malformed
         }
@@ -97,3 +125,20 @@ export const init = (options: InitOptions): void => {
     .catch(() => {});
   drainOfflineQueue().catch(() => {});
 };
+
+/**
+ * Phase 42 sub-E.05: shape of each entry in the native crash JSON's
+ * `_pendingAttachments` array. Mirrors what
+ * `SentoriCrashHandler.write` writes on iOS and (sub-F) what
+ * `SentoriCrashWriter` writes on Android.
+ */
+type PendingAttachment = {
+  base64: string;
+  kind: AttachmentKind;
+  mediaType: string;
+  source: AttachmentSource;
+};
+
+// Keep AttachmentMeta in the imports — it's part of the public type
+// surface re-exported from this module's bundle.
+export type { AttachmentMeta };

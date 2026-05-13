@@ -68,7 +68,7 @@ import Foundation
         let release = (cfg["release"] as? String) ?? "unknown"
         let environment = (cfg["environment"] as? String) ?? "prod"
 
-        let event: [String: Any] = [
+        var event: [String: Any] = [
             "id": UUID().uuidString.lowercased(),
             "timestamp": iso8601(Date()),
             "kind": "error",
@@ -94,6 +94,38 @@ import Foundation
             "traceId": NSNull(),
             "spanId": NSNull(),
         ]
+
+        // Phase 42 sub-E.04/07: capture the screen + view tree right
+        // before the app dies. The handler runs synchronously on the
+        // thread that threw NSException; UIKit's still valid at this
+        // point. Both blobs go in a temp `_pendingAttachments` field
+        // — JS strips it on next launch, uploads each via
+        // `POST /v1/events/<id>/attachments/<kind>`, then enqueues
+        // the cleaned event.
+        if let snap = SentoriScreenshotCapture.captureKeyWindow() {
+            var pending: [[String: Any]] = []
+            if let sc = snap["screenshot"] as? [String: Any],
+               let b64 = sc["base64"] as? String {
+                pending.append([
+                    "kind": "screenshot",
+                    "base64": b64,
+                    "mediaType": (sc["mediaType"] as? String) ?? "image/jpeg",
+                    "source": "ios",
+                ])
+            }
+            if let vt = snap["viewTree"],
+               let data = try? JSONSerialization.data(withJSONObject: vt, options: []) {
+                pending.append([
+                    "kind": "viewTree",
+                    "base64": data.base64EncodedString(),
+                    "mediaType": "application/json",
+                    "source": "ios",
+                ])
+            }
+            if !pending.isEmpty {
+                event["_pendingAttachments"] = pending
+            }
+        }
 
         guard let dir = pendingDir() else { return }
         let url = dir.appendingPathComponent("\(UUID().uuidString.lowercased()).json")
