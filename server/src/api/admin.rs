@@ -397,6 +397,21 @@ pub async fn patch_issue(
         .execute(pool)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
+
+        // Phase 43 sub-B.01: notify external integrations on
+        // resolve. Skip non-resolve transitions (silenced / closed
+        // / active flip without a clear semantic for Linear).
+        if status == "resolved" {
+            let pool = pool.clone();
+            tokio::spawn(async move {
+                crate::integrations::dispatch::on_status_change(
+                    &pool,
+                    issue_id,
+                    crate::integrations::IssueLifecycleEvent::Resolved,
+                )
+                .await;
+            });
+        }
     }
 
     // Phase 25 sub-F: assignee patch is independent of status.

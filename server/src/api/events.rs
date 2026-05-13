@@ -154,6 +154,34 @@ pub(crate) async fn persist_with_grouping(
                 message: event.error.message.clone(),
             });
         }
+        // Phase 43 sub-B.01: also kick off integration dispatch (Linear /
+        // Slack / …) off the ingest hot path. tokio::spawn so any
+        // upstream API latency never reaches event persist.
+        {
+            let pool = pool.clone();
+            let project_id = project_id;
+            let issue_id = outcome.issue_id;
+            let error_type = event.error.r#type.clone();
+            let error_message = event.error.message.clone();
+            let release = event.release.clone();
+            let environment = event.environment.clone();
+            let base_url = state.base_url.clone();
+            tokio::spawn(async move {
+                crate::integrations::dispatch::on_new_issue(
+                    crate::integrations::dispatch::DispatchInput {
+                        pool: &pool,
+                        project_id,
+                        issue_id,
+                        error_type: &error_type,
+                        error_message: &error_message,
+                        release: &release,
+                        environment: &environment,
+                        base_url: &base_url,
+                    },
+                )
+                .await;
+            });
+        }
         // Phase 27 sub-B: also evaluate `new_issue` alert rules.
         crate::rule_eval::try_fire_on_event(
             pool,
@@ -180,6 +208,20 @@ pub(crate) async fn persist_with_grouping(
             });
         }
         m::issue_regressed();
+        // Phase 43 sub-B.01: same dispatch as new-issue but with
+        // `Regressed` lifecycle — adapters post a re-open comment.
+        {
+            let pool = pool.clone();
+            let issue_id = outcome.issue_id;
+            tokio::spawn(async move {
+                crate::integrations::dispatch::on_status_change(
+                    &pool,
+                    issue_id,
+                    crate::integrations::IssueLifecycleEvent::Regressed,
+                )
+                .await;
+            });
+        }
         // Phase 27 sub-B: also evaluate `regression` alert rules.
         crate::rule_eval::try_fire_on_event(
             pool,
