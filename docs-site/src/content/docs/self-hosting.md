@@ -60,6 +60,7 @@ SENTORI_PG_PASSWORD=$(openssl rand -hex 16)
 | `SENTORI_SMTP_PASS` | unset | optional auth |
 | `SENTORI_SMTP_FROM` | `sentori@localhost` | From: address |
 | `SENTORI_DATA_DIR` | `/data` | source-map blob storage path |
+| `SENTORI_ATTACHMENT_DIR` | unset | local-fs path for per-event attachments (screenshots, view trees). When unset, the upload endpoint returns `503 attachmentsDisabled` and the SDK silently skips. |
 | `SENTORI_WEB_PORT` | `8000` | host port for the web container |
 | `SENTORI_TRACE_RETENTION_DAYS` | `14` | how long spans + traces are kept (see *Data retention* below) |
 | `SENTORI_SPAN_LIMIT_MONTHLY` | `10000000` | per-org monthly span-ingest budget, separate from the error-event quota; `0` = unlimited |
@@ -82,6 +83,13 @@ tables:
   a short hard window keeps storage bounded; recent traces stay 100%
   complete (Sentori does **not** sample at ingest). Set it longer if
   you have the disk; set it shorter to be aggressive.
+- **event attachments** (screenshots, view trees) follow the events
+  cutoff — same daily pass deletes the `event_attachments` row and
+  the on-disk blob via `AttachmentStore::delete_event`. Allocate
+  `SENTORI_ATTACHMENT_DIR` somewhere with at least the same
+  retention window's worth of headroom; typical screenshot is 50-100
+  KB, an org producing 100 errors/day with screenshots on burns ~5
+  MB/day, ~150 MB over the 30-day floor.
 
 The same pass keeps ~6 months of empty monthly partitions ahead of
 "now" so writes never spill into the `*_default` catch-all partition —
