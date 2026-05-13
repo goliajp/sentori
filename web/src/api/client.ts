@@ -62,6 +62,16 @@ export type IssueRow = {
   status: IssueStatus
 }
 
+/** Phase 47.01 — slim row for the related-issues panel. */
+export type RelatedIssue = {
+  errorType: string
+  eventCount: number
+  id: string
+  lastSeen: string
+  messageSample: string
+  status: IssueStatus
+}
+
 // Phase 36 sub-A: trace list row, mirrors server/src/api/traces.rs#TraceRow.
 export type TraceStatus = 'cancelled' | 'error' | 'ok'
 export type TraceRow = {
@@ -447,6 +457,10 @@ export const adminApi = {
 
   listReleasesForIssue: (projectId: string, issueId: string) =>
     adminFetch<string[]>(`/projects/${projectId}/issues/${issueId}/releases`),
+
+  /** Phase 47.01 — sibling issues likely to share root cause. */
+  listRelatedIssues: (projectId: string, issueId: string) =>
+    adminFetch<RelatedIssue[]>(`/projects/${projectId}/issues/${issueId}/related`),
 
   /** Phase 23 sub-A — list releases for the project, enriched with
    *  event / sourcemap / dSYM / mapping counts. */

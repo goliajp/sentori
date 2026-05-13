@@ -19,6 +19,7 @@ import { FrameRoleBadge } from '@/components/FrameRoleBadge'
 import { IssueDetailSkeleton } from '@/components/IssueDetailSkeleton'
 import { CopyMarkdownButton } from '@/components/CopyMarkdownButton'
 import { MergeIssueButton } from '@/components/MergeIssueButton'
+import { RelatedIssuesPanel } from '@/components/RelatedIssuesPanel'
 import { OpenInEditorButton } from '@/components/OpenInEditorButton'
 import { SourceCode } from '@/components/SourceCode'
 import { ErrorState } from '@/components/states'
@@ -182,6 +183,8 @@ export function IssueDetailView() {
           )}
         </div>
       </header>
+
+      <RelatedIssuesPanel issueId={issueId} orgSlug={currentOrg.slug} projectId={projectId!} />
 
       <div className="border-border flex h-9 shrink-0 items-center gap-1 border-b px-4">
         {TABS.map((t) => (
@@ -498,7 +501,7 @@ function StackTab({
 
       <ReleaseArtifactsPanel projectId={projectId} release={payload.release} />
 
-      <RelatedIssuesPanel
+      <OtherIssuesInReleasePanel
         currentIssueId={issueId}
         orgSlug={orgSlug}
         projectId={projectId}
@@ -723,7 +726,7 @@ function StateEntry({
  * active issues (≤ a few dozen). Server-side filtering by `excludeId`
  * can land if the dataset grows.
  */
-function RelatedIssuesPanel({
+function OtherIssuesInReleasePanel({
   currentIssueId,
   orgSlug,
   projectId,

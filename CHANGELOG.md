@@ -6,6 +6,66 @@
 
 ---
 
+## v0.7 — 综合升级（Phase 43–47）
+
+**Goal:** 在 v0.6 issue 诊断深度的基础上，五条并行轴一次性铺开：Linear/Slack 双向集成、客户端 sampling + 数据分析、Web SDK 矩阵（Vue/Svelte/Solid 加入）、session-trail 轻量回放、最后一波 polish 收尾。
+
+**npm 包变化**：
+
+- `@goliapkg/sentori-core` 0.5.0 → 0.6.0（Phase 44 sampling helpers + Phase 46 TrailBuffer/SessionTrail）
+- `@goliapkg/sentori-javascript` 0.3.4 → 0.4.0（sampling、sessionTrail capture + uploadAttachment、captureStep）
+- `@goliapkg/sentori-react-native` 0.6.1 → 0.7.0（sampling、sessionTrail、useTraceNavigation 自动 captureStep）
+- `@goliapkg/sentori-react` 0.4.4 → 0.4.5（router 自动 captureStep）
+- `@goliapkg/sentori-next` 0.2.4 → 0.2.5（依赖跟随 javascript/react）
+- `@goliapkg/sentori-vue` 0.1.0 ✨ 首次发布
+- `@goliapkg/sentori-svelte` 0.1.0 ✨ 首次发布
+- `@goliapkg/sentori-solid` 0.1.0 ✨ 首次发布
+
+**设计四条协调铁律**：sentori-core single source of truth / 复用 Phase 42 attachment 框架 / 集成走 v0.2 outbound webhook 改造的 IntegrationAdapter trait / sampling 跨 SDK 单一 API。
+
+### Phase 43 — Linear 双向集成 + Slack（commit 92e482f / 542900d / 370d746 / e0c24df）✅
+
+- 新表 `integrations`（org_id, kind in ('linear','slack'), config JSONB）+ `issue_integration_links`，partial unique index on (org_id, kind) WHERE revoked_at IS NULL
+- `IntegrationAdapter` Rust trait，`ConnectMode::{OAuth, Manual}` 枚举：Linear 走 authorize_code → token，Slack 走 manual incoming-webhook URL
+- Linear adapter：GraphQL `issueCreate` mutation + `Linear-Signature` 头的 HMAC-SHA-256 constant-time 校验。webhook 反向同步：Linear issue state.type → 'completed'/'canceled' 触发 Sentori resolve，同状态短路防 comment 回环
+- Slack adapter：`accept_manual_config({webhookUrl, channelLabel?})` 校验 `https://hooks.slack.com/` 前缀，Block Kit 模板用 mrkdwn 转义
+- 派发链路：`integrations/dispatch.rs#on_new_issue` / `on_status_change` 用 `tokio::spawn` 走 ingest 热路径之外，Linear API 延迟永不阻塞 event 落库
+- Dashboard `<IntegrationsView>` 加 SECONDARY nav（admin-only），OAuth/Manual 双 mode 渲染、`<SlackConfigureForm>` inline
+
+### Phase 44 — Sampling + 数据分析（commit 0bf924a）✅
+
+- `sentori-core/src/sampling.ts`：`shouldSample(rate)` 均匀采样 + `shouldSampleTrace(traceId, rate)` 对 traceId 前 32 bits 哈希做确定性决定（保证一条 trace 的所有 span 共享同一 yes/no）+ `normalizeRate` clamp 到 [0,1]
+- RN + JS SDK：`init({ sampling: { errors, traces } })`，capture 路径在最开始 gate，丢弃前埋 `sampled-out` 面包屑保留可观测性
+- Issue merge 功能：`POST /admin/api/projects/{p}/issues/{i}/merge` 事务式 UPDATE events SET issue_id + 聚合 + DELETE source。Dashboard `<MergeIssueButton>` 带 UUID 校验
+- Issue 全文搜索：migration 0034 加 `tsvector` 生成列 + GIN 索引（`simple` config 不做词干），`?search=` query 串走 `to_tsquery`，issues 列表的 free-text 自动喂进 search
+- Cross-stack cause chain：event 协议加 `error.nativeError?: { issueId, type, message }`，dashboard `<NativeErrorCard>` 在 CauseChain 里展示 amber-tinted 跨栈卡片 + 跳 native issue 链接
+
+### Phase 45 — Web SDK 矩阵 Vue/Svelte/Solid（commit c5fab5b）✅
+
+- `@goliapkg/sentori-vue@0.1.0`：`app.use(sentori, opts)` plugin，包住 `app.config.errorHandler`（chain previous）；`<SentoriErrorBoundary>` 用 `errorCaptured` lifecycle + slot fallback + `ignore` prop；`setupTraceNavigation(router)` from `/router` subpath
+- `@goliapkg/sentori-svelte@0.1.0`：`sentoriHandleError()` 工厂返回 `HandleClientError` 形状；`traceNavigation($navigating)` 接 `$app/stores`；Svelte 5 用户直接用内置 `<svelte:boundary>`
+- `@goliapkg/sentori-solid@0.1.0`：`sentoriOnCatch` 给 Solid 内置 `<ErrorBoundary onCatch>` 用；`traceSolidRouter(pathname)` 在 `createEffect` 里调，同路径短路
+- 三个 SDK 各 ~100 LOC adapter，shared adapter base 评估后改判为不需要（框架 boundary 语义差异太大，强抽象更绕）
+
+### Phase 46 — Session-trail 轻量回放（commit 07d12f1）✅
+
+- `sentori-core/src/trail.ts`：`TrailBuffer` ring buffer max 30 steps + `sealTrail()`，每步 `{ ts, label, breadcrumb?, viewTreeRef?, screenshotRef? }`
+- `captureStep(label, opts)` 公开 API（JS + RN 都暴露），各 framework SDK 的 router helper（react/vue/svelte/solid）自动写 `route:<path>`，RN 的 useTraceNavigation 写 `screen:<name>`
+- `init({ capture: { sessionTrail: true } })` opt-in；`captureException` 时 `sealTrail` → `uploadAttachment('sessionTrail', JSON)` → push ref 进 `event.attachments[]`，并清空 buffer（每个 crash 一份 trail，干净）
+- Server：`AttachmentKind` 加 `'sessionTrail'`，migration 0035 扩 event_attachments.kind CHECK，application/json 白名单
+- Dashboard `<SessionTrailViewer>`：左栏 step list + 右栏 detail（label、相对 crash 时间、breadcrumb、可选 screenshot/viewTree 链接），← → 键步进，默认 focus 最后一步（最接近 crash）。AttachmentGallery 自动渲染为可展开 `<details>` 卡
+
+### Phase 47 — Polish 收尾 ✅（部分）
+
+- 47.01 Related Issues panel：server `GET /admin/api/projects/{p}/issues/{i}/related` 返回同 project / 同 error_type 的 sibling issue（capped 5，按 last_seen DESC），dashboard `<RelatedIssuesPanel>` 渲染为 header 下的 chip row + 已 resolved/closed 的 muted 渲染
+- 47.04 SDK perf benchmark：`sdk/core/src/__tests__/perf.bench.ts` 给 uuidV7 / shouldSample / shouldSampleTrace / breadcrumb / TrailBuffer.push / sealTrail 各一条 wall-clock 预算（10x 实测 margin，CI-safe）。`bun run bench` 跑这条
+- 47.06 ROADMAP + CHANGELOG v0.7 整段（本节）
+- 47.02 hover frame ↔ tree node 联动：deferred — 单独 follow-up
+- 47.05 Dashboard LCP gate：deferred — 需要 Lighthouse infra
+- 47.07 v0.7 tag + npm publish：等 Insight 验证后一次性走
+
+---
+
 ## v0.6 — Phase 42 — Issue Detail 诊断深度
 
 **Goal:** Issue 详情从「stack + 朴素文本源码」升级成「stack + 高亮源码 + 智能调用链 + 出错截图 + UI tree + cross-stack 串联 + AI export」。覆盖 JS / RN / iOS native / Android native 全栈。9 个 sub-phase (A → I)，每个独立 commit + 多数独立 deploy。

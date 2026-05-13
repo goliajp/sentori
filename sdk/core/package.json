@@ -33,10 +33,11 @@
     "README.md"
   ],
   "scripts": {
+    "bench": "bun test ./src/__tests__/perf.bench.ts",
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit",
+    "prepack": "bun run build",
     "test": "bun test",
-    "prepack": "bun run build"
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -187,6 +187,13 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/issues/{issue_id}/releases",
             get(api::admin::releases_for_issue),
         )
+        // Phase 47.01: related-issues panel — sibling issues likely
+        // to share root cause (same error_type, same project, capped
+        // at 5).
+        .route(
+            "/projects/{project_id}/issues/{issue_id}/related",
+            get(api::admin::related_issues),
+        )
         .route(
             "/projects/{project_id}/dsyms",
             get(api::dsyms::list_dsyms).post(api::dsyms::upload_dsym).layer((

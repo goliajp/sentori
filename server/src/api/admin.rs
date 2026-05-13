@@ -242,6 +242,59 @@ fn parse_cursor(s: &str) -> Option<(OffsetDateTime, Uuid)> {
     Some((last_seen, id))
 }
 
+/// Phase 47.01 — slim row for the related-issues panel.
+#[derive(Debug, Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct RelatedIssueRow {
+    pub id: Uuid,
+    pub error_type: String,
+    pub message_sample: String,
+    pub status: String,
+    pub event_count: i64,
+    #[serde(with = "time::serde::rfc3339")]
+    pub last_seen: OffsetDateTime,
+}
+
+/// `GET /admin/api/projects/{project_id}/issues/{issue_id}/related`
+///
+/// Sibling issues likely to share root cause. Definition:
+///   - same project, different issue, same `error_type`
+///   - any status (so a recently-resolved sibling still surfaces —
+///     the dashboard renders a "resolved" pill so you don't follow
+///     a dead lead)
+///   - ordered by `last_seen DESC`, capped at 5
+///
+/// Cheap query: uses the existing `issues_project_status_last_seen`
+/// index by leading with `project_id`. We deliberately do NOT match
+/// on fingerprint (those are merged or duplicates) or on
+/// `release` (release-specific isn't the relationship the user wants
+/// from "related" — they want "same kind of error elsewhere").
+pub async fn related_issues(
+    State(state): State<AppState>,
+    Path((project_id, issue_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<Vec<RelatedIssueRow>>, AppError> {
+    let pool = state.db.as_ref().ok_or(AppError::DatabaseUnavailable)?;
+    let rows: Vec<RelatedIssueRow> = sqlx::query_as(
+        r#"
+        SELECT id, error_type, message_sample, status, event_count, last_seen
+        FROM issues
+        WHERE project_id = $1
+          AND id != $2
+          AND error_type = (
+              SELECT error_type FROM issues WHERE project_id = $1 AND id = $2
+          )
+        ORDER BY last_seen DESC
+        LIMIT 5
+        "#,
+    )
+    .bind(project_id)
+    .bind(issue_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(Json(rows))
+}
+
 /// `GET /admin/api/projects/{project_id}/issues/{issue_id}/releases`
 /// Distinct release names this issue has been seen on, sorted ascending.
 pub async fn releases_for_issue(
