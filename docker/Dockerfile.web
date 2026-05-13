@@ -32,6 +32,10 @@ COPY sdk/react/package.json ./sdk/react/
 COPY sdk/next/package.json ./sdk/next/
 COPY sdk/react-native/package.json ./sdk/react-native/
 COPY sdk/expo/package.json ./sdk/expo/
+# Phase 45 — Web SDK matrix added Vue / Svelte / Solid as workspaces.
+COPY sdk/vue/package.json ./sdk/vue/
+COPY sdk/svelte/package.json ./sdk/svelte/
+COPY sdk/solid/package.json ./sdk/solid/
 COPY web/package.json ./web/
 RUN bun install --frozen-lockfile
 
