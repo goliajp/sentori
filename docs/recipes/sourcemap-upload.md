@@ -5,19 +5,33 @@ description: GitHub Actions / GitLab CI / Vercel build hook recipes
 
 # Source map upload from CI
 
-`sentori-cli upload sourcemap` takes a release name + files or
-directories and POSTs to ingest. Walks dirs for `.js` / `.js.map`
-pairs, dedupes by sha256 so re-runs are cheap.
+The CLI is `@goliapkg/sentori-cli` (npm). `sentori-cli upload sourcemap`
+takes a release name + files or directories and POSTs them to your
+Sentori instance. Directories are scanned (one level) for `.map` /
+`.js` / `.jsbundle` / `.bundle` / `.hbc` files; the server dedupes by
+sha256, so re-runs are cheap. No install needed in CI — `npx` it:
 
 ```bash
-sentori-cli upload sourcemap \
+npx @goliapkg/sentori-cli@latest upload sourcemap \
   --release "myapp@1.2.3+456" \
   --token "$SENTORI_TOKEN" \
-  --ingest-url "$SENTORI_INGEST_URL" \
+  --api-url "$SENTORI_API_URL" \
   dist/assets/
 ```
 
-Below: how to wire this into the three most common CI surfaces.
+`--token` falls back to `$SENTORI_TOKEN`, `--api-url` to
+`$SENTORI_API_URL` (default `https://api.sentori.golia.jp`; for a
+self-hosted instance, your host). `--ingest-url` is accepted as an
+alias for `--api-url`. `--dry-run` lists what would be uploaded.
+
+> **The release string must match.** `--release` here has to be byte-for-byte
+> what the SDK reports via `init({ release })` (e.g. `myapp@1.2.3+456`).
+> If they differ the dashboard silently can't symbolicate — see the
+> "no source map for release X" / "release mismatch" hints on the issue
+> page.
+
+Below: how to wire this into the common CI surfaces (the recipes below
+install the CLI globally; `npx` works too).
 
 ## GitHub Actions
 
@@ -42,8 +56,7 @@ jobs:
       - run: bun run build
       - name: Install sentori-cli
         run: |
-          curl -fsSL https://cdn.sentori.golia.jp/install-cli.sh | bash
-          echo "$HOME/.sentori/bin" >> "$GITHUB_PATH"
+          npm install -g @goliapkg/sentori-cli
       - name: Upload sourcemaps
         run: sentori-cli upload sourcemap --release "$RELEASE" dist/assets/
       - name: Notify of deploy
@@ -90,7 +103,7 @@ upload-sourcemaps:
   image: oven/bun:1
   needs: [build]
   script:
-    - curl -fsSL https://cdn.sentori.golia.jp/install-cli.sh | bash
+    - npm install -g @goliapkg/sentori-cli
     - export PATH="$HOME/.sentori/bin:$PATH"
     - export RELEASE="myapp@$CI_COMMIT_REF_NAME+$CI_PIPELINE_IID"
     - sentori-cli upload sourcemap --release "$RELEASE" dist/assets/
@@ -160,6 +173,44 @@ module.exports = {
   productionBrowserSourceMaps: true,
 }
 ```
+
+## React Native / Expo (Hermes)
+
+A React Native release build is double-minified: Metro bundles your JS
+(emitting `*.packager.map`), then Hermes compiles that to bytecode
+(emitting `*.hbc.map`). The frames you get in production point at the
+*bytecode* offset, so you need the **composed** map.
+
+```bash
+# 1. produce the bundle + the Metro source map
+npx react-native bundle \
+  --platform ios --dev false --entry-file index.js \
+  --bundle-output main.jsbundle \
+  --sourcemap-output main.jsbundle.packager.map
+# (Hermes compilation runs as part of the iOS/Android build and writes
+#  main.jsbundle.hbc.map alongside main.jsbundle.hbc.)
+
+# 2. compose them into one usable map
+node node_modules/react-native/scripts/compose-source-maps.js \
+  main.jsbundle.packager.map main.jsbundle.hbc.map \
+  -o main.jsbundle.map
+
+# 3. upload — release must equal init({ release }) in your app
+npx @goliapkg/sentori-cli@latest upload sourcemap \
+  --release "myapp@$(node -p "require('./app.json').expo.version")+$BUILD_NUMBER" \
+  --token "$SENTORI_TOKEN" \
+  main.jsbundle.map main.jsbundle
+```
+
+Do this once per platform (the iOS and Android bundles differ).
+
+**Expo / EAS:** `@goliapkg/sentori-expo` ships an EAS post-build hook
+(`@goliapkg/sentori-expo/eas-post-build`) that runs step 3 against
+`./dist` after `expo export --source-maps`. Wire it from `eas.json`'s
+`build.<profile>.hooks.postPublish` with `{ "options": { "release":
+"..." } }`, and set `SENTORI_ADMIN_TOKEN` in EAS secrets. For a *Hermes*
+EAS build you still need the compose step (1–2 above) before the hook —
+run it from a custom build script.
 
 ## Verifying
 

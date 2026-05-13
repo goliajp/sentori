@@ -127,15 +127,21 @@ docker compose logs -f server | grep -E 'new-issue|notifier'
 
 ## Source-map uploads
 
-After a release build:
+So dashboard stack traces resolve to your source. After a release
+build, with `@goliapkg/sentori-cli` (`npx` works without installing):
 
 ```bash
-sentori-cli upload sourcemap \
+npx @goliapkg/sentori-cli@latest upload sourcemap \
   --release "myapp@1.2.3+456" \
   --token "$SENTORI_DEV_TOKEN" \
-  --ingest-url "https://sentori.your-host.com" \
-  ./bundle/index.android.bundle.map
+  --api-url "https://sentori.your-host.com" \
+  ./bundle/   # a dir (scanned for *.map / *.js / *.bundle) or specific files
 ```
+
+`--release` must equal the value the SDK reports via `init({ release })`.
+`--token` falls back to `$SENTORI_TOKEN`, `--api-url` to `$SENTORI_API_URL`.
+React Native (Hermes) needs the Metro + Hermes maps composed first — see
+docs → Recipes → "Source map upload" → React Native.
 
 Files are deduped by sha256 and stored under `SENTORI_DATA_DIR/artifacts/`.
 

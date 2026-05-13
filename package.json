@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "workspaces": [
+    "sdk/cli",
     "sdk/core",
     "sdk/expo",
     "sdk/javascript",

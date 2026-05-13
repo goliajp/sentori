@@ -26,10 +26,17 @@
  *   node ./node_modules/@goliapkg/sentori-expo/scripts/eas-post-build.mjs \
  *     --token $SENTORI_ADMIN_TOKEN --release "$EAS_BUILD_RELEASE"
  *
- * The script shells out to `sentori-cli` for the actual upload (Phase 22
- * sub-A introduces `sentori-cli upload dsym`). Until that lands this is
- * a stub that logs what it would have done — adopt sub-D in your
- * pipeline now and the CLI integration arrives transparently.
+ * Shells out to `@goliapkg/sentori-cli upload sourcemap` for the actual
+ * upload. Make sure `@goliapkg/sentori-cli` is installed (or reachable
+ * via `npx`); if it can't be found this logs a warning and exits 0 so
+ * it never fails a build.
+ *
+ * Note: for an EAS *Hermes* production build the bundle + maps are
+ * platform-specific and must be composed first (Metro map + Hermes
+ * map); see docs → Recipes → "Source map upload" → React Native. This
+ * helper uploads whatever is under `./dist` (the default
+ * `expo export --source-maps` output) — fine for managed JS-only
+ * exports.
  */
 
 import { spawnSync } from 'node:child_process'
@@ -39,7 +46,7 @@ const args = parseArgs(process.argv.slice(2))
 
 const token = args.token ?? process.env.SENTORI_ADMIN_TOKEN
 const release = args.release ?? process.env.EAS_BUILD_RELEASE
-const ingestUrl = args.ingest ?? process.env.SENTORI_INGEST_URL
+const apiUrl = args['api-url'] ?? process.env.SENTORI_API_URL ?? process.env.SENTORI_INGEST_URL
 
 if (!token || !release) {
   console.error(
@@ -50,29 +57,30 @@ if (!token || !release) {
 }
 
 const cli = resolveCli()
-if (!cli) {
+if (!cli.length) {
   console.warn(
-    '[sentori-expo:eas-post-build] sentori-cli not found on PATH or in node_modules. ' +
-      'Skipping upload — install @goliapkg/sentori-cli to enable. ' +
-      'Phase 22 sub-A will land the proper upload subcommand.',
+    '[sentori-expo:eas-post-build] @goliapkg/sentori-cli not found on PATH or in ' +
+      'node_modules, and npx is unavailable. Skipping source-map upload — ' +
+      'install @goliapkg/sentori-cli (or make npx available) to enable.',
   )
   process.exit(0)
 }
 
 const cmd = [
+  ...cli.slice(1),
   'upload',
   'sourcemap',
   '--token',
   token,
   '--release',
   release,
-  ...(ingestUrl ? ['--ingest', ingestUrl] : []),
+  ...(apiUrl ? ['--api-url', apiUrl] : []),
   // Default Expo build output for the JS bundle + sourcemap.
   './dist',
 ]
 
-console.log(`[sentori-expo:eas-post-build] running: ${cli} ${cmd.join(' ')}`)
-const r = spawnSync(cli, cmd, { stdio: 'inherit' })
+console.log(`[sentori-expo:eas-post-build] running: ${cli[0]} ${cmd.join(' ')}`)
+const r = spawnSync(cli[0], cmd, { stdio: 'inherit' })
 process.exit(r.status ?? 0)
 
 function parseArgs(argv) {
@@ -87,17 +95,24 @@ function parseArgs(argv) {
   return out
 }
 
+/** Returns `[command, ...prefixArgs]` to invoke the CLI, or `[]` if it
+ *  can't be found anywhere. Prefers a locked node_modules copy over a
+ *  global one; falls back to `npx`. */
 function resolveCli() {
-  // Prefer node_modules/.bin so the locked @goliapkg/sentori-cli wins
-  // over a globally-installed older copy.
-  for (const p of [
-    './node_modules/.bin/sentori-cli',
-    './node_modules/@goliapkg/sentori-cli/bin/sentori-cli.js',
-  ]) {
-    if (existsSync(p)) return p
+  // node_modules/.bin/sentori-cli — npm creates this from the package's
+  // `bin` field; the locked version wins over a global install.
+  if (existsSync('./node_modules/.bin/sentori-cli')) {
+    return ['./node_modules/.bin/sentori-cli']
   }
-  // PATH lookup as last resort.
+  // The package's bin entry directly (in case .bin wasn't linked).
+  const direct = './node_modules/@goliapkg/sentori-cli/lib/index.js'
+  if (existsSync(direct)) return ['node', direct]
+  // On PATH (global install).
   const which = spawnSync('which', ['sentori-cli'])
   const found = which.stdout?.toString().trim()
-  return found || null
+  if (found) return [found]
+  // Last resort: npx (will fetch the package if not cached).
+  const npx = spawnSync('which', ['npx'])
+  if (npx.stdout?.toString().trim()) return ['npx', '--yes', '@goliapkg/sentori-cli@latest']
+  return []
 }
