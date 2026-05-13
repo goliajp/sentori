@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 
 import type { Attachment } from '@/api/client'
 
+import { ViewTreePanel } from './ViewTreePanel'
+
 /**
  * Phase 42 sub-C.09 / D.11 / D.12 — visual slot for SDK-uploaded
  * attachments on the issue-detail page.
@@ -27,8 +29,12 @@ export function AttachmentGallery({
     () => (attachments ?? []).filter((a) => a.kind === 'screenshot'),
     [attachments]
   )
+  const viewTrees = useMemo(
+    () => (attachments ?? []).filter((a) => a.kind === 'viewTree'),
+    [attachments]
+  )
   const others = useMemo(
-    () => (attachments ?? []).filter((a) => a.kind !== 'screenshot'),
+    () => (attachments ?? []).filter((a) => a.kind !== 'screenshot' && a.kind !== 'viewTree'),
     [attachments]
   )
   const [openIdx, setOpenIdx] = useState<null | number>(null)
@@ -36,20 +42,42 @@ export function AttachmentGallery({
   if (!attachments || attachments.length === 0) return null
 
   return (
-    <section>
-      <h2 className="text-fg-muted mb-2 text-[11px] tracking-wider uppercase">Captured at error</h2>
-      <ul className="flex flex-wrap gap-3">
-        {screenshots.map((a, i) => (
-          <li key={a.ref}>
-            <ScreenshotTile attachment={a} eventId={eventId} onOpen={() => setOpenIdx(i)} />
-          </li>
-        ))}
-        {others.map((a) => (
-          <li key={a.ref}>
-            <NonImageTile attachment={a} eventId={eventId} />
-          </li>
-        ))}
-      </ul>
+    <section className="space-y-4">
+      <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Captured at error</h2>
+      {(screenshots.length > 0 || others.length > 0) && (
+        <ul className="flex flex-wrap gap-3">
+          {screenshots.map((a, i) => (
+            <li key={a.ref}>
+              <ScreenshotTile attachment={a} eventId={eventId} onOpen={() => setOpenIdx(i)} />
+            </li>
+          ))}
+          {others.map((a) => (
+            <li key={a.ref}>
+              <NonImageTile attachment={a} eventId={eventId} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {/* Phase 42 sub-G.07: inline the view tree right under the gallery
+          for `viewTree` attachments. Multiple trees (rare — typically
+          one per source: ios, android, js) get stacked. */}
+      {viewTrees.map((a) => (
+        <details
+          className="border-border bg-bg-tertiary/30 rounded-md border"
+          key={a.ref}
+          open={viewTrees.length === 1}
+        >
+          <summary className="text-fg cursor-pointer px-3 py-2 text-[12px]">
+            View tree at error
+            {a.source && (
+              <span className="text-fg-muted ml-2 text-[10px] uppercase">{a.source}</span>
+            )}
+          </summary>
+          <div className="px-3 pb-3">
+            <ViewTreePanel attachmentRef={a.ref} eventId={eventId} />
+          </div>
+        </details>
+      ))}
       {openIdx !== null && (
         <Lightbox
           attachments={screenshots}

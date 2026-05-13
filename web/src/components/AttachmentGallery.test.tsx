@@ -1,9 +1,20 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
 
 import type { Attachment } from '@/api/client'
 
 import { AttachmentGallery } from './AttachmentGallery'
+
+// Phase 42 sub-G: viewTree kind now renders <ViewTreePanel> which
+// uses react-query. Wrap the tree in a QueryClientProvider for those
+// tests; non-tree tests are unaffected because the gallery only
+// reaches QueryClient for `viewTree` attachments.
+function wrap(ui: ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
+}
 
 const screenshot = (ref: string, source: Attachment['source'] = 'js'): Attachment => ({
   kind: 'screenshot',
@@ -13,8 +24,8 @@ const screenshot = (ref: string, source: Attachment['source'] = 'js'): Attachmen
   source,
 })
 
-const viewTree = (ref: string): Attachment => ({
-  kind: 'viewTree',
+const stateSnapshot = (ref: string): Attachment => ({
+  kind: 'stateSnapshot',
   mediaType: 'application/json',
   ref,
   sizeBytes: 500,
@@ -40,12 +51,33 @@ describe('<AttachmentGallery>', () => {
     expect(imgs[0]?.getAttribute('loading')).toBe('lazy')
   })
 
-  it('renders non-image attachments as pill links to the raw blob', () => {
-    render(<AttachmentGallery attachments={[viewTree('r-3')]} eventId="evX" />)
-    const link = screen.getByText('viewTree').closest('a')
+  it('renders non-image, non-tree attachments as pill links to the raw blob', () => {
+    render(<AttachmentGallery attachments={[stateSnapshot('r-3')]} eventId="evX" />)
+    const link = screen.getByText('stateSnapshot').closest('a')
     expect(link).not.toBeNull()
     expect(link?.getAttribute('href')).toBe('/admin/api/events/evX/attachments/r-3')
     expect(link?.getAttribute('target')).toBe('_blank')
+  })
+
+  it('renders viewTree attachments inline via <ViewTreePanel>', () => {
+    wrap(
+      <AttachmentGallery
+        attachments={[
+          {
+            kind: 'viewTree',
+            mediaType: 'application/json',
+            ref: 'tree-1',
+            sizeBytes: 200,
+            source: 'ios',
+          },
+        ]}
+        eventId="ev1"
+      />
+    )
+    expect(screen.getByText(/view tree at error/i)).toBeInTheDocument()
+    // The single-tree case opens <details> automatically, kicking off
+    // the fetch — assert the loading text shows up.
+    expect(screen.getByText(/loading view tree/i)).toBeInTheDocument()
   })
 
   it('opens a lightbox on screenshot click, closes on Esc', () => {
