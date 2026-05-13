@@ -9,10 +9,12 @@ import { KeyboardCheatsheet } from '@/components/KeyboardCheatsheet'
 import { Sidebar } from '@/components/sidebar'
 import { useThemeEffect } from '@/components/theme'
 import { UsageBanner } from '@/components/UsageBanner'
+import { useGoToShortcuts } from '@/lib/go-to-shortcuts'
 
 export function OrgLayout() {
   useThemeEffect()
   const { slug } = useParams()
+  useGoToShortcuts(slug ?? '')
   const [searchParams] = useSearchParams()
   const { logout, user } = useAuth()
 

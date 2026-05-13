@@ -29,6 +29,19 @@ const SECTIONS: Section[] = [
   },
   {
     items: [
+      { keys: ['g', 'o'], label: 'Overview' },
+      { keys: ['g', 'i'], label: 'Issues' },
+      { keys: ['g', 't'], label: 'Traces' },
+      { keys: ['g', 'r'], label: 'Releases' },
+      { keys: ['g', 'm'], label: 'Teams' },
+      { keys: ['g', 'a'], label: 'Alerts (admin only)' },
+      { keys: ['g', 'u'], label: 'Audit (admin only)' },
+      { keys: ['g', 's'], label: 'Settings' },
+    ],
+    title: 'Go to (press g, then the letter within 0.8 s)',
+  },
+  {
+    items: [
       { keys: ['j'], label: 'Next issue' },
       { keys: ['k'], label: 'Previous issue' },
       { keys: ['Enter'], label: 'Open highlighted issue' },
