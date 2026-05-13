@@ -90,6 +90,9 @@ const ReleaseCompareView = lazy(() =>
 const OrgSettingsView = lazy(() =>
   import('./views/org-settings').then((m) => ({ default: m.OrgSettingsView }))
 )
+const IntegrationsView = lazy(() =>
+  import('./views/integrations').then((m) => ({ default: m.IntegrationsView }))
+)
 const TeamListView = lazy(() =>
   import('./views/team-list').then((m) => ({ default: m.TeamListView }))
 )
@@ -148,6 +151,7 @@ const router = createBrowserRouter([
           { element: lazyEl(<ReleaseDetailView />), path: 'releases/:releaseName' },
           { element: lazyEl(<ReleaseCompareView />), path: 'releases/:target/compare/:base' },
           { element: lazyEl(<OrgSettingsView />), path: 'settings' },
+          { element: lazyEl(<IntegrationsView />), path: 'integrations' },
           { element: lazyEl(<TeamListView />), path: 'teams' },
           { element: lazyEl(<TeamDetailView />), path: 'teams/:teamSlug' },
           { element: lazyEl(<AlertsView />), path: 'alerts' },

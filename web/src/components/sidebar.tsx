@@ -13,6 +13,7 @@ import { ThemeToggle } from './theme-toggle'
 type IconKind =
   | 'alerts'
   | 'audit'
+  | 'integrations'
   | 'issues'
   | 'overview'
   | 'releases'
@@ -32,6 +33,7 @@ const PRIMARY: NavItem[] = [
 const SECONDARY: NavItem[] = [
   { icon: 'teams', label: 'Teams', path: 'teams' },
   { adminOnly: true, icon: 'alerts', label: 'Alerts', path: 'alerts' },
+  { adminOnly: true, icon: 'integrations', label: 'Integrations', path: 'integrations' },
   { adminOnly: true, icon: 'audit', label: 'Audit', path: 'audit' },
   { icon: 'settings', label: 'Settings', path: 'settings' },
 ]
@@ -44,6 +46,9 @@ function NavIcon({ kind }: { kind: IconKind }) {
         return 'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0'
       case 'audit':
         return 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8M8 9h2'
+      case 'integrations':
+        // chain link
+        return 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'
       case 'issues':
         return 'M10.3 3.3a2 2 0 0 1 3.4 0l8 14a2 2 0 0 1-1.7 3H3.99a2 2 0 0 1-1.7-3zM12 9v4M12 17h.01'
       case 'overview':

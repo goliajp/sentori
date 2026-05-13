@@ -193,7 +193,28 @@ export type Breadcrumb = {
   type: 'custom' | 'log' | 'nav' | 'net' | 'user'
 }
 
+export type IntegrationRow = {
+  id: string
+  orgId: string
+  orgSlug: string
+  kind: 'linear' | 'slack'
+  display: Record<string, null | string | undefined>
+  createdAt: string
+}
+
 export const adminApi = {
+  /** Phase 43 sub-A.03: list active integrations across the caller's orgs. */
+  listIntegrations: () => adminFetch<IntegrationRow[]>('/integrations'),
+  /** Build the OAuth connect URL. The browser must navigate there
+   *  (not fetch) since OAuth needs a top-level redirect. */
+  integrationConnectUrl: (kind: string, orgSlug: string): string =>
+    `/admin/api/integrations/${kind}/connect?orgSlug=${encodeURIComponent(orgSlug)}`,
+  /** Soft-revoke (sets `revoked_at`). */
+  revokeIntegration: (kind: string, orgSlug: string) =>
+    adminFetch<null>(`/integrations/${kind}?orgSlug=${encodeURIComponent(orgSlug)}`, {
+      method: 'DELETE',
+    }),
+
   issueDetail: (projectId: string, issueId: string) =>
     adminFetch<IssueRow>(`/projects/${projectId}/issues/${issueId}`),
 
