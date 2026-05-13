@@ -104,6 +104,11 @@ object SentoriAnrWatchdog {
         try {
             val mainStack = Looper.getMainLooper().thread.stackTrace
             val event = buildAnrEvent(ctx, mainStack)
+            // Phase 42 sub-F.07: ANR by definition means main thread
+            // is wedged — but PixelCopy runs on a HandlerThread, so we
+            // can still snapshot the (frozen) UI. Attach screenshot
+            // + view tree like the crash path.
+            attachPending(event)
             val dir = File(ctx.filesDir, PENDING_DIR_NAME)
             if (!dir.exists()) dir.mkdirs()
             val file = File(dir, "${uuid()}.json")
@@ -111,6 +116,47 @@ object SentoriAnrWatchdog {
         } catch (_: Throwable) {
             // never throw from inside the watchdog — losing one
             // capture beats killing the worker thread.
+        }
+    }
+
+    private fun attachPending(event: JSONObject) {
+        val snap = try {
+            SentoriScreenshotCapture.captureKeyWindow()
+        } catch (_: Throwable) {
+            null
+        } ?: return
+        val pending = JSONArray()
+
+        @Suppress("UNCHECKED_CAST")
+        val sc = snap["screenshot"] as? Map<String, Any>
+        if (sc != null) {
+            val b64 = sc["base64"] as? String
+            val mt = (sc["mediaType"] as? String) ?: "image/webp"
+            if (b64 != null) {
+                pending.put(JSONObject().apply {
+                    put("kind", "screenshot")
+                    put("base64", b64)
+                    put("mediaType", mt)
+                    put("source", "android")
+                })
+            }
+        }
+        val vt = snap["viewTree"]
+        if (vt != null) {
+            val asJson = SentoriScreenshotCapture.toJson(vt)
+            val base64 = android.util.Base64.encodeToString(
+                asJson.toString().toByteArray(Charsets.UTF_8),
+                android.util.Base64.NO_WRAP,
+            )
+            pending.put(JSONObject().apply {
+                put("kind", "viewTree")
+                put("base64", base64)
+                put("mediaType", "application/json")
+                put("source", "android")
+            })
+        }
+        if (pending.length() > 0) {
+            event.put("_pendingAttachments", pending)
         }
     }
 

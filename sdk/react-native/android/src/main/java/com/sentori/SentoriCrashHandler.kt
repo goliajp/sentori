@@ -2,6 +2,7 @@ package com.sentori
 
 import android.content.Context
 import android.os.Build
+import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -41,6 +42,11 @@ object SentoriCrashHandler {
                 // never throw inside the crash handler
             }
             previousHandler?.uncaughtException(thread, throwable)
+        }
+        // Phase 42 sub-F.01: have the screenshot helper track the
+        // foreground Activity so it knows which Window to PixelCopy.
+        (appCtx as? android.app.Application)?.let {
+            SentoriScreenshotCapture.register(it)
         }
     }
 
@@ -131,12 +137,59 @@ object SentoriCrashHandler {
             put("spanId", JSONObject.NULL)
         }
 
+        // Phase 42 sub-F.05/08: capture screen + view tree before the
+        // app dies, attach as `_pendingAttachments` for the JS side to
+        // upload on next launch (same shape as iOS sub-E).
+        attachPending(event)
+
         val dir = pendingDir() ?: return
         val file = File(dir, "${uuidLower()}.json")
         try {
             file.writeText(event.toString())
         } catch (_: Throwable) {
             // best-effort
+        }
+    }
+
+    private fun attachPending(event: JSONObject) {
+        val snap = try {
+            SentoriScreenshotCapture.captureKeyWindow()
+        } catch (_: Throwable) {
+            null
+        } ?: return
+        val pending = JSONArray()
+
+        @Suppress("UNCHECKED_CAST")
+        val sc = snap["screenshot"] as? Map<String, Any>
+        if (sc != null) {
+            val b64 = sc["base64"] as? String
+            val mt = (sc["mediaType"] as? String) ?: "image/webp"
+            if (b64 != null) {
+                pending.put(JSONObject().apply {
+                    put("kind", "screenshot")
+                    put("base64", b64)
+                    put("mediaType", mt)
+                    put("source", "android")
+                })
+            }
+        }
+        val vt = snap["viewTree"]
+        if (vt != null) {
+            // Convert Map → JSONObject → string → base64
+            val asJson = SentoriScreenshotCapture.toJson(vt)
+            val base64 = Base64.encodeToString(
+                asJson.toString().toByteArray(Charsets.UTF_8),
+                Base64.NO_WRAP,
+            )
+            pending.put(JSONObject().apply {
+                put("kind", "viewTree")
+                put("base64", base64)
+                put("mediaType", "application/json")
+                put("source", "android")
+            })
+        }
+        if (pending.length() > 0) {
+            event.put("_pendingAttachments", pending)
         }
     }
 
