@@ -389,6 +389,7 @@ mod tests {
         let sm = synthetic_sourcemap();
         let mut err = ErrorObject {
             cause: None,
+            native_error: None,
             message: "boom".into(),
             r#type: "Error".into(),
             // bundle line 2 → original line 6 in src/foo.ts; the second
@@ -429,10 +430,12 @@ mod tests {
         let mut err = ErrorObject {
             cause: Some(Box::new(ErrorObject {
                 cause: None,
+                native_error: None,
                 message: "root".into(),
                 r#type: "Error".into(),
                 stack: vec![frame("bundle.js", 1, 0)], // → src/foo.ts:2
             })),
+            native_error: None,
             message: "boom".into(),
             r#type: "Error".into(),
             stack: vec![frame("bundle.js", 2, 0)],

@@ -52,7 +52,7 @@ jobs:
       - name: cargo check (cli)
         run: cargo check --manifest-path cli/Cargo.toml --all-targets
 
-  web-and-sdk:
+  web:
     runs-on: ubuntu-latest
 
     steps:
@@ -70,17 +70,49 @@ jobs:
           bun run test
           bun run build
 
-      - name: sdk — install + typecheck + test + build
-        working-directory: sdk/react-native
+  sdk:
+    # Phase 47.07 follow-up: previously this job only covered
+    # sdk/react-native, so Vue / Svelte / Solid (added Phase 45) and
+    # sentori-core / javascript / react / next regressions slipped
+    # through. Matrix-run all 8 SDKs in parallel so any one of them
+    # going red fails the build immediately.
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - sdk/core
+          - sdk/javascript
+          - sdk/react
+          - sdk/next
+          - sdk/react-native
+          - sdk/vue
+          - sdk/svelte
+          - sdk/solid
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # `bun install` at the root resolves the whole workspace, so
+      # every per-package step below can skip re-installing.
+      - name: install workspace
+        run: bun install --frozen-lockfile
+
+      - name: ${{ matrix.package }} — typecheck + test + build
+        working-directory: ${{ matrix.package }}
         run: |
-          bun install --frozen-lockfile
           bun run typecheck
           bun test
           bun run build
 
   docker-build:
     runs-on: ubuntu-latest
-    needs: [server-test, web-and-sdk]
+    needs: [server-test, web, sdk]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     permissions:
