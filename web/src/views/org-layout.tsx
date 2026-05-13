@@ -1,36 +1,18 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
-import { Link, Navigate, Outlet, useLocation, useParams, useSearchParams } from 'react-router'
+import { Navigate, Outlet, useParams, useSearchParams } from 'react-router'
 
 import { adminApi, orgsApi, teamsApi } from '@/api/client'
 import { OrgCtx } from '@/auth/orgContext'
 import { useAuth } from '@/auth/state'
 import { CmdK } from '@/components/CmdK'
 import { KeyboardCheatsheet } from '@/components/KeyboardCheatsheet'
-import { OnboardingBadge } from '@/components/OnboardingBadge'
-import { OrgSwitcher } from '@/components/OrgSwitcher'
-import { RoleBadge } from '@/components/RoleBadge'
-import { ThemeToggle } from '@/components/theme-toggle'
+import { Sidebar } from '@/components/sidebar'
 import { useThemeEffect } from '@/components/theme'
 import { UsageBanner } from '@/components/UsageBanner'
-import { useDensity } from '@/lib/density'
-
-type NavItem = { adminOnly?: boolean; label: string; path: string }
-
-const NAV: NavItem[] = [
-  { label: 'Overview', path: 'overview' },
-  { label: 'Issues', path: 'issues' },
-  { label: 'Traces', path: 'traces' },
-  { label: 'Releases', path: 'releases' },
-  { label: 'Teams', path: 'teams' },
-  { adminOnly: true, label: 'Alerts', path: 'alerts' },
-  { adminOnly: true, label: 'Audit', path: 'audit' },
-  { label: 'Settings', path: 'settings' },
-]
 
 export function OrgLayout() {
   useThemeEffect()
   const { slug } = useParams()
-  const location = useLocation()
   const [searchParams] = useSearchParams()
   const { logout, user } = useAuth()
 
@@ -90,8 +72,6 @@ export function OrgLayout() {
 
   const currentProject = filteredProjects[0] ?? null
 
-  const isActive = (path: string) => location.pathname.startsWith(`/org/${currentOrg.slug}/${path}`)
-
   return (
     <OrgCtx.Provider
       value={{
@@ -103,83 +83,28 @@ export function OrgLayout() {
         teams: teams ?? [],
       }}
     >
-      <div className="flex h-full flex-col">
+      <div className="flex h-full">
         <a className="skip-to-content" href="#sentori-main">
           Skip to content
         </a>
-        <header className="border-border bg-bg/80 flex h-12 shrink-0 items-center justify-between border-b px-6 backdrop-blur-xl">
-          <div className="flex items-center gap-4">
-            <Link className="text-fg text-sm font-semibold" to="/">
-              Sentori
-            </Link>
-            <OrgSwitcher
-              current={currentOrg}
-              currentTeamSlug={currentTeamSlug}
-              orgs={orgs ?? []}
-              teams={teams ?? []}
-            />
-            <nav className="flex items-center gap-1">
-              {NAV.filter(
-                (item) =>
-                  !item.adminOnly || currentOrg.role === 'owner' || currentOrg.role === 'admin'
-              ).map((item) => (
-                <Link
-                  className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-                    isActive(item.path)
-                      ? 'bg-accent/10 text-accent'
-                      : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
-                  }`}
-                  key={item.path}
-                  to={`/org/${currentOrg.slug}/${item.path}`}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-          </div>
-          <div className="flex items-center gap-3">
-            <OnboardingBadge project={currentProject} />
-            <Link
-              className="text-fg-muted hover:text-fg hidden items-center gap-1.5 text-xs sm:inline-flex"
-              title="My activity"
-              to="/me/activity"
-            >
-              {user?.email}
-              <RoleBadge role={currentOrg.role} />
-            </Link>
-            <DensityToggle />
-            <ThemeToggle />
-            <button
-              className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-3 py-1.5 text-sm transition-colors"
-              onClick={() => void logout()}
-              type="button"
-            >
-              Sign out
-            </button>
-          </div>
-        </header>
-        <UsageBanner org={currentOrg} />
-        <main className="flex-1 overflow-y-auto" id="sentori-main">
-          <Outlet />
-        </main>
-        <CmdK />
-        <KeyboardCheatsheet />
+        <Sidebar
+          currentOrg={currentOrg}
+          currentProject={currentProject}
+          currentTeamSlug={currentTeamSlug}
+          onLogout={() => void logout()}
+          orgs={orgs ?? []}
+          teams={teams ?? []}
+          user={user}
+        />
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <UsageBanner org={currentOrg} />
+          <main className="flex-1 overflow-y-auto" id="sentori-main">
+            <Outlet />
+          </main>
+        </div>
       </div>
+      <CmdK />
+      <KeyboardCheatsheet />
     </OrgCtx.Provider>
-  )
-}
-
-function DensityToggle() {
-  const { density, toggle } = useDensity()
-  return (
-    <button
-      aria-label={`Density: ${density}. Click to toggle.`}
-      className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-2 py-1.5 text-xs transition-colors"
-      onClick={toggle}
-      title={`Density: ${density} — click to toggle`}
-      type="button"
-    >
-      {density === 'compact' ? '☰' : '≡'}
-    </button>
   )
 }

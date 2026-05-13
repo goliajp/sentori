@@ -521,28 +521,22 @@ Phase 40 sub-A/B/C 完成。剩下的（dashboard 渲染、dev-mode、publish、
 - [x] bump + publish `@goliapkg/sentori-react-native@0.5.6`（仅 rn 改动，无依赖链 re-publish）
 - [x] commit `v0.5 day 5: dev-mode metro symbolicate`
 
-### Day 6 — Phase 41 sub-A：左侧 sidebar 组件
+### Day 6 — Phase 41：左侧 sidebar（组件 + layout 重构）✅（合并了原 Day 6+7）
 
-- [ ] 新 `web/src/components/sidebar.tsx`：竖排 —— 顶部 org/project 切换器（复用现有 `useOrg`）；主导航 Overview / Issues / Traces / Releases（带图标）；次要项 Teams / Alerts / Audit / Settings 收进可折叠的 "More" 分组或底部；最底部用户菜单（邮箱 + OWNER badge + Sign out）+ 主题切换（现在右上角那个 ☀/🖥/🌙 移过来）；active 项左边一道 accent 竖条 + 背景（Linear 风）；宽 ~220px
-- [ ] 暂和现有顶部 NAV 并存（Day 7 拆顶部）—— 或直接在 Day 6 就接进 `org-layout`，看实施时哪种 diff 干净
-- [ ] commit `v0.5 day 6: left sidebar component`
+- [x] 新 `web/src/components/sidebar.tsx`：`<Sidebar>` —— 顶 Sentori wordmark + `<OnboardingBadge>` + `<OrgSwitcher>`（复用）；主导航 Overview/Issues/Traces/Releases（带 16px inline-SVG icon、active 项 `bg-accent/10 text-accent`）；细分隔线；次要项 Teams/Alerts/Audit/Settings（admin-only 的隐藏给非 admin）；底部（`mt-auto`）用户邮箱 + `<RoleBadge>`（链到 /me/activity）+ density toggle + `<ThemeToggle>` + Sign out。宽 `w-56`，`border-r`。窄屏（`< md`）：persistent rail 隐藏，左上角 fixed hamburger 打开同样内容的 overlay drawer（route 变自动关，eslint-disable 那行同 codebase 既有 pattern）
+- [x] `web/src/views/org-layout.tsx` 重写：去掉顶部 `<header>` 横排 NAV + 那堆 `OrgSwitcher`/`RoleBadge`/`ThemeToggle`/`OnboardingBadge`/`DensityToggle`（都进了 sidebar），改成 `<div flex h-full> <Sidebar/> <div flex-1 flex-col> <UsageBanner/> <main><Outlet/></main> </div> </div>` + `<CmdK/>` + `<KeyboardCheatsheet/>`；各 view 自带的 `<header h-12>`（Issues/Traces 等的标题+搜索条）保留，不再加 context bar；所有路由路径不变。data fetching（orgs/projects/teams/projectTeamsQueries）原样
+- [x] `bun run check` 0 error（23 个 pre-existing warnings 不影响）/ `bun run test` 40/40 / `bun run build` OK（main bundle 342→346 KB / gzip ~110 KB）/ tsc 干净
+- [x] **defer**：`g i`/`g t` "go to" 快捷键（`react-hotkeys-hook` 不直接支持 key sequence，要自己写个 sequence handler，留 polish）；sidebar 折叠/展开（当前桌面常驻、窄屏 drawer，没"折成图标轨"这个中间态 —— 要的话 polish 再加）
+- [x] commit `v0.5 day 6: left sidebar + layout restructure`
 
-### Day 7 — Phase 41 sub-B：layout 重构 + 响应式
+### Day 7 — Phase 41 sub-C：打磨 + 测试 + v0.5.0 发布
 
-- [ ] `web/src/views/org-layout.tsx`：拆掉顶部横排 NAV，改成 `<Sidebar>` + 主内容区两栏；顶部留一条很薄的 context bar（面包屑 / 当前 view 标题 / 全局搜索入口）或不留
-- [ ] 窄屏（< md）：sidebar 折叠成只剩图标的窄轨（hover / 点击展开）或抽屉式，移动端可用
-- [ ] keyboard：`g i` / `g t` / `g r` 等 "go to" 快捷键（Linear 的 `g` 前缀）；`[` `]` 折叠/展开 sidebar
-- [ ] 所有现有路由路径不变（`/org/{slug}/issues` 等），只换 chrome；`bun run check` 0 / `bun run build` OK
-- [ ] commit `v0.5 day 7: layout restructure + responsive sidebar`
-
-### Day 8 — Phase 41 sub-C：打磨 + 测试 + v0.5.0 发布
-
-- [ ] 对齐设计宪法（Linear/Vercel/Modal）：间距 / 字号 / 图标 / dark+light 两套 / density 设置仍生效
-- [ ] vitest 更新（org-layout / sidebar 渲染 + 导航）；playwright e2e（登录 → 各 view → 折叠 sidebar）；bundle 对比（sidebar 进 main bundle，控增量）
-- [ ] CHANGELOG.md v0.5 section（Phase 39 / 40 / 41 各一行 condensed summary + v0.5.x patch 列表 + npm 版本）；marketing / docs 里的 dashboard 截图（如有）更新成新 chrome
+- [ ] 对齐设计宪法（Linear/Vercel/Modal）：间距 / 字号 / icon 一致性 / dark+light 两套都过一遍 / density 设置仍生效；sidebar 在很窄/很宽视口下不破
+- [ ] vitest：新 `sidebar.test.tsx`（渲 `<Sidebar>` with `<MemoryRouter>` + `QueryClientProvider`：主/次导航项渲出 / active 项高亮 / 非 admin 看不到 Alerts·Audit / 窄屏 hamburger 存在）；playwright e2e 跑通主流程（登录 → 各 view 跳转 → 窄屏开/关 drawer）；bundle 对比
+- [ ] CHANGELOG.md v0.5 section（Phase 39 / 40 / 41 各一行 condensed summary + v0.5.x patch 列表 + npm 版本）；docs / marketing 里的 dashboard 截图（如有）更新成新 chrome
 - [ ] ROADMAP 顶部状态 v0.5 🚧 → ✅；git tag v0.5.0 + `gh release create v0.5.0`
 - [ ] **告知 Insight 阶段已 finish，可以按上面 ⚑ 那两步接了**
-- [ ] commit `v0.5 day 8: dashboard chrome polish + v0.5.0 release`
+- [ ] commit `v0.5 day 7: dashboard chrome polish + v0.5.0 release`
 
 ---
 
