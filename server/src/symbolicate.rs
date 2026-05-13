@@ -134,6 +134,9 @@ pub(crate) fn symbolicate_error_object(sm: &SourceMap, error: &mut ErrorObject) 
     }
 }
 
+/// ±5 lines is plenty for the dashboard's inline snippet.
+const FRAME_CONTEXT_LINES: usize = 5;
+
 fn symbolicate_frame_typed(sm: &SourceMap, frame: &mut Frame) {
     if frame.line == 0 {
         return;
@@ -151,13 +154,44 @@ fn symbolicate_frame_typed(sm: &SourceMap, frame: &mut Frame) {
         frame.absolute_path = Some(src.to_string());
         frame.file = src.to_string();
     }
-    frame.line = (token.get_src_line() as u64).saturating_add(1) as u32;
+    let src_line0 = token.get_src_line() as usize;
+    frame.line = (src_line0 as u64).saturating_add(1) as u32;
     frame.column = Some(token.get_src_col());
     if let Some(name) = token.get_name() {
         frame.function = Some(name.to_string());
     }
     // A frame that resolved through the source map points at app source.
     frame.in_app = true;
+    // Inline source context (from sourcesContent), so the dashboard
+    // doesn't need a per-frame fetch.
+    if let Some((pre, at, post)) = source_window(sm, token.get_src_id(), src_line0, FRAME_CONTEXT_LINES) {
+        frame.pre_context = pre;
+        frame.context_line = Some(at);
+        frame.post_context = post;
+    }
+}
+
+/// `(before, at, after)` lines around 0-indexed `line0` in source
+/// `src_id` — or `None` if the map didn't embed `sourcesContent` for
+/// it (or the line is out of range).
+fn source_window(
+    sm: &SourceMap,
+    src_id: u32,
+    line0: usize,
+    n: usize,
+) -> Option<(Vec<String>, String, Vec<String>)> {
+    let view = sm.get_source_view(src_id)?;
+    let lines: Vec<&str> = view.source().lines().collect();
+    if line0 >= lines.len() {
+        return None;
+    }
+    let start = line0.saturating_sub(n);
+    let end = (line0 + n + 1).min(lines.len());
+    Some((
+        lines[start..line0].iter().map(|s| s.to_string()).collect(),
+        lines[line0].to_string(),
+        lines[(line0 + 1)..end].iter().map(|s| s.to_string()).collect(),
+    ))
 }
 
 /// Phase 25 sub-B: lift a window of original source around the
@@ -333,6 +367,7 @@ mod tests {
             absolute_path: None,
             column: Some(col),
             file: file.to_string(),
+            context_line: None,
             function: None,
             in_app: false,
             line,
@@ -363,6 +398,16 @@ mod tests {
         assert_eq!(f0.raw_line, Some(2));
         assert_eq!(f0.raw_column, Some(0));
         assert!(f0.in_app, "a frame that resolved through the map is in-app");
+        // Inline source context comes from the map's sourcesContent.
+        assert_eq!(f0.context_line.as_deref(), Some("  throw new Error('boom')"));
+        // line 6 (1-indexed) → 5 lines before clamp to the 5 above it,
+        // 5 after clamp to the 2 that exist.
+        assert_eq!(f0.pre_context.len(), 5);
+        assert_eq!(f0.pre_context.last().map(String::as_str), Some("function beta() {"));
+        assert_eq!(f0.post_context, vec!["}".to_string(), "// footer".to_string()]);
+
+        // Location-less frame has no context either.
+        assert!(err.stack[1].context_line.is_none());
 
         // Location-less frame is untouched.
         let f1 = &err.stack[1];

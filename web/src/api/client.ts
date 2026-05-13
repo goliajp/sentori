@@ -142,6 +142,10 @@ export type ServerEvent = {
   platform: 'android' | 'ios' | 'javascript'
   release: string
   spanId: null | string
+  /** Server-set at ingest. `releaseHasMap: true` + still-raw frames =
+   *  the uploaded source map doesn't match this build / frames fall
+   *  outside it. Absent on old events. */
+  symbolication?: { releaseHasMap: boolean }
   tags: Record<string, string>
   timestamp: string
   traceId: null | string
@@ -158,10 +162,15 @@ export type SentoriError = {
 export type Frame = {
   absolutePath?: string
   column?: number
+  /** The source line at `line` itself (server-set on symbolicated JS
+   *  frames; some native SDKs fill it too). Between pre/post context. */
+  contextLine?: string
   file: string
   function?: string
   inApp: boolean
   line: number
+  postContext?: string[]
+  preContext?: string[]
 }
 
 export type Breadcrumb = {

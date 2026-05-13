@@ -202,6 +202,13 @@ pub struct Frame {
     #[serde(default)]
     pub post_context: Vec<String>,
 
+    /// The source line at `line` itself, between `pre_context` and
+    /// `post_context`. Server-set on JS frames symbolicated at ingest
+    /// (so the dashboard can render the snippet inline without a
+    /// per-frame fetch); native SDKs may also fill it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_line: Option<String>,
+
     /// Pre-symbolication coordinates. Set by the server when it rewrites
     /// `file`/`line`/`column` via an uploaded source map at ingest, so
     /// the dashboard's "show source" lookup (which reverse-maps through

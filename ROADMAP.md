@@ -487,13 +487,14 @@ Phase 40 sub-A/B/C 完成。剩下的（dashboard 渲染、dev-mode、publish、
 - [x] 测试：`auth.rs` +1（`token_hint` 区分形状 vs 值）。`cargo test --lib` 36→37、`--all-targets --no-run` 通过
 - [x] commit `v0.5 day 2: 401 hint + symbolication status meta`
 
-### Day 3 — ingest 时填源码片段 + dashboard 内联渲染 + vendor 折叠
+### Day 3 — ingest 时填源码片段 + dashboard 内联渲染 + vendor 折叠 ✅
 
-- [ ] server：`symbolicate_frame_typed` 对 in-app 帧顺手填 `pre_context` / `post_context`（±5 行，来自 sourcemap 的 `sourcesContent`，复用 `window_from_sourcemap` 的切片逻辑）—— dashboard 就不用每帧一个 fetch
-- [ ] `web/src/views/issue-detail.tsx` 栈渲染：in-app 帧默认展开、带 ±5 行源码片段（出错行高亮）+ header `function · file:line:col`；连续 vendor / node_modules 帧折叠成 `▸ N more frames`（点开）；没符号化成功的帧用 Day 2 的 `symbolication` meta 标原因（`no source map uploaded for release X` / `release mismatch: event has X, maps exist for [Y, Z]` / `frame outside the source map`）；`<UnsymbolicatedHint>` 文案更新 + 链到 recipe
-- [ ] （可选）frame 链到对应 commit 的 git 源码（project 设置里配仓库 URL 模板 + release→commit 映射；没配就不显示）—— 时间够就做，不够就 defer
-- [ ] vitest / playwright：符号化帧 + 内联源码渲染 / vendor 折叠 / 未符号化帧的原因提示。`bun run check` 0 error / `bun run build` OK
-- [ ] commit `v0.5 day 3: inline source snippets + vendor fold + symbolication diagnostics`
+- [x] server：`Frame` 加 `context_line: Option<String>`；`symbolicate_frame_typed` 对解析成功的帧顺手填 `pre_context` / `context_line` / `post_context`（±5 行，新 `source_window(sm, src_id, line0, n)` 从 `sourcesContent` 切片）—— dashboard 不用每帧一个 fetch
+- [x] `web/src/api/client.ts`：`Frame` 加 `preContext?`/`postContext?`/`contextLine?`；`ServerEvent` 加 `symbolication?: { releaseHasMap }`
+- [x] `web/src/views/issue-detail.tsx` 栈渲染重写：`StackList` run-length 分组 —— in-app 帧 → `FrameRow`（header `#i function file:line:col` + 内联 `<pre>` 源码片段：pre dim + 出错行红底高亮 + post dim，带行号）；连续 vendor 帧 → `VendorFold`（`▸ N library frames`，点开展开）；任一 in-app 帧没 `contextLine` 时底下一行小字按 `symbolication.releaseHasMap` 标原因（false → "upload a source map: `npx @goliapkg/sentori-cli upload sourcemap …`" / true → "a map exists but these frames didn't resolve through it（wrong build / outside map）"）；`<UnsymbolicatedHint>` 加 docs recipe 链接。`CauseChain` 把 `symbolication` 透传下去。`StackList` export 出来好测
+- [x] git 源码链接：deferred（需要 project 设置里配仓库 URL 模板 + release→commit 映射，没人配；留到有人要再做）
+- [x] 测试：新 `web/src/views/issue-detail-stack.test.tsx` 5 个（in-app 帧渲内联源码 + 行号 / vendor run 折叠成 "2 library frames" / 没 map → "upload a source map" + cli 命令 / 有 map 但没解析 → "didn't resolve through it" / 空 stack → "No frames."）。`bun run check` 0 error / `bun run test` 40/40（was 35，+5）/ `bun run build` OK。server `cargo test --lib` 37/37（symbolicate 测试加了对 pre/context/post 的断言）/ `--all-targets --no-run` 通过
+- [x] commit `v0.5 day 3: inline source snippets + vendor fold + symbolication diagnostics`
 
 ### Day 4 — Expo source-map config plugin（Phase 40 收尾：cleaner 集成）
 

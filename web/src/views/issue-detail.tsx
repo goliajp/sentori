@@ -407,12 +407,14 @@ function StackTab({
         <StackList
           onFrameClick={(idx) => setOpenFrame({ cause: 0, frame: idx })}
           stack={payload.error.stack}
+          symbolication={payload.symbolication}
         />
         {payload.error.cause && (
           <CauseChain
             depth={1}
             error={payload.error.cause}
             onFrameClick={(cause, frame) => setOpenFrame({ cause, frame })}
+            symbolication={payload.symbolication}
           />
         )}
       </Section>
@@ -759,7 +761,20 @@ function UnsymbolicatedHint({
         <p className="text-fg font-medium">This stack is unsymbolicated.</p>
         <p className="text-fg-muted mt-0.5">
           Upload the {what} for <span className="text-fg font-mono">{release}</span> to see original
-          frames.
+          frames —{' '}
+          {needsSourcemap ? (
+            <a
+              className="text-accent hover:text-accent/80"
+              href="https://docs.sentori.golia.jp/recipes/sourcemap-upload/"
+              rel="noreferrer"
+              target="_blank"
+            >
+              how to upload source maps
+            </a>
+          ) : (
+            'see project settings → releases'
+          )}
+          .
         </p>
       </div>
       <Link
@@ -846,40 +861,161 @@ function Section({
   )
 }
 
-function StackList({
+type Symbolication = { releaseHasMap: boolean } | undefined
+
+/** Frame header + (for in-app frames) an inline source snippet from
+ *  `pre/context/postContext`. Clicking opens the full-file drawer. */
+function FrameRow({ frame, idx, onClick }: { frame: Frame; idx: number; onClick?: () => void }) {
+  const hasSnippet = frame.contextLine !== undefined
+  const pre = frame.preContext ?? []
+  const post = frame.postContext ?? []
+  // First pre-context line's number: `line` is the at-line.
+  const firstNo = frame.line - pre.length
+  const lineNo = (n: number) => (
+    <span className="text-fg-muted/60 mr-3 inline-block w-10 shrink-0 text-right tabular-nums select-none">
+      {n}
+    </span>
+  )
+  return (
+    <div className={`border-border/40 border-b last:border-b-0 ${frame.inApp ? 'bg-bg' : ''}`}>
+      <button
+        className="hover:bg-bg-tertiary/60 flex w-full items-baseline gap-3 px-3 py-1.5 text-left text-[12px]"
+        onClick={onClick}
+        type="button"
+      >
+        <span className="text-fg-muted w-6 shrink-0 text-right text-[11px] tabular-nums">
+          {idx}
+        </span>
+        <span
+          className={`font-mono whitespace-nowrap ${frame.inApp ? 'text-fg' : 'text-fg-muted'}`}
+        >
+          {frame.function ?? '<anonymous>'}
+        </span>
+        <span className="text-fg-muted truncate font-mono">
+          {frame.file}:{frame.line}
+          {frame.column !== undefined ? `:${frame.column}` : ''}
+        </span>
+      </button>
+      {hasSnippet && (
+        <pre className="bg-bg-tertiary/30 overflow-x-auto px-3 pb-2 font-mono text-[11px] leading-[1.5]">
+          {pre.map((l, i) => (
+            <div className="text-fg-muted/80" key={`p${i}`}>
+              {lineNo(firstNo + i)}
+              {l || ' '}
+            </div>
+          ))}
+          <div className="text-fg -mx-3 bg-red-500/10 px-3">
+            {lineNo(frame.line)}
+            {frame.contextLine || ' '}
+          </div>
+          {post.map((l, i) => (
+            <div className="text-fg-muted/80" key={`q${i}`}>
+              {lineNo(frame.line + 1 + i)}
+              {l || ' '}
+            </div>
+          ))}
+        </pre>
+      )}
+    </div>
+  )
+}
+
+/** A run of consecutive vendor frames, collapsed by default. */
+function VendorFold({
+  base,
+  frames,
+  onFrameClick,
+}: {
+  /** index of `frames[0]` within the full stack */
+  base: number
+  frames: Frame[]
+  onFrameClick?: (frameIdx: number) => void
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="border-border/40 border-b last:border-b-0">
+      <button
+        className="text-fg-muted hover:bg-bg-tertiary/40 hover:text-fg flex w-full items-center gap-1 px-3 py-1 text-left text-[11px]"
+        onClick={() => setOpen((o) => !o)}
+        type="button"
+      >
+        <span className="inline-block w-3">{open ? '▾' : '▸'}</span>
+        {frames.length} library frame{frames.length === 1 ? '' : 's'}
+      </button>
+      {open && (
+        <div className="bg-bg-tertiary/20">
+          {frames.map((f, i) => (
+            <button
+              className="hover:bg-bg-tertiary/50 text-fg-muted flex w-full items-baseline gap-3 px-3 py-1 pl-9 text-left text-[12px]"
+              key={i}
+              onClick={() => onFrameClick?.(base + i)}
+              type="button"
+            >
+              <span className="w-6 shrink-0 text-right text-[11px] tabular-nums">{base + i}</span>
+              <span className="font-mono whitespace-nowrap">{f.function ?? '<anonymous>'}</span>
+              <span className="truncate font-mono">
+                {f.file}:{f.line}
+                {f.column !== undefined ? `:${f.column}` : ''}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function StackList({
   onFrameClick,
   stack,
+  symbolication,
 }: {
   onFrameClick?: (frameIdx: number) => void
   stack: Frame[]
+  symbolication?: Symbolication
 }) {
   if (stack.length === 0) {
     return <p className="text-fg-muted text-sm">No frames.</p>
   }
+  // Run-length: emit in-app frames as FrameRow, collapse runs of vendor frames.
+  const groups: (
+    | { kind: 'app'; at: number; frame: Frame }
+    | { kind: 'vendor'; at: number; frames: Frame[] }
+  )[] = []
+  for (let i = 0; i < stack.length; i++) {
+    const f = stack[i]!
+    if (f.inApp) {
+      groups.push({ kind: 'app', at: i, frame: f })
+    } else {
+      const last = groups[groups.length - 1]
+      if (last && last.kind === 'vendor') last.frames.push(f)
+      else groups.push({ kind: 'vendor', at: i, frames: [f] })
+    }
+  }
+  const anyInAppMissingSource = stack.some((f) => f.inApp && f.contextLine === undefined)
   return (
-    <div className="border-border overflow-hidden rounded-md border">
-      {stack.map((frame, i) => (
-        <button
-          className={`border-border/40 hover:bg-bg-tertiary/60 flex w-full items-baseline gap-3 border-b px-3 py-1.5 text-left text-[12px] last:border-b-0 ${
-            frame.inApp ? 'bg-bg' : 'bg-bg-tertiary/40 text-fg-muted'
-          }`}
-          key={i}
-          onClick={() => onFrameClick?.(i)}
-          type="button"
-        >
-          <span className="text-fg-muted w-6 text-right text-[11px] tabular-nums">{i}</span>
-          <span className="text-fg font-mono whitespace-nowrap">
-            {frame.function ?? '<anonymous>'}
-          </span>
-          <span className="text-fg-muted truncate font-mono">
-            {frame.file}:{frame.line}
-            {frame.column !== undefined ? `:${frame.column}` : ''}
-          </span>
-          {!frame.inApp && (
-            <span className="text-fg-muted ml-auto text-[10px] uppercase">vendor</span>
+    <div>
+      <div className="border-border overflow-hidden rounded-md border">
+        {groups.map((g) =>
+          g.kind === 'app' ? (
+            <FrameRow frame={g.frame} idx={g.at} key={g.at} onClick={() => onFrameClick?.(g.at)} />
+          ) : (
+            <VendorFold base={g.at} frames={g.frames} key={g.at} onFrameClick={onFrameClick} />
+          )
+        )}
+      </div>
+      {anyInAppMissingSource && (
+        <p className="text-fg-muted mt-1.5 text-[11px]">
+          {symbolication?.releaseHasMap
+            ? 'No inline source for some frames — a source map is uploaded for this release, but these frames didn’t resolve through it (wrong build, or outside the map).'
+            : 'No inline source — upload a source map for this release: '}
+          {!symbolication?.releaseHasMap && (
+            <code className="font-mono">
+              npx @goliapkg/sentori-cli upload sourcemap --release "…"
+            </code>
           )}
-        </button>
-      ))}
+        </p>
+      )}
     </div>
   )
 }
@@ -888,10 +1024,12 @@ function CauseChain({
   depth,
   error,
   onFrameClick,
+  symbolication,
 }: {
   depth: number
   error: SentoriError
   onFrameClick?: (cause: number, frameIdx: number) => void
+  symbolication?: Symbolication
 }) {
   return (
     <div className="border-border/40 mt-3 border-l-2 pl-3">
@@ -899,10 +1037,19 @@ function CauseChain({
         <span className="text-fg-muted">caused by</span> {error.type}: {error.message}
       </p>
       <div className="mt-2">
-        <StackList onFrameClick={(i) => onFrameClick?.(depth, i)} stack={error.stack} />
+        <StackList
+          onFrameClick={(i) => onFrameClick?.(depth, i)}
+          stack={error.stack}
+          symbolication={symbolication}
+        />
       </div>
       {error.cause && (
-        <CauseChain depth={depth + 1} error={error.cause} onFrameClick={onFrameClick} />
+        <CauseChain
+          depth={depth + 1}
+          error={error.cause}
+          onFrameClick={onFrameClick}
+          symbolication={symbolication}
+        />
       )}
     </div>
   )
