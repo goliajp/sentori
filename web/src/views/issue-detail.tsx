@@ -17,6 +17,7 @@ import { useOrg } from '@/auth/orgContext'
 import { AttachmentGallery } from '@/components/AttachmentGallery'
 import { FrameRoleBadge } from '@/components/FrameRoleBadge'
 import { IssueDetailSkeleton } from '@/components/IssueDetailSkeleton'
+import { CopyMarkdownButton } from '@/components/CopyMarkdownButton'
 import { OpenInEditorButton } from '@/components/OpenInEditorButton'
 import { SourceCode } from '@/components/SourceCode'
 import { ErrorState } from '@/components/states'
@@ -119,6 +120,13 @@ export function IssueDetailView() {
   useHotkeys('[', () => setSelectedIdx((i) => Math.max(0, i - 1)))
   useHotkeys(']', () => setSelectedIdx((i) => Math.min(events.length - 1, i + 1)))
   useHotkeys('escape', () => navigate(issuesPath))
+  // Phase 42 sub-H.06: keyboard shortcut for "Copy as markdown" —
+  // bypasses the cursor-to-button journey for power triage.
+  useHotkeys('c', () => {
+    document
+      .querySelector<HTMLButtonElement>('button[aria-label="Copy this issue as Markdown"]')
+      ?.click()
+  })
 
   if (!issueId) return null
 
@@ -145,6 +153,7 @@ export function IssueDetailView() {
           {/* Phase 42 sub-A.13: jump straight to the crash site in the
               user's IDE. Disabled when the first in-app frame's file
               isn't an absolute local path (e.g. unsymbolicated stacks). */}
+          <CopyMarkdownButton event={selectedEvent} issue={issue} orgSlug={currentOrg.slug} />
           <OpenInEditorButton
             frame={selectedEvent?.payload.error.stack.find((f) => f.inApp) ?? null}
           />
@@ -402,6 +411,21 @@ function StackTab({
         }
         title="Stack"
       >
+        {/* Phase 42 sub-H.04: ANR / hang events get a violet banner
+            at the top of the stack so a triage user immediately
+            knows this isn't a thrown error — main thread was wedged
+            for ≥ the watchdog threshold. */}
+        {payload.kind === 'anr' && (
+          <div className="bg-accent/10 text-fg border-accent/40 mb-3 rounded-md border-l-4 px-3 py-2 text-[12px]">
+            <span className="text-accent mr-2 font-mono text-[11px] tracking-wider uppercase">
+              ⏸ {payload.platform === 'ios' ? 'Hang' : 'ANR'}
+            </span>
+            <span className="text-fg-muted">
+              Main thread blocked. Stack below is what the thread was running when the watchdog
+              fired — not a thrown exception.
+            </span>
+          </div>
+        )}
         <UnsymbolicatedHint
           orgSlug={orgSlug}
           platform={payload.platform}

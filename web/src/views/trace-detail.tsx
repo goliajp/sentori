@@ -8,7 +8,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 
 import { adminApi, type SpanRow } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
@@ -229,6 +229,39 @@ export function TraceDetailView() {
               </pre>
             </section>
           )}
+
+          {/* Phase 42 sub-H.05: trace → issue back-link. Surfaces every
+              event captured on this span with a direct link into the
+              issue-detail page — closes the loop on "I see an error
+              pill on a span, I want to land on the issue in one click". */}
+          {(() => {
+            const events = (detail.data?.events ?? []).filter((e) => e.spanId === openSpan.id)
+            if (events.length === 0) return null
+            return (
+              <section className="mt-5">
+                <h4 className="text-fg-muted text-[11px] tracking-wider uppercase">
+                  Events on this span
+                </h4>
+                <ul className="mt-2 space-y-1">
+                  {events.map((e) => (
+                    <li className="flex items-baseline gap-2 text-[12px]" key={e.id}>
+                      <span className="font-mono text-red-400">{e.errorType}</span>
+                      {e.issueId ? (
+                        <Link
+                          className="text-accent hover:text-accent/80"
+                          to={`/org/${currentOrg.slug}/issues/${e.issueId}`}
+                        >
+                          → issue
+                        </Link>
+                      ) : (
+                        <span className="text-fg-muted">no issue</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )
+          })()}
         </aside>
       )}
     </div>
