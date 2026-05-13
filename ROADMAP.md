@@ -462,26 +462,15 @@ Phase 40 sub-A/B/C 完成。剩下的（dashboard 渲染、dev-mode、publish、
 
 严格线性，一天一块；每块自带 commit。
 
-> ## ⚑ Insight 配合点：**现在就可以开始**
+> ## ⚑ Insight 配合点：**等本阶段全做完再接**（他们明确说要等 cleaner 集成）
 >
-> 服务端 ingest 时符号化（Phase 40 sub-C）已经上线，`@goliapkg/sentori-cli@0.2.1` 已 publish。Insight 不需要等下面任何一天。两件事：
-> 1. （可选、独立）`bun add @goliapkg/sentori-react-native@latest`（≥0.5.4）—— 拿 session pings / crash-free rate，零代码。
-> 2. release 构建里加 sourcemap 上传。RN Hermes：
->    ```
->    npx react-native bundle --platform ios --dev false --entry-file index.js \
->      --bundle-output main.jsbundle --sourcemap-output main.jsbundle.packager.map
->    # Hermes 编译会写出 main.jsbundle.hbc.map
->    node node_modules/react-native/scripts/compose-source-maps.js \
->      main.jsbundle.packager.map main.jsbundle.hbc.map -o main.jsbundle.map
->    npx @goliapkg/sentori-cli@latest upload sourcemap \
->      --release "<和 init({release}) 一字不差>" --token "$SENTORI_TOKEN" \
->      main.jsbundle.map main.jsbundle
->    ```
->    iOS / Android 各跑一次。Expo/EAS 可用 `@goliapkg/sentori-expo@0.1.1` 的 `eas-post-build` hook。详见 docs → Recipes → "Source map upload" → React Native。
+> 服务端 ingest 时符号化已上线、`@goliapkg/sentori-cli` 已 publish —— 技术上现在就能接，但要手写 `compose-source-maps.js` 那套脚本。Insight 想等"干净"的集成，所以本阶段加了 **Day 4：Expo source-map config plugin**（`"plugins": [["@goliapkg/sentori-expo", { token }]]` 一行，构建时自动 compose + upload，EAS 和 bare prebuild 都覆盖）。
 >
-> 做完后：该 release 的**新**错误 dashboard 上 issue 标题/分组就是 `src/Foo.tsx:42`（点帧也能出源码）。把结果记进 `docs/dogfood/insight-friction.md`。Day 4 后 dashboard 会把源码片段做成内联（现在是点开 drawer）—— 但不影响 Insight 现在就接。
+> 本阶段（Phase 40 + Phase 41 全部 day）做完后，给 Insight 的 ask 就两件、都零脚本：
+> 1. `bun add @goliapkg/sentori-react-native@latest @goliapkg/sentori-expo@latest`
+> 2. `app.json`：`"plugins": [["@goliapkg/sentori-expo", { "sourcemapUpload": { "token": "<sk_… admin token 或 EXPO_PUBLIC env>" } }]]`（确切 prop 名 Day 4 实现时定）
 >
-> 注意：parseStack 的 Hermes `address at` 前缀修复（sub-A）目前只在 workspace、还没 publish（Day 1 才发）—— 但它**不影响符号化能否成功**（服务端按 `line:col` 查 token，不看 `file` 字段；`file` 会被符号化后的源文件名覆盖），只影响"符号化失败时 `file` 字段是否干净"。所以 Insight 不用等 Day 1。
+> 然后下次构建自动传 sourcemap，dashboard 上该 release 的错误就是 `src/Foo.tsx:42`，点帧出源码。结果记进 `docs/dogfood/insight-friction.md`。
 
 ### Day 1 — publish parseStack 修复 + getting-started sourcemap 章节 ✅
 
@@ -506,31 +495,44 @@ Phase 40 sub-A/B/C 完成。剩下的（dashboard 渲染、dev-mode、publish、
 - [ ] vitest / playwright：符号化帧 + 内联源码渲染 / vendor 折叠 / 未符号化帧的原因提示。`bun run check` 0 error / `bun run build` OK
 - [ ] commit `v0.5 day 3: inline source snippets + vendor fold + symbolication diagnostics`
 
-### Day 4 — Phase 41 sub-A：左侧 sidebar 组件
+### Day 4 — Expo source-map config plugin（Phase 40 收尾：cleaner 集成）
+
+- [ ] `sdk/expo`：扩 config plugin（`app.plugin.js` / 新增一个 `withSentoriSourcemaps`）—— 接受 `{ token, apiUrl?, autoUpload? }` props；EAS 路径接 `postPublish` hook（复用 `eas-post-build.mjs`，并让它在 Hermes build 时自己跑 `react-native bundle --sourcemap-output` + `compose-source-maps.js` 再 upload，不再要求用户手写）；bare prebuild 路径用 `withXcodeProject` / `withAppBuildGradle` 注一个 build phase 干同样的事（参考 sentry expo plugin 的做法）；token 走 prop 或 `process.env.SENTORI_ADMIN_TOKEN`
+- [ ] `sentori-cli`：补一个 `sentori-cli react-native bundle-and-upload --platform <ios|android> --release <r>`（封装 `react-native bundle` → `compose-source-maps.js` → `upload sourcemap` 三步），plugin 直接调它 —— 用户/CI 也能手敲一行
+- [ ] docs：`recipes/sourcemap-upload.md` RN/Expo 一节改成"加 plugin、完事"为主，手动三步降级为附录；`docs/getting-started/react-native.md` 里 SDK 安装那段加 plugin 一行
+- [ ] 测试：`sentori-cli` 的 `bundle-and-upload`（mock 掉子进程 + fetch）；config plugin（用 `@expo/config-plugins` 的 mock config 跑一遍，断言 hook/build-phase 被注入）。`sentori-cli` 自身测试 + sdk/expo typecheck/test 绿
+- [ ] bump + publish `@goliapkg/sentori-cli`（+`sentori-expo` patch）
+- [ ] commit `v0.5 day 4: expo source-map config plugin + cli bundle-and-upload`
+- ⚑ **这之后 Insight 可以接了**（plugin 一行 + 装两个包，零脚本）
+
+### Day 5 — Phase 40 sub-E：dev-mode Metro symbolicate
+
+- [ ] `sdk/react-native`：`__DEV__` 下发事件前先 POST 原始帧给 Metro dev server 的 `/symbolicate`（RN LogBox 用的就是它）拿原始位置；Metro 不在就跳过、原样发不报错；超时短（dev only，不阻 UI）。这样 Insight 现在 dashboard 上那些 `_temp5` / `anonymous` 的 dev 错误也立刻可读
+- [ ] 测试：mock Metro `/symbolicate` 响应 → 帧被替换 / Metro 不可达 → 原样发不报错。SDK sweep + typecheck 绿；bump + publish `sentori-react-native`（+ 依赖透传）
+- [ ] commit `v0.5 day 5: dev-mode metro symbolicate`
+
+### Day 6 — Phase 41 sub-A：左侧 sidebar 组件
 
 - [ ] 新 `web/src/components/sidebar.tsx`：竖排 —— 顶部 org/project 切换器（复用现有 `useOrg`）；主导航 Overview / Issues / Traces / Releases（带图标）；次要项 Teams / Alerts / Audit / Settings 收进可折叠的 "More" 分组或底部；最底部用户菜单（邮箱 + OWNER badge + Sign out）+ 主题切换（现在右上角那个 ☀/🖥/🌙 移过来）；active 项左边一道 accent 竖条 + 背景（Linear 风）；宽 ~220px
-- [ ] 暂时和现有顶部 NAV 并存（Day 5 再拆顶部）—— 或直接在 Day 4 就接进 `org-layout`，看实施时哪种 diff 干净
-- [ ] commit `v0.5 day 4: left sidebar component`
+- [ ] 暂和现有顶部 NAV 并存（Day 7 拆顶部）—— 或直接在 Day 6 就接进 `org-layout`，看实施时哪种 diff 干净
+- [ ] commit `v0.5 day 6: left sidebar component`
 
-### Day 5 — Phase 41 sub-B：layout 重构 + 响应式
+### Day 7 — Phase 41 sub-B：layout 重构 + 响应式
 
 - [ ] `web/src/views/org-layout.tsx`：拆掉顶部横排 NAV，改成 `<Sidebar>` + 主内容区两栏；顶部留一条很薄的 context bar（面包屑 / 当前 view 标题 / 全局搜索入口）或不留
 - [ ] 窄屏（< md）：sidebar 折叠成只剩图标的窄轨（hover / 点击展开）或抽屉式，移动端可用
 - [ ] keyboard：`g i` / `g t` / `g r` 等 "go to" 快捷键（Linear 的 `g` 前缀）；`[` `]` 折叠/展开 sidebar
 - [ ] 所有现有路由路径不变（`/org/{slug}/issues` 等），只换 chrome；`bun run check` 0 / `bun run build` OK
-- [ ] commit `v0.5 day 5: layout restructure + responsive sidebar`
+- [ ] commit `v0.5 day 7: layout restructure + responsive sidebar`
 
-### Day 6 — Phase 41 sub-C：打磨 + 测试 + v0.5.0 发布
+### Day 8 — Phase 41 sub-C：打磨 + 测试 + v0.5.0 发布
 
 - [ ] 对齐设计宪法（Linear/Vercel/Modal）：间距 / 字号 / 图标 / dark+light 两套 / density 设置仍生效
 - [ ] vitest 更新（org-layout / sidebar 渲染 + 导航）；playwright e2e（登录 → 各 view → 折叠 sidebar）；bundle 对比（sidebar 进 main bundle，控增量）
 - [ ] CHANGELOG.md v0.5 section（Phase 39 / 40 / 41 各一行 condensed summary + v0.5.x patch 列表 + npm 版本）；marketing / docs 里的 dashboard 截图（如有）更新成新 chrome
 - [ ] ROADMAP 顶部状态 v0.5 🚧 → ✅；git tag v0.5.0 + `gh release create v0.5.0`
-- [ ] commit `v0.5 day 6: dashboard chrome polish + v0.5.0 release`
-
-### 机动 — Phase 40 sub-E：dev-mode Metro symbolicate（低优先、可插队/可跳）
-
-- [ ] `sdk/react-native`：`__DEV__` 下发事件前先 POST 原始帧给 Metro dev server 的 `/symbolicate`（RN LogBox 用的就是它）拿原始位置；Metro 不在就跳过。测试：mock Metro 响应 → 帧被替换 / Metro 不可达 → 原样发不报错。commit `v0.5: dev-mode metro symbolicate`
+- [ ] **告知 Insight 阶段已 finish，可以按上面 ⚑ 那两步接了**
+- [ ] commit `v0.5 day 8: dashboard chrome polish + v0.5.0 release`
 
 ---
 
