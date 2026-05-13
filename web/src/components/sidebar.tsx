@@ -83,50 +83,80 @@ type SidebarProps = {
   user: { email?: string } | null
 }
 
+type ContentProps = SidebarProps & {
+  collapsed: boolean
+  onToggleCollapsed: () => void
+}
+
 function SidebarContent({
+  collapsed,
   currentOrg,
   currentProject,
   currentTeamSlug,
   onLogout,
+  onToggleCollapsed,
   orgs,
   teams,
   user,
-}: SidebarProps) {
+}: ContentProps) {
   const location = useLocation()
   const { density, toggle: toggleDensity } = useDensity()
   const isAdmin = currentOrg.role === 'owner' || currentOrg.role === 'admin'
   const isActive = (path: string) => location.pathname.startsWith(`/org/${currentOrg.slug}/${path}`)
 
-  const Item = ({ item }: { item: NavItem }) => (
-    <Link
-      className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${
-        isActive(item.path)
-          ? 'bg-accent/10 text-accent'
-          : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
-      }`}
-      key={item.path}
-      to={`/org/${currentOrg.slug}/${item.path}`}
-    >
-      <NavIcon kind={item.icon} />
-      {item.label}
-    </Link>
-  )
+  const Item = ({ item }: { item: NavItem }) => {
+    const active = isActive(item.path)
+    const base = active
+      ? 'bg-accent/10 text-accent'
+      : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+    return collapsed ? (
+      <Link
+        className={`flex items-center justify-center rounded-md p-2 transition-colors ${base}`}
+        key={item.path}
+        title={item.label}
+        to={`/org/${currentOrg.slug}/${item.path}`}
+      >
+        <NavIcon kind={item.icon} />
+      </Link>
+    ) : (
+      <Link
+        className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${base}`}
+        key={item.path}
+        to={`/org/${currentOrg.slug}/${item.path}`}
+      >
+        <NavIcon kind={item.icon} />
+        {item.label}
+      </Link>
+    )
+  }
 
   return (
-    <div className="flex h-full w-full flex-col gap-1 p-3">
+    <div className={`flex h-full w-full flex-col gap-1 ${collapsed ? 'px-1.5 py-3' : 'p-3'}`}>
       {/* org / project */}
-      <div className="mb-1 flex items-center justify-between gap-2 px-1">
-        <Link className="text-fg text-sm font-semibold" to="/">
-          Sentori
+      {collapsed ? (
+        <Link
+          className="text-fg flex justify-center rounded-md p-2 text-sm font-semibold"
+          title="Sentori — home"
+          to="/"
+        >
+          S
         </Link>
-        <OnboardingBadge project={currentProject} />
-      </div>
-      <OrgSwitcher
-        current={currentOrg}
-        currentTeamSlug={currentTeamSlug}
-        orgs={orgs}
-        teams={teams}
-      />
+      ) : (
+        <>
+          <div className="mb-1 flex items-center justify-between gap-2 px-1">
+            <Link className="text-fg text-sm font-semibold" to="/">
+              Sentori
+            </Link>
+            <OnboardingBadge project={currentProject} />
+          </div>
+          <OrgSwitcher
+            current={currentOrg}
+            currentTeamSlug={currentTeamSlug}
+            orgs={orgs}
+            teams={teams}
+          />
+        </>
+      )}
 
       {/* primary nav */}
       <nav className="mt-3 flex flex-col gap-0.5">
@@ -141,48 +171,100 @@ function SidebarContent({
         ))}
       </nav>
 
-      {/* footer: user + toggles + sign out */}
+      {/* footer */}
       <div className="mt-auto pt-3">
         <div className="border-border/60 border-t pt-2">
-          <Link
-            className="text-fg-muted hover:bg-bg-tertiary hover:text-fg flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[12px]"
-            title="My activity"
-            to="/me/activity"
-          >
-            <span className="truncate">{user?.email ?? 'account'}</span>
-            <RoleBadge role={currentOrg.role} />
-          </Link>
-          <div className="mt-1 flex items-center gap-1 px-1">
-            <button
-              aria-label={`Density: ${density}. Click to toggle.`}
-              className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-2 py-1 text-xs"
-              onClick={toggleDensity}
-              title={`Density: ${density} — click to toggle`}
-              type="button"
-            >
-              {density === 'compact' ? '☰' : '≡'}
-            </button>
-            <ThemeToggle />
-            <button
-              className="text-fg-muted hover:bg-bg-tertiary hover:text-fg ml-auto rounded-md px-2 py-1 text-xs"
-              onClick={onLogout}
-              type="button"
-            >
-              Sign out
-            </button>
-          </div>
+          {collapsed ? (
+            <div className="flex flex-col items-center gap-1">
+              <button
+                aria-label="Expand sidebar"
+                className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-2 py-1 text-xs"
+                onClick={onToggleCollapsed}
+                title="Expand sidebar"
+                type="button"
+              >
+                »
+              </button>
+              <button
+                aria-label="Sign out"
+                className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-2 py-1 text-xs"
+                onClick={onLogout}
+                title={`Sign out (${user?.email ?? 'account'})`}
+                type="button"
+              >
+                ⎋
+              </button>
+            </div>
+          ) : (
+            <>
+              <Link
+                className="text-fg-muted hover:bg-bg-tertiary hover:text-fg flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[12px]"
+                title="My activity"
+                to="/me/activity"
+              >
+                <span className="truncate">{user?.email ?? 'account'}</span>
+                <RoleBadge role={currentOrg.role} />
+              </Link>
+              <div className="mt-1 flex items-center gap-1 px-1">
+                <button
+                  aria-label={`Density: ${density}. Click to toggle.`}
+                  className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-2 py-1 text-xs"
+                  onClick={toggleDensity}
+                  title={`Density: ${density} — click to toggle`}
+                  type="button"
+                >
+                  {density === 'compact' ? '☰' : '≡'}
+                </button>
+                <ThemeToggle />
+                <button
+                  aria-label="Collapse sidebar"
+                  className="text-fg-muted hover:bg-bg-tertiary hover:text-fg ml-auto rounded-md px-2 py-1 text-xs"
+                  onClick={onToggleCollapsed}
+                  title="Collapse sidebar"
+                  type="button"
+                >
+                  «
+                </button>
+                <button
+                  className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-2 py-1 text-xs"
+                  onClick={onLogout}
+                  type="button"
+                >
+                  Sign out
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
+const COLLAPSED_KEY = 'sentori:ui:sidebar-collapsed:v1'
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(COLLAPSED_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+function writeCollapsed(v: boolean): void {
+  try {
+    localStorage.setItem(COLLAPSED_KEY, v ? '1' : '0')
+  } catch {
+    // best-effort
+  }
+}
+
 /**
- * Left navigation rail. Persistent on `md+`; on narrow viewports it's
- * a hamburger that opens the same content as an overlay drawer.
+ * Left navigation rail. Persistent on `md+` (collapsible to an icon
+ * rail); on narrow viewports it's a hamburger that opens the same
+ * content as an overlay drawer (always full-width when open).
  */
 export function Sidebar(props: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsed())
   const { pathname } = useLocation()
   // Close the drawer whenever the route changes — a deliberate
   // react-to-external-change, not a render-derived value.
@@ -190,14 +272,24 @@ export function Sidebar(props: SidebarProps) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMobileOpen(false)
   }, [pathname])
+  const toggle = () => {
+    setCollapsed((v) => {
+      writeCollapsed(!v)
+      return !v
+    })
+  }
   return (
     <>
-      {/* desktop: persistent rail */}
-      <aside className="border-border bg-bg hidden w-56 shrink-0 border-r md:flex">
-        <SidebarContent {...props} />
+      {/* desktop: persistent rail (collapsible) */}
+      <aside
+        className={`border-border bg-bg hidden shrink-0 border-r md:flex ${
+          collapsed ? 'w-14' : 'w-56'
+        }`}
+      >
+        <SidebarContent {...props} collapsed={collapsed} onToggleCollapsed={toggle} />
       </aside>
 
-      {/* mobile: hamburger + overlay drawer */}
+      {/* mobile: hamburger + overlay drawer — always full-width */}
       <button
         aria-label="Open navigation"
         className="border-border bg-bg/80 text-fg-muted hover:text-fg fixed top-2 left-2 z-30 rounded-md border px-2 py-1 text-sm backdrop-blur-xl md:hidden"
@@ -217,7 +309,7 @@ export function Sidebar(props: SidebarProps) {
             >
               ✕
             </button>
-            <SidebarContent {...props} />
+            <SidebarContent {...props} collapsed={false} onToggleCollapsed={toggle} />
           </aside>
           <div className="bg-black/30" onClick={() => setMobileOpen(false)} style={{ flex: 1 }} />
         </div>
