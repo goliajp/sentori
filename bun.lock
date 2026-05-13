@@ -53,12 +53,13 @@
       },
       "devDependencies": {
         "@types/bun": "latest",
+        "@types/node": "*",
         "typescript": "^5",
       },
     },
     "sdk/next": {
       "name": "@goliapkg/sentori-next",
-      "version": "0.2.4",
+      "version": "0.2.5",
       "dependencies": {
         "@goliapkg/sentori-core": "0.6.0",
         "@goliapkg/sentori-javascript": "0.4.0",
@@ -77,7 +78,7 @@
     },
     "sdk/react": {
       "name": "@goliapkg/sentori-react",
-      "version": "0.4.4",
+      "version": "0.4.5",
       "dependencies": {
         "@goliapkg/sentori-core": "0.6.0",
         "@goliapkg/sentori-javascript": "0.4.0",
@@ -102,7 +103,7 @@
     },
     "sdk/react-native": {
       "name": "@goliapkg/sentori-react-native",
-      "version": "0.6.1",
+      "version": "0.7.0",
       "dependencies": {
         "@goliapkg/sentori-core": "0.6.0",
       },

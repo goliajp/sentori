@@ -1,4 +1,4 @@
-import type { ExpoApplicationLike, InitOptions } from './types.js';
+import type { InitOptions } from './types.js';
 /**
  * Drop-in init for Expo apps. Reads bundleId / version / build from
  * `expo-application` (which is shipped in every Expo SDK) so the
@@ -23,13 +23,12 @@ import type { ExpoApplicationLike, InitOptions } from './types.js';
  */
 export declare function initSentoriExpo(options: InitOptions): void;
 /**
- * Build a `slug@version+build` release string from expo-application.
- * Returns `undefined` when the module isn't available so the caller
- * can fall back to a manually-supplied release.
- *
- * Exported for callers who want to use the same string outside of
- * init (e.g. as a tag, log prefix, or metric label).
+ * Re-export of `deriveRelease` (defined in `./release.ts`) for
+ * callers who want to use the same `slug@version+build` string outside
+ * of init (e.g. as a tag, log prefix, or metric label). Lives in its
+ * own module so it can be unit-tested without the SDK chain pulling
+ * in `react-native`'s Flow-typed exports.
  */
-export declare function deriveRelease(app: ExpoApplicationLike | undefined): string | undefined;
+export { deriveRelease } from './release.js';
 export type { ExpoApplicationLike, InitOptions } from './types.js';
 //# sourceMappingURL=index.d.ts.map

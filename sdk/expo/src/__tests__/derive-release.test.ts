@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { deriveRelease } from '../index.js'
+import { deriveRelease } from '../release.js'
 
 describe('deriveRelease', () => {
   test('builds slug@version+build from expo-application fields', () => {

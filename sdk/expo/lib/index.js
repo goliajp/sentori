@@ -3,6 +3,7 @@
 // The Config Plugin (app.plugin.js) is loaded by Expo at prebuild
 // time; this module is what apps import from JS at runtime.
 import { init as initSentoriRN } from '@goliapkg/sentori-react-native';
+import { deriveRelease } from './release.js';
 /**
  * Drop-in init for Expo apps. Reads bundleId / version / build from
  * `expo-application` (which is shipped in every Expo SDK) so the
@@ -40,21 +41,13 @@ export function initSentoriExpo(options) {
     });
 }
 /**
- * Build a `slug@version+build` release string from expo-application.
- * Returns `undefined` when the module isn't available so the caller
- * can fall back to a manually-supplied release.
- *
- * Exported for callers who want to use the same string outside of
- * init (e.g. as a tag, log prefix, or metric label).
+ * Re-export of `deriveRelease` (defined in `./release.ts`) for
+ * callers who want to use the same `slug@version+build` string outside
+ * of init (e.g. as a tag, log prefix, or metric label). Lives in its
+ * own module so it can be unit-tested without the SDK chain pulling
+ * in `react-native`'s Flow-typed exports.
  */
-export function deriveRelease(app) {
-    if (!app)
-        return undefined;
-    const id = app.applicationId ?? app.nativeApplicationVersion ?? 'app';
-    const version = app.nativeApplicationVersion ?? '0.0.0';
-    const build = app.nativeBuildVersion ?? '0';
-    return `${id}@${version}+${build}`;
-}
+export { deriveRelease } from './release.js';
 function isDev() {
     // RN's __DEV__ is true under Metro dev server; bare false in
     // Hermes release builds. typeof check keeps this safe to import in

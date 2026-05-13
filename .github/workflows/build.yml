@@ -90,6 +90,8 @@ jobs:
           - sdk/vue
           - sdk/svelte
           - sdk/solid
+          - sdk/expo
+          - sdk/cli
 
     steps:
       - uses: actions/checkout@v4

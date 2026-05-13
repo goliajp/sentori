@@ -5,7 +5,8 @@
 
 import { init as initSentoriRN } from '@goliapkg/sentori-react-native'
 
-import type { ExpoApplicationLike, InitOptions } from './types.js'
+import { deriveRelease } from './release.js'
+import type { InitOptions } from './types.js'
 
 /**
  * Drop-in init for Expo apps. Reads bundleId / version / build from
@@ -47,21 +48,13 @@ export function initSentoriExpo(options: InitOptions): void {
 }
 
 /**
- * Build a `slug@version+build` release string from expo-application.
- * Returns `undefined` when the module isn't available so the caller
- * can fall back to a manually-supplied release.
- *
- * Exported for callers who want to use the same string outside of
- * init (e.g. as a tag, log prefix, or metric label).
+ * Re-export of `deriveRelease` (defined in `./release.ts`) for
+ * callers who want to use the same `slug@version+build` string outside
+ * of init (e.g. as a tag, log prefix, or metric label). Lives in its
+ * own module so it can be unit-tested without the SDK chain pulling
+ * in `react-native`'s Flow-typed exports.
  */
-export function deriveRelease(app: ExpoApplicationLike | undefined): string | undefined {
-  if (!app) return undefined
-  const id =
-    app.applicationId ?? app.nativeApplicationVersion ?? 'app'
-  const version = app.nativeApplicationVersion ?? '0.0.0'
-  const build = app.nativeBuildVersion ?? '0'
-  return `${id}@${version}+${build}`
-}
+export { deriveRelease } from './release.js'
 
 function isDev(): boolean {
   // RN's __DEV__ is true under Metro dev server; bare false in
