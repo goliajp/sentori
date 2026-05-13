@@ -329,11 +329,23 @@ Sentry uses `exceptions[]` to express cause chains. Sentori uses **nested `cause
 | `arch` | string | no | atos arch family — `arm64` / `arm64e` / `x86_64` / `arm64_32` / `armv7` / `armv7s` / `armv7k` / `x86_64h` / `i386`. Required if `debugId` is set. |
 | `instructionAddress` | int or string | no | PC at crash time. Decimal int or `"0x..."` hex. |
 | `imageAddress` | int or string | no | base address the binary was loaded at (ASLR slide). Same encoding as `instructionAddress`. The server resolves `instructionAddress - imageAddress` against the DWARF tables. |
+| `rawLine` / `rawColumn` | int | no | **server-set.** When a JS frame is symbolicated against an uploaded source map at ingest, `file`/`line`/`column`/`function` are overwritten with the original-source position and the pre-symbolication bundle position is preserved here (so the "show source" lookup, which reverse-maps through the same map, still has its starting point). Clients never send these. |
 
-When the server resolves a native frame it overwrites `function`,
+When the server resolves a **native** frame it overwrites `function`,
 `file`, and `line` with the DWARF lookup result and flips `inApp` to
-true. The native fields stay on the frame for re-symbolication after
+true; the native fields stay on the frame for re-symbolication after
 later dSYM uploads.
+
+When a **JS** frame is symbolicated at ingest against an uploaded
+source map (`kind: sourcemap` for the event's `release`), `function` /
+`file` / `line` / `column` are likewise overwritten with the original
+source position, `inApp` is flipped to true, and `rawLine` / `rawColumn`
+keep the bundle position. Issue grouping then keys on the *symbolicated*
+top in-app frame — so uploading a source map for a release that already
+has events will start grouping its new events under `src/Foo.tsx:42`
+rather than `index.bundle:1:288432` (existing issues are not
+re-fingerprinted; the old one simply goes quiet). Releases with no
+source map uploaded are unaffected.
 
 ## Breadcrumb schema
 

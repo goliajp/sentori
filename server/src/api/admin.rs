@@ -609,8 +609,18 @@ pub async fn frame_source(
         .and_then(|s| s.as_array())
         .ok_or(AppError::NotFound)?;
     let frame = stack.get(q.frame).ok_or(AppError::NotFound)?;
-    let line = frame.get("line").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-    let column = frame.get("column").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+    // If the frame was symbolicated at ingest its line/column are the
+    // *source* position; the reverse-map lookup needs the bundle
+    // position, which we stashed as rawLine/rawColumn.
+    let pick = |sym: &str, raw: &str| {
+        frame
+            .get(raw)
+            .and_then(|v| v.as_u64())
+            .or_else(|| frame.get(sym).and_then(|v| v.as_u64()))
+            .unwrap_or(0) as u32
+    };
+    let line = pick("line", "rawLine");
+    let column = pick("column", "rawColumn");
     if line == 0 {
         return Err(AppError::NotFound);
     }

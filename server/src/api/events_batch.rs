@@ -57,7 +57,7 @@ pub async fn handle(
 
     for (i, raw) in req.events.into_iter().enumerate() {
         match serde_json::from_value::<Event>(raw) {
-            Ok(event) => match event.validate() {
+            Ok(mut event) => match event.validate() {
                 Ok(()) => {
                     if !batch_quota_allows(&state, &caller).await {
                         rejected += 1;
@@ -74,7 +74,7 @@ pub async fn handle(
                             .unwrap_or_else(|_| "<failed to serialize>".into())
                     );
                     if state.db.is_some() {
-                        if let Err(e) = persist_with_grouping(&state, project_id, &event).await {
+                        if let Err(e) = persist_with_grouping(&state, project_id, &mut event).await {
                             tracing::error!(error = %e, "failed to persist event");
                         }
                     }

@@ -186,6 +186,17 @@ pub struct Frame {
 
     #[serde(default)]
     pub post_context: Vec<String>,
+
+    /// Pre-symbolication coordinates. Set by the server when it rewrites
+    /// `file`/`line`/`column` via an uploaded source map at ingest, so
+    /// the dashboard's "show source" lookup (which reverse-maps through
+    /// the same map) still has the bundle position to start from.
+    /// Clients never send these.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub raw_line: Option<u32>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub raw_column: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

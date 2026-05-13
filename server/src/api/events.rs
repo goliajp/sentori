@@ -18,7 +18,7 @@ use crate::recent::AppState;
 pub async fn handle(
     State(state): State<AppState>,
     Extension(caller): Extension<IngestCaller>,
-    Json(event): Json<Event>,
+    Json(mut event): Json<Event>,
 ) -> Result<Response, AppError> {
     let started = std::time::Instant::now();
     event.validate().map_err(|e| {
@@ -74,7 +74,7 @@ pub async fn handle(
     );
 
     if state.db.is_some() {
-        if let Err(e) = persist_with_grouping(&state, project_id, &event).await {
+        if let Err(e) = persist_with_grouping(&state, project_id, &mut event).await {
             tracing::error!(error = %e, "failed to persist event");
         }
     }
@@ -117,9 +117,16 @@ pub(crate) fn quota_exceeded_response(reset_at: time::OffsetDateTime) -> Respons
 pub(crate) async fn persist_with_grouping(
     state: &AppState,
     project_id: Uuid,
-    event: &Event,
+    event: &mut Event,
 ) -> Result<(), sqlx::Error> {
     let pool = state.db.as_ref().expect("persist_with_grouping requires db");
+    // Phase 40 sub-C: if a source map is uploaded for this release,
+    // rewrite the stack to original source *before* grouping — so the
+    // issue keys on `src/Foo.tsx:42` not `index.bundle:1:288432`, and
+    // the stored payload is already symbolicated. Best-effort.
+    if let Err(e) = crate::symbolicate::symbolicate_event(pool, event).await {
+        tracing::warn!(error = %e, release = %event.release, "symbolicate at ingest failed; storing raw");
+    }
     let fp = crate::grouping::fingerprint(event);
     let outcome = crate::issues::upsert_issue(pool, project_id, &fp, event).await?;
     persist_event_row(pool, project_id, event, Some(outcome.issue_id)).await?;

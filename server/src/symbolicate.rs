@@ -5,6 +5,8 @@ use sourcemap::SourceMap;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::event::{ErrorObject, Event, Frame};
+
 const CACHE_MAX: usize = 50;
 
 /// Process-wide cache keyed by release_id. Loads the (single) sourcemap
@@ -84,6 +86,78 @@ fn symbolicate_frame_inplace(sm: &SourceMap, frame: &mut serde_json::Value) {
     }
     // Symbolicated frames usually point at app source — flip inApp.
     frame["inApp"] = serde_json::Value::Bool(true);
+}
+
+// ── Phase 40 sub-C: symbolicate the typed Event at ingest ──────────
+//
+// `symbolicate_payload` rewrites the JSON `payload` (used by the
+// dashboard's on-demand re-symbolicate path). At ingest time we work
+// with the typed `Event` and need its frames symbolicated *before*
+// `grouping::fingerprint`, so an issue groups on `src/Foo.tsx:42`
+// rather than `index.bundle:1:288432`. Only fires if a source map is
+// uploaded for the event's release; otherwise it's a no-op (and the
+// release's grouping is unchanged).
+
+/// Symbolicate `event.error.stack` (and the `cause` chain) in place
+/// using the source map uploaded for `event.release`, if any.
+/// Best-effort: DB / parse failures are swallowed (caller continues
+/// with the un-symbolicated event). Returns `true` if a map was found
+/// and applied.
+pub async fn symbolicate_event(pool: &PgPool, event: &mut Event) -> anyhow::Result<bool> {
+    let release_id: Option<Uuid> =
+        sqlx::query_scalar("SELECT id FROM releases WHERE name = $1 LIMIT 1")
+            .bind(&event.release)
+            .fetch_optional(pool)
+            .await?;
+    let Some(release_id) = release_id else {
+        return Ok(false);
+    };
+    let Some(sm) = load_sourcemap_for_release(pool, release_id).await? else {
+        return Ok(false);
+    };
+    symbolicate_event_with_map(&sm, event);
+    Ok(true)
+}
+
+/// Pure: apply `sm` to `event`'s stack + cause chain. Split out for
+/// unit testing without a DB.
+pub fn symbolicate_event_with_map(sm: &SourceMap, event: &mut Event) {
+    symbolicate_error_object(sm, &mut event.error);
+}
+
+pub(crate) fn symbolicate_error_object(sm: &SourceMap, error: &mut ErrorObject) {
+    for frame in &mut error.stack {
+        symbolicate_frame_typed(sm, frame);
+    }
+    if let Some(cause) = error.cause.as_deref_mut() {
+        symbolicate_error_object(sm, cause);
+    }
+}
+
+fn symbolicate_frame_typed(sm: &SourceMap, frame: &mut Frame) {
+    if frame.line == 0 {
+        return;
+    }
+    let col = frame.column.unwrap_or(0);
+    let token = match sm.lookup_token(frame.line.saturating_sub(1), col) {
+        Some(t) => t,
+        None => return,
+    };
+    // Stash the bundle position so the "show source" lookup (which
+    // reverse-maps through the same map) still works.
+    frame.raw_line = Some(frame.line);
+    frame.raw_column = Some(col);
+    if let Some(src) = token.get_source() {
+        frame.absolute_path = Some(src.to_string());
+        frame.file = src.to_string();
+    }
+    frame.line = (token.get_src_line() as u64).saturating_add(1) as u32;
+    frame.column = Some(token.get_src_col());
+    if let Some(name) = token.get_name() {
+        frame.function = Some(name.to_string());
+    }
+    // A frame that resolved through the source map points at app source.
+    frame.in_app = true;
 }
 
 /// Phase 25 sub-B: lift a window of original source around the
@@ -252,5 +326,69 @@ mod tests {
         let w = window_from_sourcemap(&sm, 1, 0, 5).expect("token resolves");
         assert_eq!(w.before.len(), 1, "before clamped at start of file");
         assert!(!w.after.is_empty());
+    }
+
+    fn frame(file: &str, line: u32, col: u32) -> Frame {
+        Frame {
+            absolute_path: None,
+            column: Some(col),
+            file: file.to_string(),
+            function: None,
+            in_app: false,
+            line,
+            post_context: vec![],
+            pre_context: vec![],
+            raw_column: None,
+            raw_line: None,
+        }
+    }
+
+    #[test]
+    fn symbolicate_rewrites_resolvable_frame_and_keeps_raw_coords() {
+        let sm = synthetic_sourcemap();
+        let mut err = ErrorObject {
+            cause: None,
+            message: "boom".into(),
+            r#type: "Error".into(),
+            // bundle line 2 → original line 6 in src/foo.ts; the second
+            // frame has no location (line 0) — skipped, left as-is.
+            stack: vec![frame("bundle.js", 2, 0), frame("<anonymous>", 0, 0)],
+        };
+        symbolicate_error_object(&sm, &mut err);
+
+        let f0 = &err.stack[0];
+        assert_eq!(f0.file, "src/foo.ts");
+        assert_eq!(f0.line, 6);
+        assert_eq!(f0.column, Some(0));
+        assert_eq!(f0.raw_line, Some(2));
+        assert_eq!(f0.raw_column, Some(0));
+        assert!(f0.in_app, "a frame that resolved through the map is in-app");
+
+        // Location-less frame is untouched.
+        let f1 = &err.stack[1];
+        assert_eq!(f1.file, "<anonymous>");
+        assert_eq!(f1.line, 0);
+        assert_eq!(f1.raw_line, None);
+        assert!(!f1.in_app);
+    }
+
+    #[test]
+    fn symbolicate_recurses_into_cause_chain() {
+        let sm = synthetic_sourcemap();
+        let mut err = ErrorObject {
+            cause: Some(Box::new(ErrorObject {
+                cause: None,
+                message: "root".into(),
+                r#type: "Error".into(),
+                stack: vec![frame("bundle.js", 1, 0)], // → src/foo.ts:2
+            })),
+            message: "boom".into(),
+            r#type: "Error".into(),
+            stack: vec![frame("bundle.js", 2, 0)],
+        };
+        symbolicate_error_object(&sm, &mut err);
+        assert_eq!(err.stack[0].line, 6);
+        assert_eq!(err.cause.as_ref().unwrap().stack[0].file, "src/foo.ts");
+        assert_eq!(err.cause.as_ref().unwrap().stack[0].line, 2);
     }
 }
