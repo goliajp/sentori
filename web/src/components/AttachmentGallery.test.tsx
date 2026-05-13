@@ -31,10 +31,7 @@ describe('<AttachmentGallery>', () => {
 
   it('renders screenshot thumbnails as clickable buttons', () => {
     render(
-      <AttachmentGallery
-        attachments={[screenshot('r-1'), screenshot('r-2', 'ios')]}
-        eventId="e1"
-      />
+      <AttachmentGallery attachments={[screenshot('r-1'), screenshot('r-2', 'ios')]} eventId="e1" />
     )
     const thumbs = screen.getAllByRole('button', { name: /Screenshot/i })
     expect(thumbs).toHaveLength(2)

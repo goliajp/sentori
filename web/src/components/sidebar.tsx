@@ -7,6 +7,7 @@ import { useDensity } from '@/lib/density'
 import { OnboardingBadge } from './OnboardingBadge'
 import { OrgSwitcher } from './OrgSwitcher'
 import { RoleBadge } from './RoleBadge'
+import { EditorPicker } from './EditorPicker'
 import { ThemeToggle } from './theme-toggle'
 
 type IconKind =
@@ -205,6 +206,9 @@ function SidebarContent({
                 <span className="truncate">{user?.email ?? 'account'}</span>
                 <RoleBadge role={currentOrg.role} />
               </Link>
+              <div className="mt-2 px-1">
+                <EditorPicker />
+              </div>
               <div className="mt-1 flex items-center gap-1 px-1">
                 <button
                   aria-label={`Density: ${density}. Click to toggle.`}
