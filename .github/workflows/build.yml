@@ -60,7 +60,10 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          # Pinned (matches local). `latest` on bun has been known to
+          # change peerDependency resolution behaviour between patch
+          # releases — pin to avoid CI drift from local development.
+          bun-version: "1.3.13"
 
       - name: web — install + check + test + build
         working-directory: web
@@ -98,7 +101,10 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          # Pinned (matches local). `latest` on bun has been known to
+          # change peerDependency resolution behaviour between patch
+          # releases — pin to avoid CI drift from local development.
+          bun-version: "1.3.13"
 
       # `bun install` at the root resolves the whole workspace, so
       # every per-package step below can skip re-installing.
