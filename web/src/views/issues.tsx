@@ -14,6 +14,7 @@ import {
 import { useAuth } from '@/auth/state'
 import { useOrg } from '@/auth/orgContext'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
+import { useToast } from '@/components/ui'
 import { type ColumnDef, useColumnPrefs } from '@/lib/column-prefs'
 import { densityClasses, useDensity } from '@/lib/density'
 import { parseIssueQuery } from '@/lib/issue-query'
@@ -168,23 +169,30 @@ export function IssuesView() {
   const isLoading = issuesInfinite.isLoading
   const error = issuesInfinite.error
 
+  const toast = useToast()
   const silenceMutation = useMutation({
     mutationFn: (issueId: string) =>
       adminApi.patchIssue(projectId!, issueId, { status: 'silenced' }),
+    onError: (err: unknown) =>
+      toast.error('Failed to silence issue', {
+        detail: err instanceof Error ? err.message : undefined,
+      }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: ['issues', projectId],
-      })
+      toast.success('Issue silenced')
+      void queryClient.invalidateQueries({ queryKey: ['issues', projectId] })
     },
   })
 
   const resolveMutation = useMutation({
     mutationFn: (issueId: string) =>
       adminApi.patchIssue(projectId!, issueId, { status: 'resolved' }),
+    onError: (err: unknown) =>
+      toast.error('Failed to resolve issue', {
+        detail: err instanceof Error ? err.message : undefined,
+      }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: ['issues', projectId],
-      })
+      toast.success('Issue resolved')
+      void queryClient.invalidateQueries({ queryKey: ['issues', projectId] })
     },
   })
 
@@ -196,11 +204,16 @@ export function IssuesView() {
         action,
         issueIds: Array.from(selectedIds),
       }),
-    onSuccess: () => {
+    onError: (err: unknown) =>
+      toast.error('Bulk action failed', {
+        detail: err instanceof Error ? err.message : undefined,
+      }),
+    onSuccess: (_data, variables) => {
+      toast.success(
+        `${variables[0]?.toUpperCase() ?? ''}${variables.slice(1)}d ${selectedIds.size} issue${selectedIds.size === 1 ? '' : 's'}`
+      )
       setSelectedIds(new Set())
-      void queryClient.invalidateQueries({
-        queryKey: ['issues', projectId],
-      })
+      void queryClient.invalidateQueries({ queryKey: ['issues', projectId] })
     },
   })
 

@@ -22,7 +22,7 @@ import { MergeIssueButton } from '@/components/MergeIssueButton'
 import { RelatedIssuesPanel } from '@/components/RelatedIssuesPanel'
 import { SourceCode } from '@/components/SourceCode'
 import { ErrorState } from '@/components/states'
-import { InfoBox, Section } from '@/components/ui'
+import { InfoBox, Section, useToast } from '@/components/ui'
 import { FrameHoverProvider, frameKey, useFrameHover } from '@/lib/frame-hover'
 import { packageOf } from '@/lib/frame-package'
 import { roleOf } from '@/lib/frame-role'
@@ -106,10 +106,18 @@ export function IssueDetailView() {
 
   const queryClient = useQueryClient()
   const { user } = useAuth()
+  const toast = useToast()
   const patchMutation = useMutation({
     mutationFn: (body: Parameters<typeof adminApi.patchIssue>[2]) =>
       adminApi.patchIssue(projectId!, issueId!, body),
-    onSuccess: () => {
+    onError: (err: unknown) =>
+      toast.error('Failed to update issue', {
+        detail: err instanceof Error ? err.message : undefined,
+      }),
+    onSuccess: (_data, variables) => {
+      if (variables.status === 'resolved') toast.success('Issue resolved')
+      else if (variables.status === 'silenced') toast.success('Issue silenced')
+      else if (variables.assigneeUserId !== undefined) toast.success('Assignee updated')
       void queryClient.invalidateQueries({ queryKey: ['issue', projectId, issueId] })
       void queryClient.invalidateQueries({ queryKey: ['issues', projectId] })
     },

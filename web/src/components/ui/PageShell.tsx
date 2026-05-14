@@ -75,8 +75,11 @@ export function PageBody({
 }) {
   const pad = bleed ? 'py-6' : 'px-6 py-6'
   const width = prose ? 'mx-auto w-full max-w-3xl' : ''
+  // Phase 50 sub-B2 — 140ms opacity fade-in on route mount.
   return (
-    <div className={`min-w-0 flex-1 overflow-y-auto ${pad} ${width} ${className ?? ''}`}>
+    <div
+      className={`sentori-page-in min-w-0 flex-1 overflow-y-auto ${pad} ${width} ${className ?? ''}`}
+    >
       {children}
     </div>
   )
