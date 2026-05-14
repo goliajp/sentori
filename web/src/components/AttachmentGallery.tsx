@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 
 import { adminApi, type Attachment } from '@/api/client'
 
 import { SessionTrailViewer } from './SessionTrailViewer'
+import { InfoBox } from './ui'
 import { ViewTreePanel } from './ViewTreePanel'
 
 /**
@@ -55,36 +56,35 @@ export function AttachmentGallery({ eventId, projectId }: { eventId: string; pro
 
   if (isLoading) {
     return (
-      <section className="space-y-4">
-        <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Captured at error</h2>
+      <Frame>
         <p className="text-fg-muted text-[12px]">Loading attachments…</p>
-      </section>
+      </Frame>
     )
   }
   if (error) {
     return (
-      <section className="space-y-4">
-        <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Captured at error</h2>
-        <p className="text-[12px] text-red-400">Failed to load attachments for this event.</p>
-      </section>
+      <Frame>
+        <InfoBox variant="danger" title="Failed to load attachments">
+          The server couldn't return attachments for this event. Retry the page; if it keeps
+          failing, check the dashboard console for the request response.
+        </InfoBox>
+      </Frame>
     )
   }
   if (attachments.length === 0) {
     return (
-      <section className="space-y-4">
-        <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Captured at error</h2>
-        <p className="text-fg-muted text-[12px]">
-          No attachments captured for this event. Set{' '}
-          <code className="font-mono">capture: {`{ screenshot: true }`}</code> in your SDK init to
-          attach a screenshot when <code className="font-mono">captureException</code> fires.
-        </p>
-      </section>
+      <Frame>
+        <InfoBox variant="info" title="No attachments captured for this event">
+          Add <code className="font-mono">capture: {`{ screenshot: true }`}</code> to your SDK{' '}
+          <code className="font-mono">init</code> call to attach a screenshot when{' '}
+          <code className="font-mono">captureException</code> fires.
+        </InfoBox>
+      </Frame>
     )
   }
 
   return (
-    <section className="space-y-4">
-      <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Captured at error</h2>
+    <Frame>
       {(screenshots.length > 0 || others.length > 0) && (
         <ul className="flex flex-wrap gap-3">
           {screenshots.map((a, i) => (
@@ -148,6 +148,19 @@ export function AttachmentGallery({ eventId, projectId }: { eventId: string; pro
           startIdx={openIdx}
         />
       )}
+    </Frame>
+  )
+}
+
+/** Phase 49 sub-A — every state (loading / error / empty / data) lives
+ *  inside this section frame so the section header stays consistent. */
+function Frame({ children }: { children: ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <h2 className="text-fg-muted text-[11px] font-medium tracking-[0.06em] uppercase">
+        Captured at error
+      </h2>
+      {children}
     </section>
   )
 }

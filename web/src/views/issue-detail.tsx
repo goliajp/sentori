@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { type ReactNode, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
 import { Link, useNavigate, useParams } from 'react-router'
 
@@ -22,6 +22,7 @@ import { MergeIssueButton } from '@/components/MergeIssueButton'
 import { RelatedIssuesPanel } from '@/components/RelatedIssuesPanel'
 import { SourceCode } from '@/components/SourceCode'
 import { ErrorState } from '@/components/states'
+import { InfoBox, Section } from '@/components/ui'
 import { FrameHoverProvider, frameKey, useFrameHover } from '@/lib/frame-hover'
 import { packageOf } from '@/lib/frame-package'
 import { roleOf } from '@/lib/frame-role'
@@ -152,13 +153,12 @@ export function IssueDetailView() {
         <span className="text-fg-muted ml-1 truncate text-sm">{issue.messageSample}</span>
         <StatusBadge issue={issue} />
         <div className="ml-auto flex items-center gap-2">
-          {/* Phase 48 sub-F — removed the "Open in <IDE>" button. The
-              dashboard now ships its own source viewer (FrameSourceDrawer,
-              fed by the server's sourcemap-sourcesContent endpoint), so
-              no external IDE jump is needed. Click any frame in the
-              Stack tab to open the inline source. */}
-          <CopyMarkdownButton event={selectedEvent} issue={issue} orgSlug={currentOrg.slug} />
-          <MergeIssueButton issueId={issueId} orgSlug={currentOrg.slug} projectId={projectId!} />
+          {/* Phase 49 sub-B — header is split into three visual groups:
+              (1) primary issue actions (IssueActions: assignee +
+              "Resolve in <release>"), (2) event navigation
+              (EventPicker), (3) overflow for secondary actions (Copy
+              MD / Merge / etc). Copy MD also has a `c` hotkey so power
+              triage doesn't need the menu round-trip. */}
           <IssueActions
             currentUserId={user?.id ?? null}
             issue={issue}
@@ -180,6 +180,9 @@ export function IssueDetailView() {
               total={issue.eventCount}
             />
           )}
+          <div aria-hidden className="border-border/60 mx-1 h-5 w-px border-l" />
+          <CopyMarkdownButton event={selectedEvent} issue={issue} orgSlug={currentOrg.slug} />
+          <MergeIssueButton issueId={issueId} orgSlug={currentOrg.slug} projectId={projectId!} />
         </div>
       </header>
 
@@ -416,19 +419,16 @@ function StackTab({
           }
           title="Stack"
         >
-          {/* Phase 42 sub-H.04: ANR / hang events get a violet banner
-            at the top of the stack so a triage user immediately
-            knows this isn't a thrown error — main thread was wedged
-            for ≥ the watchdog threshold. */}
+          {/* Phase 42 sub-H.04: ANR / hang events get a warning banner
+              at the top of the stack so a triage user immediately
+              knows this isn't a thrown error — main thread was wedged
+              for ≥ the watchdog threshold. */}
           {payload.kind === 'anr' && (
-            <div className="bg-accent/10 text-fg border-accent/40 mb-3 rounded-md border-l-4 px-3 py-2 text-[12px]">
-              <span className="text-accent mr-2 font-mono text-[11px] tracking-wider uppercase">
-                ⏸ {payload.platform === 'ios' ? 'Hang' : 'ANR'}
-              </span>
-              <span className="text-fg-muted">
+            <div className="mb-3">
+              <InfoBox title={`⏸ ${payload.platform === 'ios' ? 'Hang' : 'ANR'}`} variant="warning">
                 Main thread blocked. Stack below is what the thread was running when the watchdog
                 fired — not a thrown exception.
-              </span>
+              </InfoBox>
             </div>
           )}
           <UnsymbolicatedHint
@@ -824,36 +824,34 @@ function UnsymbolicatedHint({
 
   const what = needsSourcemap ? 'source map' : needsDsym ? 'iOS dSYM' : 'ProGuard mapping'
   return (
-    <div
-      className="border-border bg-bg-tertiary/30 mb-3 flex items-start justify-between gap-3 rounded-md border px-3 py-2 text-[12px]"
-      role="status"
-    >
-      <div>
-        <p className="text-fg font-medium">This stack is unsymbolicated.</p>
-        <p className="text-fg-muted mt-0.5">
-          Upload the {what} for <span className="text-fg font-mono">{release}</span> to see original
-          frames —{' '}
-          {needsSourcemap ? (
-            <a
-              className="text-accent hover:text-accent/80"
-              href="https://docs.sentori.golia.jp/recipes/sourcemap-upload/"
-              rel="noreferrer"
-              target="_blank"
-            >
-              how to upload source maps
-            </a>
-          ) : (
-            'see project settings → releases'
-          )}
-          .
-        </p>
-      </div>
-      <Link
-        className="text-accent hover:text-accent/80 shrink-0 self-center text-[12px] whitespace-nowrap"
-        to={`/org/${orgSlug}/releases/${encodeURIComponent(release)}`}
-      >
-        Open release →
-      </Link>
+    <div className="mb-3">
+      <InfoBox title="This stack is unsymbolicated" variant="warning">
+        <span className="flex items-start justify-between gap-3">
+          <span className="min-w-0">
+            Upload the {what} for <span className="text-fg font-mono">{release}</span> to see
+            original frames —{' '}
+            {needsSourcemap ? (
+              <a
+                className="text-accent underline-offset-2 hover:underline"
+                href="https://docs.sentori.golia.jp/recipes/sourcemap-upload/"
+                rel="noreferrer"
+                target="_blank"
+              >
+                how to upload source maps
+              </a>
+            ) : (
+              'see project settings → releases'
+            )}
+            .
+          </span>
+          <Link
+            className="text-accent shrink-0 self-center text-[12px] whitespace-nowrap underline-offset-2 hover:underline"
+            to={`/org/${orgSlug}/releases/${encodeURIComponent(release)}`}
+          >
+            Open release →
+          </Link>
+        </span>
+      </InfoBox>
     </div>
   )
 }
@@ -912,25 +910,8 @@ function humanBytes(n: number): string {
   return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 
-function Section({
-  children,
-  right,
-  title,
-}: {
-  children: ReactNode
-  right?: ReactNode
-  title: string
-}) {
-  return (
-    <div>
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-fg-muted text-[11px] tracking-wider uppercase">{title}</h3>
-        {right}
-      </div>
-      {children}
-    </div>
-  )
-}
+// Phase 49 sub-A — `Section` is now imported from `@/components/ui`.
+// Local definition removed; all callers use the shared component.
 
 type Symbolication = { releaseHasMap: boolean } | undefined
 
@@ -1411,22 +1392,29 @@ function FrameSourceError({ environment, error }: { environment: string; error: 
     // "could be three things" wall of text.
     if (environment === 'dev' || environment === 'development') {
       return (
-        <p className="text-fg-muted px-4 py-6 text-[12px]">
-          <span className="text-fg">Dev build.</span> Source maps are only uploaded for production
-          releases. Ship a release build with <code className="font-mono">bun cli release</code> to
-          see the original source here.
-        </p>
+        <div className="px-4 py-4">
+          <InfoBox title="Dev build" variant="info">
+            Source maps are only uploaded for production releases. Ship a release build with{' '}
+            <code className="font-mono">bun cli release</code> to see the original source here.
+          </InfoBox>
+        </div>
       )
     }
     return (
-      <p className="text-fg-muted px-4 py-6 text-[12px]">
-        No source available for this frame. Either the release has no source map uploaded, the
-        bundle position can't be reverse-mapped, or the source map was generated without{' '}
-        <code className="font-mono">sourcesContent</code>.
-      </p>
+      <div className="px-4 py-4">
+        <InfoBox title="No source available for this frame" variant="warning">
+          Either the release has no source map uploaded, the bundle position can't be
+          reverse-mapped, or the source map was generated without{' '}
+          <code className="font-mono">sourcesContent</code>.
+        </InfoBox>
+      </div>
     )
   }
-  return <p className="px-4 py-6 text-[12px] text-red-400">Failed to load source preview.</p>
+  return (
+    <div className="px-4 py-4">
+      <InfoBox variant="danger">Failed to load source preview.</InfoBox>
+    </div>
+  )
 }
 
 function KeyValueGrid({ data }: { data: Record<string, string> }) {
