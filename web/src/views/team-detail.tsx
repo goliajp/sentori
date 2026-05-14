@@ -137,7 +137,7 @@ export function TeamDetailView() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 p-6">
+    <div className="space-y-8 p-6">
       <header>
         <Link className="text-fg-muted hover:text-fg text-[12px]" to={`/org/${orgSlug}/teams`}>
           ← Back to teams

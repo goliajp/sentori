@@ -75,7 +75,7 @@ export function AlertsView() {
   const rules = data ?? []
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-6">
+    <div className="space-y-4 p-6">
       <header className="flex items-baseline justify-between">
         <div>
           <h1 className="text-fg text-xl font-semibold">Alert rules</h1>

@@ -31,7 +31,7 @@ the same PR.**
 | `--color-fg-secondary`  | `#374151` | hover states, slightly de-emphasized text         |
 | `--color-fg-muted`      | `#6b7280` | metadata, timestamps, secondary labels            |
 | `--color-border`        | `#e5e7eb` | hairline dividers, input borders                  |
-| `--color-accent`        | `#6d28d9` | primary buttons, focus rings, links               |
+| `--color-accent`        | `#4f46e5` | primary buttons, focus rings, links (indigo)      |
 
 ### Dark theme (the default — marketing and docs are dark-only)
 
@@ -44,7 +44,7 @@ the same PR.**
 | `--color-fg-secondary`  | `#d1d5db` | hover states, slightly de-emphasized text         |
 | `--color-fg-muted`      | `#9ca3af` | metadata, timestamps, secondary labels            |
 | `--color-border`        | `#2a2a35` | hairline dividers, input borders                  |
-| `--color-accent`        | `#a78bfa` | primary buttons, focus rings, links               |
+| `--color-accent`        | `#818cf8` | primary buttons, focus rings, links (indigo)      |
 
 ### Status / semantic colours (Phase 49 sub-A)
 

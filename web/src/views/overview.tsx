@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { adminApi, type HealthBucket, type HealthSummary } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
+import { PageBody, PageHeader, PageShell } from '@/components/ui'
 
 /**
  * Phase 26 sub-D: project overview / health widget.
@@ -36,44 +37,47 @@ export function OverviewView() {
   if (!data) return null
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
-      <header>
-        <h1 className="text-fg text-xl font-semibold">{currentProject?.name ?? 'Overview'}</h1>
-        <p className="text-fg-muted mt-1 text-[12px]">
-          Last 24 hours · {data.buckets.length} bucket{data.buckets.length === 1 ? '' : 's'}
-        </p>
-      </header>
+    <PageShell>
+      <PageHeader
+        subtitle={`Last 24 hours · ${data.buckets.length} bucket${data.buckets.length === 1 ? '' : 's'}`}
+        title={currentProject?.name ?? 'Overview'}
+      />
+      <PageBody>
+        <div className="space-y-6">
+          <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Stat
+              accent={rateAccent(data.summary.crashFreeSessionRate, 0.99)}
+              hint={`${data.summary.crashedSessions.toLocaleString()} crashed · ${data.summary.erroredSessions.toLocaleString()} errored`}
+              label="Crash-free sessions"
+              value={formatRate(data.summary.crashFreeSessionRate)}
+            />
+            <Stat
+              accent={rateAccent(data.summary.crashFreeUserRate, 0.995)}
+              hint={`${data.summary.crashedUsers.toLocaleString()} of ${data.summary.totalUsers.toLocaleString()} users`}
+              label="Crash-free users"
+              value={formatRate(data.summary.crashFreeUserRate)}
+            />
+            <Stat
+              accent="neutral"
+              hint={`${data.summary.totalUsers.toLocaleString()} unique users`}
+              label="Total sessions"
+              value={data.summary.totalSessions.toLocaleString()}
+            />
+          </section>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Stat
-          accent={rateAccent(data.summary.crashFreeSessionRate, 0.99)}
-          hint={`${data.summary.crashedSessions.toLocaleString()} crashed · ${data.summary.erroredSessions.toLocaleString()} errored`}
-          label="Crash-free sessions"
-          value={formatRate(data.summary.crashFreeSessionRate)}
-        />
-        <Stat
-          accent={rateAccent(data.summary.crashFreeUserRate, 0.995)}
-          hint={`${data.summary.crashedUsers.toLocaleString()} of ${data.summary.totalUsers.toLocaleString()} users`}
-          label="Crash-free users"
-          value={formatRate(data.summary.crashFreeUserRate)}
-        />
-        <Stat
-          accent="neutral"
-          hint={`${data.summary.totalUsers.toLocaleString()} unique users`}
-          label="Total sessions"
-          value={data.summary.totalSessions.toLocaleString()}
-        />
-      </section>
+          <section>
+            <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">
+              Sessions over time
+            </h2>
+            <SessionSparkline buckets={data.buckets} />
+          </section>
 
-      <section>
-        <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Sessions over time</h2>
-        <SessionSparkline buckets={data.buckets} />
-      </section>
-
-      <section>
-        <SummaryFootnote summary={data.summary} />
-      </section>
-    </div>
+          <section>
+            <SummaryFootnote summary={data.summary} />
+          </section>
+        </div>
+      </PageBody>
+    </PageShell>
   )
 }
 

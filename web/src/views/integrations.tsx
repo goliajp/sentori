@@ -90,7 +90,7 @@ export function IntegrationsView() {
   )
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-6">
+    <div className="space-y-6 p-6">
       <header>
         <h1 className="text-fg text-xl font-semibold">Integrations</h1>
         <p className="text-fg-muted mt-1 text-[12px]">

@@ -6,4 +6,5 @@
 export { Chip } from './Chip'
 export { InfoBox } from './InfoBox'
 export { OverflowItem, OverflowMenu } from './OverflowMenu'
+export { PageBody, PageHeader, PageShell } from './PageShell'
 export { Section } from './Section'

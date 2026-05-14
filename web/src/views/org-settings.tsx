@@ -126,7 +126,7 @@ export function OrgSettingsView() {
   })
 
   return (
-    <div className="mx-auto max-w-3xl space-y-10 px-6 py-8 text-[13px]">
+    <div className="space-y-10 px-6 py-8 text-[13px]">
       <header>
         <h1 className="text-fg text-lg font-semibold">Settings — {currentOrg.name}</h1>
         <p className="text-fg-muted mt-1 text-sm">

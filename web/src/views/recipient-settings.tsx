@@ -73,7 +73,7 @@ export function RecipientSettingsView() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8 px-6 py-8 text-[13px]">
+    <div className="space-y-8 px-6 py-8 text-[13px]">
       <header>
         <h1 className="text-fg text-lg font-semibold">Notification recipients — {project.name}</h1>
         <p className="text-fg-muted mt-1 text-sm">

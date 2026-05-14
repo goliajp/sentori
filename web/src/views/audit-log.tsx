@@ -50,7 +50,7 @@ export function AuditLogView() {
 
   if (!allowed) {
     return (
-      <div className="mx-auto max-w-4xl p-6">
+      <div className="p-6">
         <p className="text-fg-muted text-sm">Only org admins can view the audit log.</p>
       </div>
     )
@@ -88,7 +88,7 @@ export function AuditLogView() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 p-6">
+    <div className="space-y-5 p-6">
       <header className="flex items-baseline justify-between">
         <div>
           <h1 className="text-fg text-xl font-semibold">Audit log</h1>

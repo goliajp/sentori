@@ -19,7 +19,10 @@
   --color-fg-muted: #6b7280;
   --color-fg-secondary: #374151;
   --color-border: #e5e7eb;
-  --color-accent: #6d28d9;
+  /* Phase 49 sub-G — indigo (was purple #6d28d9). The whole
+   * dashboard's accent surfaces (active nav, buttons, focus rings,
+   * link underlines) pivot through this single token. */
+  --color-accent: #4f46e5;
   /* Phase 49 sub-A — semantic status colors for InfoBox / Hint /
    * Banner. Muted to not fight the accent purple. */
   --color-info: #2563eb;
@@ -44,7 +47,7 @@ html[data-theme='dark'] {
   --color-fg-muted: #9ca3af;
   --color-fg-secondary: #d1d5db;
   --color-border: #2a2a35;
-  --color-accent: #a78bfa;
+  --color-accent: #818cf8;
   --color-info: #93c5fd;
   --color-info-bg: #0c1e3a;
   --color-info-border: #1e3a6a;

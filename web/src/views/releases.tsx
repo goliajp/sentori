@@ -53,7 +53,7 @@ export function ReleasesView() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-3 p-6">
+    <div className="space-y-3 p-6">
       <header className="flex items-baseline justify-between">
         <h1 className="text-fg text-xl font-semibold">Releases</h1>
         <span className="text-fg-muted text-[12px]">{rows.length} release(s)</span>

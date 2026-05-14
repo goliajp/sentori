@@ -34,7 +34,7 @@ export function ReleaseCompareView() {
   if (!data) return null
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
+    <div className="space-y-6 p-6">
       <header>
         <Link
           className="text-fg-muted hover:text-fg text-[12px]"

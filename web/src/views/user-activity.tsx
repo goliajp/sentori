@@ -34,7 +34,7 @@ export function UserActivityView() {
   const hasMore = rows.length === PAGE_LIMIT
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5 p-6">
+    <div className="space-y-5 p-6">
       <header>
         <h1 className="text-fg text-xl font-semibold">My activity</h1>
         <p className="text-fg-muted mt-1 text-sm">
