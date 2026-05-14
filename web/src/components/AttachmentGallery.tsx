@@ -27,11 +27,11 @@ import { ViewTreePanel } from './ViewTreePanel'
  * download button. Non-image kinds (`viewTree` / `stateSnapshot` /
  * `logTail` / `sessionTrail`) get a dedicated viewer.
  */
-export function AttachmentGallery({ eventId }: { eventId: string }) {
+export function AttachmentGallery({ eventId, projectId }: { eventId: string; projectId: string }) {
   const { data, error, isLoading } = useQuery({
-    enabled: !!eventId,
-    queryFn: () => adminApi.listEventAttachments(eventId),
-    queryKey: ['event-attachments', eventId],
+    enabled: !!eventId && !!projectId,
+    queryFn: () => adminApi.listEventAttachments(projectId, eventId),
+    queryKey: ['event-attachments', projectId, eventId],
     staleTime: 60_000,
   })
   const attachments = data ?? []

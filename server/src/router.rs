@@ -160,9 +160,12 @@ pub fn build(cfg: ServerConfig) -> Router {
         // Phase 48 sub-A.2 — list every attachment row the server knows
         // about for an event. Dashboard reads this directly so a broken
         // `payload.attachments` echo path (Insight's original report)
-        // doesn't hide the screenshot.
+        // doesn't hide the screenshot. Scoped under /projects/{project_id}
+        // so the require_project_in_org middleware gates access AND the
+        // SQL query can use the (project_id, event_id) index instead of
+        // a full-partition scan.
         .route(
-            "/events/{event_id}/attachments",
+            "/projects/{project_id}/events/{event_id}/attachments",
             get(api::attachments::list_for_event),
         )
         .route(

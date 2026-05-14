@@ -234,67 +234,45 @@ pub struct AttachmentRow {
     pub source: String,
 }
 
-/// Phase 48 sub-A.2 — `GET /admin/api/events/{event_id}/attachments`
+/// Phase 48 sub-A.2 — `GET /admin/api/projects/{project_id}/events/{event_id}/attachments`
 ///
 /// Lists every attachment row the server has for an event, regardless
 /// of whether `payload.attachments[]` in the event JSON echoed them.
 /// Dashboard pulls from this so a broken client-side echo (the
 /// 201→202 rewrite Insight reported) can't hide the screenshot.
+///
+/// Scoped under `/projects/{project_id}/` so `require_project_in_org`
+/// middleware gates access and the SQL query can use the
+/// `(project_id, event_id)` filter directly — a naked `WHERE id = $1`
+/// on the events table forces a sequential scan of every monthly
+/// partition.
 pub async fn list_for_event(
     State(state): State<AppState>,
-    Extension(caller): Extension<AdminCaller>,
-    Path(event_id): Path<Uuid>,
+    Path((project_id, event_id)): Path<(Uuid, Uuid)>,
 ) -> Response {
     let Some(pool) = state.db.as_ref() else {
         return server_error("dbNotConfigured");
     };
 
-    // First read project_id off any attachment row to gate access; if
-    // the event has no attachments at all the caller still gets a 200
-    // with `[]` (the "no screenshot was captured" case shouldn't 403).
-    let project_row: Option<(Uuid,)> = sqlx::query_as(
-        "SELECT project_id FROM event_attachments WHERE event_id = $1 LIMIT 1",
-    )
-    .bind(event_id)
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None);
-
-    let project_id = match project_row {
-        Some((pid,)) => pid,
-        // No attachments → derive project_id from the events table for the
-        // access gate. If the event doesn't exist either, 404.
-        None => {
-            let ev: Option<(Uuid,)> = sqlx::query_as(
-                "SELECT project_id FROM events WHERE id = $1 LIMIT 1",
-            )
-            .bind(event_id)
-            .fetch_optional(pool)
-            .await
-            .unwrap_or(None);
-            match ev {
-                Some((pid,)) => pid,
-                None => return not_found("eventNotFound"),
-            }
-        }
-    };
-
-    if !is_admin_for_project(pool, &caller, project_id).await {
-        return (StatusCode::FORBIDDEN, Json(json!({ "error": "forbidden" }))).into_response();
-    }
-
-    let rows: Vec<AttachmentRow> = sqlx::query_as(
+    let rows: Vec<AttachmentRow> = match sqlx::query_as(
         r#"
         SELECT ref, kind, media_type, size_bytes, source
         FROM event_attachments
-        WHERE event_id = $1
+        WHERE project_id = $1 AND event_id = $2
         ORDER BY received_at ASC
         "#,
     )
+    .bind(project_id)
     .bind(event_id)
     .fetch_all(pool)
     .await
-    .unwrap_or_default();
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::error!(error = %e, %project_id, %event_id, "list_for_event query failed");
+            return server_error("dbError");
+        }
+    };
 
     (StatusCode::OK, Json(rows)).into_response()
 }

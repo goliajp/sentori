@@ -51,13 +51,13 @@ afterEach(() => {
 describe('<AttachmentGallery>', () => {
   it('renders an explicit empty state when the server has no attachments', async () => {
     stubAttachments([])
-    wrap(<AttachmentGallery eventId="e1" />)
+    wrap(<AttachmentGallery projectId="p1" eventId="e1" />)
     expect(await screen.findByText(/no attachments captured/i)).toBeInTheDocument()
   })
 
   it('renders screenshot thumbnails as clickable buttons', async () => {
     stubAttachments([screenshot('r-1'), screenshot('r-2', 'ios')])
-    wrap(<AttachmentGallery eventId="e1" />)
+    wrap(<AttachmentGallery projectId="p1" eventId="e1" />)
     const thumbs = await screen.findAllByRole('button', { name: /Screenshot/i })
     expect(thumbs).toHaveLength(2)
     const imgs = screen.getAllByAltText('Crash screenshot')
@@ -67,7 +67,7 @@ describe('<AttachmentGallery>', () => {
 
   it('renders non-image, non-tree attachments as pill links to the raw blob', async () => {
     stubAttachments([stateSnapshot('r-3')])
-    wrap(<AttachmentGallery eventId="evX" />)
+    wrap(<AttachmentGallery projectId="p1" eventId="evX" />)
     const label = await screen.findByText('stateSnapshot')
     const link = label.closest('a')
     expect(link).not.toBeNull()
@@ -85,7 +85,7 @@ describe('<AttachmentGallery>', () => {
         source: 'ios',
       },
     ])
-    wrap(<AttachmentGallery eventId="ev1" />)
+    wrap(<AttachmentGallery projectId="p1" eventId="ev1" />)
     expect(await screen.findByText(/view tree at error/i)).toBeInTheDocument()
     // The single-tree case opens <details> automatically; the panel
     // kicks off its own fetch which our stub also satisfies, so we
@@ -94,7 +94,7 @@ describe('<AttachmentGallery>', () => {
 
   it('opens a lightbox on screenshot click, closes on Esc', async () => {
     stubAttachments([screenshot('r-1')])
-    wrap(<AttachmentGallery eventId="e1" />)
+    wrap(<AttachmentGallery projectId="p1" eventId="e1" />)
     const thumb = (await screen.findAllByRole('button', { name: /Screenshot/i }))[0]!
     fireEvent.click(thumb)
     expect(screen.getByRole('dialog')).toBeInTheDocument()
@@ -105,7 +105,7 @@ describe('<AttachmentGallery>', () => {
 
   it('arrow-key steps through screenshots in the lightbox', async () => {
     stubAttachments([screenshot('r-a'), screenshot('r-b'), screenshot('r-c')])
-    wrap(<AttachmentGallery eventId="e1" />)
+    wrap(<AttachmentGallery projectId="p1" eventId="e1" />)
     const thumbs = await screen.findAllByRole('button', { name: /Screenshot/i })
     fireEvent.click(thumbs[0]!)
     expect(screen.getByText('1 / 3')).toBeInTheDocument()
@@ -121,7 +121,7 @@ describe('<AttachmentGallery>', () => {
 
   it('downloads from the same blob URL', async () => {
     stubAttachments([screenshot('r-d')])
-    wrap(<AttachmentGallery eventId="ev9" />)
+    wrap(<AttachmentGallery projectId="p1" eventId="ev9" />)
     const thumb = (await screen.findAllByRole('button', { name: /Screenshot/i }))[0]!
     fireEvent.click(thumb)
     const dl = screen.getByText(/download/i)
