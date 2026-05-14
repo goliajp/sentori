@@ -1,106 +1,106 @@
-import { type FormEvent, useState } from 'react'
-import { Link, Navigate, useSearchParams } from 'react-router'
+import { useState } from 'react'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 
 import { useAuth } from '@/auth/state'
 
 export function LoginView() {
   const { isAuthed, login } = useAuth()
-  const [params] = useSearchParams()
-  const next = sanitizeNext(params.get('next'))
+  const nav = useNavigate()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<null | string>(null)
-  const [submitting, setSubmitting] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<null | string>(null)
 
-  if (isAuthed === true) {
-    return <Navigate replace to={next ?? '/'} />
+  if (isAuthed) {
+    const to = (location.state as { from?: string } | null)?.from ?? '/'
+    return <Navigate replace to={to} />
   }
 
-  const onSubmit = async (e: FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
-    setSubmitting(true)
+    setBusy(true)
+    setErr(null)
     try {
       await login(email, password)
-    } catch (err) {
-      const status = (err as { status?: number })?.status
-      const body = (err as { body?: { error?: string } })?.body
-      if (status === 401) {
-        setError('Wrong email or password')
-      } else if (status === 403 && body?.error === 'emailNotVerified') {
-        setError('Please verify your email — check your inbox for the link.')
-      } else if (status === 429) {
-        setError('Too many attempts — slow down a moment.')
-      } else {
-        setError('Login failed')
-      }
+      nav('/')
+    } catch (cause) {
+      setErr(cause instanceof Error ? cause.message : 'Login failed')
     } finally {
-      setSubmitting(false)
+      setBusy(false)
     }
   }
 
   return (
-    <div className="bg-bg flex h-full items-center justify-center">
-      <form
-        className="border-border bg-bg w-80 space-y-4 rounded-lg border p-6"
-        onSubmit={onSubmit}
-      >
-        <div>
-          <h1 className="text-fg text-lg font-semibold">Sentori</h1>
-          <p className="text-fg-muted mt-1 text-sm">Sign in to your dashboard.</p>
-        </div>
-        <input
-          autoComplete="email"
-          autoFocus
-          className="border-border bg-bg-tertiary text-fg focus:ring-accent w-full rounded-md border px-3 py-2 text-sm focus:ring-1 focus:outline-none"
-          name="email"
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
-          required
-          type="email"
-          value={email}
-        />
-        <input
-          autoComplete="current-password"
-          className="border-border bg-bg-tertiary text-fg focus:ring-accent w-full rounded-md border px-3 py-2 text-sm focus:ring-1 focus:outline-none"
-          name="password"
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          required
-          type="password"
-          value={password}
-        />
-        {error && <p className="text-sm text-[color:var(--color-danger)]">{error}</p>}
+    <AuthShell title="Sign in">
+      <form className="space-y-3" onSubmit={submit}>
+        <Field label="Email" onChange={setEmail} type="email" value={email} />
+        <Field label="Password" onChange={setPassword} type="password" value={password} />
+        {err && <div className="text-danger t-sm">{err}</div>}
         <button
-          className="bg-accent text-bg w-full rounded-md px-3 py-2 text-sm font-medium disabled:opacity-50"
-          disabled={submitting || !email || !password}
+          className="bg-accent text-bg t-md w-full rounded px-3 py-1.5 font-medium disabled:opacity-50"
+          disabled={busy}
           type="submit"
         >
-          {submitting ? 'Signing in…' : 'Sign in'}
+          {busy ? 'Signing in…' : 'Sign in'}
         </button>
-        <div className="text-fg-muted flex justify-between text-xs">
-          <Link
-            className="hover:text-fg"
-            to={next ? `/register?next=${encodeURIComponent(next)}` : '/register'}
-          >
-            Create account
-          </Link>
-          <Link className="hover:text-fg" to="/forgot-password">
-            Forgot password?
-          </Link>
-        </div>
       </form>
+      <div className="text-fg-muted t-sm mt-4 text-center">
+        <Link className="hover:text-fg" to="/register">
+          Create account
+        </Link>
+        <span className="mx-2">·</span>
+        <Link className="hover:text-fg" to="/forgot-password">
+          Forgot password?
+        </Link>
+      </div>
+    </AuthShell>
+  )
+}
+
+export function AuthShell({ children, title }: { children: React.ReactNode; title: string }) {
+  return (
+    <div className="bg-bg flex h-full items-center justify-center">
+      <div className="w-80">
+        <h1
+          className="text-fg t-lg mb-4 text-center font-semibold"
+          style={{ letterSpacing: '0.22em' }}
+        >
+          SENTORI
+        </h1>
+        <div className="border-border bg-bg-secondary/30 rounded-md border p-4">
+          <h2 className="text-fg t-md mb-3 font-semibold">{title}</h2>
+          {children}
+        </div>
+      </div>
     </div>
   )
 }
 
-/**
- * Only allow same-origin paths. Drops anything that smells like an open
- * redirect (absolute URL, protocol-relative, double-slash, etc.).
- */
-function sanitizeNext(raw: null | string): null | string {
-  if (!raw) return null
-  if (!raw.startsWith('/')) return null
-  if (raw.startsWith('//')) return null
-  return raw
+export function Field({
+  autoComplete,
+  label,
+  onChange,
+  type = 'text',
+  value,
+}: {
+  autoComplete?: string
+  label: string
+  onChange: (v: string) => void
+  type?: string
+  value: string
+}) {
+  return (
+    <label className="block">
+      <span className="text-fg-muted t-sm mb-1 block">{label}</span>
+      <input
+        autoComplete={autoComplete}
+        className="border-border bg-bg t-md text-fg focus:border-accent w-full rounded border px-2.5 py-1.5 outline-none"
+        onChange={(e) => onChange(e.target.value)}
+        required
+        type={type}
+        value={value}
+      />
+    </label>
+  )
 }

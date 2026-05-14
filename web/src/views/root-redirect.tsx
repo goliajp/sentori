@@ -1,34 +1,26 @@
 import { useQuery } from '@tanstack/react-query'
 import { Navigate } from 'react-router'
 
-import { adminApi, orgsApi } from '@/api/client'
+import { orgsApi } from '@/api/client'
 
 /**
- * Authenticated landing page. Routing rules, in order:
- *   - no orgs              → /onboarding (create org)
- *   - first org no project → /onboarding (create project + SDK install)
- *   - otherwise            → /org/{firstSlug}/issues
+ * After login, the root route redirects to the user's first org's
+ * Overview. If they're in no org yet, send them to /onboarding.
  */
 export function RootRedirect() {
-  const orgsQuery = useQuery({ queryFn: orgsApi.listMine, queryKey: ['orgs'] })
-  const projectsQuery = useQuery({
-    queryFn: adminApi.listProjects,
-    queryKey: ['projects'],
+  const { data, error, isLoading } = useQuery({
+    queryFn: orgsApi.listMine,
+    queryKey: ['orgs'],
   })
 
-  if (orgsQuery.isLoading || projectsQuery.isLoading) {
+  if (isLoading) {
     return (
-      <div className="text-fg-muted flex h-full items-center justify-center text-sm">Loading…</div>
+      <div className="text-fg-muted t-md flex h-full items-center justify-center">Loading…</div>
     )
   }
-  const orgs = orgsQuery.data ?? []
-  if (orgs.length === 0) {
-    return <Navigate replace to="/onboarding" />
-  }
-  const firstOrg = orgs[0]
-  const orgProjects = (projectsQuery.data ?? []).filter((p) => p.orgSlug === firstOrg.slug)
-  if (orgProjects.length === 0) {
-    return <Navigate replace to="/onboarding" />
-  }
-  return <Navigate replace to={`/org/${firstOrg.slug}/issues`} />
+  if (error) return <Navigate replace to="/login" />
+
+  const first = (data ?? [])[0]
+  if (!first) return <Navigate replace to="/onboarding" />
+  return <Navigate replace to={`/org/${first.slug}/overview`} />
 }
