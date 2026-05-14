@@ -594,7 +594,7 @@ export function IssuesView() {
                       {issue.errorType}
                       {isAnr(issue.errorType) && (
                         <span
-                          className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-300 uppercase ring-1 ring-amber-500/30"
+                          className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-[color:var(--color-warning)] uppercase ring-1 ring-amber-500/30"
                           title="Application Not Responding — main thread blocked ≥ 5 s"
                         >
                           ANR
@@ -602,7 +602,7 @@ export function IssuesView() {
                       )}
                       {issue.status === 'regressed' && (
                         <span
-                          className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-red-300 uppercase ring-1 ring-red-500/30"
+                          className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-[color:var(--color-danger)] uppercase ring-1 ring-red-500/30"
                           title={
                             issue.regressedInRelease
                               ? `Regressed in ${issue.regressedInRelease}`
@@ -839,7 +839,7 @@ function SaveViewModal({
               </select>
             </label>
           )}
-          {error && <p className="text-[12px] text-red-400">{error}</p>}
+          {error && <p className="text-[12px] text-[color:var(--color-danger)]">{error}</p>}
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <button

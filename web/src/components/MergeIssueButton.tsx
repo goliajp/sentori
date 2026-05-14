@@ -89,7 +89,7 @@ export function MergeIssueButton({
         type="text"
         value={target}
       />
-      {error && <span className="text-[10px] text-red-300">{error}</span>}
+      {error && <span className="text-[10px] text-[color:var(--color-danger)]">{error}</span>}
       <button
         className="border-accent/60 text-accent hover:bg-accent/10 rounded-md border px-2 py-1 text-[11px] disabled:opacity-50"
         disabled={merge.isPending || !target.trim()}

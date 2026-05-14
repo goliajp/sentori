@@ -70,7 +70,7 @@ export function LoginView() {
           type="password"
           value={password}
         />
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm text-[color:var(--color-danger)]">{error}</p>}
         <button
           className="bg-accent text-bg w-full rounded-md px-3 py-2 text-sm font-medium disabled:opacity-50"
           disabled={submitting || !email || !password}

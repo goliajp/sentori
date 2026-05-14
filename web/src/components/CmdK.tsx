@@ -222,11 +222,11 @@ function SectionLabel({ label }: { label: string }) {
 
 function KindChip({ kind }: { kind: SearchHit['type'] }) {
   const colour: Record<SearchHit['type'], string> = {
-    issue: 'bg-red-500/15 text-red-300',
-    member: 'bg-violet-500/15 text-violet-300',
+    issue: 'bg-[color:var(--color-danger-bg)] text-[color:var(--color-danger)]',
+    member: 'bg-accent/10 text-accent',
     org: 'bg-accent/10 text-accent',
-    project: 'bg-blue-500/15 text-blue-300',
-    team: 'bg-amber-500/15 text-amber-300',
+    project: 'bg-[color:var(--color-info-bg)] text-[color:var(--color-info)]',
+    team: 'bg-[color:var(--color-warning-bg)] text-[color:var(--color-warning)]',
   }
   return (
     <span

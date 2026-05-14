@@ -171,10 +171,10 @@ function CrumbBody({ crumb, type }: { crumb: GroupableCrumb; type: string }) {
         status == null
           ? 'text-fg-muted'
           : status >= 500
-            ? 'text-red-400'
+            ? 'text-[color:var(--color-danger)]'
             : status >= 400
-              ? 'text-amber-300'
-              : 'text-green-300'
+              ? 'text-[color:var(--color-warning)]'
+              : 'text-[color:var(--color-success)]'
       return (
         <span className="text-fg flex-1 truncate font-mono">
           <span className="text-fg-muted mr-1.5">{method || 'GET'}</span>
@@ -189,9 +189,9 @@ function CrumbBody({ crumb, type }: { crumb: GroupableCrumb; type: string }) {
       const msg = stringField(data, 'message')
       const lc =
         level === 'error'
-          ? 'text-red-400'
+          ? 'text-[color:var(--color-danger)]'
           : level === 'warn' || level === 'warning'
-            ? 'text-amber-300'
+            ? 'text-[color:var(--color-warning)]'
             : 'text-fg-muted'
       return (
         <span className="text-fg flex-1 truncate font-mono">

@@ -52,7 +52,7 @@ export function VerifyView() {
         )}
         {status === 'error' && (
           <>
-            <p className="text-sm text-red-400">{message}</p>
+            <p className="text-sm text-[color:var(--color-danger)]">{message}</p>
             <Link className="text-accent text-sm hover:underline" to="/register">
               Register again
             </Link>

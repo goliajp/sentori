@@ -211,7 +211,7 @@ function CreateOrgStep({ onDone }: { onDone: () => void }) {
           value={slug}
         />
       </Field>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-[color:var(--color-danger)]">{error}</p>}
       <PrimaryButton disabled={create.isPending || !name.trim() || slug.length < 3}>
         {create.isPending ? 'Creating…' : 'Continue'}
       </PrimaryButton>
@@ -269,7 +269,7 @@ function CreateProjectStep({
           value={name}
         />
       </Field>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-[color:var(--color-danger)]">{error}</p>}
       <PrimaryButton disabled={create.isPending || !name.trim()}>
         {create.isPending ? 'Creating…' : 'Create project'}
       </PrimaryButton>

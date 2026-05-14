@@ -55,7 +55,7 @@ export function ReleaseCompareView() {
       </header>
 
       <CompareSection
-        accentClass="text-red-300 bg-red-500/15 ring-red-500/30"
+        accentClass="text-[color:var(--color-danger)] bg-red-500/15 ring-red-500/30"
         emptyHint={`No new issues in ${data.target} that weren't already in ${data.base}.`}
         orgSlug={currentOrg.slug}
         rows={data.added}
@@ -64,7 +64,7 @@ export function ReleaseCompareView() {
       />
 
       <CompareSection
-        accentClass="text-green-300 bg-green-500/15 ring-green-500/30"
+        accentClass="text-[color:var(--color-success)] bg-green-500/15 ring-green-500/30"
         emptyHint={`No issues from ${data.base} disappeared in ${data.target}.`}
         orgSlug={currentOrg.slug}
         rows={data.fixed}

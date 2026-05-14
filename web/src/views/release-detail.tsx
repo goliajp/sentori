@@ -188,7 +188,11 @@ function HealthStat({
   value: string
 }) {
   const valueClass =
-    tone === 'good' ? 'text-green-300' : tone === 'warn' ? 'text-amber-300' : 'text-fg'
+    tone === 'good'
+      ? 'text-[color:var(--color-success)]'
+      : tone === 'warn'
+        ? 'text-[color:var(--color-warning)]'
+        : 'text-fg'
   return (
     <div>
       <dt className="text-fg-muted text-[10px] tracking-wider uppercase">{label}</dt>

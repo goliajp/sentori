@@ -103,7 +103,7 @@ export function IntegrationsView() {
           className={`rounded-md border-l-4 px-3 py-2 text-[12px] ${
             banner.kind === 'success'
               ? 'border-accent/40 bg-accent/[0.04] text-fg'
-              : 'border-red-400/40 bg-red-500/[0.04] text-red-300'
+              : 'border-red-400/40 bg-red-500/[0.04] text-[color:var(--color-danger)]'
           }`}
         >
           {banner.text}
@@ -144,7 +144,7 @@ export function IntegrationsView() {
               <div className="shrink-0">
                 {row ? (
                   <button
-                    className="text-fg-muted rounded-md border border-transparent px-2 py-1 text-[11px] hover:text-red-300"
+                    className="text-fg-muted rounded-md border border-transparent px-2 py-1 text-[11px] hover:text-[color:var(--color-danger)]"
                     disabled={revoke.isPending}
                     onClick={() => revoke.mutate({ kind: a.kind, orgSlug: currentOrg.slug })}
                     type="button"
@@ -249,7 +249,7 @@ function SlackConfigureForm({
         type="text"
         value={channelLabel}
       />
-      {error && <p className="text-[10px] text-red-300">{error}</p>}
+      {error && <p className="text-[10px] text-[color:var(--color-danger)]">{error}</p>}
       <div className="flex justify-end gap-2">
         <button
           className="text-fg-muted hover:text-fg text-[11px]"

@@ -110,7 +110,9 @@ export function ProjectTeamSettingsView() {
                 ) : (
                   <span
                     className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${
-                      isBound ? 'bg-emerald-500/15 text-emerald-300' : 'bg-fg/10 text-fg-muted'
+                      isBound
+                        ? 'bg-[color:var(--color-success-bg)] text-[color:var(--color-success)]'
+                        : 'bg-fg/10 text-fg-muted'
                     }`}
                   >
                     {isBound ? 'Bound' : 'Not bound'}

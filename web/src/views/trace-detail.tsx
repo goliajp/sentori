@@ -165,7 +165,7 @@ export function TraceDetailView() {
                     <StatusPill status={n.span.status} />
                     {(eventsBySpan.get(n.span.id) ?? 0) > 0 && (
                       <span
-                        className="ml-2 inline-block rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-400 tabular-nums"
+                        className="ml-2 inline-block rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] text-[color:var(--color-danger)] tabular-nums"
                         title="Events captured on this span"
                       >
                         {eventsBySpan.get(n.span.id)} event
@@ -245,7 +245,9 @@ export function TraceDetailView() {
                 <ul className="mt-2 space-y-1">
                   {events.map((e) => (
                     <li className="flex items-baseline gap-2 text-[12px]" key={e.id}>
-                      <span className="font-mono text-red-400">{e.errorType}</span>
+                      <span className="font-mono text-[color:var(--color-danger)]">
+                        {e.errorType}
+                      </span>
                       {e.issueId ? (
                         <Link
                           className="text-accent hover:text-accent/80"
@@ -271,10 +273,10 @@ export function TraceDetailView() {
 function StatusPill({ status }: { status: SpanRow['status'] }) {
   const cls =
     status === 'error'
-      ? 'bg-red-500/10 text-red-400'
+      ? 'bg-red-500/10 text-[color:var(--color-danger)]'
       : status === 'cancelled'
         ? 'bg-amber-500/10 text-amber-400'
-        : 'bg-green-500/10 text-green-400'
+        : 'bg-green-500/10 text-[color:var(--color-success)]'
   return (
     <span
       className={`inline-block rounded px-2 py-0.5 text-[11px] tracking-wider uppercase ${cls}`}

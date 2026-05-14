@@ -157,7 +157,7 @@ export function AlertsView() {
                         <span>{r.name}</span>
                         {r.muted && (
                           <span
-                            className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-300 uppercase ring-1 ring-amber-500/30"
+                            className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-[color:var(--color-warning)] uppercase ring-1 ring-amber-500/30"
                             title="Muted — manual unmute required"
                           >
                             Muted
@@ -165,7 +165,7 @@ export function AlertsView() {
                         )}
                         {!r.muted && r.snoozedUntil && new Date(r.snoozedUntil) > new Date() && (
                           <span
-                            className="ml-2 rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-blue-300 uppercase ring-1 ring-blue-500/30"
+                            className="ml-2 rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-[color:var(--color-info)] uppercase ring-1 ring-blue-500/30"
                             title={`Snoozed until ${new Date(r.snoozedUntil).toLocaleString()}`}
                           >
                             Snoozed
@@ -229,7 +229,7 @@ export function AlertsView() {
                             Edit
                           </button>
                           <button
-                            className="text-fg-muted text-[11px] hover:text-red-400"
+                            className="text-fg-muted text-[11px] hover:text-[color:var(--color-danger)]"
                             onClick={() => {
                               if (confirm(`Delete rule "${r.name}"?`)) deleteMutation.mutate(r.id)
                             }}
@@ -295,7 +295,11 @@ function DeliveriesRow({
           Recent webhook deliveries
         </div>
         {isLoading && <span className="text-fg-muted text-[12px]">loading…</span>}
-        {error && <span className="text-[12px] text-red-400">failed to load deliveries</span>}
+        {error && (
+          <span className="text-[12px] text-[color:var(--color-danger)]">
+            failed to load deliveries
+          </span>
+        )}
         {data && data.length === 0 && (
           <span className="text-fg-muted text-[12px] italic">
             No deliveries yet — webhook will fire on the next rule match.
@@ -339,10 +343,10 @@ function DeliveriesRow({
 function StatusChip({ status }: { status: 'delivered' | 'failed' | 'pending' }) {
   const cls =
     status === 'delivered'
-      ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30'
+      ? 'bg-[color:var(--color-success-bg)] text-[color:var(--color-success)] ring-[color:var(--color-success-border)]'
       : status === 'failed'
-        ? 'bg-red-500/15 text-red-300 ring-red-500/30'
-        : 'bg-amber-500/15 text-amber-300 ring-amber-500/30'
+        ? 'bg-[color:var(--color-danger-bg)] text-[color:var(--color-danger)] ring-red-500/30'
+        : 'bg-[color:var(--color-warning-bg)] text-[color:var(--color-warning)] ring-[color:var(--color-warning-border)]'
   return (
     <span
       className={`rounded px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase ring-1 ${cls}`}
@@ -618,7 +622,7 @@ function RuleModal({
             </label>
           </div>
 
-          {error && <p className="text-[12px] text-red-400">{error}</p>}
+          {error && <p className="text-[12px] text-[color:var(--color-danger)]">{error}</p>}
         </div>
 
         <div className="mt-5 flex justify-end gap-2">

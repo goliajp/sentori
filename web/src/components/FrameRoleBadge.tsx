@@ -21,7 +21,7 @@ type Props = {
 }
 
 const STYLE: Record<FrameRole, string> = {
-  boundary: 'bg-amber-500/10 text-amber-300',
+  boundary: 'bg-[color:var(--color-warning-bg)] text-[color:var(--color-warning)]',
   framework: 'bg-sky-500/10 text-sky-300',
   lib: 'bg-fg-muted/10 text-fg-muted',
   unknown: 'bg-fg-muted/10 text-fg-muted',

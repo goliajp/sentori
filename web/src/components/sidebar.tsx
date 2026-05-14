@@ -110,26 +110,42 @@ function SidebarContent({
   const isAdmin = currentOrg.role === 'owner' || currentOrg.role === 'admin'
   const isActive = (path: string) => location.pathname.startsWith(`/org/${currentOrg.slug}/${path}`)
 
+  // Phase 49 sub-K — Linear-style nav row with a 2px accent indicator
+  // bar on the left when active. The bar lives outside the rounded
+  // background so it can hug the sidebar edge cleanly.
   const Item = ({ item }: { item: NavItem }) => {
     const active = isActive(item.path)
-    const base = active
-      ? 'bg-accent/10 text-accent'
-      : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
     return collapsed ? (
       <Link
-        className={`flex items-center justify-center rounded-md p-2 transition-colors ${base}`}
+        className={`relative flex items-center justify-center rounded-md p-2 transition-colors ${
+          active ? 'bg-accent/10 text-accent' : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+        }`}
         key={item.path}
         title={item.label}
         to={`/org/${currentOrg.slug}/${item.path}`}
       >
         <NavIcon kind={item.icon} />
+        {active && (
+          <span
+            aria-hidden
+            className="bg-accent absolute top-1/2 -left-2 h-4 w-[2px] -translate-y-1/2 rounded-r"
+          />
+        )}
       </Link>
     ) : (
       <Link
-        className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${base}`}
+        className={`relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${
+          active ? 'bg-accent/10 text-accent' : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+        }`}
         key={item.path}
         to={`/org/${currentOrg.slug}/${item.path}`}
       >
+        {active && (
+          <span
+            aria-hidden
+            className="bg-accent absolute top-1/2 -left-2 h-5 w-[2px] -translate-y-1/2 rounded-r"
+          />
+        )}
         <NavIcon kind={item.icon} />
         {item.label}
       </Link>

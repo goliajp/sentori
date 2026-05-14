@@ -2,9 +2,10 @@ import type { OrgRole, TeamRole } from '@/api/client'
 
 const ROLE_STYLES: Record<OrgRole | TeamRole, string> = {
   admin: 'bg-accent/15 text-accent ring-accent/30',
-  lead: 'bg-amber-500/15 text-amber-300 ring-amber-500/30',
+  lead: 'bg-[color:var(--color-warning-bg)] text-[color:var(--color-warning)] ring-[color:var(--color-warning-border)]',
   member: 'bg-fg/10 text-fg-muted ring-fg/20',
-  owner: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30',
+  owner:
+    'bg-[color:var(--color-success-bg)] text-[color:var(--color-success)] ring-[color:var(--color-success-border)]',
   viewer: 'bg-bg-tertiary text-fg-muted ring-border',
 }
 

@@ -320,10 +320,12 @@ function IssueActions({
 
 function StatusBadge({ issue }: { issue: IssueRow }) {
   const colour: Record<IssueRow['status'], string> = {
-    active: 'bg-amber-500/15 text-amber-300 ring-amber-500/30',
+    active:
+      'bg-[color:var(--color-warning-bg)] text-[color:var(--color-warning)] ring-[color:var(--color-warning-border)]',
     closed: 'bg-bg-tertiary text-fg-muted ring-border',
-    regressed: 'bg-red-500/15 text-red-300 ring-red-500/30',
-    resolved: 'bg-green-500/15 text-green-300 ring-green-500/30',
+    regressed: 'bg-[color:var(--color-danger-bg)] text-[color:var(--color-danger)] ring-red-500/30',
+    resolved:
+      'bg-[color:var(--color-success-bg)] text-[color:var(--color-success)] ring-green-500/30',
     silenced: 'bg-bg-tertiary text-fg-muted ring-border',
   }
   return (
@@ -706,7 +708,10 @@ function StateEntry({
 }: {
   entry: Extract<ActivityEntry, { kind: 'regressed' | 'resolved' }>
 }) {
-  const colour = entry.kind === 'resolved' ? 'text-green-300' : 'text-red-300'
+  const colour =
+    entry.kind === 'resolved'
+      ? 'text-[color:var(--color-success)]'
+      : 'text-[color:var(--color-danger)]'
   const label = entry.kind === 'resolved' ? 'Resolved' : 'Regressed'
   return (
     <div className="flex items-baseline gap-3 px-3 py-2 text-[12px]">
@@ -1254,7 +1259,7 @@ function NativeErrorCard({
       to={`/org/${currentOrg.slug}/issues/${nativeError.issueId}`}
     >
       <p className="text-fg text-[12px] leading-relaxed">
-        <span className="mr-1.5 inline-block font-mono text-[11px] tracking-wider text-amber-300 uppercase">
+        <span className="mr-1.5 inline-block font-mono text-[11px] tracking-wider text-[color:var(--color-warning)] uppercase">
           ↪ caused by native crash
         </span>
         <span className="text-fg-muted font-mono">{nativeError.type}:</span>{' '}
