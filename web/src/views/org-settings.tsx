@@ -126,7 +126,7 @@ export function OrgSettingsView() {
   })
 
   return (
-    <div className="space-y-10 px-6 py-8 text-[13px]">
+    <div className="space-y-10 px-6 py-8 t-md">
       <header>
         <h1 className="text-fg text-lg font-semibold">Settings — {currentOrg.name}</h1>
         <p className="text-fg-muted mt-1 text-sm">
@@ -137,7 +137,7 @@ export function OrgSettingsView() {
       <UsageSection slug={slug} />
 
       <section className="space-y-3">
-        <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Org details</h2>
+        <h2 className="text-fg-muted t-sm tracking-wider uppercase">Org details</h2>
         <form className="flex items-center gap-2" onSubmit={onSaveName}>
           <input
             className="border-border bg-bg-tertiary text-fg focus:ring-accent rounded-md border px-3 py-1.5 text-sm focus:ring-1 focus:outline-none"
@@ -159,12 +159,12 @@ export function OrgSettingsView() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Members</h2>
+        <h2 className="text-fg-muted t-sm tracking-wider uppercase">Members</h2>
         {membersQuery.isLoading && <p className="text-fg-muted">Loading…</p>}
         {membersQuery.data && (
           <table className="w-full border-collapse">
             <thead>
-              <tr className="text-fg-muted border-border h-7 border-b text-left text-[11px] tracking-wider uppercase">
+              <tr className="text-fg-muted border-border h-7 border-b text-left t-sm tracking-wider uppercase">
                 <th className="px-2 font-medium">Email</th>
                 <th className="w-32 px-2 font-medium">Role</th>
                 <th className="w-32 px-2 font-medium" />
@@ -181,7 +181,7 @@ export function OrgSettingsView() {
                         <span className="font-mono">{m.email}</span>
                         {teamsForUser.map((t) => (
                           <span
-                            className="border-border bg-bg-tertiary text-fg-muted rounded border px-1.5 py-0.5 text-[10px] font-medium"
+                            className="border-border bg-bg-tertiary text-fg-muted rounded border px-1.5 py-0.5 t-sm font-medium"
                             key={t.id}
                             title={t.name}
                           >
@@ -246,7 +246,7 @@ export function OrgSettingsView() {
 
       {canManage && (
         <section className="space-y-3">
-          <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Invite a member</h2>
+          <h2 className="text-fg-muted t-sm tracking-wider uppercase">Invite a member</h2>
           <form className="flex items-center gap-2" onSubmit={onInvite}>
             <input
               className="border-border bg-bg-tertiary text-fg focus:ring-accent flex-1 rounded-md border px-3 py-1.5 text-sm focus:ring-1 focus:outline-none"
@@ -295,7 +295,7 @@ export function OrgSettingsView() {
           {invitesQuery.data && invitesQuery.data.length > 0 ? (
             <table className="mt-4 w-full border-collapse">
               <thead>
-                <tr className="text-fg-muted border-border h-7 border-b text-left text-[11px] tracking-wider uppercase">
+                <tr className="text-fg-muted border-border h-7 border-b text-left t-sm tracking-wider uppercase">
                   <th className="px-2 font-medium">Pending invite</th>
                   <th className="w-24 px-2 font-medium">Role</th>
                   <th className="w-24 px-2 font-medium">Expires</th>
@@ -310,7 +310,7 @@ export function OrgSettingsView() {
                         <span className="font-mono">{inv.email}</span>
                         {inv.teamSlug && (
                           <span
-                            className="border-border bg-bg-tertiary text-fg-muted rounded border px-1.5 py-0.5 text-[10px] font-medium"
+                            className="border-border bg-bg-tertiary text-fg-muted rounded border px-1.5 py-0.5 t-sm font-medium"
                             title={`Will join team ${inv.teamSlug}`}
                           >
                             {inv.teamSlug}
@@ -319,7 +319,7 @@ export function OrgSettingsView() {
                       </div>
                     </td>
                     <td className="text-fg-muted px-2 font-mono uppercase">{inv.role}</td>
-                    <td className="text-fg-muted px-2 font-mono text-[11px] tabular-nums">
+                    <td className="text-fg-muted px-2 font-mono t-sm tabular-nums">
                       {new Date(inv.expiresAt).toISOString().slice(0, 10)}
                     </td>
                     <td className="px-2 text-right">
@@ -387,7 +387,7 @@ function TransferOwnershipSection() {
   return (
     <section className="border-danger/30 space-y-3 rounded-lg border border-dashed p-4">
       <header>
-        <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Transfer ownership</h2>
+        <h2 className="text-fg-muted t-sm tracking-wider uppercase">Transfer ownership</h2>
         <p className="text-fg-muted mt-1 text-xs">
           Hand this org over to another admin. Your role drops to admin; the recipient must confirm
           via the email link before anything changes.
@@ -444,7 +444,7 @@ function UsageSection({ slug }: { slug: string }) {
 
   return (
     <section className="space-y-3">
-      <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Usage this month</h2>
+      <h2 className="text-fg-muted t-sm tracking-wider uppercase">Usage this month</h2>
       {isLoading && <p className="text-fg-muted">Loading…</p>}
       {data && <UsageWidget usage={data} />}
     </section>
@@ -458,7 +458,7 @@ function UsageWidget({ usage }: { usage: UsageRow }) {
   const reset = new Date(usage.resetAt).toISOString().slice(0, 10)
   return (
     <div className="space-y-2">
-      <div className="text-fg-muted flex items-baseline justify-between text-[12px]">
+      <div className="text-fg-muted flex items-baseline justify-between t-md">
         <span>
           <span className="text-fg font-mono">{usage.eventCount.toLocaleString()}</span> /{' '}
           {usage.eventLimitMonthly.toLocaleString()} events
@@ -471,7 +471,7 @@ function UsageWidget({ usage }: { usage: UsageRow }) {
         <div className={`h-full ${tone}`} style={{ width: `${pct}%` }} />
       </div>
       {usage.droppedCount > 0 && (
-        <p className="text-fg-muted text-[11px]">
+        <p className="text-fg-muted t-sm">
           {usage.droppedCount.toLocaleString()} events dropped this period.
         </p>
       )}

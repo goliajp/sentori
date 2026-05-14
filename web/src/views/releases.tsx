@@ -5,6 +5,7 @@ import { adminApi, type ReleaseListRow } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
 import { EmptyArt, PageBody, PageHeader, PageShell } from '@/components/ui'
+import { formatRelative as relativeDay } from '@/lib/format'
 
 /**
  * Phase 23 sub-A: project releases list. Card per release with the
@@ -58,7 +59,7 @@ export function ReleasesView() {
   return (
     <PageShell>
       <PageHeader
-        actions={<span className="text-fg-muted text-[12px]">{rows.length} releases</span>}
+        actions={<span className="text-fg-muted t-md">{rows.length} releases</span>}
         title="Releases"
       />
       <PageBody>
@@ -81,23 +82,23 @@ function ReleaseCard({ orgSlug, row }: { orgSlug: string; row: ReleaseListRow })
         to={`/org/${orgSlug}/releases/${encodeURIComponent(row.name)}`}
       >
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-fg truncate font-mono text-[13px] font-semibold">{row.name}</h2>
+          <h2 className="text-fg truncate font-mono t-md font-semibold">{row.name}</h2>
           <time
-            className="text-fg-muted shrink-0 font-mono text-[11px] tabular-nums"
+            className="text-fg-muted shrink-0 font-mono t-sm tabular-nums"
             dateTime={deployStamp}
             title={new Date(deployStamp).toISOString()}
           >
             {relativeDay(deployStamp)}
           </time>
         </div>
-        <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-[12px] sm:grid-cols-4">
+        <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 t-md sm:grid-cols-4">
           <Stat label="Events" value={row.eventCount.toLocaleString()} />
           <Stat label="Source maps" value={row.sourcemapCount} muted={row.sourcemapCount === 0} />
           <Stat label="iOS dSYMs" value={row.dsymCount} muted={row.dsymCount === 0} />
           <Stat label="ProGuard" value={row.mappingCount} muted={row.mappingCount === 0} />
         </dl>
         {row.firstSeen && row.lastSeen && (
-          <p className="text-fg-muted mt-2 text-[11px]">
+          <p className="text-fg-muted mt-2 t-sm">
             {relativeDay(row.firstSeen)} → {relativeDay(row.lastSeen)}
           </p>
         )}
@@ -109,9 +110,9 @@ function ReleaseCard({ orgSlug, row }: { orgSlug: string; row: ReleaseListRow })
 function Stat({ label, muted, value }: { label: string; muted?: boolean; value: number | string }) {
   return (
     <div>
-      <dt className="text-fg-muted text-[10px] tracking-wider uppercase">{label}</dt>
+      <dt className="text-fg-muted t-sm tracking-wider uppercase">{label}</dt>
       <dd
-        className={`font-mono text-[13px] tabular-nums ${muted ? 'text-fg-muted/70' : 'text-fg'}`}
+        className={`font-mono t-md tabular-nums ${muted ? 'text-fg-muted/70' : 'text-fg'}`}
       >
         {value}
       </dd>
@@ -119,16 +120,7 @@ function Stat({ label, muted, value }: { label: string; muted?: boolean; value: 
   )
 }
 
-function relativeDay(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime()
-  const days = Math.floor(ms / 86_400_000)
-  if (days <= 0) {
-    const hours = Math.floor(ms / 3_600_000)
-    if (hours <= 0) return 'just now'
-    return `${hours}h ago`
-  }
-  if (days === 1) return 'yesterday'
-  if (days < 30) return `${days}d ago`
-  const months = Math.floor(days / 30)
-  return `${months}mo ago`
-}
+// `relativeDay` was a per-file helper that returned strings like
+// `5d ago` / `yesterday` / `3mo ago`. We now alias the shared
+// `formatRelative` which returns the shorter `5d / 3mo / 1y` and
+// rounds defensively (no negative output for clock skew).

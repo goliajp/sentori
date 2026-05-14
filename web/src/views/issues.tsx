@@ -15,9 +15,11 @@ import { useAuth } from '@/auth/state'
 import { useOrg } from '@/auth/orgContext'
 import { LiveEventSparkline } from '@/components/charts'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
+import { Tag } from '@/components/Tag'
 import { EmptyArt, useToast } from '@/components/ui'
 import { type ColumnDef, useColumnPrefs } from '@/lib/column-prefs'
 import { densityClasses, useDensity } from '@/lib/density'
+import { formatRelative } from '@/lib/format'
 import { parseIssueQuery } from '@/lib/issue-query'
 
 // Phase 24 sub-B: column visibility prefs. errorType + message are
@@ -349,23 +351,34 @@ export function IssuesView() {
 
   return (
     <div className="flex h-full flex-col">
+      {/*
+       * Header: single-line filter strip. Replaces the previous h-12 row.
+       * Layout: title (with row count) · status chip group · spacer ·
+       * live sparkline · ANR toggle · search · views menu · column menu.
+       */}
       <div className="border-border flex h-12 shrink-0 items-center gap-3 border-b px-6">
-        <div className="text-fg text-base font-semibold">Issues</div>
+        <h1 className="text-fg t-lg font-semibold">
+          Issues
+          {filtered.length > 0 && (
+            <span className="text-fg-muted t-md ml-2 font-normal">({filtered.length})</span>
+          )}
+        </h1>
         <div className="ml-2 flex items-center gap-1">
-          {STATUSES.map((s) => (
-            <button
-              className={`rounded-md px-2.5 py-1 text-[12px] transition-colors ${
-                effectiveStatus === s
-                  ? 'bg-accent/10 text-accent'
-                  : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
-              }`}
-              key={s}
-              onClick={() => setStatusTab(s)}
-              type="button"
-            >
-              {s}
-            </button>
-          ))}
+          {STATUSES.map((s) => {
+            const active = effectiveStatus === s
+            return (
+              <button
+                className="cursor-pointer"
+                key={s}
+                onClick={() => setStatusTab(s)}
+                type="button"
+              >
+                <Tag variant={active ? 'accent' : 'default'}>
+                  <span className={active ? 'text-fg' : ''}>{s}</span>
+                </Tag>
+              </button>
+            )
+          })}
         </div>
         <div className="ml-auto flex items-center gap-2">
           {projectId && (
@@ -375,7 +388,7 @@ export function IssuesView() {
           )}
           <button
             aria-pressed={anrOnly}
-            className={`rounded-md px-2.5 py-1 text-[12px] transition-colors ${
+            className={`t-md rounded-md px-2.5 py-1 transition-colors ${
               anrOnly
                 ? 'border border-[color:var(--color-warning-border)] bg-[color:var(--color-warning-bg)] text-[color:var(--color-warning)] ring-1 ring-[color:var(--color-warning-border)]'
                 : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
@@ -387,7 +400,7 @@ export function IssuesView() {
             ANR
           </button>
           <input
-            className="border-border bg-bg-tertiary text-fg focus:ring-accent w-[28rem] rounded-md border px-3 py-1 font-mono text-[12px] focus:ring-1 focus:outline-none"
+            className="border-border bg-bg-tertiary text-fg focus:ring-accent t-md w-[28rem] rounded-md border px-3 py-1 font-mono focus:ring-1 focus:outline-none"
             onChange={(e) => setQueryText(e.target.value)}
             placeholder="errorType:Foo env:prod last:24h …  (/)"
             ref={searchRef}
@@ -397,7 +410,7 @@ export function IssuesView() {
           <div className="relative" ref={viewsRef}>
             <button
               aria-expanded={viewsOpen}
-              className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-2.5 py-1 text-[12px] transition-colors"
+              className="text-fg-muted hover:bg-bg-tertiary hover:text-fg t-md rounded-md px-2.5 py-1 transition-colors"
               onClick={() => setViewsOpen((v) => !v)}
               type="button"
             >
@@ -405,7 +418,7 @@ export function IssuesView() {
             </button>
             {viewsOpen && (
               <div
-                className="border-border bg-bg shadow-overlay absolute right-0 z-20 mt-1 w-72 rounded-md border p-2 text-[12px]"
+                className="border-border bg-bg shadow-overlay t-md absolute right-0 z-20 mt-1 w-72 rounded-md border p-2"
                 role="menu"
               >
                 <ViewsMenu
@@ -423,7 +436,7 @@ export function IssuesView() {
             <button
               aria-expanded={columnsOpen}
               aria-label="Column settings"
-              className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-2 py-1 text-[12px] transition-colors"
+              className="text-fg-muted hover:bg-bg-tertiary hover:text-fg t-md rounded-md px-2 py-1 transition-colors"
               onClick={() => setColumnsOpen((v) => !v)}
               type="button"
             >
@@ -431,10 +444,10 @@ export function IssuesView() {
             </button>
             {columnsOpen && (
               <div
-                className="border-border bg-bg shadow-overlay absolute right-0 z-20 mt-1 w-44 rounded-md border p-2 text-[12px]"
+                className="border-border bg-bg shadow-overlay t-md absolute right-0 z-20 mt-1 w-44 rounded-md border p-2"
                 role="menu"
               >
-                <div className="text-fg-muted px-1 py-1 text-[10px] tracking-wider uppercase">
+                <div className="text-fg-muted t-sm px-1 py-1 tracking-wider uppercase">
                   Columns
                 </div>
                 {ISSUE_COLUMNS.map((c) => (
@@ -452,7 +465,7 @@ export function IssuesView() {
                   </label>
                 ))}
                 <button
-                  className="text-fg-muted hover:text-fg mt-1 w-full rounded px-2 py-1 text-left text-[11px]"
+                  className="text-fg-muted hover:text-fg t-sm mt-1 w-full rounded px-2 py-1 text-left"
                   onClick={resetColumns}
                   type="button"
                 >
@@ -464,12 +477,12 @@ export function IssuesView() {
         </div>
       </div>
       {parsed.warnings.length > 0 && (
-        <div className="border-border border-b bg-[color:var(--color-warning-bg)] px-6 py-2 text-[11px] text-[color:var(--color-warning)]">
+        <div className="border-border t-sm border-b bg-[color:var(--color-warning-bg)] px-6 py-2 text-[color:var(--color-warning)]">
           {parsed.warnings.join(' · ')}
         </div>
       )}
       {selectedIds.size > 0 && (
-        <div className="border-border bg-accent/5 flex items-center gap-3 border-b px-6 py-2 text-[12px]">
+        <div className="border-border bg-accent/5 t-md flex items-center gap-3 border-b px-6 py-2">
           <span className="text-fg">
             <strong className="font-mono tabular-nums">{selectedIds.size}</strong> selected
           </span>
@@ -571,9 +584,9 @@ export function IssuesView() {
       )}
       {!isLoading && !error && filtered.length > 0 && (
         <div className="flex-1 overflow-y-auto">
-          <table className="w-full border-collapse text-[13px]">
+          <table className="t-md w-full border-collapse">
             <thead className="bg-bg sticky top-0 z-10">
-              <tr className="text-fg-muted border-border h-7 border-b text-left text-[11px] tracking-wider uppercase">
+              <tr className="text-fg-muted border-border t-sm h-7 border-b text-left tracking-wider uppercase">
                 <th className="w-9 pl-4">
                   <input
                     aria-label="Select all"
@@ -642,24 +655,31 @@ export function IssuesView() {
                     <span className="inline-flex items-center gap-2">
                       {issue.errorType}
                       {isAnr(issue.errorType) && (
-                        <span
-                          className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-[color:var(--color-warning)] uppercase ring-1 ring-amber-500/30"
-                          title="Application Not Responding — main thread blocked ≥ 5 s"
+                        <Tag
+                          variant="warning"
+                          className="uppercase"
+                          // Title attribute lives on the wrapping span so the
+                          // hover hint still appears.
                         >
-                          ANR
-                        </span>
+                          <span
+                            title="Application Not Responding — main thread blocked ≥ 5 s"
+                          >
+                            ANR
+                          </span>
+                        </Tag>
                       )}
                       {issue.status === 'regressed' && (
-                        <span
-                          className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-[color:var(--color-danger)] uppercase ring-1 ring-red-500/30"
-                          title={
-                            issue.regressedInRelease
-                              ? `Regressed in ${issue.regressedInRelease}`
-                              : 'Regressed — issue had been resolved, came back'
-                          }
-                        >
-                          Regressed
-                        </span>
+                        <Tag variant="danger" className="uppercase">
+                          <span
+                            title={
+                              issue.regressedInRelease
+                                ? `Regressed in ${issue.regressedInRelease}`
+                                : 'Regressed — issue had been resolved, came back'
+                            }
+                          >
+                            Regressed
+                          </span>
+                        </Tag>
                       )}
                     </span>
                   </td>
@@ -671,24 +691,24 @@ export function IssuesView() {
                   )}
                   {visibleColumns.has('lastSeen') && (
                     <td className="text-fg-muted px-6 font-mono whitespace-nowrap tabular-nums">
-                      {relativeTime(issue.lastSeen)}
+                      {formatRelative(issue.lastSeen)}
                     </td>
                   )}
                   {visibleColumns.has('firstSeen') && (
                     <td className="text-fg-muted px-6 font-mono whitespace-nowrap tabular-nums">
-                      {relativeTime(issue.firstSeen)}
+                      {formatRelative(issue.firstSeen)}
                     </td>
                   )}
                   {visibleColumns.has('env') && (
                     <td className="text-fg-muted px-6">{issue.lastEnvironment ?? '—'}</td>
                   )}
                   {visibleColumns.has('release') && (
-                    <td className="text-fg-muted truncate px-6 font-mono text-[12px]">
+                    <td className="text-fg-muted t-md truncate px-6 font-mono">
                       {issue.lastRelease ?? '—'}
                     </td>
                   )}
                   {visibleColumns.has('assignee') && (
-                    <td className="text-fg-muted truncate px-6 text-[12px]">
+                    <td className="text-fg-muted t-md truncate px-6">
                       {issue.assigneeEmail ?? '—'}
                     </td>
                   )}
@@ -742,7 +762,7 @@ function LoadMoreSentinel({
   return (
     <div className="border-border/40 flex items-center justify-center border-t py-3" ref={ref}>
       <button
-        className="text-fg-muted hover:text-fg text-[12px]"
+        className="text-fg-muted hover:text-fg t-md"
         disabled={isFetching}
         onClick={onLoadMore}
         type="button"
@@ -773,16 +793,6 @@ function match(issue: IssueRow, filter: string): boolean {
     (issue.lastRelease?.toLowerCase().includes(q) ?? false) ||
     (issue.lastEnvironment?.toLowerCase().includes(q) ?? false)
   )
-}
-
-function relativeTime(iso: string): string {
-  const d = new Date(iso)
-  const diffMs = Date.now() - d.getTime()
-  const diffSec = Math.floor(diffMs / 1000)
-  if (diffSec < 60) return `${diffSec}s ago`
-  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`
-  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`
-  return d.toISOString().slice(0, 10)
 }
 
 function SaveViewModal({
@@ -840,15 +850,15 @@ function SaveViewModal({
     >
       <div className="border-border bg-bg w-[28rem] rounded-md border p-4 shadow-xl">
         <h2 className="text-fg text-[14px] font-semibold">Save current view</h2>
-        <p className="text-fg-muted mt-1 truncate font-mono text-[11px]">
+        <p className="text-fg-muted mt-1 truncate font-mono t-sm">
           {currentQuery || `(no filter — status: ${currentStatus})`}
         </p>
         <div className="mt-4 space-y-3">
           <label className="block">
-            <div className="text-fg-muted text-[11px] tracking-wider uppercase">Name</div>
+            <div className="text-fg-muted t-sm tracking-wider uppercase">Name</div>
             <input
               autoFocus
-              className="border-border bg-bg-tertiary text-fg focus:ring-accent mt-1 w-full rounded-md border px-2 py-1 text-[13px] focus:ring-1 focus:outline-none"
+              className="border-border bg-bg-tertiary text-fg focus:ring-accent mt-1 w-full rounded-md border px-2 py-1 t-md focus:ring-1 focus:outline-none"
               maxLength={80}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Prod high-priority"
@@ -856,8 +866,8 @@ function SaveViewModal({
             />
           </label>
           <fieldset>
-            <div className="text-fg-muted text-[11px] tracking-wider uppercase">Scope</div>
-            <div className="mt-1 flex gap-3 text-[12px]">
+            <div className="text-fg-muted t-sm tracking-wider uppercase">Scope</div>
+            <div className="mt-1 flex gap-3 t-md">
               {(['personal', 'team', 'org'] as const).map((s) => (
                 <label className="text-fg flex items-center gap-1.5" key={s}>
                   <input
@@ -873,9 +883,9 @@ function SaveViewModal({
           </fieldset>
           {scope === 'team' && (
             <label className="block">
-              <div className="text-fg-muted text-[11px] tracking-wider uppercase">Team</div>
+              <div className="text-fg-muted t-sm tracking-wider uppercase">Team</div>
               <select
-                className="border-border bg-bg-tertiary text-fg mt-1 w-full rounded-md border px-2 py-1 text-[13px]"
+                className="border-border bg-bg-tertiary text-fg mt-1 w-full rounded-md border px-2 py-1 t-md"
                 onChange={(e) => setTeamSlug(e.target.value)}
                 value={teamSlug}
               >
@@ -888,18 +898,18 @@ function SaveViewModal({
               </select>
             </label>
           )}
-          {error && <p className="text-[12px] text-[color:var(--color-danger)]">{error}</p>}
+          {error && <p className="t-md text-[color:var(--color-danger)]">{error}</p>}
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <button
-            className="text-fg-muted hover:text-fg rounded-md px-3 py-1 text-[12px]"
+            className="text-fg-muted hover:text-fg rounded-md px-3 py-1 t-md"
             onClick={onClose}
             type="button"
           >
             Cancel
           </button>
           <button
-            className="bg-accent text-bg disabled:bg-bg-tertiary disabled:text-fg-muted rounded-md px-3 py-1 text-[12px] disabled:cursor-not-allowed"
+            className="bg-accent text-bg disabled:bg-bg-tertiary disabled:text-fg-muted rounded-md px-3 py-1 t-md disabled:cursor-not-allowed"
             disabled={!canSubmit || createMutation.isPending}
             onClick={() => createMutation.mutate()}
             type="button"
@@ -926,18 +936,18 @@ function ViewsMenu({
 
   return (
     <>
-      <div className="text-fg-muted px-1 py-1 text-[10px] tracking-wider uppercase">
+      <div className="text-fg-muted px-1 py-1 t-sm tracking-wider uppercase">
         Saved views
       </div>
       {views.length === 0 && (
-        <p className="text-fg-muted px-2 py-2 text-[12px]">
+        <p className="text-fg-muted px-2 py-2 t-md">
           No saved views yet. Save the current filter to share with your team.
         </p>
       )}
       {(['org', 'team', 'personal'] as const).map((scope) =>
         groups[scope].length > 0 ? (
           <div className="border-border/50 mt-1 border-t pt-1" key={scope}>
-            <div className="text-fg-muted px-2 text-[10px] tracking-wider uppercase">{scope}</div>
+            <div className="text-fg-muted px-2 t-sm tracking-wider uppercase">{scope}</div>
             {groups[scope].map((v) => (
               <button
                 className="hover:bg-bg-tertiary block w-full rounded px-2 py-1 text-left"
@@ -947,10 +957,10 @@ function ViewsMenu({
               >
                 <div className="text-fg truncate">{v.name}</div>
                 {v.scope === 'team' && v.teamSlug && (
-                  <div className="text-fg-muted truncate text-[10px]">team: {v.teamSlug}</div>
+                  <div className="text-fg-muted truncate t-sm">team: {v.teamSlug}</div>
                 )}
                 {v.payload.query && (
-                  <div className="text-fg-muted truncate font-mono text-[10px]">
+                  <div className="text-fg-muted truncate font-mono t-sm">
                     {v.payload.query}
                   </div>
                 )}

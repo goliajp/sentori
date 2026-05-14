@@ -93,7 +93,7 @@ export function AuditLogView() {
       <PageHeader
         actions={
           <button
-            className="border-border text-fg-muted hover:bg-bg-tertiary rounded-md border px-3 py-1.5 text-[12px]"
+            className="border-border text-fg-muted hover:bg-bg-tertiary rounded-md border px-3 py-1.5 t-md"
             disabled={rows.length === 0}
             onClick={onExportCsv}
             type="button"
@@ -112,7 +112,7 @@ export function AuditLogView() {
         <div className="space-y-5">
           <section className="border-border flex flex-wrap items-center gap-3 rounded-md border p-3">
             <select
-              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 text-[13px]"
+              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 t-md"
               onChange={(e) => setAction(e.target.value)}
               value={action}
             >
@@ -124,7 +124,7 @@ export function AuditLogView() {
               ))}
             </select>
             <select
-              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 text-[13px]"
+              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 t-md"
               onChange={(e) => setActorUserId(e.target.value)}
               value={actorUserId}
             >
@@ -136,7 +136,7 @@ export function AuditLogView() {
               ))}
             </select>
             <input
-              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 text-[13px]"
+              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 t-md"
               onChange={(e) => setBefore(e.target.value)}
               title="Show entries strictly before this time"
               type="datetime-local"
@@ -144,7 +144,7 @@ export function AuditLogView() {
             />
             {(action || actorUserId || before) && (
               <button
-                className="text-fg-muted hover:text-fg ml-auto text-[12px]"
+                className="text-fg-muted hover:text-fg ml-auto t-md"
                 onClick={() => {
                   setAction('')
                   setActorUserId('')
@@ -165,7 +165,7 @@ export function AuditLogView() {
             <>
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="text-fg-muted border-border border-b text-left text-[11px] tracking-wider uppercase">
+                  <tr className="text-fg-muted border-border border-b text-left t-sm tracking-wider uppercase">
                     <th className="px-2 py-2 font-medium">Time</th>
                     <th className="px-2 py-2 font-medium">Actor</th>
                     <th className="px-2 py-2 font-medium">Action</th>
@@ -181,7 +181,7 @@ export function AuditLogView() {
               </table>
               {hasMore && (
                 <button
-                  className="border-border text-fg-muted hover:bg-bg-tertiary mx-auto block rounded-md border px-3 py-1.5 text-[12px]"
+                  className="border-border text-fg-muted hover:bg-bg-tertiary mx-auto block rounded-md border px-3 py-1.5 t-md"
                   onClick={onLoadMore}
                   type="button"
                 >
@@ -205,22 +205,22 @@ function AuditRowItem({ density, row }: { density: Density; row: AuditRow }) {
   return (
     <>
       <tr className={`border-border/50 border-b align-top ${dCls.rowClass}`}>
-        <td className="text-fg-muted px-2 py-2 font-mono text-[11px] tabular-nums">
+        <td className="text-fg-muted px-2 py-2 font-mono t-sm tabular-nums">
           {new Date(row.createdAt).toISOString().replace('T', ' ').slice(0, 19)}
         </td>
-        <td className="text-fg px-2 py-2 font-mono text-[12px]">
+        <td className="text-fg px-2 py-2 font-mono t-md">
           {row.actorEmail ?? <span className="text-fg-muted italic">system</span>}
         </td>
-        <td className="text-fg px-2 py-2 font-mono text-[12px]">{row.action}</td>
-        <td className="text-fg-muted px-2 py-2 text-[12px]">
+        <td className="text-fg px-2 py-2 font-mono t-md">{row.action}</td>
+        <td className="text-fg-muted px-2 py-2 t-md">
           <span className="font-mono">{row.targetType}</span>
           {row.targetId && (
-            <span className="text-fg-muted ml-1 font-mono text-[10px]">
+            <span className="text-fg-muted ml-1 font-mono t-sm">
               {row.targetId.slice(0, 8)}…
             </span>
           )}
         </td>
-        <td className="px-2 py-2 text-[12px]">
+        <td className="px-2 py-2 t-md">
           {empty ? (
             <span className="text-fg-muted">—</span>
           ) : (
@@ -237,7 +237,7 @@ function AuditRowItem({ density, row }: { density: Density; row: AuditRow }) {
       {open && !empty && (
         <tr>
           <td className="px-2 pb-3" colSpan={5}>
-            <pre className="bg-bg-tertiary text-fg overflow-x-auto rounded p-2 font-mono text-[11px]">
+            <pre className="bg-bg-tertiary text-fg overflow-x-auto rounded p-2 font-mono t-sm">
               {payloadStr}
             </pre>
           </td>

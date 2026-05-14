@@ -139,11 +139,11 @@ export function TeamDetailView() {
   return (
     <div className="space-y-8 p-6">
       <header>
-        <Link className="text-fg-muted hover:text-fg text-[12px]" to={`/org/${orgSlug}/teams`}>
+        <Link className="text-fg-muted hover:text-fg t-md" to={`/org/${orgSlug}/teams`}>
           ← Back to teams
         </Link>
         <h1 className="text-fg mt-2 text-2xl font-semibold">{team.name}</h1>
-        <p className="text-fg-muted mt-1 font-mono text-[12px]">{team.slug}</p>
+        <p className="text-fg-muted mt-1 font-mono t-md">{team.slug}</p>
         {team.description && <p className="text-fg-muted mt-2 text-sm">{team.description}</p>}
       </header>
 
@@ -152,7 +152,7 @@ export function TeamDetailView() {
         {canManage && addableMembers.length > 0 && (
           <form className="mt-3 flex flex-wrap items-center gap-2" onSubmit={onAddMember}>
             <select
-              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1.5 text-[13px]"
+              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1.5 t-md"
               onChange={(e) => setAddUserId(e.target.value)}
               required
               value={addUserId}
@@ -165,7 +165,7 @@ export function TeamDetailView() {
               ))}
             </select>
             <select
-              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1.5 text-[13px]"
+              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1.5 t-md"
               onChange={(e) => setAddRole(e.target.value as TeamRole)}
               value={addRole}
             >
@@ -176,13 +176,13 @@ export function TeamDetailView() {
               ))}
             </select>
             <button
-              className="bg-accent text-bg rounded-md px-3 py-1.5 text-[13px] font-medium disabled:opacity-50"
+              className="bg-accent text-bg rounded-md px-3 py-1.5 t-md font-medium disabled:opacity-50"
               disabled={addMember.isPending || !addUserId}
               type="submit"
             >
               {addMember.isPending ? 'Adding…' : 'Add'}
             </button>
-            {addMsg && <span className="text-fg-muted text-[12px]">{addMsg}</span>}
+            {addMsg && <span className="text-fg-muted t-md">{addMsg}</span>}
           </form>
         )}
         {members.length === 0 ? (
@@ -190,7 +190,7 @@ export function TeamDetailView() {
         ) : (
           <table className="mt-3 w-full border-collapse">
             <thead>
-              <tr className="text-fg-muted border-border border-b text-left text-[12px] uppercase">
+              <tr className="text-fg-muted border-border border-b text-left t-md uppercase">
                 <th className="px-2 py-2 font-medium">Email</th>
                 <th className="px-2 py-2 font-medium">Role</th>
                 <th className="px-2 py-2 font-medium">Joined</th>
@@ -200,11 +200,11 @@ export function TeamDetailView() {
             <tbody>
               {members.map((m) => (
                 <tr className={`border-border border-b ${dCls.rowClass}`} key={m.userId}>
-                  <td className="text-fg px-2 py-2 text-[13px]">{m.email}</td>
+                  <td className="text-fg px-2 py-2 t-md">{m.email}</td>
                   <td className="px-2 py-2">
                     {canManage ? (
                       <select
-                        className="border-border bg-bg-tertiary text-fg rounded border px-1.5 py-0.5 text-[12px]"
+                        className="border-border bg-bg-tertiary text-fg rounded border px-1.5 py-0.5 t-md"
                         onChange={(e) =>
                           patchMemberRole.mutate({
                             role: e.target.value as TeamRole,
@@ -223,13 +223,13 @@ export function TeamDetailView() {
                       <RoleBadge role={m.role} />
                     )}
                   </td>
-                  <td className="text-fg-muted px-2 py-2 text-[12px] tabular-nums">
+                  <td className="text-fg-muted px-2 py-2 t-md tabular-nums">
                     {new Date(m.createdAt).toLocaleDateString()}
                   </td>
                   {canManage && (
                     <td className="px-2 py-2 text-right">
                       <button
-                        className="text-fg-muted hover:text-danger text-[12px]"
+                        className="text-fg-muted hover:text-danger t-md"
                         onClick={() => removeMember.mutate(m.userId)}
                         type="button"
                       >
@@ -246,14 +246,14 @@ export function TeamDetailView() {
 
       <section>
         <h2 className="text-fg text-sm font-semibold">Projects</h2>
-        <p className="text-fg-muted mt-1 text-[12px]">
+        <p className="text-fg-muted mt-1 t-md">
           Bind projects to this team to scope access. Projects with no team binding stay open to
           every org member.
         </p>
         {canManage && bindableProjects.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <select
-              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1.5 text-[13px]"
+              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1.5 t-md"
               onChange={(e) => setBindProjectId(e.target.value)}
               value={bindProjectId}
             >
@@ -265,14 +265,14 @@ export function TeamDetailView() {
               ))}
             </select>
             <button
-              className="bg-accent text-bg rounded-md px-3 py-1.5 text-[13px] font-medium disabled:opacity-50"
+              className="bg-accent text-bg rounded-md px-3 py-1.5 t-md font-medium disabled:opacity-50"
               disabled={bindProject.isPending || !bindProjectId}
               onClick={() => bindProject.mutate()}
               type="button"
             >
               {bindProject.isPending ? 'Binding…' : 'Bind project'}
             </button>
-            {bindMsg && <span className="text-fg-muted text-[12px]">{bindMsg}</span>}
+            {bindMsg && <span className="text-fg-muted t-md">{bindMsg}</span>}
           </div>
         )}
         {projects.length === 0 ? (
@@ -284,10 +284,10 @@ export function TeamDetailView() {
                 className="border-border flex items-center justify-between rounded-md border px-3 py-2"
                 key={p.id}
               >
-                <span className="text-fg text-[13px]">{p.name}</span>
+                <span className="text-fg t-md">{p.name}</span>
                 {canManage && (
                   <button
-                    className="text-fg-muted hover:text-danger text-[12px]"
+                    className="text-fg-muted hover:text-danger t-md"
                     onClick={() => unbindProject.mutate(p.id)}
                     type="button"
                   >

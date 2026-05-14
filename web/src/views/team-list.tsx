@@ -71,7 +71,7 @@ export function TeamListView() {
           <h2 className="text-fg text-sm font-semibold">Create team</h2>
           <form className="mt-3 grid gap-3 sm:grid-cols-2" onSubmit={onCreate}>
             <input
-              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1.5 text-[13px]"
+              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1.5 t-md"
               maxLength={32}
               minLength={3}
               onChange={(e) => setNewSlug(e.target.value)}
@@ -81,7 +81,7 @@ export function TeamListView() {
               value={newSlug}
             />
             <input
-              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1.5 text-[13px]"
+              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1.5 t-md"
               maxLength={64}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Display name"
@@ -89,7 +89,7 @@ export function TeamListView() {
               value={newName}
             />
             <input
-              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1.5 text-[13px] sm:col-span-2"
+              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1.5 t-md sm:col-span-2"
               maxLength={280}
               onChange={(e) => setNewDesc(e.target.value)}
               placeholder="Description (optional)"
@@ -97,13 +97,13 @@ export function TeamListView() {
             />
             <div className="flex items-center gap-3 sm:col-span-2">
               <button
-                className="bg-accent text-bg rounded-md px-3 py-1.5 text-[13px] font-medium disabled:opacity-50"
+                className="bg-accent text-bg rounded-md px-3 py-1.5 t-md font-medium disabled:opacity-50"
                 disabled={createTeam.isPending}
                 type="submit"
               >
                 {createTeam.isPending ? 'Creating…' : 'Create'}
               </button>
-              {createMsg && <span className="text-fg-muted text-[12px]">{createMsg}</span>}
+              {createMsg && <span className="text-fg-muted t-md">{createMsg}</span>}
             </div>
           </form>
         </section>
@@ -119,7 +119,7 @@ export function TeamListView() {
         ) : (
           <table className="w-full border-collapse">
             <thead>
-              <tr className="text-fg-muted border-border border-b text-left text-[12px] uppercase">
+              <tr className="text-fg-muted border-border border-b text-left t-md uppercase">
                 <th className="px-2 py-2 font-medium">Slug</th>
                 <th className="px-2 py-2 font-medium">Name</th>
                 <th className="px-2 py-2 font-medium">Description</th>
@@ -135,21 +135,21 @@ export function TeamListView() {
                 >
                   <td className="px-2 py-2">
                     <Link
-                      className="text-accent font-mono text-[12px] hover:underline"
+                      className="text-accent font-mono t-md hover:underline"
                       to={`/org/${slug}/teams/${t.slug}`}
                     >
                       {t.slug}
                     </Link>
                   </td>
-                  <td className="text-fg px-2 py-2 text-[13px]">{t.name}</td>
-                  <td className="text-fg-muted px-2 py-2 text-[12px]">{t.description ?? '—'}</td>
-                  <td className="text-fg-muted px-2 py-2 text-[12px] tabular-nums">
+                  <td className="text-fg px-2 py-2 t-md">{t.name}</td>
+                  <td className="text-fg-muted px-2 py-2 t-md">{t.description ?? '—'}</td>
+                  <td className="text-fg-muted px-2 py-2 t-md tabular-nums">
                     {new Date(t.createdAt).toLocaleDateString()}
                   </td>
                   {canManage && (
                     <td className="px-2 py-2 text-right">
                       <button
-                        className="text-fg-muted hover:text-danger text-[12px]"
+                        className="text-fg-muted hover:text-danger t-md"
                         onClick={() => {
                           if (
                             confirm(

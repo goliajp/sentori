@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router'
 import { adminApi, type ReleaseCompareRow } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { ErrorState, LoadingState } from '@/components/states'
+import { formatRelative as relativeDay } from '@/lib/format'
 
 /**
  * Phase 23 sub-E: diff issues between two releases.
@@ -37,7 +38,7 @@ export function ReleaseCompareView() {
     <div className="space-y-6 p-6">
       <header>
         <Link
-          className="text-fg-muted hover:text-fg text-[12px]"
+          className="text-fg-muted hover:text-fg t-md"
           to={`/org/${currentOrg.slug}/releases/${encodeURIComponent(target)}`}
         >
           ← {target}
@@ -47,7 +48,7 @@ export function ReleaseCompareView() {
           <span className="text-fg-muted mx-2">→</span>
           <span>{data.target}</span>
         </h1>
-        <p className="text-fg-muted mt-1 text-[12px]">
+        <p className="text-fg-muted mt-1 t-md">
           {data.added.length + data.fixed.length + data.persisting.length} issue
           {data.added.length + data.fixed.length + data.persisting.length === 1 ? '' : 's'} touched
           between these releases.
@@ -112,7 +113,7 @@ function ReleaseCompareBar({
   const net = added - fixed
   return (
     <div className="border-border bg-bg-secondary space-y-3 rounded-md border p-4">
-      <div className="flex items-baseline justify-between text-[11px]">
+      <div className="flex items-baseline justify-between t-sm">
         <div className="text-fg-muted tracking-wider uppercase">Movement</div>
         <div className="text-fg-muted">
           <span
@@ -146,7 +147,7 @@ function ReleaseCompareBar({
           title={`${persisting} persisting`}
         />
       </div>
-      <div className="text-fg-muted flex justify-between font-mono text-[11px] tabular-nums">
+      <div className="text-fg-muted flex justify-between font-mono t-sm tabular-nums">
         <span>
           <span className="text-[color:var(--color-danger)]">●</span> {added} added
         </span>
@@ -179,18 +180,18 @@ function CompareSection({
   return (
     <section>
       <header className="flex items-baseline gap-3">
-        <h2 className="text-fg text-[13px] font-semibold">
+        <h2 className="text-fg t-md font-semibold">
           {title}
           <span
-            className={`ml-2 rounded px-1.5 py-0.5 text-[11px] font-medium tabular-nums ring-1 ${accentClass}`}
+            className={`ml-2 rounded px-1.5 py-0.5 t-sm font-medium tabular-nums ring-1 ${accentClass}`}
           >
             {rows.length}
           </span>
         </h2>
-        <p className="text-fg-muted text-[11px]">{subtitle}</p>
+        <p className="text-fg-muted t-sm">{subtitle}</p>
       </header>
       {rows.length === 0 ? (
-        <p className="text-fg-muted mt-2 text-[12px]">{emptyHint}</p>
+        <p className="text-fg-muted mt-2 t-md">{emptyHint}</p>
       ) : (
         <ul className="border-border divide-border mt-2 divide-y rounded-md border">
           {rows.map((r) => (
@@ -200,12 +201,12 @@ function CompareSection({
                 to={`/org/${orgSlug}/issues/${r.id}`}
               >
                 <div className="flex min-w-0 flex-1 items-baseline gap-3">
-                  <span className="text-fg truncate text-[13px] font-medium">{r.errorType}</span>
-                  <span className="text-fg-muted truncate text-[12px]">{r.messageSample}</span>
+                  <span className="text-fg truncate t-md font-medium">{r.errorType}</span>
+                  <span className="text-fg-muted truncate t-md">{r.messageSample}</span>
                 </div>
-                <div className="text-fg-muted shrink-0 text-right text-[11px]">
+                <div className="text-fg-muted shrink-0 text-right t-sm">
                   <div className="font-mono tabular-nums">{r.eventCount.toLocaleString()} ev</div>
-                  <div className="text-[10px]">{relativeDay(r.lastSeen)}</div>
+                  <div className="t-sm">{relativeDay(r.lastSeen)}</div>
                 </div>
               </Link>
             </li>
@@ -216,16 +217,4 @@ function CompareSection({
   )
 }
 
-function relativeDay(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime()
-  if (Number.isNaN(ms)) return iso
-  const days = Math.floor(ms / 86_400_000)
-  if (days <= 0) {
-    const hours = Math.floor(ms / 3_600_000)
-    if (hours <= 0) return 'just now'
-    return `${hours}h ago`
-  }
-  if (days === 1) return 'yesterday'
-  if (days < 30) return `${days}d ago`
-  return `${Math.floor(days / 30)}mo ago`
-}
+// `relativeDay` is aliased to the shared `formatRelative` (see imports).

@@ -138,7 +138,7 @@ function Stepper({ phase }: { phase: Phase }) {
   ]
   const currentIdx = steps.findIndex((s) => s.key === phase)
   return (
-    <div className="text-fg-muted flex items-center gap-2 text-[11px] tracking-wider uppercase">
+    <div className="text-fg-muted flex items-center gap-2 t-sm tracking-wider uppercase">
       {steps.map((s, i) => (
         <div className="flex items-center gap-2" key={s.key}>
           <span
@@ -366,9 +366,9 @@ function WaitEventStep({
           arrives. Polling every 3 seconds.
         </p>
       </div>
-      <div className="border-border/60 bg-bg-tertiary/40 rounded-md border p-4 text-[12px]">
+      <div className="border-border/60 bg-bg-tertiary/40 rounded-md border p-4 t-md">
         <div className="text-fg-muted mb-1 tracking-wider uppercase">Quick-test snippet (JS)</div>
-        <pre className="text-fg overflow-x-auto font-mono text-[11px] leading-relaxed">
+        <pre className="text-fg overflow-x-auto font-mono t-sm leading-relaxed">
           {`import { captureError } from '@goliapkg/sentori-react-native'
 captureError(new Error('hello from ${project.name}'))`}
         </pre>
@@ -404,7 +404,7 @@ function SdkPicker({ onChange, value }: { onChange: (s: SdkChoice) => void; valu
       {SDKS.map((s) => (
         <button
           aria-pressed={value === s.key}
-          className={`rounded-md border px-3 py-2 text-left text-[12px] transition-colors ${
+          className={`rounded-md border px-3 py-2 text-left t-md transition-colors ${
             value === s.key ? 'border-accent bg-accent/10' : 'border-border hover:bg-bg-tertiary'
           }`}
           key={s.key}
@@ -523,7 +523,7 @@ function Field({ children, hint, label }: { children: ReactNode; hint?: string; 
     <label className="block">
       <span className="text-fg-muted text-xs tracking-wider uppercase">{label}</span>
       <div className="mt-1">{children}</div>
-      {hint && <span className="text-fg-muted mt-1 block font-mono text-[11px]">{hint}</span>}
+      {hint && <span className="text-fg-muted mt-1 block font-mono t-sm">{hint}</span>}
     </label>
   )
 }
@@ -560,12 +560,12 @@ function CodeBlock({ children, label }: { children: string; label: string }) {
   return (
     <div className="border-border/60 bg-bg-tertiary/40 rounded-md border">
       <div className="border-border/60 flex items-center justify-between border-b px-3 py-1.5">
-        <span className="text-fg-muted text-[10px] tracking-wider uppercase">{label}</span>
-        <button className="text-fg-muted hover:text-fg text-[11px]" onClick={onCopy} type="button">
+        <span className="text-fg-muted t-sm tracking-wider uppercase">{label}</span>
+        <button className="text-fg-muted hover:text-fg t-sm" onClick={onCopy} type="button">
           {copied ? 'copied' : 'copy'}
         </button>
       </div>
-      <pre className="text-fg overflow-x-auto px-3 py-2 font-mono text-[12px] leading-relaxed whitespace-pre">
+      <pre className="text-fg overflow-x-auto px-3 py-2 font-mono t-md leading-relaxed whitespace-pre">
         {children}
       </pre>
     </div>

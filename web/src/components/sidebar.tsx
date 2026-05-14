@@ -8,7 +8,27 @@ import { VERSION_LABEL } from '@/version'
 import { OnboardingBadge } from './OnboardingBadge'
 import { OrgSwitcher } from './OrgSwitcher'
 import { RoleBadge } from './RoleBadge'
-import { ThemeToggle } from './theme-toggle'
+
+/**
+ * Left navigation rail — tasks.golia.jp pattern.
+ *
+ *   • Whole rail gets uniform `p-3` so links never crash into the edges
+ *   • Every link is a rounded pill (`px-2 py-1`). Active = accent-tinted
+ *     bg + accent text. Inactive = full-foreground text with a dimmed
+ *     icon — the eye reads "active link is the blue one" before reading
+ *     labels.
+ *   • Links inside a section sit at `space-y-px` (1px microgap).
+ *   • Between groups: `mb-5` whitespace, NOT a `border-b` hairline. Hard
+ *     rules between groups read as enterprise chrome; whitespace reads
+ *     as Linear/Vercel-grade.
+ *   • Group titles `px-2` so the label aligns with link text (one column,
+ *     two weights).
+ *   • Overview pins at the top with no group title (`Section without
+ *     title`) so it sits separated from Monitor/Organize by whitespace.
+ *
+ * The brand wordmark moved to the Toolbar. The theme toggle moved to the
+ * Toolbar. This rail focuses on navigation + identity + preferences.
+ */
 
 type IconKind =
   | 'alerts'
@@ -23,22 +43,21 @@ type IconKind =
 
 type NavItem = { adminOnly?: boolean; icon: IconKind; label: string; path: IconKind }
 
-// Primary nav, then the secondary (settings-ish) group below a rule.
-const PRIMARY: NavItem[] = [
-  { icon: 'overview', label: 'Overview', path: 'overview' },
+const PINNED: NavItem = { icon: 'overview', label: 'Overview', path: 'overview' }
+const MONITOR: NavItem[] = [
   { icon: 'issues', label: 'Issues', path: 'issues' },
   { icon: 'traces', label: 'Traces', path: 'traces' },
   { icon: 'releases', label: 'Releases', path: 'releases' },
-]
-const SECONDARY: NavItem[] = [
-  { icon: 'teams', label: 'Teams', path: 'teams' },
   { adminOnly: true, icon: 'alerts', label: 'Alerts', path: 'alerts' },
+]
+const ORGANIZE: NavItem[] = [
+  { icon: 'teams', label: 'Teams', path: 'teams' },
   { adminOnly: true, icon: 'integrations', label: 'Integrations', path: 'integrations' },
   { adminOnly: true, icon: 'audit', label: 'Audit', path: 'audit' },
   { icon: 'settings', label: 'Settings', path: 'settings' },
 ]
 
-/** 16px stroke icons (currentColor) — keeps the bundle tiny, no icon dep. */
+/** 16px stroke icons (currentColor) — keeps bundle tiny, no icon dep. */
 function NavIcon({ kind }: { kind: IconKind }) {
   const p = (() => {
     switch (kind) {
@@ -47,7 +66,6 @@ function NavIcon({ kind }: { kind: IconKind }) {
       case 'audit':
         return 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8M8 9h2'
       case 'integrations':
-        // chain link
         return 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'
       case 'issues':
         return 'M10.3 3.3a2 2 0 0 1 3.4 0l8 14a2 2 0 0 1-1.7 3H3.99a2 2 0 0 1-1.7-3zM12 9v4M12 17h.01'
@@ -66,7 +84,7 @@ function NavIcon({ kind }: { kind: IconKind }) {
   return (
     <svg
       aria-hidden
-      className="size-4 shrink-0"
+      className="h-3.5 w-3.5 shrink-0"
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -94,6 +112,72 @@ type ContentProps = SidebarProps & {
   onToggleCollapsed: () => void
 }
 
+function SideLink({
+  collapsed,
+  item,
+  orgSlug,
+}: {
+  collapsed: boolean
+  item: NavItem
+  orgSlug: string
+}) {
+  const location = useLocation()
+  const active = location.pathname.startsWith(`/org/${orgSlug}/${item.path}`)
+
+  if (collapsed) {
+    return (
+      <Link
+        className={`flex items-center justify-center rounded-md p-2 transition-colors ${
+          active ? 'bg-accent/10 text-accent' : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+        }`}
+        title={item.label}
+        to={`/org/${orgSlug}/${item.path}`}
+      >
+        <NavIcon kind={item.icon} />
+      </Link>
+    )
+  }
+
+  return (
+    <Link
+      className={`t-md block truncate rounded px-2 py-1 transition-colors ${
+        active ? 'bg-accent/10 text-accent' : 'text-fg hover:bg-bg-tertiary'
+      }`}
+      to={`/org/${orgSlug}/${item.path}`}
+    >
+      <span
+        className={`mr-2 inline-flex align-[-2px] ${active ? '' : 'text-fg-muted'}`}
+        // Render the same SVG inline so vertical alignment matches a
+        // pure-text adjacent label without flex gymnastics.
+      >
+        <NavIcon kind={item.icon} />
+      </span>
+      {item.label}
+    </Link>
+  )
+}
+
+function Section({
+  children,
+  collapsed,
+  title,
+}: {
+  children: React.ReactNode
+  collapsed?: boolean
+  title?: string
+}) {
+  return (
+    <div className="mb-5 last:mb-0">
+      {title && !collapsed && (
+        <div className="text-fg-muted t-sm mb-1 px-2 font-semibold tracking-wider uppercase">
+          {title}
+        </div>
+      )}
+      <div className="space-y-px">{children}</div>
+    </div>
+  )
+}
+
 function SidebarContent({
   collapsed,
   currentOrg,
@@ -105,70 +189,27 @@ function SidebarContent({
   teams,
   user,
 }: ContentProps) {
-  const location = useLocation()
   const { density, toggle: toggleDensity } = useDensity()
   const isAdmin = currentOrg.role === 'owner' || currentOrg.role === 'admin'
-  const isActive = (path: string) => location.pathname.startsWith(`/org/${currentOrg.slug}/${path}`)
-
-  // Phase 49 sub-K — Linear-style nav row with a 2px accent indicator
-  // bar on the left when active. The bar lives outside the rounded
-  // background so it can hug the sidebar edge cleanly.
-  const Item = ({ item }: { item: NavItem }) => {
-    const active = isActive(item.path)
-    return collapsed ? (
-      <Link
-        className={`relative flex items-center justify-center rounded-md p-2 transition-colors ${
-          active ? 'bg-accent/10 text-accent' : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
-        }`}
-        key={item.path}
-        title={item.label}
-        to={`/org/${currentOrg.slug}/${item.path}`}
-      >
-        <NavIcon kind={item.icon} />
-        {active && (
-          <span
-            aria-hidden
-            className="bg-accent absolute top-1/2 -left-2 h-4 w-[2px] -translate-y-1/2 rounded-r"
-          />
-        )}
-      </Link>
-    ) : (
-      <Link
-        className={`relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${
-          active ? 'bg-accent/10 text-accent' : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
-        }`}
-        key={item.path}
-        to={`/org/${currentOrg.slug}/${item.path}`}
-      >
-        {active && (
-          <span
-            aria-hidden
-            className="bg-accent absolute top-1/2 -left-2 h-5 w-[2px] -translate-y-1/2 rounded-r"
-          />
-        )}
-        <NavIcon kind={item.icon} />
-        {item.label}
-      </Link>
-    )
-  }
 
   return (
-    <div className={`flex h-full w-full flex-col gap-1 ${collapsed ? 'px-1.5 py-3' : 'p-3'}`}>
-      {/* org / project */}
+    <div className={`flex h-full w-full flex-col ${collapsed ? 'px-1.5 py-3' : 'p-3'}`}>
+      {/* Identity — org switcher + onboarding nudge. The brand wordmark
+       *  lives in the Toolbar; we don't repeat it here. */}
       {collapsed ? (
         <Link
-          className="text-fg flex justify-center rounded-md p-2 text-sm font-semibold"
-          title="Sentori — home"
-          to="/"
+          className="text-fg hover:bg-bg-tertiary mb-3 flex justify-center rounded-md p-2 text-sm font-semibold"
+          title={currentOrg.name}
+          to={`/org/${currentOrg.slug}/overview`}
         >
-          S
+          {currentOrg.slug.slice(0, 2).toUpperCase()}
         </Link>
       ) : (
-        <>
+        <div className="mb-3">
           <div className="mb-1 flex items-center justify-between gap-2 px-1">
-            <Link className="text-fg text-sm font-semibold" to="/">
-              Sentori
-            </Link>
+            <div className="text-fg-muted t-sm font-semibold tracking-wider uppercase">
+              Organization
+            </div>
             <OnboardingBadge project={currentProject} />
           </div>
           <OrgSwitcher
@@ -177,86 +218,81 @@ function SidebarContent({
             orgs={orgs}
             teams={teams}
           />
-        </>
+        </div>
       )}
 
-      {/* primary nav */}
-      <nav className="mt-3 flex flex-col gap-0.5">
-        {PRIMARY.map((i) => (
-          <Item item={i} key={i.path} />
-        ))}
-      </nav>
-      <div className="border-border/60 mx-1 my-2 border-t" />
-      <nav className="flex flex-col gap-0.5">
-        {SECONDARY.filter((i) => !i.adminOnly || isAdmin).map((i) => (
-          <Item item={i} key={i.path} />
-        ))}
-      </nav>
+      {/* Nav — three sections separated by whitespace, not borders. */}
+      <div className="flex-1 overflow-y-auto">
+        <Section collapsed={collapsed}>
+          <SideLink collapsed={collapsed} item={PINNED} orgSlug={currentOrg.slug} />
+        </Section>
 
-      {/* footer */}
-      <div className="mt-auto pt-3">
-        <div className="border-border/60 border-t pt-2">
-          {collapsed ? (
-            <div className="flex flex-col items-center gap-1">
+        <Section collapsed={collapsed} title="Monitor">
+          {MONITOR.filter((i) => !i.adminOnly || isAdmin).map((i) => (
+            <SideLink collapsed={collapsed} item={i} key={i.path} orgSlug={currentOrg.slug} />
+          ))}
+        </Section>
+
+        <Section collapsed={collapsed} title="Organize">
+          {ORGANIZE.filter((i) => !i.adminOnly || isAdmin).map((i) => (
+            <SideLink collapsed={collapsed} item={i} key={i.path} orgSlug={currentOrg.slug} />
+          ))}
+        </Section>
+      </div>
+
+      {/* Footer — account + preferences. Theme toggle moved to Toolbar. */}
+      <div className="border-border/60 mt-3 border-t pt-3">
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-1">
+            <button
+              aria-label="Expand sidebar"
+              className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-2 py-1 text-xs"
+              onClick={onToggleCollapsed}
+              title="Expand sidebar"
+              type="button"
+            >
+              »
+            </button>
+            <UserMenuButton collapsed onLogout={onLogout} role={currentOrg.role} user={user} />
+          </div>
+        ) : (
+          <>
+            <UserMenuButton onLogout={onLogout} role={currentOrg.role} user={user} />
+            <div className="mt-1 flex items-center gap-1 px-1">
               <button
-                aria-label="Expand sidebar"
+                aria-label={`Density: ${density}. Click to toggle.`}
                 className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-2 py-1 text-xs"
-                onClick={onToggleCollapsed}
-                title="Expand sidebar"
+                onClick={toggleDensity}
+                title={`Density: ${density} — click to toggle`}
                 type="button"
               >
-                »
+                {density === 'ultra' ? '☷' : density === 'compact' ? '☰' : '≡'}
               </button>
-              <UserMenuButton collapsed onLogout={onLogout} role={currentOrg.role} user={user} />
-            </div>
-          ) : (
-            <>
-              <UserMenuButton onLogout={onLogout} role={currentOrg.role} user={user} />
-              {/* Phase 48 sub-D — single thin strip of preference toggles +
-                  a sidebar collapse handle. Sign-out moved into the user
-                  menu popover above so this row never wraps. */}
-              <div className="mt-1 flex items-center gap-1 px-1">
-                <button
-                  aria-label={`Density: ${density}. Click to toggle.`}
-                  className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-2 py-1 text-xs"
-                  onClick={toggleDensity}
-                  title={`Density: ${density} — click to toggle`}
-                  type="button"
-                >
-                  {density === 'ultra' ? '☷' : density === 'compact' ? '☰' : '≡'}
-                </button>
-                <ThemeToggle />
-                <button
-                  aria-label="Collapse sidebar"
-                  className="text-fg-muted hover:bg-bg-tertiary hover:text-fg ml-auto rounded-md px-2 py-1 text-xs"
-                  onClick={onToggleCollapsed}
-                  title="Collapse sidebar"
-                  type="button"
-                >
-                  «
-                </button>
-              </div>
-              <div
-                className="text-fg-muted/50 mt-1 px-2 font-mono text-[10px] tracking-tight"
-                title="Click to copy build sha"
+              <button
+                aria-label="Collapse sidebar"
+                className="text-fg-muted hover:bg-bg-tertiary hover:text-fg ml-auto rounded-md px-2 py-1 text-xs"
+                onClick={onToggleCollapsed}
+                title="Collapse sidebar"
+                type="button"
               >
-                {VERSION_LABEL}
-              </div>
-            </>
-          )}
-        </div>
+                «
+              </button>
+            </div>
+            <div
+              className="text-fg-muted/50 t-sm mt-1 px-2 font-mono tracking-tight"
+              title="Build version + git sha"
+            >
+              {VERSION_LABEL}
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
 }
 
-/**
- * Phase 48 sub-D — collapsible user-menu button. Replaces the
- * previous footer-cram (email link + density + theme + collapse +
- * sign-out all on one row, which forced "Sign out" to wrap). Closed
- * state shows email + role; open state pops up "My activity" + "Sign
- * out". Outside-click and Esc both close.
- */
+/** Popover account menu — closed state shows email + role, open state
+ *  surfaces "My activity" + "Sign out". Outside-click + Esc close it. */
 function UserMenuButton({
   collapsed,
   onLogout,
@@ -295,7 +331,7 @@ function UserMenuButton({
         className={
           collapsed
             ? 'text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-2 py-1 text-xs'
-            : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[12px]'
+            : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg t-md flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5'
         }
         onClick={() => setOpen((v) => !v)}
         type="button"
@@ -311,7 +347,7 @@ function UserMenuButton({
       </button>
       {open && (
         <div
-          className="border-border bg-bg-tertiary absolute right-0 bottom-full z-50 mb-1 w-44 rounded-md border py-1 text-[12px] shadow-lg"
+          className="border-border bg-bg-tertiary t-md absolute right-0 bottom-full z-50 mb-1 w-44 rounded-md border py-1 shadow-lg"
           role="menu"
         >
           <Link
@@ -353,18 +389,13 @@ function writeCollapsed(v: boolean): void {
   }
 }
 
-/**
- * Left navigation rail. Persistent on `md+` (collapsible to an icon
- * rail); on narrow viewports it's a hamburger that opens the same
- * content as an overlay drawer (always full-width when open).
- */
 export function Sidebar(props: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsed())
   const { pathname } = useLocation()
-  // Close the drawer whenever the route changes — a deliberate
-  // react-to-external-change, not a render-derived value.
   useEffect(() => {
+    // Close the drawer whenever the route changes — a deliberate
+    // react-to-external-change, not a render-derived value.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMobileOpen(false)
   }, [pathname])
@@ -376,16 +407,14 @@ export function Sidebar(props: SidebarProps) {
   }
   return (
     <>
-      {/* desktop: persistent rail (collapsible) */}
       <aside
-        className={`border-border bg-bg hidden shrink-0 border-r md:flex ${
+        className={`border-border bg-bg/60 hidden shrink-0 border-r md:flex ${
           collapsed ? 'w-14' : 'w-56'
         }`}
       >
         <SidebarContent {...props} collapsed={collapsed} onToggleCollapsed={toggle} />
       </aside>
 
-      {/* mobile: hamburger + overlay drawer — always full-width */}
       <button
         aria-label="Open navigation"
         className="border-border bg-bg/80 text-fg-muted hover:text-fg fixed top-2 left-2 z-30 rounded-md border px-2 py-1 text-sm backdrop-blur-xl md:hidden"

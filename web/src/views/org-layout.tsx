@@ -7,7 +7,9 @@ import { useAuth } from '@/auth/state'
 import { CmdK } from '@/components/CmdK'
 import { KeyboardCheatsheet } from '@/components/KeyboardCheatsheet'
 import { Sidebar } from '@/components/sidebar'
+import { StatusBar } from '@/components/status-bar'
 import { useThemeEffect } from '@/components/theme'
+import { Toolbar } from '@/components/toolbar'
 import { UsageBanner } from '@/components/UsageBanner'
 import { useGoToShortcuts } from '@/lib/go-to-shortcuts'
 
@@ -85,25 +87,35 @@ export function OrgLayout() {
         teams: teams ?? [],
       }}
     >
-      <div className="flex h-full">
+      {/*
+       * Five-region shell — tasks.golia.jp shape:
+       *   Toolbar (h-12, brand + search + theme)
+       *   Sidebar + main (flex row)
+       *   StatusBar (h-8, version + health + user/clock)
+       */}
+      <div className="flex h-full flex-col">
         <a className="skip-to-content" href="#sentori-main">
           Skip to content
         </a>
-        <Sidebar
-          currentOrg={currentOrg}
-          currentProject={currentProject}
-          currentTeamSlug={currentTeamSlug}
-          onLogout={() => void logout()}
-          orgs={orgs ?? []}
-          teams={teams ?? []}
-          user={user}
-        />
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <UsageBanner org={currentOrg} />
-          <main className="flex-1 overflow-y-auto" id="sentori-main">
-            <Outlet />
-          </main>
+        <Toolbar />
+        <div className="flex min-h-0 flex-1">
+          <Sidebar
+            currentOrg={currentOrg}
+            currentProject={currentProject}
+            currentTeamSlug={currentTeamSlug}
+            onLogout={() => void logout()}
+            orgs={orgs ?? []}
+            teams={teams ?? []}
+            user={user}
+          />
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <UsageBanner org={currentOrg} />
+            <main className="flex-1 overflow-y-auto" id="sentori-main">
+              <Outlet />
+            </main>
+          </div>
         </div>
+        <StatusBar />
       </div>
       <CmdK />
       <KeyboardCheatsheet />

@@ -71,7 +71,7 @@ export function OverviewView() {
           </section>
 
           <section>
-            <h2 className="text-fg-muted mb-2 text-[11px] tracking-wider uppercase">
+            <h2 className="text-fg-muted mb-2 t-sm tracking-wider uppercase">
               Sessions over time
             </h2>
             <LineChart
@@ -133,12 +133,12 @@ function Stat({
     >
       <div className="flex items-center gap-2">
         <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-        <span className="text-fg-muted text-[11px] tracking-wider uppercase">{label}</span>
+        <span className="text-fg-muted t-sm tracking-wider uppercase">{label}</span>
       </div>
       <div className="text-fg mt-2 font-mono text-2xl tabular-nums">
         <StatNumber format={format} value={rawValue} />
       </div>
-      <div className="text-fg-muted mt-1 text-[11px]">{hint}</div>
+      <div className="text-fg-muted mt-1 t-sm">{hint}</div>
     </div>
   )
 }
@@ -150,7 +150,7 @@ function Stat({
 function SummaryFootnote({ summary }: { summary: HealthSummary }) {
   if (summary.totalSessions === 0) {
     return (
-      <p className="text-fg-muted text-[12px]">
+      <p className="text-fg-muted t-md">
         Wire up sessions in your SDK with <code className="font-mono">sentori.init({'{...}'})</code>{' '}
         — the JS / RN packages send a session ping on app close automatically.
       </p>

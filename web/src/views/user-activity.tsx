@@ -39,7 +39,7 @@ export function UserActivityView() {
         <h1 className="text-fg text-xl font-semibold">My activity</h1>
         <p className="text-fg-muted mt-1 text-sm">
           Every admin action you've taken across orgs you're a member of.{' '}
-          {user && <span className="font-mono text-[12px]">{user.email}</span>}
+          {user && <span className="font-mono t-md">{user.email}</span>}
         </p>
       </header>
 
@@ -57,7 +57,7 @@ export function UserActivityView() {
 
       {hasMore && (
         <button
-          className="border-border text-fg-muted hover:bg-bg-tertiary mx-auto block rounded-md border px-3 py-1.5 text-[12px]"
+          className="border-border text-fg-muted hover:bg-bg-tertiary mx-auto block rounded-md border px-3 py-1.5 t-md"
           onClick={() => setBefore(rows[rows.length - 1]!.createdAt)}
           type="button"
         >
@@ -73,15 +73,15 @@ function ActivityItem({ label, row }: { label: string; row: UserActivityRow }) {
   return (
     <li className="flex items-baseline gap-3 px-4 py-3">
       <time
-        className="text-fg-muted shrink-0 font-mono text-[11px] tabular-nums"
+        className="text-fg-muted shrink-0 font-mono t-sm tabular-nums"
         dateTime={row.createdAt}
         title={ts.toISOString()}
       >
         {ts.toISOString().replace('T', ' ').slice(0, 19)}
       </time>
       <div className="min-w-0 flex-1">
-        <div className="text-fg text-[13px]">{label}</div>
-        <div className="text-fg-muted text-[12px]">
+        <div className="text-fg t-md">{label}</div>
+        <div className="text-fg-muted t-md">
           in{' '}
           {row.orgSlug ? (
             <Link className="text-accent hover:underline" to={`/org/${row.orgSlug}/issues`}>
@@ -90,7 +90,7 @@ function ActivityItem({ label, row }: { label: string; row: UserActivityRow }) {
           ) : (
             <span className="italic">deleted org</span>
           )}
-          <span className="ml-2 font-mono text-[10px] uppercase">{row.targetType}</span>
+          <span className="ml-2 font-mono t-sm uppercase">{row.targetType}</span>
         </div>
       </div>
     </li>

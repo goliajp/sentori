@@ -14,6 +14,7 @@ import { useOrg } from '@/auth/orgContext'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
 import { EmptyArt } from '@/components/ui'
 import { densityClasses, useDensity } from '@/lib/density'
+import { formatRelative } from '@/lib/format'
 import { parseTraceQuery } from '@/lib/trace-query'
 
 const PAGE_SIZE = 100
@@ -98,12 +99,12 @@ export function TracesView() {
     <div className="flex h-full flex-col">
       <header className="border-border flex h-12 shrink-0 items-center gap-3 border-b px-6">
         <h1 className="text-fg text-base font-semibold">Traces</h1>
-        <span className="text-fg-muted text-[12px]">{traces.length} loaded</span>
+        <span className="text-fg-muted t-md">{traces.length} loaded</span>
 
         <div className="ml-auto flex items-center gap-2">
           <button
             aria-pressed={showOrphans}
-            className={`rounded-md px-2 py-1 text-[11px] tracking-wider uppercase transition-colors ${
+            className={`rounded-md px-2 py-1 t-sm tracking-wider uppercase transition-colors ${
               showOrphans
                 ? 'bg-accent/10 text-accent'
                 : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
@@ -115,7 +116,7 @@ export function TracesView() {
             {showOrphans ? 'incl. orphans' : 'hide orphans'}
           </button>
           <input
-            className="border-border bg-bg-tertiary text-fg w-80 rounded-md border px-3 py-1 text-[12px]"
+            className="border-border bg-bg-tertiary text-fg w-80 rounded-md border px-3 py-1 t-md"
             onChange={(e) => setQueryText(e.target.value)}
             placeholder="op:http.client status:error duration:>500ms …"
             type="text"
@@ -125,7 +126,7 @@ export function TracesView() {
       </header>
 
       {parsed.warnings.length > 0 && (
-        <div className="border-border border-b bg-amber-500/5 px-6 py-2 text-[11px] text-[color:var(--color-warning)]">
+        <div className="border-border border-b bg-amber-500/5 px-6 py-2 t-sm text-[color:var(--color-warning)]">
           {parsed.warnings.join(' · ')}
         </div>
       )}
@@ -138,9 +139,9 @@ export function TracesView() {
         />
       ) : (
         <div className="flex-1 overflow-y-auto">
-          <table className="w-full border-collapse text-[13px]">
+          <table className="w-full border-collapse t-md">
             <thead className="bg-bg sticky top-0 z-10">
-              <tr className="border-border text-fg-muted border-b text-[11px] tracking-wider uppercase">
+              <tr className="border-border text-fg-muted border-b t-sm tracking-wider uppercase">
                 <th className="px-4 text-left">Op</th>
                 <th className="px-4 text-left">Name</th>
                 <th className="px-4 text-right">Span count</th>
@@ -197,7 +198,7 @@ function StatusPill({ status }: { status: TraceRow['status'] }) {
         : 'bg-green-500/10 text-[color:var(--color-success)]'
   return (
     <span
-      className={`inline-block rounded px-2 py-0.5 text-[11px] tracking-wider uppercase ${cls}`}
+      className={`inline-block rounded px-2 py-0.5 t-sm tracking-wider uppercase ${cls}`}
     >
       {status}
     </span>
@@ -210,18 +211,7 @@ function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(2)} s`
 }
 
-function formatRelative(iso: string): string {
-  const then = new Date(iso).getTime()
-  const now = Date.now()
-  const s = Math.max(0, Math.round((now - then) / 1000))
-  if (s < 60) return `${s}s ago`
-  const m = Math.round(s / 60)
-  if (m < 60) return `${m}m ago`
-  const h = Math.round(m / 60)
-  if (h < 24) return `${h}h ago`
-  const d = Math.round(h / 24)
-  return `${d}d ago`
-}
+// `formatRelative` is imported from `@/lib/format` (see imports).
 
 function LoadMoreSentinel({
   hasMore,
@@ -251,7 +241,7 @@ function LoadMoreSentinel({
   return (
     <div className="border-border/40 flex items-center justify-center border-t py-3" ref={ref}>
       <button
-        className="text-fg-muted hover:text-fg text-[12px]"
+        className="text-fg-muted hover:text-fg t-md"
         disabled={isFetching}
         onClick={onLoadMore}
         type="button"

@@ -10,6 +10,7 @@ import {
 } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { ErrorState, LoadingState } from '@/components/states'
+import { formatRelative as relativeDay } from '@/lib/format'
 
 /**
  * Phase 23 sub-B: per-release artifact tree.
@@ -57,7 +58,7 @@ export function ReleaseDetailView() {
     <div className="space-y-6 p-6">
       <header>
         <Link
-          className="text-fg-muted hover:text-fg text-[12px]"
+          className="text-fg-muted hover:text-fg t-md"
           to={`/org/${currentOrg.slug}/releases`}
         >
           ← All releases
@@ -67,7 +68,7 @@ export function ReleaseDetailView() {
           {otherReleases.length > 0 && (
             <select
               aria-label="Compare with"
-              className="border-border bg-bg-tertiary text-fg max-w-[260px] shrink-0 rounded-md border px-2 py-1 font-mono text-[12px]"
+              className="border-border bg-bg-tertiary text-fg max-w-[260px] shrink-0 rounded-md border px-2 py-1 font-mono t-md"
               defaultValue=""
               onChange={(e) => {
                 if (!e.target.value) return
@@ -87,7 +88,7 @@ export function ReleaseDetailView() {
             </select>
           )}
         </div>
-        <p className="text-fg-muted mt-1 text-[12px]">
+        <p className="text-fg-muted mt-1 t-md">
           {artifactCount} artifact{artifactCount === 1 ? '' : 's'} uploaded for this release.
         </p>
       </header>
@@ -107,7 +108,7 @@ export function ReleaseDetailView() {
           createdAt: s.createdAt,
           key: s.id,
           left: s.name,
-          right: <span className="text-fg-muted text-[11px]">{s.kind}</span>,
+          right: <span className="text-fg-muted t-sm">{s.kind}</span>,
         }))}
         title="Source maps"
       />
@@ -147,9 +148,9 @@ function ReleaseHealthPanel({ projectId, release }: { projectId: string; release
 
   return (
     <section>
-      <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Health · last 7 days</h2>
+      <h2 className="text-fg-muted t-sm tracking-wider uppercase">Health · last 7 days</h2>
       {data.summary.totalSessions === 0 ? (
-        <p className="text-fg-muted mt-2 text-[12px]">No session pings on this release yet.</p>
+        <p className="text-fg-muted mt-2 t-md">No session pings on this release yet.</p>
       ) : (
         <dl className="border-border mt-2 grid grid-cols-2 gap-x-6 gap-y-1 rounded-md border p-4 sm:grid-cols-4">
           <HealthStat
@@ -195,7 +196,7 @@ function HealthStat({
         : 'text-fg'
   return (
     <div>
-      <dt className="text-fg-muted text-[10px] tracking-wider uppercase">{label}</dt>
+      <dt className="text-fg-muted t-sm tracking-wider uppercase">{label}</dt>
       <dd className={`mt-1 font-mono text-[14px] tabular-nums ${valueClass}`}>{value}</dd>
     </div>
   )
@@ -238,7 +239,7 @@ function DsymSection({
         key: d.id,
         left: d.objectName ?? d.debugId,
         right: (
-          <span className="flex items-center gap-2 text-[11px]">
+          <span className="flex items-center gap-2 t-sm">
             <span className="text-fg-muted font-mono">{d.debugId.slice(0, 8)}…</span>
             <span className="bg-bg-tertiary text-fg-muted rounded px-1.5 py-0.5 font-mono">
               {d.arch}
@@ -278,7 +279,7 @@ function MappingSection({
         key: m.id,
         left: m.debugId ?? '(no embedded id)',
         right: (
-          <span className="text-fg-muted font-mono text-[11px] tabular-nums">
+          <span className="text-fg-muted font-mono t-sm tabular-nums">
             {humanBytes(m.sizeBytes)}
           </span>
         ),
@@ -308,21 +309,21 @@ function ArtifactSection({
 }) {
   return (
     <section>
-      <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">{title}</h2>
+      <h2 className="text-fg-muted t-sm tracking-wider uppercase">{title}</h2>
       {rows.length === 0 ? (
-        <p className="text-fg-muted mt-2 text-[12px]">{emptyHint}</p>
+        <p className="text-fg-muted mt-2 t-md">{emptyHint}</p>
       ) : (
         <ul className="border-border divide-border mt-2 divide-y rounded-md border">
           {rows.map((r) => (
             <li className="flex items-center justify-between gap-3 px-4 py-2" key={r.key}>
               <div className="flex min-w-0 flex-1 items-center gap-3">
-                <span className="text-fg truncate font-mono text-[12px]">{r.left}</span>
+                <span className="text-fg truncate font-mono t-md">{r.left}</span>
                 {r.right}
               </div>
-              <div className="text-fg-muted shrink-0 text-right text-[11px]">
+              <div className="text-fg-muted shrink-0 text-right t-sm">
                 <div className="font-mono tabular-nums">{relativeDay(r.createdAt)}</div>
                 {r.uploader && (
-                  <div className="text-[10px]" title={r.uploader}>
+                  <div className="t-sm" title={r.uploader}>
                     {r.uploader.length > 24 ? r.uploader.slice(0, 22) + '…' : r.uploader}
                   </div>
                 )}
@@ -341,19 +342,7 @@ function humanBytes(n: number): string {
   return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 
-function relativeDay(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime()
-  if (Number.isNaN(ms)) return iso
-  const days = Math.floor(ms / 86_400_000)
-  if (days <= 0) {
-    const hours = Math.floor(ms / 3_600_000)
-    if (hours <= 0) return 'just now'
-    return `${hours}h ago`
-  }
-  if (days === 1) return 'yesterday'
-  if (days < 30) return `${days}d ago`
-  return `${Math.floor(days / 30)}mo ago`
-}
+// `relativeDay` is aliased to the shared `formatRelative` (see imports).
 
 // re-export type for clarity in callers
 export type { ReleaseArtifacts, ReleaseSourcemap }

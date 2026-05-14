@@ -58,7 +58,7 @@ export function ProjectTeamSettingsView() {
   return (
     <div className="space-y-6 p-6">
       <header>
-        <Link className="text-fg-muted hover:text-fg text-[12px]" to={`/org/${orgSlug}/issues`}>
+        <Link className="text-fg-muted hover:text-fg t-md" to={`/org/${orgSlug}/issues`}>
           ← Back
         </Link>
         <h1 className="text-fg mt-2 text-xl font-semibold">{project.name} — Teams</h1>
@@ -87,16 +87,16 @@ export function ProjectTeamSettingsView() {
               <li className="flex items-center justify-between px-4 py-3" key={t.id}>
                 <div>
                   <Link
-                    className="text-accent font-mono text-[12px] hover:underline"
+                    className="text-accent font-mono t-md hover:underline"
                     to={`/org/${orgSlug}/teams/${t.slug}`}
                   >
                     {t.slug}
                   </Link>
-                  <span className="text-fg ml-2 text-[13px]">{t.name}</span>
+                  <span className="text-fg ml-2 t-md">{t.name}</span>
                 </div>
                 {canManage ? (
                   <button
-                    className={`rounded-md px-3 py-1 text-[12px] font-medium ${
+                    className={`rounded-md px-3 py-1 t-md font-medium ${
                       isBound
                         ? 'border-border text-fg-muted hover:bg-bg-tertiary border'
                         : 'bg-accent text-bg'
@@ -109,7 +109,7 @@ export function ProjectTeamSettingsView() {
                   </button>
                 ) : (
                   <span
-                    className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${
+                    className={`rounded px-1.5 py-0.5 t-sm font-medium ${
                       isBound
                         ? 'bg-[color:var(--color-success-bg)] text-[color:var(--color-success)]'
                         : 'bg-fg/10 text-fg-muted'

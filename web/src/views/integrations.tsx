@@ -93,14 +93,14 @@ export function IntegrationsView() {
     <div className="space-y-6 p-6">
       <header>
         <h1 className="text-fg text-xl font-semibold">Integrations</h1>
-        <p className="text-fg-muted mt-1 text-[12px]">
+        <p className="text-fg-muted mt-1 t-md">
           Org-scoped connections. Auto-create / mirror Sentori issues into external tools.
         </p>
       </header>
 
       {banner && (
         <div
-          className={`rounded-md border-l-4 px-3 py-2 text-[12px] ${
+          className={`rounded-md border-l-4 px-3 py-2 t-md ${
             banner.kind === 'success'
               ? 'border-accent/40 bg-accent/[0.04] text-fg'
               : 'border-red-400/40 bg-red-500/[0.04] text-[color:var(--color-danger)]'
@@ -122,14 +122,14 @@ export function IntegrationsView() {
                 <div className="flex items-center gap-2">
                   <h2 className="text-fg text-[14px] font-medium">{a.label}</h2>
                   {row && (
-                    <span className="bg-accent/10 text-accent rounded px-1.5 py-0.5 text-[10px] tracking-wider uppercase">
+                    <span className="bg-accent/10 text-accent rounded px-1.5 py-0.5 t-sm tracking-wider uppercase">
                       connected
                     </span>
                   )}
                 </div>
-                <p className="text-fg-muted mt-1 text-[12px]">{a.description}</p>
+                <p className="text-fg-muted mt-1 t-md">{a.description}</p>
                 {row && (
-                  <dl className="text-fg-muted mt-2 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 text-[11px]">
+                  <dl className="text-fg-muted mt-2 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 t-sm">
                     {Object.entries(row.display).map(([k, v]) =>
                       v ? (
                         <div className="contents" key={k}>
@@ -144,7 +144,7 @@ export function IntegrationsView() {
               <div className="shrink-0">
                 {row ? (
                   <button
-                    className="text-fg-muted rounded-md border border-transparent px-2 py-1 text-[11px] hover:text-[color:var(--color-danger)]"
+                    className="text-fg-muted rounded-md border border-transparent px-2 py-1 t-sm hover:text-[color:var(--color-danger)]"
                     disabled={revoke.isPending}
                     onClick={() => revoke.mutate({ kind: a.kind, orgSlug: currentOrg.slug })}
                     type="button"
@@ -153,7 +153,7 @@ export function IntegrationsView() {
                   </button>
                 ) : a.mode === 'oauth' ? (
                   <a
-                    className="border-border hover:border-accent/60 hover:text-fg text-fg-muted rounded-md border px-3 py-1 text-[11px]"
+                    className="border-border hover:border-accent/60 hover:text-fg text-fg-muted rounded-md border px-3 py-1 t-sm"
                     href={adminApi.integrationConnectUrl(a.kind, currentOrg.slug)}
                   >
                     Connect →
@@ -215,7 +215,7 @@ function SlackConfigureForm({
   if (!open) {
     return (
       <button
-        className="border-border hover:border-accent/60 hover:text-fg text-fg-muted rounded-md border px-3 py-1 text-[11px]"
+        className="border-border hover:border-accent/60 hover:text-fg text-fg-muted rounded-md border px-3 py-1 t-sm"
         onClick={() => setOpen(true)}
         type="button"
       >
@@ -233,7 +233,7 @@ function SlackConfigureForm({
     >
       <input
         aria-label="Slack incoming webhook URL"
-        className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 font-mono text-[10px]"
+        className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 font-mono t-sm"
         onChange={(e) => setWebhookUrl(e.target.value)}
         placeholder="https://hooks.slack.com/services/T…/B…/…"
         required
@@ -243,23 +243,23 @@ function SlackConfigureForm({
       />
       <input
         aria-label="Channel label (display only)"
-        className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 text-[11px]"
+        className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 t-sm"
         onChange={(e) => setChannelLabel(e.target.value)}
         placeholder="#sentori-alerts (optional)"
         type="text"
         value={channelLabel}
       />
-      {error && <p className="text-[10px] text-[color:var(--color-danger)]">{error}</p>}
+      {error && <p className="t-sm text-[color:var(--color-danger)]">{error}</p>}
       <div className="flex justify-end gap-2">
         <button
-          className="text-fg-muted hover:text-fg text-[11px]"
+          className="text-fg-muted hover:text-fg t-sm"
           onClick={() => setOpen(false)}
           type="button"
         >
           Cancel
         </button>
         <button
-          className="border-accent/60 text-accent hover:bg-accent/10 rounded-md border px-2 py-1 text-[11px] disabled:opacity-50"
+          className="border-accent/60 text-accent hover:bg-accent/10 rounded-md border px-2 py-1 t-sm disabled:opacity-50"
           disabled={submit.isPending || !webhookUrl.trim()}
           type="submit"
         >

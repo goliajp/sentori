@@ -120,7 +120,7 @@ export function TraceDetailView() {
         </button>
         <h2 className="text-fg truncate text-base font-semibold">{trace.rootOp ?? '—'}</h2>
         <span className="text-fg-muted ml-1 truncate text-sm">{trace.rootName ?? '—'}</span>
-        <span className="text-fg-muted ml-auto text-[12px]">
+        <span className="text-fg-muted ml-auto t-md">
           {detail.data.spans.length} spans · {formatDuration(trace.durationMs)} · {trace.status}
         </span>
       </header>
@@ -136,9 +136,9 @@ export function TraceDetailView() {
       </div>
 
       <section className="flex-1 overflow-y-auto">
-        <table className="w-full border-collapse text-[12px]">
+        <table className="w-full border-collapse t-md">
           <thead className="bg-bg sticky top-0 z-10">
-            <tr className="border-border text-fg-muted border-b text-[11px] tracking-wider uppercase">
+            <tr className="border-border text-fg-muted border-b t-sm tracking-wider uppercase">
               <th className="px-4 py-2 text-left">Op / Name</th>
               <th className="px-4 py-2 text-right">Duration</th>
               <th className="px-4 py-2 text-left">Status</th>
@@ -176,7 +176,7 @@ export function TraceDetailView() {
                     <StatusPill status={n.span.status} />
                     {(eventsBySpan.get(n.span.id) ?? 0) > 0 && (
                       <span
-                        className="ml-2 inline-block rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] text-[color:var(--color-danger)] tabular-nums"
+                        className="ml-2 inline-block rounded bg-red-500/10 px-1.5 py-0.5 t-sm text-[color:var(--color-danger)] tabular-nums"
                         title="Events captured on this span"
                       >
                         {eventsBySpan.get(n.span.id)} event
@@ -203,9 +203,9 @@ export function TraceDetailView() {
               ✕
             </button>
           </div>
-          <p className="text-fg-muted mt-1 truncate text-[12px]">{openSpan.name}</p>
+          <p className="text-fg-muted mt-1 truncate t-md">{openSpan.name}</p>
 
-          <dl className="mt-4 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-[12px]">
+          <dl className="mt-4 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 t-md">
             <dt className="text-fg-muted">id</dt>
             <dd className="font-mono break-all">{openSpan.id}</dd>
             <dt className="text-fg-muted">parent</dt>
@@ -220,8 +220,8 @@ export function TraceDetailView() {
 
           {Object.keys(openSpan.tags).length > 0 && (
             <section className="mt-5">
-              <h4 className="text-fg-muted text-[11px] tracking-wider uppercase">Tags</h4>
-              <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-[12px]">
+              <h4 className="text-fg-muted t-sm tracking-wider uppercase">Tags</h4>
+              <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 t-md">
                 {Object.entries(openSpan.tags).map(([k, v]) => (
                   <Fragment key={k}>
                     <dt className="text-fg-muted font-mono">{k}</dt>
@@ -234,8 +234,8 @@ export function TraceDetailView() {
 
           {openSpan.data && (
             <section className="mt-5">
-              <h4 className="text-fg-muted text-[11px] tracking-wider uppercase">Data</h4>
-              <pre className="bg-bg-tertiary mt-2 overflow-x-auto rounded p-3 text-[11px]">
+              <h4 className="text-fg-muted t-sm tracking-wider uppercase">Data</h4>
+              <pre className="bg-bg-tertiary mt-2 overflow-x-auto rounded p-3 t-sm">
                 {JSON.stringify(openSpan.data, null, 2)}
               </pre>
             </section>
@@ -250,12 +250,12 @@ export function TraceDetailView() {
             if (events.length === 0) return null
             return (
               <section className="mt-5">
-                <h4 className="text-fg-muted text-[11px] tracking-wider uppercase">
+                <h4 className="text-fg-muted t-sm tracking-wider uppercase">
                   Events on this span
                 </h4>
                 <ul className="mt-2 space-y-1">
                   {events.map((e) => (
-                    <li className="flex items-baseline gap-2 text-[12px]" key={e.id}>
+                    <li className="flex items-baseline gap-2 t-md" key={e.id}>
                       <span className="font-mono text-[color:var(--color-danger)]">
                         {e.errorType}
                       </span>
@@ -290,7 +290,7 @@ function StatusPill({ status }: { status: SpanRow['status'] }) {
         : 'bg-green-500/10 text-[color:var(--color-success)]'
   return (
     <span
-      className={`inline-block rounded px-2 py-0.5 text-[11px] tracking-wider uppercase ${cls}`}
+      className={`inline-block rounded px-2 py-0.5 t-sm tracking-wider uppercase ${cls}`}
     >
       {status}
     </span>

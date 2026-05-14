@@ -72,7 +72,9 @@ body,
 body {
   color: var(--color-fg);
   background-color: var(--color-bg);
-  font-size: 14px;
+  /* 13px body — tightens the dashboard to tasks.golia.jp / devops density.
+   * Pair with the strict t-sm/t-md/t-lg utility scale defined below. */
+  font-size: 13px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   font-family:
@@ -83,6 +85,76 @@ body {
     'Segoe UI',
     Roboto,
     sans-serif;
+}
+
+/*
+ * Strict typography scale — three sizes only.
+ *
+ *   .t-sm  → 11px / caption / muted label / count meta
+ *   .t-md  → 13px / body / table cell / link (default)
+ *   .t-lg  → 16px / page title / heading / hero value
+ *
+ * Reach for these instead of Tailwind `text-xs` / `text-sm` / `text-[Npx]`.
+ * If you find yourself wanting a fourth size, the design is asking for
+ * a layout change, not a new size. (Brand wordmarks + data-viz labels
+ * are the documented exceptions — see Toolbar SENTORI logo, flamegraph
+ * bar labels.)
+ */
+@utility t-sm {
+  font-size: 11px;
+  line-height: 1.4;
+}
+@utility t-md {
+  font-size: 13px;
+  line-height: 1.5;
+}
+@utility t-lg {
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+/*
+ * Standard data-table treatment.
+ *
+ * Add `.std-table` to a div that wraps a `<table>` (e.g. GDS DataTable or
+ * a plain table). It gives the wrapper a single outer frame (rounded-md
+ * border) and paints a 1px hairline between every cell using the SAME
+ * --color-border token, so the outer frame and the inner grid look like
+ * one piece rather than wrapper-around-table.
+ *
+ * The `> div` reset neutralizes any component-level chrome (border,
+ * radius, shadow, inner padding) that a wrapped Card-style root might
+ * carry, otherwise you get two concentric outlines with two different
+ * border-radii.
+ */
+.std-table > div {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+}
+.std-table table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0;
+}
+.std-table td,
+.std-table th {
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  padding: 10px 12px;
+  vertical-align: middle;
+}
+.std-table th {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.std-table tr > :last-child {
+  border-right: 0;
+}
+.std-table tr:last-child > td {
+  border-bottom: 0;
 }
 
 /*
