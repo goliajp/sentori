@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { auditApi, type AuditRow, orgsApi } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { useHasPermission } from '@/auth/useHasPermission'
+import { PageBody, PageHeader, PageShell } from '@/components/ui'
 import { type Density, densityClasses, useDensity } from '@/lib/density'
 
 const PAGE_LIMIT = 100
@@ -88,105 +89,110 @@ export function AuditLogView() {
   }
 
   return (
-    <div className="space-y-5 p-6">
-      <header className="flex items-baseline justify-between">
-        <div>
-          <h1 className="text-fg text-xl font-semibold">Audit log</h1>
-          <p className="text-fg-muted mt-1 text-sm">
-            Append-only record of admin actions in <span className="font-mono">{slug}</span>.
-          </p>
-        </div>
-        <button
-          className="border-border text-fg-muted hover:bg-bg-tertiary rounded-md border px-3 py-1.5 text-[12px]"
-          disabled={rows.length === 0}
-          onClick={onExportCsv}
-          type="button"
-        >
-          Export CSV
-        </button>
-      </header>
-
-      <section className="border-border flex flex-wrap items-center gap-3 rounded-md border p-3">
-        <select
-          className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 text-[13px]"
-          onChange={(e) => setAction(e.target.value)}
-          value={action}
-        >
-          <option value="">All actions</option>
-          {(actionsCatalog.data ?? []).map((a) => (
-            <option key={a.code} value={a.code}>
-              {a.label}
-            </option>
-          ))}
-        </select>
-        <select
-          className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 text-[13px]"
-          onChange={(e) => setActorUserId(e.target.value)}
-          value={actorUserId}
-        >
-          <option value="">All actors</option>
-          {(membersQuery.data ?? []).map((m) => (
-            <option key={m.userId} value={m.userId}>
-              {m.email}
-            </option>
-          ))}
-        </select>
-        <input
-          className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 text-[13px]"
-          onChange={(e) => setBefore(e.target.value)}
-          title="Show entries strictly before this time"
-          type="datetime-local"
-          value={before}
-        />
-        {(action || actorUserId || before) && (
+    <PageShell>
+      <PageHeader
+        actions={
           <button
-            className="text-fg-muted hover:text-fg ml-auto text-[12px]"
-            onClick={() => {
-              setAction('')
-              setActorUserId('')
-              setBefore('')
-            }}
+            className="border-border text-fg-muted hover:bg-bg-tertiary rounded-md border px-3 py-1.5 text-[12px]"
+            disabled={rows.length === 0}
+            onClick={onExportCsv}
             type="button"
           >
-            Clear filters
+            Export CSV
           </button>
-        )}
-      </section>
-
-      {auditQuery.isLoading ? (
-        <p className="text-fg-muted text-sm">Loading…</p>
-      ) : rows.length === 0 ? (
-        <p className="text-fg-muted text-sm">No matching entries.</p>
-      ) : (
-        <>
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="text-fg-muted border-border border-b text-left text-[11px] tracking-wider uppercase">
-                <th className="px-2 py-2 font-medium">Time</th>
-                <th className="px-2 py-2 font-medium">Actor</th>
-                <th className="px-2 py-2 font-medium">Action</th>
-                <th className="px-2 py-2 font-medium">Target</th>
-                <th className="px-2 py-2 font-medium">Payload</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <AuditRowItem density={density} key={r.id} row={r} />
-              ))}
-            </tbody>
-          </table>
-          {hasMore && (
-            <button
-              className="border-border text-fg-muted hover:bg-bg-tertiary mx-auto block rounded-md border px-3 py-1.5 text-[12px]"
-              onClick={onLoadMore}
-              type="button"
+        }
+        subtitle={
+          <>
+            Append-only record of admin actions in <span className="font-mono">{slug}</span>
+          </>
+        }
+        title="Audit log"
+      />
+      <PageBody>
+        <div className="space-y-5">
+          <section className="border-border flex flex-wrap items-center gap-3 rounded-md border p-3">
+            <select
+              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 text-[13px]"
+              onChange={(e) => setAction(e.target.value)}
+              value={action}
             >
-              Load older →
-            </button>
+              <option value="">All actions</option>
+              {(actionsCatalog.data ?? []).map((a) => (
+                <option key={a.code} value={a.code}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+            <select
+              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 text-[13px]"
+              onChange={(e) => setActorUserId(e.target.value)}
+              value={actorUserId}
+            >
+              <option value="">All actors</option>
+              {(membersQuery.data ?? []).map((m) => (
+                <option key={m.userId} value={m.userId}>
+                  {m.email}
+                </option>
+              ))}
+            </select>
+            <input
+              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 text-[13px]"
+              onChange={(e) => setBefore(e.target.value)}
+              title="Show entries strictly before this time"
+              type="datetime-local"
+              value={before}
+            />
+            {(action || actorUserId || before) && (
+              <button
+                className="text-fg-muted hover:text-fg ml-auto text-[12px]"
+                onClick={() => {
+                  setAction('')
+                  setActorUserId('')
+                  setBefore('')
+                }}
+                type="button"
+              >
+                Clear filters
+              </button>
+            )}
+          </section>
+
+          {auditQuery.isLoading ? (
+            <p className="text-fg-muted text-sm">Loading…</p>
+          ) : rows.length === 0 ? (
+            <p className="text-fg-muted text-sm">No matching entries.</p>
+          ) : (
+            <>
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="text-fg-muted border-border border-b text-left text-[11px] tracking-wider uppercase">
+                    <th className="px-2 py-2 font-medium">Time</th>
+                    <th className="px-2 py-2 font-medium">Actor</th>
+                    <th className="px-2 py-2 font-medium">Action</th>
+                    <th className="px-2 py-2 font-medium">Target</th>
+                    <th className="px-2 py-2 font-medium">Payload</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <AuditRowItem density={density} key={r.id} row={r} />
+                  ))}
+                </tbody>
+              </table>
+              {hasMore && (
+                <button
+                  className="border-border text-fg-muted hover:bg-bg-tertiary mx-auto block rounded-md border px-3 py-1.5 text-[12px]"
+                  onClick={onLoadMore}
+                  type="button"
+                >
+                  Load older →
+                </button>
+              )}
+            </>
           )}
-        </>
-      )}
-    </div>
+        </div>
+      </PageBody>
+    </PageShell>
   )
 }
 

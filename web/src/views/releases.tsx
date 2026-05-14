@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { adminApi, type ReleaseListRow } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
+import { PageBody, PageHeader, PageShell } from '@/components/ui'
 
 /**
  * Phase 23 sub-A: project releases list. Card per release with the
@@ -53,18 +54,19 @@ export function ReleasesView() {
   }
 
   return (
-    <div className="space-y-3 p-6">
-      <header className="flex items-baseline justify-between">
-        <h1 className="text-fg text-xl font-semibold">Releases</h1>
-        <span className="text-fg-muted text-[12px]">{rows.length} release(s)</span>
-      </header>
-
-      <ul className="space-y-2">
-        {rows.map((r) => (
-          <ReleaseCard key={r.id} orgSlug={currentOrg.slug} row={r} />
-        ))}
-      </ul>
-    </div>
+    <PageShell>
+      <PageHeader
+        actions={<span className="text-fg-muted text-[12px]">{rows.length} releases</span>}
+        title="Releases"
+      />
+      <PageBody>
+        <ul className="space-y-2">
+          {rows.map((r) => (
+            <ReleaseCard key={r.id} orgSlug={currentOrg.slug} row={r} />
+          ))}
+        </ul>
+      </PageBody>
+    </PageShell>
   )
 }
 
