@@ -332,7 +332,7 @@ export function IssuesView() {
             aria-pressed={anrOnly}
             className={`rounded-md px-2.5 py-1 text-[12px] transition-colors ${
               anrOnly
-                ? 'bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30'
+                ? 'border border-[color:var(--color-warning-border)] bg-[color:var(--color-warning-bg)] text-[color:var(--color-warning)] ring-1 ring-[color:var(--color-warning-border)]'
                 : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
             }`}
             onClick={toggleAnrOnly}
@@ -419,7 +419,7 @@ export function IssuesView() {
         </div>
       </div>
       {parsed.warnings.length > 0 && (
-        <div className="border-border bg-amber-500/5 px-6 py-2 text-[11px] text-amber-300">
+        <div className="border-border border-b bg-[color:var(--color-warning-bg)] px-6 py-2 text-[11px] text-[color:var(--color-warning)]">
           {parsed.warnings.join(' · ')}
         </div>
       )}

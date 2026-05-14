@@ -25,6 +25,7 @@ the same PR.**
 | Token                   | Value     | Used for                                          |
 |-------------------------|-----------|---------------------------------------------------|
 | `--color-bg`            | `#ffffff` | page background                                   |
+| `--color-bg-secondary`  | `#fafafa` | card surfaces that need a slight lift             |
 | `--color-bg-tertiary`   | `#f3f4f6` | inputs, buttons, card backgrounds                 |
 | `--color-fg`            | `#111827` | primary text                                      |
 | `--color-fg-secondary`  | `#374151` | hover states, slightly de-emphasized text         |
@@ -37,6 +38,7 @@ the same PR.**
 | Token                   | Value     | Used for                                          |
 |-------------------------|-----------|---------------------------------------------------|
 | `--color-bg`            | `#0b0b0f` | page background                                   |
+| `--color-bg-secondary`  | `#11121a` | card surfaces that need a slight lift             |
 | `--color-bg-tertiary`   | `#1a1a23` | inputs, buttons, card backgrounds                 |
 | `--color-fg`            | `#f3f4f6` | primary text                                      |
 | `--color-fg-secondary`  | `#d1d5db` | hover states, slightly de-emphasized text         |
@@ -44,20 +46,23 @@ the same PR.**
 | `--color-border`        | `#2a2a35` | hairline dividers, input borders                  |
 | `--color-accent`        | `#a78bfa` | primary buttons, focus rings, links               |
 
-### Status colours
+### Status / semantic colours (Phase 49 sub-A)
 
-These are Tailwind palette references, not CSS variables — the dashboard
-already uses `bg-red-500/15 text-red-300` style classes inline. The list
-exists so we keep the meaning consistent across surfaces.
+Real CSS variables — paired text / bg / border triples per variant.
+The `<InfoBox variant>` primitive in `web/src/components/ui/InfoBox.tsx`
+and the `<Chip tone>` primitive both consume these directly. Use them
+instead of `bg-red-500/15 text-red-300`-style ad-hoc Tailwind so a
+future palette tweak only touches the token table.
 
-| Semantic          | Tailwind class fragment           | Used for                                |
-|-------------------|------------------------------------|-----------------------------------------|
-| Success / healthy | `green-500/15` `green-300`         | crash-free rate ≥ threshold             |
-| Warning           | `amber-500/15` `amber-300`         | active issues, ANR, snooze chip         |
-| Danger / error    | `red-500/15` `red-300`             | regressed issues, crashed sessions      |
-| Info              | `blue-500/15` `blue-300`           | nav/projects in Cmd+K, snoozed chip     |
-| Neutral / mute    | `bg-bg-tertiary` `text-fg-muted`   | closed / silenced state                 |
-| Distinct (member) | `violet-500/15` `violet-300`       | user references in Cmd+K                |
+| Semantic | Token triple                                                              | Used for                                          |
+|----------|---------------------------------------------------------------------------|---------------------------------------------------|
+| Info     | `--color-info` / `--color-info-bg` / `--color-info-border`                | hints, "this is how it works", nav highlights     |
+| Success  | `--color-success` / `--color-success-bg` / `--color-success-border`       | crash-free rate ≥ threshold, opt-in is on         |
+| Warning  | `--color-warning` / `--color-warning-bg` / `--color-warning-border`       | ANR, unsymbolicated, snooze chip, parser warnings |
+| Danger   | `--color-danger` / `--color-danger-bg` / `--color-danger-border`          | regressed issues, crashed sessions, fetch errors  |
+
+Light values are mid-tone-on-pale-tint; dark values are pale-tone-on-deep-tint —
+both pass WCAG AA on the dashboard's background colours.
 
 ## Typography
 

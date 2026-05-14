@@ -133,7 +133,7 @@ export function TokenSettingsView() {
             {createMutation.isPending ? 'Generating…' : 'Generate token'}
           </button>
         </form>
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm text-[color:var(--color-danger)]">{error}</p>}
       </section>
 
       <section>

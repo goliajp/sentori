@@ -95,7 +95,12 @@ export function SessionTrailViewer({
   }, [steps])
 
   if (isLoading) return <div className="text-fg-muted text-[11px]">Loading session trail…</div>
-  if (error) return <div className="text-[11px] text-red-400">Failed to load session trail.</div>
+  if (error)
+    return (
+      <div className="text-[11px] text-[color:var(--color-danger)]">
+        Failed to load session trail.
+      </div>
+    )
   if (steps.length === 0) return <div className="text-fg-muted text-[11px]">No steps recorded.</div>
 
   const focused = effectiveFocus === null ? null : (steps[effectiveFocus] ?? null)

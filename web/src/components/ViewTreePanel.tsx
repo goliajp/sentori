@@ -146,7 +146,11 @@ export function ViewTreePanel({
     return <p className="text-fg-muted px-2 py-4 text-[12px]">Loading view tree…</p>
   }
   if (error) {
-    return <p className="px-2 py-4 text-[12px] text-red-400">Failed to load view tree.</p>
+    return (
+      <p className="px-2 py-4 text-[12px] text-[color:var(--color-danger)]">
+        Failed to load view tree.
+      </p>
+    )
   }
   if (!data) return null
 

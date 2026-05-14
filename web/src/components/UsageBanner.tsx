@@ -25,9 +25,11 @@ export function UsageBanner({ org }: { org: OrgRow }) {
 
   const exceeded = pct >= HARD_THRESHOLD
   const reset = new Date(data.resetAt).toISOString().slice(0, 10)
+  // Phase 49 sub-C — use semantic status tokens instead of raw amber /
+  // red so the banner stays in sync with InfoBox + dark-mode palette.
   const tone = exceeded
-    ? 'border-red-500/60 bg-red-500/10 text-red-300'
-    : 'border-amber-500/60 bg-amber-500/10 text-amber-200'
+    ? 'border-[color:var(--color-danger-border)] bg-[color:var(--color-danger-bg)] text-[color:var(--color-danger)]'
+    : 'border-[color:var(--color-warning-border)] bg-[color:var(--color-warning-bg)] text-[color:var(--color-warning)]'
 
   return (
     <div className={`border-b ${tone} px-6 py-1.5 text-[12px]`}>
