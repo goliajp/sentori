@@ -20,7 +20,6 @@ import { FrameRoleBadge } from '@/components/FrameRoleBadge'
 import { SourceCode } from '@/components/SourceCode'
 import { PageHeader } from '@/layout/page-header'
 import { formatRelative } from '@/lib/format'
-import { packageOf } from '@/lib/frame-package'
 import { roleOf } from '@/lib/frame-role'
 import { languageOf } from '@/lib/source-language'
 import { frameToSourceUrl } from '@/lib/source-link'
@@ -453,55 +452,46 @@ function StackList({
   sourceRepoUrl?: null | string
   stack: Frame[]
 }) {
+  const [hideVendor, setHideVendor] = useState(false)
   if (stack.length === 0) {
     return <p className="text-fg-muted t-md">No frames captured.</p>
   }
-  // Run-length collapse, splitting vendor runs by package so e.g.
-  // react-native and expo-router fold separately (each named).
-  const groups: (
-    | { at: number; frame: Frame; kind: 'app' }
-    | { at: number; frames: Frame[]; kind: 'vendor'; pkg: null | string }
-  )[] = []
-  for (let i = 0; i < stack.length; i++) {
-    const f = stack[i]!
-    if (f.inApp) {
-      groups.push({ at: i, frame: f, kind: 'app' })
-      continue
-    }
-    const pkg = packageOf(f.file)
-    const last = groups[groups.length - 1]
-    if (last && last.kind === 'vendor' && last.pkg === pkg) last.frames.push(f)
-    else groups.push({ at: i, frames: [f], kind: 'vendor', pkg })
-  }
-  // If every frame in the stack is vendor (no in-app, common for
-  // unhandled-rejection or unmapped native crashes), the user otherwise
-  // sees a single "1 library frame" foldout and thinks the page is
-  // empty. Expand by default in that case so the frame names are
-  // visible without an extra click.
-  const allVendor = groups.every((g) => g.kind === 'vendor')
+  const vendorCount = stack.filter((f) => !f.inApp).length
+  const visible = hideVendor ? stack.filter((f) => f.inApp) : stack
   return (
-    <div className="border-border overflow-hidden rounded-md border">
-      {groups.map((g) =>
-        g.kind === 'app' ? (
-          <FrameRow
-            frame={g.frame}
-            idx={g.at}
-            key={g.at}
-            onClick={onFrameClick ? () => onFrameClick(g.at) : undefined}
-            sourceRepoUrl={sourceRepoUrl}
-          />
-        ) : (
-          <VendorFold
-            base={g.at}
-            defaultOpen={allVendor}
-            frames={g.frames}
-            key={g.at}
-            onFrameClick={onFrameClick}
-            pkg={g.pkg}
-            sourceRepoUrl={sourceRepoUrl}
-          />
-        )
+    <div>
+      {vendorCount > 0 && (
+        <div className="text-fg-muted t-sm mb-2 flex items-center justify-between gap-2">
+          <span>
+            {stack.length} frame{stack.length === 1 ? '' : 's'} ·{' '}
+            <span className="font-mono">{vendorCount}</span> from libraries
+          </span>
+          <button
+            className="text-fg-muted hover:text-fg t-sm tracking-wider uppercase"
+            onClick={() => setHideVendor((v) => !v)}
+            type="button"
+          >
+            {hideVendor ? `▸ show ${vendorCount} library` : `▾ hide library`}
+          </button>
+        </div>
       )}
+      <div className="border-border overflow-hidden rounded-md border">
+        {visible.map((f) => {
+          // We always pass the ORIGINAL index from `stack` so frame
+          // numbering, source drawer lookup, and `↗ src` link don't
+          // shift when vendor frames are hidden.
+          const idx = stack.indexOf(f)
+          return (
+            <FrameRow
+              frame={f}
+              idx={idx}
+              key={idx}
+              onClick={onFrameClick ? () => onFrameClick(idx) : undefined}
+              sourceRepoUrl={sourceRepoUrl}
+            />
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -581,84 +571,10 @@ function FrameRow({
   )
 }
 
-function VendorFold({
-  base,
-  defaultOpen = false,
-  frames,
-  onFrameClick,
-  pkg,
-  sourceRepoUrl,
-}: {
-  base: number
-  defaultOpen?: boolean
-  frames: Frame[]
-  onFrameClick?: (idx: number) => void
-  pkg: null | string
-  sourceRepoUrl?: null | string
-}) {
-  const [open, setOpen] = useState(defaultOpen)
-  return (
-    <div className="border-border/40 border-b last:border-b-0">
-      <button
-        className="text-fg-muted hover:bg-bg-tertiary/40 hover:text-fg t-sm flex w-full items-center gap-2 px-3 py-1 text-left"
-        onClick={() => setOpen((o) => !o)}
-        type="button"
-      >
-        <span className="inline-block w-3">{open ? '▾' : '▸'}</span>
-        <FrameRoleBadge role={roleOf(frames[0]!)} />
-        {pkg ? (
-          <>
-            <span className="text-fg font-mono">{pkg}</span>
-            <span>
-              ({frames.length} frame{frames.length === 1 ? '' : 's'})
-            </span>
-          </>
-        ) : (
-          <span>
-            {frames.length} library frame{frames.length === 1 ? '' : 's'}
-          </span>
-        )}
-      </button>
-      {open && (
-        <div className="bg-bg-tertiary/10">
-          {frames.map((f, i) => {
-            const repoUrl = frameToSourceUrl({ file: f.file, line: f.line, sourceRepoUrl })
-            return (
-              <div className="flex items-baseline gap-3 px-3 py-1 pl-9" key={i}>
-                <button
-                  className="text-fg-muted hover:text-fg t-sm flex flex-1 items-baseline gap-3 text-left font-mono"
-                  onClick={() => onFrameClick?.(base + i)}
-                  type="button"
-                >
-                  <span className="w-6 shrink-0 text-right tabular-nums">{base + i}</span>
-                  <span className="text-fg whitespace-nowrap">{f.function ?? '<anonymous>'}</span>
-                  <span className="truncate">
-                    {f.file}
-                    <span className="text-fg-dim">:</span>
-                    <span className="tabular-nums">{f.line}</span>
-                    {f.column !== undefined ? `:${f.column}` : ''}
-                  </span>
-                </button>
-                {repoUrl && (
-                  <a
-                    aria-label="Open this line on the configured source host"
-                    className="text-fg-muted hover:text-fg t-sm shrink-0 tracking-wider uppercase"
-                    href={repoUrl}
-                    onClick={(e) => e.stopPropagation()}
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    ↗ src
-                  </a>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
+// VendorFold removed (Phase 52 follow-up): the StackList now renders
+// every frame inline. Library frames stay visible by default with a
+// dimmer treatment via `FrameRow`'s `inApp` branch; users who want a
+// shorter view toggle "hide library" in the header above the list.
 
 /**
  * Full-file source drawer — opened by clicking a frame in StackList.
