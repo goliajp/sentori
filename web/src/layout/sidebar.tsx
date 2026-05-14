@@ -1,13 +1,11 @@
-import { Link, useLocation, useParams } from 'react-router'
+import { Link, useLocation } from 'react-router'
 
 import type { ModuleDef } from '@/modules/registry'
 
 import { useOrg } from '@/auth/orgContext'
 import { useAuth } from '@/auth/state'
-import { GROUPS, MODULES, modulesInGroup, PINNED_MODULE } from '@/modules/registry'
+import { GROUPS, modulesInGroup, PINNED_MODULE } from '@/modules/registry'
 import { VERSION_LABEL } from '@/version'
-
-void MODULES
 
 /**
  * Left navigation rail. tasks.golia.jp / devops.golia.jp pattern:
@@ -120,13 +118,4 @@ function UserMenu({ email, onLogout }: { email: null | string; onLogout: () => v
       </button>
     </div>
   )
-}
-
-/**
- * Bridge so legacy imports (`useParams<{ slug }>()`) inside views can
- * still reach the current org slug without re-plumbing.
- */
-export function useOrgSlug(): string {
-  const { slug } = useParams<{ slug: string }>()
-  return slug ?? ''
 }

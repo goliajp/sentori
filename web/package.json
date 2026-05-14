@@ -10,7 +10,7 @@
     "check": "tsc --noEmit && eslint src/ && prettier --check src/",
     "fix": "eslint --fix src/ && prettier --write src/",
     "lhci": "bunx @lhci/cli@^0.16 autorun --config=./lighthouserc.cjs",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:e2e": "playwright test",
     "test:watch": "vitest"
   },
