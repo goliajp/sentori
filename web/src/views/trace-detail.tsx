@@ -14,6 +14,7 @@ import { adminApi, type SpanRow } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { Flamegraph } from '@/components/charts'
 import { ErrorState, LoadingState } from '@/components/states'
+import { Tag } from '@/components/Tag'
 
 type TreeNode = {
   children: TreeNode[]
@@ -175,13 +176,12 @@ export function TraceDetailView() {
                   <td className="px-4 py-1">
                     <StatusPill status={n.span.status} />
                     {(eventsBySpan.get(n.span.id) ?? 0) > 0 && (
-                      <span
-                        className="ml-2 inline-block rounded bg-red-500/10 px-1.5 py-0.5 t-sm text-[color:var(--color-danger)] tabular-nums"
-                        title="Events captured on this span"
-                      >
-                        {eventsBySpan.get(n.span.id)} event
-                        {eventsBySpan.get(n.span.id) === 1 ? '' : 's'}
-                      </span>
+                      <Tag className="ml-2 tabular-nums" variant="danger">
+                        <span title="Events captured on this span">
+                          {eventsBySpan.get(n.span.id)} event
+                          {eventsBySpan.get(n.span.id) === 1 ? '' : 's'}
+                        </span>
+                      </Tag>
                     )}
                   </td>
                 </tr>

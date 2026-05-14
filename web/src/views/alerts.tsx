@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { type AlertRule, type AlertRuleInput, type AlertTriggerKind, orgsApi } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { useHasPermission } from '@/auth/useHasPermission'
+import { Tag } from '@/components/Tag'
 import { PageBody, PageHeader, PageShell } from '@/components/ui'
 import { densityClasses, useDensity } from '@/lib/density'
 import { formatRelative as relativeTime } from '@/lib/format'
@@ -157,20 +158,22 @@ export function AlertsView() {
                         )}
                         <span>{r.name}</span>
                         {r.muted && (
-                          <span
-                            className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 t-sm font-medium tracking-wide text-[color:var(--color-warning)] uppercase ring-1 ring-amber-500/30"
-                            title="Muted — manual unmute required"
+                          <Tag
+                            className="ml-2 uppercase"
+                            variant="warning"
                           >
-                            Muted
-                          </span>
+                            <span title="Muted — manual unmute required">Muted</span>
+                          </Tag>
                         )}
                         {!r.muted && r.snoozedUntil && new Date(r.snoozedUntil) > new Date() && (
-                          <span
-                            className="ml-2 rounded bg-blue-500/15 px-1.5 py-0.5 t-sm font-medium tracking-wide text-[color:var(--color-info)] uppercase ring-1 ring-blue-500/30"
-                            title={`Snoozed until ${new Date(r.snoozedUntil).toLocaleString()}`}
-                          >
-                            Snoozed
-                          </span>
+                          <Tag className="ml-2 uppercase">
+                            <span
+                              className="text-info"
+                              title={`Snoozed until ${new Date(r.snoozedUntil).toLocaleString()}`}
+                            >
+                              Snoozed
+                            </span>
+                          </Tag>
                         )}
                       </td>
                       <td className="text-fg-muted px-3">
