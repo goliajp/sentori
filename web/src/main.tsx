@@ -7,6 +7,8 @@ import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 
 import { ErrorState } from './components/states'
+import { ToastProvider } from './components/ui'
+import { GlobalProgress } from './components/GlobalProgress'
 
 // Phase 17 sub-F: dogfood. Reports dashboard's own JS errors back to
 // the same Sentori instance under the `sentori-dashboard` project.
@@ -201,11 +203,14 @@ createRoot(document.getElementById('root')!).render(
         }
       >
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <DensityProvider>
-              <RouterProvider router={router} />
-            </DensityProvider>
-          </AuthProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <DensityProvider>
+                <GlobalProgress />
+                <RouterProvider router={router} />
+              </DensityProvider>
+            </AuthProvider>
+          </ToastProvider>
         </QueryClientProvider>
       </SentoriErrorBoundary>
     </SentoriProvider>

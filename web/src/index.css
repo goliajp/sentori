@@ -129,3 +129,116 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * Phase 50 sub-B1 — skeleton shimmer. Two-stop gradient sweeps
+ * across the placeholder block at 1.4s linear infinite. Tokens
+ * (--color-bg-tertiary → --color-bg-secondary) so it matches the
+ * theme it's loading inside.
+ */
+.sentori-skeleton {
+  background: linear-gradient(
+    100deg,
+    var(--color-bg-tertiary) 30%,
+    var(--color-bg-secondary) 50%,
+    var(--color-bg-tertiary) 70%
+  );
+  background-size: 200% 100%;
+  animation: sentori-shimmer 1.4s linear infinite;
+}
+@keyframes sentori-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/*
+ * Phase 50 sub-B7 — top progress bar. Indeterminate 2px stripe that
+ * lives at the top of the viewport while any background fetch is
+ * in-flight. The `<TopProgress>` component toggles a class on
+ * `<body>` so the bar is rendered once globally.
+ */
+.sentori-top-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 60;
+  pointer-events: none;
+}
+.sentori-top-progress > div {
+  height: 100%;
+  background: var(--color-accent);
+  animation: sentori-progress 1.2s ease-in-out infinite;
+  transform-origin: left;
+}
+@keyframes sentori-progress {
+  0% {
+    transform: translateX(-100%) scaleX(0.3);
+  }
+  50% {
+    transform: translateX(0%) scaleX(0.6);
+  }
+  100% {
+    transform: translateX(100%) scaleX(0.3);
+  }
+}
+
+/*
+ * Phase 50 sub-B5 — toast container + entry animation. Toasts sit
+ * bottom-right; new ones slide up + fade in.
+ */
+@keyframes sentori-toast-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.sentori-toast {
+  animation: sentori-toast-in 180ms ease-out;
+}
+
+/*
+ * Phase 50 sub-B2 — page transition. PageBody children fade in on
+ * mount; React-Router state change re-mounts the route which
+ * triggers the animation. Subtle (140ms, opacity-only) so power
+ * users navigating quickly don't see ghosting.
+ */
+@keyframes sentori-page-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.sentori-page-in {
+  animation: sentori-page-in 140ms ease-out;
+}
+
+/*
+ * Phase 50 sub-B3 — optimistic row removal. When a row leaves the
+ * list (issue resolved / merged / silenced), apply this class on
+ * the way out. 240ms slide-left + fade.
+ */
+@keyframes sentori-row-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+.sentori-row-out {
+  animation: sentori-row-out 240ms ease-in forwards;
+}
