@@ -782,7 +782,7 @@ function EventsTab({
         >
           <div className="flex items-baseline gap-3">
             <span className="text-fg font-mono">{e.id.slice(0, 8)}</span>
-            <span className="text-fg-muted truncate">{e.errorMessage}</span>
+            <span className="text-fg-muted truncate">{displayMessage(e.errorMessage)}</span>
             <span className="text-fg-muted t-sm ml-auto font-mono tabular-nums">
               {formatRelative(e.receivedAt)}
             </span>
