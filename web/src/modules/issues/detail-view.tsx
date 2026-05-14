@@ -520,20 +520,20 @@ function FrameRow({
       <div className="hover:bg-bg-tertiary/40 t-md flex items-baseline gap-3 px-3 py-1.5">
         <button
           aria-label="Open full source for this frame"
-          className="flex flex-1 items-baseline gap-3 text-left"
+          className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5 text-left"
           onClick={onClick}
           type="button"
         >
           <span className="text-fg-muted t-sm w-6 shrink-0 text-right tabular-nums">{idx}</span>
           <FrameRoleBadge role={roleOf(frame)} />
           <span
-            className={`shrink-0 font-mono font-semibold whitespace-nowrap ${
+            className={`min-w-0 font-mono font-semibold break-all ${
               frame.inApp ? 'text-fg' : 'text-fg-muted'
             }`}
           >
             {frame.function ?? '<anonymous>'}
           </span>
-          <span className="text-fg-muted truncate font-mono">
+          <span className="text-fg-muted min-w-0 font-mono break-all">
             {frame.file}
             <span className="text-fg-dim">:</span>
             <span className="tabular-nums">{frame.line}</span>
