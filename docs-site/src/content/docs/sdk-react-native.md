@@ -1,6 +1,11 @@
-# @goliapkg/sentori-react-native
+---
+title: React Native SDK
+description: JS + native crash capture, screenshots, view trees, session trail
+---
 
-React Native SDK for Sentori. Captures JS errors, iOS `NSException`,
+# Sentori React Native SDK
+
+`@goliapkg/sentori-react-native`. Captures JS errors, iOS `NSException`,
 Android uncaught Java/Kotlin exceptions, and ships them through a
 batched HTTP transport.
 
