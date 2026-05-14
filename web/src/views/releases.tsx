@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 import { adminApi, type ReleaseListRow } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
-import { PageBody, PageHeader, PageShell } from '@/components/ui'
+import { EmptyArt, PageBody, PageHeader, PageShell } from '@/components/ui'
 
 /**
  * Phase 23 sub-A: project releases list. Card per release with the
@@ -31,6 +31,7 @@ export function ReleasesView() {
     return (
       <EmptyState
         hint="Create one in your org settings to see releases."
+        icon={<EmptyArt kind="project" />}
         title="No project in this org yet"
       />
     )
@@ -48,6 +49,7 @@ export function ReleasesView() {
             <code className="font-mono">sentori-cli upload</code> runs against this project.
           </>
         }
+        icon={<EmptyArt kind="releases" />}
         title="No releases yet"
       />
     )

@@ -6,6 +6,7 @@
 export { Button } from './Button'
 export { Card } from './Card'
 export { Chip } from './Chip'
+export { EmptyArt } from './EmptyArt'
 export { InfoBox } from './InfoBox'
 export { Input } from './Input'
 export { OverflowItem, OverflowMenu } from './OverflowMenu'

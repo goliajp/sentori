@@ -15,7 +15,7 @@ import { useAuth } from '@/auth/state'
 import { useOrg } from '@/auth/orgContext'
 import { LiveEventSparkline } from '@/components/charts'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
-import { useToast } from '@/components/ui'
+import { EmptyArt, useToast } from '@/components/ui'
 import { type ColumnDef, useColumnPrefs } from '@/lib/column-prefs'
 import { densityClasses, useDensity } from '@/lib/density'
 import { parseIssueQuery } from '@/lib/issue-query'
@@ -526,6 +526,7 @@ export function IssuesView() {
       {!projectId && (
         <EmptyState
           hint="Create one in your org settings to start ingesting events."
+          icon={<EmptyArt kind="project" />}
           title="No project in this org yet"
         />
       )}
@@ -538,6 +539,7 @@ export function IssuesView() {
               ? 'Try a different status tab or clear the filter.'
               : 'Trigger an error from your SDK to see it here.'
           }
+          icon={<EmptyArt kind="issues" />}
           title={`No ${effectiveStatus} issues`}
         />
       )}

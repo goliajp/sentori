@@ -4,7 +4,7 @@ import { adminApi, type HealthSummary } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { LineChart } from '@/components/charts'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
-import { PageBody, PageHeader, PageShell, StatNumber } from '@/components/ui'
+import { EmptyArt, PageBody, PageHeader, PageShell, StatNumber } from '@/components/ui'
 
 /**
  * Phase 26 sub-D: project overview / health widget.
@@ -29,6 +29,7 @@ export function OverviewView() {
     return (
       <EmptyState
         hint="Create one in your org settings to start ingesting events."
+        icon={<EmptyArt kind="project" />}
         title="No project selected"
       />
     )

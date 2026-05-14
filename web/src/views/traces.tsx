@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router'
 import { adminApi, type TraceRow } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
+import { EmptyArt } from '@/components/ui'
 import { densityClasses, useDensity } from '@/lib/density'
 import { parseTraceQuery } from '@/lib/trace-query'
 
@@ -132,6 +133,7 @@ export function TracesView() {
       {traces.length === 0 ? (
         <EmptyState
           hint="Send an http.client span from a Sentori-instrumented client."
+          icon={<EmptyArt kind="traces" />}
           title="No traces yet"
         />
       ) : (
