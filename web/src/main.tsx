@@ -40,17 +40,25 @@ const sentoriConfig = {
 
 applyTheme()
 
-const moduleChildren = MODULES.flatMap((m) => {
+/**
+ * Modules with `children` get a NESTED route so the parent renders
+ * <Outlet /> and child views appear inside the parent's layout. This
+ * lets Issues / Traces show a master-detail (rail on left, detail on
+ * right) instead of jumping between separate full-page screens.
+ */
+const moduleChildren = MODULES.map((m) => {
   const View = m.view
-  const own = { element: <View />, path: m.path }
-  if (!m.children) return [own]
-  return [
-    own,
-    ...m.children.map((c) => {
+  if (!m.children || m.children.length === 0) {
+    return { element: <View />, path: m.path }
+  }
+  return {
+    children: m.children.map((c) => {
       const Child = c.view
-      return { element: <Child />, path: `${m.path}/${c.path}` }
+      return { element: <Child />, path: c.path }
     }),
-  ]
+    element: <View />,
+    path: m.path,
+  }
 })
 
 const router = createBrowserRouter([
