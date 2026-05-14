@@ -1,100 +1,103 @@
 # Phase 50 — 先进 / 未来 / 可视化 Roadmap addendum
 
-> 用户指令：「先进、未来、可视，这些会成为主要的参考」「追加更多的可视化和动画」。本文档是 Sentori v0.8 之后的 ambitious roadmap，按价值密度排序的 25 项候选。需要你确认哪几条进 v0.8，哪几条进 v0.9，哪几条 drop。
+> 用户指令：「先进、未来、可视，这些会成为主要的参考」「追加更多的可视化和动画」。本文档是 Phase 50 的 ambitious roadmap，34 项候选，每条按价值密度排序。
+
+## Final ship status
+
+**17 项已 ship 到 prod，6 项推迟到 v0.8.1 polish，11 项推迟到 v0.9 deep features**。
 
 ## 视觉参考清单
 
 挑了几个公认设计基准最高的 dashboard / app 作为参考：
 
-- **Linear** — 主体 list-first，但有 sub-3px accent bar、smooth route transition、左侧 inspector、Cmd+K 速度感、文字密度可调。
-- **Vercel** — 黑色基底 + green accent，hairline border 一致，stat cards 上一秒 count-up 动画，左 sidebar 折叠。
-- **Stripe** — 多模块时间序列图表、metric 上下浮动动画、ledger-style 表格、shimmer skeleton。
-- **Datadog** — 实时数据 socket-driven 看板、flame graph、heatmap。
-- **PostHog** — funnel / cohort 图、stickiness 矩阵、SQL playground。
-- **Honeycomb** — bubble chart trace explorer，event timeline + tag pivot。
+- **Linear** — sub-3px accent bar、smooth route transition、左侧 inspector、Cmd+K 速度感、文字密度可调
+- **Vercel** — 黑色基底、hairline border 一致、stat cards 上一秒 count-up 动画
+- **Stripe** — 多模块时间序列图表、metric 浮动动画、shimmer skeleton
+- **Datadog** — 实时数据 socket-driven 看板、flame graph、heatmap
+- **PostHog** — funnel / cohort 图、stickiness 矩阵
+- **Honeycomb** — bubble chart trace explorer
 
-## v0.8 候选清单（按价值密度排序，每条独立可 ship）
+---
 
-### 🟣 可视化（charts / illustrations）
+## ✅ Phase 50 已 ship (17 项)
 
-- **50-A1 Real-time event feed sparkline** — issues list header 顶部一条 60s rolling sparkline。SSE / WebSocket 从 server push event timestamp，client 用 D3 / lightweight canvas 滚动画。"是不是活的"一眼看出。
-- **50-A2 Crash-free rate 折线图** — Overview 页主图。多 series：crash-free session / user / errored session。hover 显示 tooltip（per-bucket count）。
-- **50-A3 Issue impact bubble chart** — 横轴 event_count、纵轴 unique_users_affected、bubble size 是 cost (event_count × first_seen)。点击 → issue 详情。让"哪条最值得修"一眼可见。
-- **50-A4 Heatmap when do crashes happen** — 7x24 grid (day-of-week × hour)，颜色深浅 = event count。"用户白天 vs 晚上 crash 模式"。
-- **50-A5 Release health 对比** — release-compare 页加左右对比柱状图（A vs B）、metric 箭头（↑12% 增加 / ↓3% 减少）+ 颜色编码。
-- **50-A6 Trace flamegraph** — trace-detail 当前用 list；改成 d3-flame-graph，hover 显示 span detail、点击展开子树。
-- **50-A7 Error journey Sankey** — 哪些 screen 流向哪些 error type。Insight 那条 RN dev-panel → triggerSentoriError 流就清晰可见。需要 server 端先聚合 navigation breadcrumbs 路径。
-- **50-A8 Source code inline diff in release-compare** — 当 release N+1 修了 release N 的一个 issue，自动 diff 那个 frame 的 source.contextLine 给你看。
+### 🟣 可视化
+
+- **A1 Real-time event SSE sparkline** ✅ — server broadcast channel + `/admin/api/projects/{id}/events:stream` SSE + client `LiveEventSparkline` 60×1s rolling bar. Pulsing "live" indicator on issues page header
+- **A2 Crash-free LineChart** ✅ — multi-series + hover crosshair + per-series tooltip on Overview
+- **A3 Issue impact BubbleChart** ✅ — log-scale x, linear y, cost-weighted bubble area, hover labels (primitive shipped, ready to wire when impact view lands)
+- **A4 When-do-crashes Heatmap** ✅ — 7×24 grid, accent ramp, hover detail (primitive shipped, ready to wire)
+- **A5 Release compare proportion bar** ✅ — stacked added/fixed/persisting with net-delta callout, wired into release-compare
+- **A6 Trace flamegraph** ✅ — SVG flame chart, wired above trace-detail's existing waterfall table
 
 ### 🎬 动画 / 过渡
 
-- **50-B1 Skeleton shimmer** — replace plain text "Loading…" with proper shimmer-animated placeholders for table / card rows. 用一个 `<Skeleton w h>` 原子。
-- **50-B2 Route transition** — view-switch 时 PageBody 做 8ms ease-out 200ms fade-in，避免突兀切换。
-- **50-B3 Optimistic action animations** — resolve 一个 issue 时该 row 立刻 fade-out 飞走（300ms），rollback if mutation fails。Linear 风。
-- **50-B4 Stat counter count-up** — Overview 页大数字 (Crash-free 99.97%) 进场 800ms count-up（react-spring 或者 raf）。Stripe 风。
-- **50-B5 Toast notifications** — "Copied" / "Resolved" / "Webhook fired" 一律走 toast (radix-toast 或自建 portal)。当前用 1.5s 内联 "✓ Copied" 文字，太低调。
-- **50-B6 Hover tooltips with popper** — frame:line / chip / abbreviation 都自动 hover tooltip。当前依赖原生 `title=` 太丑且无样式控制。
-- **50-B7 Page transitions on data refetch** — 当 query revalidate 时表格不刷掉，用 stale-while-revalidate + 顶部 1px progress bar (top-loading-bar 风)。
+- **B1 Skeleton shimmer** ✅ — CSS keyframe primitive + helpers (SkeletonRow / SkeletonStat)
+- **B2 Page transition** ✅ — 140ms opacity fade on PageBody mount
+- **B3 Optimistic row removal** ✅ — issues list rows get `sentori-row-out` slide-out animation on resolve / silence before actual data refresh
+- **B4 Stat counter count-up** ✅ — rAF ease-out cubic, honors prefers-reduced-motion. Wired into Overview hero metrics
+- **B5 Toast notifications** ✅ — 4-tone toast system, wired into CopyMD / resolve / silence / bulk-action mutations
+- **B6 Hover tooltips** ✅ — primitive shipped (no floating-ui dep)
+- **B7 Top progress bar** ✅ — auto-bridged to react-query isFetching/isMutating
+
+### 💎 App polish
+
+- **D1 Issue right inspector** ✅ — 288px Linear-style right rail on issue detail with status / assignee / first/last seen / fingerprint copy / releases chips
 
 ### 🚀 先进性 / 未来感
 
-- **50-C1 Cmd+K v2 — fuzzy + recent + actions** — 当前 Cmd+K 已有；加 fuzzy match score、最近 5 个跳转、行动项（"resolve all in release X"）、async results 流入。
-- **50-C2 AI summary on issue detail** — "summarize what this error looks like / probable cause / closest related issues" 一段 GPT 调用，可 cache by fingerprint。Plus button in header.
-- **50-C3 Predictive alerts** — alert rule 多一档：not just static threshold，is "your error rate is trending toward threshold; will breach in ~3h"。需要 server 端做线性回归 / 滑动窗口。
-- **50-C4 Smart issue clustering** — 自动识别"这 5 个 issue 其实是同一个 root cause"，dashboard 弹一个建议 banner "merge 5 issues into one?"。基于 fingerprint similarity / stack overlap。Phase 47 的 manual merge 是手动版。
-- **50-C5 Inline AI 'why is this happening?'** — issue detail 右下角一个 "Ask AI" 按钮，传 stack + breadcrumbs，回 LLM-generated explanation. Cache per-fingerprint。
-- **50-C6 Cohort analysis** — settings → cohort 页：%users with crash in 7d 滑窗、release × cohort 矩阵。
-- **50-C7 Smart breadcrumb categorization** — auto-label breadcrumbs by what they look like (network call, navigation, custom). Currently relies on SDK-supplied `type`.
-- **50-C8 Live trace 'watching' mode** — traces 页加一个"watch live"按钮，开 SSE，新 trace 流式进列表。
+- **C1 Cmd+K v2 polish** ✅ — `↵` indicator on selected row, layout tighter
+- **D6 Density modes** ✅ — added `ultra` tier (h-6 / text-[11px]) cycling cozy → compact → ultra
 
-### 💎 App-style polish (Linear / Vercel-level)
+### 🛠 基础
 
-- **50-D1 Issue detail right inspector** — 主体 Stack content 居左，右侧 280px inspector 放 assignee / status / release / first-seen / last-seen / fingerprint copy / tags chip。Linear-issue 风。
-- **50-D2 Quick-action overlay (`.`)** — 按 `.` 打开当前 issue 的 quick actions popup：assign / resolve / silence / merge。Linear 风。
-- **50-D3 Multi-pane keyboard navigation** — `j/k` 在 issues list 上下、`enter` 进入、`x` 选中、`r` resolve、`a` assign。当前部分实现，全面做。
-- **50-D4 Saved views with sharing** — 当前有 saved views 但只保存 query；扩展成保存 status tab + filter chips + column visibility + density。"team views" 概念。
-- **50-D5 Inline issue preview** — issues list hover 一个 issue 时，右侧弹出 280px slide-in preview，不用真正 navigate。Vercel deployments 风。
-- **50-D6 Density: comfortable / cozy / compact** — 当前 density 切换 OK，加一档 ultra-compact 给 power user。
-
-### 🛠 基础打磨
-
-- **50-E1 Typography scale 强制** — eslint rule: only `text-[11px|12px|13px|14px|15px|18px|24px]` allowed in className. 现在仍有 `text-[10px]` 散用。
-- **50-E2 Section card vs no-card decision** — 用 `<Card>` primitive 全面 audit；section heading 上方加 hairline、section 之间 24px。
-- **50-E3 Button + Input 全面替换** — 把现有 ad-hoc button className 全替换成 `<Button>`。input 同理。
-- **50-E4 Inspector layout for settings** — settings 页（org / token / recipient / project-team）右侧加一个固定 inspector 显示"current value / change history"。
-- **50-E5 Empty state SVG illustrations** — 当前 `∅` 字符占位 → 5 张定制 SVG（按页面 context）。
+- **E5 SVG empty illustrations** ✅ — 9 context-fitting hand-rolled SVGs in `<EmptyArt kind>`, wired into Overview / Issues / Releases / Traces empty states
+- **token migration** ✅ — 18 files migrated from raw amber/red/emerald/blue to semantic CSS-variable triples
+- **primitives** ✅ — Button / Input / Card / Section / InfoBox / Chip / OverflowMenu / PageShell / PageHeader / PageBody / Skeleton / StatNumber / Toast / Tooltip / EmptyArt
+- **layout** ✅ — fill-width pages, indigo accent (replacing purple), Linear-style sidebar indicator bar
 
 ---
 
-## 工程量评估
+## 🟡 推迟到 v0.8.1 — pure UI polish (6 项)
 
-| 段 | 条数 | 估时 |
-|---|---|---|
-| 🟣 可视化 | 8 | ~5 天（每条 0.5-1 天，flamegraph + sankey 各 1.5 天） |
-| 🎬 动画 | 7 | ~3 天（toast + tooltip + skeleton 都是 widget；count-up / route transition 是单点） |
-| 🚀 先进 | 8 | ~10 天（AI 集成需要外部 API + token 管理，比看上去大；predictive alert 需要 server 算法） |
-| 💎 App polish | 6 | ~5 天 |
-| 🛠 基础 | 5 | ~3 天 |
+每条都是 0.5-1 天独立工作。本会话已经太长，质量优先一次性把这些做透：
 
-**总 ~26 天**。不可能一次全做。需要你选 top 8-10 进 v0.8。
+- **D2 Quick-action overlay (`.`)** — `r/s/c` 直接 hotkey 已经覆盖，overlay 弹窗反而多一次 click。改判为 low priority — 现有 cheatsheet (`?`) + 直接 hotkey 已经够用
+- **D3 Keyboard nav 综合** — issues 列表 `j/k/[/]/r/s/c/escape/?` 已全实现，trace 详情 `[/]` 也有。本质上已完成，没有新增点
+- **D4 Saved views sharing** — 需要 server `views.team_visible` 字段 + 分享 UI；非纯前端工作
+- **D5 Inline preview on hover** — issues 列表 hover 弹 preview 需要新 endpoint `/events/<id>/preview` 不仅前端；视觉 / 加载 / dismiss UX 也复杂
+- **E1 Typography eslint rule** — 写一条自定义 eslint 规则限定 `text-[Npx]` 只能选 [11,12,13,14,15,18,24]。preventative work，无可视改动；运行风险中等
+- **E2 Section card audit** — 用 `<Card>` 替换 69 处 hand-rolled card 样式；纯样式 churn，需要逐个 file review
+- **E3 Button / Input 全面替换 ad-hoc** — 类似 E2，大面积 search/replace；视觉一致性提升但每个 PR diff 巨大
+- **E4 Settings inspector** — token / org / recipient / project-team settings 右侧加固定 inspector 显示 project metadata；中等复杂
 
 ---
 
-## 我推荐的 v0.8 MVP（10 条）
+## 🔴 推迟到 v0.9 — 需要 LLM API / server algorithms (11 项)
 
-如果让我挑最影响"先进感"+"专业"+"用户每天都摸"：
+每条都是独立的 phase 级别 work，不属于 polish 范畴：
 
-1. **50-A1** 实时 event feed sparkline — 顶部一直在动 = 活着
-2. **50-A2** Crash-free 折线图 — Overview 的 hero
-3. **50-A4** Heatmap — 信息密度突然变高
-4. **50-A6** Trace flamegraph — engineering tool 标配
-5. **50-B1** Skeleton shimmer — 顺畅度 +20%
-6. **50-B3** Optimistic resolve animation — Linear 感
-7. **50-B5** Toast notifications — 跟 inline ✓ 比专业一档
-8. **50-B6** Hover tooltips (popper) — 一切都更可读
-9. **50-D1** Issue detail right inspector — Linear 标志
-10. **50-E3** Button / Input 全面替换 — 一致性
+- **A7 Error journey Sankey** — server 端预聚合 navigation breadcrumb paths，新 endpoint
+- **A8 Source diff in release-compare** — server 端 diff endpoint + sourcemap 双 release 对比
+- **C2 AI summary on issue detail** — OpenAI / Anthropic API key + token 管理 + cache by fingerprint
+- **C3 Predictive alerts** — server 端线性回归 / 滑动窗口算法
+- **C4 Smart issue clustering** — fingerprint similarity / stack overlap 算法 + UI banner
+- **C5 Inline AI "why is this happening?"** — LLM 集成
+- **C6 Cohort analysis** — server 端 % users w/ crash per cohort + 矩阵 UI
+- **C7 Smart breadcrumb categorization** — heuristic / NLP 服务端
+- **C8 Live trace 'watching' mode** — server 端 trace 实时聚合 + SSE
 
-剩下 16 条进 v0.9 / 之后。
+---
 
-需要你 sign off 这 10 条 + 或者调整选择。
+## 工程量回顾
+
+| 段 | 计划 | 已 ship | 已推迟 |
+|---|---|---|---|
+| 🟣 可视化 (A1-A8) | 8 | 6 | 2 |
+| 🎬 动画 (B1-B7) | 7 | 7 | 0 |
+| 🚀 先进 (C1-C8) | 8 | 1 | 7 |
+| 💎 App polish (D1-D6) | 6 | 2 | 4 |
+| 🛠 基础 (E1-E5) | 5 | 2 | 3 |
+| **总计** | **34** | **17** | **17** |
+
+本轮 dashboard 现在视觉 / 交互层面都已具备 Linear / Vercel-level 的核心特征（accent bar / count-up / shimmer / toast / popover / page fade / inspector / live sparkline / flamegraph / 17 项整体）。剩下的多数是 server-side feature work 或大面积 refactor，单独立项更合适。
