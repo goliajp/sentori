@@ -5,7 +5,6 @@ import type { ModuleDef } from '@/modules/registry'
 import { useOrg } from '@/auth/orgContext'
 import { useAuth } from '@/auth/state'
 import { GROUPS, modulesInGroup, PINNED_MODULE } from '@/modules/registry'
-import { VERSION_LABEL } from '@/version'
 
 /**
  * Left navigation rail. tasks.golia.jp / devops.golia.jp pattern:
@@ -46,10 +45,9 @@ export function Sidebar() {
       </div>
 
       <div className="border-border/60 border-t p-3">
+        {/* Version label lives in the status bar only — no need to repeat
+         *  it here. Sidebar footer = account affordance + logout, period. */}
         <UserMenu email={user?.email ?? null} onLogout={() => void logout()} />
-        <div className="text-fg-muted/60 t-sm mt-1 px-1 font-mono tabular-nums">
-          {VERSION_LABEL}
-        </div>
       </div>
     </aside>
   )
