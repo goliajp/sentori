@@ -9,6 +9,7 @@ import {
   type Breadcrumb,
   type EventRow,
   type Frame,
+  type FrameSource,
   type IssueRow,
   type IssueStatus,
 } from '@/api/client'
@@ -380,6 +381,10 @@ function StackTab({
 }) {
   const payload = event.payload
   const frames = payload.error?.stack ?? []
+  // Server-fetched full-file source drawer. Open one at a time; click
+  // another frame to switch. Esc closes (handled inside the drawer).
+  const [openFrame, setOpenFrame] = useState<null | number>(null)
+
   return (
     <div className="space-y-3">
       {event.traceId && (
@@ -397,7 +402,11 @@ function StackTab({
         </div>
       )}
       <Pane title="Stack trace">
-        <StackList stack={frames} sourceRepoUrl={sourceRepoUrl} />
+        <StackList
+          onFrameClick={(idx) => setOpenFrame(idx)}
+          sourceRepoUrl={sourceRepoUrl}
+          stack={frames}
+        />
       </Pane>
 
       {/* Phase 48 sub-A.2 — screenshots / view-tree / session-trail from
@@ -418,11 +427,29 @@ function StackTab({
           }}
         />
       </Pane>
+
+      {openFrame !== null && (
+        <FrameSourceDrawer
+          environment={payload.environment}
+          eventId={event.id}
+          frame={openFrame}
+          onClose={() => setOpenFrame(null)}
+          projectId={projectId}
+        />
+      )}
     </div>
   )
 }
 
-function StackList({ sourceRepoUrl, stack }: { sourceRepoUrl?: null | string; stack: Frame[] }) {
+function StackList({
+  onFrameClick,
+  sourceRepoUrl,
+  stack,
+}: {
+  onFrameClick?: (idx: number) => void
+  sourceRepoUrl?: null | string
+  stack: Frame[]
+}) {
   if (stack.length === 0) {
     return <p className="text-fg-muted t-md">No frames captured.</p>
   }
@@ -447,9 +474,21 @@ function StackList({ sourceRepoUrl, stack }: { sourceRepoUrl?: null | string; st
     <div className="border-border overflow-hidden rounded-md border">
       {groups.map((g) =>
         g.kind === 'app' ? (
-          <FrameRow frame={g.frame} idx={g.at} key={g.at} sourceRepoUrl={sourceRepoUrl} />
+          <FrameRow
+            frame={g.frame}
+            idx={g.at}
+            key={g.at}
+            onClick={onFrameClick ? () => onFrameClick(g.at) : undefined}
+            sourceRepoUrl={sourceRepoUrl}
+          />
         ) : (
-          <VendorFold base={g.at} frames={g.frames} key={g.at} pkg={g.pkg} />
+          <VendorFold
+            base={g.at}
+            frames={g.frames}
+            key={g.at}
+            onFrameClick={onFrameClick}
+            pkg={g.pkg}
+          />
         )
       )}
     </div>
@@ -459,10 +498,12 @@ function StackList({ sourceRepoUrl, stack }: { sourceRepoUrl?: null | string; st
 function FrameRow({
   frame,
   idx,
+  onClick,
   sourceRepoUrl,
 }: {
   frame: Frame
   idx: number
+  onClick?: () => void
   sourceRepoUrl?: null | string
 }) {
   const hasSnippet = frame.contextLine !== undefined
@@ -476,25 +517,32 @@ function FrameRow({
   return (
     <div className={`border-border/40 border-b last:border-b-0 ${frame.inApp ? 'bg-bg' : ''}`}>
       <div className="hover:bg-bg-tertiary/40 t-md flex items-baseline gap-3 px-3 py-1.5">
-        <span className="text-fg-muted t-sm w-6 shrink-0 text-right tabular-nums">{idx}</span>
-        <FrameRoleBadge role={roleOf(frame)} />
-        <span
-          className={`shrink-0 font-mono font-semibold whitespace-nowrap ${
-            frame.inApp ? 'text-fg' : 'text-fg-muted'
-          }`}
+        <button
+          aria-label="Open full source for this frame"
+          className="flex flex-1 items-baseline gap-3 text-left"
+          onClick={onClick}
+          type="button"
         >
-          {frame.function ?? '<anonymous>'}
-        </span>
-        <span className="text-fg-muted truncate font-mono">
-          {frame.file}
-          <span className="text-fg-dim">:</span>
-          <span className="tabular-nums">{frame.line}</span>
-          {frame.column !== undefined ? `:${frame.column}` : ''}
-        </span>
+          <span className="text-fg-muted t-sm w-6 shrink-0 text-right tabular-nums">{idx}</span>
+          <FrameRoleBadge role={roleOf(frame)} />
+          <span
+            className={`shrink-0 font-mono font-semibold whitespace-nowrap ${
+              frame.inApp ? 'text-fg' : 'text-fg-muted'
+            }`}
+          >
+            {frame.function ?? '<anonymous>'}
+          </span>
+          <span className="text-fg-muted truncate font-mono">
+            {frame.file}
+            <span className="text-fg-dim">:</span>
+            <span className="tabular-nums">{frame.line}</span>
+            {frame.column !== undefined ? `:${frame.column}` : ''}
+          </span>
+        </button>
         {repoUrl && (
           <a
             aria-label="Open this line on the configured source host"
-            className="text-fg-muted hover:text-fg t-sm ml-auto shrink-0 self-center tracking-wider uppercase"
+            className="text-fg-muted hover:text-fg t-sm shrink-0 self-center tracking-wider uppercase"
             href={repoUrl}
             onClick={(e) => e.stopPropagation()}
             rel="noopener noreferrer"
@@ -522,7 +570,17 @@ function FrameRow({
   )
 }
 
-function VendorFold({ base, frames, pkg }: { base: number; frames: Frame[]; pkg: null | string }) {
+function VendorFold({
+  base,
+  frames,
+  onFrameClick,
+  pkg,
+}: {
+  base: number
+  frames: Frame[]
+  onFrameClick?: (idx: number) => void
+  pkg: null | string
+}) {
   const [open, setOpen] = useState(false)
   return (
     <div className="border-border/40 border-b last:border-b-0">
@@ -549,19 +607,155 @@ function VendorFold({ base, frames, pkg }: { base: number; frames: Frame[]; pkg:
       {open && (
         <div className="bg-bg-tertiary/10">
           {frames.map((f, i) => (
-            <div
-              className="text-fg-muted t-sm flex items-baseline gap-3 px-3 py-1 pl-9 font-mono"
+            <button
+              className="text-fg-muted hover:bg-bg-tertiary/50 hover:text-fg t-sm flex w-full items-baseline gap-3 px-3 py-1 pl-9 text-left font-mono"
               key={i}
+              onClick={() => onFrameClick?.(base + i)}
+              type="button"
             >
               <span className="w-6 shrink-0 text-right tabular-nums">{base + i}</span>
               <span className="whitespace-nowrap">{f.function ?? '<anonymous>'}</span>
               <span className="truncate">
                 {f.file}:{f.line}
               </span>
-            </div>
+            </button>
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Full-file source drawer — opened by clicking a frame in StackList.
+ * Fetches via `/projects/:id/events/:id/frame-source?frame=N` with a
+ * configurable context window (±5 / ±20 / ±50). Server caches each
+ * window immutable + 1h so flipping is free after first fetch.
+ */
+function FrameSourceDrawer({
+  environment,
+  eventId,
+  frame,
+  onClose,
+  projectId,
+}: {
+  environment: string
+  eventId: string
+  frame: number
+  onClose: () => void
+  projectId: string
+}) {
+  const [contextLines, setContextLines] = useState(5)
+  const { data, error, isLoading } = useQuery({
+    placeholderData: (prev) => prev,
+    queryFn: () => adminApi.frameSource(projectId, eventId, { frame, lines: contextLines }),
+    queryKey: ['frame-source', projectId, eventId, frame, contextLines],
+    staleTime: 60 * 60 * 1000,
+  })
+  useHotkeys('escape', onClose, { enableOnFormTags: true })
+
+  return (
+    <div
+      aria-modal
+      className="fixed inset-y-0 right-0 z-40 flex w-full max-w-2xl flex-col"
+      role="dialog"
+    >
+      <div
+        className="absolute inset-0 -z-10 bg-black/30"
+        onClick={onClose}
+        style={{ left: 'auto', right: '100%', width: '100vw' }}
+      />
+      <div className="border-border bg-bg flex h-full flex-col border-l shadow-xl">
+        <header className="border-border flex h-12 shrink-0 items-center gap-3 border-b px-4">
+          <div className="text-fg-muted t-sm truncate tracking-wider uppercase">
+            Source · frame {frame}
+          </div>
+          <div className="ml-auto flex items-center gap-1">
+            {[5, 20, 50].map((n) => (
+              <button
+                aria-label={`Show ±${n} lines`}
+                className={`t-sm rounded px-2 py-0.5 transition-colors ${
+                  contextLines === n
+                    ? 'bg-accent/10 text-accent'
+                    : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+                }`}
+                key={n}
+                onClick={() => setContextLines(n)}
+                type="button"
+              >
+                ±{n}
+              </button>
+            ))}
+          </div>
+          <button
+            aria-label="Close"
+            className="text-fg-muted hover:text-fg t-md rounded px-2 py-1"
+            onClick={onClose}
+            type="button"
+          >
+            ✕ Esc
+          </button>
+        </header>
+        <div className="flex-1 overflow-auto">
+          {isLoading && <p className="text-fg-muted t-md px-4 py-6">Loading source…</p>}
+          {error && <FrameSourceError environment={environment} error={error} />}
+          {data && <FrameSourceBody source={data} />}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FrameSourceBody({ source }: { source: FrameSource }) {
+  const offset = source.line - source.before.length
+  const code = [...source.before, source.at, ...source.after].join('\n')
+  const language = languageOf(source.file)
+  return (
+    <div className="t-md px-4 py-3">
+      <p className="text-fg-muted truncate font-mono">
+        {source.file}:{source.line}:{source.column}
+      </p>
+      <div className="border-border bg-bg-tertiary/40 mt-3 overflow-hidden rounded-md border">
+        <SourceCode
+          code={code}
+          highlightLines={[source.line]}
+          language={language}
+          lineAnchorPrefix="src-"
+          startLine={offset}
+        />
+      </div>
+    </div>
+  )
+}
+
+function FrameSourceError({ environment, error }: { environment: string; error: unknown }) {
+  const status = (error as { status?: number } | undefined)?.status
+  if (status === 404) {
+    if (environment === 'dev' || environment === 'development') {
+      return (
+        <div className="border-info/40 bg-info/5 text-info t-md mx-4 my-4 rounded border px-3 py-2">
+          <div className="t-sm mb-1 font-semibold tracking-wider uppercase">Dev build</div>
+          <div className="text-fg">
+            Source maps are only uploaded for production releases. Run{' '}
+            <code className="font-mono">bun cli release</code> to see the original source here.
+          </div>
+        </div>
+      )
+    }
+    return (
+      <div className="border-warning/40 bg-warning/5 text-warning t-md mx-4 my-4 rounded border px-3 py-2">
+        <div className="t-sm mb-1 font-semibold tracking-wider uppercase">No source</div>
+        <div className="text-fg">
+          Either the release has no source map uploaded, the bundle position can&apos;t be
+          reverse-mapped, or the source map was generated without{' '}
+          <code className="font-mono">sourcesContent</code>.
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="border-danger/40 bg-danger/5 text-danger t-md mx-4 my-4 rounded border px-3 py-2">
+      Failed to load source preview.
     </div>
   )
 }
