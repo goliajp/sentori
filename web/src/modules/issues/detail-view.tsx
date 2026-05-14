@@ -143,7 +143,7 @@ export function IssueDetailView() {
         title={
           <span className="inline-flex items-baseline gap-2">
             <StatusText status={issue.status} />
-            <span className="text-fg">{issue.messageSample || '(no message)'}</span>
+            <span className="text-fg">{displayMessage(issue.messageSample)}</span>
           </span>
         }
       />
@@ -1010,6 +1010,19 @@ function Empty({ hint, title }: { hint: string; title: string }) {
       <div className="text-fg t-md">{hint}</div>
     </div>
   )
+}
+
+/**
+ * Pre-coerceError events ship the literal `[object Object]` as their
+ * message. We can't recover the original payload, but we can stop
+ * showing the useless string. New events ship through SDK coerceError
+ * and never look like this.
+ */
+function displayMessage(message: string): string {
+  if (!message) return '(no message)'
+  if (message === '[object Object]')
+    return '(non-Error thrown — SDK upgrade required to surface payload)'
+  return message
 }
 
 function timeOfDay(iso: string): string {

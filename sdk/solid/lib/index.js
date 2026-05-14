@@ -23,7 +23,7 @@
  * ship a giant API. Most users will just need `initSentori` +
  * `captureException`.
  */
-import { setActiveSpan, startSpan } from '@goliapkg/sentori-core';
+import { coerceError, setActiveSpan, startSpan } from '@goliapkg/sentori-core';
 import { captureException as captureExceptionJs, captureStep, initSentori as initSentoriJs, } from '@goliapkg/sentori-javascript';
 export function initSentori(options) {
     initSentoriJs(options);
@@ -44,7 +44,10 @@ export function initSentori(options) {
  * into a monitoring service.)
  */
 export function sentoriOnCatch(err) {
-    const e = err instanceof Error ? err : new Error(String(err));
+    // `coerceError` JSON-stringifies plain-object throws (`throw {code:
+    // 'auth/expired'}`) so the dashboard shows the real payload instead
+    // of `[object Object]`. See @goliapkg/sentori-core/coerce-error.
+    const e = coerceError(err);
     captureExceptionJs(e);
 }
 /**

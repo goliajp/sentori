@@ -24,7 +24,7 @@
  * `captureException`.
  */
 
-import { setActiveSpan, startSpan, type SpanHandle } from '@goliapkg/sentori-core'
+import { coerceError, setActiveSpan, startSpan, type SpanHandle } from '@goliapkg/sentori-core'
 import {
   captureException as captureExceptionJs,
   captureStep,
@@ -54,7 +54,10 @@ export function initSentori(options: SentoriSolidOptions): void {
  * into a monitoring service.)
  */
 export function sentoriOnCatch(err: unknown): void {
-  const e = err instanceof Error ? err : new Error(String(err))
+  // `coerceError` JSON-stringifies plain-object throws (`throw {code:
+  // 'auth/expired'}`) so the dashboard shows the real payload instead
+  // of `[object Object]`. See @goliapkg/sentori-core/coerce-error.
+  const e = coerceError(err)
   captureExceptionJs(e)
 }
 

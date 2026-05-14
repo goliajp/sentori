@@ -1,3 +1,4 @@
+import { coerceError } from '@goliapkg/sentori-core';
 import { captureError } from '../capture.js';
 import { endSession } from '../session-tracker.js';
 let installed = false;
@@ -12,20 +13,21 @@ export function installBrowserHooks() {
     const w = globalThis;
     if (typeof w.addEventListener !== 'function')
         return false;
+    // `coerceError` keeps the actual thrown value visible — plain objects
+    // come through as JSON instead of `[object Object]`, primitives as
+    // their printed value, `{name, message}`-shaped throws preserve both
+    // fields. See @goliapkg/sentori-core/coerce-error.
     const onError = (e) => {
         const err = e.error;
-        if (err instanceof Error)
-            captureError(err);
+        if (err !== undefined) {
+            captureError(coerceError(err));
+        }
         else if (typeof e.message === 'string') {
             captureError(new Error(e.message));
         }
     };
     const onRejection = (e) => {
-        const reason = e.reason;
-        if (reason instanceof Error)
-            captureError(reason);
-        else
-            captureError(new Error(typeof reason === 'string' ? reason : 'unhandled rejection'));
+        captureError(coerceError(e.reason));
     };
     w.addEventListener('error', onError);
     w.addEventListener('unhandledrejection', onRejection);

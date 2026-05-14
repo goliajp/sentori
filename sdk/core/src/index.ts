@@ -21,6 +21,8 @@ export type {
   User,
 } from './types.js'
 
+export { coerceError } from './coerce-error.js'
+
 export { shouldSample, shouldSampleTrace } from './sampling.js'
 
 export { uuidV7 } from './uuid.js'

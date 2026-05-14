@@ -1,3 +1,5 @@
+import { coerceError } from '@goliapkg/sentori-core';
+
 import { captureError } from '../capture';
 
 type RejectionTracker = (opts: {
@@ -22,9 +24,11 @@ export const installPromiseHandler = (): void => {
       allRejections: true,
       onUnhandled: (_id, rejection) => {
         try {
-          const err =
-            rejection instanceof Error ? rejection : new Error(String(rejection));
-          captureError(err);
+          // `coerceError` keeps the actual rejection visible. JS code
+          // routinely rejects with plain objects (`Promise.reject({code})`),
+          // which would otherwise collapse to the literal text
+          // `[object Object]` in the dashboard.
+          captureError(coerceError(rejection));
         } catch {
           // never throw
         }

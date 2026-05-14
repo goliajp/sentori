@@ -24,7 +24,7 @@
  * `onError` prop on your top-level component.
  */
 import { captureException as captureExceptionJs, captureStep, initSentori as initSentoriJs, } from '@goliapkg/sentori-javascript';
-import { setActiveSpan, startSpan } from '@goliapkg/sentori-core';
+import { coerceError, setActiveSpan, startSpan } from '@goliapkg/sentori-core';
 export function initSentori(options) {
     initSentoriJs(options);
 }
@@ -36,7 +36,10 @@ export function initSentori(options) {
  */
 export function sentoriHandleError() {
     return ({ error, message }) => {
-        const e = error instanceof Error ? error : new Error(String(error));
+        // SvelteKit's `handleError` hook sees whatever user code threw,
+        // including plain objects. `coerceError` JSON-stringifies those so
+        // the dashboard shows the real payload, not `[object Object]`.
+        const e = coerceError(error);
         captureExceptionJs(e);
         return { message: message ?? e.message };
     };

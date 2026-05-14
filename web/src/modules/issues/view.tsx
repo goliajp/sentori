@@ -104,7 +104,9 @@ function IssueRowItem({ orgSlug, row }: { orgSlug: string; row: IssueRow }) {
           <span className="text-fg-muted t-sm shrink-0 font-mono">{shortId(row.id)}</span>
           <span className="text-fg t-md min-w-0 flex-1 truncate font-semibold">
             {row.errorType}
-            <span className="text-fg-muted ml-2 font-normal">{row.messageSample}</span>
+            <span className="text-fg-muted ml-2 font-normal">
+              {displayMessage(row.messageSample)}
+            </span>
           </span>
         </Link>
       </td>
@@ -207,6 +209,17 @@ function SkeletonTable() {
       ))}
     </div>
   )
+}
+
+/**
+ * Pre-coerceError events (shipped before the SDK fix) carry the literal
+ * string `[object Object]` as their message. Replace it with a more
+ * honest placeholder so the row reads sensibly. New events go through
+ * `coerceError` in the SDK and never look like this.
+ */
+function displayMessage(message: string): string {
+  if (message === '[object Object]') return '(non-Error thrown — SDK upgrade required)'
+  return message
 }
 
 function shortId(id: string): string {

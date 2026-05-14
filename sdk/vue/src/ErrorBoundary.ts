@@ -7,6 +7,7 @@
 // Sentori and renders either the slot's children or a `fallback`
 // slot when the subtree threw.
 
+import { coerceError } from '@goliapkg/sentori-core'
 import { captureException } from '@goliapkg/sentori-javascript'
 import { defineComponent, h, ref } from 'vue'
 
@@ -36,7 +37,9 @@ export const SentoriErrorBoundary = defineComponent({
     }
   },
   errorCaptured(err, _instance, info) {
-    const e = err instanceof Error ? err : new Error(String(err))
+    // `coerceError` JSON-stringifies plain-object throws so the
+    // dashboard shows the real payload instead of `[object Object]`.
+    const e = coerceError(err)
     if ((this.ignore as readonly string[]).includes(e.name)) {
       return true // propagate further
     }

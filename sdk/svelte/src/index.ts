@@ -30,7 +30,7 @@ import {
   initSentori as initSentoriJs,
   type InitOptions,
 } from '@goliapkg/sentori-javascript'
-import { setActiveSpan, startSpan, type SpanHandle } from '@goliapkg/sentori-core'
+import { coerceError, setActiveSpan, startSpan, type SpanHandle } from '@goliapkg/sentori-core'
 
 export type SentoriSvelteOptions = InitOptions
 
@@ -51,7 +51,10 @@ export function sentoriHandleError(): (input: {
   message?: string
 }) => { message: string } {
   return ({ error, message }) => {
-    const e = error instanceof Error ? error : new Error(String(error))
+    // SvelteKit's `handleError` hook sees whatever user code threw,
+    // including plain objects. `coerceError` JSON-stringifies those so
+    // the dashboard shows the real payload, not `[object Object]`.
+    const e = coerceError(error)
     captureExceptionJs(e)
     return { message: message ?? e.message }
   }

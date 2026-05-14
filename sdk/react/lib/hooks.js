@@ -1,3 +1,4 @@
+import { coerceError } from '@goliapkg/sentori-core';
 import { useCallback } from 'react';
 import { useSentoriCtx } from './SentoriProvider.js';
 /**
@@ -34,7 +35,10 @@ export function useCaptureError(fn, extras) {
             return await fn(...args);
         }
         catch (e) {
-            captureError(e instanceof Error ? e : new Error(String(e)), extras);
+            // `coerceError` keeps non-Error throws useful — JSON-stringifies
+            // plain objects instead of letting `String(e)` collapse them to
+            // the literal text `[object Object]`. See coerce-error.ts.
+            captureError(coerceError(e), extras);
             throw e;
         }
     }, [captureError, fn, extras]);

@@ -3,6 +3,7 @@
 // unhandledRejection) are wired here; route-handler errors are
 // captured via the onRequestError export below.
 
+import { coerceError } from '@goliapkg/sentori-core'
 import { captureError, initSentori } from '@goliapkg/sentori-javascript'
 
 import { resolveConfig, type SentoriNextConfig } from './config.js'
@@ -72,7 +73,9 @@ export async function onRequestError(
   request: RequestErrorRequest,
   context?: RequestErrorContext,
 ): Promise<void> {
-  const error = err instanceof Error ? err : new Error(String(err))
+  // `coerceError` JSON-stringifies plain-object throws so the dashboard
+  // shows the real payload instead of `[object Object]`.
+  const error = coerceError(err)
   captureError(error, {
     tags: {
       'next.method': request?.method ?? '',

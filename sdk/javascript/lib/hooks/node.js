@@ -1,3 +1,4 @@
+import { coerceError } from '@goliapkg/sentori-core';
 import { captureError } from '../capture.js';
 import { endSession } from '../session-tracker.js';
 let installed = false;
@@ -19,13 +20,10 @@ export function installNodeHooks() {
     if (!p || typeof p.on !== 'function')
         return false;
     p.on('uncaughtException', (err) => {
-        captureError(err);
+        captureError(coerceError(err));
     });
     p.on('unhandledRejection', (reason) => {
-        if (reason instanceof Error)
-            captureError(reason);
-        else
-            captureError(new Error(typeof reason === 'string' ? reason : 'unhandled rejection'));
+        captureError(coerceError(reason));
     });
     // Phase 26 sub-B: ship a session ping on graceful exit.
     // beforeExit fires when the loop is about to drain — our last

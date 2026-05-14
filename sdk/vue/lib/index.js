@@ -25,6 +25,7 @@
  *     import { setupTraceNavigation } from '@goliapkg/sentori-vue/router'
  *     setupTraceNavigation(router)
  */
+import { coerceError } from '@goliapkg/sentori-core';
 import { captureException as captureExceptionJs, initSentori as initSentoriJs, } from '@goliapkg/sentori-javascript';
 const plugin = {
     install(app, options) {
@@ -35,7 +36,11 @@ const plugin = {
         //    non-Error values so the SDK still gets a stack.
         const previous = app.config.errorHandler;
         app.config.errorHandler = (err, instance, info) => {
-            const e = err instanceof Error ? err : new Error(String(err));
+            // `coerceError` JSON-stringifies plain-object throws — Vue's
+            // errorHandler regularly sees non-Error values from user code
+            // (`throw {code: 'auth/expired'}`). Without it those collapse to
+            // the literal text `[object Object]` in the dashboard.
+            const e = coerceError(err);
             captureExceptionJs(e, {
                 tags: {
                     'vue.component': instance?.$options?.name ?? '<anonymous>',
