@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { adminApi, type HealthBucket, type HealthSummary } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
-import { PageBody, PageHeader, PageShell } from '@/components/ui'
+import { PageBody, PageHeader, PageShell, StatNumber } from '@/components/ui'
 
 /**
  * Phase 26 sub-D: project overview / health widget.
@@ -47,21 +47,24 @@ export function OverviewView() {
           <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Stat
               accent={rateAccent(data.summary.crashFreeSessionRate, 0.99)}
+              format={formatRate}
               hint={`${data.summary.crashedSessions.toLocaleString()} crashed · ${data.summary.erroredSessions.toLocaleString()} errored`}
               label="Crash-free sessions"
-              value={formatRate(data.summary.crashFreeSessionRate)}
+              rawValue={data.summary.crashFreeSessionRate ?? 0}
             />
             <Stat
               accent={rateAccent(data.summary.crashFreeUserRate, 0.995)}
+              format={formatRate}
               hint={`${data.summary.crashedUsers.toLocaleString()} of ${data.summary.totalUsers.toLocaleString()} users`}
               label="Crash-free users"
-              value={formatRate(data.summary.crashFreeUserRate)}
+              rawValue={data.summary.crashFreeUserRate ?? 0}
             />
             <Stat
               accent="neutral"
+              format={(v) => Math.round(v).toLocaleString()}
               hint={`${data.summary.totalUsers.toLocaleString()} unique users`}
               label="Total sessions"
-              value={data.summary.totalSessions.toLocaleString()}
+              rawValue={data.summary.totalSessions}
             />
           </section>
 
@@ -83,30 +86,42 @@ export function OverviewView() {
 
 function Stat({
   accent,
+  format,
   hint,
   label,
-  value,
+  rawValue,
 }: {
   accent: 'good' | 'neutral' | 'warn'
+  format: (v: number) => string
   hint: string
   label: string
-  value: string
+  rawValue: number
 }) {
+  // Phase 49 sub-C — semantic tokens; Phase 50 sub-B4 — StatNumber
+  // ease-out count-up on the hero digits.
   const ring =
     accent === 'good'
-      ? 'ring-green-500/30'
+      ? 'ring-[color:var(--color-success-border)]'
       : accent === 'warn'
-        ? 'ring-amber-500/30'
+        ? 'ring-[color:var(--color-warning-border)]'
         : 'ring-border'
   const dot =
-    accent === 'good' ? 'bg-green-400' : accent === 'warn' ? 'bg-amber-400' : 'bg-fg-muted/40'
+    accent === 'good'
+      ? 'bg-[color:var(--color-success)]'
+      : accent === 'warn'
+        ? 'bg-[color:var(--color-warning)]'
+        : 'bg-fg-muted/40'
   return (
-    <div className={`border-border rounded-md border p-4 ring-1 ${ring}`}>
+    <div
+      className={`border-border bg-bg-secondary rounded-md border p-4 ring-1 ${ring} transition-colors`}
+    >
       <div className="flex items-center gap-2">
         <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
         <span className="text-fg-muted text-[11px] tracking-wider uppercase">{label}</span>
       </div>
-      <div className="text-fg mt-2 font-mono text-2xl tabular-nums">{value}</div>
+      <div className="text-fg mt-2 font-mono text-2xl tabular-nums">
+        <StatNumber format={format} value={rawValue} />
+      </div>
       <div className="text-fg-muted mt-1 text-[11px]">{hint}</div>
     </div>
   )

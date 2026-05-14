@@ -1,17 +1,19 @@
-import { useState } from 'react'
-
 import type { EventRow, IssueRow } from '@/api/client'
 import { renderIssueMarkdown } from '@/lib/issue-markdown'
 
+import { useToast } from './ui'
+
 /**
  * Phase 42 sub-H.02 — render the active event as Markdown and copy
- * it to the clipboard. The shape is tuned for paste-into-AI / paste-
- * into-ticket workflows: error headline, top stack frames with
- * inline source fences, breadcrumb tail.
+ * it to the clipboard. Tuned for paste-into-AI / paste-into-ticket
+ * workflows: error headline, top stack frames with inline source
+ * fences, breadcrumb tail.
  *
- * Button gives a 1.5s "Copied" flash on success; falls back to a
- * `prompt()` with the text if `navigator.clipboard.writeText` isn't
- * available (Safari over HTTP, or `localhost` in some configs).
+ * Phase 50 sub-B5 — confirmation moved from an inline "✓ Copied" flash
+ * to a global toast. Lets the user click → see toast → tab away;
+ * the inline flash was inconvenient on small screens where the
+ * button wasn't on the user's gaze. Fallback path (insecure context)
+ * still pops `window.prompt` so power users can grab the text.
  */
 export function CopyMarkdownButton({
   event,
@@ -22,7 +24,7 @@ export function CopyMarkdownButton({
   issue: IssueRow
   orgSlug: string
 }) {
-  const [status, setStatus] = useState<'copied' | 'idle'>('idle')
+  const toast = useToast()
   if (!event) return null
 
   const onClick = async () => {
@@ -34,11 +36,10 @@ export function CopyMarkdownButton({
     })
     try {
       await navigator.clipboard.writeText(md)
-      setStatus('copied')
-      setTimeout(() => setStatus('idle'), 1500)
+      toast.success('Copied as Markdown', {
+        detail: 'Stack + source + breadcrumbs are on your clipboard.',
+      })
     } catch {
-      // Insecure context (http) or clipboard API blocked — fall back
-      // to a prompt the user can manually copy out of.
       window.prompt('Markdown:', md)
     }
   }
@@ -51,7 +52,7 @@ export function CopyMarkdownButton({
       title="Copy a Markdown summary of this issue (stack + source + breadcrumbs) for paste-into-chat or AI debug"
       type="button"
     >
-      {status === 'copied' ? '✓ Copied' : '📋 Copy MD'}
+      📋 Copy MD
     </button>
   )
 }
