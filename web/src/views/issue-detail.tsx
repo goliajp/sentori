@@ -18,6 +18,7 @@ import { AttachmentGallery } from '@/components/AttachmentGallery'
 import { FrameRoleBadge } from '@/components/FrameRoleBadge'
 import { IssueDetailSkeleton } from '@/components/IssueDetailSkeleton'
 import { CopyMarkdownButton } from '@/components/CopyMarkdownButton'
+import { IssueInspector } from '@/components/IssueInspector'
 import { MergeIssueButton } from '@/components/MergeIssueButton'
 import { RelatedIssuesPanel } from '@/components/RelatedIssuesPanel'
 import { SourceCode } from '@/components/SourceCode'
@@ -213,30 +214,36 @@ export function IssueDetailView() {
         ))}
       </div>
 
-      <section className="flex-1 overflow-y-auto px-6 py-4">
-        {!selectedEvent ? (
-          <p className="text-fg-muted text-sm">No events for this issue yet.</p>
-        ) : tab === 'stack' ? (
-          <StackTab
-            event={selectedEvent}
-            issueId={issueId}
-            onToggleSymbolicated={() => setSymbolicated((s) => !s)}
-            orgSlug={currentOrg.slug}
-            projectId={projectId!}
-            releases={releasesQuery.data}
-            sourceRepoUrl={currentProject?.sourceRepoUrl}
-            symbolicated={symbolicated}
-          />
-        ) : tab === 'events' ? (
-          <EventsTab events={events} onSelect={setSelectedIdx} selectedIdx={safeIdx} />
-        ) : tab === 'breadcrumbs' ? (
-          <BreadcrumbsTab event={selectedEvent} />
-        ) : tab === 'tags' ? (
-          <TagsTab event={selectedEvent} />
-        ) : (
-          <ActivityTab issueId={issueId} projectId={projectId!} />
-        )}
-      </section>
+      {/* Phase 50 sub-D1 — main column scrolls; right rail (lg+ only)
+          stays put with issue metadata. Below lg the inspector
+          collapses entirely (info still in the header). */}
+      <div className="flex min-h-0 flex-1">
+        <section className="min-w-0 flex-1 overflow-y-auto px-6 py-4">
+          {!selectedEvent ? (
+            <p className="text-fg-muted text-sm">No events for this issue yet.</p>
+          ) : tab === 'stack' ? (
+            <StackTab
+              event={selectedEvent}
+              issueId={issueId}
+              onToggleSymbolicated={() => setSymbolicated((s) => !s)}
+              orgSlug={currentOrg.slug}
+              projectId={projectId!}
+              releases={releasesQuery.data}
+              sourceRepoUrl={currentProject?.sourceRepoUrl}
+              symbolicated={symbolicated}
+            />
+          ) : tab === 'events' ? (
+            <EventsTab events={events} onSelect={setSelectedIdx} selectedIdx={safeIdx} />
+          ) : tab === 'breadcrumbs' ? (
+            <BreadcrumbsTab event={selectedEvent} />
+          ) : tab === 'tags' ? (
+            <TagsTab event={selectedEvent} />
+          ) : (
+            <ActivityTab issueId={issueId} projectId={projectId!} />
+          )}
+        </section>
+        <IssueInspector issue={issue} releases={releasesQuery.data} />
+      </div>
     </div>
   )
 }
