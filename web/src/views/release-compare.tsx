@@ -54,6 +54,15 @@ export function ReleaseCompareView() {
         </p>
       </header>
 
+      {/* Phase 50 sub-A5 — stacked-proportion bar so the user reads
+          the relative move (Added vs Fixed vs Persisting) at a
+          glance before scanning the lists below. */}
+      <ReleaseCompareBar
+        added={data.added.length}
+        fixed={data.fixed.length}
+        persisting={data.persisting.length}
+      />
+
       <CompareSection
         accentClass="text-[color:var(--color-danger)] bg-red-500/15 ring-red-500/30"
         emptyHint={`No new issues in ${data.target} that weren't already in ${data.base}.`}
@@ -80,6 +89,74 @@ export function ReleaseCompareView() {
         subtitle="In both releases"
         title="Persisting"
       />
+    </div>
+  )
+}
+
+/**
+ * Phase 50 sub-A5 — stacked-proportion bar of issue movement between
+ * two releases. Three segments (danger/success/muted) sized by count,
+ * with the absolute numbers + delta surfaced inline.
+ */
+function ReleaseCompareBar({
+  added,
+  fixed,
+  persisting,
+}: {
+  added: number
+  fixed: number
+  persisting: number
+}) {
+  const total = added + fixed + persisting
+  if (total === 0) return null
+  const net = added - fixed
+  return (
+    <div className="border-border bg-bg-secondary space-y-3 rounded-md border p-4">
+      <div className="flex items-baseline justify-between text-[11px]">
+        <div className="text-fg-muted tracking-wider uppercase">Movement</div>
+        <div className="text-fg-muted">
+          <span
+            className={
+              net > 0
+                ? 'text-[color:var(--color-danger)]'
+                : net < 0
+                  ? 'text-[color:var(--color-success)]'
+                  : 'text-fg-muted'
+            }
+          >
+            {net > 0 ? '↑' : net < 0 ? '↓' : '—'} net {Math.abs(net)}
+          </span>{' '}
+          {net > 0 ? 'new bugs' : net < 0 ? 'bugs cleared' : 'change'}
+        </div>
+      </div>
+      <div className="border-border flex h-2 overflow-hidden rounded border">
+        <div
+          className="bg-[color:var(--color-danger)]"
+          style={{ width: `${(added / total) * 100}%` }}
+          title={`${added} added`}
+        />
+        <div
+          className="bg-[color:var(--color-success)]"
+          style={{ width: `${(fixed / total) * 100}%` }}
+          title={`${fixed} fixed`}
+        />
+        <div
+          className="bg-fg-muted/30"
+          style={{ width: `${(persisting / total) * 100}%` }}
+          title={`${persisting} persisting`}
+        />
+      </div>
+      <div className="text-fg-muted flex justify-between font-mono text-[11px] tabular-nums">
+        <span>
+          <span className="text-[color:var(--color-danger)]">●</span> {added} added
+        </span>
+        <span>
+          <span className="text-[color:var(--color-success)]">●</span> {fixed} fixed
+        </span>
+        <span>
+          <span className="opacity-50">●</span> {persisting} persisting
+        </span>
+      </div>
     </div>
   )
 }
