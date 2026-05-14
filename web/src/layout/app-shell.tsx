@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router'
 
+import { CmdK } from '@/components/CmdK'
 import { StatusBar } from '@/components/status-bar'
 import { Toolbar } from '@/components/toolbar'
 
@@ -28,6 +29,7 @@ export function AppShell() {
         </main>
       </div>
       <StatusBar />
+      <CmdK />
     </div>
   )
 }

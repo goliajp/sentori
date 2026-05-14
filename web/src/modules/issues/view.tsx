@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
 import { Link } from 'react-router'
 
 import { adminApi, type IssueRow, type IssueStatus } from '@/api/client'
@@ -7,8 +6,11 @@ import { useOrg } from '@/auth/orgContext'
 import { Tag } from '@/components/Tag'
 import { PageHeader } from '@/layout/page-header'
 import { formatRelative } from '@/lib/format'
+import { useUrlParam } from '@/lib/url-state'
 
-const STATUS_TABS: { key: IssueStatus | 'all'; label: string }[] = [
+type Tab = IssueStatus | 'all'
+
+const STATUS_TABS: { key: Tab; label: string }[] = [
   { key: 'active', label: 'Active' },
   { key: 'regressed', label: 'Regressed' },
   { key: 'resolved', label: 'Resolved' },
@@ -16,18 +18,22 @@ const STATUS_TABS: { key: IssueStatus | 'all'; label: string }[] = [
   { key: 'all', label: 'All' },
 ]
 
+const TAB_KEYS = new Set<Tab>(['active', 'regressed', 'resolved', 'silenced', 'all'])
+
 /**
  * Issues — real adminApi-backed list view, v2 design.
  *
- * Tabular layout via `.std-table` (single outer frame + hairline grid +
- * unified padding). Per row: level dot + plain mono short-id + truncated
- * title + colored status text + tabular event/user counts + mono release
- * + relative last-seen + @assignee.
+ * The active status tab lives in `?status=` so refresh, link-share, and
+ * back-button all restore the user's last view. Tab state goes through
+ * `useUrlParam` (Phase 48 sub-C helper) — any "this is a meaningful
+ * view-state knob" should follow the same pattern.
  */
 export function IssuesView() {
   const { currentOrg, currentProject } = useOrg()
   const projectId = currentProject?.id ?? null
-  const [tab, setTab] = useState<IssueStatus | 'all'>('active')
+  const [tab, setTab] = useUrlParam<Tab>('status', 'active', (raw) =>
+    TAB_KEYS.has(raw as Tab) ? (raw as Tab) : null
+  )
 
   const { data, error, isLoading } = useQuery({
     enabled: !!projectId,
