@@ -498,7 +498,7 @@ function StackTab({
           </Section>
         )}
 
-        <AttachmentGallery attachments={payload.attachments} eventId={event.id} />
+        <AttachmentGallery eventId={event.id} />
 
         <ReleaseArtifactsPanel projectId={projectId} release={payload.release} />
 

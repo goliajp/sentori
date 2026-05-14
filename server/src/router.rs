@@ -157,6 +157,14 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/events/{event_id}/attachments/{ref_id}",
             get(api::attachments::fetch),
         )
+        // Phase 48 sub-A.2 — list every attachment row the server knows
+        // about for an event. Dashboard reads this directly so a broken
+        // `payload.attachments` echo path (Insight's original report)
+        // doesn't hide the screenshot.
+        .route(
+            "/events/{event_id}/attachments",
+            get(api::attachments::list_for_event),
+        )
         .route(
             "/projects/{project_id}/issues/{issue_id}/activity",
             get(api::admin::list_issue_activity),

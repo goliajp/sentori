@@ -224,6 +224,81 @@ pub async fn fetch(
     response
 }
 
+#[derive(Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct AttachmentRow {
+    pub r#ref: Uuid,
+    pub kind: String,
+    pub media_type: String,
+    pub size_bytes: i32,
+    pub source: String,
+}
+
+/// Phase 48 sub-A.2 — `GET /admin/api/events/{event_id}/attachments`
+///
+/// Lists every attachment row the server has for an event, regardless
+/// of whether `payload.attachments[]` in the event JSON echoed them.
+/// Dashboard pulls from this so a broken client-side echo (the
+/// 201→202 rewrite Insight reported) can't hide the screenshot.
+pub async fn list_for_event(
+    State(state): State<AppState>,
+    Extension(caller): Extension<AdminCaller>,
+    Path(event_id): Path<Uuid>,
+) -> Response {
+    let Some(pool) = state.db.as_ref() else {
+        return server_error("dbNotConfigured");
+    };
+
+    // First read project_id off any attachment row to gate access; if
+    // the event has no attachments at all the caller still gets a 200
+    // with `[]` (the "no screenshot was captured" case shouldn't 403).
+    let project_row: Option<(Uuid,)> = sqlx::query_as(
+        "SELECT project_id FROM event_attachments WHERE event_id = $1 LIMIT 1",
+    )
+    .bind(event_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+
+    let project_id = match project_row {
+        Some((pid,)) => pid,
+        // No attachments → derive project_id from the events table for the
+        // access gate. If the event doesn't exist either, 404.
+        None => {
+            let ev: Option<(Uuid,)> = sqlx::query_as(
+                "SELECT project_id FROM events WHERE id = $1 LIMIT 1",
+            )
+            .bind(event_id)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
+            match ev {
+                Some((pid,)) => pid,
+                None => return not_found("eventNotFound"),
+            }
+        }
+    };
+
+    if !is_admin_for_project(pool, &caller, project_id).await {
+        return (StatusCode::FORBIDDEN, Json(json!({ "error": "forbidden" }))).into_response();
+    }
+
+    let rows: Vec<AttachmentRow> = sqlx::query_as(
+        r#"
+        SELECT ref, kind, media_type, size_bytes, source
+        FROM event_attachments
+        WHERE event_id = $1
+        ORDER BY received_at ASC
+        "#,
+    )
+    .bind(event_id)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    (StatusCode::OK, Json(rows)).into_response()
+}
+
 async fn is_admin_for_project(
     pool: &sqlx::PgPool,
     caller: &AdminCaller,

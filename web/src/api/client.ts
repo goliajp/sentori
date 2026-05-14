@@ -337,6 +337,12 @@ export const adminApi = {
     return adminFetch<EventRow[]>(`/projects/${projectId}/issues/${issueId}/events${qs}`)
   },
 
+  /** Phase 48 sub-A.2 — list every attachment the server has for an
+   *  event, regardless of payload echo. Used by the dashboard's
+   *  AttachmentGallery so a broken client echo never hides a screenshot. */
+  listEventAttachments: (eventId: string) =>
+    adminFetch<Attachment[]>(`/events/${encodeURIComponent(eventId)}/attachments`),
+
   listIssues: (
     projectId: string,
     params: {

@@ -1,6 +1,7 @@
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 
-import type { Attachment } from '@/api/client'
+import { adminApi, type Attachment } from '@/api/client'
 
 import { SessionTrailViewer } from './SessionTrailViewer'
 import { ViewTreePanel } from './ViewTreePanel'
@@ -9,45 +10,77 @@ import { ViewTreePanel } from './ViewTreePanel'
  * Phase 42 sub-C.09 / D.11 / D.12 — visual slot for SDK-uploaded
  * attachments on the issue-detail page.
  *
+ * Phase 48 sub-A.2 — pulls attachments directly from
+ * `/admin/api/events/<id>/attachments` instead of trusting
+ * `event.payload.attachments[]` echoed by the client. A broken echo
+ * (proxy rewriting 201 → 202 on upload, network blip between attach
+ * + event POST) no longer hides screenshots. Server is source-of-
+ * truth; `payload.attachments` is treated as a hint at best.
+ *
+ * Empty state now renders "No attachments captured" instead of
+ * `return null` so the user can tell whether the section is wired
+ * up vs. truly has no data.
+ *
  * Screenshots render as lazy-loaded thumbnails; clicking one opens
  * a modal `<Lightbox>` with the full-size image plus keyboard
  * controls (esc to close, ← / → to step through siblings) and a
- * download button.
- *
- * Non-image kinds (`viewTree` / `stateSnapshot` / `logTail`) still
- * fall back to a pill that opens the raw blob in a new tab. The
- * dedicated `<ViewTreePanel>` for `viewTree` lands in sub-G.
+ * download button. Non-image kinds (`viewTree` / `stateSnapshot` /
+ * `logTail` / `sessionTrail`) get a dedicated viewer.
  */
-export function AttachmentGallery({
-  attachments,
-  eventId,
-}: {
-  attachments: Attachment[] | undefined
-  /** Used to build the GET URL for each blob. */
-  eventId: string
-}) {
+export function AttachmentGallery({ eventId }: { eventId: string }) {
+  const { data, error, isLoading } = useQuery({
+    enabled: !!eventId,
+    queryFn: () => adminApi.listEventAttachments(eventId),
+    queryKey: ['event-attachments', eventId],
+    staleTime: 60_000,
+  })
+  const attachments = data ?? []
   const screenshots = useMemo(
-    () => (attachments ?? []).filter((a) => a.kind === 'screenshot'),
+    () => attachments.filter((a) => a.kind === 'screenshot'),
     [attachments]
   )
-  const viewTrees = useMemo(
-    () => (attachments ?? []).filter((a) => a.kind === 'viewTree'),
-    [attachments]
-  )
+  const viewTrees = useMemo(() => attachments.filter((a) => a.kind === 'viewTree'), [attachments])
   const sessionTrails = useMemo(
-    () => (attachments ?? []).filter((a) => a.kind === 'sessionTrail'),
+    () => attachments.filter((a) => a.kind === 'sessionTrail'),
     [attachments]
   )
   const others = useMemo(
     () =>
-      (attachments ?? []).filter(
+      attachments.filter(
         (a) => a.kind !== 'screenshot' && a.kind !== 'viewTree' && a.kind !== 'sessionTrail'
       ),
     [attachments]
   )
   const [openIdx, setOpenIdx] = useState<null | number>(null)
 
-  if (!attachments || attachments.length === 0) return null
+  if (isLoading) {
+    return (
+      <section className="space-y-4">
+        <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Captured at error</h2>
+        <p className="text-fg-muted text-[12px]">Loading attachments…</p>
+      </section>
+    )
+  }
+  if (error) {
+    return (
+      <section className="space-y-4">
+        <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Captured at error</h2>
+        <p className="text-[12px] text-red-400">Failed to load attachments for this event.</p>
+      </section>
+    )
+  }
+  if (attachments.length === 0) {
+    return (
+      <section className="space-y-4">
+        <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">Captured at error</h2>
+        <p className="text-fg-muted text-[12px]">
+          No attachments captured for this event. Set{' '}
+          <code className="font-mono">capture: {`{ screenshot: true }`}</code> in your SDK init to
+          attach a screenshot when <code className="font-mono">captureException</code> fires.
+        </p>
+      </section>
+    )
+  }
 
   return (
     <section className="space-y-4">
