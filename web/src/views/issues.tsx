@@ -64,6 +64,10 @@ export function IssuesView() {
   const [saveModalOpen, setSaveModalOpen] = useState(false)
   // Phase 24 sub-D: multi-select for bulk actions.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  // Phase 50 sub-B3 — optimistic "leaving the list" animation. Rows
+  // in this set render with `sentori-row-out` (slide-left + fade)
+  // until the next refetch removes them from `filtered` for real.
+  const [resolvingIds, setResolvingIds] = useState<Set<string>>(new Set())
   // Anchor index for shift-click range selection. Resets when the
   // filtered list shape changes meaningfully (status / query change),
   // since the indices wouldn't map cleanly anyway.
@@ -171,29 +175,49 @@ export function IssuesView() {
   const error = issuesInfinite.error
 
   const toast = useToast()
+  // Phase 50 sub-B3 — wrap the mutations so they pre-flag the row
+  // for the slide-out animation before firing. On success/failure
+  // the set drops the id so the row either really leaves or re-
+  // animates back to a normal row.
+  const markResolving = (id: string) => {
+    setResolvingIds((prev) => new Set(prev).add(id))
+  }
+  const unmarkResolving = (id: string) => {
+    setResolvingIds((prev) => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }
   const silenceMutation = useMutation({
     mutationFn: (issueId: string) =>
       adminApi.patchIssue(projectId!, issueId, { status: 'silenced' }),
-    onError: (err: unknown) =>
+    onError: (err: unknown, issueId) => {
+      unmarkResolving(issueId)
       toast.error('Failed to silence issue', {
         detail: err instanceof Error ? err.message : undefined,
-      }),
-    onSuccess: () => {
+      })
+    },
+    onSuccess: (_data, issueId) => {
       toast.success('Issue silenced')
       void queryClient.invalidateQueries({ queryKey: ['issues', projectId] })
+      unmarkResolving(issueId)
     },
   })
 
   const resolveMutation = useMutation({
     mutationFn: (issueId: string) =>
       adminApi.patchIssue(projectId!, issueId, { status: 'resolved' }),
-    onError: (err: unknown) =>
+    onError: (err: unknown, issueId) => {
+      unmarkResolving(issueId)
       toast.error('Failed to resolve issue', {
         detail: err instanceof Error ? err.message : undefined,
-      }),
-    onSuccess: () => {
+      })
+    },
+    onSuccess: (_data, issueId) => {
       toast.success('Issue resolved')
       void queryClient.invalidateQueries({ queryKey: ['issues', projectId] })
+      unmarkResolving(issueId)
     },
   })
 
@@ -302,6 +326,7 @@ export function IssuesView() {
     () => {
       const issue = filtered[safeIdx]
       if (issue && issue.status === 'active') {
+        markResolving(issue.id)
         silenceMutation.mutate(issue.id)
       }
     },
@@ -315,6 +340,7 @@ export function IssuesView() {
     () => {
       const issue = filtered[safeIdx]
       if (issue && (issue.status === 'active' || issue.status === 'regressed')) {
+        markResolving(issue.id)
         resolveMutation.mutate(issue.id)
       }
     },
@@ -583,6 +609,8 @@ export function IssuesView() {
               {filtered.map((issue, idx) => (
                 <tr
                   className={`border-border/40 cursor-pointer border-b ${dCls.rowClass} ${
+                    resolvingIds.has(issue.id) ? 'sentori-row-out' : ''
+                  } ${
                     idx === safeIdx
                       ? 'bg-accent/10'
                       : selectedIds.has(issue.id)
