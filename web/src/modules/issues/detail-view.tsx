@@ -14,8 +14,15 @@ import {
 } from '@/api/client'
 import { useAuth } from '@/auth/state'
 import { useOrg } from '@/auth/orgContext'
+import { AttachmentGallery } from '@/components/AttachmentGallery'
+import { FrameRoleBadge } from '@/components/FrameRoleBadge'
+import { SourceCode } from '@/components/SourceCode'
 import { PageHeader } from '@/layout/page-header'
 import { formatRelative } from '@/lib/format'
+import { packageOf } from '@/lib/frame-package'
+import { roleOf } from '@/lib/frame-role'
+import { languageOf } from '@/lib/source-language'
+import { frameToSourceUrl } from '@/lib/source-link'
 import { useUrlParam } from '@/lib/url-state'
 
 type Tab = 'activity' | 'breadcrumbs' | 'events' | 'stack' | 'tags'
@@ -156,8 +163,13 @@ export function IssueDetailView() {
         <Empty hint="No events have landed for this issue yet." title="No events" />
       )}
 
-      {selectedEvent && tab === 'stack' && (
-        <StackTab event={selectedEvent} orgSlug={currentOrg.slug} />
+      {selectedEvent && tab === 'stack' && projectId && (
+        <StackTab
+          event={selectedEvent}
+          orgSlug={currentOrg.slug}
+          projectId={projectId}
+          sourceRepoUrl={currentProject?.sourceRepoUrl ?? null}
+        />
       )}
       {selectedEvent && tab === 'breadcrumbs' && <BreadcrumbsTab event={selectedEvent} />}
       {selectedEvent && tab === 'tags' && <TagsTab event={selectedEvent} />}
@@ -355,7 +367,17 @@ function EventPicker({
 
 // ── tabs ────────────────────────────────────────────────────────────────
 
-function StackTab({ event, orgSlug }: { event: EventRow; orgSlug: string }) {
+function StackTab({
+  event,
+  orgSlug,
+  projectId,
+  sourceRepoUrl,
+}: {
+  event: EventRow
+  orgSlug: string
+  projectId: string
+  sourceRepoUrl?: null | string
+}) {
   const payload = event.payload
   const frames = payload.error?.stack ?? []
   return (
@@ -375,8 +397,14 @@ function StackTab({ event, orgSlug }: { event: EventRow; orgSlug: string }) {
         </div>
       )}
       <Pane title="Stack trace">
-        <StackList stack={frames} />
+        <StackList stack={frames} sourceRepoUrl={sourceRepoUrl} />
       </Pane>
+
+      {/* Phase 48 sub-A.2 — screenshots / view-tree / session-trail from
+       *  the SDK. Self-fetches via `/projects/:id/events/:id/attachments`,
+       *  silently renders nothing when the event has no attachments. */}
+      <AttachmentGallery eventId={event.id} projectId={projectId} />
+
       <Pane title="Context">
         <KeyValueGrid
           data={{
@@ -394,50 +422,67 @@ function StackTab({ event, orgSlug }: { event: EventRow; orgSlug: string }) {
   )
 }
 
-function StackList({ stack }: { stack: Frame[] }) {
+function StackList({ sourceRepoUrl, stack }: { sourceRepoUrl?: null | string; stack: Frame[] }) {
   if (stack.length === 0) {
     return <p className="text-fg-muted t-md">No frames captured.</p>
   }
-  // Run-length collapse: each contiguous block of vendor (non-in-app)
-  // frames becomes one collapsible fold so the in-app frames pop.
+  // Run-length collapse, splitting vendor runs by package so e.g.
+  // react-native and expo-router fold separately (each named).
   const groups: (
     | { at: number; frame: Frame; kind: 'app' }
-    | { at: number; frames: Frame[]; kind: 'vendor' }
+    | { at: number; frames: Frame[]; kind: 'vendor'; pkg: null | string }
   )[] = []
   for (let i = 0; i < stack.length; i++) {
     const f = stack[i]!
     if (f.inApp) {
       groups.push({ at: i, frame: f, kind: 'app' })
-    } else {
-      const last = groups[groups.length - 1]
-      if (last && last.kind === 'vendor') last.frames.push(f)
-      else groups.push({ at: i, frames: [f], kind: 'vendor' })
+      continue
     }
+    const pkg = packageOf(f.file)
+    const last = groups[groups.length - 1]
+    if (last && last.kind === 'vendor' && last.pkg === pkg) last.frames.push(f)
+    else groups.push({ at: i, frames: [f], kind: 'vendor', pkg })
   }
   return (
     <div className="border-border overflow-hidden rounded-md border">
       {groups.map((g) =>
         g.kind === 'app' ? (
-          <FrameRow frame={g.frame} idx={g.at} key={g.at} />
+          <FrameRow frame={g.frame} idx={g.at} key={g.at} sourceRepoUrl={sourceRepoUrl} />
         ) : (
-          <VendorFold base={g.at} frames={g.frames} key={g.at} />
+          <VendorFold base={g.at} frames={g.frames} key={g.at} pkg={g.pkg} />
         )
       )}
     </div>
   )
 }
 
-function FrameRow({ frame, idx }: { frame: Frame; idx: number }) {
+function FrameRow({
+  frame,
+  idx,
+  sourceRepoUrl,
+}: {
+  frame: Frame
+  idx: number
+  sourceRepoUrl?: null | string
+}) {
   const hasSnippet = frame.contextLine !== undefined
   const pre = frame.preContext ?? []
   const post = frame.postContext ?? []
+  const snippet = hasSnippet ? [...pre, frame.contextLine ?? '', ...post].join('\n') : ''
   const firstNo = frame.line - pre.length
+  const language = languageOf(frame.file)
+  const repoUrl = frameToSourceUrl({ file: frame.file, line: frame.line, sourceRepoUrl })
 
   return (
-    <div className="border-border/40 border-b last:border-b-0">
+    <div className={`border-border/40 border-b last:border-b-0 ${frame.inApp ? 'bg-bg' : ''}`}>
       <div className="hover:bg-bg-tertiary/40 t-md flex items-baseline gap-3 px-3 py-1.5">
         <span className="text-fg-muted t-sm w-6 shrink-0 text-right tabular-nums">{idx}</span>
-        <span className="text-fg shrink-0 font-mono font-semibold whitespace-nowrap">
+        <FrameRoleBadge role={roleOf(frame)} />
+        <span
+          className={`shrink-0 font-mono font-semibold whitespace-nowrap ${
+            frame.inApp ? 'text-fg' : 'text-fg-muted'
+          }`}
+        >
           {frame.function ?? '<anonymous>'}
         </span>
         <span className="text-fg-muted truncate font-mono">
@@ -446,38 +491,38 @@ function FrameRow({ frame, idx }: { frame: Frame; idx: number }) {
           <span className="tabular-nums">{frame.line}</span>
           {frame.column !== undefined ? `:${frame.column}` : ''}
         </span>
+        {repoUrl && (
+          <a
+            aria-label="Open this line on the configured source host"
+            className="text-fg-muted hover:text-fg t-sm ml-auto shrink-0 self-center tracking-wider uppercase"
+            href={repoUrl}
+            onClick={(e) => e.stopPropagation()}
+            rel="noopener noreferrer"
+            target="_blank"
+            title="Open on source host"
+          >
+            ↗ src
+          </a>
+        )}
       </div>
       {hasSnippet && (
         <div className="bg-bg-tertiary/20 px-3 pb-2">
-          <pre className="text-fg-muted t-sm overflow-x-auto rounded font-mono leading-relaxed">
-            {pre.map((line, i) => (
-              <div className="flex gap-3" key={`pre-${i}`}>
-                <span className="text-fg-muted/60 w-8 shrink-0 text-right tabular-nums">
-                  {firstNo + i}
-                </span>
-                <span className="opacity-70">{line}</span>
-              </div>
-            ))}
-            <div className="text-danger flex gap-3">
-              <span className="text-danger w-8 shrink-0 text-right tabular-nums">{frame.line}</span>
-              <span>{frame.contextLine}</span>
-            </div>
-            {post.map((line, i) => (
-              <div className="flex gap-3" key={`post-${i}`}>
-                <span className="text-fg-muted/60 w-8 shrink-0 text-right tabular-nums">
-                  {frame.line + 1 + i}
-                </span>
-                <span className="opacity-70">{line}</span>
-              </div>
-            ))}
-          </pre>
+          {/* Syntax-highlighted snippet via starry-night (Phase 42 sub-A.04).
+           *  Highlights the throw line in red without breaking line-number
+           *  alignment by passing it through `highlightLines`. */}
+          <SourceCode
+            code={snippet}
+            highlightLines={[frame.line]}
+            language={language}
+            startLine={firstNo}
+          />
         </div>
       )}
     </div>
   )
 }
 
-function VendorFold({ base, frames }: { base: number; frames: Frame[] }) {
+function VendorFold({ base, frames, pkg }: { base: number; frames: Frame[]; pkg: null | string }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="border-border/40 border-b last:border-b-0">
@@ -487,9 +532,19 @@ function VendorFold({ base, frames }: { base: number; frames: Frame[] }) {
         type="button"
       >
         <span className="inline-block w-3">{open ? '▾' : '▸'}</span>
-        <span>
-          {frames.length} library frame{frames.length === 1 ? '' : 's'}
-        </span>
+        <FrameRoleBadge role={roleOf(frames[0]!)} />
+        {pkg ? (
+          <>
+            <span className="text-fg font-mono">{pkg}</span>
+            <span>
+              ({frames.length} frame{frames.length === 1 ? '' : 's'})
+            </span>
+          </>
+        ) : (
+          <span>
+            {frames.length} library frame{frames.length === 1 ? '' : 's'}
+          </span>
+        )}
       </button>
       {open && (
         <div className="bg-bg-tertiary/10">
