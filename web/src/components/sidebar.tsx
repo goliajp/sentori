@@ -223,7 +223,7 @@ function SidebarContent({
                   title={`Density: ${density} — click to toggle`}
                   type="button"
                 >
-                  {density === 'compact' ? '☰' : '≡'}
+                  {density === 'ultra' ? '☷' : density === 'compact' ? '☰' : '≡'}
                 </button>
                 <ThemeToggle />
                 <button

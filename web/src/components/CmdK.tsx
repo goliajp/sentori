@@ -184,7 +184,7 @@ export function CmdK() {
             {items.map((hit, i) => (
               <li key={`${hit.type}-${hit.id}`}>
                 <button
-                  className={`flex w-full items-baseline gap-3 px-3 py-1.5 text-left text-[13px] ${
+                  className={`group flex w-full items-center gap-3 px-3 py-1.5 text-left text-[13px] ${
                     i === safeIdx ? 'bg-accent/10' : 'hover:bg-bg-tertiary'
                   }`}
                   onClick={() => go(hit)}
@@ -192,12 +192,20 @@ export function CmdK() {
                   type="button"
                 >
                   <KindChip kind={hit.type} />
-                  <span className="text-fg truncate">{hit.label}</span>
+                  <span className="text-fg min-w-0 flex-1 truncate">{hit.label}</span>
                   {hit.sublabel && (
-                    <span className="text-fg-muted ml-auto truncate text-[11px]">
+                    <span className="text-fg-muted shrink-0 truncate text-[11px]">
                       {hit.sublabel}
                     </span>
                   )}
+                  <span
+                    aria-hidden
+                    className={`shrink-0 font-mono text-[12px] transition-opacity ${
+                      i === safeIdx ? 'text-accent opacity-100' : 'opacity-0'
+                    }`}
+                  >
+                    ↵
+                  </span>
                 </button>
               </li>
             ))}

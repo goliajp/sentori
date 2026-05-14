@@ -23,7 +23,9 @@ import {
   useState,
 } from 'react'
 
-export type Density = 'compact' | 'cozy'
+/** Phase 50 sub-D6 — added `ultra` (h-6 / text-[11px]) for power users
+ *  who want to fit 1.5x more rows per screen at the cost of small text. */
+export type Density = 'compact' | 'cozy' | 'ultra'
 
 const STORAGE_KEY = 'sentori:ui:density:v1'
 
@@ -38,7 +40,7 @@ const DensityContext = createContext<DensityContextValue | null>(null)
 function load(): Density {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw === 'compact' || raw === 'cozy') return raw
+    if (raw === 'compact' || raw === 'cozy' || raw === 'ultra') return raw
   } catch {
     // Ignore.
   }
@@ -61,7 +63,8 @@ export function DensityProvider({ children }: { children: ReactNode }) {
   }, [])
   const toggle = useCallback(() => {
     setDensityState((prev) => {
-      const next = prev === 'compact' ? 'cozy' : 'compact'
+      // Phase 50 sub-D6 — cycle through cozy → compact → ultra → cozy.
+      const next: Density = prev === 'cozy' ? 'compact' : prev === 'compact' ? 'ultra' : 'cozy'
       save(next)
       return next
     })
@@ -92,6 +95,11 @@ export const DENSITY_CLASSES: Record<Density, { rowClass: string; cellPaddingY: 
   cozy: {
     cellPaddingY: 'py-1.5',
     rowClass: 'h-10 text-[13px]',
+  },
+  // Phase 50 sub-D6 — ultra-compact tier for power triage.
+  ultra: {
+    cellPaddingY: 'py-0',
+    rowClass: 'h-6 text-[11px]',
   },
 }
 
