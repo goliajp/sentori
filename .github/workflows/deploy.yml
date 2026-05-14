@@ -1,15 +1,30 @@
 name: deploy
 
 # Phase 16 production deploy via the goliajp/devops infra.
-# Mirrors the goliajp/portal pattern: pushes to release/* land on the
-# self-hosted lx64 runner, rsync the source into /apps/sentori/src,
-# install services/sentori/docker-compose.yml from a fresh devops
-# checkout, write .env from repo secrets, then `docker compose up -d`.
+# Mirrors the goliajp/portal pattern: lands on the self-hosted lx64
+# runner, rsync the source into /apps/sentori/src, install services
+# /sentori/docker-compose.yml from a fresh devops checkout, write
+# .env from repo secrets, then `docker compose up -d`.
+#
+# Trigger surface (Phase 48 sub-H — every dashboard change must be
+# visible on app.sentori.golia.jp without a manual branch push):
+#
+#   - push to main → deploy automatically AFTER the `build` workflow
+#     completes green for the same SHA. We gate on the build run
+#     because deploying a SHA that fails CI would leave prod in a
+#     known-broken state.
+#   - push to release/* → deploy directly (existing release-branch
+#     dance for explicit-version deploys still works).
+#   - workflow_dispatch → manual trigger from the Actions UI.
 
 on:
   push:
     branches:
       - 'release/*'
+  workflow_run:
+    workflows: ['build']
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -20,6 +35,12 @@ jobs:
   deploy:
     runs-on: [self-hosted, lx64]
     timeout-minutes: 45
+    # Gate on the upstream `build` workflow when we got here via
+    # `workflow_run`. Pushes to release/* and manual dispatches don't
+    # have an upstream run and pass through unconditionally.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
 
     env:
       REMOTE_DIR: /apps/sentori
@@ -28,14 +49,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # `workflow_run` defaults to checking out the *default* branch's
+          # HEAD, not the SHA that triggered the upstream build. Pin to
+          # the upstream SHA so we deploy exactly the commit that just
+          # went green.
           fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - name: Extract release version
         id: ver
         run: |
-          branch="${GITHUB_REF_NAME}"
-          version="${branch#release/}"
-          version="${version#v}"
+          # Branch-based releases (release/vX.Y.Z) carry the version in
+          # the branch name. Main-line deploys (workflow_run trigger)
+          # don't — we derive a short SHA so we still tag the prod box
+          # with something machine-readable.
+          branch="${GITHUB_REF_NAME:-main}"
+          if [[ "$branch" == release/* ]]; then
+            version="${branch#release/}"
+            version="${version#v}"
+          else
+            version="$(git rev-parse --short=7 HEAD)"
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "==> deploying version $version"
 
@@ -112,7 +146,10 @@ jobs:
           SENTORI_SMTP_FROM: ${{ secrets.SENTORI_SMTP_FROM }}
           SENTORI_SMTP_TLS: ${{ secrets.SENTORI_SMTP_TLS }}
           SENTORI_DOGFOOD_DASHBOARD_TOKEN: ${{ secrets.SENTORI_DOGFOOD_DASHBOARD_TOKEN }}
-          SENTORI_VERSION: ${{ github.sha }}
+          # Use the upstream SHA when we came via workflow_run (matches
+          # the checked-out ref). github.sha is the default-branch HEAD
+          # at trigger time, which can drift; prefer head_sha when set.
+          SENTORI_VERSION: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           umask 077
           cat > "${REMOTE_DIR}/.env" <<EOF
@@ -186,7 +223,10 @@ jobs:
           test "$status" = "200" || fail "docs :18802 expected 200, got $status"
           echo "==> smoke OK"
 
-      - name: Tag version
+      - name: Tag release version
+        # Only on the release/* push path — main-line deploys derived
+        # version from the short SHA, which we don't want to tag.
+        if: startsWith(github.ref, 'refs/heads/release/')
         run: |
           git tag "v${{ steps.ver.outputs.version }}" || true
           git push origin "v${{ steps.ver.outputs.version }}" || true

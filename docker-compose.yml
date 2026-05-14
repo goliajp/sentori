@@ -61,6 +61,11 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.web
+      # Phase 48 sub-D — VITE_GIT_SHA inlines into the dashboard's
+      # version badge (web/src/version.ts). SENTORI_VERSION is the
+      # deploy-time sha env var the workflow writes into .env.
+      args:
+        VITE_GIT_SHA: ${SENTORI_VERSION:-dev}
     ports:
       - "${SENTORI_WEB_PORT:-8000}:80"
     depends_on:
