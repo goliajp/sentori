@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { adminApi, type HealthBucket, type HealthSummary } from '@/api/client'
+import { adminApi, type HealthSummary } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
+import { LineChart } from '@/components/charts'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
 import { PageBody, PageHeader, PageShell, StatNumber } from '@/components/ui'
 
@@ -69,10 +70,24 @@ export function OverviewView() {
           </section>
 
           <section>
-            <h2 className="text-fg-muted text-[11px] tracking-wider uppercase">
+            <h2 className="text-fg-muted mb-2 text-[11px] tracking-wider uppercase">
               Sessions over time
             </h2>
-            <SessionSparkline buckets={data.buckets} />
+            <LineChart
+              data={data.buckets.map((b) => ({
+                crashed: b.crashed,
+                errored: b.errored,
+                ok: Math.max(0, b.total - b.crashed - b.errored),
+                total: b.total,
+                ts: b.at,
+              }))}
+              height={180}
+              series={[
+                { color: 'var(--color-accent)', key: 'ok', label: 'OK' },
+                { color: 'var(--color-warning)', key: 'errored', label: 'Errored' },
+                { color: 'var(--color-danger)', key: 'crashed', label: 'Crashed' },
+              ]}
+            />
           </section>
 
           <section>
@@ -127,58 +142,9 @@ function Stat({
   )
 }
 
-/**
- * Pure-SVG sparkline. Width fills container; height fixed at 80px.
- * Stacks crashed (red) on top of total-crashed (gray) so the visual
- * width of the red layer reads as the unhealthy share at a glance.
- *
- * No external chart library — sparklines are a few <rect>s, and this
- * keeps bundle size flat.
- */
-function SessionSparkline({ buckets }: { buckets: HealthBucket[] }) {
-  if (buckets.length === 0) {
-    return <p className="text-fg-muted mt-2 text-[12px]">No session pings in this window.</p>
-  }
-  const max = Math.max(1, ...buckets.map((b) => b.total))
-  const w = 100 / buckets.length
-  return (
-    <svg
-      aria-label="Sessions over time"
-      className="border-border bg-bg-tertiary/30 mt-2 h-20 w-full rounded-md border"
-      preserveAspectRatio="none"
-      viewBox={`0 0 100 100`}
-      role="img"
-    >
-      {buckets.map((b, i) => {
-        const totalH = (b.total / max) * 100
-        const crashedH = (b.crashed / max) * 100
-        const x = i * w
-        const y = 100 - totalH
-        return (
-          <g key={i}>
-            <rect
-              fill="currentColor"
-              height={totalH}
-              opacity="0.4"
-              width={w * 0.85}
-              x={x + w * 0.075}
-              y={y}
-            />
-            {crashedH > 0 && (
-              <rect
-                fill="rgb(239 68 68)"
-                height={crashedH}
-                width={w * 0.85}
-                x={x + w * 0.075}
-                y={100 - crashedH}
-              />
-            )}
-          </g>
-        )
-      })}
-    </svg>
-  )
-}
+// Phase 50 sub-A2: the bespoke `<SessionSparkline>` is replaced by
+// the reusable `<LineChart>` primitive — same data path, much richer
+// hover + multi-series support. Bare-bones <rect> sparkline removed.
 
 function SummaryFootnote({ summary }: { summary: HealthSummary }) {
   if (summary.totalSessions === 0) {
