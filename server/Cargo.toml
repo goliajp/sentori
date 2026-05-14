@@ -15,7 +15,11 @@ path = "src/main.rs"
 
 [dependencies]
 axum = { version = "0.8", features = ["multipart"] }
+# Phase 50 sub-A1 — SSE feed needs tokio-stream + futures for the
+# broadcast → axum::sse adapter.
 tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+futures = "0.3"
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace", "limit"] }
 serde = { version = "1", features = ["derive"] }

@@ -13,6 +13,7 @@ import {
 } from '@/api/client'
 import { useAuth } from '@/auth/state'
 import { useOrg } from '@/auth/orgContext'
+import { LiveEventSparkline } from '@/components/charts'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
 import { useToast } from '@/components/ui'
 import { type ColumnDef, useColumnPrefs } from '@/lib/column-prefs'
@@ -341,6 +342,11 @@ export function IssuesView() {
           ))}
         </div>
         <div className="ml-auto flex items-center gap-2">
+          {projectId && (
+            <div className="w-48">
+              <LiveEventSparkline projectId={projectId} />
+            </div>
+          )}
           <button
             aria-pressed={anrOnly}
             className={`rounded-md px-2.5 py-1 text-[12px] transition-colors ${

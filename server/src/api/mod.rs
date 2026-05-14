@@ -8,6 +8,7 @@ pub mod digests;
 pub mod dsyms;
 pub mod events;
 pub mod events_batch;
+pub mod events_stream;
 pub mod health;
 pub mod mappings;
 pub mod orgs;

@@ -79,6 +79,20 @@ pub async fn handle(
         }
     }
 
+    // Phase 50 sub-A1: fan out a tick to the SSE live-feed subscribers
+    // before pushing into the in-memory ring (the kind we want from
+    // the event is computed below). `send` errors when there are zero
+    // subscribers — that's the common case and not an error.
+    let kind = match event.kind {
+        crate::event::EventKind::Anr => "anr",
+        crate::event::EventKind::Error => "error",
+    };
+    let _ = state.event_ticks.send(crate::recent::EventTick {
+        kind: kind.to_string(),
+        project_id,
+        ts_ms: time::OffsetDateTime::now_utc().unix_timestamp() * 1000,
+    });
+
     state.recent.push(event);
 
     m::ingest_accepted();

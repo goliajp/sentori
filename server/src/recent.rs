@@ -35,6 +35,17 @@ impl RecentBuffer {
     }
 }
 
+/// Phase 50 sub-A1 — broadcast tick fanned to every SSE subscriber
+/// (`/admin/api/projects/{id}/events:stream`) on each ingested event.
+/// `project_id` is included so a single broadcast channel serves
+/// multi-project dashboards — clients filter on their own project.
+#[derive(Clone, Debug)]
+pub struct EventTick {
+    pub kind: String,
+    pub project_id: uuid::Uuid,
+    pub ts_ms: i64,
+}
+
 #[derive(Clone)]
 pub struct AppState {
     pub auth: AuthState,
@@ -52,6 +63,11 @@ pub struct AppState {
     /// set this is a `NoopAttachmentStore` and uploads return 503
     /// `attachmentsDisabled`.
     pub attachments: crate::attachments::SharedAttachmentStore,
+    /// Phase 50 sub-A1: broadcast sender for the live event feed.
+    /// 128-slot buffer; slow subscribers drop messages rather than
+    /// back-pressure the ingest path. `Arc` shared so cloning AppState
+    /// reuses the same channel.
+    pub event_ticks: std::sync::Arc<tokio::sync::broadcast::Sender<EventTick>>,
 }
 
 impl FromRef<AppState> for AuthState {

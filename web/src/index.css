@@ -242,3 +242,19 @@ body {
 .sentori-row-out {
   animation: sentori-row-out 240ms ease-in forwards;
 }
+
+/*
+ * Phase 50 sub-A1 — live indicator dot pulse (Linear "online" vibe).
+ */
+@keyframes sentori-live-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(from var(--color-success) r g b / 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 4px rgb(from var(--color-success) r g b / 0);
+  }
+}
+.sentori-live-pulse {
+  animation: sentori-live-pulse 2s ease-out infinite;
+}

@@ -49,6 +49,12 @@ pub fn build(cfg: ServerConfig) -> Router {
     let auth_state = AuthState::new(cfg.dev_token, cfg.db.clone());
     let recent = RecentBuffer::new();
     let cfg_self_trace_clone = cfg.self_trace.clone();
+    // Phase 50 sub-A1: 128-slot broadcast channel for the live event
+    // SSE feed. Capacity is the number of in-flight ticks a slow
+    // subscriber can buffer before the channel drops older ones —
+    // 128 covers a 1-2s burst at typical dev-time rates.
+    let (event_ticks_tx, _) =
+        tokio::sync::broadcast::channel::<crate::recent::EventTick>(128);
     let state = AppState {
         auth: auth_state.clone(),
         recent,
@@ -63,6 +69,7 @@ pub fn build(cfg: ServerConfig) -> Router {
         attachments: cfg
             .attachments
             .unwrap_or_else(|| std::sync::Arc::new(crate::attachments::NoopAttachmentStore)),
+        event_ticks: std::sync::Arc::new(event_ticks_tx),
     };
 
     let ingestion = Router::new()
@@ -204,6 +211,12 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route(
             "/projects/{project_id}/issues/{issue_id}/related",
             get(api::admin::related_issues),
+        )
+        // Phase 50 sub-A1: SSE feed of inbound event ticks for a
+        // project. Dashboard's live sparkline subscribes here.
+        .route(
+            "/projects/{project_id}/events:stream",
+            get(api::events_stream::handle),
         )
         .route(
             "/projects/{project_id}/dsyms",

@@ -2257,6 +2257,7 @@ dependencies = [
  "async-trait",
  "axum",
  "axum-extra",
+ "futures",
  "hex",
  "hmac",
  "lettre",
@@ -2278,6 +2279,7 @@ dependencies = [
  "thiserror 2.0.18",
  "time",
  "tokio",
+ "tokio-stream",
  "tower",
  "tower-http",
  "tracing",
@@ -2959,6 +2961,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
