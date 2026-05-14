@@ -2,13 +2,10 @@
 // on `captureException`. Off-main-thread, best-effort, opt-in.
 //
 // Performance contract (sub-D.04):
-//   - Wait for the in-flight RN interaction batch to drain before
-//     touching the view shot (`InteractionManager.runAfterInteractions`)
-//     so we never extend the active gesture / animation by a frame.
-//   - Yield one paint by chaining a `requestAnimationFrame` so the
-//     screenshot reflects post-error UI state, not the frame that
-//     was already half-laid-out.
-//   - Capped output: 480 px on the longest edge, WebP q=70. Typical
+//   - Yield one paint via `requestAnimationFrame` before snapshotting
+//     so the screenshot reflects post-error UI state, not the frame
+//     that was already half-laid-out.
+//   - Capped output: 480 px on the longest edge, JPEG q=70. Typical
 //     payload 30-80 KB; multipart hard cap is 500 KB.
 //   - On any failure we silently return null. The error event still
 //     goes to the server; the user just doesn't see a thumbnail.
@@ -17,8 +14,18 @@
 // lazily so apps that don't install it never pay the bundle cost
 // or fail at import time. Without it, `captureScreenshot()` returns
 // `null` immediately.
-
-import { InteractionManager } from 'react-native';
+//
+// 2026-05-15 — dropped `InteractionManager.runAfterInteractions`.
+// RN's docs mark `InteractionManager` as deprecated and recommend
+// `requestIdleCallback`, but `requestIdleCallback` doesn't actually
+// exist in RN (it's a web API), so the deprecation print is
+// unactionable for SDK consumers. The defensive "wait for the active
+// gesture batch to drain" semantics it provided is not reachable
+// from a screenshot triggered on captureException — by the time an
+// error fires, the user is between actions, not mid-gesture — so
+// removing it has no observable effect except silencing the warning.
+// The `requestAnimationFrame` calls below still guarantee one paint
+// commit before captureRef snapshots.
 
 import { engageMasks } from '../mask';
 
@@ -67,12 +74,13 @@ export async function captureScreenshot(): Promise<ScreenshotBlob | null> {
   const captureRef = loadCaptureRef();
   if (!captureRef) return null;
 
-  // Wait for the in-flight RN interaction batch to drain. This is
-  // why screenshot capture doesn't visibly stall the user's last
-  // action — we let React commit before we ask the OS to render.
-  await new Promise<void>((resolve) => {
-    InteractionManager.runAfterInteractions(() => resolve());
-  });
+  // Yield one paint frame so the post-error UI has committed before
+  // we ask the OS to snapshot it. The previous
+  // `InteractionManager.runAfterInteractions` step was removed: see
+  // file header — its replacement (`requestIdleCallback`) doesn't
+  // exist in RN, and on captureException the user is between actions
+  // anyway, so the gesture-batch-drain semantics never came into
+  // play in practice.
   await new Promise<void>((resolve) => {
     requestAnimationFrame(() => resolve());
   });
