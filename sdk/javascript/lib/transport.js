@@ -91,9 +91,13 @@ export async function uploadAttachment(cfg, eventId, kind, blob) {
             },
             method: 'POST',
         });
-        if (resp.status !== 201)
+        // Phase 48 sub-A — accept any 2xx (reverse proxies sometimes
+        // rewrite 201 → 202). Body must still parse as UploadResponse.
+        if (resp.status < 200 || resp.status >= 300)
             return null;
-        const j = (await resp.json());
+        const j = (await resp.json().catch(() => null));
+        if (!j || !j.refId)
+            return null;
         return { kind, mediaType: j.mediaType, ref: j.refId, sizeBytes: j.sizeBytes, source: 'js' };
     }
     catch {

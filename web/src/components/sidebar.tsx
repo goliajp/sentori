@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 
 import type { OrgRow, ProjectRow, TeamRow } from '@/api/client'
 import { useDensity } from '@/lib/density'
+import { VERSION_LABEL } from '@/version'
 
 import { OnboardingBadge } from './OnboardingBadge'
 import { OrgSwitcher } from './OrgSwitcher'
 import { RoleBadge } from './RoleBadge'
-import { EditorPicker } from './EditorPicker'
 import { ThemeToggle } from './theme-toggle'
 
 type IconKind =
@@ -191,29 +191,14 @@ function SidebarContent({
               >
                 »
               </button>
-              <button
-                aria-label="Sign out"
-                className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-2 py-1 text-xs"
-                onClick={onLogout}
-                title={`Sign out (${user?.email ?? 'account'})`}
-                type="button"
-              >
-                ⎋
-              </button>
+              <UserMenuButton collapsed onLogout={onLogout} role={currentOrg.role} user={user} />
             </div>
           ) : (
             <>
-              <Link
-                className="text-fg-muted hover:bg-bg-tertiary hover:text-fg flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[12px]"
-                title="My activity"
-                to="/me/activity"
-              >
-                <span className="truncate">{user?.email ?? 'account'}</span>
-                <RoleBadge role={currentOrg.role} />
-              </Link>
-              <div className="mt-2 px-1">
-                <EditorPicker />
-              </div>
+              <UserMenuButton onLogout={onLogout} role={currentOrg.role} user={user} />
+              {/* Phase 48 sub-D — single thin strip of preference toggles +
+                  a sidebar collapse handle. Sign-out moved into the user
+                  menu popover above so this row never wraps. */}
               <div className="mt-1 flex items-center gap-1 px-1">
                 <button
                   aria-label={`Density: ${density}. Click to toggle.`}
@@ -234,18 +219,104 @@ function SidebarContent({
                 >
                   «
                 </button>
-                <button
-                  className="text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-2 py-1 text-xs"
-                  onClick={onLogout}
-                  type="button"
-                >
-                  Sign out
-                </button>
+              </div>
+              <div
+                className="text-fg-muted/50 mt-1 px-2 font-mono text-[10px] tracking-tight"
+                title="Click to copy build sha"
+              >
+                {VERSION_LABEL}
               </div>
             </>
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Phase 48 sub-D — collapsible user-menu button. Replaces the
+ * previous footer-cram (email link + density + theme + collapse +
+ * sign-out all on one row, which forced "Sign out" to wrap). Closed
+ * state shows email + role; open state pops up "My activity" + "Sign
+ * out". Outside-click and Esc both close.
+ */
+function UserMenuButton({
+  collapsed,
+  onLogout,
+  role,
+  user,
+}: {
+  collapsed?: boolean
+  onLogout: () => void
+  role: OrgRow['role']
+  user: { email?: string } | null
+}) {
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <div className="relative" ref={wrapRef}>
+      <button
+        aria-expanded={open}
+        aria-label={`Account menu (${user?.email ?? 'account'})`}
+        className={
+          collapsed
+            ? 'text-fg-muted hover:bg-bg-tertiary hover:text-fg rounded-md px-2 py-1 text-xs'
+            : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[12px]'
+        }
+        onClick={() => setOpen((v) => !v)}
+        type="button"
+      >
+        {collapsed ? (
+          '⎋'
+        ) : (
+          <>
+            <span className="truncate">{user?.email ?? 'account'}</span>
+            <RoleBadge role={role} />
+          </>
+        )}
+      </button>
+      {open && (
+        <div
+          className="border-border bg-bg-tertiary absolute right-0 bottom-full z-50 mb-1 w-44 rounded-md border py-1 text-[12px] shadow-lg"
+          role="menu"
+        >
+          <Link
+            className="text-fg-muted hover:bg-bg-secondary hover:text-fg block px-3 py-1.5"
+            onClick={() => setOpen(false)}
+            role="menuitem"
+            to="/me/activity"
+          >
+            My activity
+          </Link>
+          <div className="border-border/60 my-1 border-t" />
+          <button
+            className="text-fg-muted hover:bg-bg-secondary hover:text-fg block w-full px-3 py-1.5 text-left"
+            onClick={onLogout}
+            role="menuitem"
+            type="button"
+          >
+            Sign out
+          </button>
+        </div>
+      )}
     </div>
   )
 }

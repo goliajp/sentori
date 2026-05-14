@@ -31,6 +31,8 @@ const ISSUE_COLUMNS: readonly ColumnDef<IssueColumnId>[] = [
 ]
 const ISSUE_COLUMN_STORAGE_KEY = 'sentori:issues:columns:v1'
 
+import { useUrlParam } from '@/lib/url-state'
+
 type Status = 'active' | 'closed' | 'regressed' | 'resolved' | 'silenced'
 // `regressed` lives between active and resolved in the lifecycle so it
 // reads left→right naturally. Order also matches what triage tends to
@@ -40,13 +42,20 @@ const STATUSES: readonly Status[] = ['active', 'regressed', 'resolved', 'silence
 export function IssuesView() {
   const navigate = useNavigate()
   const { currentOrg, currentProject } = useOrg()
-  const [statusTab, setStatusTab] = useState<Status>('active')
+  // Phase 48 sub-C — status tab persists in `?status=`, so refresh /
+  // link-share / back-button keep the user where they were.
+  const [statusTab, setStatusTab] = useUrlParam<Status>('status', 'active', (raw) =>
+    (STATUSES as readonly string[]).includes(raw) ? (raw as Status) : null
+  )
   // Phase 24 sub-A: single search box. Tokens like `errorType:Foo`,
   // `env:prod`, `release:myapp@1.2.3`, `status:resolved`, `last:7d`
   // map to server filter params; everything else falls through as
   // free-text matched client-side against errorType + messageSample.
-  const [queryText, setQueryText] = useState('')
-  const [anrOnly, setAnrOnly] = useState(false)
+  // Phase 48 sub-C — search + anr toggle persist in URL too.
+  const [queryText, setQueryText] = useUrlParam<string>('q', '')
+  const [anrRaw, setAnrRaw] = useUrlParam<'0' | '1'>('anr', '0', (v) => (v === '1' ? '1' : null))
+  const anrOnly = anrRaw === '1'
+  const toggleAnrOnly = () => setAnrRaw(anrOnly ? '0' : '1')
   const [selectedIdx, setSelectedIdx] = useState(0)
   const [columnsOpen, setColumnsOpen] = useState(false)
   const [viewsOpen, setViewsOpen] = useState(false)
@@ -326,7 +335,7 @@ export function IssuesView() {
                 ? 'bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30'
                 : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
             }`}
-            onClick={() => setAnrOnly((v) => !v)}
+            onClick={toggleAnrOnly}
             title="Show only Application Not Responding events"
             type="button"
           >

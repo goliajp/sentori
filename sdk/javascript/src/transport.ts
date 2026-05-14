@@ -122,13 +122,16 @@ export async function uploadAttachment(
       },
       method: 'POST',
     })
-    if (resp.status !== 201) return null
-    const j = (await resp.json()) as {
+    // Phase 48 sub-A — accept any 2xx (reverse proxies sometimes
+    // rewrite 201 → 202). Body must still parse as UploadResponse.
+    if (resp.status < 200 || resp.status >= 300) return null
+    const j = (await resp.json().catch(() => null)) as null | {
       kind: string
       mediaType: string
       refId: string
       sizeBytes: number
     }
+    if (!j || !j.refId) return null
     return { kind, mediaType: j.mediaType, ref: j.refId, sizeBytes: j.sizeBytes, source: 'js' }
   } catch {
     return null

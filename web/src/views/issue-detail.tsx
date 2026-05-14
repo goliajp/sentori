@@ -20,7 +20,6 @@ import { IssueDetailSkeleton } from '@/components/IssueDetailSkeleton'
 import { CopyMarkdownButton } from '@/components/CopyMarkdownButton'
 import { MergeIssueButton } from '@/components/MergeIssueButton'
 import { RelatedIssuesPanel } from '@/components/RelatedIssuesPanel'
-import { OpenInEditorButton } from '@/components/OpenInEditorButton'
 import { SourceCode } from '@/components/SourceCode'
 import { ErrorState } from '@/components/states'
 import { FrameHoverProvider, frameKey, useFrameHover } from '@/lib/frame-hover'
@@ -153,14 +152,13 @@ export function IssueDetailView() {
         <span className="text-fg-muted ml-1 truncate text-sm">{issue.messageSample}</span>
         <StatusBadge issue={issue} />
         <div className="ml-auto flex items-center gap-2">
-          {/* Phase 42 sub-A.13: jump straight to the crash site in the
-              user's IDE. Disabled when the first in-app frame's file
-              isn't an absolute local path (e.g. unsymbolicated stacks). */}
+          {/* Phase 48 sub-F — removed the "Open in <IDE>" button. The
+              dashboard now ships its own source viewer (FrameSourceDrawer,
+              fed by the server's sourcemap-sourcesContent endpoint), so
+              no external IDE jump is needed. Click any frame in the
+              Stack tab to open the inline source. */}
           <CopyMarkdownButton event={selectedEvent} issue={issue} orgSlug={currentOrg.slug} />
           <MergeIssueButton issueId={issueId} orgSlug={currentOrg.slug} projectId={projectId!} />
-          <OpenInEditorButton
-            frame={selectedEvent?.payload.error.stack.find((f) => f.inApp) ?? null}
-          />
           <IssueActions
             currentUserId={user?.id ?? null}
             issue={issue}
@@ -477,6 +475,7 @@ function StackTab({
         {openFrame && (
           <FrameSourceDrawer
             cause={openFrame.cause}
+            environment={payload.environment}
             eventId={event.id}
             frame={openFrame.frame}
             onClose={() => setOpenFrame(null)}
@@ -1289,12 +1288,14 @@ function NativeErrorCard({
 
 function FrameSourceDrawer({
   cause,
+  environment,
   eventId,
   frame,
   onClose,
   projectId,
 }: {
   cause: number
+  environment: string
   eventId: string
   frame: number
   onClose: () => void
@@ -1363,7 +1364,7 @@ function FrameSourceDrawer({
         </header>
         <div className="flex-1 overflow-auto">
           {isLoading && <p className="text-fg-muted px-4 py-6 text-[12px]">Loading source…</p>}
-          {error && <FrameSourceError error={error} />}
+          {error && <FrameSourceError environment={environment} error={error} />}
           {data && <FrameSourceBody source={data} />}
         </div>
       </div>
@@ -1400,10 +1401,23 @@ function FrameSourceBody({ source }: { source: FrameSource }) {
   )
 }
 
-function FrameSourceError({ error }: { error: unknown }) {
+function FrameSourceError({ environment, error }: { environment: string; error: unknown }) {
   // 404 = no sourcemap or unmapped frame; surface as a hint instead of red.
   const status = (error as { status?: number } | undefined)?.status
   if (status === 404) {
+    // Phase 48 sub-E — dev builds never have a sourcemap on the server
+    // (Metro symbolicates in-place; release builds upload one via
+    // `bun cli release`). Calling that out explicitly beats the generic
+    // "could be three things" wall of text.
+    if (environment === 'dev' || environment === 'development') {
+      return (
+        <p className="text-fg-muted px-4 py-6 text-[12px]">
+          <span className="text-fg">Dev build.</span> Source maps are only uploaded for production
+          releases. Ship a release build with <code className="font-mono">bun cli release</code> to
+          see the original source here.
+        </p>
+      )
+    }
     return (
       <p className="text-fg-muted px-4 py-6 text-[12px]">
         No source available for this frame. Either the release has no source map uploaded, the

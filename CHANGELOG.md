@@ -6,6 +6,73 @@
 
 ---
 
+## v0.7.1 — Insight feedback patch（Phase 48）
+
+**Goal:** Insight 第一份 dogfood 反馈直接落 fix。Screenshot 链路修通 + MaskRegion 不再是空头支票 + dashboard 几条专业感破绽（路由、版本号、sidebar 拥挤、IDE 外部跳转）一次性收掉。
+
+**npm 包变化：**
+
+- `@goliapkg/sentori-javascript` 0.4.0 → 0.4.1
+- `@goliapkg/sentori-react-native` 0.7.0 → 0.7.1
+- `@goliapkg/sentori-react` 0.4.5 → 0.4.6
+- `@goliapkg/sentori-next` 0.2.5 → 0.2.6
+- `@goliapkg/sentori-vue` 0.1.0 → 0.1.1
+- `@goliapkg/sentori-svelte` 0.1.0 → 0.1.1
+- `@goliapkg/sentori-solid` 0.1.0 → 0.1.1
+
+（sentori-core 0.6.0 不动 — 协议层无变化。）
+
+### Phase 48 sub-A — Screenshot 链路修复 ✅
+
+Insight 反馈核心：CFNetwork log 显示 POST `/v1/events/<id>/attachments/screenshot` server 端 202 接收成功，但 issue 详情页五个 tab 完全没有 attachment 展示位。三层修：
+
+- **Server**：`list_events_for_issue` 加 `enrich_attachments` 步骤，单批 query `event_attachments` 表并覆盖 `payload.attachments[]`。Server 端是 source-of-truth，client echo 失败或者 ref 不匹配都不影响 dashboard 显示。
+- **RN client**：`uploadAttachment` 把 `if (resp.status !== 201) return null` 放宽成接受任何 2xx（反向代理偶尔把 201 改成 202，这正是 Insight 撞到的现象）。Body 解析失败也优雅 null。
+- **JS client**：同样的放宽，sessionTrail 上传走同一条路径。
+
+### Phase 48 sub-B — MaskRegion 真正生效 ✅
+
+之前 `_maskedNativeIds` 只注册不消费 — wrap 14 个 surface 的 `<MaskRegion>` 然后截图照样把 PII 全送上去（Insight 反馈 P1，GDPR/CCPA 视角是 stop-ship）。重写：
+
+- `<MaskRegion>` 现在渲染 children + 一个 `absoluteFill` 的黑色 overlay View（normally `opacity: 0`，被 `pointerEvents="none"` 屏蔽不挡触摸）。
+- `engageMasks()` 截屏前把所有 overlay 翻 `opacity: 1` 盖住 children；imperative `setMaskedNode(ref)` 注册的 view 直接 `opacity: 0` 隐藏。截屏完恢复。
+- `captureScreenshot()` 在 `captureRef` 调用前 + 后各 yield 一帧确保 paint 落地。
+
+### Phase 48 sub-C — Issue list filter 进 URL ✅
+
+Issues list 的 `status` (active/regressed/...) tab、`q` search、`anr` 切换全部进 URL search params。F5 / link share / 后退 都保留 filter 状态。新 hook `useUrlParam<T>` 是其它视图后续接入的 building block。
+
+### Phase 48 sub-D — Sidebar footer 重做 + version badge ✅
+
+之前 footer 把 email link + EditorPicker + 4 个 toggle 全挤进 ~200px 宽，把 "Sign out" 文字压成两行。重做：
+
+- 引入 `<UserMenuButton>` 弹出式 popover：邮箱+role chip 是 trigger，点开里面有 "My activity" 和 "Sign out"。
+- 单行 toggle strip：密度 / 主题 / 折叠 sidebar handle。
+- 最底下一行 `text-fg-muted/50 mono` 显示 `v0.7.1 · sha7chars`，sha 从 `VITE_GIT_SHA` 取（Dockerfile.web 已注入）。`web/src/version.ts` 是 SENTORI_VERSION 的 single source of truth，每次发版手动 bump。
+
+### Phase 48 sub-E — Dev build 文案 ✅
+
+Frame source drawer 在 404 时根据 `event.payload.environment` 分两路：
+
+- `dev` → 「Dev build. Source maps are only uploaded for production releases. Ship a release build with `bun cli release` to see the original source here.」
+- 其它 → 保留通用 fallback 文案。
+
+### Phase 48 sub-F — 内嵌 source viewer，去掉 IDE jump ✅
+
+Sentori 主张零外部依赖。删掉：
+
+- `<OpenInEditorButton>` (8 个内置 IDE URI scheme + custom template)
+- `<EditorPicker>` sidebar UI
+- `web/src/lib/editor-template.ts` + test
+
+实际上 `<FrameSourceDrawer>` 通过 server 的 `frame_source` endpoint 已经从 sourcemap 的 `sourcesContent` 抽出完整源码、内嵌渲染（starry-night 高亮 + 上下文 ±5/±20 行可切换）— 这条链路本来就完整，IDE 跳转按钮一直是冗余。点 stack frame 即开。
+
+### Phase 48 sub-G — Publish + ROADMAP ✅
+
+7 个 npm 包 publish，本节 + git tag v0.7.1。
+
+---
+
 ## v0.7 — 综合升级（Phase 43–47）
 
 **Goal:** 在 v0.6 issue 诊断深度的基础上，五条并行轴一次性铺开：Linear/Slack 双向集成、客户端 sampling + 数据分析、Web SDK 矩阵（Vue/Svelte/Solid 加入）、session-trail 轻量回放、最后一波 polish 收尾。

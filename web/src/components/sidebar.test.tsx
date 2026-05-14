@@ -85,10 +85,15 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: /^issues$/i }).className).not.toContain('text-accent')
   })
 
-  it('renders the user email + a Sign out control and the mobile hamburger', () => {
+  it('renders the user email + Sign out reachable through the account menu', async () => {
     sidebar('owner')
     expect(screen.getByText('dev@local')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
+    // Phase 48 sub-D — Sign out moved into a popover behind the account
+    // button so the sidebar footer never wraps. Click the account button
+    // first to surface Sign out.
+    const accountBtn = screen.getByRole('button', { name: /account menu/i })
+    accountBtn.click()
+    expect(await screen.findByRole('menuitem', { name: /sign out/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /open navigation/i })).toBeInTheDocument()
   })
 })

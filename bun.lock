@@ -48,7 +48,7 @@
     },
     "sdk/javascript": {
       "name": "@goliapkg/sentori-javascript",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "dependencies": {
         "@goliapkg/sentori-core": "0.6.0",
       },
@@ -60,11 +60,11 @@
     },
     "sdk/next": {
       "name": "@goliapkg/sentori-next",
-      "version": "0.2.5",
+      "version": "0.2.6",
       "dependencies": {
         "@goliapkg/sentori-core": "0.6.0",
-        "@goliapkg/sentori-javascript": "0.4.0",
-        "@goliapkg/sentori-react": "0.4.5",
+        "@goliapkg/sentori-javascript": "0.4.1",
+        "@goliapkg/sentori-react": "0.4.6",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -79,10 +79,10 @@
     },
     "sdk/react": {
       "name": "@goliapkg/sentori-react",
-      "version": "0.4.5",
+      "version": "0.4.6",
       "dependencies": {
         "@goliapkg/sentori-core": "0.6.0",
-        "@goliapkg/sentori-javascript": "0.4.0",
+        "@goliapkg/sentori-javascript": "0.4.1",
       },
       "devDependencies": {
         "@happy-dom/global-registrator": "^17",
@@ -104,7 +104,7 @@
     },
     "sdk/react-native": {
       "name": "@goliapkg/sentori-react-native",
-      "version": "0.7.0",
+      "version": "0.7.1",
       "dependencies": {
         "@goliapkg/sentori-core": "0.6.0",
       },
@@ -131,10 +131,10 @@
     },
     "sdk/solid": {
       "name": "@goliapkg/sentori-solid",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "dependencies": {
         "@goliapkg/sentori-core": "0.6.0",
-        "@goliapkg/sentori-javascript": "0.4.0",
+        "@goliapkg/sentori-javascript": "0.4.1",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -149,10 +149,10 @@
     },
     "sdk/svelte": {
       "name": "@goliapkg/sentori-svelte",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "dependencies": {
         "@goliapkg/sentori-core": "0.6.0",
-        "@goliapkg/sentori-javascript": "0.4.0",
+        "@goliapkg/sentori-javascript": "0.4.1",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -167,10 +167,10 @@
     },
     "sdk/vue": {
       "name": "@goliapkg/sentori-vue",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "dependencies": {
         "@goliapkg/sentori-core": "0.6.0",
-        "@goliapkg/sentori-javascript": "0.4.0",
+        "@goliapkg/sentori-javascript": "0.4.1",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -1017,7 +1017,7 @@
 
     "ee-first": ["ee-first@1.1.1", "", {}, "sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow=="],
 
-    "electron-to-chromium": ["electron-to-chromium@1.5.354", "", {}, "sha512-JaBHwWcfIdmSAfWM5l3uwjGd431j8YEMikZ+K/2nXVuBqJKyZ0f+2h4n4JY5AyNiZmnY9qQr2RU3v9DxDmHMNg=="],
+    "electron-to-chromium": ["electron-to-chromium@1.5.355", "", {}, "sha512-LUPZhKzZPYSPme1jEYohpkA+ybYCJztr1quAdBd7E7h3+VOBVcKkwwtBJu41nrjawrRzfb8mtMfzWozoaK0ZIQ=="],
 
     "emoji-regex": ["emoji-regex@8.0.0", "", {}, "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A=="],
 
@@ -1972,6 +1972,8 @@
     "better-opn/open": ["open@8.4.2", "", { "dependencies": { "define-lazy-prop": "^2.0.0", "is-docker": "^2.1.1", "is-wsl": "^2.2.0" } }, "sha512-7x81NCL719oNbsq/3mh+hVrAWmFuEYUqrq/Iw3kUzH8ReypT9QQ0BLoJS7/G9k6N81XjW4qHWtjWwe/9eLy1EQ=="],
 
     "cliui/strip-ansi": ["strip-ansi@6.0.1", "", { "dependencies": { "ansi-regex": "^5.0.1" } }, "sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A=="],
+
+    "compressible/mime-db": ["mime-db@1.54.0", "", {}, "sha512-aU5EJuIN2WDemCcAp2vFBfp/m4EAhWJnUNSSw0ixs7/kXbd6Pg64EmwJkNdFhB8aWt1sH2CTXrLxo/iAGV3oPQ=="],
 
     "compression/debug": ["debug@2.6.9", "", { "dependencies": { "ms": "2.0.0" } }, "sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA=="],
 

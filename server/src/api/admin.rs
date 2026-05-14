@@ -1190,5 +1190,76 @@ pub async fn list_events_for_issue(
         }
     }
 
+    // Phase 48 sub-A: server-side attachment enrichment. The client SDK
+    // echoes attachment refs into `payload.attachments[]` *after* a
+    // successful 201 from the upload endpoint, but any failure mode in
+    // that chain (proxy returning 202, network timeout between upload
+    // and event POST, client dropping the ref because it misparsed the
+    // response) leaves the dashboard with an event whose attachments
+    // exist in `event_attachments` table but not in the payload. So we
+    // re-derive `payload.attachments` from the canonical source-of-truth
+    // table on every read. Any client-echoed entry that doesn't match a
+    // server row was forged or stale and is dropped here too.
+    enrich_attachments(pool, project_id, &mut rows).await;
+
     Ok(Json(rows))
+}
+
+/// Phase 48 sub-A — replace each event's `payload.attachments` array
+/// with the canonical list pulled from the `event_attachments` table.
+/// Single batched query for all event ids in the list to keep cost
+/// constant (one round-trip regardless of `rows.len()`).
+async fn enrich_attachments(
+    pool: &sqlx::PgPool,
+    project_id: Uuid,
+    rows: &mut [EventRow],
+) {
+    if rows.is_empty() {
+        return;
+    }
+    let event_ids: Vec<Uuid> = rows.iter().map(|r| r.id).collect();
+
+    let server_attachments: Vec<(Uuid, Uuid, String, String, i32, Option<String>)> =
+        match sqlx::query_as(
+            r#"
+            SELECT ref, event_id, kind, media_type, size_bytes, source
+            FROM event_attachments
+            WHERE project_id = $1 AND event_id = ANY($2)
+            ORDER BY received_at ASC
+            "#,
+        )
+        .bind(project_id)
+        .bind(&event_ids)
+        .fetch_all(pool)
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!(error = %e, "enrich_attachments query failed");
+                return;
+            }
+        };
+
+    let mut by_event: std::collections::HashMap<Uuid, Vec<serde_json::Value>> =
+        std::collections::HashMap::new();
+    for (r#ref, event_id, kind, media_type, size_bytes, source) in server_attachments {
+        by_event.entry(event_id).or_default().push(serde_json::json!({
+            "ref": r#ref,
+            "kind": kind,
+            "mediaType": media_type,
+            "sizeBytes": size_bytes,
+            "source": source,
+        }));
+    }
+
+    for row in rows.iter_mut() {
+        let attachments = by_event
+            .remove(&row.id)
+            .unwrap_or_default();
+        // Overwrite payload.attachments — server table is the source of
+        // truth, not whatever the client managed to echo.
+        if let Some(obj) = row.payload.as_object_mut() {
+            obj.insert("attachments".to_string(), serde_json::Value::Array(attachments));
+        }
+    }
 }

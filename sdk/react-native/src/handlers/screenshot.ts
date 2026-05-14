@@ -20,6 +20,8 @@
 
 import { InteractionManager } from 'react-native';
 
+import { engageMasks } from '../mask';
+
 type CaptureRef = (
   // Phase 42: the lib accepts a React ref or — when we pass `undefined` —
   // shoots the root window. We always go for the root (no per-component
@@ -75,6 +77,19 @@ export async function captureScreenshot(): Promise<ScreenshotBlob | null> {
     requestAnimationFrame(() => resolve());
   });
 
+  // Phase 48 sub-B — flip every registered MaskRegion overlay to
+  // opacity 1 (black covers the children) and every imperative
+  // setMaskedNode ref to opacity 0 (subtree disappears). Held for
+  // exactly one frame's worth of capture, then restored.
+  const restoreMasks = engageMasks();
+  // Yield one more frame so the overlay paint reaches the screen
+  // before captureRef snapshots. Without this the overlay opacity
+  // change is queued but the screenshotter may see the previous
+  // frame.
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+
   try {
     const base64 = await withTimeout(
       captureRef(undefined, {
@@ -87,6 +102,7 @@ export async function captureScreenshot(): Promise<ScreenshotBlob | null> {
       }),
       CAPTURE_TIMEOUT_MS,
     );
+    restoreMasks();
     if (!base64) return null;
     // view-shot doesn't ship a WebP encoder on every RN version.
     // JPEG q=70 fits the budget too (typical 40-100 KB) and every
@@ -94,6 +110,7 @@ export async function captureScreenshot(): Promise<ScreenshotBlob | null> {
     // RN minimum we support has it everywhere.
     return { base64, mediaType: 'image/jpeg' };
   } catch {
+    restoreMasks();
     return null;
   }
 }

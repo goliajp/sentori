@@ -295,13 +295,19 @@ export const uploadAttachment = async (
       },
       method: 'POST',
     });
-    if (resp.status !== 201) return null;
-    const j = (await resp.json()) as {
+    // Phase 48 sub-A: accept any 2xx instead of strict 201. Reverse
+    // proxies in front of ingest occasionally rewrite 201 → 202 (the
+    // exact symptom Insight observed), and a 200 is also a valid
+    // "stored" response. We still require a JSON body shaped like
+    // UploadResponse; non-JSON bodies fall through to null.
+    if (resp.status < 200 || resp.status >= 300) return null;
+    const j = (await resp.json().catch(() => null)) as null | {
       refId: string;
       sizeBytes: number;
       mediaType: string;
       kind: string;
     };
+    if (!j || !j.refId) return null;
     return {
       kind,
       mediaType: j.mediaType,
