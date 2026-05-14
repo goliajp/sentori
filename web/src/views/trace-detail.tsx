@@ -12,6 +12,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 
 import { adminApi, type SpanRow } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
+import { Flamegraph } from '@/components/charts'
 import { ErrorState, LoadingState } from '@/components/states'
 
 type TreeNode = {
@@ -123,6 +124,16 @@ export function TraceDetailView() {
           {detail.data.spans.length} spans · {formatDuration(trace.durationMs)} · {trace.status}
         </span>
       </header>
+
+      {/* Phase 50 sub-A6 — flamegraph above the span list. Gives an
+          immediate visual of where the trace's time went; the table
+          below stays for keyboard-accessible row selection. */}
+      <div className="border-border shrink-0 border-b px-6 py-4">
+        <Flamegraph
+          height={Math.min(400, 60 + 24 * Math.min(8, detail.data.spans.length))}
+          spans={detail.data.spans}
+        />
+      </div>
 
       <section className="flex-1 overflow-y-auto">
         <table className="w-full border-collapse text-[12px]">
