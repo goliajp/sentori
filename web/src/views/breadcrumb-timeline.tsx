@@ -101,7 +101,7 @@ function CrumbGroupRow({
       {collapsible && (
         <button
           aria-expanded={open}
-          className="text-fg-muted hover:bg-bg-tertiary border-border/40 flex w-full items-center gap-3 border-b px-3 py-1.5 text-left t-sm"
+          className="text-fg-muted hover:bg-bg-tertiary border-border/40 t-sm flex w-full items-center gap-3 border-b px-3 py-1.5 text-left"
           onClick={() => setOpen((v) => !v)}
           type="button"
         >
@@ -134,8 +134,8 @@ function CrumbRow({
 }) {
   const dot = TYPE_DOT[type] ?? TYPE_DOT.custom!
   return (
-    <div className="border-border/40 flex items-baseline gap-3 border-b px-3 py-1.5 t-md last:border-b-0">
-      <span className="text-fg-muted w-16 font-mono t-sm tabular-nums">
+    <div className="border-border/40 t-md flex items-baseline gap-3 border-b px-3 py-1.5 last:border-b-0">
+      <span className="text-fg-muted t-sm w-16 font-mono tabular-nums">
         {crumb.timestamp.slice(11, 19)}
       </span>
       <span aria-hidden className="relative flex w-3 shrink-0 items-center self-stretch">

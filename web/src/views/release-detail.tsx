@@ -57,10 +57,7 @@ export function ReleaseDetailView() {
   return (
     <div className="space-y-6 p-6">
       <header>
-        <Link
-          className="text-fg-muted hover:text-fg t-md"
-          to={`/org/${currentOrg.slug}/releases`}
-        >
+        <Link className="text-fg-muted hover:text-fg t-md" to={`/org/${currentOrg.slug}/releases`}>
           ← All releases
         </Link>
         <div className="mt-2 flex items-baseline justify-between gap-4">
@@ -68,7 +65,7 @@ export function ReleaseDetailView() {
           {otherReleases.length > 0 && (
             <select
               aria-label="Compare with"
-              className="border-border bg-bg-tertiary text-fg max-w-[260px] shrink-0 rounded-md border px-2 py-1 font-mono t-md"
+              className="border-border bg-bg-tertiary text-fg t-md max-w-[260px] shrink-0 rounded-md border px-2 py-1 font-mono"
               defaultValue=""
               onChange={(e) => {
                 if (!e.target.value) return
@@ -88,7 +85,7 @@ export function ReleaseDetailView() {
             </select>
           )}
         </div>
-        <p className="text-fg-muted mt-1 t-md">
+        <p className="text-fg-muted t-md mt-1">
           {artifactCount} artifact{artifactCount === 1 ? '' : 's'} uploaded for this release.
         </p>
       </header>
@@ -150,7 +147,7 @@ function ReleaseHealthPanel({ projectId, release }: { projectId: string; release
     <section>
       <h2 className="text-fg-muted t-sm tracking-wider uppercase">Health · last 7 days</h2>
       {data.summary.totalSessions === 0 ? (
-        <p className="text-fg-muted mt-2 t-md">No session pings on this release yet.</p>
+        <p className="text-fg-muted t-md mt-2">No session pings on this release yet.</p>
       ) : (
         <dl className="border-border mt-2 grid grid-cols-2 gap-x-6 gap-y-1 rounded-md border p-4 sm:grid-cols-4">
           <HealthStat
@@ -239,7 +236,7 @@ function DsymSection({
         key: d.id,
         left: d.objectName ?? d.debugId,
         right: (
-          <span className="flex items-center gap-2 t-sm">
+          <span className="t-sm flex items-center gap-2">
             <span className="text-fg-muted font-mono">{d.debugId.slice(0, 8)}…</span>
             <span className="bg-bg-tertiary text-fg-muted rounded px-1.5 py-0.5 font-mono">
               {d.arch}
@@ -279,7 +276,7 @@ function MappingSection({
         key: m.id,
         left: m.debugId ?? '(no embedded id)',
         right: (
-          <span className="text-fg-muted font-mono t-sm tabular-nums">
+          <span className="text-fg-muted t-sm font-mono tabular-nums">
             {humanBytes(m.sizeBytes)}
           </span>
         ),
@@ -311,16 +308,16 @@ function ArtifactSection({
     <section>
       <h2 className="text-fg-muted t-sm tracking-wider uppercase">{title}</h2>
       {rows.length === 0 ? (
-        <p className="text-fg-muted mt-2 t-md">{emptyHint}</p>
+        <p className="text-fg-muted t-md mt-2">{emptyHint}</p>
       ) : (
         <ul className="border-border divide-border mt-2 divide-y rounded-md border">
           {rows.map((r) => (
             <li className="flex items-center justify-between gap-3 px-4 py-2" key={r.key}>
               <div className="flex min-w-0 flex-1 items-center gap-3">
-                <span className="text-fg truncate font-mono t-md">{r.left}</span>
+                <span className="text-fg t-md truncate font-mono">{r.left}</span>
                 {r.right}
               </div>
-              <div className="text-fg-muted shrink-0 text-right t-sm">
+              <div className="text-fg-muted t-sm shrink-0 text-right">
                 <div className="font-mono tabular-nums">{relativeDay(r.createdAt)}</div>
                 {r.uploader && (
                   <div className="t-sm" title={r.uploader}>

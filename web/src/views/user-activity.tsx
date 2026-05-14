@@ -39,7 +39,7 @@ export function UserActivityView() {
         <h1 className="text-fg text-xl font-semibold">My activity</h1>
         <p className="text-fg-muted mt-1 text-sm">
           Every admin action you've taken across orgs you're a member of.{' '}
-          {user && <span className="font-mono t-md">{user.email}</span>}
+          {user && <span className="t-md font-mono">{user.email}</span>}
         </p>
       </header>
 
@@ -57,7 +57,7 @@ export function UserActivityView() {
 
       {hasMore && (
         <button
-          className="border-border text-fg-muted hover:bg-bg-tertiary mx-auto block rounded-md border px-3 py-1.5 t-md"
+          className="border-border text-fg-muted hover:bg-bg-tertiary t-md mx-auto block rounded-md border px-3 py-1.5"
           onClick={() => setBefore(rows[rows.length - 1]!.createdAt)}
           type="button"
         >
@@ -73,7 +73,7 @@ function ActivityItem({ label, row }: { label: string; row: UserActivityRow }) {
   return (
     <li className="flex items-baseline gap-3 px-4 py-3">
       <time
-        className="text-fg-muted shrink-0 font-mono t-sm tabular-nums"
+        className="text-fg-muted t-sm shrink-0 font-mono tabular-nums"
         dateTime={row.createdAt}
         title={ts.toISOString()}
       >
@@ -90,7 +90,7 @@ function ActivityItem({ label, row }: { label: string; row: UserActivityRow }) {
           ) : (
             <span className="italic">deleted org</span>
           )}
-          <span className="ml-2 font-mono t-sm uppercase">{row.targetType}</span>
+          <span className="t-sm ml-2 font-mono uppercase">{row.targetType}</span>
         </div>
       </div>
     </li>

@@ -82,23 +82,23 @@ function ReleaseCard({ orgSlug, row }: { orgSlug: string; row: ReleaseListRow })
         to={`/org/${orgSlug}/releases/${encodeURIComponent(row.name)}`}
       >
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-fg truncate font-mono t-md font-semibold">{row.name}</h2>
+          <h2 className="text-fg t-md truncate font-mono font-semibold">{row.name}</h2>
           <time
-            className="text-fg-muted shrink-0 font-mono t-sm tabular-nums"
+            className="text-fg-muted t-sm shrink-0 font-mono tabular-nums"
             dateTime={deployStamp}
             title={new Date(deployStamp).toISOString()}
           >
             {relativeDay(deployStamp)}
           </time>
         </div>
-        <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 t-md sm:grid-cols-4">
+        <dl className="t-md mt-3 grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-4">
           <Stat label="Events" value={row.eventCount.toLocaleString()} />
           <Stat label="Source maps" value={row.sourcemapCount} muted={row.sourcemapCount === 0} />
           <Stat label="iOS dSYMs" value={row.dsymCount} muted={row.dsymCount === 0} />
           <Stat label="ProGuard" value={row.mappingCount} muted={row.mappingCount === 0} />
         </dl>
         {row.firstSeen && row.lastSeen && (
-          <p className="text-fg-muted mt-2 t-sm">
+          <p className="text-fg-muted t-sm mt-2">
             {relativeDay(row.firstSeen)} → {relativeDay(row.lastSeen)}
           </p>
         )}
@@ -111,9 +111,7 @@ function Stat({ label, muted, value }: { label: string; muted?: boolean; value: 
   return (
     <div>
       <dt className="text-fg-muted t-sm tracking-wider uppercase">{label}</dt>
-      <dd
-        className={`font-mono t-md tabular-nums ${muted ? 'text-fg-muted/70' : 'text-fg'}`}
-      >
+      <dd className={`t-md font-mono tabular-nums ${muted ? 'text-fg-muted/70' : 'text-fg'}`}>
         {value}
       </dd>
     </div>

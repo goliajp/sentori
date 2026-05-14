@@ -126,7 +126,7 @@ export function OrgSettingsView() {
   })
 
   return (
-    <div className="space-y-10 px-6 py-8 t-md">
+    <div className="t-md space-y-10 px-6 py-8">
       <header>
         <h1 className="text-fg text-lg font-semibold">Settings — {currentOrg.name}</h1>
         <p className="text-fg-muted mt-1 text-sm">
@@ -164,7 +164,7 @@ export function OrgSettingsView() {
         {membersQuery.data && (
           <table className="w-full border-collapse">
             <thead>
-              <tr className="text-fg-muted border-border h-7 border-b text-left t-sm tracking-wider uppercase">
+              <tr className="text-fg-muted border-border t-sm h-7 border-b text-left tracking-wider uppercase">
                 <th className="px-2 font-medium">Email</th>
                 <th className="w-32 px-2 font-medium">Role</th>
                 <th className="w-32 px-2 font-medium" />
@@ -181,7 +181,7 @@ export function OrgSettingsView() {
                         <span className="font-mono">{m.email}</span>
                         {teamsForUser.map((t) => (
                           <span
-                            className="border-border bg-bg-tertiary text-fg-muted rounded border px-1.5 py-0.5 t-sm font-medium"
+                            className="border-border bg-bg-tertiary text-fg-muted t-sm rounded border px-1.5 py-0.5 font-medium"
                             key={t.id}
                             title={t.name}
                           >
@@ -295,7 +295,7 @@ export function OrgSettingsView() {
           {invitesQuery.data && invitesQuery.data.length > 0 ? (
             <table className="mt-4 w-full border-collapse">
               <thead>
-                <tr className="text-fg-muted border-border h-7 border-b text-left t-sm tracking-wider uppercase">
+                <tr className="text-fg-muted border-border t-sm h-7 border-b text-left tracking-wider uppercase">
                   <th className="px-2 font-medium">Pending invite</th>
                   <th className="w-24 px-2 font-medium">Role</th>
                   <th className="w-24 px-2 font-medium">Expires</th>
@@ -310,7 +310,7 @@ export function OrgSettingsView() {
                         <span className="font-mono">{inv.email}</span>
                         {inv.teamSlug && (
                           <span
-                            className="border-border bg-bg-tertiary text-fg-muted rounded border px-1.5 py-0.5 t-sm font-medium"
+                            className="border-border bg-bg-tertiary text-fg-muted t-sm rounded border px-1.5 py-0.5 font-medium"
                             title={`Will join team ${inv.teamSlug}`}
                           >
                             {inv.teamSlug}
@@ -319,7 +319,7 @@ export function OrgSettingsView() {
                       </div>
                     </td>
                     <td className="text-fg-muted px-2 font-mono uppercase">{inv.role}</td>
-                    <td className="text-fg-muted px-2 font-mono t-sm tabular-nums">
+                    <td className="text-fg-muted t-sm px-2 font-mono tabular-nums">
                       {new Date(inv.expiresAt).toISOString().slice(0, 10)}
                     </td>
                     <td className="px-2 text-right">
@@ -458,7 +458,7 @@ function UsageWidget({ usage }: { usage: UsageRow }) {
   const reset = new Date(usage.resetAt).toISOString().slice(0, 10)
   return (
     <div className="space-y-2">
-      <div className="text-fg-muted flex items-baseline justify-between t-md">
+      <div className="text-fg-muted t-md flex items-baseline justify-between">
         <span>
           <span className="text-fg font-mono">{usage.eventCount.toLocaleString()}</span> /{' '}
           {usage.eventLimitMonthly.toLocaleString()} events

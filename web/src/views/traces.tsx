@@ -104,7 +104,7 @@ export function TracesView() {
         <div className="ml-auto flex items-center gap-2">
           <button
             aria-pressed={showOrphans}
-            className={`rounded-md px-2 py-1 t-sm tracking-wider uppercase transition-colors ${
+            className={`t-sm rounded-md px-2 py-1 tracking-wider uppercase transition-colors ${
               showOrphans
                 ? 'bg-accent/10 text-accent'
                 : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
@@ -116,7 +116,7 @@ export function TracesView() {
             {showOrphans ? 'incl. orphans' : 'hide orphans'}
           </button>
           <input
-            className="border-border bg-bg-tertiary text-fg w-80 rounded-md border px-3 py-1 t-md"
+            className="border-border bg-bg-tertiary text-fg t-md w-80 rounded-md border px-3 py-1"
             onChange={(e) => setQueryText(e.target.value)}
             placeholder="op:http.client status:error duration:>500ms …"
             type="text"
@@ -126,7 +126,7 @@ export function TracesView() {
       </header>
 
       {parsed.warnings.length > 0 && (
-        <div className="border-border border-b bg-amber-500/5 px-6 py-2 t-sm text-[color:var(--color-warning)]">
+        <div className="border-border t-sm border-b bg-amber-500/5 px-6 py-2 text-[color:var(--color-warning)]">
           {parsed.warnings.join(' · ')}
         </div>
       )}
@@ -139,9 +139,9 @@ export function TracesView() {
         />
       ) : (
         <div className="flex-1 overflow-y-auto">
-          <table className="w-full border-collapse t-md">
+          <table className="t-md w-full border-collapse">
             <thead className="bg-bg sticky top-0 z-10">
-              <tr className="border-border text-fg-muted border-b t-sm tracking-wider uppercase">
+              <tr className="border-border text-fg-muted t-sm border-b tracking-wider uppercase">
                 <th className="px-4 text-left">Op</th>
                 <th className="px-4 text-left">Name</th>
                 <th className="px-4 text-right">Span count</th>
@@ -197,9 +197,7 @@ function StatusPill({ status }: { status: TraceRow['status'] }) {
         ? 'bg-amber-500/10 text-amber-400'
         : 'bg-green-500/10 text-[color:var(--color-success)]'
   return (
-    <span
-      className={`inline-block rounded px-2 py-0.5 t-sm tracking-wider uppercase ${cls}`}
-    >
+    <span className={`t-sm inline-block rounded px-2 py-0.5 tracking-wider uppercase ${cls}`}>
       {status}
     </span>
   )

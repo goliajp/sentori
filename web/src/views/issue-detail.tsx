@@ -201,7 +201,7 @@ export function IssueDetailView() {
       <div className="border-border flex h-9 shrink-0 items-center gap-1 border-b px-4">
         {TABS.map((t) => (
           <button
-            className={`rounded-md px-3 py-1 t-md transition-colors ${
+            className={`t-md rounded-md px-3 py-1 transition-colors ${
               tab === t
                 ? 'bg-accent/10 text-accent'
                 : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
@@ -277,7 +277,7 @@ function IssueActions({
 
   const isAssignedToMe = currentUserId !== null && issue.assigneeUserId === currentUserId
   return (
-    <div className="text-fg-muted flex items-center gap-2 t-md">
+    <div className="text-fg-muted t-md flex items-center gap-2">
       {issue.assigneeEmail ? (
         <span className="text-fg" title={`Assigned to ${issue.assigneeEmail}`}>
           @{issue.assigneeEmail.split('@')[0]}
@@ -310,7 +310,7 @@ function IssueActions({
           <span>·</span>
           <span className="hidden md:inline">Resolve in</span>
           <select
-            className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 font-mono t-sm"
+            className="border-border bg-bg-tertiary text-fg t-sm rounded-md border px-2 py-1 font-mono"
             onChange={(e) => setRelease(e.target.value)}
             value={release}
           >
@@ -346,7 +346,7 @@ function StatusBadge({ issue }: { issue: IssueRow }) {
   }
   return (
     <span
-      className={`rounded px-1.5 py-0.5 t-sm font-medium tracking-wide uppercase ring-1 ${colour[issue.status]}`}
+      className={`t-sm rounded px-1.5 py-0.5 font-medium tracking-wide uppercase ring-1 ${colour[issue.status]}`}
     >
       {issue.status}
     </span>
@@ -366,7 +366,7 @@ function EventPicker({
 }) {
   const e = events[selectedIdx]
   return (
-    <div className="text-fg-muted flex items-center gap-1 font-mono t-md tabular-nums">
+    <div className="text-fg-muted t-md flex items-center gap-1 font-mono tabular-nums">
       <button
         aria-label="Previous event"
         className="hover:bg-bg-tertiary hover:text-fg rounded px-1.5 py-0.5"
@@ -388,7 +388,7 @@ function EventPicker({
       >
         ]
       </button>
-      {e && <span className="text-fg-muted ml-2 t-sm">{e.id.slice(0, 8)}</span>}
+      {e && <span className="text-fg-muted t-sm ml-2">{e.id.slice(0, 8)}</span>}
     </div>
   )
 }
@@ -424,7 +424,7 @@ function StackTab({
         <Section
           right={
             <button
-              className={`rounded-md px-2 py-0.5 t-sm tracking-wider uppercase transition-colors ${
+              className={`t-sm rounded-md px-2 py-0.5 tracking-wider uppercase transition-colors ${
                 symbolicated
                   ? 'bg-accent/10 text-accent'
                   : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
@@ -458,13 +458,13 @@ function StackTab({
             symbolication={payload.symbolication}
           />
           {event.traceId && (
-            <div className="border-border bg-bg-tertiary/30 mb-3 flex items-center justify-between gap-3 rounded-md border px-3 py-2 t-md">
+            <div className="border-border bg-bg-tertiary/30 t-md mb-3 flex items-center justify-between gap-3 rounded-md border px-3 py-2">
               <span className="text-fg-muted">
                 Captured inside trace{' '}
                 <span className="text-fg font-mono">{event.traceId.slice(0, 8)}</span>
               </span>
               <Link
-                className="text-accent hover:text-accent/80 shrink-0 self-center t-md whitespace-nowrap"
+                className="text-accent hover:text-accent/80 t-md shrink-0 self-center whitespace-nowrap"
                 to={`/org/${orgSlug}/traces/${event.traceId}`}
               >
                 In trace →
@@ -506,7 +506,7 @@ function StackTab({
             <div className="flex flex-wrap gap-2">
               {releases.map((r) => (
                 <span
-                  className="border-border bg-bg-tertiary text-fg-muted rounded-md border px-2 py-0.5 font-mono t-md"
+                  className="border-border bg-bg-tertiary text-fg-muted t-md rounded-md border px-2 py-0.5 font-mono"
                   key={r}
                 >
                   {r}
@@ -564,7 +564,7 @@ function EventsTab({
     <div className="border-border divide-border divide-y overflow-hidden rounded-md border">
       {events.map((e, idx) => (
         <button
-          className={`block w-full px-4 py-2 text-left t-md ${
+          className={`t-md block w-full px-4 py-2 text-left ${
             idx === selectedIdx ? 'bg-accent/10' : 'hover:bg-bg-tertiary'
           }`}
           key={e.id}
@@ -574,11 +574,11 @@ function EventsTab({
           <div className="flex items-baseline gap-3">
             <span className="text-fg font-mono">{e.id.slice(0, 8)}</span>
             <span className="text-fg-muted truncate">{e.errorMessage}</span>
-            <span className="text-fg-muted ml-auto font-mono t-sm tabular-nums">
+            <span className="text-fg-muted t-sm ml-auto font-mono tabular-nums">
               {relativeTime(e.receivedAt)}
             </span>
           </div>
-          <div className="text-fg-muted mt-0.5 flex gap-3 font-mono t-sm">
+          <div className="text-fg-muted t-sm mt-0.5 flex gap-3 font-mono">
             <span>{e.environment}</span>
             <span>{e.release}</span>
             <span>{e.platform}</span>
@@ -668,7 +668,7 @@ function ActivityTab({ issueId, projectId }: { issueId: string; projectId: strin
         }}
       >
         <textarea
-          className="border-border bg-bg-tertiary text-fg focus:ring-accent block w-full resize-y rounded-md border px-3 py-2 t-md focus:ring-1 focus:outline-none"
+          className="border-border bg-bg-tertiary text-fg focus:ring-accent t-md block w-full resize-y rounded-md border px-3 py-2 focus:ring-1 focus:outline-none"
           maxLength={2000}
           onChange={(ev) => setDraft(ev.target.value)}
           placeholder="Leave a comment…"
@@ -678,7 +678,7 @@ function ActivityTab({ issueId, projectId }: { issueId: string; projectId: strin
         <div className="flex items-center justify-between">
           <span className="text-fg-muted t-sm tabular-nums">{trimmed.length} / 2000</span>
           <button
-            className="bg-accent text-bg disabled:bg-bg-tertiary disabled:text-fg-muted rounded-md px-3 py-1 t-md disabled:cursor-not-allowed"
+            className="bg-accent text-bg disabled:bg-bg-tertiary disabled:text-fg-muted t-md rounded-md px-3 py-1 disabled:cursor-not-allowed"
             disabled={!canSubmit}
             type="submit"
           >
@@ -701,12 +701,12 @@ function CommentEntry({
 }) {
   return (
     <div className="px-3 py-2">
-      <div className="flex items-baseline gap-2 t-md">
+      <div className="t-md flex items-baseline gap-2">
         <span className="text-fg font-medium">{entry.authorEmail ?? 'unknown'}</span>
         <span className="text-fg-muted font-mono tabular-nums">{relativeTime(entry.at)}</span>
         {canDelete && (
           <button
-            className="text-fg-muted hover:text-fg ml-auto t-sm"
+            className="text-fg-muted hover:text-fg t-sm ml-auto"
             onClick={onDelete}
             type="button"
           >
@@ -714,7 +714,7 @@ function CommentEntry({
           </button>
         )}
       </div>
-      <p className="text-fg mt-1 t-md whitespace-pre-wrap">{entry.body}</p>
+      <p className="text-fg t-md mt-1 whitespace-pre-wrap">{entry.body}</p>
     </div>
   )
 }
@@ -730,7 +730,7 @@ function StateEntry({
       : 'text-[color:var(--color-danger)]'
   const label = entry.kind === 'resolved' ? 'Resolved' : 'Regressed'
   return (
-    <div className="flex items-baseline gap-3 px-3 py-2 t-md">
+    <div className="t-md flex items-baseline gap-3 px-3 py-2">
       <span className={`t-sm font-medium tracking-wide uppercase ${colour}`}>{label}</span>
       <span className="text-fg-muted font-mono tabular-nums">{relativeTime(entry.at)}</span>
       {entry.release && <span className="text-fg-muted font-mono">in {entry.release}</span>}
@@ -775,7 +775,7 @@ function OtherIssuesInReleasePanel({
         {others.map((i) => (
           <li key={i.id}>
             <Link
-              className="hover:bg-bg-tertiary/40 flex items-baseline gap-3 px-3 py-1.5 t-md"
+              className="hover:bg-bg-tertiary/40 t-md flex items-baseline gap-3 px-3 py-1.5"
               to={`/org/${orgSlug}/issues/${i.id}`}
             >
               <span className="text-fg truncate font-medium whitespace-nowrap">{i.errorType}</span>
@@ -783,7 +783,7 @@ function OtherIssuesInReleasePanel({
               <span className="text-fg-muted ml-auto font-mono tabular-nums">
                 {i.eventCount.toLocaleString()} ev
               </span>
-              <span className="text-fg-muted shrink-0 font-mono t-sm tabular-nums">
+              <span className="text-fg-muted t-sm shrink-0 font-mono tabular-nums">
                 {relativeTime(i.lastSeen)}
               </span>
             </Link>
@@ -866,7 +866,7 @@ function UnsymbolicatedHint({
             .
           </span>
           <Link
-            className="text-accent shrink-0 self-center t-md whitespace-nowrap underline-offset-2 hover:underline"
+            className="text-accent t-md shrink-0 self-center whitespace-nowrap underline-offset-2 hover:underline"
             to={`/org/${orgSlug}/releases/${encodeURIComponent(release)}`}
           >
             Open release →
@@ -896,7 +896,7 @@ function ReleaseArtifactsPanel({ projectId, release }: { projectId: string; rele
 
   return (
     <Section title={`Release artifacts — ${release}`}>
-      <div className="space-y-1.5 t-md">
+      <div className="t-md space-y-1.5">
         {data.sourcemaps.length > 0 && (
           <div className="text-fg-muted">
             <span className="text-fg font-medium">Source maps:</span> {data.sourcemaps.length} file
@@ -1007,15 +1007,13 @@ function FrameRow({
       }
       onMouseLeave={hoverEnabled ? () => setHoveredKey(null) : undefined}
     >
-      <div className="hover:bg-bg-tertiary/60 flex w-full items-baseline gap-3 px-3 py-1.5 t-md">
+      <div className="hover:bg-bg-tertiary/60 t-md flex w-full items-baseline gap-3 px-3 py-1.5">
         <button
           className="flex flex-1 items-baseline gap-3 text-left"
           onClick={onClick}
           type="button"
         >
-          <span className="text-fg-muted w-6 shrink-0 text-right t-sm tabular-nums">
-            {idx}
-          </span>
+          <span className="text-fg-muted t-sm w-6 shrink-0 text-right tabular-nums">{idx}</span>
           <FrameRoleBadge role={roleOf(frame)} />
           <span
             className={`font-mono whitespace-nowrap ${frame.inApp ? 'text-fg' : 'text-fg-muted'}`}
@@ -1030,7 +1028,7 @@ function FrameRow({
         {repoUrl && (
           <a
             aria-label="Open on the source host"
-            className="text-fg-muted hover:text-fg shrink-0 self-center t-sm tracking-wider uppercase"
+            className="text-fg-muted hover:text-fg t-sm shrink-0 self-center tracking-wider uppercase"
             href={repoUrl}
             onClick={(e) => e.stopPropagation()}
             rel="noopener noreferrer"
@@ -1076,7 +1074,7 @@ function VendorFold({
   return (
     <div className="border-border/40 border-b last:border-b-0">
       <button
-        className="text-fg-muted hover:bg-bg-tertiary/40 hover:text-fg flex w-full items-center gap-2 px-3 py-1 text-left t-sm"
+        className="text-fg-muted hover:bg-bg-tertiary/40 hover:text-fg t-sm flex w-full items-center gap-2 px-3 py-1 text-left"
         onClick={() => setOpen((o) => !o)}
         type="button"
       >
@@ -1099,12 +1097,12 @@ function VendorFold({
         <div className="bg-bg-tertiary/20">
           {frames.map((f, i) => (
             <button
-              className="hover:bg-bg-tertiary/50 text-fg-muted flex w-full items-baseline gap-3 px-3 py-1 pl-9 text-left t-md"
+              className="hover:bg-bg-tertiary/50 text-fg-muted t-md flex w-full items-baseline gap-3 px-3 py-1 pl-9 text-left"
               key={i}
               onClick={() => onFrameClick?.(base + i)}
               type="button"
             >
-              <span className="w-6 shrink-0 text-right t-sm tabular-nums">{base + i}</span>
+              <span className="t-sm w-6 shrink-0 text-right tabular-nums">{base + i}</span>
               <span className="font-mono whitespace-nowrap">{f.function ?? '<anonymous>'}</span>
               <span className="truncate font-mono">
                 {f.file}:{f.line}
@@ -1192,7 +1190,7 @@ export function StackList({
         )}
       </div>
       {anyInAppMissingSource && !clientSideSymbolicated && (
-        <p className="text-fg-muted mt-1.5 t-sm">
+        <p className="text-fg-muted t-sm mt-1.5">
           {symbolication?.releaseHasMap
             ? 'No inline source for some frames — a source map is uploaded for this release, but these frames didn’t resolve through it (wrong build, or outside the map).'
             : 'No inline source — upload a source map for this release: '}
@@ -1229,7 +1227,7 @@ function CauseChain({
   return (
     <div className="border-accent/40 bg-accent/[0.04] mt-4 rounded-md border-l-4 p-3">
       <p className="text-fg t-md leading-relaxed">
-        <span className="text-accent mr-1.5 inline-block font-mono t-sm tracking-wider uppercase">
+        <span className="text-accent t-sm mr-1.5 inline-block font-mono tracking-wider uppercase">
           ↪ caused by
         </span>
         <span className="text-fg-muted font-mono">{error.type}:</span>{' '}
@@ -1275,13 +1273,13 @@ function NativeErrorCard({
       to={`/org/${currentOrg.slug}/issues/${nativeError.issueId}`}
     >
       <p className="text-fg t-md leading-relaxed">
-        <span className="mr-1.5 inline-block font-mono t-sm tracking-wider text-[color:var(--color-warning)] uppercase">
+        <span className="t-sm mr-1.5 inline-block font-mono tracking-wider text-[color:var(--color-warning)] uppercase">
           ↪ caused by native crash
         </span>
         <span className="text-fg-muted font-mono">{nativeError.type}:</span>{' '}
         <span className="text-fg">{nativeError.message}</span>
       </p>
-      <p className="text-fg-muted mt-1 t-sm">
+      <p className="text-fg-muted t-sm mt-1">
         Open native issue → <span className="font-mono">{nativeError.issueId.slice(0, 8)}</span>
       </p>
     </Link>
@@ -1333,7 +1331,7 @@ function FrameSourceDrawer({
       />
       <div className="border-border bg-bg flex h-full flex-col border-l shadow-xl">
         <header className="border-border flex h-12 shrink-0 items-center gap-3 border-b px-4">
-          <div className="text-fg-muted truncate t-sm tracking-wider uppercase">
+          <div className="text-fg-muted t-sm truncate tracking-wider uppercase">
             Source · cause {cause} · frame {frame}
           </div>
           {/* Phase 42 sub-B.02: expand-context toggle. ±5 / ±20 / ±50.
@@ -1342,7 +1340,7 @@ function FrameSourceDrawer({
             {[5, 20, 50].map((n) => (
               <button
                 aria-label={`Show ±${n} lines`}
-                className={`rounded-md px-2 py-0.5 t-sm transition-colors ${
+                className={`t-sm rounded-md px-2 py-0.5 transition-colors ${
                   contextLines === n
                     ? 'bg-accent/10 text-accent'
                     : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
@@ -1357,7 +1355,7 @@ function FrameSourceDrawer({
           </div>
           <button
             aria-label="Close"
-            className="text-fg-muted hover:text-fg rounded-md px-2 py-1 t-md"
+            className="text-fg-muted hover:text-fg t-md rounded-md px-2 py-1"
             onClick={onClose}
             type="button"
           >
@@ -1365,7 +1363,7 @@ function FrameSourceDrawer({
           </button>
         </header>
         <div className="flex-1 overflow-auto">
-          {isLoading && <p className="text-fg-muted px-4 py-6 t-md">Loading source…</p>}
+          {isLoading && <p className="text-fg-muted t-md px-4 py-6">Loading source…</p>}
           {error && <FrameSourceError environment={environment} error={error} />}
           {data && <FrameSourceBody source={data} />}
         </div>
@@ -1386,7 +1384,7 @@ function FrameSourceBody({ source }: { source: FrameSource }) {
     if (el) el.scrollIntoView({ block: 'center' })
   }, [source.line, source.file])
   return (
-    <div className="px-4 py-3 t-md">
+    <div className="t-md px-4 py-3">
       <p className="text-fg-muted truncate font-mono">
         {source.file}:{source.line}:{source.column}
       </p>
@@ -1441,7 +1439,7 @@ function FrameSourceError({ environment, error }: { environment: string; error: 
 function KeyValueGrid({ data }: { data: Record<string, string> }) {
   const entries = Object.entries(data).filter(([, v]) => v !== '' && v !== undefined)
   return (
-    <div className="grid grid-cols-2 gap-x-6 gap-y-1 t-md">
+    <div className="t-md grid grid-cols-2 gap-x-6 gap-y-1">
       {entries.map(([k, v]) => (
         <div className="flex" key={k}>
           <span className="text-fg-muted w-32 shrink-0 truncate font-mono">{k}</span>

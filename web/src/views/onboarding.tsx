@@ -138,7 +138,7 @@ function Stepper({ phase }: { phase: Phase }) {
   ]
   const currentIdx = steps.findIndex((s) => s.key === phase)
   return (
-    <div className="text-fg-muted flex items-center gap-2 t-sm tracking-wider uppercase">
+    <div className="text-fg-muted t-sm flex items-center gap-2 tracking-wider uppercase">
       {steps.map((s, i) => (
         <div className="flex items-center gap-2" key={s.key}>
           <span
@@ -366,9 +366,9 @@ function WaitEventStep({
           arrives. Polling every 3 seconds.
         </p>
       </div>
-      <div className="border-border/60 bg-bg-tertiary/40 rounded-md border p-4 t-md">
+      <div className="border-border/60 bg-bg-tertiary/40 t-md rounded-md border p-4">
         <div className="text-fg-muted mb-1 tracking-wider uppercase">Quick-test snippet (JS)</div>
-        <pre className="text-fg overflow-x-auto font-mono t-sm leading-relaxed">
+        <pre className="text-fg t-sm overflow-x-auto font-mono leading-relaxed">
           {`import { captureError } from '@goliapkg/sentori-react-native'
 captureError(new Error('hello from ${project.name}'))`}
         </pre>
@@ -404,7 +404,7 @@ function SdkPicker({ onChange, value }: { onChange: (s: SdkChoice) => void; valu
       {SDKS.map((s) => (
         <button
           aria-pressed={value === s.key}
-          className={`rounded-md border px-3 py-2 text-left t-md transition-colors ${
+          className={`t-md rounded-md border px-3 py-2 text-left transition-colors ${
             value === s.key ? 'border-accent bg-accent/10' : 'border-border hover:bg-bg-tertiary'
           }`}
           key={s.key}
@@ -523,7 +523,7 @@ function Field({ children, hint, label }: { children: ReactNode; hint?: string; 
     <label className="block">
       <span className="text-fg-muted text-xs tracking-wider uppercase">{label}</span>
       <div className="mt-1">{children}</div>
-      {hint && <span className="text-fg-muted mt-1 block font-mono t-sm">{hint}</span>}
+      {hint && <span className="text-fg-muted t-sm mt-1 block font-mono">{hint}</span>}
     </label>
   )
 }
@@ -565,7 +565,7 @@ function CodeBlock({ children, label }: { children: string; label: string }) {
           {copied ? 'copied' : 'copy'}
         </button>
       </div>
-      <pre className="text-fg overflow-x-auto px-3 py-2 font-mono t-md leading-relaxed whitespace-pre">
+      <pre className="text-fg t-md overflow-x-auto px-3 py-2 font-mono leading-relaxed whitespace-pre">
         {children}
       </pre>
     </div>

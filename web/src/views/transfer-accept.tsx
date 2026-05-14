@@ -49,7 +49,7 @@ export function TransferAcceptView() {
         demoted to admin. This action is reversible only by another transfer initiated by the new
         owner (you).
       </p>
-      <p className="text-fg-muted mt-3 t-md">
+      <p className="text-fg-muted t-md mt-3">
         Signed in as <span className="font-mono">{user.email}</span>.
       </p>
 

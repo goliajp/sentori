@@ -87,16 +87,16 @@ export function ProjectTeamSettingsView() {
               <li className="flex items-center justify-between px-4 py-3" key={t.id}>
                 <div>
                   <Link
-                    className="text-accent font-mono t-md hover:underline"
+                    className="text-accent t-md font-mono hover:underline"
                     to={`/org/${orgSlug}/teams/${t.slug}`}
                   >
                     {t.slug}
                   </Link>
-                  <span className="text-fg ml-2 t-md">{t.name}</span>
+                  <span className="text-fg t-md ml-2">{t.name}</span>
                 </div>
                 {canManage ? (
                   <button
-                    className={`rounded-md px-3 py-1 t-md font-medium ${
+                    className={`t-md rounded-md px-3 py-1 font-medium ${
                       isBound
                         ? 'border-border text-fg-muted hover:bg-bg-tertiary border'
                         : 'bg-accent text-bg'
@@ -109,7 +109,7 @@ export function ProjectTeamSettingsView() {
                   </button>
                 ) : (
                   <span
-                    className={`rounded px-1.5 py-0.5 t-sm font-medium ${
+                    className={`t-sm rounded px-1.5 py-0.5 font-medium ${
                       isBound
                         ? 'bg-[color:var(--color-success-bg)] text-[color:var(--color-success)]'
                         : 'bg-fg/10 text-fg-muted'

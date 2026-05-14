@@ -73,7 +73,7 @@ export function RecipientSettingsView() {
   }
 
   return (
-    <div className="space-y-8 px-6 py-8 t-md">
+    <div className="t-md space-y-8 px-6 py-8">
       <header>
         <h1 className="text-fg text-lg font-semibold">Notification recipients — {project.name}</h1>
         <p className="text-fg-muted mt-1 text-sm">
@@ -140,7 +140,7 @@ export function RecipientSettingsView() {
         {recipientsQuery.data && recipientsQuery.data.length > 0 && (
           <table className="w-full border-collapse">
             <thead>
-              <tr className="text-fg-muted border-border h-7 border-b text-left t-sm tracking-wider uppercase">
+              <tr className="text-fg-muted border-border t-sm h-7 border-b text-left tracking-wider uppercase">
                 <th className="px-2 font-medium">Email</th>
                 <th className="w-28 px-2 text-center font-medium">New issues</th>
                 <th className="w-28 px-2 text-center font-medium">Regressions</th>

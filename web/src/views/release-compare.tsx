@@ -48,7 +48,7 @@ export function ReleaseCompareView() {
           <span className="text-fg-muted mx-2">→</span>
           <span>{data.target}</span>
         </h1>
-        <p className="text-fg-muted mt-1 t-md">
+        <p className="text-fg-muted t-md mt-1">
           {data.added.length + data.fixed.length + data.persisting.length} issue
           {data.added.length + data.fixed.length + data.persisting.length === 1 ? '' : 's'} touched
           between these releases.
@@ -113,7 +113,7 @@ function ReleaseCompareBar({
   const net = added - fixed
   return (
     <div className="border-border bg-bg-secondary space-y-3 rounded-md border p-4">
-      <div className="flex items-baseline justify-between t-sm">
+      <div className="t-sm flex items-baseline justify-between">
         <div className="text-fg-muted tracking-wider uppercase">Movement</div>
         <div className="text-fg-muted">
           <span
@@ -147,7 +147,7 @@ function ReleaseCompareBar({
           title={`${persisting} persisting`}
         />
       </div>
-      <div className="text-fg-muted flex justify-between font-mono t-sm tabular-nums">
+      <div className="text-fg-muted t-sm flex justify-between font-mono tabular-nums">
         <span>
           <span className="text-[color:var(--color-danger)]">●</span> {added} added
         </span>
@@ -183,7 +183,7 @@ function CompareSection({
         <h2 className="text-fg t-md font-semibold">
           {title}
           <span
-            className={`ml-2 rounded px-1.5 py-0.5 t-sm font-medium tabular-nums ring-1 ${accentClass}`}
+            className={`t-sm ml-2 rounded px-1.5 py-0.5 font-medium tabular-nums ring-1 ${accentClass}`}
           >
             {rows.length}
           </span>
@@ -191,7 +191,7 @@ function CompareSection({
         <p className="text-fg-muted t-sm">{subtitle}</p>
       </header>
       {rows.length === 0 ? (
-        <p className="text-fg-muted mt-2 t-md">{emptyHint}</p>
+        <p className="text-fg-muted t-md mt-2">{emptyHint}</p>
       ) : (
         <ul className="border-border divide-border mt-2 divide-y rounded-md border">
           {rows.map((r) => (
@@ -201,10 +201,10 @@ function CompareSection({
                 to={`/org/${orgSlug}/issues/${r.id}`}
               >
                 <div className="flex min-w-0 flex-1 items-baseline gap-3">
-                  <span className="text-fg truncate t-md font-medium">{r.errorType}</span>
-                  <span className="text-fg-muted truncate t-md">{r.messageSample}</span>
+                  <span className="text-fg t-md truncate font-medium">{r.errorType}</span>
+                  <span className="text-fg-muted t-md truncate">{r.messageSample}</span>
                 </div>
-                <div className="text-fg-muted shrink-0 text-right t-sm">
+                <div className="text-fg-muted t-sm shrink-0 text-right">
                   <div className="font-mono tabular-nums">{r.eventCount.toLocaleString()} ev</div>
                   <div className="t-sm">{relativeDay(r.lastSeen)}</div>
                 </div>

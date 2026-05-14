@@ -61,7 +61,7 @@ export function TokenSettingsView() {
   }
 
   return (
-    <div className="space-y-8 px-6 py-8 t-md">
+    <div className="t-md space-y-8 px-6 py-8">
       <header>
         <h1 className="text-fg text-lg font-semibold">Tokens — {project.name}</h1>
         <p className="text-fg-muted mt-1 text-sm">
@@ -86,9 +86,7 @@ export function TokenSettingsView() {
 
       {reveal && (
         <div className="border-accent/40 bg-accent/5 space-y-2 rounded-md border p-4">
-          <div className="text-accent t-sm tracking-wider uppercase">
-            New token — visible once
-          </div>
+          <div className="text-accent t-sm tracking-wider uppercase">New token — visible once</div>
           <code className="text-fg block font-mono text-sm break-all">{reveal.token}</code>
           <div className="flex gap-3 text-xs">
             <button
@@ -144,7 +142,7 @@ export function TokenSettingsView() {
         {tokensQuery.data && tokensQuery.data.length > 0 && (
           <table className="w-full border-collapse">
             <thead>
-              <tr className="text-fg-muted border-border h-7 border-b text-left t-sm tracking-wider uppercase">
+              <tr className="text-fg-muted border-border t-sm h-7 border-b text-left tracking-wider uppercase">
                 <th className="px-2 font-medium">Label</th>
                 <th className="w-16 px-2 font-medium">Kind</th>
                 <th className="w-24 px-2 font-medium">Last 4</th>
@@ -159,7 +157,7 @@ export function TokenSettingsView() {
                   <td className="text-fg px-2 font-mono">{t.label ?? '(unlabeled)'}</td>
                   <td className="text-fg-muted px-2 font-mono uppercase">{t.kind}</td>
                   <td className="text-fg-muted px-2 font-mono">{t.last4 ? `…${t.last4}` : '—'}</td>
-                  <td className="text-fg-muted px-2 font-mono t-sm tabular-nums">
+                  <td className="text-fg-muted t-sm px-2 font-mono tabular-nums">
                     {new Date(t.createdAt).toISOString().slice(0, 10)}
                   </td>
                   <td

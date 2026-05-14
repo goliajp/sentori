@@ -93,14 +93,14 @@ export function IntegrationsView() {
     <div className="space-y-6 p-6">
       <header>
         <h1 className="text-fg text-xl font-semibold">Integrations</h1>
-        <p className="text-fg-muted mt-1 t-md">
+        <p className="text-fg-muted t-md mt-1">
           Org-scoped connections. Auto-create / mirror Sentori issues into external tools.
         </p>
       </header>
 
       {banner && (
         <div
-          className={`rounded-md border-l-4 px-3 py-2 t-md ${
+          className={`t-md rounded-md border-l-4 px-3 py-2 ${
             banner.kind === 'success'
               ? 'border-accent/40 bg-accent/[0.04] text-fg'
               : 'border-red-400/40 bg-red-500/[0.04] text-[color:var(--color-danger)]'
@@ -122,14 +122,14 @@ export function IntegrationsView() {
                 <div className="flex items-center gap-2">
                   <h2 className="text-fg text-[14px] font-medium">{a.label}</h2>
                   {row && (
-                    <span className="bg-accent/10 text-accent rounded px-1.5 py-0.5 t-sm tracking-wider uppercase">
+                    <span className="bg-accent/10 text-accent t-sm rounded px-1.5 py-0.5 tracking-wider uppercase">
                       connected
                     </span>
                   )}
                 </div>
-                <p className="text-fg-muted mt-1 t-md">{a.description}</p>
+                <p className="text-fg-muted t-md mt-1">{a.description}</p>
                 {row && (
-                  <dl className="text-fg-muted mt-2 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 t-sm">
+                  <dl className="text-fg-muted t-sm mt-2 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5">
                     {Object.entries(row.display).map(([k, v]) =>
                       v ? (
                         <div className="contents" key={k}>
@@ -144,7 +144,7 @@ export function IntegrationsView() {
               <div className="shrink-0">
                 {row ? (
                   <button
-                    className="text-fg-muted rounded-md border border-transparent px-2 py-1 t-sm hover:text-[color:var(--color-danger)]"
+                    className="text-fg-muted t-sm rounded-md border border-transparent px-2 py-1 hover:text-[color:var(--color-danger)]"
                     disabled={revoke.isPending}
                     onClick={() => revoke.mutate({ kind: a.kind, orgSlug: currentOrg.slug })}
                     type="button"
@@ -153,7 +153,7 @@ export function IntegrationsView() {
                   </button>
                 ) : a.mode === 'oauth' ? (
                   <a
-                    className="border-border hover:border-accent/60 hover:text-fg text-fg-muted rounded-md border px-3 py-1 t-sm"
+                    className="border-border hover:border-accent/60 hover:text-fg text-fg-muted t-sm rounded-md border px-3 py-1"
                     href={adminApi.integrationConnectUrl(a.kind, currentOrg.slug)}
                   >
                     Connect →
@@ -215,7 +215,7 @@ function SlackConfigureForm({
   if (!open) {
     return (
       <button
-        className="border-border hover:border-accent/60 hover:text-fg text-fg-muted rounded-md border px-3 py-1 t-sm"
+        className="border-border hover:border-accent/60 hover:text-fg text-fg-muted t-sm rounded-md border px-3 py-1"
         onClick={() => setOpen(true)}
         type="button"
       >
@@ -233,7 +233,7 @@ function SlackConfigureForm({
     >
       <input
         aria-label="Slack incoming webhook URL"
-        className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 font-mono t-sm"
+        className="border-border bg-bg-tertiary text-fg t-sm rounded-md border px-2 py-1 font-mono"
         onChange={(e) => setWebhookUrl(e.target.value)}
         placeholder="https://hooks.slack.com/services/T…/B…/…"
         required
@@ -243,7 +243,7 @@ function SlackConfigureForm({
       />
       <input
         aria-label="Channel label (display only)"
-        className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1 t-sm"
+        className="border-border bg-bg-tertiary text-fg t-sm rounded-md border px-2 py-1"
         onChange={(e) => setChannelLabel(e.target.value)}
         placeholder="#sentori-alerts (optional)"
         type="text"
@@ -259,7 +259,7 @@ function SlackConfigureForm({
           Cancel
         </button>
         <button
-          className="border-accent/60 text-accent hover:bg-accent/10 rounded-md border px-2 py-1 t-sm disabled:opacity-50"
+          className="border-accent/60 text-accent hover:bg-accent/10 t-sm rounded-md border px-2 py-1 disabled:opacity-50"
           disabled={submit.isPending || !webhookUrl.trim()}
           type="submit"
         >

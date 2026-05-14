@@ -447,9 +447,7 @@ export function IssuesView() {
                 className="border-border bg-bg shadow-overlay t-md absolute right-0 z-20 mt-1 w-44 rounded-md border p-2"
                 role="menu"
               >
-                <div className="text-fg-muted t-sm px-1 py-1 tracking-wider uppercase">
-                  Columns
-                </div>
+                <div className="text-fg-muted t-sm px-1 py-1 tracking-wider uppercase">Columns</div>
                 {ISSUE_COLUMNS.map((c) => (
                   <label
                     className="hover:bg-bg-tertiary flex cursor-pointer items-center gap-2 rounded px-2 py-1"
@@ -661,9 +659,7 @@ export function IssuesView() {
                           // Title attribute lives on the wrapping span so the
                           // hover hint still appears.
                         >
-                          <span
-                            title="Application Not Responding — main thread blocked ≥ 5 s"
-                          >
+                          <span title="Application Not Responding — main thread blocked ≥ 5 s">
                             ANR
                           </span>
                         </Tag>
@@ -850,7 +846,7 @@ function SaveViewModal({
     >
       <div className="border-border bg-bg w-[28rem] rounded-md border p-4 shadow-xl">
         <h2 className="text-fg text-[14px] font-semibold">Save current view</h2>
-        <p className="text-fg-muted mt-1 truncate font-mono t-sm">
+        <p className="text-fg-muted t-sm mt-1 truncate font-mono">
           {currentQuery || `(no filter — status: ${currentStatus})`}
         </p>
         <div className="mt-4 space-y-3">
@@ -858,7 +854,7 @@ function SaveViewModal({
             <div className="text-fg-muted t-sm tracking-wider uppercase">Name</div>
             <input
               autoFocus
-              className="border-border bg-bg-tertiary text-fg focus:ring-accent mt-1 w-full rounded-md border px-2 py-1 t-md focus:ring-1 focus:outline-none"
+              className="border-border bg-bg-tertiary text-fg focus:ring-accent t-md mt-1 w-full rounded-md border px-2 py-1 focus:ring-1 focus:outline-none"
               maxLength={80}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Prod high-priority"
@@ -867,7 +863,7 @@ function SaveViewModal({
           </label>
           <fieldset>
             <div className="text-fg-muted t-sm tracking-wider uppercase">Scope</div>
-            <div className="mt-1 flex gap-3 t-md">
+            <div className="t-md mt-1 flex gap-3">
               {(['personal', 'team', 'org'] as const).map((s) => (
                 <label className="text-fg flex items-center gap-1.5" key={s}>
                   <input
@@ -885,7 +881,7 @@ function SaveViewModal({
             <label className="block">
               <div className="text-fg-muted t-sm tracking-wider uppercase">Team</div>
               <select
-                className="border-border bg-bg-tertiary text-fg mt-1 w-full rounded-md border px-2 py-1 t-md"
+                className="border-border bg-bg-tertiary text-fg t-md mt-1 w-full rounded-md border px-2 py-1"
                 onChange={(e) => setTeamSlug(e.target.value)}
                 value={teamSlug}
               >
@@ -902,14 +898,14 @@ function SaveViewModal({
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <button
-            className="text-fg-muted hover:text-fg rounded-md px-3 py-1 t-md"
+            className="text-fg-muted hover:text-fg t-md rounded-md px-3 py-1"
             onClick={onClose}
             type="button"
           >
             Cancel
           </button>
           <button
-            className="bg-accent text-bg disabled:bg-bg-tertiary disabled:text-fg-muted rounded-md px-3 py-1 t-md disabled:cursor-not-allowed"
+            className="bg-accent text-bg disabled:bg-bg-tertiary disabled:text-fg-muted t-md rounded-md px-3 py-1 disabled:cursor-not-allowed"
             disabled={!canSubmit || createMutation.isPending}
             onClick={() => createMutation.mutate()}
             type="button"
@@ -936,18 +932,16 @@ function ViewsMenu({
 
   return (
     <>
-      <div className="text-fg-muted px-1 py-1 t-sm tracking-wider uppercase">
-        Saved views
-      </div>
+      <div className="text-fg-muted t-sm px-1 py-1 tracking-wider uppercase">Saved views</div>
       {views.length === 0 && (
-        <p className="text-fg-muted px-2 py-2 t-md">
+        <p className="text-fg-muted t-md px-2 py-2">
           No saved views yet. Save the current filter to share with your team.
         </p>
       )}
       {(['org', 'team', 'personal'] as const).map((scope) =>
         groups[scope].length > 0 ? (
           <div className="border-border/50 mt-1 border-t pt-1" key={scope}>
-            <div className="text-fg-muted px-2 t-sm tracking-wider uppercase">{scope}</div>
+            <div className="text-fg-muted t-sm px-2 tracking-wider uppercase">{scope}</div>
             {groups[scope].map((v) => (
               <button
                 className="hover:bg-bg-tertiary block w-full rounded px-2 py-1 text-left"
@@ -957,12 +951,10 @@ function ViewsMenu({
               >
                 <div className="text-fg truncate">{v.name}</div>
                 {v.scope === 'team' && v.teamSlug && (
-                  <div className="text-fg-muted truncate t-sm">team: {v.teamSlug}</div>
+                  <div className="text-fg-muted t-sm truncate">team: {v.teamSlug}</div>
                 )}
                 {v.payload.query && (
-                  <div className="text-fg-muted truncate font-mono t-sm">
-                    {v.payload.query}
-                  </div>
+                  <div className="text-fg-muted t-sm truncate font-mono">{v.payload.query}</div>
                 )}
               </button>
             ))}

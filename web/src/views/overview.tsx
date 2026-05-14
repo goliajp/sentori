@@ -71,9 +71,7 @@ export function OverviewView() {
           </section>
 
           <section>
-            <h2 className="text-fg-muted mb-2 t-sm tracking-wider uppercase">
-              Sessions over time
-            </h2>
+            <h2 className="text-fg-muted t-sm mb-2 tracking-wider uppercase">Sessions over time</h2>
             <LineChart
               data={data.buckets.map((b) => ({
                 crashed: b.crashed,
@@ -138,7 +136,7 @@ function Stat({
       <div className="text-fg mt-2 font-mono text-2xl tabular-nums">
         <StatNumber format={format} value={rawValue} />
       </div>
-      <div className="text-fg-muted mt-1 t-sm">{hint}</div>
+      <div className="text-fg-muted t-sm mt-1">{hint}</div>
     </div>
   )
 }

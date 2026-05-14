@@ -71,7 +71,7 @@ export function TeamListView() {
           <h2 className="text-fg text-sm font-semibold">Create team</h2>
           <form className="mt-3 grid gap-3 sm:grid-cols-2" onSubmit={onCreate}>
             <input
-              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1.5 t-md"
+              className="border-border bg-bg-tertiary text-fg t-md rounded-md border px-2 py-1.5"
               maxLength={32}
               minLength={3}
               onChange={(e) => setNewSlug(e.target.value)}
@@ -81,7 +81,7 @@ export function TeamListView() {
               value={newSlug}
             />
             <input
-              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1.5 t-md"
+              className="border-border bg-bg-tertiary text-fg t-md rounded-md border px-2 py-1.5"
               maxLength={64}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Display name"
@@ -89,7 +89,7 @@ export function TeamListView() {
               value={newName}
             />
             <input
-              className="border-border bg-bg-tertiary text-fg rounded-md border px-2 py-1.5 t-md sm:col-span-2"
+              className="border-border bg-bg-tertiary text-fg t-md rounded-md border px-2 py-1.5 sm:col-span-2"
               maxLength={280}
               onChange={(e) => setNewDesc(e.target.value)}
               placeholder="Description (optional)"
@@ -97,7 +97,7 @@ export function TeamListView() {
             />
             <div className="flex items-center gap-3 sm:col-span-2">
               <button
-                className="bg-accent text-bg rounded-md px-3 py-1.5 t-md font-medium disabled:opacity-50"
+                className="bg-accent text-bg t-md rounded-md px-3 py-1.5 font-medium disabled:opacity-50"
                 disabled={createTeam.isPending}
                 type="submit"
               >
@@ -119,7 +119,7 @@ export function TeamListView() {
         ) : (
           <table className="w-full border-collapse">
             <thead>
-              <tr className="text-fg-muted border-border border-b text-left t-md uppercase">
+              <tr className="text-fg-muted border-border t-md border-b text-left uppercase">
                 <th className="px-2 py-2 font-medium">Slug</th>
                 <th className="px-2 py-2 font-medium">Name</th>
                 <th className="px-2 py-2 font-medium">Description</th>
@@ -135,15 +135,15 @@ export function TeamListView() {
                 >
                   <td className="px-2 py-2">
                     <Link
-                      className="text-accent font-mono t-md hover:underline"
+                      className="text-accent t-md font-mono hover:underline"
                       to={`/org/${slug}/teams/${t.slug}`}
                     >
                       {t.slug}
                     </Link>
                   </td>
-                  <td className="text-fg px-2 py-2 t-md">{t.name}</td>
-                  <td className="text-fg-muted px-2 py-2 t-md">{t.description ?? '—'}</td>
-                  <td className="text-fg-muted px-2 py-2 t-md tabular-nums">
+                  <td className="text-fg t-md px-2 py-2">{t.name}</td>
+                  <td className="text-fg-muted t-md px-2 py-2">{t.description ?? '—'}</td>
+                  <td className="text-fg-muted t-md px-2 py-2 tabular-nums">
                     {new Date(t.createdAt).toLocaleDateString()}
                   </td>
                   {canManage && (

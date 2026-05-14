@@ -87,7 +87,7 @@ export function AlertsView() {
         actions={
           canManage && (
             <button
-              className="bg-accent text-bg rounded-md px-3 py-1 t-md"
+              className="bg-accent text-bg t-md rounded-md px-3 py-1"
               onClick={() => setEditing(null)}
               type="button"
             >
@@ -105,9 +105,9 @@ export function AlertsView() {
               No rules yet. Create one to get notified when something breaks.
             </p>
           ) : (
-            <table className="w-full border-collapse t-md">
+            <table className="t-md w-full border-collapse">
               <thead>
-                <tr className="text-fg-muted border-border h-7 border-b text-left t-sm tracking-wider uppercase">
+                <tr className="text-fg-muted border-border t-sm h-7 border-b text-left tracking-wider uppercase">
                   <th className="w-8 px-2"></th>
                   <th className="px-3 font-medium">Name</th>
                   <th className="px-3 font-medium">Trigger</th>
@@ -142,7 +142,7 @@ export function AlertsView() {
                             aria-label={
                               isOpen ? 'Hide recent deliveries' : 'Show recent deliveries'
                             }
-                            className="text-fg-muted hover:text-fg mr-1.5 inline-flex h-4 w-4 items-center justify-center font-mono t-sm"
+                            className="text-fg-muted hover:text-fg t-sm mr-1.5 inline-flex h-4 w-4 items-center justify-center font-mono"
                             onClick={() =>
                               setExpanded((prev) => {
                                 const next = new Set(prev)
@@ -158,10 +158,7 @@ export function AlertsView() {
                         )}
                         <span>{r.name}</span>
                         {r.muted && (
-                          <Tag
-                            className="ml-2 uppercase"
-                            variant="warning"
-                          >
+                          <Tag className="ml-2 uppercase" variant="warning">
                             <span title="Muted — manual unmute required">Muted</span>
                           </Tag>
                         )}
@@ -177,18 +174,18 @@ export function AlertsView() {
                         )}
                       </td>
                       <td className="text-fg-muted px-3">
-                        <span className="bg-bg-tertiary text-fg-muted rounded px-1.5 py-0.5 t-sm">
+                        <span className="bg-bg-tertiary text-fg-muted t-sm rounded px-1.5 py-0.5">
                           {TRIGGER_LABELS[r.triggerKind]}
                         </span>
                         <TriggerSummary kind={r.triggerKind} cfg={r.triggerConfig} />
                       </td>
-                      <td className="text-fg-muted truncate px-3 font-mono t-sm">
+                      <td className="text-fg-muted t-sm truncate px-3 font-mono">
                         {filterSummary(r.filterConfig)}
                       </td>
                       <td className="text-fg-muted px-3 text-right font-mono tabular-nums">
                         {r.throttleMinutes}m
                       </td>
-                      <td className="text-fg-muted px-3 font-mono t-sm tabular-nums">
+                      <td className="text-fg-muted t-sm px-3 font-mono tabular-nums">
                         {r.lastFiredAt ? relativeTime(r.lastFiredAt) : '—'}
                       </td>
                       {canManage && (
@@ -295,14 +292,12 @@ function DeliveriesRow({
   return (
     <tr className="bg-bg-tertiary/40">
       <td className="px-3 py-2" colSpan={colSpan}>
-        <div className="text-fg-muted mb-1 t-sm tracking-wider uppercase">
+        <div className="text-fg-muted t-sm mb-1 tracking-wider uppercase">
           Recent webhook deliveries
         </div>
         {isLoading && <span className="text-fg-muted t-md">loading…</span>}
         {error && (
-          <span className="t-md text-[color:var(--color-danger)]">
-            failed to load deliveries
-          </span>
+          <span className="t-md text-[color:var(--color-danger)]">failed to load deliveries</span>
         )}
         {data && data.length === 0 && (
           <span className="text-fg-muted t-md italic">
@@ -310,7 +305,7 @@ function DeliveriesRow({
           </span>
         )}
         {data && data.length > 0 && (
-          <table className="w-full t-sm tabular-nums">
+          <table className="t-sm w-full tabular-nums">
             <thead>
               <tr className="text-fg-muted text-left">
                 <th className="px-2 py-0.5 font-normal">When</th>
@@ -353,7 +348,7 @@ function StatusChip({ status }: { status: 'delivered' | 'failed' | 'pending' }) 
         : 'bg-[color:var(--color-warning-bg)] text-[color:var(--color-warning)] ring-[color:var(--color-warning-border)]'
   return (
     <span
-      className={`rounded px-1.5 py-0.5 t-sm font-medium tracking-wide uppercase ring-1 ${cls}`}
+      className={`t-sm rounded px-1.5 py-0.5 font-medium tracking-wide uppercase ring-1 ${cls}`}
     >
       {status}
     </span>
@@ -369,14 +364,14 @@ function TriggerSummary({
 }) {
   if (kind === 'event_count') {
     return (
-      <span className="ml-2 t-sm">
+      <span className="t-sm ml-2">
         ≥{cfg.count ?? 0} events / {cfg.windowMinutes ?? 5}m
       </span>
     )
   }
   if (kind === 'crash_free_drop') {
     return (
-      <span className="ml-2 t-sm">
+      <span className="t-sm ml-2">
         rate &lt; {((cfg.threshold ?? 0.99) * 100).toFixed(2)}% / {cfg.windowMinutes ?? 60}m
       </span>
     )
@@ -508,7 +503,7 @@ function RuleModal({
           <Field label="Name">
             <input
               autoFocus
-              className="border-border bg-bg-tertiary text-fg w-full rounded-md border px-2 py-1 t-md"
+              className="border-border bg-bg-tertiary text-fg t-md w-full rounded-md border px-2 py-1"
               maxLength={80}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Page on prod regressions"
@@ -518,7 +513,7 @@ function RuleModal({
 
           <Field label="Trigger">
             <select
-              className="border-border bg-bg-tertiary text-fg w-full rounded-md border px-2 py-1 t-md"
+              className="border-border bg-bg-tertiary text-fg t-md w-full rounded-md border px-2 py-1"
               onChange={(e) => setKind(e.target.value as AlertTriggerKind)}
               value={kind}
             >
@@ -551,7 +546,7 @@ function RuleModal({
           )}
 
           <fieldset className="border-border rounded-md border p-3">
-            <legend className="text-fg-muted px-1 t-sm tracking-wider uppercase">
+            <legend className="text-fg-muted t-sm px-1 tracking-wider uppercase">
               Filter (optional)
             </legend>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -575,7 +570,7 @@ function RuleModal({
 
           <Field label="Email recipients (comma-separated)">
             <input
-              className="border-border bg-bg-tertiary text-fg w-full rounded-md border px-2 py-1 font-mono t-md"
+              className="border-border bg-bg-tertiary text-fg t-md w-full rounded-md border px-2 py-1 font-mono"
               onChange={(e) => setEmails(e.target.value)}
               placeholder="oncall@example.com, alice@example.com"
               value={emails}
@@ -583,7 +578,7 @@ function RuleModal({
           </Field>
 
           <fieldset className="border-border rounded-md border p-3">
-            <legend className="text-fg-muted px-1 t-sm tracking-wider uppercase">
+            <legend className="text-fg-muted t-sm px-1 tracking-wider uppercase">
               Webhook (optional)
             </legend>
             <p className="text-fg-muted t-sm">
@@ -608,7 +603,7 @@ function RuleModal({
             <Field label="Throttle (minutes)">
               <NumberInput onChange={setThrottleMinutes} value={throttleMinutes} />
             </Field>
-            <label className="text-fg flex items-center gap-2 t-md">
+            <label className="text-fg t-md flex items-center gap-2">
               <input
                 checked={enabled}
                 onChange={(e) => setEnabled(e.target.checked)}
@@ -623,14 +618,14 @@ function RuleModal({
 
         <div className="mt-5 flex justify-end gap-2">
           <button
-            className="text-fg-muted hover:text-fg rounded-md px-3 py-1 t-md"
+            className="text-fg-muted hover:text-fg t-md rounded-md px-3 py-1"
             onClick={onClose}
             type="button"
           >
             Cancel
           </button>
           <button
-            className="bg-accent text-bg disabled:bg-bg-tertiary disabled:text-fg-muted rounded-md px-3 py-1 t-md disabled:cursor-not-allowed"
+            className="bg-accent text-bg disabled:bg-bg-tertiary disabled:text-fg-muted t-md rounded-md px-3 py-1 disabled:cursor-not-allowed"
             disabled={!canSubmit || saveMutation.isPending}
             onClick={() => saveMutation.mutate()}
             type="button"
@@ -663,7 +658,7 @@ function TextInput({
 }) {
   return (
     <input
-      className="border-border bg-bg-tertiary text-fg w-full rounded-md border px-2 py-1 font-mono t-md"
+      className="border-border bg-bg-tertiary text-fg t-md w-full rounded-md border px-2 py-1 font-mono"
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       value={value}
@@ -682,7 +677,7 @@ function NumberInput({
 }) {
   return (
     <input
-      className="border-border bg-bg-tertiary text-fg w-full rounded-md border px-2 py-1 font-mono t-md tabular-nums"
+      className="border-border bg-bg-tertiary text-fg t-md w-full rounded-md border px-2 py-1 font-mono tabular-nums"
       inputMode="decimal"
       min="0"
       onChange={(e) => onChange(e.target.value)}
