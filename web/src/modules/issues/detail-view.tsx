@@ -384,6 +384,7 @@ function StackTab({
   // Server-fetched full-file source drawer. Open one at a time; click
   // another frame to switch. Esc closes (handled inside the drawer).
   const [openFrame, setOpenFrame] = useState<null | number>(null)
+  const openFrameData = openFrame !== null ? (frames[openFrame] ?? null) : null
 
   return (
     <div className="space-y-3">
@@ -433,8 +434,10 @@ function StackTab({
           environment={payload.environment}
           eventId={event.id}
           frame={openFrame}
+          frameData={openFrameData}
           onClose={() => setOpenFrame(null)}
           projectId={projectId}
+          sourceRepoUrl={sourceRepoUrl}
         />
       )}
     </div>
@@ -470,6 +473,12 @@ function StackList({
     if (last && last.kind === 'vendor' && last.pkg === pkg) last.frames.push(f)
     else groups.push({ at: i, frames: [f], kind: 'vendor', pkg })
   }
+  // If every frame in the stack is vendor (no in-app, common for
+  // unhandled-rejection or unmapped native crashes), the user otherwise
+  // sees a single "1 library frame" foldout and thinks the page is
+  // empty. Expand by default in that case so the frame names are
+  // visible without an extra click.
+  const allVendor = groups.every((g) => g.kind === 'vendor')
   return (
     <div className="border-border overflow-hidden rounded-md border">
       {groups.map((g) =>
@@ -484,10 +493,12 @@ function StackList({
         ) : (
           <VendorFold
             base={g.at}
+            defaultOpen={allVendor}
             frames={g.frames}
             key={g.at}
             onFrameClick={onFrameClick}
             pkg={g.pkg}
+            sourceRepoUrl={sourceRepoUrl}
           />
         )
       )}
@@ -572,16 +583,20 @@ function FrameRow({
 
 function VendorFold({
   base,
+  defaultOpen = false,
   frames,
   onFrameClick,
   pkg,
+  sourceRepoUrl,
 }: {
   base: number
+  defaultOpen?: boolean
   frames: Frame[]
   onFrameClick?: (idx: number) => void
   pkg: null | string
+  sourceRepoUrl?: null | string
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   return (
     <div className="border-border/40 border-b last:border-b-0">
       <button
@@ -606,20 +621,39 @@ function VendorFold({
       </button>
       {open && (
         <div className="bg-bg-tertiary/10">
-          {frames.map((f, i) => (
-            <button
-              className="text-fg-muted hover:bg-bg-tertiary/50 hover:text-fg t-sm flex w-full items-baseline gap-3 px-3 py-1 pl-9 text-left font-mono"
-              key={i}
-              onClick={() => onFrameClick?.(base + i)}
-              type="button"
-            >
-              <span className="w-6 shrink-0 text-right tabular-nums">{base + i}</span>
-              <span className="whitespace-nowrap">{f.function ?? '<anonymous>'}</span>
-              <span className="truncate">
-                {f.file}:{f.line}
-              </span>
-            </button>
-          ))}
+          {frames.map((f, i) => {
+            const repoUrl = frameToSourceUrl({ file: f.file, line: f.line, sourceRepoUrl })
+            return (
+              <div className="flex items-baseline gap-3 px-3 py-1 pl-9" key={i}>
+                <button
+                  className="text-fg-muted hover:text-fg t-sm flex flex-1 items-baseline gap-3 text-left font-mono"
+                  onClick={() => onFrameClick?.(base + i)}
+                  type="button"
+                >
+                  <span className="w-6 shrink-0 text-right tabular-nums">{base + i}</span>
+                  <span className="text-fg whitespace-nowrap">{f.function ?? '<anonymous>'}</span>
+                  <span className="truncate">
+                    {f.file}
+                    <span className="text-fg-dim">:</span>
+                    <span className="tabular-nums">{f.line}</span>
+                    {f.column !== undefined ? `:${f.column}` : ''}
+                  </span>
+                </button>
+                {repoUrl && (
+                  <a
+                    aria-label="Open this line on the configured source host"
+                    className="text-fg-muted hover:text-fg t-sm shrink-0 tracking-wider uppercase"
+                    href={repoUrl}
+                    onClick={(e) => e.stopPropagation()}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    ↗ src
+                  </a>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -636,14 +670,18 @@ function FrameSourceDrawer({
   environment,
   eventId,
   frame,
+  frameData,
   onClose,
   projectId,
+  sourceRepoUrl,
 }: {
   environment: string
   eventId: string
   frame: number
+  frameData: Frame | null
   onClose: () => void
   projectId: string
+  sourceRepoUrl?: null | string
 }) {
   const [contextLines, setContextLines] = useState(5)
   const { data, error, isLoading } = useQuery({
@@ -653,6 +691,10 @@ function FrameSourceDrawer({
     staleTime: 60 * 60 * 1000,
   })
   useHotkeys('escape', onClose, { enableOnFormTags: true })
+
+  const repoUrl = frameData
+    ? frameToSourceUrl({ file: frameData.file, line: frameData.line, sourceRepoUrl })
+    : null
 
   return (
     <div
@@ -696,6 +738,40 @@ function FrameSourceDrawer({
             ✕ Esc
           </button>
         </header>
+
+        {/* Frame metadata — visible regardless of source availability so
+         *  the user always sees function name + file:line:column + role
+         *  + ↗ src external link, even when the body 404s. */}
+        {frameData && (
+          <div className="border-border bg-bg-secondary/30 border-b px-4 py-3">
+            <div className="t-md flex items-baseline gap-2">
+              <FrameRoleBadge role={roleOf(frameData)} />
+              <span className="text-fg shrink-0 font-mono font-semibold">
+                {frameData.function ?? '<anonymous>'}
+              </span>
+              {repoUrl && (
+                <a
+                  className="text-fg-muted hover:text-fg t-sm ml-auto shrink-0 tracking-wider uppercase"
+                  href={repoUrl}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  ↗ src
+                </a>
+              )}
+            </div>
+            <div className="text-fg-muted t-sm mt-1 truncate font-mono">
+              {frameData.file}
+              <span className="text-fg-dim">:</span>
+              <span className="tabular-nums">{frameData.line}</span>
+              {frameData.column !== undefined ? `:${frameData.column}` : ''}
+              {frameData.inApp ? null : (
+                <span className="text-fg-muted/70 ml-2 tracking-wider uppercase">vendor</span>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="flex-1 overflow-auto">
           {isLoading && <p className="text-fg-muted t-md px-4 py-6">Loading source…</p>}
           {error && <FrameSourceError environment={environment} error={error} />}
