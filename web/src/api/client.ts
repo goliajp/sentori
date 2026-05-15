@@ -308,6 +308,15 @@ export const adminApi = {
   listIssueActivity: (projectId: string, issueId: string) =>
     adminFetch<ActivityEntry[]>(`/projects/${projectId}/issues/${issueId}/activity`),
 
+  /** v0.8.2 — end-user-submitted bug reports for this issue. */
+  listUserReportsForIssue: (projectId: string, issueId: string) =>
+    adminFetch<UserReport[]>(`/projects/${projectId}/issues/${issueId}/user-reports`),
+
+  /** v0.8.2 — project-wide inbox (reports without an event_id + recent
+   *  ones with an event_id mixed in). */
+  listUserReportsForProject: (projectId: string) =>
+    adminFetch<UserReport[]>(`/projects/${projectId}/user-reports`),
+
   /** Phase 25 sub-E — post a new comment on an issue. */
   createIssueComment: (projectId: string, issueId: string, body: string) =>
     adminFetch<{ id: string }>(`/projects/${projectId}/issues/${issueId}/comments`, {
@@ -592,6 +601,19 @@ export type FrameSource = {
   column: number
   file: string
   line: number
+}
+
+// v0.8.2 — end-user-submitted bug reports.
+export type UserReport = {
+  body: string
+  email: null | string
+  eventId: null | string
+  id: string
+  issueId: null | string
+  name: null | string
+  projectId: string
+  receivedAt: string
+  title: string
 }
 
 // Phase 25 sub-E — issue activity stream entries.

@@ -13,6 +13,7 @@ import {
   type FrameSource,
   type IssueRow,
   type IssueStatus,
+  type UserReport,
 } from '@/api/client'
 import { useAuth } from '@/auth/state'
 import { useOrg } from '@/auth/orgContext'
@@ -25,7 +26,7 @@ import { languageOf } from '@/lib/source-language'
 import { frameToSourceUrl } from '@/lib/source-link'
 import { useUrlParam } from '@/lib/url-state'
 
-type Tab = 'activity' | 'breadcrumbs' | 'events' | 'stack' | 'tags'
+type Tab = 'activity' | 'breadcrumbs' | 'events' | 'feedback' | 'stack' | 'tags'
 type WritableStatus = 'active' | 'closed' | 'resolved' | 'silenced'
 
 const TABS: { key: Tab; label: string }[] = [
@@ -34,6 +35,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'breadcrumbs', label: 'Breadcrumbs' },
   { key: 'tags', label: 'Tags' },
   { key: 'activity', label: 'Activity' },
+  { key: 'feedback', label: 'User reports' },
 ]
 const TAB_KEYS = new Set<Tab>(TABS.map((t) => t.key))
 
@@ -181,6 +183,9 @@ export function IssueDetailView() {
         <EventsTab events={events} onSelect={setEventIdx} selectedIdx={safeIdx} />
       )}
       {tab === 'activity' && projectId && <ActivityTab issueId={issueId} projectId={projectId} />}
+      {tab === 'feedback' && projectId && (
+        <FeedbackTab issueId={issueId} projectId={projectId} />
+      )}
     </div>
   )
 }
@@ -980,6 +985,58 @@ function StateEntry({
       <span className="text-fg-muted t-sm font-mono tabular-nums">{formatRelative(entry.at)}</span>
       {entry.release && <span className="text-fg-muted t-md font-mono">in {entry.release}</span>}
     </div>
+  )
+}
+
+// v0.8.2 — end-user-submitted bug reports tied to this issue. Read-only
+// here; reports are created by the host app calling
+// `sentori.sendUserFeedback({ eventId, title, body, email?, name? })`,
+// which the server links to the matching event's issue automatically.
+function FeedbackTab({ issueId, projectId }: { issueId: string; projectId: string }) {
+  const reportsQ = useQuery({
+    queryFn: () => adminApi.listUserReportsForIssue(projectId, issueId),
+    queryKey: ['issue-user-reports', projectId, issueId],
+  })
+  const reports = reportsQ.data ?? []
+  if (reportsQ.isLoading) {
+    return <div className="text-fg-muted t-md px-3 py-3">Loading…</div>
+  }
+  if (reports.length === 0) {
+    return (
+      <Empty
+        hint="Host app calls `sentori.sendUserFeedback({ eventId, title, body, email? })` — reports with a matching eventId land here automatically."
+        title="No user reports for this issue"
+      />
+    )
+  }
+  return (
+    <ul className="border-border divide-border divide-y overflow-hidden rounded-md border">
+      {reports.map((r) => (
+        <FeedbackEntry key={r.id} report={r} />
+      ))}
+    </ul>
+  )
+}
+
+function FeedbackEntry({ report }: { report: UserReport }) {
+  const author = report.name ?? report.email ?? 'anonymous'
+  return (
+    <li className="px-3 py-2">
+      <div className="t-md flex items-baseline justify-between gap-2">
+        <span className="text-fg font-medium">{report.title}</span>
+        <span className="text-fg-muted t-sm font-mono tabular-nums">
+          {formatRelative(report.receivedAt)}
+        </span>
+      </div>
+      <div className="text-fg t-md mt-1 whitespace-pre-wrap">{report.body}</div>
+      <div className="text-fg-muted t-sm mt-2 flex items-center gap-3">
+        <span>{author}</span>
+        {report.email && report.name && <span className="font-mono">{report.email}</span>}
+        {report.eventId && (
+          <span className="font-mono">event {report.eventId.slice(0, 8)}</span>
+        )}
+      </div>
+    </li>
   )
 }
 
