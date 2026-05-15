@@ -116,8 +116,27 @@ export function IssueDetailView() {
         ← Issues
       </Link>
 
-      <PageHeader
-        actions={
+      {/*
+       * Two-row header. Info row sits on top with full width so a long
+       * error message wraps naturally; the toolbar row sits underneath
+       * with its own line of breathing room. Stacking beats the old
+       * `<PageHeader actions={...}>` left/right split, which crammed
+       * the assignee + Resolve / Silence / Reopen / release picker
+       * against the right edge.
+       */}
+      <header className="space-y-2">
+        <div>
+          <h1 className="text-fg t-lg inline-flex flex-wrap items-baseline gap-2 font-semibold">
+            <StatusText status={issue.status} />
+            <span className="text-fg">{displayMessage(issue.messageSample)}</span>
+          </h1>
+          <div className="text-fg-muted t-md mt-1 flex flex-wrap items-baseline gap-x-2 font-mono">
+            <span>{issue.errorType}</span>
+            {issue.lastEnvironment && <span>· env={issue.lastEnvironment}</span>}
+            {issue.lastRelease && <span>· {issue.lastRelease}</span>}
+          </div>
+        </div>
+        <div className="border-border bg-bg-secondary/30 rounded-md border px-3 py-2">
           <IssueActions
             currentUserId={user?.id ?? null}
             issue={issue}
@@ -129,23 +148,8 @@ export function IssueDetailView() {
             pending={patchM.isPending}
             releases={releasesQ.data ?? []}
           />
-        }
-        subtitle={
-          <span className="font-mono">
-            <span className="text-fg-muted">{issue.errorType}</span>
-            {issue.lastEnvironment && (
-              <span className="text-fg-muted ml-2">· env={issue.lastEnvironment}</span>
-            )}
-            {issue.lastRelease && <span className="text-fg-muted ml-2">· {issue.lastRelease}</span>}
-          </span>
-        }
-        title={
-          <span className="inline-flex items-baseline gap-2">
-            <StatusText status={issue.status} />
-            <span className="text-fg">{displayMessage(issue.messageSample)}</span>
-          </span>
-        }
-      />
+        </div>
+      </header>
 
       <Tabs current={tab} onChange={setTab} />
 
