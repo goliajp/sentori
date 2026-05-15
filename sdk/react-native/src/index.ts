@@ -9,6 +9,7 @@ import {
   setUser,
 } from './capture';
 import { ErrorBoundary } from './error-boundary';
+import { FeedbackButton, type FeedbackButtonHandle, type FeedbackButtonProps } from './feedback-widget';
 import {
   clearAllFeatureFlags,
   clearFeatureFlag,
@@ -44,6 +45,7 @@ export const sentori = {
   clearAllFeatureFlags,
   getFeatureFlags,
   ErrorBoundary,
+  FeedbackButton,
   RageTapCapture,
   registerMaskQuery,
   clearMaskQuery,
@@ -65,6 +67,7 @@ export {
   setUser,
 } from './capture';
 export { ErrorBoundary } from './error-boundary';
+export { FeedbackButton, type FeedbackButtonHandle, type FeedbackButtonProps } from './feedback-widget';
 export {
   clearAllFeatureFlags,
   clearFeatureFlag,
