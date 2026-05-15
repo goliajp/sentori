@@ -12,6 +12,18 @@ type SentoriNativeModule = {
     token: string
   }) => void
   /**
+   * v0.7.3 — JS-triggered screenshot with consumer-supplied mask IDs.
+   * `maskedIds` are RN `nativeID` strings; native walks the view
+   * tree, finds each subview by identifier, and paints a black
+   * rectangle over its frame in the captured bitmap. Resolves to
+   * `null` if there's no key window / API < 24 (Android) / render
+   * timed out. Replaced the previous `react-native-view-shot`
+   * peer-dep path.
+   */
+  captureScreenshotWithMask?: (
+    maskedIds: string[],
+  ) => Promise<null | { base64: string; mediaType: string }>
+  /**
    * Phase 22 sub-D / sub-E: cross-platform main-thread watchdog.
    * Android: 5 s / 1 s defaults (matches the OS ANR threshold).
    * iOS: 2 s / 1 s (more aggressive — iOS has no system-level
@@ -112,5 +124,28 @@ export function stopAnrWatchdog(): void {
     native()?.stopAnrWatchdog?.()
   } catch {
     // ignore
+  }
+}
+
+/**
+ * v0.7.3 — drives the native screenshot path. JS side passes the
+ * current list of mask `nativeID`s (read from the consumer's
+ * registered mask query); native renders + redacts.
+ *
+ * Returns `null` on every failure mode: no native module bound
+ * (jest, bun test, web), method missing (older native build still
+ * deployed), capture failed (no key window, timed out, etc.).
+ * Callers must treat `null` as "no screenshot this round" — the
+ * error event still ships, just without a thumbnail.
+ */
+export async function captureNativeScreenshotWithMask(
+  maskedIds: string[],
+): Promise<null | { base64: string; mediaType: string }> {
+  const n = native()
+  if (!n?.captureScreenshotWithMask) return null
+  try {
+    return await n.captureScreenshotWithMask(maskedIds)
+  } catch {
+    return null
   }
 }

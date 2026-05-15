@@ -3,15 +3,13 @@ import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { setConfig, __resetForTests as resetConfig } from '../config';
 import { uploadAttachment } from '../transport';
 
-// Phase 42 sub-D.13 — unit coverage for the upload pipeline.
+// Unit coverage for the upload pipeline.
 //
-// `captureScreenshot()` itself goes through react-native-view-shot
-// + RN's InteractionManager, neither of which exist in the bun:test
-// runtime, so we test it indirectly: `uploadAttachment` is the
-// non-RN-API surface and that's what we hit hardest. The
-// `requestAnimationFrame` / InteractionManager perf gating is a
-// runtime concern asserted via manual smoke + the iOS / Android
-// XCTest / instrumentation tests in sub-E / sub-F.
+// `captureScreenshot()` itself goes through the native module
+// (v0.7.3+) which doesn't exist in the bun:test runtime, so we
+// test it indirectly: `uploadAttachment` is the non-RN-API surface
+// and that's what we hit hardest. The native render + mask redaction
+// is exercised by the iOS XCTest / Android instrumentation tests.
 
 const origFetch = globalThis.fetch;
 afterEach(() => {

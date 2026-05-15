@@ -61,6 +61,37 @@ import UIKit
         return result
     }
 
+    /// v0.7.3 — JS-triggered screenshot path. Returns just
+    /// `{ base64, mediaType }`; view tree not needed (errors that
+    /// reach here are non-fatal and surface the tree via the
+    /// breadcrumb / stack pipeline already). When `maskedIds` is
+    /// non-empty we walk the view hierarchy by
+    /// `accessibilityIdentifier` (RN bridges `nativeID` to this on
+    /// iOS) and paint a black rectangle over each subview's frame in
+    /// the captured bitmap. Called from `Sentori.captureScreenshotWithMask`
+    /// in the Expo Module bridge.
+    @objc public static func captureScreenshotWithMask(maskedIds: [String]) -> [String: String]? {
+        if Thread.isMainThread {
+            return captureWithMaskSync(maskedIds: maskedIds)
+        }
+        var result: [String: String]?
+        DispatchQueue.main.sync {
+            result = captureWithMaskSync(maskedIds: maskedIds)
+        }
+        return result
+    }
+
+    private static func captureWithMaskSync(maskedIds: [String]) -> [String: String]? {
+        guard let window = keyWindow() else { return nil }
+        guard let jpeg = renderJpegBase64(window: window, maskedIds: Set(maskedIds)) else {
+            return nil
+        }
+        return [
+            "base64": jpeg,
+            "mediaType": "image/jpeg",
+        ]
+    }
+
     // MARK: - Internals
 
     private static func captureSync() -> [String: Any]? {
@@ -92,7 +123,10 @@ import UIKit
         return UIApplication.shared.windows.first
     }
 
-    private static func renderJpegBase64(window: UIWindow) -> String? {
+    private static func renderJpegBase64(
+        window: UIWindow,
+        maskedIds: Set<String> = []
+    ) -> String? {
         let bounds = window.bounds
         let longEdge = max(bounds.width, bounds.height)
         let scale: CGFloat = longEdge > maxLongEdgePx ? maxLongEdgePx / longEdge : 1.0
@@ -103,16 +137,56 @@ import UIKit
         format.scale = 1.0
         format.opaque = true
         let renderer = UIGraphicsImageRenderer(size: outSize, format: format)
-        let image = renderer.image { _ in
+        let image = renderer.image { ctx in
             window.drawHierarchy(
                 in: CGRect(origin: .zero, size: outSize),
                 afterScreenUpdates: false
             )
+            // v0.7.3 — paint a black rectangle over every masked
+            // subview's frame, in the same render pass so we don't
+            // pay for a second bitmap allocation. `convert(_,to:)`
+            // handles transforms and nested coordinate spaces; the
+            // scale factor maps window-points to output-pixels.
+            if !maskedIds.isEmpty {
+                let regions = findMaskedSubviews(rootView: window, ids: maskedIds)
+                if !regions.isEmpty {
+                    UIColor.black.setFill()
+                    for v in regions {
+                        let rect = v.convert(v.bounds, to: window)
+                        let scaled = CGRect(
+                            x: rect.origin.x * scale,
+                            y: rect.origin.y * scale,
+                            width: rect.size.width * scale,
+                            height: rect.size.height * scale
+                        )
+                        ctx.fill(scaled)
+                    }
+                }
+            }
         }
         guard let data = image.jpegData(compressionQuality: jpegQuality) else {
             return nil
         }
         return data.base64EncodedString()
+    }
+
+    /// Depth-first walk that stops descending once a masked subtree
+    /// is hit — the entire region is being blacked out, no need to
+    /// look at children for a second match.
+    private static func findMaskedSubviews(
+        rootView: UIView,
+        ids: Set<String>
+    ) -> [UIView] {
+        var found: [UIView] = []
+        func walk(_ v: UIView) {
+            if let id = v.accessibilityIdentifier, ids.contains(id) {
+                found.append(v)
+                return
+            }
+            for sub in v.subviews { walk(sub) }
+        }
+        walk(rootView)
+        return found
     }
 
     private static func walkTree(root: UIView) -> [String: Any] {

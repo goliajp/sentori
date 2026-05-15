@@ -33,10 +33,14 @@ export type InitOptions = {
      *  foreground (`AppState` → `active`), ends it on background.
      *  Drives crash-free rate. Set `false` to opt out. */
     sessions?: boolean;
-    /** Phase 42 sub-D.07: capture a screenshot of the current screen
-     *  on `captureException`. Opt-in — requires `react-native-view-shot`
-     *  installed and `<MaskRegion>` placed over any sensitive UI. The
-     *  image is webp q=70 480 px max, < 100 KB typical. */
+    /** Capture a screenshot of the current screen on
+     *  `captureException`. Opt-in. The capture runs through the
+     *  bundled native module — no extra peer dep required since
+     *  v0.7.3. To redact PII regions, register a mask query via
+     *  `sentori.registerMaskQuery(() => string[])` and put
+     *  `nativeID="..."` on the `<View>`s the SDK should black out.
+     *  The image is webp q=70 / jpeg q=70 at 480 px max, < 100 KB
+     *  typical. */
     screenshot?: boolean;
     /** Phase 46: record the last N steps (route changes, custom
      *  breadcrumbs) leading up to a crash. On `captureException`

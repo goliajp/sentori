@@ -24,6 +24,16 @@ public class SentoriModule: Module {
             return SentoriCrashHandler.consumePending()
         }
 
+        // v0.7.3 — JS-triggered screenshot path with consumer-supplied
+        // mask IDs. JS owns the registry of `nativeID`s to redact;
+        // native walks the view tree and paints black rectangles in
+        // the rendered bitmap. Returns `nil` (resolves to `null` in
+        // JS) when there's no key window or render fails. Replaces
+        // the previous `react-native-view-shot` peer-dep path.
+        AsyncFunction("captureScreenshotWithMask") { (maskedIds: [String]) -> [String: String]? in
+            return SentoriScreenshotCapture.captureScreenshotWithMask(maskedIds: maskedIds)
+        }
+
         // Phase 22 sub-E: opt-in iOS hang watchdog. Same JS function
         // name as Android (sub-D) so the host app calls
         // `startAnrWatchdog(...)` once, both platforms react.

@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -103,16 +105,30 @@ object SentoriScreenshotCapture {
         val activity = lastActivity?.get() ?: return null
         val window = activity.window ?: return null
         val out = mutableMapOf<String, Any>()
-        captureScreen(window)?.let { (base64, mediaType) ->
+        captureScreen(window, emptySet())?.let { (base64, mediaType) ->
             out["screenshot"] = mapOf("base64" to base64, "mediaType" to mediaType)
         }
         out["viewTree"] = walkTree(window.decorView)
         return if (out.isEmpty()) null else out
     }
 
+    /// v0.7.3 — JS-triggered screenshot path with consumer-supplied
+    /// mask IDs. Returns `{ base64, mediaType }` or `null`; matches
+    /// the iOS bridge contract. Native walks the view tree by
+    /// `View.tag` (RN bridges JS `nativeID` to the default String tag
+    /// on the underlying View) and paints black rectangles over each
+    /// masked subview's frame on the captured bitmap.
+    @JvmStatic
+    fun captureScreenshotWithMask(maskedIds: List<String>): Map<String, String>? {
+        val activity = lastActivity?.get() ?: return null
+        val window = activity.window ?: return null
+        val (base64, mediaType) = captureScreen(window, maskedIds.toHashSet()) ?: return null
+        return mapOf("base64" to base64, "mediaType" to mediaType)
+    }
+
     // ── screenshot ────────────────────────────────────────────────
 
-    private fun captureScreen(window: Window): Pair<String, String>? {
+    private fun captureScreen(window: Window, maskedIds: Set<String>): Pair<String, String>? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
             // PixelCopy is API 24+. Older Android: fall back to a
             // `View.draw(Canvas)` path that *must* run on main and
@@ -166,6 +182,28 @@ object SentoriScreenshotCapture {
         }
         if (!success) return null
 
+        // v0.7.3 — paint black rectangles over masked subviews on the
+        // already-captured bitmap. We get window-relative coordinates
+        // from `getLocationInWindow` (respects parent transforms) and
+        // scale them down to the output bitmap size.
+        if (maskedIds.isNotEmpty()) {
+            val regions = findMaskedViews(decor, maskedIds)
+            if (regions.isNotEmpty()) {
+                val canvas = Canvas(bitmap)
+                val paint = Paint().apply { color = Color.BLACK }
+                val rootLoc = IntArray(2).also { decor.getLocationInWindow(it) }
+                val tmp = IntArray(2)
+                for (v in regions) {
+                    v.getLocationInWindow(tmp)
+                    val x = (tmp[0] - rootLoc[0]) * scale
+                    val y = (tmp[1] - rootLoc[1]) * scale
+                    val rw = v.width * scale
+                    val rh = v.height * scale
+                    canvas.drawRect(x, y, x + rw, y + rh, paint)
+                }
+            }
+        }
+
         val baos = ByteArrayOutputStream(64 * 1024)
         val mediaType: String
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -179,6 +217,26 @@ object SentoriScreenshotCapture {
         bitmap.recycle()
         val base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
         return Pair(base64, mediaType)
+    }
+
+    /// Depth-first walk that stops descending once a masked subtree
+    /// is hit. RN bridges JS `nativeID` to `View.setTag(Object)` with
+    /// a String value — that's why we cast to `String` rather than
+    /// looking at the int resource-id tag space.
+    private fun findMaskedViews(root: View, ids: Set<String>): List<View> {
+        val out = mutableListOf<View>()
+        fun walk(v: View) {
+            val tag = v.tag as? String
+            if (tag != null && ids.contains(tag)) {
+                out.add(v)
+                return
+            }
+            if (v is ViewGroup) {
+                for (i in 0 until v.childCount) walk(v.getChildAt(i))
+            }
+        }
+        walk(root)
+        return out
     }
 
     // ── view tree ─────────────────────────────────────────────────

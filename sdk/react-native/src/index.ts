@@ -2,7 +2,7 @@ import { init } from './init';
 import { addBreadcrumb } from './breadcrumbs';
 import { setUser, getUser, captureError, captureException, captureStep } from './capture';
 import { ErrorBoundary } from './error-boundary';
-import { MaskRegion, setMaskedNode, unsetMaskedNode } from './mask';
+import { clearMaskQuery, registerMaskQuery } from './mask';
 import {
   endSession,
   markSessionCrashed,
@@ -18,9 +18,8 @@ export const sentori = {
   captureException,
   captureStep,
   ErrorBoundary,
-  MaskRegion,
-  setMaskedNode,
-  unsetMaskedNode,
+  registerMaskQuery,
+  clearMaskQuery,
   startSession,
   endSession,
   markSessionCrashed,
@@ -38,7 +37,7 @@ export {
   setUser,
 } from './capture';
 export { ErrorBoundary } from './error-boundary';
-export { MaskRegion, setMaskedNode, unsetMaskedNode } from './mask';
+export { clearMaskQuery, registerMaskQuery } from './mask';
 export {
   startAnrWatchdog,
   stopAnrWatchdog,

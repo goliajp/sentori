@@ -1,6 +1,6 @@
 {
   "name": "@goliapkg/sentori-react-native",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Sentori SDK for React Native \u2014 JS-layer error capture, native crash handlers (iOS / Android), batched transport, fetch + react-navigation tracing.",
   "license": "MIT",
   "homepage": "https://sentori.golia.jp",
@@ -41,8 +41,7 @@
   "peerDependencies": {
     "expo-modules-core": ">=2.0",
     "react": ">=18",
-    "react-native": ">=0.74",
-    "react-native-view-shot": ">=3.8"
+    "react-native": ">=0.74"
   },
   "peerDependenciesMeta": {
     "@react-native-async-storage/async-storage": {
@@ -50,15 +49,11 @@
     },
     "expo-modules-core": {
       "optional": true
-    },
-    "react-native-view-shot": {
-      "optional": true
     }
   },
   "optionalDependencies": {
     "@react-native-async-storage/async-storage": ">=1.23",
-    "expo-modules-core": ">=2.0",
-    "react-native-view-shot": ">=3.8"
+    "expo-modules-core": ">=2.0"
   },
   "devDependencies": {
     "@types/bun": "latest",

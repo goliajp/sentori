@@ -28,6 +28,16 @@ class SentoriModule : Module() {
             SentoriCrashHandler.consumePending()
         }
 
+        // v0.7.3 — JS-triggered screenshot path with consumer-supplied
+        // mask IDs. JS owns the registry of `nativeID`s to redact;
+        // native walks the view tree and paints black rectangles in
+        // the rendered bitmap. Returns `null` when no activity / API
+        // < 24 / capture timed out. Replaces the previous
+        // `react-native-view-shot` peer-dep path.
+        AsyncFunction("captureScreenshotWithMask") { maskedIds: List<String> ->
+            SentoriScreenshotCapture.captureScreenshotWithMask(maskedIds)
+        }
+
         // Watchdog is opt-in from JS so the host app picks the
         // trade-off — stricter detection vs noise from the Metro
         // debugger pausing the main thread. Pass `force: true` to
