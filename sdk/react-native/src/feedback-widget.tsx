@@ -28,6 +28,7 @@ import {
 } from 'react-native';
 
 import { sendUserFeedback } from './capture';
+import { isAnyNativeModuleLinked } from './native-loader';
 
 type Trigger = 'fab' | 'manual' | 'shake';
 
@@ -86,9 +87,15 @@ export const FeedbackButton = forwardRef<FeedbackButtonHandle, FeedbackButtonPro
     );
 
     // Shake detection — opt-in. We load expo-sensors lazily so apps
-    // that don't install it never pay the bundle cost.
+    // that don't install it never pay the bundle cost. Same native
+    // module guard as netinfo: if the JS package is in node_modules
+    // but native bridge isn't linked we'd otherwise crash inside the
+    // sensor emitter.
     useEffect(() => {
       if (trigger !== 'shake') return;
+      if (!isAnyNativeModuleLinked(['ExponentAccelerometer', 'EXAccelerometer', 'ExpoAccelerometer'])) {
+        return;
+      }
       let sub: { remove: () => void } | null = null;
       try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports

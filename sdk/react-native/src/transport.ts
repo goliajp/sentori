@@ -1,6 +1,7 @@
 import { drainSpans } from '@goliapkg/sentori-core';
 
 import { getConfig } from './config';
+import { isAnyNativeModuleLinked } from './native-loader';
 import type { Event } from './types';
 
 const FLUSH_INTERVAL_MS = 5_000;
@@ -166,6 +167,11 @@ type AsyncStorageLike = {
 };
 
 const getAsyncStorage = async (): Promise<AsyncStorageLike | null> => {
+  // v0.8.5 — host may have the JS package without pod install /
+  // prebuild → getItem crashes from a microtask outside our reach.
+  if (!isAnyNativeModuleLinked(['RNCAsyncStorage', 'AsyncStorageModule'])) {
+    return null;
+  }
   try {
     const mod = (await import(
       '@react-native-async-storage/async-storage'

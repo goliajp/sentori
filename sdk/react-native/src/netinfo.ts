@@ -16,6 +16,8 @@
 
 import type { Device } from '@goliapkg/sentori-core';
 
+import { isNativeModuleLinked } from './native-loader';
+
 type NetworkType = Device['networkType'];
 
 type NetInfoState = {
@@ -55,20 +57,11 @@ export function startNetworkTypeWatch(): void {
   if (_started) return;
   _started = true;
   try {
-    // v0.8.4 hotfix — when the host has `@react-native-community/netinfo`
-    // in package.json but the *native* module isn't linked (Expo Go,
-    // pod install never ran, RN autolink turned off, etc.) the JS
-    // package still imports fine but calling addEventListener throws
-    // "NativeModule.RNCNetInfo is null" from inside the lib's async
-    // emitter — past where this try/catch can reach. Gate on the
-    // NativeModules entry first so we no-op cleanly in that case.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const RN = require('react-native') as {
-      NativeModules?: Record<string, unknown>;
-    };
-    const native = RN.NativeModules?.RNCNetInfo;
-    if (native == null) {
-      // JS package present but native module isn't linked. Skip.
+    // v0.8.4 hotfix → v0.8.5 generalised via isNativeModuleLinked.
+    // host may have the JS package via hoisted node_modules but
+    // never ran pod install / prebuild → calling addEventListener
+    // crashes deep inside the lib's emitter past try/catch reach.
+    if (!isNativeModuleLinked('RNCNetInfo')) {
       return;
     }
     // eslint-disable-next-line @typescript-eslint/no-require-imports

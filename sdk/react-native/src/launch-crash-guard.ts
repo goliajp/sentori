@@ -17,6 +17,8 @@
 // add a native marker for the small set of "crashed before bridge"
 // cases.
 
+import { isAnyNativeModuleLinked } from './native-loader';
+
 const MARKER_KEY = '@sentori/launch_marker';
 const COMPLETED_KEY = '@sentori/launch_completed';
 const COUNT_KEY = '@sentori/launch_crash_count';
@@ -54,6 +56,13 @@ type AsyncStorageLike = {
 };
 
 function loadAsyncStorage(): AsyncStorageLike | null {
+  // v0.8.5 — same NativeModule guard as netinfo/transport. The
+  // require() can succeed without the native module linked, but
+  // getItem will crash from a microtask path our try/catch can't
+  // reach.
+  if (!isAnyNativeModuleLinked(['RNCAsyncStorage', 'AsyncStorageModule'])) {
+    return null;
+  }
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mod = require('@react-native-async-storage/async-storage') as {
