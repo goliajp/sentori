@@ -98,6 +98,8 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route("/v1/sessions", post(api::sessions::handle))
         .route("/v1/spans", post(api::spans::handle))
         .route("/v1/spans:batch", post(api::spans::handle_batch))
+        // v0.8.2 — end-user feedback submitted from inside the host app.
+        .route("/v1/user-reports", post(api::user_reports::ingest))
         .route(
             "/v1/events/{event_id}/attachments/{kind}",
             post(api::attachments::upload),
@@ -161,6 +163,15 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route(
             "/projects/{project_id}/traces",
             get(api::traces::list_traces),
+        )
+        // v0.8.2 — user feedback inbox + per-issue reports.
+        .route(
+            "/projects/{project_id}/user-reports",
+            get(api::user_reports::list_for_project),
+        )
+        .route(
+            "/projects/{project_id}/issues/{issue_id}/user-reports",
+            get(api::user_reports::list_for_issue),
         )
         .route(
             "/projects/{project_id}/traces/{trace_id}",
