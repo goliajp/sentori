@@ -1,6 +1,13 @@
 import { init } from './init';
 import { addBreadcrumb } from './breadcrumbs';
-import { setUser, getUser, captureError, captureException, captureStep } from './capture';
+import {
+  captureError,
+  captureException,
+  captureStep,
+  getUser,
+  sendUserFeedback,
+  setUser,
+} from './capture';
 import { ErrorBoundary } from './error-boundary';
 import { clearMaskQuery, registerMaskQuery } from './mask';
 import {
@@ -17,6 +24,7 @@ export const sentori = {
   captureError,
   captureException,
   captureStep,
+  sendUserFeedback,
   ErrorBoundary,
   registerMaskQuery,
   clearMaskQuery,
@@ -34,6 +42,7 @@ export {
   captureException,
   captureStep,
   getUser,
+  sendUserFeedback,
   setUser,
 } from './capture';
 export { ErrorBoundary } from './error-boundary';

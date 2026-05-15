@@ -7,7 +7,7 @@ import { captureScreenshot } from './handlers/screenshot';
 import { markSessionErrored } from './session-tracker';
 import { parseStack } from './stack';
 import { getTrailBuffer } from './trail';
-import { enqueue, uploadAttachment } from './transport';
+import { enqueue, sendUserReport, uploadAttachment } from './transport';
 import { uuidV7 } from './uuid';
 import { getCachedNetworkType } from './netinfo';
 import type { App, AttachmentMeta, Device, Event, SentoriError, Tags, User } from './types';
@@ -59,6 +59,29 @@ export type CaptureExtras = {
    *  true } })` is on — handy for sensitive screens. Defaults to
    *  whatever `config.screenshotsEnabled` says. */
   screenshot?: boolean;
+};
+
+/**
+ * v0.8.2 — submit an end-user-supplied bug report. Use this when the
+ * host app surfaces a "Report a problem" form. Pass `eventId` if the
+ * user is reporting a specific crash they just saw — the server links
+ * the report to that event's issue automatically.
+ *
+ * Returns `{ id, issueId }` on success or `null` on any failure
+ * (network down, ingest token revoked, validation rejected). Doesn't
+ * throw.
+ */
+export const sendUserFeedback = async (input: {
+  body: string;
+  email?: string;
+  eventId?: string;
+  name?: string;
+  title: string;
+}): Promise<null | { id: string; issueId: null | string }> => {
+  if (!isInitialized()) return null;
+  const config = getConfig();
+  if (!config) return null;
+  return sendUserReport(config.ingestUrl, config.token, input);
 };
 
 export const captureError = (error: Error, extras?: CaptureExtras): void => {

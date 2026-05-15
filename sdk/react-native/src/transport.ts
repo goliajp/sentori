@@ -242,6 +242,42 @@ export const sendSessionPing = async (
   }
 };
 
+/**
+ * v0.8.2 — submit a user-supplied bug report. Fire-and-forget; resolves
+ * with the server-assigned id on success or `null` on any failure.
+ * The host app typically calls this from a "Report a problem" form;
+ * pass `eventId` if you're reporting a specific crash the user just
+ * saw so the report links to that event's issue automatically.
+ */
+export const sendUserReport = async (
+  ingestUrl: string,
+  token: string,
+  report: {
+    body: string;
+    email?: string;
+    eventId?: string;
+    name?: string;
+    title: string;
+  },
+): Promise<null | { id: string; issueId: null | string }> => {
+  try {
+    const resp = await fetch(`${ingestUrl}/v1/user-reports`, {
+      body: JSON.stringify(report),
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Sentori-Sdk': `react-native/${SDK_VERSION}`,
+      },
+      method: 'POST',
+    });
+    if (!resp.ok) return null;
+    const j = (await resp.json()) as { id: string; issueId: null | string };
+    return j;
+  } catch {
+    return null;
+  }
+};
+
 // ──────────────────────────────────────────────────────────────────
 // Phase 42 sub-D.05 — attachment upload pipeline
 // ──────────────────────────────────────────────────────────────────
