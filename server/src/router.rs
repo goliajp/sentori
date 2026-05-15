@@ -203,6 +203,13 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/privacy/findings",
             get(api::privacy::findings),
         )
+        // v0.9.2 +S5 — Repro-as-test: generate a Jest scaffold from
+        // an event's breadcrumb trail + stack so the dev can drop it
+        // into tests/__repros__/ and start debugging in 30 seconds.
+        .route(
+            "/projects/{project_id}/events/{event_id}/repro",
+            get(api::repro::generate),
+        )
         // v0.8.4 — cert-monitor watchlist + observations.
         .route(
             "/projects/{project_id}/cert-monitor/domains",

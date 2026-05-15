@@ -19,6 +19,7 @@ pub mod privacy;
 pub mod projects;
 pub mod recent;
 pub mod recipients;
+pub mod repro;
 pub mod releases;
 pub mod search;
 pub mod sessions;

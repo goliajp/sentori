@@ -186,6 +186,35 @@ export function IssueDetailView() {
       {tab === 'feedback' && projectId && (
         <FeedbackTab issueId={issueId} projectId={projectId} />
       )}
+      {selectedEvent && projectId && (
+        <ReproDownloadFab eventId={selectedEvent.id} projectId={projectId} />
+      )}
+    </div>
+  )
+}
+
+/** v0.9.2 +S5 — small button beside the event picker that downloads
+ *  a Jest scaffold for the currently selected event. */
+function ReproDownloadFab({ eventId, projectId }: { eventId: string; projectId: string }) {
+  const onClick = () => {
+    const url = `/admin/api/projects/${projectId}/events/${eventId}/repro`
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `repro-${eventId.slice(0, 8)}.test.ts`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  }
+  return (
+    <div className="text-fg-muted t-sm flex justify-end">
+      <button
+        className="hover:text-fg t-sm flex items-center gap-1.5 font-mono"
+        onClick={onClick}
+        type="button"
+      >
+        <span className="text-accent">↓</span>
+        export as jest test
+      </button>
     </div>
   )
 }
