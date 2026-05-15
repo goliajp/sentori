@@ -4,6 +4,7 @@ import { addBreadcrumb, getBreadcrumbs } from './breadcrumbs';
 import { getBundleInfo } from './bundle-info';
 import { getConfig, isInitialized } from './config';
 import { getFeatureFlagSnapshot } from './feature-flags';
+import { clearStateSnapshots, getStateSnapshots } from './state-snapshots';
 import { symbolicateErrorViaMetro } from './handlers/dev-symbolicate';
 import { captureScreenshot } from './handlers/screenshot';
 import { markSessionErrored } from './session-tracker';
@@ -144,10 +145,47 @@ export const captureError = (error: Error, extras?: CaptureExtras): void => {
     if (config.sessionTrailEnabled && trail.size() > 0) {
       await captureAndAttachSessionTrail(event);
     }
+    // v0.9.2 +S2 — state time-travel attachment. Only if anything has
+    // been bound or recorded; cleared on success so the next crash's
+    // ring doesn't carry stale entries.
+    const stateSnapshots = getStateSnapshots();
+    if (stateSnapshots.length > 0) {
+      await captureAndAttachStateSnapshots(event, stateSnapshots);
+      clearStateSnapshots();
+    }
     enqueue(event);
   };
   void pipeline();
 };
+
+/** v0.9.2 +S2 — upload the rolling state-snapshot ring as a
+ *  `stateSnapshot` attachment so the dashboard time-travel viewer can
+ *  scrub through diffs alongside the breadcrumb timeline. */
+async function captureAndAttachStateSnapshots(
+  event: Event,
+  snapshots: ReturnType<typeof getStateSnapshots>,
+): Promise<void> {
+  try {
+    const payload = JSON.stringify({ snapshots });
+    const base64 =
+      typeof globalThis.btoa === 'function'
+        ? globalThis.btoa(payload)
+        : // Bun / node fallback
+          Buffer.from(payload, 'utf8').toString('base64');
+    const meta = await uploadAttachment(
+      event.id,
+      'stateSnapshot',
+      { base64, mediaType: 'application/json' },
+      { source: 'js' },
+    );
+    if (meta) {
+      if (!event.attachments) event.attachments = [];
+      event.attachments.push(meta);
+    }
+  } catch {
+    // best-effort
+  }
+}
 
 /**
  * Phase 46 — seal the trail buffer, upload it as a `sessionTrail`

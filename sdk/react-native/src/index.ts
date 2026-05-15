@@ -18,6 +18,7 @@ import {
 } from './feature-flags';
 import { clearMaskQuery, registerMaskQuery } from './mask';
 import { measureFn } from './measure';
+import { bindState, recordState, unbindState } from './state-snapshots';
 import { startMoment } from '@goliapkg/sentori-core';
 import { flushMetrics, recordMetric } from './metrics';
 import { RageTapCapture } from './rage-tap';
@@ -40,6 +41,9 @@ export const sentori = {
   flushMetrics,
   measureFn,
   startMoment,
+  bindState,
+  recordState,
+  unbindState,
   setFeatureFlag,
   clearFeatureFlag,
   clearAllFeatureFlags,
@@ -78,6 +82,12 @@ export { clearMaskQuery, registerMaskQuery } from './mask';
 export { flushMetrics, recordMetric } from './metrics';
 export { measureFn } from './measure';
 export { MomentHandle, type MomentProperties, startMoment } from '@goliapkg/sentori-core';
+export {
+  bindState,
+  recordState,
+  type StateSnapshot,
+  unbindState,
+} from './state-snapshots';
 export { RageTapCapture } from './rage-tap';
 export {
   startAnrWatchdog,
