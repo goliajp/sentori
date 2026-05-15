@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -339,30 +340,32 @@ function EventPicker({
 }) {
   const e = events[selectedIdx]
   return (
-    <div className="border-border bg-bg-tertiary/30 text-fg-muted t-md flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono tabular-nums">
+    <div className="border-border bg-bg-tertiary/30 text-fg-muted t-md flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-mono tabular-nums">
       <button
-        aria-label="Previous event"
-        className="hover:bg-bg-tertiary hover:text-fg rounded px-1.5 py-0.5 disabled:opacity-30"
+        aria-label="Previous event ([)"
+        className="hover:bg-bg-tertiary hover:text-fg inline-flex items-center rounded p-1 disabled:opacity-30"
         disabled={selectedIdx === 0}
         onClick={() => onSelect(Math.max(0, selectedIdx - 1))}
+        title="Previous event — keyboard: ["
         type="button"
       >
-        [
+        <ChevronLeft className="h-3.5 w-3.5" />
       </button>
-      <span>
+      <button
+        aria-label="Next event (])"
+        className="hover:bg-bg-tertiary hover:text-fg inline-flex items-center rounded p-1 disabled:opacity-30"
+        disabled={selectedIdx >= events.length - 1}
+        onClick={() => onSelect(Math.min(events.length - 1, selectedIdx + 1))}
+        title="Next event — keyboard: ]"
+        type="button"
+      >
+        <ChevronRight className="h-3.5 w-3.5" />
+      </button>
+      <span className="ml-1.5">
         event {selectedIdx + 1} / {events.length}
       </span>
       <span className="text-fg-muted/70">·</span>
       <span>{total.toLocaleString()} total</span>
-      <button
-        aria-label="Next event"
-        className="hover:bg-bg-tertiary hover:text-fg rounded px-1.5 py-0.5 disabled:opacity-30"
-        disabled={selectedIdx >= events.length - 1}
-        onClick={() => onSelect(Math.min(events.length - 1, selectedIdx + 1))}
-        type="button"
-      >
-        ]
-      </button>
       {e && <span className="text-fg-muted t-sm ml-auto">{e.id.slice(0, 12)}</span>}
     </div>
   )
