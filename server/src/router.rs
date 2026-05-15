@@ -100,6 +100,9 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route("/v1/spans:batch", post(api::spans::handle_batch))
         // v0.8.2 — end-user feedback submitted from inside the host app.
         .route("/v1/user-reports", post(api::user_reports::ingest))
+        // v0.8.3 — custom metrics (counters / gauges / timings) from
+        // the host app. Up to 500 points per batch.
+        .route("/v1/metrics:batch", post(api::metrics::ingest_batch))
         .route(
             "/v1/events/{event_id}/attachments/{kind}",
             post(api::attachments::upload),
@@ -172,6 +175,15 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route(
             "/projects/{project_id}/issues/{issue_id}/user-reports",
             get(api::user_reports::list_for_issue),
+        )
+        // v0.8.3 — custom metrics list + name summary.
+        .route(
+            "/projects/{project_id}/metrics",
+            get(api::metrics::list_for_project),
+        )
+        .route(
+            "/projects/{project_id}/metric-names",
+            get(api::metrics::list_metric_names),
         )
         .route(
             "/projects/{project_id}/traces/{trace_id}",

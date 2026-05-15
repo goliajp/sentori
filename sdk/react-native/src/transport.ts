@@ -243,6 +243,38 @@ export const sendSessionPing = async (
 };
 
 /**
+ * v0.8.3 — flush a batched set of custom metrics. The host SDK
+ * batches recordMetric() calls into a fixed-size ring (drained on
+ * a timer + at next captureException) so a busy loop doesn't spin
+ * up one fetch per point. Best-effort, no retry.
+ */
+export const sendMetricsBatch = async (
+  ingestUrl: string,
+  token: string,
+  metrics: Array<{
+    name: string;
+    tags?: Record<string, string>;
+    ts?: string;
+    value: number;
+  }>,
+): Promise<void> => {
+  if (metrics.length === 0) return;
+  try {
+    await fetch(`${ingestUrl}/v1/metrics:batch`, {
+      body: JSON.stringify({ metrics }),
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Sentori-Sdk': `react-native/${SDK_VERSION}`,
+      },
+      method: 'POST',
+    });
+  } catch {
+    // best-effort
+  }
+};
+
+/**
  * v0.8.2 — submit a user-supplied bug report. Fire-and-forget; resolves
  * with the server-assigned id on success or `null` on any failure.
  * The host app typically calls this from a "Report a problem" form;

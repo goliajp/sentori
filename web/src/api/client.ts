@@ -317,6 +317,23 @@ export const adminApi = {
   listUserReportsForProject: (projectId: string) =>
     adminFetch<UserReport[]>(`/projects/${projectId}/user-reports`),
 
+  /** v0.8.3 — distinct metric names + 24h counts. Drives the Metrics
+   *  page's left rail. */
+  listMetricNames: (projectId: string) =>
+    adminFetch<MetricName[]>(`/projects/${projectId}/metric-names`),
+
+  /** v0.8.3 — recent points for a metric (defaults to last 24h). */
+  listMetrics: (projectId: string, params: { limit?: number; name?: string; since?: string }) => {
+    const usp = new URLSearchParams()
+    if (params.name) usp.set('name', params.name)
+    if (params.since) usp.set('since', params.since)
+    if (params.limit !== undefined) usp.set('limit', String(params.limit))
+    const qs = usp.toString()
+    return adminFetch<MetricPoint[]>(
+      `/projects/${projectId}/metrics${qs ? '?' + qs : ''}`,
+    )
+  },
+
   /** Phase 25 sub-E — post a new comment on an issue. */
   createIssueComment: (projectId: string, issueId: string, body: string) =>
     adminFetch<{ id: string }>(`/projects/${projectId}/issues/${issueId}/comments`, {
@@ -601,6 +618,21 @@ export type FrameSource = {
   column: number
   file: string
   line: number
+}
+
+// v0.8.3 — custom metric shapes.
+export type MetricName = {
+  count: number
+  lastSeen: string
+  name: string
+}
+
+export type MetricPoint = {
+  id: string
+  name: string
+  tags: Record<string, unknown>
+  ts: string
+  value: number
 }
 
 // v0.8.2 — end-user-submitted bug reports.

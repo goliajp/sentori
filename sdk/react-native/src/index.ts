@@ -10,6 +10,7 @@ import {
 } from './capture';
 import { ErrorBoundary } from './error-boundary';
 import { clearMaskQuery, registerMaskQuery } from './mask';
+import { flushMetrics, recordMetric } from './metrics';
 import {
   endSession,
   markSessionCrashed,
@@ -25,6 +26,8 @@ export const sentori = {
   captureException,
   captureStep,
   sendUserFeedback,
+  recordMetric,
+  flushMetrics,
   ErrorBoundary,
   registerMaskQuery,
   clearMaskQuery,
@@ -47,6 +50,7 @@ export {
 } from './capture';
 export { ErrorBoundary } from './error-boundary';
 export { clearMaskQuery, registerMaskQuery } from './mask';
+export { flushMetrics, recordMetric } from './metrics';
 export {
   startAnrWatchdog,
   stopAnrWatchdog,

@@ -3,6 +3,7 @@ import { installGlobalHandler } from './handlers/global';
 import { installLifecycleHandler } from './handlers/lifecycle';
 import { installPromiseHandler } from './handlers/promise';
 import { installNetworkHandler } from './handlers/network';
+import { startMetricsTimer } from './metrics';
 import { drainNativePending, setNativeConfig } from './native';
 import { startNetworkTypeWatch } from './netinfo';
 import { startSession } from './session-tracker';
@@ -100,6 +101,8 @@ export const init = (options: InitOptions): void => {
   // installed; events just won't carry `device.networkType` in that
   // case.
   startNetworkTypeWatch();
+  // v0.8.3 — drain custom-metric ring every 30 s.
+  startMetricsTimer();
 
   const capture = options.capture ?? {};
   if (capture.globalErrors !== false) installGlobalHandler();

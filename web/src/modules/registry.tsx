@@ -5,6 +5,7 @@ import { AuditLogView } from './audit/view'
 import { IntegrationsView } from './integrations/view'
 import { IssueDetailView } from './issues/detail-view'
 import { IssuesView } from './issues/view'
+import { MetricsView } from './metrics/view'
 import { OverviewView } from './overview/view'
 import { ReleasesView } from './releases/view'
 import { SettingsView } from './settings/view'
@@ -61,6 +62,15 @@ export const MODULES: ModuleDef[] = [
     label: 'Traces',
     path: 'traces',
     view: TracesView,
+  },
+  {
+    group: 'monitor',
+    // bar-chart-ish glyph: three rising bars
+    iconPath: 'M4 20V10M10 20V4M16 20V14M22 20H2',
+    id: 'metrics',
+    label: 'Metrics',
+    path: 'metrics',
+    view: MetricsView,
   },
   {
     group: 'monitor',
