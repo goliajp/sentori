@@ -341,6 +341,22 @@ export const adminApi = {
       `/projects/${projectId}/moments/${encodeURIComponent(name)}`,
     ),
 
+  /** v0.9.2 +S6 — privacy score + findings. */
+  privacyScore: (projectId: string, release?: string) => {
+    const q = release ? `?release=${encodeURIComponent(release)}` : ''
+    return adminFetch<PrivacyScore>(`/projects/${projectId}/privacy/score${q}`)
+  },
+
+  privacyFindings: (projectId: string, params?: { limit?: number; release?: string }) => {
+    const usp = new URLSearchParams()
+    if (params?.release) usp.set('release', params.release)
+    if (params?.limit !== undefined) usp.set('limit', String(params.limit))
+    const qs = usp.toString()
+    return adminFetch<PrivacyFinding[]>(
+      `/projects/${projectId}/privacy/findings${qs ? '?' + qs : ''}`,
+    )
+  },
+
   /** v0.8.4 — cert-monitor watchlist. */
   listCertWatchDomains: (projectId: string) =>
     adminFetch<CertWatchDomain[]>(`/projects/${projectId}/cert-monitor/domains`),
@@ -675,6 +691,27 @@ export type CertObservation = {
   nameValue: null | string
   notAfter: string
   notBefore: string
+}
+
+// v0.9.2 +S6 — Privacy Lab shapes.
+export type PrivacyScore = {
+  leakingEvents: number
+  leaksByKind: Record<string, number>
+  release: string
+  risk: 'high' | 'low' | 'medium'
+  score: number
+  topFields: { count: number; fieldPath: string; kind: string }[]
+  totalEvents: number
+}
+
+export type PrivacyFinding = {
+  eventId: string
+  fieldPath: string
+  id: string
+  patternKind: string
+  release: string
+  sample: string
+  seenAt: string
 }
 
 // v0.9.0 #6 — Moments shapes.

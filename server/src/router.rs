@@ -194,6 +194,15 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/moments/{name}",
             get(api::moments::list_samples),
         )
+        // v0.9.2 +S6 — Privacy Lab: per-release score + recent findings.
+        .route(
+            "/projects/{project_id}/privacy/score",
+            get(api::privacy::score),
+        )
+        .route(
+            "/projects/{project_id}/privacy/findings",
+            get(api::privacy::findings),
+        )
         // v0.8.4 — cert-monitor watchlist + observations.
         .route(
             "/projects/{project_id}/cert-monitor/domains",

@@ -146,6 +146,15 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("velocity cron spawned (5m interval)");
     }
 
+    // v0.9.2 +S6: Privacy Lab scanner. Every 15m walks the JSON
+    // payload of every newly-ingested event looking for PII-shaped
+    // strings (email/phone/cc/address) and records findings for the
+    // dashboard's Privacy module.
+    if let Some(p) = pool.as_ref() {
+        sentori_server::privacy_lab::spawn(p.clone());
+        tracing::info!("privacy lab spawned (15m interval)");
+    }
+
     // Phase 29 sub-B: webhook persistent retry queue dispatcher.
     // notifier::AlertFired enqueues into webhook_deliveries; this task
     // sweeps pending rows every 30s and applies the retry schedule.

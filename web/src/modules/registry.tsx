@@ -8,6 +8,7 @@ import { IssueDetailView } from './issues/detail-view'
 import { IssuesView } from './issues/view'
 import { MetricsView } from './metrics/view'
 import { MomentsView } from './moments/view'
+import { PrivacyView } from './privacy/view'
 import { OverviewView } from './overview/view'
 import { ReleasesView } from './releases/view'
 import { SettingsView } from './settings/view'
@@ -91,6 +92,15 @@ export const MODULES: ModuleDef[] = [
     label: 'Cert monitor',
     path: 'cert-monitor',
     view: CertMonitorView,
+  },
+  {
+    group: 'monitor',
+    // eye-with-slash, privacy/redaction glyph
+    iconPath: 'M2 2l20 20M6.7 6.7C4 8.4 2.6 11 2.6 12c0 2 3 6 9.4 6 2.1 0 3.8-.4 5.2-1M11 5c.3 0 .7 0 1 .1M21.4 12c0-2-3-6-9.4-6',
+    id: 'privacy',
+    label: 'Privacy',
+    path: 'privacy',
+    view: PrivacyView,
   },
   {
     group: 'monitor',

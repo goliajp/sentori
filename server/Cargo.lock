@@ -2286,6 +2286,7 @@ dependencies = [
  "metrics",
  "metrics-exporter-prometheus",
  "object",
+ "once_cell",
  "proguard",
  "rand 0.8.6",
  "redis",

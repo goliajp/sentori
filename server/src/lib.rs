@@ -14,6 +14,7 @@ pub mod issues;
 pub mod metrics;
 pub mod notifier;
 pub mod passwd;
+pub mod privacy_lab;
 pub mod quotas;
 pub mod regression;
 pub mod retention;
