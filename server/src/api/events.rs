@@ -102,6 +102,7 @@ pub async fn handle(
     let kind = match event.kind {
         crate::event::EventKind::Anr => "anr",
         crate::event::EventKind::Error => "error",
+        crate::event::EventKind::NearCrash => "nearCrash",
     };
     let _ = state.event_ticks.send(crate::recent::EventTick {
         kind: kind.to_string(),

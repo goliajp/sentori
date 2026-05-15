@@ -14,7 +14,7 @@ export type DeviceOS = 'android' | 'ios' | 'other' | 'web'
  * `anr` is the Android ANR watchdog (≥ 5 s main-thread freeze) and,
  * once Phase 22 sub-E lands, iOS hang detection.
  */
-export type EventKind = 'anr' | 'error'
+export type EventKind = 'anr' | 'error' | 'nearCrash'
 export type BreadcrumbType = 'custom' | 'log' | 'nav' | 'net' | 'user'
 
 export type Event = {

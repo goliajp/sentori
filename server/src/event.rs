@@ -143,6 +143,12 @@ pub enum EventKind {
     /// captured main-thread stack. iOS hangs (sub-E) will share this
     /// kind once the dedicated detector lands.
     Anr,
+    /// v0.9.1 +S4: pre-crash sentinel — SDK observed sustained frame
+    /// budget overrun (or future memory pressure / storage low / etc).
+    /// Distinct from a crash: app is still running, this is an
+    /// "about to die" warning. Dashboard shows in the same issue
+    /// stream but a separate kind facet for triage.
+    NearCrash,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]

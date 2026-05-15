@@ -11,6 +11,7 @@ import {
 import { startMetricsTimer } from './metrics';
 import { drainNativePending, setNativeConfig } from './native';
 import { startNetworkTypeWatch } from './netinfo';
+import { startPreCrashSentinel, type PreCrashChannel } from './pre-crash-sentinel';
 import { startSession } from './session-tracker';
 import {
   drainOfflineQueue,
@@ -61,6 +62,13 @@ export type InitOptions = {
      *  the buffer is sealed and uploaded as a `sessionTrail`
      *  attachment. Defaults to false. */
     sessionTrail?: boolean;
+    /** v0.9.1 +S4 — pre-crash sentinel. Subscribes to JS-thread
+     *  frame timing; when ≥ 50% of a 60-frame window misses the
+     *  budget (default 32 ms / < 30 fps), emits a `kind: nearCrash`
+     *  event proactively so dashboards see the "about-to-die"
+     *  signal before an actual crash. */
+    preCrashSentinel?: boolean;
+    sentinelChannels?: PreCrashChannel[];
     /** v0.9.0 #3 — launch-crash loop guard. When two consecutive
      *  launches don't reach `markLaunchCompleted()` (typical of an
      *  OTA update with a fatal bug), invoke the host callback with
@@ -142,6 +150,14 @@ export const init = (options: InitOptions): void => {
   startNetworkTypeWatch();
   // v0.8.3 — drain custom-metric ring every 30 s.
   startMetricsTimer();
+  // v0.9.1 +S4 — pre-crash sentinel. Off by default; opt-in via
+  // `capture.preCrashSentinel: true`.
+  if (options.capture?.preCrashSentinel === true) {
+    startPreCrashSentinel({
+      enabled: true,
+      channels: options.capture.sentinelChannels,
+    });
+  }
 
   const capture = options.capture ?? {};
   if (capture.globalErrors !== false) installGlobalHandler();
