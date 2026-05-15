@@ -1,6 +1,6 @@
 {
   "name": "@goliapkg/sentori-next",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Next.js adapter for Sentori \u2014 instrumentation.ts hooks, App Router error boundary, navigation tracing, env-driven provider built on @goliapkg/sentori-react.",
   "license": "MIT",
   "homepage": "https://sentori.golia.jp",
@@ -60,8 +60,8 @@
     "react": ">=18"
   },
   "dependencies": {
-    "@goliapkg/sentori-core": "0.6.0",
-    "@goliapkg/sentori-javascript": "0.4.1",
+    "@goliapkg/sentori-core": "0.7.0",
+    "@goliapkg/sentori-javascript": "0.4.2",
     "@goliapkg/sentori-react": "0.4.6"
   },
   "devDependencies": {

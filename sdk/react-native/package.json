@@ -69,6 +69,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@goliapkg/sentori-core": "0.6.0"
+    "@goliapkg/sentori-core": "0.7.0"
   }
 }
