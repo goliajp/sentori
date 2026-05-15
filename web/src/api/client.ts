@@ -322,6 +322,25 @@ export const adminApi = {
   listMetricNames: (projectId: string) =>
     adminFetch<MetricName[]>(`/projects/${projectId}/metric-names`),
 
+  /** v0.8.4 — cert-monitor watchlist. */
+  listCertWatchDomains: (projectId: string) =>
+    adminFetch<CertWatchDomain[]>(`/projects/${projectId}/cert-monitor/domains`),
+
+  addCertWatchDomain: (projectId: string, domain: string) =>
+    adminFetch<{ id: string; domain: string }>(
+      `/projects/${projectId}/cert-monitor/domains`,
+      { body: JSON.stringify({ domain }), method: 'POST' },
+    ),
+
+  deleteCertWatchDomain: (projectId: string, watchId: string) =>
+    adminFetch<null>(`/projects/${projectId}/cert-monitor/domains/${watchId}`, {
+      method: 'DELETE',
+    }),
+
+  /** v0.8.4 — recent CT observations across the project. */
+  listCertObservations: (projectId: string) =>
+    adminFetch<CertObservation[]>(`/projects/${projectId}/cert-monitor/observations`),
+
   /** v0.8.3 — recent points for a metric (defaults to last 24h). */
   listMetrics: (projectId: string, params: { limit?: number; name?: string; since?: string }) => {
     const usp = new URLSearchParams()
@@ -618,6 +637,25 @@ export type FrameSource = {
   column: number
   file: string
   line: number
+}
+
+// v0.8.4 — CT monitor shapes.
+export type CertWatchDomain = {
+  createdAt: string
+  domain: string
+  id: string
+}
+
+export type CertObservation = {
+  certId: number
+  commonName: null | string
+  domain: string
+  firstSeen: string
+  id: string
+  issuerName: string
+  nameValue: null | string
+  notAfter: string
+  notBefore: string
 }
 
 // v0.8.3 — custom metric shapes.

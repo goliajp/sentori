@@ -2,6 +2,7 @@ import type { ComponentType } from 'react'
 
 import { AlertsView } from './alerts/view'
 import { AuditLogView } from './audit/view'
+import { CertMonitorView } from './cert-monitor/view'
 import { IntegrationsView } from './integrations/view'
 import { IssueDetailView } from './issues/detail-view'
 import { IssuesView } from './issues/view'
@@ -71,6 +72,15 @@ export const MODULES: ModuleDef[] = [
     label: 'Metrics',
     path: 'metrics',
     view: MetricsView,
+  },
+  {
+    group: 'monitor',
+    // shield-with-check, security glyph
+    iconPath: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4',
+    id: 'cert-monitor',
+    label: 'Cert monitor',
+    path: 'cert-monitor',
+    view: CertMonitorView,
   },
   {
     group: 'monitor',

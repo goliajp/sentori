@@ -129,6 +129,15 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("digest cron spawned (1h interval)");
     }
 
+    // v0.8.4: cert-transparency monitor. Every 10m polls crt.sh for
+    // each watched domain; new observations land in cert_observations
+    // and fan out a notification email to the project's recipient
+    // list. Only spawn when both the db and the notifier are wired.
+    if let (Some(p), Some(tx)) = (pool.as_ref(), notifier_tx.as_ref()) {
+        sentori_server::cert_monitor::spawn(p.clone(), tx.clone());
+        tracing::info!("cert-monitor spawned (10m interval)");
+    }
+
     // Phase 29 sub-B: webhook persistent retry queue dispatcher.
     // notifier::AlertFired enqueues into webhook_deliveries; this task
     // sweeps pending rows every 30s and applies the retry schedule.

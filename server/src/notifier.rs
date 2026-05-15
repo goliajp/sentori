@@ -106,6 +106,20 @@ pub enum NotifyEvent {
         summary_lines: Vec<String>,
         window_hours: u32,
     },
+    /// v0.8.4 — cert-monitor saw a never-before-observed certificate
+    /// issued for a watched domain. Recipients are the project's
+    /// notification list (same set as NewIssue). One email per
+    /// observation; rate-limiting / digesting is deferred until a
+    /// customer hits noisy LE renewal volume.
+    CertObserved {
+        project_id: Uuid,
+        domain: String,
+        cert_id: i64,
+        common_name: Option<String>,
+        issuer_name: String,
+        not_before: time::OffsetDateTime,
+        not_after: time::OffsetDateTime,
+    },
 }
 
 /// Spawn the notifier loop. Returns a sender producers can use to enqueue
@@ -566,6 +580,69 @@ async fn handle(
                 tracing::warn!(error = %e, %to, "send digest email failed");
             } else {
                 tracing::info!(%to, %frequency, "digest email sent");
+            }
+            Ok(())
+        }
+        NotifyEvent::CertObserved {
+            project_id,
+            domain,
+            cert_id,
+            common_name,
+            issuer_name,
+            not_before,
+            not_after,
+        } => {
+            // v0.8.4 — recipients are the project's NewIssue list (a
+            // cert popping up on your domain is at least as urgent as
+            // a new issue). We can split this into its own column on
+            // notification_recipients once a customer asks for
+            // per-feature opt-in granularity.
+            let recipients: Vec<String> = sqlx::query_scalar(
+                "SELECT email FROM notification_recipients \
+                 WHERE project_id = $1 AND on_new_issue = TRUE",
+            )
+            .bind(project_id)
+            .fetch_all(pool)
+            .await
+            .context("fetch cert-monitor recipients")?;
+            if recipients.is_empty() {
+                return Ok(());
+            }
+            let transport = build_transport(cfg)?;
+            let from: Mailbox = cfg.from.parse().context("parse from address")?;
+            let cn_line = common_name
+                .as_deref()
+                .map(|c| format!("Common name: {c}\n"))
+                .unwrap_or_default();
+            let body = format!(
+                "A new certificate has been observed on the public CT logs for a domain you're \
+                 monitoring with Sentori.\n\n\
+                 Domain watched: {domain}\n\
+                 {cn_line}\
+                 Issuer: {issuer_name}\n\
+                 Valid: {not_before} → {not_after}\n\
+                 crt.sh id: {cert_id} (https://crt.sh/?id={cert_id})\n\n\
+                 If you didn't expect this certificate, investigate immediately: \
+                 someone may have obtained a certificate for your domain.\n\n\
+                 — Sentori cert monitor"
+            );
+            for email in recipients {
+                let to: Mailbox = match email.parse() {
+                    Ok(m) => m,
+                    Err(e) => {
+                        tracing::warn!(error = %e, %email, "skip invalid cert-monitor recipient");
+                        continue;
+                    }
+                };
+                let msg = Message::builder()
+                    .from(from.clone())
+                    .to(to)
+                    .subject(format!("[Sentori] New cert observed for {domain}"))
+                    .body(body.clone())
+                    .context("build cert-monitor message")?;
+                if let Err(e) = transport.send(msg).await {
+                    tracing::warn!(error = %e, %email, "send cert-monitor email failed");
+                }
             }
             Ok(())
         }

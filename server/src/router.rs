@@ -185,6 +185,19 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/metric-names",
             get(api::metrics::list_metric_names),
         )
+        // v0.8.4 — cert-monitor watchlist + observations.
+        .route(
+            "/projects/{project_id}/cert-monitor/domains",
+            get(api::cert_monitor::list_domains).post(api::cert_monitor::add_domain),
+        )
+        .route(
+            "/projects/{project_id}/cert-monitor/domains/{watch_id}",
+            axum::routing::delete(api::cert_monitor::delete_domain),
+        )
+        .route(
+            "/projects/{project_id}/cert-monitor/observations",
+            get(api::cert_monitor::list_observations),
+        )
         .route(
             "/projects/{project_id}/traces/{trace_id}",
             get(api::traces::trace_detail),

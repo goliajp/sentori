@@ -1,6 +1,7 @@
 pub mod api;
 pub mod attachments;
 pub mod audit;
+pub mod cert_monitor;
 pub mod integrations;
 pub mod auth;
 pub mod db;
