@@ -426,7 +426,19 @@ function StackTab({
             'app.version': payload.app.version,
             'device.os': payload.device.os,
             'device.osVersion': payload.device.osVersion,
+            ...(payload.device.model ? { 'device.model': payload.device.model } : {}),
+            ...(payload.device.locale ? { 'device.locale': payload.device.locale } : {}),
+            ...(payload.device.networkType
+              ? { 'device.networkType': payload.device.networkType }
+              : {}),
             environment: payload.environment,
+            ...(payload.geo
+              ? {
+                  geo: [payload.geo.country, payload.geo.region, payload.geo.city]
+                    .filter(Boolean)
+                    .join(' · '),
+                }
+              : {}),
             platform: payload.platform,
             release: payload.release,
             'user.id': payload.user?.id ?? '(anonymous)',

@@ -141,12 +141,23 @@ export type ServerEvent = {
   device: {
     locale?: string
     model?: string
+    /** v0.8.0-c — `wifi` / `4g` / `3g` / `2g` / `slow-2g` / `offline`
+     *  / `unknown`. Free-form string on the wire to allow forward-
+     *  compat values (e.g. `5g`) without a schema bump. */
+    networkType?: string
     os: string
     osVersion: string
   }
   environment: string
   error: SentoriError
   fingerprint: string[]
+  /** v0.8.0-d — server-set from GeoIP lookup on client IP. Absent
+   *  when the operator hasn't configured a db or IP isn't resolvable. */
+  geo?: {
+    city?: string
+    country: string
+    region?: string
+  }
   id: string
   kind: 'anr' | 'error'
   platform: 'android' | 'ios' | 'javascript'
