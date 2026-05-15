@@ -55,6 +55,22 @@ export function startNetworkTypeWatch(): void {
   if (_started) return;
   _started = true;
   try {
+    // v0.8.4 hotfix — when the host has `@react-native-community/netinfo`
+    // in package.json but the *native* module isn't linked (Expo Go,
+    // pod install never ran, RN autolink turned off, etc.) the JS
+    // package still imports fine but calling addEventListener throws
+    // "NativeModule.RNCNetInfo is null" from inside the lib's async
+    // emitter — past where this try/catch can reach. Gate on the
+    // NativeModules entry first so we no-op cleanly in that case.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const RN = require('react-native') as {
+      NativeModules?: Record<string, unknown>;
+    };
+    const native = RN.NativeModules?.RNCNetInfo;
+    if (native == null) {
+      // JS package present but native module isn't linked. Skip.
+      return;
+    }
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mod = require('@react-native-community/netinfo') as NetInfoModule;
     const add = mod.addEventListener ?? mod.default?.addEventListener;
@@ -63,7 +79,7 @@ export function startNetworkTypeWatch(): void {
       _cached = mapState(state);
     });
   } catch {
-    // not installed — leave cache undefined
+    // not installed / linked / something else broke — leave cache undefined
   }
 }
 
