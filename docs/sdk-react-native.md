@@ -152,12 +152,105 @@ npx @goliapkg/sentori-cli react-native upload \
 matching events at ingest and groups the issue on the original-source
 frame. Full CI / EAS recipe: docs → Recipes → "Source map upload".
 
+## Native debug symbols
+
+Native crashes (iOS `NSException`, Android `Thread.UncaughtExceptionHandler`)
+arrive with raw frame addresses. To get readable `file:line:function`
+in the dashboard — the same `<FrameSourceDrawer>` experience JS
+frames get — upload your build's debug-symbol artifact:
+
+| platform | artifact          | command                                 |
+| -------- | ----------------- | --------------------------------------- |
+| iOS      | `Foo.dSYM` bundle | `sentori-cli upload dsym <path>`        |
+| Android  | `mapping.txt`     | `sentori-cli upload mapping <path>`     |
+
+### iOS dSYM
+
+The CLI walks the `.dSYM` bundle, enumerates each Mach-O slice via
+`dwarfdump --uuid`, and uploads them all. Run it after each release
+build (Xcode Archive / EAS build):
+
+```bash
+npx @goliapkg/sentori-cli upload dsym \
+  --project "$SENTORI_PROJECT_ID" \
+  --token "$SENTORI_ADMIN_TOKEN" \
+  --release "myapp@1.2.3+456" \
+  ./build/MyApp.dSYM
+```
+
+`--release` must equal `init({ release })` exactly. In Linux CI
+where `dwarfdump` isn't available, pass `--debug-id <uuid> --arch
+arm64` and the CLI uploads a single slice instead of auto-discovering.
+
+#### Xcode Run Script (auto-upload after Archive)
+
+Drop this as a Run Script build phase **after** "Embed Pods Frameworks":
+
+```bash
+# Sentori dSYM auto-upload
+if [ "$CONFIGURATION" != "Release" ]; then exit 0; fi
+export SENTORI_PROJECT_ID="<project-uuid>"
+export SENTORI_ADMIN_TOKEN="<admin-token>"   # store in a .env, not in git
+RELEASE="${PRODUCT_BUNDLE_IDENTIFIER}@${MARKETING_VERSION}+${CURRENT_PROJECT_VERSION}"
+find "${DWARF_DSYM_FOLDER_PATH}" -name "*.dSYM" -maxdepth 2 | while read dsym; do
+  npx -y @goliapkg/sentori-cli upload dsym \
+    --project "$SENTORI_PROJECT_ID" \
+    --token "$SENTORI_ADMIN_TOKEN" \
+    --release "$RELEASE" \
+    "$dsym"
+done
+```
+
+### Android ProGuard / R8
+
+After `assembleRelease` (or your prod variant), upload `mapping.txt`:
+
+```bash
+npx @goliapkg/sentori-cli upload mapping \
+  --project "$SENTORI_PROJECT_ID" \
+  --token "$SENTORI_ADMIN_TOKEN" \
+  --release "myapp@1.2.3+456" \
+  android/app/build/outputs/mapping/release/mapping.txt
+```
+
+If the mapping file starts with the R8 `# pg_map_id:` line the
+server sniffs the debug-id from it; otherwise pass it explicitly
+with `--debug-id`.
+
+#### Gradle hook (auto-upload after assembleRelease)
+
+Add to `android/app/build.gradle`:
+
+```gradle
+afterEvaluate {
+  tasks.matching { it.name == 'assembleRelease' }.all { releaseTask ->
+    releaseTask.finalizedBy(tasks.register("sentoriUploadMapping", Exec) {
+      workingDir rootProject.projectDir
+      def release = "${android.defaultConfig.applicationId}@${android.defaultConfig.versionName}+${android.defaultConfig.versionCode}"
+      commandLine 'npx', '-y', '@goliapkg/sentori-cli', 'upload', 'mapping',
+        '--project', System.getenv('SENTORI_PROJECT_ID'),
+        '--token',   System.getenv('SENTORI_ADMIN_TOKEN'),
+        '--release', release,
+        "${buildDir}/outputs/mapping/release/mapping.txt"
+    })
+  }
+}
+```
+
+### When it didn't symbolicate
+
+The dashboard issue detail shows `releaseHasMap: true|false` on
+each event. If `true` but frames are still raw, the upload's
+`--release` doesn't match the SDK's `init({ release })` for that
+build, or the dSYM debug-id doesn't match this build's binary
+(common when a CI run re-builds with the same version string but
+a new arch slice). Server log greps for `symbolicate` to confirm.
+
 ## Screenshot capture (opt-in)
 
-Phase 42 sub-D — when `captureException` fires, the SDK can grab a
-screenshot of the current screen, ship it to the server, and surface
-it in the issue's "Captured at error" gallery. Off by default; flip
-it on in `init`:
+When `captureException` fires the SDK can grab a screenshot of the
+current screen and ship it as an attachment on the error event. Off
+by default; flip it on in `init`:
 
 ```ts
 sentori.init({
@@ -167,15 +260,9 @@ sentori.init({
 })
 ```
 
-Requirements:
-
-```sh
-bun add react-native-view-shot
-```
-
-`react-native-view-shot` is declared as an **optional** peer
-dependency — apps that don't enable screenshots never have to
-install it.
+Since v0.7.3 the capture goes through the SDK's own native module
+(iOS `UIGraphicsImageRenderer`, Android `PixelCopy`). No peer dep
+to install — `react-native-view-shot` was dropped in 0.7.3.
 
 ### Per-call override
 
@@ -188,42 +275,64 @@ screens you'd rather not snapshot at all.
 
 ### Redacting sensitive UI
 
-Two redaction paths, depending on whether you own the view tree:
+The SDK exposes a single hook — `registerMaskQuery` — and lets the
+host app own the registry of regions to black out. The pattern in
+your code base (lives outside the SDK, never imports from it):
 
 ```tsx
-import { MaskRegion } from '@goliapkg/sentori-react-native'
+// app/src/observability/mask.tsx
+import { useEffect, useRef } from 'react'
+import { View, type ViewProps } from 'react-native'
 
-// Declarative: wrap any subtree that contains PII.
-<MaskRegion>
-  <CreditCardForm />
-</MaskRegion>
+const registry = new Set<string>()
+export const getMaskedNativeIds = (): string[] => Array.from(registry)
 
-// Imperative: third-party views you can't wrap.
-import { setMaskedNode, unsetMaskedNode } from '@goliapkg/sentori-react-native'
-const videoRef = useRef<VideoComponent>(null)
-useEffect(() => {
-  setMaskedNode(videoRef.current)
-  return () => unsetMaskedNode(videoRef.current)
-}, [])
+export function Maskable({ children, ...rest }: ViewProps & { children?: React.ReactNode }) {
+  const idRef = useRef(`mask-${Math.random().toString(36).slice(2, 10)}`)
+  useEffect(() => {
+    const id = idRef.current
+    registry.add(id)
+    return () => { registry.delete(id) }
+  }, [])
+  return (
+    <View collapsable={false} nativeID={idRef.current} {...rest}>
+      {children}
+    </View>
+  )
+}
 ```
 
-The native iOS / Android screenshotters in sub-E / sub-F consult
-the masked-node table before drawing. On the JS side, the
-`react-native-view-shot` library doesn't expose a "redact these
-rects" hook directly — wrap `<MaskRegion>` around the actual
-content you want hidden and paint it black yourself if you need
-absolute guarantees today.
+Wire it once at boot, next to `initSentori`:
+
+```ts
+import { sentori } from '@goliapkg/sentori-react-native'
+import { getMaskedNativeIds } from '@/observability/mask'
+
+sentori.registerMaskQuery(getMaskedNativeIds)
+```
+
+Then any PII surface uses `<Maskable>` — no SDK import in the UI:
+
+```tsx
+<Maskable><Text>{user.email}</Text></Maskable>
+<Maskable className="absolute inset-0"><CameraPreview /></Maskable>
+```
+
+At capture time the SDK calls the query once, walks the native
+view tree by `nativeID` (iOS `accessibilityIdentifier`, Android
+`view.tag`), and paints a black rectangle over each match on the
+captured bitmap. No live-UI flicker — the redaction is on the
+off-screen image.
 
 ### Performance
 
-The capture path yields the JS thread twice before invoking the
-native screenshotter (`InteractionManager.runAfterInteractions` →
-`requestAnimationFrame`) so it never extends the active gesture or
-animation by a frame. The resulting image is capped to **480 px
-on the long edge** at **JPEG q=70** — typical payload 50-100 KB
-under the server's 500 KB hard limit. A **1.5 s timeout** silently
-gives up if the capture or the upload stalls; the error event
-still ships without a thumbnail.
+The capture yields one `requestAnimationFrame` paint before
+asking the OS to snapshot, so post-error UI state has committed.
+Output: 480 px on the long edge, JPEG q=70 (iOS) or WEBP_LOSSY
+q=70 (Android 11+) / JPEG q=70 (Android 7-10). Typical payload
+30-100 KB, well under the server's 500 KB hard limit. On any
+failure (no key window, render rejected, timeout) the function
+returns null silently — the error event still ships.
 
 ### Session budget
 
