@@ -171,6 +171,15 @@ async fn main() -> anyhow::Result<()> {
             _ => None,
         };
 
+    // v0.8.0-d — optional GeoIP db. Operator points
+    // `SENTORI_GEOIP_DB_PATH` at a `.mmdb` (DB-IP Lite Country by
+    // default; switch to GeoLite2 City for richer dimensions).
+    // Missing / unreadable: server runs without enrichment.
+    let geoip_db_path = std::env::var("SENTORI_GEOIP_DB_PATH")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .map(std::path::PathBuf::from);
+
     let app = router::build(router::ServerConfig {
         dev_token: token,
         db: pool,
@@ -184,8 +193,17 @@ async fn main() -> anyhow::Result<()> {
         metrics: Some(metrics_handle),
         self_trace,
         attachments: Some(sentori_server::attachments::build_default_store()),
+        geoip_db_path,
     });
-    axum::serve(listener, app).await?;
+    // v0.8.0-d — pass the connecting peer's SocketAddr through to
+    // handlers so `ConnectInfo<SocketAddr>` extractors (geoip lookup,
+    // future audit log) get a real address instead of an `Extension`
+    // missing error.
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }

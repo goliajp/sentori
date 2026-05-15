@@ -68,6 +68,10 @@ pub struct AppState {
     /// back-pressure the ingest path. `Arc` shared so cloning AppState
     /// reuses the same channel.
     pub event_ticks: std::sync::Arc<tokio::sync::broadcast::Sender<EventTick>>,
+    /// v0.8.0-d — optional GeoIP reader. `None` when
+    /// `SENTORI_GEOIP_DB_PATH` isn't set or load failed; ingest just
+    /// skips enrichment in that case.
+    pub geoip: Option<crate::geoip::GeoIpReader>,
 }
 
 impl FromRef<AppState> for AuthState {

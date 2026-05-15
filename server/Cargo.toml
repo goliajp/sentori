@@ -49,6 +49,13 @@ object = { version = "0.36", default-features = false, features = ["read", "mach
 # `proguard` crate handles the full mapping format including R8's
 # inline-method expansion and synthesised line ranges.
 proguard = "5"
+# v0.8.0-d — GeoIP lookup at ingest time. `maxminddb` reads the
+# `.mmdb` binary format that MaxMind GeoLite2 + DB-IP Lite both ship
+# in. The reader is lock-free for reads, fits behind an Arc with no
+# wrapper. Default is the country-only DB-IP Lite (CC-BY 4.0, no
+# license key); operators can swap in GeoLite2 city without code
+# change by pointing `SENTORI_GEOIP_DB_PATH` at it.
+maxminddb = "0.24"
 lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1-rustls-tls"] }
 argon2 = "0.5"
 rand = "0.8"

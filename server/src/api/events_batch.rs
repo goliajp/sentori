@@ -1,6 +1,6 @@
 use axum::{
-    extract::{Extension, Json, State},
-    http::StatusCode,
+    extract::{ConnectInfo, Extension, Json, State},
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
@@ -40,6 +40,8 @@ pub struct BatchError {
 pub async fn handle(
     State(state): State<AppState>,
     Extension(caller): Extension<IngestCaller>,
+    ConnectInfo(peer): ConnectInfo<std::net::SocketAddr>,
+    headers: HeaderMap,
     Json(req): Json<BatchRequest>,
 ) -> impl IntoResponse {
     if req.events.len() > MAX_BATCH_EVENTS {
@@ -51,6 +53,13 @@ pub async fn handle(
     }
 
     let project_id = caller_project_id(&caller, &state);
+    // v0.8.0-d — one IP lookup per batch; every event in the batch
+    // came from the same client this round-trip, so spreading the
+    // db hit across the batch makes no sense.
+    let geo = state.geoip.as_ref().and_then(|reader| {
+        crate::geoip::client_ip_from_headers_or_peer(&headers, Some(peer.ip()))
+            .and_then(|ip| reader.lookup(ip))
+    });
     let mut accepted = 0u32;
     let mut rejected = 0u32;
     let mut errors = Vec::new();
@@ -59,6 +68,7 @@ pub async fn handle(
         match serde_json::from_value::<Event>(raw) {
             Ok(mut event) => match event.validate() {
                 Ok(()) => {
+                    event.geo = geo.clone();
                     if !batch_quota_allows(&state, &caller).await {
                         rejected += 1;
                         errors.push(BatchError {

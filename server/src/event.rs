@@ -63,6 +63,32 @@ pub struct Event {
     /// Other fields are echoed back to the dashboard for display.
     #[serde(default)]
     pub attachments: Vec<AttachmentRef>,
+
+    /// v0.8.0-d — server-set during ingest from a GeoIP lookup on the
+    /// client's IP (parsed from `x-forwarded-for` or the peer addr).
+    /// Clients never send this — the field is ignored on the wire if
+    /// it arrives in the request body and overwritten before persist.
+    /// `None` when the lookup db isn't configured or the IP isn't
+    /// resolvable (private range, localhost during dev).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub geo: Option<Geo>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Geo {
+    /// ISO 3166-1 alpha-2 country code, uppercase (`JP`, `US`, ...).
+    pub country: String,
+    /// ISO 3166-2 subdivision code without the country prefix (`13`
+    /// for Tokyo when country is JP, `CA` for California when US),
+    /// or `None` if the lookup db doesn't have subdivision data
+    /// (DB-IP Lite IP-to-Country is country-only — region populates
+    /// only when the operator switches to a city-grade db).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
+    /// City name, only present on a city-grade db.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub city: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -130,6 +156,15 @@ pub struct Device {
     #[serde(default)]
     #[validate(length(max = 32))]
     pub locale: Option<String>,
+
+    /// v0.8.0-c — effective network class at capture time. JS SDKs
+    /// fill this from `navigator.connection.effectiveType`; RN SDK
+    /// caches the latest `@react-native-community/netinfo` state.
+    /// Free-form short string (`wifi`, `4g`, `offline`, ...). Server
+    /// trusts the client value; dashboard reads it as a tag.
+    #[serde(default)]
+    #[validate(length(max = 16))]
+    pub network_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]

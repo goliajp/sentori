@@ -1,6 +1,6 @@
 use axum::{
-    extract::{Extension, Json, State},
-    http::StatusCode,
+    extract::{ConnectInfo, Extension, Json, State},
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 use serde_json::json;
@@ -18,6 +18,8 @@ use crate::recent::AppState;
 pub async fn handle(
     State(state): State<AppState>,
     Extension(caller): Extension<IngestCaller>,
+    ConnectInfo(peer): ConnectInfo<std::net::SocketAddr>,
+    headers: HeaderMap,
     Json(mut event): Json<Event>,
 ) -> Result<Response, AppError> {
     let started = std::time::Instant::now();
@@ -25,6 +27,20 @@ pub async fn handle(
         m::ingest_rejected();
         AppError::Validation(e)
     })?;
+
+    // v0.8.0-d — overwrite any client-supplied `geo` with the
+    // server's own lookup. Trust boundary: location is something
+    // the client *can't* prove, so the server is the source of truth.
+    // Lookup is skipped (event.geo stays None) when the db isn't
+    // loaded or the client is on a private range.
+    event.geo = None;
+    if let Some(reader) = &state.geoip {
+        if let Some(ip) = crate::geoip::client_ip_from_headers_or_peer(&headers, Some(peer.ip())) {
+            if let Some(g) = reader.lookup(ip) {
+                event.geo = Some(g);
+            }
+        }
+    }
 
     let project_id = caller_project_id(&caller, &state);
 

@@ -43,6 +43,9 @@ pub struct ServerConfig {
     /// Phase 42 sub-C.02: attachment backing store. `Default` puts
     /// a `NoopAttachmentStore` here so tests don't need to wire it.
     pub attachments: Option<crate::attachments::SharedAttachmentStore>,
+    /// v0.8.0-d — GeoIP DB path (env `SENTORI_GEOIP_DB_PATH`).
+    /// `None` skips enrichment; tests don't need to load a real db.
+    pub geoip_db_path: Option<std::path::PathBuf>,
 }
 
 pub fn build(cfg: ServerConfig) -> Router {
@@ -55,6 +58,20 @@ pub fn build(cfg: ServerConfig) -> Router {
     // 128 covers a 1-2s burst at typical dev-time rates.
     let (event_ticks_tx, _) =
         tokio::sync::broadcast::channel::<crate::recent::EventTick>(128);
+    // v0.8.0-d — load the optional GeoIP db once at startup. Load
+    // failure is non-fatal: log and run without enrichment.
+    let geoip = cfg.geoip_db_path.as_ref().and_then(|p| {
+        match crate::geoip::GeoIpReader::load(p) {
+            Ok(r) => {
+                tracing::info!(path = %p.display(), "geoip db loaded");
+                Some(r)
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, path = %p.display(), "geoip db load failed; running without enrichment");
+                None
+            }
+        }
+    });
     let state = AppState {
         auth: auth_state.clone(),
         recent,
@@ -70,6 +87,7 @@ pub fn build(cfg: ServerConfig) -> Router {
             .attachments
             .unwrap_or_else(|| std::sync::Arc::new(crate::attachments::NoopAttachmentStore)),
         event_ticks: std::sync::Arc::new(event_ticks_tx),
+        geoip,
     };
 
     let ingestion = Router::new()

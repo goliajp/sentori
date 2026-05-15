@@ -7,6 +7,7 @@ pub mod db;
 pub mod digest;
 pub mod error;
 pub mod event;
+pub mod geoip;
 pub mod grouping;
 pub mod issues;
 pub mod metrics;
