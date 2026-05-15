@@ -180,14 +180,24 @@ async fn main() -> anyhow::Result<()> {
             _ => None,
         };
 
-    // v0.8.0-d — optional GeoIP db. Operator points
-    // `SENTORI_GEOIP_DB_PATH` at a `.mmdb` (DB-IP Lite Country by
-    // default; switch to GeoLite2 City for richer dimensions).
-    // Missing / unreadable: server runs without enrichment.
-    let geoip_db_path = std::env::var("SENTORI_GEOIP_DB_PATH")
-        .ok()
-        .filter(|s| !s.is_empty())
-        .map(std::path::PathBuf::from);
+    // v0.8.0-d — GeoIP db. The docker image bundles DB-IP Lite at
+    // `/app/data/geo.mmdb` (Dockerfile.server fetches at build time),
+    // so the default works out of the box with no operator config.
+    // `SENTORI_GEOIP_DB_PATH` overrides — point at GeoLite2 City for
+    // region + city precision, or unset to disable enrichment for
+    // tests. Missing / unreadable file is non-fatal; server runs
+    // without enrichment and logs a warning at startup.
+    let geoip_db_path = match std::env::var("SENTORI_GEOIP_DB_PATH") {
+        Ok(s) if !s.is_empty() => Some(std::path::PathBuf::from(s)),
+        _ => {
+            let default = std::path::PathBuf::from("/app/data/geo.mmdb");
+            if default.exists() {
+                Some(default)
+            } else {
+                None
+            }
+        }
+    };
 
     let app = router::build(router::ServerConfig {
         dev_token: token,
