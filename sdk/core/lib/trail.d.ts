@@ -28,10 +28,13 @@ export type TrailStep = {
     ts: number;
     /** Short human-readable label for the step (route name, action). */
     label: string;
-    /** Optional pointer into the breadcrumb buffer (already on event). */
+    /** Optional pointer into the breadcrumb buffer (already on event).
+     *  `data` is for small structured payloads (e.g. screen dwell ms,
+     *  feature-flag values at the step time). Server caps it at 4 KB. */
     breadcrumb?: {
         type: string;
         message: string;
+        data?: Record<string, unknown>;
     };
     /** Optional viewTree attachment ref (uploaded separately). */
     viewTreeRef?: string;

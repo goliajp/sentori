@@ -1,4 +1,4 @@
-export type { App, AttachmentKind, AttachmentMeta, AttachmentSource, Breadcrumb, BreadcrumbType, CaptureExtras, CommonInitOptions, Device, DeviceOS, Event, EventKind, Frame, Platform, SamplingConfig, SentoriError, Span, SpanStatus, Tags, User, } from './types.js';
+export type { App, AttachmentKind, AttachmentMeta, AttachmentSource, Breadcrumb, BreadcrumbType, CaptureExtras, CommonInitOptions, Device, DeviceOS, Event, EventKind, Frame, Geo, Platform, SamplingConfig, SentoriError, Span, SpanStatus, Tags, User, } from './types.js';
 export { coerceError } from './coerce-error.js';
 export { shouldSample, shouldSampleTrace } from './sampling.js';
 export { uuidV7 } from './uuid.js';

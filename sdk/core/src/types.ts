@@ -31,6 +31,11 @@ export type Event = {
   environment: string
   error: SentoriError
   fingerprint?: string[]
+  /** v0.8.0-d — server-set from a GeoIP lookup on the client's IP.
+   *  Clients never set this; the server overwrites any incoming
+   *  value before persist. `undefined` when the operator hasn't
+   *  configured a db or the IP isn't resolvable (private range). */
+  geo?: Geo
   id: string
   kind: EventKind
   platform: Platform
@@ -40,6 +45,15 @@ export type Event = {
   timestamp: string
   traceId?: null | string
   user?: null | User
+}
+
+export type Geo = {
+  /** ISO 3166-1 alpha-2, uppercase. */
+  country: string
+  /** ISO 3166-2 subdivision (no country prefix). City-grade db only. */
+  region?: string
+  /** Localised English city name. City-grade db only. */
+  city?: string
 }
 
 /**
@@ -70,6 +84,12 @@ export type AttachmentMeta = {
 export type Device = {
   locale?: string
   model?: string
+  /** v0.8.0-c — effective connection class at capture time.
+   *  Web: `navigator.connection.effectiveType` (Network Information
+   *  API, Chrome / Edge / Safari Tech). RN: `@react-native-community/netinfo`
+   *  if installed (NetInfo's `details.cellularGeneration` mapped to the
+   *  same enum). `undefined` when not available. */
+  networkType?: '2g' | '3g' | '4g' | 'offline' | 'slow-2g' | 'unknown' | 'wifi'
   os: DeviceOS
   osVersion: string
 }

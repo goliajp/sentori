@@ -12,6 +12,7 @@ export type {
   Event,
   EventKind,
   Frame,
+  Geo,
   Platform,
   SamplingConfig,
   SentoriError,

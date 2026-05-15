@@ -4,6 +4,7 @@ import { installLifecycleHandler } from './handlers/lifecycle';
 import { installPromiseHandler } from './handlers/promise';
 import { installNetworkHandler } from './handlers/network';
 import { drainNativePending, setNativeConfig } from './native';
+import { startNetworkTypeWatch } from './netinfo';
 import { startSession } from './session-tracker';
 import {
   drainOfflineQueue,
@@ -95,6 +96,10 @@ export const init = (options: InitOptions): void => {
   });
 
   startTransport();
+  // v0.8.0-c — start watching network class. No-op if NetInfo isn't
+  // installed; events just won't carry `device.networkType` in that
+  // case.
+  startNetworkTypeWatch();
 
   const capture = options.capture ?? {};
   if (capture.globalErrors !== false) installGlobalHandler();

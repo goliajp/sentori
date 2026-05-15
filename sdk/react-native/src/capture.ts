@@ -9,6 +9,7 @@ import { parseStack } from './stack';
 import { getTrailBuffer } from './trail';
 import { enqueue, uploadAttachment } from './transport';
 import { uuidV7 } from './uuid';
+import { getCachedNetworkType } from './netinfo';
 import type { App, AttachmentMeta, Device, Event, SentoriError, Tags, User } from './types';
 
 export { captureStep, __resetTrailForTests } from './trail';
@@ -214,17 +215,41 @@ const errorToObject = (error: Error): SentoriError => {
 const collectDevice = (): Device => {
   let os: Device['os'] = 'other';
   let osVersion = '0';
+  let locale: string | undefined;
+  const networkType = getCachedNetworkType();
   try {
     const RN = require('react-native') as {
+      NativeModules: {
+        I18nManager?: { localeIdentifier?: string };
+        SettingsManager?: {
+          settings?: { AppleLanguages?: string[]; AppleLocale?: string };
+        };
+      };
       Platform: { OS: string; Version: string | number };
     };
     const rnOS = RN.Platform.OS;
     os = rnOS === 'ios' || rnOS === 'android' || rnOS === 'web' ? rnOS : 'other';
     osVersion = String(RN.Platform.Version);
+    // v0.8.0-a — RN reads user locale through native modules. These
+    // are stable RN-internal modules (SettingsManager since 0.4,
+    // I18nManager since 0.16) so we can read them directly without
+    // an extra peer dep. iOS returns e.g. "en_US"; Android returns
+    // e.g. "en_US" via `getDefault().toString()`. `AppleLocale` is
+    // the format the user picked in Settings; `AppleLanguages[0]`
+    // is the resolved language priority — prefer the former.
+    if (rnOS === 'ios') {
+      const s = RN.NativeModules.SettingsManager?.settings;
+      locale = s?.AppleLocale ?? s?.AppleLanguages?.[0];
+    } else if (rnOS === 'android') {
+      locale = RN.NativeModules.I18nManager?.localeIdentifier;
+    }
   } catch {
     // not in RN runtime (jest, bun test)
   }
-  return { os, osVersion };
+  const device: Device = { os, osVersion };
+  if (locale) device.locale = locale;
+  if (networkType) device.networkType = networkType;
+  return device;
 };
 
 const collectApp = (release: string): App => {

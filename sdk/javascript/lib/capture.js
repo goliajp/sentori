@@ -113,9 +113,11 @@ function detectDevice() {
     // about the underlying OS family rides along in `model` instead.
     const w = globalThis.navigator;
     if (w?.userAgent) {
+        const networkType = detectNetworkType(w);
         return {
             locale: w.language,
             model: detectBrowserOs(w.userAgent),
+            ...(networkType ? { networkType } : {}),
             os: 'web',
             osVersion: '0',
         };
@@ -130,6 +132,24 @@ function detectDevice() {
         };
     }
     return { os: 'other', osVersion: '0' };
+}
+/** v0.8.0-c — Network Information API. Implemented in Chrome/Edge for
+ *  years, Safari Tech Preview, Firefox flagged-only. We use the
+ *  `effectiveType` field — it normalises wifi-vs-mobile reality
+ *  ("4g" doesn't always mean cellular, can be a fast wifi link).
+ *  `navigator.onLine === false` short-circuits to "offline" before
+ *  asking the connection API, which on some browsers returns a stale
+ *  type during early offline events. */
+function detectNetworkType(nav) {
+    if (nav.onLine === false)
+        return 'offline';
+    const eff = nav.connection?.effectiveType;
+    if (eff === '4g' || eff === '3g' || eff === '2g' || eff === 'slow-2g')
+        return eff;
+    const type = nav.connection?.type;
+    if (type === 'wifi')
+        return 'wifi';
+    return undefined;
 }
 function detectBrowserOs(ua) {
     if (ua.includes('Mac OS X') || ua.includes('Macintosh'))
