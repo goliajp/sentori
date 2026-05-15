@@ -13,6 +13,7 @@ pub mod events_stream;
 pub mod health;
 pub mod mappings;
 pub mod metrics;
+pub mod moments;
 pub mod orgs;
 pub mod projects;
 pub mod recent;

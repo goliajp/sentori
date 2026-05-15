@@ -1,5 +1,6 @@
-export type { App, AttachmentKind, AttachmentMeta, AttachmentSource, Breadcrumb, BreadcrumbType, CaptureExtras, CommonInitOptions, Device, DeviceOS, Event, EventKind, Frame, Geo, Platform, SamplingConfig, SentoriError, Span, SpanStatus, Tags, User, } from './types.js';
+export type { App, AttachmentKind, AttachmentMeta, AttachmentSource, Breadcrumb, BreadcrumbType, Bundle, CaptureExtras, CommonInitOptions, Device, DeviceOS, Event, EventKind, Frame, Geo, Platform, SamplingConfig, SentoriError, Span, SpanStatus, Tags, User, } from './types.js';
 export { coerceError } from './coerce-error.js';
+export { MomentHandle, type MomentProperties, type MomentStatus, startMoment, } from './moments.js';
 export { shouldSample, shouldSampleTrace } from './sampling.js';
 export { uuidV7 } from './uuid.js';
 export { BreadcrumbBuffer, addBreadcrumb, clearBreadcrumbs, getBreadcrumbs, } from './breadcrumbs.js';

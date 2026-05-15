@@ -444,8 +444,20 @@ function StackTab({
                     .join(' · '),
                 }
               : {}),
+            ...(payload.flags && Object.keys(payload.flags).length > 0
+              ? Object.fromEntries(
+                  Object.entries(payload.flags).map(([k, v]) => [`flag:${k}`, v])
+                )
+              : {}),
             platform: payload.platform,
             release: payload.release,
+            ...(payload.bundle
+              ? {
+                  bundle: payload.bundle.source
+                    ? `${payload.bundle.id} (${payload.bundle.source})`
+                    : payload.bundle.id,
+                }
+              : {}),
             'user.id': payload.user?.id ?? '(anonymous)',
           }}
         />

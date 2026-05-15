@@ -34,6 +34,13 @@ pub struct Event {
     #[serde(default)]
     pub tags: BTreeMap<String, String>,
 
+    /// v0.9.0 #13 — feature-flag state at capture. Distinct dimension
+    /// from `tags`; the dashboard can facet on these as "experiment
+    /// was active". Same string→string shape; length-capped at 200 to
+    /// match the SDK side.
+    #[serde(default)]
+    pub flags: BTreeMap<String, String>,
+
     #[serde(default)]
     pub breadcrumbs: Vec<Breadcrumb>,
 
@@ -72,6 +79,21 @@ pub struct Event {
     /// resolvable (private range, localhost during dev).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub geo: Option<Geo>,
+
+    /// v0.9.0 #10 — OTA bundle (Expo EAS / CodePush) currently loaded.
+    /// Distinct from `release` (which is the store binary).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bundle: Option<Bundle>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Bundle {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deployed_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

@@ -9,8 +9,17 @@ import {
   setUser,
 } from './capture';
 import { ErrorBoundary } from './error-boundary';
+import {
+  clearAllFeatureFlags,
+  clearFeatureFlag,
+  getFeatureFlags,
+  setFeatureFlag,
+} from './feature-flags';
 import { clearMaskQuery, registerMaskQuery } from './mask';
+import { measureFn } from './measure';
+import { startMoment } from '@goliapkg/sentori-core';
 import { flushMetrics, recordMetric } from './metrics';
+import { RageTapCapture } from './rage-tap';
 import {
   endSession,
   markSessionCrashed,
@@ -28,7 +37,14 @@ export const sentori = {
   sendUserFeedback,
   recordMetric,
   flushMetrics,
+  measureFn,
+  startMoment,
+  setFeatureFlag,
+  clearFeatureFlag,
+  clearAllFeatureFlags,
+  getFeatureFlags,
   ErrorBoundary,
+  RageTapCapture,
   registerMaskQuery,
   clearMaskQuery,
   startSession,
@@ -49,8 +65,17 @@ export {
   setUser,
 } from './capture';
 export { ErrorBoundary } from './error-boundary';
+export {
+  clearAllFeatureFlags,
+  clearFeatureFlag,
+  getFeatureFlags,
+  setFeatureFlag,
+} from './feature-flags';
 export { clearMaskQuery, registerMaskQuery } from './mask';
 export { flushMetrics, recordMetric } from './metrics';
+export { measureFn } from './measure';
+export { MomentHandle, type MomentProperties, startMoment } from '@goliapkg/sentori-core';
+export { RageTapCapture } from './rage-tap';
 export {
   startAnrWatchdog,
   stopAnrWatchdog,

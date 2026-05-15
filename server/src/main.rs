@@ -138,6 +138,14 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("cert-monitor spawned (10m interval)");
     }
 
+    // v0.9.0 #5: issue velocity alerter. Every 5m compares each issue's
+    // 30m count vs the prior 30m bucket; trips on ratio ≥ 3 with ≥ 20
+    // events absolute. Dedupes via velocity_state table.
+    if let (Some(p), Some(tx)) = (pool.as_ref(), notifier_tx.as_ref()) {
+        sentori_server::velocity::spawn_cron(p.clone(), tx.clone());
+        tracing::info!("velocity cron spawned (5m interval)");
+    }
+
     // Phase 29 sub-B: webhook persistent retry queue dispatcher.
     // notifier::AlertFired enqueues into webhook_deliveries; this task
     // sweeps pending rows every 30s and applies the retry schedule.

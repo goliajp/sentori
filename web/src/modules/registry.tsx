@@ -7,6 +7,7 @@ import { IntegrationsView } from './integrations/view'
 import { IssueDetailView } from './issues/detail-view'
 import { IssuesView } from './issues/view'
 import { MetricsView } from './metrics/view'
+import { MomentsView } from './moments/view'
 import { OverviewView } from './overview/view'
 import { ReleasesView } from './releases/view'
 import { SettingsView } from './settings/view'
@@ -72,6 +73,15 @@ export const MODULES: ModuleDef[] = [
     label: 'Metrics',
     path: 'metrics',
     view: MetricsView,
+  },
+  {
+    group: 'monitor',
+    // funnel glyph
+    iconPath: 'M3 3h18l-7 8v8l-4-2v-6L3 3z',
+    id: 'moments',
+    label: 'Moments',
+    path: 'moments',
+    view: MomentsView,
   },
   {
     group: 'monitor',

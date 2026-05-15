@@ -158,6 +158,12 @@ export type ServerEvent = {
     country: string
     region?: string
   }
+  /** v0.9.0 #10 — OTA bundle (EAS Update / CodePush) currently loaded. */
+  bundle?: {
+    deployedAt?: string
+    id: string
+    source?: string
+  }
   id: string
   kind: 'anr' | 'error'
   platform: 'android' | 'ios' | 'javascript'
@@ -168,6 +174,10 @@ export type ServerEvent = {
    *  outside it. Absent on old events. */
   symbolication?: { releaseHasMap: boolean }
   tags: Record<string, string>
+  /** v0.9.0 #13 — feature-flag state at capture time. Distinct from
+   *  tags: dashboard treats these as experiment dimensions. Absent
+   *  when no flags were set. */
+  flags?: Record<string, string>
   timestamp: string
   traceId: null | string
   user: null | { anonymous?: boolean; id?: string }
@@ -321,6 +331,15 @@ export const adminApi = {
    *  page's left rail. */
   listMetricNames: (projectId: string) =>
     adminFetch<MetricName[]>(`/projects/${projectId}/metric-names`),
+
+  /** v0.9.0 #6 — moments aggregation (last 7d) + samples per moment. */
+  listMoments: (projectId: string) =>
+    adminFetch<MomentRow[]>(`/projects/${projectId}/moments`),
+
+  listMomentSamples: (projectId: string, name: string) =>
+    adminFetch<MomentSample[]>(
+      `/projects/${projectId}/moments/${encodeURIComponent(name)}`,
+    ),
 
   /** v0.8.4 — cert-monitor watchlist. */
   listCertWatchDomains: (projectId: string) =>
@@ -656,6 +675,26 @@ export type CertObservation = {
   nameValue: null | string
   notAfter: string
   notBefore: string
+}
+
+// v0.9.0 #6 — Moments shapes.
+export type MomentRow = {
+  abandoned: number
+  count: number
+  failed: number
+  lastSeen: string
+  name: string
+  p50Ms: number
+  p95Ms: number
+}
+
+export type MomentSample = {
+  abandoned: boolean
+  durationMs: number
+  id: string
+  name: string
+  startedAt: string
+  status: string
 }
 
 // v0.8.3 — custom metric shapes.

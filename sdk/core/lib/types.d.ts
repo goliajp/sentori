@@ -29,6 +29,8 @@ export type Event = {
     environment: string;
     error: SentoriError;
     fingerprint?: string[];
+    /** v0.9.0 #10 — OTA bundle the JS was running off. */
+    bundle?: Bundle;
     /** v0.8.0-d — server-set from a GeoIP lookup on the client's IP.
      *  Clients never set this; the server overwrites any incoming
      *  value before persist. `undefined` when the operator hasn't
@@ -40,6 +42,12 @@ export type Event = {
     release: string;
     spanId?: null | string;
     tags?: Tags;
+    /** v0.9.0 #13 — feature-flag state at capture time. Distinct
+     *  dimension from `tags`: dashboard facets/filters on these as
+     *  "experiment was X, variant was Y". Same string→string shape,
+     *  separate field on the wire so the dashboard can treat them
+     *  differently. */
+    flags?: Record<string, string>;
     timestamp: string;
     traceId?: null | string;
     user?: null | User;
@@ -89,6 +97,18 @@ export type App = {
         version: string;
     };
     version: string;
+};
+/** v0.9.0 #10 — OTA bundle info. Identifies the JS bundle currently
+ *  loaded (vs the store binary, which is `app.version` / `release`).
+ *  Populated automatically when the host has `expo-updates` or
+ *  `react-native-code-push` installed; otherwise absent. */
+export type Bundle = {
+    /** Stable identifier — Expo updateId or CodePush label/hash. */
+    id: string;
+    /** When the bundle was published. RFC 3339. */
+    deployedAt?: string;
+    /** Which OTA system reported it. */
+    source?: 'codepush' | 'expo';
 };
 /** PII-minimal — matches the server schema. */
 export type User = {

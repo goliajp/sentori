@@ -1,7 +1,9 @@
 import { sealTrail, shouldSample } from '@goliapkg/sentori-core';
 
 import { addBreadcrumb, getBreadcrumbs } from './breadcrumbs';
+import { getBundleInfo } from './bundle-info';
 import { getConfig, isInitialized } from './config';
+import { getFeatureFlagSnapshot } from './feature-flags';
 import { symbolicateErrorViaMetro } from './handlers/dev-symbolicate';
 import { captureScreenshot } from './handlers/screenshot';
 import { markSessionErrored } from './session-tracker';
@@ -97,6 +99,8 @@ export const captureError = (error: Error, extras?: CaptureExtras): void => {
     return;
   }
 
+  const flags = getFeatureFlagSnapshot();
+  const bundle = getBundleInfo();
   const event: Event = {
     id: uuidV7(),
     timestamp: new Date().toISOString(),
@@ -108,6 +112,8 @@ export const captureError = (error: Error, extras?: CaptureExtras): void => {
     app: collectApp(config.release),
     user: extras?.user ?? _user,
     tags: extras?.tags,
+    ...(flags ? { flags } : {}),
+    ...(bundle ? { bundle } : {}),
     breadcrumbs: getBreadcrumbs(),
     error: errorToObject(error),
     fingerprint: extras?.fingerprint,

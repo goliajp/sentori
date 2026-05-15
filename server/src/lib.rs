@@ -18,6 +18,7 @@ pub mod quotas;
 pub mod regression;
 pub mod retention;
 pub mod rule_eval;
+pub mod velocity;
 pub mod rate_limit;
 pub mod recent;
 pub mod roles;

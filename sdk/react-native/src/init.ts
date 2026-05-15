@@ -3,6 +3,11 @@ import { installGlobalHandler } from './handlers/global';
 import { installLifecycleHandler } from './handlers/lifecycle';
 import { installPromiseHandler } from './handlers/promise';
 import { installNetworkHandler } from './handlers/network';
+import { getBundleInfo } from './bundle-info';
+import {
+  markLaunchCompleted,
+  runLaunchCrashGuard,
+} from './launch-crash-guard';
 import { startMetricsTimer } from './metrics';
 import { drainNativePending, setNativeConfig } from './native';
 import { startNetworkTypeWatch } from './netinfo';
@@ -30,7 +35,14 @@ export type InitOptions = {
   capture?: {
     globalErrors?: boolean;
     promiseRejections?: boolean;
-    network?: boolean;
+    network?:
+      | boolean
+      | {
+          /** v0.9.0 #11 — auto-extract GraphQL `operationName` from
+           *  POST request bodies and use it as the breadcrumb / span
+           *  name (instead of `POST /graphql`). Default `true`. */
+          graphql?: boolean;
+        };
     /** Session tracking: opens a session on init and on each
      *  foreground (`AppState` → `active`), ends it on background.
      *  Drives crash-free rate. Set `false` to opt out. */
@@ -49,6 +61,20 @@ export type InitOptions = {
      *  the buffer is sealed and uploaded as a `sessionTrail`
      *  attachment. Defaults to false. */
     sessionTrail?: boolean;
+    /** v0.9.0 #3 — launch-crash loop guard. When two consecutive
+     *  launches don't reach `markLaunchCompleted()` (typical of an
+     *  OTA update with a fatal bug), invoke the host callback with
+     *  a 200 ms timeout to decide rollback / reset / continue. */
+    launchCrashGuard?: {
+      enabled: boolean;
+      onLaunchCrashDetected?: (
+        info: import('./launch-crash-guard').LaunchCrashInfo,
+      ) =>
+        | import('./launch-crash-guard').LaunchCrashAction
+        | Promise<import('./launch-crash-guard').LaunchCrashAction>;
+      threshold?: number;
+      timeoutMs?: number;
+    };
   };
   /** Phase 44 sub-B: client-side sampling. Each rate is `[0, 1]`;
    *  absent / null keeps everything. Defaults to 1.0 for both
@@ -75,6 +101,19 @@ export const init = (options: InitOptions): void => {
   const env =
     options.environment ??
     (typeof __DEV__ !== 'undefined' && __DEV__ ? 'dev' : 'prod');
+
+  // v0.9.0 #3 — launch-crash guard. Fires *before* any other setup so
+  // a known-bad bundle can roll back instead of running JS that's
+  // about to die again. AsyncStorage-backed; if the host doesn't have
+  // it the guard is a no-op.
+  const lcg = options.capture?.launchCrashGuard;
+  if (lcg?.enabled) {
+    void runLaunchCrashGuard(
+      lcg,
+      options.release,
+      getBundleInfo()?.id ?? null,
+    );
+  }
 
   setConfig({
     token: options.token,
@@ -107,7 +146,10 @@ export const init = (options: InitOptions): void => {
   const capture = options.capture ?? {};
   if (capture.globalErrors !== false) installGlobalHandler();
   if (capture.promiseRejections !== false) installPromiseHandler();
-  if (capture.network !== false) installNetworkHandler();
+  if (capture.network !== false) {
+    const netOpts = typeof capture.network === 'object' ? capture.network : undefined;
+    installNetworkHandler({ graphql: netOpts?.graphql });
+  }
   if (capture.sessions !== false) {
     // Open the cold-start session now (RN doesn't fire an AppState
     // `change` for the initial `active` state), then bind AppState so
@@ -154,6 +196,16 @@ export const init = (options: InitOptions): void => {
     })
     .catch(() => {});
   drainOfflineQueue().catch(() => {});
+
+  // v0.9.0 #3 — init reached the end without throwing. Schedule the
+  // "launch completed" marker after one tick so any synchronous user
+  // code right after `init()` gets to run first; we want the marker to
+  // confirm the JS bridge stayed alive, not just that `init()` returned.
+  if (lcg?.enabled) {
+    setTimeout(() => {
+      void markLaunchCompleted(getBundleInfo()?.id ?? null);
+    }, 2_000);
+  }
 };
 
 /**

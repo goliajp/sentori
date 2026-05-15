@@ -106,6 +106,20 @@ pub enum NotifyEvent {
         summary_lines: Vec<String>,
         window_hours: u32,
     },
+    /// v0.9.0 #5 — issue velocity alert. Fired by the velocity cron
+    /// when an issue's 30m count tripled (warn) or quintupled (page)
+    /// vs the previous 30m bucket with ≥ 20 events absolute. Routes
+    /// to the project's NewIssue recipients.
+    IssueVelocity {
+        project_id: Uuid,
+        issue_id: Uuid,
+        error_type: String,
+        message_sample: String,
+        now_count: i64,
+        prev_count: i64,
+        ratio: f64,
+        level: String,
+    },
     /// v0.8.4 — cert-monitor saw a never-before-observed certificate
     /// issued for a watched domain. Recipients are the project's
     /// notification list (same set as NewIssue). One email per
@@ -580,6 +594,64 @@ async fn handle(
                 tracing::warn!(error = %e, %to, "send digest email failed");
             } else {
                 tracing::info!(%to, %frequency, "digest email sent");
+            }
+            Ok(())
+        }
+        NotifyEvent::IssueVelocity {
+            project_id,
+            issue_id,
+            error_type,
+            message_sample,
+            now_count,
+            prev_count,
+            ratio,
+            level,
+        } => {
+            let recipients: Vec<String> = sqlx::query_scalar(
+                "SELECT email FROM notification_recipients \
+                 WHERE project_id = $1 AND on_new_issue = TRUE",
+            )
+            .bind(project_id)
+            .fetch_all(pool)
+            .await
+            .context("fetch velocity recipients")?;
+            if recipients.is_empty() {
+                return Ok(());
+            }
+            let transport = build_transport(cfg)?;
+            let from: Mailbox = cfg.from.parse().context("parse from address")?;
+            let prefix = if level == "page" { "[PAGE]" } else { "[velocity]" };
+            let subject = format!(
+                "{prefix} Issue spike: {error_type} — {now_count} events in last 30m ({ratio:.1}×)"
+            );
+            let body = format!(
+                "Sentori detected a velocity spike on this issue:\n\n\
+                 Issue:    {error_type}\n\
+                 Sample:   {message_sample}\n\
+                 Now:      {now_count} events in last 30 min\n\
+                 Previous: {prev_count} events in the 30 min before that\n\
+                 Ratio:    {ratio:.2}× (threshold: warn 3×, page 5×)\n\
+                 Level:    {level}\n\
+                 Issue ID: {issue_id}\n\n\
+                 — Sentori velocity monitor"
+            );
+            for email in recipients {
+                let to: Mailbox = match email.parse() {
+                    Ok(m) => m,
+                    Err(e) => {
+                        tracing::warn!(error = %e, %email, "skip invalid velocity recipient");
+                        continue;
+                    }
+                };
+                let msg = Message::builder()
+                    .from(from.clone())
+                    .to(to)
+                    .subject(subject.clone())
+                    .body(body.clone())
+                    .context("build velocity message")?;
+                if let Err(e) = transport.send(msg).await {
+                    tracing::warn!(error = %e, %email, "send velocity email failed");
+                }
             }
             Ok(())
         }

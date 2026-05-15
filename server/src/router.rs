@@ -185,6 +185,15 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/metric-names",
             get(api::metrics::list_metric_names),
         )
+        // v0.9.0 #6 — moments aggregation + samples.
+        .route(
+            "/projects/{project_id}/moments",
+            get(api::moments::list_for_project),
+        )
+        .route(
+            "/projects/{project_id}/moments/{name}",
+            get(api::moments::list_samples),
+        )
         // v0.8.4 — cert-monitor watchlist + observations.
         .route(
             "/projects/{project_id}/cert-monitor/domains",

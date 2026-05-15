@@ -5,6 +5,7 @@ export type {
   AttachmentSource,
   Breadcrumb,
   BreadcrumbType,
+  Bundle,
   CaptureExtras,
   CommonInitOptions,
   Device,
@@ -23,6 +24,13 @@ export type {
 } from './types.js'
 
 export { coerceError } from './coerce-error.js'
+
+export {
+  MomentHandle,
+  type MomentProperties,
+  type MomentStatus,
+  startMoment,
+} from './moments.js'
 
 export { shouldSample, shouldSampleTrace } from './sampling.js'
 
