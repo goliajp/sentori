@@ -47,6 +47,9 @@ object SentoriCrashHandler {
         // foreground Activity so it knows which Window to PixelCopy.
         (appCtx as? android.app.Application)?.let {
             SentoriScreenshotCapture.register(it)
+            // v0.9.6 #2 — replay capture also tracks the activity for
+            // wireframe view-tree walks.
+            SentoriReplayCapture.register(it)
         }
     }
 

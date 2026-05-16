@@ -25,6 +25,11 @@ public class SentoriModule: Module {
             return SentoriNativeExceptionBridge.getRecentException()
         }
 
+        // v0.9.6 #2 — wireframe session replay capture.
+        Function("captureWireframe") { (maskedIds: [String]) -> String? in
+            return SentoriReplayCapture.captureWireframe(maskedIds: maskedIds)
+        }
+
         // v0.9.4 #1 — Mobile Vitals exposure.
         Function("markJsBridgeReady") {
             SentoriMobileVitals.markJsBridgeReady()

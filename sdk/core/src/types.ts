@@ -72,6 +72,7 @@ export type Geo = {
  */
 export type AttachmentKind =
   | 'logTail'
+  | 'replay'
   | 'screenshot'
   | 'sessionTrail'
   | 'stateSnapshot'

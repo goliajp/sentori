@@ -12,8 +12,10 @@ import { startMetricsTimer } from './metrics';
 import { drainNativePending, markNativeJsBridgeReady, setNativeConfig } from './native';
 import { getColdStartMs } from './mobile-vitals';
 import { startSpan } from '@goliapkg/sentori-core';
+import { startLongTaskMonitor } from './long-task-monitor';
 import { startNetworkTypeWatch } from './netinfo';
 import { startPreCrashSentinel, type PreCrashChannel } from './pre-crash-sentinel';
+import { startReplay } from './replay';
 import { startSession } from './session-tracker';
 import {
   drainOfflineQueue,
@@ -71,6 +73,17 @@ export type InitOptions = {
      *  signal before an actual crash. */
     preCrashSentinel?: boolean;
     sentinelChannels?: PreCrashChannel[];
+    /** v0.9.6 #4 — JS-thread long-task monitor. setInterval(50ms)
+     *  tick detects JS thread stalls ≥ 200ms (configurable) and
+     *  emits a `sentori.longtask` span. Pairs with
+     *  `preCrashSentinel` (slow frames < 32ms) to cover the
+     *  "JS thread is stuck" spectrum. */
+    longTaskMonitor?: boolean | { thresholdMs?: number };
+    /** v0.9.6 #2 — wireframe session replay. Native walks the iOS
+     *  UIView / Android View hierarchy at 1 Hz and serializes
+     *  visible nodes; captureException flushes the last 60 s as a
+     *  `replay` attachment. Set to `'wireframe'` to enable. */
+    replay?: 'off' | 'wireframe' | { hz?: number; mode: 'off' | 'wireframe' };
     /** v0.9.0 #3 — launch-crash loop guard. When two consecutive
      *  launches don't reach `markLaunchCompleted()` (typical of an
      *  OTA update with a fatal bug), invoke the host callback with
@@ -177,6 +190,21 @@ export const init = (options: InitOptions): void => {
       enabled: true,
       channels: options.capture.sentinelChannels,
     });
+  }
+  // v0.9.6 #4 — long-task monitor. Off by default.
+  const lt = options.capture?.longTaskMonitor;
+  if (lt) {
+    startLongTaskMonitor({
+      enabled: true,
+      thresholdMs: typeof lt === 'object' ? lt.thresholdMs : undefined,
+    });
+  }
+  // v0.9.6 #2 — wireframe replay. Off by default.
+  const rp = options.capture?.replay;
+  if (rp === 'wireframe') {
+    startReplay({ mode: 'wireframe' });
+  } else if (rp && typeof rp === 'object' && rp.mode === 'wireframe') {
+    startReplay({ hz: rp.hz, mode: 'wireframe' });
   }
 
   const capture = options.capture ?? {};

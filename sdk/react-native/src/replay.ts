@@ -1,0 +1,123 @@
+// v0.9.6 #2 — wireframe Session Replay (SDK side).
+//
+// 60-slot ring buffer of native-captured wireframe snapshots. Each
+// tick calls into `SentoriReplayCapture.captureWireframe(maskIds)`
+// which walks the iOS UIView / Android View hierarchy and returns
+// one JSON string per snapshot. captureException flushes the ring
+// as a `replay` attachment (NDJSON: one snapshot per line).
+//
+// Why wireframe and not raster:
+//   • Storage: 80 nodes × ~80 bytes ≈ 6 KB per snapshot vs ~50 KB
+//     for a downsampled JPEG. 60-slot ring ≈ 400 KB raw / ~80 KB
+//     gzipped — fits comfortably in the 500 KB attachment cap.
+//   • Privacy: no pixels means no accidental PII leaks; mask
+//     registry decides what text to replace with "***".
+//   • Replay fidelity: less faithful to pixels but enough to see
+//     which screen the user was on and what was on it. Dashboard
+//     player renders SVG rects — denser-looking than a 1 Hz
+//     screenshot strip.
+
+import { startSpan } from '@goliapkg/sentori-core';
+
+import { getRegisteredMaskQuery } from './mask';
+import { isNativeModuleLinked } from './native-loader';
+
+const TICK_INTERVAL_MS = 1000;
+const RING_SIZE = 60;
+
+let _ring: string[] = [];
+let _timer: ReturnType<typeof setInterval> | null = null;
+let _running = false;
+
+export type ReplayOptions = {
+  mode?: 'off' | 'wireframe';
+  /** Ticks per second. Default 1. */
+  hz?: number;
+};
+
+export function startReplay(opts: ReplayOptions): void {
+  if (_running) return;
+  if (opts.mode !== 'wireframe') return;
+  // Native replay needs the Sentori native module linked. Defensive
+  // — same pattern as other native peers — for Expo Go / unlinked
+  // builds.
+  if (!isNativeModuleLinked('Sentori') && !isNativeModuleLinked('SentoriModule')) {
+    // Falls back silently. Replay rings stay empty; captureException
+    // simply doesn't attach a replay.
+    return;
+  }
+  _running = true;
+  const period = Math.max(250, Math.floor(1000 / (opts.hz ?? 1)));
+  _timer = setInterval(() => {
+    captureTick();
+  }, period);
+  (_timer as unknown as { unref?: () => void }).unref?.();
+}
+
+export function stopReplay(): void {
+  _running = false;
+  if (_timer !== null) {
+    clearInterval(_timer);
+    _timer = null;
+  }
+}
+
+function captureTick(): void {
+  if (!_running) return;
+  const tickSpan = startSpan('sentori.replay.tick', { name: 'tick' });
+  try {
+    const maskIds = readMaskIds();
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const nativeMod = loadNativeReplay();
+    const snapshot = nativeMod?.captureWireframe?.(maskIds);
+    if (typeof snapshot === 'string' && snapshot.length > 0) {
+      _ring.push(snapshot);
+      while (_ring.length > RING_SIZE) _ring.shift();
+    }
+    tickSpan.finish({ status: 'ok' });
+  } catch (e) {
+    if (e instanceof Error) tickSpan.setTag('error.message', e.message);
+    tickSpan.finish({ status: 'error' });
+  }
+}
+
+function readMaskIds(): string[] {
+  const q = getRegisteredMaskQuery();
+  if (!q) return [];
+  try {
+    return q();
+  } catch {
+    return [];
+  }
+}
+
+type ReplayNativeModule = {
+  captureWireframe?: (maskedIds: string[]) => null | string;
+};
+
+function loadNativeReplay(): ReplayNativeModule | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const core = require('expo-modules-core') as {
+      requireNativeModule: <T>(name: string) => T;
+    };
+    return core.requireNativeModule<ReplayNativeModule>('Sentori');
+  } catch {
+    return null;
+  }
+}
+
+/** Drain the ring as NDJSON (one snapshot per line). Empty string
+ *  when the ring is empty. Also clears the ring so the next session's
+ *  replay starts fresh. */
+export function drainReplay(): string {
+  if (_ring.length === 0) return '';
+  const out = _ring.join('\n');
+  _ring = [];
+  return out;
+}
+
+export function __resetReplayForTests(): void {
+  stopReplay();
+  _ring = [];
+}

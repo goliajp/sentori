@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react'
 
 import { adminApi, type Attachment } from '@/api/client'
 
+import { ReplayPlayer } from './ReplayPlayer'
 import { SessionTrailViewer } from './SessionTrailViewer'
 import { StateTimetravelViewer } from './StateTimetravelViewer'
 import { ViewTreePanel } from './ViewTreePanel'
@@ -77,6 +78,10 @@ export function AttachmentGallery({ eventId, projectId }: { eventId: string; pro
     () => attachments.filter((a) => a.kind === 'stateSnapshot'),
     [attachments]
   )
+  const replays = useMemo(
+    () => attachments.filter((a) => a.kind === 'replay'),
+    [attachments]
+  )
   const others = useMemo(
     () =>
       attachments.filter(
@@ -84,7 +89,8 @@ export function AttachmentGallery({ eventId, projectId }: { eventId: string; pro
           a.kind !== 'screenshot' &&
           a.kind !== 'viewTree' &&
           a.kind !== 'sessionTrail' &&
-          a.kind !== 'stateSnapshot'
+          a.kind !== 'stateSnapshot' &&
+          a.kind !== 'replay'
       ),
     [attachments]
   )
@@ -167,6 +173,25 @@ export function AttachmentGallery({ eventId, projectId }: { eventId: string; pro
           </summary>
           <div className="px-3 pb-3">
             <SessionTrailViewer attachmentRef={a.ref} eventId={eventId} />
+          </div>
+        </details>
+      ))}
+      {/* v0.9.6 #2 — wireframe replay player for `replay` attachments
+          (NDJSON of view-tree snapshots, one per second up to 60). */}
+      {replays.map((a) => (
+        <details
+          className="border-border bg-bg-tertiary/30 rounded-md border"
+          key={a.ref}
+          open={replays.length === 1}
+        >
+          <summary className="text-fg cursor-pointer px-3 py-2 text-[12px]">
+            Session replay (wireframe)
+            <span className="text-fg-muted ml-2 text-[10px]">
+              up to 60 s before the error
+            </span>
+          </summary>
+          <div className="px-3 pb-3">
+            <ReplayPlayer attachmentRef={a.ref} eventId={eventId} />
           </div>
         </details>
       ))}

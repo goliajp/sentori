@@ -4,6 +4,7 @@ import { addBreadcrumb, getBreadcrumbs } from './breadcrumbs';
 import { getBundleInfo } from './bundle-info';
 import { getConfig, isInitialized } from './config';
 import { getFeatureFlagSnapshot } from './feature-flags';
+import { drainReplay } from './replay';
 import { clearStateSnapshots, getStateSnapshots } from './state-snapshots';
 import { symbolicateErrorViaMetro } from './handlers/dev-symbolicate';
 import { captureScreenshot } from './handlers/screenshot';
@@ -154,10 +155,40 @@ export const captureError = (error: Error, extras?: CaptureExtras): void => {
       await captureAndAttachStateSnapshots(event, stateSnapshots);
       clearStateSnapshots();
     }
+    // v0.9.6 #2 — wireframe replay attachment. drainReplay clears the
+    // ring as a side effect so next session's replay starts fresh.
+    const replayNdjson = drainReplay();
+    if (replayNdjson.length > 0) {
+      await captureAndAttachReplay(event, replayNdjson);
+    }
     enqueue(event);
   };
   void pipeline();
 };
+
+/** v0.9.6 #2 — upload the wireframe replay ring as a `replay`
+ *  attachment. Plain NDJSON (one snapshot per line) — server may
+ *  gzip on storage; the network upload is base64. */
+async function captureAndAttachReplay(event: Event, ndjson: string): Promise<void> {
+  try {
+    const base64 =
+      typeof globalThis.btoa === 'function'
+        ? globalThis.btoa(ndjson)
+        : Buffer.from(ndjson, 'utf8').toString('base64');
+    const meta = await uploadAttachment(
+      event.id,
+      'replay',
+      { base64, mediaType: 'application/x-ndjson' },
+      { source: 'js' },
+    );
+    if (meta) {
+      if (!event.attachments) event.attachments = [];
+      event.attachments.push(meta);
+    }
+  } catch {
+    // best-effort
+  }
+}
 
 /** v0.9.2 +S2 — upload the rolling state-snapshot ring as a
  *  `stateSnapshot` attachment so the dashboard time-travel viewer can

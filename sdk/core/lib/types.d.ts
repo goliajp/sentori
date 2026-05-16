@@ -66,7 +66,7 @@ export type Geo = {
  * server returns a `ref` (UUID it generated), and the SDK echoes
  * the ref back inside the next `event.attachments[]`.
  */
-export type AttachmentKind = 'logTail' | 'screenshot' | 'sessionTrail' | 'stateSnapshot' | 'viewTree';
+export type AttachmentKind = 'logTail' | 'replay' | 'screenshot' | 'sessionTrail' | 'stateSnapshot' | 'viewTree';
 export type AttachmentSource = 'android' | 'ios' | 'js';
 export type AttachmentMeta = {
     /** Server-issued UUID — the only field ingest actually trusts. */
