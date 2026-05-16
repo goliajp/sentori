@@ -60,7 +60,7 @@
   "devDependencies": {
     "@goliapkg/sentori-react-native": "workspace:*",
     "@types/bun": "latest",
-    "typescript": "^5"
+    "typescript": "^6"
   },
   "publishConfig": {
     "access": "public"

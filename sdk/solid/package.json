@@ -47,12 +47,12 @@
     }
   },
   "dependencies": {
-    "@goliapkg/sentori-core": "0.7.0",
-    "@goliapkg/sentori-javascript": "0.4.2"
+    "@goliapkg/sentori-core": "0.8.2",
+    "@goliapkg/sentori-javascript": "0.4.3"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "typescript": "^5"
+    "typescript": "^6"
   },
   "publishConfig": {
     "access": "public"
