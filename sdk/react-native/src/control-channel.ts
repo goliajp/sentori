@@ -19,6 +19,14 @@ import { getCurrentUserId } from './capture';
 
 const POLL_INTERVAL_MS = 30_000;
 
+/** Cap on the live-mode window even if the server reports a longer
+ *  TTL. Defense-in-depth: an unbounded `ttlMs` (server bug, clock
+ *  skew, malicious server) would otherwise pin the SDK into flush-
+ *  every-event mode indefinitely, which is expensive on slow
+ *  networks. 15 min matches the dashboard's default arm length so
+ *  normal operation stays uncapped. */
+const MAX_LIVE_MODE_TTL_MS = 15 * 60_000;
+
 let _liveMode = false;
 let _liveModeUntil = 0;
 let _timer: ReturnType<typeof setInterval> | null = null;
@@ -73,7 +81,7 @@ async function pollOnce(): Promise<void> {
     const body = (await resp.json()) as { liveMode?: boolean; ttlMs?: number };
     if (body.liveMode === true) {
       _liveMode = true;
-      _liveModeUntil = Date.now() + Math.max(0, Math.min(body.ttlMs ?? 0, 15 * 60_000));
+      _liveModeUntil = Date.now() + Math.max(0, Math.min(body.ttlMs ?? 0, MAX_LIVE_MODE_TTL_MS));
     } else {
       _liveMode = false;
       _liveModeUntil = 0;

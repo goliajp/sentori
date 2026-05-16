@@ -113,7 +113,7 @@ export function LiveDebugView() {
         >
           <label className="text-fg-muted t-sm font-mono">user.id:</label>
           <input
-            className="border-border bg-bg-tertiary text-fg t-sm flex-1 rounded border px-2 py-1 font-mono"
+            className="border-border bg-bg-tertiary text-fg focus:outline-accent t-sm flex-1 rounded border px-2 py-1 font-mono focus:outline focus:outline-1 disabled:opacity-60"
             disabled={status === 'connected'}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="sentori.setUser({ id }) value"

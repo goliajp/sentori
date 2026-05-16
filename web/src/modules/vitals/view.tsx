@@ -40,7 +40,7 @@ export function VitalsView() {
             Mobile Vitals (last 7d)
           </span>
           <select
-            className="border-border bg-bg-tertiary text-fg t-sm rounded border px-2 py-1 font-mono"
+            className="border-border bg-bg-tertiary text-fg focus:outline-accent t-sm rounded border px-2 py-1 font-mono focus:outline focus:outline-1"
             onChange={(e) => setRelease(e.target.value || null)}
             value={release ?? ''}
           >
@@ -53,7 +53,7 @@ export function VitalsView() {
           </select>
         </header>
         {report && (
-          <div className="grid grid-cols-3 gap-4 p-4">
+          <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <div className="text-fg-muted t-sm">release</div>
               <div className="text-fg t-md font-mono">{report.release}</div>
@@ -97,7 +97,8 @@ export function VitalsView() {
             and pick a release with traffic.
           </div>
         ) : (
-          <table className="std-table w-full">
+          <div className="overflow-x-auto">
+          <table className="std-table w-full min-w-[640px]">
             <thead>
               <tr>
                 <th>route</th>
@@ -133,6 +134,7 @@ export function VitalsView() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
     </div>

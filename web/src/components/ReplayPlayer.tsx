@@ -71,10 +71,13 @@ export function ReplayPlayer({
   const onKey = useCallback(
     (e: KeyboardEvent) => {
       if (snapshots.length === 0) return
-      if (e.key === 'ArrowLeft') {
+      // ←/↑ step back, →/↓ step forward — both directions because
+      // operators come from different listbox conventions and the
+      // wireframe is a vertical scroll list.
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
         e.preventDefault()
         setFocus((cur) => Math.max(0, (cur ?? snapshots.length - 1) - 1))
-      } else if (e.key === 'ArrowRight') {
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
         e.preventDefault()
         setFocus((cur) => Math.min(snapshots.length - 1, (cur ?? snapshots.length - 1) + 1))
       }
@@ -110,7 +113,7 @@ export function ReplayPlayer({
           <li key={i}>
             <button
               aria-selected={effectiveFocus === i}
-              className={`hover:bg-bg-tertiary/50 block w-full px-2 py-1 text-left text-[11px] ${
+              className={`hover:bg-bg-tertiary/50 focus:outline-accent focus:outline focus:outline-1 -outline-offset-1 block w-full px-2 py-1 text-left text-[11px] transition-colors ${
                 effectiveFocus === i ? 'bg-bg-tertiary text-fg' : 'text-fg-muted'
               }`}
               onClick={() => setFocus(i)}
@@ -127,7 +130,7 @@ export function ReplayPlayer({
           </li>
         ))}
       </ol>
-      <div className="border-border overflow-hidden rounded border bg-[#fafafa] dark:bg-[#0e0e11]">
+      <div className="border-border bg-bg-secondary overflow-hidden rounded border">
         {focused === null ? (
           <div className="text-fg-muted p-3 text-[11px]">Pick a snapshot.</div>
         ) : (
@@ -148,7 +151,7 @@ function WireframeSvg({ snapshot }: { snapshot: Snapshot }) {
       viewBox={`0 0 ${w} ${h}`}
       xmlns="http://www.w3.org/2000/svg"
     >
-      <rect fill="#ffffff" height={h} width={w} x={0} y={0} />
+      <rect fill="var(--color-bg)" height={h} width={w} x={0} y={0} />
       {snapshot.nodes.map((n, i) => (
         <NodeRender key={i} node={n} />
       ))}
@@ -163,7 +166,7 @@ function NodeRender({ node }: { node: Node }) {
     return (
       <g>
         <text
-          fill={node.color ?? '#111'}
+          fill={node.color ?? 'var(--color-fg)'}
           fontFamily="system-ui, -apple-system, sans-serif"
           fontSize={fontSize}
           x={node.x}
@@ -178,7 +181,7 @@ function NodeRender({ node }: { node: Node }) {
     <rect
       fill={fill}
       height={node.h}
-      stroke="rgba(0,0,0,0.06)"
+      stroke="var(--color-border)"
       strokeWidth={0.5}
       width={node.w}
       x={node.x}
@@ -187,14 +190,19 @@ function NodeRender({ node }: { node: Node }) {
   )
 }
 
+// Wireframe palette uses fixed greys (not theme tokens). The
+// dashboard's *chrome* honors the dark/light theme, but a wireframe
+// "screenshot" should look the same regardless of who's viewing it —
+// otherwise a dark-mode operator and a light-mode operator looking
+// at the same crash see different visuals.
 function defaultFill(kind?: string): string {
   switch (kind) {
     case 'mask':
-      return '#000000'
+      return 'var(--color-fg)'
     case 'image':
-      return '#cbd5e1'
+      return 'var(--color-bg-tertiary)'
     case 'rect':
-      return '#e5e7eb'
+      return 'var(--color-bg-tertiary)'
     default:
       return 'transparent'
   }

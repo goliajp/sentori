@@ -25,9 +25,22 @@ import { isNativeModuleLinked } from './native-loader';
 const TICK_INTERVAL_MS = 1000;
 const RING_SIZE = 60;
 
+/** Floor on tick period. < 250 ms (4 Hz) the native view-tree walk
+ *  dominates the JS thread on mid-tier Android, especially with mask
+ *  consultation. The default is 1 Hz; the option exists for
+ *  benchmarking, not for production. */
+const MIN_TICK_PERIOD_MS = 250;
+
 let _ring: string[] = [];
 let _timer: ReturnType<typeof setInterval> | null = null;
 let _running = false;
+
+/** Native module ref, resolved once on first start. Caching here
+ *  avoids the cost of `requireNativeModule('Sentori')` on every
+ *  capture tick (Metro's require cache makes this cheap, but the
+ *  per-tick string lookup and possible throw still cost more than
+ *  reading a closed-over variable). */
+let _nativeMod: ReplayNativeModule | null = null;
 
 export type ReplayOptions = {
   mode?: 'off' | 'wireframe';
@@ -47,7 +60,8 @@ export function startReplay(opts: ReplayOptions): void {
     return;
   }
   _running = true;
-  const period = Math.max(250, Math.floor(1000 / (opts.hz ?? 1)));
+  _nativeMod = loadNativeReplay();
+  const period = Math.max(MIN_TICK_PERIOD_MS, Math.floor(TICK_INTERVAL_MS / (opts.hz ?? 1)));
   _timer = setInterval(() => {
     captureTick();
   }, period);
@@ -60,6 +74,7 @@ export function stopReplay(): void {
     clearInterval(_timer);
     _timer = null;
   }
+  _nativeMod = null;
 }
 
 function captureTick(): void {
@@ -67,9 +82,7 @@ function captureTick(): void {
   const tickSpan = startSpan('sentori.replay.tick', { name: 'tick' });
   try {
     const maskIds = readMaskIds();
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const nativeMod = loadNativeReplay();
-    const snapshot = nativeMod?.captureWireframe?.(maskIds);
+    const snapshot = _nativeMod?.captureWireframe?.(maskIds);
     if (typeof snapshot === 'string' && snapshot.length > 0) {
       _ring.push(snapshot);
       while (_ring.length > RING_SIZE) _ring.shift();

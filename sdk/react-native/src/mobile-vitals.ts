@@ -22,7 +22,7 @@
 
 import { startSpan } from '@goliapkg/sentori-core';
 
-import { getNativeColdStartMs } from './native';
+import { getNativeColdStartMs, getNativeFrameCounters } from './native';
 
 let _coldStartMs: null | number = null;
 let _coldStartCaptured = false;
@@ -93,13 +93,7 @@ export function markTimeToFullDisplay(route: string): TimeToFullDisplayHandle {
  *  linked. */
 export function getFrameCounters(): null | { slow: number; frozen: number } {
   try {
-    // native binding lazily required in native.ts
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const nativeMod = require('./native') as {
-      getNativeFrameCounters?: () => null | { frozen: number; slow: number };
-    };
-    if (typeof nativeMod.getNativeFrameCounters !== 'function') return null;
-    return nativeMod.getNativeFrameCounters();
+    return getNativeFrameCounters();
   } catch {
     return null;
   }

@@ -234,19 +234,42 @@ function ReproDownloadFab({ eventId, projectId }: { eventId: string; projectId: 
 // ── header sub-elements ────────────────────────────────────────────────
 
 function Tabs({ current, onChange }: { current: Tab; onChange: (t: Tab) => void }) {
+  const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // ←/→ between tabs, Home/End to jump to first/last. Wraps. The
+    // tablist hosts focus via a roving tabindex (only the active tab
+    // is focusable) which is the WAI-ARIA pattern for tab widgets.
+    const idx = TABS.findIndex((t) => t.key === current)
+    if (idx < 0) return
+    let next = idx
+    if (e.key === 'ArrowRight') next = (idx + 1) % TABS.length
+    else if (e.key === 'ArrowLeft') next = (idx - 1 + TABS.length) % TABS.length
+    else if (e.key === 'Home') next = 0
+    else if (e.key === 'End') next = TABS.length - 1
+    else return
+    e.preventDefault()
+    onChange(TABS[next]!.key)
+  }
   return (
-    <div className="border-border bg-bg-tertiary/40 flex items-center gap-1 rounded-md border px-2 py-1">
+    <div
+      aria-label="Issue detail sections"
+      className="border-border bg-bg-tertiary/40 flex items-center gap-1 rounded-md border px-2 py-1"
+      onKeyDown={onKey}
+      role="tablist"
+    >
       {TABS.map((t) => {
         const active = current === t.key
         return (
           <button
-            className={`t-md rounded px-2.5 py-1 transition-colors ${
+            aria-selected={active}
+            className={`t-md focus:outline-accent rounded px-2.5 py-1 transition-colors focus:outline focus:outline-1 ${
               active
                 ? 'bg-accent/10 text-accent'
                 : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
             }`}
             key={t.key}
             onClick={() => onChange(t.key)}
+            role="tab"
+            tabIndex={active ? 0 : -1}
             type="button"
           >
             {t.label}

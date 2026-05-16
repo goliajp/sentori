@@ -28,6 +28,23 @@ const FLUSH_INTERVAL_MS = 60_000;
 const MAX_FRAMES = 200; // safety cap per profile
 const MAX_FRAME_NAME_LEN = 120;
 
+/** Floor on user-configured sample interval. Going below ~20 ms costs
+ *  measurable JS-thread time to `new Error().stack` + regex parse on
+ *  every tick — past that point you'd see the profile drag down the
+ *  thing you're profiling. */
+const MIN_SAMPLE_INTERVAL_MS = 20;
+
+/** Floor on flush interval. Sub-5s windows produce a span every few
+ *  seconds, which is just noise for an aggregator that's looking at
+ *  per-minute hotspot trends. */
+const MIN_FLUSH_INTERVAL_MS = 5_000;
+
+/** How many stack-trace lines to keep per tick (after dropping the
+ *  Error ctor + sampleTick frames). 10 is enough to see the JS-side
+ *  call shape; deeper than that the bottom frames are usually RN
+ *  runtime / event loop and not actionable. */
+const FRAMES_PER_TICK = 10;
+
 let _frameCounts = new Map<string, number>();
 let _windowStartedAt = 0;
 let _sampleTimer: ReturnType<typeof setInterval> | null = null;
@@ -42,10 +59,19 @@ export type SampleProfilerOptions = {
   flushMs?: number;
 };
 
+/**
+ * Start the idle-tick sample profiler. Idempotent — calling twice
+ * is a no-op after the first successful start.
+ *
+ * Pairs naturally with `longTaskMonitor` (≥200ms outliers): the
+ * profiler shows the *distribution* of code that runs in idle gaps,
+ * the long-task monitor catches the few outliers that are blocking
+ * the thread. Together they cover the JS-side perf signal cheaply.
+ */
 export function startSampleProfiler(opts: SampleProfilerOptions): void {
   if (!opts.enabled || _sampleTimer !== null) return;
-  const sampleMs = Math.max(20, opts.sampleMs ?? SAMPLE_INTERVAL_MS);
-  const flushMs = Math.max(5_000, opts.flushMs ?? FLUSH_INTERVAL_MS);
+  const sampleMs = Math.max(MIN_SAMPLE_INTERVAL_MS, opts.sampleMs ?? SAMPLE_INTERVAL_MS);
+  const flushMs = Math.max(MIN_FLUSH_INTERVAL_MS, opts.flushMs ?? FLUSH_INTERVAL_MS);
 
   _windowStartedAt = Date.now();
   _sampleTimer = setInterval(() => sampleTick(), sampleMs);
@@ -72,7 +98,7 @@ function sampleTick(): void {
   if (!stack) return;
   // Skip the first 2 frames — they're our `sampleTick` + `Error
   // ctor` which would dominate every sample.
-  const lines = stack.split('\n').slice(2, 12);
+  const lines = stack.split('\n').slice(2, 2 + FRAMES_PER_TICK);
   for (const line of lines) {
     const frame = parseFrameName(line);
     if (frame) {
