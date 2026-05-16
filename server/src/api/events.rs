@@ -113,9 +113,15 @@ pub async fn handle(
     // v0.9.3 +S7 — live-debug fanout. Only events tagged with a
     // user.id are interesting; others would just spam every live
     // subscriber. `send` errors when there are zero subscribers,
-    // which is the common path: harmless.
+    // which is the common path: harmless. `project_id` is included
+    // so the SSE filter can scope to one project — two projects with
+    // the same external `user.id` (an email, an auth0 sub) would
+    // otherwise cross-leak.
     if event.user.as_ref().and_then(|u| u.id.as_deref()).is_some() {
-        let _ = state.live_events.send(event.clone());
+        let _ = state.live_events.send(crate::recent::LiveEvent {
+            project_id,
+            event: event.clone(),
+        });
     }
 
     state.recent.push(event);

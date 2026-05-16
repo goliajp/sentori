@@ -18,6 +18,14 @@ pub enum AppError {
     DatabaseUnavailable,
     #[error("forbidden")]
     Forbidden,
+    /// 503 with a stable error code in the body. Used when a feature
+    /// depends on optional config (`SENTORI_GITHUB_PAT`, source repo
+    /// URL, …) and that config isn't set on this deployment — so the
+    /// feature is unavailable, but the caller knows *why* and can
+    /// surface a "configure GitHub integration" link instead of a
+    /// generic 500.
+    #[error("unconfigured: {0}")]
+    Unconfigured(&'static str),
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -80,6 +88,14 @@ impl IntoResponse for AppError {
                 StatusCode::FORBIDDEN,
                 Json(ErrorBody {
                     error: "forbidden",
+                    details: vec![],
+                }),
+            )
+                .into_response(),
+            AppError::Unconfigured(code) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(ErrorBody {
+                    error: code,
                     details: vec![],
                 }),
             )

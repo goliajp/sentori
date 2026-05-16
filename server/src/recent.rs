@@ -46,6 +46,17 @@ pub struct EventTick {
     pub ts_ms: i64,
 }
 
+/// v0.9.3 +S7 (project_id added in v1.1 polish) — full event payload
+/// broadcast to live-debug SSE subscribers. The pair `(project_id,
+/// user_id)` is the dashboard filter key; without `project_id` two
+/// projects with the same external `user.id` (an email, an auth0 sub)
+/// would cross-leak each other's events.
+#[derive(Clone)]
+pub struct LiveEvent {
+    pub project_id: uuid::Uuid,
+    pub event: Event,
+}
+
 #[derive(Clone)]
 pub struct AppState {
     pub auth: AuthState,
@@ -70,8 +81,9 @@ pub struct AppState {
     pub event_ticks: std::sync::Arc<tokio::sync::broadcast::Sender<EventTick>>,
     /// v0.9.3 +S7: live-debug stream — fans out the *full* event
     /// (not just a tick) to dashboard subscribers filtering by
-    /// user_id. 32-slot buffer; same drop-on-slow semantics as ticks.
-    pub live_events: std::sync::Arc<tokio::sync::broadcast::Sender<crate::event::Event>>,
+    /// (project_id, user_id). 32-slot buffer; same drop-on-slow
+    /// semantics as ticks.
+    pub live_events: std::sync::Arc<tokio::sync::broadcast::Sender<LiveEvent>>,
     /// v1.1 +S7 升级: per-user-id "live mode" flag with TTL. When
     /// dashboard arms a live session for user X, this map gets a
     /// (X → expires_at) entry. SDK polls `/v1/control/poll?userId=X`

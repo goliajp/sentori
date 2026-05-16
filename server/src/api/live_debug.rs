@@ -24,8 +24,7 @@ use futures::stream::Stream;
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 use uuid::Uuid;
 
-use crate::event::Event;
-use crate::recent::AppState;
+use crate::recent::{AppState, LiveEvent};
 
 const SESSION_TTL_SECS: u64 = 10 * 60;
 
@@ -101,7 +100,7 @@ pub async fn stream_user_events(
         let user_match = &user_id_owned;
         let project_match = project_id_owned;
         match res {
-            Ok(ev) if event_matches(&ev, project_match, user_match) => Some(encode(&ev)),
+            Ok(le) if event_matches(&le, project_match, user_match) => Some(encode(&le.event)),
             _ => None,
         }
     });
@@ -117,17 +116,34 @@ pub async fn stream_user_events(
     Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15)))
 }
 
-fn event_matches(ev: &Event, project_id: Uuid, user_id: &str) -> bool {
-    let ev_user = ev.user.as_ref().and_then(|u| u.id.as_deref());
-    let _ = project_id; // ingest path doesn't carry project_id on the wire event
-                        // (server-resolved from token), so user-id match is
-                        // sufficient — collisions across projects are
-                        // unlikely given UUID-ish ids in practice. Future:
-                        // attach project_id to the broadcast payload.
+/// SSE subscribers filter on the pair `(project_id, user.id)` — both
+/// must match. The producer (`events.rs`) attaches `project_id` from
+/// the resolved ingest token, so cross-project leakage is impossible
+/// even when two projects use the same external `user.id` scheme.
+fn event_matches(le: &LiveEvent, project_id: Uuid, user_id: &str) -> bool {
+    if le.project_id != project_id {
+        return false;
+    }
+    let ev_user = le.event.user.as_ref().and_then(|u| u.id.as_deref());
     matches!(ev_user, Some(id) if id == user_id)
 }
 
-fn encode(ev: &Event) -> Result<SseEvent, Infallible> {
-    let json = serde_json::to_value(ev).unwrap_or_default();
-    Ok(SseEvent::default().event("event").json_data(json).unwrap_or_default())
+fn encode(ev: &crate::event::Event) -> Result<SseEvent, Infallible> {
+    // Serialization failure should be loud, not a silent empty payload —
+    // a corrupt event reaching the dashboard makes debugging worse.
+    // We log and emit an explicit error frame so the dashboard sees the
+    // gap rather than an empty `event: event` data line.
+    match serde_json::to_value(ev) {
+        Ok(json) => Ok(SseEvent::default()
+            .event("event")
+            .json_data(json)
+            .unwrap_or_else(|e| {
+                tracing::warn!(error = %e, "live_debug: SseEvent json_data failed");
+                SseEvent::default().event("error").data("encodeFailed")
+            })),
+        Err(e) => {
+            tracing::warn!(error = %e, "live_debug: event serialize failed");
+            Ok(SseEvent::default().event("error").data("encodeFailed"))
+        }
+    }
 }

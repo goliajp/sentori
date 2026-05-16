@@ -130,12 +130,10 @@ pub async fn attach(
     .map_err(|e| AppError::Internal(e.to_string()))?
     .flatten();
     let Some(repo_url) = repo_url else {
-        return Err(AppError::Internal(
-            "project.source_repo_url is not configured".into(),
-        ));
+        return Err(AppError::Unconfigured("sourceRepoUrlNotConfigured"));
     };
     let (owner, repo) = parse_github(&repo_url)
-        .ok_or_else(|| AppError::Internal("source_repo_url is not a GitHub URL".into()))?;
+        .ok_or(AppError::Unconfigured("sourceRepoUrlNotGithub"))?;
 
     // Fetch commit metadata from GitHub. Unauthenticated — 60 / hr
     // per server IP. Auto path in v1.0 will use a per-project PAT.
@@ -193,11 +191,7 @@ pub async fn auto_detect(
 
     let pat = match std::env::var("SENTORI_GITHUB_PAT") {
         Ok(v) if !v.is_empty() => v,
-        _ => {
-            return Err(AppError::Internal(
-                "SENTORI_GITHUB_PAT not configured on the server".into(),
-            ));
-        }
+        _ => return Err(AppError::Unconfigured("githubPatNotConfigured")),
     };
 
     let repo_url: Option<String> = sqlx::query_scalar(
@@ -209,12 +203,10 @@ pub async fn auto_detect(
     .map_err(|e| AppError::Internal(e.to_string()))?
     .flatten();
     let Some(repo_url) = repo_url else {
-        return Err(AppError::Internal(
-            "project.source_repo_url is not configured".into(),
-        ));
+        return Err(AppError::Unconfigured("sourceRepoUrlNotConfigured"));
     };
     let (owner, repo) = parse_github(&repo_url)
-        .ok_or_else(|| AppError::Internal("source_repo_url is not a GitHub URL".into()))?;
+        .ok_or(AppError::Unconfigured("sourceRepoUrlNotGithub"))?;
 
     let issue: Option<(time::OffsetDateTime,)> = sqlx::query_as(
         "SELECT first_seen FROM issues WHERE id = $1 AND project_id = $2",
@@ -343,11 +335,7 @@ pub async fn generate_revert_pr(
 
     let pat = match std::env::var("SENTORI_GITHUB_PAT") {
         Ok(v) if !v.is_empty() => v,
-        _ => {
-            return Err(AppError::Internal(
-                "SENTORI_GITHUB_PAT not configured on the server".into(),
-            ));
-        }
+        _ => return Err(AppError::Unconfigured("githubPatNotConfigured")),
     };
 
     let row: Option<(String,)> = sqlx::query_as(
@@ -373,10 +361,10 @@ pub async fn generate_revert_pr(
     .map_err(|e| AppError::Internal(e.to_string()))?
     .flatten();
     let Some(repo_url) = repo_url else {
-        return Err(AppError::Internal("project.source_repo_url not set".into()));
+        return Err(AppError::Unconfigured("sourceRepoUrlNotConfigured"));
     };
     let (owner, repo) = parse_github(&repo_url)
-        .ok_or_else(|| AppError::Internal("source_repo_url is not a GitHub URL".into()))?;
+        .ok_or(AppError::Unconfigured("sourceRepoUrlNotGithub"))?;
 
     // GitHub revert PR generation:
     //   1. GET /repos/:o/:r → default branch + latest SHA

@@ -175,8 +175,11 @@ pub async fn fetch(
         return server_error("dbNotConfigured");
     };
 
-    // Look up the attachment + its project.
-    let row: Option<(Uuid, String, String, i32)> = sqlx::query_as(
+    // Look up the attachment + its project. A DB error must
+    // fail-closed: returning `None` here would treat a transient SQL
+    // failure as "row not found" and proceed past auth — silently
+    // letting anyone hit the blob in the worst case. 500 instead.
+    let row_res = sqlx::query_as::<_, (Uuid, String, String, i32)>(
         r#"
         SELECT project_id, kind, media_type, size_bytes
         FROM event_attachments
@@ -186,8 +189,14 @@ pub async fn fetch(
     .bind(ref_id)
     .bind(event_id)
     .fetch_optional(pool)
-    .await
-    .unwrap_or(None);
+    .await;
+    let row = match row_res {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::error!(error = %e, "attachments.fetch: db query failed");
+            return server_error("dbError");
+        }
+    };
 
     let Some((project_id, _kind, media_type, _size)) = row else {
         return not_found("attachmentNotFound");
@@ -285,7 +294,10 @@ async fn is_admin_for_project(
     match caller {
         AdminCaller::LegacyAdmin | AdminCaller::DevToken => true,
         AdminCaller::User { id, .. } => {
-            let exists: Option<(i64,)> = sqlx::query_as(
+            // Fail-closed on DB error. A transient SQL failure must
+            // *not* be treated as "no row" — that would silently grant
+            // the request when membership lookup just timed out.
+            let row_res = sqlx::query_as::<_, (i64,)>(
                 "SELECT 1 FROM memberships m \
                  JOIN projects p ON p.org_id = m.org_id \
                  WHERE m.user_id = $1 AND p.id = $2 \
@@ -294,9 +306,20 @@ async fn is_admin_for_project(
             .bind(id)
             .bind(project_id)
             .fetch_optional(pool)
-            .await
-            .unwrap_or(None);
-            exists.is_some()
+            .await;
+            match row_res {
+                Ok(Some(_)) => true,
+                Ok(None) => false,
+                Err(e) => {
+                    tracing::error!(
+                        error = %e,
+                        user_id = %id,
+                        project_id = %project_id,
+                        "is_admin_for_project: membership lookup failed; denying",
+                    );
+                    false
+                }
+            }
         }
     }
 }

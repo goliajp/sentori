@@ -61,7 +61,7 @@ pub fn build(cfg: ServerConfig) -> Router {
     // v0.9.3 +S7: live-debug full-event fan-out. Small buffer (32);
     // a slow subscriber drops events rather than slowing ingest.
     let (live_events_tx, _) =
-        tokio::sync::broadcast::channel::<crate::event::Event>(32);
+        tokio::sync::broadcast::channel::<crate::recent::LiveEvent>(32);
     // v0.8.0-d — load the optional GeoIP db once at startup. Load
     // failure is non-fatal: log and run without enrichment.
     let geoip = cfg.geoip_db_path.as_ref().and_then(|p| {
