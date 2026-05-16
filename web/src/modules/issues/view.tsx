@@ -58,8 +58,13 @@ export function IssuesView() {
   const issues = data?.issues ?? []
 
   return (
-    <div className="flex h-[calc(100vh-12rem)] min-h-0 gap-3">
-      <aside className="border-border bg-bg-secondary/20 flex w-96 shrink-0 flex-col overflow-hidden rounded-md border">
+    // -mx-4 -my-3 + h-[calc(100%+1.5rem)] reach past <main>'s
+    // px-4 py-3 wrapper so the rail bleeds into the sidebar column
+    // and the detail panel reaches the right viewport edge. Single
+    // vertical divider between them, no gap, no rounded corners —
+    // matches the "tasks.golia.jp"-style fixed master-detail shape.
+    <div className="-mx-4 -my-3 flex h-[calc(100%+1.5rem)] min-h-0 overflow-hidden">
+      <aside className="border-border bg-bg-secondary/20 flex w-96 shrink-0 flex-col overflow-hidden border-r">
         <RailHeader count={issues.length} current={tab} onChange={setTab} />
         <div className="min-h-0 flex-1 overflow-y-auto">
           {!projectId && <RailEmpty hint="Create a project in org settings to start ingesting." />}
@@ -80,7 +85,7 @@ export function IssuesView() {
         </div>
       </aside>
 
-      <section className="border-border min-w-0 flex-1 overflow-y-auto rounded-md border">
+      <section className="min-w-0 flex-1 overflow-y-auto">
         {issueId ? (
           <div className="p-4">
             <Outlet />
