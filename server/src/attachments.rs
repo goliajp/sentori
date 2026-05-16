@@ -174,21 +174,43 @@ impl AttachmentStore for NoopAttachmentStore {
 
 pub type SharedAttachmentStore = Arc<dyn AttachmentStore>;
 
-/// Build the store the server runs with. Reads `SENTORI_ATTACHMENT_DIR`
-/// — when set, returns `LocalFsAttachmentStore` rooted there; when
-/// missing, returns `NoopAttachmentStore` and leaves uploads disabled
-/// (the endpoint returns 503 `attachmentsDisabled`).
+/// Build the store the server runs with.
+///
+/// Resolution order:
+///   1. `SENTORI_ATTACHMENT_DIR` — explicit override
+///   2. `$SENTORI_DATA_DIR/attachments` — derived from the catch-all
+///      data-dir env most prod compose stacks already set
+///   3. `NoopAttachmentStore` — endpoint returns 503 `attachmentsDisabled`
+///
+/// The fallback exists because v0.x prod compose stacks declared
+/// `SENTORI_DATA_DIR=/data` and mounted a volume, but never set the
+/// attachment-specific env — so attachments shipped disabled in prod
+/// for months until Insight 2026-05-17 surfaced it (every dashboard
+/// row showed "NO ATTACHMENTS CAPTURED"). The compose-side fix
+/// (explicit `SENTORI_ATTACHMENT_DIR`) lands together; this fallback
+/// keeps any existing-mount deployment working without a config
+/// change as soon as the binary is upgraded.
 pub fn build_default_store() -> SharedAttachmentStore {
-    match std::env::var("SENTORI_ATTACHMENT_DIR") {
-        Ok(dir) if !dir.trim().is_empty() => {
+    let resolved = std::env::var("SENTORI_ATTACHMENT_DIR")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| (s, "SENTORI_ATTACHMENT_DIR"))
+        .or_else(|| {
+            std::env::var("SENTORI_DATA_DIR")
+                .ok()
+                .filter(|s| !s.trim().is_empty())
+                .map(|root| (format!("{}/attachments", root.trim_end_matches('/')), "SENTORI_DATA_DIR + /attachments"))
+        });
+    match resolved {
+        Some((dir, source)) => {
             let path = Path::new(&dir).to_path_buf();
-            tracing::info!(dir = %path.display(), "attachment store: local-fs");
+            tracing::info!(dir = %path.display(), %source, "attachment store: local-fs");
             Arc::new(LocalFsAttachmentStore::new(path))
         }
-        _ => {
+        None => {
             tracing::warn!(
-                "SENTORI_ATTACHMENT_DIR not set — attachment uploads disabled. \
-                 Set it to enable screenshots / view trees."
+                "neither SENTORI_ATTACHMENT_DIR nor SENTORI_DATA_DIR set — attachment uploads disabled. \
+                 Set one of them to enable screenshots / view trees / replay."
             );
             Arc::new(NoopAttachmentStore)
         }

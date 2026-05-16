@@ -117,7 +117,7 @@ pub async fn require_admin(
     }
     let hint = match bearer {
         Some(token) => crate::auth::token_hint(token),
-        None => "log in via the dashboard, or send `Authorization: Bearer <sk_… admin token>` (project settings → tokens)",
+        None => "log in via the dashboard, or send `Authorization: Bearer st_pk_…` (project settings → tokens, kind=admin)",
     };
     (
         StatusCode::UNAUTHORIZED,

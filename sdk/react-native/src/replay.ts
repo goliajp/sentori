@@ -21,7 +21,6 @@ import { startSpan } from '@goliapkg/sentori-core';
 
 import { getRegisteredMaskQuery } from './mask';
 import { describeWireframeNative } from './native';
-import { isNativeModuleLinked } from './native-loader';
 
 declare const __DEV__: boolean | undefined;
 
@@ -54,25 +53,23 @@ export type ReplayOptions = {
 export function startReplay(opts: ReplayOptions): void {
   if (_running) return;
   if (opts.mode !== 'wireframe') return;
-  // Native replay needs the Sentori native module linked. Defensive
-  // — same pattern as other native peers — for Expo Go / unlinked
-  // builds.
-  if (!isNativeModuleLinked('Sentori') && !isNativeModuleLinked('SentoriModule')) {
+  // v0.9.10 — gate via expo-modules-core's registry (same path the
+  // screenshot capture uses). The previous `isNativeModuleLinked`
+  // check looked at the legacy `RN.NativeModules` map, but the
+  // Sentori module is registered through expo-modules-core; the
+  // legacy map never sees it, so this branch returned "not linked"
+  // forever even with the pod correctly attached (Insight 2026-05-17).
+  const info = describeWireframeNative();
+  if (!info.bound) {
     if (typeof __DEV__ !== 'undefined' && __DEV__) {
       // eslint-disable-next-line no-console
       console.warn(
-        '[sentori] replay: Sentori native module not linked — replay attachments will stay empty',
+        '[sentori] replay: Sentori native module not bound (expo-modules-core) — replay attachments will stay empty',
       );
     }
-    // Falls back silently. Replay rings stay empty; captureException
-    // simply doesn't attach a replay.
     return;
   }
-  // v0.9.9 — log once per start so Insight (or anyone) can confirm
-  // whether the native module exposes captureWireframe at all,
-  // distinguishing this from "ring never filled because tick threw".
   if (typeof __DEV__ !== 'undefined' && __DEV__) {
-    const info = describeWireframeNative();
     // eslint-disable-next-line no-console
     console.warn(
       '[sentori] replay: starting',

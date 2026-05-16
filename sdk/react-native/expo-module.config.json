@@ -1,7 +1,8 @@
 {
   "platforms": ["apple", "android"],
   "apple": {
-    "modules": ["SentoriModule"]
+    "modules": ["SentoriModule"],
+    "podspecPath": "SentoriReactNative.podspec"
   },
   "android": {
     "modules": ["com.sentori.SentoriModule"]

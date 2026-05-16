@@ -137,10 +137,10 @@ pub async fn require_token(
 
 /// Pick a 401 hint by inspecting the rejected token's shape.
 pub(crate) fn token_hint(token: &str) -> &'static str {
-    if token.starts_with("st_pk_") || token.starts_with("sk_") {
+    if token.starts_with("st_pk_") {
         "token has the right prefix but wasn't recognized — it may have been revoked, or it belongs to a different project"
     } else {
-        "token must start with `st_pk_` (ingest) or `sk_` (admin) — you may have pasted the wrong value (e.g. an org slug or project id)"
+        "token must start with `st_pk_` — you may have pasted the wrong value (e.g. an org slug or project id). Both ingest tokens (kind=public) and admin tokens (kind=admin) share the `st_pk_` prefix in v0.x; kind is enforced on the server, not by prefix."
     }
 }
 
@@ -160,8 +160,10 @@ mod tests {
     fn token_hint_distinguishes_shape_from_value() {
         // Right prefix, wrong value → "revoked / wrong project".
         assert!(token_hint("st_pk_deadbeef").contains("revoked"));
-        assert!(token_hint("sk_abc123").contains("revoked"));
-        // Not a token at all → "must start with st_pk_ / sk_".
+        // `sk_…` is no longer a recognised prefix — v0.x ships
+        // everything as `st_pk_…` with kind enforced server-side.
+        assert!(token_hint("sk_abc123").contains("must start with"));
+        // Not a token at all → "must start with st_pk_".
         assert!(token_hint("my-org-slug").contains("must start with"));
         assert!(token_hint("019508a0-0001-7000-8000-000000000000").contains("must start with"));
         assert!(token_hint("").contains("must start with"));
