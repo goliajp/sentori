@@ -42,30 +42,35 @@ impl GeoIpReader {
     /// (private range, multicast, the db simply doesn't have it).
     pub fn lookup(&self, ip: IpAddr) -> Option<Geo> {
         // Try City first — works on both DB-IP Lite Country and
-        // GeoLite2 City because the City schema is a superset.
-        // `maxminddb` returns `AddressNotFoundError` on miss; we
-        // treat all errors the same: no enrichment.
-        if let Ok(city) = self.reader.lookup::<CityLite>(ip) {
-            let country = city
-                .country
-                .and_then(|c| c.iso_code)
-                .map(|s| s.to_string());
-            let region = city
-                .subdivisions
-                .and_then(|subs| subs.into_iter().next())
-                .and_then(|s| s.iso_code)
-                .map(|s| s.to_string());
-            let city_name = city
-                .city
-                .and_then(|c| c.names)
-                .and_then(|n| n.get("en").map(|s| s.to_string()));
-            return country.map(|country| Geo {
-                country,
-                region,
-                city: city_name,
-            });
-        }
-        None
+        // GeoLite2 City because the City schema is a superset. In
+        // maxminddb 0.28 `lookup` returns a `LookupResult` whether or
+        // not the IP was found; `decode::<T>()` returns Ok(None) for
+        // "not present in db", Ok(Some(_)) for found, Err for actual
+        // parse errors. All three cases collapse to "no enrichment."
+        let result = self.reader.lookup(ip).ok()?;
+        let city = result.decode::<CityLite<'_>>().ok().flatten()?;
+        let country = city
+            .country
+            .and_then(|c| c.iso_code)
+            .map(|s| s.to_string());
+        let region = city
+            .subdivisions
+            .and_then(|subs| subs.into_iter().next())
+            .and_then(|s| s.iso_code)
+            .map(|s| s.to_string());
+        // 0.28 replaced the freeform `Option<BTreeMap<&str, &str>>` of
+        // `names` with a `Names` struct exposing named language fields.
+        // We only ever use English (consistent with the rest of the
+        // dashboard's i18n posture).
+        let city_name = city
+            .city
+            .and_then(|c| c.names.english)
+            .map(|s| s.to_string());
+        country.map(|country| Geo {
+            country,
+            region,
+            city: city_name,
+        })
     }
 }
 
