@@ -136,6 +136,29 @@ async fn drain(rx: &mut mpsc::Receiver<NotifyEvent>) -> Vec<NotifyEvent> {
     out
 }
 
+/// CI-stable: poll up to `timeout_ms` for at least one event matching
+/// `pred` to land in the channel, then drain everything. The previous
+/// pattern (sleep 100ms + try_recv loop) flaked under load when the
+/// in-process AlertFired arrived later than the wait.
+async fn drain_until(
+    rx: &mut mpsc::Receiver<NotifyEvent>,
+    timeout_ms: u64,
+    pred: impl Fn(&NotifyEvent) -> bool,
+) -> Vec<NotifyEvent> {
+    let started = std::time::Instant::now();
+    let mut out = Vec::new();
+    let deadline = std::time::Duration::from_millis(timeout_ms);
+    loop {
+        while let Ok(ev) = rx.try_recv() {
+            out.push(ev);
+        }
+        if out.iter().any(&pred) || started.elapsed() >= deadline {
+            return out;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+}
+
 #[tokio::test]
 #[serial]
 async fn new_issue_rule_fires_on_first_event_with_filter_match() {
@@ -196,10 +219,13 @@ async fn new_issue_rule_fires_on_first_event_with_filter_match() {
         .send()
         .await
         .unwrap();
-    // give async paths a tick to land
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-
-    let events = drain(&mut rx).await;
+    // Wait up to 3 s for the in-process AlertFired to land. CI's
+    // shared Postgres container is slower than a dev machine; the
+    // previous fixed 100ms sleep flaked there.
+    let events = drain_until(&mut rx, 3000, |e| {
+        matches!(e, NotifyEvent::AlertFired { rule_id: id, .. } if *id == rule_id)
+    })
+    .await;
     let alerts: Vec<_> = events
         .iter()
         .filter(|e| matches!(e, NotifyEvent::AlertFired { rule_id: id, .. } if *id == rule_id))
