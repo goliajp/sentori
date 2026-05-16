@@ -67,7 +67,7 @@ async fn spawn_mock(codes: Option<Vec<u16>>) -> (SocketAddr, Arc<AtomicU32>) {
         .route("/hook", post(mock_handler))
         .with_state(state);
     tokio::spawn(async move {
-        axum::serve(listener, app).await.unwrap();
+        axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>()).await.unwrap();
     });
     (addr, calls)
 }

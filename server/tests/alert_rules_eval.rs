@@ -35,7 +35,7 @@ async fn setup() -> Option<(SocketAddr, PgPool, mpsc::Sender<NotifyEvent>, mpsc:
         ..Default::default()
     });
     tokio::spawn(async move {
-        axum::serve(listener, app).await.unwrap();
+        axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>()).await.unwrap();
     });
     Some((addr, pool, tx, rx))
 }
@@ -159,20 +159,8 @@ async fn drain_until(
     }
 }
 
-// TODO(GOL-CI): test flakes on the CI shared-Postgres runner under
-// contention from neighbouring tests. The same logic IS exercised
-// by `event_count_rule_fires_when_threshold_crossed` and
-// `cron_throttle_prevents_double_fire` via explicit `sweep_once`
-// invocation — they cover `filter_matches` + `claim_fire` +
-// `NotifyEvent::AlertFired` deterministically. The inline-from-
-// ingest path here passes locally (sub-100ms latency on a hot
-// Postgres) but races on CI even with a 3 s poll window. Ignoring
-// to unblock deploys until we can repro + add a deterministic
-// synchronisation point (likely: explicit `try_fire_on_event`
-// invocation rather than relying on the in-handler `.await`).
 #[tokio::test]
 #[serial]
-#[ignore = "GOL-CI: races on shared-Postgres CI runner; logic covered by event_count + cron_throttle tests"]
 async fn new_issue_rule_fires_on_first_event_with_filter_match() {
     let Some((addr, pool, _tx, mut rx)) = setup().await else {
         eprintln!("skipping (DATABASE_URL not set)");

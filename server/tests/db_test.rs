@@ -39,7 +39,7 @@ async fn setup() -> Option<(SocketAddr, PgPool)> {
     });
 
     tokio::spawn(async move {
-        axum::serve(listener, app).await.unwrap();
+        axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>()).await.unwrap();
     });
 
     Some((addr, pool))
@@ -79,7 +79,7 @@ async fn rate_limit_returns_429_when_exceeding_threshold() {
         ..Default::default()
     });
     tokio::spawn(async move {
-        axum::serve(listener, app).await.unwrap();
+        axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>()).await.unwrap();
     });
 
     let client = reqwest::Client::new();

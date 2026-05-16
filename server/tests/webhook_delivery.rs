@@ -69,7 +69,7 @@ async fn spawn_mock_receiver() -> (SocketAddr, Captured) {
     let addr = listener.local_addr().unwrap();
     let app = Router::new().route("/hook", post(mock_handler)).with_state(captured.clone());
     tokio::spawn(async move {
-        axum::serve(listener, app).await.unwrap();
+        axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>()).await.unwrap();
     });
     (addr, captured)
 }
@@ -107,7 +107,7 @@ async fn setup_server() -> Option<(SocketAddr, PgPool, mpsc::Sender<NotifyEvent>
         ..Default::default()
     });
     tokio::spawn(async move {
-        axum::serve(listener, app).await.unwrap();
+        axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>()).await.unwrap();
     });
     Some((addr, pool, tx))
 }
