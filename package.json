@@ -17,6 +17,7 @@
   ],
   "scripts": {
     "build:sdks": "bun run --filter '@goliapkg/sentori-core' build && bun run --filter '@goliapkg/sentori-javascript' build && bun run --filter '@goliapkg/sentori-react-native' build && bun run --filter '@goliapkg/sentori-react' build && bun run --filter '@goliapkg/sentori-next' build && bun run --filter '@goliapkg/sentori-vue' build && bun run --filter '@goliapkg/sentori-svelte' build && bun run --filter '@goliapkg/sentori-solid' build && bun run --filter '@goliapkg/sentori-expo' build && bun run --filter '@goliapkg/sentori-cli' build",
-    "test:sdks": "bun run --filter '@goliapkg/sentori-*' test"
+    "test:sdks": "bun run --filter '@goliapkg/sentori-*' test",
+    "preflight": "echo '→ web check (tsc + eslint + prettier)' && (cd web && bun run check) && echo '→ web test' && (cd web && bun run test) && echo '→ build all SDKs (matches CI sdk job)' && bun run build:sdks && echo '→ all SDK tests' && bun run test:sdks && echo '✓ preflight green — safe to push'"
   }
 }
