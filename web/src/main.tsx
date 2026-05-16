@@ -8,7 +8,7 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 
 import { AuthProvider } from './auth/AuthProvider'
 import { ProtectedLayout } from './auth/ProtectedLayout'
-import { applyTheme } from './components/theme'
+import { installThemeWiring } from './components/theme'
 import { MODULES } from './modules/registry'
 import { ForgotPasswordView } from './views/forgot-password'
 import { InviteAcceptView } from './views/invite-accept'
@@ -38,7 +38,7 @@ const sentoriConfig = {
   token: sentoriToken ?? 'st_pk_unconfigured00000000000',
 }
 
-applyTheme()
+installThemeWiring()
 
 /**
  * Modules with `children` get a NESTED route so the parent renders
