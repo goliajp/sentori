@@ -210,6 +210,15 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/events/{event_id}/repro",
             get(api::repro::generate),
         )
+        // v0.9.3 +S3 — culprit commits per issue (manual mode).
+        .route(
+            "/projects/{project_id}/issues/{issue_id}/culprits",
+            get(api::culprits::list_for_issue).post(api::culprits::attach),
+        )
+        .route(
+            "/projects/{project_id}/issues/{issue_id}/culprits/{culprit_id}",
+            axum::routing::delete(api::culprits::detach),
+        )
         // v0.8.4 — cert-monitor watchlist + observations.
         .route(
             "/projects/{project_id}/cert-monitor/domains",

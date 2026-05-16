@@ -153,6 +153,14 @@ export function IssueDetailView() {
         </div>
       </header>
 
+      {projectId && (
+        <CulpritSection
+          issueId={issueId}
+          projectId={projectId}
+          sourceRepoUrl={currentProject?.sourceRepoUrl ?? null}
+        />
+      )}
+
       <Tabs current={tab} onChange={setTab} />
 
       {events.length > 0 && (
@@ -1025,6 +1033,140 @@ function StateEntry({
       <span className={`t-sm font-medium tracking-wide uppercase ${cls}`}>{label}</span>
       <span className="text-fg-muted t-sm font-mono tabular-nums">{formatRelative(entry.at)}</span>
       {entry.release && <span className="text-fg-muted t-md font-mono">in {entry.release}</span>}
+    </div>
+  )
+}
+
+// v0.9.3 +S3 — Likely Culprit section. Manual mode MVP: dashboard
+// user types a commit SHA, server fetches GitHub metadata, persists
+// + renders. Auto-detection (PAT + history sync) lands in v1.0.
+function CulpritSection({
+  issueId,
+  projectId,
+  sourceRepoUrl,
+}: {
+  issueId: string
+  projectId: string
+  sourceRepoUrl: null | string
+}) {
+  const qc = useQueryClient()
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState('')
+  const culpritsQ = useQuery({
+    queryFn: () => adminApi.listCulprits(projectId, issueId),
+    queryKey: ['culprits', projectId, issueId],
+  })
+  const attachM = useMutation({
+    mutationFn: (sha: string) => adminApi.attachCulprit(projectId, issueId, sha),
+    onSuccess: () => {
+      setDraft('')
+      setOpen(false)
+      void qc.invalidateQueries({ queryKey: ['culprits', projectId, issueId] })
+    },
+  })
+  const detachM = useMutation({
+    mutationFn: (id: string) => adminApi.detachCulprit(projectId, issueId, id),
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['culprits', projectId, issueId] }),
+  })
+
+  const culprits = culpritsQ.data ?? []
+  const noRepo = !sourceRepoUrl
+
+  if (culprits.length === 0 && !open) {
+    return (
+      <div className="border-border bg-bg-tertiary/30 flex items-center justify-between rounded-md border px-3 py-2">
+        <span className="text-fg-muted t-sm">
+          <span className="font-mono">Likely culprit:</span> unattributed
+        </span>
+        <button
+          className="text-accent hover:text-fg t-sm font-mono"
+          onClick={() => setOpen(true)}
+          type="button"
+        >
+          + attach commit
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="border-border bg-bg-tertiary/30 rounded-md border">
+      <div className="border-border flex items-center justify-between border-b px-3 py-2">
+        <span className="text-fg t-sm font-mono">Likely culprit</span>
+        <button
+          className="text-accent hover:text-fg t-sm font-mono"
+          onClick={() => setOpen((v) => !v)}
+          type="button"
+        >
+          {open ? 'cancel' : '+ attach'}
+        </button>
+      </div>
+      {open && (
+        <form
+          className="border-border flex items-center gap-2 border-b px-3 py-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            const sha = draft.trim()
+            if (sha.length < 7) return
+            attachM.mutate(sha)
+          }}
+        >
+          {noRepo ? (
+            <span className="text-warning t-sm">
+              Set <code className="font-mono">source_repo_url</code> in project settings first.
+            </span>
+          ) : (
+            <>
+              <input
+                className="border-border bg-bg-tertiary text-fg t-sm flex-1 rounded border px-2 py-1 font-mono"
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="commit sha (7+ chars)"
+                value={draft}
+              />
+              <button
+                className="bg-accent text-bg t-sm rounded px-3 py-1 font-medium disabled:opacity-50"
+                disabled={draft.trim().length < 7 || attachM.isPending}
+                type="submit"
+              >
+                {attachM.isPending ? 'fetching…' : 'attach'}
+              </button>
+            </>
+          )}
+        </form>
+      )}
+      <ul className="divide-border divide-y">
+        {culprits.map((c) => (
+          <li className="flex items-baseline gap-3 px-3 py-2" key={c.id}>
+            <span className="text-fg-muted font-mono text-[11px]">
+              {c.commitSha.slice(0, 7)}
+            </span>
+            <span className="text-fg t-sm flex-1 truncate">
+              {c.message ? c.message.split('\n')[0] : '(metadata fetch failed)'}
+            </span>
+            {c.author && (
+              <span className="text-fg-muted t-sm font-mono">@{c.author}</span>
+            )}
+            {c.htmlUrl && (
+              <a
+                className="text-accent t-sm hover:underline"
+                href={c.htmlUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                open ↗
+              </a>
+            )}
+            <button
+              className="text-fg-muted hover:text-danger t-sm font-mono"
+              onClick={() => detachM.mutate(c.id)}
+              type="button"
+            >
+              ×
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

@@ -341,6 +341,22 @@ export const adminApi = {
       `/projects/${projectId}/moments/${encodeURIComponent(name)}`,
     ),
 
+  /** v0.9.3 +S3 — culprit commits per issue. */
+  listCulprits: (projectId: string, issueId: string) =>
+    adminFetch<CulpritRow[]>(`/projects/${projectId}/issues/${issueId}/culprits`),
+
+  attachCulprit: (projectId: string, issueId: string, commitSha: string) =>
+    adminFetch<null>(`/projects/${projectId}/issues/${issueId}/culprits`, {
+      body: JSON.stringify({ commitSha }),
+      method: 'POST',
+    }),
+
+  detachCulprit: (projectId: string, issueId: string, culpritId: string) =>
+    adminFetch<null>(
+      `/projects/${projectId}/issues/${issueId}/culprits/${culpritId}`,
+      { method: 'DELETE' },
+    ),
+
   /** v0.9.2 +S6 — privacy score + findings. */
   privacyScore: (projectId: string, release?: string) => {
     const q = release ? `?release=${encodeURIComponent(release)}` : ''
@@ -691,6 +707,19 @@ export type CertObservation = {
   nameValue: null | string
   notAfter: string
   notBefore: string
+}
+
+// v0.9.3 +S3 — culprit commit shapes.
+export type CulpritRow = {
+  author: null | string
+  commitSha: string
+  committedAt: null | string
+  confidence: number
+  createdAt: string
+  htmlUrl: null | string
+  id: string
+  message: null | string
+  source: 'auto' | 'manual'
 }
 
 // v0.9.2 +S6 — Privacy Lab shapes.

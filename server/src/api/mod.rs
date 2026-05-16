@@ -3,6 +3,7 @@ pub mod admin_auth;
 pub mod alert_rules;
 pub mod attachments;
 pub mod cert_monitor;
+pub mod culprits;
 pub mod deploys;
 pub mod integrations;
 pub mod digests;
