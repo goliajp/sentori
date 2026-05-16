@@ -1,11 +1,8 @@
 // v0.8.3 — custom metrics surface.
 //
-// MVP shape: left rail lists every metric name seen in the last 24 h
-// (with the most-recent timestamp + 24 h count). Click one → right
-// pane shows the last N points as a table + a minimal SVG sparkline.
-// Time-series chart with axes / aggregation is intentionally deferred
-// until customers tell us which projections they want (sum vs avg vs
-// p99 — depends on whether the metric is a counter or a gauge).
+// Master/detail: left rail = metric names (counts + last-seen), right
+// pane = points table + minimal sparkline for the selected metric.
+// Aggregations (sum / avg / p99) deferred until customer signal.
 
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -35,79 +32,134 @@ export function MetricsView() {
   const points = pointsQ.data ?? []
 
   return (
-    <div className="flex h-full min-h-0 gap-3">
-      <aside className="border-border h-full w-80 shrink-0 overflow-y-auto rounded-md border">
-        <header className="border-border bg-bg-tertiary/60 sticky top-0 border-b px-3 py-2">
-          <span className="text-fg-muted t-sm font-semibold tracking-wider uppercase">
-            Metrics (last 24 h)
-          </span>
-        </header>
-        {namesQ.isLoading && <div className="text-fg-muted t-md px-3 py-3">Loading…</div>}
-        {!namesQ.isLoading && names.length === 0 && (
-          <div className="text-fg-muted t-md px-3 py-3">
-            No metrics yet. Call <code>sentori.recordMetric('name', value)</code> from the host app.
+    <div className="-mx-4 -my-3 flex h-[calc(100%+1.5rem)] min-h-0 overflow-hidden bg-[color:var(--paper)]">
+      <aside className="flex w-[20rem] shrink-0 flex-col overflow-hidden border-r border-[color:var(--rule)] bg-[color:var(--paper-2)]">
+        <header className="shrink-0 border-b border-[color:var(--rule)] px-4 py-3">
+          <h1
+            className="text-[color:var(--ink)]"
+            style={{
+              fontFamily: 'var(--font-sans)',
+              fontVariationSettings: "'wdth' 80, 'opsz' 24, 'wght' 700",
+              fontSize: '17px',
+              letterSpacing: '-0.018em',
+            }}
+          >
+            Metrics
+          </h1>
+          <div className="mt-1 font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase">
+            last 24 hours
           </div>
-        )}
-        <ul className="divide-border divide-y">
-          {names.map((n) => (
-            <li key={n.name}>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {namesQ.isLoading && <EmptyRail hint="Loading…" />}
+          {!namesQ.isLoading && names.length === 0 && (
+            <EmptyRail hint="Call sentori.recordMetric('name', value) to populate this list." />
+          )}
+          {names.map((n) => {
+            const active = selected === n.name
+            return (
               <button
-                className={`hover:bg-bg-tertiary/40 w-full px-3 py-2 text-left ${
-                  selected === n.name ? 'bg-bg-tertiary/60' : ''
+                className={`relative block w-full border-b border-[color:var(--rule-soft)] px-4 py-2.5 text-left transition-colors ${
+                  active ? 'bg-[color:var(--accent-soft)]' : 'hover:bg-[color:var(--paper)]'
                 }`}
+                key={n.name}
                 onClick={() => setSelected(n.name)}
                 type="button"
               >
-                <div className="t-md text-fg font-medium">{n.name}</div>
-                <div className="text-fg-muted t-sm flex items-center gap-2">
-                  <span className="tabular-nums">{n.count} points</span>
-                  <span className="font-mono">{formatRelative(n.lastSeen)}</span>
+                <span
+                  aria-hidden
+                  className={`absolute top-0 bottom-0 left-0 w-[2px] ${active ? 'bg-[color:var(--accent)]' : 'bg-transparent'}`}
+                />
+                <div className="font-mono text-[13px] text-[color:var(--ink)]">{n.name}</div>
+                <div className="mt-1 flex items-center gap-2 font-mono text-[10px] tracking-[0.05em] text-[color:var(--ink-muted)]">
+                  <span className="tabular-nums">{n.count.toLocaleString()} points</span>
+                  <span aria-hidden className="opacity-40">
+                    /
+                  </span>
+                  <span>{formatRelative(n.lastSeen)}</span>
                 </div>
               </button>
-            </li>
-          ))}
-        </ul>
+            )
+          })}
+        </div>
       </aside>
-      <main className="flex-1 overflow-auto">
-        {!selected && <div className="text-fg-muted t-md p-3">Pick a metric on the left.</div>}
-        {selected && pointsQ.isLoading && (
-          <div className="text-fg-muted t-md p-3">Loading points…</div>
+
+      <section className="min-w-0 flex-1 overflow-y-auto bg-[color:var(--paper)]">
+        {!selected && (
+          <Placeholder
+            hint="The left rail lists every metric name seen in the last 24 h."
+            title="Pick a metric"
+          />
         )}
+        {selected && pointsQ.isLoading && <Placeholder hint="Loading points…" title="" />}
         {selected && !pointsQ.isLoading && points.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-4 p-6">
+            <header className="pb-2">
+              <div className="font-mono text-[11px] tracking-[0.18em] text-[color:var(--accent)] uppercase">
+                metric
+              </div>
+              <h2 className="mt-1 font-mono text-[20px] text-[color:var(--ink)]">{selected}</h2>
+            </header>
             <Sparkline values={points.map((p) => p.value).reverse()} />
-            <table className="std-table w-full">
+            <table className="bench">
               <thead>
                 <tr>
-                  <th>ts</th>
-                  <th>value</th>
+                  <th>timestamp</th>
+                  <th className="num">value</th>
                   <th>tags</th>
                 </tr>
               </thead>
               <tbody>
                 {points.map((p) => (
                   <tr key={p.id}>
-                    <td className="font-mono tabular-nums">{p.ts}</td>
-                    <td className="tabular-nums">{p.value}</td>
-                    <td className="font-mono">{stringifyTags(p.tags)}</td>
+                    <td>{p.ts}</td>
+                    <td className="num">{p.value.toLocaleString()}</td>
+                    <td>{stringifyTags(p.tags)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-      </main>
+      </section>
     </div>
   )
 }
 
-/** Minimal inline SVG sparkline. No axes, no labels, no library — just
- *  a quick visual cue for "is this number going up or down". */
+function EmptyRail({ hint }: { hint: string }) {
+  return (
+    <div className="px-4 py-8 text-center">
+      <div className="mb-2 font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+        empty
+      </div>
+      <div className="mx-auto max-w-[24ch] text-[13px] leading-relaxed text-[color:var(--ink-soft)]">
+        {hint}
+      </div>
+    </div>
+  )
+}
+
+function Placeholder({ hint, title }: { hint: string; title: string }) {
+  return (
+    <div className="flex h-full items-center justify-center px-6">
+      <div className="text-center">
+        {title && (
+          <div className="mb-2 font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+            {title}
+          </div>
+        )}
+        <div className="text-[13px] text-[color:var(--ink-soft)]">{hint}</div>
+      </div>
+    </div>
+  )
+}
+
+/** Minimal inline SVG sparkline — `accent` stroke, no axes / labels. */
 function Sparkline({ values }: { values: number[] }) {
   if (values.length < 2) {
     return (
-      <div className="border-border text-fg-muted t-sm rounded border p-3">
-        Not enough points for a trend yet.
+      <div className="border-y border-[color:var(--rule)] py-3 text-center font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase">
+        not enough points for a trend yet
       </div>
     )
   }
@@ -121,19 +173,25 @@ function Sparkline({ values }: { values: number[] }) {
     .map((v, i) => `${(i * dx).toFixed(1)},${(H - ((v - min) / range) * H).toFixed(1)}`)
     .join(' ')
   return (
-    <div className="border-border rounded-md border p-3">
+    <div className="border-y border-[color:var(--rule)] py-3">
       <svg className="w-full" height={H} preserveAspectRatio="none" viewBox={`0 0 ${W} ${H}`}>
+        <polyline
+          fill="var(--accent)"
+          fillOpacity="0.08"
+          points={`0,${H} ${points} ${W},${H}`}
+          stroke="none"
+        />
         <polyline
           fill="none"
           points={points}
-          stroke="currentColor"
+          stroke="var(--accent)"
           strokeWidth="1.5"
           vectorEffect="non-scaling-stroke"
         />
       </svg>
-      <div className="text-fg-muted t-sm mt-1 flex justify-between font-mono tabular-nums">
-        <span>min {min}</span>
-        <span>max {max}</span>
+      <div className="mt-2 flex justify-between font-mono text-[10px] tracking-[0.05em] text-[color:var(--ink-muted)] uppercase tabular-nums">
+        <span>min {min.toLocaleString()}</span>
+        <span>max {max.toLocaleString()}</span>
       </div>
     </div>
   )

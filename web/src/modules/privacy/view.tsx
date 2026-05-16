@@ -1,14 +1,14 @@
 // v0.9.2 +S6 — Privacy Lab dashboard.
 //
-// Top: big "Privacy Score" gauge for the current release + risk tag
-// + breakdown by PII kind. Bottom: top leaking field paths + a recent
-// findings table. One-click "add mask rule" deferred to v1.0 (needs
-// a server-side scrubber config endpoint we don't have yet).
+// Score + risk + leak breakdown at top; "top leaking surfaces" middle;
+// recent findings tail. One-click "add mask rule" deferred to v1.0
+// (needs a server-side scrubber config endpoint we don't have yet).
 
 import { useQuery } from '@tanstack/react-query'
 
 import { adminApi } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
+import { PageHeader } from '@/layout/page-header'
 import { formatRelative } from '@/lib/format'
 
 export function PrivacyView() {
@@ -30,92 +30,85 @@ export function PrivacyView() {
   const findings = findingsQ.data ?? []
 
   const riskTone: Record<string, string> = {
-    high: 'text-danger',
-    low: 'text-success',
-    medium: 'text-warning',
+    high: 'text-[color:var(--danger)]',
+    low: 'text-[color:var(--success)]',
+    medium: 'text-[color:var(--warning)]',
   }
 
   return (
-    <div className="space-y-4">
-      <section className="border-border rounded-md border">
-        <header className="border-border bg-bg-tertiary/60 border-b px-3 py-2">
-          <span className="text-fg-muted t-sm font-semibold tracking-wider uppercase">
-            Privacy Score (per release)
-          </span>
-        </header>
-        {scoreQ.isLoading && <div className="text-fg-muted t-md px-3 py-3">Loading…</div>}
-        {score && (
-          <div className="grid grid-cols-3 gap-4 p-4">
-            <div>
-              <div className="text-fg-muted t-sm">release</div>
-              <div className="text-fg t-md font-mono">{score.release}</div>
-            </div>
-            <div>
-              <div className="text-fg-muted t-sm">score</div>
-              <div className={`text-fg t-lg font-mono tabular-nums ${riskTone[score.risk] ?? ''}`}>
-                {score.score} / 100
-              </div>
-              <div className={`t-sm font-mono uppercase ${riskTone[score.risk] ?? ''}`}>
-                {score.risk} risk
-              </div>
-            </div>
-            <div>
-              <div className="text-fg-muted t-sm">leaks</div>
-              <div className="text-fg t-md font-mono">
-                {score.leakingEvents.toLocaleString()} / {score.totalEvents.toLocaleString()} events
-              </div>
-              <div className="text-fg-muted t-sm">
-                {Object.entries(score.leaksByKind)
-                  .map(([k, v]) => `${k}=${v}`)
-                  .join(' · ') || '—'}
-              </div>
-            </div>
-          </div>
-        )}
-      </section>
+    <div className="sentori-page-in">
+      <PageHeader
+        subtitle={score?.release ? `release · ${score.release}` : 'per-release scan'}
+        title="Privacy"
+      />
 
-      <section className="border-border rounded-md border">
-        <header className="border-border bg-bg-tertiary/60 border-b px-3 py-2">
-          <span className="text-fg-muted t-sm font-semibold tracking-wider uppercase">
-            Top leaking surfaces
-          </span>
-        </header>
+      {scoreQ.isLoading && <EmptyHint>Computing score for the most-recent release…</EmptyHint>}
+
+      {score && (
+        <div className="rule-grid grid-cols-1 sm:grid-cols-3">
+          <ScoreCell label="release">
+            <span className="font-mono text-[18px] text-[color:var(--ink)]">{score.release}</span>
+          </ScoreCell>
+          <ScoreCell label="score">
+            <div className={`tabular-nums ${riskTone[score.risk] ?? 'text-[color:var(--ink)]'}`}>
+              {score.score}
+              <span className="ml-1 text-[20px] text-[color:var(--ink-muted)]">/100</span>
+            </div>
+            <div
+              className={`mt-1.5 font-mono text-[11px] tracking-[0.2em] uppercase ${
+                riskTone[score.risk] ?? 'text-[color:var(--ink-muted)]'
+              }`}
+            >
+              {score.risk} risk
+            </div>
+          </ScoreCell>
+          <ScoreCell label="leaks">
+            <div className="text-[color:var(--ink)] tabular-nums">
+              {score.leakingEvents.toLocaleString()}
+              <span className="text-[color:var(--ink-muted)]">
+                {' '}
+                / {score.totalEvents.toLocaleString()}
+              </span>
+            </div>
+            <div className="mt-1.5 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink-muted)]">
+              {Object.entries(score.leaksByKind)
+                .map(([k, v]) => `${k}=${v}`)
+                .join(' · ') || '—'}
+            </div>
+          </ScoreCell>
+        </div>
+      )}
+
+      <SubSection sub={`${score?.topFields.length ?? 0} surfaces`} title="Top leaking surfaces">
         {!score || score.topFields.length === 0 ? (
-          <div className="text-fg-muted t-md px-3 py-3">
-            No leaks observed in the current release. Good.
-          </div>
+          <EmptyHint>No leaks observed in the current release. Good.</EmptyHint>
         ) : (
-          <table className="std-table w-full">
+          <table className="bench">
             <thead>
               <tr>
                 <th>field</th>
                 <th>kind</th>
-                <th>occurrences</th>
+                <th className="num">occurrences</th>
               </tr>
             </thead>
             <tbody>
               {score.topFields.map((f, i) => (
                 <tr key={`${f.fieldPath}-${f.kind}-${i}`}>
-                  <td className="font-mono">{f.fieldPath}</td>
+                  <td className="lead">{f.fieldPath}</td>
                   <td>{f.kind}</td>
-                  <td className="tabular-nums">{f.count}</td>
+                  <td className="num">{f.count.toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-      </section>
+      </SubSection>
 
-      <section className="border-border rounded-md border">
-        <header className="border-border bg-bg-tertiary/60 border-b px-3 py-2">
-          <span className="text-fg-muted t-sm font-semibold tracking-wider uppercase">
-            Recent findings (50 most-recent)
-          </span>
-        </header>
+      <SubSection sub="50 most recent" title="Recent findings">
         {findings.length === 0 ? (
-          <div className="text-fg-muted t-md px-3 py-3">No findings yet.</div>
+          <EmptyHint>No findings yet.</EmptyHint>
         ) : (
-          <table className="std-table w-full">
+          <table className="bench">
             <thead>
               <tr>
                 <th>seen</th>
@@ -128,17 +121,65 @@ export function PrivacyView() {
             <tbody>
               {findings.map((f) => (
                 <tr key={f.id}>
-                  <td className="font-mono tabular-nums">{formatRelative(f.seenAt)}</td>
-                  <td className="font-mono">{f.release}</td>
-                  <td className="font-mono">{f.fieldPath}</td>
+                  <td className="num">{formatRelative(f.seenAt)}</td>
+                  <td>{f.release}</td>
+                  <td className="lead">{f.fieldPath}</td>
                   <td>{f.patternKind}</td>
-                  <td className="font-mono">{f.sample}</td>
+                  <td className="max-w-[40ch] truncate text-[color:var(--ink-soft)]">{f.sample}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-      </section>
+      </SubSection>
     </div>
+  )
+}
+
+function ScoreCell({ children, label }: { children: React.ReactNode; label: string }) {
+  return (
+    <div className="rule-cell">
+      <div className="t-tag">{label}</div>
+      <div
+        className="mt-3 text-[color:var(--ink)]"
+        style={{
+          fontFamily: 'var(--font-sans)',
+          fontVariationSettings: "'wdth' 84, 'opsz' 48, 'wght' 600",
+          fontSize: '32px',
+          letterSpacing: '-0.025em',
+          lineHeight: 1.05,
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function SubSection({
+  children,
+  sub,
+  title,
+}: {
+  children: React.ReactNode
+  sub: string
+  title: string
+}) {
+  return (
+    <section className="mt-2">
+      <header className="sec-head">
+        <span className="sec-head-title">{title}</span>
+        <span className="sec-head-sub">{sub}</span>
+      </header>
+      <div>{children}</div>
+    </section>
+  )
+}
+
+function EmptyHint({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="border-y border-[color:var(--rule)] py-6 text-center text-[13px] text-[color:var(--ink-soft)]">
+      {children}
+    </p>
   )
 }
