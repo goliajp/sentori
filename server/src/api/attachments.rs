@@ -76,6 +76,7 @@ pub async fn upload(
     multipart: Multipart,
 ) -> Response {
     if !ALLOWED_KINDS.contains(&kind.as_str()) {
+        tracing::warn!(%event_id, %kind, "attachment upload rejected: invalidKind");
         return bad_request("invalidKind");
     }
 
@@ -83,7 +84,13 @@ pub async fn upload(
 
     let parsed = match read_one_part(multipart, &kind).await {
         Ok(p) => p,
-        Err(e) => return e,
+        Err(e) => {
+            tracing::warn!(
+                %event_id, %project_id, %kind,
+                "attachment upload rejected: multipart parse / size / media-type",
+            );
+            return e;
+        }
     };
 
     // Hand the blob to the store. Disabled store returns 503 so the
@@ -100,7 +107,7 @@ pub async fn upload(
             )
                 .into_response(),
             other => {
-                tracing::error!(error = %other, "attachment put failed");
+                tracing::error!(error = %other, %event_id, %project_id, %kind, "attachment put failed");
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(json!({ "error": "storeFailure" })),
@@ -141,13 +148,20 @@ pub async fn upload(
     .await;
 
     if let Err(e) = res {
-        tracing::error!(error = %e, "event_attachments insert failed");
+        tracing::error!(error = %e, %event_id, %project_id, %kind, "event_attachments insert failed");
         let _ = state
             .attachments
             .delete(project_id, event_id, parsed.ref_id)
             .await;
         return server_error("dbError");
     }
+
+    tracing::info!(
+        %event_id, %project_id, kind = %kind,
+        ref_id = %parsed.ref_id,
+        size_bytes = parsed.data.len(),
+        "attachment upload ok",
+    );
 
     (
         StatusCode::CREATED,
