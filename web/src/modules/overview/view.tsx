@@ -50,21 +50,21 @@ function Hero({ count, orgName }: { count: number; orgName: string }) {
         className="max-w-prose text-[color:var(--ink)]"
         style={{
           fontFamily: 'var(--font-sans)',
-          fontVariationSettings: "'wdth' 70, 'opsz' 96, 'wght' 700",
-          fontSize: 'clamp(34px, 5vw, 54px)',
-          lineHeight: '1.04',
-          letterSpacing: '-0.035em',
+          fontVariationSettings: "'wdth' 100, 'opsz' 96, 'wght' 600",
+          fontSize: 'clamp(30px, 4.4vw, 46px)',
+          lineHeight: '1.08',
+          letterSpacing: '-0.022em',
         }}
       >
         Errors, traces &amp;{' '}
         <span
           style={{
             color: 'var(--accent)',
-            fontVariationSettings: "'wdth' 70, 'opsz' 96, 'wght' 900",
+            fontVariationSettings: "'wdth' 100, 'opsz' 96, 'wght' 600",
           }}
         >
           intent
-        </span>
+        </span>{' '}
         — at the speed of triage.
       </h2>
       <p className="mt-4 max-w-[56ch] text-[14px] leading-relaxed text-[color:var(--ink-soft)]">

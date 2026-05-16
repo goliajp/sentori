@@ -159,9 +159,9 @@ function Stat({
         className="mt-3 text-[color:var(--ink)]"
         style={{
           fontFamily: 'var(--font-sans)',
-          fontVariationSettings: "'wdth' 84, 'opsz' 48, 'wght' 600",
+          fontVariationSettings: "'wdth' 100, 'opsz' 48, 'wght' 550",
           fontSize: '28px',
-          letterSpacing: '-0.02em',
+          letterSpacing: '-0.014em',
           lineHeight: 1.1,
         }}
       >

@@ -9,8 +9,9 @@ import { ThemeToggle } from './theme-toggle'
  *     the warmth of the paper palette doesn't want chrome)
  *   • Three-column grid (1fr / auto / 1fr) — search sits at the
  *     geometric center regardless of side-slot widths
- *   • SENTORI wordmark uses the Plex Sans variable axis (wdth 80,
- *     wght 700) + a tora-orange terminal dot
+ *   • SENTORI wordmark sits at Roboto Flex's readable axis (wdth 95,
+ *     wght 600) + a tora-orange terminal dot — letter-spacing carries
+ *     the wordmark weight, not bold
  *   • Right: theme toggle
  */
 export function Toolbar() {
@@ -21,7 +22,7 @@ export function Toolbar() {
           className="text-[color:var(--ink)] uppercase"
           style={{
             fontFamily: 'var(--font-sans)',
-            fontVariationSettings: "'wdth' 70, 'opsz' 96, 'wght' 700",
+            fontVariationSettings: "'wdth' 95, 'opsz' 48, 'wght' 600",
             fontSize: '15px',
             letterSpacing: '0.22em',
           }}

@@ -31,7 +31,7 @@ export function IntegrationsView() {
                   className="text-[color:var(--ink)]"
                   style={{
                     fontFamily: 'var(--font-sans)',
-                    fontVariationSettings: "'wdth' 86, 'opsz' 24, 'wght' 600",
+                    fontVariationSettings: "'wdth' 100, 'opsz' 24, 'wght' 550",
                     fontSize: '15px',
                   }}
                 >

@@ -39,9 +39,9 @@ export function MetricsView() {
             className="text-[color:var(--ink)]"
             style={{
               fontFamily: 'var(--font-sans)',
-              fontVariationSettings: "'wdth' 80, 'opsz' 24, 'wght' 700",
+              fontVariationSettings: "'wdth' 95, 'opsz' 24, 'wght' 550",
               fontSize: '17px',
-              letterSpacing: '-0.018em',
+              letterSpacing: '-0.01em',
             }}
           >
             Metrics

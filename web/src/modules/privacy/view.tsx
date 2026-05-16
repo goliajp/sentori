@@ -144,9 +144,9 @@ function ScoreCell({ children, label }: { children: React.ReactNode; label: stri
         className="mt-3 text-[color:var(--ink)]"
         style={{
           fontFamily: 'var(--font-sans)',
-          fontVariationSettings: "'wdth' 84, 'opsz' 48, 'wght' 600",
+          fontVariationSettings: "'wdth' 100, 'opsz' 48, 'wght' 550",
           fontSize: '32px',
-          letterSpacing: '-0.025em',
+          letterSpacing: '-0.016em',
           lineHeight: 1.05,
         }}
       >

@@ -12,7 +12,7 @@
  * tell two deploys apart, short enough to fit in the sidebar.
  */
 
-export const SENTORI_VERSION = 'v0.9.2'
+export const SENTORI_VERSION = 'v0.9.3'
 
 const rawSha: string | undefined = import.meta.env.VITE_GIT_SHA
 export const BUILD_SHA = rawSha?.slice(0, 7) || 'dev'

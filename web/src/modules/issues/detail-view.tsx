@@ -132,10 +132,10 @@ export function IssueDetailView() {
           className="mt-2 max-w-prose text-[color:var(--ink)]"
           style={{
             fontFamily: 'var(--font-sans)',
-            fontVariationSettings: "'wdth' 80, 'opsz' 48, 'wght' 700",
+            fontVariationSettings: "'wdth' 95, 'opsz' 48, 'wght' 600",
             fontSize: 'clamp(22px, 2.6vw, 30px)',
-            letterSpacing: '-0.025em',
-            lineHeight: '1.12',
+            letterSpacing: '-0.018em',
+            lineHeight: '1.14',
           }}
         >
           {displayMessage(issue.messageSample)}

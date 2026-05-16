@@ -237,9 +237,9 @@ export function ScreenshotDebugCenter({
               <div
                 className="mt-1 font-sans text-[color:var(--ink)]"
                 style={{
-                  fontVariationSettings: "'wdth' 84, 'opsz' 24, 'wght' 700",
+                  fontVariationSettings: "'wdth' 100, 'opsz' 24, 'wght' 550",
                   fontSize: '15px',
-                  letterSpacing: '-0.015em',
+                  letterSpacing: '-0.005em',
                 }}
               >
                 What was on screen

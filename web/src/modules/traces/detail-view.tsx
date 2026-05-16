@@ -36,10 +36,10 @@ export function TraceDetailView() {
           className="mt-1 text-[color:var(--ink)]"
           style={{
             fontFamily: 'var(--font-sans)',
-            fontVariationSettings: "'wdth' 80, 'opsz' 48, 'wght' 700",
+            fontVariationSettings: "'wdth' 95, 'opsz' 48, 'wght' 600",
             fontSize: '26px',
-            letterSpacing: '-0.025em',
-            lineHeight: 1,
+            letterSpacing: '-0.018em',
+            lineHeight: 1.05,
           }}
         >
           {trace?.rootOp ?? trace?.rootName ?? `trace ${traceId.slice(0, 8)}`}
@@ -120,9 +120,9 @@ function Stat({
         className={highlight ? 'text-[color:var(--accent)]' : 'text-[color:var(--ink)]'}
         style={{
           fontFamily: 'var(--font-sans)',
-          fontVariationSettings: "'wdth' 84, 'opsz' 48, 'wght' 600",
+          fontVariationSettings: "'wdth' 100, 'opsz' 48, 'wght' 550",
           fontSize: '28px',
-          letterSpacing: '-0.02em',
+          letterSpacing: '-0.014em',
           marginTop: '12px',
           lineHeight: 1,
         }}

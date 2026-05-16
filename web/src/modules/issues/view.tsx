@@ -105,9 +105,9 @@ function RailHeader({
           className="text-[color:var(--ink)]"
           style={{
             fontFamily: 'var(--font-sans)',
-            fontVariationSettings: "'wdth' 80, 'opsz' 24, 'wght' 700",
+            fontVariationSettings: "'wdth' 95, 'opsz' 24, 'wght' 550",
             fontSize: '17px',
-            letterSpacing: '-0.018em',
+            letterSpacing: '-0.01em',
           }}
         >
           Issues
@@ -159,7 +159,7 @@ function RailRow({ row, selected }: { row: IssueRow; selected: boolean }) {
       <div className="flex min-w-0 items-baseline gap-2">
         <span
           className="min-w-0 flex-1 truncate font-sans text-[13px] text-[color:var(--ink)]"
-          style={{ fontVariationSettings: "'wdth' 90, 'opsz' 14, 'wght' 600" }}
+          style={{ fontVariationSettings: "'wdth' 100, 'opsz' 14, 'wght' 550" }}
         >
           {row.errorType}
         </span>
@@ -246,9 +246,9 @@ function DetailPlaceholder() {
           className="mb-3 text-[color:var(--ink)]"
           style={{
             fontFamily: 'var(--font-sans)',
-            fontVariationSettings: "'wdth' 80, 'opsz' 24, 'wght' 700",
+            fontVariationSettings: "'wdth' 95, 'opsz' 24, 'wght' 550",
             fontSize: '22px',
-            letterSpacing: '-0.018em',
+            letterSpacing: '-0.01em',
           }}
         >
           Pick a row on the left.

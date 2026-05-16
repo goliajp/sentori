@@ -146,15 +146,17 @@ body {
   line-height: 1.35;
 }
 
-/* Editorial display — Plex Sans with condensed axis + tight tracking.
- * Use on page hero numerics, KPI values, the SENTORI wordmark. */
+/* Editorial display — Roboto Flex at its readable sweet spot
+ * (default-ish width, mid weight). Use on page hero numerics, KPI
+ * values, the SENTORI wordmark. Heavy + condensed turned strokes
+ * stencil-ey at large sizes; clarity beats editorial drama. */
 @utility t-display {
   font-family: var(--font-sans);
   font-variation-settings:
-    'wdth' 80,
+    'wdth' 100,
     'opsz' 96,
-    'wght' 700;
-  letter-spacing: -0.03em;
+    'wght' 550;
+  letter-spacing: -0.018em;
   line-height: 1;
   font-feature-settings: 'tnum';
 }
@@ -181,9 +183,9 @@ body {
  * Title rows (.page-head, .sec-head) carry NO horizontal rules.
  * Hierarchy lives in the type scale alone:
  *
- *   .page-head-title    26px Plex Sans, wdth 80, wght 700
- *   .sec-head-title     15px Plex Sans, wdth 84, wght 600
- *   th (column label)   10px Plex Mono uppercase, 0.18em tracking
+ *   .page-head-title    24px Roboto Flex, wdth 95, wght 600
+ *   .sec-head-title     14px Roboto Flex, wdth 100, wght 550
+ *   th (column label)   10px Roboto Mono uppercase, 0.18em tracking
  *
  * Rules are reserved for delimiting DATA STRIPS — `.bench` and
  * `.rule-grid` open with a strong rule and close with a strong rule,
@@ -203,14 +205,17 @@ body {
 }
 .page-head-title {
   font-family: var(--font-sans);
+  /* Roboto Flex's sweet spot is wdth ~95 / wght ~550. Going narrower
+   * + heavier turns the strokes stencil-ey at this size; stay close
+   * to the default axis for clarity over editorial drama. */
   font-variation-settings:
-    'wdth' 80,
-    'opsz' 48,
-    'wght' 700;
-  font-size: 26px;
-  letter-spacing: -0.025em;
+    'wdth' 95,
+    'opsz' 36,
+    'wght' 600;
+  font-size: 24px;
+  letter-spacing: -0.015em;
   color: var(--ink);
-  line-height: 1;
+  line-height: 1.05;
 }
 .page-head-count {
   font-family: var(--font-mono);
@@ -243,11 +248,11 @@ body {
 .sec-head-title {
   font-family: var(--font-sans);
   font-variation-settings:
-    'wdth' 84,
-    'opsz' 24,
-    'wght' 600;
-  font-size: 15px;
-  letter-spacing: -0.012em;
+    'wdth' 100,
+    'opsz' 18,
+    'wght' 550;
+  font-size: 14px;
+  letter-spacing: -0.005em;
   color: var(--ink);
 }
 .sec-head-sub {
