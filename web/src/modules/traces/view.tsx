@@ -7,15 +7,6 @@ import { PageHeader } from '@/layout/page-header'
 import { formatRelative } from '@/lib/format'
 
 export function TracesView() {
-  // Traces is configured as a parent route with `:traceId` nested
-  // under it (see main.tsx moduleChildren). When detail is active we
-  // render <Outlet /> instead of the list — full-page detail, not
-  // master-detail like Issues. Without this the parent's list would
-  // keep rendering and the detail route would never mount.
-  //
-  // The list itself lives in <TraceList /> below so the early return
-  // doesn't violate rules-of-hooks (the list's useQuery / useOrg /
-  // useNavigate run consistently inside it).
   const params = useParams<{ traceId: string }>()
   if (params.traceId) return <Outlet />
   return <TraceList />
@@ -35,85 +26,74 @@ function TraceList() {
   const traces = data?.traces ?? []
 
   return (
-    <div className="space-y-3">
+    <div className="sentori-page-in space-y-5">
       <PageHeader
         count={traces.length}
-        subtitle="Distributed root spans across services"
+        num="03"
+        subtitle="Distributed root spans · last 24h"
         title="Traces"
       />
 
-      {!projectId && <Empty hint="Select a project" title="No project" />}
-      {projectId && isLoading && <Empty hint="Loading…" title="Traces" />}
-      {projectId && error && <Empty hint="Failed to load traces." title="Error" />}
+      {!projectId && <Empty hint="Select a project" title="no project" />}
+      {projectId && isLoading && <Empty hint="Loading…" title="traces" />}
+      {projectId && error && <Empty hint="Failed to load traces." title="error" />}
       {projectId && !isLoading && !error && traces.length === 0 && (
-        <Empty hint="No traces in the selected window." title="No traces" />
+        <Empty hint="No traces in the selected window." title="empty" />
       )}
 
       {traces.length > 0 && (
-        <div className="std-table border-border overflow-hidden rounded-md border">
-          <table>
-            <thead>
-              <tr className="text-fg-muted t-sm tracking-wider uppercase">
-                <th className="text-left font-medium">Trace</th>
-                <th className="w-24 text-right font-medium">Duration</th>
-                <th className="w-20 text-right font-medium">Spans</th>
-                <th className="w-32 text-left font-medium">Service</th>
-                <th className="w-24 text-left font-medium">Started</th>
-              </tr>
-            </thead>
-            <tbody>
-              {traces.map((t) => {
-                const href = `/org/${currentOrg.slug}/traces/${t.traceId}`
-                return (
-                  <tr
-                    className="hover:bg-bg-tertiary/40 focus-visible:outline-accent cursor-pointer -outline-offset-1 transition-colors focus-visible:outline focus-visible:outline-1"
-                    key={t.traceId}
-                    onClick={(e) => {
-                      // Cmd/Ctrl/Middle-click → let the first-cell <Link>
-                      // open in a new tab. Plain click anywhere else on
-                      // the row navigates in place.
-                      if (e.metaKey || e.ctrlKey || e.button === 1) return
+        <table className="bench">
+          <thead>
+            <tr>
+              <th>trace</th>
+              <th className="num">duration</th>
+              <th className="num">spans</th>
+              <th>service</th>
+              <th className="num">started</th>
+            </tr>
+          </thead>
+          <tbody>
+            {traces.map((t) => {
+              const href = `/org/${currentOrg.slug}/traces/${t.traceId}`
+              return (
+                <tr
+                  className="cursor-pointer"
+                  key={t.traceId}
+                  onClick={(e) => {
+                    if (e.metaKey || e.ctrlKey || e.button === 1) return
+                    navigate(href)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
                       navigate(href)
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        navigate(href)
-                      }
-                    }}
-                    role="link"
-                    tabIndex={0}
-                  >
-                    <td>
-                      <Link
-                        className="text-fg t-md font-mono"
-                        onClick={(e) => e.stopPropagation()}
-                        to={href}
-                      >
-                        {/* Fallback chain: root span op → root span
-                         *  name → short trace id. Insight's reports
-                         *  showed empty "—" rows for traces with no
-                         *  named root, which made the list
-                         *  un-scannable. */}
-                        {t.rootOp ?? t.rootName ?? `trace ${t.traceId.slice(0, 8)}`}
-                      </Link>
-                    </td>
-                    <td className="text-fg t-md text-right tabular-nums">
-                      {t.durationMs >= 1000
-                        ? `${(t.durationMs / 1000).toFixed(2)}s`
-                        : `${t.durationMs}ms`}
-                    </td>
-                    <td className="text-fg t-md text-right tabular-nums">{t.spanCount}</td>
-                    <td className="text-fg-muted t-md font-mono">{t.rootName ?? '—'}</td>
-                    <td className="text-fg-muted t-md tabular-nums">
-                      {formatRelative(t.lastSeen)}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                    }
+                  }}
+                  role="link"
+                  tabIndex={0}
+                >
+                  <td className="lead">
+                    <Link
+                      className="text-[color:var(--ink)] hover:text-[color:var(--accent)]"
+                      onClick={(e) => e.stopPropagation()}
+                      to={href}
+                    >
+                      {t.rootOp ?? t.rootName ?? `trace ${t.traceId.slice(0, 8)}`}
+                    </Link>
+                  </td>
+                  <td className="num text-[color:var(--ink)]">
+                    {t.durationMs >= 1000
+                      ? `${(t.durationMs / 1000).toFixed(2)}s`
+                      : `${t.durationMs}ms`}
+                  </td>
+                  <td className="num">{t.spanCount}</td>
+                  <td>{t.rootName ?? '—'}</td>
+                  <td className="num">{formatRelative(t.lastSeen)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       )}
     </div>
   )
@@ -121,9 +101,11 @@ function TraceList() {
 
 function Empty({ hint, title }: { hint: string; title: string }) {
   return (
-    <div className="border-border bg-bg-secondary/30 rounded-md border px-6 py-12 text-center">
-      <div className="text-fg-muted t-sm mb-1 font-semibold tracking-wider uppercase">{title}</div>
-      <div className="text-fg t-md">{hint}</div>
+    <div className="border-t border-b border-[color:var(--rule)] px-0 py-10 text-center">
+      <div className="mb-2 font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+        {title}
+      </div>
+      <div className="text-[13px] text-[color:var(--ink-soft)]">{hint}</div>
     </div>
   )
 }

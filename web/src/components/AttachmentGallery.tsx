@@ -1,17 +1,18 @@
 import { useQuery } from '@tanstack/react-query'
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 
 import { adminApi, type Attachment } from '@/api/client'
 
 import { ReplayPlayer } from './ReplayPlayer'
+import { ScreenshotDebugCenter, DefRow } from './ScreenshotDebugCenter'
 import { SessionTrailViewer } from './SessionTrailViewer'
 import { StateTimetravelViewer } from './StateTimetravelViewer'
 import { ViewTreePanel } from './ViewTreePanel'
 
 /**
- * v2 inline replacement for the deleted `<InfoBox>` — semantic-toned
- * box (info / warning / danger). Kept local so AttachmentGallery has
- * no out-of-module deps beyond its real reason for existing.
+ * Inline replacement for the deleted `<InfoBox>` — paper-toned, no
+ * coloured backgrounds (we collapse semantic status onto the single
+ * accent or the danger token). Bordered rule only on the top.
  */
 function InfoBox({
   children,
@@ -22,42 +23,45 @@ function InfoBox({
   title: string
   variant?: 'danger' | 'info' | 'warning'
 }) {
-  const cls =
-    variant === 'danger'
-      ? 'border-danger/40 bg-danger/5 text-danger'
-      : variant === 'warning'
-        ? 'border-warning/40 bg-warning/5 text-warning'
-        : 'border-info/40 bg-info/5 text-info'
+  const accent = variant === 'danger' ? 'var(--danger)' : 'var(--accent)'
   return (
-    <div className={`t-md rounded-md border px-3 py-2 ${cls}`}>
-      <div className="t-sm mb-1 font-semibold tracking-wider uppercase">{title}</div>
-      <div className="text-fg">{children}</div>
+    <div className="border-t border-b px-0 py-3" style={{ borderColor: 'var(--rule)' }}>
+      <div
+        className="mb-1.5 font-mono text-[10px] tracking-[0.22em] uppercase"
+        style={{ color: accent }}
+      >
+        {title}
+      </div>
+      <div className="text-[13px] text-[color:var(--ink-soft)]">{children}</div>
     </div>
   )
 }
 
 /**
- * Phase 42 sub-C.09 / D.11 / D.12 — visual slot for SDK-uploaded
- * attachments on the issue-detail page.
+ * Attachment gallery — sits on the issue-detail page under the stack
+ * trace. Pulls server-of-truth attachments from
+ * `/admin/api/events/<id>/attachments` (Phase 48 sub-A.2 — the wire
+ * `payload.attachments[]` is treated as a hint, not a contract).
  *
- * Phase 48 sub-A.2 — pulls attachments directly from
- * `/admin/api/events/<id>/attachments` instead of trusting
- * `event.payload.attachments[]` echoed by the client. A broken echo
- * (proxy rewriting 201 → 202 on upload, network blip between attach
- * + event POST) no longer hides screenshots. Server is source-of-
- * truth; `payload.attachments` is treated as a hint at best.
+ * Editorial design: thumbnails sit on a hairline-divided strip with
+ * no per-tile chrome. Clicking opens the new
+ * `<ScreenshotDebugCenter>` — a three-pane fullscreen page that
+ * surfaces the screenshot at viewport scale alongside the same
+ * event-context fields the issue-detail page already shows.
  *
- * Empty state now renders "No attachments captured" instead of
- * `return null` so the user can tell whether the section is wired
- * up vs. truly has no data.
- *
- * Screenshots render as lazy-loaded thumbnails; clicking one opens
- * a modal `<Lightbox>` with the full-size image plus keyboard
- * controls (esc to close, ← / → to step through siblings) and a
- * download button. Non-image kinds (`viewTree` / `stateSnapshot` /
- * `logTail` / `sessionTrail`) get a dedicated viewer.
+ * `eventContext` is the slot the parent fills with `<DefRow>`s for
+ * release / device / geo / error / breadcrumbs — keeps the gallery
+ * scope-free (no second event-detail fetch).
  */
-export function AttachmentGallery({ eventId, projectId }: { eventId: string; projectId: string }) {
+export function AttachmentGallery({
+  eventContext,
+  eventId,
+  projectId,
+}: {
+  eventContext?: ReactNode
+  eventId: string
+  projectId: string
+}) {
   const { data, error, isLoading } = useQuery({
     enabled: !!eventId && !!projectId,
     queryFn: () => adminApi.listEventAttachments(projectId, eventId),
@@ -96,16 +100,16 @@ export function AttachmentGallery({ eventId, projectId }: { eventId: string; pro
   if (isLoading) {
     return (
       <Frame>
-        <p className="text-fg-muted text-[12px]">Loading attachments…</p>
+        <p className="text-[12px] text-[color:var(--ink-muted)]">Loading attachments…</p>
       </Frame>
     )
   }
   if (error) {
     return (
       <Frame>
-        <InfoBox variant="danger" title="Failed to load attachments">
-          The server couldn't return attachments for this event. Retry the page; if it keeps
-          failing, check the dashboard console for the request response.
+        <InfoBox variant="danger" title="Failed to load">
+          The server didn't return attachments for this event. Retry the page; if it keeps failing,
+          check the dashboard console for the request response.
         </InfoBox>
       </Frame>
     )
@@ -113,7 +117,7 @@ export function AttachmentGallery({ eventId, projectId }: { eventId: string; pro
   if (attachments.length === 0) {
     return (
       <Frame>
-        <InfoBox variant="info" title="No attachments captured for this event">
+        <InfoBox title="No attachments captured">
           Add <code className="font-mono">capture: {`{ screenshot: true }`}</code> to your SDK{' '}
           <code className="font-mono">init</code> call to attach a screenshot when{' '}
           <code className="font-mono">captureException</code> fires.
@@ -122,121 +126,134 @@ export function AttachmentGallery({ eventId, projectId }: { eventId: string; pro
     )
   }
 
+  // Concatenated open-list: screenshots first, then others. The
+  // debug center steps through in this order so siblings stay close.
+  const openable = [...screenshots, ...others]
+
   return (
     <Frame>
-      {(screenshots.length > 0 || others.length > 0) && (
-        <ul className="flex flex-wrap gap-3">
+      {openable.length > 0 && (
+        <ul className="flex flex-wrap gap-4 pt-3">
           {screenshots.map((a, i) => (
             <li key={a.ref}>
               <ScreenshotTile attachment={a} eventId={eventId} onOpen={() => setOpenIdx(i)} />
             </li>
           ))}
-          {others.map((a) => (
+          {others.map((a, i) => (
             <li key={a.ref}>
-              <NonImageTile attachment={a} eventId={eventId} />
+              <NonImageTile
+                attachment={a}
+                eventId={eventId}
+                onOpen={() => setOpenIdx(screenshots.length + i)}
+              />
             </li>
           ))}
         </ul>
       )}
-      {/* Phase 42 sub-G.07: inline the view tree right under the gallery
-          for `viewTree` attachments. Multiple trees (rare — typically
-          one per source: ios, android, js) get stacked. */}
       {viewTrees.map((a) => (
         <details
-          className="border-border bg-bg-tertiary/30 rounded-md border"
+          className="mt-4 border-t border-[color:var(--rule)]"
           key={a.ref}
           open={viewTrees.length === 1}
         >
-          <summary className="text-fg cursor-pointer px-3 py-2 text-[12px]">
-            View tree at error
+          <summary className="flex cursor-pointer items-baseline gap-3 py-3">
+            <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+              View tree
+            </span>
+            <span className="font-sans text-[14px] text-[color:var(--ink)]">at error</span>
             {a.source && (
-              <span className="text-fg-muted ml-2 text-[10px] uppercase">{a.source}</span>
+              <span className="ml-auto font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+                {a.source}
+              </span>
             )}
           </summary>
-          <div className="px-3 pb-3">
+          <div className="pb-4">
             <ViewTreePanel attachmentRef={a.ref} eventId={eventId} />
           </div>
         </details>
       ))}
       {sessionTrails.map((a) => (
         <details
-          className="border-border bg-bg-tertiary/30 rounded-md border"
+          className="mt-4 border-t border-[color:var(--rule)]"
           key={a.ref}
           open={sessionTrails.length === 1}
         >
-          <summary className="text-fg cursor-pointer px-3 py-2 text-[12px]">
-            Session trail
-            <span className="text-fg-muted ml-2 text-[10px]">steps leading up to the error</span>
+          <summary className="flex cursor-pointer items-baseline gap-3 py-3">
+            <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+              Session trail
+            </span>
+            <span className="font-sans text-[14px] text-[color:var(--ink)]">
+              steps leading up to the error
+            </span>
           </summary>
-          <div className="px-3 pb-3">
+          <div className="pb-4">
             <SessionTrailViewer attachmentRef={a.ref} eventId={eventId} />
           </div>
         </details>
       ))}
-      {/* v0.9.6 #2 — wireframe replay player for `replay` attachments
-          (NDJSON of view-tree snapshots, one per second up to 60). */}
       {replays.map((a) => (
         <details
-          className="border-border bg-bg-tertiary/30 rounded-md border"
+          className="mt-4 border-t border-[color:var(--rule)]"
           key={a.ref}
           open={replays.length === 1}
         >
-          <summary className="text-fg cursor-pointer px-3 py-2 text-[12px]">
-            Session replay (wireframe)
-            <span className="text-fg-muted ml-2 text-[10px]">up to 60 s before the error</span>
+          <summary className="flex cursor-pointer items-baseline gap-3 py-3">
+            <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+              Session replay
+            </span>
+            <span className="font-sans text-[14px] text-[color:var(--ink)]">
+              wireframe · up to 60 s pre-error
+            </span>
           </summary>
-          <div className="px-3 pb-3">
+          <div className="pb-4">
             <ReplayPlayer attachmentRef={a.ref} eventId={eventId} />
           </div>
         </details>
       ))}
-      {/* v0.9.3 +S2-VIEW — state time-travel for `stateSnapshot`
-          attachments uploaded by SDKs that called `bindState` or
-          `recordState`. Default open when there's only one. */}
       {stateSnapshots.map((a) => (
         <details
-          className="border-border bg-bg-tertiary/30 rounded-md border"
+          className="mt-4 border-t border-[color:var(--rule)]"
           key={a.ref}
           open={stateSnapshots.length === 1}
         >
-          <summary className="text-fg cursor-pointer px-3 py-2 text-[12px]">
-            State time-travel
-            <span className="text-fg-muted ml-2 text-[10px]">
-              redux / zustand / manual snapshots leading up to the error
+          <summary className="flex cursor-pointer items-baseline gap-3 py-3">
+            <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+              State time-travel
+            </span>
+            <span className="font-sans text-[14px] text-[color:var(--ink)]">
+              redux / zustand / manual snapshots
             </span>
           </summary>
-          <div className="px-3 pb-3">
+          <div className="pb-4">
             <StateTimetravelViewer attachmentRef={a.ref} eventId={eventId} />
           </div>
         </details>
       ))}
-      {openIdx !== null && (
-        <Lightbox
-          attachments={screenshots}
+      {openIdx !== null && openable.length > 0 && (
+        <ScreenshotDebugCenter
+          attachments={openable}
           eventId={eventId}
           onClose={() => setOpenIdx(null)}
-          onStep={(d) =>
-            setOpenIdx((cur) => {
-              if (cur === null || screenshots.length === 0) return cur
-              return (cur + d + screenshots.length) % screenshots.length
-            })
-          }
           startIdx={openIdx}
-        />
+        >
+          {eventContext}
+        </ScreenshotDebugCenter>
       )}
     </Frame>
   )
 }
 
-/** Phase 49 sub-A — every state (loading / error / empty / data) lives
- *  inside this section frame so the section header stays consistent. */
+/** Section header lives outside the column container so its hairline
+ *  spans the full attachment band. */
 function Frame({ children }: { children: ReactNode }) {
   return (
-    <section className="space-y-3">
-      <h2 className="text-fg-muted text-[11px] font-medium tracking-[0.06em] uppercase">
-        Captured at error
-      </h2>
-      {children}
+    <section className="space-y-1">
+      <header className="sec-head">
+        <span className="sec-head-num">06</span>
+        <h2 className="sec-head-title">Captured at error</h2>
+        <span className="sec-head-sub">attachments</span>
+      </header>
+      <div className="pt-3">{children}</div>
     </section>
   )
 }
@@ -257,118 +274,52 @@ function ScreenshotTile({
   const url = attachmentUrl(eventId, attachment.ref)
   return (
     <button
-      className="border-border hover:border-accent/60 block overflow-hidden rounded-md border"
+      className="group block transition-all"
       onClick={onOpen}
-      title={`Screenshot · ${attachment.source ?? 'unknown source'}`}
+      title={`Open in debug center · ${attachment.source ?? 'unknown'}`}
       type="button"
     >
-      <img alt="Crash screenshot" className="block max-h-40 w-auto" loading="lazy" src={url} />
+      <div className="overflow-hidden outline outline-1 outline-offset-0 outline-[color:var(--rule)] transition-colors group-hover:outline-[color:var(--accent)]">
+        <img alt="Crash screenshot" className="block max-h-44 w-auto" loading="lazy" src={url} />
+      </div>
+      <div className="mt-1.5 font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase transition-colors group-hover:text-[color:var(--accent)]">
+        screenshot
+        {attachment.source && (
+          <span className="ml-2 text-[color:var(--ink-muted)]">· {attachment.source}</span>
+        )}
+        <span className="ml-2 tracking-normal text-[color:var(--ink-muted)] normal-case group-hover:text-[color:var(--accent)]">
+          ↗ open
+        </span>
+      </div>
     </button>
   )
 }
 
-function NonImageTile({ attachment, eventId }: { attachment: Attachment; eventId: string }) {
-  const url = attachmentUrl(eventId, attachment.ref)
-  return (
-    <a
-      className="border-border hover:border-accent/60 text-fg-muted hover:text-fg flex items-center gap-2 rounded-md border px-3 py-2 text-[12px]"
-      href={url}
-      rel="noopener noreferrer"
-      target="_blank"
-      title={`${attachment.kind} · ${attachment.source ?? 'unknown source'}`}
-    >
-      <span className="font-mono">{attachment.kind}</span>
-      {attachment.source && <span className="text-[10px] uppercase">{attachment.source}</span>}
-    </a>
-  )
-}
-
-function Lightbox({
-  attachments,
-  eventId,
-  onClose,
-  onStep,
-  startIdx,
+function NonImageTile({
+  attachment,
+  onOpen,
 }: {
-  attachments: Attachment[]
+  attachment: Attachment
   eventId: string
-  onClose: () => void
-  onStep: (delta: number) => void
-  startIdx: number
+  onOpen: () => void
 }) {
-  const active = attachments[startIdx]
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-      else if (e.key === 'ArrowRight') onStep(+1)
-      else if (e.key === 'ArrowLeft') onStep(-1)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, onStep])
-
-  if (!active) return null
-
-  const url = attachmentUrl(eventId, active.ref)
-  const hasSiblings = attachments.length > 1
-
   return (
-    <div
-      aria-modal
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-6"
-      onClick={onClose}
-      role="dialog"
+    <button
+      className="flex flex-col items-start gap-1 border-l-2 border-[color:var(--rule)] px-3 py-2 text-[color:var(--ink-soft)] transition-colors hover:border-[color:var(--accent)] hover:text-[color:var(--ink)]"
+      onClick={onOpen}
+      title={`Open in debug center · ${attachment.kind}`}
+      type="button"
     >
-      {/* Inner wrapper stops click-on-image from closing the modal. */}
-      <div
-        className="flex max-h-full max-w-full flex-col items-center"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <img
-          alt="Crash screenshot"
-          className="max-h-[80vh] max-w-[90vw] rounded-md shadow-2xl"
-          src={url}
-        />
-        <div className="text-fg-muted mt-3 flex items-center gap-4 text-[11px]">
-          <span>
-            {startIdx + 1} / {attachments.length}
-            {active.source && <span className="ml-2 uppercase">{active.source}</span>}
-          </span>
-          {hasSiblings && (
-            <>
-              <button
-                aria-label="Previous"
-                className="hover:text-fg"
-                onClick={() => onStep(-1)}
-                type="button"
-              >
-                ← prev
-              </button>
-              <button
-                aria-label="Next"
-                className="hover:text-fg"
-                onClick={() => onStep(+1)}
-                type="button"
-              >
-                next →
-              </button>
-            </>
-          )}
-          <a
-            className="hover:text-fg"
-            download
-            href={url}
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            ↓ download
-          </a>
-          <button aria-label="Close" className="hover:text-fg" onClick={onClose} type="button">
-            ✕ esc
-          </button>
-        </div>
-      </div>
-    </div>
+      <span className="font-mono text-[12px]">{attachment.kind}</span>
+      {attachment.source && (
+        <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+          {attachment.source}
+        </span>
+      )}
+    </button>
   )
 }
+
+// Re-export DefRow so issue-detail can compose its own context block
+// inline without importing two paths.
+export { DefRow }

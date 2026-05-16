@@ -1,38 +1,51 @@
 import type { ReactNode } from 'react'
 
 /**
- * Standard page-level header for list / index / detail pages.
+ * Editorial page header — tri-part pattern matching the section-head
+ * utility but pitched for the page-level title.
  *
- *   • h1 in t-lg + count chip + subtitle
- *   • Optional right-side `actions` slot
+ *   ┌─────────────────────────────────────────────────────────────┐
+ *   │ 02   Issues                          subtitle · last 24h    │  ← top rule
+ *   │ ╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴ │  ← bottom rule
+ *   └─────────────────────────────────────────────────────────────┘
  *
- * Layout rules:
- *   1. Pages always use the full available width — no `mx-auto max-w-*`
- *      on page roots.
- *   2. Forms that *create* an entity are modals (URL-tracked), not pages.
- *   3. Auth pages are the one exception — centered narrow card.
+ * The number is opt-in. Pages that have an obvious sequence (Issues →
+ * Traces → Vitals → …) supply theirs from `modules/registry`. Pages
+ * that don't (Settings, Audit) leave it blank.
  */
 export function PageHeader({
   actions,
   count,
+  num,
   subtitle,
   title,
 }: {
   actions?: ReactNode
   count?: number
+  num?: string
   subtitle?: ReactNode
   title: ReactNode
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <h1 className="text-fg t-lg font-semibold">
+    <header className="sec-head">
+      {num && <span className="sec-head-num">{num}</span>}
+      <h1 className="sec-head-title">
         {title}
         {count !== undefined && (
-          <span className="text-fg-muted t-md ml-2 font-normal">({count})</span>
+          <span
+            className="tnum ml-3 font-mono text-[12px] tracking-[0.05em] text-[color:var(--ink-muted)]"
+            style={{ fontVariationSettings: 'unset' }}
+          >
+            {count.toLocaleString()}
+          </span>
         )}
-        {subtitle && <span className="text-fg-muted t-md ml-2 font-normal">{subtitle}</span>}
       </h1>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
-    </div>
+      {subtitle && (
+        <span className="sec-head-sub flex items-center gap-2">
+          {typeof subtitle === 'string' ? subtitle : subtitle}
+        </span>
+      )}
+      {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
+    </header>
   )
 }
