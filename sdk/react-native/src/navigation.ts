@@ -24,6 +24,10 @@ import { useEffect, useRef } from 'react';
 
 import { setActiveSpan, startSpan, type SpanHandle } from '@goliapkg/sentori-core';
 
+import {
+  getNativeFrameCounters,
+  resetNativeFrameCounters,
+} from './native';
 import { captureStep } from './trail';
 
 /** Minimal contract: anything with `addListener('state', cb)` and
@@ -101,11 +105,21 @@ export function useTraceNavigation(navigationRef: NavigationRefLike): void {
       const enteredAt = lastRouteEnteredAtRef.current;
       if (!span) return null;
       const dwellMs = enteredAt !== null ? Math.max(0, Date.now() - enteredAt) : null;
+      // v0.9.4 #1 — drain native frame counters at screen-leave.
+      // Empty/null when native module not linked; tags omitted.
+      const fc = getNativeFrameCounters();
+      const finishTags: Record<string, string> = {};
+      if (dwellMs !== null) finishTags['nav.dwell_ms'] = String(dwellMs);
+      if (fc) {
+        finishTags['vital.slow_frames'] = String(fc.slow);
+        finishTags['vital.frozen_frames'] = String(fc.frozen);
+      }
       span.finish({
         status: 'ok',
-        // Tag values are strings on the wire — cast at finish-time.
-        tags: dwellMs !== null ? { 'nav.dwell_ms': String(dwellMs) } : undefined,
+        tags: Object.keys(finishTags).length > 0 ? finishTags : undefined,
       });
+      // Reset counters for the next screen.
+      resetNativeFrameCounters();
       return dwellMs;
     };
 

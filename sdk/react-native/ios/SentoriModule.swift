@@ -14,6 +14,23 @@ public class SentoriModule: Module {
 
         OnCreate {
             SentoriCrashHandler.register()
+            // v0.9.4 #1 — capture cold-start anchor + start frame watch.
+            SentoriMobileVitals.registerColdStartAnchor()
+            SentoriMobileVitals.startFrameWatch()
+        }
+
+        // v0.9.4 #1 — Mobile Vitals exposure.
+        Function("markJsBridgeReady") {
+            SentoriMobileVitals.markJsBridgeReady()
+        }
+        Function("getColdStartMs") { () -> Double? in
+            return SentoriMobileVitals.getColdStartMs()?.doubleValue
+        }
+        Function("getFrameCounters") { () -> [String: Any]? in
+            return SentoriMobileVitals.getFrameCounters() as? [String: Any]
+        }
+        Function("resetFrameCounters") {
+            SentoriMobileVitals.resetFrameCounters()
         }
 
         Function("setConfig") { (config: [String: Any]) in

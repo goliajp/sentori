@@ -18,6 +18,11 @@ import {
 } from './feature-flags';
 import { clearMaskQuery, registerMaskQuery } from './mask';
 import { measureFn } from './measure';
+import {
+  getColdStartMs,
+  markTimeToFullDisplay,
+  type TimeToFullDisplayHandle,
+} from './mobile-vitals';
 import { bindState, recordState, unbindState } from './state-snapshots';
 import { startMoment } from '@goliapkg/sentori-core';
 import { flushMetrics, recordMetric } from './metrics';
@@ -44,6 +49,8 @@ export const sentori = {
   bindState,
   recordState,
   unbindState,
+  markTimeToFullDisplay,
+  getColdStartMs,
   setFeatureFlag,
   clearFeatureFlag,
   clearAllFeatureFlags,
@@ -81,6 +88,11 @@ export {
 export { clearMaskQuery, registerMaskQuery } from './mask';
 export { flushMetrics, recordMetric } from './metrics';
 export { measureFn } from './measure';
+export {
+  getColdStartMs,
+  markTimeToFullDisplay,
+  type TimeToFullDisplayHandle,
+} from './mobile-vitals';
 export { MomentHandle, type MomentProperties, startMoment } from '@goliapkg/sentori-core';
 export {
   bindState,

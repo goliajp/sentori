@@ -12,6 +12,29 @@ type SentoriNativeModule = {
     token: string
   }) => void
   /**
+   * v0.9.4 #1 — cold start measurement. iOS:
+   * `mach_absolute_time` from `applicationDidFinishLaunching` to first
+   * JS bridge ready. Android: `Process.getStartElapsedRealtime()`.
+   * Returns null when native side hasn't captured yet.
+   */
+  getColdStartMs?: () => null | number
+  /**
+   * v0.9.4 #1 — call once at JS init() to finalize the cold-start
+   * measurement. iOS subtracts from the app-delegate anchor;
+   * Android uses Process.getStartElapsedRealtime() so the call is
+   * idempotent if missed.
+   */
+  markJsBridgeReady?: () => void
+  /**
+   * v0.9.4 #1 — slow/frozen frame counters since the most recent
+   * navigation transition. Native side hooks `CADisplayLink` (iOS)
+   * / `Choreographer.FrameCallback` (Android). Frame > 16.67ms =
+   * slow; > 700ms = frozen.
+   */
+  getFrameCounters?: () => null | { frozen: number; slow: number }
+  /** Reset counters on navigation transition (called by useTraceNavigation). */
+  resetFrameCounters?: () => void
+  /**
    * v0.7.3 — JS-triggered screenshot with consumer-supplied mask IDs.
    * `maskedIds` are RN `nativeID` strings; native walks the view
    * tree, finds each subview by identifier, and paints a black
@@ -122,6 +145,43 @@ export function startAnrWatchdog(options?: {
 export function stopAnrWatchdog(): void {
   try {
     native()?.stopAnrWatchdog?.()
+  } catch {
+    // ignore
+  }
+}
+
+/** v0.9.4 #1 — finalize cold-start measurement. Idempotent. */
+export function markNativeJsBridgeReady(): void {
+  try {
+    native()?.markJsBridgeReady?.()
+  } catch {
+    // ignore
+  }
+}
+
+/** v0.9.4 #1 — read cold start ms once. null when native unavailable. */
+export function getNativeColdStartMs(): null | number {
+  try {
+    const v = native()?.getColdStartMs?.()
+    return typeof v === 'number' && Number.isFinite(v) ? v : null
+  } catch {
+    return null
+  }
+}
+
+/** v0.9.4 #1 — read slow/frozen frame counters since last reset. */
+export function getNativeFrameCounters(): null | { frozen: number; slow: number } {
+  try {
+    return native()?.getFrameCounters?.() ?? null
+  } catch {
+    return null
+  }
+}
+
+/** v0.9.4 #1 — reset frame counters on navigation transition. */
+export function resetNativeFrameCounters(): void {
+  try {
+    native()?.resetFrameCounters?.()
   } catch {
     // ignore
   }

@@ -18,6 +18,24 @@ class SentoriModule : Module() {
         OnCreate {
             val ctx = appContext.reactContext ?: return@OnCreate
             SentoriCrashHandler.register(ctx)
+            // v0.9.4 #1 — start frame watch. Cold-start is captured
+            // anchored to Process.getStartElapsedRealtime so no
+            // separate registerColdStartAnchor() call is needed.
+            SentoriMobileVitals.startFrameWatch()
+        }
+
+        // v0.9.4 #1 — Mobile Vitals exposure.
+        Function("markJsBridgeReady") {
+            SentoriMobileVitals.markJsBridgeReady()
+        }
+        Function("getColdStartMs") {
+            SentoriMobileVitals.getColdStartMs()
+        }
+        Function("getFrameCounters") {
+            SentoriMobileVitals.getFrameCounters()
+        }
+        Function("resetFrameCounters") {
+            SentoriMobileVitals.resetFrameCounters()
         }
 
         Function("setConfig") { config: Map<String, Any?> ->

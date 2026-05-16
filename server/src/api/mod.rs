@@ -32,3 +32,4 @@ pub mod tokens;
 pub mod user_auth;
 pub mod user_reports;
 pub mod views;
+pub mod vitals;

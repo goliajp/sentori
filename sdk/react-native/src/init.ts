@@ -9,7 +9,9 @@ import {
   runLaunchCrashGuard,
 } from './launch-crash-guard';
 import { startMetricsTimer } from './metrics';
-import { drainNativePending, setNativeConfig } from './native';
+import { drainNativePending, markNativeJsBridgeReady, setNativeConfig } from './native';
+import { getColdStartMs } from './mobile-vitals';
+import { startSpan } from '@goliapkg/sentori-core';
 import { startNetworkTypeWatch } from './netinfo';
 import { startPreCrashSentinel, type PreCrashChannel } from './pre-crash-sentinel';
 import { startSession } from './session-tracker';
@@ -142,6 +144,24 @@ export const init = (options: InitOptions): void => {
     release: options.release,
     environment: env,
   });
+  // v0.9.4 #1 — finalize cold-start measurement. iOS uses the
+  // delta from `applicationDidFinishLaunching` to this call;
+  // Android uses Process.getStartElapsedRealtime() so the value is
+  // computed at this point and cached.
+  markNativeJsBridgeReady();
+  // Emit a one-off cold-start span. Server aggregates these per
+  // release for the Mobile Vitals dashboard. No-op when native
+  // module isn't linked.
+  const coldMs = getColdStartMs();
+  if (coldMs !== null && coldMs > 0 && coldMs < 60_000) {
+    const span = startSpan('sentori.cold_start', {
+      name: 'cold-start',
+      parent: null,
+      startNowMs: Date.now() - coldMs,
+      tags: { 'vital.kind': 'cold_start' },
+    });
+    span.finish({ status: 'ok' });
+  }
 
   startTransport();
   // v0.8.0-c — start watching network class. No-op if NetInfo isn't

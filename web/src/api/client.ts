@@ -341,6 +341,14 @@ export const adminApi = {
       `/projects/${projectId}/moments/${encodeURIComponent(name)}`,
     ),
 
+  /** v0.9.4 #1 — mobile vitals report + release list. */
+  vitalsReport: (projectId: string, release?: string) => {
+    const q = release ? `?release=${encodeURIComponent(release)}` : ''
+    return adminFetch<VitalsReport>(`/projects/${projectId}/vitals${q}`)
+  },
+  listVitalsReleases: (projectId: string) =>
+    adminFetch<VitalsRelease[]>(`/projects/${projectId}/vitals/releases`),
+
   /** v0.9.3 +S3 — culprit commits per issue. */
   listCulprits: (projectId: string, issueId: string) =>
     adminFetch<CulpritRow[]>(`/projects/${projectId}/issues/${issueId}/culprits`),
@@ -707,6 +715,29 @@ export type CertObservation = {
   nameValue: null | string
   notAfter: string
   notBefore: string
+}
+
+// v0.9.4 #1 — mobile vitals shapes.
+export type VitalsReport = {
+  coldStart: { p50Ms: number; p95Ms: number; samples: number }
+  perRoute: {
+    navigations: number
+    route: string
+    totalFrozenFrames: number
+    totalSlowFrames: number
+    ttfdP50Ms: number
+    ttfdP95Ms: number
+    ttfdSamples: number
+    ttidP50Ms: number
+    ttidP95Ms: number
+  }[]
+  release: string
+}
+
+export type VitalsRelease = {
+  eventCount: number
+  lastSeen: string
+  release: string
 }
 
 // v0.9.3 +S3 — culprit commit shapes.

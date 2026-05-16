@@ -16,6 +16,7 @@ import { SettingsView } from './settings/view'
 import { TeamsView } from './teams/view'
 import { TraceDetailView } from './traces/detail-view'
 import { TracesView } from './traces/view'
+import { VitalsView } from './vitals/view'
 
 export type ModuleGroup = 'monitor' | 'organize'
 
@@ -75,6 +76,15 @@ export const MODULES: ModuleDef[] = [
     label: 'Metrics',
     path: 'metrics',
     view: MetricsView,
+  },
+  {
+    group: 'monitor',
+    // gauge glyph
+    iconPath: 'M12 14l4-4M3 12a9 9 0 1 1 18 0M5 12a7 7 0 0 1 14 0',
+    id: 'vitals',
+    label: 'Vitals',
+    path: 'vitals',
+    view: VitalsView,
   },
   {
     group: 'monitor',

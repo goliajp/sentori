@@ -215,6 +215,15 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/events/{event_id}/repro",
             get(api::repro::generate),
         )
+        // v0.9.4 #1 — mobile vitals report + release list.
+        .route(
+            "/projects/{project_id}/vitals",
+            get(api::vitals::report),
+        )
+        .route(
+            "/projects/{project_id}/vitals/releases",
+            get(api::vitals::list_releases),
+        )
         // v0.9.3 +S7 — live debug stream (SSE).
         .route(
             "/projects/{project_id}/live-debug/users/{user_id}",
