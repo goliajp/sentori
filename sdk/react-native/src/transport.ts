@@ -1,4 +1,4 @@
-import { drainSpans } from '@goliapkg/sentori-core';
+import { addBreadcrumb, drainSpans } from '@goliapkg/sentori-core';
 
 import { getConfig } from './config';
 import { isLiveMode } from './control-channel';
@@ -382,14 +382,20 @@ export const uploadAttachment = async (
     // exact symptom Insight observed), and a 200 is also a valid
     // "stored" response. We still require a JSON body shaped like
     // UploadResponse; non-JSON bodies fall through to null.
-    if (resp.status < 200 || resp.status >= 300) return null;
+    if (resp.status < 200 || resp.status >= 300) {
+      noteAttachmentFailure(eventId, kind, `http_${resp.status}`);
+      return null;
+    }
     const j = (await resp.json().catch(() => null)) as null | {
       refId: string;
       sizeBytes: number;
       mediaType: string;
       kind: string;
     };
-    if (!j || !j.refId) return null;
+    if (!j || !j.refId) {
+      noteAttachmentFailure(eventId, kind, 'bad_response_body');
+      return null;
+    }
     return {
       kind,
       mediaType: j.mediaType,
@@ -397,10 +403,37 @@ export const uploadAttachment = async (
       sizeBytes: j.sizeBytes,
       source: opts.source ?? 'js',
     };
-  } catch {
+  } catch (e) {
+    const reason = e instanceof Error ? `fetch_${e.name}` : 'fetch_unknown';
+    noteAttachmentFailure(eventId, kind, reason);
     return null;
   }
 };
+
+/**
+ * v0.9.7 — Insight F2 fix-forward. When uploadAttachment silently
+ * returns null, the host event ships without the screenshot and the
+ * dashboard renders "No attachments captured" — looking identical
+ * to "host didn't enable screenshots" and leaving us guessing at
+ * which layer broke.
+ *
+ * Drop a breadcrumb so the next event on the same SDK instance
+ * carries a tagged trail entry. Dashboard's breadcrumb panel will
+ * show `sentori.attach.failed { eventId, kind, reason }` and we can
+ * tell upload-broke from never-tried at a glance.
+ */
+function noteAttachmentFailure(
+  eventId: string,
+  kind: string,
+  reason: string,
+): void {
+  addBreadcrumb('custom', {
+    category: 'sentori.attach.failed',
+    eventId,
+    kind,
+    reason,
+  });
+}
 
 function filenameFor(kind: string, mediaType: string): string {
   const ext = mediaType.split('/')[1] ?? 'bin';
