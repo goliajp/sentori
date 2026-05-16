@@ -33,8 +33,14 @@ function loadNodeImpl() {
     if (!proc?.versions?.node)
         return null;
     try {
+        // TS 6 typecheck without @types/node — `require` isn't ambient
+        // here. Cast through globalThis (Node injects require even in
+        // CommonJS-emitted-as-ESM bundles via interop).
+        const req = globalThis.require;
+        if (typeof req !== 'function')
+            return null;
         // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const mod = require('node:async_hooks');
+        const mod = req('node:async_hooks');
         const als = new mod.AsyncLocalStorage();
         return {
             get: () => als.getStore()?.span ?? null,

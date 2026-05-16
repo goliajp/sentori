@@ -1,6 +1,6 @@
 {
   "name": "@goliapkg/sentori-svelte",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Svelte / SvelteKit adapter for Sentori — hooks.client + hooks.server init helpers, page navigation tracing.",
   "license": "MIT",
   "homepage": "https://sentori.golia.jp",
@@ -47,8 +47,8 @@
     }
   },
   "dependencies": {
-    "@goliapkg/sentori-core": "0.8.2",
-    "@goliapkg/sentori-javascript": "0.4.3"
+    "@goliapkg/sentori-core": "0.8.3",
+    "@goliapkg/sentori-javascript": "0.4.4"
   },
   "devDependencies": {
     "@types/bun": "latest",
