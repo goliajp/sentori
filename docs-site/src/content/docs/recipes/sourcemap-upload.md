@@ -14,15 +14,21 @@ sha256, so re-runs are cheap. No install needed in CI — `npx` it:
 ```bash
 npx @goliapkg/sentori-cli@latest upload sourcemap \
   --release "myapp@1.2.3+456" \
-  --token "$SENTORI_TOKEN" \
-  --api-url "$SENTORI_API_URL" \
   dist/assets/
 ```
 
-`--token` falls back to `$SENTORI_TOKEN`, `--api-url` to
-`$SENTORI_API_URL` (default `https://api.sentori.golia.jp`; for a
-self-hosted instance, your host). `--ingest-url` is accepted as an
-alias for `--api-url`. `--dry-run` lists what would be uploaded.
+Tokens (in resolution order): `--token` flag → `$SENTORI_ADMIN_TOKEN`
+env → `$SENTORI_TOKEN` env. Prefer a **kind=admin** token from
+Dashboard → Project Settings → Tokens (kind=public works in v0.x but
+will be rejected by `/admin/api/...` once v1.0 ships).
+
+Base URL (in resolution order): `--api-url` flag → `$SENTORI_ADMIN_URL`
+env → `$SENTORI_INGEST_URL` env with `ingest.` → `api.` substitution
+→ default `https://api.sentori.golia.jp`. `--ingest-url` is accepted
+as an alias for `--api-url`. `--dry-run` lists what would be uploaded.
+
+Full token / base-URL contract: `docs/runbook/cli-auth.md` in the
+Sentori repo (canonical reference, linked from support tickets).
 
 > **The release string must match.** `--release` here has to be byte-for-byte
 > what the SDK reports via `init({ release })` (e.g. `myapp@1.2.3+456`).
@@ -46,7 +52,9 @@ jobs:
   build-and-upload:
     runs-on: ubuntu-latest
     env:
-      SENTORI_TOKEN: ${{ secrets.SENTORI_TOKEN }}
+      # kind=admin token from dashboard → Project Settings → Tokens.
+      # Falls back to SENTORI_TOKEN (kind=public) in v0.x for back-compat.
+      SENTORI_ADMIN_TOKEN: ${{ secrets.SENTORI_ADMIN_TOKEN }}
       SENTORI_INGEST_URL: https://ingest.sentori.golia.jp
       RELEASE: myapp@${{ github.ref_name }}+${{ github.run_number }}
     steps:
@@ -60,6 +68,12 @@ jobs:
       - name: Upload sourcemaps
         run: sentori-cli upload sourcemap --release "$RELEASE" dist/assets/
       - name: Notify of deploy
+        env:
+          # Ingest /v1/deploys takes a kind=public ingest token, not
+          # the admin token. If you only have one secret, the admin
+          # token works here too (v0.x lenient); use the ingest token
+          # in prod so you don't waste an admin slot on a deploy ping.
+          SENTORI_TOKEN: ${{ secrets.SENTORI_TOKEN }}
         run: |
           curl -fsS -X POST "$SENTORI_INGEST_URL/v1/deploys" \
             -H "Authorization: Bearer $SENTORI_TOKEN" \
