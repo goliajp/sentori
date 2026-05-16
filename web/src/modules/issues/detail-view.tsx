@@ -1154,6 +1154,18 @@ function CulpritSection({
     onSuccess: () =>
       void qc.invalidateQueries({ queryKey: ['culprits', projectId, issueId] }),
   })
+  const autoM = useMutation({
+    mutationFn: () => adminApi.autoDetectCulprit(projectId, issueId),
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ['culprits', projectId, issueId] }),
+  })
+  const revertM = useMutation({
+    mutationFn: (culpritId: string) =>
+      adminApi.generateRevertPr(projectId, issueId, culpritId),
+    onSuccess: (data) => {
+      if (data?.prUrl) window.open(data.prUrl, '_blank', 'noopener')
+    },
+  })
 
   const culprits = culpritsQ.data ?? []
   const noRepo = !sourceRepoUrl
@@ -1163,14 +1175,30 @@ function CulpritSection({
       <div className="border-border bg-bg-tertiary/30 flex items-center justify-between rounded-md border px-3 py-2">
         <span className="text-fg-muted t-sm">
           <span className="font-mono">Likely culprit:</span> unattributed
+          {autoM.isError && (
+            <span className="text-danger ml-3 text-[10px] font-mono">
+              auto-detect failed: {String((autoM.error as Error)?.message ?? 'unknown')}
+            </span>
+          )}
         </span>
-        <button
-          className="text-accent hover:text-fg t-sm font-mono"
-          onClick={() => setOpen(true)}
-          type="button"
-        >
-          + attach commit
-        </button>
+        <span className="flex items-center gap-3">
+          <button
+            className="text-accent hover:text-fg t-sm font-mono disabled:opacity-50"
+            disabled={autoM.isPending || !sourceRepoUrl}
+            onClick={() => autoM.mutate()}
+            title={!sourceRepoUrl ? 'Set source_repo_url first' : 'auto-detect via GitHub'}
+            type="button"
+          >
+            {autoM.isPending ? '… scoring' : 'auto-detect'}
+          </button>
+          <button
+            className="text-accent hover:text-fg t-sm font-mono"
+            onClick={() => setOpen(true)}
+            type="button"
+          >
+            + attach commit
+          </button>
+        </span>
       </div>
     )
   }
@@ -1232,6 +1260,11 @@ function CulpritSection({
             {c.author && (
               <span className="text-fg-muted t-sm font-mono">@{c.author}</span>
             )}
+            {c.source === 'auto' && (
+              <span className="text-accent text-[9px] uppercase font-mono tracking-wider">
+                auto · {c.confidence}
+              </span>
+            )}
             {c.htmlUrl && (
               <a
                 className="text-accent t-sm hover:underline"
@@ -1243,6 +1276,14 @@ function CulpritSection({
               </a>
             )}
             <button
+              className="text-accent hover:text-fg t-sm font-mono disabled:opacity-50"
+              disabled={revertM.isPending}
+              onClick={() => revertM.mutate(c.id)}
+              type="button"
+            >
+              {revertM.isPending && revertM.variables === c.id ? '…' : 'revert PR'}
+            </button>
+            <button
               className="text-fg-muted hover:text-danger t-sm font-mono"
               onClick={() => detachM.mutate(c.id)}
               type="button"
@@ -1252,6 +1293,12 @@ function CulpritSection({
           </li>
         ))}
       </ul>
+      {(autoM.isError || revertM.isError) && (
+        <div className="border-border border-t px-3 py-1.5 text-[10px] text-danger font-mono">
+          {autoM.isError && <>auto: {String((autoM.error as Error)?.message ?? 'unknown')}<br /></>}
+          {revertM.isError && <>revert PR: {String((revertM.error as Error)?.message ?? 'unknown')}</>}
+        </div>
+      )}
     </div>
   )
 }

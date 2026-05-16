@@ -365,6 +365,20 @@ export const adminApi = {
       { method: 'DELETE' },
     ),
 
+  /** v1.1 +S3 升级 — on-demand auto-detect best culprit candidate. */
+  autoDetectCulprit: (projectId: string, issueId: string) =>
+    adminFetch<{ commitSha: string; confidence: number; score: number }>(
+      `/projects/${projectId}/issues/${issueId}/culprits:auto`,
+      { method: 'POST' },
+    ),
+
+  /** v1.1 +S3 升级 — generate a Revert PR draft via GitHub API. */
+  generateRevertPr: (projectId: string, issueId: string, culpritId: string) =>
+    adminFetch<{ prUrl: string }>(
+      `/projects/${projectId}/issues/${issueId}/culprits/${culpritId}/revert-pr`,
+      { method: 'POST' },
+    ),
+
   /** v0.9.2 +S6 — privacy score + findings. */
   privacyScore: (projectId: string, release?: string) => {
     const q = release ? `?release=${encodeURIComponent(release)}` : ''

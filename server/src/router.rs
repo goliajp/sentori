@@ -238,6 +238,15 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/issues/{issue_id}/culprits/{culprit_id}",
             axum::routing::delete(api::culprits::detach),
         )
+        // v1.1 +S3 升级 — on-demand auto-detect + Revert PR.
+        .route(
+            "/projects/{project_id}/issues/{issue_id}/culprits:auto",
+            post(api::culprits::auto_detect),
+        )
+        .route(
+            "/projects/{project_id}/issues/{issue_id}/culprits/{culprit_id}/revert-pr",
+            post(api::culprits::generate_revert_pr),
+        )
         // v0.8.4 — cert-monitor watchlist + observations.
         .route(
             "/projects/{project_id}/cert-monitor/domains",
