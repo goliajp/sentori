@@ -12,6 +12,7 @@ pub mod events;
 pub mod events_batch;
 pub mod events_stream;
 pub mod health;
+pub mod live_debug;
 pub mod mappings;
 pub mod metrics;
 pub mod moments;

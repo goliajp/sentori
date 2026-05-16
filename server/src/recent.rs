@@ -68,6 +68,10 @@ pub struct AppState {
     /// back-pressure the ingest path. `Arc` shared so cloning AppState
     /// reuses the same channel.
     pub event_ticks: std::sync::Arc<tokio::sync::broadcast::Sender<EventTick>>,
+    /// v0.9.3 +S7: live-debug stream — fans out the *full* event
+    /// (not just a tick) to dashboard subscribers filtering by
+    /// user_id. 32-slot buffer; same drop-on-slow semantics as ticks.
+    pub live_events: std::sync::Arc<tokio::sync::broadcast::Sender<crate::event::Event>>,
     /// v0.8.0-d — optional GeoIP reader. `None` when
     /// `SENTORI_GEOIP_DB_PATH` isn't set or load failed; ingest just
     /// skips enrichment in that case.

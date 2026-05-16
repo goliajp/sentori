@@ -58,6 +58,10 @@ pub fn build(cfg: ServerConfig) -> Router {
     // 128 covers a 1-2s burst at typical dev-time rates.
     let (event_ticks_tx, _) =
         tokio::sync::broadcast::channel::<crate::recent::EventTick>(128);
+    // v0.9.3 +S7: live-debug full-event fan-out. Small buffer (32);
+    // a slow subscriber drops events rather than slowing ingest.
+    let (live_events_tx, _) =
+        tokio::sync::broadcast::channel::<crate::event::Event>(32);
     // v0.8.0-d — load the optional GeoIP db once at startup. Load
     // failure is non-fatal: log and run without enrichment.
     let geoip = cfg.geoip_db_path.as_ref().and_then(|p| {
@@ -87,6 +91,7 @@ pub fn build(cfg: ServerConfig) -> Router {
             .attachments
             .unwrap_or_else(|| std::sync::Arc::new(crate::attachments::NoopAttachmentStore)),
         event_ticks: std::sync::Arc::new(event_ticks_tx),
+        live_events: std::sync::Arc::new(live_events_tx),
         geoip,
     };
 
@@ -209,6 +214,11 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route(
             "/projects/{project_id}/events/{event_id}/repro",
             get(api::repro::generate),
+        )
+        // v0.9.3 +S7 — live debug stream (SSE).
+        .route(
+            "/projects/{project_id}/live-debug/users/{user_id}",
+            get(api::live_debug::stream_user_events),
         )
         // v0.9.3 +S3 — culprit commits per issue (manual mode).
         .route(

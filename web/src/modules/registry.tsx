@@ -6,6 +6,7 @@ import { CertMonitorView } from './cert-monitor/view'
 import { IntegrationsView } from './integrations/view'
 import { IssueDetailView } from './issues/detail-view'
 import { IssuesView } from './issues/view'
+import { LiveDebugView } from './live-debug/view'
 import { MetricsView } from './metrics/view'
 import { MomentsView } from './moments/view'
 import { PrivacyView } from './privacy/view'
@@ -101,6 +102,16 @@ export const MODULES: ModuleDef[] = [
     label: 'Privacy',
     path: 'privacy',
     view: PrivacyView,
+  },
+  {
+    adminOnly: true,
+    group: 'monitor',
+    // radio-tower / broadcast glyph
+    iconPath: 'M4.9 19.1A9 9 0 0 1 4.9 4.9M19.1 4.9a9 9 0 0 1 0 14.2M7.8 16.2A5 5 0 0 1 7.8 7.8M16.2 7.8a5 5 0 0 1 0 8.4M12 13a1 1 0 1 1 0-2 1 1 0 0 1 0 2zM12 22v-9',
+    id: 'live-debug',
+    label: 'Live debug',
+    path: 'live-debug',
+    view: LiveDebugView,
   },
   {
     group: 'monitor',

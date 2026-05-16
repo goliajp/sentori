@@ -110,6 +110,14 @@ pub async fn handle(
         ts_ms: time::OffsetDateTime::now_utc().unix_timestamp() * 1000,
     });
 
+    // v0.9.3 +S7 — live-debug fanout. Only events tagged with a
+    // user.id are interesting; others would just spam every live
+    // subscriber. `send` errors when there are zero subscribers,
+    // which is the common path: harmless.
+    if event.user.as_ref().and_then(|u| u.id.as_deref()).is_some() {
+        let _ = state.live_events.send(event.clone());
+    }
+
     state.recent.push(event);
 
     m::ingest_accepted();
