@@ -194,6 +194,21 @@ pub async fn auto_detect(
         _ => return Err(AppError::Unconfigured("githubPatNotConfigured")),
     };
 
+    // Cap the entire auto_detect run at 45s. fetch_commit_files is
+    // called once per top-10 proximity candidate; without a cap a slow
+    // partial GitHub outage could keep the connection open for minutes.
+    let runner = auto_detect_inner(pool, &pat, project_id, issue_id);
+    return tokio::time::timeout(std::time::Duration::from_secs(45), runner)
+        .await
+        .map_err(|_| AppError::Internal("auto_detect timed out (45s)".into()))?;
+}
+
+async fn auto_detect_inner(
+    pool: &sqlx::PgPool,
+    pat: &str,
+    project_id: Uuid,
+    issue_id: Uuid,
+) -> Result<Response, AppError> {
     let repo_url: Option<String> = sqlx::query_scalar(
         "SELECT source_repo_url FROM projects WHERE id = $1",
     )
@@ -247,7 +262,7 @@ pub async fn auto_detect(
     // outside our scoring window.
     let since = first_seen - time::Duration::days(7);
     let until = first_seen + time::Duration::hours(1);
-    let commits = fetch_recent_commits(&pat, &owner, &repo, since, until)
+    let commits = fetch_recent_commits(pat, &owner, &repo, since, until)
         .await
         .map_err(|e| AppError::Internal(format!("github fetch: {e}")))?;
 
@@ -272,9 +287,27 @@ pub async fn auto_detect(
     ranked.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
     let top_proxy = ranked.into_iter().take(10).collect::<Vec<_>>();
 
+    // Per-commit file lookup can fail (rate limit, transient 5xx); we
+    // don't want one bad commit to abort the whole scoring run, but
+    // we *do* want the dashboard to know scoring ran in a degraded
+    // mode (overlap=0 across the board) — otherwise low confidence
+    // looks like "we tried hard and nothing matched" when actually we
+    // never got the file lists.
     let mut best: Option<(f64, &GitHubCommitListEntry, Vec<String>)> = None;
+    let mut file_lookup_failures: u32 = 0;
     for (prox_score, c) in &top_proxy {
-        let files = fetch_commit_files(&pat, &owner, &repo, &c.sha).await.unwrap_or_default();
+        let files = match fetch_commit_files(pat, &owner, &repo, &c.sha).await {
+            Ok(f) => f,
+            Err(e) => {
+                file_lookup_failures += 1;
+                tracing::warn!(
+                    sha = %c.sha,
+                    error = %e,
+                    "auto_detect: fetch_commit_files failed; overlap=0 for this commit",
+                );
+                Vec::new()
+            }
+        };
         let overlap = file_overlap_score(&files, &stack_files);
         let total = overlap * 10.0 + *prox_score;
         match &best {
@@ -282,15 +315,34 @@ pub async fn auto_detect(
             _ => best = Some((total, c, files)),
         }
     }
+    let degraded = file_lookup_failures > 0;
 
-    let Some((score, chosen, _files)) = best else {
-        return Err(AppError::Internal("scoring failed".into()));
+    // Both "no commits in window" and "no commit cleared threshold"
+    // are normal outcomes, not server errors — return 200 with an
+    // explicit `detected: null` so the dashboard can show "couldn't
+    // auto-attribute" vs. having to parse a 500 body. Threshold = 5
+    // means at least one matching file (overlap × 10) OR ≥ 5 hours
+    // of proximity score — anything below is too weak to be useful.
+    let (score, chosen, _files) = match best {
+        Some(b) if b.0 >= 5.0 => b,
+        Some(b) => {
+            return Ok(Json(serde_json::json!({
+                "detected": null,
+                "reason": "belowThreshold",
+                "bestScore": b.0,
+                "degraded": degraded,
+            }))
+            .into_response());
+        }
+        None => {
+            return Ok(Json(serde_json::json!({
+                "detected": null,
+                "reason": "noProximityCandidates",
+                "degraded": degraded,
+            }))
+            .into_response());
+        }
     };
-    if score < 5.0 {
-        return Err(AppError::Internal(format!(
-            "no candidate scored above threshold (best={score:.1})"
-        )));
-    }
     let confidence = score.clamp(0.0, 100.0) as i32;
 
     let id = Uuid::now_v7();
@@ -317,9 +369,12 @@ pub async fn auto_detect(
     .map_err(|e| AppError::Internal(e.to_string()))?;
 
     Ok(Json(serde_json::json!({
-        "commitSha": chosen.sha,
-        "confidence": confidence,
-        "score": score,
+        "detected": {
+            "commitSha": chosen.sha,
+            "confidence": confidence,
+            "score": score,
+        },
+        "degraded": degraded,
     }))
     .into_response())
 }
@@ -377,9 +432,18 @@ pub async fn generate_revert_pr(
     // pick the revert locally. We deliver a draft PR that links the
     // sentori issue and the offending commit; the developer takes it
     // from there.
-    let pr = open_revert_draft_pr(&pat, &owner, &repo, &sha, issue_id)
-        .await
-        .map_err(|e| AppError::Internal(format!("github PR: {e}")))?;
+    // open_revert_draft_pr makes multiple sequential GitHub calls
+    // (repo info → ref info → create branch → open PR). Each step's
+    // reqwest timeout is 20s; total worst case would be ~80s. Cap the
+    // whole flow at 30s so we fail fast on enterprise proxies / slow
+    // GitHub partial outages instead of holding the connection.
+    let pr = tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        open_revert_draft_pr(&pat, &owner, &repo, &sha, issue_id),
+    )
+    .await
+    .map_err(|_| AppError::Internal("github PR generation timed out (30s)".into()))?
+    .map_err(|e| AppError::Internal(format!("github PR: {e}")))?;
 
     Ok(Json(serde_json::json!({ "prUrl": pr.html_url })).into_response())
 }
