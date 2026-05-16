@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { adminApi, type Attachment } from '@/api/client'
 
 import { SessionTrailViewer } from './SessionTrailViewer'
+import { StateTimetravelViewer } from './StateTimetravelViewer'
 import { ViewTreePanel } from './ViewTreePanel'
 
 /**
@@ -72,10 +73,18 @@ export function AttachmentGallery({ eventId, projectId }: { eventId: string; pro
     () => attachments.filter((a) => a.kind === 'sessionTrail'),
     [attachments]
   )
+  const stateSnapshots = useMemo(
+    () => attachments.filter((a) => a.kind === 'stateSnapshot'),
+    [attachments]
+  )
   const others = useMemo(
     () =>
       attachments.filter(
-        (a) => a.kind !== 'screenshot' && a.kind !== 'viewTree' && a.kind !== 'sessionTrail'
+        (a) =>
+          a.kind !== 'screenshot' &&
+          a.kind !== 'viewTree' &&
+          a.kind !== 'sessionTrail' &&
+          a.kind !== 'stateSnapshot'
       ),
     [attachments]
   )
@@ -158,6 +167,26 @@ export function AttachmentGallery({ eventId, projectId }: { eventId: string; pro
           </summary>
           <div className="px-3 pb-3">
             <SessionTrailViewer attachmentRef={a.ref} eventId={eventId} />
+          </div>
+        </details>
+      ))}
+      {/* v0.9.3 +S2-VIEW — state time-travel for `stateSnapshot`
+          attachments uploaded by SDKs that called `bindState` or
+          `recordState`. Default open when there's only one. */}
+      {stateSnapshots.map((a) => (
+        <details
+          className="border-border bg-bg-tertiary/30 rounded-md border"
+          key={a.ref}
+          open={stateSnapshots.length === 1}
+        >
+          <summary className="text-fg cursor-pointer px-3 py-2 text-[12px]">
+            State time-travel
+            <span className="text-fg-muted ml-2 text-[10px]">
+              redux / zustand / manual snapshots leading up to the error
+            </span>
+          </summary>
+          <div className="px-3 pb-3">
+            <StateTimetravelViewer attachmentRef={a.ref} eventId={eventId} />
           </div>
         </details>
       ))}
