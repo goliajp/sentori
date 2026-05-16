@@ -1,6 +1,7 @@
 import { drainSpans } from '@goliapkg/sentori-core';
 
 import { getConfig } from './config';
+import { isLiveMode } from './control-channel';
 import { isAnyNativeModuleLinked } from './native-loader';
 import type { Event } from './types';
 
@@ -25,6 +26,13 @@ const SDK_VERSION = '0.0.0';
 
 export const enqueue = (event: Event): void => {
   _queue.push(event);
+  // v1.1 +S7 升级 — when the dashboard has armed live-debug for the
+  // current user, flush immediately instead of waiting for the 5 s
+  // batch interval. Dashboard sees each event with sub-second latency.
+  if (isLiveMode()) {
+    void flush();
+    return;
+  }
   if (_queue.length >= BATCH_SIZE) {
     void flush();
   } else if (!_flushTimer) {

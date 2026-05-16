@@ -29,6 +29,64 @@ use crate::recent::AppState;
 
 const SESSION_TTL_SECS: u64 = 10 * 60;
 
+/// v1.1 +S7 升级 — arm a user_id for live mode. SDK polls
+/// `/v1/control/poll?userId=X` and reads back `liveMode: true` for
+/// the TTL window. Idempotent — re-arm refreshes the deadline.
+pub async fn arm_user(
+    State(state): State<AppState>,
+    Path((_project_id, user_id)): Path<(Uuid, String)>,
+) -> axum::http::StatusCode {
+    let expires_at = time::OffsetDateTime::now_utc() + time::Duration::seconds(SESSION_TTL_SECS as i64);
+    let mut targets = state.live_targets.write().await;
+    targets.insert(user_id, expires_at);
+    axum::http::StatusCode::CREATED
+}
+
+pub async fn disarm_user(
+    State(state): State<AppState>,
+    Path((_project_id, user_id)): Path<(Uuid, String)>,
+) -> axum::http::StatusCode {
+    let mut targets = state.live_targets.write().await;
+    targets.remove(&user_id);
+    axum::http::StatusCode::NO_CONTENT
+}
+
+/// `GET /v1/control/poll?userId=X` — SDK polls this every 30s. Returns
+/// `{ liveMode: bool, ttlMs: number }`. No auth (ingest token middleware
+/// already gates ingestion routes; this lives under the ingest path).
+pub async fn poll(
+    State(state): State<AppState>,
+    axum::extract::Query(q): axum::extract::Query<PollQuery>,
+) -> axum::response::Json<PollResponse> {
+    let now = time::OffsetDateTime::now_utc();
+    let mut live_mode = false;
+    let mut ttl_ms: i64 = 0;
+    {
+        let mut targets = state.live_targets.write().await;
+        targets.retain(|_, expires| *expires > now);
+        if let Some(user_id) = q.user_id.as_deref() {
+            if let Some(expires_at) = targets.get(user_id) {
+                live_mode = true;
+                ttl_ms = (*expires_at - now).whole_milliseconds() as i64;
+            }
+        }
+    }
+    axum::response::Json(PollResponse { live_mode, ttl_ms })
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PollQuery {
+    pub user_id: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PollResponse {
+    pub live_mode: bool,
+    pub ttl_ms: i64,
+}
+
 pub async fn stream_user_events(
     State(state): State<AppState>,
     Path((project_id, user_id)): Path<(Uuid, String)>,

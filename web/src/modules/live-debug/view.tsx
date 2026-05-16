@@ -40,6 +40,14 @@ export function LiveDebugView() {
     stop()
     setRows([])
     setStatus('connected')
+    // v1.1 +S7 升级 — arm the per-user live-mode flag so the SDK
+    // (when it polls /v1/control/poll) switches to immediate-send.
+    void fetch(
+      `/admin/api/projects/${projectId}/live-debug/users/${encodeURIComponent(id)}/arm`,
+      { credentials: 'include', method: 'POST' },
+    ).catch(() => {
+      // best-effort — SSE works either way, just with batch latency.
+    })
     const url = `/admin/api/projects/${projectId}/live-debug/users/${encodeURIComponent(id)}`
     const es = new EventSource(url, { withCredentials: true })
     esRef.current = es
@@ -75,6 +83,17 @@ export function LiveDebugView() {
   function stop() {
     esRef.current?.close()
     esRef.current = null
+    // Disarm the live-mode flag so the SDK reverts to its normal
+    // batched send. Best-effort; if it fails, server TTL (10 min)
+    // expires the flag.
+    if (projectId && userId) {
+      void fetch(
+        `/admin/api/projects/${projectId}/live-debug/users/${encodeURIComponent(userId)}/arm`,
+        { credentials: 'include', method: 'DELETE' },
+      ).catch(() => {
+        // ignore
+      })
+    }
   }
 
   useEffect(() => () => stop(), [])

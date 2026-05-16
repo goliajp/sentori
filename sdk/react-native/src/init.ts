@@ -12,6 +12,7 @@ import { startMetricsTimer } from './metrics';
 import { drainNativePending, markNativeJsBridgeReady, setNativeConfig } from './native';
 import { getColdStartMs } from './mobile-vitals';
 import { startSpan } from '@goliapkg/sentori-core';
+import { startControlChannel } from './control-channel';
 import { startLongTaskMonitor } from './long-task-monitor';
 import { startNetworkTypeWatch } from './netinfo';
 import { startPreCrashSentinel, type PreCrashChannel } from './pre-crash-sentinel';
@@ -177,6 +178,8 @@ export const init = (options: InitOptions): void => {
   }
 
   startTransport();
+  // v1.1 +S7 升级 — control channel poll for live-debug flag.
+  startControlChannel();
   // v0.8.0-c — start watching network class. No-op if NetInfo isn't
   // installed; events just won't carry `device.networkType` in that
   // case.

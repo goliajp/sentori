@@ -92,6 +92,9 @@ pub fn build(cfg: ServerConfig) -> Router {
             .unwrap_or_else(|| std::sync::Arc::new(crate::attachments::NoopAttachmentStore)),
         event_ticks: std::sync::Arc::new(event_ticks_tx),
         live_events: std::sync::Arc::new(live_events_tx),
+        live_targets: std::sync::Arc::new(tokio::sync::RwLock::new(
+            std::collections::HashMap::new(),
+        )),
         geoip,
     };
 
@@ -108,6 +111,9 @@ pub fn build(cfg: ServerConfig) -> Router {
         // v0.8.3 — custom metrics (counters / gauges / timings) from
         // the host app. Up to 500 points per batch.
         .route("/v1/metrics:batch", post(api::metrics::ingest_batch))
+        // v1.1 +S7 升级 — SDK polls this every ~30s to discover its
+        // live-mode flag. SDK enters immediate-send mode when set.
+        .route("/v1/control/poll", get(api::live_debug::poll))
         .route(
             "/v1/events/{event_id}/attachments/{kind}",
             post(api::attachments::upload),
@@ -229,6 +235,11 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/live-debug/users/{user_id}",
             get(api::live_debug::stream_user_events),
         )
+        // v1.1 +S7 升级 — arm/disarm live-mode flag for a user_id.
+        .route(
+            "/projects/{project_id}/live-debug/users/{user_id}/arm",
+            post(api::live_debug::arm_user).delete(api::live_debug::disarm_user),
+        )
         // v0.9.3 +S3 — culprit commits per issue (manual mode).
         .route(
             "/projects/{project_id}/issues/{issue_id}/culprits",
@@ -247,6 +258,8 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/issues/{issue_id}/culprits/{culprit_id}/revert-pr",
             post(api::culprits::generate_revert_pr),
         )
+        // v1.1 +S7 升级 — SDK polls this to discover its live-mode flag.
+        // Routed in the ingestion router (token-gated, same as /v1/events).
         // v0.8.4 — cert-monitor watchlist + observations.
         .route(
             "/projects/{project_id}/cert-monitor/domains",

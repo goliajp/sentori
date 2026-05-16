@@ -72,6 +72,12 @@ pub struct AppState {
     /// (not just a tick) to dashboard subscribers filtering by
     /// user_id. 32-slot buffer; same drop-on-slow semantics as ticks.
     pub live_events: std::sync::Arc<tokio::sync::broadcast::Sender<crate::event::Event>>,
+    /// v1.1 +S7 升级: per-user-id "live mode" flag with TTL. When
+    /// dashboard arms a live session for user X, this map gets a
+    /// (X → expires_at) entry. SDK polls `/v1/control/poll?userId=X`
+    /// every ~30s and switches to immediate-send (no batching) while
+    /// the flag is set. Map auto-purges expired entries on read.
+    pub live_targets: std::sync::Arc<tokio::sync::RwLock<std::collections::HashMap<String, time::OffsetDateTime>>>,
     /// v0.8.0-d — optional GeoIP reader. `None` when
     /// `SENTORI_GEOIP_DB_PATH` isn't set or load failed; ingest just
     /// skips enrichment in that case.

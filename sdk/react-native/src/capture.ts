@@ -55,6 +55,10 @@ export const setUser = (user: User | null): void => {
 
 export const getUser = (): User | null => _user;
 
+/** v1.1 +S7 升级 — read just the current user id for the control
+ *  channel poll. Returns `undefined` until `setUser({ id })` runs. */
+export const getCurrentUserId = (): string | undefined => _user?.id ?? undefined;
+
 export type CaptureExtras = {
   tags?: Tags;
   user?: User;
