@@ -19,6 +19,12 @@ public class SentoriModule: Module {
             SentoriMobileVitals.startFrameWatch()
         }
 
+        // v0.9.5 #8 — TurboModule exception bridge readout for
+        // coerceError to attach native stack to wrapped JSError.
+        Function("getRecentNativeException") { () -> [String: Any]? in
+            return SentoriNativeExceptionBridge.getRecentException()
+        }
+
         // v0.9.4 #1 — Mobile Vitals exposure.
         Function("markJsBridgeReady") {
             SentoriMobileVitals.markJsBridgeReady()

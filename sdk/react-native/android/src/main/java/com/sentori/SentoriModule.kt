@@ -24,6 +24,11 @@ class SentoriModule : Module() {
             SentoriMobileVitals.startFrameWatch()
         }
 
+        // v0.9.5 #8 — TurboModule exception bridge readout.
+        Function("getRecentNativeException") {
+            SentoriNativeExceptionBridge.getRecent()
+        }
+
         // v0.9.4 #1 — Mobile Vitals exposure.
         Function("markJsBridgeReady") {
             SentoriMobileVitals.markJsBridgeReady()

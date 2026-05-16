@@ -119,6 +119,16 @@ object SentoriCrashHandler {
 
         val error = errorToJson(throwable)
 
+        // v0.9.5 #7 — detect crashes originating from native code (JNI
+        // / .so libs). Pure SIGSEGV in a stripped .so won't reach us
+        // without breakpad (queued for v1.1), but throws that surface
+        // as UnsatisfiedLinkError or have native frames in the stack
+        // are tagged so the dashboard can split them out.
+        val tags = JSONObject()
+        if (SentoriNativeOrigin.looksNative(throwable)) {
+            tags.put("native_signal", "true")
+        }
+
         val event = JSONObject().apply {
             put("id", uuidLower())
             put("timestamp", iso8601Now())
@@ -129,7 +139,7 @@ object SentoriCrashHandler {
             put("device", device)
             put("app", app)
             put("user", JSONObject.NULL)
-            put("tags", JSONObject())
+            put("tags", tags)
             put("breadcrumbs", JSONArray())
             put("error", error)
             put("fingerprint", JSONArray())

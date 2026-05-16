@@ -13,6 +13,7 @@ import { getTrailBuffer } from './trail';
 import { enqueue, sendUserReport, uploadAttachment } from './transport';
 import { uuidV7 } from './uuid';
 import { getCachedNetworkType } from './netinfo';
+import { getRecentNativeException } from './native';
 import type { App, AttachmentMeta, Device, Event, SentoriError, Tags, User } from './types';
 
 export { captureStep, __resetTrailForTests } from './trail';
@@ -269,6 +270,27 @@ const errorToObject = (error: Error): SentoriError => {
   let cause: SentoriError | null = null;
   if (causeRaw instanceof Error) {
     cause = errorToObject(causeRaw);
+  }
+
+  // v0.9.5 #8 — TurboModule swallowed-exception bridge. If the host
+  // wrapped a native call with `@try @catch + recordException`, the
+  // native ring may hold a fresh entry (< 1 s old). Synthesize that
+  // as a `cause` so the JS event includes the original native stack.
+  if (cause === null) {
+    const recent = getRecentNativeException();
+    if (recent && recent.ageMs <= 1500) {
+      cause = {
+        type: recent.name || 'NativeException',
+        message: recent.reason,
+        stack: recent.stack.map((line, i) => ({
+          function: line.trim(),
+          file: '<native>',
+          inApp: false,
+          line: i + 1,
+        })),
+        cause: null,
+      };
+    }
   }
 
   return {

@@ -35,6 +35,18 @@ type SentoriNativeModule = {
   /** Reset counters on navigation transition (called by useTraceNavigation). */
   resetFrameCounters?: () => void
   /**
+   * v0.9.5 #8 — read the most-recent native exception recorded by
+   * `SentoriNativeExceptionBridge` within the last 1 s. Used by the
+   * JS-side capture path to attach native stack info to a JSError
+   * that RN wrapped from a swallowed NSException / Java Exception.
+   */
+  getRecentNativeException?: () => null | {
+    ageMs: number
+    name: string
+    reason: string
+    stack: string[]
+  }
+  /**
    * v0.7.3 — JS-triggered screenshot with consumer-supplied mask IDs.
    * `maskedIds` are RN `nativeID` strings; native walks the view
    * tree, finds each subview by identifier, and paints a black
@@ -184,6 +196,22 @@ export function resetNativeFrameCounters(): void {
     native()?.resetFrameCounters?.()
   } catch {
     // ignore
+  }
+}
+
+/** v0.9.5 #8 — fetch the most-recent native exception from
+ *  SentoriNativeExceptionBridge (within last ~1 s). null if none or
+ *  bridge not linked. */
+export function getRecentNativeException(): null | {
+  ageMs: number
+  name: string
+  reason: string
+  stack: string[]
+} {
+  try {
+    return native()?.getRecentNativeException?.() ?? null
+  } catch {
+    return null
   }
 }
 
