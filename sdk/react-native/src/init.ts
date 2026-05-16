@@ -17,6 +17,7 @@ import { startLongTaskMonitor } from './long-task-monitor';
 import { startNetworkTypeWatch } from './netinfo';
 import { startPreCrashSentinel, type PreCrashChannel } from './pre-crash-sentinel';
 import { startReplay } from './replay';
+import { startSampleProfiler } from './sample-profiler';
 import { startSession } from './session-tracker';
 import {
   drainOfflineQueue,
@@ -85,6 +86,12 @@ export type InitOptions = {
      *  visible nodes; captureException flushes the last 60 s as a
      *  `replay` attachment. Set to `'wireframe'` to enable. */
     replay?: 'off' | 'wireframe' | { hz?: number; mode: 'off' | 'wireframe' };
+    /** v1.1 #4 升级 — JS sample profiler. setInterval(50ms) idle-tick
+     *  sampler aggregates frame counts → emits sentori.profile span
+     *  every 60s with `flameData` (frame → tick count). Pairs with
+     *  longTaskMonitor (≥200ms outliers) — sample profiler 看 idle
+     *  分布、long-task 看 outliers。 */
+    sampleProfiler?: boolean | { flushMs?: number; sampleMs?: number };
     /** v0.9.0 #3 — launch-crash loop guard. When two consecutive
      *  launches don't reach `markLaunchCompleted()` (typical of an
      *  OTA update with a fatal bug), invoke the host callback with
@@ -208,6 +215,15 @@ export const init = (options: InitOptions): void => {
     startReplay({ mode: 'wireframe' });
   } else if (rp && typeof rp === 'object' && rp.mode === 'wireframe') {
     startReplay({ hz: rp.hz, mode: 'wireframe' });
+  }
+  // v1.1 #4 升级 — JS sample profiler. Off by default.
+  const sp = options.capture?.sampleProfiler;
+  if (sp) {
+    startSampleProfiler({
+      enabled: true,
+      flushMs: typeof sp === 'object' ? sp.flushMs : undefined,
+      sampleMs: typeof sp === 'object' ? sp.sampleMs : undefined,
+    });
   }
 
   const capture = options.capture ?? {};
