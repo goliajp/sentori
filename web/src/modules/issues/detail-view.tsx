@@ -161,6 +161,10 @@ export function IssueDetailView() {
         />
       )}
 
+      {selectedEvent && projectId && (
+        <EventGlanceStrip event={selectedEvent} projectId={projectId} />
+      )}
+
       <Tabs current={tab} onChange={setTab} />
 
       {events.length > 0 && (
@@ -1034,6 +1038,87 @@ function StateEntry({
       <span className="text-fg-muted t-sm font-mono tabular-nums">{formatRelative(entry.at)}</span>
       {entry.release && <span className="text-fg-muted t-md font-mono">in {entry.release}</span>}
     </div>
+  )
+}
+
+// v0.9.6 #15 — compact "at a glance" strip below the culprit section.
+// Single dense row pulling key dims from the selected event payload
+// + a row of attachment availability badges so the operator knows
+// what kinds of attached evidence exist before clicking through tabs.
+function EventGlanceStrip({ event, projectId }: { event: EventRow; projectId: string }) {
+  const p = event.payload
+  const attachmentsQ = useQuery({
+    queryFn: () => adminApi.listEventAttachments(projectId, event.id),
+    queryKey: ['event-attachments', projectId, event.id],
+    staleTime: 60_000,
+  })
+  const attachments = attachmentsQ.data ?? []
+  const has = (kind: string) => attachments.some((a) => a.kind === kind)
+
+  const dims: { label: string; value: string }[] = []
+  dims.push({ label: 'release', value: p.release })
+  if (p.bundle) {
+    dims.push({
+      label: 'bundle',
+      value: p.bundle.source ? `${p.bundle.id} (${p.bundle.source})` : p.bundle.id,
+    })
+  }
+  dims.push({ label: 'platform', value: p.platform })
+  if (p.device?.os && p.device?.osVersion) {
+    dims.push({ label: 'os', value: `${p.device.os} ${p.device.osVersion}` })
+  }
+  if (p.device?.model) {
+    dims.push({ label: 'model', value: p.device.model })
+  }
+  if (p.device?.locale) {
+    dims.push({ label: 'locale', value: p.device.locale })
+  }
+  if (p.device?.networkType) {
+    dims.push({ label: 'net', value: p.device.networkType })
+  }
+  if (p.geo) {
+    dims.push({
+      label: 'geo',
+      value: [p.geo.country, p.geo.region, p.geo.city].filter(Boolean).join(' · '),
+    })
+  }
+
+  return (
+    <div className="border-border bg-bg-tertiary/30 rounded-md border">
+      <div className="border-border flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-3 py-1.5">
+        {dims.map((d) => (
+          <span className="t-sm flex items-baseline gap-1" key={d.label}>
+            <span className="text-fg-muted font-mono text-[10px]">{d.label}</span>
+            <span className="text-fg font-mono">{d.value}</span>
+          </span>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5">
+        <span className="text-fg-muted t-sm font-mono">attached:</span>
+        <Badge label="screenshot" present={has('screenshot')} />
+        <Badge label="replay" present={has('replay')} />
+        <Badge label="state" present={has('stateSnapshot')} />
+        <Badge label="trail" present={has('sessionTrail')} />
+        <Badge label="viewTree" present={has('viewTree')} />
+        {attachmentsQ.isLoading && (
+          <span className="text-fg-muted t-sm font-mono">…</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Badge({ label, present }: { label: string; present: boolean }) {
+  return (
+    <span
+      className={`t-sm rounded border px-1.5 py-[1px] font-mono text-[10px] ${
+        present
+          ? 'border-accent/40 text-accent bg-accent/10'
+          : 'border-border text-fg-mute'
+      }`}
+    >
+      {present ? '●' : '○'} {label}
+    </span>
   )
 }
 
