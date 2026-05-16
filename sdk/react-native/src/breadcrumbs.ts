@@ -1,15 +1,22 @@
-// Phase 21: ring buffer logic lives in @goliapkg/sentori-core. The
-// public surface here keeps its object-form `addBreadcrumb({ type,
-// data, timestamp? })` so existing callers don't break, and we
-// expose `__resetForTests` for the test suite.
-import {
-  BreadcrumbBuffer,
-  clearBreadcrumbs as clearCore,
-  getBreadcrumbs as getCore,
-  addBreadcrumb as pushCore,
-} from '@goliapkg/sentori-core'
+// v0.9.8 — RN SDK now owns its own BreadcrumbBuffer instance.
+//
+// Previous behaviour delegated to sentori-core's module-scoped
+// `_global` buffer. That was fine on Node / bun (single module
+// instance), but Metro's CJS/ESM interop on react-native can
+// instantiate `@goliapkg/sentori-core` twice when the host app and
+// the SDK both resolve it — the handler writes to one `_global` and
+// `capture.ts` reads from the other, leaving every event with
+// `breadcrumbs: []` (Insight 2026-05-16 report).
+//
+// Keeping the buffer local to the RN SDK is the smallest fix that
+// guarantees a single instance regardless of how the bundler
+// resolves sentori-core. addBreadcrumb / getBreadcrumbs / clearBreadcrumbs
+// are now self-contained.
+import { BreadcrumbBuffer } from '@goliapkg/sentori-core'
 
 import type { Breadcrumb, BreadcrumbType } from './types'
+
+declare const __DEV__: boolean | undefined
 
 export type AddBreadcrumbInput = {
   data: Record<string, unknown>
@@ -17,26 +24,37 @@ export type AddBreadcrumbInput = {
   type: BreadcrumbType
 }
 
-const _shadow = new BreadcrumbBuffer()
+const _local = new BreadcrumbBuffer()
 
 export const addBreadcrumb = (input: AddBreadcrumbInput): void => {
+  _local.push(input.type, input.data)
   if (input.timestamp) {
-    // Caller wants a specific timestamp — pushCore stamps `now()`, so
-    // we go through a private buffer to preserve that field. This path
-    // is rarely used (most callers omit timestamp).
-    _shadow.push(input.type, input.data)
-    const last = _shadow.snapshot().at(-1)
+    // Override the auto-stamped `now()` with the caller's value. Rare
+    // path; most callers omit timestamp.
+    const last = _local.snapshot().at(-1)
     if (last) last.timestamp = input.timestamp
-    return
   }
-  pushCore(input.type, input.data)
 }
 
-export const getBreadcrumbs = (): Breadcrumb[] => getCore()
+export const getBreadcrumbs = (): Breadcrumb[] => _local.snapshot()
 
 export const clearBreadcrumbs = (): void => {
-  clearCore()
-  _shadow.clear()
+  _local.clear()
 }
 
 export const __resetForTests = (): void => clearBreadcrumbs()
+
+/** v0.9.8 — `__DEV__`-gated peek used by `captureException` to log
+ *  diagnostic counts to Metro. Production builds never see this. */
+export const __peekBreadcrumbCount = (): number => _local.snapshot().length
+
+/** Surface-area helper that the SDK uses internally to drop diagnostic
+ *  breadcrumbs without leaking the object-form API. Same target buffer
+ *  as the public `addBreadcrumb`. */
+export const addInternalBreadcrumb = (type: BreadcrumbType, data: Record<string, unknown>): void => {
+  _local.push(type, data)
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    // eslint-disable-next-line no-console
+    console.warn('[sentori] breadcrumb:', type, data)
+  }
+}

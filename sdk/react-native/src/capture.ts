@@ -1,6 +1,10 @@
 import { sealTrail, shouldSample } from '@goliapkg/sentori-core';
 
-import { addBreadcrumb, getBreadcrumbs } from './breadcrumbs';
+import {
+  __peekBreadcrumbCount,
+  addBreadcrumb,
+  getBreadcrumbs,
+} from './breadcrumbs';
 import { getBundleInfo } from './bundle-info';
 import { getConfig, isInitialized } from './config';
 import { getFeatureFlagSnapshot } from './feature-flags';
@@ -108,6 +112,7 @@ export const captureError = (error: Error, extras?: CaptureExtras): void => {
 
   const flags = getFeatureFlagSnapshot();
   const bundle = getBundleInfo();
+  const crumbs = getBreadcrumbs();
   const event: Event = {
     id: uuidV7(),
     timestamp: new Date().toISOString(),
@@ -121,10 +126,25 @@ export const captureError = (error: Error, extras?: CaptureExtras): void => {
     tags: extras?.tags,
     ...(flags ? { flags } : {}),
     ...(bundle ? { bundle } : {}),
-    breadcrumbs: getBreadcrumbs(),
+    breadcrumbs: crumbs,
     error: errorToObject(error),
     fingerprint: extras?.fingerprint,
   };
+  // v0.9.8 — dev-only diagnostic. Insight saw `breadcrumbs: []` on
+  // every event in 0.9.7 despite handlers being installed; this line
+  // makes it visible in Metro that the snapshot at captureException
+  // time really is empty (no breadcrumb events fired yet) vs. having
+  // been silently dropped on the wire. Production builds gate out.
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[sentori] captureException',
+      'eventId=', event.id,
+      'breadcrumbs=', crumbs.length,
+      'wantScreenshot=', config.screenshotsEnabled && extras?.screenshot !== false,
+      'wantSessionTrail=', config.sessionTrailEnabled,
+    );
+  }
 
   // Phase 26 sub-B: a captured error promotes the current session to
   // `errored` so the next AppState=background ping reports unhealthy.
@@ -164,6 +184,16 @@ export const captureError = (error: Error, extras?: CaptureExtras): void => {
     const replayNdjson = drainReplay();
     if (replayNdjson.length > 0) {
       await captureAndAttachReplay(event, replayNdjson);
+    }
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[sentori] enqueue',
+        'eventId=', event.id,
+        'attachments=', event.attachments?.length ?? 0,
+        'kinds=', (event.attachments ?? []).map((a) => a.kind).join(',') || '(none)',
+        'breadcrumbsAtEnqueue=', __peekBreadcrumbCount(),
+      );
     }
     enqueue(event);
   };
@@ -278,13 +308,31 @@ async function captureAndAttachScreenshot(event: Event): Promise<void> {
   let blob: Awaited<ReturnType<typeof captureScreenshot>> = null;
   try {
     blob = await captureScreenshot();
-  } catch {
-    // capture itself shouldn't throw — `captureScreenshot` already
-    // catches — but be defensive.
+  } catch (e) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn('[sentori] screenshot capture threw', e);
+    }
   }
   if (!blob) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[sentori] screenshot blob null — native module missing or capture returned null',
+        'eventId=', event.id,
+      );
+    }
     addBreadcrumb({ type: 'custom', data: { reason: 'screenshot-capture-failed' } });
     return;
+  }
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[sentori] screenshot blob ok, uploading',
+      'eventId=', event.id,
+      'mediaType=', blob.mediaType,
+      'base64Bytes=', blob.base64.length,
+    );
   }
   const attachment: AttachmentMeta | null = await uploadAttachment(
     event.id,
@@ -293,6 +341,10 @@ async function captureAndAttachScreenshot(event: Event): Promise<void> {
     { source: 'js' },
   );
   if (!attachment) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn('[sentori] screenshot upload returned null', 'eventId=', event.id);
+    }
     addBreadcrumb({ type: 'custom', data: { reason: 'screenshot-upload-failed' } });
     return;
   }

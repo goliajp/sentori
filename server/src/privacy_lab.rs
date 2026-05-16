@@ -31,8 +31,21 @@ static RX_EMAIL: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?i)\b[a-z0-9._%+-]{1,64}@[a-z0-9.-]{1,253}\.[a-z]{2,24}\b").unwrap()
 });
 static RX_PHONE: Lazy<Regex> = Lazy::new(|| {
-    // Loose: 7-15 digits with optional +/-/space/parens grouping.
-    Regex::new(r"(?:\+?[0-9]{1,3}[ \-]?)?(?:\(?[0-9]{2,4}\)?[ \-]?){2,4}[0-9]{2,4}").unwrap()
+    // v0.9.8 — tightened from the earlier loose pattern. Insight's
+    // 2026-05-16 report had every release flagged 0/100 because
+    //   `5.4.26051603+349`        (app build id)
+    //   `2026-05-16`               (ISO date substring)
+    //   `10-227-60-214`            (IP-encoded subdomain)
+    // all matched a 7+digit phone-ish run. Now the regex requires a
+    // recognisable phone shape: leading `+CC` or a paren group, and
+    // word-boundary anchored so it doesn't chew through build ids
+    // embedded in larger strings. The `check_string` post-filter
+    // also bumps the digit-count floor to 10 and skips known-safe
+    // field paths.
+    Regex::new(
+        r"\b(?:\+[0-9]{1,3}[ \-]?(?:\(?[0-9]{2,4}\)?[ \-]?){2,4}[0-9]{2,4}|\([0-9]{3}\)[ \-]?[0-9]{3}[ \-]?[0-9]{4}|[0-9]{3}-[0-9]{3}-[0-9]{4})\b",
+    )
+    .unwrap()
 });
 static RX_CC: Lazy<Regex> = Lazy::new(|| {
     // 13-19 contiguous digits, optionally split by spaces or dashes
@@ -149,6 +162,14 @@ fn check_string(s: &str, path: &str, out: &mut Vec<Finding>) {
     if path.ends_with(".stack") || path.contains(".error.type") {
         return;
     }
+    // v0.9.8 — Insight 2026-05-16: structural fields that store
+    // version-strings / urls / build identifiers were getting
+    // mis-flagged because their values contain long digit runs that
+    // *look* phone-shaped. These paths are never user input; skip
+    // PII scanning on them entirely.
+    if is_structural_path(path) {
+        return;
+    }
     if let Some(m) = RX_EMAIL.find(s) {
         out.push(Finding {
             field_path: path.to_string(),
@@ -166,11 +187,11 @@ fn check_string(s: &str, path: &str, out: &mut Vec<Finding>) {
         });
     } else if let Some(m) = RX_PHONE.find(s) {
         let candidate = m.as_str();
-        // The phone regex is very loose. Filter strings that are
-        // unlikely to be phones: < 7 digits total, or part of a known
-        // non-PII pattern (timestamps, UUIDs).
+        // Post-filter: the new regex anchors on shape but we still
+        // sanity-check the digit count, and skip when the surrounding
+        // string is obviously a UUID, timestamp, or build identifier.
         let digit_count = candidate.chars().filter(|c| c.is_ascii_digit()).count();
-        if digit_count >= 7 && digit_count <= 15 && !looks_like_uuid_or_ts(s) {
+        if digit_count >= 10 && digit_count <= 15 && !looks_like_non_phone(s) {
             out.push(Finding {
                 field_path: path.to_string(),
                 kind: "phone".into(),
@@ -187,6 +208,35 @@ fn check_string(s: &str, path: &str, out: &mut Vec<Finding>) {
     }
 }
 
+/// v0.9.8 — paths that hold technical identifiers, never user input.
+/// Anchoring on these saves the false-positive cost of value-level
+/// regex hacks.
+fn is_structural_path(path: &str) -> bool {
+    // .release, .app.version, .app.build — version identifiers
+    if path.ends_with(".release")
+        || path.ends_with(".version")
+        || path.ends_with(".build")
+        || path == "release"
+    {
+        return true;
+    }
+    // .url / .uri / hostname-style breadcrumb fields. Hostnames with
+    // dashed IP-encoded subdomains and CDN hostnames have long digit
+    // runs that look phone-shaped.
+    if path.ends_with(".url") || path.ends_with(".uri") || path.ends_with(".host") {
+        return true;
+    }
+    // .id paths (UUIDs, event ids, span ids, trace ids).
+    if path.ends_with(".id") || path == "id" {
+        return true;
+    }
+    // Bundle / sourcemap identifiers.
+    if path.ends_with(".bundleId") || path.ends_with(".commit") {
+        return true;
+    }
+    false
+}
+
 fn truncate_sample(s: &str) -> String {
     if s.len() <= SAMPLE_MAX_BYTES {
         s.to_string()
@@ -200,14 +250,102 @@ fn truncate_sample(s: &str) -> String {
     }
 }
 
-fn looks_like_uuid_or_ts(s: &str) -> bool {
-    // crude — covers RFC4122 UUIDs and ISO 8601 timestamps so we
-    // don't flag them as phone numbers.
+fn looks_like_non_phone(s: &str) -> bool {
+    // RFC4122 UUID
     if s.len() == 36 && s.matches('-').count() == 4 {
         return true;
     }
-    if s.starts_with("20") && s.contains('T') && s.contains(':') {
+    // ISO 8601 timestamp (anywhere in the string, not just at the start)
+    if RX_ISO_TS.is_match(s) {
+        return true;
+    }
+    // Bare ISO date `2026-05-16` (anywhere) — Insight's error messages
+    // embed these in template strings like `dev smoke @ 2026-05-16T...`
+    if RX_ISO_DATE.is_match(s) {
+        return true;
+    }
+    // Semver-like build id `5.4.26051603` or `5.4.26051603+349`. Three
+    // dot-separated components, last component ≥ 6 digits → build/date.
+    if RX_BUILD_VERSION.is_match(s) {
+        return true;
+    }
+    // Hostname / FQDN with dashed-IP subdomain `10-227-60-214.host.com`.
+    if RX_HOSTNAME.is_match(s) {
         return true;
     }
     false
+}
+
+static RX_ISO_TS: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}").unwrap()
+});
+static RX_ISO_DATE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b\d{4}-\d{2}-\d{2}\b").unwrap());
+static RX_BUILD_VERSION: Lazy<Regex> = Lazy::new(|| {
+    // major.minor.<6+ digits>  optionally with +build suffix.
+    Regex::new(r"\b\d+\.\d+\.\d{6,}(?:\+\w+)?\b").unwrap()
+});
+static RX_HOSTNAME: Lazy<Regex> = Lazy::new(|| {
+    // <something>.<word>.<tld> where <something> contains dashes/digits.
+    Regex::new(r"\b[\w\-]+(?:\.[\w\-]+){2,}\.[a-z]{2,24}\b").unwrap()
+});
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn kinds_for(payload: &Value) -> Vec<String> {
+        scan_payload(payload).into_iter().map(|f| f.kind).collect()
+    }
+
+    #[test]
+    fn flags_real_phone_in_message() {
+        let p = serde_json::json!({"error": {"message": "call +1-415-555-1234 now"}});
+        assert!(kinds_for(&p).contains(&"phone".to_string()));
+    }
+
+    #[test]
+    fn flags_email() {
+        let p = serde_json::json!({"user": {"email": "alice@example.com"}});
+        assert!(kinds_for(&p).contains(&"email".to_string()));
+    }
+
+    // v0.9.8 regression coverage — Insight 2026-05-16 false positives.
+
+    #[test]
+    fn does_not_flag_app_release_as_phone() {
+        let p = serde_json::json!({"release": "focus-ai-app@5.4.26051603+349"});
+        assert!(!kinds_for(&p).contains(&"phone".to_string()));
+    }
+
+    #[test]
+    fn does_not_flag_app_version_as_phone() {
+        let p = serde_json::json!({"app": {"version": "5.4.26051603"}});
+        assert!(!kinds_for(&p).contains(&"phone".to_string()));
+    }
+
+    #[test]
+    fn does_not_flag_iso_date_embedded_in_message_as_phone() {
+        let p = serde_json::json!({
+            "error": {"message": "sentori dev smoke @ 2026-05-16T12:46:30Z"}
+        });
+        assert!(!kinds_for(&p).contains(&"phone".to_string()));
+    }
+
+    #[test]
+    fn does_not_flag_ip_dashed_subdomain_as_phone() {
+        let p = serde_json::json!({
+            "breadcrumbs": [
+                {"data": {"url": "https://10-227-60-214.device.focusai.com/api/health"}}
+            ]
+        });
+        assert!(!kinds_for(&p).contains(&"phone".to_string()));
+    }
+
+    #[test]
+    fn does_not_flag_uuid_as_phone() {
+        let p = serde_json::json!({
+            "data": {"trace_id": "12345678-1234-1234-1234-1234567890ab"}
+        });
+        assert!(!kinds_for(&p).contains(&"phone".to_string()));
+    }
 }
