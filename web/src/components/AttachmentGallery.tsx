@@ -133,7 +133,7 @@ export function AttachmentGallery({
   return (
     <Frame>
       {openable.length > 0 && (
-        <ul className="flex flex-wrap gap-4 pt-3">
+        <ul className="flex flex-wrap justify-center gap-4 pt-3">
           {screenshots.map((a, i) => (
             <li key={a.ref}>
               <ScreenshotTile attachment={a} eventId={eventId} onOpen={() => setOpenIdx(i)} />

@@ -80,16 +80,28 @@ export function CmdK() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-[10vh]"
+      aria-modal
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] backdrop-blur-sm"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) setOpen(false)
       }}
+      role="dialog"
+      style={{ background: 'rgb(from var(--ink) r g b / 0.32)' }}
     >
-      <div className="border-border bg-bg w-[36rem] max-w-[92vw] rounded-md border shadow-2xl">
-        <div className="border-border border-b px-3 py-2">
+      <div
+        className="w-[40rem] max-w-[92vw] overflow-hidden border border-[color:var(--rule)] bg-[color:var(--paper)]"
+        style={{ boxShadow: '0 24px 64px -16px rgb(from var(--ink) r g b / 0.5)' }}
+      >
+        {/* Search input — paper-toned, hairline bottom rule. No
+         *  rounded corners, no thick focus halo: a single accent
+         *  underline appears via the caret + the label tag. */}
+        <div className="flex items-baseline gap-3 border-b border-[color:var(--rule)] px-5 py-3">
+          <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+            Search
+          </span>
           <input
             aria-label="Search"
-            className="text-fg t-md placeholder:text-fg-muted w-full bg-transparent font-mono outline-none"
+            className="min-w-0 flex-1 bg-transparent font-sans text-[15px] text-[color:var(--ink)] caret-[color:var(--accent)] placeholder:text-[color:var(--ink-muted)] focus:outline-none"
             onChange={(e) => {
               setQ(e.target.value)
               setIdx(0)
@@ -109,57 +121,89 @@ export function CmdK() {
                 }
               }
             }}
-            placeholder="Search issues / projects / orgs / teams / members…"
+            placeholder="issues · projects · orgs · teams · members"
             ref={inputRef}
             value={q}
           />
+          <span className="hidden font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase sm:inline">
+            ⌘K
+          </span>
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto">
           {q.length === 0 && (
-            <p className="text-fg-muted t-sm px-3 py-3">Start typing to search across this org.</p>
+            <p className="px-5 py-4 text-[12px] text-[color:var(--ink-muted)]">
+              Start typing to search across this org.
+            </p>
           )}
-          {q.length > 0 && isFetching && <p className="text-fg-muted t-sm px-3 py-2">Searching…</p>}
+          {q.length > 0 && isFetching && (
+            <p className="px-5 py-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink-muted)]">
+              searching…
+            </p>
+          )}
           {q.length > 0 && !isFetching && hits.length === 0 && (
-            <p className="text-fg-muted t-sm px-3 py-3">No matches.</p>
+            <p className="px-5 py-4 text-[12px] text-[color:var(--ink-muted)]">No matches.</p>
           )}
           <ul>
-            {hits.map((hit, i) => (
-              <li key={`${hit.type}-${hit.id}`}>
-                <button
-                  className={`group flex w-full items-center gap-3 px-3 py-1.5 text-left ${
-                    i === safeIdx ? 'bg-accent/10' : 'hover:bg-bg-tertiary'
-                  }`}
-                  onClick={() => open_(hit)}
-                  onMouseEnter={() => setIdx(i)}
-                  type="button"
-                >
-                  <KindChip kind={hit.type} />
-                  <span className="text-fg t-md min-w-0 flex-1 truncate">{hit.label}</span>
-                  {hit.sublabel && (
-                    <span className="text-fg-muted t-sm shrink-0 truncate">{hit.sublabel}</span>
-                  )}
-                  <span
-                    aria-hidden
-                    className={`t-md shrink-0 font-mono transition-opacity ${
-                      i === safeIdx ? 'text-accent opacity-100' : 'opacity-0'
+            {hits.map((hit, i) => {
+              const active = i === safeIdx
+              return (
+                <li key={`${hit.type}-${hit.id}`}>
+                  <button
+                    className={`group relative flex w-full items-center gap-3 border-l-2 px-5 py-2 text-left transition-colors ${
+                      active
+                        ? 'border-[color:var(--accent)] bg-[color:var(--accent-soft)]'
+                        : 'border-transparent hover:bg-[color:var(--paper-2)]'
                     }`}
+                    onClick={() => open_(hit)}
+                    onMouseEnter={() => setIdx(i)}
+                    type="button"
                   >
-                    ↵
-                  </span>
-                </button>
-              </li>
-            ))}
+                    <KindChip kind={hit.type} />
+                    <span className="min-w-0 flex-1 truncate text-[13px] text-[color:var(--ink)]">
+                      {hit.label}
+                    </span>
+                    {hit.sublabel && (
+                      <span className="shrink-0 truncate font-mono text-[11px] text-[color:var(--ink-muted)]">
+                        {hit.sublabel}
+                      </span>
+                    )}
+                    <span
+                      aria-hidden
+                      className={`shrink-0 font-mono text-[12px] transition-opacity ${
+                        active ? 'text-[color:var(--accent)] opacity-100' : 'opacity-0'
+                      }`}
+                    >
+                      ↵
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         </div>
 
-        <div className="border-border text-fg-muted t-sm flex items-center gap-3 border-t px-3 py-1.5">
-          <span>↑↓ navigate</span>
-          <span>↵ open</span>
-          <span>esc close</span>
+        <div className="flex items-center gap-4 border-t border-[color:var(--rule)] bg-[color:var(--paper-2)] px-5 py-2 font-mono text-[10px] tracking-[0.15em] text-[color:var(--ink-muted)] uppercase">
+          <span>
+            <Kbd>↑↓</Kbd> navigate
+          </span>
+          <span>
+            <Kbd>↵</Kbd> open
+          </span>
+          <span className="ml-auto">
+            <Kbd>esc</Kbd> close
+          </span>
         </div>
       </div>
     </div>
+  )
+}
+
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="mr-1 inline-block border border-[color:var(--rule)] bg-[color:var(--paper)] px-1.5 py-px font-mono text-[10px] tracking-normal text-[color:var(--ink-soft)]">
+      {children}
+    </span>
   )
 }
 

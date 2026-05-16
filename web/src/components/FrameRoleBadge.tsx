@@ -1,17 +1,16 @@
 import type { FrameRole } from '@/lib/frame-role'
 
 /**
- * Phase 42 sub-A.08 — small colour-coded chip next to a frame's
- * function name, so you can scan a stack and see "this is mine" vs
- * "this is React Native internals" at a glance.
+ * Frame-role chip next to a function name. Uses the designed semantic
+ * palette triples (bg/text/border) so both light and dark modes have
+ * real contrast — alpha-on-accent was washing the FRAMEWORK chip out
+ * to invisibility on dark.
  *
- * Colours:
- *   you        — accent (purple) on accent-tinted background
- *   framework  — sky-blue
- *   lib        — neutral grey on muted background
- *   boundary   — amber (reserved for Phase 42 sub-A4)
- *   unknown    — same as lib visually; kept distinct in code for
- *                future "still classifying" badges
+ *   you        — accent (the "this is mine" signal)
+ *   framework  — info (sky / steel — readable, not screaming)
+ *   lib        — paper-2 fill on ink-muted text
+ *   boundary   — warning (amber — Phase 42 sub-A4 reservation)
+ *   unknown    — same visual as lib; kept distinct for future use
  */
 
 type Props = {
@@ -21,17 +20,18 @@ type Props = {
 }
 
 const STYLE: Record<FrameRole, string> = {
-  boundary: 'bg-[color:var(--color-warning-bg)] text-[color:var(--color-warning)]',
-  framework: 'bg-sky-500/10 text-sky-300',
-  lib: 'bg-fg-muted/10 text-fg-muted',
-  unknown: 'bg-fg-muted/10 text-fg-muted',
-  you: 'bg-accent/10 text-accent',
+  boundary:
+    'bg-[color:var(--warning-bg)] text-[color:var(--warning)] border-[color:var(--warning-border)]',
+  framework: 'bg-[color:var(--info-bg)] text-[color:var(--info)] border-[color:var(--info-border)]',
+  lib: 'bg-[color:var(--paper-2)] text-[color:var(--ink-muted)] border-[color:var(--rule)]',
+  unknown: 'bg-[color:var(--paper-2)] text-[color:var(--ink-muted)] border-[color:var(--rule)]',
+  you: 'bg-[color:var(--accent-soft)] text-[color:var(--accent)] border-[color:var(--accent)]',
 }
 
 export function FrameRoleBadge({ label, role }: Props) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] tracking-wider uppercase ${STYLE[role]}`}
+      className={`inline-flex shrink-0 items-center border px-1.5 py-0.5 font-mono text-[10px] tracking-[0.14em] uppercase ${STYLE[role]}`}
     >
       {label ?? role}
     </span>

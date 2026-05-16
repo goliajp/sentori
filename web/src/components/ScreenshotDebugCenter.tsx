@@ -349,19 +349,18 @@ function ThumbButton({
       type="button"
     >
       <div
-        className={`relative flex aspect-square w-full items-center justify-center overflow-hidden bg-[color:var(--paper-2)] ${
+        className={`relative w-full overflow-hidden bg-[color:var(--paper-2)] ${
           active
             ? 'outline outline-2 outline-offset-2 outline-[color:var(--accent)]'
             : 'outline outline-1 outline-offset-0 outline-[color:var(--rule)]'
         }`}
       >
-        {/* Centered, fit-to-box — most device screenshots are taller
-         *  than wide; a square frame + object-contain keeps the
-         *  whole image visible and lines neighbouring thumbs up on
-         *  a clean grid. */}
+        {/* Keep the screenshot's native aspect — phone shots are portrait,
+         *  desktop shots are landscape. Letterboxing them into a square
+         *  was hiding visual information. */}
         <img
           alt={`Screenshot ${index + 1}`}
-          className="max-h-full max-w-full object-contain"
+          className="block h-auto w-full"
           loading="lazy"
           src={thumbUrl}
         />

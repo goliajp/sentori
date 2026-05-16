@@ -123,16 +123,16 @@ function NavIcon({ active, path }: { active: boolean; path: string }) {
 function UserMenu({ email, onLogout }: { email: null | string; onLogout: () => void }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="truncate font-mono text-[11px] text-[color:var(--ink-soft)]">
+      <span className="min-w-0 truncate font-mono text-[11px] text-[color:var(--ink-soft)]">
         {email ?? 'account'}
       </span>
       <button
-        className="font-mono text-[11px] text-[color:var(--ink-muted)] transition-colors hover:text-[color:var(--accent)]"
+        className="shrink-0 font-mono text-[11px] whitespace-nowrap text-[color:var(--ink-muted)] transition-colors hover:text-[color:var(--accent)]"
         onClick={onLogout}
         title="Sign out"
         type="button"
       >
-        ⎋ sign out
+        ⎋ sign&nbsp;out
       </button>
     </div>
   )

@@ -326,13 +326,18 @@ function IssueActions({
   const isAssignedToMe = currentUserId !== null && issue.assigneeUserId === currentUserId
 
   return (
-    <div className="text-fg-muted t-md flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2 text-[12px] text-[color:var(--ink-soft)]">
       {issue.assigneeEmail ? (
-        <span className="text-accent" title={`Assigned to ${issue.assigneeEmail}`}>
+        <span
+          className="font-mono text-[color:var(--accent)]"
+          title={`Assigned to ${issue.assigneeEmail}`}
+        >
           @{issue.assigneeEmail.split('@')[0]}
         </span>
       ) : (
-        <span className="italic">unassigned</span>
+        <span className="font-mono text-[11px] text-[color:var(--ink-muted)] italic">
+          unassigned
+        </span>
       )}
       {!isAssignedToMe && currentUserId && (
         <ActionButton
@@ -346,10 +351,14 @@ function IssueActions({
       )}
       {issue.status !== 'resolved' && releaseOptions.length > 0 && (
         <>
-          <span className="text-fg-muted">·</span>
-          <span className="hidden md:inline">in</span>
+          <span aria-hidden className="text-[color:var(--ink-muted)]">
+            ·
+          </span>
+          <span className="hidden font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase md:inline">
+            in
+          </span>
           <select
-            className="border-border bg-bg text-fg t-sm rounded border px-2 py-1 font-mono"
+            className="h-7 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[11px] text-[color:var(--ink)] transition-colors hover:border-[color:var(--accent)] focus:border-[color:var(--accent)] focus:outline-none"
             onChange={(e) => setRelease(e.target.value)}
             value={release}
           >
@@ -360,7 +369,7 @@ function IssueActions({
             ))}
           </select>
           <button
-            className="bg-accent text-bg t-md rounded px-2.5 py-1 font-medium disabled:opacity-50"
+            className="inline-flex h-7 items-center bg-[color:var(--accent)] px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--paper)] uppercase transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={pending || !release}
             onClick={() => onResolveInRelease(release || null)}
             type="button"
@@ -394,7 +403,7 @@ function ActionButton({
 }) {
   return (
     <button
-      className="border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2.5 py-1 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink)] uppercase transition-colors hover:border-[color:var(--accent)] hover:text-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex h-7 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2.5 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink)] uppercase transition-colors hover:border-[color:var(--accent)] hover:text-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
       disabled={disabled}
       onClick={onClick}
       type="button"
@@ -502,20 +511,7 @@ function StackTab({
        *  The Context pane that used to sit here re-stated every
        *  field the glance strip already shows; removed. */}
       <AttachmentGallery
-        eventContext={
-          <div>
-            {payload.user?.id && (
-              <Row label="user.id">
-                <span className="font-mono text-[12px] break-all">{payload.user.id}</span>
-              </Row>
-            )}
-            {Object.entries(payload.flags ?? {}).map(([k, v]) => (
-              <Row key={k} label={`flag:${k}`}>
-                <span className="font-mono text-[12px]">{v}</span>
-              </Row>
-            ))}
-          </div>
-        }
+        eventContext={<DebugCenterEventContext event={event} />}
         eventId={event.id}
         projectId={projectId}
       />
@@ -1382,6 +1378,149 @@ function Pane({ children, title }: { children: React.ReactNode; title: string })
       </header>
       <div>{children}</div>
     </section>
+  )
+}
+
+/**
+ * Right-rail context for the screenshot debug center. The fullscreen
+ * viewer is "the operator is staring at the crash UI" — that view is
+ * useless without the same event dims the inline page shows. This is
+ * the canonical slot; keep it in sync when the issue-detail glance
+ * strip grows new fields.
+ */
+function DebugCenterEventContext({ event }: { event: EventRow }) {
+  const p = event.payload
+  const errMsg = p.error?.message
+  const crumbs = (p.breadcrumbs ?? []).slice(-3).reverse()
+  const flagEntries = Object.entries(p.flags ?? {})
+  const release = p.release
+  const bundle = p.bundle
+    ? p.bundle.source
+      ? `${p.bundle.id} (${p.bundle.source})`
+      : p.bundle.id
+    : null
+  const osLine =
+    p.device?.os && p.device?.osVersion
+      ? `${p.device.os} ${p.device.osVersion}`
+      : (p.device?.os ?? null)
+  const geoLine = p.geo
+    ? [p.geo.country, p.geo.region, p.geo.city].filter(Boolean).join(' · ')
+    : null
+
+  return (
+    <div className="space-y-5">
+      <CtxBlock title="Error">
+        <Row label="type">
+          <span className="font-mono text-[12px] break-all text-[color:var(--danger)]">
+            {p.error?.type ?? '—'}
+          </span>
+        </Row>
+        {errMsg && (
+          <Row label="message">
+            <span className="font-sans text-[12px] leading-snug break-words">
+              {errMsg.split('\n')[0]}
+            </span>
+          </Row>
+        )}
+      </CtxBlock>
+
+      <CtxBlock title="Release">
+        <Row label="release">
+          <span className="font-mono text-[12px] break-all">{release}</span>
+        </Row>
+        {bundle && (
+          <Row label="bundle">
+            <span className="font-mono text-[12px] break-all">{bundle}</span>
+          </Row>
+        )}
+        <Row label="env">
+          <span className="font-mono text-[12px]">{p.environment}</span>
+        </Row>
+      </CtxBlock>
+
+      <CtxBlock title="Device">
+        <Row label="platform">
+          <span className="font-mono text-[12px]">{p.platform}</span>
+        </Row>
+        {osLine && (
+          <Row label="os">
+            <span className="font-mono text-[12px]">{osLine}</span>
+          </Row>
+        )}
+        {p.device?.model && (
+          <Row label="model">
+            <span className="font-mono text-[12px]">{p.device.model}</span>
+          </Row>
+        )}
+        {p.device?.locale && (
+          <Row label="locale">
+            <span className="font-mono text-[12px]">{p.device.locale}</span>
+          </Row>
+        )}
+        {p.device?.networkType && (
+          <Row label="net">
+            <span className="font-mono text-[12px]">{p.device.networkType}</span>
+          </Row>
+        )}
+        {geoLine && (
+          <Row label="geo">
+            <span className="font-sans text-[12px]">{geoLine}</span>
+          </Row>
+        )}
+      </CtxBlock>
+
+      {(p.user?.id || flagEntries.length > 0) && (
+        <CtxBlock title="User & flags">
+          {p.user?.id && (
+            <Row label="user.id">
+              <span className="font-mono text-[12px] break-all">{p.user.id}</span>
+            </Row>
+          )}
+          {flagEntries.map(([k, v]) => (
+            <Row key={k} label={`flag:${k}`}>
+              <span className="font-mono text-[12px]">{String(v)}</span>
+            </Row>
+          ))}
+        </CtxBlock>
+      )}
+
+      {crumbs.length > 0 && (
+        <CtxBlock title="Last breadcrumbs">
+          <ul className="space-y-1.5">
+            {crumbs.map((b, i) => (
+              <li key={i} className="text-[11px] leading-snug">
+                <span className="font-mono text-[10px] tracking-[0.1em] text-[color:var(--ink-muted)] tabular-nums">
+                  {timeOfDay(b.timestamp)}
+                </span>
+                <span
+                  className={`ml-2 font-mono text-[9px] tracking-[0.18em] uppercase ${CRUMB_COLOR[b.type]}`}
+                >
+                  {b.type}
+                </span>
+                <div className="mt-0.5 font-mono text-[11px] break-words text-[color:var(--ink)]">
+                  {stringifyData(b.data)}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </CtxBlock>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Mini-section header inside the debug-center right rail. Matches the
+ * "Debug context" head style above the slot so the eye flows naturally.
+ */
+function CtxBlock({ children, title }: { children: React.ReactNode; title: string }) {
+  return (
+    <div>
+      <div className="mb-1.5 font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+        {title}
+      </div>
+      <div>{children}</div>
+    </div>
   )
 }
 
