@@ -1,15 +1,11 @@
-// v0.8.4 — Certificate Transparency monitor dashboard.
-//
-// MVP layout: top half = the project's watched-domain list (add /
-// remove). Bottom half = observation feed for the whole project,
-// most-recent first. No per-domain drilldown yet — the feed is
-// small enough that a flat list works.
+// v0.8.4 — Certificate Transparency monitor.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { adminApi } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
+import { PageHeader } from '@/layout/page-header'
 import { formatRelative } from '@/lib/format'
 
 export function CertMonitorView() {
@@ -47,96 +43,132 @@ export function CertMonitorView() {
   const canSubmit = trimmed.length >= 3 && trimmed.length <= 253 && !addM.isPending
 
   return (
-    <div className="space-y-4">
-      <section className="border-border rounded-md border">
-        <header className="border-border bg-bg-tertiary/60 border-b px-3 py-2">
-          <span className="text-fg-muted t-sm font-semibold tracking-wider uppercase">
-            Watched domains
-          </span>
-        </header>
-        <ul className="divide-border divide-y">
+    <div className="sentori-page-in">
+      <PageHeader subtitle="public CT logs · 10 min poll" title="Cert monitor" />
+
+      <SubSection sub={`${domains.length} watched`} title="Watched domains">
+        <ul>
           {domains.length === 0 && !domainsQ.isLoading && (
-            <li className="text-fg-muted t-md px-3 py-3">
-              Add a domain below. The server polls crt.sh every 10 min and fires an email when a new
+            <li className="border-y border-[color:var(--rule)] py-4 text-[13px] text-[color:var(--ink-soft)]">
+              Add a domain below. The server polls crt.sh every 10 min and emails when a new
               certificate appears in the public CT logs.
             </li>
           )}
-          {domains.map((d) => (
-            <li className="flex items-center justify-between gap-2 px-3 py-2" key={d.id}>
-              <span className="t-md text-fg font-mono">{d.domain}</span>
+          {domains.map((d, i) => (
+            <li
+              className={`flex items-center justify-between gap-3 py-2.5 ${
+                i === 0 ? 'border-t' : ''
+              } border-b border-[color:var(--rule-soft)]`}
+              key={d.id}
+            >
+              <span className="font-mono text-[13px] text-[color:var(--ink)]">{d.domain}</span>
               <button
-                className="text-fg-muted hover:text-danger t-sm"
+                className="font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase transition-colors hover:text-[color:var(--danger)]"
                 onClick={() => deleteM.mutate(d.id)}
                 type="button"
               >
-                Remove
+                remove
               </button>
             </li>
           ))}
         </ul>
+
         <form
-          className="border-border flex items-center gap-2 border-t px-3 py-2"
+          className="mt-3 flex items-center gap-3 border-t border-[color:var(--rule)] pt-3"
           onSubmit={(e) => {
             e.preventDefault()
             if (canSubmit) addM.mutate(trimmed)
           }}
         >
+          <label
+            className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase"
+            htmlFor="cert-domain"
+          >
+            domain
+          </label>
           <input
-            className="border-border bg-bg-tertiary text-fg focus:border-accent t-md flex-1 rounded-md border px-2 py-1 outline-none"
+            className="flex-1 border-b border-[color:var(--rule)] bg-transparent py-1 font-mono text-[13px] text-[color:var(--ink)] placeholder:text-[color:var(--ink-muted)] focus:border-[color:var(--accent)] focus:outline-none"
+            id="cert-domain"
             maxLength={253}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="example.com"
             value={draft}
           />
           <button
-            className="bg-accent text-bg t-md rounded px-3 py-1 font-medium disabled:opacity-50"
+            className="bg-[color:var(--accent)] px-3 py-1 font-mono text-[11px] tracking-[0.1em] text-[color:var(--paper)] uppercase disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!canSubmit}
             type="submit"
           >
-            {addM.isPending ? 'Adding…' : 'Watch'}
+            {addM.isPending ? 'adding…' : 'watch'}
           </button>
         </form>
-      </section>
+      </SubSection>
 
-      <section className="border-border rounded-md border">
-        <header className="border-border bg-bg-tertiary/60 border-b px-3 py-2">
-          <span className="text-fg-muted t-sm font-semibold tracking-wider uppercase">
-            Recent observations
-          </span>
-        </header>
-        {observationsQ.isLoading && <div className="text-fg-muted t-md px-3 py-3">Loading…</div>}
+      <SubSection sub={`${observations.length} seen`} title="Recent observations">
+        {observationsQ.isLoading && (
+          <p className="border-y border-[color:var(--rule)] py-4 text-center text-[13px] text-[color:var(--ink-soft)]">
+            Loading…
+          </p>
+        )}
         {!observationsQ.isLoading && observations.length === 0 && (
-          <div className="text-fg-muted t-md px-3 py-3">
+          <p className="border-y border-[color:var(--rule)] py-6 text-center text-[13px] text-[color:var(--ink-soft)]">
             No certificates observed yet — newly-watched domains take up to 10 min for the first
             poll.
-          </div>
+          </p>
         )}
-        <ul className="divide-border divide-y">
+        <ul>
           {observations.map((o) => (
-            <li className="px-3 py-2" key={o.id}>
-              <div className="t-md flex items-baseline justify-between gap-2">
-                <span className="text-fg font-mono">{o.domain}</span>
-                <span className="text-fg-muted t-sm font-mono tabular-nums">
+            <li
+              className="border-b border-[color:var(--rule-soft)] py-3 first:border-t first:border-[color:var(--rule)]"
+              key={o.id}
+            >
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="font-mono text-[13px] text-[color:var(--ink)]">{o.domain}</span>
+                <span className="font-mono text-[10px] tracking-[0.05em] text-[color:var(--ink-muted)] tabular-nums">
                   {formatRelative(o.firstSeen)}
                 </span>
               </div>
-              <div className="text-fg t-md mt-1">{o.commonName ?? '(no common name)'}</div>
-              <div className="text-fg-muted t-sm mt-1 font-mono">Issuer: {o.issuerName}</div>
-              <div className="text-fg-muted t-sm mt-0.5 font-mono">
-                Valid {o.notBefore} → {o.notAfter}
+              <div className="mt-1 text-[13px] text-[color:var(--ink-soft)]">
+                {o.commonName ?? '(no common name)'}
               </div>
-              <a
-                className="text-accent t-sm mt-1 inline-block hover:underline"
-                href={`https://crt.sh/?id=${o.certId}`}
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                crt.sh/{o.certId} ↗
-              </a>
+              <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 font-mono text-[11px] text-[color:var(--ink-muted)]">
+                <span>issuer · {o.issuerName}</span>
+                <span>
+                  valid {o.notBefore} → {o.notAfter}
+                </span>
+                <a
+                  className="ml-auto text-[color:var(--accent)] hover:underline"
+                  href={`https://crt.sh/?id=${o.certId}`}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  crt.sh/{o.certId} ↗
+                </a>
+              </div>
             </li>
           ))}
         </ul>
-      </section>
+      </SubSection>
     </div>
+  )
+}
+
+function SubSection({
+  children,
+  sub,
+  title,
+}: {
+  children: React.ReactNode
+  sub: string
+  title: string
+}) {
+  return (
+    <section>
+      <header className="sec-head">
+        <span className="sec-head-title">{title}</span>
+        <span className="sec-head-sub">{sub}</span>
+      </header>
+      <div>{children}</div>
+    </section>
   )
 }

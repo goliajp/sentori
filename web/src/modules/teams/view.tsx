@@ -16,57 +16,50 @@ export function TeamsView() {
   const teams = data ?? []
 
   return (
-    <div className="space-y-3">
-      <PageHeader
-        count={teams.length}
-        subtitle="Groups that own projects and receive alerts"
-        title="Teams"
-      />
+    <div className="sentori-page-in">
+      <PageHeader count={teams.length} subtitle="own projects · receive alerts" title="Teams" />
 
-      {isLoading && <Empty hint="Loading…" title="Teams" />}
-      {error && <Empty hint="Failed to load teams." title="Error" />}
+      {isLoading && <Hint>Loading…</Hint>}
+      {error && <Hint>Failed to load teams.</Hint>}
       {!isLoading && !error && teams.length === 0 && (
-        <Empty hint="No teams yet — create one in org settings." title="No teams" />
+        <Hint>No teams yet — create one in org settings.</Hint>
       )}
 
       {teams.length > 0 && (
-        <div className="std-table border-border overflow-hidden rounded-md border">
-          <table>
-            <thead>
-              <tr className="text-fg-muted t-sm tracking-wider uppercase">
-                <th className="text-left font-medium">Team</th>
-                <th className="w-32 text-left font-medium">Slug</th>
-                <th className="text-left font-medium">Description</th>
+        <table className="bench">
+          <thead>
+            <tr>
+              <th>team</th>
+              <th>slug</th>
+              <th>description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {teams.map((t) => (
+              <tr key={t.id}>
+                <td className="lead">
+                  <Link
+                    className="text-[color:var(--ink)] hover:text-[color:var(--accent)]"
+                    to={`/org/${currentOrg.slug}/teams/${t.slug}`}
+                  >
+                    {t.name}
+                  </Link>
+                </td>
+                <td>{t.slug}</td>
+                <td className="text-[color:var(--ink-soft)]">{t.description ?? '—'}</td>
               </tr>
-            </thead>
-            <tbody>
-              {teams.map((t) => (
-                <tr className="hover:bg-bg-tertiary/40" key={t.id}>
-                  <td>
-                    <Link
-                      className="text-fg t-md font-semibold"
-                      to={`/org/${currentOrg.slug}/teams/${t.slug}`}
-                    >
-                      {t.name}
-                    </Link>
-                  </td>
-                  <td className="text-fg-muted t-md font-mono">{t.slug}</td>
-                  <td className="text-fg-muted t-md">{t.description ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   )
 }
 
-function Empty({ hint, title }: { hint: string; title: string }) {
+function Hint({ children }: { children: React.ReactNode }) {
   return (
-    <div className="border-border bg-bg-secondary/30 rounded-md border px-6 py-12 text-center">
-      <div className="text-fg-muted t-sm mb-1 font-semibold tracking-wider uppercase">{title}</div>
-      <div className="text-fg t-md">{hint}</div>
-    </div>
+    <p className="border-y border-[color:var(--rule)] py-6 text-center text-[13px] text-[color:var(--ink-soft)]">
+      {children}
+    </p>
   )
 }

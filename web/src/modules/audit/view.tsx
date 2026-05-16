@@ -16,52 +16,49 @@ export function AuditLogView() {
   const rows = data ?? []
 
   return (
-    <div className="space-y-3">
+    <div className="sentori-page-in">
       <PageHeader
         count={rows.length}
-        subtitle="Append-only log of every mutating action"
-        title="Audit log"
+        subtitle="append-only · every mutating action"
+        title="Audit"
       />
 
-      {isLoading && <Empty hint="Loading…" title="Audit" />}
-      {error && <Empty hint="Failed to load audit log." title="Error" />}
-      {!isLoading && !error && rows.length === 0 && <Empty hint="No entries yet." title="Empty" />}
+      {isLoading && <Hint>Loading…</Hint>}
+      {error && <Hint>Failed to load audit log.</Hint>}
+      {!isLoading && !error && rows.length === 0 && <Hint>No entries yet.</Hint>}
 
       {rows.length > 0 && (
-        <div className="std-table border-border overflow-hidden rounded-md border">
-          <table>
-            <thead>
-              <tr className="text-fg-muted t-sm tracking-wider uppercase">
-                <th className="w-24 text-left font-medium">When</th>
-                <th className="w-40 text-left font-medium">Actor</th>
-                <th className="w-48 text-left font-medium">Action</th>
-                <th className="text-left font-medium">Target</th>
+        <table className="bench">
+          <thead>
+            <tr>
+              <th>when</th>
+              <th>actor</th>
+              <th>action</th>
+              <th>target</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((e) => (
+              <tr key={e.id}>
+                <td className="num">{formatRelative(e.createdAt)}</td>
+                <td className="text-[color:var(--accent)]">{e.actorEmail ?? 'system'}</td>
+                <td className="lead">{e.action}</td>
+                <td className="text-[color:var(--ink-soft)]">
+                  {e.targetType}:{e.targetId ?? '—'}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {rows.map((e) => (
-                <tr className="hover:bg-bg-tertiary/40" key={e.id}>
-                  <td className="text-fg-muted t-md tabular-nums">{formatRelative(e.createdAt)}</td>
-                  <td className="text-accent t-md">{e.actorEmail ?? 'system'}</td>
-                  <td className="text-fg t-md font-mono">{e.action}</td>
-                  <td className="text-fg-muted t-md font-mono">
-                    {e.targetType}:{e.targetId ?? '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   )
 }
 
-function Empty({ hint, title }: { hint: string; title: string }) {
+function Hint({ children }: { children: React.ReactNode }) {
   return (
-    <div className="border-border bg-bg-secondary/30 rounded-md border px-6 py-12 text-center">
-      <div className="text-fg-muted t-sm mb-1 font-semibold tracking-wider uppercase">{title}</div>
-      <div className="text-fg t-md">{hint}</div>
-    </div>
+    <p className="border-y border-[color:var(--rule)] py-6 text-center text-[13px] text-[color:var(--ink-soft)]">
+      {children}
+    </p>
   )
 }

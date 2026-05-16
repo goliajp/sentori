@@ -12,42 +12,53 @@ export function IntegrationsView() {
   const items = data ?? []
 
   return (
-    <div className="space-y-3">
-      <PageHeader
-        count={items.length}
-        subtitle="External destinations: Slack, webhook, archive…"
-        title="Integrations"
-      />
+    <div className="sentori-page-in">
+      <PageHeader count={items.length} subtitle="Slack · webhook · archive" title="Integrations" />
 
-      {isLoading && <Empty hint="Loading…" title="Integrations" />}
-      {error && <Empty hint="Failed to load." title="Error" />}
-      {!isLoading && !error && items.length === 0 && <Empty hint="None connected." title="Empty" />}
+      {isLoading && <Hint>Loading…</Hint>}
+      {error && <Hint>Failed to load integrations.</Hint>}
+      {!isLoading && !error && items.length === 0 && <Hint>None connected yet.</Hint>}
 
       {items.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <ul>
           {items.map((it) => (
-            <div className="border-border bg-bg-secondary/30 rounded-md border p-3" key={it.id}>
-              <div className="t-md text-fg font-semibold">{it.kind}</div>
-              <div className="text-fg-muted t-sm mt-1 font-mono">
+            <li
+              className="border-b border-[color:var(--rule-soft)] py-3 first:border-t first:border-[color:var(--rule)]"
+              key={it.id}
+            >
+              <div className="flex items-baseline justify-between gap-3">
+                <span
+                  className="text-[color:var(--ink)]"
+                  style={{
+                    fontFamily: 'var(--font-sans)',
+                    fontVariationSettings: "'wdth' 86, 'opsz' 24, 'wght' 600",
+                    fontSize: '15px',
+                  }}
+                >
+                  {it.kind}
+                </span>
+                <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--success)] uppercase">
+                  ● connected
+                </span>
+              </div>
+              <div className="mt-1 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink-muted)]">
                 {Object.entries(it.display)
                   .filter(([, v]) => v)
                   .map(([k, v]) => `${k}=${String(v)}`)
                   .join(' · ') || '—'}
               </div>
-              <div className="text-success t-md mt-2">connected</div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   )
 }
 
-function Empty({ hint, title }: { hint: string; title: string }) {
+function Hint({ children }: { children: React.ReactNode }) {
   return (
-    <div className="border-border bg-bg-secondary/30 rounded-md border px-6 py-12 text-center">
-      <div className="text-fg-muted t-sm mb-1 font-semibold tracking-wider uppercase">{title}</div>
-      <div className="text-fg t-md">{hint}</div>
-    </div>
+    <p className="border-y border-[color:var(--rule)] py-6 text-center text-[13px] text-[color:var(--ink-soft)]">
+      {children}
+    </p>
   )
 }

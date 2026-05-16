@@ -15,57 +15,81 @@ export function SettingsView() {
   const members = membersQ.data ?? []
 
   return (
-    <div className="space-y-3">
-      <PageHeader subtitle="Org-level configuration" title="Settings" />
+    <div className="sentori-page-in">
+      <PageHeader subtitle="org configuration" title="Settings" />
 
-      <Pane title="Organization">
+      <SubSection title="Organization">
         <Row label="slug">
-          <span className="text-fg font-mono">{currentOrg.slug}</span>
+          <span className="font-mono">{currentOrg.slug}</span>
         </Row>
-        <Row label="name">
-          <span className="text-fg">{currentOrg.name}</span>
-        </Row>
+        <Row label="name">{currentOrg.name}</Row>
         <Row label="your role">
-          <span className="text-accent font-medium">{currentOrg.role}</span>
+          <span className="font-mono text-[color:var(--accent)]">{currentOrg.role}</span>
         </Row>
-      </Pane>
+      </SubSection>
 
-      <Pane title={`Members (${members.length})`}>
-        {membersQ.isLoading ? (
-          <div className="text-fg-muted t-md">Loading…</div>
-        ) : members.length === 0 ? (
-          <div className="text-fg-muted t-md">No members.</div>
-        ) : (
-          <div className="space-y-1">
-            {members.map((m) => (
-              <div className="t-md flex items-center justify-between" key={m.userId}>
-                <span className="text-fg">{m.email}</span>
-                <span className="text-fg-muted">{m.role}</span>
-              </div>
-            ))}
-          </div>
+      <SubSection sub={`${members.length} total`} title="Members">
+        {membersQ.isLoading && (
+          <p className="border-y border-[color:var(--rule)] py-4 text-[13px] text-[color:var(--ink-soft)]">
+            Loading…
+          </p>
         )}
-      </Pane>
+        {!membersQ.isLoading && members.length === 0 && (
+          <p className="border-y border-[color:var(--rule)] py-4 text-[13px] text-[color:var(--ink-soft)]">
+            No members.
+          </p>
+        )}
+        {members.length > 0 && (
+          <ul>
+            {members.map((m, i) => (
+              <li
+                className={`flex items-baseline justify-between gap-3 border-b border-[color:var(--rule-soft)] py-2 ${
+                  i === 0 ? 'border-t border-[color:var(--rule)]' : ''
+                }`}
+                key={m.userId}
+              >
+                <span className="text-[13px] text-[color:var(--ink)]">{m.email}</span>
+                <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+                  {m.role}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SubSection>
     </div>
   )
 }
 
-function Pane({ children, title }: { children: React.ReactNode; title: string }) {
+function SubSection({
+  children,
+  sub,
+  title,
+}: {
+  children: React.ReactNode
+  sub?: string
+  title: string
+}) {
   return (
-    <div className="border-border bg-bg-secondary/30 overflow-hidden rounded-md border">
-      <header className="border-border border-b px-3 py-2">
-        <span className="text-fg-muted t-sm font-semibold tracking-wider uppercase">{title}</span>
+    <section>
+      <header className="sec-head">
+        <span className="sec-head-title">{title}</span>
+        {sub && <span className="sec-head-sub">{sub}</span>}
       </header>
-      <div className="px-3 py-2.5">{children}</div>
-    </div>
+      <div>{children}</div>
+    </section>
   )
 }
 
 function Row({ children, label }: { children: React.ReactNode; label: string }) {
   return (
-    <div className="t-md mb-1.5 flex items-baseline justify-between gap-3 last:mb-0">
-      <span className="text-fg-muted t-sm tracking-wide">{label}</span>
-      <span className="min-w-0 truncate text-right">{children}</span>
+    <div className="flex items-baseline justify-between gap-3 border-b border-[color:var(--rule-soft)] py-2 first:border-t first:border-[color:var(--rule)]">
+      <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+        {label}
+      </span>
+      <span className="min-w-0 truncate text-right text-[13px] text-[color:var(--ink)]">
+        {children}
+      </span>
     </div>
   )
 }
