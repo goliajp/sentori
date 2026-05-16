@@ -148,21 +148,62 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ─── Section header (tri-part) ────────────────────────────────── */
-/* Pattern: `01 — Issues / Active stream • last 24h` becomes
- *   <header class="sec-head">
- *     <span class="sec-head-num">01</span>
- *     <h2 class="sec-head-title">Issues</h2>
- *     <span class="sec-head-sub">Active stream · last 24h</span>
- *   </header>
+/* ─── Hierarchy through type, not chrome ──────────────────────────
+ *
+ * Title rows (.page-head, .sec-head) carry NO horizontal rules.
+ * Hierarchy lives in the type scale alone:
+ *
+ *   .page-head-title    26px Plex Sans, wdth 80, wght 700
+ *   .sec-head-title     15px Plex Sans, wdth 84, wght 600
+ *   th (column label)   10px Plex Mono uppercase, 0.18em tracking
+ *
+ * Rules are reserved for delimiting DATA STRIPS — `.bench` and
+ * `.rule-grid` open with a strong rule and close with a strong rule,
+ * with soft rules between rows. The title floats above the strip.
+ * No floating dividers, no double lines, no chrome competing with
+ * the data.
+ *
+ * Use `.sec-head-num` on a child only when content is actually
+ * sequential (step 1 / step 2 / …). Page titles and sidebar groups
+ * are category labels, not sequences — they don't get numbers.
  */
+.page-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 6px 0 18px;
+}
+.page-head-title {
+  font-family: var(--font-sans);
+  font-variation-settings:
+    'wdth' 80,
+    'opsz' 48,
+    'wght' 700;
+  font-size: 26px;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  line-height: 1;
+}
+.page-head-count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+  font-feature-settings: 'tnum';
+}
+.page-head-sub {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-muted);
+  letter-spacing: 0.08em;
+}
+
 .sec-head {
   display: flex;
   align-items: baseline;
   gap: 12px;
-  border-top: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
-  padding: 14px 0 12px;
+  padding: 22px 0 10px;
 }
 .sec-head-num {
   font-family: var(--font-mono);
@@ -174,11 +215,11 @@ body {
 .sec-head-title {
   font-family: var(--font-sans);
   font-variation-settings:
-    'wdth' 82,
+    'wdth' 84,
     'opsz' 24,
-    'wght' 700;
-  font-size: 18px;
-  letter-spacing: -0.018em;
+    'wght' 600;
+  font-size: 15px;
+  letter-spacing: -0.012em;
   color: var(--ink);
 }
 .sec-head-sub {
@@ -223,6 +264,9 @@ body {
 }
 .bench thead {
   border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.bench tbody tr:last-child td {
   border-bottom: 1px solid var(--rule);
 }
 .bench th {

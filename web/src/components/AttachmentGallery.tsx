@@ -247,13 +247,12 @@ export function AttachmentGallery({
  *  spans the full attachment band. */
 function Frame({ children }: { children: ReactNode }) {
   return (
-    <section className="space-y-1">
+    <section>
       <header className="sec-head">
-        <span className="sec-head-num">06</span>
         <h2 className="sec-head-title">Captured at error</h2>
         <span className="sec-head-sub">attachments</span>
       </header>
-      <div className="pt-3">{children}</div>
+      <div>{children}</div>
     </section>
   )
 }

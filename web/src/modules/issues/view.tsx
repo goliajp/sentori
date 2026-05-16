@@ -101,21 +101,16 @@ function RailHeader({
   return (
     <header className="shrink-0 border-b border-[color:var(--rule)] px-4 py-3">
       <div className="flex items-baseline justify-between">
-        <h1 className="flex items-baseline gap-2.5">
-          <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
-            02
-          </span>
-          <span
-            className="text-[color:var(--ink)]"
-            style={{
-              fontFamily: 'IBM Plex Sans, sans-serif',
-              fontVariationSettings: "'wdth' 82, 'opsz' 24, 'wght' 700",
-              fontSize: '17px',
-              letterSpacing: '-0.018em',
-            }}
-          >
-            Issues
-          </span>
+        <h1
+          className="text-[color:var(--ink)]"
+          style={{
+            fontFamily: 'IBM Plex Sans, sans-serif',
+            fontVariationSettings: "'wdth' 82, 'opsz' 24, 'wght' 700",
+            fontSize: '17px',
+            letterSpacing: '-0.018em',
+          }}
+        >
+          Issues
         </h1>
         <span className="font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
           {count.toLocaleString()}

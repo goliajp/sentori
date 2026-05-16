@@ -29,7 +29,6 @@ function TraceList() {
     <div className="sentori-page-in space-y-5">
       <PageHeader
         count={traces.length}
-        num="03"
         subtitle="Distributed root spans · last 24h"
         title="Traces"
       />

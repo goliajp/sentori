@@ -1,50 +1,35 @@
 import type { ReactNode } from 'react'
 
 /**
- * Editorial page header — tri-part pattern matching the section-head
- * utility but pitched for the page-level title.
+ * Page-level title strip. No horizontal rules — the page's first data
+ * block (a `.bench` thead, a `.rule-grid`, a hero) provides the first
+ * visible line and the title floats above it. Hierarchy comes from
+ * type scale alone (26px Plex Sans condensed for page · 15px for
+ * in-page sections · 10px mono for column labels).
  *
- *   ┌─────────────────────────────────────────────────────────────┐
- *   │ 02   Issues                          subtitle · last 24h    │  ← top rule
- *   │ ╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴ │  ← bottom rule
- *   └─────────────────────────────────────────────────────────────┘
- *
- * The number is opt-in. Pages that have an obvious sequence (Issues →
- * Traces → Vitals → …) supply theirs from `modules/registry`. Pages
- * that don't (Settings, Audit) leave it blank.
+ * No `num` prop. Numbering belongs only between completely sibling,
+ * sequential items (steps of a wizard, ordered stack frames). Page
+ * titles, sidebar groups, and unrelated sub-sections are not
+ * sequences — they don't get numbers.
  */
 export function PageHeader({
   actions,
   count,
-  num,
   subtitle,
   title,
 }: {
   actions?: ReactNode
   count?: number
-  num?: string
   subtitle?: ReactNode
   title: ReactNode
 }) {
   return (
-    <header className="sec-head">
-      {num && <span className="sec-head-num">{num}</span>}
-      <h1 className="sec-head-title">
-        {title}
-        {count !== undefined && (
-          <span
-            className="tnum ml-3 font-mono text-[12px] tracking-[0.05em] text-[color:var(--ink-muted)]"
-            style={{ fontVariationSettings: 'unset' }}
-          >
-            {count.toLocaleString()}
-          </span>
-        )}
-      </h1>
-      {subtitle && (
-        <span className="sec-head-sub flex items-center gap-2">
-          {typeof subtitle === 'string' ? subtitle : subtitle}
-        </span>
+    <header className="page-head">
+      <h1 className="page-head-title">{title}</h1>
+      {count !== undefined && (
+        <span className="page-head-count">{count.toLocaleString()}</span>
       )}
+      {subtitle && <span className="page-head-sub">{subtitle}</span>}
       {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
     </header>
   )

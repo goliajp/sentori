@@ -38,11 +38,11 @@ export function Sidebar() {
           <SideLink module={PINNED_MODULE} orgSlug={currentOrg.slug} />
         </Section>
 
-        {GROUPS.map((g, gIdx) => {
+        {GROUPS.map((g) => {
           const visible = modulesInGroup(g.id).filter((m) => !m.adminOnly || isAdmin)
           if (visible.length === 0) return null
           return (
-            <Section key={g.id} num={String(gIdx + 1).padStart(2, '0')} title={g.label}>
+            <Section key={g.id} title={g.label}>
               {visible.map((m) => (
                 <SideLink key={m.id} module={m} orgSlug={currentOrg.slug} />
               ))}
@@ -60,22 +60,15 @@ export function Sidebar() {
 
 function Section({
   children,
-  num,
   title,
 }: {
   children: React.ReactNode
-  num?: string
   title?: string
 }) {
   return (
     <div className="mb-1 last:mb-0">
       {title && (
-        <div className="flex items-baseline gap-2 border-t border-[color:var(--rule-soft)] px-4 pt-4 pb-2">
-          {num && (
-            <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)]">
-              {num}
-            </span>
-          )}
+        <div className="border-t border-[color:var(--rule-soft)] px-4 pt-5 pb-2">
           <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
             {title}
           </span>
