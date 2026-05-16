@@ -110,35 +110,37 @@ export function IssueDetailView() {
   const issue = issueQ.data
 
   return (
-    <div className="space-y-3">
+    <div className="sentori-page-in space-y-4">
       <Link
-        className="text-fg-muted hover:text-fg t-sm inline-flex items-center gap-1"
+        className="inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase transition-colors hover:text-[color:var(--accent)]"
         to={`/org/${currentOrg.slug}/issues`}
       >
-        ← Issues
+        ← back to issues
       </Link>
 
-      {/*
-       * Two-row header. Info row sits on top with full width so a long
-       * error message wraps naturally; the toolbar row sits underneath
-       * with its own line of breathing room. Stacking beats the old
-       * `<PageHeader actions={...}>` left/right split, which crammed
-       * the assignee + Resolve / Silence / Reopen / release picker
-       * against the right edge.
-       */}
-      <header className="space-y-2">
-        <div>
-          <h1 className="text-fg t-lg inline-flex flex-wrap items-baseline gap-2 font-semibold">
-            <StatusText status={issue.status} />
-            <span className="text-fg">{displayMessage(issue.messageSample)}</span>
-          </h1>
-          <div className="text-fg-muted t-md mt-1 flex flex-wrap items-baseline gap-x-2 font-mono">
-            <span>{issue.errorType}</span>
-            {issue.lastEnvironment && <span>· env={issue.lastEnvironment}</span>}
-            {issue.lastRelease && <span>· {issue.lastRelease}</span>}
-          </div>
+      {/* Header — title + meta float on the paper, no card frame.
+       *  Actions sit directly below separated by a hairline so a
+       *  long error message wraps cleanly. */}
+      <header>
+        <div className="flex items-baseline gap-3">
+          <StatusText status={issue.status} />
+          <span className="font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase">
+            {issue.errorType}
+          </span>
         </div>
-        <div className="border-border bg-bg-secondary/30 rounded-md border px-3 py-2">
+        <h1
+          className="mt-2 max-w-prose text-[color:var(--ink)]"
+          style={{
+            fontFamily: 'var(--font-sans)',
+            fontVariationSettings: "'wdth' 80, 'opsz' 48, 'wght' 700",
+            fontSize: 'clamp(22px, 2.6vw, 30px)',
+            letterSpacing: '-0.025em',
+            lineHeight: '1.12',
+          }}
+        >
+          {displayMessage(issue.messageSample)}
+        </h1>
+        <div className="mt-4 border-t border-[color:var(--rule)] pt-3">
           <IssueActions
             currentUserId={user?.id ?? null}
             issue={issue}
@@ -250,7 +252,7 @@ function Tabs({ current, onChange }: { current: Tab; onChange: (t: Tab) => void 
   return (
     <div
       aria-label="Issue detail sections"
-      className="border-border bg-bg-tertiary/40 flex items-center gap-1 rounded-md border px-2 py-1"
+      className="flex items-baseline gap-5 border-b border-[color:var(--rule)] pb-px"
       onKeyDown={onKey}
       role="tablist"
     >
@@ -259,10 +261,10 @@ function Tabs({ current, onChange }: { current: Tab; onChange: (t: Tab) => void 
         return (
           <button
             aria-selected={active}
-            className={`t-md focus:outline-accent rounded px-2.5 py-1 transition-colors focus:outline focus:outline-1 ${
+            className={`relative pb-2 font-mono text-[11px] tracking-[0.1em] uppercase transition-colors focus:outline-none ${
               active
-                ? 'bg-accent/10 text-accent'
-                : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+                ? 'text-[color:var(--ink)]'
+                : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]'
             }`}
             key={t.key}
             onClick={() => onChange(t.key)}
@@ -271,6 +273,12 @@ function Tabs({ current, onChange }: { current: Tab; onChange: (t: Tab) => void 
             type="button"
           >
             {t.label}
+            {active && (
+              <span
+                aria-hidden
+                className="absolute right-0 -bottom-px left-0 h-[2px] bg-[color:var(--accent)]"
+              />
+            )}
           </button>
         )
       })}
@@ -279,15 +287,17 @@ function Tabs({ current, onChange }: { current: Tab; onChange: (t: Tab) => void 
 }
 
 function StatusText({ status }: { status: IssueStatus }) {
-  const cls =
+  const tone =
     status === 'active'
-      ? 'text-success font-medium'
+      ? 'text-[color:var(--danger)]'
       : status === 'regressed'
-        ? 'text-danger font-medium'
-        : status === 'closed'
-          ? 'text-fg'
-          : 'text-fg-muted'
-  return <span className={`t-md ${cls}`}>{status}</span>
+        ? 'text-[color:var(--danger)]'
+        : status === 'resolved'
+          ? 'text-[color:var(--success)]'
+          : 'text-[color:var(--ink-muted)]'
+  return (
+    <span className={`font-mono text-[10px] tracking-[0.22em] uppercase ${tone}`}>{status}</span>
+  )
 }
 
 function IssueActions({
@@ -384,7 +394,7 @@ function ActionButton({
 }) {
   return (
     <button
-      className="border-border text-fg hover:bg-bg-tertiary t-md rounded border px-2.5 py-1 disabled:opacity-50"
+      className="border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2.5 py-1 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink)] uppercase transition-colors hover:border-[color:var(--accent)] hover:text-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
       disabled={disabled}
       onClick={onClick}
       type="button"
@@ -407,10 +417,10 @@ function EventPicker({
 }) {
   const e = events[selectedIdx]
   return (
-    <div className="border-border bg-bg-tertiary/30 text-fg-muted t-md flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-mono tabular-nums">
+    <div className="flex items-center gap-2 py-2 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink-muted)] tabular-nums">
       <button
         aria-label="Previous event ([)"
-        className="hover:bg-bg-tertiary hover:text-fg inline-flex items-center rounded p-1 disabled:opacity-30"
+        className="inline-flex items-center p-1 text-[color:var(--ink-soft)] transition-colors hover:text-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-30"
         disabled={selectedIdx === 0}
         onClick={() => onSelect(Math.max(0, selectedIdx - 1))}
         title="Previous event — keyboard: ["
@@ -420,7 +430,7 @@ function EventPicker({
       </button>
       <button
         aria-label="Next event (])"
-        className="hover:bg-bg-tertiary hover:text-fg inline-flex items-center rounded p-1 disabled:opacity-30"
+        className="inline-flex items-center p-1 text-[color:var(--ink-soft)] transition-colors hover:text-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-30"
         disabled={selectedIdx >= events.length - 1}
         onClick={() => onSelect(Math.min(events.length - 1, selectedIdx + 1))}
         title="Next event — keyboard: ]"
@@ -428,12 +438,14 @@ function EventPicker({
       >
         <ChevronRight className="h-3.5 w-3.5" />
       </button>
-      <span className="ml-1.5">
-        event {selectedIdx + 1} / {events.length}
+      <span className="ml-2 text-[color:var(--ink)]">
+        event {String(selectedIdx + 1).padStart(2, '0')} / {events.length}
       </span>
-      <span className="text-fg-muted/70">·</span>
+      <span aria-hidden className="opacity-40">
+        ·
+      </span>
       <span>{total.toLocaleString()} total</span>
-      {e && <span className="text-fg-muted t-sm ml-auto">{e.id.slice(0, 12)}</span>}
+      {e && <span className="ml-auto text-[color:var(--ink-muted)]">{e.id.slice(0, 12)}</span>}
     </div>
   )
 }
@@ -482,46 +494,31 @@ function StackTab({
         />
       </Pane>
 
-      {/* Phase 48 sub-A.2 — screenshots / view-tree / session-trail from
-       *  the SDK. Self-fetches via `/projects/:id/events/:id/attachments`,
-       *  silently renders nothing when the event has no attachments. */}
-      <AttachmentGallery eventId={event.id} projectId={projectId} />
-
-      <Pane title="Context">
-        <KeyValueGrid
-          data={{
-            'app.version': payload.app.version,
-            'device.os': payload.device.os,
-            'device.osVersion': payload.device.osVersion,
-            ...(payload.device.model ? { 'device.model': payload.device.model } : {}),
-            ...(payload.device.locale ? { 'device.locale': payload.device.locale } : {}),
-            ...(payload.device.networkType
-              ? { 'device.networkType': payload.device.networkType }
-              : {}),
-            environment: payload.environment,
-            ...(payload.geo
-              ? {
-                  geo: [payload.geo.country, payload.geo.region, payload.geo.city]
-                    .filter(Boolean)
-                    .join(' · '),
-                }
-              : {}),
-            ...(payload.flags && Object.keys(payload.flags).length > 0
-              ? Object.fromEntries(Object.entries(payload.flags).map(([k, v]) => [`flag:${k}`, v]))
-              : {}),
-            platform: payload.platform,
-            release: payload.release,
-            ...(payload.bundle
-              ? {
-                  bundle: payload.bundle.source
-                    ? `${payload.bundle.id} (${payload.bundle.source})`
-                    : payload.bundle.id,
-                }
-              : {}),
-            'user.id': payload.user?.id ?? '(anonymous)',
-          }}
-        />
-      </Pane>
+      {/* Phase 48 sub-A.2 — screenshots / view-tree / session-trail.
+       *  Drops eventContext into the screenshot debug center so the
+       *  fullscreen viewer has device + release + user.id alongside
+       *  the JPEG. The visible context strip on this tab is the
+       *  EventGlanceStrip above — Tags tab carries the deep KV.
+       *  The Context pane that used to sit here re-stated every
+       *  field the glance strip already shows; removed. */}
+      <AttachmentGallery
+        eventContext={
+          <div>
+            {payload.user?.id && (
+              <Row label="user.id">
+                <span className="font-mono text-[12px] break-all">{payload.user.id}</span>
+              </Row>
+            )}
+            {Object.entries(payload.flags ?? {}).map(([k, v]) => (
+              <Row key={k} label={`flag:${k}`}>
+                <span className="font-mono text-[12px]">{v}</span>
+              </Row>
+            ))}
+          </div>
+        }
+        eventId={event.id}
+        projectId={projectId}
+      />
 
       {openFrame !== null && (
         <FrameSourceDrawer
@@ -1103,23 +1100,29 @@ function EventGlanceStrip({ event, projectId }: { event: EventRow; projectId: st
   }
 
   return (
-    <div className="border-border bg-bg-tertiary/30 rounded-md border">
-      <div className="border-border flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-3 py-1.5">
+    <div className="border-y border-[color:var(--rule)] py-3">
+      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1.5">
         {dims.map((d) => (
-          <span className="t-sm flex items-baseline gap-1" key={d.label}>
-            <span className="text-fg-muted font-mono text-[10px]">{d.label}</span>
-            <span className="text-fg font-mono">{d.value}</span>
+          <span className="flex items-baseline gap-1.5" key={d.label}>
+            <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+              {d.label}
+            </span>
+            <span className="font-mono text-[12px] text-[color:var(--ink)]">{d.value}</span>
           </span>
         ))}
       </div>
-      <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5">
-        <span className="text-fg-muted t-sm font-mono">attached:</span>
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+          attached
+        </span>
         <Badge label="screenshot" present={has('screenshot')} />
         <Badge label="replay" present={has('replay')} />
         <Badge label="state" present={has('stateSnapshot')} />
         <Badge label="trail" present={has('sessionTrail')} />
         <Badge label="viewTree" present={has('viewTree')} />
-        {attachmentsQ.isLoading && <span className="text-fg-muted t-sm font-mono">…</span>}
+        {attachmentsQ.isLoading && (
+          <span className="font-mono text-[11px] text-[color:var(--ink-muted)]">…</span>
+        )}
       </div>
     </div>
   )
@@ -1128,11 +1131,12 @@ function EventGlanceStrip({ event, projectId }: { event: EventRow; projectId: st
 function Badge({ label, present }: { label: string; present: boolean }) {
   return (
     <span
-      className={`t-sm rounded border px-1.5 py-[1px] font-mono text-[10px] ${
-        present ? 'border-accent/40 text-accent bg-accent/10' : 'border-border text-fg-mute'
+      className={`inline-flex items-baseline gap-1 font-mono text-[11px] tabular-nums ${
+        present ? 'text-[color:var(--accent)]' : 'text-[color:var(--ink-muted)]'
       }`}
     >
-      {present ? '●' : '○'} {label}
+      <span aria-hidden>{present ? '●' : '○'}</span>
+      <span>{label}</span>
     </span>
   )
 }
@@ -1372,11 +1376,25 @@ function FeedbackEntry({ report }: { report: UserReport }) {
 
 function Pane({ children, title }: { children: React.ReactNode; title: string }) {
   return (
-    <div className="border-border overflow-hidden rounded-md border">
-      <header className="border-border border-b px-3 py-2">
-        <span className="text-fg-muted t-sm font-semibold tracking-wider uppercase">{title}</span>
+    <section>
+      <header className="sec-head">
+        <span className="sec-head-title">{title}</span>
       </header>
-      <div className="px-3 py-2.5">{children}</div>
+      <div>{children}</div>
+    </section>
+  )
+}
+
+/** Editorial label / value row — used by the screenshot debug center
+ *  context slot (and re-usable when we surface event metadata
+ *  inline). 80px label gutter so values line up across a stack. */
+function Row({ children, label }: { children: React.ReactNode; label: string }) {
+  return (
+    <div className="grid grid-cols-[80px_1fr] items-baseline gap-3 py-1 text-[12px]">
+      <div className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+        {label}
+      </div>
+      <div className="text-[color:var(--ink)]">{children}</div>
     </div>
   )
 }
@@ -1400,9 +1418,11 @@ function KeyValueGrid({ data }: { data: Record<string, unknown> }) {
 
 function Empty({ hint, title }: { hint: string; title: string }) {
   return (
-    <div className="border-border bg-bg-secondary/30 rounded-md border px-6 py-10 text-center">
-      <div className="text-fg-muted t-sm mb-1 font-semibold tracking-wider uppercase">{title}</div>
-      <div className="text-fg t-md">{hint}</div>
+    <div className="border-y border-[color:var(--rule)] py-8 text-center">
+      <div className="mb-1 font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+        {title}
+      </div>
+      <div className="text-[13px] text-[color:var(--ink-soft)]">{hint}</div>
     </div>
   )
 }

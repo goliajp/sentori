@@ -19,86 +19,72 @@ export function ReleasesView() {
   const rows = data ?? []
 
   return (
-    <div className="space-y-3">
-      <PageHeader
-        count={rows.length}
-        subtitle="Deploys with event counts and artifact uploads"
-        title="Releases"
-      />
+    <div className="sentori-page-in">
+      <PageHeader count={rows.length} subtitle="deploys · sourcemaps · symbols" title="Releases" />
 
-      {!projectId && <Empty hint="Select a project" title="No project" />}
-      {projectId && isLoading && <Empty hint="Loading…" title="Releases" />}
-      {projectId && error && <Empty hint="Failed to load releases." title="Error" />}
+      {!projectId && <Empty hint="Select a project to see its releases." />}
+      {projectId && isLoading && <Empty hint="Loading…" />}
+      {projectId && error && <Empty hint="Failed to load releases — retry." />}
       {projectId && !isLoading && !error && rows.length === 0 && (
-        <Empty
-          hint="No releases yet — push an event or run sentori-cli upload."
-          title="No releases"
-        />
+        <Empty hint="No releases yet. Push an event or run sentori-cli upload." />
       )}
 
       {rows.length > 0 && (
-        <div className="std-table border-border overflow-hidden rounded-md border">
-          <table>
-            <thead>
-              <tr className="text-fg-muted t-sm tracking-wider uppercase">
-                <th className="text-left font-medium">Release</th>
-                <th className="w-24 text-right font-medium">Events</th>
-                <th className="w-24 text-right font-medium">Sourcemaps</th>
-                <th className="w-24 text-right font-medium">dSYMs</th>
-                <th className="w-24 text-right font-medium">Proguard</th>
-                <th className="w-32 text-left font-medium">Deployed</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const deployStamp = r.deployAt ?? r.firstSeen ?? r.createdAt
-                return (
-                  <tr className="hover:bg-bg-tertiary/40" key={r.id}>
-                    <td>
-                      <Link
-                        className="text-fg t-md font-mono font-semibold"
-                        to={`/org/${currentOrg.slug}/releases/${encodeURIComponent(r.name)}`}
-                      >
-                        {r.name}
-                      </Link>
-                    </td>
-                    <td className="text-fg t-md text-right tabular-nums">
-                      {r.eventCount.toLocaleString()}
-                    </td>
-                    <td
-                      className={`t-md text-right tabular-nums ${r.sourcemapCount === 0 ? 'text-fg-muted' : 'text-fg'}`}
+        <table className="bench">
+          <thead>
+            <tr>
+              <th>release</th>
+              <th className="num">events</th>
+              <th className="num">js maps</th>
+              <th className="num">dsym</th>
+              <th className="num">proguard</th>
+              <th className="num">deployed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const deployStamp = r.deployAt ?? r.firstSeen ?? r.createdAt
+              return (
+                <tr key={r.id}>
+                  <td className="lead">
+                    <Link
+                      className="text-[color:var(--ink)] hover:text-[color:var(--accent)]"
+                      to={`/org/${currentOrg.slug}/releases/${encodeURIComponent(r.name)}`}
                     >
-                      {r.sourcemapCount}
-                    </td>
-                    <td
-                      className={`t-md text-right tabular-nums ${r.dsymCount === 0 ? 'text-fg-muted' : 'text-fg'}`}
-                    >
-                      {r.dsymCount}
-                    </td>
-                    <td
-                      className={`t-md text-right tabular-nums ${r.mappingCount === 0 ? 'text-fg-muted' : 'text-fg'}`}
-                    >
-                      {r.mappingCount}
-                    </td>
-                    <td className="text-fg-muted t-md tabular-nums">
-                      {formatRelative(deployStamp)}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                      {r.name}
+                    </Link>
+                  </td>
+                  <td className="num">{r.eventCount.toLocaleString()}</td>
+                  <td
+                    className={`num ${
+                      r.sourcemapCount === 0 ? 'text-[color:var(--ink-muted)]' : ''
+                    }`}
+                  >
+                    {r.sourcemapCount}
+                  </td>
+                  <td className={`num ${r.dsymCount === 0 ? 'text-[color:var(--ink-muted)]' : ''}`}>
+                    {r.dsymCount}
+                  </td>
+                  <td
+                    className={`num ${r.mappingCount === 0 ? 'text-[color:var(--ink-muted)]' : ''}`}
+                  >
+                    {r.mappingCount}
+                  </td>
+                  <td className="num">{formatRelative(deployStamp)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       )}
     </div>
   )
 }
 
-function Empty({ hint, title }: { hint: string; title: string }) {
+function Empty({ hint }: { hint: string }) {
   return (
-    <div className="border-border bg-bg-secondary/30 rounded-md border px-6 py-12 text-center">
-      <div className="text-fg-muted t-sm mb-1 font-semibold tracking-wider uppercase">{title}</div>
-      <div className="text-fg t-md">{hint}</div>
-    </div>
+    <p className="border-y border-[color:var(--rule)] py-6 text-center text-[13px] text-[color:var(--ink-soft)]">
+      {hint}
+    </p>
   )
 }

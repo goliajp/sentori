@@ -1,19 +1,9 @@
 // v0.9.3 +S7 — Live Debug Stream viewer.
-//
-// Operator types a user id → page opens an EventSource against
-// `/admin/api/projects/{id}/live-debug/users/{userId}`. Server fans
-// out every event tagged with that user.id in near-real-time
-// (bounded by SDK batch interval, default ~5 s).
-//
-// MVP: console-style append-only list. Each row is a minimal event
-// summary (timestamp, kind, error type, message) with a "view"
-// link that opens the full issue detail in a new tab. 10-minute
-// server-side TTL — when the SSE emits `timeout` event the stream
-// closes and the page shows a re-arm button.
 
 import { useEffect, useRef, useState } from 'react'
 
 import { useOrg } from '@/auth/orgContext'
+import { PageHeader } from '@/layout/page-header'
 
 type LiveRow = {
   errorMessage: string
@@ -24,15 +14,15 @@ type LiveRow = {
   release: string
 }
 
+type Status = 'closed' | 'connected' | 'error' | 'idle' | 'timeout'
+
 export function LiveDebugView() {
   const { currentProject } = useOrg()
   const projectId = currentProject?.id ?? null
   const [userId, setUserId] = useState('')
   const [draft, setDraft] = useState('')
   const [rows, setRows] = useState<LiveRow[]>([])
-  const [status, setStatus] = useState<'idle' | 'connected' | 'closed' | 'timeout' | 'error'>(
-    'idle'
-  )
+  const [status, setStatus] = useState<Status>('idle')
   const esRef = useRef<EventSource | null>(null)
 
   function start(id: string) {
@@ -40,14 +30,10 @@ export function LiveDebugView() {
     stop()
     setRows([])
     setStatus('connected')
-    // v1.1 +S7 升级 — arm the per-user live-mode flag so the SDK
-    // (when it polls /v1/control/poll) switches to immediate-send.
     void fetch(`/admin/api/projects/${projectId}/live-debug/users/${encodeURIComponent(id)}/arm`, {
       credentials: 'include',
       method: 'POST',
-    }).catch(() => {
-      // best-effort — SSE works either way, just with batch latency.
-    })
+    }).catch(() => {})
     const url = `/admin/api/projects/${projectId}/live-debug/users/${encodeURIComponent(id)}`
     const es = new EventSource(url, { withCredentials: true })
     esRef.current = es
@@ -83,130 +69,143 @@ export function LiveDebugView() {
   function stop() {
     esRef.current?.close()
     esRef.current = null
-    // Disarm the live-mode flag so the SDK reverts to its normal
-    // batched send. Best-effort; if it fails, server TTL (10 min)
-    // expires the flag.
     if (projectId && userId) {
       void fetch(
         `/admin/api/projects/${projectId}/live-debug/users/${encodeURIComponent(userId)}/arm`,
         { credentials: 'include', method: 'DELETE' }
-      ).catch(() => {
-        // ignore
-      })
+      ).catch(() => {})
     }
   }
 
   useEffect(() => () => stop(), [])
 
-  return (
-    <div className="space-y-3">
-      <section className="border-border rounded-md border p-3">
-        <form
-          className="flex items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            const id = draft.trim()
-            if (id.length === 0) return
-            setUserId(id)
-            start(id)
-          }}
-        >
-          <label className="text-fg-muted t-sm font-mono">user.id:</label>
-          <input
-            className="border-border bg-bg-tertiary text-fg focus:outline-accent t-sm flex-1 rounded border px-2 py-1 font-mono focus:outline focus:outline-1 disabled:opacity-60"
-            disabled={status === 'connected'}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="sentori.setUser({ id }) value"
-            value={draft}
-          />
-          {status === 'connected' ? (
-            <button
-              className="border-danger text-danger t-sm rounded border px-3 py-1 font-mono"
-              onClick={() => {
-                stop()
-                setStatus('closed')
-              }}
-              type="button"
-            >
-              stop
-            </button>
-          ) : (
-            <button
-              className="bg-accent text-bg t-sm rounded px-3 py-1 font-medium"
-              disabled={draft.trim().length === 0}
-              type="submit"
-            >
-              start
-            </button>
-          )}
-          <span className={`t-sm font-mono ${statusTone[status]}`}>● {status}</span>
-        </form>
-      </section>
+  const connected = status === 'connected'
 
-      <section className="border-border rounded-md border">
-        <header className="border-border flex items-center justify-between border-b px-3 py-2">
-          <span className="text-fg-muted t-sm font-semibold tracking-wider uppercase">
-            Live event stream {userId && <span className="font-mono">· {userId}</span>}
+  return (
+    <div className="sentori-page-in">
+      <PageHeader
+        actions={
+          <span
+            className={`flex items-center gap-1.5 font-mono text-[11px] tracking-[0.05em] ${
+              statusTone[status]
+            }`}
+          >
+            <span
+              aria-hidden
+              className={`inline-block h-1.5 w-1.5 rounded-full bg-current ${
+                connected ? 'sentori-live-pulse' : ''
+              }`}
+            />
+            {status}
           </span>
-          <span className="text-fg-muted t-sm tabular-nums">{rows.length} events</span>
-        </header>
-        {rows.length === 0 && (
-          <div className="text-fg-muted t-md p-3">
-            {status === 'connected'
-              ? 'Waiting for events…'
-              : 'Set a user id above and click start.'}
-          </div>
+        }
+        subtitle={userId ? `user.id · ${userId}` : 'idle'}
+        title="Live debug"
+      />
+
+      {/* Connect form — flush against page-head, no card chrome */}
+      <form
+        className="flex items-center gap-3 border-b border-[color:var(--rule)] py-3"
+        onSubmit={(e) => {
+          e.preventDefault()
+          const id = draft.trim()
+          if (id.length === 0) return
+          setUserId(id)
+          start(id)
+        }}
+      >
+        <label
+          className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase"
+          htmlFor="live-userid"
+        >
+          user.id
+        </label>
+        <input
+          className="flex-1 border-b border-[color:var(--rule)] bg-transparent px-0 py-1 font-mono text-[13px] text-[color:var(--ink)] placeholder:text-[color:var(--ink-muted)] focus:border-[color:var(--accent)] focus:outline-none disabled:opacity-50"
+          disabled={connected}
+          id="live-userid"
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="value from sentori.setUser({ id })"
+          value={draft}
+        />
+        {connected ? (
+          <button
+            className="border border-[color:var(--danger)] px-3 py-1 font-mono text-[11px] tracking-[0.1em] text-[color:var(--danger)] uppercase transition-colors hover:bg-[color:var(--danger-bg)]"
+            onClick={() => {
+              stop()
+              setStatus('closed')
+            }}
+            type="button"
+          >
+            stop
+          </button>
+        ) : (
+          <button
+            className="bg-[color:var(--accent)] px-3 py-1 font-mono text-[11px] tracking-[0.1em] text-[color:var(--paper)] uppercase disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={draft.trim().length === 0}
+            type="submit"
+          >
+            arm
+          </button>
         )}
-        {rows.length > 0 && (
-          <table className="std-table w-full">
-            <thead>
-              <tr>
-                <th>received</th>
-                <th>kind</th>
-                <th>type</th>
-                <th>message</th>
-                <th>release</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows
-                .slice()
-                .reverse()
-                .map((r, i) => (
-                  <tr key={`${r.eventId}-${i}`}>
-                    <td className="font-mono tabular-nums">
-                      {new Date(r.receivedAt).toLocaleTimeString()}
-                    </td>
-                    <td>
-                      <span
-                        className={
-                          r.kind === 'error'
-                            ? 'text-danger font-mono'
-                            : r.kind === 'nearCrash'
-                              ? 'text-warning font-mono'
-                              : 'text-fg-muted font-mono'
-                        }
-                      >
-                        {r.kind}
-                      </span>
-                    </td>
-                    <td className="font-mono">{r.errorType}</td>
-                    <td className="t-sm truncate">{r.errorMessage}</td>
-                    <td className="font-mono">{r.release}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+      </form>
+
+      {/* Live stream */}
+      {rows.length === 0 ? (
+        <div className="border-b border-[color:var(--rule)] py-8 text-center text-[13px] text-[color:var(--ink-soft)]">
+          {connected
+            ? 'Waiting for events from this user.id…'
+            : 'Arm a user.id to start streaming.'}
+        </div>
+      ) : (
+        <table className="bench">
+          <thead>
+            <tr>
+              <th>time</th>
+              <th>kind</th>
+              <th>type</th>
+              <th>message</th>
+              <th>release</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows
+              .slice()
+              .reverse()
+              .map((r, i) => (
+                <tr key={`${r.eventId}-${i}`}>
+                  <td className="num">
+                    {new Date(r.receivedAt).toLocaleTimeString('en-US', { hour12: false })}
+                  </td>
+                  <td>
+                    <span className={kindTone[r.kind] ?? 'text-[color:var(--ink-muted)]'}>
+                      {r.kind}
+                    </span>
+                  </td>
+                  <td className="lead">{r.errorType}</td>
+                  <td className="max-w-[40ch] truncate text-[color:var(--ink-soft)]">
+                    {r.errorMessage}
+                  </td>
+                  <td>{r.release}</td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      )}
     </div>
   )
 }
 
-const statusTone: Record<string, string> = {
-  closed: 'text-fg-muted',
-  connected: 'text-success',
-  error: 'text-danger',
-  idle: 'text-fg-muted',
-  timeout: 'text-warning',
+const statusTone: Record<Status, string> = {
+  closed: 'text-[color:var(--ink-muted)]',
+  connected: 'text-[color:var(--success)]',
+  error: 'text-[color:var(--danger)]',
+  idle: 'text-[color:var(--ink-muted)]',
+  timeout: 'text-[color:var(--warning)]',
+}
+
+const kindTone: Record<string, string> = {
+  anr: 'text-[color:var(--warning)]',
+  error: 'text-[color:var(--danger)]',
+  nearCrash: 'text-[color:var(--warning)]',
 }
