@@ -349,15 +349,19 @@ function ThumbButton({
       type="button"
     >
       <div
-        className={`relative aspect-[9/16] w-full overflow-hidden ${
+        className={`relative flex aspect-square w-full items-center justify-center overflow-hidden bg-[color:var(--paper-2)] ${
           active
             ? 'outline outline-2 outline-offset-2 outline-[color:var(--accent)]'
             : 'outline outline-1 outline-offset-0 outline-[color:var(--rule)]'
         }`}
       >
+        {/* Centered, fit-to-box — most device screenshots are taller
+         *  than wide; a square frame + object-contain keeps the
+         *  whole image visible and lines neighbouring thumbs up on
+         *  a clean grid. */}
         <img
           alt={`Screenshot ${index + 1}`}
-          className="h-full w-full object-cover"
+          className="max-h-full max-w-full object-contain"
           loading="lazy"
           src={thumbUrl}
         />

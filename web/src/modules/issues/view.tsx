@@ -104,8 +104,8 @@ function RailHeader({
         <h1
           className="text-[color:var(--ink)]"
           style={{
-            fontFamily: 'IBM Plex Sans, sans-serif',
-            fontVariationSettings: "'wdth' 82, 'opsz' 24, 'wght' 700",
+            fontFamily: 'var(--font-sans)',
+            fontVariationSettings: "'wdth' 80, 'opsz' 24, 'wght' 700",
             fontSize: '17px',
             letterSpacing: '-0.018em',
           }}
@@ -245,8 +245,8 @@ function DetailPlaceholder() {
         <div
           className="mb-3 text-[color:var(--ink)]"
           style={{
-            fontFamily: 'IBM Plex Sans, sans-serif',
-            fontVariationSettings: "'wdth' 82, 'opsz' 24, 'wght' 700",
+            fontFamily: 'var(--font-sans)',
+            fontVariationSettings: "'wdth' 80, 'opsz' 24, 'wght' 700",
             fontSize: '22px',
             letterSpacing: '-0.018em',
           }}

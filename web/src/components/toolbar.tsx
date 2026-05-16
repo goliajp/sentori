@@ -20,8 +20,8 @@ export function Toolbar() {
         <span
           className="text-[color:var(--ink)] uppercase"
           style={{
-            fontFamily: 'IBM Plex Sans, sans-serif',
-            fontVariationSettings: "'wdth' 80, 'opsz' 96, 'wght' 700",
+            fontFamily: 'var(--font-sans)',
+            fontVariationSettings: "'wdth' 70, 'opsz' 96, 'wght' 700",
             fontSize: '15px',
             letterSpacing: '0.22em',
           }}

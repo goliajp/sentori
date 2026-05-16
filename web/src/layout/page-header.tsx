@@ -26,9 +26,7 @@ export function PageHeader({
   return (
     <header className="page-head">
       <h1 className="page-head-title">{title}</h1>
-      {count !== undefined && (
-        <span className="page-head-count">{count.toLocaleString()}</span>
-      )}
+      {count !== undefined && <span className="page-head-count">{count.toLocaleString()}</span>}
       {subtitle && <span className="page-head-sub">{subtitle}</span>}
       {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
     </header>

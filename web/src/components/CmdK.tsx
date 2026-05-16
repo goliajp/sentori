@@ -164,16 +164,19 @@ export function CmdK() {
 }
 
 function KindChip({ kind }: { kind: SearchHit['type'] }) {
+  // Designed triples (bg / text / border) from the semantic palette,
+  // not alpha-on-accent. Reads in both light and dark modes.
   const colour: Record<SearchHit['type'], string> = {
-    issue: 'bg-danger/10 text-danger border-danger/30',
-    member: 'bg-accent/10 text-accent border-accent/30',
-    org: 'bg-accent/10 text-accent border-accent/30',
-    project: 'bg-info/10 text-info border-info/30',
-    team: 'bg-warning/10 text-warning border-warning/30',
+    issue:
+      'bg-[color:var(--danger-bg)] text-[color:var(--danger)] border-[color:var(--danger-border)]',
+    member: 'bg-[color:var(--accent-soft)] text-[color:var(--accent)] border-[color:var(--accent)]',
+    org: 'bg-[color:var(--accent-soft)] text-[color:var(--accent)] border-[color:var(--accent)]',
+    project: 'bg-[color:var(--info-bg)] text-[color:var(--info)] border-[color:var(--info-border)]',
+    team: 'bg-[color:var(--warning-bg)] text-[color:var(--warning)] border-[color:var(--warning-border)]',
   }
   return (
     <span
-      className={`t-sm inline-block w-14 shrink-0 rounded border px-1.5 py-0.5 text-center font-medium tracking-wide uppercase ${colour[kind]}`}
+      className={`inline-block w-14 shrink-0 border px-1.5 py-px text-center text-[10px] font-medium tracking-[0.12em] uppercase ${colour[kind]}`}
     >
       {kind}
     </span>

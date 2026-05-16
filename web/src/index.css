@@ -2,11 +2,12 @@
 @import './styles/syntax.css';
 
 /*
- * Editorial design language (Phase 51) — paper-on-paper warmth with
- * surgical tora-orange accent + IBM Plex Sans (variable axis) / Plex
- * Mono. Rule-line grids instead of card frames; section headers as
- * three-part mono-num / sans-h2 / mono-sub. Inspired by the torajs
- * pitch deck visual lexicon (Bloomberg Terminal × IBM annual report).
+ * Editorial design language — paper-on-paper warmth with surgical
+ * tora-orange accent + Roboto Flex (variable axis sans) / Roboto
+ * Mono (fixed-weight companion for tables + code). Rule-line grids
+ * instead of card frames; hierarchy via type scale + rule weight,
+ * not via numbered chrome. Inspired by the torajs pitch deck visual
+ * lexicon (Bloomberg Terminal × IBM annual report).
  *
  * Token bridge: the existing --color-bg / --color-fg / --color-border
  * names stay so legacy view code keeps compiling. Each maps onto its
@@ -15,7 +16,7 @@
  */
 
 @theme {
-  /* ───────── editorial primitives ───────── */
+  /* ───────── editorial neutrals ───────── */
   --paper: #f7f4ec;
   --paper-2: #fffdf7;
   --paper-3: #ece5d2;
@@ -27,12 +28,25 @@
   --accent: #d04920;
   --accent-soft: #fff1e8;
   --accent-strong: #b53c1a;
-  /* The single non-accent status color we keep (true error states).
-   * Success / warning / info collapse onto the accent + ink scale
-   * because in this aesthetic, "everything that wants your eye" goes
-   * to one place. */
-  --danger: #c81a3c;
-  --danger-soft: #fce6ea;
+
+  /* ───────── semantic status palette (light) ─────────
+   * Each kind has 3 tokens — text / bg / border — sized so the
+   * (text on bg) pair clears WCAG AA against the page paper. Used
+   * by Tag chips, InfoBox banners, status dots, severity columns.
+   * Deliberately NOT collapsed onto accent: a row of mixed-severity
+   * issues needs the eye to triage by colour at a glance. */
+  --info: #1d4ed8;
+  --info-bg: #e0eafc;
+  --info-border: #93b4f8;
+  --success: #166534;
+  --success-bg: #dcf3e1;
+  --success-border: #86c89a;
+  --warning: #92400e;
+  --warning-bg: #fbeacc;
+  --warning-border: #f0c474;
+  --danger: #991b1b;
+  --danger-bg: #fbd8d8;
+  --danger-border: #ec9595;
 
   /* ───────── bridge into legacy --color-* names ───────── */
   --color-bg: var(--paper);
@@ -43,32 +57,33 @@
   --color-fg-muted: var(--ink-muted);
   --color-border: var(--rule);
   --color-accent: var(--accent);
-  /* Status surfaces fold to accent except danger. */
-  --color-info: var(--ink-soft);
-  --color-info-bg: var(--paper-2);
-  --color-info-border: var(--rule);
-  --color-success: var(--accent);
-  --color-success-bg: var(--accent-soft);
-  --color-success-border: var(--accent);
-  --color-warning: var(--accent-strong);
-  --color-warning-bg: var(--accent-soft);
-  --color-warning-border: var(--accent);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-info-border: var(--info-border);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-success-border: var(--success-border);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-border: var(--warning-border);
   --color-danger: var(--danger);
-  --color-danger-bg: var(--danger-soft);
-  --color-danger-border: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-border: var(--danger-border);
 
-  /* IBM Plex font stack — loaded from Google Fonts in index.html.
-   * Sans is the variable family so wdth / opsz can be tuned with
-   * `font-variation-settings` on display text. */
+  /* Roboto Flex (variable axes wdth 25-151 / opsz 8-144 / wght
+   * 100-1000) + Roboto Mono (fixed-weight companion). Roboto Flex
+   * has no monospace axis, so tables / code blocks use Roboto Mono
+   * — same designer family so the two don't fight on rhythm.
+   * Loaded from Google Fonts in index.html. */
   --font-sans:
-    'IBM Plex Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    'Roboto Flex', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Roboto Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 
 html[data-theme='dark'] {
-  /* Warm ink-on-paper-dark — not cold sci-fi black. Same paper feel
-   * as the light theme, just inverted into a kraft-paper-at-night
-   * register. */
+  /* Warm ink-on-paper-dark — kraft paper at night, not cold sci-fi
+   * black. Paper feel preserved; the semantic palette is tuned for
+   * AAA contrast on the dark surface. */
   --paper: #15140f;
   --paper-2: #1d1c16;
   --paper-3: #262420;
@@ -80,8 +95,19 @@ html[data-theme='dark'] {
   --accent: #ff7848;
   --accent-soft: #2a1610;
   --accent-strong: #ff9266;
-  --danger: #ff6e7d;
-  --danger-soft: #2a0e15;
+
+  --info: #7dd3fc;
+  --info-bg: #0c2940;
+  --info-border: #1e4a78;
+  --success: #6ee7b7;
+  --success-bg: #0c2a1e;
+  --success-border: #194934;
+  --warning: #fcd34d;
+  --warning-bg: #2a1f08;
+  --warning-border: #58430c;
+  --danger: #fca5a5;
+  --danger-bg: #2a0c0c;
+  --danger-border: #5a1818;
 }
 
 html,
@@ -98,10 +124,12 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   font-family: var(--font-sans);
+  /* Roboto Flex at slight width compression (wdth 96) + body opsz
+   * 14 reads denser than 100/100 default while staying humane at
+   * dashboard sizes. */
   font-variation-settings:
-    'wdth' 92,
+    'wdth' 96,
     'opsz' 14;
-  font-feature-settings: 'ss01';
 }
 
 /* ─── Typography scale ─────────────────────────────────────────── */

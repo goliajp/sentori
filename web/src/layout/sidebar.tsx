@@ -58,13 +58,7 @@ export function Sidebar() {
   )
 }
 
-function Section({
-  children,
-  title,
-}: {
-  children: React.ReactNode
-  title?: string
-}) {
+function Section({ children, title }: { children: React.ReactNode; title?: string }) {
   return (
     <div className="mb-1 last:mb-0">
       {title && (

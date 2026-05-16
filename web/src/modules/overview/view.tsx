@@ -35,9 +35,8 @@ export function OverviewView() {
 
       <SubSection sub="stub · live throughput chart lands next" title="Health">
         <p className="max-w-prose pt-3 text-[13px] text-[color:var(--ink-soft)]">
-          Live throughput + per-project health summaries land here in the next
-          iteration. The Plex-Mono mini-charts will sit in the same column grid
-          as the KPI strip above.
+          Live throughput + per-project health summaries land here in the next iteration. The
+          Plex-Mono mini-charts will sit in the same column grid as the KPI strip above.
         </p>
       </SubSection>
     </div>
@@ -50,8 +49,8 @@ function Hero({ count, orgName }: { count: number; orgName: string }) {
       <h2
         className="max-w-prose text-[color:var(--ink)]"
         style={{
-          fontFamily: 'IBM Plex Sans, sans-serif',
-          fontVariationSettings: "'wdth' 78, 'opsz' 96, 'wght' 700",
+          fontFamily: 'var(--font-sans)',
+          fontVariationSettings: "'wdth' 70, 'opsz' 96, 'wght' 700",
           fontSize: 'clamp(34px, 5vw, 54px)',
           lineHeight: '1.04',
           letterSpacing: '-0.035em',
@@ -61,7 +60,7 @@ function Hero({ count, orgName }: { count: number; orgName: string }) {
         <span
           style={{
             color: 'var(--accent)',
-            fontVariationSettings: "'wdth' 78, 'opsz' 96, 'wght' 800",
+            fontVariationSettings: "'wdth' 70, 'opsz' 96, 'wght' 900",
           }}
         >
           intent
@@ -70,8 +69,8 @@ function Hero({ count, orgName }: { count: number; orgName: string }) {
       </h2>
       <p className="mt-4 max-w-[56ch] text-[14px] leading-relaxed text-[color:var(--ink-soft)]">
         Watching {count.toLocaleString()} project{count === 1 ? '' : 's'} for{' '}
-        <span className="font-mono text-[color:var(--ink)]">{orgName}</span>. Section
-        anchors run down the left sidebar; data strips below have their own column rules.
+        <span className="font-mono text-[color:var(--ink)]">{orgName}</span>. Section anchors run
+        down the left sidebar; data strips below have their own column rules.
       </p>
     </div>
   )
@@ -117,7 +116,7 @@ function Kpi({
         {valueSuffix && (
           <span
             className="ml-1 text-[20px] text-[color:var(--ink-muted)]"
-            style={{ fontVariationSettings: "'wdth' 92, 'opsz' 24, 'wght' 500" }}
+            style={{ fontVariationSettings: "'wdth' 96, 'opsz' 24, 'wght' 500" }}
           >
             {valueSuffix}
           </span>
