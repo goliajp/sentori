@@ -195,9 +195,7 @@ export function IssueDetailView() {
         <EventsTab events={events} onSelect={setEventIdx} selectedIdx={safeIdx} />
       )}
       {tab === 'activity' && projectId && <ActivityTab issueId={issueId} projectId={projectId} />}
-      {tab === 'feedback' && projectId && (
-        <FeedbackTab issueId={issueId} projectId={projectId} />
-      )}
+      {tab === 'feedback' && projectId && <FeedbackTab issueId={issueId} projectId={projectId} />}
       {selectedEvent && projectId && (
         <ReproDownloadFab eventId={selectedEvent.id} projectId={projectId} />
       )}
@@ -240,7 +238,7 @@ function Tabs({ current, onChange }: { current: Tab; onChange: (t: Tab) => void 
     // is focusable) which is the WAI-ARIA pattern for tab widgets.
     const idx = TABS.findIndex((t) => t.key === current)
     if (idx < 0) return
-    let next = idx
+    let next: number
     if (e.key === 'ArrowRight') next = (idx + 1) % TABS.length
     else if (e.key === 'ArrowLeft') next = (idx - 1 + TABS.length) % TABS.length
     else if (e.key === 'Home') next = 0
@@ -509,9 +507,7 @@ function StackTab({
                 }
               : {}),
             ...(payload.flags && Object.keys(payload.flags).length > 0
-              ? Object.fromEntries(
-                  Object.entries(payload.flags).map(([k, v]) => [`flag:${k}`, v])
-                )
+              ? Object.fromEntries(Object.entries(payload.flags).map(([k, v]) => [`flag:${k}`, v]))
               : {}),
             platform: payload.platform,
             release: payload.release,
@@ -1123,9 +1119,7 @@ function EventGlanceStrip({ event, projectId }: { event: EventRow; projectId: st
         <Badge label="state" present={has('stateSnapshot')} />
         <Badge label="trail" present={has('sessionTrail')} />
         <Badge label="viewTree" present={has('viewTree')} />
-        {attachmentsQ.isLoading && (
-          <span className="text-fg-muted t-sm font-mono">…</span>
-        )}
+        {attachmentsQ.isLoading && <span className="text-fg-muted t-sm font-mono">…</span>}
       </div>
     </div>
   )
@@ -1135,9 +1129,7 @@ function Badge({ label, present }: { label: string; present: boolean }) {
   return (
     <span
       className={`t-sm rounded border px-1.5 py-[1px] font-mono text-[10px] ${
-        present
-          ? 'border-accent/40 text-accent bg-accent/10'
-          : 'border-border text-fg-mute'
+        present ? 'border-accent/40 text-accent bg-accent/10' : 'border-border text-fg-mute'
       }`}
     >
       {present ? '●' : '○'} {label}
@@ -1174,17 +1166,14 @@ function CulpritSection({
   })
   const detachM = useMutation({
     mutationFn: (id: string) => adminApi.detachCulprit(projectId, issueId, id),
-    onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['culprits', projectId, issueId] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['culprits', projectId, issueId] }),
   })
   const autoM = useMutation({
     mutationFn: () => adminApi.autoDetectCulprit(projectId, issueId),
-    onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['culprits', projectId, issueId] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['culprits', projectId, issueId] }),
   })
   const revertM = useMutation({
-    mutationFn: (culpritId: string) =>
-      adminApi.generateRevertPr(projectId, issueId, culpritId),
+    mutationFn: (culpritId: string) => adminApi.generateRevertPr(projectId, issueId, culpritId),
     onSuccess: (data) => {
       if (data?.prUrl) window.open(data.prUrl, '_blank', 'noopener')
     },
@@ -1199,7 +1188,7 @@ function CulpritSection({
         <span className="text-fg-muted t-sm">
           <span className="font-mono">Likely culprit:</span> unattributed
           {autoM.isError && (
-            <span className="text-danger ml-3 text-[10px] font-mono">
+            <span className="text-danger ml-3 font-mono text-[10px]">
               auto-detect failed: {String((autoM.error as Error)?.message ?? 'unknown')}
             </span>
           )}
@@ -1274,17 +1263,13 @@ function CulpritSection({
       <ul className="divide-border divide-y">
         {culprits.map((c) => (
           <li className="flex items-baseline gap-3 px-3 py-2" key={c.id}>
-            <span className="text-fg-muted font-mono text-[11px]">
-              {c.commitSha.slice(0, 7)}
-            </span>
+            <span className="text-fg-muted font-mono text-[11px]">{c.commitSha.slice(0, 7)}</span>
             <span className="text-fg t-sm flex-1 truncate">
               {c.message ? c.message.split('\n')[0] : '(metadata fetch failed)'}
             </span>
-            {c.author && (
-              <span className="text-fg-muted t-sm font-mono">@{c.author}</span>
-            )}
+            {c.author && <span className="text-fg-muted t-sm font-mono">@{c.author}</span>}
             {c.source === 'auto' && (
-              <span className="text-accent text-[9px] uppercase font-mono tracking-wider">
+              <span className="text-accent font-mono text-[9px] tracking-wider uppercase">
                 auto · {c.confidence}
               </span>
             )}
@@ -1317,9 +1302,16 @@ function CulpritSection({
         ))}
       </ul>
       {(autoM.isError || revertM.isError) && (
-        <div className="border-border border-t px-3 py-1.5 text-[10px] text-danger font-mono">
-          {autoM.isError && <>auto: {String((autoM.error as Error)?.message ?? 'unknown')}<br /></>}
-          {revertM.isError && <>revert PR: {String((revertM.error as Error)?.message ?? 'unknown')}</>}
+        <div className="border-border text-danger border-t px-3 py-1.5 font-mono text-[10px]">
+          {autoM.isError && (
+            <>
+              auto: {String((autoM.error as Error)?.message ?? 'unknown')}
+              <br />
+            </>
+          )}
+          {revertM.isError && (
+            <>revert PR: {String((revertM.error as Error)?.message ?? 'unknown')}</>
+          )}
         </div>
       )}
     </div>
@@ -1370,9 +1362,7 @@ function FeedbackEntry({ report }: { report: UserReport }) {
       <div className="text-fg-muted t-sm mt-2 flex items-center gap-3">
         <span>{author}</span>
         {report.email && report.name && <span className="font-mono">{report.email}</span>}
-        {report.eventId && (
-          <span className="font-mono">event {report.eventId.slice(0, 8)}</span>
-        )}
+        {report.eventId && <span className="font-mono">event {report.eventId.slice(0, 8)}</span>}
       </div>
     </li>
   )

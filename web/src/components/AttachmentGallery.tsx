@@ -78,10 +78,7 @@ export function AttachmentGallery({ eventId, projectId }: { eventId: string; pro
     () => attachments.filter((a) => a.kind === 'stateSnapshot'),
     [attachments]
   )
-  const replays = useMemo(
-    () => attachments.filter((a) => a.kind === 'replay'),
-    [attachments]
-  )
+  const replays = useMemo(() => attachments.filter((a) => a.kind === 'replay'), [attachments])
   const others = useMemo(
     () =>
       attachments.filter(
@@ -186,9 +183,7 @@ export function AttachmentGallery({ eventId, projectId }: { eventId: string; pro
         >
           <summary className="text-fg cursor-pointer px-3 py-2 text-[12px]">
             Session replay (wireframe)
-            <span className="text-fg-muted ml-2 text-[10px]">
-              up to 60 s before the error
-            </span>
+            <span className="text-fg-muted ml-2 text-[10px]">up to 60 s before the error</span>
           </summary>
           <div className="px-3 pb-3">
             <ReplayPlayer attachmentRef={a.ref} eventId={eventId} />

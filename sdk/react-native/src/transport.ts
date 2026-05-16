@@ -181,10 +181,17 @@ const getAsyncStorage = async (): Promise<AsyncStorageLike | null> => {
     return null;
   }
   try {
-    const mod = (await import(
-      '@react-native-async-storage/async-storage'
-    )) as { default: AsyncStorageLike };
-    return mod.default;
+    // Resolve via the host's runtime `require` rather than `import()`.
+    // `import()` is type-checked at build time (TS6 strict-mode); the
+    // peer dep isn't installed in monorepo-root CI, which made `bun
+    // run build:sdks` fail to find the type declarations. The peer is
+    // optional at runtime anyway — the isAnyNativeModuleLinked guard
+    // above already returned `null` if the package isn't installed.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require('@react-native-async-storage/async-storage') as {
+      default?: AsyncStorageLike;
+    } & AsyncStorageLike;
+    return mod.default ?? mod;
   } catch {
     return null;
   }

@@ -38,8 +38,7 @@ export function CertMonitorView() {
   })
   const deleteM = useMutation({
     mutationFn: (watchId: string) => adminApi.deleteCertWatchDomain(projectId!, watchId),
-    onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['cert-watch-domains', projectId] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['cert-watch-domains', projectId] }),
   })
 
   const domains = domainsQ.data ?? []
@@ -58,15 +57,12 @@ export function CertMonitorView() {
         <ul className="divide-border divide-y">
           {domains.length === 0 && !domainsQ.isLoading && (
             <li className="text-fg-muted t-md px-3 py-3">
-              Add a domain below. The server polls crt.sh every 10 min and
-              fires an email when a new certificate appears in the public CT logs.
+              Add a domain below. The server polls crt.sh every 10 min and fires an email when a new
+              certificate appears in the public CT logs.
             </li>
           )}
           {domains.map((d) => (
-            <li
-              className="flex items-center justify-between gap-2 px-3 py-2"
-              key={d.id}
-            >
+            <li className="flex items-center justify-between gap-2 px-3 py-2" key={d.id}>
               <span className="t-md text-fg font-mono">{d.domain}</span>
               <button
                 className="text-fg-muted hover:text-danger t-sm"
@@ -108,13 +104,11 @@ export function CertMonitorView() {
             Recent observations
           </span>
         </header>
-        {observationsQ.isLoading && (
-          <div className="text-fg-muted t-md px-3 py-3">Loading…</div>
-        )}
+        {observationsQ.isLoading && <div className="text-fg-muted t-md px-3 py-3">Loading…</div>}
         {!observationsQ.isLoading && observations.length === 0 && (
           <div className="text-fg-muted t-md px-3 py-3">
-            No certificates observed yet — newly-watched domains take up
-            to 10 min for the first poll.
+            No certificates observed yet — newly-watched domains take up to 10 min for the first
+            poll.
           </div>
         )}
         <ul className="divide-border divide-y">
@@ -126,12 +120,8 @@ export function CertMonitorView() {
                   {formatRelative(o.firstSeen)}
                 </span>
               </div>
-              <div className="text-fg t-md mt-1">
-                {o.commonName ?? '(no common name)'}
-              </div>
-              <div className="text-fg-muted t-sm mt-1 font-mono">
-                Issuer: {o.issuerName}
-              </div>
+              <div className="text-fg t-md mt-1">{o.commonName ?? '(no common name)'}</div>
+              <div className="text-fg-muted t-sm mt-1 font-mono">Issuer: {o.issuerName}</div>
               <div className="text-fg-muted t-sm mt-0.5 font-mono">
                 Valid {o.notBefore} → {o.notAfter}
               </div>

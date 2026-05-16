@@ -76,9 +76,7 @@ export function VitalsView() {
             </div>
             <div>
               <div className="text-fg-muted t-sm">routes</div>
-              <div className="text-fg t-md font-mono tabular-nums">
-                {report.perRoute.length}
-              </div>
+              <div className="text-fg t-md font-mono tabular-nums">{report.perRoute.length}</div>
             </div>
           </div>
         )}
@@ -93,47 +91,43 @@ export function VitalsView() {
         {!report || report.perRoute.length === 0 ? (
           <div className="text-fg-muted t-md px-3 py-3">
             No route vitals yet. Mount{' '}
-            <code className="font-mono">useTraceNavigation(navigationRef)</code> in your app
-            and pick a release with traffic.
+            <code className="font-mono">useTraceNavigation(navigationRef)</code> in your app and
+            pick a release with traffic.
           </div>
         ) : (
           <div className="overflow-x-auto">
-          <table className="std-table w-full min-w-[640px]">
-            <thead>
-              <tr>
-                <th>route</th>
-                <th>navigations</th>
-                <th>TTID p50</th>
-                <th>TTID p95</th>
-                <th>TTFD p50</th>
-                <th>TTFD p95</th>
-                <th>slow frames</th>
-                <th>frozen frames</th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.perRoute.map((r) => (
-                <tr key={r.route}>
-                  <td className="font-mono">{r.route}</td>
-                  <td className="tabular-nums">{r.navigations}</td>
-                  <td className="tabular-nums">{r.ttidP50Ms}ms</td>
-                  <td className="tabular-nums">{r.ttidP95Ms}ms</td>
-                  <td className="tabular-nums">
-                    {r.ttfdSamples > 0 ? `${r.ttfdP50Ms}ms` : '—'}
-                  </td>
-                  <td className="tabular-nums">
-                    {r.ttfdSamples > 0 ? `${r.ttfdP95Ms}ms` : '—'}
-                  </td>
-                  <td className={`tabular-nums ${r.totalSlowFrames > 0 ? 'text-warning' : ''}`}>
-                    {r.totalSlowFrames}
-                  </td>
-                  <td className={`tabular-nums ${r.totalFrozenFrames > 0 ? 'text-danger' : ''}`}>
-                    {r.totalFrozenFrames}
-                  </td>
+            <table className="std-table w-full min-w-[640px]">
+              <thead>
+                <tr>
+                  <th>route</th>
+                  <th>navigations</th>
+                  <th>TTID p50</th>
+                  <th>TTID p95</th>
+                  <th>TTFD p50</th>
+                  <th>TTFD p95</th>
+                  <th>slow frames</th>
+                  <th>frozen frames</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {report.perRoute.map((r) => (
+                  <tr key={r.route}>
+                    <td className="font-mono">{r.route}</td>
+                    <td className="tabular-nums">{r.navigations}</td>
+                    <td className="tabular-nums">{r.ttidP50Ms}ms</td>
+                    <td className="tabular-nums">{r.ttidP95Ms}ms</td>
+                    <td className="tabular-nums">{r.ttfdSamples > 0 ? `${r.ttfdP50Ms}ms` : '—'}</td>
+                    <td className="tabular-nums">{r.ttfdSamples > 0 ? `${r.ttfdP95Ms}ms` : '—'}</td>
+                    <td className={`tabular-nums ${r.totalSlowFrames > 0 ? 'text-warning' : ''}`}>
+                      {r.totalSlowFrames}
+                    </td>
+                    <td className={`tabular-nums ${r.totalFrozenFrames > 0 ? 'text-danger' : ''}`}>
+                      {r.totalFrozenFrames}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </section>

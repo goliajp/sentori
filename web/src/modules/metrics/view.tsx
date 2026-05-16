@@ -42,13 +42,10 @@ export function MetricsView() {
             Metrics (last 24 h)
           </span>
         </header>
-        {namesQ.isLoading && (
-          <div className="text-fg-muted t-md px-3 py-3">Loading…</div>
-        )}
+        {namesQ.isLoading && <div className="text-fg-muted t-md px-3 py-3">Loading…</div>}
         {!namesQ.isLoading && names.length === 0 && (
           <div className="text-fg-muted t-md px-3 py-3">
-            No metrics yet. Call <code>sentori.recordMetric('name', value)</code> from
-            the host app.
+            No metrics yet. Call <code>sentori.recordMetric('name', value)</code> from the host app.
           </div>
         )}
         <ul className="divide-border divide-y">
@@ -72,11 +69,7 @@ export function MetricsView() {
         </ul>
       </aside>
       <main className="flex-1 overflow-auto">
-        {!selected && (
-          <div className="text-fg-muted t-md p-3">
-            Pick a metric on the left.
-          </div>
-        )}
+        {!selected && <div className="text-fg-muted t-md p-3">Pick a metric on the left.</div>}
         {selected && pointsQ.isLoading && (
           <div className="text-fg-muted t-md p-3">Loading points…</div>
         )}
@@ -112,7 +105,11 @@ export function MetricsView() {
  *  a quick visual cue for "is this number going up or down". */
 function Sparkline({ values }: { values: number[] }) {
   if (values.length < 2) {
-    return <div className="border-border text-fg-muted t-sm rounded border p-3">Not enough points for a trend yet.</div>
+    return (
+      <div className="border-border text-fg-muted t-sm rounded border p-3">
+        Not enough points for a trend yet.
+      </div>
+    )
   }
   const min = Math.min(...values)
   const max = Math.max(...values)

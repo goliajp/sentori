@@ -118,7 +118,9 @@ export function StateTimetravelViewer({
     return <div className="text-fg-muted text-[11px]">No snapshots recorded.</div>
 
   const focused = effectiveFocus === null ? null : (snapshots[effectiveFocus] ?? null)
-  const payloadToRender: Record<string, unknown> = rehydrate ? rehydratedState : (focused?.diff ?? {})
+  const payloadToRender: Record<string, unknown> = rehydrate
+    ? rehydratedState
+    : (focused?.diff ?? {})
 
   return (
     <div className="grid grid-cols-[200px_1fr] gap-3">
@@ -207,9 +209,7 @@ function JsonTree({ root = false, value }: { root?: boolean; value: unknown }) {
     if (value.length === 0) return <span className="text-fg-muted">[]</span>
     return (
       <details className={root ? '' : 'pl-3'} open>
-        <summary className="text-fg-muted cursor-pointer">
-          Array({value.length})
-        </summary>
+        <summary className="text-fg-muted cursor-pointer">Array({value.length})</summary>
         <ul className="border-fg-muted/20 ml-3 border-l pl-2">
           {value.map((v, i) => (
             <li key={i} className="flex items-baseline gap-1">
@@ -226,9 +226,7 @@ function JsonTree({ root = false, value }: { root?: boolean; value: unknown }) {
     if (entries.length === 0) return <span className="text-fg-muted">{'{}'}</span>
     return (
       <details className={root ? '' : 'pl-3'} open>
-        <summary className="text-fg-muted cursor-pointer">
-          Object({entries.length})
-        </summary>
+        <summary className="text-fg-muted cursor-pointer">Object({entries.length})</summary>
         <ul className="border-fg-muted/20 ml-3 border-l pl-2">
           {entries.map(([k, v]) => (
             <li key={k} className="flex items-baseline gap-1">

@@ -333,13 +333,10 @@ export const adminApi = {
     adminFetch<MetricName[]>(`/projects/${projectId}/metric-names`),
 
   /** v0.9.0 #6 — moments aggregation (last 7d) + samples per moment. */
-  listMoments: (projectId: string) =>
-    adminFetch<MomentRow[]>(`/projects/${projectId}/moments`),
+  listMoments: (projectId: string) => adminFetch<MomentRow[]>(`/projects/${projectId}/moments`),
 
   listMomentSamples: (projectId: string, name: string) =>
-    adminFetch<MomentSample[]>(
-      `/projects/${projectId}/moments/${encodeURIComponent(name)}`,
-    ),
+    adminFetch<MomentSample[]>(`/projects/${projectId}/moments/${encodeURIComponent(name)}`),
 
   /** v0.9.4 #1 — mobile vitals report + release list. */
   vitalsReport: (projectId: string, release?: string) => {
@@ -360,23 +357,22 @@ export const adminApi = {
     }),
 
   detachCulprit: (projectId: string, issueId: string, culpritId: string) =>
-    adminFetch<null>(
-      `/projects/${projectId}/issues/${issueId}/culprits/${culpritId}`,
-      { method: 'DELETE' },
-    ),
+    adminFetch<null>(`/projects/${projectId}/issues/${issueId}/culprits/${culpritId}`, {
+      method: 'DELETE',
+    }),
 
   /** v1.1 +S3 升级 — on-demand auto-detect best culprit candidate. */
   autoDetectCulprit: (projectId: string, issueId: string) =>
     adminFetch<{ commitSha: string; confidence: number; score: number }>(
       `/projects/${projectId}/issues/${issueId}/culprits:auto`,
-      { method: 'POST' },
+      { method: 'POST' }
     ),
 
   /** v1.1 +S3 升级 — generate a Revert PR draft via GitHub API. */
   generateRevertPr: (projectId: string, issueId: string, culpritId: string) =>
     adminFetch<{ prUrl: string }>(
       `/projects/${projectId}/issues/${issueId}/culprits/${culpritId}/revert-pr`,
-      { method: 'POST' },
+      { method: 'POST' }
     ),
 
   /** v0.9.2 +S6 — privacy score + findings. */
@@ -391,7 +387,7 @@ export const adminApi = {
     if (params?.limit !== undefined) usp.set('limit', String(params.limit))
     const qs = usp.toString()
     return adminFetch<PrivacyFinding[]>(
-      `/projects/${projectId}/privacy/findings${qs ? '?' + qs : ''}`,
+      `/projects/${projectId}/privacy/findings${qs ? '?' + qs : ''}`
     )
   },
 
@@ -400,10 +396,10 @@ export const adminApi = {
     adminFetch<CertWatchDomain[]>(`/projects/${projectId}/cert-monitor/domains`),
 
   addCertWatchDomain: (projectId: string, domain: string) =>
-    adminFetch<{ id: string; domain: string }>(
-      `/projects/${projectId}/cert-monitor/domains`,
-      { body: JSON.stringify({ domain }), method: 'POST' },
-    ),
+    adminFetch<{ id: string; domain: string }>(`/projects/${projectId}/cert-monitor/domains`, {
+      body: JSON.stringify({ domain }),
+      method: 'POST',
+    }),
 
   deleteCertWatchDomain: (projectId: string, watchId: string) =>
     adminFetch<null>(`/projects/${projectId}/cert-monitor/domains/${watchId}`, {
@@ -421,9 +417,7 @@ export const adminApi = {
     if (params.since) usp.set('since', params.since)
     if (params.limit !== undefined) usp.set('limit', String(params.limit))
     const qs = usp.toString()
-    return adminFetch<MetricPoint[]>(
-      `/projects/${projectId}/metrics${qs ? '?' + qs : ''}`,
-    )
+    return adminFetch<MetricPoint[]>(`/projects/${projectId}/metrics${qs ? '?' + qs : ''}`)
   },
 
   /** Phase 25 sub-E — post a new comment on an issue. */

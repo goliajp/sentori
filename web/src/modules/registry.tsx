@@ -107,7 +107,8 @@ export const MODULES: ModuleDef[] = [
   {
     group: 'monitor',
     // eye-with-slash, privacy/redaction glyph
-    iconPath: 'M2 2l20 20M6.7 6.7C4 8.4 2.6 11 2.6 12c0 2 3 6 9.4 6 2.1 0 3.8-.4 5.2-1M11 5c.3 0 .7 0 1 .1M21.4 12c0-2-3-6-9.4-6',
+    iconPath:
+      'M2 2l20 20M6.7 6.7C4 8.4 2.6 11 2.6 12c0 2 3 6 9.4 6 2.1 0 3.8-.4 5.2-1M11 5c.3 0 .7 0 1 .1M21.4 12c0-2-3-6-9.4-6',
     id: 'privacy',
     label: 'Privacy',
     path: 'privacy',
@@ -117,7 +118,8 @@ export const MODULES: ModuleDef[] = [
     adminOnly: true,
     group: 'monitor',
     // radio-tower / broadcast glyph
-    iconPath: 'M4.9 19.1A9 9 0 0 1 4.9 4.9M19.1 4.9a9 9 0 0 1 0 14.2M7.8 16.2A5 5 0 0 1 7.8 7.8M16.2 7.8a5 5 0 0 1 0 8.4M12 13a1 1 0 1 1 0-2 1 1 0 0 1 0 2zM12 22v-9',
+    iconPath:
+      'M4.9 19.1A9 9 0 0 1 4.9 4.9M19.1 4.9a9 9 0 0 1 0 14.2M7.8 16.2A5 5 0 0 1 7.8 7.8M16.2 7.8a5 5 0 0 1 0 8.4M12 13a1 1 0 1 1 0-2 1 1 0 0 1 0 2zM12 22v-9',
     id: 'live-debug',
     label: 'Live debug',
     path: 'live-debug',

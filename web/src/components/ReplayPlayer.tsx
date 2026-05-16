@@ -113,7 +113,7 @@ export function ReplayPlayer({
           <li key={i}>
             <button
               aria-selected={effectiveFocus === i}
-              className={`hover:bg-bg-tertiary/50 focus:outline-accent focus:outline focus:outline-1 -outline-offset-1 block w-full px-2 py-1 text-left text-[11px] transition-colors ${
+              className={`hover:bg-bg-tertiary/50 focus:outline-accent block w-full px-2 py-1 text-left text-[11px] -outline-offset-1 transition-colors focus:outline focus:outline-1 ${
                 effectiveFocus === i ? 'bg-bg-tertiary text-fg' : 'text-fg-muted'
               }`}
               onClick={() => setFocus(i)}
@@ -125,7 +125,7 @@ export function ReplayPlayer({
                   <span className="text-[9px]">{relativeFromCrash(s.ts, crashTs)}</span>
                 )}
               </div>
-              <div className="text-[9px] text-fg-muted">{s.nodes.length} nodes</div>
+              <div className="text-fg-muted text-[9px]">{s.nodes.length} nodes</div>
             </button>
           </li>
         ))}

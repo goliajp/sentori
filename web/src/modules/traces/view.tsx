@@ -7,16 +7,24 @@ import { PageHeader } from '@/layout/page-header'
 import { formatRelative } from '@/lib/format'
 
 export function TracesView() {
-  const { currentOrg, currentProject } = useOrg()
-  const projectId = currentProject?.id ?? null
-  const navigate = useNavigate()
   // Traces is configured as a parent route with `:traceId` nested
   // under it (see main.tsx moduleChildren). When detail is active we
   // render <Outlet /> instead of the list — full-page detail, not
   // master-detail like Issues. Without this the parent's list would
   // keep rendering and the detail route would never mount.
+  //
+  // The list itself lives in <TraceList /> below so the early return
+  // doesn't violate rules-of-hooks (the list's useQuery / useOrg /
+  // useNavigate run consistently inside it).
   const params = useParams<{ traceId: string }>()
   if (params.traceId) return <Outlet />
+  return <TraceList />
+}
+
+function TraceList() {
+  const { currentOrg, currentProject } = useOrg()
+  const projectId = currentProject?.id ?? null
+  const navigate = useNavigate()
 
   const { data, error, isLoading } = useQuery({
     enabled: !!projectId,
@@ -58,7 +66,7 @@ export function TracesView() {
                 const href = `/org/${currentOrg.slug}/traces/${t.traceId}`
                 return (
                   <tr
-                    className="hover:bg-bg-tertiary/40 focus-visible:outline-accent cursor-pointer transition-colors focus-visible:outline focus-visible:outline-1 -outline-offset-1"
+                    className="hover:bg-bg-tertiary/40 focus-visible:outline-accent cursor-pointer -outline-offset-1 transition-colors focus-visible:outline focus-visible:outline-1"
                     key={t.traceId}
                     onClick={(e) => {
                       // Cmd/Ctrl/Middle-click → let the first-cell <Link>
@@ -97,7 +105,9 @@ export function TracesView() {
                     </td>
                     <td className="text-fg t-md text-right tabular-nums">{t.spanCount}</td>
                     <td className="text-fg-muted t-md font-mono">{t.rootName ?? '—'}</td>
-                    <td className="text-fg-muted t-md tabular-nums">{formatRelative(t.lastSeen)}</td>
+                    <td className="text-fg-muted t-md tabular-nums">
+                      {formatRelative(t.lastSeen)}
+                    </td>
                   </tr>
                 )
               })}

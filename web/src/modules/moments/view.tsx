@@ -38,13 +38,11 @@ export function MomentsView() {
             Moments (last 7d)
           </span>
         </header>
-        {namesQ.isLoading && (
-          <div className="text-fg-muted t-md px-3 py-3">Loading…</div>
-        )}
+        {namesQ.isLoading && <div className="text-fg-muted t-md px-3 py-3">Loading…</div>}
         {!namesQ.isLoading && names.length === 0 && (
           <div className="text-fg-muted t-md px-3 py-3">
-            Call <code>sentori.startMoment('checkout').end()</code> from your
-            host app to start collecting flow durations + abandonment.
+            Call <code>sentori.startMoment('checkout').end()</code> from your host app to start
+            collecting flow durations + abandonment.
           </div>
         )}
         <ul className="divide-border divide-y">
@@ -63,10 +61,10 @@ export function MomentsView() {
                   <div className="text-fg-muted t-sm flex items-center gap-2 tabular-nums">
                     <span>{n.count}</span>
                     <span>·</span>
-                    <span>p50 {n.p50Ms}ms · p95 {n.p95Ms}ms</span>
-                    {n.abandoned > 0 && (
-                      <span className="text-warning">· {abandonPct}% abn</span>
-                    )}
+                    <span>
+                      p50 {n.p50Ms}ms · p95 {n.p95Ms}ms
+                    </span>
+                    {n.abandoned > 0 && <span className="text-warning">· {abandonPct}% abn</span>}
                   </div>
                 </button>
               </li>
@@ -75,11 +73,7 @@ export function MomentsView() {
         </ul>
       </aside>
       <main className="flex-1 overflow-auto">
-        {!selected && (
-          <div className="text-fg-muted t-md p-3">
-            Pick a moment on the left.
-          </div>
-        )}
+        {!selected && <div className="text-fg-muted t-md p-3">Pick a moment on the left.</div>}
         {selected && samplesQ.isLoading && (
           <div className="text-fg-muted t-md p-3">Loading samples…</div>
         )}

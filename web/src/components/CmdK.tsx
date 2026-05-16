@@ -48,7 +48,7 @@ export function CmdK() {
     if (!open) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setQ('')
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+
     setIdx(0)
     const t = setTimeout(() => inputRef.current?.focus(), 0)
     return () => clearTimeout(t)

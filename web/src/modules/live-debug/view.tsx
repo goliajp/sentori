@@ -42,10 +42,10 @@ export function LiveDebugView() {
     setStatus('connected')
     // v1.1 +S7 升级 — arm the per-user live-mode flag so the SDK
     // (when it polls /v1/control/poll) switches to immediate-send.
-    void fetch(
-      `/admin/api/projects/${projectId}/live-debug/users/${encodeURIComponent(id)}/arm`,
-      { credentials: 'include', method: 'POST' },
-    ).catch(() => {
+    void fetch(`/admin/api/projects/${projectId}/live-debug/users/${encodeURIComponent(id)}/arm`, {
+      credentials: 'include',
+      method: 'POST',
+    }).catch(() => {
       // best-effort — SSE works either way, just with batch latency.
     })
     const url = `/admin/api/projects/${projectId}/live-debug/users/${encodeURIComponent(id)}`
@@ -89,7 +89,7 @@ export function LiveDebugView() {
     if (projectId && userId) {
       void fetch(
         `/admin/api/projects/${projectId}/live-debug/users/${encodeURIComponent(userId)}/arm`,
-        { credentials: 'include', method: 'DELETE' },
+        { credentials: 'include', method: 'DELETE' }
       ).catch(() => {
         // ignore
       })
