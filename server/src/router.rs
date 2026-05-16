@@ -214,6 +214,15 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/privacy/findings",
             get(api::privacy::findings),
         )
+        // v0.9.11 — admin re-scan after a classifier upgrade. Wipes
+        // findings + cursor for (project, optional release) and
+        // synchronously re-runs the new classifier over the last 7d
+        // of events so the score recovers without waiting for the
+        // 7d window to age out stale rows.
+        .route(
+            "/projects/{project_id}/privacy/rescan",
+            post(api::privacy::rescan),
+        )
         // v0.9.2 +S5 — Repro-as-test: generate a Jest scaffold from
         // an event's breadcrumb trail + stack so the dev can drop it
         // into tests/__repros__/ and start debugging in 30 seconds.

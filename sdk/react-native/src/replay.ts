@@ -93,7 +93,12 @@ export function stopReplay(): void {
     _timer = null;
   }
   _nativeMod = null;
+  _emptyTickCount = 0;
+  _emptyTickLogStride = 1;
 }
+
+let _emptyTickCount = 0;
+let _emptyTickLogStride = 1;
 
 function captureTick(): void {
   if (!_running) return;
@@ -104,6 +109,28 @@ function captureTick(): void {
     if (typeof snapshot === 'string' && snapshot.length > 0) {
       _ring.push(snapshot);
       while (_ring.length > RING_SIZE) _ring.shift();
+      _emptyTickCount = 0;
+      _emptyTickLogStride = 1;
+    } else if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      // v0.9.11 — Insight 2026-05-17 Finding 6: tick fires hundreds
+      // of times but ring stays empty → native returned null/empty.
+      // Log on a back-off schedule (1st, 10th, 100th, …) so the
+      // diagnostic is visible without spamming Metro at 1 Hz for a
+      // 15-minute session.
+      _emptyTickCount += 1;
+      if (_emptyTickCount === 1 || _emptyTickCount === _emptyTickLogStride) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[sentori] replay tick: native returned',
+          snapshot === null
+            ? 'null'
+            : typeof snapshot === 'string'
+              ? `empty (length=${snapshot.length})`
+              : typeof snapshot,
+          `(empty ticks so far: ${_emptyTickCount})`,
+        );
+        _emptyTickLogStride = Math.max(_emptyTickLogStride * 10, 10);
+      }
     }
     tickSpan.finish({ status: 'ok' });
   } catch (e) {

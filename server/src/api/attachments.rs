@@ -311,8 +311,23 @@ async fn is_admin_for_project(
             // Fail-closed on DB error. A transient SQL failure must
             // *not* be treated as "no row" — that would silently grant
             // the request when membership lookup just timed out.
-            let row_res = sqlx::query_as::<_, (i64,)>(
-                "SELECT 1 FROM memberships m \
+            //
+            // Insight 2026-05-17 Finding 5: this function used
+            // `query_as::<_, (i64,)>("SELECT 1 FROM ...")`. PostgreSQL
+            // returns `1` as int4 (i32), not int8 (i64), so sqlx
+            // raised a column-type-mismatch error and the fail-closed
+            // branch returned false for EVERY logged-in user. The
+            // first POST upload that actually landed an
+            // `event_attachments` row exposed it (before the Finding 3
+            // fix, POST returned 503 attachmentsDisabled and this
+            // path was unreachable).
+            //
+            // Decoding the role string from the same memberships join
+            // that `require_project_in_org` already uses gives us a
+            // type-stable column and parity with the issue-page
+            // authorization check.
+            let row_res = sqlx::query_scalar::<_, String>(
+                "SELECT m.role FROM memberships m \
                  JOIN projects p ON p.org_id = m.org_id \
                  WHERE m.user_id = $1 AND p.id = $2 \
                  LIMIT 1",
@@ -322,7 +337,7 @@ async fn is_admin_for_project(
             .fetch_optional(pool)
             .await;
             match row_res {
-                Ok(Some(_)) => true,
+                Ok(Some(_role)) => true,
                 Ok(None) => false,
                 Err(e) => {
                     tracing::error!(

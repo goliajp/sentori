@@ -232,3 +232,52 @@ pub async fn findings(
         .collect();
     Ok(Json(out).into_response())
 }
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RescanParams {
+    pub release: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RescanResult {
+    pub release: Option<String>,
+    pub deleted_findings: u64,
+    pub deleted_cursors: u64,
+    pub rescanned_events: u64,
+    pub new_findings: u64,
+}
+
+/// POST /admin/api/projects/{id}/privacy/rescan?release=<r>
+///
+/// Wipes pii_findings + pii_scan_cursor for (project, optional
+/// release), then synchronously re-runs the classifier over the same
+/// events. Use after a classifier upgrade so the score reflects the
+/// new rules immediately instead of waiting for the 7-day score
+/// window to age out the old findings.
+///
+/// Bounded at 5_000 events per call to keep request latency sane; if
+/// the project has more recent traffic, call again or wait for the
+/// background scanner (15 min interval) to finish the tail.
+pub async fn rescan(
+    State(state): State<AppState>,
+    Path(project_id): Path<Uuid>,
+    Query(p): Query<RescanParams>,
+) -> Result<Response, AppError> {
+    let Some(pool) = &state.db else {
+        return Err(AppError::Unconfigured("dbNotConfigured"));
+    };
+    let (deleted_findings, deleted_cursors, rescanned_events, new_findings) =
+        crate::privacy_lab::rescan_release(pool, project_id, p.release.as_deref(), 5_000)
+            .await
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(Json(RescanResult {
+        release: p.release,
+        deleted_findings,
+        deleted_cursors,
+        rescanned_events,
+        new_findings,
+    })
+    .into_response())
+}

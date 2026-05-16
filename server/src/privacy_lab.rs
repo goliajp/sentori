@@ -70,6 +70,118 @@ pub fn spawn(pool: PgPool) {
     });
 }
 
+/// v0.9.11 — admin-triggered re-scan for one project (optionally
+/// one release). Used by the privacy rescan endpoint after a
+/// classifier change so the score recovers without waiting for old
+/// events to age out of the 7-day score window.
+///
+/// Steps:
+///   1. DELETE findings for (project, release? )
+///   2. DELETE cursor rows for events under (project, release?)
+///   3. Re-run scan_payload on each affected event payload directly,
+///      bounded by `per_call_cap` to keep request latency sane.
+///
+/// Returns (deleted_findings, deleted_cursors, rescanned_events,
+/// new_findings) so the admin endpoint can tell the operator what
+/// happened.
+pub async fn rescan_release(
+    pool: &PgPool,
+    project_id: Uuid,
+    release: Option<&str>,
+    per_call_cap: i64,
+) -> Result<(u64, u64, u64, u64)> {
+    let deleted_findings = match release {
+        Some(r) => sqlx::query(
+            "DELETE FROM pii_findings WHERE project_id = $1 AND release = $2",
+        )
+        .bind(project_id)
+        .bind(r)
+        .execute(pool)
+        .await?
+        .rows_affected(),
+        None => sqlx::query("DELETE FROM pii_findings WHERE project_id = $1")
+            .bind(project_id)
+            .execute(pool)
+            .await?
+            .rows_affected(),
+    };
+
+    let deleted_cursors = match release {
+        Some(r) => sqlx::query(
+            "DELETE FROM pii_scan_cursor WHERE event_id IN \
+             (SELECT id FROM events WHERE project_id = $1 AND release = $2)",
+        )
+        .bind(project_id)
+        .bind(r)
+        .execute(pool)
+        .await?
+        .rows_affected(),
+        None => sqlx::query(
+            "DELETE FROM pii_scan_cursor WHERE event_id IN \
+             (SELECT id FROM events WHERE project_id = $1)",
+        )
+        .bind(project_id)
+        .execute(pool)
+        .await?
+        .rows_affected(),
+    };
+
+    // Pull events to re-scan. Same 7-day score window as the public
+    // score formula so we don't waste time scanning rows that won't
+    // affect the displayed number.
+    let rows: Vec<(Uuid, String, Value)> = match release {
+        Some(r) => sqlx::query_as(
+            "SELECT id, release, payload FROM events \
+             WHERE project_id = $1 AND release = $2 \
+             AND received_at >= now() - interval '7 days' \
+             ORDER BY received_at DESC LIMIT $3",
+        )
+        .bind(project_id)
+        .bind(r)
+        .bind(per_call_cap)
+        .fetch_all(pool)
+        .await?,
+        None => sqlx::query_as(
+            "SELECT id, release, payload FROM events \
+             WHERE project_id = $1 \
+             AND received_at >= now() - interval '7 days' \
+             ORDER BY received_at DESC LIMIT $2",
+        )
+        .bind(project_id)
+        .bind(per_call_cap)
+        .fetch_all(pool)
+        .await?,
+    };
+    let rescanned_events = rows.len() as u64;
+    let mut new_findings: u64 = 0;
+
+    for (event_id, evt_release, payload) in rows {
+        let findings = scan_payload(&payload);
+        for f in &findings {
+            sqlx::query(
+                "INSERT INTO pii_findings \
+                 (id, project_id, release, event_id, field_path, pattern_kind, sample) \
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            )
+            .bind(Uuid::now_v7())
+            .bind(project_id)
+            .bind(&evt_release)
+            .bind(event_id)
+            .bind(&f.field_path)
+            .bind(&f.kind)
+            .bind(&f.sample)
+            .execute(pool)
+            .await?;
+            new_findings += 1;
+        }
+        sqlx::query("INSERT INTO pii_scan_cursor (event_id) VALUES ($1) ON CONFLICT DO NOTHING")
+            .bind(event_id)
+            .execute(pool)
+            .await?;
+    }
+    Ok((deleted_findings, deleted_cursors, rescanned_events, new_findings))
+}
+
 async fn scan_once(pool: &PgPool) -> Result<()> {
     // Pull unscanned recent events. JOIN the cursor table to skip
     // already-processed ids.
