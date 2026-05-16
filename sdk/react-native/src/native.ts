@@ -4,6 +4,8 @@
  * this keeps the SDK usable in pure-JS environments (jest, bun test, web).
  */
 
+declare const __DEV__: boolean | undefined
+
 type SentoriNativeModule = {
   drainPending: () => Promise<string[]>
   setConfig: (config: {
@@ -59,6 +61,13 @@ type SentoriNativeModule = {
     maskedIds: string[],
   ) => Promise<null | { base64: string; mediaType: string }>
   /**
+   * v0.9.6 #2 — wireframe view-tree snapshot. iOS walks the
+   * UIView hierarchy, paints each node as a rect/text descriptor,
+   * intersects with masked nativeIDs. Returns an NDJSON-shaped
+   * snapshot string or null on failure.
+   */
+  captureWireframe?: (maskedIds: string[]) => null | string
+  /**
    * Phase 22 sub-D / sub-E: cross-platform main-thread watchdog.
    * Android: 5 s / 1 s defaults (matches the OS ANR threshold).
    * iOS: 2 s / 1 s (more aggressive — iOS has no system-level
@@ -85,8 +94,22 @@ function native(): SentoriNativeModule | null {
       requireNativeModule: <T>(name: string) => T
     }
     _native = core.requireNativeModule<SentoriNativeModule>('Sentori')
-  } catch {
+    if (typeof __DEV__ !== 'undefined' && __DEV__ && _native !== null) {
+      // v0.9.9 — Insight asked for "tell me exactly which functions
+      // the iOS pod is currently exposing." Logged once per process
+      // (the cached _native short-circuits subsequent calls). Helps
+      // distinguish "pod is stale" from "method exists but throws
+      // at runtime" in one log line.
+      const keys = Object.keys(_native as object).sort()
+      // eslint-disable-next-line no-console
+      console.warn('[sentori] native module bound; exposed methods:', keys.join(', ') || '(none)')
+    }
+  } catch (e) {
     _native = null
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn('[sentori] requireNativeModule("Sentori") threw', e)
+    }
   }
   return _native
 }
@@ -230,10 +253,52 @@ export async function captureNativeScreenshotWithMask(
   maskedIds: string[],
 ): Promise<null | { base64: string; mediaType: string }> {
   const n = native()
-  if (!n?.captureScreenshotWithMask) return null
-  try {
-    return await n.captureScreenshotWithMask(maskedIds)
-  } catch {
+  if (!n) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[sentori] native module not bound — requireNativeModule("Sentori") threw',
+      )
+    }
     return null
+  }
+  if (!n.captureScreenshotWithMask) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[sentori] native.captureScreenshotWithMask missing — pod install may be stale',
+      )
+    }
+    return null
+  }
+  try {
+    const r = await n.captureScreenshotWithMask(maskedIds)
+    if (!r && typeof __DEV__ !== 'undefined' && __DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[sentori] native screenshot returned null — no key window / render failed',
+      )
+    }
+    return r
+  } catch (e) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn('[sentori] native screenshot threw', e)
+    }
+    return null
+  }
+}
+
+/** v0.9.9 — diagnostic peek used by the wireframe replay tick. Same
+ *  four-way distinction as captureNativeScreenshotWithMask. Logged at
+ *  most once per `startReplay()` (the wrapper in replay.ts gates). */
+export function describeWireframeNative(): {
+  bound: boolean
+  hasCaptureWireframe: boolean
+} {
+  const n = native()
+  return {
+    bound: n !== null,
+    hasCaptureWireframe: Boolean(n?.captureWireframe),
   }
 }

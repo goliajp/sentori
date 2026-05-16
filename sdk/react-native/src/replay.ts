@@ -20,7 +20,10 @@
 import { startSpan } from '@goliapkg/sentori-core';
 
 import { getRegisteredMaskQuery } from './mask';
+import { describeWireframeNative } from './native';
 import { isNativeModuleLinked } from './native-loader';
+
+declare const __DEV__: boolean | undefined;
 
 const TICK_INTERVAL_MS = 1000;
 const RING_SIZE = 60;
@@ -55,9 +58,27 @@ export function startReplay(opts: ReplayOptions): void {
   // — same pattern as other native peers — for Expo Go / unlinked
   // builds.
   if (!isNativeModuleLinked('Sentori') && !isNativeModuleLinked('SentoriModule')) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[sentori] replay: Sentori native module not linked — replay attachments will stay empty',
+      );
+    }
     // Falls back silently. Replay rings stay empty; captureException
     // simply doesn't attach a replay.
     return;
+  }
+  // v0.9.9 — log once per start so Insight (or anyone) can confirm
+  // whether the native module exposes captureWireframe at all,
+  // distinguishing this from "ring never filled because tick threw".
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    const info = describeWireframeNative();
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[sentori] replay: starting',
+      'bound=', info.bound,
+      'hasCaptureWireframe=', info.hasCaptureWireframe,
+    );
   }
   _running = true;
   _nativeMod = loadNativeReplay();
