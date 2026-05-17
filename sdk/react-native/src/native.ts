@@ -83,6 +83,19 @@ type SentoriNativeModule = {
     trackedSource?: string
     trackedActivity?: string
     decorViewFound?: boolean
+    /** v1.0.0-rc.3: deepest descendant reached by the walker. If
+     *  this is 2-3 the walker bailed early; if it matches the
+     *  expected view-tree depth (~20-40 for RN apps) the capture
+     *  is healthy. */
+    lastDepthMax?: number
+    /** v1.0.0-rc.3: byte length of the last serialised payload. */
+    lastSizeBytes?: number
+    /** v1.0.0-rc.3: lifetime counters — totalTicks is the number
+     *  of times native captureWireframe ran; totalEmptyResultTicks
+     *  is the subset that came back null or empty. Ratio surfaces
+     *  intermittent failures (e.g. 200/240 ≈ 80% failure rate). */
+    totalTicks?: number
+    totalEmptyResultTicks?: number
   }
   /**
    * v1.0.0-rc.2 — diagnostic mirror of probeWireframe for the
@@ -356,24 +369,47 @@ export function probeNativeWireframe(): {
   lastPath: string
   sceneCount: number
   windowCount: number
+  /** v1.0.0-rc.3: max recursion depth reached by the walker on
+   *  the last tick. Healthy on an RN app: 20-40. If it's 2-3 the
+   *  walker bailed early (zero-size parent, masked root). */
+  lastDepthMax: number
+  /** v1.0.0-rc.3: byte length of the last serialised payload. */
+  lastSizeBytes: number
+  /** v1.0.0-rc.3: lifetime totals. `totalEmptyResultTicks /
+   *  totalTicks` is the failure rate. */
+  totalTicks: number
+  totalEmptyResultTicks: number
+  raw: Record<string, unknown>
 } {
   const n = native()
   if (!n || typeof n.probeWireframe !== 'function') {
     return {
       available: false,
+      lastDepthMax: 0,
       lastNodes: 0,
       lastPath: 'native.unavailable',
+      lastSizeBytes: 0,
+      raw: {},
       sceneCount: 0,
+      totalEmptyResultTicks: 0,
+      totalTicks: 0,
       windowCount: 0,
     }
   }
   try {
     const r = n.probeWireframe()
+    const raw = (r ?? {}) as Record<string, unknown>
     return {
       available: true,
+      lastDepthMax: typeof r?.lastDepthMax === 'number' ? r.lastDepthMax : 0,
       lastNodes: typeof r?.lastNodes === 'number' ? r.lastNodes : 0,
       lastPath: typeof r?.lastPath === 'string' ? r.lastPath : 'unknown',
+      lastSizeBytes: typeof r?.lastSizeBytes === 'number' ? r.lastSizeBytes : 0,
+      raw,
       sceneCount: typeof r?.sceneCount === 'number' ? r.sceneCount : 0,
+      totalEmptyResultTicks:
+        typeof r?.totalEmptyResultTicks === 'number' ? r.totalEmptyResultTicks : 0,
+      totalTicks: typeof r?.totalTicks === 'number' ? r.totalTicks : 0,
       windowCount: typeof r?.windowCount === 'number' ? r.windowCount : 0,
     }
   } catch (e) {
@@ -383,9 +419,14 @@ export function probeNativeWireframe(): {
     }
     return {
       available: false,
+      lastDepthMax: 0,
       lastNodes: 0,
       lastPath: 'native.threw',
+      lastSizeBytes: 0,
+      raw: {},
       sceneCount: 0,
+      totalEmptyResultTicks: 0,
+      totalTicks: 0,
       windowCount: 0,
     }
   }

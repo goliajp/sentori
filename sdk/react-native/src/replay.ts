@@ -133,7 +133,17 @@ export function stopReplay(): void {
 
 let _emptyTickCount = 0;
 let _emptyTickLogStride = 1;
+let _thinTickCount = 0;
+let _thinTickLogStride = 1;
+let _okTickCount = 0;
 let _firstTickLogged = false;
+
+/** Anything below this many nodes is suspicious — likely the
+ *  walker bailed early (zero-size parent, masked root, etc.).
+ *  Insight 2026-05-18 verify event saw 800-node payloads on some
+ *  ticks and 1-3-node payloads on others; this threshold flags
+ *  the latter without spamming on small-but-valid screens. */
+const THIN_RESULT_NODES = 6;
 
 function captureTick(): void {
   if (!_running) return;
@@ -173,6 +183,38 @@ function captureTick(): void {
       }
       _emptyTickCount = 0;
       _emptyTickLogStride = 1;
+
+      // v1.0.0-rc.3 — Insight 2026-05-18 report: some ticks land
+      // valid non-empty JSON but with only the root View + 1-2 wrappers
+      // (the Android zero-size-bails-subtree bug, now fixed natively;
+      // this log catches similar regressions). Cheap node-count parse
+      // — we only look at one digit-level character class.
+      _okTickCount += 1;
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        const nodeCount = countNodesQuick(snapshot);
+        const sizeBytes = snapshot.length;
+        const isThin = nodeCount < THIN_RESULT_NODES;
+        if (isThin) {
+          _thinTickCount += 1;
+          if (_thinTickCount === 1 || _thinTickCount === _thinTickLogStride) {
+            // eslint-disable-next-line no-console
+            console.warn(
+              `[sentori] replay tick: thin result nodes=${nodeCount} sizeBytes=${sizeBytes} (thin ticks so far: ${_thinTickCount})`,
+            );
+            _thinTickLogStride = Math.max(_thinTickLogStride * 10, 10);
+          }
+        } else {
+          _thinTickCount = 0;
+          _thinTickLogStride = 1;
+        }
+        // First good tick logs the shape so devs see it once.
+        if (_okTickCount === 1) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[sentori] replay tick: first ok — nodes=${nodeCount} sizeBytes=${sizeBytes}`,
+          );
+        }
+      }
     } else if (typeof __DEV__ !== 'undefined' && __DEV__) {
       // v0.9.11 — Insight 2026-05-17 Finding 6: tick fires hundreds
       // of times but ring stays empty → native returned null/empty.
@@ -203,6 +245,29 @@ function captureTick(): void {
       console.warn('[sentori] replay tick: threw', e);
     }
   }
+}
+
+/**
+ * Approximate node-count parse — counts occurrences of the
+ * `"x":` key in the serialised payload. Every node JSON object
+ * starts with `{"x":<n>,"y":<n>,"w":<n>,"h":<n>...}` so the
+ * occurrence count matches the array length without paying for a
+ * full `JSON.parse`. Cheap enough to run inside the 1 Hz tick.
+ */
+function countNodesQuick(payload: string): number {
+  let count = 0;
+  let i = 0;
+  // Skip the outer {"ts":..,"width":..,"height":..,"nodes":[
+  // and count `"x":` thereafter. The outer payload doesn't contain
+  // a top-level "x" key so any match must be a node.
+  const needle = '"x":';
+  while (true) {
+    const at = payload.indexOf(needle, i);
+    if (at < 0) break;
+    count += 1;
+    i = at + needle.length;
+  }
+  return count;
 }
 
 function readMaskIds(): string[] {

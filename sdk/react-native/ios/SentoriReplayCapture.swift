@@ -29,22 +29,31 @@ import UIKit
         return result
     }
 
-    /// Last path the keyWindow lookup took. Exposed to JS via
-    /// `probeWireframe()` so the failure-mode diagnostic in Metro can
-    /// tell scene-race from "no window at all" without re-rolling the
-    /// pod. Updated on every captureSync call.
+    /// Diagnostic readouts exposed to JS via `probeWireframe()`.
+    ///
+    /// v0.9.12: lastPath / lastNodes / scene-window counts
+    /// v1.0.0-rc.3: + lastDepthMax / lastSizeBytes / totalTicks /
+    ///              totalEmptyResultTicks — answers "the ring isn't
+    ///              empty but the dashboard renders nothing, which
+    ///              layer dropped the data?" without a re-roll.
     @objc public static var lastDiagPath: String = "none(not-yet-called)"
     @objc public static var lastDiagNodes: Int = 0
     @objc public static var lastDiagSceneCount: Int = 0
     @objc public static var lastDiagWindowCount: Int = 0
+    @objc public static var lastDiagDepthMax: Int = 0
+    @objc public static var lastDiagSizeBytes: Int = 0
+    @objc public static var totalTicks: Int = 0
+    @objc public static var totalEmptyResultTicks: Int = 0
     private static var loggedFirstResult = false
 
     private static func captureSync(maskedIds: Set<String>) -> String? {
+        totalTicks += 1
         let (winOpt, path) = resolveKeyWindow()
         lastDiagPath = path
         lastDiagSceneCount = currentSceneCount()
         lastDiagWindowCount = currentWindowCount()
         guard let window = winOpt else {
+            totalEmptyResultTicks += 1
             if !loggedFirstResult {
                 NSLog(
                     "[sentori] wireframe: returning nil — keyWindow path=%@ scenes=%d windows=%d",
@@ -57,21 +66,29 @@ import UIKit
             return nil
         }
         var nodes: [[String: Any]] = []
+        var depthMax = 0
         walk(
             view: window,
+            depth: 0,
+            depthMax: &depthMax,
             parentMasked: false,
             maskedIds: maskedIds,
             window: window,
             nodes: &nodes
         )
         lastDiagNodes = nodes.count
+        lastDiagDepthMax = depthMax
+        if nodes.isEmpty {
+            totalEmptyResultTicks += 1
+        }
         if !loggedFirstResult {
             NSLog(
-                "[sentori] wireframe: first capture ok — keyWindow path=%@ bounds=%.0fx%.0f nodes=%d",
+                "[sentori] wireframe: first capture ok — keyWindow path=%@ bounds=%.0fx%.0f nodes=%d depthMax=%d",
                 path,
                 window.bounds.width,
                 window.bounds.height,
-                nodes.count
+                nodes.count,
+                depthMax
             )
             loggedFirstResult = true
         }
@@ -82,7 +99,9 @@ import UIKit
             "nodes": nodes,
         ]
         if let data = try? JSONSerialization.data(withJSONObject: payload, options: []) {
-            return String(data: data, encoding: .utf8)
+            let s = String(data: data, encoding: .utf8)
+            lastDiagSizeBytes = s?.utf8.count ?? 0
+            return s
         }
         return nil
     }
@@ -157,22 +176,32 @@ import UIKit
             "lastNodes": lastDiagNodes,
             "sceneCount": lastDiagSceneCount,
             "windowCount": lastDiagWindowCount,
+            "lastDepthMax": lastDiagDepthMax,
+            "lastSizeBytes": lastDiagSizeBytes,
+            "totalTicks": totalTicks,
+            "totalEmptyResultTicks": totalEmptyResultTicks,
         ]
     }
 
     /// Cap on nodes per snapshot — extremely deep / wide trees can
     /// have thousands of subviews (UICollectionView recyclers).
     private static let MAX_NODES = 800
+    private static let MAX_DEPTH = 60
 
     private static func walk(
         view: UIView,
+        depth: Int,
+        depthMax: inout Int,
         parentMasked: Bool,
         maskedIds: Set<String>,
         window: UIWindow,
         nodes: inout [[String: Any]]
     ) {
         if nodes.count >= MAX_NODES { return }
+        if depth >= MAX_DEPTH { return }
         if view.isHidden || view.alpha < 0.01 { return }
+
+        if depth > depthMax { depthMax = depth }
 
         let isThisMasked = view.accessibilityIdentifier
             .map { maskedIds.contains($0) } ?? false
@@ -219,6 +248,8 @@ import UIKit
             for sub in view.subviews {
                 walk(
                     view: sub,
+                    depth: depth + 1,
+                    depthMax: &depthMax,
                     parentMasked: masked,
                     maskedIds: maskedIds,
                     window: window,

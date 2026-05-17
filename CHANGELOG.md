@@ -6,6 +6,44 @@
 
 ---
 
+## v1.0.0-rc.3 — Android replay walker recurses through zero-size wrappers
+
+**Theme:** Insight 2026-05-18 rc.2 re-verify (`com.qualcomm.insight` on Samsung S22 / Android 16) 报告：rc.2 native (`probeScreenshot` 在 exposed-methods list 里) 确认是新版，但 wireframe 仍间歇问题。两条独立 bug 叠加：
+- (A) `captureWireframe` 间歇丢 subtree —— 只 emit root + 几个顶层 wrapper，800 nodes 报告对但 dashboard 渲染空
+- (B) rc.2 把诊断 warning 收得太严，只在 `null`/空串时 fire，对「非空但 nodes=[]」的 thin result 静默
+
+**Package bumps：**
+
+- `@goliapkg/sentori-react-native` 1.0.0-rc.2 → **1.0.0-rc.3**（patch — Android-only native fix + 双端诊断扩展）
+
+### Root cause
+
+`SentoriReplayCapture.kt` walk() 在 view 自身 `width <= 0 || height <= 0` 时整段 return —— 包括「不 emit 节点」和「不递归 children」两个 effect。对 RN Fabric 拓扑下经常出现的 zero-measure ViewGroup wrapper（在 RN 的 shadow-tree 中间层 + lazy-layout 阶段）来说，这意味着**整个 React tree 子树都被跳过**，根 decorView + 几层 padding wrapper 之外什么都没拿到。结果 NDJSON 非空、JS 视为成功、ring 累计「几乎空」帧、dashboard 渲染近空。
+
+iOS 端走的是 "skip emit but recurse" 写法（comment 已经有 `invisible container — skip emitting but recurse`），从一开始就对。
+
+### Fix
+
+* **Android walk()** 拆分「emit a node」和「recurse into children」语义：zero-size view 不 emit 节点但仍递归子树。对 MAX_DEPTH (60) + MAX_NODES (800) 仍设上限。
+* **诊断状态扩展**：双端新增 `lastDepthMax` / `lastSizeBytes` / `totalTicks` / `totalEmptyResultTicks`，原有 `lastPath` / `lastNodes` / scene-window counts 保留。失败模式有正面证据（"depthMax=42" 说明 walker 跑通了；"depthMax=3" 说明又被早期 bail 卡住了）。
+* **JS replay tick 加 thin-result warning**：捕获 nodes < 6 的 "成功但浅" 情况，stride 1/10/100/... 节奏避免 spam。原来的 `replay tick: native returned null` warning 保留，覆盖另一条 failure path。
+* **第一次 ok tick 也打 log**：`[sentori] replay tick: first ok — nodes=N sizeBytes=B`，让 dev 一眼看到 capture 真的拿到结构。
+
+### Verify
+
+- 109 SDK tests + tsc clean
+- 待 Insight 重 build APK on S22 / Android 16, 期望:
+  - `[sentori] replay tick: first ok — nodes=300+ sizeBytes=15000+`
+  - `[sentori] enqueue ... attachments=3 kinds=screenshot,sessionTrail,replay`
+  - dashboard issue detail 上 Session replay 段渲染出完整 wireframe layout (不再是 2-3 个空 box)
+  - `await Sentori.probeNativeWireframe()` returns `lastDepthMax: 30-50` (健康范围)
+
+### Other
+
+- iOS 端补 depthMax / sizeBytes / totalTicks 诊断 (parity)，行为不变
+
+---
+
 ## v1.0.0-rc.2 — Android foreground-Activity tracker
 
 **Theme:** Insight 2026-05-17 Android verify (`feature/GOL-582-sentori-0-9-upgrade @ b792e31d`, Samsung Galaxy S22 / Android 16) 上 `captureScreenshot` 和 `captureWireframe` 双路都 null。同 JS 在 iOS sim-insight 一次过。Android 单独有 native-side Activity 解析 gap。
