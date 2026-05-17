@@ -11,6 +11,7 @@ pub mod event;
 pub mod geoip;
 pub mod grouping;
 pub mod issues;
+pub mod mailer;
 pub mod metrics;
 pub mod notifier;
 pub mod passwd;

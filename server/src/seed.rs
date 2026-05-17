@@ -85,8 +85,9 @@ pub async fn ensure_superadmin(pool: &PgPool) -> anyhow::Result<()> {
     };
 
     // If the seeded user has the sentinel password hash, issue a
-    // fresh reset token + log the link. Newest one wins; operator
-    // can clean stale rows at their leisure.
+    // fresh reset token. Try to deliver via SMTP; always log too so
+    // the operator can still grab the link from `docker compose logs`
+    // even when SMTP is mid-flap.
     if password_hash == "oauth:seeded:no-password" {
         let token = random_token(32);
         let expires_at = OffsetDateTime::now_utc() + Duration::hours(48);
@@ -101,11 +102,17 @@ pub async fn ensure_superadmin(pool: &PgPool) -> anyhow::Result<()> {
         .await?;
         let base = std::env::var("SENTORI_BASE_URL")
             .unwrap_or_else(|_| "http://localhost:8000".to_string());
+        let link = format!("{base}/reset-password/{token}");
         tracing::info!(
             email = %email,
-            link = %format!("{base}/reset-password/{token}"),
+            link = %link,
             "superadmin reset-password link (valid 48 h)",
         );
+        match crate::mailer::send_password_reset(&email, &link).await {
+            Ok(true) => tracing::info!(email = %email, "superadmin reset email delivered"),
+            Ok(false) => tracing::info!(email = %email, "SMTP not configured; link is logged above"),
+            Err(e) => tracing::warn!(error = %e, email = %email, "superadmin reset email send failed; link is logged above"),
+        }
     }
 
     Ok(())

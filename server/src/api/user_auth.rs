@@ -545,12 +545,31 @@ pub async fn forgot_password(
         let base = std::env::var("SENTORI_BASE_URL")
             .unwrap_or_else(|_| "http://localhost:8000".to_string());
         let link = format!("{base}/reset-password/{token}");
-        tracing::info!(
-            email = %email,
-            link = %link,
-            expires_at = %expires_at,
-            "password reset link issued (deliver via your operator-side SMTP)",
-        );
+
+        // v1.0 — actually fire the email when SMTP is configured.
+        // Always log too — operator runbook references the log line
+        // and email delivery can flap (DNS, MTA-STS, RBL).
+        match crate::mailer::send_password_reset(&email, &link).await {
+            Ok(true) => {
+                tracing::info!(email = %email, "password reset email delivered");
+            }
+            Ok(false) => {
+                tracing::info!(
+                    email = %email,
+                    link = %link,
+                    expires_at = %expires_at,
+                    "password reset link issued (SMTP not configured, deliver out of band)",
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    email = %email,
+                    link = %link,
+                    "password reset email send failed; link is logged here as fallback",
+                );
+            }
+        }
     } else {
         tracing::info!(email = %email, "password reset requested for unknown email (200 silently)");
     }
