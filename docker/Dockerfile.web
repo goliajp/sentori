@@ -37,6 +37,12 @@ COPY sdk/vue/package.json ./sdk/vue/
 COPY sdk/svelte/package.json ./sdk/svelte/
 COPY sdk/solid/package.json ./sdk/solid/
 COPY web/package.json ./web/
+# apps/rn-example is a workspace member (its strict react-native pin
+# mirrors Insight's production stack — see commit b362855). bun
+# install --frozen-lockfile walks the whole workspace tree, so its
+# package.json has to be present even though the web image doesn't
+# build the example app.
+COPY apps/rn-example/package.json ./apps/rn-example/
 RUN bun install --frozen-lockfile
 
 # Source layer — re-runs on any file change.
