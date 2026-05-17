@@ -137,14 +137,40 @@ event detail send the issue URL and we'll cross-check.
 
 ## Branch state
 
-- Sentori main: `feature` branch will land as commit `<TBD>` then ship
-  npm `1.0.0-rc.2` under the `@next` tag (we don't bump `@latest` on a
-  patch).
+- Sentori main: shipped at commits `792bbc9` (SDK fix) and `b362855`
+  (workspace fix surfaced during verify).
 - All 109 SDK tests pass + `tsc --noEmit` clean.
 - iOS regression: the 4-tier keyWindow on screenshot is additive — it
   defaults to the same single-pass path that was working for you on
   rc.1. Should not affect your green iOS verify.
+- **npm**: `1.0.0-rc.2` published under `@next` 2026-05-17 ~23:20 JST.
+  `npm view @goliapkg/sentori-react-native dist-tags` shows
+  `latest: 0.9.11 · next: 1.0.0-rc.2`.
 
-Once the publish lands (we'll comment in this file with the npm
-timestamp), bump on your side and re-verify on the same S22 device.
-The dashboard URL for the new event is what we'll diff against.
+## Sentori-side verify pass (before publish)
+
+Tethered the same S22 model SDK rc.2 was tested against — actually
+the exact device serial `R5CT52DF07D`. Brought up `apps/rn-example`
+under RN 0.83.6 (matched to your `package.json`; surfacing a
+workspace-membership bug in our monorepo on the way), ran a fresh
+captureException tap, and the probes report:
+
+```
+[verify-android] probe screenshot
+  trackedSource: 'lifecycle.resumed'
+  trackedActivity: 'com.goliapanda.sentoriexample.MainActivity'
+  decorViewFound: true
+[replay-test] probe path=ok(lifecycle.resumed) nodes=36
+```
+
+`SentoriForegroundActivity.current()` returns a live Activity via
+the lifecycle callback (in our example the Activity comes up after
+the module's `OnCreate` so the lifecycle path catches it; in your
+dev-launcher topology the reflection back-fill is the one that'll
+kick in — `trackedSource` would read `reflection.activityThread`).
+Replay capture returns 36 non-null nodes. rc.1's `activity.null` /
+`replay tick: returned null` symptom is gone end-to-end.
+
+Bump on your side and re-verify on the same S22 with the
+`com.qualcomm.insight` package; the dashboard URL for the new event
+is what we'll diff against.
