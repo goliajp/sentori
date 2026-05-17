@@ -271,17 +271,26 @@ function ScreenshotTile({
   onOpen: () => void
 }) {
   const url = attachmentUrl(eventId, attachment.ref)
+  // Use an inline-block wrapper that sizes itself to the natural
+  // image dimensions, so there's no surround colour bleed and no
+  // "thumbnail centred inside a wider black square" artefact from
+  // earlier revisions. `block button + w-auto img` sized the button
+  // to its flex parent's full width while the img stayed at its
+  // natural portrait width — the gap rendered as the page bg (near-
+  // black in dark mode). The fix is to make the outer element
+  // inline-sized.
   return (
     <button
-      className="group block transition-all"
+      aria-label="Open screenshot in debug center"
+      className="group inline-block max-w-full text-left transition-all"
       onClick={onOpen}
       title={`Open in debug center · ${attachment.source ?? 'unknown'}`}
       type="button"
     >
-      <div className="overflow-hidden outline outline-1 outline-offset-0 outline-[color:var(--rule)] transition-colors group-hover:outline-[color:var(--accent)]">
+      <span className="block max-h-44 w-fit overflow-hidden outline outline-1 outline-offset-0 outline-[color:var(--rule)] transition-colors group-hover:outline-[color:var(--accent)]">
         <img alt="Crash screenshot" className="block max-h-44 w-auto" loading="lazy" src={url} />
-      </div>
-      <div className="mt-1.5 font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase transition-colors group-hover:text-[color:var(--accent)]">
+      </span>
+      <span className="mt-1.5 block font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase transition-colors group-hover:text-[color:var(--accent)]">
         screenshot
         {attachment.source && (
           <span className="ml-2 text-[color:var(--ink-muted)]">· {attachment.source}</span>
@@ -289,7 +298,7 @@ function ScreenshotTile({
         <span className="ml-2 tracking-normal text-[color:var(--ink-muted)] normal-case group-hover:text-[color:var(--accent)]">
           ↗ open
         </span>
-      </div>
+      </span>
     </button>
   )
 }
