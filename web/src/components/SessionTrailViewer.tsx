@@ -94,99 +94,125 @@ export function SessionTrailViewer({
     return steps[steps.length - 1]!.ts
   }, [steps])
 
-  if (isLoading) return <div className="text-fg-muted text-[11px]">Loading session trail…</div>
+  if (isLoading)
+    return (
+      <p className="border-y border-[color:var(--rule)] py-3 text-[12px] text-[color:var(--ink-soft)]">
+        Loading session trail…
+      </p>
+    )
   if (error)
     return (
-      <div className="text-[11px] text-[color:var(--color-danger)]">
+      <p className="border-y border-[color:var(--rule)] py-3 text-[12px] text-[color:var(--danger)]">
         Failed to load session trail.
-      </div>
+      </p>
     )
-  if (steps.length === 0) return <div className="text-fg-muted text-[11px]">No steps recorded.</div>
+  if (steps.length === 0)
+    return (
+      <p className="border-y border-[color:var(--rule)] py-3 text-[12px] text-[color:var(--ink-soft)]">
+        No steps recorded.
+      </p>
+    )
 
   const focused = effectiveFocus === null ? null : (steps[effectiveFocus] ?? null)
 
   return (
-    <div className="grid grid-cols-[200px_1fr] gap-3">
-      <ol className="border-border max-h-[320px] overflow-y-auto rounded border" role="listbox">
+    <div className="grid grid-cols-[200px_1fr] gap-4">
+      <ol
+        aria-label="Session trail steps"
+        className="max-h-[320px] overflow-y-auto border-y border-[color:var(--rule)]"
+        role="listbox"
+      >
         {steps.map((s, i) => (
           <li key={i}>
             <button
               aria-selected={effectiveFocus === i}
-              className={`hover:bg-bg-tertiary/50 block w-full px-2 py-1 text-left text-[11px] ${
-                effectiveFocus === i ? 'bg-bg-tertiary text-fg' : 'text-fg-muted'
+              className={`block w-full border-b border-[color:var(--rule-soft)] px-2.5 py-1.5 text-left transition-colors last:border-b-0 ${
+                effectiveFocus === i
+                  ? 'bg-[color:var(--accent-soft)] text-[color:var(--ink)]'
+                  : 'text-[color:var(--ink-soft)] hover:bg-[color:var(--paper-2)]'
               }`}
               onClick={() => setFocus(i)}
               type="button"
             >
-              <span className="font-mono">{String(i + 1).padStart(2, '0')}</span>{' '}
-              <span className="truncate">{s.label}</span>
+              <div className="flex items-baseline gap-2">
+                <span className="font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                <span className="truncate text-[12px]">{s.label}</span>
+              </div>
             </button>
           </li>
         ))}
       </ol>
-      <div className="border-border rounded border p-3 text-[12px]">
+      <div className="border-y border-[color:var(--rule)] py-3 text-[12px]">
         {focused === null ? (
-          <p className="text-fg-muted">Use ← / → or click a step.</p>
+          <p className="text-[color:var(--ink-muted)]">Use ← / → or click a step.</p>
         ) : (
-          <dl className="space-y-2">
-            <div className="grid grid-cols-[80px_1fr] gap-2">
-              <dt className="text-fg-muted">Step</dt>
-              <dd>
-                {effectiveFocus !== null ? effectiveFocus + 1 : '?'} of {steps.length}
-                {crashTs !== null && (
-                  <span className="text-fg-muted ml-2">
-                    ({relativeFromCrash(focused.ts, crashTs)})
+          <dl className="grid grid-cols-[100px_1fr] gap-x-3 gap-y-2">
+            <Dt>Step</Dt>
+            <dd className="text-[color:var(--ink)]">
+              {effectiveFocus !== null ? effectiveFocus + 1 : '?'} of {steps.length}
+              {crashTs !== null && (
+                <span className="ml-2 font-mono text-[11px] text-[color:var(--ink-muted)]">
+                  ({relativeFromCrash(focused.ts, crashTs)})
+                </span>
+              )}
+            </dd>
+            <Dt>Label</Dt>
+            <dd className="font-mono text-[12px] text-[color:var(--ink)]">{focused.label}</dd>
+            {focused.breadcrumb && (
+              <>
+                <Dt>Breadcrumb</Dt>
+                <dd>
+                  <span className="mr-1.5 inline-flex h-4 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-1.5 font-mono text-[9px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+                    {focused.breadcrumb.type}
                   </span>
-                )}
-              </dd>
-              <dt className="text-fg-muted">Label</dt>
-              <dd className="font-mono">{focused.label}</dd>
-              {focused.breadcrumb && (
-                <>
-                  <dt className="text-fg-muted">Breadcrumb</dt>
-                  <dd>
-                    <span className="bg-bg-tertiary text-fg-muted rounded px-1 py-[1px] text-[10px] uppercase">
-                      {focused.breadcrumb.type}
-                    </span>{' '}
-                    {focused.breadcrumb.message}
-                  </dd>
-                </>
-              )}
-              {focused.screenshotRef && (
-                <>
-                  <dt className="text-fg-muted">Screenshot</dt>
-                  <dd>
-                    <a
-                      className="text-accent underline"
-                      href={`/admin/api/events/${encodeURIComponent(eventId)}/attachments/${encodeURIComponent(focused.screenshotRef)}`}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      open
-                    </a>
-                  </dd>
-                </>
-              )}
-              {focused.viewTreeRef && (
-                <>
-                  <dt className="text-fg-muted">View tree</dt>
-                  <dd>
-                    <a
-                      className="text-accent underline"
-                      href={`/admin/api/events/${encodeURIComponent(eventId)}/attachments/${encodeURIComponent(focused.viewTreeRef)}`}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      open
-                    </a>
-                  </dd>
-                </>
-              )}
-            </div>
+                  <span className="text-[color:var(--ink)]">{focused.breadcrumb.message}</span>
+                </dd>
+              </>
+            )}
+            {focused.screenshotRef && (
+              <>
+                <Dt>Screenshot</Dt>
+                <dd>
+                  <a
+                    className="font-mono text-[11px] tracking-[0.1em] text-[color:var(--accent)] uppercase hover:text-[color:var(--accent-strong)]"
+                    href={`/admin/api/events/${encodeURIComponent(eventId)}/attachments/${encodeURIComponent(focused.screenshotRef)}`}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    open ↗
+                  </a>
+                </dd>
+              </>
+            )}
+            {focused.viewTreeRef && (
+              <>
+                <Dt>View tree</Dt>
+                <dd>
+                  <a
+                    className="font-mono text-[11px] tracking-[0.1em] text-[color:var(--accent)] uppercase hover:text-[color:var(--accent-strong)]"
+                    href={`/admin/api/events/${encodeURIComponent(eventId)}/attachments/${encodeURIComponent(focused.viewTreeRef)}`}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    open ↗
+                  </a>
+                </dd>
+              </>
+            )}
           </dl>
         )}
       </div>
     </div>
+  )
+}
+
+function Dt({ children }: { children: React.ReactNode }) {
+  return (
+    <dt className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+      {children}
+    </dt>
   )
 }
 

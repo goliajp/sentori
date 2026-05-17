@@ -143,11 +143,15 @@ export function ViewTreePanel({
   }, [hoverHighlight])
 
   if (isLoading) {
-    return <p className="text-fg-muted px-2 py-4 text-[12px]">Loading view tree…</p>
+    return (
+      <p className="border-y border-[color:var(--rule)] py-3 text-[12px] text-[color:var(--ink-soft)]">
+        Loading view tree…
+      </p>
+    )
   }
   if (error) {
     return (
-      <p className="px-2 py-4 text-[12px] text-[color:var(--color-danger)]">
+      <p className="border-y border-[color:var(--rule)] py-3 text-[12px] text-[color:var(--danger)]">
         Failed to load view tree.
       </p>
     )
@@ -158,11 +162,11 @@ export function ViewTreePanel({
 
   return (
     <div className="space-y-2">
-      <div className="text-fg-muted flex items-center gap-3 text-[11px]">
+      <div className="flex items-center gap-3 font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
         <span>{total} nodes</span>
         <input
           aria-label="Search view tree"
-          className="border-border bg-bg-tertiary text-fg ml-auto w-60 rounded-md border px-2 py-1 text-[11px]"
+          className="ml-auto h-7 w-60 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-sans text-[12px] tracking-normal text-[color:var(--ink)] normal-case placeholder:text-[color:var(--ink-muted)] focus:border-[color:var(--accent)] focus:outline-none"
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Filter by name / a11y label"
           type="text"
@@ -170,7 +174,7 @@ export function ViewTreePanel({
         />
       </div>
       <div
-        className="border-border bg-bg-tertiary/30 max-h-[60vh] overflow-auto rounded-md border p-2 font-mono text-[11px]"
+        className="max-h-[60vh] overflow-auto border-y border-[color:var(--rule)] bg-[color:var(--paper-2)] p-2 font-mono text-[11px]"
         ref={panelRef}
       >
         <TreeNode
@@ -233,12 +237,12 @@ function TreeNode({
   return (
     <div>
       <button
-        className={`hover:bg-bg-tertiary/60 flex w-full items-baseline gap-1 rounded px-1 py-0.5 text-left ${
+        className={`flex w-full items-baseline gap-1 px-1 py-0.5 text-left transition-colors ${
           isHovered
-            ? 'text-fg ring-accent/60 bg-accent/20 ring-1'
+            ? 'bg-[color:var(--accent-soft)] text-[color:var(--ink)] ring-1 ring-[color:var(--accent)]'
             : isMatched
-              ? 'text-fg bg-accent/10'
-              : 'text-fg-muted'
+              ? 'bg-[color:var(--accent-soft)]/60 text-[color:var(--ink)]'
+              : 'text-[color:var(--ink-soft)] hover:bg-[color:var(--paper)]'
         }`}
         data-node-id={id}
         onClick={() => hasChildren && onToggle(id)}
@@ -246,15 +250,19 @@ function TreeNode({
         type="button"
       >
         {hasChildren ? (
-          <span className="text-fg-muted/60 inline-block w-3">{reallyOpen ? '▾' : '▸'}</span>
+          <span className="inline-block w-3 text-[color:var(--ink-muted)]/60">
+            {reallyOpen ? '▾' : '▸'}
+          </span>
         ) : (
           <span className="inline-block w-3" />
         )}
-        <span className="text-fg whitespace-nowrap">{n.name}</span>
-        <span className="text-fg-muted/70">·</span>
-        <span className="text-fg-muted/80 whitespace-nowrap">{n.type}</span>
+        <span className="whitespace-nowrap text-[color:var(--ink)]">{n.name}</span>
+        <span className="text-[color:var(--ink-muted)]/70">·</span>
+        <span className="whitespace-nowrap text-[color:var(--ink-muted)]">{n.type}</span>
         {n.props_summary && Object.keys(n.props_summary).length > 0 && (
-          <span className="text-fg-muted/60 truncate text-[10px]">{summary(n.props_summary)}</span>
+          <span className="truncate text-[10px] text-[color:var(--ink-muted)]/70">
+            {summary(n.props_summary)}
+          </span>
         )}
       </button>
       {reallyOpen &&

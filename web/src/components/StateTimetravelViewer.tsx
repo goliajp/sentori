@@ -107,15 +107,24 @@ export function StateTimetravelViewer({
     return acc
   }, [snapshots, effectiveFocus])
 
-  if (isLoading) return <div className="text-fg-muted text-[11px]">Loading state snapshots…</div>
+  if (isLoading)
+    return (
+      <p className="border-y border-[color:var(--rule)] py-3 text-[12px] text-[color:var(--ink-soft)]">
+        Loading state snapshots…
+      </p>
+    )
   if (error)
     return (
-      <div className="text-[11px] text-[color:var(--color-danger)]">
+      <p className="border-y border-[color:var(--rule)] py-3 text-[12px] text-[color:var(--danger)]">
         Failed to load state snapshots.
-      </div>
+      </p>
     )
   if (snapshots.length === 0)
-    return <div className="text-fg-muted text-[11px]">No snapshots recorded.</div>
+    return (
+      <p className="border-y border-[color:var(--rule)] py-3 text-[12px] text-[color:var(--ink-soft)]">
+        No snapshots recorded.
+      </p>
+    )
 
   const focused = effectiveFocus === null ? null : (snapshots[effectiveFocus] ?? null)
   const payloadToRender: Record<string, unknown> = rehydrate
@@ -123,59 +132,70 @@ export function StateTimetravelViewer({
     : (focused?.diff ?? {})
 
   return (
-    <div className="grid grid-cols-[200px_1fr] gap-3">
-      <ol className="border-border max-h-[320px] overflow-y-auto rounded border" role="listbox">
+    <div className="grid grid-cols-[200px_1fr] gap-4">
+      <ol
+        aria-label="State snapshots"
+        className="max-h-[320px] overflow-y-auto border-y border-[color:var(--rule)]"
+        role="listbox"
+      >
         {snapshots.map((s, i) => (
           <li key={i}>
             <button
               aria-selected={effectiveFocus === i}
-              className={`hover:bg-bg-tertiary/50 block w-full px-2 py-1 text-left text-[11px] ${
-                effectiveFocus === i ? 'bg-bg-tertiary text-fg' : 'text-fg-muted'
+              className={`block w-full border-b border-[color:var(--rule-soft)] px-2.5 py-1.5 text-left transition-colors last:border-b-0 ${
+                effectiveFocus === i
+                  ? 'bg-[color:var(--accent-soft)] text-[color:var(--ink)]'
+                  : 'text-[color:var(--ink-soft)] hover:bg-[color:var(--paper-2)]'
               }`}
               onClick={() => setFocus(i)}
               type="button"
             >
               <div className="flex items-baseline gap-2">
-                <span className="text-fg-muted font-mono">{String(i + 1).padStart(2, '0')}</span>
-                <span className="text-fg-muted bg-bg-tertiary rounded px-1 py-[1px] text-[9px] uppercase">
+                <span className="font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                <span className="inline-flex h-4 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-1.5 font-mono text-[9px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
                   {s.source}
                 </span>
                 {crashTs !== null && (
-                  <span className="text-fg-muted ml-auto font-mono text-[9px]">
+                  <span className="ml-auto font-mono text-[10px] text-[color:var(--ink-muted)] tabular-nums">
                     {relativeFromCrash(s.ts, crashTs)}
                   </span>
                 )}
               </div>
-              <div className="text-fg-muted truncate text-[10px]">
+              <div className="mt-0.5 truncate font-mono text-[10px] text-[color:var(--ink-muted)]">
                 {Object.keys(s.diff).join(', ')}
               </div>
             </button>
           </li>
         ))}
       </ol>
-      <div className="border-border rounded border">
-        <div className="border-border flex items-center justify-between border-b px-3 py-1.5">
-          <div className="text-[11px]">
-            <span className="text-fg-muted">Snapshot</span>{' '}
-            <span className="font-mono">
-              {effectiveFocus !== null ? effectiveFocus + 1 : '?'} of {snapshots.length}
+      <div className="border-y border-[color:var(--rule)]">
+        <div className="flex items-center justify-between border-b border-[color:var(--rule-soft)] px-3 py-2">
+          <div className="text-[12px]">
+            <span className="mr-1.5 font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+              Snapshot
+            </span>
+            <span className="font-mono text-[color:var(--ink)] tabular-nums">
+              {effectiveFocus !== null ? effectiveFocus + 1 : '?'} / {snapshots.length}
             </span>
             {focused && (
-              <span className="text-fg-muted ml-3">
-                <span className="bg-bg-tertiary text-fg-muted rounded px-1 py-[1px] text-[9px] uppercase">
+              <span className="ml-3 inline-flex items-center gap-1.5">
+                <span className="inline-flex h-4 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-1.5 font-mono text-[9px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
                   {focused.source}
                 </span>
                 {crashTs !== null && (
-                  <span className="ml-2 font-mono text-[10px]">
+                  <span className="font-mono text-[10px] text-[color:var(--ink-muted)] tabular-nums">
                     {relativeFromCrash(focused.ts, crashTs)}
                   </span>
                 )}
               </span>
             )}
           </div>
-          <label className="text-fg-muted flex items-center gap-1.5 text-[10px]">
+          <label className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.1em] text-[color:var(--ink-muted)] uppercase">
             <input
               checked={rehydrate}
+              className="accent-[color:var(--accent)]"
               onChange={(e) => setRehydrate(e.target.checked)}
               type="checkbox"
             />
