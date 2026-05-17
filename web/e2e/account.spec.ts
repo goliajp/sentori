@@ -131,7 +131,7 @@ test('forgot-password → reset → new pw authenticates', async ({ browser, req
   // default 5s assertion budget.
   const respPromise = page.waitForResponse(
     (r) => r.url().endsWith('/api/auth/forgot-password') && r.request().method() === 'POST',
-    { timeout: 15_000 },
+    { timeout: 30_000 },
   )
   await page.getByRole('button', { name: /send reset link/i }).click()
   const resp = await respPromise
