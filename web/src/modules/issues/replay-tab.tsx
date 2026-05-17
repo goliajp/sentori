@@ -212,9 +212,10 @@ function ReplayCanvas({
       <svg
         aria-label={a11yLabel}
         className="block w-full"
+        overflow="hidden"
         preserveAspectRatio="xMidYMid meet"
         role="img"
-        style={{ maxHeight: '420px' }}
+        style={{ maxHeight: '420px', overflow: 'hidden' }}
         viewBox={`0 0 ${frame.width} ${frame.height}`}
       >
         <title>{a11yLabel}</title>
@@ -222,16 +223,25 @@ function ReplayCanvas({
           Wireframe snapshot of the host app at the selected timeline frame.
           {diff && ' Coloured outlines highlight nodes that changed since the previous frame.'}
         </desc>
-        {/* Removed-nodes layer: render ghosts of the previous frame's
-         *  positions that are absent in the current frame. */}
-        {diff &&
-          prevFrame &&
-          diff.removed.map((i) => (
-            <NodeShape diffStatus="removed" key={`r${i}`} node={prevFrame.nodes[i]!} />
+        {/* rc.8 — clip-path so an overflowing walker emission can't
+         *  paint outside the device frame. */}
+        <defs>
+          <clipPath id="wf-tab-viewport-clip">
+            <rect height={frame.height} width={frame.width} x={0} y={0} />
+          </clipPath>
+        </defs>
+        <g clipPath="url(#wf-tab-viewport-clip)">
+          {/* Removed-nodes layer: render ghosts of the previous frame's
+           *  positions that are absent in the current frame. */}
+          {diff &&
+            prevFrame &&
+            diff.removed.map((i) => (
+              <NodeShape diffStatus="removed" key={`r${i}`} node={prevFrame.nodes[i]!} />
+            ))}
+          {frame.nodes.map((n, i) => (
+            <NodeShape diffStatus={diff ? diff.status[i] : undefined} key={i} node={n} />
           ))}
-        {frame.nodes.map((n, i) => (
-          <NodeShape diffStatus={diff ? diff.status[i] : undefined} key={i} node={n} />
-        ))}
+        </g>
       </svg>
     </div>
   )

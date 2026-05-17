@@ -414,16 +414,29 @@ function Scrubber({
 function WireframeSvg({ snapshot }: { snapshot: Snapshot }) {
   const w = snapshot.width
   const h = snapshot.height
+  // rc.8 — explicit clipPath so a stray walker emission with
+  // x + w > viewport.width can't paint outside the device frame
+  // (Insight 2026-05-18 saw a horizontal grey bar overflowing
+  // ~3× viewport width). overflow="hidden" attribute belt-and-
+  // braces against Safari's historical lax-clip behaviour.
   return (
     <svg
+      overflow="hidden"
       preserveAspectRatio="xMidYMid meet"
-      style={{ display: 'block', height: '100%', width: '100%' }}
+      style={{ display: 'block', height: '100%', width: '100%', overflow: 'hidden' }}
       viewBox={`0 0 ${w} ${h}`}
       xmlns="http://www.w3.org/2000/svg"
     >
-      {snapshot.nodes.map((n, i) => (
-        <NodeRender key={i} node={n} />
-      ))}
+      <defs>
+        <clipPath id="wf-viewport-clip">
+          <rect height={h} width={w} x={0} y={0} />
+        </clipPath>
+      </defs>
+      <g clipPath="url(#wf-viewport-clip)">
+        {snapshot.nodes.map((n, i) => (
+          <NodeRender key={i} node={n} />
+        ))}
+      </g>
     </svg>
   )
 }
