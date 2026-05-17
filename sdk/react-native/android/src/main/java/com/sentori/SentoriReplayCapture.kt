@@ -1,6 +1,10 @@
 package com.sentori
 
 import android.app.Activity
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
@@ -214,8 +218,18 @@ object SentoriReplayCapture {
                 }
                 view.background != null -> {
                     node.put("kind", "rect")
-                    // Background drawables don't always expose color directly.
-                    // Skip color for non-ColorDrawable; renderer falls back to neutral.
+                    // rc.5 — extract the fill colour from the
+                    // background Drawable so wireframes show the host
+                    // app's actual brand palette, not a uniform grey
+                    // grid. iOS' UIView.backgroundColor already drives
+                    // this path; the Android side had been emitting
+                    // null since v0.9.6 and the dashboard fell back to
+                    // a neutral fill for every coloured CTA. Insight
+                    // 2026-05-18 verify event made the gap visible.
+                    val color = extractDrawableColor(view.background)
+                    if (color != null && (color shr 24 and 0xff) != 0) {
+                        node.put("color", colorToHex(color))
+                    }
                     kindEmitted = true
                 }
             }
@@ -240,5 +254,41 @@ object SentoriReplayCapture {
         val g = (c shr 8) and 0xff
         val b = c and 0xff
         return String.format("#%02X%02X%02X%02X", r, g, b, a)
+    }
+
+    /** rc.5 — best-effort fill-colour extraction for the View's
+     *  background Drawable. RN's `backgroundColor: '#...'` style
+     *  lands as a ColorDrawable in flat cases and a GradientDrawable
+     *  whenever the View also carries `borderRadius` or
+     *  `borderWidth`; Pressables wrap the painted child in a
+     *  RippleDrawable layer list. We cover all three. Returns
+     *  the packed ARGB int or null when nothing usable is exposed
+     *  (StateListDrawable with no current state, opaque image
+     *  drawables, etc.). */
+    private fun extractDrawableColor(drawable: Drawable?): Int? {
+        return when (drawable) {
+            null -> null
+            is ColorDrawable -> drawable.color
+            is GradientDrawable -> {
+                // API 24+ exposes the ColorStateList for the
+                // `setColor()` value. RN's typical solid-colour
+                // GradientDrawable returns a single default colour
+                // here; gradients with multiple stops still surface
+                // a reasonable representative colour.
+                val csl = drawable.color
+                csl?.defaultColor
+            }
+            is RippleDrawable -> {
+                // Iterate the layer list; the inner painted layer
+                // is what carries the brand colour.
+                for (i in 0 until drawable.numberOfLayers) {
+                    val inner = drawable.getDrawable(i)
+                    val c = extractDrawableColor(inner)
+                    if (c != null && (c shr 24 and 0xff) != 0) return c
+                }
+                null
+            }
+            else -> null
+        }
     }
 }
