@@ -19,6 +19,12 @@ export default defineConfig({
       // dev (and `bun run preview`, used by playwright e2e) works without
       // a fronting proxy.
       '/api': 'http://localhost:8080',
+      // v1.0 — dev-only token-peek routes used by Playwright e2e to
+      // pluck single-use verify/reset tokens out of the DB without
+      // shelling into postgres. Server only mounts them when
+      // SENTORI_EXPOSE_DEV_TOKENS=1; the proxy hop here is a no-op in
+      // prod because the path doesn't exist anyway.
+      '/dev': 'http://localhost:8080',
     },
   },
   test: {

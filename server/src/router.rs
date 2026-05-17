@@ -601,13 +601,43 @@ pub fn build(cfg: ServerConfig) -> Router {
         post(api::integrations::linear_webhook),
     );
 
-    Router::new()
+    // Dev-only token peek routes — gated by SENTORI_EXPOSE_DEV_TOKENS=1.
+    // Playwright (and other e2e harnesses) use these to pluck a freshly
+    // issued verification or password-reset token out of the database
+    // without needing to shell into the postgres container. The env var
+    // is unset in production.
+    let dev_token_peek = if std::env::var("SENTORI_EXPOSE_DEV_TOKENS")
+        .ok()
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+    {
+        Some(
+            Router::new()
+                .route(
+                    "/last-verify-token",
+                    get(api::user_auth::dev_last_verify_token),
+                )
+                .route(
+                    "/last-reset-token",
+                    get(api::user_auth::dev_last_reset_token),
+                )
+                .with_state(state.clone()),
+        )
+    } else {
+        None
+    };
+
+    let mut app = Router::new()
         .merge(ingestion)
         .merge(integrations_public)
         .nest("/admin/api", admin)
         .nest("/api/auth", user_auth)
         .nest("/api", orgs)
-        .merge(metrics)
+        .merge(metrics);
+    if let Some(r) = dev_token_peek {
+        app = app.nest("/dev", r);
+    }
+    app
         .layer(RequestBodyLimitLayer::new(MAX_BODY_BYTES))
         // Phase 37 sub-A: self-instrument span emission. Wrap last so
         // the wrapped future runs once per top-level request — inner

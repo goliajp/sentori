@@ -676,6 +676,7 @@ pub struct ChangePasswordRequest {
 pub async fn change_password(
     State(state): State<AppState>,
     axum::Extension(user): axum::Extension<CurrentUser>,
+    jar: CookieJar,
     Json(body): Json<ChangePasswordRequest>,
 ) -> Response {
     let pool = match &state.db {
@@ -716,6 +717,22 @@ pub async fn change_password(
         .is_err()
     {
         return server_error("dbError");
+    }
+
+    // Account page promises "Changing your password signs you out of
+    // all other devices." Honor that by deleting every session for
+    // this user except the calling one. Caller keeps their cookie;
+    // other devices have to sign in again with the new password.
+    let keep = jar
+        .get(SESSION_COOKIE)
+        .map(|c| c.value().to_string())
+        .unwrap_or_default();
+    if !keep.is_empty() {
+        let _ = sqlx::query("DELETE FROM auth_sessions WHERE user_id = $1 AND id <> $2")
+            .bind(user.id)
+            .bind(&keep)
+            .execute(&pool)
+            .await;
     }
 
     ok_response()
@@ -907,4 +924,70 @@ fn server_error(error: &str) -> Response {
         Json(json!({ "error": error })),
     )
         .into_response()
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Dev-only: peek the latest verification / reset token for an email.
+//
+// e2e tests (playwright) need to clip a token out of the database to
+// drive the second step of a multi-step flow. In CI we can't shell
+// into a postgres container, and we don't want to add a `pg` runtime
+// dep to the dashboard just for tests. These endpoints close that
+// gap.
+//
+// Gated by SENTORI_EXPOSE_DEV_TOKENS=1 — when the env is unset the
+// router skips mounting them. In prod the env is never set.
+// ─────────────────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct DevTokenPeekQuery {
+    pub email: String,
+}
+
+pub async fn dev_last_verify_token(
+    State(state): State<AppState>,
+    axum::extract::Query(q): axum::extract::Query<DevTokenPeekQuery>,
+) -> Response {
+    let Some(pool) = state.db.clone() else {
+        return server_error("db not configured");
+    };
+    let row: Option<(String,)> = sqlx::query_as(
+        "SELECT ev.token FROM email_verifications ev \
+         JOIN users u ON u.id = ev.user_id \
+         WHERE u.email = $1 \
+         ORDER BY ev.created_at DESC LIMIT 1",
+    )
+    .bind(&q.email)
+    .fetch_optional(&pool)
+    .await
+    .ok()
+    .flatten();
+    match row {
+        Some((token,)) => (StatusCode::OK, Json(json!({ "token": token }))).into_response(),
+        None => (StatusCode::NOT_FOUND, Json(json!({ "error": "notFound" }))).into_response(),
+    }
+}
+
+pub async fn dev_last_reset_token(
+    State(state): State<AppState>,
+    axum::extract::Query(q): axum::extract::Query<DevTokenPeekQuery>,
+) -> Response {
+    let Some(pool) = state.db.clone() else {
+        return server_error("db not configured");
+    };
+    let row: Option<(String,)> = sqlx::query_as(
+        "SELECT pr.token FROM password_resets pr \
+         JOIN users u ON u.id = pr.user_id \
+         WHERE u.email = $1 \
+         ORDER BY pr.created_at DESC LIMIT 1",
+    )
+    .bind(&q.email)
+    .fetch_optional(&pool)
+    .await
+    .ok()
+    .flatten();
+    match row {
+        Some((token,)) => (StatusCode::OK, Json(json!({ "token": token }))).into_response(),
+        None => (StatusCode::NOT_FOUND, Json(json!({ "error": "notFound" }))).into_response(),
+    }
 }

@@ -13,12 +13,21 @@ import { defineConfig, devices } from '@playwright/test'
 //
 // Trigger via `bun run test:e2e`.
 
+// DATABASE_URL is parameterized so CI (postgres service on :5432) and
+// local dev (docker-compose on :55434) can both run the same suite.
+// Override via `DATABASE_URL=...` in the calling env.
 const SERVER_ENV = {
-  DATABASE_URL: 'postgres://postgres:dev@127.0.0.1:55434/sentori',
+  DATABASE_URL:
+    process.env.DATABASE_URL || 'postgres://postgres:dev@127.0.0.1:55434/sentori',
   SENTORI_DEV_TOKEN: 'st_pk_e2etest00000000000000000000',
   SENTORI_ADMIN_PASSWORD: 'e2e-admin',
   SENTORI_SESSION_SECRET: 'e2e-secret-please-rotate',
   SENTORI_BASE_URL: 'http://127.0.0.1:5173',
+  // Mount /dev/last-verify-token + /dev/last-reset-token so the e2e
+  // helpers can read single-use tokens out of the DB over HTTP — works
+  // in CI without `docker exec`. Server skips these routes when the
+  // env is unset (prod default).
+  SENTORI_EXPOSE_DEV_TOKENS: '1',
   RUST_LOG: 'warn,sentori_server=info',
 } as const
 

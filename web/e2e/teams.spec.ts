@@ -12,9 +12,7 @@
 // dev-only `/dev/last-verify-token` endpoint when this moves out of
 // "run locally" mode.
 
-import { execFileSync } from 'node:child_process'
-
-import { expect, test } from '@playwright/test'
+import { expect, test, type APIRequestContext } from '@playwright/test'
 
 const PASSWORD = 'pw-e2e-teams-1234'
 
@@ -24,33 +22,26 @@ function uniq(): string {
   return Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-function fetchVerifyToken(email: string): string {
-  const stdout = execFileSync('docker', [
-    'exec',
-    'sentori-pg',
-    'psql',
-    '-U',
-    'postgres',
-    '-d',
-    'sentori',
-    '-tA',
-    '-c',
-    `SELECT ev.token FROM email_verifications ev JOIN users u ON u.id = ev.user_id WHERE u.email = '${email}' ORDER BY ev.created_at DESC LIMIT 1`,
-  ])
-  const token = stdout.toString().trim()
-  if (!token) throw new Error(`no verify token for ${email}`)
-  return token
+async function fetchVerifyToken(
+  request: APIRequestContext,
+  email: string,
+): Promise<string> {
+  const resp = await request.get(
+    `/dev/last-verify-token?email=${encodeURIComponent(email)}`,
+  )
+  if (!resp.ok()) throw new Error(`no verify token for ${email} (${resp.status()})`)
+  return ((await resp.json()) as { token: string }).token
 }
 
 async function registerAndVerify(
-  request: import('@playwright/test').APIRequestContext,
+  request: APIRequestContext,
   email: string,
 ): Promise<void> {
   const reg = await request.post('/api/auth/register', {
     data: { email, password: PASSWORD },
   })
   expect(reg.ok(), 'register').toBeTruthy()
-  const token = fetchVerifyToken(email)
+  const token = await fetchVerifyToken(request, email)
   const ver = await request.get(`/api/auth/verify?token=${encodeURIComponent(token)}`)
   expect(ver.ok(), 'verify').toBeTruthy()
 }
@@ -71,11 +62,12 @@ test('owner creates team, invitee accepts pre-bound invite', async ({
   const ownerCtx = await browser.newContext()
   const ownerPage = await ownerCtx.newPage()
   await ownerPage.goto('/login')
-  await ownerPage.getByPlaceholder('you@example.com').fill(ownerEmail)
-  await ownerPage.getByPlaceholder('Password').fill(PASSWORD)
+  await ownerPage.getByLabel('email').fill(ownerEmail)
+  await ownerPage.getByLabel('password').fill(PASSWORD)
   await ownerPage.getByRole('button', { name: /sign in/i }).click()
-  // Brand-new account → redirects to onboarding to create the first org.
-  await ownerPage.waitForURL(/\/onboarding/)
+  // Brand-new account → redirects to onboarding (or directly into an
+  // auto-provisioned org overview depending on the dashboard build).
+  await ownerPage.waitForURL(/\/onboarding|\/org\//)
 
   // Use the owner's page-bound request context so cookies are shared.
   const ownerApi = ownerPage.request
@@ -116,11 +108,11 @@ test('owner creates team, invitee accepts pre-bound invite', async ({
   const invCtx = await browser.newContext()
   const invPage = await invCtx.newPage()
   await invPage.goto('/login')
-  await invPage.getByPlaceholder('you@example.com').fill(inviteeEmail)
-  await invPage.getByPlaceholder('Password').fill(PASSWORD)
+  await invPage.getByLabel('email').fill(inviteeEmail)
+  await invPage.getByLabel('password').fill(PASSWORD)
   await invPage.getByRole('button', { name: /sign in/i }).click()
   // No org yet → onboarding. Then jump straight to the invite link.
-  await invPage.waitForURL(/\/onboarding/)
+  await invPage.waitForURL(/\/onboarding|\/org\//)
   await invPage.goto(`/invite/${inviteToken}`)
   // The invite-accept view fires the POST automatically on mount and
   // navigates to /org/<slug>/issues on success.
