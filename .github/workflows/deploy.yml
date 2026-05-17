@@ -146,6 +146,15 @@ jobs:
           SENTORI_SMTP_FROM: ${{ secrets.SENTORI_SMTP_FROM }}
           SENTORI_SMTP_TLS: ${{ secrets.SENTORI_SMTP_TLS }}
           SENTORI_DOGFOOD_DASHBOARD_TOKEN: ${{ secrets.SENTORI_DOGFOOD_DASHBOARD_TOKEN }}
+          # v1.0 — OAuth provider credentials. Registered manually at
+          # github.com/settings/developers + console.cloud.google.com,
+          # then pasted into the corresponding repo secret. Empty when
+          # the operator hasn't registered yet; the server gracefully
+          # hides the "Continue with …" buttons in that case.
+          SENTORI_GITHUB_CLIENT_ID: ${{ secrets.SENTORI_GITHUB_CLIENT_ID }}
+          SENTORI_GITHUB_CLIENT_SECRET: ${{ secrets.SENTORI_GITHUB_CLIENT_SECRET }}
+          SENTORI_GOOGLE_CLIENT_ID: ${{ secrets.SENTORI_GOOGLE_CLIENT_ID }}
+          SENTORI_GOOGLE_CLIENT_SECRET: ${{ secrets.SENTORI_GOOGLE_CLIENT_SECRET }}
           # Use the upstream SHA when we came via workflow_run (matches
           # the checked-out ref). github.sha is the default-branch HEAD
           # at trigger time, which can drift; prefer head_sha when set.
@@ -165,6 +174,10 @@ jobs:
           SENTORI_SMTP_TLS=${SENTORI_SMTP_TLS:-starttls}
           # Phase 17 sub-F dogfood — read by docker-compose web build args
           SENTORI_DOGFOOD_DASHBOARD_TOKEN=${SENTORI_DOGFOOD_DASHBOARD_TOKEN}
+          SENTORI_GITHUB_CLIENT_ID=${SENTORI_GITHUB_CLIENT_ID}
+          SENTORI_GITHUB_CLIENT_SECRET=${SENTORI_GITHUB_CLIENT_SECRET}
+          SENTORI_GOOGLE_CLIENT_ID=${SENTORI_GOOGLE_CLIENT_ID}
+          SENTORI_GOOGLE_CLIENT_SECRET=${SENTORI_GOOGLE_CLIENT_SECRET}
           SENTORI_VERSION=${SENTORI_VERSION}
           RUST_LOG=info,sentori_server=info
           EOF
