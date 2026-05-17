@@ -38,6 +38,13 @@ public class SentoriModule: Module {
             return SentoriReplayCapture.probe()
         }
 
+        // v1.0.0-rc.2 — diagnostic readout for screenshot. Same shape
+        // as Android side; lets Insight ship raw state back when the
+        // captureScreenshot path returns null.
+        Function("probeScreenshot") { () -> [String: Any] in
+            return SentoriScreenshotCapture.probe()
+        }
+
         // v0.9.4 #1 — Mobile Vitals exposure.
         Function("markJsBridgeReady") {
             SentoriMobileVitals.markJsBridgeReady()

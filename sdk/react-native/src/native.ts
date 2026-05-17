@@ -78,9 +78,20 @@ type SentoriNativeModule = {
   probeWireframe?: () => {
     lastPath: string
     lastNodes: number
-    sceneCount: number
-    windowCount: number
+    sceneCount?: number
+    windowCount?: number
+    trackedSource?: string
+    trackedActivity?: string
+    decorViewFound?: boolean
   }
+  /**
+   * v1.0.0-rc.2 — diagnostic mirror of probeWireframe for the
+   * screenshot path. Returned shape is best-effort cross-platform —
+   * Android carries `trackedActivity` / `decorViewFound` / dims,
+   * iOS carries `windowFound` / `rootViewControllerFound` / `bounds*`.
+   * Callers should treat unknown keys as missing.
+   */
+  probeScreenshot?: () => Record<string, unknown>
   /**
    * Phase 22 sub-D / sub-E: cross-platform main-thread watchdog.
    * Android: 5 s / 1 s defaults (matches the OS ANR threshold).
@@ -377,5 +388,53 @@ export function probeNativeWireframe(): {
       sceneCount: 0,
       windowCount: 0,
     }
+  }
+}
+
+/**
+ * v1.0.0-rc.2 — JS entry to the `probeScreenshot` native diagnostic.
+ * Same shape contract as [probeNativeWireframe]: returns a flat
+ * key/value bag the consumer can ship back as-is when screenshot
+ * capture returns null.
+ *
+ *   path                       meaning
+ *   ─────────────────────────  ───────────────────────────────────────
+ *   none(not-yet-called)       captureScreenshot has never run
+ *   ok                         capture succeeded
+ *   activity.null              Android: foreground tracker had no Activity
+ *   window.null                Android/iOS: Activity/scene has no window
+ *   decorView.null             Android: window had no decor view
+ *   decorView.zero-size        Android: decorView size <= 0 (mid-layout)
+ *   api.unsupported            Android: API < 24 (no PixelCopy)
+ *   pixelCopy.notSuccess       Android: PixelCopy completed but reported failure
+ *   pixelCopy.threw:<class>    Android: PixelCopy threw mid-request
+ *   render.failed              iOS: UIGraphicsImageRenderer returned nil
+ *   empty                      iOS: walked tree but no view+screenshot output
+ *
+ * On Android the result also carries `trackedSource` (lifecycle.created /
+ * lifecycle.resumed / reflection.activityThread / manual.setActivity)
+ * so callers can tell whether the SDK back-filled via reflection.
+ */
+export function probeNativeScreenshot(): {
+  available: boolean
+  lastPath: string
+  raw: Record<string, unknown>
+} {
+  const n = native()
+  if (!n || typeof n.probeScreenshot !== 'function') {
+    return { available: false, lastPath: 'native.unavailable', raw: {} }
+  }
+  try {
+    const r = n.probeScreenshot()
+    const raw =
+      r && typeof r === 'object' && !Array.isArray(r) ? (r as Record<string, unknown>) : {}
+    const lastPath = typeof raw.lastPath === 'string' ? raw.lastPath : 'unknown'
+    return { available: true, lastPath, raw }
+  } catch (e) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn('[sentori] probeScreenshot threw', e)
+    }
+    return { available: false, lastPath: 'native.threw', raw: {} }
   }
 }

@@ -102,6 +102,7 @@ export {
 } from './state-snapshots';
 export { RageTapCapture } from './rage-tap';
 export {
+  probeNativeScreenshot,
   probeNativeWireframe,
   startAnrWatchdog,
   stopAnrWatchdog,

@@ -6,6 +6,40 @@
 
 ---
 
+## v1.0.0-rc.2 — Android foreground-Activity tracker
+
+**Theme:** Insight 2026-05-17 Android verify (`feature/GOL-582-sentori-0-9-upgrade @ b792e31d`, Samsung Galaxy S22 / Android 16) 上 `captureScreenshot` 和 `captureWireframe` 双路都 null。同 JS 在 iOS sim-insight 一次过。Android 单独有 native-side Activity 解析 gap。
+
+**Package bumps：**
+
+- `@goliapkg/sentori-react-native` 1.0.0-rc.1 → **1.0.0-rc.2**（patch — 仅 Android 行为修复 + 双端新增 `probeScreenshot` 诊断 API）
+
+### Root cause
+
+`SentoriCrashHandler.register(context)` 走的是 Expo module `OnCreate` 生命周期。在 Insight dev-launcher → MainActivity 拓扑下，MainActivity 已经 onResume 完了才轮到 module init。`Application.registerActivityLifecycleCallbacks` **只补发未来事件、不补发已发生的状态**，所以 `lastActivity` 一直 null —— 每次 capture short-circuit 到 `null`。iOS keyWindow 4 层 fallback 治的那一类 bug 在 Android 上的等价形态。
+
+### Fix
+
+新加 `SentoriForegroundActivity.kt` 作为进程级 single source of truth：
+
+1. **`Application.ActivityLifecycleCallbacks`** —— 继续 track 未来的 onCreate/onStarted/onResumed
+2. **`ActivityThread` reflection back-fill** —— `install()` 时立刻通过 `android.app.ActivityThread.currentActivityThread().mActivities` 拿当前 foreground Activity，补已经 resumed 不会再触发 callback 的盲区。失败安静吞掉，lifecycle callbacks 继续兜底
+3. **`SentoriScreenshotCapture.register()` / `SentoriReplayCapture.register()`** 都代理到 `SentoriForegroundActivity.install()`，两边共享同一个 Activity 指针 —— 不会出现 screenshot 看到 Activity 但 replay 没看到的不对称
+4. **诊断**：双端新增 `probeScreenshot()`（mirror `probeWireframe()` shape）+ 每个失败 path 都有 tagged 字符串 (`activity.null` / `decorView.zero-size` / `pixelCopy.notSuccess` / `pixelCopy.threw:<class>` / ...)，JS 端 `probeNativeScreenshot()` 一行拿到，Insight verify 不用贴 logcat
+5. **iOS screenshot capture** 顺手补 4 层 keyWindow resolution + `probeScreenshot` + lastDiagPath，跟 replay 端保持一致
+
+### Verify
+
+- 109 SDK tests 全绿 + tsc clean
+- 待 Insight 在 Samsung Galaxy S22 / Android 16 同一台真机重跑：期 metro log 出 `enqueue ... attachments=3 kinds=screenshot,sessionTrail,replay`、dashboard `attached: ● screenshot · ● replay`
+- 失败时 `await Sentori.probeNativeScreenshot()` 一行返回带 `trackedSource: "reflection.activityThread"` / `lastPath` 的诊断
+
+### Other
+
+- Insight 同次 verify 抓到一条 production-grade Android RN bug (`ReactViewGroup contains null child at index 3`) —— 不属于 SDK 路径，平台真的看到了原本看不到的崩溃。独立条目 GOL-589
+
+---
+
 ## v1.0.0-rc.1 — Replay scrubber + iOS showcase
 
 **Theme:** Sentori 从 "看到 stack" 进化到 "看到崩前 30 帧的 prop 变化"，并把 iOS SwiftUI showcase 当作开源门面。

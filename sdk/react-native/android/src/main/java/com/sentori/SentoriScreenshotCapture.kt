@@ -1,13 +1,11 @@
 package com.sentori
 
-import android.app.Activity
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.os.Build
-import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Base64
@@ -16,7 +14,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.Window
 import java.io.ByteArrayOutputStream
-import java.lang.ref.WeakReference
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.json.JSONArray
@@ -60,36 +57,44 @@ object SentoriScreenshotCapture {
     private const val MAX_NODES = 1500
     private const val PIXEL_COPY_TIMEOUT_MS = 200L
 
-    /// Latest activity we've seen via `ActivityLifecycleCallbacks` —
-    /// used to find the window to screenshot when neither the JS
-    /// side (which knows of `Activity.this` via React Native) nor
-    /// the crash handler hands one to us.
-    @Volatile private var lastActivity: WeakReference<Activity>? = null
+    // v1.0.0-rc.2 — diagnostic readout so the JS side can ask
+    // "why did screenshot return null" without parsing logcat. Mirrors
+    // SentoriReplayCapture.probe() and the iOS Swift probe.
+    @Volatile private var lastDiagPath: String = "none(not-yet-called)"
+    @Volatile private var lastDiagW: Int = 0
+    @Volatile private var lastDiagH: Int = 0
 
     /**
-     * Attach an `ActivityLifecycleCallbacks` so subsequent
-     * `captureScreen()` calls know which Activity (and therefore
-     * Window) to target. Idempotent; call from
-     * `SentoriCrashHandler.register(context)`.
+     * Snapshot of the most recent capture attempt — what code path
+     * resolved an Activity, what the decor view's dimensions were,
+     * and what call source the foreground tracker last saw the
+     * Activity from. Used by `probeNativeScreenshot()` on the JS
+     * side so Insight can ship raw diagnostic state back without
+     * needing logcat access.
+     */
+    @JvmStatic
+    fun probe(): Map<String, Any> {
+        val tracked = SentoriForegroundActivity.current()
+        return mapOf(
+            "lastPath" to lastDiagPath,
+            "lastWidth" to lastDiagW,
+            "lastHeight" to lastDiagH,
+            "trackedSource" to SentoriForegroundActivity.lastPath,
+            "trackedActivity" to (tracked?.javaClass?.name ?: "null"),
+            "decorViewFound" to (tracked?.window?.decorView != null),
+        )
+    }
+
+    /**
+     * Idempotent. Wires the screenshot helper into the shared
+     * foreground-activity tracker; kept as a public entrypoint for
+     * backwards compat with existing call sites (the crash handler
+     * still calls this), but the actual lifecycle subscription lives
+     * in [SentoriForegroundActivity].
      */
     @JvmStatic
     fun register(application: Application) {
-        application.registerActivityLifecycleCallbacks(object :
-            Application.ActivityLifecycleCallbacks {
-            override fun onActivityCreated(a: Activity, b: Bundle?) {
-                lastActivity = WeakReference(a)
-            }
-            override fun onActivityStarted(a: Activity) {
-                lastActivity = WeakReference(a)
-            }
-            override fun onActivityResumed(a: Activity) {
-                lastActivity = WeakReference(a)
-            }
-            override fun onActivityPaused(a: Activity) {}
-            override fun onActivityStopped(a: Activity) {}
-            override fun onActivitySaveInstanceState(a: Activity, b: Bundle) {}
-            override fun onActivityDestroyed(a: Activity) {}
-        })
+        SentoriForegroundActivity.install(application)
     }
 
     /**
@@ -102,8 +107,16 @@ object SentoriScreenshotCapture {
      */
     @JvmStatic
     fun captureKeyWindow(): Map<String, Any>? {
-        val activity = lastActivity?.get() ?: return null
-        val window = activity.window ?: return null
+        val activity = SentoriForegroundActivity.current()
+        if (activity == null) {
+            lastDiagPath = "activity.null"
+            return null
+        }
+        val window = activity.window
+        if (window == null) {
+            lastDiagPath = "window.null"
+            return null
+        }
         val out = mutableMapOf<String, Any>()
         captureScreen(window, emptySet())?.let { (base64, mediaType) ->
             out["screenshot"] = mapOf("base64" to base64, "mediaType" to mediaType)
@@ -120,8 +133,16 @@ object SentoriScreenshotCapture {
     /// masked subview's frame on the captured bitmap.
     @JvmStatic
     fun captureScreenshotWithMask(maskedIds: List<String>): Map<String, String>? {
-        val activity = lastActivity?.get() ?: return null
-        val window = activity.window ?: return null
+        val activity = SentoriForegroundActivity.current()
+        if (activity == null) {
+            lastDiagPath = "activity.null"
+            return null
+        }
+        val window = activity.window
+        if (window == null) {
+            lastDiagPath = "window.null"
+            return null
+        }
         val (base64, mediaType) = captureScreen(window, maskedIds.toHashSet()) ?: return null
         return mapOf("base64" to base64, "mediaType" to mediaType)
     }
@@ -135,12 +156,22 @@ object SentoriScreenshotCapture {
             // requires the activity not to be torn down. Skip for
             // now; v0.6.1 SDK can add the fallback if real-world
             // data shows we have users below API 24.
+            lastDiagPath = "api.unsupported"
             return null
         }
-        val decor = window.decorView ?: return null
+        val decor = window.decorView
+        if (decor == null) {
+            lastDiagPath = "decorView.null"
+            return null
+        }
         val w = decor.width
         val h = decor.height
-        if (w <= 0 || h <= 0) return null
+        lastDiagW = w
+        lastDiagH = h
+        if (w <= 0 || h <= 0) {
+            lastDiagPath = "decorView.zero-size"
+            return null
+        }
 
         // Long-edge scale.
         val longEdge = maxOf(w, h).toFloat()
@@ -175,12 +206,17 @@ object SentoriScreenshotCapture {
                 )
             }
             latch.await(PIXEL_COPY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-        } catch (_: Throwable) {
+        } catch (t: Throwable) {
+            lastDiagPath = "pixelCopy.threw:${t.javaClass.simpleName}"
             return null
         } finally {
             handlerThread.quitSafely()
         }
-        if (!success) return null
+        if (!success) {
+            lastDiagPath = "pixelCopy.notSuccess"
+            return null
+        }
+        lastDiagPath = "ok"
 
         // v0.7.3 — paint black rectangles over masked subviews on the
         // already-captured bitmap. We get window-relative coordinates

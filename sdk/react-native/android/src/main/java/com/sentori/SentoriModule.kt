@@ -39,6 +39,14 @@ class SentoriModule : Module() {
             SentoriReplayCapture.probe()
         }
 
+        // v1.0.0-rc.2 — diagnostic readout for screenshot. Surfaces
+        // foreground-Activity provenance, decor-view state, and the
+        // last failure reason so the JS side can ship raw state back
+        // when screenshot returns null.
+        Function("probeScreenshot") {
+            SentoriScreenshotCapture.probe()
+        }
+
         // v0.9.4 #1 — Mobile Vitals exposure.
         Function("markJsBridgeReady") {
             SentoriMobileVitals.markJsBridgeReady()

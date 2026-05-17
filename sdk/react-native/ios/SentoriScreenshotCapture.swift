@@ -82,10 +82,15 @@ import UIKit
     }
 
     private static func captureWithMaskSync(maskedIds: [String]) -> [String: String]? {
-        guard let window = keyWindow() else { return nil }
-        guard let jpeg = renderJpegBase64(window: window, maskedIds: Set(maskedIds)) else {
+        guard let window = keyWindowDiag().window else {
+            lastDiagPath = "window.null"
             return nil
         }
+        guard let jpeg = renderJpegBase64(window: window, maskedIds: Set(maskedIds)) else {
+            lastDiagPath = "render.failed"
+            return nil
+        }
+        lastDiagPath = "ok"
         return [
             "base64": jpeg,
             "mediaType": "image/jpeg",
@@ -94,8 +99,28 @@ import UIKit
 
     // MARK: - Internals
 
+    // v1.0.0-rc.2 — diagnostic readout mirror of the replay-capture
+    // probe. The JS side calls `probeScreenshot()` to ship raw state
+    // back when screenshot returns null.
+    private static var lastDiagPath: String = "none(not-yet-called)"
+
+    @objc public static func probe() -> [String: Any] {
+        let (win, path) = keyWindowDiag()
+        return [
+            "lastPath": lastDiagPath,
+            "resolvedPath": path,
+            "windowFound": win != nil,
+            "rootViewControllerFound": win?.rootViewController != nil,
+            "boundsW": win.map { Double($0.bounds.width) } ?? 0.0,
+            "boundsH": win.map { Double($0.bounds.height) } ?? 0.0,
+        ]
+    }
+
     private static func captureSync() -> [String: Any]? {
-        guard let window = keyWindow() else { return nil }
+        guard let window = keyWindowDiag().window else {
+            lastDiagPath = "window.null"
+            return nil
+        }
         var out: [String: Any] = [:]
         if let jpeg = renderJpegBase64(window: window) {
             out["screenshot"] = [
@@ -104,7 +129,48 @@ import UIKit
             ]
         }
         out["viewTree"] = walkTree(root: window)
-        return out.isEmpty ? nil : out
+        if out.isEmpty {
+            lastDiagPath = "empty"
+            return nil
+        }
+        lastDiagPath = "ok"
+        return out
+    }
+
+    /// keyWindow with the same 4-tier resolution as the replay capture,
+    /// plus the diagnostic path tag for the probe. The original
+    /// single-pass `keyWindow()` is kept for source-compat callers but
+    /// new paths funnel through this so screenshot + replay agree on
+    /// which window they are pointing at.
+    private static func keyWindowDiag() -> (window: UIWindow?, path: String) {
+        if #available(iOS 13.0, *) {
+            let scenes = Array(UIApplication.shared.connectedScenes)
+            for scene in scenes where scene.activationState == .foregroundActive {
+                if let ws = scene as? UIWindowScene,
+                   let key = ws.windows.first(where: { $0.isKeyWindow }) {
+                    return (key, "scene.fg.key")
+                }
+            }
+            for scene in scenes where scene.activationState == .foregroundActive {
+                if let ws = scene as? UIWindowScene, let win = ws.windows.first {
+                    return (win, "scene.fg.first")
+                }
+            }
+            for scene in scenes where scene.activationState == .foregroundInactive {
+                if let ws = scene as? UIWindowScene, let win = ws.windows.first {
+                    return (win, "scene.fgi.first")
+                }
+            }
+            for scene in scenes {
+                if let ws = scene as? UIWindowScene, let win = ws.windows.first {
+                    return (win, "scene.any.first")
+                }
+            }
+        }
+        if let leg = UIApplication.shared.windows.first {
+            return (leg, "legacy.first")
+        }
+        return (nil, "none")
     }
 
     private static func keyWindow() -> UIWindow? {

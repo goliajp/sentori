@@ -9,7 +9,6 @@ import android.widget.ImageView
 import android.widget.TextView
 import org.json.JSONArray
 import org.json.JSONObject
-import java.lang.ref.WeakReference
 
 /**
  * v0.9.6 #2 — wireframe session replay (Android side).
@@ -27,8 +26,6 @@ object SentoriReplayCapture {
 
     private const val MAX_NODES = 800
 
-    @Volatile private var lastActivity: WeakReference<Activity>? = null
-
     // v0.9.12 — diagnostic readout so the JS side can ask "why is the
     // ring empty?" without parsing logcat. Mirrors the iOS side.
     @Volatile private var lastDiagPath: String = "none(not-yet-called)"
@@ -36,39 +33,35 @@ object SentoriReplayCapture {
 
     @JvmStatic
     fun probe(): Map<String, Any> {
-        val activity = lastActivity?.get()
+        val activity = SentoriForegroundActivity.current()
         return mapOf(
             "lastPath" to lastDiagPath,
             "lastNodes" to lastDiagNodes,
-            "sceneCount" to if (activity != null) 1 else 0,
-            "windowCount" to (activity?.window?.let { 1 } ?: 0),
+            "trackedSource" to SentoriForegroundActivity.lastPath,
+            "trackedActivity" to (activity?.javaClass?.name ?: "null"),
+            "decorViewFound" to (activity?.window?.decorView != null),
         )
     }
 
+    /** Backwards compat — pre-rc.2 callers that hand-fed an Activity
+     *  through `setActivity` still work; we forward to the shared
+     *  tracker so screenshot + replay both see it. */
     @JvmStatic
     fun setActivity(activity: Activity?) {
-        lastActivity = activity?.let { WeakReference(it) }
+        if (activity != null) SentoriForegroundActivity.set(activity, "manual.setActivity")
     }
 
-    /** Attach an ActivityLifecycleCallbacks so future
-     *  `captureWireframe()` calls know which Activity to walk. */
+    /** Idempotent. Wires the replay helper into the shared tracker;
+     *  kept as a public entrypoint for backwards compat with existing
+     *  call sites. */
     @JvmStatic
     fun register(application: android.app.Application) {
-        application.registerActivityLifecycleCallbacks(object :
-            android.app.Application.ActivityLifecycleCallbacks {
-            override fun onActivityCreated(a: Activity, b: android.os.Bundle?) { setActivity(a) }
-            override fun onActivityStarted(a: Activity) { setActivity(a) }
-            override fun onActivityResumed(a: Activity) { setActivity(a) }
-            override fun onActivityPaused(a: Activity) {}
-            override fun onActivityStopped(a: Activity) {}
-            override fun onActivitySaveInstanceState(a: Activity, b: android.os.Bundle) {}
-            override fun onActivityDestroyed(a: Activity) {}
-        })
+        SentoriForegroundActivity.install(application)
     }
 
     @JvmStatic
     fun captureWireframe(maskedIds: List<String>): String? {
-        val activity = lastActivity?.get()
+        val activity = SentoriForegroundActivity.current()
         if (activity == null) {
             lastDiagPath = "activity.null"
             return null
@@ -89,7 +82,7 @@ object SentoriReplayCapture {
         val rootLoc = IntArray(2).also { root.getLocationInWindow(it) }
         walk(root, false, maskedSet, rootLoc, rect, nodes)
 
-        lastDiagPath = "activity.resumed"
+        lastDiagPath = "ok(${SentoriForegroundActivity.lastPath})"
         lastDiagNodes = nodes.length()
 
         val payload = JSONObject().apply {
