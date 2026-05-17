@@ -29,12 +29,13 @@ import { GROUPS, modulesInGroup, PINNED_MODULE } from '@/modules/registry'
  */
 export function Sidebar() {
   const { currentOrg, currentProject, orgs, projects } = useOrg()
-  const { logout, user } = useAuth()
+  const { user } = useAuth()
   const isAdmin = currentOrg.role === 'owner' || currentOrg.role === 'admin'
 
   return (
     <aside className="hidden w-56 shrink-0 flex-col overflow-hidden border-r border-[color:var(--rule)] bg-[color:var(--paper)] md:flex">
       <ContextBlock
+        canCreateProject={isAdmin}
         currentOrg={currentOrg}
         currentProject={currentProject}
         orgs={orgs}
@@ -89,10 +90,44 @@ export function Sidebar() {
         )}
       </div>
 
-      <div className="border-t border-[color:var(--rule)] bg-[color:var(--paper-2)] px-4 py-3">
-        <UserMenu email={user?.email ?? null} onLogout={() => void logout()} />
-      </div>
+      <FooterStrip />
     </aside>
+  )
+}
+
+/**
+ * Sidebar bottom strip. The toolbar's avatar dropdown handles the
+ * "account" surface end-to-end (sign out, account, activity); the old
+ * email + `⎋ sign out` row in the sidebar duplicated that. This strip
+ * now just exposes two compact off-ramps the avatar dropdown doesn't:
+ *
+ *   docs ↗   feedback ↗
+ *
+ * Same hairline + paper-2 fill as before so the nav rail still ends
+ * with a closing rule.
+ */
+function FooterStrip() {
+  return (
+    <div className="border-t border-[color:var(--rule)] bg-[color:var(--paper-2)] px-4 py-2.5">
+      <div className="flex items-center justify-between font-mono text-[10px] tracking-[0.18em] uppercase">
+        <a
+          className="text-[color:var(--ink-muted)] transition-colors hover:text-[color:var(--accent)]"
+          href="https://docs.sentori.golia.jp"
+          rel="noreferrer"
+          target="_blank"
+        >
+          docs ↗
+        </a>
+        <a
+          className="text-[color:var(--ink-muted)] transition-colors hover:text-[color:var(--accent)]"
+          href="https://github.com/goliajp/sentori/issues/new"
+          rel="noreferrer"
+          target="_blank"
+        >
+          feedback ↗
+        </a>
+      </div>
+    </div>
   )
 }
 
@@ -100,19 +135,24 @@ export function Sidebar() {
  * Top-of-sidebar context — answers "what am I looking at?" before the
  * user even reads a module label. Two rows:
  *
- *   ORG     ▾  qualcomm  (role: owner)
- *   PROJECT ▾  focus-ai-app
+ *   ORG     ▾ qualcomm   role  +
+ *   PROJECT ▾ focus-ai…       +
  *
  * Each row is a native <select> if the user has ≥ 2 of that thing,
- * else a static label. We keep the switcher inline (not a popover)
- * so it never blocks pointer events on the rest of the rail.
+ * else a static label. The trailing `+` button is the discoverable
+ * action for creating a new org / project — promoted out of the select
+ * options (where it hid as a fake `__new__` choice) so users can find
+ * it without opening the dropdown. Project `+` only shows when the
+ * viewer is an org owner/admin.
  */
 function ContextBlock({
+  canCreateProject,
   currentOrg,
   currentProject,
   orgs,
   projects,
 }: {
+  canCreateProject: boolean
   currentOrg: OrgRow
   currentProject: null | ProjectRow
   orgs: OrgRow[]
@@ -125,10 +165,6 @@ function ContextBlock({
 
   /** Switch org by full navigation — orgs scope the whole app. */
   const switchOrg = (slug: string) => {
-    if (slug === '__new__') {
-      navigate('/onboarding')
-      return
-    }
     navigate(`/org/${slug}/overview`)
   }
 
@@ -155,7 +191,7 @@ function ContextBlock({
       <ContextRow label="org">
         <select
           aria-label="Switch organization"
-          className="w-full appearance-none bg-transparent pr-4 text-[13px] text-[color:var(--ink)] focus:outline-none"
+          className="min-w-0 flex-1 appearance-none truncate bg-transparent pr-1 text-[13px] text-[color:var(--ink)] focus:outline-none"
           onChange={(e) => switchOrg(e.target.value)}
           value={currentOrg.slug}
         >
@@ -164,20 +200,20 @@ function ContextBlock({
               {o.name || o.slug}
             </option>
           ))}
-          <option value="__new__">+ new org…</option>
         </select>
-        <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+        <span className="shrink-0 font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
           {currentOrg.role}
         </span>
+        <PlusButton onClick={() => navigate('/onboarding')} title="New organization" />
       </ContextRow>
 
       <ContextRow label="project">
         {projects.length === 0 ? (
-          <span className="text-[12px] text-[color:var(--ink-muted)] italic">none yet</span>
+          <span className="flex-1 text-[12px] text-[color:var(--ink-muted)] italic">none yet</span>
         ) : (
           <select
             aria-label="Switch project"
-            className="w-full appearance-none bg-transparent pr-4 text-[13px] text-[color:var(--ink)] focus:outline-none"
+            className="min-w-0 flex-1 appearance-none truncate bg-transparent pr-1 text-[13px] text-[color:var(--ink)] focus:outline-none"
             onChange={(e) => switchProject(e.target.value)}
             value={selectedProjectValue}
           >
@@ -188,8 +224,40 @@ function ContextBlock({
             ))}
           </select>
         )}
+        {canCreateProject && (
+          <PlusButton
+            onClick={() => navigate(`/org/${currentOrg.slug}/settings#new-project`)}
+            title="New project"
+          />
+        )}
       </ContextRow>
     </div>
+  )
+}
+
+/** Small `+` icon button — shared affordance for "new org" and
+ *  "new project" actions in the context block. */
+function PlusButton({ onClick, title }: { onClick: () => void; title: string }) {
+  return (
+    <button
+      aria-label={title}
+      className="flex h-5 w-5 shrink-0 items-center justify-center text-[color:var(--ink-muted)] transition-colors hover:bg-[color:var(--paper)] hover:text-[color:var(--accent)]"
+      onClick={onClick}
+      title={title}
+      type="button"
+    >
+      <svg
+        aria-hidden
+        className="h-3 w-3"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.6"
+        viewBox="0 0 24 24"
+      >
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+    </button>
   )
 }
 
@@ -263,23 +331,5 @@ function NavIcon({ active, path }: { active: boolean; path: string }) {
     >
       <path d={path} />
     </svg>
-  )
-}
-
-function UserMenu({ email, onLogout }: { email: null | string; onLogout: () => void }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="min-w-0 truncate font-mono text-[11px] text-[color:var(--ink-soft)]">
-        {email ?? 'account'}
-      </span>
-      <button
-        className="shrink-0 font-mono text-[11px] whitespace-nowrap text-[color:var(--ink-muted)] transition-colors hover:text-[color:var(--accent)]"
-        onClick={onLogout}
-        title="Sign out"
-        type="button"
-      >
-        ⎋ sign&nbsp;out
-      </button>
-    </div>
   )
 }

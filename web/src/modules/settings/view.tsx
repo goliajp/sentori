@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import { Link } from 'react-router'
+import { useEffect, useState } from 'react'
+import { Link, useLocation } from 'react-router'
 
 import { adminApi, type OrgRole, orgsApi, teamsApi } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
@@ -27,6 +27,17 @@ import { PageHeader } from '@/layout/page-header'
 export function SettingsView() {
   const { currentOrg } = useOrg()
   const qc = useQueryClient()
+  const location = useLocation()
+  // Sidebar's "+ new project" button deep-links here as
+  // `/org/{slug}/settings#new-project`. We honor that hash by both
+  // pre-opening the Projects → create form AND scrolling it into view
+  // once the section is rendered.
+  const hashFocus = location.hash.replace(/^#/, '')
+  useEffect(() => {
+    if (!hashFocus) return
+    const el = document.getElementById(hashFocus)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [hashFocus])
 
   const membersQ = useQuery({
     enabled: !!currentOrg.slug,
@@ -182,8 +193,9 @@ export function SettingsView() {
         )}
       </SubSection>
 
-      <SubSection sub={`${projects.length} total`} title="Projects">
+      <SubSection id="new-project" sub={`${projects.length} total`} title="Projects">
         <CollapsibleForm
+          defaultOpen={hashFocus === 'new-project'}
           disabled={createProjectM.isPending}
           error={errOf(createProjectM.error)}
           label="create project"
@@ -253,19 +265,21 @@ type FormField =
   | { name: string; placeholder?: string; required?: boolean; type: 'email' | 'text' }
 
 function CollapsibleForm({
+  defaultOpen,
   disabled,
   error,
   fields,
   label,
   onSubmit,
 }: {
+  defaultOpen?: boolean
   disabled: boolean
   error: null | string
   fields: FormField[]
   label: string
   onSubmit: (values: Record<string, string>) => void
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen ?? false)
   const [values, setValues] = useState<Record<string, string>>({})
 
   if (!open) {
@@ -368,15 +382,17 @@ function Hint({ children }: { children: React.ReactNode }) {
 
 function SubSection({
   children,
+  id,
   sub,
   title,
 }: {
   children: React.ReactNode
+  id?: string
   sub?: string
   title: string
 }) {
   return (
-    <section>
+    <section id={id}>
       <header className="sec-head">
         <span className="sec-head-title">{title}</span>
         {sub && <span className="sec-head-sub">{sub}</span>}

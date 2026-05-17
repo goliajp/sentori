@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router'
 
 import { userAuthApi } from '@/api/client'
 
-import { AuthShell, Field, OAuthButtons } from './login'
+import { AuthError, AuthShell, Field, FooterLinks, OAuthButtons, PrimaryButton } from './login'
 
 export function RegisterView() {
   const nav = useNavigate()
@@ -31,23 +31,28 @@ export function RegisterView() {
     <AuthShell title="Create account">
       <OAuthButtons />
       <form className="space-y-3" onSubmit={submit}>
-        <Field label="Email" onChange={setEmail} type="email" value={email} />
-        <Field label="Password" onChange={setPassword} type="password" value={password} />
-        {err && <div className="text-danger t-sm">{err}</div>}
-        <button
-          className="bg-accent text-bg t-md w-full rounded px-3 py-1.5 font-medium disabled:opacity-50"
-          disabled={busy}
-          type="submit"
-        >
-          {busy ? 'Creating…' : 'Create account'}
-        </button>
+        <Field autoComplete="email" label="email" onChange={setEmail} type="email" value={email} />
+        <Field
+          autoComplete="new-password"
+          label="password"
+          onChange={setPassword}
+          type="password"
+          value={password}
+        />
+        {err && <AuthError>{err}</AuthError>}
+        <PrimaryButton busy={busy} disabled={password.length < 8}>
+          {busy ? 'creating…' : 'create account'}
+        </PrimaryButton>
+        <p className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+          8 characters minimum
+        </p>
       </form>
-      <div className="text-fg-muted t-sm mt-4 text-center">
-        Already have an account?{' '}
-        <Link className="hover:text-fg" to="/login">
-          Sign in
+      <FooterLinks>
+        <span>already a member?</span>
+        <Link className="text-[color:var(--ink)] hover:text-[color:var(--accent)]" to="/login">
+          sign in
         </Link>
-      </div>
+      </FooterLinks>
     </AuthShell>
   )
 }

@@ -3,7 +3,8 @@ import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router'
 
 import { orgsApi } from '@/api/client'
-import { AuthShell } from './login'
+
+import { AuthError, AuthShell } from './login'
 
 export function InviteAcceptView() {
   const { token } = useParams<{ token: string }>()
@@ -20,11 +21,13 @@ export function InviteAcceptView() {
 
   return (
     <AuthShell title="Accept invite">
-      {m.isPending && <p className="text-fg-muted t-md">Accepting…</p>}
+      {m.isPending && (
+        <p className="text-[13px] text-[color:var(--ink-soft)]">Accepting your invite…</p>
+      )}
       {m.error && (
-        <p className="text-danger t-md">
+        <AuthError>
           {m.error instanceof Error ? m.error.message : 'Failed to accept invite.'}
-        </p>
+        </AuthError>
       )}
     </AuthShell>
   )

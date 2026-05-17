@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { orgsApi } from '@/api/client'
-import { AuthShell, Field } from './login'
+
+import { AuthError, AuthShell, Field, PrimaryButton } from './login'
 
 export function OnboardingView() {
   const nav = useNavigate()
@@ -29,16 +30,15 @@ export function OnboardingView() {
   return (
     <AuthShell title="Create your first org">
       <form className="space-y-3" onSubmit={submit}>
-        <Field label="Display name" onChange={setName} value={name} />
-        <Field label="Slug" onChange={setSlug} value={slug} />
-        {err && <div className="text-danger t-sm">{err}</div>}
-        <button
-          className="bg-accent text-bg t-md w-full rounded px-3 py-1.5 font-medium disabled:opacity-50"
-          disabled={busy}
-          type="submit"
-        >
-          {busy ? 'Creating…' : 'Create org'}
-        </button>
+        <Field label="display name" onChange={setName} value={name} />
+        <Field label="slug" onChange={setSlug} value={slug} />
+        {err && <AuthError>{err}</AuthError>}
+        <PrimaryButton busy={busy} disabled={!name || !slug}>
+          {busy ? 'creating…' : 'create org'}
+        </PrimaryButton>
+        <p className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+          slug is lowercase, used in URLs (`/org/{'<slug>'}/…`)
+        </p>
       </form>
     </AuthShell>
   )

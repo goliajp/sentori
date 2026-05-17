@@ -4,6 +4,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 
 import { userAuthApi } from '@/api/client'
 import { useAuth } from '@/auth/state'
+import { SENTORI_VERSION } from '@/version'
 
 export function LoginView() {
   const { isAuthed, login } = useAuth()
@@ -37,43 +38,95 @@ export function LoginView() {
     <AuthShell title="Sign in">
       <OAuthButtons />
       <form className="space-y-3" onSubmit={submit}>
-        <Field label="Email" onChange={setEmail} type="email" value={email} />
-        <Field label="Password" onChange={setPassword} type="password" value={password} />
-        {err && <div className="text-danger t-sm">{err}</div>}
-        <button
-          className="bg-accent text-bg t-md w-full rounded px-3 py-1.5 font-medium disabled:opacity-50"
-          disabled={busy}
-          type="submit"
-        >
-          {busy ? 'Signing in…' : 'Sign in'}
-        </button>
+        <Field autoComplete="email" label="email" onChange={setEmail} type="email" value={email} />
+        <Field
+          autoComplete="current-password"
+          label="password"
+          onChange={setPassword}
+          type="password"
+          value={password}
+        />
+        {err && <AuthError>{err}</AuthError>}
+        <PrimaryButton busy={busy}>{busy ? 'signing in…' : 'sign in'}</PrimaryButton>
       </form>
-      <div className="text-fg-muted t-sm mt-4 text-center">
-        <Link className="hover:text-fg" to="/register">
-          Create account
+      <FooterLinks>
+        <Link className="hover:text-[color:var(--accent)]" to="/register">
+          create account
         </Link>
-        <span className="mx-2">·</span>
-        <Link className="hover:text-fg" to="/forgot-password">
-          Forgot password?
+        <span className="text-[color:var(--ink-muted)]/50">·</span>
+        <Link className="hover:text-[color:var(--accent)]" to="/forgot-password">
+          forgot password
         </Link>
-      </div>
+      </FooterLinks>
     </AuthShell>
   )
 }
 
+/**
+ * Editorial auth-page shell. Paper page + centered column, wordmark
+ * + accent terminal dot + version micro-tag floating above a single
+ * hairline-bracketed content strip. No card, no rounded chrome —
+ * matches the dashboard's rule-grid lexicon.
+ *
+ *   SENTORI ·  ← wordmark with tora-orange dot
+ *   v1.0.0     ← mono micro-tag
+ *
+ *   ── SIGN IN ────────────  ← top hairline + caps title
+ *   <content>
+ *   ───────────────────────  ← bottom hairline
+ *   create account · forgot
+ */
 export function AuthShell({ children, title }: { children: React.ReactNode; title: string }) {
   return (
-    <div className="bg-bg flex h-full items-center justify-center">
-      <div className="w-80">
-        <h1
-          className="text-fg t-lg mb-4 text-center font-semibold"
-          style={{ letterSpacing: '0.22em' }}
-        >
-          SENTORI
-        </h1>
-        <div className="border-border bg-bg-secondary/30 rounded-md border p-4">
-          <h2 className="text-fg t-md mb-3 font-semibold">{title}</h2>
-          {children}
+    <div className="flex min-h-full items-center justify-center bg-[color:var(--paper)] px-4 py-12">
+      <div className="w-full max-w-[360px]">
+        <div className="mb-7 flex items-baseline justify-center gap-2">
+          <span
+            className="text-[color:var(--ink)] uppercase"
+            style={{
+              fontFamily: 'var(--font-sans)',
+              fontVariationSettings: "'wdth' 95, 'opsz' 48, 'wght' 600",
+              fontSize: '18px',
+              letterSpacing: '0.24em',
+            }}
+          >
+            SENTORI
+            <span
+              aria-hidden
+              className="ml-1.5 inline-block"
+              style={{
+                background: 'var(--accent)',
+                borderRadius: '50%',
+                height: '6px',
+                transform: 'translateY(-2px)',
+                width: '6px',
+              }}
+            />
+          </span>
+          <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+            {SENTORI_VERSION}
+          </span>
+        </div>
+
+        <div className="border-y border-[color:var(--rule)]">
+          <header className="flex items-baseline gap-3 px-px py-2.5">
+            <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+              ·
+            </span>
+            <h2
+              className="text-[color:var(--ink)]"
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '11px',
+                fontWeight: 500,
+                letterSpacing: '0.22em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {title}
+            </h2>
+          </header>
+          <div className="border-t border-[color:var(--rule-soft)] px-px py-5">{children}</div>
         </div>
       </div>
     </div>
@@ -95,10 +148,12 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-fg-muted t-sm mb-1 block">{label}</span>
+      <span className="mb-1 block font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+        {label}
+      </span>
       <input
         autoComplete={autoComplete}
-        className="border-border bg-bg t-md text-fg focus:border-accent w-full rounded border px-2.5 py-1.5 outline-none"
+        className="h-9 w-full border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2.5 text-[13px] text-[color:var(--ink)] outline-none focus:border-[color:var(--accent)]"
         onChange={(e) => onChange(e.target.value)}
         required
         type={type}
@@ -108,17 +163,54 @@ export function Field({
   )
 }
 
+export function PrimaryButton({
+  busy,
+  children,
+  disabled,
+}: {
+  busy?: boolean
+  children: React.ReactNode
+  disabled?: boolean
+}) {
+  return (
+    <button
+      className="mt-1 inline-flex h-9 w-full items-center justify-center bg-[color:var(--accent)] px-3 font-mono text-[11px] tracking-[0.12em] text-[color:var(--paper)] uppercase transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+      disabled={busy || disabled}
+      type="submit"
+    >
+      {children}
+    </button>
+  )
+}
+
+export function AuthError({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      aria-live="polite"
+      className="border border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] px-2.5 py-1.5 font-mono text-[11px] text-[color:var(--danger)]"
+    >
+      {children}
+    </div>
+  )
+}
+
+export function FooterLinks({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mt-5 flex items-center justify-center gap-2 font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+      {children}
+    </div>
+  )
+}
+
 /**
  * OAuth provider buttons — Google + GitHub. Polls
  * `/auth/oauth/providers` to see which the server has env-vars for,
  * hides the rest. When neither is configured the whole block is
  * suppressed (no awkward divider over an empty list).
  *
- * The /auth/oauth/{provider}/start handler isn't wired yet — these
- * buttons currently navigate to the start URL which 404s until the
- * follow-up commit. That's still the right shape because the dashboard
- * surface is the gate: the moment the env-vars + start handler land,
- * the buttons go live with no dashboard change.
+ * Style matches the editorial form: paper-2 fill with a hairline
+ * border, mono-cap label, hover ramps to ink-soft border. No rounded
+ * corners — the rest of the page is square.
  */
 export function OAuthButtons() {
   const providersQ = useQuery({
@@ -132,10 +224,10 @@ export function OAuthButtons() {
   if (!providers.github && !providers.google) return null
 
   return (
-    <div className="mb-4 space-y-2">
+    <div className="mb-5 space-y-2">
       {providers.github && (
         <a
-          className="border-border bg-bg t-md text-fg hover:border-fg-muted flex w-full items-center justify-center gap-2 rounded border px-3 py-1.5"
+          className="flex h-9 w-full items-center justify-center gap-2 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-3 text-[13px] text-[color:var(--ink)] transition-colors hover:border-[color:var(--ink-soft)]"
           href="/api/auth/oauth/github/start"
         >
           <GitHubGlyph /> Continue with GitHub
@@ -143,16 +235,16 @@ export function OAuthButtons() {
       )}
       {providers.google && (
         <a
-          className="border-border bg-bg t-md text-fg hover:border-fg-muted flex w-full items-center justify-center gap-2 rounded border px-3 py-1.5"
+          className="flex h-9 w-full items-center justify-center gap-2 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-3 text-[13px] text-[color:var(--ink)] transition-colors hover:border-[color:var(--ink-soft)]"
           href="/api/auth/oauth/google/start"
         >
           <GoogleGlyph /> Continue with Google
         </a>
       )}
-      <div className="text-fg-muted t-sm relative my-2 flex items-center gap-2">
-        <span className="border-border flex-1 border-t" />
-        <span className="text-[10px] tracking-[0.18em] uppercase">or</span>
-        <span className="border-border flex-1 border-t" />
+      <div className="relative my-3 flex items-center gap-2 font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+        <span className="h-px flex-1 bg-[color:var(--rule)]" />
+        <span>or with email</span>
+        <span className="h-px flex-1 bg-[color:var(--rule)]" />
       </div>
     </div>
   )
@@ -172,6 +264,18 @@ function GoogleGlyph() {
       <path
         fill="#EA4335"
         d="M12 10.9v3.2h5c-.2 1.3-1.5 3.8-5 3.8-3 0-5.5-2.5-5.5-5.6S9 6.7 12 6.7c1.7 0 2.9.7 3.5 1.3l2.4-2.3C16.3 4.2 14.3 3.3 12 3.3c-4.8 0-8.7 3.9-8.7 8.7s3.9 8.7 8.7 8.7c5 0 8.4-3.5 8.4-8.5 0-.6-.1-1-.1-1.4H12z"
+      />
+      <path
+        fill="#34A853"
+        d="M3.9 7.4l2.7 2c.7-1.5 2.2-2.7 5.4-2.7v-3.4C8.6 3.3 5.4 4.7 3.9 7.4z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.9 7.4C3.4 8.7 3.3 10 3.3 11.3c0 1.3.2 2.6.6 3.9l3.3-2.5c-.2-.5-.3-1-.3-1.5s.1-.9.3-1.4L3.9 7.4z"
+      />
+      <path
+        fill="#4285F4"
+        d="M20.5 11.9c0-.6-.1-1-.1-1.4H12v3.2h5c-.2 1.3-1.5 3.8-5 3.8v3.4c4.8 0 8.5-3.4 8.5-9z"
       />
     </svg>
   )
