@@ -1,10 +1,12 @@
 package com.sentori
 
 import android.app.Activity
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
+import android.graphics.drawable.StateListDrawable
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
@@ -93,9 +95,18 @@ object SentoriReplayCapture {
             totalEmptyResultTicks++
             return null
         }
-        val root = activity.window?.decorView
+        // rc.8 — anchor the walk at android.R.id.content, NOT
+        // window.decorView. decorView includes the StatusBarBackground
+        // and NavigationBarBackground sibling views the PhoneWindow
+        // injects (full display width, positioned in absolute window
+        // coords). Insight 2026-05-18 saw those bleed into the
+        // wireframe as horizontal grey bars stretching beyond the
+        // viewport width. Anchoring at the content FrameLayout drops
+        // them while keeping the app's React tree intact.
+        val decor = activity.window?.decorView
+        val root = decor?.findViewById<View>(android.R.id.content)
         if (root == null) {
-            lastDiagPath = "decorView.null"
+            lastDiagPath = if (decor == null) "decorView.null" else "contentView.null"
             totalEmptyResultTicks++
             return null
         }
@@ -217,18 +228,21 @@ object SentoriReplayCapture {
                     kindEmitted = true
                 }
                 view.background != null -> {
-                    node.put("kind", "rect")
-                    // rc.5 — extract the fill colour from the
-                    // background Drawable so wireframes show the host
-                    // app's actual brand palette, not a uniform grey
-                    // grid. iOS' UIView.backgroundColor already drives
-                    // this path; the Android side had been emitting
-                    // null since v0.9.6 and the dashboard fell back to
-                    // a neutral fill for every coloured CTA. Insight
-                    // 2026-05-18 verify event made the gap visible.
-                    val color = extractDrawableColor(view.background)
-                    if (color != null && (color shr 24 and 0xff) != 0) {
-                        node.put("color", colorToHex(color))
+                    // rc.8 — backgrounds backed by a BitmapDrawable
+                    // (a View whose backgroundImage / drawable
+                    // resource is a raster) emit as `image` kind so
+                    // the dashboard renders them as a media region,
+                    // not as a grey rect. Everything else stays
+                    // `rect` and tries to extract a fill colour.
+                    val bg = view.background
+                    if (bg is BitmapDrawable) {
+                        node.put("kind", "image")
+                    } else {
+                        node.put("kind", "rect")
+                        val color = extractDrawableColor(bg)
+                        if (color != null && (color shr 24 and 0xff) != 0) {
+                            node.put("color", colorToHex(color))
+                        }
                     }
                     kindEmitted = true
                 }
@@ -283,6 +297,17 @@ object SentoriReplayCapture {
                 val csl = drawable.color
                 csl?.defaultColor
             }
+            is StateListDrawable -> {
+                // rc.8 — Pressable / TouchableOpacity wrap their child
+                // in a StateListDrawable (default state + pressed
+                // state). `.current` returns the currently-applied
+                // state's drawable, which during a normal capture
+                // is the unpressed visual — exactly what we want.
+                // AnimatedStateListDrawable extends StateListDrawable
+                // so it inherits this branch.
+                extractDrawableColor(drawable.current)
+            }
+            is BitmapDrawable -> null
             is LayerDrawable -> {
                 for (i in 0 until drawable.numberOfLayers) {
                     val inner = drawable.getDrawable(i)
