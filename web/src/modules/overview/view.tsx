@@ -157,7 +157,7 @@ function ProjectCard({ orgSlug, project }: { orgSlug: string; project: ProjectRo
         </a>
       )}
 
-      <div className="mt-1 flex items-center justify-between border-t border-[color:var(--rule-soft)] pt-2 font-mono text-[10px] tracking-[0.1em] text-[color:var(--ink-muted)] uppercase">
+      <div className="mt-1 flex items-center justify-between gap-3 border-t border-[color:var(--rule-soft)] pt-2 font-mono text-[10px] tracking-[0.1em] text-[color:var(--ink-muted)] uppercase">
         <Link
           className="hover:text-[color:var(--accent)]"
           to={`/org/${orgSlug}/issues?project=${project.id}`}
@@ -175,6 +175,13 @@ function ProjectCard({ orgSlug, project }: { orgSlug: string; project: ProjectRo
           to={`/org/${orgSlug}/vitals?project=${project.id}`}
         >
           vitals →
+        </Link>
+        <Link
+          className="text-[color:var(--accent)] hover:text-[color:var(--accent-strong)]"
+          to={`/org/${orgSlug}/projects/${project.id}/integration`}
+          title="Install SDK + ingest tokens"
+        >
+          integrate →
         </Link>
       </div>
     </li>

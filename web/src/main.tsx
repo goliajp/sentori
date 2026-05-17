@@ -16,6 +16,7 @@ import { InviteAcceptView } from './views/invite-accept'
 import { LoginView } from './views/login'
 import { OnboardingView } from './views/onboarding'
 import { OrgLayout } from './views/org-layout'
+import { ProjectIntegrationView } from './views/project-integration'
 import { RegisterView } from './views/register'
 import { ResetPasswordView } from './views/reset-password'
 import { RootRedirect } from './views/root-redirect'
@@ -94,7 +95,17 @@ const router = createBrowserRouter([
       { element: <InviteAcceptView />, path: 'invite/:token' },
       { element: <TransferAcceptView />, path: 'transfers/:token' },
       {
-        children: [{ element: <Navigate replace to="overview" />, index: true }, ...moduleChildren],
+        children: [
+          { element: <Navigate replace to="overview" />, index: true },
+          // Project-scoped integration view — lives inside OrgLayout so
+          // the sidebar / context block stays mounted while the user
+          // works through token setup for a specific project.
+          {
+            element: <ProjectIntegrationView />,
+            path: 'projects/:projectId/integration',
+          },
+          ...moduleChildren,
+        ],
         element: <OrgLayout />,
         path: 'org/:slug',
       },

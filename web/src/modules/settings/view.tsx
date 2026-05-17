@@ -214,7 +214,7 @@ export function SettingsView() {
                 <th>name</th>
                 <th>id</th>
                 <th>repo</th>
-                <th className="w-20"></th>
+                <th className="w-44"></th>
               </tr>
             </thead>
             <tbody>
@@ -237,12 +237,20 @@ export function SettingsView() {
                     )}
                   </td>
                   <td>
-                    <Link
-                      className="font-mono text-[10px] tracking-[0.1em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--accent)]"
-                      to={`/org/${currentOrg.slug}/issues?project=${p.id}`}
-                    >
-                      open →
-                    </Link>
+                    <div className="flex items-center justify-end gap-3 font-mono text-[10px] tracking-[0.1em] uppercase">
+                      <Link
+                        className="text-[color:var(--ink-muted)] hover:text-[color:var(--accent)]"
+                        to={`/org/${currentOrg.slug}/projects/${p.id}/integration`}
+                      >
+                        integrate →
+                      </Link>
+                      <Link
+                        className="text-[color:var(--ink-muted)] hover:text-[color:var(--accent)]"
+                        to={`/org/${currentOrg.slug}/issues?project=${p.id}`}
+                      >
+                        open →
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}
