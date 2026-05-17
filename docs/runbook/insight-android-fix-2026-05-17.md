@@ -174,3 +174,84 @@ Replay capture returns 36 non-null nodes. rc.1's `activity.null` /
 Bump on your side and re-verify on the same S22 with the
 `com.qualcomm.insight` package; the dashboard URL for the new event
 is what we'll diff against.
+
+---
+
+## Dashboard wireframe render — Sentori-side follow-up (2026-05-18)
+
+You also reported the Android wireframe was reaching the dashboard
+(1 frame, 800 nodes) but the canvas painted essentially empty —
+just a faint outline structure. That was a dashboard rendering
+bug, not an SDK one. **No SDK bump needed**; the fix is entirely
+client-side on `app.sentori.golia.jp`.
+
+### What was wrong
+
+`SentoriReplayCapture.kt` only sets a `color` field on TextView
+nodes (`view.currentTextColor`). EditText / ImageView / generic
+View-with-background emit `kind: text|image|rect` with **no
+`color`**, by design — the SDK is shipping structural data,
+expecting the dashboard to render it. The dashboard's
+`defaultFill(kind)` was returning `var(--paper-3)` for both rect
+and image; the canvas container bg was ALSO `var(--paper-3)`.
+Same colour, fill on bg → invisible. Worked on iOS because iOS's
+introspection set per-node colours more often, so the bg-match
+gap didn't bite there.
+
+### What changed (dashboard only)
+
+* **32-colour curated palette** (`web/src/lib/wireframe-palette.ts`)
+  hand-picked from Tailwind `-400`/`-500` weights so every
+  swatch sits in the same perceptual-luminance band. No single
+  hue dominates the canvas; legibility is independent of host UI
+  theme.
+* **Stable per-node hue**. The palette index comes from a djb2 hash
+  of the node's `(x,y,w,h)` fingerprint — same node keeps the
+  same colour across frames, so the diff overlay's added /
+  changed / removed strokes are the only signal that needs to
+  change between frames. Diff reads cleanly now.
+* **0.75 fill-opacity** on every rect/circle, so overlapping
+  layers composite visibly. The viewer can read depth order
+  without explicit z-index cues.
+* **Two shape primitives**: rectangles (with `rx=8` for non-square
+  images) and circles (for square-aspect images, e.g. avatars).
+  Text nodes always render with `var(--ink)` regardless of the
+  SDK-emitted colour — wireframes are structural diagrams,
+  readability beats colour fidelity. The screenshot tile right
+  above carries the actual pixel-accurate render.
+* **Theme-aware stroke + mask** — fixed `rgba(0,0,0,0.18)` stroke
+  was invisible against the dark-mode canvas; now uses
+  `var(--rule)` (and `var(--ink)` + `0.78` alpha for masks),
+  both of which contrast on either theme.
+
+Same logic applied symmetrically to both the inline player on
+issue-detail (the one you screenshotted) and the dedicated
+Replay tab.
+
+### What you have to do
+
+**Refresh the issue detail page** for event
+`019e3669-5973-7eb0-b578-50d2d60b3f04` (or any newer event). The
+wireframe should now render as a layered, mixed-hue mobile
+mockup. iOS events render identically — same palette, same shape
+primitives, no platform-specific code path.
+
+That's it — no `bun add`, no `pod install`, no SDK redeploy. The
+event data on disk hasn't changed.
+
+### Status summary, second update
+
+| Path | rc.1 Android | rc.2 Android | rc.2 + dashboard render fix |
+|---|---|---|---|
+| native module bound | ✅ | ✅ | ✅ |
+| `replay tick: native returned null` warns | every tick | **never** ✅ | never |
+| `captureScreenshotWithMask` blob | ❌ null | ✅ WebP | ✅ |
+| `captureWireframe` data | ❌ null | ✅ | ✅ |
+| Dashboard `● screenshot` filled | ❌ | ✅ | ✅ |
+| Dashboard `● replay` attachment present | ❌ | ✅ | ✅ |
+| **Dashboard Replay viewport renders content** | ❌ | ❌ residual | **✅ FIXED** |
+| `probeScreenshot` / `probeWireframe` API | absent | ✅ | ✅ |
+
+All three layers (SDK + ingest + dashboard render) green now.
+Bonus finding (GOL-589 `IllegalStateException ReactViewGroup`)
+is independent and still your call.
