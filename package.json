@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0-rc.1",
   "workspaces": [
+    "apps/rn-example",
     "sdk/cli",
     "sdk/core",
     "sdk/expo",

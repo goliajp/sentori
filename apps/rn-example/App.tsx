@@ -10,6 +10,7 @@ import {
 
 import {
   drainReplay,
+  probeNativeScreenshot,
   probeNativeWireframe,
   sentori,
   startAnrWatchdog,
@@ -107,6 +108,17 @@ export default function App() {
         console.warn('[replay-test]', msg);
       },
       title: '[replay] probe wireframe state',
+    },
+    {
+      onPress: () => {
+        const p = probeNativeScreenshot();
+        const tracked = (p.raw.trackedSource as string | undefined) ?? 'n/a';
+        const decor = (p.raw.decorViewFound as boolean | undefined) ?? false;
+        const msg = `probe screenshot path=${p.lastPath} tracked=${tracked} decor=${decor}`;
+        append(msg);
+        console.warn('[verify-android]', msg, p.raw);
+      },
+      title: '[screenshot] probe state',
     },
     {
       onPress: () => {
