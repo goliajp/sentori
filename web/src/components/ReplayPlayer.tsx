@@ -3,11 +3,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import {
   isCircleShape,
-  WIREFRAME_FILL,
-  WIREFRAME_IMAGE_OPACITY,
+  WIREFRAME_IMAGE_FILL,
   WIREFRAME_MASK_FILL,
-  WIREFRAME_MASK_OPACITY,
-  WIREFRAME_RECT_OPACITY,
+  WIREFRAME_RECT_FILL,
   WIREFRAME_TEXT_FILL,
 } from '@/lib/wireframe-palette'
 
@@ -459,48 +457,25 @@ function NodeRender({ node }: { node: Node }) {
     )
   }
   if (node.kind === 'mask') {
-    return (
-      <rect
-        fill={WIREFRAME_MASK_FILL}
-        fillOpacity={WIREFRAME_MASK_OPACITY}
-        height={node.h}
-        width={node.w}
-        x={node.x}
-        y={node.y}
-      />
-    )
+    return <rect fill={WIREFRAME_MASK_FILL} height={node.h} width={node.w} x={node.x} y={node.y} />
   }
 
-  // Image gets slightly heavier alpha so media regions read as
-  // distinct from generic containers; both use the same ink hue.
-  const fillOpacity = node.kind === 'image' ? WIREFRAME_IMAGE_OPACITY : WIREFRAME_RECT_OPACITY
+  // Original 0.9.x default scheme: SDK colour pass-through with a
+  // translucent-white fallback. iOS sets `node.color` for UILabels
+  // / coloured UIView backgrounds so coloured CTAs render with
+  // their actual hue; Android's most-common case of "uncoloured
+  // ViewGroup" falls through to the muted default. No border per
+  // user preference — the alpha layering handles depth.
+  const fill = node.kind === 'image' ? WIREFRAME_IMAGE_FILL : (node.color ?? WIREFRAME_RECT_FILL)
 
   if (node.kind === 'image' && isCircleShape(node.w, node.h)) {
     const r = Math.min(node.w, node.h) / 2
-    return (
-      <circle
-        cx={node.x + node.w / 2}
-        cy={node.y + node.h / 2}
-        fill={WIREFRAME_FILL}
-        fillOpacity={fillOpacity}
-        r={r}
-      />
-    )
+    return <circle cx={node.x + node.w / 2} cy={node.y + node.h / 2} fill={fill} r={r} />
   }
 
   // image (non-square) → softly rounded; rect → square corners.
   const rx = node.kind === 'image' ? 8 : 0
-  return (
-    <rect
-      fill={WIREFRAME_FILL}
-      fillOpacity={fillOpacity}
-      height={node.h}
-      rx={rx}
-      width={node.w}
-      x={node.x}
-      y={node.y}
-    />
-  )
+  return <rect fill={fill} height={node.h} rx={rx} width={node.w} x={node.x} y={node.y} />
 }
 
 function Hint({ children, tone }: { children: React.ReactNode; tone?: 'danger' }) {

@@ -4,11 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { adminApi, type ReplayFrame } from '@/api/client'
 import {
   isCircleShape,
-  WIREFRAME_FILL,
-  WIREFRAME_IMAGE_OPACITY,
+  WIREFRAME_IMAGE_FILL,
   WIREFRAME_MASK_FILL,
-  WIREFRAME_MASK_OPACITY,
-  WIREFRAME_RECT_OPACITY,
+  WIREFRAME_RECT_FILL,
   WIREFRAME_TEXT_FILL,
 } from '@/lib/wireframe-palette'
 
@@ -298,20 +296,19 @@ function NodeShape({
     )
   }
 
-  // Structural ink-on-paper rendering — no per-node hue, no
-  // outline. Kind drives the alpha tier and the shape primitive.
-  // Diff overlay reuses the dashboard's semantic stroke colours
-  // (success / warning / danger) but only when the node actually
-  // moved between frames — same-frame nodes stay borderless.
+  // Original 0.9.x default scheme: SDK colour pass-through with a
+  // translucent-white fallback. Borders dropped per user
+  // preference; diff overlay keeps the semantic stroke colours
+  // (added/changed/removed) since those carry meaning beyond
+  // structural decoration.
   const isMask = node.kind === 'mask'
   const isImage = node.kind === 'image'
 
-  let fill: string = isMask ? WIREFRAME_MASK_FILL : WIREFRAME_FILL
-  let fillOpacity = isMask
-    ? WIREFRAME_MASK_OPACITY
+  let fill: string = isMask
+    ? WIREFRAME_MASK_FILL
     : isImage
-      ? WIREFRAME_IMAGE_OPACITY
-      : WIREFRAME_RECT_OPACITY
+      ? WIREFRAME_IMAGE_FILL
+      : (node.color ?? WIREFRAME_RECT_FILL)
   let stroke = 'transparent'
   let strokeWidth = 0
   let opacity = 1
@@ -325,7 +322,6 @@ function NodeShape({
     stroke = 'var(--danger)'
     strokeWidth = 1.4
     fill = 'transparent'
-    fillOpacity = 0
     opacity = 0.55
   }
 
@@ -337,7 +333,6 @@ function NodeShape({
           cx={node.x + node.w / 2}
           cy={node.y + node.h / 2}
           fill={fill}
-          fillOpacity={fillOpacity}
           r={r}
           stroke={stroke}
           strokeWidth={strokeWidth}
@@ -350,7 +345,6 @@ function NodeShape({
     <g opacity={opacity}>
       <rect
         fill={fill}
-        fillOpacity={fillOpacity}
         height={node.h}
         rx={isImage ? 8 : 0}
         stroke={stroke}

@@ -1,59 +1,48 @@
 /**
- * Wireframe rendering tokens — muted, structural, single-hue.
+ * Wireframe rendering tokens — original-style defaults (translucent
+ * white on whatever canvas), with borders dropped.
  *
- * History: a 32-colour palette landed first when the original bg-
- * matching default fill (paper-3 on paper-3 canvas) erased Android
- * wireframes. The palette over-corrected — every rect/image got a
- * vivid hash-picked hue and the wireframe lost its structural
- * "design-tool placeholder" character, looking arcade. Reverted
- * here to a single tone (ink) with kind-specific alpha levels,
- * which matches design-tool wireframe palettes (Figma's
- * placeholder, Sketch's wireframe symbols, Carbon's empty-state).
+ * Iteration history (latest first):
  *
- * Why this works on both themes:
- *   - `var(--ink)` is dark in light mode and warm-light in dark
- *     mode, so the same alpha gives readable shapes against either
- *     canvas.
- *   - Lower alpha for generic containers, slightly higher for
- *     images so they read as media, opaque for masks so redaction
- *     is unambiguous.
- *   - Text always renders at full opacity in ink — content reads
- *     regardless of the host app's text colour (Android emits
- *     `currentTextColor` which is white on dark-mode UIs and
- *     would vanish on the light canvas).
- *   - No strokes. The canvas paper colour is the negative space
- *     between rects and you can see edges by alpha alone — borders
- *     felt heavy on dense stacks (cf. user feedback after the
- *     palette round).
+ *   rev 4 (current): back to the original 0.9.x logic — translucent
+ *     white defaults, honour `node.color` when the SDK gives one.
+ *     Borders dropped per user preference.
+ *
+ *   rev 3: 4-shade neutral palette + SDK colour pass-through. Felt
+ *     too clever for the structure-signalling job.
+ *
+ *   rev 2: pure ink + per-kind alpha. Too monotone.
+ *
+ *   rev 1: 32-hue hash palette. Too colourful.
+ *
+ *   rev 0: bg colour same as canvas → invisible (Insight verify).
  */
 
-/** Fill colour for every non-mask node. Theme-aware via the ink
- *  token; combine with the per-kind alpha tokens below. */
-export const WIREFRAME_FILL = 'var(--ink)'
+/** Generic container rect fill — translucent white. */
+export const WIREFRAME_RECT_FILL = 'rgba(255,255,255,0.06)'
 
-/** Mask nodes — solid ink, high opacity. Signals redaction
- *  unambiguously on either canvas. */
-export const WIREFRAME_MASK_FILL = 'var(--ink)'
-export const WIREFRAME_MASK_OPACITY = 0.78
+/** Image-kind fill — slightly heavier so media regions distinguish
+ *  from generic containers when the SDK provided no `color`. */
+export const WIREFRAME_IMAGE_FILL = 'rgba(255,255,255,0.18)'
 
-/** Image nodes — slightly heavier than generic rects so they read
- *  as "media" without needing a separate hue. */
-export const WIREFRAME_IMAGE_OPACITY = 0.18
+/** Mask — opaque dark for unambiguous redaction on either canvas. */
+export const WIREFRAME_MASK_FILL = 'rgba(0,0,0,0.65)'
 
-/** Generic container rects — soft tint, enough to outline the
- *  layout grid but quiet enough that nested rects compose
- *  visibly. */
-export const WIREFRAME_RECT_OPACITY = 0.09
-
-/** Text — full opacity, ink colour, always readable against the
- *  canvas. */
+/** Text fill — always ink, regardless of the SDK-emitted text
+ *  colour. Wireframes are structural diagrams; content readability
+ *  beats colour fidelity. */
 export const WIREFRAME_TEXT_FILL = 'var(--ink)'
 
+/** When the SDK emitted an explicit colour (iOS UIView.backgroundColor,
+ *  iOS UILabel.textColor, Android TextView.currentTextColor), render
+ *  at this opacity so the host UI's real colour shows through but
+ *  still composes with overlapping layers. */
+export const WIREFRAME_COLORED_OPACITY = 1
+
 /** Image-kind nodes get rendered as rounded rects (or circles when
- *  the frame is roughly square — avatar-style). Centralised so both
- *  the inline player and the dedicated tab agree. */
+ *  the frame is roughly square — avatar-style). */
 export function isCircleShape(w: number, h: number): boolean {
   const min = Math.min(w, h)
-  if (min < 8) return false // tiny dots stay rect, no perceptual win from circle
+  if (min < 8) return false
   return Math.abs(w - h) <= min * 0.08
 }
