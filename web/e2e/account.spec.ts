@@ -122,16 +122,21 @@ test('forgot-password → reset → new pw authenticates', async ({ browser, req
   await page.goto('/login')
   await page.getByRole('link', { name: /forgot password/i }).click()
   await page.waitForURL(/\/forgot-password/)
+  // CI flake guard: wait for the network to fully settle before
+  // interacting. The forgot-password page lazy-loads Roboto Flex via
+  // CSS @font-face + Vite's HMR client opens a websocket on first
+  // mount; if we click the submit button before React's
+  // `useState` + `useEffect` hooks have committed, the click can
+  // race the form's `onSubmit` handler and fall through to a native
+  // form post (which targets the current URL, not /api/auth/...) —
+  // observed in CI as the `waitForResponse` listener never firing
+  // even at 45s budgets. `networkidle` is the cheapest cross-browser
+  // signal that hydration is done.
+  await page.waitForLoadState('networkidle')
   await page.getByLabel('email').fill(email)
-  // Wait for the network call to complete before asserting the UI.
-  // Different from `toBeVisible` on the success copy because (a) the
-  // copy splits across multiple nodes (the email lives in a styled
-  // span) which can defeat regex text-match in CI race conditions
-  // and (b) CI cold-starts are slow enough to blow past playwright's
-  // default 5s assertion budget.
   const respPromise = page.waitForResponse(
     (r) => r.url().endsWith('/api/auth/forgot-password') && r.request().method() === 'POST',
-    { timeout: 45_000 },
+    { timeout: 30_000 },
   )
   await page.getByRole('button', { name: /send reset link/i }).click()
   const resp = await respPromise

@@ -50,7 +50,10 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL: 'http://127.0.0.1:5173',
-    trace: 'on-first-retry',
+    // Keep traces for failed tests so a CI flake gives us a
+    // playwright.zip we can actually inspect (timeline, screenshots,
+    // network log) instead of just "timeout exceeded".
+    trace: 'retain-on-failure',
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
