@@ -1,6 +1,6 @@
 [package]
 name = "sentori-cli"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 edition = "2024"
 description = "Sentori CLI — upload source maps and other release artifacts"
 license = "TBD"

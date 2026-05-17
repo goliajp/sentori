@@ -1,8 +1,108 @@
 # Sentori CHANGELOG
 
-> v0.1 + v0.2 已完成 phase 的详细记录（含每条 sub 的中文 summary）。新规划见 [ROADMAP.md](./ROADMAP.md)。
+> v0.1 + v0.2 已完成 phase 的详细记录（含每条 sub 的中文 summary）。新规划见 [ROADMAP.md](./ROADMAP.md) + [docs/roadmap/v1.0.md](./docs/roadmap/v1.0.md)。
 
 > 本文件由 ROADMAP.md 历史段拆分而来，每条记录的真实落地凭证以 git log + commit message 为准。
+
+---
+
+## v1.0.0-rc.1 — Replay scrubber + iOS showcase
+
+**Theme:** Sentori 从 "看到 stack" 进化到 "看到崩前 30 帧的 prop 变化"，并把 iOS SwiftUI showcase 当作开源门面。
+
+**Package bumps：**
+
+- `@goliapkg/sentori-react-native` 0.9.12 → **1.0.0-rc.1** （major — unref crash fix 是 hard break）
+- `@sentori/web` (dashboard) 0.1.0 → **1.0.0-rc.1**
+- `sentori-server` 0.1.0 → **1.0.0-rc.1**
+- `sentori-cli` 0.1.0 → **1.0.0-rc.1**
+- `@goliapkg/sentori-monorepo` 0.0.0 → **1.0.0-rc.1**
+
+（其它 SDK package — core / vue / svelte / next — 暂不动，本 release 焦点是 RN 通路。）
+
+### Workstream A — Replay scrubber + fiber tree diff
+
+**A1 — SDK wireframe path repair** (commits `7490bed`, `33230ec`)
+- iOS keyWindow 改 4 层 fallback (foregroundActive → fgi → any scene → legacy)，加 NSLog 诊断 + `probe()` 暴露 path / nodes / scene / window counts 给 JS
+- Android symmetric probe (activity.null / decorView.null / root.zero-size / activity.resumed)
+- JS `probeNativeWireframe()` typed wrapper
+- **关键修复**：`replay.ts` 删 `.unref?.()` — Hermes 0.81 timer 是 plain number，optional-chain 走 prototype lookup → undefined → synchronous throw 被 RN bridge 静默吞掉 → setInterval 注册但 callback 永不触发。这是 Insight 2026-05-17 verify report 的 "starting bound=true 后 30s 没有 tick log" 根因
+- 加 unconditional FIRST INVOCATION log + startSpan 包 try（span 库失败不再杀整个 tick）
+
+**A2 — Frame-level delta encoding** (commit `6203ec8`)
+- 60-frame payload 在 sparse app 上 ~7 KB raw、heavy app ~400 KB raw，都在 500 KB attachment cap 内
+- 加 frame-level dedup：新 snapshot 跟最后一帧 byte-equal 时不 push。静态 UI 不再吃掉 ring 槽位
+
+**A3 — Server-side wireframe storage + query** (commit `d2a8258`)
+- 修 `ALLOWED_KINDS` 漏 `replay` 的 bug — migration 0043 加了 DB CHECK 但 application 层 whitelist 没同步，每次 SDK upload replay attachment 都 400 invalidKind（Insight 看到 `○ replay` 的根因）
+- 加 `application/x-ndjson` 到 replay 的 media-type whitelist
+- 新 endpoint `GET /admin/api/projects/{project_id}/events/{event_id}/replay-frames` — 服务端解 NDJSON 直接返回 frame JSON 数组，dashboard 不用在 client 做 NDJSON parse
+
+**A4 — Dashboard scrubber UI** (commit `455beda`)
+- 新 `<ReplayTab>` 加在 issue detail 的 tab 列表，位置 Stack 后、Events 前
+- SVG wireframe canvas（一个 `<rect>` per node + soft text glyph，aspect ratio 锁 device viewport）
+- 220px 右侧 meta 列：frame N/total · t+ 秒 · ts · nodes · viewport
+- Horizontal thumbnail rail — 一帧一个 mini SVG，accent outline on 当前帧，click-to-jump
+- Scrubber 控件：Prev / Play / Next + HTML range slider + 2 Hz auto-play stop at end (不 wrap)
+- 键盘导航：← → step / Space play-pause / Home End jump
+- Empty state 引导 SDK 配置而不是 404
+
+**A5 — Tree diff renderer** (commit `2cc6694`)
+- "◉ diff vs prev" toggle 在 meta 列
+- spatial fingerprint 配对（(x,y,w,h) 取整 → key）— SDK 不出稳定 ID 时这是最诚实的 matcher
+- added (success-green outline) / changed (warning-amber outline) / removed (danger-red translucent ghost overlay at prev position)
+- diff summary 行：added N / changed N / removed N
+
+**A6 — Issue detail integration** (folded into `455beda`)
+- 1 import + 1 Tab key + 1 conditional render
+
+### Workstream S — Showcase / marketing front door
+
+**S1 — Showcase polish round 1** (commit `93fed34`)
+- iOS-18+ MeshGradient aurora behind warm-dark backdrop（缓慢漂移，atmospheric not UI animation）
+- 共享 `formatBytes` helper — "—" / "952 B" / "1.0 KB" / "30.9 KB"
+- DefRow 收 84→72px gutter + minimumScaleFactor 0.7 — `(not yet sampled)` 完整显示
+
+**S2 — Marketing screenshot capture** (commit `c9b3c76`)
+- `marketing/assets/showcase-hero.png` — 顶部 scroll：brand wordmark + tagline + status pill + 8-card demo grid 上半
+- `marketing/assets/showcase-bottom.png` — 底部 scroll：grid 下半 + wireframe replay ring chart + recent events + footer
+
+**S3 — Repo root README** (commit `72f10fd`)
+- 完全重写：showcase hero 起手 → 三个 60s path（try-in-sim / RN install / self-host）→ RN-first features 罗列 → roadmap
+- 替换过期的 `@sentori/react-native` 为 `@goliapkg/sentori-react-native`
+- 链接 `docs/roadmap/v1.0.md` 而非旧 phases doc
+
+**S4 — docs-site landing alignment** (commit `c12dc3f`)
+- splash hero 接 README tagline
+- 4 张 card：iOS showcase / SDK reference / Wireframe replay / Self-hosting
+- "What you can do today" 列出 4 个可执行的能力
+- 25 pages 编译干净，无 MDX/Starlight warning
+
+### Workstream C — Intent cluster (cold)
+
+C1–C6 全部 cold。trigger："Replay" 上线 ≥ 1 周 + ≥ 100 events 带完整 breadcrumbs — 等真实数据积累。下个 release 开 C 系列。
+
+### iOS Showcase 项目本身 — `apps/ios-showcase/`
+
+新增。SwiftUI 6 + iOS 26 deployment。**直接 link SDK 的 Swift 源**（绕开 ExpoModulesCore JS bridge），证明 native 通路在没有 RN 的情况下也能用：
+
+- `SentoriCrashHandler` / `SentoriReplayCapture` / `SentoriScreenshotCapture` / `SentoriMobileVitals` / `SentoriHangWatchdog` / `SentoriNativeExceptionBridge` 全部链接，`SentoriModule.swift`（Expo wrapper）显式排除
+- xcodegen 作为 project 源（xcodeproj git-ignored）
+- 6 个 SwiftUI view 模块：Hero / KPI / ActionGrid / ReplayRing / EventLog / Footer
+- 8 张 demo card，每张 SF Symbol 动画 + Liquid Glass material + 触发一个 SDK 能力
+
+### 验证
+
+- iOS showcase 在 sim-sentori 上跑：10 秒内 replay frames 16 → 258，bytes 0 → 30.9 KB（wireframe sampler 在 native 通路里跑得稳）
+- 所有 [sentori] diagnostic warn 在 RN example app 上 fire on boot — A1 trigger 真实达成
+- 109 SDK tests + dashboard typecheck + docs-site build 全 green
+- 所有 commits CI green，deploy 上线 app.sentori.golia.jp
+
+### 已知限制
+
+- `apps/ios-showcase/` 是 simulator-only，没 deployment team 签名（CODE_SIGN_IDENTITY="-"）
+- RN SDK 0.9.x→1.0.0 是 major bump（unref crash fix 是 hard break）— 升级前确认你的 RN 上 Hermes timer 实现，0.83 之后版本已修
+- C 系列（intent cluster）延后到 v1.1
 
 ---
 
