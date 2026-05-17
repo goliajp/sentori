@@ -48,8 +48,10 @@ export function ReplayTab({ eventId, projectId }: { eventId: string; projectId: 
   const ref = framesQ.data?.ref ?? null
   const [idx, setIdx] = useState(0)
   const [playing, setPlaying] = useState(false)
+  const [diffMode, setDiffMode] = useState(false)
   const safeIdx = frames.length > 0 ? Math.min(idx, frames.length - 1) : 0
   const current = frames[safeIdx]
+  const previous = safeIdx > 0 ? frames[safeIdx - 1] : undefined
 
   // Auto-play steps at ~2 Hz to match the sampler cadence. Stop at
   // the end (don't loop — staring at a wrap-around is disorienting
@@ -128,12 +130,15 @@ export function ReplayTab({ eventId, projectId }: { eventId: string; projectId: 
       </header>
 
       <div className="grid grid-cols-[minmax(0,1fr)_220px] gap-5">
-        <ReplayCanvas frame={current} />
+        <ReplayCanvas diffMode={diffMode} frame={current} prevFrame={previous} />
         <ReplayMeta
           baseTs={baseTs}
+          diffEnabled={diffMode}
           elapsedSec={elapsedSec}
           frame={current}
           frameIdx={safeIdx}
+          onToggleDiff={() => setDiffMode((d) => !d)}
+          prevFrame={previous}
           totalFrames={frames.length}
         />
       </div>
@@ -156,8 +161,24 @@ export function ReplayTab({ eventId, projectId }: { eventId: string; projectId: 
 }
 
 /** SVG wireframe renderer. One <rect> per node + a soft <text>
- *  glyph when the node has visible copy. */
-function ReplayCanvas({ frame }: { frame?: ReplayFrame }) {
+ *  glyph when the node has visible copy.
+ *
+ *  When `diffMode` is on and `prevFrame` is provided, each node is
+ *  tagged "added" / "removed" / "changed" / "same" by spatial-position
+ *  matching (see `computeDiff` below). Added nodes draw with a
+ *  success outline, removed with a danger outline as ghosts of the
+ *  previous frame, changed with a warning outline. Same-as-previous
+ *  nodes render normally.
+ */
+function ReplayCanvas({
+  diffMode,
+  frame,
+  prevFrame,
+}: {
+  diffMode: boolean
+  frame?: ReplayFrame
+  prevFrame?: ReplayFrame
+}) {
   if (!frame) {
     return (
       <div className="flex h-[420px] items-center justify-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] text-[color:var(--ink-muted)]">
@@ -165,8 +186,8 @@ function ReplayCanvas({ frame }: { frame?: ReplayFrame }) {
       </div>
     )
   }
-  // Cap height; aspect locked to the device viewport from the
-  // sampler so the proportions match what the user actually saw.
+  const diff = diffMode && prevFrame ? computeDiff(prevFrame, frame) : null
+
   return (
     <div className="bg-[color:var(--paper-2)]">
       <svg
@@ -175,35 +196,100 @@ function ReplayCanvas({ frame }: { frame?: ReplayFrame }) {
         style={{ maxHeight: '420px' }}
         viewBox={`0 0 ${frame.width} ${frame.height}`}
       >
+        {/* Removed-nodes layer: render ghosts of the previous frame's
+         *  positions that are absent in the current frame. */}
+        {diff &&
+          prevFrame &&
+          diff.removed.map((i) => (
+            <NodeShape diffStatus="removed" key={`r${i}`} node={prevFrame.nodes[i]!} />
+          ))}
         {frame.nodes.map((n, i) => (
-          <NodeShape key={i} node={n} />
+          <NodeShape diffStatus={diff ? diff.status[i] : undefined} key={i} node={n} />
         ))}
       </svg>
     </div>
   )
 }
 
-function NodeShape({ node }: { node: ReplayFrame['nodes'][number] }) {
-  const fill =
+type DiffStatus = 'added' | 'changed' | 'removed' | 'same'
+
+/** Match nodes across two frames by their (x, y, w, h) spatial
+ *  fingerprint — the SDK doesn't emit stable IDs so position is
+ *  the best honest matcher. Returns:
+ *
+ *  - `status[i]` for each node in `next`: 'added' (no spatial match
+ *    in prev) / 'changed' (matched but kind|color|text differs) /
+ *    'same' (matched and identical)
+ *  - `removed[]`: indices in `prev` that have no spatial match in `next`
+ */
+function computeDiff(
+  prev: ReplayFrame,
+  next: ReplayFrame
+): { removed: number[]; status: DiffStatus[] } {
+  const key = (n: ReplayFrame['nodes'][number]) =>
+    `${Math.round(n.x)},${Math.round(n.y)},${Math.round(n.w)},${Math.round(n.h)}`
+  const prevMap = new Map<string, number>()
+  prev.nodes.forEach((n, i) => prevMap.set(key(n), i))
+  const status: DiffStatus[] = next.nodes.map((n) => {
+    const k = key(n)
+    const pIdx = prevMap.get(k)
+    if (pIdx === undefined) return 'added'
+    const p = prev.nodes[pIdx]!
+    prevMap.delete(k)
+    return p.kind === n.kind && p.color === n.color && p.text === n.text ? 'same' : 'changed'
+  })
+  // Anything still in prevMap was removed.
+  const removed: number[] = Array.from(prevMap.values())
+  return { removed, status }
+}
+
+function NodeShape({
+  diffStatus,
+  node,
+}: {
+  diffStatus?: DiffStatus
+  node: ReplayFrame['nodes'][number]
+}) {
+  // Base fill — same logic regardless of diff status.
+  const baseFill =
     node.kind === 'mask'
       ? '#000'
       : node.kind === 'image'
-        ? 'var(--ink-muted)'
+        ? 'rgba(255,255,255,0.18)'
         : node.color || 'rgba(255,255,255,0.06)'
-  const stroke = node.kind === 'text' ? 'none' : 'rgba(255,255,255,0.12)'
+
+  // Diff overlay — strokes + opacity. Always uses semantic colors
+  // from the dashboard palette so light/dark themes both read.
+  let stroke = node.kind === 'text' ? 'none' : 'rgba(255,255,255,0.12)'
+  let strokeWidth = 0.5
+  let fill = baseFill
+  let opacity = 1
+  if (diffStatus === 'added') {
+    stroke = 'var(--success)'
+    strokeWidth = 1.6
+  } else if (diffStatus === 'changed') {
+    stroke = 'var(--warning)'
+    strokeWidth = 1.6
+  } else if (diffStatus === 'removed') {
+    stroke = 'var(--danger)'
+    strokeWidth = 1.4
+    fill = 'transparent'
+    opacity = 0.55
+  }
+
   return (
-    <g>
+    <g opacity={opacity}>
       <rect
         fill={fill}
         height={node.h}
         rx={node.kind === 'image' || node.kind === 'rect' ? 2 : 0}
         stroke={stroke}
-        strokeWidth={0.5}
+        strokeWidth={strokeWidth}
         width={node.w}
         x={node.x}
         y={node.y}
       />
-      {node.kind === 'text' && node.text && (
+      {node.kind === 'text' && node.text && diffStatus !== 'removed' && (
         <text
           dominantBaseline="middle"
           fill="rgba(255,255,255,0.78)"
@@ -221,18 +307,26 @@ function NodeShape({ node }: { node: ReplayFrame['nodes'][number] }) {
 
 function ReplayMeta({
   baseTs,
+  diffEnabled,
   elapsedSec,
   frame,
   frameIdx,
+  onToggleDiff,
+  prevFrame,
   totalFrames,
 }: {
   baseTs: number
+  diffEnabled: boolean
   elapsedSec: number
   frame?: ReplayFrame
   frameIdx: number
+  onToggleDiff: () => void
+  prevFrame?: ReplayFrame
   totalFrames: number
 }) {
   void baseTs
+  const counts = diffEnabled && prevFrame && frame ? summariseDiff(prevFrame, frame) : null
+
   return (
     <div className="space-y-1.5 pt-2">
       <Row label="frame" value={`${frameIdx + 1} / ${totalFrames}`} />
@@ -243,8 +337,74 @@ function ReplayMeta({
         label="viewport"
         value={frame ? `${Math.round(frame.width)} × ${Math.round(frame.height)}` : '—'}
       />
+
+      <button
+        aria-pressed={diffEnabled}
+        className={`mt-3 inline-flex h-6 items-center border px-2 font-mono text-[10px] tracking-[0.12em] uppercase transition-colors ${
+          diffEnabled
+            ? 'border-[color:var(--accent)] bg-[color:var(--accent-soft)] text-[color:var(--accent)]'
+            : 'border-[color:var(--rule)] text-[color:var(--ink-soft)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]'
+        }`}
+        disabled={!prevFrame}
+        onClick={onToggleDiff}
+        type="button"
+      >
+        {diffEnabled ? '◉' : '○'} diff vs prev
+      </button>
+
+      {counts && (
+        <div className="mt-2 space-y-1">
+          <DiffRow color="success" count={counts.added} label="added" />
+          <DiffRow color="warning" count={counts.changed} label="changed" />
+          <DiffRow color="danger" count={counts.removed} label="removed" />
+        </div>
+      )}
     </div>
   )
+}
+
+function DiffRow({
+  color,
+  count,
+  label,
+}: {
+  color: 'danger' | 'success' | 'warning'
+  count: number
+  label: string
+}) {
+  return (
+    <div className="grid grid-cols-[60px_1fr] items-baseline gap-3">
+      <span
+        className={`font-mono text-[10px] tracking-[0.18em] uppercase text-[color:var(--${color})]`}
+      >
+        {label}
+      </span>
+      <span className="font-mono text-[12px] text-[color:var(--ink)] tabular-nums">{count}</span>
+    </div>
+  )
+}
+
+function summariseDiff(prev: ReplayFrame, next: ReplayFrame) {
+  const key = (n: ReplayFrame['nodes'][number]) =>
+    `${Math.round(n.x)},${Math.round(n.y)},${Math.round(n.w)},${Math.round(n.h)}`
+  const prevMap = new Map<string, number>()
+  prev.nodes.forEach((n, i) => prevMap.set(key(n), i))
+  let added = 0
+  let changed = 0
+  for (const n of next.nodes) {
+    const k = key(n)
+    const pIdx = prevMap.get(k)
+    if (pIdx === undefined) {
+      added += 1
+      continue
+    }
+    const p = prev.nodes[pIdx]!
+    prevMap.delete(k)
+    if (p.kind !== n.kind || p.color !== n.color || p.text !== n.text) {
+      changed += 1
+    }
+  }
+  return { added, changed, removed: prevMap.size }
 }
 
 function Row({ label, value }: { label: string; value: string }) {
