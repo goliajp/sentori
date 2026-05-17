@@ -8,15 +8,15 @@ export function StubView() {
   const last = pathname.replace(/\/$/, '').split('/').pop() ?? 'view'
   const title = last.charAt(0).toUpperCase() + last.slice(1)
   return (
-    <div className="space-y-3">
-      <PageHeader subtitle="Not yet implemented in v2" title={title} />
-      <div className="border-border bg-bg-secondary/30 rounded-md border px-4 py-12 text-center">
-        <div className="text-fg-muted t-sm mb-1 font-semibold tracking-wider uppercase">
+    <div className="sentori-page-in">
+      <PageHeader subtitle="not yet implemented" title={title} />
+      <div className="border-y border-[color:var(--rule)] px-4 py-10 text-center">
+        <div className="mb-1.5 font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
           Coming soon
         </div>
-        <div className="text-fg t-md">
-          <span className="text-accent font-mono">{title}</span> is wired into the router but the
-          view body lands in a follow-up commit.
+        <div className="text-[13px] text-[color:var(--ink-soft)]">
+          <span className="font-mono text-[color:var(--ink)]">{title}</span> is wired into the
+          router but the view body lands in a follow-up.
         </div>
       </div>
     </div>
