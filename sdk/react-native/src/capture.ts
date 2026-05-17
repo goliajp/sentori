@@ -1,5 +1,6 @@
 import { sealTrail, shouldSample } from '@goliapkg/sentori-core';
 
+import { base64Utf8 } from './base64';
 import {
   __peekBreadcrumbCount,
   addBreadcrumb,
@@ -8,7 +9,7 @@ import {
 import { getBundleInfo } from './bundle-info';
 import { getConfig, isInitialized } from './config';
 import { getFeatureFlagSnapshot } from './feature-flags';
-import { drainReplay } from './replay';
+import { drainReplay, isReplayRunning } from './replay';
 import { clearStateSnapshots, getStateSnapshots } from './state-snapshots';
 import { symbolicateErrorViaMetro } from './handlers/dev-symbolicate';
 import { captureScreenshot } from './handlers/screenshot';
@@ -143,6 +144,7 @@ export const captureError = (error: Error, extras?: CaptureExtras): void => {
       'breadcrumbs=', crumbs.length,
       'wantScreenshot=', config.screenshotsEnabled && extras?.screenshot !== false,
       'wantSessionTrail=', config.sessionTrailEnabled,
+      'wantReplay=', isReplayRunning(),
     );
   }
 
@@ -184,6 +186,17 @@ export const captureError = (error: Error, extras?: CaptureExtras): void => {
     const replayNdjson = drainReplay();
     if (replayNdjson.length > 0) {
       await captureAndAttachReplay(event, replayNdjson);
+    } else if (typeof __DEV__ !== 'undefined' && __DEV__ && isReplayRunning()) {
+      // rc.4 — explicit "replay was on but ring drained empty" signal.
+      // Without this, "kinds=screenshot,sessionTrail" looks
+      // indistinguishable from `replay: off` even though the ticks
+      // were healthy upstream. Insight 2026-05-18 verify shape made
+      // this gap painful to triage.
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[sentori] replay drain empty (no frames buffered at captureException)',
+        'eventId=', event.id,
+      );
     }
     if (typeof __DEV__ !== 'undefined' && __DEV__) {
       // eslint-disable-next-line no-console
@@ -202,25 +215,49 @@ export const captureError = (error: Error, extras?: CaptureExtras): void => {
 
 /** v0.9.6 #2 — upload the wireframe replay ring as a `replay`
  *  attachment. Plain NDJSON (one snapshot per line) — server may
- *  gzip on storage; the network upload is base64. */
+ *  gzip on storage; the network upload is base64.
+ *
+ *  rc.4: route through `base64Utf8` so non-Latin-1 text inside any
+ *  walked TextView (Japanese / Chinese / em-dash etc.) doesn't blow
+ *  up the Hermes-spec `btoa`. The pre-rc.4 inline `btoa(ndjson)` path
+ *  threw `InvalidCharacterError` on those code points, the
+ *  surrounding catch swallowed it silently, and the replay
+ *  attachment never landed. Insight 2026-05-18 verify caught it
+ *  after rc.3's walker fix surfaced deep TextView content. Dev
+ *  logs replace the silent catch so the next failure shape is
+ *  visible. */
 async function captureAndAttachReplay(event: Event, ndjson: string): Promise<void> {
   try {
-    const base64 =
-      typeof globalThis.btoa === 'function'
-        ? globalThis.btoa(ndjson)
-        : Buffer.from(ndjson, 'utf8').toString('base64');
+    const base64 = base64Utf8(ndjson);
     const meta = await uploadAttachment(
       event.id,
       'replay',
       { base64, mediaType: 'application/x-ndjson' },
       { source: 'js' },
     );
-    if (meta) {
-      if (!event.attachments) event.attachments = [];
-      event.attachments.push(meta);
+    if (!meta) {
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[sentori] replay upload returned null',
+          'eventId=', event.id,
+          'ndjsonBytes=', ndjson.length,
+        );
+      }
+      return;
     }
-  } catch {
-    // best-effort
+    if (!event.attachments) event.attachments = [];
+    event.attachments.push(meta);
+  } catch (e) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[sentori] replay attachment threw',
+        'eventId=', event.id,
+        'ndjsonBytes=', ndjson.length,
+        e,
+      );
+    }
   }
 }
 
@@ -233,11 +270,7 @@ async function captureAndAttachStateSnapshots(
 ): Promise<void> {
   try {
     const payload = JSON.stringify({ snapshots });
-    const base64 =
-      typeof globalThis.btoa === 'function'
-        ? globalThis.btoa(payload)
-        : // Bun / node fallback
-          Buffer.from(payload, 'utf8').toString('base64');
+    const base64 = base64Utf8(payload);
     const meta = await uploadAttachment(
       event.id,
       'stateSnapshot',
@@ -267,12 +300,7 @@ async function captureAndAttachSessionTrail(event: Event): Promise<void> {
   const payload = sealTrail(trail);
   trail.clear();
   const json = JSON.stringify(payload);
-  // base64 the JSON for the `data:` URI multipart bridge (same
-  // trick the screenshot path uses).
-  const base64 =
-    typeof globalThis.btoa === 'function'
-      ? globalThis.btoa(unescape(encodeURIComponent(json)))
-      : Buffer.from(json, 'utf-8').toString('base64');
+  const base64 = base64Utf8(json);
   const attachment = await uploadAttachment(
     event.id,
     'sessionTrail',
@@ -288,6 +316,12 @@ async function captureAndAttachSessionTrail(event: Event): Promise<void> {
 }
 
 export const captureException = captureError;
+
+/** rc.4 — test hook. The real replay attach path is internal so we
+ *  don't bloat the public surface, but the encoding bug Insight hit
+ *  on 2026-05-18 needs a behaviour-level test that exercises the
+ *  same code path captureException runs in production. */
+export const __captureAndAttachReplayForTests = captureAndAttachReplay;
 
 /** Phase 42 sub-D.08: per-session screenshot quota gate. */
 function allowScreenshot(): boolean {

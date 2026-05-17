@@ -139,6 +139,11 @@ export default function App() {
         <Text style={styles.title}>Sentori</Text>
         <Text style={styles.subtitle}>example · Expo 55 · RN 0.83</Text>
         <Text style={styles.meta}>ingest: {INGEST_URL}</Text>
+        {/* rc.4 verify — JP / em-dash / emoji so the walked
+            wireframe NDJSON carries non-Latin-1 text. The pre-rc.4
+            inline `btoa(ndjson)` path threw on this content; rc.4
+            routes through base64Utf8. */}
+        <Text style={styles.meta}>設定 · ログアウト · こんにちは — 🎉</Text>
       </View>
 
       <View style={styles.buttons}>

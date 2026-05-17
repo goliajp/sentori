@@ -296,6 +296,15 @@ function loadNativeReplay(): ReplayNativeModule | null {
   }
 }
 
+/** rc.4 — surface "is replay subsystem alive" so the captureException
+ *  debug log can label `wantReplay` alongside `wantScreenshot` /
+ *  `wantSessionTrail`. Insight 2026-05-18 verify flagged that the
+ *  pre-rc.4 log line was missing `wantReplay`, leaving the failure
+ *  shape ambiguous (config-off vs. ring-empty vs. attach-failed). */
+export function isReplayRunning(): boolean {
+  return _running;
+}
+
 /** Drain the ring as NDJSON (one snapshot per line). Empty string
  *  when the ring is empty. Also clears the ring so the next session's
  *  replay starts fresh. */
