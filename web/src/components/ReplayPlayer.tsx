@@ -3,11 +3,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import {
   isCircleShape,
-  paletteColorFor,
-  WIREFRAME_FILL_OPACITY,
+  WIREFRAME_FILL,
+  WIREFRAME_IMAGE_OPACITY,
   WIREFRAME_MASK_FILL,
   WIREFRAME_MASK_OPACITY,
-  WIREFRAME_STROKE,
+  WIREFRAME_RECT_OPACITY,
   WIREFRAME_TEXT_FILL,
 } from '@/lib/wireframe-palette'
 
@@ -471,7 +471,9 @@ function NodeRender({ node }: { node: Node }) {
     )
   }
 
-  const fill = paletteColorFor(node)
+  // Image gets slightly heavier alpha so media regions read as
+  // distinct from generic containers; both use the same ink hue.
+  const fillOpacity = node.kind === 'image' ? WIREFRAME_IMAGE_OPACITY : WIREFRAME_RECT_OPACITY
 
   if (node.kind === 'image' && isCircleShape(node.w, node.h)) {
     const r = Math.min(node.w, node.h) / 2
@@ -479,11 +481,9 @@ function NodeRender({ node }: { node: Node }) {
       <circle
         cx={node.x + node.w / 2}
         cy={node.y + node.h / 2}
-        fill={fill}
-        fillOpacity={WIREFRAME_FILL_OPACITY}
+        fill={WIREFRAME_FILL}
+        fillOpacity={fillOpacity}
         r={r}
-        stroke={WIREFRAME_STROKE}
-        strokeWidth={0.5}
       />
     )
   }
@@ -492,12 +492,10 @@ function NodeRender({ node }: { node: Node }) {
   const rx = node.kind === 'image' ? 8 : 0
   return (
     <rect
-      fill={fill}
-      fillOpacity={WIREFRAME_FILL_OPACITY}
+      fill={WIREFRAME_FILL}
+      fillOpacity={fillOpacity}
       height={node.h}
       rx={rx}
-      stroke={WIREFRAME_STROKE}
-      strokeWidth={0.5}
       width={node.w}
       x={node.x}
       y={node.y}

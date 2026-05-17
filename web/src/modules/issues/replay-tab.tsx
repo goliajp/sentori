@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from 'react'
 import { adminApi, type ReplayFrame } from '@/api/client'
 import {
   isCircleShape,
-  paletteColorFor,
-  WIREFRAME_FILL_OPACITY,
+  WIREFRAME_FILL,
+  WIREFRAME_IMAGE_OPACITY,
   WIREFRAME_MASK_FILL,
   WIREFRAME_MASK_OPACITY,
-  WIREFRAME_STROKE,
+  WIREFRAME_RECT_OPACITY,
   WIREFRAME_TEXT_FILL,
 } from '@/lib/wireframe-palette'
 
@@ -298,18 +298,22 @@ function NodeShape({
     )
   }
 
-  // Diff overlay — strokes use the dashboard's semantic palette so
-  // they pop on either light or dark canvas. `removed` ghosts the
-  // shape (no fill).
+  // Structural ink-on-paper rendering — no per-node hue, no
+  // outline. Kind drives the alpha tier and the shape primitive.
+  // Diff overlay reuses the dashboard's semantic stroke colours
+  // (success / warning / danger) but only when the node actually
+  // moved between frames — same-frame nodes stay borderless.
   const isMask = node.kind === 'mask'
-  const baseFill = isMask ? WIREFRAME_MASK_FILL : paletteColorFor(node)
-  const baseStroke = isMask ? 'transparent' : WIREFRAME_STROKE
-  const baseStrokeWidth = 0.5
+  const isImage = node.kind === 'image'
 
-  let stroke = baseStroke
-  let strokeWidth = baseStrokeWidth
-  let fill: string = baseFill
-  let fillOpacity = isMask ? WIREFRAME_MASK_OPACITY : WIREFRAME_FILL_OPACITY
+  let fill: string = isMask ? WIREFRAME_MASK_FILL : WIREFRAME_FILL
+  let fillOpacity = isMask
+    ? WIREFRAME_MASK_OPACITY
+    : isImage
+      ? WIREFRAME_IMAGE_OPACITY
+      : WIREFRAME_RECT_OPACITY
+  let stroke = 'transparent'
+  let strokeWidth = 0
   let opacity = 1
   if (diffStatus === 'added') {
     stroke = 'var(--success)'
@@ -325,7 +329,7 @@ function NodeShape({
     opacity = 0.55
   }
 
-  if (node.kind === 'image' && isCircleShape(node.w, node.h)) {
+  if (isImage && isCircleShape(node.w, node.h)) {
     const r = Math.min(node.w, node.h) / 2
     return (
       <g opacity={opacity}>
@@ -348,7 +352,7 @@ function NodeShape({
         fill={fill}
         fillOpacity={fillOpacity}
         height={node.h}
-        rx={node.kind === 'image' ? 8 : 0}
+        rx={isImage ? 8 : 0}
         stroke={stroke}
         strokeWidth={strokeWidth}
         width={node.w}
