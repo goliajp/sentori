@@ -7,6 +7,7 @@ import {
   WIREFRAME_IMAGE_FILL,
   WIREFRAME_IMAGE_OPACITY,
   WIREFRAME_MASK_FILL,
+  WIREFRAME_RECT_FALLBACK_OPACITY,
   WIREFRAME_RECT_FILL,
   WIREFRAME_RECT_OPACITY,
   WIREFRAME_TEXT_FILL,
@@ -235,8 +236,9 @@ function ReplayCanvas({
             <path
               d={`M 0 0 L ${gridStep} 0 M 0 0 L 0 ${gridStep}`}
               stroke="var(--rule)"
-              strokeOpacity={0.55}
+              strokeOpacity={0.8}
               strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
             />
           </pattern>
         </defs>
@@ -326,14 +328,22 @@ function NodeShape({
   const isMask = node.kind === 'mask'
   const isImage = node.kind === 'image'
 
+  const hasExplicitColor = !isMask && !isImage && !!node.color
   let fill: string = isMask
     ? WIREFRAME_MASK_FILL
     : isImage
       ? WIREFRAME_IMAGE_FILL
       : (node.color ?? WIREFRAME_RECT_FILL)
-  // Mask stays at its declared opacity (already a heavy rgba); the
-  // other kinds compose via the shared opacity.
-  let fillOpacity = isMask ? 1 : isImage ? WIREFRAME_IMAGE_OPACITY : WIREFRAME_RECT_OPACITY
+  // Mask stays at its declared opacity (already a heavy rgba). Rect
+  // without an SDK-emitted colour drops to the fallback opacity so
+  // the grid pattern underneath still reads through old captures.
+  let fillOpacity = isMask
+    ? 1
+    : isImage
+      ? WIREFRAME_IMAGE_OPACITY
+      : hasExplicitColor
+        ? WIREFRAME_RECT_OPACITY
+        : WIREFRAME_RECT_FALLBACK_OPACITY
   let stroke = 'transparent'
   let strokeWidth = 0
   let opacity = 1

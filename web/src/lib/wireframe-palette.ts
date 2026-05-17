@@ -37,11 +37,16 @@ export const WIREFRAME_RECT_FILL = 'rgb(255,255,255)'
 export const WIREFRAME_IMAGE_FILL = 'rgb(255,255,255)'
 
 /** Shared fill-opacity for rect / circle / colour-passed-through
- *  nodes. 0.9 — the user dialled this up from 0.75 once colours
- *  started landing (rc.5 Android background extraction); the
- *  remaining 10% headroom is enough that overlapping CTAs still
- *  read a touch more saturated than a single one. */
+ *  nodes — when the SDK gave us an actual colour. 0.9 keeps brand
+ *  hues saturated; the 10% headroom is overlap composition. */
 export const WIREFRAME_RECT_OPACITY = 0.9
+
+/** Opacity for fallback (no explicit `node.color`) rect fills.
+ *  Lower so the grid pattern underneath still reads through old
+ *  pre-rc.5 captures where Android emitted no colour for any
+ *  rect kind — "明明有内容还是啥也看不到" was the failure shape
+ *  when this was implicitly 0.9 alongside coloured rects. */
+export const WIREFRAME_RECT_FALLBACK_OPACITY = 0.12
 
 /** Image regions fully opaque — media reads as a solid block;
  *  container overlap is carried by the rect tier. */

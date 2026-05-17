@@ -6,6 +6,7 @@ import {
   WIREFRAME_IMAGE_FILL,
   WIREFRAME_IMAGE_OPACITY,
   WIREFRAME_MASK_FILL,
+  WIREFRAME_RECT_FALLBACK_OPACITY,
   WIREFRAME_RECT_FILL,
   WIREFRAME_RECT_OPACITY,
   WIREFRAME_TEXT_FILL,
@@ -435,8 +436,9 @@ function WireframeSvg({ snapshot }: { snapshot: Snapshot }) {
           <path
             d={`M 0 0 L ${step} 0 M 0 0 L 0 ${step}`}
             stroke="var(--rule)"
-            strokeOpacity={0.55}
+            strokeOpacity={0.8}
             strokeWidth={1}
+            vectorEffect="non-scaling-stroke"
           />
         </pattern>
       </defs>
@@ -484,8 +486,13 @@ function NodeRender({ node }: { node: Node }) {
   // as translucent layers — two stacked rects read more saturated
   // than one, describing depth without rendering as a solid block.
   const isImage = node.kind === 'image'
+  const hasExplicitColor = !isImage && !!node.color
   const fill = isImage ? WIREFRAME_IMAGE_FILL : (node.color ?? WIREFRAME_RECT_FILL)
-  const fillOpacity = isImage ? WIREFRAME_IMAGE_OPACITY : WIREFRAME_RECT_OPACITY
+  const fillOpacity = isImage
+    ? WIREFRAME_IMAGE_OPACITY
+    : hasExplicitColor
+      ? WIREFRAME_RECT_OPACITY
+      : WIREFRAME_RECT_FALLBACK_OPACITY
 
   if (isImage && isCircleShape(node.w, node.h)) {
     const r = Math.min(node.w, node.h) / 2
