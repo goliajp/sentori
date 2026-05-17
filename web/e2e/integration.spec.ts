@@ -76,8 +76,8 @@ test('mint → list → revoke project ingest token via UI', async ({ browser, r
   expect(projResp.status(), `project create ${await projResp.text()}`).toBeLessThan(300)
   const { id: projectId } = (await projResp.json()) as { id: string }
 
-  // Jump straight to the integration view.
-  await page.goto(`/org/${orgSlug}/projects/${projectId}/integration`)
+  // Jump straight to the integration module with the project pinned.
+  await page.goto(`/org/${orgSlug}/integrate?project=${projectId}`)
 
   // Empty state.
   await expect(page.getByText(/no active tokens yet/i)).toBeVisible()

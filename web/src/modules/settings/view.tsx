@@ -240,7 +240,7 @@ export function SettingsView() {
                     <div className="flex items-center justify-end gap-3 font-mono text-[10px] tracking-[0.1em] uppercase">
                       <Link
                         className="text-[color:var(--ink-muted)] hover:text-[color:var(--accent)]"
-                        to={`/org/${currentOrg.slug}/projects/${p.id}/integration`}
+                        to={`/org/${currentOrg.slug}/integrate?project=${p.id}`}
                       >
                         integrate →
                       </Link>

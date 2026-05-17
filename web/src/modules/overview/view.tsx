@@ -178,7 +178,7 @@ function ProjectCard({ orgSlug, project }: { orgSlug: string; project: ProjectRo
         </Link>
         <Link
           className="text-[color:var(--accent)] hover:text-[color:var(--accent-strong)]"
-          to={`/org/${orgSlug}/projects/${project.id}/integration`}
+          to={`/org/${orgSlug}/integrate?project=${project.id}`}
           title="Install SDK + ingest tokens"
         >
           integrate →

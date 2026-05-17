@@ -1,15 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link } from 'react-router'
 
 import { tokensApi, type TokenRow } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
+import { PageHeader } from '@/layout/page-header'
 
 /**
- * Project Integration — `/org/:slug/projects/:projectId/integration`.
+ * Integration module — sidebar entry. Project comes from the org-wide
+ * sidebar context (set by the `?project=` switcher), same as every
+ * other per-project module, so we never duplicate the project in
+ * the URL path.
  *
- * Single-screen answer to "how do I integrate this project?". Three
- * stacked sections:
+ * Three stacked sections:
  *
  *   ── Project ─────  static info (name, id, org)
  *   ── Tokens ──────  list / create / revoke ingest tokens
@@ -24,11 +27,11 @@ import { useOrg } from '@/auth/orgContext'
  * SHA-256 hash server-side.
  */
 export function ProjectIntegrationView() {
-  const { projectId, slug } = useParams<{ projectId: string; slug: string }>()
-  const { currentOrg, projects } = useOrg()
+  const { currentOrg, currentProject } = useOrg()
   const qc = useQueryClient()
 
-  const project = projects.find((p) => p.id === projectId)
+  const projectId = currentProject?.id ?? null
+  const project = currentProject
 
   const tokensQ = useQuery({
     enabled: !!projectId,
@@ -55,24 +58,22 @@ export function ProjectIntegrationView() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['tokens', projectId] }),
   })
 
-  if (!projectId || !slug) return null
+  if (!projectId) {
+    return (
+      <div className="sentori-page-in">
+        <PageHeader subtitle="install · ingest tokens" title="Integrate" />
+        <p className="border-y border-[color:var(--rule)] py-4 text-[13px] text-[color:var(--ink-soft)]">
+          Pick a project in the sidebar to mint an ingest token and grab the SDK quickstart snippet.
+        </p>
+      </div>
+    )
+  }
 
   return (
-    <div className="sentori-page-in mx-auto max-w-4xl px-6 py-8">
-      <Link
-        className="inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.1em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--accent)]"
-        to={`/org/${slug}/settings`}
-      >
-        ← back to settings
-      </Link>
+    <div className="sentori-page-in">
+      <PageHeader subtitle={`${project?.name ?? '—'} · ${currentOrg.slug}`} title="Integrate" />
 
-      <header className="page-head mt-2">
-        <h1 className="page-head-title">{project?.name ?? 'Integration'}</h1>
-        <span className="page-head-sub">org · {currentOrg.slug}</span>
-      </header>
-
-      {/* ── Project info ── */}
-      <section className="mt-4">
+      <section>
         <header className="sec-head">
           <span className="sec-head-title">Project</span>
           <span className="sec-head-sub">stable identifiers</span>
@@ -196,7 +197,7 @@ export function ProjectIntegrationView() {
         Once events arrive,{' '}
         <Link
           className="text-[color:var(--ink)] hover:text-[color:var(--accent)]"
-          to={`/org/${slug}/issues?project=${projectId}`}
+          to={`/org/${currentOrg.slug}/issues?project=${projectId}`}
         >
           open issues →
         </Link>

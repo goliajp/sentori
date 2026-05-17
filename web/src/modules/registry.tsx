@@ -11,6 +11,7 @@ import { MetricsView } from './metrics/view'
 import { MomentsView } from './moments/view'
 import { PrivacyView } from './privacy/view'
 import { OverviewView } from './overview/view'
+import { ProjectIntegrationView } from '../views/project-integration'
 import { ReleasesView } from './releases/view'
 import { SettingsView } from './settings/view'
 import { TeamsView } from './teams/view'
@@ -161,6 +162,15 @@ export const MODULES: ModuleDef[] = [
     label: 'Integrations',
     path: 'integrations',
     view: IntegrationsView,
+  },
+  {
+    adminOnly: true,
+    group: 'organize',
+    iconPath: 'M7 7h10M7 12h10M7 17h6M3 4h2M3 9h2M3 14h2M3 19h2',
+    id: 'integrate',
+    label: 'Integrate',
+    path: 'integrate',
+    view: ProjectIntegrationView,
   },
   {
     adminOnly: true,
