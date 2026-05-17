@@ -37,6 +37,26 @@ let _ring: string[] = [];
 let _timer: ReturnType<typeof setInterval> | null = null;
 let _running = false;
 
+/**
+ * v0.9.13 — frame-level delta encoding: when the new snapshot matches
+ * the last one byte-for-byte (static UI, no animation, off-screen
+ * app), skip pushing it. The ring stays meaningful (one frame =
+ * one *change*), the attachment shrinks proportionally, and a real
+ * idle phase no longer evicts a useful pre-error frame.
+ *
+ * We only check against the most-recently-pushed snapshot, not the
+ * whole ring — that's cheap (one string comparison per tick) and
+ * catches the dominant case (idle screens). True content changes
+ * fall through and push as before.
+ *
+ * Budget verification on the iOS showcase (apps/ios-showcase): 60
+ * frames at ~120 bytes each → ≈ 7 KB raw NDJSON, well under the
+ * 500 KB attachment cap. Heavier RN apps with 200+ visible nodes
+ * per frame can land in the 400 KB band; future work in v1.x adds
+ * native gzip on upload if real-world traffic ever pushes the cap.
+ */
+let _lastPushed: null | string = null;
+
 /** Native module ref, resolved once on first start. Caching here
  *  avoids the cost of `requireNativeModule('Sentori')` on every
  *  capture tick (Metro's require cache makes this cheap, but the
@@ -142,8 +162,15 @@ function captureTick(): void {
     const maskIds = readMaskIds();
     const snapshot = _nativeMod?.captureWireframe?.(maskIds);
     if (typeof snapshot === 'string' && snapshot.length > 0) {
-      _ring.push(snapshot);
-      while (_ring.length > RING_SIZE) _ring.shift();
+      // v0.9.13 — skip pushing if the frame is identical to the last
+      // pushed one. See _lastPushed comment for the rationale.
+      if (snapshot !== _lastPushed) {
+        _ring.push(snapshot);
+        _lastPushed = snapshot;
+        while (_ring.length > RING_SIZE) {
+          _ring.shift();
+        }
+      }
       _emptyTickCount = 0;
       _emptyTickLogStride = 1;
     } else if (typeof __DEV__ !== 'undefined' && __DEV__) {
@@ -211,10 +238,12 @@ export function drainReplay(): string {
   if (_ring.length === 0) return '';
   const out = _ring.join('\n');
   _ring = [];
+  _lastPushed = null;
   return out;
 }
 
 export function __resetReplayForTests(): void {
   stopReplay();
   _ring = [];
+  _lastPushed = null;
 }
