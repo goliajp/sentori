@@ -40,7 +40,12 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 5_000 },
   fullyParallel: false, // share one server / one DB
-  retries: 0,
+  // CI has been flaking on the forgot-password test even at 45 s
+  // for the response — the server reliably answers in <1 s once
+  // it's awake but the first hit on a cold runner can be much
+  // slower. One retry covers the cold-start tax without masking
+  // a real regression (a real bug would fail both attempts).
+  retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: 'list',
   use: {
