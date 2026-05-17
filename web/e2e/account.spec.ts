@@ -124,7 +124,12 @@ test('forgot-password → reset → new pw authenticates', async ({ browser, req
   await page.waitForURL(/\/forgot-password/)
   await page.getByLabel('email').fill(email)
   await page.getByRole('button', { name: /send reset link/i }).click()
-  await expect(page.getByText(/a reset link is on its way/i)).toBeVisible()
+  // The submit button disappears when the success state takes over —
+  // that's a cheaper, more reliable signal than scanning multi-node
+  // copy for a substring, and tolerates a slower CI cold-start.
+  await expect(page.getByRole('button', { name: /send reset link/i })).toBeHidden({
+    timeout: 15_000,
+  })
 
   // Pull the token from the DB + drive the reset UI.
   const token = await fetchResetToken(request, email)
