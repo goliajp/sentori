@@ -10,7 +10,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "@goliapkg/sentori-react-native": "file:..",
+    "@goliapkg/sentori-react-native": "file:../../sdk/react-native",
     "expo": "~55.0.24",
     "expo-dev-client": "~55.0.34",
     "expo-linking": "~55.0.15",

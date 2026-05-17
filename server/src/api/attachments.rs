@@ -388,18 +388,7 @@ pub async fn replay_frames(
         Ok(t) => t,
         Err(_) => return server_error("notUtf8"),
     };
-    let mut frames: Vec<serde_json::Value> = Vec::new();
-    for line in text.lines() {
-        if line.trim().is_empty() {
-            continue;
-        }
-        match serde_json::from_str::<serde_json::Value>(line) {
-            Ok(v) => frames.push(v),
-            Err(e) => {
-                tracing::warn!(error = %e, %ref_id, "replay frame skipped (parse failed)");
-            }
-        }
-    }
+    let frames = parse_replay_ndjson(text, Some(ref_id));
 
     (
         StatusCode::OK,
@@ -410,6 +399,82 @@ pub async fn replay_frames(
         })),
     )
         .into_response()
+}
+
+/// Parse a NDJSON replay attachment into a `Vec<JSON>`. Blank lines
+/// are skipped silently; malformed JSON lines are skipped with a
+/// `tracing::warn!` so a corrupted single frame can't break the
+/// whole timeline.
+///
+/// `ref_id` is only used for the warn tag (and only when supplied),
+/// so the function is callable from tests that don't have a real ref.
+pub fn parse_replay_ndjson(text: &str, ref_id: Option<Uuid>) -> Vec<serde_json::Value> {
+    let mut frames: Vec<serde_json::Value> = Vec::new();
+    for line in text.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        match serde_json::from_str::<serde_json::Value>(line) {
+            Ok(v) => frames.push(v),
+            Err(e) => {
+                if let Some(rid) = ref_id {
+                    tracing::warn!(error = %e, ref_id = %rid, "replay frame skipped (parse failed)");
+                } else {
+                    tracing::warn!(error = %e, "replay frame skipped (parse failed)");
+                }
+            }
+        }
+    }
+    frames
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_empty_string_returns_empty_vec() {
+        assert!(parse_replay_ndjson("", None).is_empty());
+    }
+
+    #[test]
+    fn parse_skips_blank_lines() {
+        let input = "\n\n  \n\n";
+        assert!(parse_replay_ndjson(input, None).is_empty());
+    }
+
+    #[test]
+    fn parse_two_well_formed_frames() {
+        let input = concat!(
+            r#"{"ts":1000,"width":390,"height":844,"nodes":[]}"#,
+            "\n",
+            r#"{"ts":1500,"width":390,"height":844,"nodes":[{"kind":"text","x":0,"y":0,"w":10,"h":10,"text":"hi"}]}"#,
+        );
+        let frames = parse_replay_ndjson(input, None);
+        assert_eq!(frames.len(), 2);
+        assert_eq!(frames[0]["ts"], 1000);
+        assert_eq!(frames[1]["ts"], 1500);
+        assert_eq!(frames[1]["nodes"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn parse_skips_malformed_line_keeps_the_rest() {
+        let input = "{\"ts\":1,\"width\":1,\"height\":1,\"nodes\":[]}\n\
+                     not json at all\n\
+                     {\"ts\":2,\"width\":1,\"height\":1,\"nodes\":[]}\n";
+        let frames = parse_replay_ndjson(input, None);
+        assert_eq!(frames.len(), 2, "malformed line must not break the timeline");
+        assert_eq!(frames[0]["ts"], 1);
+        assert_eq!(frames[1]["ts"], 2);
+    }
+
+    #[test]
+    fn parse_one_frame_no_trailing_newline() {
+        let input = r#"{"ts":42,"width":390,"height":844,"nodes":[]}"#;
+        let frames = parse_replay_ndjson(input, None);
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0]["ts"], 42);
+    }
 }
 
 async fn is_admin_for_project(

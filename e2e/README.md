@@ -26,7 +26,7 @@ Exits 0 on success; non-zero on any check failure.
 - Does not load the example app
 
 Simulator end-to-end is manual for v0.1 — see
-`sdk/react-native/example/README.md` for the iOS / Android bring-up steps.
+`apps/rn-example/README.md` for the iOS / Android bring-up steps.
 GUI automation (`xcrun simctl`-driven button taps, `adb shell`, GitHub
 Actions macOS runner) is deferred to v0.2.
 

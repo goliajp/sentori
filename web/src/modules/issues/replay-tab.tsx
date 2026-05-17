@@ -116,7 +116,13 @@ export function ReplayTab({ eventId, projectId }: { eventId: string; projectId: 
   const elapsedSec = current ? (current.ts - baseTs) / 1000 : 0
 
   return (
-    <section className="space-y-3" ref={panelRef} tabIndex={0}>
+    <section
+      aria-label="Wireframe replay scrubber"
+      className="space-y-3"
+      ref={panelRef}
+      role="region"
+      tabIndex={0}
+    >
       <header className="flex items-baseline gap-4 border-b border-[color:var(--rule)] pb-2">
         <span className="text-[15px] font-medium text-[color:var(--ink)]">Wireframe replay</span>
         <span className="font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink-muted)] tabular-nums">
@@ -188,14 +194,24 @@ function ReplayCanvas({
   }
   const diff = diffMode && prevFrame ? computeDiff(prevFrame, frame) : null
 
+  const a11yLabel = diff
+    ? `Wireframe frame, ${frame.nodes.length} nodes — diff overlay on, ${diff.removed.length} removed`
+    : `Wireframe frame, ${frame.nodes.length} nodes`
   return (
     <div className="bg-[color:var(--paper-2)]">
       <svg
+        aria-label={a11yLabel}
         className="block w-full"
         preserveAspectRatio="xMidYMid meet"
+        role="img"
         style={{ maxHeight: '420px' }}
         viewBox={`0 0 ${frame.width} ${frame.height}`}
       >
+        <title>{a11yLabel}</title>
+        <desc>
+          Wireframe snapshot of the host app at the selected timeline frame.
+          {diff && ' Coloured outlines highlight nodes that changed since the previous frame.'}
+        </desc>
         {/* Removed-nodes layer: render ghosts of the previous frame's
          *  positions that are absent in the current frame. */}
         {diff &&
@@ -211,7 +227,7 @@ function ReplayCanvas({
   )
 }
 
-type DiffStatus = 'added' | 'changed' | 'removed' | 'same'
+export type DiffStatus = 'added' | 'changed' | 'removed' | 'same'
 
 /** Match nodes across two frames by their (x, y, w, h) spatial
  *  fingerprint — the SDK doesn't emit stable IDs so position is
@@ -222,7 +238,7 @@ type DiffStatus = 'added' | 'changed' | 'removed' | 'same'
  *    'same' (matched and identical)
  *  - `removed[]`: indices in `prev` that have no spatial match in `next`
  */
-function computeDiff(
+export function computeDiff(
   prev: ReplayFrame,
   next: ReplayFrame
 ): { removed: number[]; status: DiffStatus[] } {
@@ -384,7 +400,7 @@ function DiffRow({
   )
 }
 
-function summariseDiff(prev: ReplayFrame, next: ReplayFrame) {
+export function summariseDiff(prev: ReplayFrame, next: ReplayFrame) {
   const key = (n: ReplayFrame['nodes'][number]) =>
     `${Math.round(n.x)},${Math.round(n.y)},${Math.round(n.w)},${Math.round(n.h)}`
   const prevMap = new Map<string, number>()

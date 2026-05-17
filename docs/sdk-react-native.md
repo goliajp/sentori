@@ -397,6 +397,118 @@ You can leave the calls in production safely.
 - One trail per crash: the buffer is sealed and cleared inside
   `captureException`, so successive crashes get fresh trails.
 
+## Wireframe replay (opt-in, v1.0)
+
+v1.0 adds a wireframe **session replay** ring. The native side
+walks the UIView (iOS) / decor View (Android) hierarchy at a fixed
+cadence and serialises each visible node as a compact rect descriptor
+(`{ kind, x, y, w, h, text?, color? }`). The ring keeps the last
+60 snapshots (60 seconds at the 1 Hz default) and flushes as a
+`replay` attachment on every `captureException`.
+
+Off by default; flip on in `init`:
+
+```ts
+sentori.init({
+  token: 'st_pk_…',
+  release: 'myapp@1.2.3+456',
+  capture: { replay: { mode: 'wireframe', hz: 1 } },
+})
+```
+
+`hz` is sampler frequency in Hz. Default 1 (one snapshot per
+second). 2 Hz is the sweet spot for "felt fluid" replays of
+animations; > 2 Hz starts to compete with the JS thread for
+main-queue dispatches on mid-tier Android.
+
+### What you get on the dashboard
+
+The issue detail page grows a **Replay** tab between Stack and
+Events when the event has a replay attachment. It renders the
+frame stream as:
+
+- a SVG canvas at the device viewport's aspect ratio — every node
+  is a `<rect>` with optional text glyph; same primitive shape the
+  native sampler emits
+- a horizontal **thumbnail rail** — one mini SVG per frame,
+  click-to-jump
+- a **time slider** + Prev / Play / Next + 2 Hz auto-play
+- keyboard nav: ←/→ step, Space play/pause, Home/End jump
+- a **diff vs prev** toggle — added (green) / changed (amber) /
+  removed (red ghost) outlines on each node, plus a per-frame
+  count rail
+
+### Why wireframe, not raster
+
+- **Storage** — 80 nodes × ~80 bytes ≈ 6 KB per snapshot. A 60-slot
+  ring is ~360 KB raw, well under the 500 KB attachment cap. Raster
+  session replay is 50 KB / frame on the same scene.
+- **Privacy** — no pixels means no accidental PII leaks. Mask
+  registry decides what text is replaced with `***`.
+- **Replay fidelity** — less faithful to pixels but enough to see
+  which screen the user was on and what was on it, which is the
+  question that matters during triage.
+
+### Mask registry
+
+```ts
+sentori.registerMaskQuery(() => {
+  // Return the list of nativeIDs (iOS) / view tags (Android) the
+  // sampler should mask out. Called once per tick — keep it
+  // O(small).
+  return ['login.password', 'profile.dob', 'payment.cc-number']
+})
+```
+
+A node whose accessibilityIdentifier / View.tag matches is rendered
+as a single black mask rectangle and its subtree is skipped.
+
+### Diagnostic + drain APIs (advanced)
+
+For dev verification, the SDK exposes three calls beyond
+`captureException`:
+
+```ts
+import {
+  drainReplay,
+  probeNativeWireframe,
+  startReplay,
+  stopReplay,
+} from '@goliapkg/sentori-react-native'
+
+// One-shot status of the native side. Useful in a "Why is my ring
+// empty?" debug screen. See the iOS showcase
+// `apps/ios-showcase/SentoriShowcase/Views/ActionGrid.swift` for
+// the canonical usage.
+const probe = probeNativeWireframe()
+// {
+//   available: true,
+//   lastPath: 'scene.fg.key',   // which keyWindow tier resolved
+//   lastNodes: 47,
+//   sceneCount: 1,
+//   windowCount: 1,
+// }
+
+// Manually drain the ring as NDJSON without firing a captureException.
+// Side effect: clears the ring. Use sparingly.
+const ndjson = drainReplay()
+
+// Hot-start / hot-stop (init() does this automatically when the
+// `capture.replay` option is set; exposed for dev tooling).
+startReplay({ mode: 'wireframe', hz: 2 })
+stopReplay()
+```
+
+### Known surface
+
+- iOS: requires iOS 13+ (the sampler uses `connectedScenes`); falls
+  back to `UIApplication.shared.windows.first` on iOS 12.
+- Android: walks the current Resumed Activity's decor view; sampler
+  returns null between activity transitions.
+- Hermes on RN ≤ 0.82 had a `Timer.unref` interop bug that killed
+  the sampler tick. Fixed in the SDK in v1.0.0-rc.1; consumer apps
+  on Hermes 0.83+ are unaffected.
+
 ## What this SDK does NOT do (v0.1)
 
 - Native signal-based crashes (SIGSEGV / SIGABRT) — only `NSException`
