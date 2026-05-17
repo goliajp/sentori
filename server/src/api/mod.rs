@@ -16,6 +16,7 @@ pub mod live_debug;
 pub mod mappings;
 pub mod metrics;
 pub mod moments;
+pub mod oauth;
 pub mod orgs;
 pub mod privacy;
 pub mod projects;

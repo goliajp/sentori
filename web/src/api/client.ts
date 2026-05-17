@@ -1039,7 +1039,12 @@ export type AuthUser = {
   avatarUrl?: null | string
   displayName?: null | string
   email: string
+  /** True when the user verified their email via the link we sent
+   *  on register. OAuth-registered users are always true. */
+  emailVerified?: boolean
   id: string
+  /** Non-null when the account is linked to GitHub / Google. */
+  oauthProvider?: null | string
 }
 
 export type OAuthProviders = { github: boolean; google: boolean }
@@ -1084,6 +1089,11 @@ export const userAuthApi = {
       body: JSON.stringify({ password, token }),
       method: 'POST',
     }),
+
+  /** Kill every session for the current user except the one this
+   *  request is made from. Used by the "Sign out other devices"
+   *  button on /account. */
+  signOutEverywhere: () => authFetch<{ ok: true }>('/sign-out-everywhere', { method: 'POST' }),
 
   verify: (token: string) => authFetch<{ ok: true }>(`/verify?token=${encodeURIComponent(token)}`),
 }

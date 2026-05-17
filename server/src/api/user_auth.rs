@@ -369,22 +369,31 @@ pub async fn me(State(state): State<AppState>, jar: CookieJar) -> Response {
         None => return unauthorized(),
     };
 
-    let row: Option<(Uuid, String, Option<String>, Option<String>, OffsetDateTime)> =
-        sqlx::query_as(
-            "SELECT u.id, u.email, u.display_name, u.avatar_url, s.expires_at \
-             FROM auth_sessions s JOIN users u ON u.id = s.user_id \
-             WHERE s.id = $1",
-        )
-        .bind(&session_id)
-        .fetch_optional(&pool)
-        .await
-        .ok()
-        .flatten();
+    let row: Option<(
+        Uuid,
+        String,
+        Option<String>,
+        Option<String>,
+        bool,
+        Option<String>,
+        OffsetDateTime,
+    )> = sqlx::query_as(
+        "SELECT u.id, u.email, u.display_name, u.avatar_url, \
+                u.email_verified, u.oauth_provider, s.expires_at \
+         FROM auth_sessions s JOIN users u ON u.id = s.user_id \
+         WHERE s.id = $1",
+    )
+    .bind(&session_id)
+    .fetch_optional(&pool)
+    .await
+    .ok()
+    .flatten();
 
-    let (id, email, display_name, avatar_url, expires_at) = match row {
-        Some(r) => r,
-        None => return unauthorized(),
-    };
+    let (id, email, display_name, avatar_url, email_verified, oauth_provider, expires_at) =
+        match row {
+            Some(r) => r,
+            None => return unauthorized(),
+        };
     if expires_at < OffsetDateTime::now_utc() {
         return unauthorized();
     }
@@ -397,6 +406,8 @@ pub async fn me(State(state): State<AppState>, jar: CookieJar) -> Response {
                 "email": email,
                 "displayName": display_name,
                 "avatarUrl": avatar_url,
+                "emailVerified": email_verified,
+                "oauthProvider": oauth_provider,
             },
         })),
     )
@@ -762,6 +773,37 @@ pub async fn patch_me(
         (None, None) => unreachable!("set_parts emptiness already returned"),
     };
     if res.is_err() {
+        return server_error("dbError");
+    }
+    ok_response()
+}
+
+/// POST /auth/sign-out-everywhere — invalidates every session for
+/// the current user EXCEPT the one making the call. The caller keeps
+/// their cookie; all other devices are signed out.
+pub async fn sign_out_everywhere(
+    State(state): State<AppState>,
+    axum::Extension(user): axum::Extension<CurrentUser>,
+    jar: CookieJar,
+) -> Response {
+    let pool = match &state.db {
+        Some(p) => p.clone(),
+        None => return server_error("db not configured"),
+    };
+    let keep = jar
+        .get(SESSION_COOKIE)
+        .map(|c| c.value().to_string())
+        .unwrap_or_default();
+    if keep.is_empty() {
+        return unauthorized();
+    }
+    if sqlx::query("DELETE FROM auth_sessions WHERE user_id = $1 AND id <> $2")
+        .bind(user.id)
+        .bind(&keep)
+        .execute(&pool)
+        .await
+        .is_err()
+    {
         return server_error("dbError");
     }
     ok_response()

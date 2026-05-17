@@ -6,6 +6,9 @@ export type AuthContextValue = {
   isAuthed: boolean | null
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  /** Re-fetch /me from the server. Call after profile mutations so
+   *  display_name / avatar_url update everywhere the user is shown. */
+  refresh: () => Promise<void>
   user: AuthUser | null
 }
 

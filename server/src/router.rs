@@ -444,12 +444,20 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route("/me", get(api::user_auth::me))
         // v1.0 — dashboard polls this to decide which OAuth buttons
         // to render on /login + /register.
-        .route("/oauth/providers", get(api::user_auth::oauth_providers));
+        .route("/oauth/providers", get(api::user_auth::oauth_providers))
+        // v1.0 — OAuth authorization-code flow. Both endpoints are
+        // unauth (a logged-out user is the entire point of /start).
+        .route("/oauth/{provider}/start", get(api::oauth::start))
+        .route("/oauth/{provider}/callback", get(api::oauth::callback));
     // v1.0 — authed-user-only profile + change-password mutations.
     // Sit behind the same require_user guard the orgs/teams routes use.
     let user_auth_authed = Router::new()
         .route("/me", axum::routing::patch(api::user_auth::patch_me))
         .route("/change-password", post(api::user_auth::change_password))
+        .route(
+            "/sign-out-everywhere",
+            post(api::user_auth::sign_out_everywhere),
+        )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             api::user_auth::require_user,

@@ -20,12 +20,20 @@ import { PageHeader } from '@/layout/page-header'
  * user belongs to zero orgs (e.g. right after invite-accept dropout).
  */
 export function AccountView() {
-  const { user } = useAuth()
+  const { refresh, user } = useAuth()
   const qc = useQueryClient()
 
   const meQ = useQuery({ queryFn: userAuthApi.me, queryKey: ['me'] })
 
   const me = meQ.data?.user ?? user
+
+  // After any profile mutation: invalidate react-query + push fresh
+  // /me into the AuthProvider so the toolbar avatar + every
+  // other `useAuth().user` consumer reflects the change.
+  const onProfileSaved = () => {
+    void qc.invalidateQueries({ queryKey: ['me'] })
+    void refresh()
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -35,13 +43,72 @@ export function AccountView() {
         avatarUrl={me?.avatarUrl ?? null}
         displayName={me?.displayName ?? null}
         email={me?.email ?? ''}
-        onSaved={() => qc.invalidateQueries({ queryKey: ['me'] })}
+        onSaved={onProfileSaved}
       />
 
       <ReadonlyBlock id={me?.id ?? ''} email={me?.email ?? ''} />
 
       <PasswordBlock />
+
+      <SecurityBlock />
     </div>
+  )
+}
+
+function SecurityBlock() {
+  const [busy, setBusy] = useState(false)
+  const [ok, setOk] = useState(false)
+  const [err, setErr] = useState<null | string>(null)
+
+  const onClick = async () => {
+    if (
+      !confirm('Sign out of every device except this one? You will keep your current session here.')
+    ) {
+      return
+    }
+    setBusy(true)
+    setErr(null)
+    setOk(false)
+    try {
+      await userAuthApi.signOutEverywhere()
+      setOk(true)
+    } catch (e) {
+      const body = (e as { body?: { error?: string } } | undefined)?.body
+      setErr(body?.error ?? (e instanceof Error ? e.message : 'request failed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="mt-8">
+      <header className="sec-head">
+        <span className="sec-head-title">Security</span>
+        <span className="sec-head-sub">device sessions</span>
+      </header>
+      <div className="flex flex-col gap-2 border-y border-[color:var(--rule)] py-5">
+        <p className="text-[13px] text-[color:var(--ink-soft)]">
+          Sign out of every other device. Your current browser session stays valid; everywhere else
+          has to sign in again.
+        </p>
+        <div className="flex items-center gap-3">
+          <button
+            className="inline-flex h-7 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink)] uppercase transition-colors hover:border-[color:var(--danger)] hover:text-[color:var(--danger)] disabled:opacity-50"
+            disabled={busy}
+            onClick={() => void onClick()}
+            type="button"
+          >
+            {busy ? 'signing out…' : 'sign out other devices'}
+          </button>
+          {ok && (
+            <span className="font-mono text-[11px] text-[color:var(--success)]">
+              other sessions signed out ✓
+            </span>
+          )}
+          {err && <span className="font-mono text-[11px] text-[color:var(--danger)]">{err}</span>}
+        </div>
+      </div>
+    </section>
   )
 }
 

@@ -3,6 +3,7 @@ import { Outlet } from 'react-router'
 import { CmdK } from '@/components/CmdK'
 import { StatusBar } from '@/components/status-bar'
 import { Toolbar } from '@/components/toolbar'
+import { VerifyBanner } from '@/components/verify-banner'
 
 import { Sidebar } from './sidebar'
 
@@ -20,6 +21,7 @@ export function AppShell() {
         Skip to content
       </a>
       <Toolbar />
+      <VerifyBanner />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <main className="min-w-0 flex-1 overflow-y-auto" id="sentori-main">
