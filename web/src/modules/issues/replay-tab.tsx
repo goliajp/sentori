@@ -2,6 +2,14 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 
 import { adminApi, type ReplayFrame } from '@/api/client'
+import {
+  isCircleShape,
+  paletteColorFor,
+  WIREFRAME_FILL_OPACITY,
+  WIREFRAME_MASK_FILL,
+  WIREFRAME_STROKE,
+  WIREFRAME_TEXT_FILL,
+} from '@/lib/wireframe-palette'
 
 /**
  * v1.0 A4 — Replay tab on the issue detail surface.
@@ -266,19 +274,41 @@ function NodeShape({
   diffStatus?: DiffStatus
   node: ReplayFrame['nodes'][number]
 }) {
-  // Base fill — same logic regardless of diff status.
-  const baseFill =
-    node.kind === 'mask'
-      ? '#000'
-      : node.kind === 'image'
-        ? 'rgba(255,255,255,0.18)'
-        : node.color || 'rgba(255,255,255,0.06)'
+  // Structural wireframe — colour comes from the curated palette via
+  // a stable hash of the node's spatial fingerprint. Same node keeps
+  // the same hue across frames, so the diff overlay strokes
+  // (added/changed/removed) are the only thing the eye has to scan
+  // for visual change. See `lib/wireframe-palette.ts` for the why.
+  const text = node.kind === 'text' && node.text ? truncate(node.text, 60) : null
 
-  // Diff overlay — strokes + opacity. Always uses semantic colors
-  // from the dashboard palette so light/dark themes both read.
-  let stroke = node.kind === 'text' ? 'none' : 'rgba(255,255,255,0.12)'
-  let strokeWidth = 0.5
-  let fill = baseFill
+  if (node.kind === 'text' && text) {
+    return (
+      <text
+        dominantBaseline="middle"
+        fill={WIREFRAME_TEXT_FILL}
+        fontFamily="system-ui"
+        fontSize={Math.max(8, Math.min(node.h * 0.6, 14))}
+        opacity={diffStatus === 'removed' ? 0.45 : 1}
+        x={node.x + 2}
+        y={node.y + node.h / 2}
+      >
+        {text}
+      </text>
+    )
+  }
+
+  // Diff overlay — strokes use the dashboard's semantic palette so
+  // they pop on either light or dark canvas. `removed` ghosts the
+  // shape (no fill).
+  const isMask = node.kind === 'mask'
+  const baseFill = isMask ? WIREFRAME_MASK_FILL : paletteColorFor(node)
+  const baseStroke = isMask ? 'transparent' : WIREFRAME_STROKE
+  const baseStrokeWidth = 0.5
+
+  let stroke = baseStroke
+  let strokeWidth = baseStrokeWidth
+  let fill: string = baseFill
+  let fillOpacity = isMask ? 1 : WIREFRAME_FILL_OPACITY
   let opacity = 1
   if (diffStatus === 'added') {
     stroke = 'var(--success)'
@@ -290,33 +320,40 @@ function NodeShape({
     stroke = 'var(--danger)'
     strokeWidth = 1.4
     fill = 'transparent'
+    fillOpacity = 0
     opacity = 0.55
+  }
+
+  if (node.kind === 'image' && isCircleShape(node.w, node.h)) {
+    const r = Math.min(node.w, node.h) / 2
+    return (
+      <g opacity={opacity}>
+        <circle
+          cx={node.x + node.w / 2}
+          cy={node.y + node.h / 2}
+          fill={fill}
+          fillOpacity={fillOpacity}
+          r={r}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+        />
+      </g>
+    )
   }
 
   return (
     <g opacity={opacity}>
       <rect
         fill={fill}
+        fillOpacity={fillOpacity}
         height={node.h}
-        rx={node.kind === 'image' || node.kind === 'rect' ? 2 : 0}
+        rx={node.kind === 'image' ? 8 : 0}
         stroke={stroke}
         strokeWidth={strokeWidth}
         width={node.w}
         x={node.x}
         y={node.y}
       />
-      {node.kind === 'text' && node.text && diffStatus !== 'removed' && (
-        <text
-          dominantBaseline="middle"
-          fill="rgba(255,255,255,0.78)"
-          fontFamily="system-ui"
-          fontSize={Math.max(8, Math.min(node.h * 0.6, 14))}
-          x={node.x + 2}
-          y={node.y + node.h / 2}
-        >
-          {truncate(node.text, 60)}
-        </text>
-      )}
     </g>
   )
 }

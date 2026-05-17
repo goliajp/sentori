@@ -1,6 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import {
+  isCircleShape,
+  paletteColorFor,
+  WIREFRAME_FILL_OPACITY,
+  WIREFRAME_MASK_FILL,
+  WIREFRAME_STROKE,
+  WIREFRAME_TEXT_FILL,
+} from '@/lib/wireframe-palette'
+
 /**
  * Wireframe replay player — inline rendering under
  * "Captured at error → Session replay" on the issue detail page.
@@ -426,95 +435,64 @@ function WireframeSvg({ snapshot }: { snapshot: Snapshot }) {
 }
 
 /**
- * If the SDK emitted an explicit colour for the node, use it only when
- * it would visibly contrast against the canvas (paper-2 in light mode,
- * warm-dark in dark mode). Android's `view.background` on dark-mode
- * apps often paints near-white; rendering that literally erases the
- * shape. Falls back to the structural tint for low-contrast emits.
+ * Wireframe rendering is structural, not photographic. Every node is
+ * one of three primitives — text, circle (square images), rect —
+ * filled from the curated 32-colour palette via a stable hash of the
+ * spatial fingerprint. Result: same node keeps the same hue across
+ * frames, overlapping rects stay legible at 0.75 alpha, and the
+ * visual reads consistently regardless of the host app's UI palette.
  */
-function pickFill(color: string | undefined, kind: string | undefined): string {
-  if (!color) return defaultFill(kind)
-  const lum = parseHexLuminance(color)
-  if (lum === null) return color // unknown shape, trust the SDK
-  if (lum > 0.92) return defaultFill(kind) // near-white, would vanish on paper-2
-  return color
-}
-
-function parseHexLuminance(hex: string): null | number {
-  // Accepts #RGB, #RRGGBB, #RRGGBBAA. Returns relative luminance in [0,1].
-  const m = /^#?([0-9a-f]{3,8})$/i.exec(hex.trim())
-  if (!m) return null
-  let body = m[1]!
-  if (body.length === 3)
-    body = body
-      .split('')
-      .map((c) => c + c)
-      .join('')
-  if (body.length < 6) return null
-  const r = parseInt(body.slice(0, 2), 16) / 255
-  const g = parseInt(body.slice(2, 4), 16) / 255
-  const b = parseInt(body.slice(4, 6), 16) / 255
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b
-}
-
 function NodeRender({ node }: { node: Node }) {
-  const fill = pickFill(node.color, node.kind)
   if (node.kind === 'text' && node.text) {
     const fontSize = Math.min(14, Math.max(8, node.h * 0.6))
     return (
-      <g>
-        <text
-          // Wireframe is a structural diagram — readability against
-          // the canvas beats colour fidelity. Android's
-          // `view.currentTextColor` returns white on dark-mode apps
-          // (#FFFFFFB3 is common), which would be invisible against
-          // the light paper-2 canvas; force the ink token instead so
-          // text content reads on any host UI.
-          fill="var(--ink)"
-          fontFamily="system-ui, -apple-system, sans-serif"
-          fontSize={fontSize}
-          x={node.x}
-          y={node.y + node.h * 0.7}
-        >
-          {node.text}
-        </text>
-      </g>
+      <text
+        fill={WIREFRAME_TEXT_FILL}
+        fontFamily="system-ui, -apple-system, sans-serif"
+        fontSize={fontSize}
+        x={node.x}
+        y={node.y + node.h * 0.7}
+      >
+        {node.text}
+      </text>
     )
   }
+  if (node.kind === 'mask') {
+    return <rect fill={WIREFRAME_MASK_FILL} height={node.h} width={node.w} x={node.x} y={node.y} />
+  }
+
+  const fill = paletteColorFor(node)
+
+  if (node.kind === 'image' && isCircleShape(node.w, node.h)) {
+    const r = Math.min(node.w, node.h) / 2
+    return (
+      <circle
+        cx={node.x + node.w / 2}
+        cy={node.y + node.h / 2}
+        fill={fill}
+        fillOpacity={WIREFRAME_FILL_OPACITY}
+        r={r}
+        stroke={WIREFRAME_STROKE}
+        strokeWidth={0.5}
+      />
+    )
+  }
+
+  // image (non-square) → softly rounded; rect → square corners.
+  const rx = node.kind === 'image' ? 8 : 0
   return (
     <rect
       fill={fill}
+      fillOpacity={WIREFRAME_FILL_OPACITY}
       height={node.h}
-      stroke="rgba(0,0,0,0.18)"
+      rx={rx}
+      stroke={WIREFRAME_STROKE}
       strokeWidth={0.5}
       width={node.w}
       x={node.x}
       y={node.y}
     />
   )
-}
-
-/**
- * Default fills are theme-agnostic alpha tints so they're visible on
- * both paper-2 (light) and the warm-dark background (dark) without
- * needing two palettes. Android emits most nodes as `kind: rect` /
- * `image` with no `color` field (only TextView sets one), so a bg-
- * matching default would erase ~95% of an Android wireframe — the
- * exact symptom Insight hit on the qualcomm-insight verify event.
- */
-function defaultFill(kind?: string): string {
-  switch (kind) {
-    case 'mask':
-      return 'rgba(0,0,0,0.65)'
-    case 'image':
-      // Slight blue tint so image placeholders read as "media" not
-      // "container", mirroring how design tools cue image regions.
-      return 'rgba(59,130,246,0.12)'
-    case 'rect':
-      return 'rgba(0,0,0,0.08)'
-    default:
-      return 'rgba(0,0,0,0.05)'
-  }
 }
 
 function Hint({ children, tone }: { children: React.ReactNode; tone?: 'danger' }) {

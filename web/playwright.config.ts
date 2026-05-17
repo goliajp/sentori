@@ -33,7 +33,11 @@ const SERVER_ENV = {
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 30_000,
+  // CI cold-starts plus the forgot-password test (register → verify
+  // → SMTP probe → UI submit → reset UI → re-login) needs more than
+  // 30 s for a fresh runner. Locally these tests still finish in
+  // ~5 s; the higher ceiling is dead time on a warm machine.
+  timeout: 60_000,
   expect: { timeout: 5_000 },
   fullyParallel: false, // share one server / one DB
   retries: 0,
