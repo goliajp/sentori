@@ -425,14 +425,52 @@ function WireframeSvg({ snapshot }: { snapshot: Snapshot }) {
   )
 }
 
+/**
+ * If the SDK emitted an explicit colour for the node, use it only when
+ * it would visibly contrast against the canvas (paper-2 in light mode,
+ * warm-dark in dark mode). Android's `view.background` on dark-mode
+ * apps often paints near-white; rendering that literally erases the
+ * shape. Falls back to the structural tint for low-contrast emits.
+ */
+function pickFill(color: string | undefined, kind: string | undefined): string {
+  if (!color) return defaultFill(kind)
+  const lum = parseHexLuminance(color)
+  if (lum === null) return color // unknown shape, trust the SDK
+  if (lum > 0.92) return defaultFill(kind) // near-white, would vanish on paper-2
+  return color
+}
+
+function parseHexLuminance(hex: string): null | number {
+  // Accepts #RGB, #RRGGBB, #RRGGBBAA. Returns relative luminance in [0,1].
+  const m = /^#?([0-9a-f]{3,8})$/i.exec(hex.trim())
+  if (!m) return null
+  let body = m[1]!
+  if (body.length === 3)
+    body = body
+      .split('')
+      .map((c) => c + c)
+      .join('')
+  if (body.length < 6) return null
+  const r = parseInt(body.slice(0, 2), 16) / 255
+  const g = parseInt(body.slice(2, 4), 16) / 255
+  const b = parseInt(body.slice(4, 6), 16) / 255
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
 function NodeRender({ node }: { node: Node }) {
-  const fill = node.color ?? defaultFill(node.kind)
+  const fill = pickFill(node.color, node.kind)
   if (node.kind === 'text' && node.text) {
     const fontSize = Math.min(14, Math.max(8, node.h * 0.6))
     return (
       <g>
         <text
-          fill={node.color ?? 'var(--ink)'}
+          // Wireframe is a structural diagram — readability against
+          // the canvas beats colour fidelity. Android's
+          // `view.currentTextColor` returns white on dark-mode apps
+          // (#FFFFFFB3 is common), which would be invisible against
+          // the light paper-2 canvas; force the ink token instead so
+          // text content reads on any host UI.
+          fill="var(--ink)"
           fontFamily="system-ui, -apple-system, sans-serif"
           fontSize={fontSize}
           x={node.x}
