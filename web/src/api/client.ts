@@ -1043,8 +1043,58 @@ export type AuthUser = {
    *  on register. OAuth-registered users are always true. */
   emailVerified?: boolean
   id: string
+  /** v1.0 — instance-wide god-mode flag. Unlocks /superadmin/*
+   *  dashboard surfaces + cross-org admin endpoints. */
+  isSuperadmin?: boolean
   /** Non-null when the account is linked to GitHub / Google. */
   oauthProvider?: null | string
+}
+
+/** v1.0 — rows returned by superadmin endpoints. Cross-org. */
+export type SuperadminUserRow = {
+  avatarUrl: null | string
+  createdAt: string
+  displayName: null | string
+  email: string
+  emailVerified: boolean
+  id: string
+  isSuperadmin: boolean
+  oauthProvider: null | string
+  orgCount: number
+}
+
+export type SuperadminOrgRow = {
+  createdAt: string
+  id: string
+  memberCount: number
+  name: string
+  ownerEmail: null | string
+  ownerId: string
+  projectCount: number
+  slug: string
+}
+
+export type SuperadminProjectRow = {
+  createdAt: string
+  eventCount30d: number
+  id: string
+  name: string
+  orgId: string
+  orgSlug: string
+  sourceRepoUrl: null | string
+}
+
+/** v1.0 — superadmin-only API surface. Mirrors the gated
+ *  `/admin/api/superadmin/*` server routes. */
+export const superadminApi = {
+  listOrgs: () => adminFetch<SuperadminOrgRow[]>('/superadmin/orgs'),
+  listProjects: () => adminFetch<SuperadminProjectRow[]>('/superadmin/projects'),
+  listUsers: () => adminFetch<SuperadminUserRow[]>('/superadmin/users'),
+  setSuperadmin: (userId: string, isSuperadmin: boolean) =>
+    adminFetch<{ ok: true }>(`/superadmin/users/${userId}`, {
+      body: JSON.stringify({ isSuperadmin }),
+      method: 'PATCH',
+    }),
 }
 
 export type OAuthProviders = { github: boolean; google: boolean }

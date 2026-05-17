@@ -17,6 +17,11 @@ async fn main() -> anyhow::Result<()> {
         Some(url) => {
             let pool = db::connect(&url).await?;
             seed::ensure_dev_project(&pool).await?;
+            // v1.0 — operator-side superadmin + seed-project bootstrap.
+            // Both no-op when their env vars aren't set so this is
+            // safe in every deployment.
+            seed::ensure_superadmin(&pool).await?;
+            seed::ensure_seed_project(&pool).await?;
             tracing::info!("postgres connected, migrations applied, dev project seeded");
             Some(pool)
         }

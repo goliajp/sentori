@@ -26,6 +26,7 @@ pub mod repro;
 pub mod releases;
 pub mod search;
 pub mod sessions;
+pub mod superadmin;
 pub mod spans;
 pub mod teams;
 pub mod traces;

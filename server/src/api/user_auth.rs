@@ -375,11 +375,12 @@ pub async fn me(State(state): State<AppState>, jar: CookieJar) -> Response {
         Option<String>,
         Option<String>,
         bool,
+        bool,
         Option<String>,
         OffsetDateTime,
     )> = sqlx::query_as(
         "SELECT u.id, u.email, u.display_name, u.avatar_url, \
-                u.email_verified, u.oauth_provider, s.expires_at \
+                u.email_verified, u.is_superadmin, u.oauth_provider, s.expires_at \
          FROM auth_sessions s JOIN users u ON u.id = s.user_id \
          WHERE s.id = $1",
     )
@@ -389,11 +390,19 @@ pub async fn me(State(state): State<AppState>, jar: CookieJar) -> Response {
     .ok()
     .flatten();
 
-    let (id, email, display_name, avatar_url, email_verified, oauth_provider, expires_at) =
-        match row {
-            Some(r) => r,
-            None => return unauthorized(),
-        };
+    let (
+        id,
+        email,
+        display_name,
+        avatar_url,
+        email_verified,
+        is_superadmin,
+        oauth_provider,
+        expires_at,
+    ) = match row {
+        Some(r) => r,
+        None => return unauthorized(),
+    };
     if expires_at < OffsetDateTime::now_utc() {
         return unauthorized();
     }
@@ -407,6 +416,7 @@ pub async fn me(State(state): State<AppState>, jar: CookieJar) -> Response {
                 "displayName": display_name,
                 "avatarUrl": avatar_url,
                 "emailVerified": email_verified,
+                "isSuperadmin": is_superadmin,
                 "oauthProvider": oauth_provider,
             },
         })),

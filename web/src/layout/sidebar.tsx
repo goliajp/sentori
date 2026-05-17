@@ -57,6 +57,36 @@ export function Sidebar() {
             </Section>
           )
         })}
+
+        {/* v1.0 — instance-wide superadmin link. Only renders for
+         *  users with `is_superadmin = TRUE` on their row. Distinct
+         *  group with a tora-tinted micro-label so it reads as
+         *  "out-of-band power" not just another module. */}
+        {user?.isSuperadmin && (
+          <Section title="Operator">
+            <Link
+              className="group relative block py-1.5 pr-3 pl-4 text-[color:var(--accent)] transition-colors hover:bg-[color:var(--paper-2)]/60"
+              to="/superadmin"
+            >
+              <span aria-hidden className="absolute top-0 bottom-0 left-0 w-[2px] bg-transparent" />
+              <span className="flex items-center gap-2.5 text-[13px]">
+                <svg
+                  aria-hidden
+                  className="h-3.5 w-3.5 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.5"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 2 4 6v6c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6Z" />
+                </svg>
+                <span className="truncate">Superadmin</span>
+              </span>
+            </Link>
+          </Section>
+        )}
       </div>
 
       <div className="border-t border-[color:var(--rule)] bg-[color:var(--paper-2)] px-4 py-3">

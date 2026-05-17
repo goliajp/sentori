@@ -423,7 +423,27 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route("/logout", post(api::admin_auth::logout))
         .route("/me", get(api::admin_auth::me));
 
-    let admin = Router::new().merge(admin_protected).merge(admin_public);
+    // v1.0 — operator god-mode endpoints. Cookie-session-authed and
+    // gated by `users.is_superadmin = TRUE`. Mounted under
+    // `/admin/api/superadmin/...` so the dashboard's existing
+    // adminFetch helper picks them up.
+    let superadmin_routes = Router::new()
+        .route("/superadmin/users", get(api::superadmin::list_users))
+        .route(
+            "/superadmin/users/{user_id}",
+            axum::routing::patch(api::superadmin::patch_user),
+        )
+        .route("/superadmin/orgs", get(api::superadmin::list_orgs))
+        .route("/superadmin/projects", get(api::superadmin::list_projects))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            api::superadmin::require_superadmin,
+        ));
+
+    let admin = Router::new()
+        .merge(admin_protected)
+        .merge(admin_public)
+        .merge(superadmin_routes);
 
     // Phase 13 sub-B: user auth (separate from admin_password-based admin auth).
     // register/login are rate-limited per-IP; verify/logout/me are open.

@@ -19,6 +19,12 @@ import { OrgLayout } from './views/org-layout'
 import { RegisterView } from './views/register'
 import { ResetPasswordView } from './views/reset-password'
 import { RootRedirect } from './views/root-redirect'
+import {
+  SuperadminLayout,
+  SuperadminOrgsView,
+  SuperadminProjectsView,
+  SuperadminUsersView,
+} from './views/superadmin'
 import { TransferAcceptView } from './views/transfer-accept'
 import { UserActivityView } from './views/user-activity'
 import { VerifyView } from './views/verify'
@@ -75,6 +81,16 @@ const router = createBrowserRouter([
       { element: <OnboardingView />, path: 'onboarding' },
       { element: <AccountView />, path: 'account' },
       { element: <UserActivityView />, path: 'me/activity' },
+      {
+        children: [
+          { element: <Navigate replace to="users" />, index: true },
+          { element: <SuperadminUsersView />, path: 'users' },
+          { element: <SuperadminOrgsView />, path: 'orgs' },
+          { element: <SuperadminProjectsView />, path: 'projects' },
+        ],
+        element: <SuperadminLayout />,
+        path: 'superadmin',
+      },
       { element: <InviteAcceptView />, path: 'invite/:token' },
       { element: <TransferAcceptView />, path: 'transfers/:token' },
       {
