@@ -487,16 +487,16 @@ function StackTab({
   return (
     <div className="space-y-3">
       {event.traceId && (
-        <div className="border-border bg-bg-tertiary/30 t-md flex items-center justify-between gap-3 rounded-md border px-3 py-2">
-          <span className="text-fg-muted">
+        <div className="flex items-center justify-between gap-3 border-y border-[color:var(--rule)] py-2 text-[13px]">
+          <span className="text-[color:var(--ink-soft)]">
             Captured inside trace{' '}
-            <span className="text-fg font-mono">{event.traceId.slice(0, 8)}</span>
+            <span className="font-mono text-[color:var(--ink)]">{event.traceId.slice(0, 8)}</span>
           </span>
           <Link
-            className="text-accent hover:text-accent/80 t-md whitespace-nowrap"
+            className="font-mono text-[10px] tracking-[0.18em] whitespace-nowrap text-[color:var(--accent)] uppercase hover:text-[color:var(--accent-strong)]"
             to={`/org/${orgSlug}/traces/${event.traceId}`}
           >
-            Open trace →
+            open trace →
           </Link>
         </div>
       )}
@@ -547,20 +547,24 @@ function StackList({
 }) {
   const [hideVendor, setHideVendor] = useState(false)
   if (stack.length === 0) {
-    return <p className="text-fg-muted t-md">No frames captured.</p>
+    return (
+      <p className="border-y border-[color:var(--rule)] py-3 text-[13px] text-[color:var(--ink-soft)]">
+        No frames captured.
+      </p>
+    )
   }
   const vendorCount = stack.filter((f) => !f.inApp).length
   const visible = hideVendor ? stack.filter((f) => f.inApp) : stack
   return (
     <div>
       {vendorCount > 0 && (
-        <div className="text-fg-muted t-sm mb-2 flex items-center justify-between gap-2">
+        <div className="mb-2 flex items-center justify-between gap-2 font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
           <span>
             {stack.length} frame{stack.length === 1 ? '' : 's'} ·{' '}
-            <span className="font-mono">{vendorCount}</span> from libraries
+            <span className="text-[color:var(--ink-soft)]">{vendorCount}</span> from libraries
           </span>
           <button
-            className="text-fg-muted hover:text-fg t-sm tracking-wider uppercase"
+            className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase transition-colors hover:text-[color:var(--accent)]"
             onClick={() => setHideVendor((v) => !v)}
             type="button"
           >
@@ -568,7 +572,7 @@ function StackList({
           </button>
         </div>
       )}
-      <div className="border-border overflow-hidden rounded-md border">
+      <div className="overflow-hidden border-y border-[color:var(--rule)]">
         {visible.map((f) => {
           // We always pass the ORIGINAL index from `stack` so frame
           // numbering, source drawer lookup, and `↗ src` link don't
