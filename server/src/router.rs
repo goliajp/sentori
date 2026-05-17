@@ -20,6 +20,12 @@ const MAX_BODY_BYTES: usize = 1024 * 1024; // 1 MB per protocol.md size limits
 // via DefaultBodyLimit::disable() and rely on per-handler validation.
 const MAX_ADMIN_UPLOAD_BYTES: usize = 256 * 1024 * 1024;
 
+/// Per-route ingest cap for the attachment POST. Replay NDJSON for
+/// dense screens (Insight 2026-05-18: 82 nodes × 60 frames ≈ 1.5 MB
+/// per crash) blew through the 1 MB global default; 16 MB keeps
+/// dense-UI replay accepted while still bounding abuse.
+const MAX_INGEST_ATTACHMENT_BYTES: usize = 16 * 1024 * 1024;
+
 #[derive(Default)]
 pub struct ServerConfig {
     pub dev_token: String,
@@ -116,7 +122,10 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route("/v1/control/poll", get(api::live_debug::poll))
         .route(
             "/v1/events/{event_id}/attachments/{kind}",
-            post(api::attachments::upload),
+            post(api::attachments::upload).layer((
+                DefaultBodyLimit::disable(),
+                RequestBodyLimitLayer::new(MAX_INGEST_ATTACHMENT_BYTES),
+            )),
         )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
