@@ -852,10 +852,16 @@ pub async fn sign_out_everywhere(
 /// can render correctly *now* without conditioning on whether the
 /// flow is wired yet.
 pub async fn oauth_providers(State(_state): State<AppState>) -> Response {
-    let github = std::env::var("SENTORI_GITHUB_CLIENT_ID").is_ok()
-        && std::env::var("SENTORI_GITHUB_CLIENT_SECRET").is_ok();
-    let google = std::env::var("SENTORI_GOOGLE_CLIENT_ID").is_ok()
-        && std::env::var("SENTORI_GOOGLE_CLIENT_SECRET").is_ok();
+    // docker-compose passes through `${KEY:-}` so the variable is *set*
+    // (present in std::env::var) but empty when the operator hasn't
+    // registered the OAuth app yet. `is_ok()` alone reports both pairs
+    // as enabled in that case and the login page renders dead buttons.
+    // Require a non-empty value on both id + secret.
+    let configured = |k: &str| std::env::var(k).ok().is_some_and(|v| !v.trim().is_empty());
+    let github =
+        configured("SENTORI_GITHUB_CLIENT_ID") && configured("SENTORI_GITHUB_CLIENT_SECRET");
+    let google =
+        configured("SENTORI_GOOGLE_CLIENT_ID") && configured("SENTORI_GOOGLE_CLIENT_SECRET");
     (
         StatusCode::OK,
         Json(json!({ "github": github, "google": google })),
