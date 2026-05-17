@@ -123,13 +123,19 @@ test('forgot-password → reset → new pw authenticates', async ({ browser, req
   await page.getByRole('link', { name: /forgot password/i }).click()
   await page.waitForURL(/\/forgot-password/)
   await page.getByLabel('email').fill(email)
+  // Wait for the network call to complete before asserting the UI.
+  // Different from `toBeVisible` on the success copy because (a) the
+  // copy splits across multiple nodes (the email lives in a styled
+  // span) which can defeat regex text-match in CI race conditions
+  // and (b) CI cold-starts are slow enough to blow past playwright's
+  // default 5s assertion budget.
+  const respPromise = page.waitForResponse(
+    (r) => r.url().endsWith('/api/auth/forgot-password') && r.request().method() === 'POST',
+    { timeout: 15_000 },
+  )
   await page.getByRole('button', { name: /send reset link/i }).click()
-  // The submit button disappears when the success state takes over —
-  // that's a cheaper, more reliable signal than scanning multi-node
-  // copy for a substring, and tolerates a slower CI cold-start.
-  await expect(page.getByRole('button', { name: /send reset link/i })).toBeHidden({
-    timeout: 15_000,
-  })
+  const resp = await respPromise
+  expect(resp.status(), 'forgot-password should 200').toBe(200)
 
   // Pull the token from the DB + drive the reset UI.
   const token = await fetchResetToken(request, email)
