@@ -411,14 +411,17 @@ function SubSection({
 }
 
 function Row({ children, label }: { children: React.ReactNode; label: string }) {
+  // Fullwidth dashboards put labels and values on opposite ends of a
+  // 1500 px row; the eye then has to traverse a huge gap to pair
+  // them. Switch to a definition-list grid — label hugs left at a
+  // mono micro-tag width, value sits flush against it with normal
+  // reading distance. Same hairline divider strip.
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-[color:var(--rule-soft)] py-2 first:border-t first:border-[color:var(--rule)]">
+    <div className="grid grid-cols-[120px_1fr] items-baseline gap-x-4 border-b border-[color:var(--rule-soft)] py-2 first:border-t first:border-[color:var(--rule)]">
       <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
         {label}
       </span>
-      <span className="min-w-0 truncate text-right text-[13px] text-[color:var(--ink)]">
-        {children}
-      </span>
+      <span className="min-w-0 truncate text-[13px] text-[color:var(--ink)]">{children}</span>
     </div>
   )
 }
