@@ -76,11 +76,46 @@ One new file does the load-bearing work:
 
 ## What this expects on your end
 
+**Important — Android needs a native rebuild, not just a metro
+reset.** The rc.1 → rc.2 Android fix is Kotlin (new
+`SentoriForegroundActivity.kt` + changes to `SentoriScreenshot`
+/ `SentoriReplayCapture`). Metro reload only reloads JS; the
+native module on the device stays at whatever was last `gradle
+build`-ed into the APK. We saw a case where the package.json /
+bun.lock / node_modules all said rc.2 but the running app was
+still showing rc.1 behaviour because the APK never got
+rebuilt — `[sentori] enqueue ... kinds=sessionTrail` instead of
+`kinds=screenshot,replay`.
+
 ```bash
+# 1) Pull rc.2 — if package.json already pins it, this is a no-op
 bun add @goliapkg/sentori-react-native@1.0.0-rc.2
+
+# 2) iOS — pod re-resolve picks up the new podspec
 cd ios && pod cache clean SentoriReactNative && pod install --repo-update && cd ..
-# Android — pure JS/Gradle pickup; reset Metro:
-bunx react-native start --reset-cache
+
+# 3) Android — REBUILD THE APK. One of:
+#    a) Expo dev client (most Insight devs):
+bunx expo run:android --device <serial>   # full prebuild + assembleDebug + install
+#    b) Bare RN with gradle directly:
+cd android && ./gradlew clean && ./gradlew :app:installDebug && cd ..
+```
+
+To confirm rc.2 is actually running on-device:
+
+```bash
+adb logcat -d | grep '\[sentori\] native module bound'
+# Expected: ...exposed methods: …, probeScreenshot, probeWireframe, …
+# rc.1 had probeWireframe only, NOT probeScreenshot. If the line
+# omits probeScreenshot you're running an APK built against rc.1.
+```
+
+Or call from JS in a dev build:
+
+```ts
+const sc = await Sentori.probeNativeScreenshot()
+// rc.1: { available: false, lastPath: 'native.unavailable', raw: {} }
+// rc.2: { available: true,  lastPath: 'none(not-yet-called)' | 'ok' | ..., raw: {…} }
 ```
 
 Boot + 1 captureException — expected log shape on Android now:
