@@ -37,16 +37,16 @@ export const WIREFRAME_RECT_FILL = 'rgb(255,255,255)'
 export const WIREFRAME_IMAGE_FILL = 'rgb(255,255,255)'
 
 /** Shared fill-opacity for rect / circle / colour-passed-through
- *  nodes. ~25% opaque ≈ 75% transparent, the threshold the user
- *  asked for so two overlapping rectangles read clearly more
- *  saturated than a single one — describing depth without
- *  saturating into a flat block. */
-export const WIREFRAME_RECT_OPACITY = 0.25
+ *  nodes. 0.95 lands on the high-saturation side — the previous
+ *  0.25 was too pale to read on the dashboard's dark canvas (user
+ *  feedback 2026-05-18: "看不清了"). Overlap composition is still
+ *  visible at this opacity, just subtler. */
+export const WIREFRAME_RECT_OPACITY = 0.95
 
-/** Slightly heavier for image regions so media reads distinct from
- *  generic containers; still translucent enough that overlaps
- *  compose. */
-export const WIREFRAME_IMAGE_OPACITY = 0.35
+/** Image regions stay fully opaque — they represent media and
+ *  reading them as solid blocks is fine; container overlap is
+ *  carried by the rect tier. */
+export const WIREFRAME_IMAGE_OPACITY = 1
 
 /** Mask — opaque dark for unambiguous redaction on either canvas. */
 export const WIREFRAME_MASK_FILL = 'rgba(0,0,0,0.65)'
