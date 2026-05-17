@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   isCircleShape,
   WIREFRAME_IMAGE_FILL,
+  WIREFRAME_IMAGE_OPACITY,
   WIREFRAME_MASK_FILL,
   WIREFRAME_RECT_FILL,
+  WIREFRAME_RECT_OPACITY,
   WIREFRAME_TEXT_FILL,
 } from '@/lib/wireframe-palette'
 
@@ -460,22 +462,44 @@ function NodeRender({ node }: { node: Node }) {
     return <rect fill={WIREFRAME_MASK_FILL} height={node.h} width={node.w} x={node.x} y={node.y} />
   }
 
-  // Original 0.9.x default scheme: SDK colour pass-through with a
-  // translucent-white fallback. iOS sets `node.color` for UILabels
-  // / coloured UIView backgrounds so coloured CTAs render with
-  // their actual hue; Android's most-common case of "uncoloured
-  // ViewGroup" falls through to the muted default. No border per
-  // user preference — the alpha layering handles depth.
-  const fill = node.kind === 'image' ? WIREFRAME_IMAGE_FILL : (node.color ?? WIREFRAME_RECT_FILL)
+  // Default scheme: SDK colour pass-through with a solid-white
+  // fallback. iOS sets `node.color` for UILabels / coloured UIView
+  // backgrounds so coloured CTAs render with their actual hue;
+  // Android's most-common case of "uncoloured ViewGroup" falls
+  // through to the muted default. `fill-opacity` is the shared
+  // single knob so explicit colours and the fallback both compose
+  // as translucent layers — two stacked rects read more saturated
+  // than one, describing depth without rendering as a solid block.
+  const isImage = node.kind === 'image'
+  const fill = isImage ? WIREFRAME_IMAGE_FILL : (node.color ?? WIREFRAME_RECT_FILL)
+  const fillOpacity = isImage ? WIREFRAME_IMAGE_OPACITY : WIREFRAME_RECT_OPACITY
 
-  if (node.kind === 'image' && isCircleShape(node.w, node.h)) {
+  if (isImage && isCircleShape(node.w, node.h)) {
     const r = Math.min(node.w, node.h) / 2
-    return <circle cx={node.x + node.w / 2} cy={node.y + node.h / 2} fill={fill} r={r} />
+    return (
+      <circle
+        cx={node.x + node.w / 2}
+        cy={node.y + node.h / 2}
+        fill={fill}
+        fillOpacity={fillOpacity}
+        r={r}
+      />
+    )
   }
 
   // image (non-square) → softly rounded; rect → square corners.
-  const rx = node.kind === 'image' ? 8 : 0
-  return <rect fill={fill} height={node.h} rx={rx} width={node.w} x={node.x} y={node.y} />
+  const rx = isImage ? 8 : 0
+  return (
+    <rect
+      fill={fill}
+      fillOpacity={fillOpacity}
+      height={node.h}
+      rx={rx}
+      width={node.w}
+      x={node.x}
+      y={node.y}
+    />
+  )
 }
 
 function Hint({ children, tone }: { children: React.ReactNode; tone?: 'danger' }) {

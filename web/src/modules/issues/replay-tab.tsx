@@ -5,8 +5,10 @@ import { adminApi, type ReplayFrame } from '@/api/client'
 import {
   isCircleShape,
   WIREFRAME_IMAGE_FILL,
+  WIREFRAME_IMAGE_OPACITY,
   WIREFRAME_MASK_FILL,
   WIREFRAME_RECT_FILL,
+  WIREFRAME_RECT_OPACITY,
   WIREFRAME_TEXT_FILL,
 } from '@/lib/wireframe-palette'
 
@@ -296,11 +298,11 @@ function NodeShape({
     )
   }
 
-  // Original 0.9.x default scheme: SDK colour pass-through with a
-  // translucent-white fallback. Borders dropped per user
-  // preference; diff overlay keeps the semantic stroke colours
-  // (added/changed/removed) since those carry meaning beyond
-  // structural decoration.
+  // SDK colour pass-through with a solid-white fallback; the shared
+  // `fill-opacity` knob is what makes overlapping rectangles describe
+  // depth instead of saturating into a flat block. Diff overlay keeps
+  // the semantic stroke colours (added / changed / removed) since
+  // those carry meaning beyond structural decoration.
   const isMask = node.kind === 'mask'
   const isImage = node.kind === 'image'
 
@@ -309,6 +311,9 @@ function NodeShape({
     : isImage
       ? WIREFRAME_IMAGE_FILL
       : (node.color ?? WIREFRAME_RECT_FILL)
+  // Mask stays at its declared opacity (already a heavy rgba); the
+  // other kinds compose via the shared opacity.
+  let fillOpacity = isMask ? 1 : isImage ? WIREFRAME_IMAGE_OPACITY : WIREFRAME_RECT_OPACITY
   let stroke = 'transparent'
   let strokeWidth = 0
   let opacity = 1
@@ -322,6 +327,7 @@ function NodeShape({
     stroke = 'var(--danger)'
     strokeWidth = 1.4
     fill = 'transparent'
+    fillOpacity = 0
     opacity = 0.55
   }
 
@@ -333,6 +339,7 @@ function NodeShape({
           cx={node.x + node.w / 2}
           cy={node.y + node.h / 2}
           fill={fill}
+          fillOpacity={fillOpacity}
           r={r}
           stroke={stroke}
           strokeWidth={strokeWidth}
@@ -345,6 +352,7 @@ function NodeShape({
     <g opacity={opacity}>
       <rect
         fill={fill}
+        fillOpacity={fillOpacity}
         height={node.h}
         rx={isImage ? 8 : 0}
         stroke={stroke}
