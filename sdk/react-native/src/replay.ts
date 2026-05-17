@@ -83,7 +83,20 @@ export function startReplay(opts: ReplayOptions): void {
   _timer = setInterval(() => {
     captureTick();
   }, period);
-  (_timer as unknown as { unref?: () => void }).unref?.();
+  // v0.9.12 — Insight 2026-05-17 report: 0.9.11 emitted the
+  // "starting bound=true" line then went silent. Root cause was the
+  // `.unref?.()` call that used to live here. Hermes 0.81 doesn't
+  // ship a Timer object with the Node-style `unref` method, and the
+  // optional-chained call ended up dereferencing a `prototype`
+  // property on `undefined` — throwing synchronously inside
+  // startReplay, which RN's bridge swallowed silently. Net effect:
+  // setInterval registered, captureTick never invoked. Drop the
+  // call; replay tick lifecycle is bound to the app process, no
+  // event-loop tweak needed.
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    // eslint-disable-next-line no-console
+    console.warn('[sentori] replay: scheduled tick period=', period, 'ms');
+  }
 }
 
 export function stopReplay(): void {
@@ -95,14 +108,36 @@ export function stopReplay(): void {
   _nativeMod = null;
   _emptyTickCount = 0;
   _emptyTickLogStride = 1;
+  _firstTickLogged = false;
 }
 
 let _emptyTickCount = 0;
 let _emptyTickLogStride = 1;
+let _firstTickLogged = false;
 
 function captureTick(): void {
   if (!_running) return;
-  const tickSpan = startSpan('sentori.replay.tick', { name: 'tick' });
+  // v0.9.12 — UNCONDITIONAL first-tick log. Proves the setInterval
+  // callback is firing at all, before any other code that could
+  // throw. 0.9.11's diagnostic was inside a `else if (snapshot==null)`
+  // branch that could only surface AFTER the native call returned;
+  // useless when the bug is that the tick body never enters.
+  if (typeof __DEV__ !== 'undefined' && __DEV__ && !_firstTickLogged) {
+    // eslint-disable-next-line no-console
+    console.warn('[sentori] replay tick: FIRST INVOCATION');
+    _firstTickLogged = true;
+  }
+  // 0.9.11 called startSpan OUTSIDE the catch block. If
+  // `@goliapkg/sentori-core` failed to initialise (or startSpan
+  // threw for any other reason on the first tick) the whole tick
+  // callback died silently. Wrap so worst case is "no span for this
+  // tick" not "no ticks for the session".
+  let tickSpan: ReturnType<typeof startSpan> | null = null;
+  try {
+    tickSpan = startSpan('sentori.replay.tick', { name: 'tick' });
+  } catch {
+    // never fatal
+  }
   try {
     const maskIds = readMaskIds();
     const snapshot = _nativeMod?.captureWireframe?.(maskIds);
@@ -132,10 +167,14 @@ function captureTick(): void {
         _emptyTickLogStride = Math.max(_emptyTickLogStride * 10, 10);
       }
     }
-    tickSpan.finish({ status: 'ok' });
+    tickSpan?.finish({ status: 'ok' });
   } catch (e) {
-    if (e instanceof Error) tickSpan.setTag('error.message', e.message);
-    tickSpan.finish({ status: 'error' });
+    if (e instanceof Error) tickSpan?.setTag('error.message', e.message);
+    tickSpan?.finish({ status: 'error' });
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn('[sentori] replay tick: threw', e);
+    }
   }
 }
 
