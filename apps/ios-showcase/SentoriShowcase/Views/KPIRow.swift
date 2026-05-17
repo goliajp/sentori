@@ -20,17 +20,11 @@ struct KPIRow: View {
             )
             KPICell(
                 label: "replay bytes",
-                value: byteSize(sentori.ringBytes),
+                value: formatBytes(sentori.ringBytes),
                 hint: "uncompressed",
                 accent: false,
             )
         }
-    }
-
-    private func byteSize(_ b: Int) -> String {
-        if b < 1024 { return "\(b)b" }
-        let kb = Double(b) / 1024.0
-        return String(format: "%.1fkb", kb)
     }
 }
 

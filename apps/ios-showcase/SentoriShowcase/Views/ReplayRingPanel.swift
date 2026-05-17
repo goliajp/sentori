@@ -25,7 +25,7 @@ struct ReplayRingPanel: View {
                     )
                     DefRow(
                         label: "bytes",
-                        value: sentori.ringBytes > 0 ? "~\(sentori.ringBytes / 1024) KB" : "—",
+                        value: formatBytes(sentori.ringBytes),
                     )
                     DefRow(
                         label: "last path",
@@ -93,13 +93,25 @@ struct DefRow: View {
                 .font(SentoriType.mono(9, weight: .medium))
                 .tracking(1.8)
                 .foregroundStyle(SentoriPalette.inkMuted)
-                .frame(width: 84, alignment: .leading)
+                .frame(width: 72, alignment: .leading)
             Text(value)
                 .font(SentoriType.mono(12))
                 .foregroundStyle(SentoriPalette.ink)
                 .lineLimit(1)
+                .minimumScaleFactor(0.7)
                 .truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
+}
+
+/// Compact byte size — keeps the value short under the narrow
+/// rail without dropping precision at small sizes.
+func formatBytes(_ bytes: Int) -> String {
+    if bytes == 0 { return "—" }
+    if bytes < 1024 { return "\(bytes) B" }
+    let kb = Double(bytes) / 1024.0
+    if kb < 100 { return String(format: "%.1f KB", kb) }
+    if kb < 1024 { return "\(Int(kb)) KB" }
+    return String(format: "%.1f MB", kb / 1024.0)
 }

@@ -29,6 +29,12 @@ struct ContentView: View {
                 SentoriPalette.paper.ignoresSafeArea()
                 BackdropAura()
                     .ignoresSafeArea()
+                if #available(iOS 18.0, *) {
+                    AuroraMesh()
+                        .ignoresSafeArea()
+                        .opacity(0.55)
+                        .allowsHitTesting(false)
+                }
             }
         )
         .preferredColorScheme(.dark)
@@ -61,6 +67,44 @@ private struct BackdropAura: View {
         }
         .blendMode(.plusLighter)
         .opacity(0.55)
+    }
+}
+
+/// iOS 18+ mesh gradient — a low-amplitude, slowly drifting aurora
+/// behind the hero. The motion is gentle enough to read as
+/// atmospheric (not animated UI) but enough to make the page feel
+/// alive on first scroll.
+@available(iOS 18.0, *)
+private struct AuroraMesh: View {
+    @State private var t: Float = 0
+
+    private var points: [SIMD2<Float>] {
+        let drift = sin(t) * 0.06
+        let drift2 = cos(t * 0.7) * 0.04
+        return [
+            SIMD2(0, 0), SIMD2(0.5, -0.02), SIMD2(1, 0),
+            SIMD2(-0.02 + drift, 0.45), SIMD2(0.5 + drift2, 0.5),
+            SIMD2(1.02 - drift, 0.55),
+            SIMD2(0, 1), SIMD2(0.5, 1.02), SIMD2(1, 1),
+        ]
+    }
+
+    var body: some View {
+        MeshGradient(
+            width: 3,
+            height: 3,
+            points: points,
+            colors: [
+                SentoriPalette.paper, Color(red: 0.18, green: 0.12, blue: 0.16), SentoriPalette.accent.opacity(0.25),
+                Color(red: 0.10, green: 0.10, blue: 0.18), Color(red: 0.16, green: 0.14, blue: 0.22), Color(red: 0.20, green: 0.10, blue: 0.12),
+                SentoriPalette.paper, Color(red: 0.10, green: 0.13, blue: 0.20), SentoriPalette.paper,
+            ],
+        )
+        .onAppear {
+            withAnimation(.linear(duration: 18).repeatForever(autoreverses: true)) {
+                t = .pi
+            }
+        }
     }
 }
 
