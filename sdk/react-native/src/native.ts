@@ -68,6 +68,20 @@ type SentoriNativeModule = {
    */
   captureWireframe?: (maskedIds: string[]) => null | string
   /**
+   * v0.9.12 — diagnostic readout for the wireframe path. Cheap
+   * synchronous call that returns the path the last `captureWireframe`
+   * tick took plus scene/window counts at that moment. Used by the
+   * example app's debug button and the Insight verify flow to tell
+   * "no window resolvable" from "window walked but tree empty" without
+   * shipping a new pod.
+   */
+  probeWireframe?: () => {
+    lastPath: string
+    lastNodes: number
+    sceneCount: number
+    windowCount: number
+  }
+  /**
    * Phase 22 sub-D / sub-E: cross-platform main-thread watchdog.
    * Android: 5 s / 1 s defaults (matches the OS ANR threshold).
    * iOS: 2 s / 1 s (more aggressive — iOS has no system-level
@@ -295,10 +309,73 @@ export async function captureNativeScreenshotWithMask(
 export function describeWireframeNative(): {
   bound: boolean
   hasCaptureWireframe: boolean
+  hasProbeWireframe: boolean
 } {
   const n = native()
   return {
     bound: n !== null,
     hasCaptureWireframe: Boolean(n?.captureWireframe),
+    hasProbeWireframe: Boolean(n?.probeWireframe),
+  }
+}
+
+/**
+ * v0.9.12 — JS entry to the native `probeWireframe` diagnostic. Safe
+ * to call before the first replay tick — returns the not-yet-called
+ * sentinel. When the ring stays empty, this is the single call that
+ * answers "why" without redeploying the pod.
+ *
+ *   path             meaning
+ *   ───────────────  ───────────────────────────────────────────────
+ *   none(not-yet…)   captureWireframe has never run yet
+ *   scene.fg.key     iOS: resolved via foregroundActive scene's key window
+ *   scene.fg.first   iOS: foregroundActive scene's first window (no key)
+ *   scene.fgi.first  iOS: foregroundInactive scene mid-transition
+ *   scene.any.first  iOS: had to fall back to any window
+ *   legacy.first     iOS: legacy UIApplication.windows path
+ *   none             iOS: no UIWindow reachable at the tick instant
+ *   activity.null    Android: no resumed Activity registered
+ *   decorView.null   Android: activity has no decor view yet
+ *   root.zero-size   Android: decorView size <= 0 (mid-layout)
+ *   activity.resumed Android: ok
+ */
+export function probeNativeWireframe(): {
+  available: boolean
+  lastNodes: number
+  lastPath: string
+  sceneCount: number
+  windowCount: number
+} {
+  const n = native()
+  if (!n || typeof n.probeWireframe !== 'function') {
+    return {
+      available: false,
+      lastNodes: 0,
+      lastPath: 'native.unavailable',
+      sceneCount: 0,
+      windowCount: 0,
+    }
+  }
+  try {
+    const r = n.probeWireframe()
+    return {
+      available: true,
+      lastNodes: typeof r?.lastNodes === 'number' ? r.lastNodes : 0,
+      lastPath: typeof r?.lastPath === 'string' ? r.lastPath : 'unknown',
+      sceneCount: typeof r?.sceneCount === 'number' ? r.sceneCount : 0,
+      windowCount: typeof r?.windowCount === 'number' ? r.windowCount : 0,
+    }
+  } catch (e) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn('[sentori] probeWireframe threw', e)
+    }
+    return {
+      available: false,
+      lastNodes: 0,
+      lastPath: 'native.threw',
+      sceneCount: 0,
+      windowCount: 0,
+    }
   }
 }

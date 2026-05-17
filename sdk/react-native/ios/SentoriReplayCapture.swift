@@ -29,8 +29,33 @@ import UIKit
         return result
     }
 
+    /// Last path the keyWindow lookup took. Exposed to JS via
+    /// `probeWireframe()` so the failure-mode diagnostic in Metro can
+    /// tell scene-race from "no window at all" without re-rolling the
+    /// pod. Updated on every captureSync call.
+    @objc public static var lastDiagPath: String = "none(not-yet-called)"
+    @objc public static var lastDiagNodes: Int = 0
+    @objc public static var lastDiagSceneCount: Int = 0
+    @objc public static var lastDiagWindowCount: Int = 0
+    private static var loggedFirstResult = false
+
     private static func captureSync(maskedIds: Set<String>) -> String? {
-        guard let window = keyWindow() else { return nil }
+        let (winOpt, path) = resolveKeyWindow()
+        lastDiagPath = path
+        lastDiagSceneCount = currentSceneCount()
+        lastDiagWindowCount = currentWindowCount()
+        guard let window = winOpt else {
+            if !loggedFirstResult {
+                NSLog(
+                    "[sentori] wireframe: returning nil — keyWindow path=%@ scenes=%d windows=%d",
+                    path,
+                    lastDiagSceneCount,
+                    lastDiagWindowCount
+                )
+                loggedFirstResult = true
+            }
+            return nil
+        }
         var nodes: [[String: Any]] = []
         walk(
             view: window,
@@ -39,6 +64,17 @@ import UIKit
             window: window,
             nodes: &nodes
         )
+        lastDiagNodes = nodes.count
+        if !loggedFirstResult {
+            NSLog(
+                "[sentori] wireframe: first capture ok — keyWindow path=%@ bounds=%.0fx%.0f nodes=%d",
+                path,
+                window.bounds.width,
+                window.bounds.height,
+                nodes.count
+            )
+            loggedFirstResult = true
+        }
         let payload: [String: Any] = [
             "ts": Int(Date().timeIntervalSince1970 * 1000),
             "width": Double(window.bounds.width),
@@ -51,19 +87,77 @@ import UIKit
         return nil
     }
 
-    private static func keyWindow() -> UIWindow? {
+    /// Four-tier window resolution. The previous single-pass loop
+    /// returned nil whenever the first connected scene was a
+    /// `.background` or `.unattached` SwiftUI/preview scene that had
+    /// no windows yet — common on iOS 26 cold-start where the JS
+    /// thread spins up the replay tick before scene activation
+    /// settles (the v0.9.6 default 1 Hz fires within ~200 ms).
+    private static func resolveKeyWindow() -> (UIWindow?, String) {
         if #available(iOS 13.0, *) {
-            for scene in UIApplication.shared.connectedScenes {
-                guard let ws = scene as? UIWindowScene else { continue }
-                if let key = ws.windows.first(where: { $0.isKeyWindow }) {
-                    return key
-                }
-                if let first = ws.windows.first {
-                    return first
+            let scenes = Array(UIApplication.shared.connectedScenes)
+            // Pass 1: foregroundActive scene with a key window.
+            for scene in scenes where scene.activationState == .foregroundActive {
+                if let ws = scene as? UIWindowScene,
+                   let key = ws.windows.first(where: { $0.isKeyWindow }) {
+                    return (key, "scene.fg.key")
                 }
             }
+            // Pass 2: foregroundActive scene's first window (no key set yet).
+            for scene in scenes where scene.activationState == .foregroundActive {
+                if let ws = scene as? UIWindowScene, let win = ws.windows.first {
+                    return (win, "scene.fg.first")
+                }
+            }
+            // Pass 3: foregroundInactive (mid-transition) scene with any window.
+            for scene in scenes where scene.activationState == .foregroundInactive {
+                if let ws = scene as? UIWindowScene, let win = ws.windows.first {
+                    return (win, "scene.fgi.first")
+                }
+            }
+            // Pass 4: any scene at all with windows.
+            for scene in scenes {
+                if let ws = scene as? UIWindowScene, let win = ws.windows.first {
+                    return (win, "scene.any.first")
+                }
+            }
+            // Fallthrough → legacy windows list.
         }
-        return UIApplication.shared.windows.first
+        if let leg = UIApplication.shared.windows.first {
+            return (leg, "legacy.first")
+        }
+        return (nil, "none")
+    }
+
+    private static func currentSceneCount() -> Int {
+        if #available(iOS 13.0, *) {
+            return UIApplication.shared.connectedScenes.count
+        }
+        return 0
+    }
+
+    private static func currentWindowCount() -> Int {
+        if #available(iOS 13.0, *) {
+            return UIApplication.shared.connectedScenes.reduce(0) { acc, scene in
+                acc + ((scene as? UIWindowScene)?.windows.count ?? 0)
+            }
+        }
+        return UIApplication.shared.windows.count
+    }
+
+    /// JS-side probe. Returns a dict the example/dashboard can render
+    /// to ask "why is the ring empty?" without parsing Metro logs.
+    /// `lastNodes == 0 && lastPath != "none"` means the window walk
+    /// happened but the tree was empty (unusual — backgrounded?).
+    /// `lastPath == "none(...)"` means no UIWindow was reachable at
+    /// the moment of the last tick.
+    @objc public static func probe() -> [String: Any] {
+        return [
+            "lastPath": lastDiagPath,
+            "lastNodes": lastDiagNodes,
+            "sceneCount": lastDiagSceneCount,
+            "windowCount": lastDiagWindowCount,
+        ]
     }
 
     /// Cap on nodes per snapshot — extremely deep / wide trees can

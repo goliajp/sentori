@@ -30,6 +30,14 @@ public class SentoriModule: Module {
             return SentoriReplayCapture.captureWireframe(maskedIds: maskedIds)
         }
 
+        // v0.9.12 — diagnostic readout for replay. Returns the last
+        // keyWindow resolution path + scene/window counts so a single
+        // JS-side button can answer "why is my ring empty?" without
+        // re-rolling the pod. See SentoriReplayCapture.swift.
+        Function("probeWireframe") { () -> [String: Any] in
+            return SentoriReplayCapture.probe()
+        }
+
         // v0.9.4 #1 — Mobile Vitals exposure.
         Function("markJsBridgeReady") {
             SentoriMobileVitals.markJsBridgeReady()

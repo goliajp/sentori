@@ -29,6 +29,22 @@ object SentoriReplayCapture {
 
     @Volatile private var lastActivity: WeakReference<Activity>? = null
 
+    // v0.9.12 — diagnostic readout so the JS side can ask "why is the
+    // ring empty?" without parsing logcat. Mirrors the iOS side.
+    @Volatile private var lastDiagPath: String = "none(not-yet-called)"
+    @Volatile private var lastDiagNodes: Int = 0
+
+    @JvmStatic
+    fun probe(): Map<String, Any> {
+        val activity = lastActivity?.get()
+        return mapOf(
+            "lastPath" to lastDiagPath,
+            "lastNodes" to lastDiagNodes,
+            "sceneCount" to if (activity != null) 1 else 0,
+            "windowCount" to (activity?.window?.let { 1 } ?: 0),
+        )
+    }
+
     @JvmStatic
     fun setActivity(activity: Activity?) {
         lastActivity = activity?.let { WeakReference(it) }
@@ -52,15 +68,29 @@ object SentoriReplayCapture {
 
     @JvmStatic
     fun captureWireframe(maskedIds: List<String>): String? {
-        val activity = lastActivity?.get() ?: return null
-        val root = activity.window?.decorView ?: return null
-        if (root.width <= 0 || root.height <= 0) return null
+        val activity = lastActivity?.get()
+        if (activity == null) {
+            lastDiagPath = "activity.null"
+            return null
+        }
+        val root = activity.window?.decorView
+        if (root == null) {
+            lastDiagPath = "decorView.null"
+            return null
+        }
+        if (root.width <= 0 || root.height <= 0) {
+            lastDiagPath = "root.zero-size"
+            return null
+        }
 
         val maskedSet = maskedIds.toHashSet()
         val nodes = JSONArray()
         val rect = Rect()
         val rootLoc = IntArray(2).also { root.getLocationInWindow(it) }
         walk(root, false, maskedSet, rootLoc, rect, nodes)
+
+        lastDiagPath = "activity.resumed"
+        lastDiagNodes = nodes.length()
 
         val payload = JSONObject().apply {
             put("ts", System.currentTimeMillis())

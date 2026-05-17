@@ -102,10 +102,12 @@ export {
 } from './state-snapshots';
 export { RageTapCapture } from './rage-tap';
 export {
+  probeNativeWireframe,
   startAnrWatchdog,
   stopAnrWatchdog,
   triggerNativeCrash,
 } from './native';
+export { drainReplay, startReplay, stopReplay } from './replay';
 export {
   endSession,
   markSessionCrashed,

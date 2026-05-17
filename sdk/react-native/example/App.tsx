@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 
 import {
+  drainReplay,
+  probeNativeWireframe,
   sentori,
   startAnrWatchdog,
   triggerNativeCrash,
@@ -26,6 +28,10 @@ sentori.init({
   release: 'sentori-example@1.0.0+1',
   environment: 'dev',
   ingestUrl: INGEST_URL,
+  // v0.9.12 — enable wireframe replay so the example app exercises
+  // the same ring buffer Insight is verifying. 2 Hz to fill the ring
+  // faster during interactive testing.
+  capture: { replay: { mode: 'wireframe', hz: 2 } },
 });
 
 // Phase 29 sub-A e2e: start the hang watchdog with force=true so it
@@ -102,6 +108,29 @@ export default function App(): React.JSX.Element {
           // intentionally empty
         }
         append('main resumed');
+      },
+    },
+    {
+      title: '[replay] probe wireframe state',
+      onPress: () => {
+        const p = probeNativeWireframe();
+        const msg = `probe path=${p.lastPath} nodes=${p.lastNodes} scenes=${p.sceneCount} windows=${p.windowCount}`;
+        append(msg);
+        // eslint-disable-next-line no-console
+        console.warn('[replay-test]', msg);
+      },
+    },
+    {
+      title: '[replay] drain ring (no crash)',
+      onPress: () => {
+        const ndjson = drainReplay();
+        const lines = ndjson ? ndjson.split('\n').length : 0;
+        const bytes = ndjson.length;
+        const head = ndjson.slice(0, 120).replace(/\n/g, ' | ');
+        const msg = `drained frames=${lines} bytes=${bytes}`;
+        append(msg);
+        // eslint-disable-next-line no-console
+        console.warn('[replay-test]', msg, '\n  head:', head);
       },
     },
   ];

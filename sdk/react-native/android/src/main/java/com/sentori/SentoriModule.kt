@@ -34,6 +34,11 @@ class SentoriModule : Module() {
             SentoriReplayCapture.captureWireframe(maskedIds)
         }
 
+        // v0.9.12 — diagnostic readout for replay. See iOS side.
+        Function("probeWireframe") {
+            SentoriReplayCapture.probe()
+        }
+
         // v0.9.4 #1 — Mobile Vitals exposure.
         Function("markJsBridgeReady") {
             SentoriMobileVitals.markJsBridgeReady()
