@@ -4,7 +4,7 @@ import android.app.Activity
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.RippleDrawable
+import android.graphics.drawable.LayerDrawable
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
@@ -256,31 +256,34 @@ object SentoriReplayCapture {
         return String.format("#%02X%02X%02X%02X", r, g, b, a)
     }
 
-    /** rc.5 — best-effort fill-colour extraction for the View's
-     *  background Drawable. RN's `backgroundColor: '#...'` style
-     *  lands as a ColorDrawable in flat cases and a GradientDrawable
-     *  whenever the View also carries `borderRadius` or
-     *  `borderWidth`; Pressables wrap the painted child in a
-     *  RippleDrawable layer list. We cover all three. Returns
-     *  the packed ARGB int or null when nothing usable is exposed
-     *  (StateListDrawable with no current state, opaque image
-     *  drawables, etc.). */
+    /** rc.5 / rc.7 — best-effort fill-colour extraction for the View's
+     *  background Drawable. We hit:
+     *
+     *    - `ColorDrawable` — flat `<View style={{ backgroundColor }}>`.
+     *    - `GradientDrawable` — RN ≤ 0.73's path for backgroundColor +
+     *      borderRadius / borderWidth.
+     *    - Any `LayerDrawable` subclass — RippleDrawable (Pressable),
+     *      `com.facebook.react.uimanager.drawable.CompositeBackgroundDrawable`
+     *      (RN 0.74+ Fabric path, wraps the real
+     *      `BackgroundDrawable` layer alongside borders / shadows), and
+     *      any other future composite. Iterate layers, recurse.
+     *    - **rc.7 reflective fallback** — for the BackgroundDrawable
+     *      itself (RN 0.74+, Kotlin `internal class` so we can't
+     *      import it from this module) and any other custom Drawable
+     *      that follows the convention of exposing `getBackgroundColor()`
+     *      or `getColor()`. Without this, Insight's app — which uses
+     *      Pressables and rounded Views and so renders nearly every
+     *      coloured surface via CompositeBackgroundDrawable —
+     *      surfaced zero `node.color` fields on rc.5. */
     private fun extractDrawableColor(drawable: Drawable?): Int? {
         return when (drawable) {
             null -> null
             is ColorDrawable -> drawable.color
             is GradientDrawable -> {
-                // API 24+ exposes the ColorStateList for the
-                // `setColor()` value. RN's typical solid-colour
-                // GradientDrawable returns a single default colour
-                // here; gradients with multiple stops still surface
-                // a reasonable representative colour.
                 val csl = drawable.color
                 csl?.defaultColor
             }
-            is RippleDrawable -> {
-                // Iterate the layer list; the inner painted layer
-                // is what carries the brand colour.
+            is LayerDrawable -> {
                 for (i in 0 until drawable.numberOfLayers) {
                     val inner = drawable.getDrawable(i)
                     val c = extractDrawableColor(inner)
@@ -288,7 +291,31 @@ object SentoriReplayCapture {
                 }
                 null
             }
-            else -> null
+            else -> extractByReflection(drawable)
         }
+    }
+
+    /** rc.7 — read `getBackgroundColor()` / `getColor()` via Java
+     *  reflection. Kotlin synthesizes the former from any `var
+     *  backgroundColor: Int` declaration, so RN's internal
+     *  `BackgroundDrawable` (which holds the actual paint colour
+     *  behind any RN View with backgroundColor) exposes it
+     *  automatically. Any throw / non-Int return falls through to
+     *  null — fully best-effort. */
+    private fun extractByReflection(drawable: Drawable): Int? {
+        val cls = drawable.javaClass
+        for (name in arrayOf("getBackgroundColor", "getColor")) {
+            try {
+                val method = cls.getMethod(name)
+                val result = method.invoke(drawable)
+                if (result is Int) return result
+            } catch (_: NoSuchMethodException) {
+                // try next
+            } catch (_: Throwable) {
+                // some custom drawables throw on reflective access; bail
+                return null
+            }
+        }
+        return null
     }
 }
