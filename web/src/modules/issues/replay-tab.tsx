@@ -7,6 +7,7 @@ import {
   paletteColorFor,
   WIREFRAME_FILL_OPACITY,
   WIREFRAME_MASK_FILL,
+  WIREFRAME_MASK_OPACITY,
   WIREFRAME_STROKE,
   WIREFRAME_TEXT_FILL,
 } from '@/lib/wireframe-palette'
@@ -308,7 +309,7 @@ function NodeShape({
   let stroke = baseStroke
   let strokeWidth = baseStrokeWidth
   let fill: string = baseFill
-  let fillOpacity = isMask ? 1 : WIREFRAME_FILL_OPACITY
+  let fillOpacity = isMask ? WIREFRAME_MASK_OPACITY : WIREFRAME_FILL_OPACITY
   let opacity = 1
   if (diffStatus === 'added') {
     stroke = 'var(--success)'

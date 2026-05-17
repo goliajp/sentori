@@ -78,9 +78,12 @@ export const WIREFRAME_PALETTE: readonly string[] = [
 
 export const WIREFRAME_FILL_OPACITY = 0.75
 
-/** Mask nodes always render with a strong dark fill — signals
- *  redaction regardless of canvas theme. */
-export const WIREFRAME_MASK_FILL = 'rgba(20, 18, 16, 0.78)'
+/** Mask nodes signal redaction — always high contrast against the
+ *  canvas regardless of theme. Uses the `--ink` token (dark in
+ *  light mode, warm-light in dark mode); callers apply
+ *  `fill-opacity=0.78` so adjacent masks composite predictably. */
+export const WIREFRAME_MASK_FILL = 'var(--ink)'
+export const WIREFRAME_MASK_OPACITY = 0.78
 
 /** Text fill — text content + position matter more than the host
  *  app's text colour. Use the ink token so wireframe text reads on
@@ -88,8 +91,12 @@ export const WIREFRAME_MASK_FILL = 'rgba(20, 18, 16, 0.78)'
 export const WIREFRAME_TEXT_FILL = 'var(--ink)'
 
 /** Rect stroke — subtle outline so adjacent same-colour rects don't
- *  visually merge. Theme-agnostic alpha. */
-export const WIREFRAME_STROKE = 'rgba(0,0,0,0.18)'
+ *  visually merge. Uses the `--rule` token (light mode: warm beige
+ *  on paper-2; dark mode: dim warm grey on warm-dark) so the stroke
+ *  contrasts against the canvas in either theme. The fixed alpha
+ *  value (`rgba(0,0,0,0.18)`) was light-mode-only and disappeared in
+ *  dark mode. */
+export const WIREFRAME_STROKE = 'var(--rule)'
 
 /**
  * Deterministic palette index from a node's spatial fingerprint.

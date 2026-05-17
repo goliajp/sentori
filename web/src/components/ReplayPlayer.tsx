@@ -6,6 +6,7 @@ import {
   paletteColorFor,
   WIREFRAME_FILL_OPACITY,
   WIREFRAME_MASK_FILL,
+  WIREFRAME_MASK_OPACITY,
   WIREFRAME_STROKE,
   WIREFRAME_TEXT_FILL,
 } from '@/lib/wireframe-palette'
@@ -458,7 +459,16 @@ function NodeRender({ node }: { node: Node }) {
     )
   }
   if (node.kind === 'mask') {
-    return <rect fill={WIREFRAME_MASK_FILL} height={node.h} width={node.w} x={node.x} y={node.y} />
+    return (
+      <rect
+        fill={WIREFRAME_MASK_FILL}
+        fillOpacity={WIREFRAME_MASK_OPACITY}
+        height={node.h}
+        width={node.w}
+        x={node.x}
+        y={node.y}
+      />
+    )
   }
 
   const fill = paletteColorFor(node)
