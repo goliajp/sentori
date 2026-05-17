@@ -391,6 +391,19 @@ export const uploadAttachment = async (
     // UploadResponse; non-JSON bodies fall through to null.
     if (resp.status < 200 || resp.status >= 300) {
       noteAttachmentFailure(eventId, kind, `http_${resp.status}`);
+      // rc.6 — surface the status in dev so Insight-style triage
+      // doesn't have to guess between 413/422/500. Pre-rc.6 only
+      // the breadcrumb carried the reason; logcat only saw the
+      // generic `upload returned null` line.
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[sentori] attachment upload non-2xx',
+          'eventId=', eventId,
+          'kind=', kind,
+          'status=', resp.status,
+        );
+      }
       return null;
     }
     const j = (await resp.json().catch(() => null)) as null | {
@@ -401,6 +414,15 @@ export const uploadAttachment = async (
     };
     if (!j || !j.refId) {
       noteAttachmentFailure(eventId, kind, 'bad_response_body');
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[sentori] attachment upload bad-response-body',
+          'eventId=', eventId,
+          'kind=', kind,
+          'status=', resp.status,
+        );
+      }
       return null;
     }
     return {
@@ -413,6 +435,15 @@ export const uploadAttachment = async (
   } catch (e) {
     const reason = e instanceof Error ? `fetch_${e.name}` : 'fetch_unknown';
     noteAttachmentFailure(eventId, kind, reason);
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[sentori] attachment upload fetch threw',
+        'eventId=', eventId,
+        'kind=', kind,
+        'reason=', reason,
+      );
+    }
     return null;
   }
 };
