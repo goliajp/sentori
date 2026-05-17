@@ -1,5 +1,6 @@
-import { Link, useLocation } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 
+import type { OrgRow, ProjectRow } from '@/api/client'
 import type { ModuleDef } from '@/modules/registry'
 
 import { useOrg } from '@/auth/orgContext'
@@ -27,12 +28,19 @@ import { GROUPS, modulesInGroup, PINNED_MODULE } from '@/modules/registry'
  *   …
  */
 export function Sidebar() {
-  const { currentOrg } = useOrg()
+  const { currentOrg, currentProject, orgs, projects } = useOrg()
   const { logout, user } = useAuth()
   const isAdmin = currentOrg.role === 'owner' || currentOrg.role === 'admin'
 
   return (
     <aside className="hidden w-56 shrink-0 flex-col overflow-hidden border-r border-[color:var(--rule)] bg-[color:var(--paper)] md:flex">
+      <ContextBlock
+        currentOrg={currentOrg}
+        currentProject={currentProject}
+        orgs={orgs}
+        projects={projects}
+      />
+
       <div className="flex-1 overflow-y-auto py-2">
         <Section>
           <SideLink module={PINNED_MODULE} orgSlug={currentOrg.slug} />
@@ -55,6 +63,94 @@ export function Sidebar() {
         <UserMenu email={user?.email ?? null} onLogout={() => void logout()} />
       </div>
     </aside>
+  )
+}
+
+/**
+ * Top-of-sidebar context — answers "what am I looking at?" before the
+ * user even reads a module label. Two rows:
+ *
+ *   ORG     ▾  qualcomm  (role: owner)
+ *   PROJECT ▾  focus-ai-app
+ *
+ * Each row is a native <select> if the user has ≥ 2 of that thing,
+ * else a static label. We keep the switcher inline (not a popover)
+ * so it never blocks pointer events on the rest of the rail.
+ */
+function ContextBlock({
+  currentOrg,
+  currentProject,
+  orgs,
+  projects,
+}: {
+  currentOrg: OrgRow
+  currentProject: null | ProjectRow
+  orgs: OrgRow[]
+  projects: ProjectRow[]
+}) {
+  const navigate = useNavigate()
+  const orgsForCurrent = orgs.length > 0 ? orgs : [currentOrg]
+
+  return (
+    <div className="border-b border-[color:var(--rule)] bg-[color:var(--paper-2)] px-4 pt-3.5 pb-3">
+      <ContextRow label="org">
+        {orgsForCurrent.length > 1 ? (
+          <select
+            aria-label="Switch organization"
+            className="w-full appearance-none bg-transparent pr-4 text-[13px] text-[color:var(--ink)] focus:outline-none"
+            onChange={(e) => navigate(`/org/${e.target.value}/overview`)}
+            value={currentOrg.slug}
+          >
+            {orgsForCurrent.map((o) => (
+              <option key={o.slug} value={o.slug}>
+                {o.name || o.slug}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="text-[13px] text-[color:var(--ink)]">
+            {currentOrg.name || currentOrg.slug}
+          </span>
+        )}
+        <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+          {currentOrg.role}
+        </span>
+      </ContextRow>
+
+      <ContextRow label="project">
+        {projects.length === 0 ? (
+          <span className="text-[12px] text-[color:var(--ink-muted)] italic">none yet</span>
+        ) : projects.length > 1 ? (
+          <select
+            aria-label="Switch project"
+            className="w-full appearance-none bg-transparent pr-4 text-[13px] text-[color:var(--ink)] focus:outline-none"
+            onChange={(e) => navigate(`/org/${currentOrg.slug}/overview?project=${e.target.value}`)}
+            value={currentProject?.id ?? ''}
+          >
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="truncate text-[13px] text-[color:var(--ink)]">
+            {currentProject?.name ?? '—'}
+          </span>
+        )}
+      </ContextRow>
+    </div>
+  )
+}
+
+function ContextRow({ children, label }: { children: React.ReactNode; label: string }) {
+  return (
+    <div className="flex items-baseline gap-2 py-1">
+      <span className="w-14 shrink-0 font-mono text-[9px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+        {label}
+      </span>
+      <div className="flex min-w-0 flex-1 items-baseline gap-2 truncate">{children}</div>
+    </div>
   )
 }
 
