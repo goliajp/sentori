@@ -245,6 +245,31 @@ export type IntegrationRow = {
   createdAt: string
 }
 
+/** A single wireframe replay frame, as emitted by the SDK and
+ *  returned parsed by the server's replay-frames endpoint. */
+export type ReplayFrame = {
+  ts: number
+  width: number
+  height: number
+  nodes: ReplayNode[]
+}
+
+export type ReplayNode = {
+  kind?: 'image' | 'mask' | 'rect' | 'text'
+  x: number
+  y: number
+  w: number
+  h: number
+  text?: string
+  color?: string
+}
+
+export type ReplayFramesResponse = {
+  ref: null | string
+  frameCount: number
+  frames: ReplayFrame[]
+}
+
 export const adminApi = {
   /** Phase 43 sub-A.03: list active integrations across the caller's orgs. */
   listIntegrations: () => adminFetch<IntegrationRow[]>('/integrations'),
@@ -466,6 +491,15 @@ export const adminApi = {
   listEventAttachments: (projectId: string, eventId: string) =>
     adminFetch<Attachment[]>(
       `/projects/${projectId}/events/${encodeURIComponent(eventId)}/attachments`
+    ),
+
+  /** v1.0 A3 — parsed wireframe replay frames for the latest replay
+   *  attachment on this event. Returns `{ ref: null, frames: [] }`
+   *  when the event has no replay attachment so the Replay tab can
+   *  render a uniform empty state without a 404 branch. */
+  listReplayFrames: (projectId: string, eventId: string) =>
+    adminFetch<ReplayFramesResponse>(
+      `/projects/${projectId}/events/${encodeURIComponent(eventId)}/replay-frames`
     ),
 
   listIssues: (

@@ -20,17 +20,19 @@ import { useOrg } from '@/auth/orgContext'
 import { AttachmentGallery } from '@/components/AttachmentGallery'
 import { FrameRoleBadge } from '@/components/FrameRoleBadge'
 import { SourceCode } from '@/components/SourceCode'
+import { ReplayTab } from './replay-tab'
 import { formatRelative } from '@/lib/format'
 import { roleOf } from '@/lib/frame-role'
 import { languageOf } from '@/lib/source-language'
 import { frameToSourceUrl } from '@/lib/source-link'
 import { useUrlParam } from '@/lib/url-state'
 
-type Tab = 'activity' | 'breadcrumbs' | 'events' | 'feedback' | 'stack' | 'tags'
+type Tab = 'activity' | 'breadcrumbs' | 'events' | 'feedback' | 'replay' | 'stack' | 'tags'
 type WritableStatus = 'active' | 'closed' | 'resolved' | 'silenced'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'stack', label: 'Stack' },
+  { key: 'replay', label: 'Replay' },
   { key: 'events', label: 'Events' },
   { key: 'breadcrumbs', label: 'Breadcrumbs' },
   { key: 'tags', label: 'Tags' },
@@ -190,6 +192,9 @@ export function IssueDetailView() {
           projectId={projectId}
           sourceRepoUrl={currentProject?.sourceRepoUrl ?? null}
         />
+      )}
+      {selectedEvent && tab === 'replay' && projectId && (
+        <ReplayTab eventId={selectedEvent.id} projectId={projectId} />
       )}
       {selectedEvent && tab === 'breadcrumbs' && <BreadcrumbsTab event={selectedEvent} />}
       {selectedEvent && tab === 'tags' && <TagsTab event={selectedEvent} />}
