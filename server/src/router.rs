@@ -430,6 +430,10 @@ pub fn build(cfg: ServerConfig) -> Router {
     let user_auth_limited = Router::new()
         .route("/register", post(api::user_auth::register))
         .route("/login", post(api::user_auth::login))
+        // v1.0 — password reset is rate-limited too (one of the
+        // classic email-bombing vectors).
+        .route("/forgot-password", post(api::user_auth::forgot_password))
+        .route("/reset-password", post(api::user_auth::reset_password))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             crate::rate_limit::rate_limit_auth_middleware,
@@ -437,8 +441,23 @@ pub fn build(cfg: ServerConfig) -> Router {
     let user_auth_open = Router::new()
         .route("/verify", get(api::user_auth::verify))
         .route("/logout", post(api::user_auth::logout))
-        .route("/me", get(api::user_auth::me));
-    let user_auth = Router::new().merge(user_auth_limited).merge(user_auth_open);
+        .route("/me", get(api::user_auth::me))
+        // v1.0 — dashboard polls this to decide which OAuth buttons
+        // to render on /login + /register.
+        .route("/oauth/providers", get(api::user_auth::oauth_providers));
+    // v1.0 — authed-user-only profile + change-password mutations.
+    // Sit behind the same require_user guard the orgs/teams routes use.
+    let user_auth_authed = Router::new()
+        .route("/me", axum::routing::patch(api::user_auth::patch_me))
+        .route("/change-password", post(api::user_auth::change_password))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            api::user_auth::require_user,
+        ));
+    let user_auth = Router::new()
+        .merge(user_auth_limited)
+        .merge(user_auth_open)
+        .merge(user_auth_authed);
 
     // Phase 13 sub-C: orgs / memberships / invites. All require_user.
     let orgs = Router::new()

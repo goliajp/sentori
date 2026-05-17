@@ -1035,11 +1035,30 @@ export type ProjectRow = {
   sourceRepoUrl?: null | string
 }
 
-export type AuthUser = { email: string; id: string }
+export type AuthUser = {
+  avatarUrl?: null | string
+  displayName?: null | string
+  email: string
+  id: string
+}
 
-/** Phase 13 sub-B/E: user-based auth (DB session cookie). */
+export type OAuthProviders = { github: boolean; google: boolean }
+
+/** Phase 13 sub-B/E + v1.0: user-based auth + profile mutations. */
 export const userAuthApi = {
-  forgotPassword: () => Promise.reject<never>({ body: { error: 'notImplemented' }, status: 501 }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    authFetch<{ ok: true }>('/change-password', {
+      body: JSON.stringify({ currentPassword, newPassword }),
+      method: 'POST',
+    }),
+
+  forgotPassword: (email: string) =>
+    authFetch<{ ok: true }>('/forgot-password', {
+      body: JSON.stringify({ email }),
+      method: 'POST',
+    }),
+
+  listOAuthProviders: () => authFetch<OAuthProviders>('/oauth/providers'),
 
   login: (email: string, password: string) =>
     authFetch<{ ok: true; user: AuthUser }>('/login', {
@@ -1051,9 +1070,18 @@ export const userAuthApi = {
 
   me: () => authFetch<{ user: AuthUser }>('/me'),
 
+  patchMe: (body: { avatarUrl?: null | string; displayName?: null | string }) =>
+    authFetch<{ ok: true }>('/me', { body: JSON.stringify(body), method: 'PATCH' }),
+
   register: (email: string, password: string) =>
     authFetch<{ ok: true }>('/register', {
       body: JSON.stringify({ email, password }),
+      method: 'POST',
+    }),
+
+  resetPassword: (token: string, password: string) =>
+    authFetch<{ ok: true }>('/reset-password', {
+      body: JSON.stringify({ password, token }),
       method: 'POST',
     }),
 

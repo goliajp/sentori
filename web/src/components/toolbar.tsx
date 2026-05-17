@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 
+import { AccountMenu } from './account-menu'
 import { ThemeToggle } from './theme-toggle'
 
 /**
@@ -57,6 +58,7 @@ export function Toolbar() {
 
       <div className="flex items-center gap-3 justify-self-end">
         <ThemeToggle />
+        <AccountMenu />
       </div>
     </header>
   )

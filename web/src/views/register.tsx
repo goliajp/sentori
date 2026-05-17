@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router'
 
 import { userAuthApi } from '@/api/client'
 
-import { AuthShell, Field } from './login'
+import { AuthShell, Field, OAuthButtons } from './login'
 
 export function RegisterView() {
   const nav = useNavigate()
@@ -29,6 +29,7 @@ export function RegisterView() {
 
   return (
     <AuthShell title="Create account">
+      <OAuthButtons />
       <form className="space-y-3" onSubmit={submit}>
         <Field label="Email" onChange={setEmail} type="email" value={email} />
         <Field label="Password" onChange={setPassword} type="password" value={password} />

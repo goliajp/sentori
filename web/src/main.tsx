@@ -10,12 +10,14 @@ import { AuthProvider } from './auth/AuthProvider'
 import { ProtectedLayout } from './auth/ProtectedLayout'
 import { installThemeWiring } from './components/theme'
 import { MODULES } from './modules/registry'
+import { AccountView } from './views/account'
 import { ForgotPasswordView } from './views/forgot-password'
 import { InviteAcceptView } from './views/invite-accept'
 import { LoginView } from './views/login'
 import { OnboardingView } from './views/onboarding'
 import { OrgLayout } from './views/org-layout'
 import { RegisterView } from './views/register'
+import { ResetPasswordView } from './views/reset-password'
 import { RootRedirect } from './views/root-redirect'
 import { TransferAcceptView } from './views/transfer-accept'
 import { UserActivityView } from './views/user-activity'
@@ -66,10 +68,12 @@ const router = createBrowserRouter([
   { element: <RegisterView />, path: '/register' },
   { element: <VerifyView />, path: '/verify' },
   { element: <ForgotPasswordView />, path: '/forgot-password' },
+  { element: <ResetPasswordView />, path: '/reset-password/:token' },
   {
     children: [
       { element: <RootRedirect />, index: true },
       { element: <OnboardingView />, path: 'onboarding' },
+      { element: <AccountView />, path: 'account' },
       { element: <UserActivityView />, path: 'me/activity' },
       { element: <InviteAcceptView />, path: 'invite/:token' },
       { element: <TransferAcceptView />, path: 'transfers/:token' },

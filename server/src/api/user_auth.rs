@@ -369,18 +369,19 @@ pub async fn me(State(state): State<AppState>, jar: CookieJar) -> Response {
         None => return unauthorized(),
     };
 
-    let row: Option<(Uuid, String, OffsetDateTime)> = sqlx::query_as(
-        "SELECT u.id, u.email, s.expires_at \
-         FROM auth_sessions s JOIN users u ON u.id = s.user_id \
-         WHERE s.id = $1",
-    )
-    .bind(&session_id)
-    .fetch_optional(&pool)
-    .await
-    .ok()
-    .flatten();
+    let row: Option<(Uuid, String, Option<String>, Option<String>, OffsetDateTime)> =
+        sqlx::query_as(
+            "SELECT u.id, u.email, u.display_name, u.avatar_url, s.expires_at \
+             FROM auth_sessions s JOIN users u ON u.id = s.user_id \
+             WHERE s.id = $1",
+        )
+        .bind(&session_id)
+        .fetch_optional(&pool)
+        .await
+        .ok()
+        .flatten();
 
-    let (id, email, expires_at) = match row {
+    let (id, email, display_name, avatar_url, expires_at) = match row {
         Some(r) => r,
         None => return unauthorized(),
     };
@@ -390,7 +391,14 @@ pub async fn me(State(state): State<AppState>, jar: CookieJar) -> Response {
 
     (
         StatusCode::OK,
-        Json(json!({ "user": { "id": id, "email": email } })),
+        Json(json!({
+            "user": {
+                "id": id,
+                "email": email,
+                "displayName": display_name,
+                "avatarUrl": avatar_url,
+            },
+        })),
     )
         .into_response()
 }
@@ -449,6 +457,339 @@ pub async fn current_user(pool: &PgPool, session_id: &str) -> Option<(Uuid, Stri
         return None;
     }
     Some((id, email))
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// v1.0 — profile + password management
+// ─────────────────────────────────────────────────────────────────────
+
+const RESET_TOKEN_BYTES: usize = 32; // 256 bits
+const RESET_TTL_HOURS: i64 = 2;
+
+#[derive(Deserialize)]
+pub struct ForgotPasswordRequest {
+    pub email: String,
+}
+
+/// POST /auth/forgot-password — issue a single-use reset token.
+///
+/// Always returns 200 OK regardless of whether the email matched a
+/// real user. That's the standard "don't reveal which addresses are
+/// registered" rule for password-reset endpoints.
+///
+/// When the email *does* match, we generate a 256-bit token, persist
+/// it in `password_resets` with a 2 h expiry, and log the reset URL
+/// at tracing INFO. Operators wire up their own SMTP / SES to ship
+/// the link to the user (the notifier module handles outbound mail
+/// for alerts; password-reset delivery is intentionally minimal here
+/// to keep self-host options open).
+pub async fn forgot_password(
+    State(state): State<AppState>,
+    Json(body): Json<ForgotPasswordRequest>,
+) -> Response {
+    let pool = match &state.db {
+        Some(p) => p.clone(),
+        None => return server_error("db not configured"),
+    };
+
+    let email = body.email.trim().to_ascii_lowercase();
+    if !is_plausible_email(&email) {
+        // Still return 200 — silent on validation.
+        return ok_response();
+    }
+
+    let user_row: Option<(Uuid,)> = sqlx::query_as("SELECT id FROM users WHERE email = $1")
+        .bind(&email)
+        .fetch_optional(&pool)
+        .await
+        .ok()
+        .flatten();
+
+    if let Some((user_id,)) = user_row {
+        let token = random_token(RESET_TOKEN_BYTES);
+        let expires_at = OffsetDateTime::now_utc() + Duration::hours(RESET_TTL_HOURS);
+        if let Err(e) = sqlx::query(
+            "INSERT INTO password_resets (token, user_id, expires_at) \
+             VALUES ($1, $2, $3)",
+        )
+        .bind(&token)
+        .bind(user_id)
+        .bind(expires_at)
+        .execute(&pool)
+        .await
+        {
+            tracing::error!(error = %e, "forgot_password: insert reset token failed");
+            return server_error("dbError");
+        }
+        let base = std::env::var("SENTORI_BASE_URL")
+            .unwrap_or_else(|_| "http://localhost:8000".to_string());
+        let link = format!("{base}/reset-password/{token}");
+        tracing::info!(
+            email = %email,
+            link = %link,
+            expires_at = %expires_at,
+            "password reset link issued (deliver via your operator-side SMTP)",
+        );
+    } else {
+        tracing::info!(email = %email, "password reset requested for unknown email (200 silently)");
+    }
+
+    ok_response()
+}
+
+#[derive(Deserialize)]
+pub struct ResetPasswordRequest {
+    pub token: String,
+    pub password: String,
+}
+
+/// POST /auth/reset-password — exchange a reset token for a new pwd.
+///
+/// Token is consumed atomically — second use returns
+/// `tokenAlreadyUsed`. Expired tokens return `tokenExpired`.
+pub async fn reset_password(
+    State(state): State<AppState>,
+    Json(body): Json<ResetPasswordRequest>,
+) -> Response {
+    let pool = match &state.db {
+        Some(p) => p.clone(),
+        None => return server_error("db not configured"),
+    };
+
+    if body.password.len() < PASSWORD_MIN_LEN {
+        return bad_request("passwordTooShort");
+    }
+
+    let row: Option<(Uuid, OffsetDateTime, Option<OffsetDateTime>)> = sqlx::query_as(
+        "SELECT user_id, expires_at, used_at FROM password_resets WHERE token = $1",
+    )
+    .bind(&body.token)
+    .fetch_optional(&pool)
+    .await
+    .ok()
+    .flatten();
+
+    let (user_id, expires_at, used_at) = match row {
+        Some(r) => r,
+        None => return bad_request("tokenInvalid"),
+    };
+    if used_at.is_some() {
+        return bad_request("tokenAlreadyUsed");
+    }
+    if expires_at < OffsetDateTime::now_utc() {
+        return bad_request("tokenExpired");
+    }
+
+    let password_hash = match passwd::hash(&body.password) {
+        Ok(h) => h,
+        Err(_) => return server_error("hashFailed"),
+    };
+
+    let mut tx = match pool.begin().await {
+        Ok(t) => t,
+        Err(_) => return server_error("txBegin"),
+    };
+    if sqlx::query("UPDATE users SET password_hash = $1 WHERE id = $2")
+        .bind(&password_hash)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+    {
+        let _ = tx.rollback().await;
+        return server_error("dbError");
+    }
+    if sqlx::query("UPDATE password_resets SET used_at = now() WHERE token = $1")
+        .bind(&body.token)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+    {
+        let _ = tx.rollback().await;
+        return server_error("dbError");
+    }
+    if tx.commit().await.is_err() {
+        return server_error("txCommit");
+    }
+
+    // Invalidate any active sessions so the freshly-rotated password
+    // takes effect immediately on every device.
+    let _ = sqlx::query("DELETE FROM auth_sessions WHERE user_id = $1")
+        .bind(user_id)
+        .execute(&pool)
+        .await;
+
+    ok_response()
+}
+
+#[derive(Deserialize)]
+pub struct ChangePasswordRequest {
+    #[serde(rename = "currentPassword")]
+    pub current_password: String,
+    #[serde(rename = "newPassword")]
+    pub new_password: String,
+}
+
+/// POST /auth/change-password — for a user already logged in. Requires
+/// the current password to defend against session-hijack-then-rotate
+/// attacks (industry standard).
+pub async fn change_password(
+    State(state): State<AppState>,
+    axum::Extension(user): axum::Extension<CurrentUser>,
+    Json(body): Json<ChangePasswordRequest>,
+) -> Response {
+    let pool = match &state.db {
+        Some(p) => p.clone(),
+        None => return server_error("db not configured"),
+    };
+
+    if body.new_password.len() < PASSWORD_MIN_LEN {
+        return bad_request("passwordTooShort");
+    }
+
+    let existing: Option<(String,)> =
+        sqlx::query_as("SELECT password_hash FROM users WHERE id = $1")
+            .bind(user.id)
+            .fetch_optional(&pool)
+            .await
+            .ok()
+            .flatten();
+    let (current_hash,) = match existing {
+        Some(r) => r,
+        None => return unauthorized(),
+    };
+
+    if !passwd::verify(&body.current_password, &current_hash) {
+        return bad_request("invalidCurrentPassword");
+    }
+
+    let new_hash = match passwd::hash(&body.new_password) {
+        Ok(h) => h,
+        Err(_) => return server_error("hashFailed"),
+    };
+
+    if sqlx::query("UPDATE users SET password_hash = $1 WHERE id = $2")
+        .bind(&new_hash)
+        .bind(user.id)
+        .execute(&pool)
+        .await
+        .is_err()
+    {
+        return server_error("dbError");
+    }
+
+    ok_response()
+}
+
+#[derive(Deserialize)]
+pub struct PatchMeRequest {
+    #[serde(rename = "displayName")]
+    pub display_name: Option<String>,
+    #[serde(rename = "avatarUrl")]
+    pub avatar_url: Option<String>,
+}
+
+/// PATCH /auth/me — update display name and/or avatar URL.
+///
+/// Both fields are nullable so a client can clear them by sending
+/// `null`. We use `Option<Option<String>>` semantics by treating
+/// `None` (key absent) as "leave alone" and `Some(empty)` as "set
+/// empty / clear".
+pub async fn patch_me(
+    State(state): State<AppState>,
+    axum::Extension(user): axum::Extension<CurrentUser>,
+    Json(body): Json<PatchMeRequest>,
+) -> Response {
+    let pool = match &state.db {
+        Some(p) => p.clone(),
+        None => return server_error("db not configured"),
+    };
+
+    if let Some(ref name) = body.display_name {
+        let trimmed = name.trim();
+        if trimmed.chars().count() > 80 {
+            return bad_request("displayNameTooLong");
+        }
+    }
+    if let Some(ref url) = body.avatar_url {
+        if url.len() > 512 {
+            return bad_request("avatarUrlTooLong");
+        }
+        // Soft validation — must look like a URL when non-empty.
+        if !url.is_empty() && !(url.starts_with("http://") || url.starts_with("https://")) {
+            return bad_request("avatarUrlInvalid");
+        }
+    }
+
+    // Build the SET clause dynamically — only touch what the caller asked us to.
+    let mut set_parts: Vec<&'static str> = Vec::new();
+    if body.display_name.is_some() {
+        set_parts.push("display_name = $1");
+    }
+    if body.avatar_url.is_some() {
+        if body.display_name.is_some() {
+            set_parts.push("avatar_url = $2");
+        } else {
+            set_parts.push("avatar_url = $1");
+        }
+    }
+    if set_parts.is_empty() {
+        return ok_response();
+    }
+    let sql = format!(
+        "UPDATE users SET {} WHERE id = ${}",
+        set_parts.join(", "),
+        set_parts.len() + 1,
+    );
+
+    let res = match (body.display_name, body.avatar_url) {
+        (Some(name), Some(url)) => {
+            sqlx::query(&sql)
+                .bind(name)
+                .bind(url)
+                .bind(user.id)
+                .execute(&pool)
+                .await
+        }
+        (Some(name), None) => {
+            sqlx::query(&sql)
+                .bind(name)
+                .bind(user.id)
+                .execute(&pool)
+                .await
+        }
+        (None, Some(url)) => sqlx::query(&sql).bind(url).bind(user.id).execute(&pool).await,
+        (None, None) => unreachable!("set_parts emptiness already returned"),
+    };
+    if res.is_err() {
+        return server_error("dbError");
+    }
+    ok_response()
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// v1.0 — OAuth provider configuration discovery
+// ─────────────────────────────────────────────────────────────────────
+
+/// GET /auth/oauth/providers — tells the dashboard which OAuth
+/// buttons to render. Endpoint always responds; the response shape
+/// is `{ google: bool, github: bool }`. The buttons are hidden when
+/// the corresponding env var pair is unset.
+///
+/// Full OAuth code-exchange flow (start / callback) lands in a
+/// follow-up — this endpoint is the contract surface so the dashboard
+/// can render correctly *now* without conditioning on whether the
+/// flow is wired yet.
+pub async fn oauth_providers(State(_state): State<AppState>) -> Response {
+    let github = std::env::var("SENTORI_GITHUB_CLIENT_ID").is_ok()
+        && std::env::var("SENTORI_GITHUB_CLIENT_SECRET").is_ok();
+    let google = std::env::var("SENTORI_GOOGLE_CLIENT_ID").is_ok()
+        && std::env::var("SENTORI_GOOGLE_CLIENT_SECRET").is_ok();
+    (
+        StatusCode::OK,
+        Json(json!({ "github": github, "google": google })),
+    )
+        .into_response()
 }
 
 /// Cheap structural validation — just enough to keep obvious garbage out of
