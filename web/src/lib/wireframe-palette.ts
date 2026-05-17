@@ -37,15 +37,15 @@ export const WIREFRAME_RECT_FILL = 'rgb(255,255,255)'
 export const WIREFRAME_IMAGE_FILL = 'rgb(255,255,255)'
 
 /** Shared fill-opacity for rect / circle / colour-passed-through
- *  nodes. 0.75 was the user's original ask — clearly visible on
- *  the dark canvas while still leaving enough headroom that two
- *  stacked rects read a touch more saturated than one. */
-export const WIREFRAME_RECT_OPACITY = 0.75
+ *  nodes. 0.9 — the user dialled this up from 0.75 once colours
+ *  started landing (rc.5 Android background extraction); the
+ *  remaining 10% headroom is enough that overlapping CTAs still
+ *  read a touch more saturated than a single one. */
+export const WIREFRAME_RECT_OPACITY = 0.9
 
-/** Image regions slightly heavier than rect — media reads as a
- *  more saturated block, but not fully opaque so overlap with
- *  surrounding containers still composes. */
-export const WIREFRAME_IMAGE_OPACITY = 0.9
+/** Image regions fully opaque — media reads as a solid block;
+ *  container overlap is carried by the rect tier. */
+export const WIREFRAME_IMAGE_OPACITY = 1
 
 /** Mask — opaque dark for unambiguous redaction on either canvas. */
 export const WIREFRAME_MASK_FILL = 'rgba(0,0,0,0.65)'
