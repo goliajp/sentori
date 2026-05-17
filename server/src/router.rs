@@ -313,6 +313,14 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/events/{event_id}/attachments",
             get(api::attachments::list_for_event),
         )
+        // v1.0 A3 — Replay-tab read path. Parses the latest
+        // replay-kind NDJSON attachment server-side and returns a
+        // JSON frame array, so the dashboard scrubber doesn't need
+        // an NDJSON parser on the client.
+        .route(
+            "/projects/{project_id}/events/{event_id}/replay-frames",
+            get(api::attachments::replay_frames),
+        )
         .route(
             "/projects/{project_id}/issues/{issue_id}/activity",
             get(api::admin::list_issue_activity),

@@ -40,6 +40,13 @@ const ALLOWED_KINDS: &[&str] = &[
     "stateSnapshot",
     "logTail",
     "sessionTrail",
+    // v0.9.13 — wireframe replay ring drained on captureException.
+    // The DB CHECK constraint was widened in migration
+    // 0043_attachments_replay_kind.sql, but the application-level
+    // whitelist here was never updated, so every replay upload was
+    // 400 invalidKind on the server side. That's the Insight-side
+    // "○ replay" empty-circle outcome on dashboard event headers.
+    "replay",
 ];
 const ALLOWED_SOURCES: &[&str] = &["js", "ios", "android"];
 
@@ -51,6 +58,7 @@ fn allowed_media_types(kind: &str) -> &'static [&'static str] {
         "screenshot" => &["image/webp", "image/png", "image/jpeg"],
         "viewTree" | "stateSnapshot" | "sessionTrail" => &["application/json"],
         "logTail" => &["application/json", "text/plain"],
+        "replay" => &["application/x-ndjson", "application/json"],
         _ => &[],
     }
 }
@@ -298,6 +306,110 @@ pub async fn list_for_event(
     };
 
     (StatusCode::OK, Json(rows)).into_response()
+}
+
+/// `GET /admin/api/projects/{project_id}/events/{event_id}/replay-frames`
+///
+/// Dashboard Replay-tab read path (v1.0 A3). Returns the parsed
+/// frames from the **latest** replay-kind attachment for the event,
+/// so the scrubber can render a timeline without doing
+/// NDJSON-parsing on the client.
+///
+/// Multiple replay attachments per event are rare (one per
+/// captureException by design) but if they happen, we surface the
+/// most recently received one — that's the frame stream that led
+/// up to the current event.
+///
+/// Response shape:
+/// ```json
+/// {
+///   "ref": "uuid",
+///   "frameCount": 42,
+///   "frames": [
+///     { "ts": 17338..., "width": 390, "height": 844, "nodes": [...] },
+///     ...
+///   ]
+/// }
+/// ```
+/// 200 with `frames: []` when the event has no replay attachment —
+/// keeps the dashboard rendering pattern simple (no special 404
+/// branch for "feature absent").
+pub async fn replay_frames(
+    State(state): State<AppState>,
+    Path((project_id, event_id)): Path<(Uuid, Uuid)>,
+) -> Response {
+    let Some(pool) = state.db.as_ref() else {
+        return server_error("dbNotConfigured");
+    };
+
+    let row_res = sqlx::query_as::<_, (Uuid,)>(
+        r#"
+        SELECT ref
+        FROM event_attachments
+        WHERE project_id = $1 AND event_id = $2 AND kind = 'replay'
+        ORDER BY received_at DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(project_id)
+    .bind(event_id)
+    .fetch_optional(pool)
+    .await;
+    let row = match row_res {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::error!(error = %e, %project_id, %event_id, "replay_frames query failed");
+            return server_error("dbError");
+        }
+    };
+
+    let Some((ref_id,)) = row else {
+        // No replay attachment — return an empty stream, not 404.
+        return (
+            StatusCode::OK,
+            Json(json!({ "ref": null, "frameCount": 0, "frames": [] })),
+        )
+            .into_response();
+    };
+
+    let data = match state.attachments.get(project_id, event_id, ref_id).await {
+        Ok(d) => d,
+        Err(AttachmentError::NotFound) => return not_found("blobMissing"),
+        Err(e) => {
+            tracing::error!(error = %e, %ref_id, "replay attachment get failed");
+            return server_error("storeFailure");
+        }
+    };
+
+    // NDJSON: one JSON object per line. Skip blank lines + lines
+    // that fail to parse — a malformed frame shouldn't break the
+    // whole stream.
+    let text = match std::str::from_utf8(&data) {
+        Ok(t) => t,
+        Err(_) => return server_error("notUtf8"),
+    };
+    let mut frames: Vec<serde_json::Value> = Vec::new();
+    for line in text.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        match serde_json::from_str::<serde_json::Value>(line) {
+            Ok(v) => frames.push(v),
+            Err(e) => {
+                tracing::warn!(error = %e, %ref_id, "replay frame skipped (parse failed)");
+            }
+        }
+    }
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "ref": ref_id,
+            "frameCount": frames.len(),
+            "frames": frames,
+        })),
+    )
+        .into_response()
 }
 
 async fn is_admin_for_project(
