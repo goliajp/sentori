@@ -1,5 +1,5 @@
 {
-  "name": "sentori-example",
+  "name": "example",
   "version": "1.0.0",
   "main": "index.ts",
   "private": true,
@@ -10,15 +10,18 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "@react-native-async-storage/async-storage": "2.1.2",
     "@goliapkg/sentori-react-native": "file:..",
-    "expo": "~54.0.33",
-    "expo-status-bar": "~3.0.9",
-    "react": "19.1.0",
-    "react-native": "0.81.5"
+    "expo": "~55.0.24",
+    "expo-dev-client": "~55.0.34",
+    "expo-linking": "~55.0.15",
+    "expo-status-bar": "~55.0.6",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-native": "0.83.6"
   },
   "devDependencies": {
-    "@types/react": "~19.1.0",
+    "@babel/core": "^7.25.0",
+    "@types/react": "~19.2.0",
     "typescript": "~5.9.2"
   }
 }

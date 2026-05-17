@@ -1,8 +1,14 @@
-// Metro config for monorepo: example/ depends on the parent SDK
-// (`@goliapkg/sentori-react-native` via `file:..`), and bun's isolated
-// install puts the package.json as a symlink. Metro doesn't follow
-// symlinks by default and only watches the project root, so we need
-// to explicitly opt in and add the parent SDK as a watched root.
+// Metro config for the SDK example app.
+//
+// Why this isn't the Expo default:
+//   1. `@goliapkg/sentori-react-native` is linked from `file:..` (the
+//      parent SDK directory). Metro doesn't follow symlinks and only
+//      watches the project root by default, so we explicitly add the
+//      SDK as a watch root + enable unstable_enableSymlinks.
+//   2. The dev box runs other RN apps on port 8081, so we pin Metro
+//      to 9090. The iOS .app reads `RCT_METRO_PORT` from
+//      `ios/.xcode.env.local` at build time and bakes the URL in.
+//      Both numbers must match.
 
 const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
@@ -20,10 +26,6 @@ config.resolver.nodeModulesPaths = [
 config.resolver.unstable_enableSymlinks = true;
 config.resolver.unstable_enablePackageExports = true;
 
-// Pin Metro to 9090 so 8081 stays free for whatever else the dev
-// box is running. The iOS native build bakes the dev-server URL
-// from RCT_METRO_PORT at compile time (set in ios/.xcode.env.local),
-// so changing this number requires a clean rebuild of the .app.
 config.server = {
   ...(config.server ?? {}),
   port: 9090,

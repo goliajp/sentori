@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Platform,
   Pressable,
@@ -16,8 +16,6 @@ import {
   triggerNativeCrash,
 } from '@goliapkg/sentori-react-native';
 
-// iOS simulator can reach the host's localhost directly.
-// Android emulator must use 10.0.2.2 to reach the host.
 const INGEST_URL =
   Platform.OS === 'android' ? 'http://10.0.2.2:8080' : 'http://localhost:8080';
 
@@ -28,31 +26,24 @@ sentori.init({
   release: 'sentori-example@1.0.0+1',
   environment: 'dev',
   ingestUrl: INGEST_URL,
-  // v0.9.12 — enable wireframe replay so the example app exercises
-  // the same ring buffer Insight is verifying. 2 Hz to fill the ring
-  // faster during interactive testing.
   capture: { replay: { mode: 'wireframe', hz: 2 } },
 });
 
-// Phase 29 sub-A e2e: start the hang watchdog with force=true so it
-// runs in this debug build. 2 s timeout means a 5-second main-thread
-// busy loop trips it; 500 ms tick interval keeps detection prompt.
-startAnrWatchdog({ force: true, timeoutMs: 2000, intervalMs: 500 });
+startAnrWatchdog({ force: true, intervalMs: 500, timeoutMs: 2000 });
 
 type LogLine = { id: number; text: string };
 
-export default function App(): React.JSX.Element {
+export default function App() {
   const [log, setLog] = useState<LogLine[]>([]);
 
   const append = (text: string) => {
     setLog((prev) =>
-      [{ id: Date.now() + Math.random(), text }, ...prev].slice(0, 8),
+      [{ id: Date.now() + Math.random(), text }, ...prev].slice(0, 10),
     );
   };
 
-  const buttons: { title: string; onPress: () => void }[] = [
+  const buttons: { onPress: () => void; title: string }[] = [
     {
-      title: 'Throw TypeError (caught by global handler)',
       onPress: () => {
         append('throwing TypeError…');
         setTimeout(() => {
@@ -60,78 +51,73 @@ export default function App(): React.JSX.Element {
           x.foo();
         }, 0);
       },
+      title: 'Throw TypeError (global handler)',
     },
     {
-      title: 'Unhandled promise rejection',
       onPress: () => {
         append('rejecting promise…');
         void Promise.reject(new Error('unhandled rejection demo'));
       },
+      title: 'Unhandled promise rejection',
     },
     {
-      title: 'Manual sentori.captureError(...)',
       onPress: () => {
         append('captureError manual…');
         sentori.captureError(new Error('manual capture'), {
           tags: { source: 'button' },
         });
       },
+      title: 'Manual sentori.captureError()',
     },
     {
-      title: 'fetch failure → breadcrumb + capture',
       onPress: async () => {
         append('fetch then capture…');
         try {
           await fetch('http://localhost:9999/does-not-exist');
         } catch {
-          // expected
+          /* expected */
         }
         sentori.captureError(new Error('after a failed fetch'));
       },
+      title: 'fetch failure → capture',
     },
     {
-      title: 'Native crash (closes app — relaunch to send)',
       onPress: () => {
         append('triggering native crash…');
         triggerNativeCrash();
       },
+      title: 'Native crash (relaunch sends)',
     },
     {
-      title: 'Hang main thread (5s — Phase 29 sub-A)',
       onPress: () => {
         append('hanging main for 5s…');
         const start = Date.now();
-        // Busy-loop on the JS thread (= iOS RN main thread). The
-        // watchdog tick runs on a background dispatch queue, sees
-        // main hasn't ack'd within 2s, and fires the sampler.
         while (Date.now() - start < 5000) {
-          // intentionally empty
+          /* busy-loop */
         }
         append('main resumed');
       },
+      title: 'Hang main thread 5 s',
     },
     {
-      title: '[replay] probe wireframe state',
       onPress: () => {
         const p = probeNativeWireframe();
         const msg = `probe path=${p.lastPath} nodes=${p.lastNodes} scenes=${p.sceneCount} windows=${p.windowCount}`;
         append(msg);
-        // eslint-disable-next-line no-console
         console.warn('[replay-test]', msg);
       },
+      title: '[replay] probe wireframe state',
     },
     {
-      title: '[replay] drain ring (no crash)',
       onPress: () => {
         const ndjson = drainReplay();
         const lines = ndjson ? ndjson.split('\n').length : 0;
-        const bytes = ndjson.length;
         const head = ndjson.slice(0, 120).replace(/\n/g, ' | ');
-        const msg = `drained frames=${lines} bytes=${bytes}`;
+        const msg = `drained frames=${lines} bytes=${ndjson.length}`;
         append(msg);
-        // eslint-disable-next-line no-console
         console.warn('[replay-test]', msg, '\n  head:', head);
       },
+      title: '[replay] drain ring (no crash)',
     },
   ];
 
@@ -139,17 +125,16 @@ export default function App(): React.JSX.Element {
     <View style={styles.root}>
       <View style={styles.header}>
         <Text style={styles.title}>Sentori</Text>
-        <Text style={styles.subtitle}>example</Text>
+        <Text style={styles.subtitle}>example · Expo 55 · RN 0.83</Text>
         <Text style={styles.meta}>ingest: {INGEST_URL}</Text>
-        <Text style={styles.meta}>release: sentori-example@1.0.0+1</Text>
       </View>
 
       <View style={styles.buttons}>
         {buttons.map((b) => (
           <Pressable
             key={b.title}
-            style={({ pressed }) => [styles.btn, pressed && styles.btnPressed]}
             onPress={b.onPress}
+            style={({ pressed }) => [styles.btn, pressed && styles.btnPressed]}
           >
             <Text style={styles.btnLabel}>{b.title}</Text>
           </Pressable>
@@ -162,7 +147,7 @@ export default function App(): React.JSX.Element {
       <ScrollView style={styles.log}>
         {log.length === 0 ? (
           <Text style={styles.logEmpty}>
-            tap a button — then watch the sentori-server stdout
+            tap a button — then watch sentori-server stdout
           </Text>
         ) : (
           log.map((l) => (
@@ -177,77 +162,61 @@ export default function App(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#0e0e10',
-    paddingHorizontal: 20,
-    paddingTop: 64,
-    paddingBottom: 24,
-  },
-  header: {
-    marginBottom: 24,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '600',
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    color: '#7a7a82',
-    fontSize: 14,
-    marginTop: 2,
-  },
-  meta: {
-    color: '#5a5a62',
-    fontSize: 11,
-    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
-    marginTop: 8,
-  },
-  buttons: {
-    gap: 8,
-    marginBottom: 24,
-  },
   btn: {
     backgroundColor: '#1a1a1f',
     borderColor: '#2a2a32',
-    borderWidth: 1,
     borderRadius: 8,
-    paddingVertical: 12,
+    borderWidth: 1,
     paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  btnPressed: {
-    backgroundColor: '#222229',
-  },
-  btnLabel: {
-    color: '#e0e0e6',
-    fontSize: 14,
-  },
-  logHeader: {
-    borderTopColor: '#1a1a1f',
-    borderTopWidth: 1,
-    paddingTop: 12,
-    marginBottom: 8,
-  },
-  logHeaderText: {
-    color: '#7a7a82',
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  log: {
-    flex: 1,
-  },
-  logLine: {
-    color: '#a0a0a8',
-    fontSize: 12,
-    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
-    paddingVertical: 4,
-  },
+  btnLabel: { color: '#e0e0e6', fontSize: 14 },
+  btnPressed: { backgroundColor: '#222229' },
+  buttons: { gap: 8, marginBottom: 24 },
+  header: { marginBottom: 24 },
+  log: { flex: 1 },
   logEmpty: {
     color: '#5a5a62',
     fontSize: 12,
     fontStyle: 'italic',
     paddingVertical: 8,
+  },
+  logHeader: {
+    borderTopColor: '#1a1a1f',
+    borderTopWidth: 1,
+    marginBottom: 8,
+    paddingTop: 12,
+  },
+  logHeaderText: {
+    color: '#7a7a82',
+    fontSize: 11,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  logLine: {
+    color: '#a0a0a8',
+    fontFamily: Platform.select({ android: 'monospace', ios: 'Menlo' }),
+    fontSize: 12,
+    paddingVertical: 4,
+  },
+  meta: {
+    color: '#5a5a62',
+    fontFamily: Platform.select({ android: 'monospace', ios: 'Menlo' }),
+    fontSize: 11,
+    marginTop: 8,
+  },
+  root: {
+    backgroundColor: '#0e0e10',
+    flex: 1,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+    paddingTop: 64,
+  },
+  subtitle: { color: '#7a7a82', fontSize: 14, marginTop: 2 },
+  title: {
+    color: '#fff',
+    fontSize: 28,
+    fontWeight: '600',
+    letterSpacing: -0.5,
   },
 });
