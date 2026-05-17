@@ -207,7 +207,6 @@ function ReplayCanvas({
   const a11yLabel = diff
     ? `Wireframe frame, ${frame.nodes.length} nodes — diff overlay on, ${diff.removed.length} removed`
     : `Wireframe frame, ${frame.nodes.length} nodes`
-  const gridStep = Math.max(24, Math.round(Math.min(frame.width, frame.height) / 24))
   return (
     <div className="bg-[color:var(--paper-2)]">
       <svg
@@ -223,26 +222,6 @@ function ReplayCanvas({
           Wireframe snapshot of the host app at the selected timeline frame.
           {diff && ' Coloured outlines highlight nodes that changed since the previous frame.'}
         </desc>
-        {/* Base grid pattern so the captured area always reads as
-         *  "captured" even when the host app's nodes share the same
-         *  fill as the canvas. */}
-        <defs>
-          <pattern
-            height={gridStep}
-            id="wf-grid-tab"
-            patternUnits="userSpaceOnUse"
-            width={gridStep}
-          >
-            <path
-              d={`M 0 0 L ${gridStep} 0 M 0 0 L 0 ${gridStep}`}
-              stroke="var(--rule)"
-              strokeOpacity={0.8}
-              strokeWidth={1}
-              vectorEffect="non-scaling-stroke"
-            />
-          </pattern>
-        </defs>
-        <rect fill="url(#wf-grid-tab)" height={frame.height} width={frame.width} x={0} y={0} />
         {/* Removed-nodes layer: render ghosts of the previous frame's
          *  positions that are absent in the current frame. */}
         {diff &&

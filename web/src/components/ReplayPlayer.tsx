@@ -414,10 +414,6 @@ function Scrubber({
 function WireframeSvg({ snapshot }: { snapshot: Snapshot }) {
   const w = snapshot.width
   const h = snapshot.height
-  // Step ≈ 1/24 of the shorter axis — coarse enough to keep DOM
-  // node count flat regardless of capture resolution, fine enough
-  // to read as a grid on a phone-shaped portrait.
-  const step = Math.max(24, Math.round(Math.min(w, h) / 24))
   return (
     <svg
       preserveAspectRatio="xMidYMid meet"
@@ -425,24 +421,6 @@ function WireframeSvg({ snapshot }: { snapshot: Snapshot }) {
       viewBox={`0 0 ${w} ${h}`}
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Base grid pattern — always visible underneath the node
-       *  fills so a frame that happens to be all-same-colour-as-
-       *  paper-2 (or has no nodes in a region) still reads as
-       *  "captured area, just no content here", not "loading
-       *  failed". User 2026-05-18: "总有可能会有这种明明有内容
-       *  还是啥也看不到的情况". */}
-      <defs>
-        <pattern height={step} id="wf-grid" patternUnits="userSpaceOnUse" width={step}>
-          <path
-            d={`M 0 0 L ${step} 0 M 0 0 L 0 ${step}`}
-            stroke="var(--rule)"
-            strokeOpacity={0.8}
-            strokeWidth={1}
-            vectorEffect="non-scaling-stroke"
-          />
-        </pattern>
-      </defs>
-      <rect fill="url(#wf-grid)" height={h} width={w} x={0} y={0} />
       {snapshot.nodes.map((n, i) => (
         <NodeRender key={i} node={n} />
       ))}
