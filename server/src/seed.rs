@@ -111,7 +111,7 @@ pub async fn ensure_superadmin(pool: &PgPool) -> anyhow::Result<()> {
         match crate::mailer::send_password_reset(&email, &link).await {
             Ok(true) => tracing::info!(email = %email, "superadmin reset email delivered"),
             Ok(false) => tracing::info!(email = %email, "SMTP not configured; link is logged above"),
-            Err(e) => tracing::warn!(error = %e, email = %email, "superadmin reset email send failed; link is logged above"),
+            Err(e) => tracing::warn!(error = ?e, email = %email, "superadmin reset email send failed; link is logged above"),
         }
     }
 

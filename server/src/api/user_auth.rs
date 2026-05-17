@@ -563,7 +563,7 @@ pub async fn forgot_password(
             }
             Err(e) => {
                 tracing::warn!(
-                    error = %e,
+                    error = ?e,
                     email = %email,
                     link = %link,
                     "password reset email send failed; link is logged here as fallback",
