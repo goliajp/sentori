@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link } from 'react-router'
 
-import { adminApi, orgsApi, teamsApi } from '@/api/client'
+import { adminApi, type OrgRole, orgsApi, teamsApi } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { PageHeader } from '@/layout/page-header'
 
@@ -10,28 +11,33 @@ import { PageHeader } from '@/layout/page-header'
  *
  * Sections (top → bottom):
  *   1. Organization (slug / name / role)
- *   2. Members (with role)
- *   3. Teams (with member count, link to detail)
- *   4. Projects (with slug, repo URL, "open issues" CTA)
+ *   2. Members — list + invite form
+ *   3. Teams — list + create-team form
+ *   4. Projects — list + create-project form
  *
- * Lives behind /org/:slug/settings; admin gating happens in the
- * sidebar (the link only renders for owner/admin), not here.
+ * All four section forms collapse by default; tap the section's
+ * "+ create"-style action to expand. Submissions optimistically
+ * invalidate the relevant react-query cache so the row appears
+ * inline without a page reload.
+ *
+ * Admin gating happens in the sidebar (link only renders for
+ * owner/admin), not here — but server endpoints fail-closed on
+ * role too.
  */
 export function SettingsView() {
   const { currentOrg } = useOrg()
+  const qc = useQueryClient()
 
   const membersQ = useQuery({
     enabled: !!currentOrg.slug,
     queryFn: () => orgsApi.listMembers(currentOrg.slug),
     queryKey: ['members', currentOrg.slug],
   })
-
   const teamsQ = useQuery({
     enabled: !!currentOrg.slug,
     queryFn: () => teamsApi.list(currentOrg.slug),
     queryKey: ['teams', currentOrg.slug],
   })
-
   const projectsQ = useQuery({
     enabled: !!currentOrg.slug,
     queryFn: adminApi.listProjects,
@@ -41,6 +47,21 @@ export function SettingsView() {
   const members = membersQ.data ?? []
   const teams = teamsQ.data ?? []
   const projects = (projectsQ.data ?? []).filter((p) => p.orgSlug === currentOrg.slug)
+
+  const inviteM = useMutation({
+    mutationFn: (body: { email: string; role: OrgRole; teamSlug?: null | string }) =>
+      orgsApi.createInvite(currentOrg.slug, body.email, body.role, body.teamSlug),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['members', currentOrg.slug] }),
+  })
+  const createTeamM = useMutation({
+    mutationFn: (body: { description?: string; name: string; slug: string }) =>
+      teamsApi.create(currentOrg.slug, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['teams', currentOrg.slug] }),
+  })
+  const createProjectM = useMutation({
+    mutationFn: (name: string) => adminApi.createProject(currentOrg.slug, { name }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+  })
 
   return (
     <div className="sentori-page-in">
@@ -57,8 +78,41 @@ export function SettingsView() {
       </SubSection>
 
       <SubSection sub={`${members.length} total`} title="Members">
+        <CollapsibleForm
+          disabled={inviteM.isPending}
+          error={errOf(inviteM.error)}
+          label="invite member"
+          onSubmit={(values) =>
+            inviteM.mutate({
+              email: values.email,
+              role: (values.role || 'member') as OrgRole,
+              teamSlug: values.team || null,
+            })
+          }
+          fields={[
+            { name: 'email', placeholder: 'email@example.com', required: true, type: 'email' },
+            {
+              name: 'role',
+              options: [
+                { label: 'member', value: 'member' },
+                { label: 'admin', value: 'admin' },
+                { label: 'owner', value: 'owner' },
+              ],
+              type: 'select',
+            },
+            {
+              name: 'team',
+              options: [
+                { label: '(no team)', value: '' },
+                ...teams.map((t) => ({ label: t.name, value: t.slug })),
+              ],
+              type: 'select',
+            },
+          ]}
+        />
+
         {membersQ.isLoading && <Hint>Loading…</Hint>}
-        {!membersQ.isLoading && members.length === 0 && <Hint>No members.</Hint>}
+        {!membersQ.isLoading && members.length === 0 && <Hint>No members yet.</Hint>}
         {members.length > 0 && (
           <ul>
             {members.map((m, i) => (
@@ -79,13 +133,26 @@ export function SettingsView() {
       </SubSection>
 
       <SubSection sub={`${teams.length} total`} title="Teams">
+        <CollapsibleForm
+          disabled={createTeamM.isPending}
+          error={errOf(createTeamM.error)}
+          label="create team"
+          onSubmit={(values) =>
+            createTeamM.mutate({
+              description: values.description || undefined,
+              name: values.name,
+              slug: values.slug,
+            })
+          }
+          fields={[
+            { name: 'name', placeholder: 'Frontend', required: true, type: 'text' },
+            { name: 'slug', placeholder: 'frontend', required: true, type: 'text' },
+            { name: 'description', placeholder: 'optional', type: 'text' },
+          ]}
+        />
+
         {teamsQ.isLoading && <Hint>Loading…</Hint>}
-        {!teamsQ.isLoading && teams.length === 0 && (
-          <Hint>
-            No teams yet. Create one via <code className="font-mono">teamsApi.create</code> (orgs
-            admin token), or wait for the in-dashboard create-team form — coming in v1.1.
-          </Hint>
-        )}
+        {!teamsQ.isLoading && teams.length === 0 && <Hint>No teams yet.</Hint>}
         {teams.length > 0 && (
           <table className="bench">
             <thead>
@@ -116,8 +183,18 @@ export function SettingsView() {
       </SubSection>
 
       <SubSection sub={`${projects.length} total`} title="Projects">
+        <CollapsibleForm
+          disabled={createProjectM.isPending}
+          error={errOf(createProjectM.error)}
+          label="create project"
+          onSubmit={(values) => createProjectM.mutate(values.name)}
+          fields={[{ name: 'name', placeholder: 'my-app', required: true, type: 'text' }]}
+        />
+
         {projectsQ.isLoading && <Hint>Loading…</Hint>}
-        {!projectsQ.isLoading && projects.length === 0 && <Hint>No projects in this org yet.</Hint>}
+        {!projectsQ.isLoading && projects.length === 0 && (
+          <Hint>No projects in this org yet — create your first one above.</Hint>
+        )}
         {projects.length > 0 && (
           <table className="bench">
             <thead>
@@ -163,6 +240,114 @@ export function SettingsView() {
       </SubSection>
     </div>
   )
+}
+
+/**
+ * Editorial inline-create form. Tap label → form expands. Submit
+ * runs `onSubmit(values)`; on success the parent's mutation onSuccess
+ * invalidates the relevant query. On error the parent passes the
+ * message in via `error` prop.
+ */
+type FormField =
+  | { name: string; options: { label: string; value: string }[]; type: 'select' }
+  | { name: string; placeholder?: string; required?: boolean; type: 'email' | 'text' }
+
+function CollapsibleForm({
+  disabled,
+  error,
+  fields,
+  label,
+  onSubmit,
+}: {
+  disabled: boolean
+  error: null | string
+  fields: FormField[]
+  label: string
+  onSubmit: (values: Record<string, string>) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [values, setValues] = useState<Record<string, string>>({})
+
+  if (!open) {
+    return (
+      <div className="flex justify-end pt-2 pb-2">
+        <button
+          className="inline-flex h-7 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-3 font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink)] uppercase transition-colors hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+          onClick={() => setOpen(true)}
+          type="button"
+        >
+          + {label}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <form
+      className="flex flex-wrap items-end gap-2 border-b border-[color:var(--rule)] py-3"
+      onSubmit={(e) => {
+        e.preventDefault()
+        onSubmit(values)
+      }}
+    >
+      {fields.map((f) => (
+        <label className="flex flex-col gap-1" key={f.name}>
+          <span className="font-mono text-[9px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+            {f.name}
+          </span>
+          {f.type === 'select' ? (
+            <select
+              className="h-7 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[12px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+              onChange={(e) => setValues({ ...values, [f.name]: e.target.value })}
+              value={values[f.name] ?? f.options[0]?.value ?? ''}
+            >
+              {f.options.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              className="h-7 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[12px] text-[color:var(--ink)] placeholder:text-[color:var(--ink-muted)] focus:border-[color:var(--accent)] focus:outline-none"
+              onChange={(e) => setValues({ ...values, [f.name]: e.target.value })}
+              placeholder={f.placeholder}
+              required={f.required}
+              type={f.type}
+              value={values[f.name] ?? ''}
+            />
+          )}
+        </label>
+      ))}
+      <button
+        className="inline-flex h-7 items-center bg-[color:var(--accent)] px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--paper)] uppercase transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={disabled}
+        type="submit"
+      >
+        {disabled ? 'creating…' : 'create'}
+      </button>
+      <button
+        className="inline-flex h-7 items-center px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--ink)]"
+        onClick={() => setOpen(false)}
+        type="button"
+      >
+        cancel
+      </button>
+      {error && (
+        <span className="basis-full pt-1 font-mono text-[11px] text-[color:var(--danger)]">
+          {error}
+        </span>
+      )}
+    </form>
+  )
+}
+
+function errOf(e: unknown): null | string {
+  if (!e) return null
+  const body = (e as { body?: { error?: string } } | undefined)?.body
+  if (body?.error) return body.error
+  if (e instanceof Error) return e.message
+  return 'request failed'
 }
 
 function hostOf(url: string): null | string {

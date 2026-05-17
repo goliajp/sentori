@@ -620,6 +620,14 @@ export const adminApi = {
 
   listProjects: () => adminFetch<ProjectRow[]>('/projects'),
 
+  /** v1.0 — create a project inside an org. Caller must be owner or
+   *  admin of that org (server enforces). Returns the new project row. */
+  createProject: (orgSlug: string, body: { name: string }) =>
+    adminFetch<ProjectRow>(`/orgs/${orgSlug}/projects`, {
+      body: JSON.stringify(body),
+      method: 'POST',
+    }),
+
   listReleasesForIssue: (projectId: string, issueId: string) =>
     adminFetch<string[]>(`/projects/${projectId}/issues/${issueId}/releases`),
 
