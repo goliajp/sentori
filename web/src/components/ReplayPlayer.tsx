@@ -323,7 +323,7 @@ function CanvasFrame({ snapshot }: { snapshot: null | Snapshot }) {
   const aspect = snapshot.width / snapshot.height
   return (
     <div
-      className="mx-auto border border-[color:var(--rule)] bg-[color:var(--paper-3)]"
+      className="mx-auto border border-[color:var(--rule)] bg-[color:var(--paper-2)]"
       style={{
         aspectRatio: `${aspect}`,
         maxHeight: 480,
@@ -410,7 +410,14 @@ function WireframeSvg({ snapshot }: { snapshot: Snapshot }) {
       viewBox={`0 0 ${w} ${h}`}
       xmlns="http://www.w3.org/2000/svg"
     >
-      <rect fill="var(--paper)" height={h} width={w} x={0} y={0} />
+      {/* Canvas bg comes from the parent div (var(--paper-2)); the SVG
+       *  does NOT paint its own background — previously this rect was
+       *  the same colour as the parent which made it impossible to
+       *  tell the wireframe area apart from any letterbox bars, and
+       *  it also competed with the node fills below for visibility.
+       *  Pulling it out also makes diff overlays render cleaner since
+       *  there's only one chrome layer to read.
+       */}
       {snapshot.nodes.map((n, i) => (
         <NodeRender key={i} node={n} />
       ))}
@@ -440,7 +447,7 @@ function NodeRender({ node }: { node: Node }) {
     <rect
       fill={fill}
       height={node.h}
-      stroke="var(--rule)"
+      stroke="rgba(0,0,0,0.18)"
       strokeWidth={0.5}
       width={node.w}
       x={node.x}
@@ -449,16 +456,26 @@ function NodeRender({ node }: { node: Node }) {
   )
 }
 
+/**
+ * Default fills are theme-agnostic alpha tints so they're visible on
+ * both paper-2 (light) and the warm-dark background (dark) without
+ * needing two palettes. Android emits most nodes as `kind: rect` /
+ * `image` with no `color` field (only TextView sets one), so a bg-
+ * matching default would erase ~95% of an Android wireframe — the
+ * exact symptom Insight hit on the qualcomm-insight verify event.
+ */
 function defaultFill(kind?: string): string {
   switch (kind) {
     case 'mask':
-      return 'var(--ink)'
+      return 'rgba(0,0,0,0.65)'
     case 'image':
-      return 'var(--paper-3)'
+      // Slight blue tint so image placeholders read as "media" not
+      // "container", mirroring how design tools cue image regions.
+      return 'rgba(59,130,246,0.12)'
     case 'rect':
-      return 'var(--paper-3)'
+      return 'rgba(0,0,0,0.08)'
     default:
-      return 'transparent'
+      return 'rgba(0,0,0,0.05)'
   }
 }
 
