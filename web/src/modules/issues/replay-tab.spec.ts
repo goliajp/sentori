@@ -48,8 +48,12 @@ describe('computeDiff', () => {
   })
 
   it('detects "changed" when spatial position matches but text/color/kind differs', () => {
-    const prev = frame([{ color: '#aaa', h: 20, kind: 'text', text: 'before', w: 100, x: 10, y: 10 }])
-    const next = frame([{ color: '#aaa', h: 20, kind: 'text', text: 'after', w: 100, x: 10, y: 10 }])
+    const prev = frame([
+      { color: '#aaa', h: 20, kind: 'text', text: 'before', w: 100, x: 10, y: 10 },
+    ])
+    const next = frame([
+      { color: '#aaa', h: 20, kind: 'text', text: 'after', w: 100, x: 10, y: 10 },
+    ])
     const diff = computeDiff(prev, next)
     expect(diff.status).toEqual(['changed'])
     expect(diff.removed).toEqual([])
