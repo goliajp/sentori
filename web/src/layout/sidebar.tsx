@@ -33,7 +33,7 @@ export function Sidebar() {
   const isAdmin = currentOrg.role === 'owner' || currentOrg.role === 'admin'
 
   return (
-    <aside className="hidden w-56 shrink-0 flex-col overflow-hidden border-r border-[color:var(--rule)] bg-[color:var(--paper)] md:flex">
+    <aside className="hidden w-60 shrink-0 flex-col overflow-hidden border-r border-[color:var(--rule)] bg-[color:var(--paper)] md:flex">
       <ContextBlock
         canCreateProject={isAdmin}
         currentOrg={currentOrg}
@@ -188,7 +188,15 @@ function ContextBlock({
 
   return (
     <div className="border-b border-[color:var(--rule)] bg-[color:var(--paper-2)] px-4 pt-3.5 pb-3">
-      <ContextRow label="org">
+      <ContextRow
+        label="org"
+        meta={
+          <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+            {currentOrg.role}
+          </span>
+        }
+        plus={<PlusButton onClick={() => navigate('/onboarding')} title="New organization" />}
+      >
         <select
           aria-label="Switch organization"
           className="min-w-0 flex-1 appearance-none truncate bg-transparent pr-1 text-[13px] text-[color:var(--ink)] focus:outline-none"
@@ -201,13 +209,19 @@ function ContextBlock({
             </option>
           ))}
         </select>
-        <span className="shrink-0 font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
-          {currentOrg.role}
-        </span>
-        <PlusButton onClick={() => navigate('/onboarding')} title="New organization" />
       </ContextRow>
 
-      <ContextRow label="project">
+      <ContextRow
+        label="project"
+        plus={
+          canCreateProject ? (
+            <PlusButton
+              onClick={() => navigate(`/org/${currentOrg.slug}/settings#new-project`)}
+              title="New project"
+            />
+          ) : null
+        }
+      >
         {projects.length === 0 ? (
           <span className="flex-1 text-[12px] text-[color:var(--ink-muted)] italic">none yet</span>
         ) : (
@@ -223,12 +237,6 @@ function ContextBlock({
               </option>
             ))}
           </select>
-        )}
-        {canCreateProject && (
-          <PlusButton
-            onClick={() => navigate(`/org/${currentOrg.slug}/settings#new-project`)}
-            title="New project"
-          />
         )}
       </ContextRow>
     </div>
@@ -261,13 +269,37 @@ function PlusButton({ onClick, title }: { onClick: () => void; title: string }) 
   )
 }
 
-function ContextRow({ children, label }: { children: React.ReactNode; label: string }) {
+/**
+ * Stacked context row — micro-label on its own line, value row
+ * underneath claims the full sidebar width. Long project / org names
+ * (qualcomm-insight, mobile-team-pmf-prototype, …) no longer get
+ * shouldered out by a 56 px left-aligned label tag. The optional
+ * `meta` slot lands above the value at the right edge (role tag),
+ * and `plus` (+ icon button) tails the value row.
+ */
+function ContextRow({
+  children,
+  label,
+  meta,
+  plus,
+}: {
+  children: React.ReactNode
+  label: string
+  meta?: React.ReactNode
+  plus?: React.ReactNode
+}) {
   return (
-    <div className="flex items-baseline gap-2 py-1">
-      <span className="w-14 shrink-0 font-mono text-[9px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
-        {label}
-      </span>
-      <div className="flex min-w-0 flex-1 items-baseline gap-2 truncate">{children}</div>
+    <div className="py-1.5 first:pt-0">
+      <div className="mb-1 flex items-baseline justify-between gap-2">
+        <span className="font-mono text-[9px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+          {label}
+        </span>
+        {meta}
+      </div>
+      <div className="flex min-w-0 items-center gap-1">
+        <div className="flex min-w-0 flex-1 items-center truncate">{children}</div>
+        {plus}
+      </div>
     </div>
   )
 }
