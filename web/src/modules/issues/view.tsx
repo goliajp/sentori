@@ -168,26 +168,29 @@ function RailRow({ row, selected }: { row: IssueRow; selected: boolean }) {
       <div className="mt-0.5 line-clamp-1 text-[12px] text-[color:var(--ink-soft)]">
         {displayMessage(row.messageSample)}
       </div>
-      <div className="mt-2 flex items-center gap-2.5 font-mono text-[10px] tracking-[0.05em] text-[color:var(--ink-muted)]">
+      {/* Compact meta row — each atomic unit (`25 ev`, `14h`, assignee)
+       *  is non-breakable so the rail's narrow column can't split a
+       *  number off its unit ("25" \n "ev"). */}
+      <div className="mt-2 flex items-center gap-2 font-mono text-[10px] tracking-[0.05em] whitespace-nowrap text-[color:var(--ink-muted)]">
         <span className="tabular-nums">{row.eventCount.toLocaleString()} ev</span>
         <span aria-hidden className="opacity-40">
-          /
+          ·
         </span>
         <span className="tabular-nums">{formatRelative(row.lastSeen)}</span>
-        {row.lastRelease && (
-          <>
-            <span aria-hidden className="opacity-40">
-              /
-            </span>
-            <span className="truncate">{row.lastRelease}</span>
-          </>
-        )}
         {row.assigneeEmail && (
-          <span className="ml-auto shrink-0 text-[color:var(--accent)]">
+          <span className="ml-auto truncate text-[color:var(--accent)]">
             @{row.assigneeEmail.split('@')[0]}
           </span>
         )}
       </div>
+      {/* Release on its own line — it's the longest field and the most
+       *  expendable; let it own a full-width truncation row so it
+       *  never elbows the meta numbers into pieces. */}
+      {row.lastRelease && (
+        <div className="mt-0.5 truncate font-mono text-[10px] tracking-[0.05em] text-[color:var(--ink-muted)] opacity-80">
+          {row.lastRelease}
+        </div>
+      )}
     </Link>
   )
 }
