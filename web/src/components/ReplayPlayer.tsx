@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   isCircleShape,
@@ -11,127 +11,39 @@ import {
   WIREFRAME_RECT_OPACITY,
   WIREFRAME_TEXT_FILL,
 } from '@/lib/wireframe-palette'
+import {
+  asV2OrUpgradeV1,
+  type Node,
+  type ReconstructedFrame,
+  ReplayTimeline,
+} from '@/lib/replay-reconstruct'
 
 /**
  * Wireframe replay player — inline rendering under
- * "Captured at error → Session replay" on the issue detail page.
+ * "Captured at error → Session replay" on the issue-detail page.
  *
- * v1.0 polish round:
- *
- *   1. The canvas now sizes itself to the wireframe's natural mobile
- *      aspect (portrait, ~9:19.5) so the SVG no longer letterboxes
- *      against a wide parent — the "what's the dark area on the
- *      right" question goes away. The frame list + canvas now sit
- *      side-by-side in a grid that lets the canvas claim only the
- *      width its aspect needs.
- *
- *   2. Play controls — ▶ play / ⏸ pause + Prev / Next + a horizontal
- *      slider. Auto-advance is 1 Hz (matches the SDK sampler cadence),
- *      stops at the last frame. ←/→ still works for keyboard nav.
- *
- *   3. Frame list shows a delta count per row ("Δ +3 / −1 / ~5" —
- *      added / removed / changed nodes versus the previous frame).
- *      Lets the operator skim straight to "where things moved"
- *      instead of clicking through identical-looking snapshots. We
- *      also drop byte-equal consecutive frames the SDK still ships
- *      (defence in depth — the SDK has its own dedup but it only
- *      catches exact-byte equality; we additionally collapse
- *      frames that have the same node count + same root size and
- *      a zero-delta diff, which is the common "UI didn't move"
- *      case).
+ * rc.9 v2 model:
+ *   - Replay attachment is keyframe + delta NDJSON (see
+ *     docs/replay-encoding-v2.md). `ReplayTimeline` does the
+ *     reconstruction; this component just drives the playback clock.
+ *   - Seek axis is real time (ms relative to clip start), not a
+ *     frame index. The scrubber bar reads `0.0s / 60.0s`.
+ *   - Playback is a rAF loop. Each rendered frame finds the two
+ *     bracketing captures and cross-fades between them via stacked
+ *     `<g opacity>` layers, so the perceived smoothness is 60 fps
+ *     even though the SDK captures at 4 Hz.
+ *   - The left-side panel lists keyframes only (clickable seek
+ *     targets) — deltas show up implicitly as the wireframe
+ *     animating between keyframes.
  */
 
-type Node = {
-  kind?: 'image' | 'mask' | 'rect' | 'text'
-  x: number
-  y: number
-  w: number
-  h: number
-  text?: string
-  color?: string
-}
-
-type Snapshot = {
-  ts: number
-  width: number
-  height: number
-  nodes: Node[]
-}
-
-type SnapshotWithDelta = Snapshot & {
-  /** 0 means "no movement vs prev"; null for the first frame. */
-  delta: null | { added: number; changed: number; removed: number }
-}
-
-async function fetchReplay(eventId: string, ref: string): Promise<Snapshot[]> {
+async function fetchReplayLines(eventId: string, ref: string): Promise<ReplayTimeline> {
   const url = `/admin/api/events/${encodeURIComponent(eventId)}/attachments/${encodeURIComponent(ref)}`
   const resp = await fetch(url, { credentials: 'include' })
   if (!resp.ok) throw new Error(`replay ${resp.status}`)
   const text = await resp.text()
-  const lines = text.split('\n').filter((l) => l.trim().length > 0)
-  const out: Snapshot[] = []
-  for (const line of lines) {
-    try {
-      out.push(JSON.parse(line) as Snapshot)
-    } catch {
-      // skip malformed snapshot
-    }
-  }
-  return out
-}
-
-/** Spatial-fingerprint diff between two frames (same approach as
- *  the dedicated Replay tab). Cheap O(n) under integer rounding. */
-function diffSnapshots(
-  prev: Snapshot,
-  next: Snapshot
-): { added: number; changed: number; removed: number } {
-  const key = (n: Node) =>
-    `${Math.round(n.x)},${Math.round(n.y)},${Math.round(n.w)},${Math.round(n.h)}`
-  const prevMap = new Map<string, Node>()
-  for (const n of prev.nodes) prevMap.set(key(n), n)
-  let added = 0
-  let changed = 0
-  const matched = new Set<string>()
-  for (const n of next.nodes) {
-    const k = key(n)
-    const p = prevMap.get(k)
-    if (!p) {
-      added++
-    } else {
-      matched.add(k)
-      if (
-        (p.kind ?? '') !== (n.kind ?? '') ||
-        (p.color ?? '') !== (n.color ?? '') ||
-        (p.text ?? '') !== (n.text ?? '')
-      ) {
-        changed++
-      }
-    }
-  }
-  let removed = 0
-  for (const k of prevMap.keys()) if (!matched.has(k)) removed++
-  return { added, changed, removed }
-}
-
-/** Drop consecutive frames that produce a zero-delta diff. The SDK
- *  byte-dedups, but a re-rendered frame with identical structure can
- *  still slip through; we collapse it here so the operator's list
- *  doesn't repeat the same wireframe N times. */
-function withDeltas(snapshots: Snapshot[]): SnapshotWithDelta[] {
-  const out: SnapshotWithDelta[] = []
-  for (let i = 0; i < snapshots.length; i++) {
-    const s = snapshots[i]!
-    if (i === 0) {
-      out.push({ ...s, delta: null })
-      continue
-    }
-    const prev = out[out.length - 1]!
-    const d = diffSnapshots(prev, s)
-    if (d.added === 0 && d.removed === 0 && d.changed === 0) continue // collapse
-    out.push({ ...s, delta: d })
-  }
-  return out
+  const lines = asV2OrUpgradeV1(text)
+  return new ReplayTimeline(lines)
 }
 
 export function ReplayPlayer({
@@ -142,196 +54,168 @@ export function ReplayPlayer({
   eventId: string
 }) {
   const { data, error, isLoading } = useQuery({
-    queryFn: () => fetchReplay(eventId, attachmentRef),
+    queryFn: () => fetchReplayLines(eventId, attachmentRef),
     queryKey: ['replay', eventId, attachmentRef],
     staleTime: Infinity,
   })
 
-  const snapshots = useMemo<SnapshotWithDelta[]>(() => (data ? withDeltas(data) : []), [data])
-  const [focusIdx, setFocusIdx] = useState<number>(0)
-  const [playing, setPlaying] = useState(false)
-  const safeIdx = Math.min(Math.max(focusIdx, 0), Math.max(snapshots.length - 1, 0))
+  const timeline = data ?? null
+  const duration = timeline?.durationMs() ?? 0
+  const captureTimes = useMemo(() => timeline?.captureTimes() ?? [], [timeline])
+  const keyframeTimes = useMemo(() => timeline?.keyframeTimes() ?? [], [timeline])
+  const startTs = timeline?.startTs() ?? 0
 
-  // Auto-advance — 1 Hz matches the SDK sampler default. Stops at
-  // the end (no wrap-around — playing past the last frame would
-  // re-render the same crash state forever).
+  const [playheadRel, setPlayheadRel] = useState(0) // ms relative to clip start
+  const [playing, setPlaying] = useState(false)
+
+  const playStartRef = useRef<{ replayStartRel: number; wallStart: number } | null>(null)
+  const rafRef = useRef<null | number>(null)
+
+  // rAF playback loop. Drives `playheadRel` from wall-clock so playback
+  // speed matches real time regardless of render rate.
   useEffect(() => {
-    if (!playing || snapshots.length === 0) return
-    const id = window.setInterval(() => {
-      setFocusIdx((cur) => {
-        const next = cur + 1
-        if (next >= snapshots.length) {
-          setPlaying(false)
-          return cur
+    if (!playing || !timeline || duration <= 0) return
+    playStartRef.current = {
+      replayStartRel: playheadRel,
+      wallStart: performance.now(),
+    }
+    const tick = () => {
+      const info = playStartRef.current
+      if (!info) return
+      const now = performance.now()
+      const next = info.replayStartRel + (now - info.wallStart)
+      if (next >= duration) {
+        setPlayheadRel(duration)
+        setPlaying(false)
+        return
+      }
+      setPlayheadRel(next)
+      rafRef.current = requestAnimationFrame(tick)
+    }
+    rafRef.current = requestAnimationFrame(tick)
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, timeline, duration])
+
+  const seekToRel = useCallback(
+    (relMs: number) => {
+      setPlayheadRel((prev) => {
+        const clamped = Math.max(0, Math.min(duration, relMs))
+        // If we're playing, restart the wall-clock anchor at the new position.
+        if (playStartRef.current !== null) {
+          playStartRef.current = { replayStartRel: clamped, wallStart: performance.now() }
         }
-        return next
+        return clamped === prev ? prev : clamped
       })
-    }, 1000)
-    return () => window.clearInterval(id)
-  }, [playing, snapshots.length])
+    },
+    [duration]
+  )
 
   const onKey = useCallback(
     (e: KeyboardEvent) => {
-      if (snapshots.length === 0) return
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      if (!timeline) return
+      if (e.key === 'ArrowLeft') {
         e.preventDefault()
-        setFocusIdx((cur) => Math.max(0, cur - 1))
-      } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        seekToRel(playheadRel - 250)
+      } else if (e.key === 'ArrowRight') {
         e.preventDefault()
-        setFocusIdx((cur) => Math.min(snapshots.length - 1, cur + 1))
+        seekToRel(playheadRel + 250)
       } else if (e.key === ' ') {
         e.preventDefault()
         setPlaying((p) => !p)
       }
     },
-    [snapshots.length]
+    [timeline, playheadRel, seekToRel]
   )
   useEffect(() => {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onKey])
 
-  const crashTs = useMemo(() => {
-    if (snapshots.length === 0) return null
-    return snapshots[snapshots.length - 1]!.ts
-  }, [snapshots])
-
   if (isLoading) return <Hint>Loading replay…</Hint>
   if (error) return <Hint tone="danger">Failed to load wireframe replay.</Hint>
-  if (snapshots.length === 0) return <Hint>No snapshots in replay attachment.</Hint>
+  if (!timeline || captureTimes.length === 0) {
+    return <Hint>No frames in replay attachment.</Hint>
+  }
 
-  const focused = snapshots[safeIdx] ?? null
-  const totalRaw = (data ?? []).length
-  const collapsed = totalRaw - snapshots.length
+  // Render: compute bracketing captures + alpha.
+  const playheadAbs = startTs + playheadRel
+  const { left, right, alpha } = pickBrackets(timeline, captureTimes, playheadAbs)
 
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-[200px_1fr] gap-4">
-        <FrameList
-          collapsedCount={collapsed}
-          crashTs={crashTs}
-          onFocus={setFocusIdx}
-          safeIdx={safeIdx}
-          snapshots={snapshots}
+        <KeyframeList
+          keyframeTimes={keyframeTimes}
+          onSeek={(absTs) => seekToRel(absTs - startTs)}
+          playheadAbs={playheadAbs}
+          startTs={startTs}
         />
-        <CanvasFrame snapshot={focused} />
+        <CanvasFrame alpha={alpha} left={left} right={right} />
       </div>
 
-      <Scrubber
-        canBack={safeIdx > 0}
-        canForward={safeIdx < snapshots.length - 1}
-        onPlayPause={() => setPlaying((p) => !p)}
-        onSeek={setFocusIdx}
-        onStepBack={() => setFocusIdx((c) => Math.max(0, c - 1))}
-        onStepForward={() => setFocusIdx((c) => Math.min(snapshots.length - 1, c + 1))}
+      <TimeScrubber
+        canBack={playheadRel > 0}
+        canForward={playheadRel < duration}
+        captureTimes={captureTimes}
+        durationMs={duration}
+        keyframeTimes={keyframeTimes}
+        onPlayPause={() => {
+          if (playheadRel >= duration) setPlayheadRel(0)
+          setPlaying((p) => !p)
+        }}
+        onSeek={seekToRel}
+        playheadRelMs={playheadRel}
         playing={playing}
-        selectedIdx={safeIdx}
-        totalFrames={snapshots.length}
+        startTs={startTs}
       />
     </div>
   )
 }
 
-function FrameList({
-  collapsedCount,
-  crashTs,
-  onFocus,
-  safeIdx,
-  snapshots,
-}: {
-  collapsedCount: number
-  crashTs: null | number
-  onFocus: (i: number) => void
-  safeIdx: number
-  snapshots: SnapshotWithDelta[]
-}) {
-  return (
-    <div>
-      <ol
-        aria-label="Replay snapshot list"
-        className="max-h-[420px] overflow-y-auto border-y border-[color:var(--rule)]"
-        role="listbox"
-      >
-        {snapshots.map((s, i) => (
-          <li key={i}>
-            <button
-              aria-selected={safeIdx === i}
-              className={`block w-full border-b border-[color:var(--rule-soft)] px-2.5 py-1.5 text-left transition-colors last:border-b-0 ${
-                safeIdx === i
-                  ? 'bg-[color:var(--accent-soft)] text-[color:var(--ink)]'
-                  : 'text-[color:var(--ink-soft)] hover:bg-[color:var(--paper-2)]'
-              }`}
-              onClick={() => onFocus(i)}
-              role="option"
-              type="button"
-            >
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="font-mono text-[12px] tabular-nums">
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <span className="font-mono text-[10px] text-[color:var(--ink-muted)]">
-                  {crashTs !== null ? relativeFromCrash(s.ts, crashTs) : ''}
-                </span>
-              </div>
-              <div className="mt-0.5 flex items-baseline justify-between gap-2 font-mono text-[10px] text-[color:var(--ink-muted)]">
-                <span>{s.nodes.length} nodes</span>
-                <DeltaChip delta={s.delta} />
-              </div>
-            </button>
-          </li>
-        ))}
-      </ol>
-      {collapsedCount > 0 && (
-        <p className="mt-2 font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
-          {collapsedCount} identical frame{collapsedCount === 1 ? '' : 's'} collapsed
-        </p>
-      )}
-    </div>
-  )
-}
-
-function DeltaChip({
-  delta,
-}: {
-  delta: null | { added: number; changed: number; removed: number }
-}) {
-  if (!delta) return <span className="text-[color:var(--ink-muted)]/60">start</span>
-  if (delta.added === 0 && delta.changed === 0 && delta.removed === 0) {
-    return <span className="text-[color:var(--ink-muted)]/60">·</span>
+function pickBrackets(
+  timeline: ReplayTimeline,
+  captureTimes: number[],
+  playheadAbs: number
+): { alpha: number; left: null | ReconstructedFrame; right: null | ReconstructedFrame } {
+  if (captureTimes.length === 0) return { alpha: 0, left: null, right: null }
+  // Find rightmost captureTime <= playheadAbs.
+  let leftIdx = 0
+  for (let i = 0; i < captureTimes.length; i++) {
+    if (captureTimes[i]! <= playheadAbs) leftIdx = i
+    else break
   }
-  return (
-    <span className="space-x-1.5">
-      {delta.added > 0 && (
-        <span className="text-[color:var(--success)]" title={`${delta.added} added`}>
-          +{delta.added}
-        </span>
-      )}
-      {delta.removed > 0 && (
-        <span className="text-[color:var(--danger)]" title={`${delta.removed} removed`}>
-          −{delta.removed}
-        </span>
-      )}
-      {delta.changed > 0 && (
-        <span className="text-[color:var(--warning)]" title={`${delta.changed} changed`}>
-          ~{delta.changed}
-        </span>
-      )}
-    </span>
-  )
+  const leftTs = captureTimes[leftIdx]!
+  const rightTs = leftIdx + 1 < captureTimes.length ? captureTimes[leftIdx + 1]! : leftTs
+  const span = rightTs - leftTs
+  const alpha = span <= 0 ? 0 : Math.max(0, Math.min(1, (playheadAbs - leftTs) / span))
+  return {
+    alpha,
+    left: timeline.reconstructAt(leftTs),
+    right: timeline.reconstructAt(rightTs),
+  }
 }
 
-/** Canvas pinned to the wireframe's natural aspect ratio — no
- *  letterbox bars. Width is whatever the parent gives us up to the
- *  aspect-derived ceiling; height follows. */
-function CanvasFrame({ snapshot }: { snapshot: null | Snapshot }) {
-  if (!snapshot) {
+function CanvasFrame({
+  alpha,
+  left,
+  right,
+}: {
+  alpha: number
+  left: null | ReconstructedFrame
+  right: null | ReconstructedFrame
+}) {
+  const ref = right ?? left
+  if (!ref) {
     return (
       <div className="flex h-[420px] items-center justify-center border border-[color:var(--rule)] text-[12px] text-[color:var(--ink-muted)]">
-        Pick a snapshot.
+        Empty replay.
       </div>
     )
   }
-  const aspect = snapshot.width / snapshot.height
+  const aspect = ref.width / ref.height
   return (
     <div
       className="mx-auto border border-[color:var(--rule)] bg-[color:var(--paper-2)]"
@@ -341,84 +225,24 @@ function CanvasFrame({ snapshot }: { snapshot: null | Snapshot }) {
         width: `min(100%, calc(480px * ${aspect}))`,
       }}
     >
-      <WireframeSvg snapshot={snapshot} />
+      <WireframeSvg alpha={alpha} left={left} right={right} />
     </div>
   )
 }
 
-function Scrubber({
-  canBack,
-  canForward,
-  onPlayPause,
-  onSeek,
-  onStepBack,
-  onStepForward,
-  playing,
-  selectedIdx,
-  totalFrames,
+function WireframeSvg({
+  alpha,
+  left,
+  right,
 }: {
-  canBack: boolean
-  canForward: boolean
-  onPlayPause: () => void
-  onSeek: (i: number) => void
-  onStepBack: () => void
-  onStepForward: () => void
-  playing: boolean
-  selectedIdx: number
-  totalFrames: number
+  alpha: number
+  left: null | ReconstructedFrame
+  right: null | ReconstructedFrame
 }) {
-  return (
-    <div className="flex items-center gap-3 border-t border-[color:var(--rule)] pt-3">
-      <button
-        aria-label="Previous frame"
-        className="inline-flex h-7 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink)] uppercase disabled:opacity-40"
-        disabled={!canBack}
-        onClick={onStepBack}
-        type="button"
-      >
-        ◀ prev
-      </button>
-      <button
-        aria-label={playing ? 'Pause' : 'Play'}
-        className="inline-flex h-7 items-center border border-[color:var(--accent)] bg-[color:var(--accent)] px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--paper)] uppercase"
-        onClick={onPlayPause}
-        type="button"
-      >
-        {playing ? '⏸ pause' : '▶ play'}
-      </button>
-      <button
-        aria-label="Next frame"
-        className="inline-flex h-7 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink)] uppercase disabled:opacity-40"
-        disabled={!canForward}
-        onClick={onStepForward}
-        type="button"
-      >
-        next ▶
-      </button>
-      <input
-        aria-label="Frame slider"
-        className="flex-1 accent-[color:var(--accent)]"
-        max={Math.max(totalFrames - 1, 0)}
-        min={0}
-        onChange={(e) => onSeek(Number(e.target.value))}
-        type="range"
-        value={selectedIdx}
-      />
-      <span className="font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
-        {selectedIdx + 1} / {totalFrames}
-      </span>
-    </div>
-  )
-}
-
-function WireframeSvg({ snapshot }: { snapshot: Snapshot }) {
-  const w = snapshot.width
-  const h = snapshot.height
-  // rc.8 — explicit clipPath so a stray walker emission with
-  // x + w > viewport.width can't paint outside the device frame
-  // (Insight 2026-05-18 saw a horizontal grey bar overflowing
-  // ~3× viewport width). overflow="hidden" attribute belt-and-
-  // braces against Safari's historical lax-clip behaviour.
+  const ref = right ?? left
+  if (!ref) return null
+  const w = ref.width
+  const h = ref.height
   return (
     <svg
       overflow="hidden"
@@ -433,22 +257,37 @@ function WireframeSvg({ snapshot }: { snapshot: Snapshot }) {
         </clipPath>
       </defs>
       <g clipPath="url(#wf-viewport-clip)">
-        {snapshot.nodes.map((n, i) => (
-          <NodeRender key={i} node={n} />
-        ))}
+        {/* Cross-fade: left at (1 - α), right at α. Matched nodes
+         *  with identical color sit at full opacity (cumulative); a
+         *  color-changed node visibly tweens between the two; an
+         *  added or removed node fades in / out. */}
+        {left && (
+          <g opacity={1 - alpha}>
+            {left.nodes.map((n, i) => (
+              <NodeRender key={`l${i}`} node={n} />
+            ))}
+          </g>
+        )}
+        {right && right !== left && (
+          <g opacity={alpha}>
+            {right.nodes.map((n, i) => (
+              <NodeRender key={`r${i}`} node={n} />
+            ))}
+          </g>
+        )}
+        {/* Single-state case (left === right or only one): render once at α=1 */}
+        {right && right === left && (
+          <g>
+            {right.nodes.map((n, i) => (
+              <NodeRender key={i} node={n} />
+            ))}
+          </g>
+        )}
       </g>
     </svg>
   )
 }
 
-/**
- * Wireframe rendering is structural, not photographic. Every node is
- * one of three primitives — text, circle (square images), rect —
- * filled from the curated 32-colour palette via a stable hash of the
- * spatial fingerprint. Result: same node keeps the same hue across
- * frames, overlapping rects stay legible at 0.75 alpha, and the
- * visual reads consistently regardless of the host app's UI palette.
- */
 function NodeRender({ node }: { node: Node }) {
   if (node.kind === 'text' && node.text) {
     const fontSize = Math.min(14, Math.max(8, node.h * 0.6))
@@ -468,14 +307,6 @@ function NodeRender({ node }: { node: Node }) {
     return <rect fill={WIREFRAME_MASK_FILL} height={node.h} width={node.w} x={node.x} y={node.y} />
   }
 
-  // Default scheme: SDK colour pass-through with a solid-white
-  // fallback. iOS sets `node.color` for UILabels / coloured UIView
-  // backgrounds so coloured CTAs render with their actual hue;
-  // Android's most-common case of "uncoloured ViewGroup" falls
-  // through to the muted default. `fill-opacity` is the shared
-  // single knob so explicit colours and the fallback both compose
-  // as translucent layers — two stacked rects read more saturated
-  // than one, describing depth without rendering as a solid block.
   const isImage = node.kind === 'image'
   const hasExplicitColor = !isImage && !!node.color
   const fill = isImage ? WIREFRAME_IMAGE_FILL : (node.color ?? WIREFRAME_RECT_FILL)
@@ -498,7 +329,6 @@ function NodeRender({ node }: { node: Node }) {
     )
   }
 
-  // image (non-square) → softly rounded; rect → square corners.
   const rx = isImage ? 8 : 0
   return (
     <rect
@@ -513,22 +343,212 @@ function NodeRender({ node }: { node: Node }) {
   )
 }
 
+function KeyframeList({
+  keyframeTimes,
+  onSeek,
+  playheadAbs,
+  startTs,
+}: {
+  keyframeTimes: number[]
+  onSeek: (absTs: number) => void
+  playheadAbs: number
+  startTs: number
+}) {
+  // Index of the keyframe currently in effect (largest <= playhead).
+  let activeIdx = 0
+  for (let i = 0; i < keyframeTimes.length; i++) {
+    if (keyframeTimes[i]! <= playheadAbs) activeIdx = i
+    else break
+  }
+  return (
+    <div>
+      <ol
+        aria-label="Replay keyframe list"
+        className="max-h-[420px] overflow-y-auto border-y border-[color:var(--rule)]"
+        role="listbox"
+      >
+        {keyframeTimes.map((ts, i) => {
+          const rel = ts - startTs
+          const active = i === activeIdx
+          return (
+            <li key={ts}>
+              <button
+                aria-selected={active}
+                className={`block w-full border-b border-[color:var(--rule-soft)] px-2.5 py-1.5 text-left transition-colors last:border-b-0 ${
+                  active
+                    ? 'bg-[color:var(--accent-soft)] text-[color:var(--ink)]'
+                    : 'text-[color:var(--ink-soft)] hover:bg-[color:var(--paper-2)]'
+                }`}
+                onClick={() => onSeek(ts)}
+                role="option"
+                type="button"
+              >
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="font-mono text-[12px] tabular-nums">
+                    K{String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="font-mono text-[10px] text-[color:var(--ink-muted)] tabular-nums">
+                    {formatSecond(rel)}
+                  </span>
+                </div>
+              </button>
+            </li>
+          )
+        })}
+      </ol>
+      <p className="mt-2 font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+        keyframes · scrub between for detail
+      </p>
+    </div>
+  )
+}
+
+function TimeScrubber({
+  canBack,
+  canForward,
+  captureTimes,
+  durationMs,
+  keyframeTimes,
+  onPlayPause,
+  onSeek,
+  playheadRelMs,
+  playing,
+  startTs,
+}: {
+  canBack: boolean
+  canForward: boolean
+  captureTimes: number[]
+  durationMs: number
+  keyframeTimes: number[]
+  onPlayPause: () => void
+  onSeek: (relMs: number) => void
+  playheadRelMs: number
+  playing: boolean
+  startTs: number
+}) {
+  return (
+    <div className="space-y-1 border-t border-[color:var(--rule)] pt-3">
+      <div className="flex items-center gap-3">
+        <button
+          aria-label="Step back 250 ms"
+          className="inline-flex h-7 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink)] uppercase disabled:opacity-40"
+          disabled={!canBack}
+          onClick={() => onSeek(playheadRelMs - 250)}
+          type="button"
+        >
+          ◀ −0.25 s
+        </button>
+        <button
+          aria-label={playing ? 'Pause' : 'Play'}
+          className="inline-flex h-7 items-center border border-[color:var(--accent)] bg-[color:var(--accent)] px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--paper)] uppercase"
+          onClick={onPlayPause}
+          type="button"
+        >
+          {playing ? '⏸ pause' : '▶ play'}
+        </button>
+        <button
+          aria-label="Step forward 250 ms"
+          className="inline-flex h-7 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink)] uppercase disabled:opacity-40"
+          disabled={!canForward}
+          onClick={() => onSeek(playheadRelMs + 250)}
+          type="button"
+        >
+          +0.25 s ▶
+        </button>
+        <input
+          aria-label="Replay seek (seconds)"
+          className="flex-1 accent-[color:var(--accent)]"
+          max={Math.max(durationMs, 0)}
+          min={0}
+          onChange={(e) => onSeek(Number(e.target.value))}
+          step={10}
+          type="range"
+          value={playheadRelMs}
+        />
+        <span className="font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
+          {formatSecond(playheadRelMs)} / {formatSecond(durationMs)}
+        </span>
+      </div>
+      {/* Keyframe ticks on a parallel SVG strip so the operator sees
+       *  cadence + capture density at a glance. */}
+      <KeyframeTicks
+        captureTimes={captureTimes}
+        durationMs={durationMs}
+        keyframeTimes={keyframeTimes}
+        startTs={startTs}
+      />
+    </div>
+  )
+}
+
+function KeyframeTicks({
+  captureTimes,
+  durationMs,
+  keyframeTimes,
+  startTs,
+}: {
+  captureTimes: number[]
+  durationMs: number
+  keyframeTimes: number[]
+  startTs: number
+}) {
+  if (durationMs <= 0) return null
+  return (
+    <svg
+      aria-hidden="true"
+      className="block h-2 w-full"
+      preserveAspectRatio="none"
+      viewBox={`0 0 1000 10`}
+    >
+      {captureTimes.map((ts) => {
+        const rel = ts - startTs
+        const x = (rel / durationMs) * 1000
+        return (
+          <line
+            key={`c${ts}`}
+            stroke="var(--rule)"
+            strokeOpacity={0.4}
+            strokeWidth={0.5}
+            x1={x}
+            x2={x}
+            y1={3}
+            y2={7}
+          />
+        )
+      })}
+      {keyframeTimes.map((ts) => {
+        const rel = ts - startTs
+        const x = (rel / durationMs) * 1000
+        return (
+          <line
+            key={`k${ts}`}
+            stroke="var(--accent)"
+            strokeOpacity={0.8}
+            strokeWidth={1.2}
+            x1={x}
+            x2={x}
+            y1={0}
+            y2={10}
+          />
+        )
+      })}
+    </svg>
+  )
+}
+
+function formatSecond(ms: number): string {
+  const s = Math.max(0, ms) / 1000
+  return `${s.toFixed(2)}s`
+}
+
 function Hint({ children, tone }: { children: React.ReactNode; tone?: 'danger' }) {
   return (
     <p
       className={`border-y border-[color:var(--rule)] py-3 text-[12px] ${
-        tone === 'danger' ? 'text-[color:var(--danger)]' : 'text-[color:var(--ink-soft)]'
+        tone === 'danger' ? 'text-[color:var(--danger)]' : 'text-[color:var(--ink-muted)]'
       }`}
     >
       {children}
     </p>
   )
-}
-
-function relativeFromCrash(ts: number, crashTs: number): string {
-  const delta = crashTs - ts
-  if (delta === 0) return 'crash'
-  if (delta < 1000) return `${delta}ms`
-  if (delta < 60_000) return `${(delta / 1000).toFixed(1)}s`
-  return `${(delta / 60_000).toFixed(1)}min`
 }
