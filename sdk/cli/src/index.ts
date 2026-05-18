@@ -12,13 +12,24 @@ Source-map upload:
   sentori-cli upload sourcemap [options] <path...>
       Upload one or more files or directories. A directory is scanned
       (one level) for *.map / *.js / *.jsbundle / *.bundle / *.hbc;
-      a file given explicitly is uploaded as-is. Use this for web
-      bundlers (point at the build dir) or for already-composed RN maps.
+      a file given explicitly is uploaded as-is. Use this when you
+      already have a composed sourcemap on disk:
+        - web bundlers (point at the build dir),
+        - iOS post-\`react-native-xcode.sh\` where the build phase has
+          already composed packager + Hermes maps into the final
+          \`$SOURCEMAP_FILE\` and deleted the intermediates.
+      Composed-then-uploaded vs raw-then-server-composed yield
+      identical symbolication — the server stores the same shape
+      either way.
 
   sentori-cli react-native upload [options]
       Compose a Metro packager map + a Hermes map into one source map
-      and upload it (plus the bundle). Use this for a Hermes release
-      build. Requires --metro-map and --hermes-map.
+      (uses react-native's \`scripts/compose-source-maps.js\`) and
+      upload the result. Use this when you have both raw maps on
+      disk — typical Android release path where the gradle
+      \`bundleReleaseJsAndAssets\` task leaves both maps untouched.
+      Requires --metro-map and --hermes-map. On iOS the build phase
+      deletes the intermediates, so use \`upload sourcemap\` instead.
 
 Native artifacts (project-scoped, need --project + admin token):
   sentori-cli upload dsym --project <uuid> [--release <r>] [--object-name <n>] [--debug-id <uuid> --arch <a>] <path>
@@ -63,13 +74,20 @@ Options (issue commands):
                     to "regressed" if a matching event lands later.
 
 Hermes release build, by hand:
-  npx react-native bundle --platform ios --dev false --entry-file index.js \\
-    --bundle-output main.jsbundle --sourcemap-output main.jsbundle.packager.map
-  # (the iOS/Android build compiles to Hermes and writes main.jsbundle.hbc.map)
-  npx @goliapkg/sentori-cli react-native upload \\
-    --release "<app>@<version>+<build>" --token "$SENTORI_TOKEN" \\
-    --metro-map main.jsbundle.packager.map --hermes-map main.jsbundle.hbc.map \\
-    --bundle main.jsbundle
+
+  Android (raw maps still on disk after \`./gradlew bundleRelease\`):
+    npx @goliapkg/sentori-cli react-native upload \\
+      --release "<app>@<version>+<build>" --token "$SENTORI_TOKEN" \\
+      --metro-map  android/app/build/intermediates/sourcemaps/react/release/index.android.bundle.packager.map \\
+      --hermes-map android/app/build/intermediates/sourcemaps/react/release/index.android.bundle.compiler.map \\
+      --bundle     android/app/build/generated/assets/react/release/index.android.bundle
+
+  iOS (already-composed map after \`xcodebuild archive\`; the build
+       phase deletes intermediates so you only have the composed map):
+    npx @goliapkg/sentori-cli upload sourcemap \\
+      --release "<app>@<version>+<build>" --token "$SENTORI_TOKEN" \\
+      "$BUILT_PRODUCTS_DIR/main.jsbundle.map" \\
+      "$BUILT_PRODUCTS_DIR/main.jsbundle"
 `
 
 type Common = { apiUrl: string; dryRun: boolean; release: string; token: string }
