@@ -14,18 +14,18 @@ use crate::api;
 use crate::auth::{AuthState, require_token};
 use crate::recent::{AppState, RecentBuffer};
 
-/// Global outer cap applied to every route. Used to be 1 MB; rc.6
-/// added a per-route 16 MB override on the attachment POST, but the
-/// outer Tower layer runs **before** the inner one and cut the
-/// stream first — Insight 2026-05-18 saw 770 KB replay POSTs
-/// rejected at 413 with this exact symptom. Raising the global to
-/// 16 MB lets the per-route override + axum extractor
-/// DefaultBodyLimit (2 MB default for non-attachment routes)
-/// actually decide each endpoint's effective cap. Routes that
-/// process small JSON bodies still self-limit via the extractor;
-/// only the attachment route uses DefaultBodyLimit::disable() to
-/// reach the full 16 MB.
-const MAX_BODY_BYTES: usize = 16 * 1024 * 1024;
+/// Global outer cap applied to every route. Sized to the *largest*
+/// per-route inner cap so admin uploads (dsym / mapping / sourcemap
+/// at 256 MB each, see MAX_ADMIN_UPLOAD_BYTES) can actually use their
+/// budget. Tower layers stack from outside in — an outer cap below
+/// an inner cap silently dominates; Insight 2026-05-18 hit this
+/// shape twice: first with the 1 MB → 16 MB bump for replay
+/// attachment, then with a 37 MB Android packager.map sourcemap
+/// that still blew through 16 MB despite the per-route 256 MB
+/// override. Small-payload ingest routes (events / spans /
+/// sessions / etc.) self-limit via explicit per-route 1 MB layers
+/// declared at the route below — they never see this outer cap.
+const MAX_BODY_BYTES: usize = 256 * 1024 * 1024;
 // Phase 22 sub-A: dSYM uploads can run up to ~256 MB per arch slice;
 // release / sourcemap / dsym admin routes opt out of the outer cap
 // via DefaultBodyLimit::disable() and rely on per-handler validation.
