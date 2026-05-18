@@ -1,21 +1,19 @@
-// v0.9.6 #2 — wireframe Session Replay (SDK side).
+// rc.9 — wireframe Session Replay v2 encoding.
 //
-// 60-slot ring buffer of native-captured wireframe snapshots. Each
-// tick calls into `SentoriReplayCapture.captureWireframe(maskIds)`
-// which walks the iOS UIView / Android View hierarchy and returns
-// one JSON string per snapshot. captureException flushes the ring
-// as a `replay` attachment (NDJSON: one snapshot per line).
+// Replaces rc.8's "one full snapshot per tick" with keyframe + delta:
+//   - Native walker still emits a full snapshot string every tick.
+//   - JS parses the snapshot, builds a fingerprint→node map, and either
+//     emits a keyframe (cold start / every KEYFRAME_INTERVAL_MS / when
+//     the delta would be bigger than a fresh key) OR a delta against
+//     the previous emit's reconstructed state.
+//   - Static-UI ticks produce zero-delta heartbeats which we drop.
 //
-// Why wireframe and not raster:
-//   • Storage: 80 nodes × ~80 bytes ≈ 6 KB per snapshot vs ~50 KB
-//     for a downsampled JPEG. 60-slot ring ≈ 400 KB raw / ~80 KB
-//     gzipped — fits comfortably in the 500 KB attachment cap.
-//   • Privacy: no pixels means no accidental PII leaks; mask
-//     registry decides what text to replace with "***".
-//   • Replay fidelity: less faithful to pixels but enough to see
-//     which screen the user was on and what was on it. Dashboard
-//     player renders SVG rects — denser-looking than a 1 Hz
-//     screenshot strip.
+// At 4 Hz capture / 4 s keyframes the wire bytes drop ~50 % vs rc.8 at
+// 1 Hz for the same 60 s pre-error window, and the dashboard player
+// cross-fades between captures at 24 fps so playback reads as motion
+// rather than a 1 Hz slideshow.
+//
+// Wire schema: docs/replay-encoding-v2.md.
 
 import { startSpan } from '@goliapkg/sentori-core';
 
@@ -24,61 +22,74 @@ import { describeWireframeNative } from './native';
 
 declare const __DEV__: boolean | undefined;
 
-const TICK_INTERVAL_MS = 1000;
-const RING_SIZE = 60;
+/** Default capture interval (4 Hz). Override via `replay.hz`. */
+const TICK_INTERVAL_MS = 250;
 
-/** Floor on tick period. < 250 ms (4 Hz) the native view-tree walk
- *  dominates the JS thread on mid-tier Android, especially with mask
- *  consultation. The default is 1 Hz; the option exists for
- *  benchmarking, not for production. */
-const MIN_TICK_PERIOD_MS = 250;
+/** How often to emit a fresh keyframe — caps reconstruction chain
+ *  length and lets the player re-sync after a dropped line. */
+const KEYFRAME_INTERVAL_MS = 4_000;
 
-let _ring: string[] = [];
+/** When the delta against the previous frame would carry ≥ this
+ *  fraction of the current node count, prefer a fresh keyframe —
+ *  emits roughly the same bytes but doesn't grow the chain. */
+const DELTA_TO_KEYFRAME_RATIO = 0.4;
+
+/** Floor under which the keyframe-vs-delta ratio heuristic does
+ *  not apply. Trivial UIs (≤ 10 nodes — boot splash, dev panel,
+ *  tests) shouldn't drop to keyframes on every change. */
+const KEYFRAME_RATIO_MIN_NODES = 10;
+
+/** Replay window kept in the ring buffer. captureException drains. */
+const REPLAY_WINDOW_MS = 60_000;
+
+/** Hard ceiling on ring item count — defence against a wedged tick
+ *  clock filling memory; under normal capture rates we evict by time
+ *  long before this fires. */
+const MAX_RING_ITEMS = 1000;
+
+/** Floor on tick period. < 100 ms the native view-tree walk dominates
+ *  the JS thread on mid-tier Android. */
+const MIN_TICK_PERIOD_MS = 100;
+
+type Node = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  kind?: string;
+  text?: string;
+  color?: string;
+};
+
+type NativeFrame = { ts: number; width: number; height: number; nodes: Node[] };
+
+type RingItem = { ts: number; line: string };
+
+let _ring: RingItem[] = [];
 let _timer: ReturnType<typeof setInterval> | null = null;
 let _running = false;
 
-/**
- * v0.9.13 — frame-level delta encoding: when the new snapshot matches
- * the last one byte-for-byte (static UI, no animation, off-screen
- * app), skip pushing it. The ring stays meaningful (one frame =
- * one *change*), the attachment shrinks proportionally, and a real
- * idle phase no longer evicts a useful pre-error frame.
- *
- * We only check against the most-recently-pushed snapshot, not the
- * whole ring — that's cheap (one string comparison per tick) and
- * catches the dominant case (idle screens). True content changes
- * fall through and push as before.
- *
- * Budget verification on the iOS showcase (apps/ios-showcase): 60
- * frames at ~120 bytes each → ≈ 7 KB raw NDJSON, well under the
- * 500 KB attachment cap. Heavier RN apps with 200+ visible nodes
- * per frame can land in the 400 KB band; future work in v1.x adds
- * native gzip on upload if real-world traffic ever pushes the cap.
- */
-let _lastPushed: null | string = null;
+/** Last emit's reconstructed state — fingerprint → node. Null until
+ *  the first keyframe lands; reset on drain so the next session
+ *  starts with a fresh keyframe. */
+let _lastFrameState: Map<string, Node> | null = null;
+let _lastKeyframeTs = 0;
 
-/** Native module ref, resolved once on first start. Caching here
- *  avoids the cost of `requireNativeModule('Sentori')` on every
- *  capture tick (Metro's require cache makes this cheap, but the
- *  per-tick string lookup and possible throw still cost more than
- *  reading a closed-over variable). */
 let _nativeMod: ReplayNativeModule | null = null;
 
 export type ReplayOptions = {
   mode?: 'off' | 'wireframe';
-  /** Ticks per second. Default 1. */
+  /** Ticks per second. Default 4. */
   hz?: number;
+  /** Keyframe cadence in ms. Default 4000. */
+  keyframeMs?: number;
 };
+
+let _keyframeIntervalMs = KEYFRAME_INTERVAL_MS;
 
 export function startReplay(opts: ReplayOptions): void {
   if (_running) return;
   if (opts.mode !== 'wireframe') return;
-  // v0.9.10 — gate via expo-modules-core's registry (same path the
-  // screenshot capture uses). The previous `isNativeModuleLinked`
-  // check looked at the legacy `RN.NativeModules` map, but the
-  // Sentori module is registered through expo-modules-core; the
-  // legacy map never sees it, so this branch returned "not linked"
-  // forever even with the pod correctly attached (Insight 2026-05-17).
   const info = describeWireframeNative();
   if (!info.bound) {
     if (typeof __DEV__ !== 'undefined' && __DEV__) {
@@ -99,23 +110,17 @@ export function startReplay(opts: ReplayOptions): void {
   }
   _running = true;
   _nativeMod = loadNativeReplay();
-  const period = Math.max(MIN_TICK_PERIOD_MS, Math.floor(TICK_INTERVAL_MS / (opts.hz ?? 1)));
+  _keyframeIntervalMs = opts.keyframeMs ?? KEYFRAME_INTERVAL_MS;
+  const hz = opts.hz ?? 4;
+  const period = Math.max(MIN_TICK_PERIOD_MS, Math.round(1000 / hz));
   _timer = setInterval(() => {
     captureTick();
   }, period);
-  // v0.9.12 — Insight 2026-05-17 report: 0.9.11 emitted the
-  // "starting bound=true" line then went silent. Root cause was the
-  // `.unref?.()` call that used to live here. Hermes 0.81 doesn't
-  // ship a Timer object with the Node-style `unref` method, and the
-  // optional-chained call ended up dereferencing a `prototype`
-  // property on `undefined` — throwing synchronously inside
-  // startReplay, which RN's bridge swallowed silently. Net effect:
-  // setInterval registered, captureTick never invoked. Drop the
-  // call; replay tick lifecycle is bound to the app process, no
-  // event-loop tweak needed.
   if (typeof __DEV__ !== 'undefined' && __DEV__) {
     // eslint-disable-next-line no-console
-    console.warn('[sentori] replay: scheduled tick period=', period, 'ms');
+    console.warn(
+      '[sentori] replay: scheduled tick period=', period, 'ms keyframe=', _keyframeIntervalMs, 'ms',
+    );
   }
 }
 
@@ -129,6 +134,9 @@ export function stopReplay(): void {
   _emptyTickCount = 0;
   _emptyTickLogStride = 1;
   _firstTickLogged = false;
+  _okTickCount = 0;
+  _thinTickCount = 0;
+  _thinTickLogStride = 1;
 }
 
 let _emptyTickCount = 0;
@@ -138,30 +146,15 @@ let _thinTickLogStride = 1;
 let _okTickCount = 0;
 let _firstTickLogged = false;
 
-/** Anything below this many nodes is suspicious — likely the
- *  walker bailed early (zero-size parent, masked root, etc.).
- *  Insight 2026-05-18 verify event saw 800-node payloads on some
- *  ticks and 1-3-node payloads on others; this threshold flags
- *  the latter without spamming on small-but-valid screens. */
 const THIN_RESULT_NODES = 6;
 
 function captureTick(): void {
   if (!_running) return;
-  // v0.9.12 — UNCONDITIONAL first-tick log. Proves the setInterval
-  // callback is firing at all, before any other code that could
-  // throw. 0.9.11's diagnostic was inside a `else if (snapshot==null)`
-  // branch that could only surface AFTER the native call returned;
-  // useless when the bug is that the tick body never enters.
   if (typeof __DEV__ !== 'undefined' && __DEV__ && !_firstTickLogged) {
     // eslint-disable-next-line no-console
     console.warn('[sentori] replay tick: FIRST INVOCATION');
     _firstTickLogged = true;
   }
-  // 0.9.11 called startSpan OUTSIDE the catch block. If
-  // `@goliapkg/sentori-core` failed to initialise (or startSpan
-  // threw for any other reason on the first tick) the whole tick
-  // callback died silently. Wrap so worst case is "no span for this
-  // tick" not "no ticks for the session".
   let tickSpan: ReturnType<typeof startSpan> | null = null;
   try {
     tickSpan = startSpan('sentori.replay.tick', { name: 'tick' });
@@ -170,71 +163,32 @@ function captureTick(): void {
   }
   try {
     const maskIds = readMaskIds();
-    const snapshot = _nativeMod?.captureWireframe?.(maskIds);
-    if (typeof snapshot === 'string' && snapshot.length > 0) {
-      // v0.9.13 — skip pushing if the frame is identical to the last
-      // pushed one. See _lastPushed comment for the rationale.
-      if (snapshot !== _lastPushed) {
-        _ring.push(snapshot);
-        _lastPushed = snapshot;
-        while (_ring.length > RING_SIZE) {
-          _ring.shift();
-        }
-      }
-      _emptyTickCount = 0;
-      _emptyTickLogStride = 1;
+    const snapshotJson = _nativeMod?.captureWireframe?.(maskIds);
+    if (typeof snapshotJson !== 'string' || snapshotJson.length === 0) {
+      handleEmptyTick(snapshotJson);
+      tickSpan?.finish({ status: 'ok' });
+      return;
+    }
 
-      // v1.0.0-rc.3 — Insight 2026-05-18 report: some ticks land
-      // valid non-empty JSON but with only the root View + 1-2 wrappers
-      // (the Android zero-size-bails-subtree bug, now fixed natively;
-      // this log catches similar regressions). Cheap node-count parse
-      // — we only look at one digit-level character class.
-      _okTickCount += 1;
+    let snapshot: NativeFrame;
+    try {
+      snapshot = JSON.parse(snapshotJson) as NativeFrame;
+    } catch (e) {
       if (typeof __DEV__ !== 'undefined' && __DEV__) {
-        const nodeCount = countNodesQuick(snapshot);
-        const sizeBytes = snapshot.length;
-        const isThin = nodeCount < THIN_RESULT_NODES;
-        if (isThin) {
-          _thinTickCount += 1;
-          if (_thinTickCount === 1 || _thinTickCount === _thinTickLogStride) {
-            // eslint-disable-next-line no-console
-            console.warn(
-              `[sentori] replay tick: thin result nodes=${nodeCount} sizeBytes=${sizeBytes} (thin ticks so far: ${_thinTickCount})`,
-            );
-            _thinTickLogStride = Math.max(_thinTickLogStride * 10, 10);
-          }
-        } else {
-          _thinTickCount = 0;
-          _thinTickLogStride = 1;
-        }
-        // First good tick logs the shape so devs see it once.
-        if (_okTickCount === 1) {
-          // eslint-disable-next-line no-console
-          console.warn(
-            `[sentori] replay tick: first ok — nodes=${nodeCount} sizeBytes=${sizeBytes}`,
-          );
-        }
-      }
-    } else if (typeof __DEV__ !== 'undefined' && __DEV__) {
-      // v0.9.11 — Insight 2026-05-17 Finding 6: tick fires hundreds
-      // of times but ring stays empty → native returned null/empty.
-      // Log on a back-off schedule (1st, 10th, 100th, …) so the
-      // diagnostic is visible without spamming Metro at 1 Hz for a
-      // 15-minute session.
-      _emptyTickCount += 1;
-      if (_emptyTickCount === 1 || _emptyTickCount === _emptyTickLogStride) {
         // eslint-disable-next-line no-console
-        console.warn(
-          '[sentori] replay tick: native returned',
-          snapshot === null
-            ? 'null'
-            : typeof snapshot === 'string'
-              ? `empty (length=${snapshot.length})`
-              : typeof snapshot,
-          `(empty ticks so far: ${_emptyTickCount})`,
-        );
-        _emptyTickLogStride = Math.max(_emptyTickLogStride * 10, 10);
+        console.warn('[sentori] replay tick: native JSON parse failed', e);
       }
+      tickSpan?.finish({ status: 'error' });
+      return;
+    }
+
+    _emptyTickCount = 0;
+    _emptyTickLogStride = 1;
+
+    encodeAndPush(snapshot);
+
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      diagnosticForTick(snapshot, snapshotJson.length);
     }
     tickSpan?.finish({ status: 'ok' });
   } catch (e) {
@@ -247,27 +201,140 @@ function captureTick(): void {
   }
 }
 
-/**
- * Approximate node-count parse — counts occurrences of the
- * `"x":` key in the serialised payload. Every node JSON object
- * starts with `{"x":<n>,"y":<n>,"w":<n>,"h":<n>...}` so the
- * occurrence count matches the array length without paying for a
- * full `JSON.parse`. Cheap enough to run inside the 1 Hz tick.
- */
-function countNodesQuick(payload: string): number {
-  let count = 0;
-  let i = 0;
-  // Skip the outer {"ts":..,"width":..,"height":..,"nodes":[
-  // and count `"x":` thereafter. The outer payload doesn't contain
-  // a top-level "x" key so any match must be a node.
-  const needle = '"x":';
-  while (true) {
-    const at = payload.indexOf(needle, i);
-    if (at < 0) break;
-    count += 1;
-    i = at + needle.length;
+function encodeAndPush(snapshot: NativeFrame): void {
+  const currentState = new Map<string, Node>();
+  for (const n of snapshot.nodes) currentState.set(fingerprint(n), n);
+
+  const ts = snapshot.ts;
+  const isCold = _lastFrameState === null;
+  const keyframeOverdue = ts - _lastKeyframeTs >= _keyframeIntervalMs;
+
+  let line: string;
+
+  if (isCold || keyframeOverdue) {
+    line = encodeKeyframe(snapshot);
+    _lastKeyframeTs = ts;
+  } else {
+    const delta = computeDelta(_lastFrameState as Map<string, Node>, currentState);
+    const totalChanged = delta.added.length + delta.changed.length + delta.removed.length;
+    if (totalChanged === 0) {
+      // No-op heartbeat — drop. Keep _lastFrameState as-is (identical).
+      return;
+    }
+    if (
+      currentState.size >= KEYFRAME_RATIO_MIN_NODES &&
+      totalChanged >= currentState.size * DELTA_TO_KEYFRAME_RATIO
+    ) {
+      // Big screen transition on a substantial UI — emit a fresh
+      // keyframe so reconstruction doesn't carry a near-rewrite delta.
+      line = encodeKeyframe(snapshot);
+      _lastKeyframeTs = ts;
+    } else {
+      line = JSON.stringify({
+        ts,
+        kind: 'delta',
+        added: delta.added,
+        changed: delta.changed,
+        removed: delta.removed,
+      });
+    }
   }
-  return count;
+
+  _ring.push({ ts, line });
+  evictRing(ts);
+  _lastFrameState = currentState;
+}
+
+function encodeKeyframe(snapshot: NativeFrame): string {
+  return JSON.stringify({
+    ts: snapshot.ts,
+    kind: 'key',
+    width: snapshot.width,
+    height: snapshot.height,
+    nodes: snapshot.nodes,
+  });
+}
+
+function evictRing(nowTs: number): void {
+  const cutoff = nowTs - REPLAY_WINDOW_MS;
+  while (_ring.length > 0 && _ring[0]!.ts < cutoff) _ring.shift();
+  while (_ring.length > MAX_RING_ITEMS) _ring.shift();
+}
+
+/** Fingerprint integer-rounds before joining so sub-pixel jitter from
+ *  RN's Fabric layout (occasionally floats) doesn't break stable
+ *  matching across ticks. */
+function fingerprint(n: Node): string {
+  return `${n.x | 0},${n.y | 0},${n.w | 0},${n.h | 0}`;
+}
+
+type Delta = { added: Node[]; changed: Node[]; removed: Pick<Node, 'x' | 'y' | 'w' | 'h'>[] };
+
+export function computeDelta(prev: Map<string, Node>, curr: Map<string, Node>): Delta {
+  const added: Node[] = [];
+  const changed: Node[] = [];
+  const removed: Pick<Node, 'x' | 'y' | 'w' | 'h'>[] = [];
+  for (const [fp, node] of curr) {
+    const p = prev.get(fp);
+    if (!p) {
+      added.push(node);
+      continue;
+    }
+    if (
+      (p.kind ?? '') !== (node.kind ?? '') ||
+      (p.color ?? '') !== (node.color ?? '') ||
+      (p.text ?? '') !== (node.text ?? '')
+    ) {
+      changed.push(node);
+    }
+  }
+  for (const [fp, node] of prev) {
+    if (!curr.has(fp)) removed.push({ x: node.x, y: node.y, w: node.w, h: node.h });
+  }
+  return { added, changed, removed };
+}
+
+function handleEmptyTick(snapshot: unknown): void {
+  if (typeof __DEV__ === 'undefined' || !__DEV__) return;
+  _emptyTickCount += 1;
+  if (_emptyTickCount === 1 || _emptyTickCount === _emptyTickLogStride) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[sentori] replay tick: native returned',
+      snapshot === null
+        ? 'null'
+        : typeof snapshot === 'string'
+          ? `empty (length=${snapshot.length})`
+          : typeof snapshot,
+      `(empty ticks so far: ${_emptyTickCount})`,
+    );
+    _emptyTickLogStride = Math.max(_emptyTickLogStride * 10, 10);
+  }
+}
+
+function diagnosticForTick(snapshot: NativeFrame, snapshotBytes: number): void {
+  _okTickCount += 1;
+  const nodeCount = snapshot.nodes.length;
+  const isThin = nodeCount < THIN_RESULT_NODES;
+  if (isThin) {
+    _thinTickCount += 1;
+    if (_thinTickCount === 1 || _thinTickCount === _thinTickLogStride) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[sentori] replay tick: thin result nodes=${nodeCount} sizeBytes=${snapshotBytes} (thin ticks so far: ${_thinTickCount})`,
+      );
+      _thinTickLogStride = Math.max(_thinTickLogStride * 10, 10);
+    }
+  } else {
+    _thinTickCount = 0;
+    _thinTickLogStride = 1;
+  }
+  if (_okTickCount === 1) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[sentori] replay tick: first ok — nodes=${nodeCount} sizeBytes=${snapshotBytes}`,
+    );
+  }
 }
 
 function readMaskIds(): string[] {
@@ -296,28 +363,36 @@ function loadNativeReplay(): ReplayNativeModule | null {
   }
 }
 
-/** rc.4 — surface "is replay subsystem alive" so the captureException
- *  debug log can label `wantReplay` alongside `wantScreenshot` /
- *  `wantSessionTrail`. Insight 2026-05-18 verify flagged that the
- *  pre-rc.4 log line was missing `wantReplay`, leaving the failure
- *  shape ambiguous (config-off vs. ring-empty vs. attach-failed). */
 export function isReplayRunning(): boolean {
   return _running;
 }
 
-/** Drain the ring as NDJSON (one snapshot per line). Empty string
- *  when the ring is empty. Also clears the ring so the next session's
- *  replay starts fresh. */
+/** Drain the ring as NDJSON (keyframe or delta per line). Empty
+ *  string when the ring is empty. Resets state so the next session's
+ *  replay starts with a fresh keyframe. */
 export function drainReplay(): string {
   if (_ring.length === 0) return '';
-  const out = _ring.join('\n');
+  const out = _ring.map((r) => r.line).join('\n');
   _ring = [];
-  _lastPushed = null;
+  _lastFrameState = null;
+  _lastKeyframeTs = 0;
   return out;
 }
 
 export function __resetReplayForTests(): void {
   stopReplay();
   _ring = [];
-  _lastPushed = null;
+  _lastFrameState = null;
+  _lastKeyframeTs = 0;
+}
+
+/** rc.9 — test seam. Lets unit tests drive the encoder without a
+ *  native module; pretends we received `frameJson` on the tick. */
+export function __feedTickForTests(frameJson: string): void {
+  if (!_running) {
+    // Simulate "running" without an actual setInterval — caller drives.
+    _running = true;
+  }
+  const snapshot = JSON.parse(frameJson) as NativeFrame;
+  encodeAndPush(snapshot);
 }
