@@ -22,8 +22,13 @@ import { describeWireframeNative } from './native';
 
 declare const __DEV__: boolean | undefined;
 
-/** Default capture interval (4 Hz). Override via `replay.hz`. */
-const TICK_INTERVAL_MS = 250;
+/** Default capture interval (2 Hz). Override via `replay.hz`. rc.10
+ *  rolled this back from rc.9's 4 Hz default: iOS sim measured 1 ms
+ *  per tick on a thin dev panel but extrapolation to a 200-node
+ *  Insight-class UI on Android pushes JS-thread occupancy past 1 %,
+ *  which violates the "几乎不能造成性能抖动" rule. Apps that want
+ *  smoother playback motion can opt into `replay.hz: 4` explicitly. */
+const TICK_INTERVAL_MS = 500;
 
 /** How often to emit a fresh keyframe — caps reconstruction chain
  *  length and lets the player re-sync after a dropped line. */
@@ -79,7 +84,9 @@ let _nativeMod: ReplayNativeModule | null = null;
 
 export type ReplayOptions = {
   mode?: 'off' | 'wireframe';
-  /** Ticks per second. Default 4. */
+  /** Ticks per second. Default 2. Opt into 4 (or 8) for
+   *  motion-heavy apps where playback smoothness matters more than
+   *  the marginal CPU saving. */
   hz?: number;
   /** Keyframe cadence in ms. Default 4000. */
   keyframeMs?: number;
@@ -111,7 +118,7 @@ export function startReplay(opts: ReplayOptions): void {
   _running = true;
   _nativeMod = loadNativeReplay();
   _keyframeIntervalMs = opts.keyframeMs ?? KEYFRAME_INTERVAL_MS;
-  const hz = opts.hz ?? 4;
+  const hz = opts.hz ?? 2;
   const period = Math.max(MIN_TICK_PERIOD_MS, Math.round(1000 / hz));
   _timer = setInterval(() => {
     captureTick();

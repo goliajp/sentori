@@ -27,7 +27,7 @@ sentori.init({
   release: 'sentori-example@1.0.0+1',
   environment: 'dev',
   ingestUrl: INGEST_URL,
-  capture: { replay: { mode: 'wireframe', hz: 2 } },
+  capture: { replay: { mode: 'wireframe' } },
 });
 
 startAnrWatchdog({ force: true, intervalMs: 500, timeoutMs: 2000 });
@@ -42,6 +42,7 @@ export default function App() {
       [{ id: Date.now() + Math.random(), text }, ...prev].slice(0, 10),
     );
   };
+
 
   const buttons: { onPress: () => void; title: string }[] = [
     {

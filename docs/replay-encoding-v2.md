@@ -10,13 +10,15 @@ v2 replaces "one full snapshot per tick" with "one full snapshot every ~4 second
 
 ## Tick rate
 
-| | rc.8 | rc.9 |
-|---|---|---|
-| Native tick interval | 1000 ms | **250 ms (4 Hz)** |
-| Source samples per 60 s window | 60 | 240 |
-| Playback target | step-frame | **24 fps cross-fade** |
+| | rc.8 | rc.9 | rc.10 |
+|---|---|---|---|
+| Native tick interval | 1000 ms | 250 ms (4 Hz) | **500 ms (2 Hz)** |
+| Source samples per 60 s window | 60 | 240 | 120 |
+| Playback target | step-frame | 24 fps cross-fade | 24 fps cross-fade |
 
-The `replay.hz` SDK option still works — pass `8` for higher-fidelity capture (motion-heavy apps) or `2` for ultra-light. Default 4.
+rc.10 rolled the default back to 2 Hz after iOS sim verify measured ~1 ms / tick on a thin dev panel — fine on iOS, but extrapolation to dense (200-node) Android UIs pushes JS-thread occupancy past 1 %, violating the project's "几乎不能造成性能抖动" rule. Apps that want smoother motion can opt into `replay.hz: 4` explicitly; the cross-fade renderer adapts automatically (more captures means tighter bracketing, less interpolation distance).
+
+The `replay.hz` SDK option still accepts 1 / 2 / 4 / 8. Floor is 100 ms (10 Hz) under MIN_TICK_PERIOD_MS — don't crank past that.
 
 ## Ring buffer
 
