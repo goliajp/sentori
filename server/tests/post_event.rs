@@ -115,6 +115,39 @@ async fn payload_too_large_returns_413() {
     assert_eq!(resp.status(), 413);
 }
 
+/// Regression: the attachment POST route raises the body cap to 16 MB
+/// for replay NDJSON. Before this was fixed (server tier of rc.10) the
+/// outer global RequestBodyLimitLayer cut every body off at 1 MB
+/// regardless of the per-route override — Insight 2026-05-18 verify
+/// caught 770 KB replays getting 413. Posting a 5 MB body to the
+/// attachment endpoint here should NOT return 413; the route is
+/// behind ingest-token auth so we expect 401 (token mismatch) when
+/// the body limit no longer pre-empts.
+#[tokio::test]
+async fn attachment_route_accepts_payloads_above_1mb() {
+    let addr = spawn().await;
+    let client = reqwest::Client::new();
+
+    // Send 5 MB of bytes with a multipart content-type so the request
+    // pipeline accepts it like a real upload. We don't need a valid
+    // boundary because the body-cap check fires before the multipart
+    // parser sees the body.
+    let big: Vec<u8> = vec![b'x'; 5 * 1024 * 1024];
+
+    let resp = client
+        .post(format!("http://{addr}/v1/events/test-event-id/attachments/replay"))
+        .header("Authorization", "Bearer wrong-token-just-to-fail-auth")
+        .header("Content-Type", "multipart/form-data; boundary=----test")
+        .body(big)
+        .send()
+        .await
+        .unwrap();
+
+    // The interesting assertion is "not 413". Auth failure (401) is
+    // the expected outcome since our bogus token doesn't match.
+    assert_ne!(resp.status(), 413, "5 MB body got 413; outer body cap is still squeezing the per-route override");
+}
+
 #[tokio::test]
 async fn invalid_json_returns_400() {
     let addr = spawn().await;

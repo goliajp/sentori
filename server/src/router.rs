@@ -14,9 +14,20 @@ use crate::api;
 use crate::auth::{AuthState, require_token};
 use crate::recent::{AppState, RecentBuffer};
 
-const MAX_BODY_BYTES: usize = 1024 * 1024; // 1 MB per protocol.md size limits
+/// Global outer cap applied to every route. Used to be 1 MB; rc.6
+/// added a per-route 16 MB override on the attachment POST, but the
+/// outer Tower layer runs **before** the inner one and cut the
+/// stream first — Insight 2026-05-18 saw 770 KB replay POSTs
+/// rejected at 413 with this exact symptom. Raising the global to
+/// 16 MB lets the per-route override + axum extractor
+/// DefaultBodyLimit (2 MB default for non-attachment routes)
+/// actually decide each endpoint's effective cap. Routes that
+/// process small JSON bodies still self-limit via the extractor;
+/// only the attachment route uses DefaultBodyLimit::disable() to
+/// reach the full 16 MB.
+const MAX_BODY_BYTES: usize = 16 * 1024 * 1024;
 // Phase 22 sub-A: dSYM uploads can run up to ~256 MB per arch slice;
-// release / sourcemap / dsym admin routes opt out of the 1 MB cap
+// release / sourcemap / dsym admin routes opt out of the outer cap
 // via DefaultBodyLimit::disable() and rely on per-handler validation.
 const MAX_ADMIN_UPLOAD_BYTES: usize = 256 * 1024 * 1024;
 
@@ -104,19 +115,25 @@ pub fn build(cfg: ServerConfig) -> Router {
         geoip,
     };
 
+    // Per-route body-stream cap for small-payload ingest endpoints.
+    // Without this each route would inherit the 16 MB outer cap and
+    // a wedged client could keep us reading 16 MB of garbage before
+    // the JSON parser rejects it. 1 MB is generous for a single
+    // event / span batch / session ping.
+    let small_body = RequestBodyLimitLayer::new(1024 * 1024);
     let ingestion = Router::new()
-        .route("/v1/events", post(api::events::handle))
-        .route("/v1/events:batch", post(api::events_batch::handle))
+        .route("/v1/events", post(api::events::handle).layer(small_body.clone()))
+        .route("/v1/events:batch", post(api::events_batch::handle).layer(small_body.clone()))
         .route("/v1/events/_recent", get(api::recent::handle))
-        .route("/v1/deploys", post(api::deploys::handle))
-        .route("/v1/sessions", post(api::sessions::handle))
-        .route("/v1/spans", post(api::spans::handle))
-        .route("/v1/spans:batch", post(api::spans::handle_batch))
+        .route("/v1/deploys", post(api::deploys::handle).layer(small_body.clone()))
+        .route("/v1/sessions", post(api::sessions::handle).layer(small_body.clone()))
+        .route("/v1/spans", post(api::spans::handle).layer(small_body.clone()))
+        .route("/v1/spans:batch", post(api::spans::handle_batch).layer(small_body.clone()))
         // v0.8.2 — end-user feedback submitted from inside the host app.
-        .route("/v1/user-reports", post(api::user_reports::ingest))
+        .route("/v1/user-reports", post(api::user_reports::ingest).layer(small_body.clone()))
         // v0.8.3 — custom metrics (counters / gauges / timings) from
         // the host app. Up to 500 points per batch.
-        .route("/v1/metrics:batch", post(api::metrics::ingest_batch))
+        .route("/v1/metrics:batch", post(api::metrics::ingest_batch).layer(small_body.clone()))
         // v1.1 +S7 升级 — SDK polls this every ~30s to discover its
         // live-mode flag. SDK enters immediate-send mode when set.
         .route("/v1/control/poll", get(api::live_debug::poll))
