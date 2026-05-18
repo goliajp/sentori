@@ -500,6 +500,26 @@ function StackTab({
           </Link>
         </div>
       )}
+      {/* Per-event detail block — error.type / full error.message /
+       *  cause chain / last 3 breadcrumbs. Moved here above the
+       *  stack and the attachments so when scrubbing events
+       *  (`[` / `]` hotkeys) the user immediately reads what this
+       *  event was about, then sees the screenshot of the screen
+       *  where it happened. The issue h1 above is sampled, not
+       *  per-event; this pane is the event's own story. */}
+      <ErrorBodyPane event={event} />
+
+      {/* Phase 48 sub-A.2 / 2026-05-19: screenshots / view-tree /
+       *  session-trail. Now sits ABOVE the stack so the visual
+       *  context (screen the user saw at error) is the first
+       *  thing the eye lands on after the error body — scrubbing
+       *  events shows the picture changing in place. */}
+      <AttachmentGallery
+        eventContext={<DebugCenterEventContext event={event} />}
+        eventId={event.id}
+        projectId={projectId}
+      />
+
       <Pane title="Stack trace">
         <StackList
           onFrameClick={(idx) => setOpenFrame(idx)}
@@ -507,19 +527,6 @@ function StackTab({
           stack={frames}
         />
       </Pane>
-
-      {/* Phase 48 sub-A.2 — screenshots / view-tree / session-trail.
-       *  Drops eventContext into the screenshot debug center so the
-       *  fullscreen viewer has device + release + user.id alongside
-       *  the JPEG. The visible context strip on this tab is the
-       *  EventGlanceStrip above — Tags tab carries the deep KV.
-       *  The Context pane that used to sit here re-stated every
-       *  field the glance strip already shows; removed. */}
-      <AttachmentGallery
-        eventContext={<DebugCenterEventContext event={event} />}
-        eventId={event.id}
-        projectId={projectId}
-      />
 
       {openFrame !== null && (
         <FrameSourceDrawer
@@ -1386,6 +1393,98 @@ function Pane({ children, title }: { children: React.ReactNode; title: string })
         <span className="sec-head-title">{title}</span>
       </header>
       <div>{children}</div>
+    </section>
+  )
+}
+
+/**
+ * Per-event "Error body + debug peek" pane that sits above the
+ * attachment gallery + stack trace on the Stack tab. Whereas the issue
+ * h1 shows a SAMPLED message (representative of the issue across all
+ * events), this pane shows the message + cause chain + last few
+ * breadcrumbs for **this specific event** the user is scrubbing —
+ * so `[` / `]` between events visibly changes content here.
+ */
+function ErrorBodyPane({ event }: { event: EventRow }) {
+  const err = event.payload.error
+  if (!err) return null
+  const causeChain: { message?: string; type: string }[] = []
+  let c = err.cause
+  while (c) {
+    causeChain.push({ message: c.message, type: c.type })
+    c = c.cause
+  }
+  const lastCrumbs = (event.payload.breadcrumbs ?? []).slice(-3).reverse()
+  return (
+    <section>
+      <header className="sec-head">
+        <span className="sec-head-title">Error</span>
+        <span className="sec-head-sub">event {event.id.slice(0, 8)}</span>
+      </header>
+      <div className="space-y-3">
+        <div className="grid grid-cols-[120px_1fr] items-baseline gap-x-4">
+          <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+            type
+          </span>
+          <span className="font-mono text-[13px] break-all text-[color:var(--danger)]">
+            {err.type}
+          </span>
+        </div>
+        {err.message && (
+          <div className="grid grid-cols-[120px_1fr] items-baseline gap-x-4">
+            <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+              message
+            </span>
+            <pre className="font-sans text-[13px] leading-snug break-words whitespace-pre-wrap text-[color:var(--ink)]">
+              {err.message}
+            </pre>
+          </div>
+        )}
+        {causeChain.length > 0 && (
+          <div className="grid grid-cols-[120px_1fr] items-baseline gap-x-4">
+            <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+              caused by
+            </span>
+            <ul className="space-y-1">
+              {causeChain.map((c, i) => (
+                <li className="font-mono text-[12px] break-words" key={i}>
+                  <span className="text-[color:var(--danger)]">{c.type}</span>
+                  {c.message && (
+                    <>
+                      <span className="text-[color:var(--ink-muted)]">: </span>
+                      <span className="text-[color:var(--ink-soft)]">{c.message}</span>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {lastCrumbs.length > 0 && (
+          <div className="grid grid-cols-[120px_1fr] items-baseline gap-x-4">
+            <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+              breadcrumbs
+            </span>
+            <ul className="space-y-1.5">
+              {lastCrumbs.map((b, i) => (
+                <li className="text-[12px] leading-snug" key={i}>
+                  <span className="font-mono text-[10px] tracking-[0.1em] text-[color:var(--ink-muted)] tabular-nums">
+                    {timeOfDay(b.timestamp)}
+                  </span>
+                  <span
+                    className={`ml-2 font-mono text-[9px] tracking-[0.18em] uppercase ${CRUMB_COLOR[b.type]}`}
+                  >
+                    {b.type}
+                  </span>
+                  <div className="mt-0.5 font-mono text-[11px] break-words text-[color:var(--ink)]">
+                    {stringifyData(b.data)}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </section>
   )
 }
