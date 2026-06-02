@@ -12,6 +12,11 @@ import {
 } from './launch-crash-guard';
 import { getInstallId } from './install-id';
 import { startMetricsTimer } from './metrics';
+import {
+  emitColdStart,
+  markColdStartT0,
+  startRuntimeMetricsTimer,
+} from './runtime-metrics';
 import { startTrackTimer } from './track';
 import { drainNativePending, markNativeJsBridgeReady, setNativeConfig } from './native';
 import { getColdStartMs } from './mobile-vitals';
@@ -81,6 +86,16 @@ export type InitOptions = {
      *  breadcrumb shape on upgrade; recommended `true` for new
      *  integrations. See `docs/recipes/track-and-metrics.md`. */
     trackAutoBreadcrumb?: boolean;
+    /** v2.1 W2 — auto-instrument runtime metrics (FPS, JS heap,
+     *  cold-start, route nav timing, network bytes). Drains the
+     *  shared `@goliapkg/sentori-core` ring to
+     *  `/v1/runtime-metrics:batch` every 30 s. Defaults to `true`
+     *  in W2 part 2 — cold-start only, ~6 emits per session
+     *  per device, ~zero main-thread cost. Higher-cost instruments
+     *  (FPS / route-nav) land in W2 part 3 with per-tick perf
+     *  budget tests as stop-ship gates per
+     *  `.claude/CLAUDE.md` performance bedrock. */
+    runtimeMetrics?: boolean;
     /** v0.9.1 +S4 — pre-crash sentinel. Subscribes to JS-thread
      *  frame timing; when ≥ 50% of a 60-frame window misses the
      *  budget (default 32 ms / < 30 fps), emits a `kind: nearCrash`
@@ -249,6 +264,20 @@ export const init = (options: InitOptions): void => {
   startMetricsTimer();
   // v1.1 chunk B — drain `sentori.track()` ring every 30 s.
   startTrackTimer();
+  // v2.1 W2 — runtime metrics auto-instrument. Defaults on; host
+  // can opt out with `capture: { runtimeMetrics: false }`. The
+  // ring + emit live in `@goliapkg/sentori-core`; we own the
+  // 30 s flusher + the cold-start one-shot here. FPS / heap /
+  // route-nav / network instruments ship in W2 part 3 (each
+  // gated on its own per-tick perf budget CI test).
+  if (options.capture?.runtimeMetrics !== false) {
+    markColdStartT0();
+    startRuntimeMetricsTimer();
+    // Defer the emit one tick so React's first paint settles
+    // before we stamp "cold-start ended". 0-delay setTimeout puts
+    // the call after the current microtask queue drains.
+    setTimeout(emitColdStart, 0);
+  }
   // v1.1 chunk S1 — warm the install-id cache. Fire-and-forget;
   // any event captured before the first resolve simply omits
   // `device.installId`. Subsequent captures pick it up via the
