@@ -101,6 +101,17 @@ export const qk = {
   metrics: {
     names: (projectId: Id) => tuple('metric-names', projectId),
     points: (projectId: Id, name: Id) => tuple('metric-points', projectId, name),
+    /** v2.1 W3 — runtime metrics BI query. Folds every dim into
+     *  the cache key so different slices don't collide. */
+    runtime: (
+      projectId: Id,
+      name: string,
+      dim: string,
+      measure: string,
+      bucket: string,
+      from: string,
+      to: string
+    ) => tuple('runtime-metrics-query', projectId, name, dim, measure, bucket, from, to),
   },
   moments: {
     list: (projectId: Id) => tuple('moments', projectId),

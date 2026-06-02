@@ -344,6 +344,13 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/metric-names",
             get(api::metrics::list_metric_names),
         )
+        // v2.1 W3 — runtime metrics BI query. Picks the rollup
+        // tier (raw / _1m / _1h / _1d) based on (bucket, from, to)
+        // and returns one series per dim tuple.
+        .route(
+            "/projects/{project_id}/runtime-metrics/query",
+            get(api::runtime_metrics_query::query),
+        )
         // v0.9.0 #6 — moments aggregation + samples.
         .route(
             "/projects/{project_id}/moments",

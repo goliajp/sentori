@@ -65,6 +65,9 @@ const LiveDebugView = lazyView(() =>
 const MetricsView = lazyView(() =>
   import('./metrics/view').then((m) => ({ default: m.MetricsView }))
 )
+const RuntimeMetricsView = lazyView(() =>
+  import('./metrics/runtime-view').then((m) => ({ default: m.RuntimeMetricsView }))
+)
 const MomentsView = lazyView(() =>
   import('./moments/view').then((m) => ({ default: m.MomentsView }))
 )
@@ -180,6 +183,18 @@ export const MODULES: ModuleDef[] = [
     label: 'Metrics',
     path: 'metrics',
     view: MetricsView,
+  },
+  // v2.1 W3 — runtime metrics dashboard (auto-instrument FPS /
+  // heap / cold-start / route-nav / network bytes). Visible in
+  // sidebar; the v0.8.3 `metrics` module (recordMetric custom
+  // channel) stays hidden as the secondary surface.
+  {
+    group: 'monitor',
+    iconPath: 'M3 17l6-6 4 4 8-8M14 7h7v7',
+    id: 'runtime',
+    label: 'Runtime',
+    path: 'runtime',
+    view: RuntimeMetricsView,
   },
   {
     group: 'monitor',

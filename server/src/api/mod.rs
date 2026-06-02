@@ -28,6 +28,10 @@ pub mod oauth;
 /// rate-limit budget all differ. Writes to `runtime_metrics_raw`
 /// (partitioned-by-day) and is rolled up by `metrics_rollup`.
 pub mod runtime_metrics;
+/// v2.1 W3 — dashboard BI query endpoint for runtime metrics.
+/// Reads from the rollup tier (raw / _1m / _1h / _1d) appropriate
+/// for the requested (bucket, from, to) window.
+pub mod runtime_metrics_query;
 pub mod orgs;
 pub mod privacy;
 pub mod projects;

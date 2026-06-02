@@ -775,6 +775,32 @@ export const adminApi = {
   listCertObservations: (projectId: string) =>
     adminFetch<CertObservation[]>(`/projects/${projectId}/cert-monitor/observations`),
 
+  /** v2.1 W3 — runtime metrics BI query. Server picks the rollup
+   *  tier (raw / _1m / _1h / _1d) based on the (bucket, from, to)
+   *  window and returns one series per dim tuple. */
+  queryRuntimeMetrics: (
+    projectId: string,
+    params: {
+      bucket?: '1d' | '1h' | '1m' | '5m' | '15m'
+      dim?: 'device_class' | 'environment' | 'none' | 'release'
+      from?: string
+      measure?: 'avg' | 'count' | 'p50' | 'p95' | 'p99' | 'sum'
+      name: string
+      to?: string
+    }
+  ) => {
+    const usp = new URLSearchParams()
+    usp.set('name', params.name)
+    if (params.dim && params.dim !== 'none') usp.set('dim', params.dim)
+    if (params.measure) usp.set('measure', params.measure)
+    if (params.bucket) usp.set('bucket', params.bucket)
+    if (params.from) usp.set('from', params.from)
+    if (params.to) usp.set('to', params.to)
+    return adminFetch<RuntimeMetricsQueryResponse>(
+      `/projects/${projectId}/runtime-metrics/query?${usp.toString()}`
+    )
+  },
+
   /** v0.8.3 — recent points for a metric (defaults to last 24h).
    *  v2.0 W3 — `spanId` filter ties a metric query to its emitting
    *  span; drives the dashboard span detail "related metrics" row. */
@@ -1458,6 +1484,26 @@ export type MetricPoint = {
   id: string
   name: string
   tags: Record<string, unknown>
+  ts: string
+  value: number
+}
+
+// v2.1 W3 — runtime metrics BI query response.
+export type RuntimeMetricsQueryResponse = {
+  /** Which rollup tier the server picked. Surfaced as a
+   *  "resolution" badge in the UI. */
+  tier: '1d' | '1h' | '1m' | 'raw'
+  series: RuntimeMetricsSeries[]
+}
+
+export type RuntimeMetricsSeries = {
+  /** Tag combo identifying the series (e.g. release=v1.0.0).
+   *  Empty when `dim=none`. */
+  label: string
+  points: RuntimeMetricsPoint[]
+}
+
+export type RuntimeMetricsPoint = {
   ts: string
   value: number
 }
