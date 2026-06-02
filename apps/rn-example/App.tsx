@@ -9,12 +9,17 @@ import {
 } from 'react-native';
 
 import {
+  addBreadcrumb,
   drainReplay,
   probeNativeScreenshot,
   probeNativeWireframe,
+  recordMetric,
   sentori,
   startAnrWatchdog,
+  startTrace,
+  track,
   triggerNativeCrash,
+  withScopedSpan,
 } from '@goliapkg/sentori-react-native';
 
 const INGEST_URL =
@@ -102,6 +107,62 @@ export default function App() {
         sentori.captureException(new Error('after a failed fetch'));
       },
       title: 'fetch failure → capture',
+    },
+    // v2.0 W4 — one button per manual-instrumentation recipe.
+    // Tap, watch the log line update, then check the dashboard
+    // (issues / traces / metrics modules) for the corresponding
+    // entry.
+    {
+      onPress: () => {
+        addBreadcrumb({
+          type: 'user',
+          data: { message: 'demo: clicked addBreadcrumb', route: 'manual-recipe' },
+        });
+        append('breadcrumb added (rides on next capture)');
+      },
+      title: 'Manual sentori.addBreadcrumb()',
+    },
+    {
+      onPress: () => {
+        track('demo.checkout.click', { sku: 'SKU-42', tier: 'pro' });
+        append('track demo.checkout.click emitted');
+      },
+      title: 'Manual sentori.track() — analytics event',
+    },
+    {
+      onPress: async () => {
+        append('startTrace + withScopedSpan + recordMetric…');
+        const trace = startTrace('checkout.demo');
+        await withScopedSpan(
+          'db.query.users',
+          async (span) => {
+            await new Promise((r) => setTimeout(r, 25));
+            // v2.0 W3 — recordMetric ties this point to its emitting
+            // span via tags.span_id; dashboard renders related
+            // metrics row.
+            recordMetric('db.users.row_count', 42, undefined, { parent: span });
+          },
+          { parent: trace },
+        );
+        trace.end({ status: 'ok' });
+        append('trace + span + metric emitted (look on dashboard)');
+      },
+      title: 'Manual trace + span + recordMetric',
+    },
+    {
+      onPress: () => {
+        // v2.0 W3 captureException combined with a track auto-breadcrumb
+        // demonstrates the customer-journey chain (requires
+        // init.capture.trackAutoBreadcrumb: true to bring track events
+        // into the breadcrumb trail visible on the next capture).
+        track('demo.journey.step1', { surface: 'onboard' });
+        track('demo.journey.step2', { surface: 'paywall' });
+        sentori.captureException(new Error('after-track demo'), {
+          tags: { source: 'manual-journey' },
+        });
+        append('track ×2 then captureException (journey breadcrumbs on issue)');
+      },
+      title: 'track ×2 → captureException (journey demo)',
     },
     {
       onPress: () => {
