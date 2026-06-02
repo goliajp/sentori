@@ -17,6 +17,8 @@ import {
   markColdStartT0,
   startRuntimeMetricsTimer,
 } from './runtime-metrics';
+import { startFpsInstrument } from './runtime-metrics-fps';
+import { startHeapInstrument } from './runtime-metrics-heap';
 import { startTrackTimer } from './track';
 import { drainNativePending, markNativeJsBridgeReady, setNativeConfig } from './native';
 import { getColdStartMs } from './mobile-vitals';
@@ -277,6 +279,16 @@ export const init = (options: InitOptions): void => {
     // before we stamp "cold-start ended". 0-delay setTimeout puts
     // the call after the current microtask queue drains.
     setTimeout(emitColdStart, 0);
+    // FPS via rAF (per-tick budget < 0.5 ms — see
+    // runtime-metrics-fps.ts header). Heap is a 30 s polling
+    // tick; no-op when performance.memory isn't exposed (most
+    // RN engines today; we ship the wiring anyway so the same
+    // SDK works on web targets via @goliapkg/sentori-javascript).
+    startFpsInstrument();
+    startHeapInstrument();
+    // Route-nav dwell timing emits inline from `navigation.ts`'s
+    // useTraceNavigation state listener — no extra start call
+    // needed; the host already mounts that hook for tracing.
   }
   // v1.1 chunk S1 — warm the install-id cache. Fire-and-forget;
   // any event captured before the first resolve simply omits
