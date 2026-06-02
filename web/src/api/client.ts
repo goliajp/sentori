@@ -775,12 +775,18 @@ export const adminApi = {
   listCertObservations: (projectId: string) =>
     adminFetch<CertObservation[]>(`/projects/${projectId}/cert-monitor/observations`),
 
-  /** v0.8.3 — recent points for a metric (defaults to last 24h). */
-  listMetrics: (projectId: string, params: { limit?: number; name?: string; since?: string }) => {
+  /** v0.8.3 — recent points for a metric (defaults to last 24h).
+   *  v2.0 W3 — `spanId` filter ties a metric query to its emitting
+   *  span; drives the dashboard span detail "related metrics" row. */
+  listMetrics: (
+    projectId: string,
+    params: { limit?: number; name?: string; since?: string; spanId?: string }
+  ) => {
     const usp = new URLSearchParams()
     if (params.name) usp.set('name', params.name)
     if (params.since) usp.set('since', params.since)
     if (params.limit !== undefined) usp.set('limit', String(params.limit))
+    if (params.spanId) usp.set('spanId', params.spanId)
     const qs = usp.toString()
     return adminFetch<MetricPoint[]>(`/projects/${projectId}/metrics${qs ? '?' + qs : ''}`)
   },

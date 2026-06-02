@@ -119,6 +119,12 @@ pub struct ListParams {
     #[serde(default, with = "time::serde::rfc3339::option")]
     pub since: Option<OffsetDateTime>,
     pub limit: Option<i64>,
+    /// v2.0 W3 — when set, return only metric points whose
+    /// `tags.span_id` equals this. Drives the dashboard span detail
+    /// "related metrics" row — see `docs/roadmap/v2.0.md` W3
+    /// acceptance + `recordMetric(name, value, tags?, { parent })`
+    /// in the SDK.
+    pub span_id: Option<String>,
 }
 
 pub async fn list_for_project(
@@ -134,8 +140,22 @@ pub async fn list_for_project(
         OffsetDateTime::now_utc() - time::Duration::hours(24)
     });
 
-    let rows: Vec<(Uuid, String, f64, serde_json::Value, OffsetDateTime)> = match &params.name {
-        Some(name) => sqlx::query_as(
+    let rows: Vec<(Uuid, String, f64, serde_json::Value, OffsetDateTime)> = match (&params.name, &params.span_id) {
+        (Some(name), Some(span_id)) => sqlx::query_as(
+            "SELECT id, name, value, tags, ts FROM metrics \
+             WHERE project_id = $1 AND name = $2 AND ts >= $3 \
+             AND tags->>'span_id' = $4 \
+             ORDER BY ts DESC LIMIT $5",
+        )
+        .bind(project_id)
+        .bind(name)
+        .bind(since)
+        .bind(span_id)
+        .bind(limit)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?,
+        (Some(name), None) => sqlx::query_as(
             "SELECT id, name, value, tags, ts FROM metrics \
              WHERE project_id = $1 AND name = $2 AND ts >= $3 \
              ORDER BY ts DESC LIMIT $4",
@@ -147,7 +167,20 @@ pub async fn list_for_project(
         .fetch_all(pool)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?,
-        None => sqlx::query_as(
+        (None, Some(span_id)) => sqlx::query_as(
+            "SELECT id, name, value, tags, ts FROM metrics \
+             WHERE project_id = $1 AND ts >= $2 \
+             AND tags->>'span_id' = $3 \
+             ORDER BY ts DESC LIMIT $4",
+        )
+        .bind(project_id)
+        .bind(since)
+        .bind(span_id)
+        .bind(limit)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?,
+        (None, None) => sqlx::query_as(
             "SELECT id, name, value, tags, ts FROM metrics \
              WHERE project_id = $1 AND ts >= $2 \
              ORDER BY ts DESC LIMIT $3",
