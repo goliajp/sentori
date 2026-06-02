@@ -158,6 +158,14 @@ pub fn build(cfg: ServerConfig) -> Router {
         // v0.8.3 — custom metrics (counters / gauges / timings) from
         // the host app. Up to 500 points per batch.
         .route("/v1/metrics:batch", post(api::metrics::ingest_batch).layer(small_body.clone()))
+        // v2.1 W1 — auto-instrument runtime metrics. Sibling of
+        // /v1/metrics:batch; writes to runtime_metrics_raw
+        // (partitioned by day, rolled up by metrics_rollup) and
+        // applies a stricter name regex + tag cardinality cap.
+        .route(
+            "/v1/runtime-metrics:batch",
+            post(api::runtime_metrics::ingest_batch).layer(small_body.clone()),
+        )
         // v1.1 chunk B — analytics `track` events (page views, custom
         // funnels). Separate table + endpoint from /v1/events so the
         // high-volume analytics path doesn't share the error retention

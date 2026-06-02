@@ -186,6 +186,20 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("webhook dispatch cron spawned (30s interval)");
     }
 
+    // v2.1 W1 — runtime metrics auxiliary crons:
+    //   • metrics_partition: hourly, owns runtime_metrics_raw
+    //     day-partition lifecycle (3-day forward window + 90d
+    //     retention DROP). Runs once on boot so today's
+    //     partition is guaranteed before any ingest.
+    //   • metrics_rollup: 60s tick raw→1m + hourly 1m→1h +
+    //     daily 1h→1d. See docs/design/v2-metrics.md.
+    if let Some(p) = pool.as_ref() {
+        sentori_server::metrics_partition::spawn_cron(p.clone());
+        tracing::info!("metrics partition cron spawned (1h interval, 3d window, 90d retention)");
+        sentori_server::metrics_rollup::spawn_cron(p.clone());
+        tracing::info!("metrics rollup cron spawned (60s tick raw→1m, hourly 1m→1h, daily 1h→1d)");
+    }
+
     let addr: SocketAddr = "0.0.0.0:8080".parse()?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
 

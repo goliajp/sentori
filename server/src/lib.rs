@@ -18,6 +18,15 @@ pub mod issues;
 pub mod live_presence;
 pub mod mailer;
 pub mod metrics;
+/// v2.1 W1 — hourly partition lifecycle for `runtime_metrics_raw`.
+/// Pure Postgres (no pg_partman / Timescale), CREATE TABLE IF
+/// NOT EXISTS … PARTITION OF … per day; daily DROP for 90-day
+/// retention. See docs/design/v2-metrics.md.
+pub mod metrics_partition;
+/// v2.1 W1 — runtime metrics rollup cron. 60 s tick raw → _1m
+/// (with 10 s late-arrival safety margin), hourly _1m → _1h,
+/// daily _1h → _1d. Schema in migrations 0068 / 0069.
+pub mod metrics_rollup;
 pub mod notification_digest;
 pub mod notification_email;
 pub mod notifications;

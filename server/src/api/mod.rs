@@ -22,6 +22,12 @@ pub mod mappings;
 pub mod metrics;
 pub mod moments;
 pub mod oauth;
+/// v2.1 W1 — auto-instrument runtime metrics ingest. Separate
+/// from `metrics` (which carries the v0.8.3 recordMetric custom
+/// channel) because the validation rules, storage shape, and
+/// rate-limit budget all differ. Writes to `runtime_metrics_raw`
+/// (partitioned-by-day) and is rolled up by `metrics_rollup`.
+pub mod runtime_metrics;
 pub mod orgs;
 pub mod privacy;
 pub mod projects;
