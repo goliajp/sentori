@@ -14,4 +14,11 @@ export { safeAsync, safeFn } from './safe.js';
 export { __resetCircuitForTests, isCircuitOpen, reportInternal, setInternalReporter, } from './self-report.js';
 export { getLogLevel, type LogLevel, logger, type LogTransport, setLogLevel, setLogTransport, } from './logger.js';
 export { hashIdentities, type LinkBy } from './identity.js';
+/** v2.1 W2 — runtime metrics ring + emit API. Storage primitive
+ *  only — transport (POST /v1/runtime-metrics:batch) lives in
+ *  the per-platform SDK. Auto-instrument modules (FPS / heap /
+ *  cold-start / route-nav / network) push via `emitMetric`; the
+ *  per-SDK flusher drains via `drainRuntimeMetricsForFlush()`
+ *  on its 30 s tick, coalesced with the existing event flush. */
+export { RuntimeMetricBuffer, __peekRuntimeMetricsSize, __resetRuntimeMetricsForTests, drainRuntimeMetricsForFlush, emitMetric, rebufferRuntimeMetrics, type RuntimeMetricPoint, } from './runtime-metrics.js';
 //# sourceMappingURL=index.d.ts.map
