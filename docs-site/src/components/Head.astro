@@ -1,0 +1,21 @@
+---
+// Phase 17 sub-F: dogfood. Wraps Starlight's default <Head> and
+// appends a <script> block that wires the JS SDK on the client.
+// Token is injected via PUBLIC_SENTORI_TOKEN at build time and
+// no-ops if absent.
+import Default from '@astrojs/starlight/components/Head.astro'
+---
+
+<Default />
+<script>
+  import { initSentori } from '@goliapkg/sentori-javascript'
+  const token = import.meta.env.PUBLIC_SENTORI_TOKEN
+  if (token) {
+    initSentori({
+      token,
+      ingestUrl: 'https://ingest.sentori.golia.jp',
+      release: `docs@${import.meta.env.PUBLIC_GIT_SHA ?? '0.0.0'}`,
+      environment: 'prod',
+    })
+  }
+</script>

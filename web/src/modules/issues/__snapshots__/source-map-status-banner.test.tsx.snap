@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SourceMapStatusBanner > renders per-release nudge when project is healthy but this release isn't (W27) 1`] = `"No sourcemap uploaded for release myapp@1.2.3. Frames will resolve symbols but source views below will be empty. Run sentori-cli upload sourcemap --release myapp@1.2.3 — recipe."`;
+
+exports[`SourceMapStatusBanner > renders project-wide nudge when no sourcemap uploaded anywhere 1`] = `"No sourcemaps uploaded for this project's releases. Frames will resolve symbols but source views below will be empty. Run sentori-cli upload sourcemap — recipe."`;

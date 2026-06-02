@@ -1,0 +1,135 @@
+---
+import '../styles/global.css'
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta
+      name="description"
+      content="Sentori pricing. Self-hosted is free forever. SaaS free tier 100k events/month, sign up at sentori.golia.jp."
+    />
+    <link rel="canonical" href="https://sentori.golia.jp/pricing/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Sentori" />
+    <meta property="og:title" content="Pricing — Sentori" />
+    <meta property="og:description" content="Self-hosted is free forever. SaaS free tier 100k events/month, open registration." />
+    <meta property="og:url" content="https://sentori.golia.jp/pricing/" />
+    <meta property="og:image" content="https://sentori.golia.jp/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Pricing — Sentori" />
+    <meta name="twitter:description" content="Self-hosted is free forever. SaaS free tier 100k events/month." />
+    <meta name="twitter:image" content="https://sentori.golia.jp/og.png" />
+    <title>Pricing — Sentori</title>
+  </head>
+  <body class="bg-bg text-fg min-h-screen">
+    <header class="border-border border-b">
+      <nav class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4 text-sm">
+        <a href="/" class="text-fg font-semibold">Sentori</a>
+        <div class="text-fg-muted flex gap-6">
+          <a href="/docs" class="hover:text-fg transition-colors">Docs</a>
+          <a href="/pricing" class="text-fg">Pricing</a>
+          <a href="https://github.com/goliajp/sentori" class="hover:text-fg transition-colors">GitHub</a>
+          <a href="/login" class="hover:text-fg transition-colors">Sign in</a>
+          <a
+            href="/register"
+            class="bg-accent text-bg rounded-md px-3 py-1.5 font-medium transition-opacity hover:opacity-90"
+          >Get started</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="mx-auto max-w-5xl px-6 pt-16 pb-24">
+      <h1 class="text-fg text-4xl font-semibold tracking-tight">Pricing</h1>
+      <p class="text-fg-muted mt-4 max-w-2xl leading-relaxed">
+        Two ways to use Sentori. Pick the one that matches your team's
+        comfort with running infra.
+      </p>
+
+      <div class="mt-16 grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div class="border-border bg-bg-tertiary/30 rounded-lg border p-8">
+          <div class="text-fg-muted text-xs tracking-wider uppercase">
+            Self-hosted
+          </div>
+          <div class="text-fg mt-2 text-3xl font-semibold">Free forever</div>
+          <p class="text-fg-muted mt-4 text-sm leading-relaxed">
+            One <code class="text-fg font-mono">docker compose up</code> on
+            any single VM. Bring your own Postgres password. No event
+            limit, no retention cap, no recipient cap. Source MIT-style.
+          </p>
+          <ul class="text-fg-muted mt-6 space-y-2 text-sm">
+            <li>• Unlimited events</li>
+            <li>• Unlimited team members (Phase 13+)</li>
+            <li>• Source maps + symbolication</li>
+            <li>• Email alerts</li>
+            <li>• Run on a $5/mo VM</li>
+          </ul>
+          <a
+            href="/docs/self-hosting"
+            class="border-border text-fg hover:bg-bg-tertiary mt-8 inline-block rounded-md border px-4 py-2 text-sm transition-colors"
+          >
+            Self-hosting guide →
+          </a>
+        </div>
+
+        <div class="border-accent/40 bg-accent/5 rounded-lg border p-8">
+          <div class="text-fg-muted text-xs tracking-wider uppercase">
+            SaaS — Free
+          </div>
+          <div class="text-fg mt-2 text-3xl font-semibold">$0</div>
+          <p class="text-fg-muted mt-4 text-sm leading-relaxed">
+            Hosted at <span class="text-fg font-mono">sentori.golia.jp</span>.
+            100k events / month, 30-day retention, multi-org. No card
+            required. Pro / enterprise pricing lands after we've stayed
+            up reliably for a while.
+          </p>
+          <ul class="text-fg-muted mt-6 space-y-2 text-sm">
+            <li>• 100k events / month</li>
+            <li>• 30-day retention</li>
+            <li>• Multi-org, role-based</li>
+            <li>• Same dashboard, zero ops</li>
+            <li>• Email alerts on new issues + quota</li>
+          </ul>
+          <a
+            href="/register"
+            class="bg-accent text-bg mt-8 inline-block rounded-md px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90"
+          >
+            Sign up — free →
+          </a>
+        </div>
+      </div>
+
+      <p class="text-fg-muted mt-16 max-w-2xl text-xs leading-relaxed">
+        Self-hosted will always be free. The hosted plan exists so we can
+        offer a zero-ops option; revenue from Pro funds development that
+        also benefits the open-source build.
+      </p>
+    </main>
+
+    <footer class="border-border border-t">
+      <div class="text-fg-muted mx-auto flex max-w-5xl items-center justify-between px-6 py-8 text-xs">
+        <div class="flex gap-4">
+          <a class="hover:text-fg" href="/legal/privacy">Privacy</a>
+          <a class="hover:text-fg" href="/legal/terms">Terms</a>
+        </div>
+        <span>Built in Tokyo.</span>
+      </div>
+    </footer>
+    <script>
+      import { initSentori } from '@goliapkg/sentori-javascript'
+      const token = import.meta.env.PUBLIC_SENTORI_TOKEN
+      if (token) {
+        initSentori({
+          token,
+          ingestUrl: 'https://ingest.sentori.golia.jp',
+          release: `marketing@${import.meta.env.PUBLIC_GIT_SHA ?? '0.0.0'}`,
+          environment: 'prod',
+        })
+      }
+    </script>
+  </body>
+</html>

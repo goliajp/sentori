@@ -1,0 +1,2037 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sentori v0.9 — RN 深度设计</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html{background:#0a0a0c}
+body{
+  margin:0;
+  background:#0a0a0c;
+  color:#e6e6e8;
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","SF Pro Text","Segoe UI",system-ui,sans-serif;
+  font-size:13px;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  letter-spacing:-0.002em;
+}
+.mono,code,kbd,pre,.matrix,.feat-api,.opt-label{
+  font-family:"JetBrains Mono","Geist Mono","SF Mono",Menlo,Consolas,ui-monospace,monospace;
+  font-feature-settings:"calt","ss01";
+  letter-spacing:-0.01em;
+}
+a{color:inherit;text-decoration:none}
+h1,h2,h3,h4{margin:0;font-weight:500;letter-spacing:-0.005em}
+p{margin:0}
+
+:root{
+  --bg:#0a0a0c;
+  --bg-1:#0e0e11;
+  --bg-2:#131318;
+  --bg-3:#1a1a20;
+  --border:rgba(255,255,255,0.06);
+  --border-2:rgba(255,255,255,0.10);
+  --border-3:rgba(255,255,255,0.14);
+  --fg:#e6e6e8;
+  --fg-2:#a1a1aa;
+  --fg-3:#6b6b73;
+  --fg-mute:#44444d;
+
+  --amber:#f5a623;
+  --amber-2:#d4a356;
+  --amber-bg:rgba(245,166,35,0.12);
+  --amber-line:rgba(245,166,35,0.32);
+
+  --blue:#6da3d9;
+  --blue-bg:rgba(91,142,201,0.12);
+  --blue-line:rgba(91,142,201,0.30);
+
+  --gray:#7e7e88;
+  --gray-bg:rgba(126,126,136,0.16);
+  --gray-line:rgba(126,126,136,0.32);
+
+  --green:#4ade80;
+  --green-bg:rgba(74,222,128,0.10);
+  --green-line:rgba(74,222,128,0.30);
+
+  --red:#f87171;
+  --red-bg:rgba(248,113,113,0.10);
+  --red-line:rgba(248,113,113,0.30);
+
+  --cyan:#7dd3fc;
+  --cyan-2:#38bdf8;
+  --cyan-bg:rgba(125,211,252,0.08);
+  --cyan-line:rgba(125,211,252,0.30);
+
+  --violet:#c4b5fd;
+  --violet-bg:rgba(196,181,253,0.10);
+  --violet-line:rgba(196,181,253,0.32);
+
+  --sentori-col:rgba(245,166,35,0.045);
+  --sentori-col-strong:rgba(245,166,35,0.10);
+}
+
+/* ============== Layout ============== */
+.shell{
+  display:grid;
+  grid-template-columns:230px 1fr;
+  max-width:1340px;
+  margin:0 auto;
+  min-height:100vh;
+}
+.toc{
+  position:sticky;
+  top:0;
+  align-self:start;
+  height:100vh;
+  padding:32px 24px;
+  border-right:1px solid var(--border);
+  font-size:12px;
+  background:var(--bg);
+  z-index:5;
+}
+main{
+  padding:32px 48px 80px 36px;
+  max-width:1100px;
+  min-width:0;
+}
+
+/* ============== TOC ============== */
+.toc-brand{
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:11px;
+  letter-spacing:0.10em;
+  text-transform:uppercase;
+  color:var(--amber);
+  margin-bottom:22px;
+}
+.toc-brand .v{color:var(--fg-3)}
+.toc ol{list-style:none;padding:0;margin:0}
+.toc li{padding:0}
+.toc a{
+  display:flex;
+  align-items:baseline;
+  gap:10px;
+  padding:5px 10px;
+  margin:2px 0;
+  border-radius:3px;
+  color:var(--fg-2);
+  transition:background 120ms,color 120ms;
+}
+.toc a:hover{color:var(--fg);background:var(--bg-2)}
+.toc a.active{
+  color:var(--fg);
+  background:var(--bg-3);
+  box-shadow:inset 2px 0 0 var(--amber);
+}
+.toc a.active .toc-num{color:var(--amber)}
+.toc a.active[data-id="origin"]{box-shadow:inset 2px 0 0 var(--cyan)}
+.toc a.active[data-id="origin"] .toc-num{color:var(--cyan)}
+.toc-num{
+  color:var(--fg-mute);
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:10.5px;
+  min-width:18px;
+}
+.toc-meta{
+  margin-top:30px;
+  padding-top:18px;
+  border-top:1px solid var(--border);
+  color:var(--fg-mute);
+  font-size:10.5px;
+  line-height:1.7;
+}
+.toc-meta div{display:flex;justify-content:space-between;gap:8px}
+.toc-meta strong{color:var(--fg-3);font-weight:500;font-size:10px;letter-spacing:0.05em;text-transform:uppercase}
+
+/* ============== Header ============== */
+.pageheader{
+  padding-bottom:28px;
+  margin-bottom:36px;
+  border-bottom:1px solid var(--border);
+}
+.crumb{
+  display:flex;
+  gap:6px;
+  color:var(--fg-mute);
+  font-size:10.5px;
+  letter-spacing:0.10em;
+  text-transform:uppercase;
+  margin-bottom:12px;
+}
+.crumb b{color:var(--fg-2);font-weight:500}
+.crumb .sep{color:var(--fg-mute)}
+h1{
+  font-size:30px;
+  line-height:1.18;
+  letter-spacing:-0.015em;
+  font-weight:500;
+}
+h1 .accent{color:var(--amber)}
+h1 .accent-cyan{color:var(--cyan)}
+.lede{
+  color:var(--fg-2);
+  max-width:64ch;
+  margin-top:14px;
+  font-size:13.5px;
+  line-height:1.7;
+}
+.anchorchips{
+  margin-top:20px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+}
+.chip{
+  font-size:10.5px;
+  padding:3px 8px;
+  border:1px solid var(--border-2);
+  color:var(--fg-3);
+  border-radius:3px;
+  background:var(--bg-1);
+}
+.chip b{color:var(--fg-2);font-weight:500}
+
+/* ============== Section ============== */
+.section{margin-bottom:64px;scroll-margin-top:24px}
+.section-h{
+  display:flex;
+  align-items:baseline;
+  gap:14px;
+  margin-bottom:22px;
+}
+.section-h .num{
+  color:var(--fg-mute);
+  font-size:12px;
+  letter-spacing:0.04em;
+}
+.section-h h2{
+  font-size:19px;
+  letter-spacing:-0.01em;
+  font-weight:500;
+}
+.section-h .line{
+  flex:1;
+  border-top:1px solid var(--border);
+}
+.section-h .sub{
+  color:var(--fg-3);
+  font-size:11px;
+  letter-spacing:0.02em;
+}
+.section-h .ck-pill{
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:10px;
+  color:var(--cyan);
+  border:1px solid var(--cyan-line);
+  background:var(--cyan-bg);
+  padding:2px 7px;
+  border-radius:2px;
+  letter-spacing:0.05em;
+}
+
+/* ============== Constitution ============== */
+.constitution{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:1px;
+  background:var(--border);
+  border:1px solid var(--border);
+  border-radius:5px;
+  overflow:hidden;
+  margin-bottom:30px;
+}
+.pillar{
+  background:var(--bg-1);
+  padding:16px 18px 14px;
+}
+.pillar .glyph{
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:32px;
+  line-height:1;
+  color:var(--amber);
+  font-weight:300;
+  margin-bottom:8px;
+  letter-spacing:-0.04em;
+}
+.pillar .pillar-name{
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:10.5px;
+  color:var(--fg-3);
+  letter-spacing:0.10em;
+}
+.pillar .pillar-tag{
+  margin-top:4px;
+  font-size:11.5px;
+  color:var(--fg-2);
+  line-height:1.5;
+}
+
+/* ============== Competitor cards ============== */
+.compgrid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+}
+.compcard{
+  border:1px solid var(--border);
+  background:var(--bg-1);
+  padding:14px 16px;
+  border-radius:4px;
+}
+.compcard.sentori{
+  border-color:var(--amber-line);
+  background:linear-gradient(180deg,rgba(245,166,35,0.05),rgba(245,166,35,0.015));
+  grid-column:span 4;
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:18px;
+  align-items:start;
+}
+.compcard.sentori .name{grid-column:span 3}
+.compcard .name{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-bottom:2px;
+}
+.compcard h3{font-size:14px;letter-spacing:-0.005em;font-weight:500}
+.compcard .ver{
+  font-size:10.5px;
+  color:var(--fg-mute);
+}
+.compcard p{font-size:11.5px;color:var(--fg-2);line-height:1.6;margin:0}
+.compcard .row{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.compcard .row:first-of-type{border-top:0;margin-top:6px;padding-top:0}
+.compcard .label{
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:9.5px;
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  color:var(--fg-mute);
+  margin-bottom:3px;
+}
+.compcard.sentori .label{color:var(--amber)}
+
+/* ============== Feature matrix ============== */
+.matwrap{
+  border:1px solid var(--border);
+  border-radius:5px;
+  overflow:auto;
+  background:var(--bg-1);
+  max-height:64vh;
+}
+.matrix{
+  width:100%;
+  border-collapse:collapse;
+  font-size:11.5px;
+}
+.matrix th,.matrix td{
+  padding:5px 8px;
+  text-align:center;
+  border-right:1px solid var(--border);
+  border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+.matrix th{
+  background:var(--bg-2);
+  color:var(--fg-3);
+  font-weight:500;
+  font-size:10.5px;
+  letter-spacing:0.04em;
+  text-transform:uppercase;
+  position:sticky;
+  top:0;
+  z-index:2;
+}
+.matrix th.feat-h{text-align:left;padding-left:14px}
+.matrix th.sent{
+  color:var(--amber);
+  background:var(--sentori-col-strong);
+  border-left:1px solid var(--amber-line);
+}
+.matrix td.feat{
+  text-align:left;
+  color:var(--fg-2);
+  padding-left:14px;
+  max-width:260px;
+  position:sticky;
+  left:0;
+  background:var(--bg-1);
+  z-index:1;
+}
+.matrix tbody tr:hover td{background:rgba(255,255,255,0.025)}
+.matrix tbody tr:hover td.feat{background:#15151a}
+.matrix tbody tr:hover td.sent{background:var(--sentori-col-strong)}
+.matrix tbody tr:last-child td{border-bottom:0}
+.matrix td.sent{
+  background:var(--sentori-col);
+  border-left:1px solid var(--amber-line);
+  color:var(--fg);
+}
+.g{display:inline-block;width:18px;text-align:center;font-weight:400}
+.g.f{color:var(--fg)}
+.g.h{color:var(--amber-2)}
+.g.m{color:var(--fg-mute)}
+.g.n{color:var(--fg-mute)}
+.matrix td.sent .g.m{color:var(--red);font-weight:600}
+.matrix td.sent .g.h{color:#ff9d3a;font-weight:600}
+.legend{
+  display:flex;
+  flex-wrap:wrap;
+  gap:18px;
+  margin-top:12px;
+  font-size:11px;
+  color:var(--fg-3);
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+}
+.legend span b{margin-right:6px;font-weight:400}
+
+/* ============== Gaps ============== */
+.quads{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.quad{
+  border:1px solid var(--border);
+  background:var(--bg-1);
+  padding:14px 18px 16px;
+  border-radius:4px;
+}
+.quad h3{
+  font-size:11px;
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  letter-spacing:0.06em;
+  text-transform:uppercase;
+  margin-bottom:10px;
+  color:var(--fg-2);
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.quad h3 .tag{
+  font-size:9.5px;
+  padding:1px 6px;
+  border-radius:2px;
+  border:1px solid var(--border-2);
+  color:var(--fg-3);
+  letter-spacing:0.04em;
+  font-weight:500;
+  text-transform:none;
+}
+.quad ul{list-style:none;margin:0;padding:0}
+.quad li{
+  font-size:12px;
+  color:var(--fg-2);
+  padding:7px 0;
+  border-top:1px solid var(--border);
+  line-height:1.6;
+}
+.quad li:first-child{border-top:0;padding-top:0}
+.quad li b{color:var(--fg);font-weight:500}
+.quad.parity h3{color:var(--green)}
+.quad.parity h3 .tag{color:var(--green);border-color:var(--green-line)}
+.quad.behind h3{color:var(--red)}
+.quad.behind h3 .tag{color:var(--red);border-color:var(--red-line)}
+.quad.leapfrog h3{color:var(--amber)}
+.quad.leapfrog h3 .tag{color:var(--amber);border-color:var(--amber-line)}
+.quad.outscope h3{color:var(--fg-3)}
+
+/* ============== Origin (sentori-original) ============== */
+.origin-intro{
+  border:1px solid var(--cyan-line);
+  background:linear-gradient(180deg,rgba(125,211,252,0.06),rgba(125,211,252,0.015));
+  padding:14px 18px;
+  border-radius:4px;
+  margin-bottom:14px;
+  font-size:12.5px;
+  line-height:1.7;
+  color:var(--fg-2);
+}
+.origin-intro b{color:var(--cyan)}
+.origin-intro .label{
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:10.5px;
+  color:var(--cyan);
+  letter-spacing:0.10em;
+  text-transform:uppercase;
+  margin-bottom:6px;
+  display:block;
+}
+.origingrid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.origin-card{
+  border:1px solid var(--cyan-line);
+  background:linear-gradient(180deg,rgba(125,211,252,0.04),rgba(125,211,252,0.01));
+  border-radius:5px;
+  padding:14px 16px 12px;
+  position:relative;
+}
+.origin-card .origin-num{
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  color:var(--cyan);
+  font-size:11px;
+  letter-spacing:0.04em;
+  font-weight:500;
+  min-width:30px;
+}
+.origin-card .feat-name{color:var(--fg);font-weight:500}
+.origin-card .badge-orig{
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:9px;
+  padding:2px 6px;
+  border-radius:2px;
+  border:1px solid var(--cyan-line);
+  background:var(--cyan-bg);
+  color:var(--cyan);
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  font-weight:500;
+}
+.origin-card .feat-why{color:var(--fg-2);font-size:11.5px;line-height:1.6;margin-bottom:10px}
+.origin-card .feat-api{
+  background:#07090b;
+  border:1px solid rgba(125,211,252,0.18);
+}
+.origin-card .feat-api .k{color:var(--cyan)}
+.origin-card .feat-meta{color:var(--fg-mute)}
+.origin-card .feat-meta b{color:var(--cyan-2)}
+.origin-card .nocompete{
+  font-size:10.5px;
+  color:var(--cyan);
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  letter-spacing:0.04em;
+  margin-top:8px;
+  padding-top:8px;
+  border-top:1px solid rgba(125,211,252,0.16);
+}
+
+/* ============== Roadmap ============== */
+.checkpoint{margin-bottom:34px}
+.checkpoint-h{
+  display:flex;
+  align-items:baseline;
+  gap:12px;
+  margin-bottom:12px;
+}
+.checkpoint-h .ck-name{
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:13px;
+  color:var(--amber);
+  letter-spacing:-0.005em;
+}
+.checkpoint-h .ck-meta{
+  color:var(--fg-3);
+  font-size:11px;
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+}
+.checkpoint-h .ck-line{
+  flex:1;
+  border-top:1px solid var(--border);
+}
+.roadgrid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.feat-card{
+  border:1px solid var(--border);
+  background:var(--bg-1);
+  border-radius:5px;
+  padding:14px 16px 12px;
+  position:relative;
+}
+.feat-card.wide{grid-column:span 2}
+.feat-head{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:9px;
+  flex-wrap:wrap;
+}
+.feat-num{
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  color:var(--fg-mute);
+  font-size:11.5px;
+  letter-spacing:0;
+  min-width:24px;
+}
+.feat-name{
+  flex:1;
+  font-size:13px;
+  letter-spacing:-0.005em;
+  color:var(--fg);
+  min-width:160px;
+  font-weight:500;
+}
+.badge{
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:9.5px;
+  padding:2px 6px;
+  border-radius:2px;
+  border:1px solid;
+  letter-spacing:0.05em;
+  line-height:1.5;
+  text-transform:uppercase;
+  font-weight:500;
+}
+.badge.A{color:var(--amber);border-color:var(--amber-line);background:var(--amber-bg)}
+.badge.B{color:var(--blue);border-color:var(--blue-line);background:var(--blue-bg)}
+.badge.C{color:var(--gray);border-color:var(--gray-line);background:var(--gray-bg)}
+.badge.eff-S{color:var(--green);border-color:var(--green-line);background:var(--green-bg)}
+.badge.eff-M{color:var(--fg-2);border-color:var(--border-3);background:var(--bg-3)}
+.badge.eff-L{color:var(--amber);border-color:var(--amber-line);background:var(--amber-bg)}
+.badge.eff-XL{color:var(--red);border-color:var(--red-line);background:var(--red-bg)}
+
+.feat-why{
+  font-size:11.5px;
+  color:var(--fg-2);
+  line-height:1.6;
+  margin-bottom:10px;
+}
+.feat-api{
+  background:#070708;
+  border:1px solid var(--border);
+  border-radius:3px;
+  padding:9px 12px;
+  font-size:10.5px;
+  line-height:1.65;
+  color:var(--fg-2);
+  white-space:pre;
+  overflow-x:auto;
+}
+.feat-api .k{color:var(--amber-2)}
+.feat-api .s{color:#87caa8}
+.feat-api .n{color:#b8c0ff}
+.feat-api .c{color:var(--fg-mute);font-style:italic}
+.feat-api .v{color:var(--blue)}
+.feat-api .p{color:var(--fg-3)}
+.feat-meta{
+  margin-top:10px;
+  font-size:10.5px;
+  color:var(--fg-mute);
+  display:flex;
+  flex-wrap:wrap;
+  gap:14px;
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+}
+.feat-meta span b{color:var(--fg-2);font-weight:500}
+.feat-card.noapi .feat-api{
+  background:transparent;
+  border-style:dashed;
+  color:var(--fg-3);
+  font-style:italic;
+  font-size:11px;
+}
+
+/* ============== Decisions ============== */
+.decisions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.decision{
+  border:1px solid var(--border);
+  background:var(--bg-1);
+  border-radius:5px;
+  padding:14px 16px 12px;
+}
+.decision-h{
+  display:flex;
+  gap:10px;
+  align-items:baseline;
+  margin-bottom:6px;
+}
+.d-num{
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  color:var(--amber);
+  font-size:12px;
+  font-weight:500;
+  min-width:24px;
+}
+.d-title{
+  font-size:13px;
+  letter-spacing:-0.005em;
+  font-weight:500;
+  flex:1;
+}
+.pillrow{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
+  margin:11px 0 8px;
+}
+.opt{
+  border:1px solid var(--border-2);
+  background:var(--bg-2);
+  color:var(--fg-3);
+  padding:9px 12px 9px;
+  border-radius:3px;
+  font-size:11px;
+  line-height:1.55;
+  position:relative;
+}
+.opt .opt-label{
+  display:block;
+  color:var(--fg-mute);
+  font-size:9px;
+  letter-spacing:0.10em;
+  margin-bottom:4px;
+  text-transform:uppercase;
+}
+.opt.rec{
+  border-color:var(--amber-line);
+  background:var(--amber-bg);
+  color:var(--fg);
+}
+.opt.rec .opt-label{color:var(--amber)}
+.opt.rec::after{
+  content:"采用";
+  position:absolute;
+  top:-7px;
+  right:8px;
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:8.5px;
+  letter-spacing:0.12em;
+  color:var(--amber);
+  background:var(--bg);
+  padding:0 6px;
+  border:1px solid var(--amber-line);
+  border-radius:2px;
+}
+.decision-why{
+  font-size:11px;
+  color:var(--fg-2);
+  line-height:1.6;
+  margin-top:6px;
+  padding-top:8px;
+  border-top:1px solid var(--border);
+}
+.decision-why b{color:var(--fg);font-weight:500}
+
+/* ============== Risks ============== */
+.risks{
+  border:1px solid var(--border);
+  background:var(--bg-1);
+  border-radius:5px;
+  padding:14px 20px 12px;
+  margin-bottom:24px;
+}
+.risks h3{
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:11px;
+  letter-spacing:0.06em;
+  text-transform:uppercase;
+  color:var(--fg-3);
+  margin-bottom:10px;
+}
+.risks ol{
+  list-style:none;
+  counter-reset:r;
+  padding:0;
+  margin:0;
+}
+.risks li{
+  counter-increment:r;
+  padding:8px 0 8px 32px;
+  position:relative;
+  font-size:12px;
+  color:var(--fg-2);
+  border-top:1px solid var(--border);
+  line-height:1.6;
+}
+.risks li:first-child{border-top:0}
+.risks li::before{
+  content:counter(r,decimal-leading-zero);
+  position:absolute;
+  left:0;
+  top:8px;
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  color:var(--fg-mute);
+  font-size:11px;
+}
+.risks li b{color:var(--fg);font-weight:500}
+
+/* ============== Surprises ============== */
+.surprises{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:8px;
+  margin-bottom:24px;
+}
+.surprise{
+  border:1px solid var(--border);
+  border-left:2px solid var(--amber);
+  background:var(--bg-1);
+  padding:11px 16px 10px;
+  border-radius:0 4px 4px 0;
+  font-size:11.5px;
+  line-height:1.65;
+  color:var(--fg-2);
+}
+.surprise .h{
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:10px;
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  color:var(--fg-mute);
+  margin-bottom:4px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.surprise .h .glyph{color:var(--amber)}
+.surprise b{color:var(--fg);font-weight:500}
+.surprise a{color:var(--amber);text-decoration:none;border-bottom:1px dotted var(--amber-line)}
+
+/* ============== What's next ============== */
+.cta{
+  border:1px solid var(--amber-line);
+  background:linear-gradient(180deg,rgba(245,166,35,0.08),rgba(245,166,35,0.02));
+  border-radius:5px;
+  padding:22px 28px 24px;
+  margin-top:8px;
+  position:relative;
+}
+.cta .label{
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:10.5px;
+  letter-spacing:0.12em;
+  color:var(--amber);
+  text-transform:uppercase;
+}
+.cta h3{
+  margin:8px 0 10px;
+  font-size:20px;
+  letter-spacing:-0.012em;
+  font-weight:500;
+}
+.cta p{
+  color:var(--fg-2);
+  font-size:13px;
+  line-height:1.7;
+  margin:0;
+  max-width:66ch;
+}
+.cta .ctalist{
+  margin-top:16px;
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:6px;
+}
+.cta .ctalist .ci{
+  font-size:11px;
+  color:var(--fg-2);
+  padding:7px 11px;
+  border:1px solid var(--border);
+  background:var(--bg);
+  border-radius:3px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:6px;
+}
+.cta .ctalist .ci b{color:var(--amber);font-weight:500;font-family:"JetBrains Mono",ui-monospace,monospace}
+.cta .ctalist .ci .pill{
+  font-size:9px;
+  padding:1px 5px;
+  border-radius:2px;
+  background:var(--amber-bg);
+  color:var(--amber);
+  border:1px solid var(--amber-line);
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  letter-spacing:0.04em;
+}
+
+/* ============== Footer ============== */
+footer{
+  margin-top:48px;
+  padding-top:18px;
+  border-top:1px solid var(--border);
+  color:var(--fg-mute);
+  font-size:10.5px;
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+}
+
+/* ============== Scrollbar ============== */
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.07);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.12)}
+
+/* ============== Print ============== */
+@media print{
+  body{background:white;color:black}
+  .toc{display:none}
+  main{padding:0;max-width:100%}
+  .shell{display:block}
+}
+
+/* ============== Mobile ============== */
+@media (max-width:980px){
+  .shell{grid-template-columns:1fr}
+  .toc{
+    position:static;
+    height:auto;
+    border-right:0;
+    border-bottom:1px solid var(--border);
+    padding:20px;
+  }
+  main{padding:24px 20px}
+  .compgrid{grid-template-columns:1fr 1fr}
+  .compcard.sentori{grid-column:span 2;grid-template-columns:1fr 1fr}
+  .compcard.sentori .name{grid-column:span 2}
+  .roadgrid,.decisions,.quads,.surprises,.origingrid{grid-template-columns:1fr}
+  .feat-card.wide{grid-column:auto}
+  .constitution{grid-template-columns:1fr 1fr}
+}
+
+/* fade in on load */
+@keyframes fadeIn{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:none}}
+.section{animation:fadeIn 320ms ease-out both}
+.section:nth-child(2){animation-delay:30ms}
+.section:nth-child(3){animation-delay:60ms}
+.section:nth-child(4){animation-delay:90ms}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<aside class="toc">
+  <div class="toc-brand">SENTORI <span class="v">v0.9</span></div>
+  <ol>
+    <li><a href="#landscape" data-id="landscape"><span class="toc-num">01</span>全景</a></li>
+    <li><a href="#matrix" data-id="matrix"><span class="toc-num">02</span>矩阵</a></li>
+    <li><a href="#gaps" data-id="gaps"><span class="toc-num">03</span>差距</a></li>
+    <li><a href="#origin" data-id="origin"><span class="toc-num">04</span>原创创新</a></li>
+    <li><a href="#roadmap" data-id="roadmap"><span class="toc-num">05</span>路线图</a></li>
+    <li><a href="#decisions" data-id="decisions"><span class="toc-num">06</span>决策</a></li>
+    <li><a href="#risks-next" data-id="risks-next"><span class="toc-num">07</span>风险 &amp; 接下来</a></li>
+  </ol>
+  <div class="toc-meta">
+    <div><strong>状态</strong><span>设计草案</span></div>
+    <div><strong>调研</strong><span>2026-05</span></div>
+    <div><strong>原文</strong><span>~6.3k 字</span></div>
+    <div><strong>对标</strong><span>7 家</span></div>
+    <div><strong>路线</strong><span>15 项</span></div>
+    <div><strong>原创</strong><span>7 项</span></div>
+    <div><strong>决策</strong><span>7 项</span></div>
+    <div><strong>源文档</strong><span class="mono">…deep-dive.md</span></div>
+  </div>
+</aside>
+
+<main>
+
+<header class="pageheader">
+  <div class="crumb mono">
+    <span>SENTORI</span><span class="sep">▸</span>
+    <span>设计</span><span class="sep">▸</span>
+    <span>V0.9</span><span class="sep">▸</span>
+    <b>RN 深度设计</b>
+  </div>
+  <h1>Sentori v0.9 — React Native <span class="accent">深度设计</span></h1>
+  <p class="lede">
+    把 Sentori React Native SDK 从"可接受的 v0.7 替代品"推到"RN 领域最好"。立场鲜明，必要时反 Sentry。这份文档分三层：对标行业现状、列出我们要做但他们不会做的<span style="color:var(--cyan)">原创功能</span>、把这些塞进可执行的 v0.9 → v1.0 路线图，最后让维护者拍 7 个分叉决策。
+  </p>
+  <div class="anchorchips">
+    <span class="chip mono">sentry-rn <b>8.11.x</b></span>
+    <span class="chip mono">embrace-rn <b>6.5.x</b></span>
+    <span class="chip mono">bugsnag-rn <b>8.3.x</b></span>
+    <span class="chip mono">datadog mobile-rn <b>2026.maj</b></span>
+    <span class="chip mono">posthog replay <b>3.2+</b></span>
+    <span class="chip mono">react native <b>0.77 – 0.79</b></span>
+    <span class="chip mono">新架构 <b>默认</b></span>
+  </div>
+</header>
+
+<!-- ====================== 01 LANDSCAPE ====================== -->
+<section class="section" id="landscape">
+  <div class="section-h">
+    <span class="num mono">01</span>
+    <h2>全景 / Landscape</h2>
+    <span class="line"></span>
+    <span class="sub mono">设计宪法 · 7 家竞品 · 1 个 sentori</span>
+  </div>
+
+  <div class="constitution">
+    <div class="pillar">
+      <div class="glyph">简</div>
+      <div class="pillar-name">SCHEMA</div>
+      <div class="pillar-tag">极简事件结构 — 不背 Sentry 的历史负担</div>
+    </div>
+    <div class="pillar">
+      <div class="glyph">密</div>
+      <div class="pillar-name">UI</div>
+      <div class="pillar-tag">Linear / Vercel 密度 — 不做企业级留白</div>
+    </div>
+    <div class="pillar">
+      <div class="glyph">轻</div>
+      <div class="pillar-name">DEPLOY</div>
+      <div class="pillar-tag"><code>docker compose up</code> — 不要 22 个容器</div>
+    </div>
+    <div class="pillar">
+      <div class="glyph">一行</div>
+      <div class="pillar-name">SDK</div>
+      <div class="pillar-tag">一次 import；一次 init；扁平命名空间</div>
+    </div>
+  </div>
+
+  <div class="compgrid">
+    <div class="compcard">
+      <div class="name"><h3>Sentry RN</h3><span class="ver mono">8.11.x</span></div>
+      <div class="row"><div class="label">杀手特性</div><p>Replay + Profiling + Tracing 三件套在一个 issue 页缝合。</p></div>
+      <div class="row"><div class="label">摩擦点</div><p>Android replay 包 ~40 KB；定价不透明；TurboModule 吞异常 bug 未修。</p></div>
+    </div>
+    <div class="compcard">
+      <div class="name"><h3>Embrace</h3><span class="ver mono">6.5.x</span></div>
+      <div class="row"><div class="label">杀手特性</div><p>Moments + 流失追踪 + 结构化 play-by-play。v6 全面 OTel 化。</p></div>
+      <div class="row"><div class="label">摩擦点</div><p>闭源后端；企业销售模式；无自部署；不公开报价。</p></div>
+    </div>
+    <div class="compcard">
+      <div class="name"><h3>Bugsnag</h3><span class="ver mono">8.3.x</span></div>
+      <div class="row"><div class="label">杀手特性</div><p>启动崩溃循环防护 + Feature Flag 维度 + 稳定性评分。</p></div>
+      <div class="row"><div class="label">摩擦点</div><p>Dashboard 陈旧；无 Replay；性能 Span 在追赶但不领跑。</p></div>
+    </div>
+    <div class="compcard">
+      <div class="name"><h3>Crashlytics</h3><span class="ver mono">@rn-firebase</span></div>
+      <div class="row"><div class="label">杀手特性</div><p>Velocity 告警 2026 升级：30 分钟内影响用户百分比阈值，ANR 单独算。</p></div>
+      <div class="row"><div class="label">摩擦点</div><p>锁死 Firebase 形态；同窗口无性能/Tracing；不能自部署；安装最复杂。</p></div>
+    </div>
+    <div class="compcard">
+      <div class="name"><h3>Datadog RUM</h3><span class="ver mono">2026 RN 大版本</span></div>
+      <div class="row"><div class="label">杀手特性</div><p>后端 Trace ↔ 移动 Trace 关联 (firstPartyHosts)；OpenFeature 评估。</p></div>
+      <div class="row"><div class="label">摩擦点</div><p>企业定价；安装路径重；RN SDK 是通用 mobile SDK 的 wrapper，不够 RN-native。</p></div>
+    </div>
+    <div class="compcard">
+      <div class="name"><h3>Instabug → Luciq</h3><span class="ver mono">2026-01-28 归档</span></div>
+      <div class="row"><div class="label">杀手特性</div><p>摇一摇上报 + 全截图 replay + Bug 复现。Feedback-first 产品。</p></div>
+      <div class="row"><div class="label">摩擦点</div><p>RN 仓库归档 + 改名；血脉断了；<b>段位空缺，窗口期开放</b>。</p></div>
+    </div>
+    <div class="compcard">
+      <div class="name"><h3>PostHog</h3><span class="ver mono">rn-replay 3.2+</span></div>
+      <div class="row"><div class="label">杀手特性</div><p>Wireframe replay — PII 故事比 raster 更容易在合规面前讲清。</p></div>
+      <div class="row"><div class="label">摩擦点</div><p>Analytics-first；错误/崩溃 UX 单薄；不支持 Expo Go。</p></div>
+    </div>
+
+    <div class="compcard sentori">
+      <div class="name">
+        <h3>Sentori <span style="color:var(--fg-3);font-weight:400">— v0.7.6 当前</span></h3>
+        <span class="ver mono">@goliapkg/sentori-react-native</span>
+      </div>
+      <div>
+        <div class="label">已并跑</div>
+        <p>崩溃捕获 · 面包屑 · 会话 · 符号化 · 自部署 · 包体 &lt; 200 KB · 一行接入。</p>
+      </div>
+      <div>
+        <div class="label">差异角度</div>
+        <p>Wireframe replay · Moments &amp; 流失 · TurboModule 修复 · EAS-aware 告警 · 统一移动视图 · <span style="color:var(--cyan)">7 项 sentori 原创</span>。</p>
+      </div>
+      <div>
+        <div class="label">必须补齐</div>
+        <p>移动 Vitals · Replay · Profiling · NDK · Velocity 告警。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====================== 02 MATRIX ====================== -->
+<section class="section" id="matrix">
+  <div class="section-h">
+    <span class="num mono">02</span>
+    <h2>功能矩阵 / Feature Matrix</h2>
+    <span class="line"></span>
+    <span class="sub mono">34 维 · 8 产品 · sentori 列 → 必须解决</span>
+  </div>
+
+  <div class="matwrap">
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th class="feat-h">功能</th>
+          <th>Sentry</th>
+          <th>Bugsnag</th>
+          <th>Embrace</th>
+          <th>Crashlytics</th>
+          <th>Datadog</th>
+          <th>Instabug</th>
+          <th>PostHog</th>
+          <th class="sent">Sentori</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="feat">JS 错误捕获</td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g f">✓</span></td></tr>
+        <tr><td class="feat">iOS NSException</td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g f">✓</span></td></tr>
+        <tr><td class="feat">Android JVM 未捕获</td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g f">✓</span></td></tr>
+        <tr><td class="feat">Android NDK (C++)</td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g m">✗</span></td></tr>
+        <tr><td class="feat">ANR / 主线程卡顿</td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g f">✓</span></td></tr>
+        <tr><td class="feat">启动崩溃循环防护</td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g m">✗</span></td></tr>
+        <tr><td class="feat">新架构 TurboModule 异常保真</td><td><span class="g h">◐</span></td><td><span class="g h">◐</span></td><td><span class="g h">◐</span></td><td><span class="g h">◐</span></td><td><span class="g h">◐</span></td><td><span class="g h">◐</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g h">◐</span></td></tr>
+        <tr><td class="feat">Session Replay (光栅)</td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g h">◐</span></td><td><span class="g m">✗</span></td><td><span class="g h">◐</span></td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td class="sent"><span class="g m">✗</span></td></tr>
+        <tr><td class="feat">Session Replay (Wireframe)</td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td class="sent"><span class="g m">✗</span></td></tr>
+        <tr><td class="feat">会话轨迹 / Timeline</td><td><span class="g h">◐</span></td><td><span class="g h">◐</span></td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td><span class="g h">◐</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td class="sent"><span class="g f">✓</span></td></tr>
+        <tr><td class="feat">冷启动追踪</td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g m">✗</span></td></tr>
+        <tr><td class="feat">TTID / TTFD 每屏</td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g m">✗</span></td></tr>
+        <tr><td class="feat">慢帧 / 冻帧 计数</td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g m">✗</span></td></tr>
+        <tr><td class="feat">JS 线程采样 (Hermes)</td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g h">◐</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g m">✗</span></td></tr>
+        <tr><td class="feat">原生 CPU 采样</td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g h">◐</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g m">✗</span></td></tr>
+        <tr><td class="feat">fetch + XHR 面包屑</td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td class="sent"><span class="g f">✓</span></td></tr>
+        <tr><td class="feat">GraphQL Body 捕获</td><td><span class="g h">◐</span></td><td><span class="g m">✗</span></td><td><span class="g h">◐</span></td><td><span class="g m">✗</span></td><td><span class="g h">◐</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g m">✗</span></td></tr>
+        <tr><td class="feat">分布式 Trace 传播</td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g f">✓</span></td></tr>
+        <tr><td class="feat">react-navigation 自动 Tracing</td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td><span class="g f">✓</span></td><td class="sent"><span class="g f">✓</span></td></tr>
+        <tr><td class="feat">Source Map 自动化</td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td><span class="g h">◐</span></td><td><span class="g h">◐</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g f">✓</span></td></tr>
+        <tr><td class="feat">自定义指标</td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td class="sent"><span class="g f">✓</span></td></tr>
+        <tr><td class="feat">Moments / 流失追踪</td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g m">✗</span></td></tr>
+        <tr><td class="feat">Feature Flag 维度</td><td><span class="g h">◐</span></td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td class="sent"><span class="g m">✗</span></td></tr>
+        <tr><td class="feat">用户反馈 API</td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g f">✓</span></td></tr>
+        <tr><td class="feat">用户反馈 Widget</td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g m">✗</span></td></tr>
+        <tr><td class="feat">Rage Tap / 连点</td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td class="sent"><span class="g m">✗</span></td></tr>
+        <tr><td class="feat">PII 自动遮蔽</td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g h">◐</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td class="sent"><span class="g h">◐</span></td></tr>
+        <tr><td class="feat">PII 消费者规则</td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g h">◐</span></td><td><span class="g h">◐</span></td><td><span class="g h">◐</span></td><td class="sent"><span class="g f">✓</span></td></tr>
+        <tr><td class="feat">离线队列</td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td class="sent"><span class="g f">✓</span></td></tr>
+        <tr><td class="feat">OTA / EAS Update 感知</td><td><span class="g h">◐</span></td><td><span class="g h">◐</span></td><td><span class="g h">◐</span></td><td><span class="g m">✗</span></td><td><span class="g h">◐</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g m">✗</span></td></tr>
+        <tr><td class="feat">无崩溃率</td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g f">✓</span></td></tr>
+        <tr><td class="feat">Velocity 告警</td><td><span class="g h">◐</span></td><td><span class="g h">◐</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td class="sent"><span class="g m">✗</span></td></tr>
+        <tr><td class="feat">自部署</td><td><span class="g f">✓</span></td><td><span class="g h">◐</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td class="sent"><span class="g f">✓</span></td></tr>
+        <tr><td class="feat">单命令部署</td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g n">—</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g h">◐</span></td><td class="sent"><span class="g f">✓</span></td></tr>
+        <tr><td class="feat">RN 端包体 &lt; 200 KB</td><td><span class="g m">✗</span></td><td><span class="g h">◐</span></td><td><span class="g m">✗</span></td><td><span class="g f">✓</span></td><td><span class="g m">✗</span></td><td><span class="g m">✗</span></td><td><span class="g h">◐</span></td><td class="sent"><span class="g f">✓</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="legend">
+    <span><b style="color:var(--fg)">✓</b>已发布</span>
+    <span><b style="color:var(--amber-2)">◐</b>部分 · 需开关 · 手动</span>
+    <span><b style="color:var(--fg-mute)">✗</b>缺失</span>
+    <span><b style="color:var(--fg-mute)">—</b>非范畴</span>
+    <span style="color:var(--red)"><b>红色</b>sentori 列 = 优先补</span>
+  </div>
+</section>
+
+<!-- ====================== 03 GAPS ====================== -->
+<section class="section" id="gaps">
+  <div class="section-h">
+    <span class="num mono">03</span>
+    <h2>差距分析 / Gap Analysis</h2>
+    <span class="line"></span>
+    <span class="sub mono">已在的位置 · 必须打的仗 · 不打的仗</span>
+  </div>
+
+  <div class="quads">
+    <div class="quad parity">
+      <h3><span>已并跑</span> <span class="tag">入场资格已有</span></h3>
+      <ul>
+        <li><b>崩溃 + 面包屑 + 会话</b> + 无崩溃率。</li>
+        <li><b>react-navigation Tracing</b> + fetch/XHR Tracing + 分布式 traceparent。</li>
+        <li><b>Mask 注册表</b> — 手术刀级，消费者拥有。<i>优于</i> Sentry 的"遮全部"默认。</li>
+        <li><b>Source Map + dSYM + Proguard</b> 自动化 + CLI 钩子。</li>
+        <li><b>自部署</b> — <code>docker compose up</code> 完胜 Sentry 的 22 容器参考栈。</li>
+        <li><b>包体</b> — 没塞 Replay / Profiler。(这是特性，不是 bug。)</li>
+        <li><b>一行接入</b> + 扁平命名空间。</li>
+      </ul>
+    </div>
+
+    <div class="quad behind">
+      <h3><span>明确落后</span> <span class="tag">必须补齐才能上桌</span></h3>
+      <ul>
+        <li><b>无移动 Vitals</b> — 冷启动直方图、慢/冻帧、TTID/TTFD 全无。客户会逐项对比。</li>
+        <li><b>无 Session Replay</b> — 所有正经竞品都有；Dashboard 完全没有播放能力。</li>
+        <li><b>无 JS Profiling</b> — Sentry 给火焰图；我们说"看 trace"。</li>
+        <li><b>无 NDK</b> — 带 C++ 依赖（图像、ML、编解码）的 RN 应用对我们就是黑洞。</li>
+        <li><b>无 Velocity 告警</b> — 告警只有规则式，没有回归式。</li>
+        <li><b>新架构保真度</b> — Sentry 也有缺口；我们这片是 unknown territory。</li>
+      </ul>
+    </div>
+
+    <div class="quad leapfrog">
+      <h3><span>可弯道超车</span> <span class="tag">设计宪法帮我们赢</span></h3>
+      <ul>
+        <li><b>Wireframe Replay</b>（PostHog 流派）。Schema 简：不要每会话 MB 级存储。隐私故事好讲。在 Linear 密度下渲染更舒服。</li>
+        <li><b>Moments / 流失追踪</b>（Embrace 有；Sentry 没）。一行 API <code>sentori.startMoment('checkout').end()</code> → 漏斗 UI。</li>
+        <li><b>TurboModule 异常修复</b>。补 <code>RCTTurboModule.mm</code> 吞异常那个洞。我们做得到是因为只有一个 SDK + 一个运行时模型。</li>
+        <li><b>EAS Update / CodePush 感知</b>。每条事件带 bundle id；崩溃高峰自动建议回滚。Sentry release health 是 binary-build 中心。</li>
+        <li><b>RN-shaped Velocity 告警</b>。"Issue X 在 bundle <code>r/123</code>（灰度 20%）上 30 分钟内激增 5×" → Slack/Linear。</li>
+        <li><b>单页 Issue → Replay → Trace → Profile</b>。Sentry 四件都有但 join 松。Schema 简让它们落在同一行，UI 密让它们落在同一屏。</li>
+      </ul>
+    </div>
+
+    <div class="quad outscope">
+      <h3><span>不竞争</span> <span class="tag">明确放弃</span></h3>
+      <ul>
+        <li><b>JS+native 全栈火焰图</b>。挑 JS 线程就够。</li>
+        <li><b>通用 OTel 接入面</b>。让 Datadog / Embrace 打这场仗。</li>
+        <li><b>巨型集成生态</b>。Slack / Linear / Jira / GitHub 够了。</li>
+        <li><b>Web SDK 功能追赶</b> — 这版搁置。RN-first 就是 RN-first。</li>
+        <li><b>像素级 Raster Replay</b>。宪法决定的反 Sentry 立场。Wireframe 是我们押的方向。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ====================== 04 ORIGIN (sentori-original) ====================== -->
+<section class="section" id="origin">
+  <div class="section-h">
+    <span class="num mono">04</span>
+    <h2>原创创新 / Sentori-Original</h2>
+    <span class="line"></span>
+    <span class="ck-pill">竞品 = 0</span>
+  </div>
+
+  <div class="origin-intro">
+    <span class="label">为什么有这一章</span>
+    路线图（下一节）讲的是<b>对标行业 + 补齐 + 个别弯道超车</b>。但 sentori 不应止步于"做得跟 Sentry 一样好"。这一节是<b>原创视角</b>：从我们的角度发明的、竞品 0 或半解决的能力。每一项都瞄着<b>"做完之后 Sentori 是市面上唯一一家"</b>。
+    工程上不全在 v0.9 范围内，但应当被认作 sentori 的<b>产品定义</b>而不是 nice-to-have。
+  </div>
+
+  <div class="origingrid">
+
+    <div class="origin-card">
+      <div class="feat-head">
+        <span class="origin-num">S1</span>
+        <span class="feat-name">AI 语义聚合 + 根因建议</span>
+        <span class="badge-orig">原创 · 竞品 0</span>
+        <span class="badge eff-L">L</span>
+      </div>
+      <p class="feat-why">Sentry 至今仍用 hash 几行 stack 做 fingerprint。我们站在 LLM 工具链上，自然做<b>语义级聚合</b>：对 stack + 关键 breadcrumbs + 源码上下文做嵌入，<b>"看似无关的 5 条 issue 其实是同一根因"</b> 自动归类。每个新 issue 顶部直接出"建议修复 diff"。</p>
+<pre class="feat-api"><span class="c">// server-side only, dashboard 顶部新加一块面板:</span>
+<span class="p">┌────────────────────────────────────────┐</span>
+<span class="p">│</span> <span class="k">建议根因</span>: parseRoute 在 deep-link 处 <span class="p">│</span>
+<span class="p">│</span> 未防御 <span class="s">null</span> nextScreen.params       <span class="p">│</span>
+<span class="p">│</span> <span class="k">语义同类</span>: <span class="v">#1812 #1547 #1209</span>          <span class="p">│</span>
+<span class="p">│</span> <span class="k">建议 patch</span>: <span class="p">[+12 -4]</span> view diff      <span class="p">│</span>
+<span class="p">└────────────────────────────────────────┘</span></pre>
+      <div class="feat-meta">
+        <span><b>触及</b> 服务端 LLM 调用 · dashboard</span>
+        <span><b>差异化</b> Sentry 的 root cause 是 paid Premium</span>
+      </div>
+      <div class="nocompete">// 没人做 · 我们做完是市面唯一</div>
+    </div>
+
+    <div class="origin-card">
+      <div class="feat-head">
+        <span class="origin-num">S2</span>
+        <span class="feat-name">State 时光机</span>
+        <span class="badge-orig">原创 · 竞品 0</span>
+        <span class="badge eff-L">L</span>
+      </div>
+      <p class="feat-why">Sentry Replay 只有 UI 截图，没 state。我们记 <b>Redux / Zustand / Context state 快照</b>，与 breadcrumb timeline 同步。点击崩溃前 8 秒任意 breadcrumb → 看当时 <i>整个 app state</i>。这是 RN 调试真正的痛点 — "崩溃时购物车里到底有什么"。</p>
+<pre class="feat-api"><span class="v">sentori</span>.<span class="k">bindState</span>(<span class="p">{</span>
+  <span class="v">redux</span><span class="p">:</span> store,          <span class="c">// 可选</span>
+  <span class="v">zustand</span><span class="p">:</span> useStore,      <span class="c">// 可选</span>
+<span class="p">}</span>);
+
+<span class="c">// 或手动:</span>
+<span class="v">sentori</span>.<span class="k">recordState</span>(<span class="p">{</span> user, cart <span class="p">}</span>);
+<span class="c">// 每次 breadcrumb fire → diff vs 上次 → 入 ring</span></pre>
+      <div class="feat-meta">
+        <span><b>触及</b> SDK state 适配器 · server attachment · dashboard 时光机 viewer</span>
+      </div>
+      <div class="nocompete">// Sentry replay 只有 UI · 我们有 state</div>
+    </div>
+
+    <div class="origin-card">
+      <div class="feat-head">
+        <span class="origin-num">S3</span>
+        <span class="feat-name">罪魁祸首定位 + Revert PR</span>
+        <span class="badge-orig">原创 · 竞品 0</span>
+        <span class="badge eff-M">M</span>
+      </div>
+      <p class="feat-why">给定 issue 的 throw line + first_seen 时间窗 + git history，算出<b>最可能引入此 bug 的 commit</b>。Issue Detail 顶部出一行"<code>likely culprit · commit a3f7b · @alice · 2h before first crash</code>"，旁边按钮 <b>"生成 revert PR"</b> 走 GitHub 集成。</p>
+<pre class="feat-api"><span class="c">// dashboard issue detail header 新增:</span>
+<span class="p">[</span><span class="k">likely culprit</span><span class="p">]</span>
+  <span class="v">a3f7b91</span> @alice · 2h before first crash
+  <span class="s">"refactor: simplify deep-link parser"</span>
+  <span class="p">[</span>open commit<span class="p">]</span> <span class="p">[</span>generate revert PR<span class="p">]</span></pre>
+      <div class="feat-meta">
+        <span><b>触及</b> 服务端 git 同步 + blame · GitHub 集成</span>
+      </div>
+      <div class="nocompete">// 没有竞品做这个 · 仅靠 sentori 服务端就能算</div>
+    </div>
+
+    <div class="origin-card">
+      <div class="feat-head">
+        <span class="origin-num">S4</span>
+        <span class="feat-name">崩溃前哨 (Pre-crash Sentinel)</span>
+        <span class="badge-orig">原创 · 竞品 0</span>
+        <span class="badge eff-M">M</span>
+      </div>
+      <p class="feat-why">所有竞品都是 reactive — 崩了才报。我们做 <b>predictive</b>：客户端订阅内存压力 / 帧预算 / 存储 / 网络抖动，模式识别到"<b>即将崩溃</b>"信号在 crash 之前几秒/几分钟主动报。dashboard 上是一类新事件 <code>kind: nearCrash</code>，独立 timeline 标记。</p>
+<pre class="feat-api"><span class="v">sentori</span>.<span class="k">init</span>(<span class="p">{</span>
+  <span class="v">capture</span><span class="p">:</span> <span class="p">{</span>
+    <span class="v">preCrashSentinel</span><span class="p">:</span> <span class="k">true</span>,
+    <span class="v">sentinelChannels</span><span class="p">:</span> <span class="p">[</span>
+      <span class="s">'memory-pressure'</span>,
+      <span class="s">'frame-budget-overrun'</span>,
+      <span class="s">'storage-low'</span>,
+      <span class="s">'oom-warning'</span>,
+    <span class="p">]</span>,
+  <span class="p">}</span>,
+<span class="p">}</span>);</pre>
+      <div class="feat-meta">
+        <span><b>触及</b> SDK iOS/Android 系统 hook · server 新事件类型 · dashboard 标记</span>
+      </div>
+      <div class="nocompete">// 所有竞品 = 事后归档 · 我们 = 事前预警</div>
+    </div>
+
+    <div class="origin-card">
+      <div class="feat-head">
+        <span class="origin-num">S5</span>
+        <span class="feat-name">生产事件复刻测试 (Repro-as-Code)</span>
+        <span class="badge-orig">原创 · 竞品 0</span>
+        <span class="badge eff-M">M</span>
+      </div>
+      <p class="feat-why">Issue Detail 顶部一个按钮 <b>"导出为 Jest 测试"</b>。Server 把 breadcrumb sequence + 错误 trigger + state（来自 S2）+ mock 网络响应一起编排成一份 <code>tests/__repros__/issue-N.test.ts</code>。RN 工程师下载、本地跑、断点、修。<b>从 crash 到本地复现 = 30 秒</b>。</p>
+<pre class="feat-api"><span class="c">// dashboard 输出:</span>
+<span class="c">// tests/__repros__/issue-1812.test.ts</span>
+<span class="k">test</span>(<span class="s">'issue-1812: deep link with null params'</span>, <span class="k">async</span> () <span class="p">=></span> <span class="p">{</span>
+  <span class="k">mockFetch</span>(<span class="s">'/api/route'</span>, <span class="p">{</span> <span class="v">status</span><span class="p">:</span> <span class="n">200</span> <span class="p">}</span>);
+  <span class="k">await</span> <span class="k">act</span>(() <span class="p">=></span> Linking.<span class="k">openURL</span>(<span class="s">'app://deep'</span>));
+  <span class="c">// expect: parseRoute throws TypeError</span>
+<span class="p">}</span>);</pre>
+      <div class="feat-meta">
+        <span><b>触及</b> 服务端测试生成 · dashboard 导出 · RN 测试 boilerplate</span>
+      </div>
+      <div class="nocompete">// 行业第一个 · RN 调试痛点直接命中</div>
+    </div>
+
+    <div class="origin-card">
+      <div class="feat-head">
+        <span class="origin-num">S6</span>
+        <span class="feat-name">隐私实验室 + 合规评分</span>
+        <span class="badge-orig">原创 · 半解决</span>
+        <span class="badge eff-M">M</span>
+      </div>
+      <p class="feat-why">Sentry 有 scrubber，但<b>没有给你打分</b>。我们扫所有入库 event → 找疑似 PII (email / phone / address / cc-like 数字)。每个 release 一个 <b>Privacy Score</b> (0–100) + GDPR / CCPA risk tag。Top "本周 PII 泄漏 surface" 列表 → 一键加 mask 规则。</p>
+<pre class="feat-api"><span class="c">// dashboard 新 module: Privacy</span>
+<span class="c">// release v1.2.3 privacy score</span>
+<span class="p">┌──────────────────────────────────────┐</span>
+<span class="p">│</span> <span class="k">score</span>: <span class="v">68</span> / <span class="n">100</span>  <span class="k">risk</span>: <span class="v">MEDIUM</span>     <span class="p">│</span>
+<span class="p">│</span> <span class="k">leaks</span>:                              <span class="p">│</span>
+<span class="p">│</span>   <span class="v">12</span> events 含 email-like                  <span class="p">│</span>
+<span class="p">│</span>   <span class="v">3</span>  events 含 phone-like                    <span class="p">│</span>
+<span class="p">│</span>   <span class="v">1</span>  breadcrumb 含 cc-like                    <span class="p">│</span>
+<span class="p">│</span> <span class="p">[</span>add mask rule<span class="p">]</span> <span class="p">[</span>export GDPR report<span class="p">]</span><span class="p">│</span>
+<span class="p">└──────────────────────────────────────┘</span></pre>
+      <div class="feat-meta">
+        <span><b>触及</b> 服务端 PII 扫描 cron · dashboard Privacy 模块</span>
+      </div>
+      <div class="nocompete">// 给合规团队一个 SaaS-ready dashboard</div>
+    </div>
+
+    <div class="origin-card">
+      <div class="feat-head">
+        <span class="origin-num">S7</span>
+        <span class="feat-name">实时调试流 (Live Debug Stream)</span>
+        <span class="badge-orig">原创 · 竞品 0</span>
+        <span class="badge eff-L">L</span>
+      </div>
+      <p class="feat-why">Sentry Spotlight 只在<b>本地开发</b>能用。我们做 <b>生产级</b> live debug：dev 在 dashboard 选一个 user → 开 live session → SDK 拿到 ephemeral flag → 进入"无批量、无采样"模式 → 该 user 接下来的所有 event 实时流到 dashboard timeline。10 分钟超时自动关。</p>
+<pre class="feat-api"><span class="c">// 客户端无新 API,</span>
+<span class="c">// 只要 init 时 setUser 过即可:</span>
+<span class="v">sentori</span>.<span class="k">setUser</span>(<span class="p">{</span> <span class="v">id</span><span class="p">:</span> <span class="s">'u-123'</span> <span class="p">}</span>);
+
+<span class="c">// dashboard:</span>
+<span class="c">// 找到 u-123 → [start live debug]</span>
+<span class="c">// → server 下发 flag</span>
+<span class="c">// → SDK 进入 live mode</span>
+<span class="c">// → 接下来的所有 events 实时 stream</span></pre>
+      <div class="feat-meta">
+        <span><b>触及</b> SDK control channel · server SSE · dashboard live viewer</span>
+      </div>
+      <div class="nocompete">// 行业第一个 prod-grade 的 live debug</div>
+    </div>
+
+    <div class="origin-card" style="grid-column:span 2;background:linear-gradient(180deg,rgba(125,211,252,0.08),rgba(125,211,252,0.02))">
+      <div class="feat-head">
+        <span class="origin-num">合计</span>
+        <span class="feat-name">7 项原创 = "做完之后只有 Sentori 一家"</span>
+      </div>
+      <p class="feat-why" style="margin-bottom:0">
+        S1 + S2 + S3 + S5 在一起的形态非常有意思 — issue 出来 → AI 推根因 (S1) → 时光机看 crash 时的 state (S2) → blame 出罪魁 commit (S3) → 一键导成本地测试 (S5)。<b>这是一条 sentry 完全做不到的工作流</b>，因为他们 schema 厚、产品分裂。我们 schema 简 + UI 密 + 数据全在同一行，做这条工作流是<b>自然衍生</b>。这是我们真正的 moat。
+      </p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ====================== 05 ROADMAP ====================== -->
+<section class="section" id="roadmap">
+  <div class="section-h">
+    <span class="num mono">05</span>
+    <h2>路线图 / Roadmap</h2>
+    <span class="line"></span>
+    <span class="sub mono">15 项 · 3 个 checkpoint · v0.9 → v1.0</span>
+  </div>
+
+  <!-- v0.9.0 -->
+  <div class="checkpoint">
+    <div class="checkpoint-h">
+      <span class="ck-name">v0.9.0</span>
+      <span class="ck-meta">补齐入场资格 · ~3 周 · 8 项</span>
+      <span class="ck-line"></span>
+    </div>
+    <div class="roadgrid">
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">#1</span>
+          <span class="feat-name">移动 Vitals</span>
+          <span class="badge B">B 并跑</span>
+          <span class="badge eff-L">L</span>
+        </div>
+        <p class="feat-why">没有冷启动 + TTID/TTFD + 慢/冻帧 → 进不了 Sentry / Embrace / Datadog 的对比表。客户最常引用的"试了你们工具，发现没 X"缺口。</p>
+<pre class="feat-api"><span class="v">sentori</span>.<span class="k">init</span>(<span class="p">{</span>
+  <span class="v">capture</span><span class="p">:</span> <span class="p">{</span> <span class="v">mobileVitals</span><span class="p">:</span> <span class="k">true</span> <span class="p">}</span>,
+<span class="p">}</span>);
+
+<span class="c">// 自动无法判断时手动标 TTFD:</span>
+<span class="k">const</span> h = <span class="v">sentori</span>.<span class="k">markTimeToFullDisplay</span>(<span class="s">'Home'</span>);
+h.<span class="k">end</span>();</pre>
+        <div class="feat-meta">
+          <span><b>触及</b> SDK · 原生 iOS+And · 服务端 · dashboard</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">#3</span>
+          <span class="feat-name">启动崩溃循环防护</span>
+          <span class="badge A">A 差异化</span>
+          <span class="badge eff-M">M</span>
+        </div>
+        <p class="feat-why">Bugsnag 唯一拥有。OTA 更新有 bug 会让 RN 应用陷入<b>不可恢复</b>启动崩溃死循环。便宜建造，触发时戏剧化效果强。</p>
+<pre class="feat-api"><span class="v">sentori</span>.<span class="k">init</span>(<span class="p">{</span>
+  <span class="v">capture</span><span class="p">:</span> <span class="p">{</span>
+    <span class="v">launchCrashGuard</span><span class="p">:</span> <span class="p">{</span>
+      <span class="v">enabled</span><span class="p">:</span> <span class="k">true</span>,
+      <span class="v">onLaunchCrashDetected</span><span class="p">:</span> (info) <span class="p">=></span> (<span class="p">{</span>
+        <span class="v">action</span><span class="p">:</span> <span class="s">'rollback'</span>,
+        <span class="v">toBundle</span><span class="p">:</span> info.<span class="v">lastSafeBundle</span>,
+      <span class="p">}</span>),
+    <span class="p">}</span>,
+  <span class="p">}</span>,
+<span class="p">}</span>);</pre>
+        <div class="feat-meta">
+          <span><b>触及</b> 原生 SDK · server</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">#6</span>
+          <span class="feat-name">Moments / 流失追踪</span>
+          <span class="badge A">A 差异化</span>
+          <span class="badge eff-M">M</span>
+        </div>
+        <p class="feat-why">Embrace 标志性能力；Sentry 没有。Schema 简（一个 span + abandoned 标志位）+ UI 密（漏斗图）。一行 API。</p>
+<pre class="feat-api"><span class="k">const</span> m = <span class="v">sentori</span>.<span class="k">startMoment</span>(<span class="s">'checkout'</span>, <span class="p">{</span>
+  <span class="v">properties</span><span class="p">:</span> <span class="p">{</span> <span class="v">cartValue</span><span class="p">:</span> <span class="n">42</span> <span class="p">}</span>,
+<span class="p">}</span>);
+m.<span class="k">checkpoint</span>(<span class="s">'payment-submitted'</span>);
+m.<span class="k">end</span>();      <span class="c">// 或 .fail() / .abandon()</span></pre>
+        <div class="feat-meta">
+          <span><b>触及</b> SDK · server (span field) · dashboard</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">#10</span>
+          <span class="feat-name">EAS Update / CodePush 感知</span>
+          <span class="badge A">A 差异化</span>
+          <span class="badge eff-M">M</span>
+        </div>
+        <p class="feat-why">每个生产 RN 应用都发 OTA。Crashlytics 不处理；Sentry release health 是 binary-build 中心。直接的胜利。</p>
+<pre class="feat-api"><span class="v">sentori</span>.<span class="k">init</span>(<span class="p">{</span>
+  <span class="v">release</span><span class="p">:</span> <span class="s">'1.2.3+456'</span>,   <span class="c">// store binary</span>
+  <span class="c">// 自动从 expo-updates 探测:</span>
+  <span class="c">// bundle: { id: 'r/123', deployedAt }</span>
+<span class="p">}</span>);</pre>
+        <div class="feat-meta">
+          <span><b>触及</b> SDK · server · dashboard</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">#5</span>
+          <span class="feat-name">Velocity 告警 (RN-shaped)</span>
+          <span class="badge B">B 并跑</span>
+          <span class="badge eff-M">M</span>
+        </div>
+        <p class="feat-why">不是"错误率 &gt; X" — 而是"<b>这条 issue</b> 比 10 分钟前命中更多用户了"。纯服务端能力。</p>
+<pre class="feat-api"><span class="c"># 项目 velocity 策略</span>
+<span class="v">new_issue_in_release</span><span class="p">:</span>
+  <span class="v">notify</span><span class="p">:</span> @oncall via slack
+<span class="v">issue_velocity_3x_in_30m</span><span class="p">:</span>
+  <span class="v">notify</span><span class="p">:</span> @oncall via slack
+<span class="v">issue_velocity_5x_in_30m</span><span class="p">:</span>
+  <span class="v">page</span><span class="p">:</span> @oncall via pagerduty</pre>
+        <div class="feat-meta">
+          <span><b>触及</b> server cron · 现有集成</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">#13</span>
+          <span class="feat-name">Feature Flag 维度</span>
+          <span class="badge B">B 并跑</span>
+          <span class="badge eff-S">S</span>
+        </div>
+        <p class="feat-why">Bugsnag 一个小 API，带来巨大过滤能力。tag 不能区分"实验维度"与"环境状态"。</p>
+<pre class="feat-api"><span class="v">sentori</span>.<span class="k">setFeatureFlag</span>(<span class="s">'checkout-v2'</span>, <span class="s">'variant-a'</span>);
+<span class="v">sentori</span>.<span class="k">clearFeatureFlag</span>(<span class="s">'checkout-v2'</span>);</pre>
+        <div class="feat-meta">
+          <span><b>触及</b> SDK · server (索引字段) · dashboard</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">#11</span>
+          <span class="feat-name">GraphQL 操作自动命名</span>
+          <span class="badge C">C 锦上添花</span>
+          <span class="badge eff-S">S</span>
+        </div>
+        <p class="feat-why">每个 RN 应用用 Apollo/urql/Relay。所有 GraphQL 请求当前 breadcrumb 是 <code>POST /graphql</code>（无用）。自动提取 <code>operationName</code>。</p>
+<pre class="feat-api"><span class="v">sentori</span>.<span class="k">init</span>(<span class="p">{</span>
+  <span class="v">capture</span><span class="p">:</span> <span class="p">{</span>
+    <span class="v">network</span><span class="p">:</span> <span class="p">{</span> <span class="v">graphql</span><span class="p">:</span> <span class="k">true</span> <span class="p">}</span>,
+  <span class="p">}</span>,
+<span class="p">}</span>);
+<span class="c">// → breadcrumb: graphql/UpdateCart</span></pre>
+        <div class="feat-meta">
+          <span><b>触及</b> SDK 网络 handler · mask 复用</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">#12</span>
+          <span class="feat-name">Rage Tap / 连点</span>
+          <span class="badge C">C 锦上添花</span>
+          <span class="badge eff-S">S</span>
+        </div>
+        <p class="feat-why">Sentry 8.10 加的。小但向评估者表明"这个 SDK 懂 RN"。与 Replay (#2) 配合更强。</p>
+<pre class="feat-api"><span class="c">// 在 app root 处:</span>
+<span class="p">&lt;</span><span class="v">sentori</span>.<span class="v">RageTapCapture</span><span class="p">&gt;</span>
+  <span class="p">{</span>children<span class="p">}</span>
+<span class="p">&lt;/</span><span class="v">sentori</span>.<span class="v">RageTapCapture</span><span class="p">&gt;</span>
+<span class="c">// 自动: 800ms 内 ≥3 次 → ui.multiClick breadcrumb</span></pre>
+        <div class="feat-meta">
+          <span><b>触及</b> SDK gesture 桩</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- v0.9.1 -->
+  <div class="checkpoint">
+    <div class="checkpoint-h">
+      <span class="ck-name">v0.9.1</span>
+      <span class="ck-meta">弯道超车 + sentori 原创首发 · ~5 周 · 6 项</span>
+      <span class="ck-line"></span>
+    </div>
+    <div class="roadgrid">
+
+      <div class="feat-card wide">
+        <div class="feat-head">
+          <span class="feat-num">#2</span>
+          <span class="feat-name">Session Replay (wireframe 模式)</span>
+          <span class="badge A">A 差异化</span>
+          <span class="badge eff-XL">XL</span>
+        </div>
+        <p class="feat-why">最大可信度缺口。Wireframe 而非 raster 是弯道超车：存储更便宜、GDPR 下更易讲、Linear 密度下渲染更舒服。PostHog 已证明模型可行；<b>错误追踪赛道无人触及</b>。Sentry 的 raster: 40 KB 包 + $0.003/replay 存储成本。</p>
+<pre class="feat-api"><span class="v">sentori</span>.<span class="k">init</span>(<span class="p">{</span>
+  <span class="v">capture</span><span class="p">:</span> <span class="p">{</span>
+    <span class="v">replay</span><span class="p">:</span> <span class="p">{</span>
+      <span class="v">mode</span><span class="p">:</span> <span class="s">'wireframe'</span>,          <span class="c">// 'wireframe' | 'off'</span>
+      <span class="v">sampleSessionRate</span><span class="p">:</span> <span class="n">0.05</span>,    <span class="c">// 连续 stream</span>
+      <span class="v">sampleOnErrorRate</span><span class="p">:</span> <span class="n">1.0</span>,     <span class="c">// 60s 环形缓冲</span>
+      <span class="v">maskText</span><span class="p">:</span> <span class="k">true</span>,
+      <span class="v">maskImages</span><span class="p">:</span> <span class="k">true</span>,
+    <span class="p">}</span>,
+  <span class="p">}</span>,
+<span class="p">}</span>);</pre>
+        <div class="feat-meta">
+          <span><b>触及</b> 原生 view 树遍历 · server attachment · dashboard SVG renderer</span>
+          <span><b>砍掉若赶进度</b> 连续 stream → 仅 on-error 60 秒</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">#8</span>
+          <span class="feat-name">TurboModule 异常保真</span>
+          <span class="badge A">A 差异化</span>
+          <span class="badge eff-M">M</span>
+        </div>
+        <p class="feat-why">RN 0.76+ 默认新架构。<code>RCTTurboModule.mm</code> 把 NSException 包装成通用 JSError。<b>Sentry 也没修</b>。"市面唯一保真" claim 可写到 marketing 上。</p>
+<pre class="feat-api"><span class="c">// 无客户面 API.</span>
+<span class="c">// iOS: 拦 ObjCTurboModule::performVoidMethodInvocation</span>
+<span class="c">// And: TurboModule.invokeMethod 反射代理</span>
+<span class="c">// coerceError 给 JS event 接上原生 stack</span></pre>
+        <div class="feat-meta">
+          <span><b>触及</b> 仅原生</span>
+          <span><b>风险</b> 每个 RN minor 可能破</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">+S2</span>
+          <span class="feat-name">State 时光机 (原创)</span>
+          <span class="badge-orig">原创</span>
+          <span class="badge eff-L">L</span>
+        </div>
+        <p class="feat-why">前面 §04 介绍。安排在 v0.9.1 是因为它与 Replay (#2) 一起出来才有完整故事 — "看 UI + 看 state"。</p>
+<pre class="feat-api"><span class="v">sentori</span>.<span class="k">bindState</span>(<span class="p">{</span> <span class="v">redux</span><span class="p">:</span> store <span class="p">}</span>);
+<span class="c">// 自动: state diff 与每个 breadcrumb 同步</span>
+<span class="c">// dashboard: 点 breadcrumb → 看当时 state</span></pre>
+        <div class="feat-meta">
+          <span><b>依赖</b> #2 replay 的 timeline UI</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">+S4</span>
+          <span class="feat-name">崩溃前哨 (原创)</span>
+          <span class="badge-orig">原创</span>
+          <span class="badge eff-M">M</span>
+        </div>
+        <p class="feat-why">前面 §04 介绍。预测式信号 — 内存压力、帧预算、存储低。本身风险可控，可独立 v0.9.1 安全 ship。</p>
+<pre class="feat-api"><span class="v">sentori</span>.<span class="k">init</span>(<span class="p">{</span>
+  <span class="v">capture</span><span class="p">:</span> <span class="p">{</span>
+    <span class="v">preCrashSentinel</span><span class="p">:</span> <span class="k">true</span>,
+  <span class="p">}</span>,
+<span class="p">}</span>);</pre>
+        <div class="feat-meta">
+          <span><b>触及</b> SDK 原生系统订阅</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">#9</span>
+          <span class="feat-name">反馈 Widget</span>
+          <span class="badge B">B 并跑</span>
+          <span class="badge eff-M">M</span>
+        </div>
+        <p class="feat-why">我们有 <code>sendUserFeedback()</code> 但没 widget。Sentry 8.9 加了；Embrace 也有。一行 import drop-in 符合"一行接入"。</p>
+<pre class="feat-api"><span class="k">import</span> <span class="p">{</span> <span class="v">FeedbackButton</span> <span class="p">}</span> <span class="k">from</span> <span class="s">'@goliapkg/sentori-react-native'</span>;
+
+<span class="p">&lt;</span><span class="v">FeedbackButton</span>
+  <span class="v">trigger</span>=<span class="s">"shake"</span>
+  <span class="v">attachScreenshot</span>
+  <span class="v">attachReplayBuffer</span>
+<span class="p">/&gt;</span></pre>
+        <div class="feat-meta">
+          <span><b>触及</b> SDK JS 组件 · sensor peer</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">#14</span>
+          <span class="feat-name">measureFn (profile-lite)</span>
+          <span class="badge C">C 锦上添花</span>
+          <span class="badge eff-S">S</span>
+        </div>
+        <p class="feat-why">#4 的子集，影响半径更小。在 Hermes 采样器建造期间，先 ship 用户面 API。Span 系统的轻包装。</p>
+<pre class="feat-api"><span class="k">const</span> result = <span class="k">await</span> <span class="v">sentori</span>.<span class="k">measureFn</span>(
+  <span class="s">'addToCart'</span>,
+  <span class="k">async</span> () <span class="p">=></span> <span class="k">await</span> api.<span class="k">addToCart</span>(item),
+);</pre>
+        <div class="feat-meta">
+          <span><b>触及</b> 仅 SDK</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- v0.9.2 / v1.0 -->
+  <div class="checkpoint">
+    <div class="checkpoint-h">
+      <span class="ck-name">v0.9.2 → v1.0</span>
+      <span class="ck-meta">深度 + sentori 原创全完 · ~5 周 · 7 项</span>
+      <span class="ck-line"></span>
+    </div>
+    <div class="roadgrid">
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">#4</span>
+          <span class="feat-name">JS 线程采样 (Hermes)</span>
+          <span class="badge A">A 差异化</span>
+          <span class="badge eff-L">L</span>
+        </div>
+        <p class="feat-why">Hermes 采样便宜。不跟 Sentry 拼火焰图美学 — 拼"<i>这次慢渲染 → 这个函数调用</i>"自动归因。</p>
+<pre class="feat-api"><span class="v">sentori</span>.<span class="k">init</span>(<span class="p">{</span>
+  <span class="v">capture</span><span class="p">:</span> <span class="p">{</span>
+    <span class="v">profile</span><span class="p">:</span> <span class="p">{</span>
+      <span class="v">mode</span><span class="p">:</span> <span class="s">'on-slow-frame'</span>,  <span class="c">// 默认</span>
+      <span class="v">sampleHz</span><span class="p">:</span> <span class="n">100</span>,
+    <span class="p">}</span>,
+  <span class="p">}</span>,
+<span class="p">}</span>);</pre>
+        <div class="feat-meta">
+          <span><b>依赖</b> #1 mobile vitals</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">#7</span>
+          <span class="feat-name">Android NDK 崩溃捕获</span>
+          <span class="badge B">B 并跑</span>
+          <span class="badge eff-L">L</span>
+        </div>
+        <p class="feat-why">带原生依赖的大型 RN 应用让我们漏 ~10-20% 崩溃。"RN-first" 不能漏 C++。</p>
+<pre class="feat-api"><span class="c">// 无客户面 API · 自动启用</span>
+<span class="c">// breakpad/crashpad minidump 写 pending/</span>
+<span class="c">// 下次启动 drain 已有路径</span>
+<span class="c">// 服务端 dump_syms 处理 .so 符号</span></pre>
+        <div class="feat-meta">
+          <span><b>触及</b> Android 原生 · 服务端 symbolicator</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">+S1</span>
+          <span class="feat-name">AI 语义聚合 + 根因建议 (原创)</span>
+          <span class="badge-orig">原创</span>
+          <span class="badge eff-L">L</span>
+        </div>
+        <p class="feat-why">§04 介绍。技术上独立 — LLM 在服务端做嵌入 + 聚类。安排在 v0.9.2 是因为需要前面足够多的事件历史训练判定。</p>
+<pre class="feat-api"><span class="c">// dashboard issue detail 顶部新加面板</span>
+<span class="c">// suggested root cause + similar issues + patch diff</span></pre>
+        <div class="feat-meta">
+          <span><b>触及</b> server LLM 调用 · dashboard</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">+S3</span>
+          <span class="feat-name">罪魁祸首定位 + Revert PR (原创)</span>
+          <span class="badge-orig">原创</span>
+          <span class="badge eff-M">M</span>
+        </div>
+        <p class="feat-why">§04 介绍。需要 GitHub 集成 + 服务端 git 同步管线，所以排在路线后段。M 的工作但价值高。</p>
+<pre class="feat-api"><span class="c">// dashboard issue detail header:</span>
+<span class="c">// [likely culprit] commit + author</span>
+<span class="c">// [generate revert PR] one-click</span></pre>
+        <div class="feat-meta">
+          <span><b>触及</b> server git 同步 · GitHub 集成</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">+S5</span>
+          <span class="feat-name">生产事件复刻测试 (原创)</span>
+          <span class="badge-orig">原创</span>
+          <span class="badge eff-M">M</span>
+        </div>
+        <p class="feat-why">§04 介绍。依赖 S2 (state) 才能复刻完整。所以排 v1.0。</p>
+<pre class="feat-api"><span class="c">// dashboard issue → [导出 jest test]</span>
+<span class="c">// → tests/__repros__/issue-N.test.ts</span></pre>
+        <div class="feat-meta">
+          <span><b>依赖</b> S2 state 时光机</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">+S6</span>
+          <span class="feat-name">隐私实验室 + 评分 (原创)</span>
+          <span class="badge-orig">原创</span>
+          <span class="badge eff-M">M</span>
+        </div>
+        <p class="feat-why">§04 介绍。给合规团队的 SaaS-ready dashboard。可放 v1.0 也可后续。</p>
+<pre class="feat-api"><span class="c">// dashboard 新模块: Privacy</span>
+<span class="c">// per-release score + PII leak top list</span></pre>
+        <div class="feat-meta">
+          <span><b>触及</b> server PII scan · dashboard</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-head">
+          <span class="feat-num">+S7</span>
+          <span class="feat-name">实时调试流 (原创)</span>
+          <span class="badge-orig">原创</span>
+          <span class="badge eff-L">L</span>
+        </div>
+        <p class="feat-why">§04 介绍。需要 control channel + SSE 双向通信，作为 v1.0 收尾。</p>
+<pre class="feat-api"><span class="c">// dashboard: [start live debug] on user u-123</span>
+<span class="c">// → SDK 进入 live mode · 实时流 events</span></pre>
+        <div class="feat-meta">
+          <span><b>触及</b> SDK control · server SSE · dashboard</span>
+        </div>
+      </div>
+
+      <div class="feat-card wide">
+        <div class="feat-head">
+          <span class="feat-num">#15</span>
+          <span class="feat-name">统一移动 Issue 视图 (dashboard 收口)</span>
+          <span class="badge A">A 差异化</span>
+          <span class="badge eff-M">M</span>
+        </div>
+        <p class="feat-why">UI 密是我们的胜利条件。前面 4 种新数据类型 + 7 项原创如果各占一个 tab，我们就失去 Linear 密度优势。这一项是 dashboard <b>非谈判项</b>：在一屏内呈现 stack + replay strip + vitals + trace + breadcrumbs + profile + state 时光机 + 根因建议 + 罪魁 commit。</p>
+<pre class="feat-api"><span class="c">┌── header (release · bundle · device · location · 罪魁 commit) ─┐</span>
+<span class="c">│  AI 根因建议 + 建议 patch diff                               │</span>
+<span class="c">├── stack ── replay strip ── vitals ─── state snapshot ────────┤</span>
+<span class="c">│  源码 ±5    wireframe scrub   ttid     time-travel state     │</span>
+<span class="c">├── trace ── breadcrumbs ── profile ── repro-as-test export ───┤</span>
+<span class="c">│  waterfall  timeline       flame      [生成 jest test]      │</span>
+<span class="c">└──────────────────────────────────────────────────────────────┘</span></pre>
+        <div class="feat-meta">
+          <span><b>触及</b> 仅 dashboard</span>
+          <span><b>依赖</b> #1, #2, #4, S1, S2, S3, S5</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====================== 06 DECISIONS ====================== -->
+<section class="section" id="decisions">
+  <div class="section-h">
+    <span class="num mono">06</span>
+    <h2>决策 / Decisions</h2>
+    <span class="line"></span>
+    <span class="sub mono">7 个分叉 · 维护者拍板 · 路线图随之重排</span>
+  </div>
+
+  <div class="decisions">
+
+    <div class="decision">
+      <div class="decision-h">
+        <span class="d-num">D1</span>
+        <span class="d-title">Replay 形态</span>
+      </div>
+      <div class="pillrow">
+        <div class="opt rec">
+          <span class="opt-label">A · 仅 wireframe</span>
+          反 Sentry 立场。更轻、隐私更易讲、发布更快。
+        </div>
+        <div class="opt">
+          <span class="opt-label">B · wireframe + raster</span>
+          像素级可选。原生渲染复杂度高。
+        </div>
+      </div>
+      <div class="decision-why">客户若一定要 raster — <b>不是我们目标客户</b>。如真需要，做付费模块独立 ship。</div>
+    </div>
+
+    <div class="decision">
+      <div class="decision-h">
+        <span class="d-num">D2</span>
+        <span class="d-title">Profiling</span>
+      </div>
+      <div class="pillrow">
+        <div class="opt rec">
+          <span class="opt-label">A · Hermes 采样</span>
+          相比"除 Sentry 外"所有竞品形成差异化。<code>on-slow-frame</code> 默认。
+        </div>
+        <div class="opt">
+          <span class="opt-label">B · 不做</span>
+          省 L 工作量。失去性能 bug 对比。
+        </div>
+      </div>
+      <div class="decision-why"><code>on-slow-frame</code> 模式确保<b>常态下生产采样开销基本为零</b>。always-on profiling 是陷阱。</div>
+    </div>
+
+    <div class="decision">
+      <div class="decision-h">
+        <span class="d-num">D3</span>
+        <span class="d-title">启动崩溃回调</span>
+      </div>
+      <div class="pillrow">
+        <div class="opt rec">
+          <span class="opt-label">A · 阻塞 ≤200ms</span>
+          Bugsnag 模型。在 JS 跑之前选 rollback / reset / continue。
+        </div>
+        <div class="opt">
+          <span class="opt-label">B · fire-and-forget</span>
+          更安全。客户在启动后再调 <code>sentori.rollback()</code>。
+        </div>
+      </div>
+      <div class="decision-why">这个功能的本意就是<b>不让</b>坏 JS 跑起来。不阻塞 = 功能价值减半。硬 200ms 超时 → 默认 <code>continue</code>。</div>
+    </div>
+
+    <div class="decision">
+      <div class="decision-h">
+        <span class="d-num">D4</span>
+        <span class="d-title">新架构立场</span>
+      </div>
+      <div class="pillrow">
+        <div class="opt rec">
+          <span class="opt-label">A · 激进</span>
+          RN 0.77+ 优先。自己的原生模块用 TurboModule。
+        </div>
+        <div class="opt">
+          <span class="opt-label">B · 兼容优先</span>
+          支持 0.71+ 全功能。开发负担重，速度慢。
+        </div>
+      </div>
+      <div class="decision-why">2026 新启 RN 应用都在新架构上。Sentry 有存量要拖；<b>我们没有</b>。跟 RN core 同步走。</div>
+    </div>
+
+    <div class="decision">
+      <div class="decision-h">
+        <span class="d-num">D5</span>
+        <span class="d-title">Replay 存储</span>
+      </div>
+      <div class="pillrow">
+        <div class="opt rec">
+          <span class="opt-label">A · attachment blob</span>
+          每会话 gzip NDJSON。复用现 attachment 系统。零迁移。
+        </div>
+        <div class="opt">
+          <span class="opt-label">B · replay_frames 表</span>
+          帧级查询能力。运维更重。破"部署轻"。
+        </div>
+      </div>
+      <div class="decision-why">Schema 简。在 event 行保留 frame_count + duration 供过滤即可。<b>不预建</b>查询表。</div>
+    </div>
+
+    <div class="decision">
+      <div class="decision-h">
+        <span class="d-num">D6</span>
+        <span class="d-title">SaaS 定价角度</span>
+      </div>
+      <div class="pillrow">
+        <div class="opt rec">
+          <span class="opt-label">A · 免费 replay，按保留期付费</span>
+          Replay 事件免费；&gt; 7 天保留为付费档。
+        </div>
+        <div class="opt">
+          <span class="opt-label">B · 按 replay 计费</span>
+          买家熟悉。Sentry 形态。
+        </div>
+      </div>
+      <div class="decision-why">"我们不是 Sentry" 的故事。Wireframe 便宜 → 卖便宜。与 D1 技术选择对齐。</div>
+    </div>
+
+    <div class="decision">
+      <div class="decision-h">
+        <span class="d-num">D7</span>
+        <span class="d-title">SDK API 命名空间</span>
+      </div>
+      <div class="pillrow">
+        <div class="opt rec">
+          <span class="opt-label">A · 扁平</span>
+          <code>sentori.startMoment</code> · <code>sentori.recordState</code> · <code>sentori.setFeatureFlag</code> …
+        </div>
+        <div class="opt">
+          <span class="opt-label">B · 按域名嵌套</span>
+          <code>sentori.perf.startMoment</code> · <code>sentori.flags.set</code> …
+        </div>
+      </div>
+      <div class="decision-why">"一行接入"意味着<b>一个命名空间</b>。结构化的代价 = 放弃宪法原则，代价太高。</div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ====================== 07 RISKS & NEXT ====================== -->
+<section class="section" id="risks-next">
+  <div class="section-h">
+    <span class="num mono">07</span>
+    <h2>风险 &amp; 接下来 / Risks &amp; Next</h2>
+    <span class="line"></span>
+    <span class="sub mono">5 风险 · 4 意外发现 · 1 CTA</span>
+  </div>
+
+  <div class="risks">
+    <h3>路线图级别的风险</h3>
+    <ol>
+      <li><b>包体膨胀。</b>每个新功能都是 JS + 原生。做到 #15 SDK 可能翻倍。缓解：每项功能必须可通过 <code>capture.*</code> 关闭，tree-shakeable。v0.9.0 完后审一遍。</li>
+      <li><b>新架构跑步机。</b>RN minor 版本每 ~2 个季度破一次 TurboModule 内部。0.76 / 0.78 / 0.79 跑 CI 矩阵；pin known-good。</li>
+      <li><b>dogfood 饱和。</b>Insight 一个客户撑 v0.9，v1.0 没有第二 canary。在 v1.0 之前需要排上第二个 RN dogfood 项目。</li>
+      <li><b>Dashboard 密度上限。</b>UI 密 + 4 种新数据类型 + 7 项原创 → 可能变 "Bloomberg Terminal"。#15 统一 issue 视图<b>非谈判</b>。</li>
+      <li><b>服务端范围悄悄膨胀。</b>一半功能触及服务端。"RN 深度设计"标题掩盖了这同时是服务端路线图。明确承认它。</li>
+    </ol>
+  </div>
+
+  <div class="surprises">
+    <div class="surprise">
+      <div class="h"><span class="glyph">●</span>意外 · 机会窗口</div>
+      <p><b>Instabug 仓库 2026-01-28 归档</b>，rebrand 为 Luciq。前业内 #2 反馈产品处于过渡。占领其 RN 段位的窗口开放。<a href="https://github.com/Instabug/Instabug-React-Native">github.com/Instabug/…</a></p>
+    </div>
+    <div class="surprise">
+      <div class="h"><span class="glyph">●</span>意外 · 技术差异点</div>
+      <p><b>连 Sentry 也没修新架构 TurboModule 吞 NSException 的 bug。</b>他们的 pipeline 仍显示为 <code>__pthread_kill</code> 或通用 Hermes 错误。 <a href="https://github.com/reactwg/react-native-new-architecture/discussions/276">RN WG #276</a></p>
+    </div>
+    <div class="surprise">
+      <div class="h"><span class="glyph">●</span>意外 · 竞品 bug</div>
+      <p><b>Sentry 自动 TTID 在 react-navigation TabNavigator 上挂着</b> — 2024 年开的 issue 没修。我们第一次发布就能做对。<a href="https://github.com/getsentry/sentry-react-native/issues/3786">sentry-rn#3786</a></p>
+    </div>
+    <div class="surprise">
+      <div class="h"><span class="glyph">●</span>意外 · 集成切入</div>
+      <p><b>EAS Update SDK 55（2026-02）</b>加 Hermes 字节码 diff + 百分比灰度 + 撤回回滚。我们的 #3 + #10 接进去 — 对 Expo 客户的故事比 CodePush 干净得多。</p>
+    </div>
+  </div>
+
+  <div class="cta">
+    <div class="label">接下来</div>
+    <h3>定 7 个决策 · 发布 v0.9.0</h3>
+    <p>
+      路线图已经按宪法对齐，并把 sentori 原创工作流分散嵌入 v0.9.1 与 v1.0。<b>动手之前</b>先把 D1–D7 拍板（大多决定 effort 估算的量级）。之后 v0.9.0 这一批（8 项，~3 周）补齐入场资格，不动差异化部分。真正有意思的工作 — Wireframe Replay、TurboModule 修复、Profiling、加上 7 项原创 — 在 v0.9.1 起逐步落地。
+    </p>
+    <div class="ctalist">
+      <div class="ci"><span><b>D1</b> · Replay 形态</span><span class="pill">wireframe</span></div>
+      <div class="ci"><span><b>D2</b> · Profiling</span><span class="pill">Hermes · on-slow-frame</span></div>
+      <div class="ci"><span><b>D3</b> · 启动崩溃回调</span><span class="pill">阻塞 ≤200ms</span></div>
+      <div class="ci"><span><b>D4</b> · 新架构</span><span class="pill">激进</span></div>
+      <div class="ci"><span><b>D5</b> · Replay 存储</span><span class="pill">attachment blob</span></div>
+      <div class="ci"><span><b>D6</b> · 定价</span><span class="pill">免费 / 按保留</span></div>
+      <div class="ci"><span><b>D7</b> · API 命名</span><span class="pill">扁平</span></div>
+      <div class="ci"><span><b>v0.9.0</b> · 8 项</span><span class="pill">~3 周</span></div>
+    </div>
+  </div>
+
+  <footer>
+    <span>SENTORI / 设计 / v0.9 RN 深度</span>
+    <span>研究 2026-05 · 7 竞品 · 34 维 · 15 路线 · 7 原创 · 7 决策</span>
+  </footer>
+</section>
+
+</main>
+</div>
+
+<script>
+(function () {
+  var links = document.querySelectorAll('.toc a[data-id]');
+  var sections = Array.from(document.querySelectorAll('main section.section'));
+  function spy() {
+    var y = window.scrollY + 120;
+    var active = sections[0];
+    for (var i = 0; i < sections.length; i++) {
+      if (sections[i].offsetTop <= y) active = sections[i];
+    }
+    for (var j = 0; j < links.length; j++) {
+      links[j].classList.toggle('active', links[j].getAttribute('data-id') === active.id);
+    }
+  }
+  window.addEventListener('scroll', spy, { passive: true });
+  spy();
+})();
+</script>
+</body>
+</html>

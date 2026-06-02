@@ -1,0 +1,40 @@
+@import 'tailwindcss';
+
+/*
+ * Phase 28 sub-F: design tokens.
+ *
+ * Mirrors web/src/index.css palette so dashboard and marketing share
+ * tokens. Marketing is dark-only — only the dark values land here.
+ * Single source of truth: docs/design-tokens.md. Changing a token
+ * requires updating all three CSS surfaces + the doc in the same
+ * commit.
+ */
+
+@theme {
+  --color-bg: #0b0b0f;
+  --color-bg-tertiary: #1a1a23;
+  --color-fg: #f3f4f6;
+  --color-fg-muted: #9ca3af;
+  --color-fg-secondary: #d1d5db;
+  --color-border: #2a2a35;
+  --color-accent: #818cf8;
+}
+
+html,
+body {
+  margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+code,
+.font-mono {
+  font-family:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}

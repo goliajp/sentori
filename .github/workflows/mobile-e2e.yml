@@ -1,0 +1,177 @@
+name: mobile-e2e
+
+# Phase 16 sub-E: native crash + source-map e2e jobs.
+#
+# These run on every PR + push to master but use a macOS runner (for
+# iOS) and an Ubuntu runner with the Android emulator action (for
+# Android). They're slower than the Linux unit-test job, so the
+# regular CI workflow keeps running on Ubuntu and we let mobile fan
+# out only when relevant trees change.
+
+# v0.4 CI sweep: `push` / `pull_request` triggers temporarily disabled.
+# Two unrelated infra gaps were generating fail-mail noise on every
+# commit:
+#   1. android-robolectric: no `gradlew` wrapper in the repo (the RN
+#      example uses Expo, no Gradle-native project to drive).
+#   2. mailcatcher: port 1025 collides with another job's container
+#      on the same runner; needs docker network isolation.
+# Restore the previous triggers once those two are fixed. Manual
+# dispatch still works for one-off runs.
+on:
+  workflow_dispatch:
+
+# v2.1 — opt into Node.js 24 ahead of GitHub Actions' 2026-06-02
+# forced cutover. See `build.yml` for the rationale.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  ios-xctest:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: List simulators (sanity)
+        run: xcrun simctl list devices available | head -20
+      - name: Run XCTest
+        working-directory: sdk/react-native/ios
+        run: |
+          xcodebuild test \
+            -scheme SentoriTests \
+            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            -resultBundlePath /tmp/sentori-ios.xcresult \
+            CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-xcresult
+          path: /tmp/sentori-ios.xcresult
+
+  android-robolectric:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/gradle-build-action@v3
+      - name: Run Robolectric
+        working-directory: sdk/react-native/android
+        run: ./gradlew test --console=plain
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-test-reports
+          path: sdk/react-native/android/build/reports/tests/
+
+  mailcatcher:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: dev
+          POSTGRES_DB: sentori
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      valkey:
+        image: valkey/valkey:8-alpine
+        ports: ['6379:6379']
+      mailpit:
+        image: axllent/mailpit:latest
+        ports: ['1025:1025', '1080:8025']
+    env:
+      DATABASE_URL: postgres://postgres:dev@localhost:5432/sentori
+      VALKEY_URL: redis://localhost:6379
+      SENTORI_DEV_TOKEN: devtoken
+      SENTORI_ADMIN_PASSWORD: ci-admin
+      SENTORI_SESSION_SECRET: ci-secret-deadbeefdeadbeefdeadbeefdeadbeef
+      SENTORI_BASE_URL: http://localhost:8080
+      SENTORI_SMTP_HOST: localhost
+      SENTORI_SMTP_PORT: '1025'
+      SENTORI_SMTP_TLS: plain
+      SENTORI_SMTP_FROM: sentori@local
+      PG_CONTAINER: ''  # short-circuit docker exec — script falls back to localhost psql
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Apply migrations
+        run: |
+          for f in server/migrations/*.sql; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+          done
+      - name: Build + start server
+        working-directory: server
+        run: |
+          cargo build
+          target/debug/sentori-server &
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:8080/v1/events/_recent \
+              -H "Authorization: Bearer $SENTORI_DEV_TOKEN" && break
+            sleep 1
+          done
+      - name: Run mailcatcher smoke
+        run: bash scripts/test-mailcatcher.sh
+
+  sourcemap-e2e:
+    needs: mailcatcher
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: dev
+          POSTGRES_DB: sentori
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build CLI
+        run: cargo build --release --manifest-path cli/Cargo.toml
+      - name: Apply migrations + start server
+        env:
+          DATABASE_URL: postgres://postgres:dev@localhost:5432/sentori
+          SENTORI_DEV_TOKEN: devtoken
+          SENTORI_ADMIN_PASSWORD: ci-admin
+          SENTORI_SESSION_SECRET: ci-secret-deadbeefdeadbeefdeadbeefdeadbeef
+          SENTORI_BASE_URL: http://localhost:8080
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          for f in server/migrations/*.sql; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+          done
+          cargo build --manifest-path server/Cargo.toml
+          server/target/debug/sentori-server &
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:8080/v1/events/_recent \
+              -H "Authorization: Bearer $SENTORI_DEV_TOKEN" && break
+            sleep 1
+          done
+      - name: Run sourcemap e2e
+        env:
+          SENTORI_BASE: http://localhost:8080
+          SENTORI_DEV_TOKEN: devtoken
+          SENTORI_PROJECT_ID: 019508a0-0000-7000-8000-000000000000
+        run: bash scripts/sourcemap-e2e/run.sh

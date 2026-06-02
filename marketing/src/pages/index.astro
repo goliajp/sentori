@@ -1,0 +1,240 @@
+---
+import '../styles/global.css'
+
+// v2.4 redesign — single-domain consolidation.
+//
+// Navigation links use same-domain paths:
+//   /docs            → docs site (Astro Starlight, base="/docs")
+//   /main            → SPA dashboard (was app.sentori.golia.jp)
+//   /register         → register page (auth, root-level)
+//   /login           → login
+//
+// Content focus: v2.3 capabilities + the "free bonus" stance.
+// Removed the long "why we built this" wall — moved to /docs.
+
+const features = [
+  {
+    icon: '⌁',
+    title: 'JS + Native error capture',
+    body: 'ErrorUtils + Hermes promise tracker on the JS side; NSException on iOS, Java/Kotlin uncaught on Android. One SDK, three runtimes, one dashboard.',
+  },
+  {
+    icon: '⊟',
+    title: 'Schema without legacy',
+    body: 'Single JSON event per request, camelCase wire format, nested cause chains, uuid v7 ids. No envelope, no exceptions[] arrays. Designed in 2026 — not retrofitted from 2012.',
+  },
+  {
+    icon: '⊞',
+    title: 'One binary, one compose',
+    body: 'axum + Postgres + Valkey, in one Rust binary. docker compose up. No Kafka, no ClickHouse, no Snuba. Self-hostable on a single VM.',
+  },
+  {
+    icon: '◐',
+    title: 'Dense, keyboard-first dashboard',
+    body: 'Issues are a 32-px row table; j / k / Enter / s / / / [ / ]. Tabular nums, mono release strings. Designed against Linear and Modal, not Sentry.',
+  },
+  {
+    icon: '◌',
+    title: 'Cross-project user lookup — no PII on wire',
+    body: 'Hash email / phone / OAuth sub on the device; server stores per-org-salted fingerprints. Operator looks up one user across every project in your org without Sentori ever seeing the raw value. Audit-safe by construction.',
+  },
+  {
+    icon: '⇄',
+    title: 'Sentry-compatible drop-in',
+    body: 'import * as Sentry from "@goliapkg/sentori-react-native/compat" — your existing Sentry code runs. One-shot console hints flag the few translation differences. Migrate gradually or stay on the compat surface forever.',
+  },
+  {
+    icon: '⌀',
+    title: 'Silent by default; LLM-friendly',
+    body: 'logLevel: "warn" means Sentori never pollutes your metro / browser console under normal operation. Flat, discoverable types so LLM agents generate correct calls. No Hub / Scope / Severity-enum legacy.',
+  },
+  {
+    icon: '⚯',
+    title: 'Free bonus, never a burden',
+    body: 'NEVER rule: SDK failures are silently swallowed and self-reported via a circuit-breaker. Host code never sees a stack trace from inside Sentori. < 1% main-thread budget on mid devices, < 500 KB / minute typical.',
+  },
+]
+
+const SNIPPET = `import sentori from '@goliapkg/sentori-react-native'
+
+sentori.init({
+  token: 'st_pk_…',
+  release: 'myapp@1.2.3',
+  // Optional cross-project user lookup (PII-safe):
+  // hashed client-side before send.
+  // sentori.setUser({ id: 'usr_123', linkBy: { email } })
+})`
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta
+      name="description"
+      content="Error tracking + user lookup for React, React Native, Next.js, Vue, Svelte, SolidJS. Hashes user identity on-device so Sentori never sees raw email. Self-hostable Rust binary, dense Linear-style dashboard, Sentry-compatible API drop-in."
+    />
+    <link rel="canonical" href="https://sentori.golia.jp/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Sentori" />
+    <meta property="og:title" content="Sentori — error tracking + PII-safe user lookup" />
+    <meta property="og:description" content="SDKs for React, React Native, Next.js, Vue, Svelte, SolidJS. Cross-project user lookup with on-device identity hashing. Self-hostable Rust binary." />
+    <meta property="og:url" content="https://sentori.golia.jp/" />
+    <meta property="og:image" content="https://sentori.golia.jp/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Sentori — error tracking + PII-safe user lookup" />
+    <meta name="twitter:description" content="React-first error tracking. On-device identity hashing for cross-project user lookup. Self-hostable." />
+    <meta name="twitter:image" content="https://sentori.golia.jp/og.png" />
+    <title>Sentori — error tracking, built React-first</title>
+  </head>
+  <body class="bg-bg text-fg min-h-screen">
+    <header class="border-border border-b">
+      <nav class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4 text-sm">
+        <a href="/" class="text-fg font-semibold tracking-tight">Sentori</a>
+        <div class="text-fg-muted flex items-center gap-6">
+          <a href="/docs" class="hover:text-fg transition-colors">Docs</a>
+          <a href="/pricing" class="hover:text-fg transition-colors">Pricing</a>
+          <a href="https://github.com/goliajp/sentori" class="hover:text-fg transition-colors">GitHub</a>
+          <a href="/login" class="hover:text-fg transition-colors">Sign in</a>
+          <a
+            href="/register"
+            class="bg-accent text-bg rounded-md px-3 py-1.5 font-medium transition-opacity hover:opacity-90"
+          >Get started</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="mx-auto max-w-5xl px-6">
+      <!-- ── Hero ─────────────────────────────────────────────────── -->
+      <section class="pt-24 pb-16">
+        <p class="text-accent font-mono text-[11px] tracking-[0.22em] uppercase">
+          v2.3 · identity layer + Sentry-compat drop-in
+        </p>
+        <h1 class="text-fg mt-3 max-w-3xl text-5xl leading-tight font-semibold tracking-tight">
+          Error tracking + user lookup,<br />
+          without sending PII.
+        </h1>
+        <p class="text-fg-muted mt-6 max-w-2xl text-lg leading-relaxed">
+          First-class SDKs for React, React Native, Next.js, Vue, Svelte, and SolidJS. Cross-project user lookup with on-device identity hashing — operator types a real email, Sentori never sees it. Dense Linear-style dashboard, single Rust binary deploy, Sentry-compatible API for drop-in migration.
+        </p>
+        <div class="mt-10 flex flex-wrap items-center gap-3">
+          <a
+            href="/register"
+            class="bg-accent text-bg rounded-md px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90"
+          >
+            Get started — free →
+          </a>
+          <a
+            href="/docs/getting-started"
+            class="border-border text-fg hover:bg-bg-tertiary rounded-md border px-4 py-2 text-sm transition-colors"
+          >
+            Read the docs
+          </a>
+          <a
+            href="/docs/sentry-compat"
+            class="text-fg-muted hover:text-fg px-2 text-sm transition-colors"
+          >
+            Migrating from Sentry? →
+          </a>
+        </div>
+      </section>
+
+      <!-- ── Code snippet ─────────────────────────────────────────── -->
+      <section class="pb-20">
+        <div class="border-border rounded-md border bg-[color:var(--bg-tertiary,#0e0e10)] overflow-x-auto">
+          <div class="border-border flex items-center justify-between border-b px-4 py-2">
+            <span class="text-fg-muted font-mono text-[11px] tracking-[0.08em] uppercase">
+              install
+            </span>
+            <span class="text-fg-muted font-mono text-[11px]">
+              @goliapkg/sentori-react-native@1.3
+            </span>
+          </div>
+          <pre class="text-fg p-4 font-mono text-[12.5px] leading-relaxed">{SNIPPET}</pre>
+        </div>
+        <p class="text-fg-muted mt-2 text-[11px]">
+          Five-minute quickstarts for each framework in <a href="/docs/getting-started" class="text-fg hover:text-accent">the docs</a>.
+        </p>
+      </section>
+
+      <!-- ── Feature grid ─────────────────────────────────────────── -->
+      <section class="border-border grid grid-cols-1 gap-x-12 gap-y-10 border-t pt-16 md:grid-cols-2">
+        {
+          features.map((f) => (
+            <div>
+              <div class="text-accent font-mono text-base leading-none">{f.icon}</div>
+              <h3 class="text-fg mt-2 text-base font-semibold">{f.title}</h3>
+              <p class="text-fg-muted mt-2 text-sm leading-relaxed">{f.body}</p>
+            </div>
+          ))
+        }
+      </section>
+
+      <!-- ── Self-host vs SaaS ────────────────────────────────────── -->
+      <section class="border-border mt-24 border-t pt-16">
+        <div class="grid grid-cols-1 gap-12 md:grid-cols-2">
+          <div>
+            <p class="text-accent font-mono text-[11px] tracking-[0.22em] uppercase">SaaS</p>
+            <h2 class="text-fg mt-2 text-xl font-semibold tracking-tight">sentori.golia.jp</h2>
+            <p class="text-fg-muted mt-3 leading-relaxed">
+              Sign up, copy a token, ship. Same binary as the open-source build — multi-tenant migrations on, your data isolated by org-scoped salts. Free tier per the <a href="/pricing" class="text-fg hover:text-accent">pricing page</a>.
+            </p>
+            <a
+              href="/register"
+              class="text-accent mt-4 inline-block text-sm hover:underline"
+            >
+              Create an account →
+            </a>
+          </div>
+          <div>
+            <p class="text-accent font-mono text-[11px] tracking-[0.22em] uppercase">Self-host</p>
+            <h2 class="text-fg mt-2 text-xl font-semibold tracking-tight">docker compose up</h2>
+            <p class="text-fg-muted mt-3 leading-relaxed">
+              One Rust binary, Postgres, Valkey. No Kafka / ClickHouse / Snuba — runs on a t3.small. Identity scope salts stay on your DB; nothing leaves your perimeter.
+            </p>
+            <a
+              href="/docs/self-hosting"
+              class="text-accent mt-4 inline-block text-sm hover:underline"
+            >
+              Self-hosting guide →
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Legal / footer-ish links ─────────────────────────────── -->
+      <section
+        class="text-fg-muted border-border mt-24 flex flex-wrap items-center gap-x-5 gap-y-1 border-t pt-6 text-[12px]"
+      >
+        <a class="hover:text-fg" href="/docs">Docs</a>
+        <a class="hover:text-fg" href="/docs/getting-started">Quickstart</a>
+        <a class="hover:text-fg" href="/docs/sentry-compat">Sentry compat</a>
+        <a class="hover:text-fg" href="/docs/migration-v1-to-v2">v1 → v2 migration</a>
+        <a class="hover:text-fg" href="/docs/privacy/identity">Privacy</a>
+        <a class="hover:text-fg" href="/legal/privacy">Privacy policy</a>
+        <a class="hover:text-fg" href="/legal/terms">Terms</a>
+        <a class="hover:text-fg" href="/docs/self-hosting">Self-host</a>
+        <a class="hover:text-fg" href="https://github.com/goliajp/sentori">GitHub</a>
+      </section>
+    </main>
+
+    <footer class="border-border mt-16 border-t">
+      <div class="text-fg-muted mx-auto flex max-w-5xl items-center justify-between px-6 py-8 text-xs">
+        <span>Sentori · React-first error tracking</span>
+        <span>Built in Tokyo.</span>
+      </div>
+    </footer>
+    <script>
+      // Phase 17 sub-F: dogfood. Marketing site reports its own JS
+      // errors back to Sentori so the marketing-app shows up as a
+      // first-class project in the dashboard. Replaces the prior
+      // explicit window.onerror handler with the SDK; the SDK
+      // installs identical hooks plus promise-rejection coverage.
+      // (Marketing JS is minimal, so this almost never fires —
+      // exists to keep the rest of the dashboard self-consistent.)
+    </script>
+  </body>
+</html>

@@ -1,0 +1,67 @@
+---
+title: Sentori
+description: RN-first error tracking with wireframe replay. Self-hostable.
+template: splash
+hero:
+  title: Sentori
+  tagline: |
+    Errors, traces, and **intent** — at the speed of triage.
+    RN-first error tracking with native wireframe replay, hang
+    watchdog, and a SwiftUI showcase.
+  actions:
+    - text: Get started
+      link: /getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: Star on GitHub
+      link: https://github.com/goliajp/sentori
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components'
+
+<CardGrid>
+  <Card title="Try the iOS showcase" icon="puzzle">
+    SwiftUI 6 demo that links the Sentori native core directly —
+    fastest way to feel what the SDK captures, no JS bridge.
+    [Read the showcase notes →](https://github.com/goliajp/sentori/tree/main/apps/ios-showcase)
+  </Card>
+  <Card title="SDK reference" icon="seti:javascript">
+    `@goliapkg/sentori-react-native` — JS, iOS, Android. Capture
+    API, wireframe replay, hang watchdog, ErrorBoundary, native
+    crash setup, source-map upload.
+    [Read →](/sdk-react-native/)
+  </Card>
+  <Card title="Wireframe replay" icon="information">
+    60 slots of fiber-tree snapshots, ~120 bytes per frame at idle.
+    Dashboard scrubs through prop / colour / position changes —
+    not video, not pixels.
+    [Read the protocol →](/protocol/)
+  </Card>
+  <Card title="Self-hosting" icon="setting">
+    Production deploy with docker compose, SMTP, source maps,
+    backups, reverse proxy. Single Rust binary + Postgres + Valkey.
+    [Read →](/self-hosting/)
+  </Card>
+</CardGrid>
+
+## What you can do today
+
+- **Capture errors** from any React Native + Expo app on iOS or Android in one
+  line: `sentori.captureException(err)`. JS errors, iOS `NSException`,
+  Android uncaught exceptions, fetch-call-stack-of-failure breadcrumbs.
+- **Scrub a wireframe replay** of the last 60 seconds on the issue
+  detail page — see what was on screen at the moment of the crash,
+  and which nodes changed between frames.
+- **Self-host on a single VM** — `docker compose up -d` and you're
+  live. No external dependencies, no S3 required (local-fs storage
+  for attachments works out of the box).
+- **Upload source maps** through `sentori-cli` so every stack frame
+  resolves to the original TypeScript line in the dashboard.
+
+## Roadmap
+
+The v1.0 plan (Replay scrubber, intent cluster, iOS showcase as
+the open-source front door) lives at
+[`docs/roadmap/v1.0.md`](https://github.com/goliajp/sentori/blob/main/docs/roadmap/v1.0.md)
+in the repo.

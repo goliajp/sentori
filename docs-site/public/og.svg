@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" preserveAspectRatio="xMidYMid meet">
+  <rect width="1200" height="630" fill="#0b0b0f"/>
+  <!-- subtle accent strip -->
+  <rect x="80" y="80" width="64" height="4" fill="#a78bfa"/>
+  <!-- top-left: monospace status line -->
+  <text x="80" y="124" fill="#6b7280" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace" font-size="22" font-weight="400">sentori.golia.jp</text>
+  <!-- title -->
+  <text x="80" y="320" fill="#f3f4f6" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="140" font-weight="700" letter-spacing="-4">Sentori</text>
+  <!-- subtitle line 1 -->
+  <text x="80" y="400" fill="#9ca3af" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="40" font-weight="400">Modern error tracking for React Native.</text>
+  <!-- subtitle line 2 -->
+  <text x="80" y="450" fill="#9ca3af" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="40" font-weight="400">Self-hostable. Single Rust binary.</text>
+  <!-- bottom-left chips -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22" font-weight="400">
+    <rect x="80"  y="540" width="180" height="44" rx="6" fill="#1a1a22" stroke="#2a2a35" stroke-width="1"/>
+    <text x="170" y="568" fill="#a78bfa" text-anchor="middle">react-native</text>
+    <rect x="276" y="540" width="120" height="44" rx="6" fill="#1a1a22" stroke="#2a2a35" stroke-width="1"/>
+    <text x="336" y="568" fill="#a78bfa" text-anchor="middle">rust</text>
+    <rect x="412" y="540" width="180" height="44" rx="6" fill="#1a1a22" stroke="#2a2a35" stroke-width="1"/>
+    <text x="502" y="568" fill="#a78bfa" text-anchor="middle">self-hosted</text>
+  </g>
+</svg>
