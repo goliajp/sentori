@@ -43,6 +43,18 @@ export default defineConfig({
           ],
         },
         {
+          label: 'Manual instrumentation',
+          items: [
+            { label: 'Manual issue reporting', slug: 'recipes/manual-issue' },
+            { label: 'Manual trace', slug: 'recipes/manual-trace' },
+            { label: 'Manual span', slug: 'recipes/manual-span' },
+            { label: 'Manual moment', slug: 'recipes/manual-moment' },
+            { label: 'Manual breadcrumb', slug: 'recipes/manual-breadcrumb' },
+            { label: 'Track + metrics', slug: 'recipes/track-and-metrics' },
+            { label: 'v1 → v2 migration', slug: 'recipes/v1-to-v2-migration' },
+          ],
+        },
+        {
           label: 'Recipes',
           items: [
             { label: 'Next.js', slug: 'recipes/nextjs' },
