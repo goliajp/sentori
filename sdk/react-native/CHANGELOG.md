@@ -1,5 +1,90 @@
 # @goliapkg/sentori-react-native
 
+## 2.1.0
+
+### Minor Changes
+
+- v2.1 — runtime metrics auto-instrument suite (RN)
+
+  **New (additive — purely opt-in via `capture.runtimeMetrics`,
+  defaults `true`)**
+
+  - `sentori.init({ capture: { runtimeMetrics: true } })` (default
+    on) starts the RN auto-instrument suite. Drains the shared
+    `@goliapkg/sentori-core` ring to `/v1/runtime-metrics:batch`
+    every 30 s, coalesced with the existing event flush so the
+    host app pays one round-trip instead of two.
+
+  **Metrics emitted**
+
+  | Name                                                            | Source                                           | Cost                                        |
+  | --------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------- |
+  | `runtime.cold_start_ms`                                         | One-shot at first paint                          | trivial                                     |
+  | `runtime.fps.p50` / `runtime.fps.p95`                           | rAF rolling 5 s window                           | per-tick < 0.5 ms target                    |
+  | `runtime.heap.{used,total,limit}_bytes`                         | `performance.memory` poll @ 30 s                 | trivial when present, silent no-op when not |
+  | `runtime.route_nav_ms`                                          | inline emit from `useTraceNavigation` per screen | trivial                                     |
+  | `runtime.network.bytes_sent` / `runtime.network.bytes_received` | fetch wrapper counters, 30 s emit                | 2 adds per fetch round-trip                 |
+
+  **Core API surface (additive)**
+
+  - `emitMetric(name, value, tags?)` — auto-instrument entry point.
+    Same validation as the server: `^[a-z][a-z0-9_]*\.[a-z0-9_.]+$`
+    name regex, value finite, tags ≤ 16. Malformed silently dropped
+    per the NEVER rule.
+  - `RuntimeMetricBuffer` — bounded ring (10k cap, FIFO drop).
+    Module-scoped global + per-instance constructor for multi-org
+    test fixtures.
+  - `drainRuntimeMetricsForFlush()` — atomic drain for the per-SDK
+    flusher; surfaces overflow drop count once via
+    `reportInternal('runtime-metrics.ring_overflow', ...)`.
+  - `rebufferRuntimeMetrics(points)` — failed-flush recovery,
+    bounded by ring cap.
+
+  **Server side (v2.1 W1, already in prod)**
+
+  - `POST /v1/runtime-metrics:batch` token-gated endpoint, writes
+    to `runtime_metrics_raw` (day-partitioned, 90 d retention).
+  - 60 s rollup cron raw → `_1m` with 10 s late-arrival safety
+    margin; hourly `_1m → _1h`; daily `_1h → _1d`.
+  - Pre-computed count / sum / avg / p50 / p95 / p99 per
+    (project, bucket, name, release, environment, device_class)
+    so the dashboard BI panel reads percentiles directly.
+
+  **Compatibility**
+
+  - v2.0 SDK requests parse unchanged on the v2.1 server. The
+    `server/tests/v20_compat.rs` suite (5 cases) pins this. The
+    v1 compat suite (11 cases) also stays green.
+  - Mixed v2.0 / v2.1 fleets are fully supported — no flag day.
+    Hosts that stay on v2.0 skip runtime-metric reporting; their
+    errors / traces / breadcrumbs land on the same server unchanged.
+
+  **Performance bedrock** (per `.claude/CLAUDE.md`)
+
+  - Per-tick budget < 0.5 ms on a Pixel-5-equivalent bench
+    (stop-ship gate; CI workflow lands in W2 part 5).
+  - Sustained main-thread cost < 1 %.
+  - Total network < 500 KB per 60 s capture window (auto-instrument
+    contributes ~2.4 KB / min, ~0.5 % of the budget).
+
+  **Not yet in 2.1**
+
+  - Web matrix auto-instrument wiring (sdk-javascript +
+    sdk-react / -vue / -svelte / -solid). Core's `emitMetric` is
+    available to web hosts; the framework adapters' auto-instrument
+    hooks ship in 2.1.1.
+  - `.github/workflows/sdk-perf.yml` per-tick budget CI workflow
+    ships in 2.1.1 alongside the web matrix.
+
+  See `docs/roadmap/v2.1.md` for the full L2 / W-checkpoint plan
+  and `docs/design/v2-metrics.md` for the schema + capacity
+  envelope rationale.
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @goliapkg/sentori-core@1.1.0
+
 ## 2.0.0
 
 ### Major Changes

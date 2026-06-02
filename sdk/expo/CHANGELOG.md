@@ -1,5 +1,12 @@
 # @goliapkg/sentori-expo
 
+## 4.0.0
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @goliapkg/sentori-react-native@2.1.0
+
 ## 3.0.0
 
 ### Major Changes
