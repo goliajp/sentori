@@ -48,7 +48,11 @@ export type CaptureMessageOptions = {
    *  ring-buffer snapshot is sealed and attached. */
   breadcrumbs?: Breadcrumb[]
 }
-export type BreadcrumbType = 'custom' | 'log' | 'nav' | 'net' | 'user'
+/** v2.0 W3 — `track` joins the breadcrumb type axis. Emitted
+ *  automatically by `sentori.track()` when `init.capture.trackAutoBreadcrumb`
+ *  is `true`, so a later `captureException` carries the customer
+ *  journey leading up to the failure. */
+export type BreadcrumbType = 'custom' | 'log' | 'nav' | 'net' | 'track' | 'user'
 
 export type Event = {
   app: App
@@ -248,8 +252,23 @@ export type Span = {
   traceId: string
 }
 
+/** v2.0 W3 — capture-time policy knobs shared across SDKs. Optional
+ *  block; absent → all defaults. Defaults are conservative to avoid
+ *  changing existing customer breadcrumb shape; new integrations are
+ *  encouraged to set `trackAutoBreadcrumb: true`. */
+export type CaptureOptions = {
+  /** When `true`, every `track(name, props)` call also pushes a
+   *  breadcrumb of `{ type: 'track', data: { name, props } }` so the
+   *  customer journey shows up on a subsequent `captureException` /
+   *  `captureMessage`. Defaults to `false` to preserve v1 behaviour
+   *  on upgrade. */
+  trackAutoBreadcrumb?: boolean
+}
+
 /** Subset of init options that every SDK accepts. SDKs may extend. */
 export type CommonInitOptions = {
+  /** v2.0 W3 — capture-time policy knobs. See `CaptureOptions`. */
+  capture?: CaptureOptions
   /** "prod" / "dev" / "staging" / whatever you want. */
   environment: string
   /** e.g. https://ingest.sentori.golia.jp */

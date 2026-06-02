@@ -19,7 +19,13 @@ export type SentoriNextConfig = Partial<CommonInitOptions> & {
 const CLIENT_PREFIX = 'NEXT_PUBLIC_SENTORI_'
 const SERVER_PREFIX = 'SENTORI_'
 
-const KEY_MAP: Record<keyof CommonInitOptions, string> = {
+/** v2.0 W3 — CommonInitOptions now has a nested `capture` object that
+ *  can't be resolved from a single env var, so KEY_MAP restricts to
+ *  the four primitive-string fields the env layer actually drives.
+ *  Nested options stay explicit-only via `cfg`. */
+type EnvDrivenKey = 'environment' | 'ingestUrl' | 'release' | 'token'
+
+const KEY_MAP: Record<EnvDrivenKey, string> = {
   environment: 'ENVIRONMENT',
   ingestUrl: 'INGEST_URL',
   release: 'RELEASE',
@@ -39,7 +45,7 @@ export function resolveConfig(side: Side, cfg: SentoriNextConfig = {}): CommonIn
   const env = cfg.envOverride ?? processEnv()
   const out: Partial<CommonInitOptions> = {}
 
-  for (const k of Object.keys(KEY_MAP) as (keyof CommonInitOptions)[]) {
+  for (const k of Object.keys(KEY_MAP) as EnvDrivenKey[]) {
     const explicit = cfg[k]
     if (explicit !== undefined) {
       out[k] = explicit
@@ -50,6 +56,13 @@ export function resolveConfig(side: Side, cfg: SentoriNextConfig = {}): CommonIn
     const server = env[`${SERVER_PREFIX}${suffix}`]
     const v = side === 'client' ? browser : (server ?? browser)
     if (v) out[k] = v
+  }
+
+  // v2.0 W3 — `capture` is nested, env can't drive it. Carry the
+  // explicit value through so callers can still pass
+  // `capture: { trackAutoBreadcrumb: true }` to resolveConfig().
+  if (cfg.capture !== undefined) {
+    out.capture = cfg.capture
   }
 
   // Defaults: ingestUrl points at the public SaaS if nothing was set.

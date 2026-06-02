@@ -11,6 +11,8 @@
 // outgoing connection pool. Batching makes the SDK safe to use as a
 // cheap counter primitive.
 
+import type { SpanContextLike } from '@goliapkg/sentori-core';
+
 import { getConfig, isInitialized } from './config';
 import { sendMetricsBatch } from './transport';
 
@@ -43,7 +45,7 @@ export function recordMetric(
   name: string,
   value: number,
   tags?: Record<string, string>,
-  opts?: { parent?: { spanId: string; traceId: string } },
+  opts?: { parent?: SpanContextLike },
 ): void {
   if (!isInitialized()) return;
   if (typeof name !== 'string' || name.length === 0 || name.length > 200) return;

@@ -73,6 +73,14 @@ export type InitOptions = {
      *  the buffer is sealed and uploaded as a `sessionTrail`
      *  attachment. Defaults to false. */
     sessionTrail?: boolean;
+    /** v2.0 W3 — when `true`, every `sentori.track(name, props)`
+     *  also pushes a `{ type: 'track', data: { name, props } }`
+     *  breadcrumb so a subsequent `captureException` /
+     *  `captureMessage` carries the customer journey leading up to
+     *  the failure. Defaults to `false` to preserve v1 customer
+     *  breadcrumb shape on upgrade; recommended `true` for new
+     *  integrations. See `docs/recipes/track-and-metrics.md`. */
+    trackAutoBreadcrumb?: boolean;
     /** v0.9.1 +S4 — pre-crash sentinel. Subscribes to JS-thread
      *  frame timing; when ≥ 50% of a 60-frame window misses the
      *  budget (default 32 ms / < 30 fps), emits a `kind: nearCrash`
@@ -197,6 +205,11 @@ export const init = (options: InitOptions): void => {
     traceSampleRate: options.sample?.traces ?? options.sampling?.traces ?? null,
     messageSampleRate: options.sample?.messages ?? options.sampling?.messages ?? null,
     sessionTrailEnabled: options.capture?.sessionTrail === true,
+    // v2.0 W3 — when true, every `track()` also pushes a
+    // `type: 'track'` breadcrumb so a subsequent captureException
+    // carries the customer journey. Defaults false to preserve v1
+    // breadcrumb shape on upgrade.
+    trackAutoBreadcrumb: options.capture?.trackAutoBreadcrumb === true,
   });
 
   // Tell the native crash handler about the config so the JSON it writes

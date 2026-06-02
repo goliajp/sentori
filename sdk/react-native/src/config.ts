@@ -36,6 +36,11 @@ export type Config = {
    *  session-trail buffer and uploads it as a `sessionTrail`
    *  attachment. Defaults to false. */
   sessionTrailEnabled: boolean;
+  /** v2.0 W3 — when true, every `track(name, props)` call also
+   *  pushes a `{ type: 'track', data: { name, props } }` breadcrumb
+   *  so a subsequent capture carries the customer journey. Defaults
+   *  to false to preserve v1 customer breadcrumb shape on upgrade. */
+  trackAutoBreadcrumb: boolean;
   /** v2.3 — Sentori console output gate.
    *
    *  Default `warn`: SDK is silent on host's console unless
