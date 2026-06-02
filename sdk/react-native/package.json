@@ -32,6 +32,10 @@
       "types": "./lib/compat/sentry.d.ts",
       "default": "./lib/compat/sentry.js"
     },
+    "./feedback": {
+      "types": "./lib/feedback.d.ts",
+      "default": "./lib/feedback.js"
+    },
     "./package.json": "./package.json"
   },
   "bin": {
