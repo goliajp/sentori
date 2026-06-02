@@ -19,6 +19,7 @@ import {
 } from './runtime-metrics';
 import { startFpsInstrument } from './runtime-metrics-fps';
 import { startHeapInstrument } from './runtime-metrics-heap';
+import { startNetworkBytesInstrument } from './runtime-metrics-network';
 import { startTrackTimer } from './track';
 import { drainNativePending, markNativeJsBridgeReady, setNativeConfig } from './native';
 import { getColdStartMs } from './mobile-vitals';
@@ -286,6 +287,12 @@ export const init = (options: InitOptions): void => {
     // SDK works on web targets via @goliapkg/sentori-javascript).
     startFpsInstrument();
     startHeapInstrument();
+    // Network bytes counters drain every 30 s. The counters
+    // themselves are incremented inline by handlers/network.ts
+    // on every fetch round-trip — see the recordNetworkBytes
+    // call site there. No-op when `capture.network: false` is
+    // set (no fetch patch → no counter increments).
+    startNetworkBytesInstrument();
     // Route-nav dwell timing emits inline from `navigation.ts`'s
     // useTraceNavigation state listener — no extra start call
     // needed; the host already mounts that hook for tracing.
