@@ -1,6 +1,6 @@
 {
   "name": "@goliapkg/sentori-vue",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "Vue 3 adapter for Sentori — plugin, errorHandler hook, Vue Router auto-trace navigation, <SentoriErrorBoundary>.",
   "license": "Apache-2.0 OR MIT",
   "author": "GOLIA K.K. <takagi@golia.jp> (https://golia.jp)",
@@ -54,8 +54,8 @@
     }
   },
   "dependencies": {
-    "@goliapkg/sentori-core": "^0.10.0",
-    "@goliapkg/sentori-javascript": "^0.6.0"
+    "@goliapkg/sentori-core": "^1.0.0",
+    "@goliapkg/sentori-javascript": "^1.0.0"
   },
   "devDependencies": {
     "@types/bun": "latest",

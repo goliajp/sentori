@@ -1,6 +1,6 @@
 {
   "name": "@goliapkg/sentori-react",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "description": "React adapter for Sentori — Provider, ErrorBoundary (resetKeys + render-prop), Suspense, TraceRender, react-router breadcrumbs + auto-tracing.",
   "license": "Apache-2.0 OR MIT",
   "author": "GOLIA K.K. <takagi@golia.jp> (https://golia.jp)",
@@ -57,8 +57,8 @@
     }
   },
   "dependencies": {
-    "@goliapkg/sentori-core": "^0.10.0",
-    "@goliapkg/sentori-javascript": "^0.6.0"
+    "@goliapkg/sentori-core": "^1.0.0",
+    "@goliapkg/sentori-javascript": "^1.0.0"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^17",

@@ -1,5 +1,92 @@
 # @goliapkg/sentori-react
 
+## 1.0.0
+
+### Major Changes
+
+- v2.0 — manual instrumentation v2 (W1–W4 closeout)
+
+  The SDK gets its first major release since v1. Every change is
+  either a rename (v1 aliases gone), a move (advanced surfaces
+  behind subpath imports), or an additive new API. Wire format is
+  forever back-compat with v1 — v1 SDK still reports against a
+  v2 server and vice-versa. Migration is purely syntactic; estimated
+  effort for a typical app is ~15 minutes. See the migration recipe
+  at `docs.sentori.golia.jp/recipes/v1-to-v2-migration`.
+
+  **Renamed (v1 aliases removed)**
+
+  - `sentori.captureError(err)` → `sentori.captureException(err)`
+  - `sentori.initSentori({ ... })` → `sentori.init({ ... })`
+  - `span.finish()` → `span.end()`
+  - Positional `addBreadcrumb('msg', { route })` → object-form
+    `addBreadcrumb({ type, data })`
+  - `Event` type → `SentoriEvent` (avoids DOM `Event` collision)
+  - `SpanHandle` / `MomentHandle` types → `Span` / `Moment`
+
+  **Moved (subpath imports — bundle hygiene)**
+
+  - `FeedbackButton` → `import { FeedbackButton } from
+'@goliapkg/sentori-react-native/feedback'` (top-level re-export
+    retained for one release cycle)
+  - `Sentry` compat layer → `import { Sentry } from
+'@goliapkg/sentori-react-native/compat'` (already present in
+    v1.x; reaffirmed here)
+
+  **Additive — new in v2.0**
+
+  - `sentori.captureMessage(msg, { level, tags })` — issues without
+    a thrown `Error`. Lands in the Issues module with a 💬 icon
+    next to thrown errors. Recipe:
+    `docs.sentori.golia.jp/recipes/manual-issue`.
+  - Formal `Span` / `Trace` surface — `startTrace(name)`,
+    `startSpan(op, opts)`, `withSpan(span, fn)`, `withScopedSpan(op,
+fn, opts)`. `Span` gains `.end()` / `.setAttribute()` /
+    `.setStatus()` / `.recordException()` / `.isRecording()`,
+    OTel-aligned. Recipes: `manual-trace`, `manual-span`.
+  - `sentori.recordMetric(name, value, tags?, { parent: span })` —
+    ties the metric point to its emitting span via `tags.span_id`,
+    and the dashboard's trace detail view renders a **related
+    metrics row** under that span. Recipe: `track-and-metrics`.
+  - `init.capture.trackAutoBreadcrumb: true` — every
+    `sentori.track(name, props)` also pushes a `{ type: 'track',
+data: { name, props } }` breadcrumb, so a later
+    `captureException` carries the customer journey. Defaults
+    `false` to preserve v1 breadcrumb shape on upgrade; recommended
+    `true` for new integrations.
+  - `BreadcrumbType` union adds `'track'`; server `BreadcrumbType`
+    enum adds matching `Track` variant.
+
+  **Safety guarantee — NEVER rule**
+
+  Every public `sentori.*` API is wrapped via `safeFn` /
+  `safeAsync` (`sdk/core/src/safe.ts`); internal errors silently
+  fail and optionally self-report via the circuit breaker. The host
+  app never sees a thrown error, a rejected promise, a frame drop,
+  a network failure, or anything else attributable to Sentori — per
+  `.claude/CLAUDE.md` performance budgets (< 1 % main-thread
+  sustained, < 5 ms per tick).
+
+  **Server compatibility**
+
+  v1 and v2 SDK requests parse cleanly against either v1 or v2
+  server. Regression suites `server/tests/v1_compat.rs` (existing)
+  and `server/tests/v20_compat.rs` (added with v2.1 W1) gate this.
+
+  **Rollout**
+
+  We dogfood the SDK on the SaaS dashboard. Recommended customer
+  sequence: lockstep upgrade + run the codemod (15 min), opt into
+  `trackAutoBreadcrumb`, adopt `captureMessage` / `withSpan` /
+  `recordMetric({ parent })` for the cases v1 didn't fit. Mixed
+  v1 / v2 fleets are supported indefinitely — there's no flag day.
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @goliapkg/sentori-core@1.0.0
+  - @goliapkg/sentori-javascript@1.0.0
+
 ## 0.5.0
 
 ### Minor Changes
