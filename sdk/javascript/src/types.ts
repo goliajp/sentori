@@ -40,5 +40,13 @@ export type InitOptions = CommonInitOptions & {
    *  uploads alongside the next `captureException`. */
   capture?: {
     sessionTrail?: boolean
+    /** v2.1 W2 — start the 30 s runtime-metrics flusher. Off by
+     *  default in JS because the auto-instrument modules (FPS /
+     *  heap / network bytes) are RN-only in 2.1.0; web hosts that
+     *  want to push metrics today can flip this on and call
+     *  `emitMetric()` directly. The transport pipe is identical
+     *  to RN's so the dashboard treats both sources uniformly.
+     *  Defaults to `false`. */
+    runtimeMetrics?: boolean
   }
 }

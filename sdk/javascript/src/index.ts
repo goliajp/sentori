@@ -17,6 +17,23 @@ export {
   type SpanContextLike,
   type StartSpanOptions,
 } from '@goliapkg/sentori-core'
+// v2.1 W2 — runtime metrics primitives. Hosts (or framework
+// adapters) emit auto-instrument points via `emitMetric`; the
+// flusher in `./runtime-metrics.js` drains every 30 s. Buffer is
+// module-scoped in core so emit + drain stay coherent across
+// the SDK bundle.
+export {
+  RuntimeMetricBuffer,
+  drainRuntimeMetricsForFlush,
+  emitMetric,
+  rebufferRuntimeMetrics,
+  type RuntimeMetricPoint,
+} from '@goliapkg/sentori-core'
+export {
+  flushRuntimeMetrics,
+  startRuntimeMetricsTimer,
+  stopRuntimeMetricsTimer,
+} from './runtime-metrics.js'
 export type {
   CaptureMessageOptions,
   MessageLevel,

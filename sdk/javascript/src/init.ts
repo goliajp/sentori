@@ -3,6 +3,7 @@ import { installBrowserHooks } from './hooks/browser.js'
 import { installFetchInstrumentation } from './hooks/fetch.js'
 import { installNodeHooks } from './hooks/node.js'
 import { installXhrInstrumentation } from './hooks/xhr.js'
+import { startRuntimeMetricsTimer } from './runtime-metrics.js'
 import { startSession } from './session-tracker.js'
 import { flushSpans, startSpanFlush } from './transport.js'
 import type { InitOptions } from './types.js'
@@ -41,5 +42,13 @@ export function initSentori(options: InitOptions): void {
     addEventListener('pagehide', () => {
       void flushSpans()
     })
+  }
+  // v2.1 W2 — opt-in runtime metrics flusher. Off by default in
+  // JS since the auto-instrument modules (FPS / heap / network
+  // bytes) are RN-only in 2.1.0; web hosts that want to push
+  // metrics today can flip this on and call `emitMetric()`
+  // directly.
+  if (options.capture?.runtimeMetrics === true) {
+    startRuntimeMetricsTimer()
   }
 }

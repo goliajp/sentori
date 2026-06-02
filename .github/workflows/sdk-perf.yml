@@ -1,0 +1,42 @@
+name: sdk-perf
+
+# v2.1 W2 — per-tick perf budget gate for the SDK's hot paths.
+# Runs the bench suite in `sdk/core/src/__tests__/perf.bench.ts`
+# which asserts each hot operation stays under a generous (10x
+# observed) wall-clock budget. A regression on emitMetric /
+# drain / breadcrumb / span fails the suite and blocks the merge.
+#
+# The benches are stable enough to run on a shared GitHub-hosted
+# runner because budgets are 10x typical observed time. If a real
+# regression nudges any path over budget we want to know.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    paths:
+      - 'sdk/core/**'
+      - 'sdk/react-native/**'
+      - 'sdk/javascript/**'
+      - '.github/workflows/sdk-perf.yml'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  perf-bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install deps
+        run: bun install --frozen-lockfile
+      - name: Build core (perf bench imports compiled output)
+        run: bun run --filter '@goliapkg/sentori-core' build
+      - name: Core perf bench
+        # The bench file is .bench.ts (not .test.ts) so bun test's
+        # filter normally skips it — pass the explicit path.
+        run: cd sdk/core && bun test ./src/__tests__/perf.bench.ts
