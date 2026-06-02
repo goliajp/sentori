@@ -22,7 +22,8 @@
 - **v1.2** ✅ Linear/Slack/Jira 集成深化 + 标签 / 静音 / 时间线（W1–W10，闭于 2026-05-20）。
 - **v1.3** ✅ Webhook + 通知通道 + 源码 bundle（W11–W15，闭于 2026-05-20）。
 - **v1.4** ✅ v1.x 系列收口：W16–W29 一次性全部 ship（Email/digest/per-issue mute/Jira OAuth/GitHub App Valkey/webhook retry UI/cross-org templates/label catalog+SLA/source-bundle streaming+multi+per-release status/RN build-time uploader/snapshot tests），v1.x defer backlog 归零。详见 [`docs/roadmap/v1.4.md`](./docs/roadmap/v1.4.md)。
-- **v2.0** ⏸ placeholder — 等用户定 L2 边界后开工。详见 [`docs/roadmap/v2.0.md`](./docs/roadmap/v2.0.md)。
+- **v2.0** 🚧 in-flight — manual instrumentation v2；W1+W2 SDK 已 ship（`captureMessage` + `startSpan`/`withSpan` + `safeFn`/`safeAsync` + server migration `0064_events_level_message.sql`），待 close：W3 cohesion API + W4 docs/migration（`docs/recipes/v1-to-v2-migration.md` + `docs/design/manual-instrumentation-v2.md`） + `@goliapkg/sentori-react-native@2.0.0` major bump publish。详见 [`docs/roadmap/v2.0.md`](./docs/roadmap/v2.0.md)。
+- **v2.1** 📝 planned — Runtime metrics auto-instrument（FPS/heap/cold-start/route-nav/network）+ Endpoint health synthetic probe（outside-in cron, auto-issue on consecutive fail）。详见 [`docs/roadmap/v2.1.md`](./docs/roadmap/v2.1.md)。门控在 v2.0 close 之上。
 
 > 版本管理：从这套 polish 起，monorepo 改用 [Changesets](./docs/runbook/release-sdks.md) 管理多包 semver，避免空 bump。
 
