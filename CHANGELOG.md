@@ -12,9 +12,9 @@
 
 **Package bumps:**
 
-- `@goliapkg/sentori-core` → **1.3.0** (minor — `BeforeSendHook` type + `ReadyInfo` shared type + logger module surface re-exported + `withSpan` overload dispatch + `withActiveSpan` explicit name)
-- `@goliapkg/sentori-javascript` → **1.3.0** (minor — `init.logLevel` + `init.onReady` + `init.sample` canonical name + `init.beforeSend`)
-- `@goliapkg/sentori-react-native` → **2.3.0** (minor — `init.beforeSend` + logger surface re-export + `ReadyInfo` from core + `/compat` Sentry drop-in test coverage)
+- `@goliapkg/sentori-core` → **1.2.0** (minor — two minor changesets merged: logger surface + ReadyInfo shared type + `BeforeSendHook` type + `withSpan` overload dispatch + `withActiveSpan` explicit name)
+- `@goliapkg/sentori-javascript` → **1.2.0** (minor — two minor changesets merged: `init.logLevel` + `init.onReady` + `init.sample` canonical name + `init.beforeSend`)
+- `@goliapkg/sentori-react-native` → **2.2.0** (minor — two minor + one patch changeset, merged into one minor bump: `init.beforeSend` + logger surface re-export + `ReadyInfo` from core + `/compat` Sentry drop-in unit-test coverage)
 
 **Highlights:**
 

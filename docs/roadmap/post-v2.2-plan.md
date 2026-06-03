@@ -1,6 +1,6 @@
 # Post-v2.2 master plan
 
-Status: **accepted 2026-06-03 — takagi delegated detail decisions to claude; 5 open questions resolved in §Decisions below**
+Status: **closed 2026-06-03 — all 9 phases (0–8) shipped in one autorun session. Detailed per-version closeouts in `docs/roadmap/v2.3.md` / `v2.4.md` / `v2.5.md`. The "v2.3.0 major bump" framing throughout this doc turned out wrong on closer reading of semver — every Phase 0–6 changeset was additive / source-compatible, so the actual ship was `core@1.2.0` / `javascript@1.2.0` / `react-native@2.2.0` (one minor bump, not a major). Phase 7 (v2.4) and Phase 8 (v2.5) are zero-SDK-change releases (dashboard + server only).**
 Owner: claude + takagi
 Date: 2026-06-03
 
