@@ -55,13 +55,12 @@ function HealthListView() {
     <div className="sentori-page-in space-y-6">
       <header className="flex items-end justify-between gap-4">
         <div>
-          <div className="font-mono text-[11px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+          <div className="text-fg-muted font-mono text-[11px] tracking-[0.18em] uppercase">
             endpoint health
           </div>
           <h1
-            className="mt-1 text-[color:var(--ink)]"
+            className="text-fg mt-1"
             style={{
-              fontFamily: 'var(--font-sans)',
               fontSize: '26px',
               fontVariationSettings: "'wdth' 95, 'opsz' 48, 'wght' 600",
               letterSpacing: '-0.018em',
@@ -70,13 +69,13 @@ function HealthListView() {
           >
             Health
           </h1>
-          <div className="mt-2 text-[12px] text-[color:var(--ink-muted)]">
+          <div className="text-fg-muted mt-2 text-[12px]">
             Outside-in synthetic probes. Auto-opens an issue on two consecutive failures and
             auto-resolves on recovery.
           </div>
         </div>
         <Link
-          className="rounded border border-[color:var(--accent)] bg-[color:var(--accent)] px-3 py-1.5 text-[12px] text-white"
+          className="border-accent bg-accent rounded border px-3 py-1.5 text-[12px] text-white"
           to={`/main/org/${orgSlug}/health/new`}
         >
           + New check
@@ -94,7 +93,7 @@ function HealthListView() {
       )}
 
       {checksQ.data && checksQ.data.length > 0 && (
-        <ul className="divide-y divide-[color:var(--rule)] rounded border border-[color:var(--rule)]">
+        <ul className="divide-border border-border divide-y rounded border">
           {checksQ.data.map((c) => (
             <CheckRow check={c} key={c.id} orgSlug={orgSlug} projectId={projectId} />
           ))}
@@ -126,20 +125,20 @@ function CheckRow({
   const p95 = lastP95(rollup)
 
   return (
-    <li className="bg-[color:var(--paper)]">
+    <li className="bg-bg">
       <Link
-        className="flex items-center gap-3 px-4 py-3 hover:bg-[color:var(--paper-2)]"
+        className="hover:bg-bg-secondary flex items-center gap-3 px-4 py-3"
         to={`/main/org/${orgSlug}/health/${check.id}`}
       >
         <StatusDot kind={status.kind} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate text-[13px] text-[color:var(--ink)]">{check.name}</span>
-            <span className="truncate font-mono text-[10px] text-[color:var(--ink-muted)]">
+            <span className="text-fg truncate text-[13px]">{check.name}</span>
+            <span className="text-fg-muted truncate font-mono text-[10px]">
               {check.method} {check.targetUrl}
             </span>
           </div>
-          <div className="mt-0.5 flex items-center gap-3 font-mono text-[10px] text-[color:var(--ink-muted)]">
+          <div className="text-fg-muted mt-0.5 flex items-center gap-3 font-mono text-[10px]">
             <span>every {check.intervalSec}s</span>
             <span>
               status ∈ [{check.assertionStatusCodes.join(', ')}]
@@ -149,7 +148,7 @@ function CheckRow({
           </div>
         </div>
         <Sparkline rollup={rollup} />
-        <div className="w-20 text-right font-mono text-[11px] text-[color:var(--ink-muted)]">
+        <div className="text-fg-muted w-20 text-right font-mono text-[11px]">
           {p95 !== null ? `${p95}ms p95` : '—'}
         </div>
       </Link>

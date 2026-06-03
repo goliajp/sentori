@@ -53,7 +53,7 @@ export function NotificationBell() {
     <div className="relative">
       <button
         aria-label="Notifications"
-        className="relative flex h-7 w-7 items-center justify-center text-[color:var(--ink-muted)] transition-colors hover:text-[color:var(--ink)]"
+        className="text-fg-muted hover:text-fg relative flex h-7 w-7 items-center justify-center transition-colors"
         onClick={() => setOpen((v) => !v)}
         type="button"
       >
@@ -69,23 +69,23 @@ export function NotificationBell() {
           <path d="M10 21a2 2 0 0 0 4 0" />
         </svg>
         {count > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 inline-block min-w-[14px] rounded-full bg-[color:var(--accent)] px-1 text-center font-mono text-[9px] leading-[14px] text-[color:var(--paper)]">
+          <span className="bg-accent text-bg absolute -top-0.5 -right-0.5 inline-block min-w-[14px] rounded-full px-1 text-center font-mono text-[9px] leading-[14px]">
             {count > 99 ? '99+' : count}
           </span>
         )}
       </button>
       {open && (
         <div
-          className="absolute top-9 right-0 z-50 w-[360px] border border-[color:var(--rule)] bg-[color:var(--paper)] shadow-lg"
+          className="border-border bg-bg absolute top-9 right-0 z-50 w-[360px] border shadow-lg"
           role="dialog"
         >
-          <div className="flex items-center justify-between border-b border-[color:var(--rule)] px-3 py-2">
-            <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+          <div className="border-border flex items-center justify-between border-b px-3 py-2">
+            <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
               Notifications
             </span>
             {count > 0 && (
               <button
-                className="font-mono text-[10px] text-[color:var(--accent)] uppercase hover:underline"
+                className="text-accent font-mono text-[10px] uppercase hover:underline"
                 onClick={() => {
                   void adminApi.markAllNotificationsRead().then(() => {
                     void qc.invalidateQueries({ queryKey: qk.notifications.unread() })
@@ -98,11 +98,9 @@ export function NotificationBell() {
               </button>
             )}
           </div>
-          <ul className="max-h-[60vh] divide-y divide-[color:var(--rule-soft)] overflow-y-auto">
+          <ul className="divide-border-muted max-h-[60vh] divide-y overflow-y-auto">
             {(recent ?? unread ?? []).length === 0 && (
-              <li className="px-3 py-6 text-center text-[12px] text-[color:var(--ink-muted)]">
-                Nothing here yet.
-              </li>
+              <li className="text-fg-muted px-3 py-6 text-center text-[12px]">Nothing here yet.</li>
             )}
             {(recent ?? unread ?? []).map((n) => (
               <NotificationRow
@@ -140,8 +138,8 @@ function NotificationRow({
   return (
     <li>
       <button
-        className={`flex w-full items-start gap-3 px-3 py-2 text-left transition-colors hover:bg-[color:var(--paper-2)] ${
-          unread ? 'bg-[color:var(--accent-soft)]/40' : ''
+        className={`hover:bg-bg-secondary flex w-full items-start gap-3 px-3 py-2 text-left transition-colors ${
+          unread ? 'bg-accent/10/40' : ''
         }`}
         onClick={onClick}
         type="button"
@@ -149,14 +147,12 @@ function NotificationRow({
         <span
           aria-hidden
           className={`mt-1 inline-block h-2 w-2 shrink-0 rounded-full ${
-            unread ? 'bg-[color:var(--accent)]' : 'bg-transparent'
+            unread ? 'bg-accent' : 'bg-transparent'
           }`}
         />
         <span className="flex-1">
-          <span className="block text-[12px] text-[color:var(--ink)]">
-            {kindLabel(notification.kind)}
-          </span>
-          <span className="block font-mono text-[10px] tracking-[0.05em] text-[color:var(--ink-muted)]">
+          <span className="text-fg block text-[12px]">{kindLabel(notification.kind)}</span>
+          <span className="text-fg-muted block font-mono text-[10px] tracking-[0.05em]">
             {formatRelative(notification.createdAt)} · issue {notification.issueId.slice(0, 8)}
           </span>
         </span>

@@ -72,14 +72,12 @@ export function HealthFormView() {
   if (!projectId) return null
   if (mode === 'edit' && existingQ.isLoading) {
     return (
-      <div className="sentori-page-in py-8 text-center text-[12px] text-[color:var(--ink-muted)]">
-        Loading…
-      </div>
+      <div className="sentori-page-in text-fg-muted py-8 text-center text-[12px]">Loading…</div>
     )
   }
   if (mode === 'edit' && (existingQ.error || !existingQ.data)) {
     return (
-      <div className="sentori-page-in py-8 text-center text-[12px] text-[color:var(--danger)]">
+      <div className="sentori-page-in text-danger py-8 text-center text-[12px]">
         Check not found.
       </div>
     )
@@ -158,13 +156,12 @@ function FormBody({ checkId, headerTitle, initial, mode, orgSlug, projectId }: F
   return (
     <div className="sentori-page-in max-w-2xl space-y-6">
       <header>
-        <div className="font-mono text-[11px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+        <div className="text-fg-muted font-mono text-[11px] tracking-[0.18em] uppercase">
           endpoint health · {mode === 'edit' ? 'edit' : 'new check'}
         </div>
         <h1
-          className="mt-1 text-[color:var(--ink)]"
+          className="text-fg mt-1"
           style={{
-            fontFamily: 'var(--font-sans)',
             fontSize: '22px',
             fontVariationSettings: "'wdth' 95, 'opsz' 32, 'wght' 580",
             letterSpacing: '-0.012em',
@@ -172,14 +169,14 @@ function FormBody({ checkId, headerTitle, initial, mode, orgSlug, projectId }: F
         >
           {headerTitle}
         </h1>
-        <div className="mt-1 text-[12px] text-[color:var(--ink-muted)]">
+        <div className="text-fg-muted mt-1 text-[12px]">
           Probes run every 60 s minimum. Two consecutive failures open an issue; recovery resolves
           it.
         </div>
       </header>
 
       <form
-        className="space-y-4 rounded border border-[color:var(--rule)] bg-[color:var(--paper-2)] p-5"
+        className="border-border bg-bg-secondary space-y-4 rounded border p-5"
         onSubmit={(e) => {
           e.preventDefault()
           if (!name || !targetUrl) return
@@ -190,7 +187,7 @@ function FormBody({ checkId, headerTitle, initial, mode, orgSlug, projectId }: F
         <div className="grid gap-4 md:grid-cols-2">
           <FieldLabel label="Name">
             <input
-              className="w-full rounded border border-[color:var(--rule)] bg-[color:var(--paper)] px-2 py-1 text-[12px]"
+              className="border-border bg-bg w-full rounded border px-2 py-1 text-[12px]"
               onChange={(e) => setName(e.target.value)}
               placeholder="checkout API liveness"
               required
@@ -199,7 +196,7 @@ function FormBody({ checkId, headerTitle, initial, mode, orgSlug, projectId }: F
           </FieldLabel>
           <FieldLabel label="Method">
             <select
-              className="w-full rounded border border-[color:var(--rule)] bg-[color:var(--paper)] px-2 py-1 text-[12px]"
+              className="border-border bg-bg w-full rounded border px-2 py-1 text-[12px]"
               onChange={(e) => setMethod(e.target.value as 'GET' | 'HEAD' | 'POST')}
               value={method}
             >
@@ -210,7 +207,7 @@ function FormBody({ checkId, headerTitle, initial, mode, orgSlug, projectId }: F
           </FieldLabel>
           <FieldLabel label="Target URL">
             <input
-              className="w-full rounded border border-[color:var(--rule)] bg-[color:var(--paper)] px-2 py-1 font-mono text-[12px]"
+              className="border-border bg-bg w-full rounded border px-2 py-1 font-mono text-[12px]"
               onChange={(e) => setTargetUrl(e.target.value)}
               placeholder="https://api.example.com/healthz"
               required
@@ -220,7 +217,7 @@ function FormBody({ checkId, headerTitle, initial, mode, orgSlug, projectId }: F
           </FieldLabel>
           <FieldLabel label="Interval (sec, min 60)">
             <input
-              className="w-full rounded border border-[color:var(--rule)] bg-[color:var(--paper)] px-2 py-1 text-[12px]"
+              className="border-border bg-bg w-full rounded border px-2 py-1 text-[12px]"
               min={60}
               onChange={(e) => setIntervalSec(parseInt(e.target.value, 10) || 60)}
               type="number"
@@ -229,7 +226,7 @@ function FormBody({ checkId, headerTitle, initial, mode, orgSlug, projectId }: F
           </FieldLabel>
           <FieldLabel label="Status codes (comma)">
             <input
-              className="w-full rounded border border-[color:var(--rule)] bg-[color:var(--paper)] px-2 py-1 font-mono text-[12px]"
+              className="border-border bg-bg w-full rounded border px-2 py-1 font-mono text-[12px]"
               onChange={(e) => setStatusCodesText(e.target.value)}
               placeholder="200, 204"
               value={statusCodesText}
@@ -237,7 +234,7 @@ function FormBody({ checkId, headerTitle, initial, mode, orgSlug, projectId }: F
           </FieldLabel>
           <FieldLabel label="Max latency (ms, optional)">
             <input
-              className="w-full rounded border border-[color:var(--rule)] bg-[color:var(--paper)] px-2 py-1 text-[12px]"
+              className="border-border bg-bg w-full rounded border px-2 py-1 text-[12px]"
               onChange={(e) => setMaxLatencyMs(e.target.value)}
               placeholder="2000"
               type="number"
@@ -246,7 +243,7 @@ function FormBody({ checkId, headerTitle, initial, mode, orgSlug, projectId }: F
           </FieldLabel>
           <FieldLabel label="Body must contain (optional)">
             <input
-              className="w-full rounded border border-[color:var(--rule)] bg-[color:var(--paper)] px-2 py-1 font-mono text-[12px]"
+              className="border-border bg-bg w-full rounded border px-2 py-1 font-mono text-[12px]"
               onChange={(e) => setBodySubstring(e.target.value)}
               placeholder={'"status":"ok"'}
               value={bodySubstring}
@@ -256,23 +253,19 @@ function FormBody({ checkId, headerTitle, initial, mode, orgSlug, projectId }: F
 
         <div className="flex items-center gap-2">
           <button
-            className="rounded border border-[color:var(--accent)] bg-[color:var(--accent)] px-3 py-1.5 text-[12px] text-white disabled:opacity-50"
+            className="border-accent bg-accent rounded border px-3 py-1.5 text-[12px] text-white disabled:opacity-50"
             disabled={pending}
             type="submit"
           >
             {pending ? 'Saving…' : mode === 'edit' ? 'Save changes' : 'Create check'}
           </button>
           <Link
-            className="rounded border border-[color:var(--rule)] px-3 py-1.5 text-[12px] text-[color:var(--ink-muted)]"
+            className="border-border text-fg-muted rounded border px-3 py-1.5 text-[12px]"
             to={backTo}
           >
             Cancel
           </Link>
-          {error && (
-            <span className="text-[11px] text-[color:var(--danger)]">
-              {(error as Error).message}
-            </span>
-          )}
+          {error && <span className="text-danger text-[11px]">{(error as Error).message}</span>}
         </div>
       </form>
     </div>

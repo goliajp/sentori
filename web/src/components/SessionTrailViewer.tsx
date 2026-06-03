@@ -98,19 +98,19 @@ export function SessionTrailViewer({
 
   if (isLoading)
     return (
-      <p className="border-y border-[color:var(--rule)] py-3 text-[12px] text-[color:var(--ink-soft)]">
+      <p className="border-border text-fg-secondary border-y py-3 text-[12px]">
         Loading session trail…
       </p>
     )
   if (error)
     return (
-      <p className="border-y border-[color:var(--rule)] py-3 text-[12px] text-[color:var(--danger)]">
+      <p className="border-border text-danger border-y py-3 text-[12px]">
         Failed to load session trail.
       </p>
     )
   if (steps.length === 0)
     return (
-      <p className="border-y border-[color:var(--rule)] py-3 text-[12px] text-[color:var(--ink-soft)]">
+      <p className="border-border text-fg-secondary border-y py-3 text-[12px]">
         No steps recorded.
       </p>
     )
@@ -121,23 +121,23 @@ export function SessionTrailViewer({
     <div className="grid grid-cols-[200px_1fr] gap-4">
       <ol
         aria-label="Session trail steps"
-        className="max-h-[320px] overflow-y-auto border-y border-[color:var(--rule)]"
+        className="border-border max-h-[320px] overflow-y-auto border-y"
         role="listbox"
       >
         {steps.map((s, i) => (
           <li key={i}>
             <button
               aria-selected={effectiveFocus === i}
-              className={`block w-full border-b border-[color:var(--rule-soft)] px-2.5 py-1.5 text-left transition-colors last:border-b-0 ${
+              className={`border-border-muted block w-full border-b px-2.5 py-1.5 text-left transition-colors last:border-b-0 ${
                 effectiveFocus === i
-                  ? 'bg-[color:var(--accent-soft)] text-[color:var(--ink)]'
-                  : 'text-[color:var(--ink-soft)] hover:bg-[color:var(--paper-2)]'
+                  ? 'bg-accent/10 text-fg'
+                  : 'text-fg-secondary hover:bg-bg-secondary'
               }`}
               onClick={() => setFocus(i)}
               type="button"
             >
               <div className="flex items-baseline gap-2">
-                <span className="font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
+                <span className="text-fg-muted font-mono text-[11px] tabular-nums">
                   {String(i + 1).padStart(2, '0')}
                 </span>
                 <span className="truncate text-[12px]">{s.label}</span>
@@ -146,30 +146,30 @@ export function SessionTrailViewer({
           </li>
         ))}
       </ol>
-      <div className="border-y border-[color:var(--rule)] py-3 text-[12px]">
+      <div className="border-border border-y py-3 text-[12px]">
         {focused === null ? (
-          <p className="text-[color:var(--ink-muted)]">Use ← / → or click a step.</p>
+          <p className="text-fg-muted">Use ← / → or click a step.</p>
         ) : (
           <dl className="grid grid-cols-[100px_1fr] gap-x-3 gap-y-2">
             <Dt>Step</Dt>
-            <dd className="text-[color:var(--ink)]">
+            <dd className="text-fg">
               {effectiveFocus !== null ? effectiveFocus + 1 : '?'} of {steps.length}
               {crashTs !== null && (
-                <span className="ml-2 font-mono text-[11px] text-[color:var(--ink-muted)]">
+                <span className="text-fg-muted ml-2 font-mono text-[11px]">
                   ({relativeFromCrash(focused.ts, crashTs)})
                 </span>
               )}
             </dd>
             <Dt>Label</Dt>
-            <dd className="font-mono text-[12px] text-[color:var(--ink)]">{focused.label}</dd>
+            <dd className="text-fg font-mono text-[12px]">{focused.label}</dd>
             {focused.breadcrumb && (
               <>
                 <Dt>Breadcrumb</Dt>
                 <dd>
-                  <span className="mr-1.5 inline-flex h-4 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-1.5 font-mono text-[9px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+                  <span className="border-border bg-bg-secondary text-fg-muted mr-1.5 inline-flex h-4 items-center border px-1.5 font-mono text-[9px] tracking-[0.12em] uppercase">
                     {focused.breadcrumb.type}
                   </span>
-                  <span className="text-[color:var(--ink)]">{focused.breadcrumb.message}</span>
+                  <span className="text-fg">{focused.breadcrumb.message}</span>
                 </dd>
               </>
             )}
@@ -178,7 +178,7 @@ export function SessionTrailViewer({
                 <Dt>Screenshot</Dt>
                 <dd>
                   <a
-                    className="font-mono text-[11px] tracking-[0.1em] text-[color:var(--accent)] uppercase hover:text-[color:var(--accent-strong)]"
+                    className="text-accent hover:text-accent-hover font-mono text-[11px] tracking-[0.1em] uppercase"
                     href={`/admin/api/events/${encodeURIComponent(eventId)}/attachments/${encodeURIComponent(focused.screenshotRef)}`}
                     rel="noreferrer"
                     target="_blank"
@@ -193,7 +193,7 @@ export function SessionTrailViewer({
                 <Dt>View tree</Dt>
                 <dd>
                   <a
-                    className="font-mono text-[11px] tracking-[0.1em] text-[color:var(--accent)] uppercase hover:text-[color:var(--accent-strong)]"
+                    className="text-accent hover:text-accent-hover font-mono text-[11px] tracking-[0.1em] uppercase"
                     href={`/admin/api/events/${encodeURIComponent(eventId)}/attachments/${encodeURIComponent(focused.viewTreeRef)}`}
                     rel="noreferrer"
                     target="_blank"
@@ -212,9 +212,7 @@ export function SessionTrailViewer({
 
 function Dt({ children }: { children: React.ReactNode }) {
   return (
-    <dt className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
-      {children}
-    </dt>
+    <dt className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">{children}</dt>
   )
 }
 

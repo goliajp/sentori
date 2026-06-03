@@ -14,12 +14,12 @@ import type { StatusKind } from './_status'
 export function StatusDot({ kind }: { kind: StatusKind }) {
   const color =
     kind === 'ok'
-      ? 'var(--accent)'
+      ? 'var(--color-accent)'
       : kind === 'transient'
         ? '#f59e0b'
         : kind === 'down'
-          ? 'var(--danger)'
-          : 'var(--ink-muted)'
+          ? 'var(--color-danger)'
+          : 'var(--color-fg-muted)'
   return (
     <span
       className="inline-block h-2 w-2 shrink-0 rounded-full"
@@ -49,7 +49,11 @@ export function Sparkline({
         const x = i * xStep
         const h = (p.uptimePct / 100) * height
         const color =
-          p.uptimePct >= 99 ? 'var(--accent)' : p.uptimePct >= 80 ? '#f59e0b' : 'var(--danger)'
+          p.uptimePct >= 99
+            ? 'var(--color-accent)'
+            : p.uptimePct >= 80
+              ? '#f59e0b'
+              : 'var(--color-danger)'
         return (
           <rect
             fill={color}
@@ -73,7 +77,7 @@ export function ProbeLog({ rows }: { rows: EndpointProbeRow[] }) {
           className="flex items-baseline gap-2"
           key={r.ts}
           style={{
-            color: r.ok ? 'var(--ink-muted)' : 'var(--danger)',
+            color: r.ok ? 'var(--color-fg-muted)' : 'var(--color-danger)',
           }}
         >
           <span className="w-32 shrink-0">{new Date(r.ts).toLocaleTimeString()}</span>
@@ -89,9 +93,7 @@ export function ProbeLog({ rows }: { rows: EndpointProbeRow[] }) {
 export function FieldLabel({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <label className="space-y-1">
-      <div className="font-mono text-[10px] tracking-[0.1em] text-[color:var(--ink-muted)] uppercase">
-        {label}
-      </div>
+      <div className="text-fg-muted font-mono text-[10px] tracking-[0.1em] uppercase">{label}</div>
       {children}
     </label>
   )

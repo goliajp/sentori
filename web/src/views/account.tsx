@@ -90,14 +90,14 @@ function SecurityBlock() {
         <span className="sec-head-title">Security</span>
         <span className="sec-head-sub">device sessions</span>
       </header>
-      <div className="flex flex-col gap-2 border-y border-[color:var(--rule)] py-5">
-        <p className="text-[13px] text-[color:var(--ink-soft)]">
+      <div className="border-border flex flex-col gap-2 border-y py-5">
+        <p className="text-fg-secondary text-[13px]">
           Sign out of every other device. Your current browser session stays valid; everywhere else
           has to sign in again.
         </p>
         <div className="flex items-center gap-3">
           <button
-            className="inline-flex h-7 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink)] uppercase transition-colors hover:border-[color:var(--danger)] hover:text-[color:var(--danger)] disabled:opacity-50"
+            className="border-border bg-bg-secondary text-fg hover:border-danger hover:text-danger inline-flex h-7 items-center border px-3 font-mono text-[11px] tracking-[0.05em] uppercase transition-colors disabled:opacity-50"
             disabled={busy}
             onClick={() => void onClick()}
             type="button"
@@ -105,11 +105,9 @@ function SecurityBlock() {
             {busy ? 'signing out…' : 'sign out other devices'}
           </button>
           {ok && (
-            <span className="font-mono text-[11px] text-[color:var(--success)]">
-              other sessions signed out ✓
-            </span>
+            <span className="text-success font-mono text-[11px]">other sessions signed out ✓</span>
           )}
-          {err && <span className="font-mono text-[11px] text-[color:var(--danger)]">{err}</span>}
+          {err && <span className="text-danger font-mono text-[11px]">{err}</span>}
         </div>
       </div>
     </section>
@@ -163,7 +161,7 @@ function ProfileBlock({
         <span className="sec-head-sub">how you appear in the dashboard</span>
       </header>
       <form
-        className="flex flex-col gap-4 border-y border-[color:var(--rule)] py-5 md:flex-row md:items-start"
+        className="border-border flex flex-col gap-4 border-y py-5 md:flex-row md:items-start"
         onSubmit={(e) => {
           e.preventDefault()
           m.mutate()
@@ -171,17 +169,17 @@ function ProfileBlock({
       >
         <img
           alt="Your avatar"
-          className="size-24 shrink-0 rounded-full border border-[color:var(--rule)] object-cover"
+          className="border-border size-24 shrink-0 rounded-full border object-cover"
           src={effectiveAvatar}
         />
 
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+            <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
               display name
             </span>
             <input
-              className="h-8 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 text-[13px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+              className="border-border bg-bg-secondary text-fg focus:border-accent h-8 border px-2 text-[13px] focus:outline-none"
               onChange={(e) => setName(e.target.value)}
               placeholder={localPart(email)}
               value={name}
@@ -189,32 +187,30 @@ function ProfileBlock({
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+            <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
               avatar URL (optional)
             </span>
             <input
-              className="h-8 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[12px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+              className="border-border bg-bg-secondary text-fg focus:border-accent h-8 border px-2 font-mono text-[12px] focus:outline-none"
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://example.com/avatar.png"
               value={url}
             />
-            <span className="text-[11px] text-[color:var(--ink-muted)]">
+            <span className="text-fg-muted text-[11px]">
               Leave blank to fall back to a Gravatar derived from your email.
             </span>
           </label>
 
           <div className="flex items-center gap-3">
             <button
-              className="inline-flex h-7 items-center bg-[color:var(--accent)] px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--paper)] uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="bg-accent text-bg inline-flex h-7 items-center px-3 font-mono text-[11px] tracking-[0.05em] uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
               disabled={m.isPending}
               type="submit"
             >
               {m.isPending ? 'saving…' : 'save profile'}
             </button>
-            {ok && (
-              <span className="font-mono text-[11px] text-[color:var(--success)]">saved ✓</span>
-            )}
-            {err && <span className="font-mono text-[11px] text-[color:var(--danger)]">{err}</span>}
+            {ok && <span className="text-success font-mono text-[11px]">saved ✓</span>}
+            {err && <span className="text-danger font-mono text-[11px]">{err}</span>}
           </div>
         </div>
       </form>
@@ -229,7 +225,7 @@ function ReadonlyBlock({ id, email }: { id: string; email: string }) {
         <span className="sec-head-title">Account</span>
         <span className="sec-head-sub">identity · stable across sessions</span>
       </header>
-      <div className="border-y border-[color:var(--rule)] py-2">
+      <div className="border-border border-y py-2">
         <RoRow label="email" value={email} />
         <RoRow label="user id" value={id} />
       </div>
@@ -240,10 +236,10 @@ function ReadonlyBlock({ id, email }: { id: string; email: string }) {
 function RoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[120px_1fr] items-baseline gap-3 py-2">
-      <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+      <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
         {label}
       </span>
-      <span className="font-mono text-[12px] break-all text-[color:var(--ink)]">{value}</span>
+      <span className="text-fg font-mono text-[12px] break-all">{value}</span>
     </div>
   )
 }
@@ -276,19 +272,19 @@ function PasswordBlock() {
         <span className="sec-head-sub">rotate your sign-in credential</span>
       </header>
       <form
-        className="flex flex-col gap-3 border-y border-[color:var(--rule)] py-5"
+        className="border-border flex flex-col gap-3 border-y py-5"
         onSubmit={(e) => {
           e.preventDefault()
           m.mutate()
         }}
       >
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+          <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
             current password
           </span>
           <input
             autoComplete="current-password"
-            className="h-8 max-w-sm border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 text-[13px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+            className="border-border bg-bg-secondary text-fg focus:border-accent h-8 max-w-sm border px-2 text-[13px] focus:outline-none"
             onChange={(e) => setCurrent(e.target.value)}
             required
             type="password"
@@ -296,37 +292,33 @@ function PasswordBlock() {
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+          <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
             new password
           </span>
           <input
             autoComplete="new-password"
-            className="h-8 max-w-sm border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 text-[13px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+            className="border-border bg-bg-secondary text-fg focus:border-accent h-8 max-w-sm border px-2 text-[13px] focus:outline-none"
             onChange={(e) => setNext(e.target.value)}
             required
             type="password"
             value={next}
           />
-          <span className="text-[11px] text-[color:var(--ink-muted)]">
+          <span className="text-fg-muted text-[11px]">
             8 characters minimum. Changing your password signs you out of all other devices.
           </span>
         </label>
         <div className="flex items-center gap-3">
           <button
-            className="inline-flex h-7 items-center bg-[color:var(--accent)] px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--paper)] uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="bg-accent text-bg inline-flex h-7 items-center px-3 font-mono text-[11px] tracking-[0.05em] uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
             disabled={m.isPending || next.length < 8 || !current}
             type="submit"
           >
             {m.isPending ? 'changing…' : 'change password'}
           </button>
-          {ok && (
-            <span className="font-mono text-[11px] text-[color:var(--success)]">
-              password updated ✓
-            </span>
-          )}
-          {err && <span className="font-mono text-[11px] text-[color:var(--danger)]">{err}</span>}
+          {ok && <span className="text-success font-mono text-[11px]">password updated ✓</span>}
+          {err && <span className="text-danger font-mono text-[11px]">{err}</span>}
           <Link
-            className="ml-auto font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--accent)]"
+            className="text-fg-muted hover:text-accent ml-auto font-mono text-[10px] tracking-[0.18em] uppercase"
             to="/forgot-password"
           >
             forgot password →
@@ -413,26 +405,23 @@ function NotificationsBlock() {
   }
 
   return (
-    <section className="mt-10 border-t border-[color:var(--rule)] pt-8" id="notifications">
+    <section className="border-border mt-10 border-t pt-8" id="notifications">
       <header className="flex items-baseline gap-3">
         <h2
-          className="text-[color:var(--ink)]"
+          className="text-fg"
           style={{
-            fontFamily: 'var(--font-sans)',
             fontSize: '18px',
             fontVariationSettings: "'wdth' 100, 'opsz' 24, 'wght' 600",
           }}
         >
           Notifications
         </h2>
-        <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+        <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
           per-user
         </span>
       </header>
 
-      {prefsQ.isLoading && (
-        <p className="mt-3 text-[12px] text-[color:var(--ink-muted)]">Loading…</p>
-      )}
+      {prefsQ.isLoading && <p className="text-fg-muted mt-3 text-[12px]">Loading…</p>}
       {prefsQ.error && (
         <p className="border-danger/40 bg-danger/5 text-danger mt-3 rounded border px-3 py-2 text-[12px]">
           {hintOfErr(prefsQ.error) ?? 'Failed to load preferences.'}
@@ -448,7 +437,7 @@ function NotificationsBlock() {
           }}
         >
           <fieldset>
-            <legend className="text-[12px] text-[color:var(--ink-soft)]">
+            <legend className="text-fg-secondary text-[12px]">
               Mute these activity kinds (your notification bell + email when it ships).
             </legend>
             <ul className="mt-2 space-y-1.5">
@@ -458,19 +447,14 @@ function NotificationsBlock() {
                   <li className="flex items-baseline gap-2" key={k.id}>
                     <input
                       checked={checked}
-                      className="accent-[color:var(--accent)]"
+                      className="accent-accent"
                       id={`mute-${k.id}`}
                       onChange={() => toggleMuted(k.id)}
                       type="checkbox"
                     />
-                    <label
-                      className="t-sm text-[color:var(--ink)] select-none"
-                      htmlFor={`mute-${k.id}`}
-                    >
+                    <label className="t-sm text-fg select-none" htmlFor={`mute-${k.id}`}>
                       {k.label}
-                      <span className="ml-2 text-[11px] text-[color:var(--ink-muted)]">
-                        {k.help}
-                      </span>
+                      <span className="text-fg-muted ml-2 text-[11px]">{k.help}</span>
                     </label>
                   </li>
                 )
@@ -479,7 +463,7 @@ function NotificationsBlock() {
           </fieldset>
 
           <fieldset>
-            <legend className="text-[12px] text-[color:var(--ink-soft)]">
+            <legend className="text-fg-secondary text-[12px]">
               Cadence (v1.4 W17: hourly + daily now batch unread notifications into one email per
               period).
             </legend>
@@ -489,13 +473,10 @@ function NotificationsBlock() {
                 { id: 'hourly', label: 'Hourly digest' },
                 { id: 'daily', label: 'Daily digest' },
               ].map((c) => (
-                <label
-                  className="t-sm flex items-baseline gap-1.5 text-[color:var(--ink)]"
-                  key={c.id}
-                >
+                <label className="t-sm text-fg flex items-baseline gap-1.5" key={c.id}>
                   <input
                     checked={cadence === c.id}
-                    className="accent-[color:var(--accent)]"
+                    className="accent-accent"
                     name="cadence"
                     onChange={() => setCadence(c.id)}
                     type="radio"
@@ -509,7 +490,7 @@ function NotificationsBlock() {
           </fieldset>
 
           <fieldset>
-            <legend className="text-[12px] text-[color:var(--ink-soft)]">
+            <legend className="text-fg-secondary text-[12px]">
               Channels (v1.4 W16: email channel now active when SMTP is configured).
             </legend>
             <div className="mt-2 flex items-baseline gap-4">
@@ -519,13 +500,10 @@ function NotificationsBlock() {
               ].map((c) => {
                 const checked = (channels ?? []).includes(c.id)
                 return (
-                  <label
-                    className="t-sm flex items-baseline gap-1.5 text-[color:var(--ink)]"
-                    key={c.id}
-                  >
+                  <label className="t-sm text-fg flex items-baseline gap-1.5" key={c.id}>
                     <input
                       checked={checked}
-                      className="accent-[color:var(--accent)]"
+                      className="accent-accent"
                       onChange={() => toggleChannel(c.id)}
                       type="checkbox"
                     />

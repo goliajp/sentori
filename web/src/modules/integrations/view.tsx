@@ -353,7 +353,7 @@ export function IntegrationsView() {
         title="Integrations"
       />
 
-      <div className="mb-4 flex gap-1 border-b border-[color:var(--rule)]">
+      <div className="border-border mb-4 flex gap-1 border-b">
         <TabButton active={tab === 'connections'} onClick={() => setTab('connections')}>
           Connections
         </TabButton>
@@ -405,9 +405,7 @@ function TabButton({
   return (
     <button
       className={`-mb-px border-b-2 px-3 py-2 font-mono text-[11px] tracking-[0.16em] uppercase ${
-        active
-          ? 'border-[color:var(--accent)] text-[color:var(--ink)]'
-          : 'border-transparent text-[color:var(--ink-soft)] hover:text-[color:var(--ink)]'
+        active ? 'border-accent text-fg' : 'text-fg-secondary hover:text-fg border-transparent'
       }`}
       onClick={onClick}
       type="button"
@@ -470,7 +468,6 @@ function AdapterCard({
         <h3
           className="text-fg"
           style={{
-            fontFamily: 'var(--font-sans)',
             fontSize: '15px',
             fontVariationSettings: "'wdth' 100, 'opsz' 24, 'wght' 600",
           }}
@@ -936,7 +933,7 @@ function TemplatesTab() {
       )}
 
       {templatesQ.isLoading && (
-        <ul className="divide-y divide-[color:var(--rule-soft)] border-y border-[color:var(--rule)]">
+        <ul className="divide-border-muted border-border divide-y border-y">
           {Array.from({ length: 3 }).map((_, i) => (
             <li className="px-2 py-3" key={i}>
               <div className="bg-fg-muted/10 h-4 w-1/2 animate-pulse rounded" />
@@ -950,25 +947,25 @@ function TemplatesTab() {
       )}
 
       {templatesQ.data && templatesQ.data.length === 0 && (
-        <p className="text-fg-muted border-y border-[color:var(--rule)] py-6 text-center text-[12px]">
+        <p className="text-fg-muted border-border border-y py-6 text-center text-[12px]">
           No templates yet. Configure an integration first, then come back to save a template.
         </p>
       )}
 
       {templatesQ.data && templatesQ.data.length > 0 && (
-        <ul className="divide-y divide-[color:var(--rule-soft)] border-y border-[color:var(--rule)]">
+        <ul className="divide-border-muted border-border divide-y border-y">
           {templatesQ.data.map((t) => (
             <li className="flex items-baseline gap-3 px-2 py-3" key={t.id}>
-              <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+              <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
                 {t.kind}
               </span>
               <span className="text-fg flex-1 truncate text-[13px]">{t.name}</span>
               {t.sharedWithOrgSlug ? (
-                <span className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+                <span className="text-fg-muted font-mono text-[10px] tracking-[0.12em] uppercase">
                   shared · {t.sharedWithOrgSlug}
                 </span>
               ) : (
-                <span className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+                <span className="text-fg-muted font-mono text-[10px] tracking-[0.12em] uppercase">
                   private
                 </span>
               )}
@@ -1086,7 +1083,7 @@ function TemplateEditor({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-bg w-full max-w-xl rounded border border-[color:var(--rule)] p-4 shadow-lg">
+      <div className="bg-bg border-border w-full max-w-xl rounded border p-4 shadow-lg">
         <header className="mb-3 flex items-baseline justify-between">
           <h3 className="text-fg text-[15px] font-semibold">
             {initial ? 'Edit template' : 'New template'}
@@ -1097,7 +1094,7 @@ function TemplateEditor({
         </header>
         <div className="space-y-3">
           <label className="block">
-            <span className="font-mono text-[10px] tracking-[0.16em] text-[color:var(--ink-muted)] uppercase">
+            <span className="text-fg-muted font-mono text-[10px] tracking-[0.16em] uppercase">
               Kind
             </span>
             <select
@@ -1115,7 +1112,7 @@ function TemplateEditor({
             </select>
           </label>
           <label className="block">
-            <span className="font-mono text-[10px] tracking-[0.16em] text-[color:var(--ink-muted)] uppercase">
+            <span className="text-fg-muted font-mono text-[10px] tracking-[0.16em] uppercase">
               Name
             </span>
             <input
@@ -1126,7 +1123,7 @@ function TemplateEditor({
             />
           </label>
           <label className="block">
-            <span className="font-mono text-[10px] tracking-[0.16em] text-[color:var(--ink-muted)] uppercase">
+            <span className="text-fg-muted font-mono text-[10px] tracking-[0.16em] uppercase">
               Config (JSON)
             </span>
             <textarea
@@ -1137,7 +1134,7 @@ function TemplateEditor({
             />
           </label>
           <label className="block">
-            <span className="font-mono text-[10px] tracking-[0.16em] text-[color:var(--ink-muted)] uppercase">
+            <span className="text-fg-muted font-mono text-[10px] tracking-[0.16em] uppercase">
               Share with org (optional)
             </span>
             <select
@@ -1157,7 +1154,7 @@ function TemplateEditor({
         </div>
         <footer className="mt-4 flex justify-end gap-2">
           <button
-            className="text-fg-muted hover:text-fg t-sm rounded border border-[color:var(--rule)] px-3 py-1"
+            className="text-fg-muted hover:text-fg t-sm border-border rounded border px-3 py-1"
             onClick={onClose}
             type="button"
           >
@@ -1204,7 +1201,7 @@ function ApplyTemplateModal({
   })
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-bg w-full max-w-md rounded border border-[color:var(--rule)] p-4 shadow-lg">
+      <div className="bg-bg border-border w-full max-w-md rounded border p-4 shadow-lg">
         <header className="mb-3">
           <h3 className="text-fg text-[15px] font-semibold">Apply template</h3>
           <p className="text-fg-muted t-sm mt-1">
@@ -1213,7 +1210,7 @@ function ApplyTemplateModal({
           </p>
         </header>
         <label className="block">
-          <span className="font-mono text-[10px] tracking-[0.16em] text-[color:var(--ink-muted)] uppercase">
+          <span className="text-fg-muted font-mono text-[10px] tracking-[0.16em] uppercase">
             Target org
           </span>
           <select
@@ -1232,7 +1229,7 @@ function ApplyTemplateModal({
         {error && <ErrorBanner message={error} />}
         <footer className="mt-4 flex justify-end gap-2">
           <button
-            className="text-fg-muted hover:text-fg t-sm rounded border border-[color:var(--rule)] px-3 py-1"
+            className="text-fg-muted hover:text-fg t-sm border-border rounded border px-3 py-1"
             onClick={onClose}
             type="button"
           >

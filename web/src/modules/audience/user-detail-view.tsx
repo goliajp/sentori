@@ -23,24 +23,24 @@ export function AudienceUserDetailView({ projectId }: { projectId: string }) {
   return (
     <div className="space-y-6">
       <form
-        className="flex items-baseline gap-3 border-b border-[color:var(--rule)] pb-4"
+        className="border-border flex items-baseline gap-3 border-b pb-4"
         onSubmit={(e) => {
           e.preventDefault()
           const trimmed = userId.trim()
           setSubmitted(trimmed.length > 0 ? trimmed : null)
         }}
       >
-        <label className="font-mono text-[11px] tracking-[0.18em] text-[color:var(--accent)] uppercase">
+        <label className="text-accent font-mono text-[11px] tracking-[0.18em] uppercase">
           user id
         </label>
         <input
-          className="min-w-0 flex-1 border-b border-[color:var(--rule)] bg-transparent py-1 font-mono text-[13px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+          className="border-border text-fg focus:border-accent min-w-0 flex-1 border-b bg-transparent py-1 font-mono text-[13px] focus:outline-none"
           onChange={(e) => setUserId(e.target.value)}
           placeholder="e.g. u_abc123"
           value={userId}
         />
         <button
-          className="border border-[color:var(--rule)] px-3 py-1 font-mono text-[11px] tracking-[0.18em] text-[color:var(--ink)] uppercase hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+          className="border-border text-fg hover:border-accent hover:text-accent border px-3 py-1 font-mono text-[11px] tracking-[0.18em] uppercase"
           type="submit"
         >
           Load
@@ -94,36 +94,30 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
   const time = new Date(entry.t).toLocaleTimeString()
   if (entry.source === 'error') {
     return (
-      <li className="grid grid-cols-[auto_8ch_1fr] items-baseline gap-3 border-b border-[color:var(--rule-soft)] py-2 last:border-b-0">
-        <span className="font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
-          {time}
-        </span>
+      <li className="border-border-muted grid grid-cols-[auto_8ch_1fr] items-baseline gap-3 border-b py-2 last:border-b-0">
+        <span className="text-fg-muted font-mono text-[11px] tabular-nums">{time}</span>
         <span
           className="font-mono text-[10px] tracking-[0.18em] uppercase"
-          style={{ color: 'var(--danger)' }}
+          style={{ color: 'var(--color-danger)' }}
         >
           error
         </span>
-        <span className="min-w-0 truncate font-mono text-[12px] text-[color:var(--ink)]">
-          <span className="text-[color:var(--danger)]">{entry.errorType}</span>{' '}
-          <span className="text-[color:var(--ink-soft)]">{entry.message}</span>
+        <span className="text-fg min-w-0 truncate font-mono text-[12px]">
+          <span className="text-danger">{entry.errorType}</span>{' '}
+          <span className="text-fg-secondary">{entry.message}</span>
         </span>
       </li>
     )
   }
   return (
-    <li className="grid grid-cols-[auto_8ch_1fr] items-baseline gap-3 border-b border-[color:var(--rule-soft)] py-2 last:border-b-0">
-      <span className="font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
-        {time}
-      </span>
-      <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--accent)] uppercase">
+    <li className="border-border-muted grid grid-cols-[auto_8ch_1fr] items-baseline gap-3 border-b py-2 last:border-b-0">
+      <span className="text-fg-muted font-mono text-[11px] tabular-nums">{time}</span>
+      <span className="text-accent font-mono text-[10px] tracking-[0.18em] uppercase">
         {entry.name === '$pageview' ? 'page' : 'track'}
       </span>
-      <span className="min-w-0 truncate font-mono text-[12px] text-[color:var(--ink)]">
+      <span className="text-fg min-w-0 truncate font-mono text-[12px]">
         <span>{entry.name}</span>
-        {entry.route ? (
-          <span className="ml-2 text-[color:var(--ink-soft)]">{entry.route}</span>
-        ) : null}
+        {entry.route ? <span className="text-fg-secondary ml-2">{entry.route}</span> : null}
       </span>
     </li>
   )

@@ -109,7 +109,7 @@ export function LiveDebugView() {
 
       {/* Connect form — flush against page-head, no card chrome */}
       <form
-        className="flex items-center gap-3 border-b border-[color:var(--rule)] py-3"
+        className="border-border flex items-center gap-3 border-b py-3"
         onSubmit={(e) => {
           e.preventDefault()
           const id = draft.trim()
@@ -119,13 +119,13 @@ export function LiveDebugView() {
         }}
       >
         <label
-          className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase"
+          className="text-fg-muted font-mono text-[10px] tracking-[0.22em] uppercase"
           htmlFor="live-userid"
         >
           user.id
         </label>
         <input
-          className="flex-1 border-b border-[color:var(--rule)] bg-transparent px-0 py-1 font-mono text-[13px] text-[color:var(--ink)] placeholder:text-[color:var(--ink-muted)] focus:border-[color:var(--accent)] focus:outline-none disabled:opacity-50"
+          className="border-border text-fg placeholder:text-fg-muted focus:border-accent flex-1 border-b bg-transparent px-0 py-1 font-mono text-[13px] focus:outline-none disabled:opacity-50"
           disabled={connected}
           id="live-userid"
           onChange={(e) => setDraft(e.target.value)}
@@ -134,7 +134,7 @@ export function LiveDebugView() {
         />
         {connected ? (
           <button
-            className="border border-[color:var(--danger)] px-3 py-1 font-mono text-[11px] tracking-[0.1em] text-[color:var(--danger)] uppercase transition-colors hover:bg-[color:var(--danger-bg)]"
+            className="border-danger text-danger hover:bg-danger/15 border px-3 py-1 font-mono text-[11px] tracking-[0.1em] uppercase transition-colors"
             onClick={() => {
               stop()
               setStatus('closed')
@@ -145,7 +145,7 @@ export function LiveDebugView() {
           </button>
         ) : (
           <button
-            className="bg-[color:var(--accent)] px-3 py-1 font-mono text-[11px] tracking-[0.1em] text-[color:var(--paper)] uppercase disabled:cursor-not-allowed disabled:opacity-50"
+            className="bg-accent text-bg px-3 py-1 font-mono text-[11px] tracking-[0.1em] uppercase disabled:cursor-not-allowed disabled:opacity-50"
             disabled={draft.trim().length === 0}
             type="submit"
           >
@@ -156,7 +156,7 @@ export function LiveDebugView() {
 
       {/* Live stream */}
       {rows.length === 0 ? (
-        <div className="border-b border-[color:var(--rule)] py-8 text-center text-[13px] text-[color:var(--ink-soft)]">
+        <div className="border-border text-fg-secondary border-b py-8 text-center text-[13px]">
           {connected
             ? 'Waiting for events from this user.id…'
             : 'Arm a user.id to start streaming.'}
@@ -182,14 +182,10 @@ export function LiveDebugView() {
                     {new Date(r.receivedAt).toLocaleTimeString('en-US', { hour12: false })}
                   </td>
                   <td>
-                    <span className={kindTone[r.kind] ?? 'text-[color:var(--ink-muted)]'}>
-                      {r.kind}
-                    </span>
+                    <span className={kindTone[r.kind] ?? 'text-fg-muted'}>{r.kind}</span>
                   </td>
                   <td className="lead">{r.errorType}</td>
-                  <td className="max-w-[40ch] truncate text-[color:var(--ink-soft)]">
-                    {r.errorMessage}
-                  </td>
+                  <td className="text-fg-secondary max-w-[40ch] truncate">{r.errorMessage}</td>
                   <td>{r.release}</td>
                 </tr>
               ))}
@@ -201,15 +197,15 @@ export function LiveDebugView() {
 }
 
 const statusTone: Record<Status, string> = {
-  closed: 'text-[color:var(--ink-muted)]',
-  connected: 'text-[color:var(--success)]',
-  error: 'text-[color:var(--danger)]',
-  idle: 'text-[color:var(--ink-muted)]',
-  timeout: 'text-[color:var(--warning)]',
+  closed: 'text-fg-muted',
+  connected: 'text-success',
+  error: 'text-danger',
+  idle: 'text-fg-muted',
+  timeout: 'text-warning',
 }
 
 const kindTone: Record<string, string> = {
-  anr: 'text-[color:var(--warning)]',
-  error: 'text-[color:var(--danger)]',
-  nearCrash: 'text-[color:var(--warning)]',
+  anr: 'text-warning',
+  error: 'text-danger',
+  nearCrash: 'text-warning',
 }

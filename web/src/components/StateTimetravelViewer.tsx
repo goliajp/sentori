@@ -111,19 +111,19 @@ export function StateTimetravelViewer({
 
   if (isLoading)
     return (
-      <p className="border-y border-[color:var(--rule)] py-3 text-[12px] text-[color:var(--ink-soft)]">
+      <p className="border-border text-fg-secondary border-y py-3 text-[12px]">
         Loading state snapshots…
       </p>
     )
   if (error)
     return (
-      <p className="border-y border-[color:var(--rule)] py-3 text-[12px] text-[color:var(--danger)]">
+      <p className="border-border text-danger border-y py-3 text-[12px]">
         Failed to load state snapshots.
       </p>
     )
   if (snapshots.length === 0)
     return (
-      <p className="border-y border-[color:var(--rule)] py-3 text-[12px] text-[color:var(--ink-soft)]">
+      <p className="border-border text-fg-secondary border-y py-3 text-[12px]">
         No snapshots recorded.
       </p>
     )
@@ -137,67 +137,67 @@ export function StateTimetravelViewer({
     <div className="grid grid-cols-[200px_1fr] gap-4">
       <ol
         aria-label="State snapshots"
-        className="max-h-[320px] overflow-y-auto border-y border-[color:var(--rule)]"
+        className="border-border max-h-[320px] overflow-y-auto border-y"
         role="listbox"
       >
         {snapshots.map((s, i) => (
           <li key={i}>
             <button
               aria-selected={effectiveFocus === i}
-              className={`block w-full border-b border-[color:var(--rule-soft)] px-2.5 py-1.5 text-left transition-colors last:border-b-0 ${
+              className={`border-border-muted block w-full border-b px-2.5 py-1.5 text-left transition-colors last:border-b-0 ${
                 effectiveFocus === i
-                  ? 'bg-[color:var(--accent-soft)] text-[color:var(--ink)]'
-                  : 'text-[color:var(--ink-soft)] hover:bg-[color:var(--paper-2)]'
+                  ? 'bg-accent/10 text-fg'
+                  : 'text-fg-secondary hover:bg-bg-secondary'
               }`}
               onClick={() => setFocus(i)}
               type="button"
             >
               <div className="flex items-baseline gap-2">
-                <span className="font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
+                <span className="text-fg-muted font-mono text-[11px] tabular-nums">
                   {String(i + 1).padStart(2, '0')}
                 </span>
-                <span className="inline-flex h-4 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-1.5 font-mono text-[9px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+                <span className="border-border bg-bg-secondary text-fg-muted inline-flex h-4 items-center border px-1.5 font-mono text-[9px] tracking-[0.12em] uppercase">
                   {s.source}
                 </span>
                 {crashTs !== null && (
-                  <span className="ml-auto font-mono text-[10px] text-[color:var(--ink-muted)] tabular-nums">
+                  <span className="text-fg-muted ml-auto font-mono text-[10px] tabular-nums">
                     {relativeFromCrash(s.ts, crashTs)}
                   </span>
                 )}
               </div>
-              <div className="mt-0.5 truncate font-mono text-[10px] text-[color:var(--ink-muted)]">
+              <div className="text-fg-muted mt-0.5 truncate font-mono text-[10px]">
                 {Object.keys(s.diff).join(', ')}
               </div>
             </button>
           </li>
         ))}
       </ol>
-      <div className="border-y border-[color:var(--rule)]">
-        <div className="flex items-center justify-between border-b border-[color:var(--rule-soft)] px-3 py-2">
+      <div className="border-border border-y">
+        <div className="border-border-muted flex items-center justify-between border-b px-3 py-2">
           <div className="text-[12px]">
-            <span className="mr-1.5 font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+            <span className="text-fg-muted mr-1.5 font-mono text-[10px] tracking-[0.18em] uppercase">
               Snapshot
             </span>
-            <span className="font-mono text-[color:var(--ink)] tabular-nums">
+            <span className="text-fg font-mono tabular-nums">
               {effectiveFocus !== null ? effectiveFocus + 1 : '?'} / {snapshots.length}
             </span>
             {focused && (
               <span className="ml-3 inline-flex items-center gap-1.5">
-                <span className="inline-flex h-4 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-1.5 font-mono text-[9px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+                <span className="border-border bg-bg-secondary text-fg-muted inline-flex h-4 items-center border px-1.5 font-mono text-[9px] tracking-[0.12em] uppercase">
                   {focused.source}
                 </span>
                 {crashTs !== null && (
-                  <span className="font-mono text-[10px] text-[color:var(--ink-muted)] tabular-nums">
+                  <span className="text-fg-muted font-mono text-[10px] tabular-nums">
                     {relativeFromCrash(focused.ts, crashTs)}
                   </span>
                 )}
               </span>
             )}
           </div>
-          <label className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.1em] text-[color:var(--ink-muted)] uppercase">
+          <label className="text-fg-muted flex items-center gap-1.5 font-mono text-[10px] tracking-[0.1em] uppercase">
             <input
               checked={rehydrate}
-              className="accent-[color:var(--accent)]"
+              className="accent-accent"
               onChange={(e) => setRehydrate(e.target.checked)}
               type="checkbox"
             />

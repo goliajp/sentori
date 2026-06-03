@@ -48,7 +48,7 @@ export function UsersView() {
       <div className="mb-2">
         <button
           aria-expanded={lookupOpen}
-          className="flex w-full items-center gap-2 border-y border-[color:var(--rule)] py-2 font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--ink-soft)]"
+          className="border-border text-fg-muted hover:text-fg-secondary flex w-full items-center gap-2 border-y py-2 font-mono text-[10px] tracking-[0.22em] uppercase"
           onClick={() => setLookupOpen((v) => !v)}
           type="button"
         >
@@ -65,7 +65,7 @@ export function UsersView() {
       <div className="mb-2">
         <button
           aria-expanded={mergeOpen}
-          className="flex w-full items-center gap-2 border-y border-[color:var(--rule)] py-2 font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--ink-soft)]"
+          className="border-border text-fg-muted hover:text-fg-secondary flex w-full items-center gap-2 border-y py-2 font-mono text-[10px] tracking-[0.22em] uppercase"
           onClick={() => setMergeOpen((v) => !v)}
           type="button"
         >
@@ -82,7 +82,7 @@ export function UsersView() {
       <div className="mb-6">
         <button
           aria-expanded={eraseOpen}
-          className="flex w-full items-center gap-2 border-y border-[color:var(--rule)] py-2 font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--danger)]"
+          className="border-border text-fg-muted hover:text-danger flex w-full items-center gap-2 border-y py-2 font-mono text-[10px] tracking-[0.22em] uppercase"
           onClick={() => setEraseOpen((v) => !v)}
           type="button"
         >

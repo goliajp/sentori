@@ -109,16 +109,16 @@ export function UsersMerge() {
 
   return (
     <div>
-      <form className="border-y border-[color:var(--rule)] py-4" onSubmit={onSubmit}>
+      <form className="border-border border-y py-4" onSubmit={onSubmit}>
         <div className="space-y-3">
           {/* Primary row */}
           <div className="grid grid-cols-[80px_140px_1fr] items-end gap-3">
-            <span className="block self-center font-mono text-[10px] tracking-[0.18em] text-[color:var(--accent)] uppercase">
+            <span className="text-accent block self-center font-mono text-[10px] tracking-[0.18em] uppercase">
               primary
             </span>
             <select
               aria-label="primary identity type"
-              className="h-8 w-full border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[12px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+              className="border-border bg-bg-secondary text-fg focus:border-accent h-8 w-full border px-2 font-mono text-[12px] focus:outline-none"
               onChange={(e) => setPrimaryType(e.target.value as IdentityKeyType)}
               value={primaryType}
             >
@@ -131,7 +131,7 @@ export function UsersMerge() {
             <input
               aria-label="primary value (hashed before send)"
               autoComplete="off"
-              className="h-8 w-full border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[12px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+              className="border-border bg-bg-secondary text-fg focus:border-accent h-8 w-full border px-2 font-mono text-[12px] focus:outline-none"
               onChange={(e) => setPrimaryRaw(e.target.value)}
               placeholder="canonical identity (e.g. their email)"
               type="text"
@@ -140,12 +140,12 @@ export function UsersMerge() {
           </div>
           {/* Alias row */}
           <div className="grid grid-cols-[80px_140px_1fr] items-end gap-3">
-            <span className="block self-center font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+            <span className="text-fg-muted block self-center font-mono text-[10px] tracking-[0.18em] uppercase">
               alias
             </span>
             <select
               aria-label="alias identity type"
-              className="h-8 w-full border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[12px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+              className="border-border bg-bg-secondary text-fg focus:border-accent h-8 w-full border px-2 font-mono text-[12px] focus:outline-none"
               onChange={(e) => setAliasType(e.target.value as IdentityKeyType)}
               value={aliasType}
             >
@@ -158,7 +158,7 @@ export function UsersMerge() {
             <input
               aria-label="alias value (hashed before send)"
               autoComplete="off"
-              className="h-8 w-full border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[12px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+              className="border-border bg-bg-secondary text-fg focus:border-accent h-8 w-full border px-2 font-mono text-[12px] focus:outline-none"
               onChange={(e) => setAliasRaw(e.target.value)}
               placeholder="other identity that's the same person"
               type="text"
@@ -167,7 +167,7 @@ export function UsersMerge() {
           </div>
           <div className="flex items-baseline justify-end gap-3">
             <button
-              className="h-8 cursor-pointer border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-4 font-mono text-[10px] tracking-[0.18em] uppercase hover:bg-[color:var(--paper)] disabled:cursor-not-allowed disabled:opacity-40"
+              className="border-border bg-bg-secondary hover:bg-bg h-8 cursor-pointer border px-4 font-mono text-[10px] tracking-[0.18em] uppercase disabled:cursor-not-allowed disabled:opacity-40"
               disabled={mergeM.isPending || primaryRaw.trim() === '' || aliasRaw.trim() === ''}
               type="submit"
             >
@@ -175,32 +175,30 @@ export function UsersMerge() {
             </button>
           </div>
         </div>
-        {submitError && (
-          <div className="mt-2 font-mono text-[11px] text-[color:var(--danger)]">{submitError}</div>
-        )}
+        {submitError && <div className="text-danger mt-2 font-mono text-[11px]">{submitError}</div>}
         {mergeM.error && (
-          <div className="mt-2 font-mono text-[11px] text-[color:var(--danger)]">
+          <div className="text-danger mt-2 font-mono text-[11px]">
             Merge failed: {mergeM.error.message}
           </div>
         )}
       </form>
 
       {result && (
-        <div className="border-b border-[color:var(--rule)] py-4">
-          <div className="font-mono text-[12px] text-[color:var(--ink)]">
+        <div className="border-border border-b py-4">
+          <div className="text-fg font-mono text-[12px]">
             {result.created ? 'Merged' : 'Re-activated'} alias{' '}
-            <span className="text-[color:var(--ink-muted)]">{result.aliasPrefix}…</span> → primary{' '}
-            <span className="text-[color:var(--ink-muted)]">{result.primaryPrefix}…</span> in scope{' '}
-            <span className="text-[color:var(--ink-muted)]">{result.scopeId.slice(0, 8)}…</span>.
-            Future lookups against the alias hash will return the primary's events.
+            <span className="text-fg-muted">{result.aliasPrefix}…</span> → primary{' '}
+            <span className="text-fg-muted">{result.primaryPrefix}…</span> in scope{' '}
+            <span className="text-fg-muted">{result.scopeId.slice(0, 8)}…</span>. Future lookups
+            against the alias hash will return the primary's events.
           </div>
           {!undone && lastAlias && (
             <div className="mt-2 flex items-center gap-3">
-              <span className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+              <span className="text-fg-muted font-mono text-[10px] tracking-[0.12em] uppercase">
                 undo window · 7 days
               </span>
               <button
-                className="h-7 cursor-pointer border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-3 font-mono text-[10px] tracking-[0.18em] uppercase hover:bg-[color:var(--paper)] disabled:cursor-not-allowed disabled:opacity-40"
+                className="border-border bg-bg-secondary hover:bg-bg h-7 cursor-pointer border px-3 font-mono text-[10px] tracking-[0.18em] uppercase disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={undoM.isPending}
                 onClick={onUndo}
                 type="button"
@@ -210,13 +208,13 @@ export function UsersMerge() {
             </div>
           )}
           {undone && (
-            <div className="mt-2 font-mono text-[11px] text-[color:var(--ink-soft)]">
+            <div className="text-fg-secondary mt-2 font-mono text-[11px]">
               Undone. Future lookups against the alias hash will return its own events again. The
               merge row stays in audit history.
             </div>
           )}
           {undoM.error && (
-            <div className="mt-2 font-mono text-[11px] text-[color:var(--danger)]">
+            <div className="text-danger mt-2 font-mono text-[11px]">
               Undo failed: {undoM.error.message}
             </div>
           )}

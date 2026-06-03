@@ -42,14 +42,14 @@ export function TeamsView() {
               <tr key={t.id}>
                 <td className="lead">
                   <Link
-                    className="text-[color:var(--ink)] hover:text-[color:var(--accent)]"
+                    className="text-fg hover:text-accent"
                     to={`/main/org/${currentOrg.slug}/teams/${t.slug}`}
                   >
                     {t.name}
                   </Link>
                 </td>
                 <td>{t.slug}</td>
-                <td className="text-[color:var(--ink-soft)]">{t.description ?? '—'}</td>
+                <td className="text-fg-secondary">{t.description ?? '—'}</td>
               </tr>
             ))}
           </tbody>

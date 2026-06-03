@@ -126,12 +126,12 @@ export function ReleasesView() {
       />
 
       {trendValues.length > 1 && (
-        <div className="mb-6 flex items-end justify-between gap-4 border-b border-[color:var(--rule)] pb-3">
+        <div className="border-border mb-6 flex items-end justify-between gap-4 border-b pb-3">
           <div>
-            <div className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+            <div className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
               events over {windowKey}
             </div>
-            <div className="font-mono text-[20px] text-[color:var(--ink)] tabular-nums">
+            <div className="text-fg font-mono text-[20px] tabular-nums">
               {trendValues.reduce((s, n) => s + n, 0).toLocaleString()}
             </div>
           </div>
@@ -169,7 +169,7 @@ export function ReleasesView() {
                 <tr key={release}>
                   <td className="lead">
                     <Link
-                      className="text-[color:var(--ink)] hover:text-[color:var(--accent)]"
+                      className="text-fg hover:text-accent"
                       to={`/main/org/${currentOrg.slug}/releases/${encodeURIComponent(release)}`}
                     >
                       {release || '(unknown)'}
@@ -180,18 +180,14 @@ export function ReleasesView() {
                   </td>
                   <td
                     className={`num tabular-nums ${
-                      Number(r.issue_count ?? 0) > 0
-                        ? 'text-[color:var(--warning)]'
-                        : 'text-[color:var(--ink-muted)]'
+                      Number(r.issue_count ?? 0) > 0 ? 'text-warning' : 'text-fg-muted'
                     }`}
                   >
                     {Number(r.issue_count ?? 0).toLocaleString()}
                   </td>
                   <td
                     className={`num tabular-nums ${
-                      Number(r.resolved_count ?? 0) > 0
-                        ? 'text-[color:var(--success)]'
-                        : 'text-[color:var(--ink-muted)]'
+                      Number(r.resolved_count ?? 0) > 0 ? 'text-success' : 'text-fg-muted'
                     }`}
                   >
                     {Number(r.resolved_count ?? 0).toLocaleString()}
@@ -223,13 +219,9 @@ function WindowPicker({
     <div className="flex items-baseline gap-2 font-mono text-[10px] tracking-[0.18em] uppercase">
       {WINDOW_KEYS.map((k, i) => (
         <span key={k} className="flex items-baseline gap-2">
-          {i > 0 && <span className="text-[color:var(--rule)]">/</span>}
+          {i > 0 && <span className="text-border">/</span>}
           <button
-            className={
-              k === active
-                ? 'text-[color:var(--accent)]'
-                : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink-soft)]'
-            }
+            className={k === active ? 'text-accent' : 'text-fg-muted hover:text-fg-secondary'}
             onClick={() => onChange(k)}
             type="button"
           >

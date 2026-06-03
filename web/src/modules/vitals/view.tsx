@@ -132,7 +132,7 @@ export function VitalsView() {
         actions={
           <select
             aria-label="Release"
-            className="border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 py-1 font-mono text-[12px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+            className="border-border bg-bg-secondary text-fg focus:border-accent border px-2 py-1 font-mono text-[12px] focus:outline-none"
             onChange={(e) => setRelease(e.target.value)}
             value={release}
           >
@@ -149,12 +149,12 @@ export function VitalsView() {
       />
 
       {(releasesQ.isError || reportQ.isError) && (
-        <p className="border-y border-[color:var(--rule)] py-6 text-center text-[13px] text-[color:var(--danger)]">
+        <p className="border-border text-danger border-y py-6 text-center text-[13px]">
           Failed to load vitals. Refresh to retry.
         </p>
       )}
       {!report && !releasesQ.isError && !reportQ.isError && reportQ.isLoading && (
-        <p className="border-y border-[color:var(--rule)] py-6 text-center text-[13px] text-[color:var(--ink-soft)]">
+        <p className="border-border text-fg-secondary border-y py-6 text-center text-[13px]">
           Loading…
         </p>
       )}
@@ -163,7 +163,7 @@ export function VitalsView() {
         !reportQ.isError &&
         !reportQ.isLoading &&
         releases.length === 0 && (
-          <p className="border-y border-[color:var(--rule)] py-6 text-center text-[13px] text-[color:var(--ink-soft)]">
+          <p className="border-border text-fg-secondary border-y py-6 text-center text-[13px]">
             No releases with vitals data yet. The SDK starts populating after the first cold-start
             measurement on a build with `mobile-vitals` enabled.
           </p>
@@ -183,12 +183,10 @@ export function VitalsView() {
               report.coldStart.samples > 0 ? (
                 <>
                   <span className="tabular-nums">{report.coldStart.p50Ms}</span>
-                  <span className="ml-1 text-[14px] text-[color:var(--ink-muted)]">ms p50</span>
+                  <span className="text-fg-muted ml-1 text-[14px]">ms p50</span>
                 </>
               ) : (
-                <span className="text-[16px] text-[color:var(--ink-muted)]">
-                  SDK ≥ 0.8.6 needed
-                </span>
+                <span className="text-fg-muted text-[16px]">SDK ≥ 0.8.6 needed</span>
               )
             }
           />
@@ -211,10 +209,8 @@ export function VitalsView() {
         {!report || report.perRoute.length === 0 ? (
           <EmptyState>
             No route vitals yet. Mount{' '}
-            <code className="font-mono text-[color:var(--ink)]">
-              useTraceNavigation(navigationRef)
-            </code>{' '}
-            in your app and pick a release with traffic.
+            <code className="text-fg font-mono">useTraceNavigation(navigationRef)</code> in your app
+            and pick a release with traffic.
           </EmptyState>
         ) : (
           <div className="overflow-x-auto">
@@ -271,7 +267,7 @@ export function VitalsView() {
                   const isCompared = compareSet.has(r.route)
                   const canAdd = compareSet.size < 4 || isCompared
                   return (
-                    <tr key={r.route} className={isCompared ? 'bg-[color:var(--accent-soft)]' : ''}>
+                    <tr key={r.route} className={isCompared ? 'bg-accent/10' : ''}>
                       <td className="num">
                         <input
                           aria-label={`compare ${r.route}`}
@@ -284,7 +280,7 @@ export function VitalsView() {
                       <td className="lead">
                         {/* Drill: route → Issues list filtered by tag.route */}
                         <Link
-                          className="text-[color:var(--ink)] hover:text-[color:var(--accent)]"
+                          className="text-fg hover:text-accent"
                           to={`/main/org/${currentOrg.slug}/issues?tag=route:${encodeURIComponent(r.route)}`}
                         >
                           {r.route}
@@ -295,18 +291,10 @@ export function VitalsView() {
                       <td className="num">{r.ttidP95Ms}ms</td>
                       <td className="num">{r.ttfdSamples > 0 ? `${r.ttfdP50Ms}ms` : '—'}</td>
                       <td className="num">{r.ttfdSamples > 0 ? `${r.ttfdP95Ms}ms` : '—'}</td>
-                      <td
-                        className={`num ${
-                          r.totalSlowFrames > 0 ? 'text-[color:var(--warning)]' : ''
-                        }`}
-                      >
+                      <td className={`num ${r.totalSlowFrames > 0 ? 'text-warning' : ''}`}>
                         {r.totalSlowFrames}
                       </td>
-                      <td
-                        className={`num ${
-                          r.totalFrozenFrames > 0 ? 'text-[color:var(--danger)]' : ''
-                        }`}
-                      >
+                      <td className={`num ${r.totalFrozenFrames > 0 ? 'text-danger' : ''}`}>
                         {r.totalFrozenFrames}
                       </td>
                     </tr>
@@ -340,8 +328,8 @@ function SortableTh({
   return (
     <th className={numeric ? 'num' : undefined}>
       <button
-        className={`cursor-pointer font-mono text-[10px] tracking-[0.18em] uppercase hover:text-[color:var(--accent)] ${
-          active ? 'text-[color:var(--accent)]' : 'text-[color:var(--ink-muted)]'
+        className={`hover:text-accent cursor-pointer font-mono text-[10px] tracking-[0.18em] uppercase ${
+          active ? 'text-accent' : 'text-fg-muted'
         }`}
         onClick={onClick}
         type="button"
@@ -372,13 +360,13 @@ function CompareStrip({
   }[]
 }) {
   return (
-    <section className="mt-6 border-y border-[color:var(--rule)] py-3">
+    <section className="border-border mt-6 border-y py-3">
       <header className="mb-2 flex items-baseline justify-between">
-        <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+        <span className="text-accent font-mono text-[10px] tracking-[0.22em] uppercase">
           compare · baseline {baseline.route}
         </span>
         <button
-          className="cursor-pointer font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--danger)]"
+          className="text-fg-muted hover:text-danger cursor-pointer font-mono text-[10px] tracking-[0.18em] uppercase"
           onClick={onClear}
           type="button"
         >
@@ -416,7 +404,7 @@ function deltaMs(actual: number, baseline: number, threshold = 0.05) {
   const pct = baseline > 0 ? diff / baseline : 0
   const text = `${diff >= 0 ? '+' : ''}${diff}ms (${(pct * 100).toFixed(0)}%)`
   if (Math.abs(pct) >= threshold) {
-    const cls = diff > 0 ? 'text-[color:var(--danger)]' : 'text-[color:var(--success)]'
+    const cls = diff > 0 ? 'text-danger' : 'text-success'
     return <span className={`font-bold ${cls}`}>{text}</span>
   }
   return <span>{text}</span>
@@ -425,6 +413,6 @@ function deltaMs(actual: number, baseline: number, threshold = 0.05) {
 function deltaCount(actual: number, baseline: number) {
   const diff = actual - baseline
   if (diff === 0) return '—'
-  const cls = diff > 0 ? 'text-[color:var(--warning)]' : 'text-[color:var(--success)]'
+  const cls = diff > 0 ? 'text-warning' : 'text-success'
   return <span className={`font-bold ${cls}`}>{diff > 0 ? `+${diff}` : diff}</span>
 }

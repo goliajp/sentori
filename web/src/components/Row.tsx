@@ -12,11 +12,11 @@
  */
 export function Row({ children, label }: { children: React.ReactNode; label: string }) {
   return (
-    <div className="grid grid-cols-[120px_1fr] items-baseline gap-x-4 border-b border-[color:var(--rule-soft)] py-2 first:border-t first:border-[color:var(--rule)]">
-      <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+    <div className="border-border-muted first:border-border grid grid-cols-[120px_1fr] items-baseline gap-x-4 border-b py-2 first:border-t">
+      <span className="text-fg-muted font-mono text-[10px] tracking-[0.22em] uppercase">
         {label}
       </span>
-      <span className="min-w-0 truncate text-[13px] text-[color:var(--ink)]">{children}</span>
+      <span className="text-fg min-w-0 truncate text-[13px]">{children}</span>
     </div>
   )
 }

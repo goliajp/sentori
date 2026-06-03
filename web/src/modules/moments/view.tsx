@@ -29,13 +29,12 @@ export function MomentsView() {
   const samples = samplesQ.data ?? []
 
   return (
-    <div className="-mx-4 -my-3 flex h-[calc(100%+1.5rem)] min-h-0 overflow-hidden bg-[color:var(--paper)]">
-      <aside className="flex w-[20rem] shrink-0 flex-col overflow-hidden border-r border-[color:var(--rule)] bg-[color:var(--paper-2)]">
-        <header className="shrink-0 border-b border-[color:var(--rule)] px-4 py-3">
+    <div className="bg-bg -mx-4 -my-3 flex h-[calc(100%+1.5rem)] min-h-0 overflow-hidden">
+      <aside className="border-border bg-bg-secondary flex w-[20rem] shrink-0 flex-col overflow-hidden border-r">
+        <header className="border-border shrink-0 border-b px-4 py-3">
           <h1
-            className="text-[color:var(--ink)]"
+            className="text-fg"
             style={{
-              fontFamily: 'var(--font-sans)',
               fontVariationSettings: "'wdth' 95, 'opsz' 24, 'wght' 550",
               fontSize: '17px',
               letterSpacing: '-0.01em',
@@ -43,7 +42,7 @@ export function MomentsView() {
           >
             Moments
           </h1>
-          <div className="mt-1 font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase">
+          <div className="text-fg-muted mt-1 font-mono text-[11px] tracking-[0.08em] uppercase">
             last 7 days
           </div>
         </header>
@@ -60,8 +59,8 @@ export function MomentsView() {
             const active = selected === n.name
             return (
               <button
-                className={`relative block w-full border-b border-[color:var(--rule-soft)] px-4 py-2.5 text-left transition-colors ${
-                  active ? 'bg-[color:var(--accent-soft)]' : 'hover:bg-[color:var(--paper)]'
+                className={`border-border-muted relative block w-full border-b px-4 py-2.5 text-left transition-colors ${
+                  active ? 'bg-accent/10' : 'hover:bg-bg'
                 }`}
                 key={n.name}
                 onClick={() => setSelected(n.name)}
@@ -69,10 +68,10 @@ export function MomentsView() {
               >
                 <span
                   aria-hidden
-                  className={`absolute top-0 bottom-0 left-0 w-[2px] ${active ? 'bg-[color:var(--accent)]' : 'bg-transparent'}`}
+                  className={`absolute top-0 bottom-0 left-0 w-[2px] ${active ? 'bg-accent' : 'bg-transparent'}`}
                 />
-                <div className="font-mono text-[13px] text-[color:var(--ink)]">{n.name}</div>
-                <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 font-mono text-[10px] tracking-[0.05em] text-[color:var(--ink-muted)] tabular-nums">
+                <div className="text-fg font-mono text-[13px]">{n.name}</div>
+                <div className="text-fg-muted mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 font-mono text-[10px] tracking-[0.05em] tabular-nums">
                   <span>{n.count.toLocaleString()}×</span>
                   <span aria-hidden className="opacity-40">
                     /
@@ -85,7 +84,7 @@ export function MomentsView() {
                       <span aria-hidden className="opacity-40">
                         /
                       </span>
-                      <span className="text-[color:var(--warning)]">{abandonPct}% abn</span>
+                      <span className="text-warning">{abandonPct}% abn</span>
                     </>
                   )}
                 </div>
@@ -95,7 +94,7 @@ export function MomentsView() {
         </div>
       </aside>
 
-      <section className="min-w-0 flex-1 overflow-y-auto bg-[color:var(--paper)]">
+      <section className="bg-bg min-w-0 flex-1 overflow-y-auto">
         {!selected && (
           <CenteredEmpty eyebrow="No moment selected">
             Pick a moment on the left to see its samples.
@@ -105,10 +104,10 @@ export function MomentsView() {
         {selected && !samplesQ.isLoading && samples.length > 0 && (
           <div className="space-y-4 p-6">
             <header>
-              <div className="font-mono text-[11px] tracking-[0.18em] text-[color:var(--accent)] uppercase">
+              <div className="text-accent font-mono text-[11px] tracking-[0.18em] uppercase">
                 moment
               </div>
-              <h2 className="mt-1 font-mono text-[20px] text-[color:var(--ink)]">{selected}</h2>
+              <h2 className="text-fg mt-1 font-mono text-[20px]">{selected}</h2>
             </header>
             <table className="bench">
               <thead>
@@ -124,9 +123,7 @@ export function MomentsView() {
                   <tr key={s.id}>
                     <td className="num">{formatRelative(s.startedAt)}</td>
                     <td className="num">{s.durationMs.toLocaleString()} ms</td>
-                    <td className={s.status === 'error' ? 'text-[color:var(--danger)]' : undefined}>
-                      {s.status}
-                    </td>
+                    <td className={s.status === 'error' ? 'text-danger' : undefined}>{s.status}</td>
                     <td>{s.abandoned ? 'yes' : '—'}</td>
                   </tr>
                 ))}

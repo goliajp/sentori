@@ -58,7 +58,7 @@ export const WIREFRAME_MASK_FILL = 'rgba(0,0,0,0.65)'
 /** Text fill — always ink, regardless of the SDK-emitted text
  *  colour. Wireframes are structural diagrams; content readability
  *  beats colour fidelity. */
-export const WIREFRAME_TEXT_FILL = 'var(--ink)'
+export const WIREFRAME_TEXT_FILL = 'var(--color-fg)'
 
 /** Image-kind nodes get rendered as rounded rects (or circles when
  *  the frame is roughly square — avatar-style). */

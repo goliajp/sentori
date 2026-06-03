@@ -1,3 +1,7 @@
+import { Alert, Tabs as GdsTabs } from '@goliapkg/gds/molecules'
+import { Badge, Skeleton } from '@goliapkg/gds/primitives'
+import { Chip, ToggleGroup } from '@goliapkg/gds/atoms'
+import { EmptyState } from '@goliapkg/gds/patterns'
 import { useQuery } from '@tanstack/react-query'
 import { Link, Outlet, useParams } from 'react-router'
 
@@ -10,7 +14,6 @@ import {
 } from '@/api/client'
 import { qk } from '@/api/query-keys'
 import { useOrg } from '@/auth/orgContext'
-import { RailEmpty } from '@/components/Hint'
 import { Sparkline } from '@/components/Sparkline'
 import { formatRelative } from '@/lib/format'
 import { useUrlParam } from '@/lib/url-state'
@@ -19,28 +22,32 @@ import { LabelChip, PriorityChip } from './triage-chips'
 
 type Tab = IssueStatus | 'all'
 
-const STATUS_TABS: { key: Tab; label: string }[] = [
-  { key: 'active', label: 'active' },
-  { key: 'regressed', label: 'regressed' },
-  { key: 'muted', label: 'muted' },
-  { key: 'resolved', label: 'resolved' },
-  { key: 'silenced', label: 'silenced' },
-  { key: 'all', label: 'all' },
+const STATUS_TABS: { id: Tab; label: string }[] = [
+  { id: 'active', label: 'Active' },
+  { id: 'regressed', label: 'Regressed' },
+  { id: 'muted', label: 'Muted' },
+  { id: 'resolved', label: 'Resolved' },
+  { id: 'silenced', label: 'Silenced' },
+  { id: 'all', label: 'All' },
 ]
 const TAB_KEYS = new Set<Tab>(['active', 'regressed', 'muted', 'resolved', 'silenced', 'all'])
 
-// v2.2 W3 — measure picker for the /explore consumer path.
 type Measure = 'event_count' | 'first_seen' | 'last_seen' | 'unique_users'
-const MEASURES: { key: Measure; label: string }[] = [
-  { key: 'event_count', label: 'events' },
-  { key: 'unique_users', label: 'users' },
-  { key: 'last_seen', label: 'last seen' },
-  { key: 'first_seen', label: 'first seen' },
+const MEASURES: { value: Measure; label: string }[] = [
+  { value: 'event_count', label: 'Events' },
+  { value: 'unique_users', label: 'Users' },
+  { value: 'last_seen', label: 'Last seen' },
+  { value: 'first_seen', label: 'First seen' },
 ]
 const MEASURE_KEYS = new Set<Measure>(['event_count', 'unique_users', 'last_seen', 'first_seen'])
 
 type WindowKey = '1d' | '7d' | '30d' | 'all'
-const WINDOWS: WindowKey[] = ['1d', '7d', '30d', 'all']
+const WINDOWS: { value: WindowKey; label: string }[] = [
+  { value: '1d', label: '1d' },
+  { value: '7d', label: '7d' },
+  { value: '30d', label: '30d' },
+  { value: 'all', label: 'All' },
+]
 const WINDOW_KEYS = new Set<WindowKey>(['1d', '7d', '30d', 'all'])
 
 function windowGteRfc3339(w: WindowKey): string | undefined {
@@ -50,29 +57,24 @@ function windowGteRfc3339(w: WindowKey): string | undefined {
 }
 
 /**
- * Issues — master/detail layout, editorial chrome.
+ * Issues — master/detail layout.
  *
  *   ┌──────────┬─────────────────────────────────┐
  *   │ rail     │  detail (Outlet)                │
  *   │ filter   │                                 │
  *   │ ◾ row    │  • If `:issueId` → IssueDetail  │
- *   │ ◾ row    │  • Else            → splash     │
+ *   │ ◾ row    │  • Else            → empty pane │
  *   └──────────┴─────────────────────────────────┘
  *
- * Rail uses paper-2 surface + hairline border-r against the main pane
- * (no card frame). Rows are rule-soft separated, hover paints
- * accent-soft. Selected row carries a left tora strip.
- *
  * URL state:
- *   `?status=`    active filter tab (default 'active')
- *   `?measure=`   v2.2 sort dim (default 'event_count')
- *   `?window=`    v2.2 time window (default '7d')
- *   `?release=`   slice by release
- *   `?errorType=` slice by error type (Sentori kind)
- *   `?env=`       slice by environment
- *   `?q=`         client-side search across error_type + message_sample
- *   `:issueId`    selected issue. When present the detail pane renders
- *                 via `<Outlet />`; otherwise the rail-empty placeholder.
+ *   ?status=     active filter tab (default 'active')
+ *   ?measure=    sort dim (default 'event_count')
+ *   ?window=     time window (default '7d')
+ *   ?release=    slice by release (deep-link from Releases)
+ *   ?errorType=  slice by Sentori error kind
+ *   ?env=        slice by environment
+ *   ?q=          server-side fuzzy match on error_type + message_sample
+ *   :issueId     selected issue → detail pane via <Outlet />
  */
 export function IssuesView() {
   const { currentProject } = useOrg()
@@ -89,7 +91,7 @@ export function IssuesView() {
     WINDOW_KEYS.has(raw as WindowKey) ? (raw as WindowKey) : null
   )
 
-  // Cross-module deep-link filters. Other modules (Releases, Related)
+  // Cross-module deep-link filters. Other modules (Releases, Users)
   // link in via these URL params; refreshing / sharing preserves the
   // slice. Each filter has a clear "× remove" chip at the top of the
   // rail so the operator can see + zero them out.
@@ -136,8 +138,8 @@ export function IssuesView() {
     })
 
   return (
-    <div className="-mx-4 -my-3 flex h-[calc(100%+1.5rem)] min-h-0 overflow-hidden bg-[color:var(--paper)]">
-      <aside className="flex w-[22rem] shrink-0 flex-col overflow-hidden border-r border-[color:var(--rule)] bg-[color:var(--paper-2)]">
+    <div className="bg-bg -mx-4 -my-3 flex h-[calc(100%+1.5rem)] min-h-0 overflow-hidden">
+      <aside className="bg-bg-secondary border-border flex w-[22rem] shrink-0 flex-col overflow-hidden border-r">
         <RailHeader
           count={rows.length}
           current={tab}
@@ -151,18 +153,40 @@ export function IssuesView() {
         {activeFilters.length > 0 && <FilterChips filters={activeFilters} />}
         <div className="min-h-0 flex-1 overflow-y-auto">
           {!projectId && (
-            <RailEmpty>Create a project in org settings to start ingesting.</RailEmpty>
+            <div className="p-4">
+              <EmptyState
+                title="No project selected"
+                description="Create a project in org settings to start ingesting."
+              />
+            </div>
           )}
           {projectId && isLoading && <RailSkeleton />}
-          {projectId && !!error && <RailEmpty>Failed to load — check your network.</RailEmpty>}
+          {projectId && !!error && (
+            <div className="p-4">
+              <Alert title="Failed to load issues" variant="danger">
+                Check your network connection or try again later.
+              </Alert>
+            </div>
+          )}
           {projectId && !isLoading && !error && rows.length === 0 && (
-            <RailEmpty>
-              {activeFilters.length > 0
-                ? 'No issues match these filters. Try clearing one or more.'
-                : tab === 'active'
-                  ? 'Quiet right now. Fire an event from your SDK to see it here.'
-                  : 'No issues match this filter.'}
-            </RailEmpty>
+            <div className="p-4">
+              <EmptyState
+                title={
+                  activeFilters.length > 0
+                    ? 'No issues match these filters'
+                    : tab === 'active'
+                      ? 'Quiet right now'
+                      : 'No issues match'
+                }
+                description={
+                  activeFilters.length > 0
+                    ? 'Try clearing one or more filters.'
+                    : tab === 'active'
+                      ? 'Fire an event from your SDK to see it here.'
+                      : 'Switch to another status tab to see more.'
+                }
+              />
+            </div>
           )}
           {rows.map((row) => (
             <RailRow
@@ -176,7 +200,7 @@ export function IssuesView() {
         </div>
       </aside>
 
-      <section className="min-w-0 flex-1 overflow-y-auto bg-[color:var(--paper)]">
+      <section className="bg-bg min-w-0 flex-1 overflow-y-auto">
         {issueId ? (
           <div className="p-6">
             <Outlet />
@@ -191,19 +215,6 @@ export function IssuesView() {
 
 // ── data hook ───────────────────────────────────────────────────────────────
 
-/**
- * Normalised row shape rendered by `RailRow`. Maps onto the v2.2
- * `/explore` `dim=issue` projection (`issue_id` / `error_type` /
- * `message_sample` / `last_release` / `status` + the requested
- * measures). Fields not in that projection (`priority`, `labels`,
- * `assigneeEmail`) stay typed optional — the row component
- * gracefully omits them — so adding them to `/explore` later is
- * additive without touching the UI.
- *
- * Issue detail (`detail-view.tsx`) re-fetches the full `IssueRow`
- * via `adminApi.issueDetail`, so this slim shape only has to drive
- * the rail row, not power the detail screen.
- */
 type RailIssueRow = {
   id: string
   errorType: string
@@ -257,9 +268,6 @@ function useIssuesRail(params: {
       ...(releaseFilter ? { releaseEq: releaseFilter } : {}),
       ...(tab === 'all' ? {} : { statusIn: [tab] }),
       ...(windowGte ? { receivedAtGte: windowGte } : {}),
-      // v2.3 — server-side fuzzy match against issues.error_type +
-      // issues.message_sample. Replaces the v2.2 W3 client-side
-      // search stub. Empty string acts as no filter.
       ...(searchFilter ? { search: searchFilter } : {}),
     },
     limit: 100,
@@ -295,11 +303,6 @@ function useIssuesRail(params: {
   }
 }
 
-/** Project one /explore `dim=issue` row into the rail shape. Falls
- *  back to safe defaults on missing fields — the server always emits
- *  `issue_id`, `error_type`, `message_sample`, `last_release`,
- *  `status` and the requested measures (see explore.rs
- *  `project_issue_row`), so the only nulls are absent timestamps. */
 function normaliseExplore(r: ExploreRow): null | RailIssueRow {
   const id = pickString(r.issue_id)
   if (!id) return null
@@ -322,17 +325,10 @@ function pickNumber(v: ExploreRow[string]): number {
 }
 
 /**
- * v2.3 — per-row sparkline. Issues the same `/explore` endpoint with
- * `dim=time_bucket` + `issueEq=<issueId>` so the result is the row's
- * event count bucketed inside the active window. The sparkline data
- * is `staleTime: 30_000` so navigating around the dashboard doesn't
- * re-fetch every visible row's chart on each render.
- *
- * Returns the values array directly (empty during load) so the
- * caller can hand it straight to `<Sparkline values={...} />`. Per
- * RailRow uses one of these hooks — React Query batches the calls
- * naturally; with `limit=100` rows in the rail and ~50 ms server
- * latency the full batch typically lands < 500 ms wall-clock.
+ * Per-row sparkline. Issues `/explore` with `dim=time_bucket` +
+ * `issueEq=<issueId>` so the result is the row's event count
+ * bucketed inside the active window. `staleTime: 30_000` keeps
+ * navigation cheap.
  */
 function useIssueSparkline(
   projectId: null | string,
@@ -365,27 +361,18 @@ type FilterChip = { label: string; onClear: () => void; value: string }
 
 function FilterChips({ filters }: { filters: FilterChip[] }) {
   return (
-    <div className="shrink-0 border-b border-[color:var(--rule-soft)] px-4 py-2">
-      <div className="mb-1 font-mono text-[9px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+    <div className="border-border shrink-0 border-b px-4 py-2">
+      <div className="text-fg-muted mb-1 font-mono text-[9px] tracking-[0.22em] uppercase">
         filters
       </div>
       <div className="flex flex-wrap gap-1.5">
         {filters.map((f) => (
-          <span
-            className="inline-flex items-center gap-1.5 border border-[color:var(--rule)] bg-[color:var(--paper)] px-2 py-0.5 font-mono text-[10px] text-[color:var(--ink-soft)]"
+          <Chip
             key={f.label + f.value}
-          >
-            <span className="text-[color:var(--ink-muted)]">{f.label}:</span>
-            <span className="max-w-[14em] truncate text-[color:var(--ink)]">{f.value}</span>
-            <button
-              aria-label={`clear ${f.label} filter`}
-              className="text-[color:var(--ink-muted)] hover:text-[color:var(--danger)]"
-              onClick={f.onClear}
-              type="button"
-            >
-              ×
-            </button>
-          </span>
+            label={`${f.label}: ${f.value}`}
+            onRemove={f.onClear}
+            variant="default"
+          />
         ))}
       </div>
     </div>
@@ -412,89 +399,54 @@ function RailHeader({
   windowKey: WindowKey
 }) {
   return (
-    <header className="shrink-0 border-b border-[color:var(--rule)] px-4 py-3">
+    <header className="border-border shrink-0 border-b px-4 py-3">
       <div className="flex items-baseline justify-between">
-        <h1
-          className="text-[color:var(--ink)]"
-          style={{
-            fontFamily: 'var(--font-sans)',
-            fontSize: '17px',
-            fontVariationSettings: "'wdth' 95, 'opsz' 24, 'wght' 550",
-            letterSpacing: '-0.01em',
-          }}
-        >
-          Issues
-        </h1>
-        <span className="font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
+        <h1 className="text-fg text-[17px] font-semibold tracking-tight">Issues</h1>
+        <span className="text-fg-muted font-mono text-[11px] tabular-nums">
           {count.toLocaleString()}
         </span>
       </div>
-      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1">
-        {STATUS_TABS.map((t) => {
-          const active = t.key === current
-          return (
-            <button
-              className={`cursor-pointer font-mono text-[11px] tracking-[0.08em] uppercase transition-colors ${
-                active
-                  ? 'text-[color:var(--accent)]'
-                  : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]'
-              }`}
-              key={t.key}
-              onClick={() => onChangeTab(t.key)}
-              type="button"
-            >
-              {t.label}
-              {active && <span className="ml-1 text-[color:var(--accent)]">·</span>}
-            </button>
-          )
-        })}
+      <div className="mt-3">
+        <GdsTabs
+          active={current}
+          onChange={(id) => onChangeTab(id as Tab)}
+          scrollable
+          size="sm"
+          tabs={STATUS_TABS}
+          variant="underline"
+        />
       </div>
-      {/* v2.2 picker bar — measure + window. */}
-      <div className="mt-3 flex flex-wrap items-baseline gap-3 font-mono text-[10px] tracking-[0.1em] uppercase">
-        <span className="text-[color:var(--ink-muted)]">sort</span>
-        <div className="flex flex-wrap items-baseline gap-2">
-          {MEASURES.map((m, i) => (
-            <span className="flex items-baseline gap-2" key={m.key}>
-              {i > 0 && <span className="text-[color:var(--rule)]">/</span>}
-              <button
-                className={
-                  m.key === measure
-                    ? 'text-[color:var(--accent)]'
-                    : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink-soft)]'
-                }
-                onClick={() => onChangeMeasure(m.key)}
-                type="button"
-              >
-                {m.label}
-              </button>
-            </span>
-          ))}
-        </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-fg-muted font-mono text-[10px] tracking-[0.1em] uppercase">sort</span>
+        <ToggleGroup
+          aria-label="Sort issues by"
+          exclusive
+          items={MEASURES}
+          onChange={(v) => {
+            const next = v[0] as Measure | undefined
+            if (next) onChangeMeasure(next)
+          }}
+          size="sm"
+          value={[measure]}
+        />
       </div>
-      <div className="mt-1.5 flex flex-wrap items-baseline gap-3 font-mono text-[10px] tracking-[0.1em] uppercase">
-        <span className="text-[color:var(--ink-muted)]">window</span>
-        <div className="flex flex-wrap items-baseline gap-2">
-          {WINDOWS.map((w, i) => (
-            <span className="flex items-baseline gap-2" key={w}>
-              {i > 0 && <span className="text-[color:var(--rule)]">/</span>}
-              <button
-                className={
-                  w === windowKey
-                    ? 'text-[color:var(--accent)]'
-                    : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink-soft)]'
-                }
-                onClick={() => onChangeWindow(w)}
-                type="button"
-              >
-                {w}
-              </button>
-            </span>
-          ))}
-        </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <span className="text-fg-muted font-mono text-[10px] tracking-[0.1em] uppercase">
+          window
+        </span>
+        <ToggleGroup
+          aria-label="Time window"
+          exclusive
+          items={WINDOWS}
+          onChange={(v) => {
+            const next = v[0] as WindowKey | undefined
+            if (next) onChangeWindow(next)
+          }}
+          size="sm"
+          value={[windowKey]}
+        />
       </div>
-      {/* Footer — explore round-trip latency, useful for spotting a
-          query that needs an index. */}
-      <div className="mt-2 font-mono text-[9px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+      <div className="text-fg-muted mt-2 font-mono text-[9px] tracking-[0.18em] uppercase">
         {typeof meta?.tookMs === 'number' ? `/explore · ${meta.tookMs} ms` : '/explore'}
       </div>
     </header>
@@ -516,43 +468,36 @@ function RailRow({
   const sparkValues = useIssueSparkline(projectId, row.id, windowKey)
   return (
     <Link
-      className={`group relative block border-b border-[color:var(--rule-soft)] px-4 py-3 transition-colors ${
-        selected ? 'bg-[color:var(--accent-soft)]' : 'hover:bg-[color:var(--paper)]'
+      className={`border-border-muted group relative block border-b px-4 py-3 transition-colors ${
+        selected ? 'bg-bg-tertiary' : 'hover:bg-bg-tertiary/60'
       }`}
       to={`/main/org/${currentOrg.slug}/issues/${row.id}`}
     >
-      {/* Active left accent strip. */}
       <span
         aria-hidden
-        className={`absolute top-0 bottom-0 left-0 w-[2px] ${
-          selected ? 'bg-[color:var(--accent)]' : 'bg-transparent'
-        }`}
+        className={`absolute top-0 bottom-0 left-0 w-[2px] ${selected ? 'bg-accent' : 'bg-transparent'}`}
       />
       <div className="flex min-w-0 items-baseline gap-2">
         {row.priority && row.priority !== 'p3' && <PriorityChip priority={row.priority} />}
-        {/* v2.0 — distinguish manual `captureMessage` events from
-         *  error/anr/nearCrash events. The server synthesises
-         *  `errorType = 'Message'` for kind=message issues, so the
-         *  client can render a different icon without a new field. */}
+        {/* Distinguish manual captureMessage events from real errors —
+         *  server synthesises `errorType = 'Message'` for kind=message
+         *  so the row can render a different glyph without a new field. */}
         {row.errorType === 'Message' && (
           <span
             aria-hidden
-            className="text-[12px] text-[color:var(--ink-muted)]"
+            className="text-fg-muted text-[12px]"
             title="Manual report (captureMessage)"
           >
             💬
           </span>
         )}
-        <span
-          className="min-w-0 flex-1 truncate font-sans text-[13px] text-[color:var(--ink)]"
-          style={{ fontVariationSettings: "'wdth' 100, 'opsz' 14, 'wght' 550" }}
-        >
+        <span className="text-fg min-w-0 flex-1 truncate text-[13px] font-medium">
           {row.errorType === 'Message' ? displayMessage(row.messageSample) : row.errorType}
         </span>
-        <StatusTag status={row.status} />
+        <IssueStatusBadge status={row.status} />
       </div>
       {row.errorType !== 'Message' && (
-        <div className="mt-0.5 line-clamp-1 text-[12px] text-[color:var(--ink-soft)]">
+        <div className="text-fg-secondary mt-0.5 line-clamp-1 text-[12px]">
           {displayMessage(row.messageSample)}
         </div>
       )}
@@ -562,40 +507,34 @@ function RailRow({
             <LabelChip key={l} label={l} />
           ))}
           {row.labels.length > 3 && (
-            <span className="font-mono text-[10px] tracking-wider text-[color:var(--ink-muted)] uppercase">
+            <span className="text-fg-muted font-mono text-[10px] tracking-wider uppercase">
               +{row.labels.length - 3}
             </span>
           )}
         </div>
       )}
-      <div className="mt-2 flex items-center gap-2 font-mono text-[10px] tracking-[0.05em] whitespace-nowrap text-[color:var(--ink-muted)]">
+      <div className="text-fg-muted mt-2 flex items-center gap-2 font-mono text-[10px] tracking-[0.05em] whitespace-nowrap">
         <span className="tabular-nums">{row.eventCount.toLocaleString()} ev</span>
         <span aria-hidden className="opacity-40">
           ·
         </span>
         <span className="tabular-nums">{row.lastSeen ? formatRelative(row.lastSeen) : '—'}</span>
-        {/* v2.3 — per-row sparkline. Uses /explore dim=time_bucket +
-         *   issueEq=row.id; one query per visible row (React Query
-         *   caches by issueId+windowKey). Renders empty SVG while
-         *   loading so layout doesn't reflow. */}
         <span aria-hidden className="ml-auto opacity-70">
           <Sparkline
             ariaLabel={`Event trend for ${row.errorType}`}
             height={16}
-            stroke="var(--ink-muted)"
+            stroke="currentColor"
             strokeWidth={1}
             values={sparkValues}
             width={64}
           />
         </span>
         {row.assigneeEmail && (
-          <span className="ml-2 truncate text-[color:var(--accent)]">
-            @{row.assigneeEmail.split('@')[0]}
-          </span>
+          <span className="text-accent ml-2 truncate">@{row.assigneeEmail.split('@')[0]}</span>
         )}
       </div>
       {row.lastRelease && (
-        <div className="mt-0.5 truncate font-mono text-[10px] tracking-[0.05em] text-[color:var(--ink-muted)] opacity-80">
+        <div className="text-fg-muted mt-0.5 truncate font-mono text-[10px] tracking-[0.05em] opacity-80">
           {row.lastRelease}
         </div>
       )}
@@ -603,28 +542,34 @@ function RailRow({
   )
 }
 
-function StatusTag({ status }: { status: IssueStatus }) {
-  const cls =
+/** Map Sentori IssueStatus onto GDS Badge variants. Sentori has more
+ *  states than GDS StatusBadge's enum, so Badge + variant + manual
+ *  label gives the right semantics. */
+function IssueStatusBadge({ status }: { status: IssueStatus }) {
+  const variant =
     status === 'regressed'
-      ? 'text-[color:var(--accent)]'
+      ? 'warning'
       : status === 'active'
-        ? 'text-[color:var(--ink)]'
-        : 'text-[color:var(--ink-muted)]'
+        ? 'info'
+        : status === 'resolved'
+          ? 'success'
+          : 'default'
   return (
-    <span className={`shrink-0 font-mono text-[10px] tracking-[0.18em] uppercase ${cls}`}>
+    <Badge className="shrink-0 font-mono text-[10px] tracking-[0.18em] uppercase" variant={variant}>
       {status}
-    </span>
+    </Badge>
   )
 }
 
 function RailSkeleton() {
   return (
-    <div>
+    <div className="flex flex-col">
       {Array.from({ length: 8 }).map((_, i) => (
-        <div
-          className="sentori-skeleton h-[68px] border-b border-[color:var(--rule-soft)]"
-          key={i}
-        />
+        <div className="border-border-muted border-b px-4 py-3" key={i}>
+          <Skeleton className="mb-2" height={14} variant="rect" width="70%" />
+          <Skeleton className="mb-2" height={11} variant="rect" width="90%" />
+          <Skeleton height={10} variant="rect" width="40%" />
+        </div>
       ))}
     </div>
   )
@@ -633,34 +578,16 @@ function RailSkeleton() {
 function DetailPlaceholder() {
   return (
     <div className="flex h-full items-center justify-center px-6">
-      <div className="max-w-md text-center">
-        <div className="mb-3 font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
-          no issue selected
-        </div>
-        <div
-          className="mb-3 text-[color:var(--ink)]"
-          style={{
-            fontFamily: 'var(--font-sans)',
-            fontSize: '22px',
-            fontVariationSettings: "'wdth' 95, 'opsz' 24, 'wght' 550",
-            letterSpacing: '-0.01em',
-          }}
-        >
-          Pick a row on the left.
-        </div>
-        <div className="text-[13px] text-[color:var(--ink-soft)]">
-          Stack trace, events, breadcrumbs and the screenshot debug center live in this pane.
-        </div>
-      </div>
+      <EmptyState
+        title="Pick a row on the left"
+        description="Stack trace, events, breadcrumbs and replays show up here."
+      />
     </div>
   )
 }
 
-/**
- * Pre-coerceError events (shipped before the SDK fix) carry the
- * literal `[object Object]` as their message. Surface that as an
- * actionable hint rather than a confusing placeholder.
- */
+/** Pre-coerceError events (shipped before the SDK fix) carry the
+ *  literal `[object Object]` as their message. Surface it as a hint. */
 function displayMessage(message: string): string {
   if (message === '[object Object]') return '(non-Error thrown — SDK upgrade required)'
   return message

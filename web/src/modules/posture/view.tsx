@@ -38,12 +38,11 @@ export function PostureView() {
 
   return (
     <div className="space-y-6">
-      <header className="border-b border-[color:var(--rule)] pb-3">
+      <header className="border-border border-b pb-3">
         <div className="flex items-baseline gap-3">
           <h1
-            className="text-[color:var(--ink)]"
+            className="text-fg"
             style={{
-              fontFamily: 'var(--font-sans)',
               fontSize: '17px',
               fontVariationSettings: "'wdth' 95, 'opsz' 24, 'wght' 550",
               letterSpacing: '-0.01em',
@@ -53,7 +52,7 @@ export function PostureView() {
           </h1>
           <TabSwitcher onChange={setTab} tab={tab} />
         </div>
-        <p className="mt-1 font-mono text-[11px] text-[color:var(--ink-muted)]">
+        <p className="text-fg-muted mt-1 font-mono text-[11px]">
           {tab === 'pin' &&
             'TLS pin mismatches reported by SDK callers · last 24h · refreshes every 60s'}
           {tab === 'trust' &&
@@ -86,13 +85,9 @@ function TabSwitcher({ onChange, tab }: { onChange: (t: PostureTab) => void; tab
     <div className="flex items-baseline gap-3 font-mono text-[11px] tracking-[0.18em] uppercase">
       {TABS.map((t, i) => (
         <span className="flex items-baseline gap-3" key={t}>
-          {i > 0 && <span className="text-[color:var(--rule)]">/</span>}
+          {i > 0 && <span className="text-border">/</span>}
           <button
-            className={
-              tab === t
-                ? 'text-[color:var(--accent)]'
-                : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink-soft)]'
-            }
+            className={tab === t ? 'text-accent' : 'text-fg-muted hover:text-fg-secondary'}
             onClick={() => onChange(t)}
             type="button"
           >
@@ -146,19 +141,19 @@ function PinAnomalyTable({ projectId }: { projectId: string }) {
 function AnomalyRow({ row }: { row: PinAnomalyRow }) {
   const suspicious = row.installCount >= 3
   return (
-    <li className="flex items-baseline gap-4 border-b border-[color:var(--rule-soft)] py-2 last:border-b-0">
-      <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-[color:var(--ink)]">
+    <li className="border-border-muted flex items-baseline gap-4 border-b py-2 last:border-b-0">
+      <span className="text-fg min-w-0 flex-1 truncate font-mono text-[13px]">
         {row.serverName ?? '(unknown server)'}
       </span>
-      <span className="font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
+      <span className="text-fg-muted font-mono text-[11px] tabular-nums">
         {new Date(row.lastSeen).toLocaleString()}
       </span>
-      <span className="font-mono text-[12px] text-[color:var(--ink-soft)] tabular-nums">
+      <span className="text-fg-secondary font-mono text-[12px] tabular-nums">
         {row.count.toLocaleString()} report{row.count === 1 ? '' : 's'}
       </span>
       <span
         className="font-mono text-[12px] tabular-nums"
-        style={{ color: suspicious ? 'var(--danger)' : 'var(--ink-soft)' }}
+        style={{ color: suspicious ? 'var(--color-danger)' : 'var(--color-fg-secondary)' }}
       >
         {row.installCount} install{row.installCount === 1 ? '' : 's'}
         {suspicious ? ' ⚠' : ''}
@@ -209,12 +204,12 @@ function TrustScoreTable({ projectId }: { projectId: string }) {
 function TrustRow({ row }: { row: TrustScoreRow }) {
   const tone =
     row.score < 30
-      ? 'var(--danger)'
+      ? 'var(--color-danger)'
       : row.score < 70
-        ? 'var(--warning, var(--accent))'
-        : 'var(--ink-soft)'
+        ? 'var(--color-warning, var(--color-accent))'
+        : 'var(--color-fg-secondary)'
   return (
-    <li className="grid grid-cols-[5ch_minmax(0,1fr)_auto_auto] items-baseline gap-3 border-b border-[color:var(--rule-soft)] py-2 last:border-b-0">
+    <li className="border-border-muted grid grid-cols-[5ch_minmax(0,1fr)_auto_auto] items-baseline gap-3 border-b py-2 last:border-b-0">
       <span
         className="font-mono text-[16px] font-medium tabular-nums"
         style={{ color: tone }}
@@ -222,17 +217,15 @@ function TrustRow({ row }: { row: TrustScoreRow }) {
       >
         {row.score}
       </span>
-      <span className="min-w-0 truncate font-mono text-[12px] text-[color:var(--ink)]">
-        {row.installId}
-      </span>
-      <span className="font-mono text-[11px] text-[color:var(--ink-muted)]">
+      <span className="text-fg min-w-0 truncate font-mono text-[12px]">{row.installId}</span>
+      <span className="text-fg-muted font-mono text-[11px]">
         {Object.entries(row.kinds)
           .sort((a, b) => b[1] - a[1])
           .slice(0, 3)
           .map(([k, n]) => `${k}×${n}`)
           .join(' · ')}
       </span>
-      <span className="font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
+      <span className="text-fg-muted font-mono text-[11px] tabular-nums">
         {new Date(row.lastSeen).toLocaleString()}
       </span>
     </li>

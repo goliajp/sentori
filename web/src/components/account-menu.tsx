@@ -43,7 +43,7 @@ export function AccountMenu() {
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label="Open account menu"
-        className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-[color:var(--rule)] transition-colors hover:border-[color:var(--accent)]"
+        className="border-border hover:border-accent flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border transition-colors"
         onClick={() => setOpen((v) => !v)}
         type="button"
       >
@@ -52,17 +52,17 @@ export function AccountMenu() {
 
       {open && (
         <div
-          className="absolute top-full right-0 z-50 mt-2 w-60 border border-[color:var(--rule)] bg-[color:var(--paper)] shadow-xl"
+          className="border-border bg-bg absolute top-full right-0 z-50 mt-2 w-60 border shadow-xl"
           role="menu"
         >
-          <div className="border-b border-[color:var(--rule)] px-3 py-3">
-            <div className="text-[13px] font-medium text-[color:var(--ink)]">{label}</div>
-            <div className="font-mono text-[11px] text-[color:var(--ink-muted)]">{user.email}</div>
+          <div className="border-border border-b px-3 py-3">
+            <div className="text-fg text-[13px] font-medium">{label}</div>
+            <div className="text-fg-muted font-mono text-[11px]">{user.email}</div>
           </div>
           <ul className="py-1">
             <li>
               <Link
-                className="block px-3 py-1.5 text-[13px] text-[color:var(--ink)] hover:bg-[color:var(--paper-2)] hover:text-[color:var(--accent)]"
+                className="text-fg hover:bg-bg-secondary hover:text-accent block px-3 py-1.5 text-[13px]"
                 onClick={() => setOpen(false)}
                 role="menuitem"
                 to="/main/account"
@@ -72,7 +72,7 @@ export function AccountMenu() {
             </li>
             <li>
               <Link
-                className="block px-3 py-1.5 text-[13px] text-[color:var(--ink)] hover:bg-[color:var(--paper-2)] hover:text-[color:var(--accent)]"
+                className="text-fg hover:bg-bg-secondary hover:text-accent block px-3 py-1.5 text-[13px]"
                 onClick={() => setOpen(false)}
                 role="menuitem"
                 to="/main/me/activity"
@@ -81,9 +81,9 @@ export function AccountMenu() {
               </Link>
             </li>
           </ul>
-          <div className="border-t border-[color:var(--rule)] py-1">
+          <div className="border-border border-t py-1">
             <button
-              className="block w-full px-3 py-1.5 text-left text-[13px] text-[color:var(--ink-soft)] hover:bg-[color:var(--paper-2)] hover:text-[color:var(--accent)]"
+              className="text-fg-secondary hover:bg-bg-secondary hover:text-accent block w-full px-3 py-1.5 text-left text-[13px]"
               onClick={() => {
                 setOpen(false)
                 void logout()

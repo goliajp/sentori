@@ -20,12 +20,11 @@ type Props = {
 }
 
 const STYLE: Record<FrameRole, string> = {
-  boundary:
-    'bg-[color:var(--warning-bg)] text-[color:var(--warning)] border-[color:var(--warning-border)]',
-  framework: 'bg-[color:var(--info-bg)] text-[color:var(--info)] border-[color:var(--info-border)]',
-  lib: 'bg-[color:var(--paper-2)] text-[color:var(--ink-muted)] border-[color:var(--rule)]',
-  unknown: 'bg-[color:var(--paper-2)] text-[color:var(--ink-muted)] border-[color:var(--rule)]',
-  you: 'bg-[color:var(--accent-soft)] text-[color:var(--accent)] border-[color:var(--accent)]',
+  boundary: 'bg-warning/15 text-warning border-warning/30',
+  framework: 'bg-info/15 text-info border-info/30',
+  lib: 'bg-bg-secondary text-fg-muted border-border',
+  unknown: 'bg-bg-secondary text-fg-muted border-border',
+  you: 'bg-accent/10 text-accent border-accent',
 }
 
 export function FrameRoleBadge({ label, role }: Props) {

@@ -8,24 +8,15 @@ import { useAuth } from '@/auth/state'
 import { GROUPS, modulesInGroup, PINNED_MODULE } from '@/modules/registry'
 
 /**
- * Editorial nav rail — paper background, mono-numbered group titles,
- * hairline section dividers (no rounded pills, no accent-tinted bg
- * blobs). Active module marked by a left tora accent strip + ink-on-
- * paper-2 fill.
+ * Lens-grouped nav rail. Five lenses answer five operator questions:
+ * "what broke?" / "what's slow?" / "who's affected?" / "is the platform
+ * safe?" / "setup & admin". Overview is pinned above the lens groups
+ * so the most common entry point is one click from the top.
  *
- *   01 / overview
- *
- *   ── monitor ────
- *   issues
- *   traces
- *   ▎ metrics       ← active: 2px accent strip + paper-2 bg
- *   vitals
- *   …
- *
- *   ── organize ──
- *   teams
- *   integrations
- *   …
+ * Visuals follow GDS semantic tokens (bg-bg-secondary rail, border-
+ * border hairlines, accent strip on active row). Density is controlled
+ * by the 5-axis theme — Sentori boots `compact` so the rail reads
+ * Bloomberg-style tight without per-class overrides.
  */
 export function Sidebar() {
   const { currentOrg, currentProject, orgs, projects } = useOrg()
@@ -33,7 +24,7 @@ export function Sidebar() {
   const isAdmin = currentOrg.role === 'owner' || currentOrg.role === 'admin'
 
   return (
-    <aside className="hidden w-60 shrink-0 flex-col overflow-hidden border-r border-[color:var(--rule)] bg-[color:var(--paper)] md:flex">
+    <aside className="bg-bg-secondary border-border hidden w-60 shrink-0 flex-col overflow-hidden border-r md:flex">
       <ContextBlock
         canCreateProject={isAdmin}
         currentOrg={currentOrg}
@@ -59,14 +50,14 @@ export function Sidebar() {
           )
         })}
 
-        {/* v1.0 — instance-wide superadmin link. Only renders for
-         *  users with `is_superadmin = TRUE` on their row. Distinct
-         *  group with a tora-tinted micro-label so it reads as
-         *  "out-of-band power" not just another module. */}
+        {/* Instance-wide superadmin link — only for users with
+         *  `is_superadmin = TRUE` on their row. Rendered with the
+         *  accent color so it reads as "out-of-band power" rather
+         *  than just another module. */}
         {user?.isSuperadmin && (
           <Section title="Operator">
             <Link
-              className="group relative block py-1.5 pr-3 pl-4 text-[color:var(--accent)] transition-colors hover:bg-[color:var(--paper-2)]/60"
+              className="text-accent hover:bg-bg-tertiary group relative block py-1.5 pr-3 pl-4 transition-colors"
               to="/main/superadmin"
             >
               <span aria-hidden className="absolute top-0 bottom-0 left-0 w-[2px] bg-transparent" />
@@ -95,23 +86,12 @@ export function Sidebar() {
   )
 }
 
-/**
- * Sidebar bottom strip. The toolbar's avatar dropdown handles the
- * "account" surface end-to-end (sign out, account, activity); the old
- * email + `⎋ sign out` row in the sidebar duplicated that. This strip
- * now just exposes two compact off-ramps the avatar dropdown doesn't:
- *
- *   docs ↗   feedback ↗
- *
- * Same hairline + paper-2 fill as before so the nav rail still ends
- * with a closing rule.
- */
 function FooterStrip() {
   return (
-    <div className="border-t border-[color:var(--rule)] bg-[color:var(--paper-2)] px-4 py-2.5">
+    <div className="border-border bg-bg-tertiary border-t px-4 py-2.5">
       <div className="flex items-center justify-between font-mono text-[10px] tracking-[0.18em] uppercase">
         <a
-          className="text-[color:var(--ink-muted)] transition-colors hover:text-[color:var(--accent)]"
+          className="text-fg-muted hover:text-accent transition-colors"
           href="/docs"
           rel="noreferrer"
           target="_blank"
@@ -119,7 +99,7 @@ function FooterStrip() {
           docs ↗
         </a>
         <a
-          className="text-[color:var(--ink-muted)] transition-colors hover:text-[color:var(--accent)]"
+          className="text-fg-muted hover:text-accent transition-colors"
           href="https://github.com/goliajp/sentori/issues/new"
           rel="noreferrer"
           target="_blank"
@@ -133,17 +113,9 @@ function FooterStrip() {
 
 /**
  * Top-of-sidebar context — answers "what am I looking at?" before the
- * user even reads a module label. Two rows:
- *
- *   ORG     ▾ qualcomm   role  +
- *   PROJECT ▾ focus-ai…       +
- *
- * Each row is a native <select> if the user has ≥ 2 of that thing,
- * else a static label. The trailing `+` button is the discoverable
- * action for creating a new org / project — promoted out of the select
- * options (where it hid as a fake `__new__` choice) so users can find
- * it without opening the dropdown. Project `+` only shows when the
- * viewer is an org owner/admin.
+ * user even reads a module label. Two rows (org / project), each a
+ * native <select> when there are ≥ 2 entries, otherwise a static
+ * label. The trailing `+` button creates a new org / project.
  */
 function ContextBlock({
   canCreateProject,
@@ -163,35 +135,29 @@ function ContextBlock({
   const [searchParams, setSearchParams] = useSearchParams()
   const orgsForCurrent = orgs.length > 0 ? orgs : [currentOrg]
 
-  /** Switch org by full navigation — orgs scope the whole app. */
   const switchOrg = (slug: string) => {
     navigate(`/main/org/${slug}/overview`)
   }
 
-  /** Switch project by *only* mutating the `?project=` query param.
-   *  This preserves the current page (Issues / Traces / Vitals / …)
-   *  so the user doesn't get yanked back to Overview every time. */
+  // Switch project by mutating ?project= only — keeps the current page
+  // (Issues / Vitals / …) so users don't get yanked back to Overview.
   const switchProject = (projectId: string) => {
     const next = new URLSearchParams(searchParams)
     next.set('project', projectId)
     setSearchParams(next, { replace: false })
   }
 
-  // Belt-and-braces guard: if the URL's ?project= ever points outside
-  // the current org (e.g. user copied a link from another org), the
-  // org-layout falls back to projects[0] and we want the <select> to
-  // reflect that — not show a stale dropdown value.
   const selectedProjectValue =
     currentProject && projects.some((p) => p.id === currentProject.id) ? currentProject.id : ''
 
-  void location // hook plumbing; URL change drives re-render via setSearchParams
+  void location
 
   return (
-    <div className="border-b border-[color:var(--rule)] bg-[color:var(--paper-2)] px-4 pt-3.5 pb-3">
+    <div className="border-border bg-bg-tertiary border-b px-4 pt-3.5 pb-3">
       <ContextRow
         label="org"
         meta={
-          <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+          <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
             {currentOrg.role}
           </span>
         }
@@ -199,7 +165,7 @@ function ContextBlock({
       >
         <select
           aria-label="Switch organization"
-          className="min-w-0 flex-1 appearance-none truncate bg-transparent pr-1 text-[13px] text-[color:var(--ink)] focus:outline-none"
+          className="text-fg min-w-0 flex-1 appearance-none truncate bg-transparent pr-1 text-[13px] focus:outline-none"
           onChange={(e) => switchOrg(e.target.value)}
           value={currentOrg.slug}
         >
@@ -223,11 +189,11 @@ function ContextBlock({
         }
       >
         {projects.length === 0 ? (
-          <span className="flex-1 text-[12px] text-[color:var(--ink-muted)] italic">none yet</span>
+          <span className="text-fg-muted flex-1 text-[12px] italic">none yet</span>
         ) : (
           <select
             aria-label="Switch project"
-            className="min-w-0 flex-1 appearance-none truncate bg-transparent pr-1 text-[13px] text-[color:var(--ink)] focus:outline-none"
+            className="text-fg min-w-0 flex-1 appearance-none truncate bg-transparent pr-1 text-[13px] focus:outline-none"
             onChange={(e) => switchProject(e.target.value)}
             value={selectedProjectValue}
           >
@@ -243,13 +209,11 @@ function ContextBlock({
   )
 }
 
-/** Small `+` icon button — shared affordance for "new org" and
- *  "new project" actions in the context block. */
 function PlusButton({ onClick, title }: { onClick: () => void; title: string }) {
   return (
     <button
       aria-label={title}
-      className="flex h-5 w-5 shrink-0 items-center justify-center text-[color:var(--ink-muted)] transition-colors hover:bg-[color:var(--paper)] hover:text-[color:var(--accent)]"
+      className="text-fg-muted hover:bg-bg hover:text-accent flex h-5 w-5 shrink-0 items-center justify-center transition-colors"
       onClick={onClick}
       title={title}
       type="button"
@@ -269,14 +233,6 @@ function PlusButton({ onClick, title }: { onClick: () => void; title: string }) 
   )
 }
 
-/**
- * Stacked context row — micro-label on its own line, value row
- * underneath claims the full sidebar width. Long project / org names
- * (qualcomm-insight, mobile-team-pmf-prototype, …) no longer get
- * shouldered out by a 56 px left-aligned label tag. The optional
- * `meta` slot lands above the value at the right edge (role tag),
- * and `plus` (+ icon button) tails the value row.
- */
 function ContextRow({
   children,
   label,
@@ -291,7 +247,7 @@ function ContextRow({
   return (
     <div className="py-1.5 first:pt-0">
       <div className="mb-1 flex items-baseline justify-between gap-2">
-        <span className="font-mono text-[9px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+        <span className="text-fg-muted font-mono text-[9px] tracking-[0.22em] uppercase">
           {label}
         </span>
         {meta}
@@ -308,8 +264,8 @@ function Section({ children, title }: { children: React.ReactNode; title?: strin
   return (
     <div className="mb-1 last:mb-0">
       {title && (
-        <div className="border-t border-[color:var(--rule-soft)] px-4 pt-5 pb-2">
-          <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+        <div className="border-border-muted border-t px-4 pt-5 pb-2">
+          <span className="text-fg-muted font-mono text-[10px] tracking-[0.22em] uppercase">
             {title}
           </span>
         </div>
@@ -326,18 +282,13 @@ function SideLink({ module, orgSlug }: { module: ModuleDef; orgSlug: string }) {
   return (
     <Link
       className={`group relative block py-1.5 pr-3 pl-4 transition-colors ${
-        active
-          ? 'bg-[color:var(--paper-2)] text-[color:var(--ink)]'
-          : 'text-[color:var(--ink-soft)] hover:bg-[color:var(--paper-2)]/60 hover:text-[color:var(--ink)]'
+        active ? 'bg-bg-tertiary text-fg' : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
       }`}
       to={target}
     >
-      {/* Left accent strip when active. */}
       <span
         aria-hidden
-        className={`absolute top-0 bottom-0 left-0 w-[2px] ${
-          active ? 'bg-[color:var(--accent)]' : 'bg-transparent'
-        }`}
+        className={`absolute top-0 bottom-0 left-0 w-[2px] ${active ? 'bg-accent' : 'bg-transparent'}`}
       />
       <span className="flex items-center gap-2.5 text-[13px]">
         <NavIcon path={module.iconPath} active={active} />
@@ -351,9 +302,7 @@ function NavIcon({ active, path }: { active: boolean; path: string }) {
   return (
     <svg
       aria-hidden
-      className={`h-3.5 w-3.5 shrink-0 ${
-        active ? 'text-[color:var(--accent)]' : 'text-[color:var(--ink-muted)]'
-      }`}
+      className={`h-3.5 w-3.5 shrink-0 ${active ? 'text-accent' : 'text-fg-muted'}`}
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"

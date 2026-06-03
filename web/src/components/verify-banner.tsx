@@ -23,7 +23,7 @@ export function VerifyBanner() {
   if (user.oauthProvider) return null
 
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-[color:var(--warning)] bg-[color:var(--warning-bg)] px-4 py-1.5 text-[12px] text-[color:var(--warning)]">
+    <div className="border-warning bg-warning/15 text-warning flex items-center justify-between gap-3 border-b px-4 py-1.5 text-[12px]">
       <span>
         <strong className="font-medium">Verify your email</strong> ·{' '}
         <span className="opacity-90">
@@ -32,15 +32,12 @@ export function VerifyBanner() {
         </span>
       </span>
       <span className="flex shrink-0 items-center gap-3 font-mono text-[10px] tracking-[0.18em] uppercase">
-        <Link
-          className="hover:text-[color:var(--ink)]"
-          to={`/verify?resend=${encodeURIComponent(user.email)}`}
-        >
+        <Link className="hover:text-fg" to={`/verify?resend=${encodeURIComponent(user.email)}`}>
           resend →
         </Link>
         <button
           aria-label="Dismiss verification banner"
-          className="text-[color:var(--warning)] hover:text-[color:var(--ink)]"
+          className="text-warning hover:text-fg"
           onClick={() => setDismissed(true)}
           type="button"
         >

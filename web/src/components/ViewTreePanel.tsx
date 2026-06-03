@@ -148,14 +148,14 @@ export function ViewTreePanel({
 
   if (isLoading) {
     return (
-      <p className="border-y border-[color:var(--rule)] py-3 text-[12px] text-[color:var(--ink-soft)]">
+      <p className="border-border text-fg-secondary border-y py-3 text-[12px]">
         Loading view tree…
       </p>
     )
   }
   if (error) {
     return (
-      <p className="border-y border-[color:var(--rule)] py-3 text-[12px] text-[color:var(--danger)]">
+      <p className="border-border text-danger border-y py-3 text-[12px]">
         Failed to load view tree.
       </p>
     )
@@ -166,11 +166,11 @@ export function ViewTreePanel({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-3 font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+      <div className="text-fg-muted flex items-center gap-3 font-mono text-[10px] tracking-[0.18em] uppercase">
         <span>{total} nodes</span>
         <input
           aria-label="Search view tree"
-          className="ml-auto h-7 w-60 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-sans text-[12px] tracking-normal text-[color:var(--ink)] normal-case placeholder:text-[color:var(--ink-muted)] focus:border-[color:var(--accent)] focus:outline-none"
+          className="border-border bg-bg-secondary text-fg placeholder:text-fg-muted focus:border-accent ml-auto h-7 w-60 border px-2 font-sans text-[12px] tracking-normal normal-case focus:outline-none"
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Filter by name / a11y label"
           type="text"
@@ -178,7 +178,7 @@ export function ViewTreePanel({
         />
       </div>
       <div
-        className="max-h-[60vh] overflow-auto border-y border-[color:var(--rule)] bg-[color:var(--paper-2)] p-2 font-mono text-[11px]"
+        className="border-border bg-bg-secondary max-h-[60vh] overflow-auto border-y p-2 font-mono text-[11px]"
         ref={panelRef}
       >
         <TreeNode
@@ -242,10 +242,10 @@ function TreeNode({
       <button
         className={`flex w-full items-baseline gap-1 px-1 py-0.5 text-left transition-colors ${
           isHovered
-            ? 'bg-[color:var(--accent-soft)] text-[color:var(--ink)] ring-1 ring-[color:var(--accent)]'
+            ? 'bg-accent/10 text-fg ring-accent ring-1'
             : isMatched
-              ? 'bg-[color:var(--accent-soft)]/60 text-[color:var(--ink)]'
-              : 'text-[color:var(--ink-soft)] hover:bg-[color:var(--paper)]'
+              ? 'bg-accent/10/60 text-fg'
+              : 'text-fg-secondary hover:bg-bg'
         }`}
         data-node-id={id}
         onClick={() => hasChildren && onToggle(id)}
@@ -253,19 +253,15 @@ function TreeNode({
         type="button"
       >
         {hasChildren ? (
-          <span className="inline-block w-3 text-[color:var(--ink-muted)]/60">
-            {reallyOpen ? '▾' : '▸'}
-          </span>
+          <span className="text-fg-muted/60 inline-block w-3">{reallyOpen ? '▾' : '▸'}</span>
         ) : (
           <span className="inline-block w-3" />
         )}
-        <span className="whitespace-nowrap text-[color:var(--ink)]">{n.name}</span>
-        <span className="text-[color:var(--ink-muted)]/70">·</span>
-        <span className="whitespace-nowrap text-[color:var(--ink-muted)]">{n.type}</span>
+        <span className="text-fg whitespace-nowrap">{n.name}</span>
+        <span className="text-fg-muted/70">·</span>
+        <span className="text-fg-muted whitespace-nowrap">{n.type}</span>
         {n.props_summary && Object.keys(n.props_summary).length > 0 && (
-          <span className="truncate text-[10px] text-[color:var(--ink-muted)]/70">
-            {summary(n.props_summary)}
-          </span>
+          <span className="text-fg-muted/70 truncate text-[10px]">{summary(n.props_summary)}</span>
         )}
       </button>
       {reallyOpen &&

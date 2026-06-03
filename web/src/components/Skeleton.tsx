@@ -27,11 +27,7 @@ export function RowSkeleton({ count = 1, height = '52px' }: { count?: number; he
   return (
     <div aria-busy="true" role="status">
       {Array.from({ length: count }).map((_, i) => (
-        <div
-          key={i}
-          className="sentori-skeleton border-b border-[color:var(--rule-soft)]"
-          style={{ height }}
-        />
+        <div key={i} className="sentori-skeleton border-border-muted border-b" style={{ height }} />
       ))}
       <span className="sr-only">Loading…</span>
     </div>
@@ -42,11 +38,7 @@ export function CardSkeleton({ count = 1, height = '120px' }: { count?: number; 
   return (
     <div className="grid gap-3" aria-busy="true" role="status">
       {Array.from({ length: count }).map((_, i) => (
-        <div
-          key={i}
-          className="sentori-skeleton border border-[color:var(--rule)]"
-          style={{ height }}
-        />
+        <div key={i} className="sentori-skeleton border-border border" style={{ height }} />
       ))}
       <span className="sr-only">Loading…</span>
     </div>

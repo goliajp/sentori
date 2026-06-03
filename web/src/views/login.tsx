@@ -56,11 +56,11 @@ export function LoginView() {
         <PrimaryButton busy={busy}>{busy ? 'signing in…' : 'sign in'}</PrimaryButton>
       </form>
       <FooterLinks>
-        <Link className="hover:text-[color:var(--accent)]" to="/register">
+        <Link className="hover:text-accent" to="/register">
           create account
         </Link>
-        <span className="text-[color:var(--ink-muted)]/50">·</span>
-        <Link className="hover:text-[color:var(--accent)]" to="/forgot-password">
+        <span className="text-fg-muted/50">·</span>
+        <Link className="hover:text-accent" to="/forgot-password">
           forgot password
         </Link>
       </FooterLinks>
@@ -84,13 +84,12 @@ export function LoginView() {
  */
 export function AuthShell({ children, title }: { children: React.ReactNode; title: string }) {
   return (
-    <div className="flex min-h-full items-center justify-center bg-[color:var(--paper)] px-4 py-12">
+    <div className="bg-bg flex min-h-full items-center justify-center px-4 py-12">
       <div className="w-full max-w-[360px]">
         <div className="mb-7 flex items-baseline justify-center gap-2">
           <span
-            className="text-[color:var(--ink)] uppercase"
+            className="text-fg uppercase"
             style={{
-              fontFamily: 'var(--font-sans)',
               fontVariationSettings: "'wdth' 95, 'opsz' 48, 'wght' 600",
               fontSize: '18px',
               letterSpacing: '0.24em',
@@ -101,7 +100,7 @@ export function AuthShell({ children, title }: { children: React.ReactNode; titl
               aria-hidden
               className="ml-1.5 inline-block"
               style={{
-                background: 'var(--accent)',
+                background: 'var(--color-accent)',
                 borderRadius: '50%',
                 height: '6px',
                 transform: 'translateY(-2px)',
@@ -109,20 +108,17 @@ export function AuthShell({ children, title }: { children: React.ReactNode; titl
               }}
             />
           </span>
-          <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+          <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
             {SENTORI_VERSION}
           </span>
         </div>
 
-        <div className="border-y border-[color:var(--rule)]">
+        <div className="border-border border-y">
           <header className="flex items-baseline gap-3 px-px py-2.5">
-            <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
-              ·
-            </span>
+            <span className="text-accent font-mono text-[10px] tracking-[0.22em] uppercase">·</span>
             <h2
-              className="text-[color:var(--ink)]"
+              className="text-fg"
               style={{
-                fontFamily: 'var(--font-mono)',
                 fontSize: '11px',
                 fontWeight: 500,
                 letterSpacing: '0.22em',
@@ -132,7 +128,7 @@ export function AuthShell({ children, title }: { children: React.ReactNode; titl
               {title}
             </h2>
           </header>
-          <div className="border-t border-[color:var(--rule-soft)] px-px py-5">{children}</div>
+          <div className="border-border-muted border-t px-px py-5">{children}</div>
         </div>
       </div>
     </div>
@@ -154,12 +150,12 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+      <span className="text-fg-muted mb-1 block font-mono text-[10px] tracking-[0.18em] uppercase">
         {label}
       </span>
       <input
         autoComplete={autoComplete}
-        className="h-9 w-full border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2.5 text-[13px] text-[color:var(--ink)] outline-none focus:border-[color:var(--accent)]"
+        className="border-border bg-bg-secondary text-fg focus:border-accent h-9 w-full border px-2.5 text-[13px] outline-none"
         onChange={(e) => onChange(e.target.value)}
         required
         type={type}
@@ -180,7 +176,7 @@ export function PrimaryButton({
 }) {
   return (
     <button
-      className="mt-1 inline-flex h-9 w-full items-center justify-center bg-[color:var(--accent)] px-3 font-mono text-[11px] tracking-[0.12em] text-[color:var(--paper)] uppercase transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+      className="bg-accent text-bg mt-1 inline-flex h-9 w-full items-center justify-center px-3 font-mono text-[11px] tracking-[0.12em] uppercase transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       disabled={busy || disabled}
       type="submit"
     >
@@ -193,7 +189,7 @@ export function AuthError({ children }: { children: React.ReactNode }) {
   return (
     <div
       aria-live="polite"
-      className="border border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] px-2.5 py-1.5 font-mono text-[11px] text-[color:var(--danger)]"
+      className="border-danger/30 bg-danger/15 text-danger border px-2.5 py-1.5 font-mono text-[11px]"
     >
       {children}
     </div>
@@ -202,7 +198,7 @@ export function AuthError({ children }: { children: React.ReactNode }) {
 
 export function FooterLinks({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mt-5 flex items-center justify-center gap-2 font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+    <div className="text-fg-muted mt-5 flex items-center justify-center gap-2 font-mono text-[10px] tracking-[0.18em] uppercase">
       {children}
     </div>
   )
@@ -233,7 +229,7 @@ export function OAuthButtons() {
     <div className="mb-5 space-y-2">
       {providers.github && (
         <a
-          className="flex h-9 w-full items-center justify-center gap-2 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-3 text-[13px] text-[color:var(--ink)] transition-colors hover:border-[color:var(--ink-soft)]"
+          className="border-border bg-bg-secondary text-fg hover:border-fg-secondary flex h-9 w-full items-center justify-center gap-2 border px-3 text-[13px] transition-colors"
           href="/api/auth/oauth/github/start"
         >
           <GitHubGlyph /> Continue with GitHub
@@ -241,16 +237,16 @@ export function OAuthButtons() {
       )}
       {providers.google && (
         <a
-          className="flex h-9 w-full items-center justify-center gap-2 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-3 text-[13px] text-[color:var(--ink)] transition-colors hover:border-[color:var(--ink-soft)]"
+          className="border-border bg-bg-secondary text-fg hover:border-fg-secondary flex h-9 w-full items-center justify-center gap-2 border px-3 text-[13px] transition-colors"
           href="/api/auth/oauth/google/start"
         >
           <GoogleGlyph /> Continue with Google
         </a>
       )}
-      <div className="relative my-3 flex items-center gap-2 font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
-        <span className="h-px flex-1 bg-[color:var(--rule)]" />
+      <div className="text-fg-muted relative my-3 flex items-center gap-2 font-mono text-[10px] tracking-[0.22em] uppercase">
+        <span className="bg-border h-px flex-1" />
         <span>or with email</span>
-        <span className="h-px flex-1 bg-[color:var(--rule)]" />
+        <span className="bg-border h-px flex-1" />
       </div>
     </div>
   )

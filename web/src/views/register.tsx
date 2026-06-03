@@ -43,13 +43,13 @@ export function RegisterView() {
         <PrimaryButton busy={busy} disabled={password.length < 8}>
           {busy ? 'creating…' : 'create account'}
         </PrimaryButton>
-        <p className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+        <p className="text-fg-muted font-mono text-[10px] tracking-[0.12em] uppercase">
           8 characters minimum
         </p>
       </form>
       <FooterLinks>
         <span>already a member?</span>
-        <Link className="text-[color:var(--ink)] hover:text-[color:var(--accent)]" to="/login">
+        <Link className="text-fg hover:text-accent" to="/login">
           sign in
         </Link>
       </FooterLinks>

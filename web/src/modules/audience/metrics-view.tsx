@@ -43,7 +43,7 @@ export function AudienceMetricsView({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-6">
-      <p className="font-mono text-[11px] text-[color:var(--ink-muted)]">
+      <p className="text-fg-muted font-mono text-[11px]">
         last 7 days · daily buckets · refreshes every 60s
       </p>
 
@@ -65,9 +65,9 @@ function Totem({ label, value, variant }: { label: string; value: number; varian
   return (
     <div className="rule-cell">
       <div
-        className="t-display text-[color:var(--ink)]"
+        className="t-display text-fg"
         style={{
-          color: variant === 'warning' && value > 0 ? 'var(--danger)' : undefined,
+          color: variant === 'warning' && value > 0 ? 'var(--color-danger)' : undefined,
           fontSize: '40px',
         }}
       >
@@ -108,32 +108,32 @@ function BarSeries({
         </span>
       </header>
       {rows.length === 0 ? (
-        <p className="py-3 font-mono text-[11px] text-[color:var(--ink-muted)]">
+        <p className="text-fg-muted py-3 font-mono text-[11px]">
           no events captured in this range yet
         </p>
       ) : (
         <ul className="pt-3">
           {rows.map((r) => (
             <li
-              className="flex items-baseline gap-3 border-b border-[color:var(--rule-soft)] py-1.5 last:border-b-0"
+              className="border-border-muted flex items-baseline gap-3 border-b py-1.5 last:border-b-0"
               key={r.label}
             >
-              <span className="basis-[68px] font-mono text-[11px] text-[color:var(--ink-muted)]">
-                {r.label}
-              </span>
+              <span className="text-fg-muted basis-[68px] font-mono text-[11px]">{r.label}</span>
               <span className="min-w-0 flex-1">
                 <span
                   aria-hidden
                   className="block h-[6px]"
                   style={{
                     backgroundColor:
-                      variant === 'warning' && r.value > 0 ? 'var(--danger)' : 'var(--accent)',
+                      variant === 'warning' && r.value > 0
+                        ? 'var(--color-danger)'
+                        : 'var(--color-accent)',
                     opacity: 0.25 + (r.pct / 100) * 0.6,
                     width: `${Math.max(r.pct, 1)}%`,
                   }}
                 />
               </span>
-              <span className="font-mono text-[12px] text-[color:var(--ink)] tabular-nums">
+              <span className="text-fg font-mono text-[12px] tabular-nums">
                 {r.value.toLocaleString()}
               </span>
             </li>
