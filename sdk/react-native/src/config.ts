@@ -1,4 +1,4 @@
-import type { LogLevel, ReadyInfo } from '@goliapkg/sentori-core';
+import type { BeforeSendHook, LogLevel, ReadyInfo } from '@goliapkg/sentori-core';
 
 /**
  * v2.3 — `ReadyInfo` is shared across SDKs via `@goliapkg/sentori-core`
@@ -47,6 +47,12 @@ export type Config = {
    *  the native-module bind status + cold-start timing. Host
    *  wraps any host-side logging here. */
   onReady?: (info: ReadyInfo) => void;
+  /** v2.3 — host-side mutate-or-drop hook called once per event
+   *  just before transport enqueue. Return the event to send it,
+   *  `null` to drop. Sync only. If the hook throws or returns a
+   *  non-event, SDK falls back to the un-mutated event and emits
+   *  one one-shot warn. */
+  beforeSend?: BeforeSendHook;
 };
 
 let _config: Config | null = null;

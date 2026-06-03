@@ -210,3 +210,58 @@ describe('active span context (withSpan / activeSpan)', () => {
     expect(activeSpan()).toBeNull()
   })
 })
+
+describe('withSpan(name, fn) — v2.3 high-level overload', () => {
+  test('opens + auto-closes span on sync fn return', () => {
+    const before = activeSpan()
+    const result = withSpan('db.query', (span) => {
+      expect(span.op).toBe('db.query')
+      expect(span.spanId).toBeTruthy()
+      return 'ok'
+    })
+    expect(result).toBe('ok')
+    expect(activeSpan()).toBe(before)
+  })
+
+  test('auto-records exception + ends with error status on throw', () => {
+    let captured: { op: string; status?: string } | null = null
+    expect(() =>
+      withSpan('failing', (span) => {
+        captured = { op: span.op }
+        throw new Error('nope')
+      }),
+    ).toThrow('nope')
+    expect(captured).not.toBeNull()
+    expect(captured!.op).toBe('failing')
+  })
+
+  test('async fn: ends span on promise resolution', async () => {
+    const result = await withSpan('async-op', async (span) => {
+      expect(span.op).toBe('async-op')
+      return 42
+    })
+    expect(result).toBe(42)
+  })
+
+  test('opts (third arg) passed through to startSpan', () => {
+    withSpan(
+      'tagged-op',
+      (span) => {
+        expect(span.tags?.['flow']).toBe('checkout')
+      },
+      { tags: { flow: 'checkout' } },
+    )
+  })
+
+  test('first-arg dispatch: SpanContextLike vs string', () => {
+    // SpanContextLike branch — sets active span.
+    const ctx = { spanId: 'span-1', traceId: 'trace-1' }
+    withSpan(ctx, () => {
+      expect(activeSpan()?.spanId).toBe('span-1')
+    })
+    // String branch — creates a new span instead.
+    withSpan('fresh', (newSpan) => {
+      expect(newSpan.spanId).not.toBe('span-1')
+    })
+  })
+})

@@ -297,6 +297,23 @@ export type ReadyInfo = {
 }
 
 /**
+ * v2.3 — host-supplied filter / mutator hook. Called once per event
+ * just before transport enqueue. Return the event (possibly mutated)
+ * to send it, or `null` to drop it entirely. Synchronous — async
+ * pre-send mutation is intentionally not supported (would let the
+ * host stall the SDK's hot path).
+ *
+ * If the hook throws, SDK swallows the error (NEVER rule), emits one
+ * one-shot `logger.warn`, and falls back to the un-mutated event.
+ * If it returns a non-event (e.g. `undefined`), same treatment.
+ *
+ * Use for host-side PII scrubbing the SDK can't do automatically
+ * (custom field names, application-specific redaction). Server-side
+ * privacy_lab still runs even when no beforeSend is configured.
+ */
+export type BeforeSendHook = (event: Event) => Event | null
+
+/**
  * Phase 44 sub-A — per-event-class client-side sampling. Each rate
  * is in `[0, 1]`; absent / null → 1.0 (keep everything). The
  * **client** drops sampled-out events before they ever leave the

@@ -176,6 +176,13 @@ export type InitOptions = {
    *  SDK is live instead of scanning the console. The `ReadyInfo`
    *  carries native-module bind status + cold-start timing. */
   onReady?: (info: ReadyInfo) => void;
+  /** v2.3 — mutate-or-drop hook on each outbound event (sync).
+   *  Return the event to ship it (possibly mutated), or `null` to
+   *  drop. See `BeforeSendHook` for the throwing / non-event
+   *  fallback policy. Used for host-side PII scrubbing the SDK
+   *  can't do automatically; server-side privacy_lab still runs
+   *  regardless. */
+  beforeSend?: import('@goliapkg/sentori-core').BeforeSendHook;
 };
 
 const DEFAULT_INGEST_URL = 'https://ingest.sentori.golia.jp';
@@ -228,6 +235,9 @@ export const init = (options: InitOptions): void => {
     // carries the customer journey. Defaults false to preserve v1
     // breadcrumb shape on upgrade.
     trackAutoBreadcrumb: options.capture?.trackAutoBreadcrumb === true,
+    // v2.3 — host-side beforeSend hook (sync). Stored on Config so
+    // capture.ts can pull it without re-resolving the InitOptions.
+    beforeSend: options.beforeSend,
   });
 
   // Tell the native crash handler about the config so the JSON it writes

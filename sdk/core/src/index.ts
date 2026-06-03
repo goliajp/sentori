@@ -3,6 +3,7 @@ export type {
   AttachmentKind,
   AttachmentMeta,
   AttachmentSource,
+  BeforeSendHook,
   Breadcrumb,
   BreadcrumbType,
   Bundle,
@@ -68,6 +69,11 @@ export {
   startSpan,
   startTrace,
   withScopedSpan,
+  // v2.3 — `withSpan` is now the unified entry point per design §2.3.
+  // Overloaded: `withSpan(name, fn)` = high-level wrap helper
+  // (equivalent to `withScopedSpan`); `withSpan(span, fn)` = low-level
+  // active-span manager (equivalent to `withActiveSpan`).
+  withSpan,
 } from './spans.js'
 
 export {
@@ -75,7 +81,10 @@ export {
   __useFallbackTraceContextForTests,
   activeSpan,
   setActiveSpan,
-  withSpan,
+  // v2.3 — renamed from `withSpan` (which now dispatches in spans.ts).
+  // `withActiveSpan(span, fn)` is the explicit name for the
+  // low-level active-context manager.
+  withActiveSpan,
 } from './trace-context.js'
 
 export {

@@ -22,7 +22,12 @@ export type {
   User,
 } from '@goliapkg/sentori-core'
 
-import type { CommonInitOptions, LogLevel, ReadyInfo } from '@goliapkg/sentori-core'
+import type {
+  BeforeSendHook,
+  CommonInitOptions,
+  LogLevel,
+  ReadyInfo,
+} from '@goliapkg/sentori-core'
 
 export type InitOptions = CommonInitOptions & {
   /** Override automatic global hooks. Default: true on browser + node. */
@@ -70,4 +75,7 @@ export type InitOptions = CommonInitOptions & {
    *  carry `coldStartMs` / `native` — those are RN-only fields and
    *  remain undefined here. */
   onReady?: (info: ReadyInfo) => void
+  /** v2.3 — host-side mutate-or-drop hook (sync). See
+   *  `BeforeSendHook` for the contract. */
+  beforeSend?: BeforeSendHook
 }
