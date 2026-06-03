@@ -5,7 +5,6 @@ import {
   type ExploreReq,
   type ExploreResp,
   type ExploreRow,
-  type IssueRow,
   type IssueStatus,
   adminApi,
 } from '@/api/client'
@@ -71,9 +70,6 @@ function windowGteRfc3339(w: WindowKey): string | undefined {
  *   `?errorType=` slice by error type (Sentori kind)
  *   `?env=`       slice by environment
  *   `?q=`         client-side search across error_type + message_sample
- *   `?legacy=1`   v2.2 W3 rollback flag — calls listIssuesPage instead
- *                 of /explore. Removed in W4 closeout once dogfood signs
- *                 off on the explore-backed list.
  *   `:issueId`    selected issue. When present the detail pane renders
  *                 via `<Outlet />`; otherwise the rail-empty placeholder.
  */
@@ -101,17 +97,9 @@ export function IssuesView() {
   const [envFilter, setEnvFilter] = useUrlParam<string>('env', '')
   const [searchFilter, setSearchFilter] = useUrlParam<string>('q', '')
 
-  // v2.2 W3 — rollback flag. Anything non-empty falls back to the
-  // pre-v2.2 listIssuesPage path while we dogfood the explore-backed
-  // implementation. Validator collapses every truthy value to '1' so
-  // the cache key is stable.
-  const [legacy] = useUrlParam<string>('legacy', '', (raw) => (raw ? '1' : ''))
-  const isLegacy = legacy === '1'
-
   const { error, isLoading, meta, rows } = useIssuesRail({
     envFilter,
     errorTypeFilter,
-    isLegacy,
     measure,
     projectId,
     releaseFilter,
@@ -152,7 +140,6 @@ export function IssuesView() {
         <RailHeader
           count={rows.length}
           current={tab}
-          isLegacy={isLegacy}
           measure={measure}
           meta={meta}
           onChangeMeasure={setMeasure}
@@ -198,15 +185,17 @@ export function IssuesView() {
 // ── data hook ───────────────────────────────────────────────────────────────
 
 /**
- * Normalised row shape rendered by `RailRow`. Both code paths (legacy
- * `listIssuesPage` and v2.2 `/explore`) produce this so the UI doesn't
- * branch on the source. Fields that exist on `IssueRow` but not in the
- * `/explore` projection (`priority`, `labels`, `assigneeEmail`,
- * `lastEnvironment`) are typed optional — RailRow tolerates absence.
+ * Normalised row shape rendered by `RailRow`. Maps onto the v2.2
+ * `/explore` `dim=issue` projection (`issue_id` / `error_type` /
+ * `message_sample` / `last_release` / `status` + the requested
+ * measures). Fields not in that projection (`priority`, `labels`,
+ * `assigneeEmail`) stay typed optional — the row component
+ * gracefully omits them — so adding them to `/explore` later is
+ * additive without touching the UI.
  *
- * Issue detail (`detail-view.tsx`) re-fetches the full `IssueRow` via
- * `adminApi.issueDetail`, so this slim shape only has to drive the
- * rail row, not power the detail screen.
+ * Issue detail (`detail-view.tsx`) re-fetches the full `IssueRow`
+ * via `adminApi.issueDetail`, so this slim shape only has to drive
+ * the rail row, not power the detail screen.
  */
 type RailIssueRow = {
   id: string
@@ -216,14 +205,12 @@ type RailIssueRow = {
   eventCount: number
   lastSeen: string
   lastRelease: null | string
-  /** Optional — only available when the legacy path is in use. */
-  priority?: IssueRow['priority']
+  priority?: 'p0' | 'p1' | 'p2' | 'p3'
   labels?: string[]
   assigneeEmail?: null | string
 }
 
 type RailMeta = null | {
-  source: 'explore' | 'legacy'
   tookMs?: number
   windowGte?: string
 }
@@ -231,7 +218,6 @@ type RailMeta = null | {
 function useIssuesRail(params: {
   envFilter: string
   errorTypeFilter: string
-  isLegacy: boolean
   measure: Measure
   projectId: null | string
   releaseFilter: string
@@ -247,7 +233,6 @@ function useIssuesRail(params: {
   const {
     envFilter,
     errorTypeFilter,
-    isLegacy,
     measure,
     projectId,
     releaseFilter,
@@ -256,30 +241,6 @@ function useIssuesRail(params: {
     windowKey,
   } = params
 
-  // ── legacy path ─────────────────────────────────────────────────────────
-  const legacyQ = useQuery({
-    enabled: !!projectId && isLegacy,
-    queryFn: () =>
-      adminApi.listIssuesPage(projectId!, {
-        limit: 100,
-        status: tab === 'all' ? undefined : tab,
-        ...(releaseFilter ? { release: releaseFilter } : {}),
-        ...(errorTypeFilter ? { errorType: errorTypeFilter } : {}),
-        ...(envFilter ? { env: envFilter } : {}),
-        ...(searchFilter ? { search: searchFilter } : {}),
-      }),
-    queryKey: [
-      'issues-list-legacy',
-      projectId,
-      tab,
-      releaseFilter,
-      errorTypeFilter,
-      envFilter,
-      searchFilter,
-    ] as const,
-  })
-
-  // ── /explore path (v2.2 default) ────────────────────────────────────────
   const windowGte = windowGteRfc3339(windowKey)
   const exploreReq: ExploreReq = {
     dim: 'issue',
@@ -296,7 +257,7 @@ function useIssuesRail(params: {
     orderDir: 'desc',
   }
   const exploreQ = useQuery<ExploreResp>({
-    enabled: !!projectId && !isLegacy,
+    enabled: !!projectId,
     queryFn: () => adminApi.explore(projectId!, exploreReq),
     queryKey: qk.exploreIssues(
       projectId,
@@ -309,28 +270,16 @@ function useIssuesRail(params: {
     ),
   })
 
-  if (isLegacy) {
-    const legacyRows = legacyQ.data?.issues ?? []
-    const filtered = legacyRows.filter((r) => matchesClientSearch(r, searchFilter))
-    return {
-      error: legacyQ.error,
-      isLoading: legacyQ.isLoading,
-      meta: { source: 'legacy' },
-      rows: filtered.map(normaliseLegacy),
-    }
-  }
-
   const exploreRows = exploreQ.data?.rows ?? []
   const normalised = exploreRows.map(normaliseExplore).filter(Boolean) as RailIssueRow[]
-  // Server `/explore` ignores `search` (no full-text in the v2.2
-  // grammar); apply the same lightweight match as the legacy path
-  // client-side so the URL param keeps working unchanged.
+  // Server `/explore` has no full-text filter in the v2.2 grammar;
+  // apply the search match client-side so the `?q=` URL param keeps
+  // working without expanding the agent-callable surface.
   const filtered = normalised.filter((r) => matchesClientSearch(r, searchFilter))
   return {
     error: exploreQ.error,
     isLoading: exploreQ.isLoading,
     meta: {
-      source: 'explore',
       tookMs: exploreQ.data?.meta.tookMs,
       windowGte,
     },
@@ -347,21 +296,6 @@ function matchesClientSearch(
   return (
     row.errorType.toLowerCase().includes(needle) || row.messageSample.toLowerCase().includes(needle)
   )
-}
-
-function normaliseLegacy(r: IssueRow): RailIssueRow {
-  return {
-    assigneeEmail: r.assigneeEmail,
-    errorType: r.errorType,
-    eventCount: r.eventCount,
-    id: r.id,
-    labels: r.labels,
-    lastRelease: r.lastRelease,
-    lastSeen: r.lastSeen,
-    messageSample: r.messageSample,
-    priority: r.priority,
-    status: r.status,
-  }
 }
 
 /** Project one /explore `dim=issue` row into the rail shape. Falls
@@ -426,7 +360,6 @@ function FilterChips({ filters }: { filters: FilterChip[] }) {
 function RailHeader({
   count,
   current,
-  isLegacy,
   measure,
   meta,
   onChangeMeasure,
@@ -436,7 +369,6 @@ function RailHeader({
 }: {
   count: number
   current: Tab
-  isLegacy: boolean
   measure: Measure
   meta: RailMeta
   onChangeMeasure: (m: Measure) => void
@@ -482,62 +414,53 @@ function RailHeader({
           )
         })}
       </div>
-      {/* v2.2 picker bar — measure + window. Hidden in legacy mode
-          since listIssuesPage doesn't honour either. */}
-      {!isLegacy && (
-        <div className="mt-3 flex flex-wrap items-baseline gap-3 font-mono text-[10px] tracking-[0.1em] uppercase">
-          <span className="text-[color:var(--ink-muted)]">sort</span>
-          <div className="flex flex-wrap items-baseline gap-2">
-            {MEASURES.map((m, i) => (
-              <span className="flex items-baseline gap-2" key={m.key}>
-                {i > 0 && <span className="text-[color:var(--rule)]">/</span>}
-                <button
-                  className={
-                    m.key === measure
-                      ? 'text-[color:var(--accent)]'
-                      : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink-soft)]'
-                  }
-                  onClick={() => onChangeMeasure(m.key)}
-                  type="button"
-                >
-                  {m.label}
-                </button>
-              </span>
-            ))}
-          </div>
+      {/* v2.2 picker bar — measure + window. */}
+      <div className="mt-3 flex flex-wrap items-baseline gap-3 font-mono text-[10px] tracking-[0.1em] uppercase">
+        <span className="text-[color:var(--ink-muted)]">sort</span>
+        <div className="flex flex-wrap items-baseline gap-2">
+          {MEASURES.map((m, i) => (
+            <span className="flex items-baseline gap-2" key={m.key}>
+              {i > 0 && <span className="text-[color:var(--rule)]">/</span>}
+              <button
+                className={
+                  m.key === measure
+                    ? 'text-[color:var(--accent)]'
+                    : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink-soft)]'
+                }
+                onClick={() => onChangeMeasure(m.key)}
+                type="button"
+              >
+                {m.label}
+              </button>
+            </span>
+          ))}
         </div>
-      )}
-      {!isLegacy && (
-        <div className="mt-1.5 flex flex-wrap items-baseline gap-3 font-mono text-[10px] tracking-[0.1em] uppercase">
-          <span className="text-[color:var(--ink-muted)]">window</span>
-          <div className="flex flex-wrap items-baseline gap-2">
-            {WINDOWS.map((w, i) => (
-              <span className="flex items-baseline gap-2" key={w}>
-                {i > 0 && <span className="text-[color:var(--rule)]">/</span>}
-                <button
-                  className={
-                    w === windowKey
-                      ? 'text-[color:var(--accent)]'
-                      : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink-soft)]'
-                  }
-                  onClick={() => onChangeWindow(w)}
-                  type="button"
-                >
-                  {w}
-                </button>
-              </span>
-            ))}
-          </div>
+      </div>
+      <div className="mt-1.5 flex flex-wrap items-baseline gap-3 font-mono text-[10px] tracking-[0.1em] uppercase">
+        <span className="text-[color:var(--ink-muted)]">window</span>
+        <div className="flex flex-wrap items-baseline gap-2">
+          {WINDOWS.map((w, i) => (
+            <span className="flex items-baseline gap-2" key={w}>
+              {i > 0 && <span className="text-[color:var(--rule)]">/</span>}
+              <button
+                className={
+                  w === windowKey
+                    ? 'text-[color:var(--accent)]'
+                    : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink-soft)]'
+                }
+                onClick={() => onChangeWindow(w)}
+                type="button"
+              >
+                {w}
+              </button>
+            </span>
+          ))}
         </div>
-      )}
-      {/* Hint footer — explore latency + source flag so dogfood can
-          tell at a glance which path is hot. */}
+      </div>
+      {/* Footer — explore round-trip latency, useful for spotting a
+          query that needs an index. */}
       <div className="mt-2 font-mono text-[9px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
-        {isLegacy
-          ? 'source: legacy · ?legacy=1'
-          : meta?.source === 'explore' && typeof meta.tookMs === 'number'
-            ? `source: /explore · ${meta.tookMs} ms`
-            : 'source: /explore'}
+        {typeof meta?.tookMs === 'number' ? `/explore · ${meta.tookMs} ms` : '/explore'}
       </div>
     </header>
   )
