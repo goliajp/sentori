@@ -711,6 +711,27 @@ export const adminApi = {
       `/projects/${projectId}/issues/${issueId}/related-across-releases`
     ),
 
+  /**
+   * v2.4 — find-user lens. Top-N fingerprints touching this issue
+   * inside a rolling window. Each row links into the existing
+   * single-fingerprint detail page so the operator can drill into
+   * one user's full timeline. See
+   * `server/src/api/admin/issue_affected_users.rs`.
+   */
+  issueAffectedUsers: (
+    projectId: string,
+    issueId: string,
+    opts: { days?: number; limit?: number } = {}
+  ) => {
+    const params = new URLSearchParams()
+    if (opts.days !== undefined) params.set('days', String(opts.days))
+    if (opts.limit !== undefined) params.set('limit', String(opts.limit))
+    const qs = params.toString()
+    return adminFetch<IssueAffectedUsersResp>(
+      `/projects/${projectId}/issues/${issueId}/affected-users${qs ? `?${qs}` : ''}`
+    )
+  },
+
   /** Phase 24 sub-D / Phase 25 sub-F — bulk status / assign. */
   bulkPatchIssues: (
     projectId: string,
@@ -2087,6 +2108,46 @@ export type IdentityEraseResp = {
 }
 
 /**
+ * v2.4 — `orgsApi.usersMerge` response. `created: true` means a
+ * new identity_merges row was inserted; `created: false` means an
+ * identical merge already existed and we just re-activated it
+ * (cleared `undone_at`).
+ */
+export type IdentityMergeResp = {
+  scopeId: string
+  primaryPrefix: string
+  aliasPrefix: string
+  created: boolean
+}
+
+/** v2.4 — `orgsApi.usersMergeUndo` response. `undone: false` means
+ *  no active merge with that alias existed (already undone, or
+ *  never merged). */
+export type IdentityMergeUndoResp = {
+  scopeId: string
+  aliasPrefix: string
+  undone: boolean
+}
+
+/**
+ * v2.4 — `adminApi.issueAffectedUsers` response. One row per
+ * (fingerprint, keyType) pair touching the issue inside the window.
+ * `totalDistinct` is the unfiltered count so the dashboard can
+ * render "showing top 20 of 412".
+ */
+export type IssueAffectedUsersResp = {
+  issueId: string
+  windowDays: number
+  totalDistinct: number
+  rows: {
+    fingerprintHex: string
+    keyType: string
+    eventCount: number
+    lastSeen: string
+  }[]
+}
+
+/**
  * v2.4 — Users page default overview. Mirrors
  * `server/src/api/admin/users_overview.rs::OverviewResp`. Fingerprints
  * surface as 64-char lowercase hex; no raw identity ever crosses the
@@ -2189,6 +2250,37 @@ export const orgsApi = {
    */
   usersErase: (slug: string, body: { keyType: string; clientHash: string; dryRun?: boolean }) =>
     adminFetch<IdentityEraseResp>(`/orgs/${slug}/users/erase`, {
+      body: JSON.stringify(body),
+      method: 'POST',
+    }),
+
+  /**
+   * v2.4 — operator-driven identity merge. Maps alias → primary
+   * inside the org's default identity scope; subsequent lookup
+   * calls against the alias hash transparently return the primary's
+   * events (one-hop follow). Same body shape on both sides:
+   * `(keyType, clientHash)` pairs.
+   */
+  usersMerge: (
+    slug: string,
+    body: {
+      primary: { keyType: string; clientHash: string }
+      alias: { keyType: string; clientHash: string }
+    }
+  ) =>
+    adminFetch<IdentityMergeResp>(`/orgs/${slug}/users/merge`, {
+      body: JSON.stringify(body),
+      method: 'POST',
+    }),
+
+  /**
+   * v2.4 — undo a previously-written merge (soft; the audit row
+   * survives, only the lookup-follow effect is reversed). Server
+   * enforces no time gate — the dashboard surfaces a 7-day window
+   * for the undo affordance.
+   */
+  usersMergeUndo: (slug: string, body: { alias: { keyType: string; clientHash: string } }) =>
+    adminFetch<IdentityMergeUndoResp>(`/orgs/${slug}/users/merge/undo`, {
       body: JSON.stringify(body),
       method: 'POST',
     }),

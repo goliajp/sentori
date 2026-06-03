@@ -211,6 +211,18 @@ export function IssueDetailView() {
         />
       )}
 
+      {/* v2.4 — find-user lens. Top-N fingerprints affected by this
+       *   issue inside the active window. Clicks route into the
+       *   single-fingerprint detail page. Off when zero identified
+       *   users — keeps the page tight for unauthenticated traffic. */}
+      {projectId && (
+        <AffectedUsersPanel
+          currentOrgSlug={currentOrg.slug}
+          issueId={issueId}
+          projectId={projectId}
+        />
+      )}
+
       {selectedEvent && projectId && (
         <EventGlanceStrip event={selectedEvent} projectId={projectId} />
       )}
@@ -2416,5 +2428,72 @@ function RelatedRow({
         {row.eventCount.toLocaleString()}
       </span>
     </li>
+  )
+}
+
+/**
+ * v2.4 — find-user lens. Top-N fingerprints affected by this
+ * issue inside the active window. Clicks route into the existing
+ * single-fingerprint detail page; the row's leftmost cell shows
+ * a 12-char hex prefix + key_type so the operator can tell which
+ * identity channel the user came in through (email / googleSub /
+ * username / ...). The panel hides itself when zero identified
+ * users — keeps the page tight when traffic is anonymous.
+ */
+function AffectedUsersPanel({
+  currentOrgSlug,
+  issueId,
+  projectId,
+}: {
+  currentOrgSlug: string
+  issueId: string
+  projectId: string
+}) {
+  const WINDOW_DAYS = 7
+  const q = useQuery({
+    enabled: !!projectId && !!issueId,
+    queryFn: () =>
+      adminApi.issueAffectedUsers(projectId, issueId, { days: WINDOW_DAYS, limit: 20 }),
+    queryKey: qk.issue.affectedUsers(projectId, issueId, WINDOW_DAYS),
+    staleTime: 30_000,
+  })
+
+  if (q.isLoading) return null
+  const data = q.data
+  if (!data || data.totalDistinct === 0) return null
+
+  return (
+    <section className="mt-6 border-y border-[color:var(--rule)] py-3">
+      <header className="mb-2 flex items-baseline justify-between">
+        <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+          affected users · last {data.windowDays}d
+        </span>
+        <span className="font-mono text-[10px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase">
+          showing top {data.rows.length} of {data.totalDistinct.toLocaleString()}
+        </span>
+      </header>
+      <ul className="divide-y divide-[color:var(--rule-soft)]">
+        {data.rows.map((r) => (
+          <li
+            key={r.fingerprintHex + r.keyType}
+            className="grid grid-cols-[260px_1fr_auto_auto] items-baseline gap-3 py-1.5"
+          >
+            <Link
+              className="truncate font-mono text-[12px] text-[color:var(--ink)] hover:text-[color:var(--accent)]"
+              to={`/main/org/${currentOrgSlug}/users/${r.fingerprintHex}?window=${WINDOW_DAYS}`}
+            >
+              {r.fingerprintHex.slice(0, 12)}…
+            </Link>
+            <span className="font-mono text-[11px] text-[color:var(--ink-soft)]">{r.keyType}</span>
+            <span className="font-mono text-[10px] text-[color:var(--ink-muted)] tabular-nums">
+              {r.eventCount.toLocaleString()} ev
+            </span>
+            <span className="font-mono text-[10px] text-[color:var(--ink-muted)] tabular-nums">
+              {formatRelative(r.lastSeen)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }

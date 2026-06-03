@@ -4,6 +4,7 @@ import { PageHeader } from '@/layout/page-header'
 
 import { UsersErase } from './erase'
 import { UsersLookup } from './lookup'
+import { UsersMerge } from './merge'
 import { UsersOverview } from './overview'
 
 function hasLookupDeepLink(): boolean {
@@ -32,6 +33,10 @@ export function UsersView() {
   // analogue: erase requires a typed-confirmation gate every time;
   // we deliberately don't let a URL preload the dangerous state.
   const [eraseOpen, setEraseOpen] = useState(false)
+  // v2.4 — operator-driven identity merge bar. Reversible (soft
+  // undo within 7 days) so we don't typed-confirmation-gate it
+  // like erase. Off by default — merges are rare + intentional.
+  const [mergeOpen, setMergeOpen] = useState(false)
 
   return (
     <div className="sentori-page-in">
@@ -53,6 +58,23 @@ export function UsersView() {
         {lookupOpen && (
           <div className="mt-2">
             <UsersLookup />
+          </div>
+        )}
+      </div>
+
+      <div className="mb-2">
+        <button
+          aria-expanded={mergeOpen}
+          className="flex w-full items-center gap-2 border-y border-[color:var(--rule)] py-2 font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--ink-soft)]"
+          onClick={() => setMergeOpen((v) => !v)}
+          type="button"
+        >
+          <span aria-hidden>{mergeOpen ? '▾' : '▸'}</span>
+          <span>merge identities</span>
+        </button>
+        {mergeOpen && (
+          <div className="mt-2">
+            <UsersMerge />
           </div>
         )}
       </div>

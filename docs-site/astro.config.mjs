@@ -69,6 +69,7 @@ export default defineConfig({
             { label: 'Multi-environment', slug: 'recipes/multi-environment' },
             { label: 'Endpoint health', slug: 'recipes/endpoint-health' },
             { label: 'Find bugs with /explore', slug: 'recipes/find-bugs-with-explore' },
+            { label: 'Find users affected', slug: 'recipes/find-users-affected' },
           ],
         },
         {

@@ -58,6 +58,9 @@ export const qk = {
     activity: (projectId: Id, issueId: Id) => tuple('issue-activity', projectId, issueId),
     userReports: (projectId: Id, issueId: Id) => tuple('issue-user-reports', projectId, issueId),
     culprits: (projectId: Id, issueId: Id) => tuple('culprits', projectId, issueId),
+    // v2.4 — find-user lens: per-issue affected fingerprints panel.
+    affectedUsers: (projectId: Id, issueId: Id, days: number) =>
+      tuple('issue-affected-users', projectId, issueId, days),
   },
 
   // ── traces ──────────────────────────────────────────────────────────

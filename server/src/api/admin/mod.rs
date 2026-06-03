@@ -179,6 +179,8 @@ pub mod explore;
 mod frame_source;
 pub mod identity_erase;
 pub mod identity_lookup;
+pub mod identity_merge;
+pub mod issue_affected_users;
 pub mod users_detail;
 pub mod users_overview;
 mod integration_links;

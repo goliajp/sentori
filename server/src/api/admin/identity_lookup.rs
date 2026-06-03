@@ -117,7 +117,28 @@ pub async fn lookup(
         }));
     };
 
-    let stored_fp = crate::identity::compute_fingerprint(&salt, &req.key_type, &req.client_hash);
+    let computed_fp =
+        crate::identity::compute_fingerprint(&salt, &req.key_type, &req.client_hash);
+
+    // v2.4 — merge follow-through: if this fingerprint has been
+    // recorded as an alias inside an active (non-undone) merge,
+    // swap to the primary before querying events. One-hop only;
+    // chains are not followed because the schema enforces "one
+    // primary per alias" via the (scope_id, alias_fp) PK.
+    let stored_fp: Vec<u8> = match sqlx::query_scalar::<_, Vec<u8>>(
+        "SELECT primary_fp FROM identity_merges \
+         WHERE scope_id = $1 AND alias_fp = $2 AND undone_at IS NULL \
+         LIMIT 1",
+    )
+    .bind(scope_id)
+    .bind(&computed_fp)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?
+    {
+        Some(primary) => primary,
+        None => computed_fp,
+    };
 
     // Aggregate per project: how many events touched this fingerprint,
     // first/last seen, distinct issue count.

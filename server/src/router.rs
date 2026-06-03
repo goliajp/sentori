@@ -490,6 +490,29 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/orgs/{slug}/users/erase",
             post(api::admin::identity_erase::erase),
         )
+        // v2.4 — operator-driven identity merge. POST writes one row
+        // in identity_merges mapping alias → primary; subsequent
+        // /users/lookup against the alias transparently returns the
+        // primary's events (one-hop follow). /undo soft-undoes
+        // (sets undone_at) so the merge stops affecting lookups
+        // but the audit row survives forever.
+        .route(
+            "/orgs/{slug}/users/merge",
+            post(api::admin::identity_merge::merge),
+        )
+        .route(
+            "/orgs/{slug}/users/merge/undo",
+            post(api::admin::identity_merge::undo_merge),
+        )
+        // v2.4 — find-user lens primary drill: Issue Detail panel
+        // listing the top-N fingerprints touching this issue inside
+        // the active window. One row per (fingerprint, key_type)
+        // pair; each row links into the existing single-fingerprint
+        // detail page.
+        .route(
+            "/projects/{project_id}/issues/{issue_id}/affected-users",
+            axum::routing::get(api::admin::issue_affected_users::affected_users),
+        )
         // v2.4 — Users page default view. Aggregates over the org's
         // default identity scope; returns kpi + top-affected fingerprints
         // + per-release / per-key_type breakdown.

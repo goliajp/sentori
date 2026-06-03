@@ -50,6 +50,12 @@ pub mod actions {
     /// look-ups can't surface the subject's events.
     pub const IDENTITY_ERASED: &str = "identity.erased";
     pub const IDENTITY_ERASE_DRY_RUN: &str = "identity.erase.dry_run";
+
+    /// v2.4 — operator collapses two fingerprints into one via the
+    /// Users "this is the same person" action. Reversible via
+    /// `identity.merge_undone` within the 7-day undo window.
+    pub const IDENTITY_MERGED: &str = "identity.merged";
+    pub const IDENTITY_MERGE_UNDONE: &str = "identity.merge_undone";
 }
 
 pub mod targets {
@@ -104,6 +110,8 @@ pub fn label_for(action: &str) -> &str {
         actions::ALERT_RULE_DELETED => "Alert rule deleted",
         actions::IDENTITY_ERASED => "Identity erased (DSR)",
         actions::IDENTITY_ERASE_DRY_RUN => "Identity erase dry-run",
+        actions::IDENTITY_MERGED => "Identity merged",
+        actions::IDENTITY_MERGE_UNDONE => "Identity merge undone",
         // Unknown code — fall back to the raw input so the UI shows
         // *something* instead of crashing. The lifetime borrows from the
         // caller's &str.
@@ -140,6 +148,8 @@ pub fn all_labels() -> Vec<(&'static str, &'static str)> {
         actions::ALERT_RULE_DELETED,
         actions::IDENTITY_ERASED,
         actions::IDENTITY_ERASE_DRY_RUN,
+        actions::IDENTITY_MERGED,
+        actions::IDENTITY_MERGE_UNDONE,
     ]
     .iter()
     .map(|c| (*c, label_for(c)))
