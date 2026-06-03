@@ -1,3 +1,6 @@
+import { Alert, Card, Dialog, DialogFooter, Tabs as GdsTabs } from '@goliapkg/gds/molecules'
+import { Badge as GdsBadge, Button } from '@goliapkg/gds/primitives'
+import { EmptyState } from '@goliapkg/gds/patterns'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
@@ -18,7 +21,6 @@ import {
   type UserReport,
 } from '@/api/client'
 import { useAuth } from '@/auth/state'
-import { ModuleEmpty } from '@/components/Hint'
 import { useOrg } from '@/auth/orgContext'
 import { AttachmentGallery } from '@/components/AttachmentGallery'
 import { FrameRoleBadge } from '@/components/FrameRoleBadge'
@@ -116,44 +118,36 @@ export function IssueDetailView() {
   useHotkeys('escape', () => navigate(`/main/org/${currentOrg.slug}/issues`))
 
   if (!issueId) return null
-  if (issueQ.isLoading) return <ModuleEmpty eyebrow="Issue">Loading…</ModuleEmpty>
+  if (issueQ.isLoading) return <EmptyState description="Fetching issue details…" title="Loading" />
   if (issueQ.error || !issueQ.data)
-    return <ModuleEmpty eyebrow="Issue">Failed to load.</ModuleEmpty>
+    return (
+      <Alert title="Failed to load issue" variant="danger">
+        Check your network connection or try again later.
+      </Alert>
+    )
 
   const issue = issueQ.data
 
   return (
-    <div className="sentori-page-in space-y-4">
+    <div className="space-y-4">
       <Link
-        className="inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase transition-colors hover:text-[color:var(--accent)]"
+        className="text-fg-muted hover:text-accent inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.08em] uppercase transition-colors"
         to={`/main/org/${currentOrg.slug}/issues`}
       >
         ← back to issues
       </Link>
 
-      {/* Header — title + meta float on the paper, no card frame.
-       *  Actions sit directly below separated by a hairline so a
-       *  long error message wraps cleanly. */}
       <header>
         <div className="flex items-baseline gap-3">
           <StatusText status={issue.status} />
-          <span className="font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase">
+          <span className="text-fg-muted font-mono text-[11px] tracking-[0.08em] uppercase">
             {issue.errorType}
           </span>
         </div>
-        <h1
-          className="mt-2 max-w-prose text-[color:var(--ink)]"
-          style={{
-            fontFamily: 'var(--font-sans)',
-            fontVariationSettings: "'wdth' 95, 'opsz' 48, 'wght' 600",
-            fontSize: 'clamp(22px, 2.6vw, 30px)',
-            letterSpacing: '-0.018em',
-            lineHeight: '1.14',
-          }}
-        >
+        <h1 className="text-fg mt-2 max-w-prose text-[clamp(22px,2.6vw,30px)] leading-tight font-semibold tracking-tight">
           {displayMessage(issue.messageSample)}
         </h1>
-        <div className="mt-4 border-t border-[color:var(--rule)] pt-3">
+        <div className="border-border mt-4 border-t pt-3">
           <IssueActions
             currentUserId={user?.id ?? null}
             issue={issue}
@@ -174,14 +168,12 @@ export function IssueDetailView() {
             pending={patchM.isPending}
           />
         </div>
-        {/* v2.4 — privacy-aware "affected users" alongside the event
-         *  count. Hidden when the backend can't compute it (older
-         *  list-shaped responses) or when no identified users have
-         *  hit this issue yet. */}
         {issue.affectedUsers !== undefined && issue.affectedUsers > 0 && (
-          <div className="mt-2 font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
+          <div className="text-fg-muted mt-2 font-mono text-[11px] tabular-nums">
             <span>{issue.eventCount.toLocaleString()} events</span>
-            <span className="mx-2 text-[color:var(--rule)]">·</span>
+            <span aria-hidden className="text-border mx-2">
+              ·
+            </span>
             <span>
               {issue.affectedUsers.toLocaleString()} affected user
               {issue.affectedUsers === 1 ? '' : 's'}
@@ -229,9 +221,18 @@ export function IssueDetailView() {
 
       <Tabs current={tab} onChange={setTab} />
 
-      {eventsQ.isLoading && <ModuleEmpty eyebrow="Events">Loading events…</ModuleEmpty>}
+      {eventsQ.isLoading && (
+        <Card>
+          <EmptyState description="Fetching events…" title="Loading" />
+        </Card>
+      )}
       {!eventsQ.isLoading && events.length === 0 && tab !== 'activity' && (
-        <ModuleEmpty eyebrow="No events">No events have landed for this issue yet.</ModuleEmpty>
+        <Card>
+          <EmptyState
+            description="Once an event lands for this issue it will show up here."
+            title="No events yet"
+          />
+        </Card>
       )}
 
       {/* v1.1 #ux: 3-pane content area on lg+.
@@ -294,85 +295,45 @@ function ReproDownloadFab({ eventId, projectId }: { eventId: string; projectId: 
     a.remove()
   }
   return (
-    <div className="text-fg-muted t-sm flex justify-end">
-      <button
-        className="hover:text-fg t-sm flex items-center gap-1.5 font-mono"
-        onClick={onClick}
-        type="button"
-      >
-        <span className="text-accent">↓</span>
-        export as jest test
-      </button>
+    <div className="flex justify-end">
+      <Button onClick={onClick} size="sm" variant="ghost">
+        <span aria-hidden className="text-accent mr-1.5">
+          ↓
+        </span>
+        Export as Jest test
+      </Button>
     </div>
   )
 }
 
 // ── header sub-elements ────────────────────────────────────────────────
 
+/** GDS Tabs adapter — the registry's 7-tab list (Stack / Replay /
+ *  Events / Breadcrumbs / Tags / Activity / User reports) feeds
+ *  directly into `<GdsTabs>` with underline variant for editorial
+ *  density. GDS handles roving tabindex + ←/→ keyboard nav. */
 function Tabs({ current, onChange }: { current: Tab; onChange: (t: Tab) => void }) {
-  const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    // ←/→ between tabs, Home/End to jump to first/last. Wraps. The
-    // tablist hosts focus via a roving tabindex (only the active tab
-    // is focusable) which is the WAI-ARIA pattern for tab widgets.
-    const idx = TABS.findIndex((t) => t.key === current)
-    if (idx < 0) return
-    let next: number
-    if (e.key === 'ArrowRight') next = (idx + 1) % TABS.length
-    else if (e.key === 'ArrowLeft') next = (idx - 1 + TABS.length) % TABS.length
-    else if (e.key === 'Home') next = 0
-    else if (e.key === 'End') next = TABS.length - 1
-    else return
-    e.preventDefault()
-    onChange(TABS[next]!.key)
-  }
   return (
-    <div
-      aria-label="Issue detail sections"
-      className="flex items-baseline gap-5 border-b border-[color:var(--rule)] pb-px"
-      onKeyDown={onKey}
-      role="tablist"
-    >
-      {TABS.map((t) => {
-        const active = current === t.key
-        return (
-          <button
-            aria-selected={active}
-            className={`relative pb-2 font-mono text-[11px] tracking-[0.1em] uppercase transition-colors focus:outline-none ${
-              active
-                ? 'text-[color:var(--ink)]'
-                : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]'
-            }`}
-            key={t.key}
-            onClick={() => onChange(t.key)}
-            role="tab"
-            tabIndex={active ? 0 : -1}
-            type="button"
-          >
-            {t.label}
-            {active && (
-              <span
-                aria-hidden
-                className="absolute right-0 -bottom-px left-0 h-[2px] bg-[color:var(--accent)]"
-              />
-            )}
-          </button>
-        )
-      })}
-    </div>
+    <GdsTabs
+      active={current}
+      onChange={(id) => onChange(id as Tab)}
+      tabs={TABS.map((t) => ({ id: t.key, label: t.label }))}
+      variant="underline"
+    />
   )
 }
 
 function StatusText({ status }: { status: IssueStatus }) {
-  const tone =
-    status === 'active'
-      ? 'text-[color:var(--danger)]'
-      : status === 'regressed'
-        ? 'text-[color:var(--danger)]'
-        : status === 'resolved'
-          ? 'text-[color:var(--success)]'
-          : 'text-[color:var(--ink-muted)]'
+  const variant =
+    status === 'active' || status === 'regressed'
+      ? 'danger'
+      : status === 'resolved'
+        ? 'success'
+        : 'default'
   return (
-    <span className={`font-mono text-[10px] tracking-[0.22em] uppercase ${tone}`}>{status}</span>
+    <GdsBadge className="font-mono text-[10px] tracking-[0.22em] uppercase" variant={variant}>
+      {status}
+    </GdsBadge>
   )
 }
 
@@ -402,39 +363,39 @@ function IssueActions({
   const isAssignedToMe = currentUserId !== null && issue.assigneeUserId === currentUserId
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-[12px] text-[color:var(--ink-soft)]">
+    <div className="text-fg-secondary flex flex-wrap items-center gap-2 text-[12px]">
       {issue.assigneeEmail ? (
-        <span
-          className="font-mono text-[color:var(--accent)]"
-          title={`Assigned to ${issue.assigneeEmail}`}
-        >
+        <span className="text-accent font-mono" title={`Assigned to ${issue.assigneeEmail}`}>
           @{issue.assigneeEmail.split('@')[0]}
         </span>
       ) : (
-        <span className="font-mono text-[11px] text-[color:var(--ink-muted)] italic">
-          unassigned
-        </span>
+        <span className="text-fg-muted font-mono text-[11px] italic">unassigned</span>
       )}
       {!isAssignedToMe && currentUserId && (
-        <ActionButton
+        <Button
           disabled={pending}
-          label="Assign to me"
           onClick={() => onAssign(currentUserId)}
-        />
+          size="sm"
+          variant="secondary"
+        >
+          Assign to me
+        </Button>
       )}
       {issue.assigneeUserId && (
-        <ActionButton disabled={pending} label="Unassign" onClick={() => onAssign(null)} />
+        <Button disabled={pending} onClick={() => onAssign(null)} size="sm" variant="secondary">
+          Unassign
+        </Button>
       )}
       {issue.status !== 'resolved' && releaseOptions.length > 0 && (
         <>
-          <span aria-hidden className="text-[color:var(--ink-muted)]">
+          <span aria-hidden className="text-fg-muted">
             ·
           </span>
-          <span className="hidden font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase md:inline">
+          <span className="text-fg-muted hidden font-mono text-[10px] tracking-[0.18em] uppercase md:inline">
             in
           </span>
           <select
-            className="h-7 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[11px] text-[color:var(--ink)] transition-colors hover:border-[color:var(--accent)] focus:border-[color:var(--accent)] focus:outline-none"
+            className="bg-bg border-border text-fg hover:border-accent focus:border-accent h-7 border px-2 font-mono text-[11px] transition-colors focus:outline-none"
             onChange={(e) => setRelease(e.target.value)}
             value={release}
           >
@@ -444,28 +405,45 @@ function IssueActions({
               </option>
             ))}
           </select>
-          <button
-            className="inline-flex h-7 items-center bg-[color:var(--accent)] px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--paper)] uppercase transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          <Button
             disabled={pending || !release}
             onClick={() => onResolveInRelease(release || null)}
-            type="button"
+            size="sm"
+            variant="primary"
           >
             Resolve
-          </button>
+          </Button>
         </>
       )}
       {issue.status === 'active' && (
-        <ActionButton
+        <Button
           disabled={pending}
-          label="Silence"
           onClick={() => onPatchStatus('silenced')}
-        />
+          size="sm"
+          variant="secondary"
+        >
+          Silence
+        </Button>
       )}
       {issue.status === 'active' && (
-        <ActionButton disabled={pending} label="Mute" onClick={() => onPatchStatus('muted')} />
+        <Button
+          disabled={pending}
+          onClick={() => onPatchStatus('muted')}
+          size="sm"
+          variant="secondary"
+        >
+          Mute
+        </Button>
       )}
       {(issue.status === 'resolved' || issue.status === 'silenced' || issue.status === 'muted') && (
-        <ActionButton disabled={pending} label="Reopen" onClick={() => onPatchStatus('active')} />
+        <Button
+          disabled={pending}
+          onClick={() => onPatchStatus('active')}
+          size="sm"
+          variant="secondary"
+        >
+          Reopen
+        </Button>
       )}
       <WatchToggle issueId={issue.id} />
       <MuteToggle issueId={issue.id} />
@@ -473,10 +451,9 @@ function IssueActions({
   )
 }
 
-// v1.2 W7.a — Linked external issues panel. Shows one row per
-// integration_kind (linear/github/gitlab/jira) with the
-// denormalised title + status + last-updated. Server refreshes those
-// fields via inbound webhooks; this panel just renders.
+// Linked external issues panel — Linear/GitHub/GitLab/Jira refs that
+// inbound webhooks keep denormalised on the issue row. Panel hides
+// when there are no links so the detail page stays tight.
 function LinkedIssuesPanel({ issueId, projectId }: { issueId: string; projectId: string }) {
   const linksQ = useQuery({
     queryFn: () => adminApi.listIntegrationLinks(projectId, issueId),
@@ -486,9 +463,9 @@ function LinkedIssuesPanel({ issueId, projectId }: { issueId: string; projectId:
   const links = linksQ.data ?? []
   if (links.length === 0) return null
   return (
-    <div className="border-border bg-bg-tertiary/30 rounded-md border">
+    <Card padding="none">
       <div className="border-border flex items-center justify-between border-b px-3 py-2">
-        <span className="text-fg t-sm font-mono">Linked issues</span>
+        <span className="text-fg font-mono text-[13px]">Linked issues</span>
       </div>
       <ul className="divide-border divide-y">
         {links.map((l) => (
@@ -499,13 +476,15 @@ function LinkedIssuesPanel({ issueId, projectId }: { issueId: string; projectId:
             <span className="text-fg-muted font-mono text-[10px] tracking-wider uppercase">
               {l.integrationKind}
             </span>
-            <span className="text-fg t-sm flex-1 truncate">{l.externalTitle ?? l.externalId}</span>
+            <span className="text-fg flex-1 truncate text-[13px]">
+              {l.externalTitle ?? l.externalId}
+            </span>
             {l.externalStatus && (
-              <span className="text-fg-muted t-sm font-mono">{l.externalStatus}</span>
+              <span className="text-fg-muted font-mono text-[13px]">{l.externalStatus}</span>
             )}
             {l.externalUrl && (
               <a
-                className="text-accent hover:text-accent-strong t-sm font-mono"
+                className="text-accent hover:text-accent-hover font-mono text-[13px]"
                 href={l.externalUrl}
                 rel="noopener noreferrer"
                 target="_blank"
@@ -516,7 +495,7 @@ function LinkedIssuesPanel({ issueId, projectId }: { issueId: string; projectId:
           </li>
         ))}
       </ul>
-    </div>
+    </Card>
   )
 }
 
@@ -545,11 +524,14 @@ function WatchToggle({ issueId }: { issueId: string }) {
   if (!resolvedProjectId) return null
   const watching = watchQ.data?.watching ?? false
   return (
-    <ActionButton
+    <Button
       disabled={toggle.isPending}
-      label={watching ? '✓ Watching' : 'Watch'}
       onClick={() => toggle.mutate()}
-    />
+      size="sm"
+      variant="secondary"
+    >
+      {watching ? '✓ Watching' : 'Watch'}
+    </Button>
   )
 }
 
@@ -577,11 +559,14 @@ function MuteToggle({ issueId }: { issueId: string }) {
   if (!resolvedProjectId) return null
   const muted = watchQ.data?.muted ?? false
   return (
-    <ActionButton
+    <Button
       disabled={toggle.isPending}
-      label={muted ? '🔕 Muted' : 'Mute'}
       onClick={() => toggle.mutate()}
-    />
+      size="sm"
+      variant="secondary"
+    >
+      {muted ? '🔕 Muted' : 'Mute'}
+    </Button>
   )
 }
 
@@ -618,12 +603,12 @@ function TriageRow({
     setAdding(false)
   }
   return (
-    <div className="flex flex-wrap items-center gap-2 text-[12px] text-[color:var(--ink-soft)]">
-      <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+    <div className="text-fg-secondary flex flex-wrap items-center gap-2 text-[12px]">
+      <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
         priority
       </span>
       <select
-        className="h-7 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[11px] text-[color:var(--ink)] transition-colors hover:border-[color:var(--accent)] focus:border-[color:var(--accent)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        className="bg-bg border-border text-fg hover:border-accent focus:border-accent h-7 border px-2 font-mono text-[11px] transition-colors focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         disabled={pending}
         onChange={(e) => onSetPriority(e.target.value as IssuePriority)}
         value={issue.priority}
@@ -633,10 +618,10 @@ function TriageRow({
         <option value="p2">p2 — medium</option>
         <option value="p3">p3 — backlog</option>
       </select>
-      <span aria-hidden className="text-[color:var(--ink-muted)]">
+      <span aria-hidden className="text-fg-muted">
         ·
       </span>
-      <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+      <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
         labels
       </span>
       {issue.labels.map((l) => (
@@ -649,7 +634,7 @@ function TriageRow({
       {adding ? (
         <input
           autoFocus
-          className="h-7 border border-[color:var(--accent)] bg-[color:var(--paper-2)] px-2 font-mono text-[11px] text-[color:var(--ink)] focus:outline-none"
+          className="bg-bg border-accent text-fg h-7 border px-2 font-mono text-[11px] focus:outline-none"
           disabled={pending}
           onBlur={submitDraft}
           onChange={(e) => setDraft(e.target.value)}
@@ -664,30 +649,11 @@ function TriageRow({
           value={draft}
         />
       ) : (
-        <ActionButton disabled={pending} label="+ label" onClick={() => setAdding(true)} />
+        <Button disabled={pending} onClick={() => setAdding(true)} size="sm" variant="secondary">
+          + label
+        </Button>
       )}
     </div>
-  )
-}
-
-function ActionButton({
-  disabled,
-  label,
-  onClick,
-}: {
-  disabled?: boolean
-  label: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      className="inline-flex h-7 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2.5 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink)] uppercase transition-colors hover:border-[color:var(--accent)] hover:text-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
-      disabled={disabled}
-      onClick={onClick}
-      type="button"
-    >
-      {label}
-    </button>
   )
 }
 
@@ -718,15 +684,15 @@ function EventsRail({
 
   return (
     <aside className="lg:sticky lg:top-3 lg:max-h-[calc(100vh-220px)]">
-      <header className="flex items-baseline justify-between border-b border-[color:var(--rule)] pb-2 font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+      <header className="border-border text-fg-muted flex items-baseline justify-between border-b pb-2 font-mono text-[10px] tracking-[0.18em] uppercase">
         <span>
-          events <span className="text-[color:var(--ink)] tabular-nums">{events.length}</span>
+          events <span className="text-fg tabular-nums">{events.length}</span>
           {/* v2.0 — explicit hint when fetch capped below total so
            *  triage doesn't silently miss older events. Cursor
            *  pagination is the v2.1 fix; until then this is the
            *  honest signal that some events aren't loaded. */}
           {events.length >= 500 && total > events.length && (
-            <span className="ml-1 text-[color:var(--warning)] normal-case">
+            <span className="text-warning ml-1 normal-case">
               (capped — {total - events.length} older not loaded)
             </span>
           )}
@@ -734,7 +700,7 @@ function EventsRail({
         <span>{total.toLocaleString()} total</span>
       </header>
       <ul
-        className="divide-y divide-[color:var(--rule-soft)] overflow-y-auto"
+        className="divide-border-muted divide-y overflow-y-auto"
         ref={listRef}
         style={{ maxHeight: 'calc(100vh - 260px)' }}
       >
@@ -746,27 +712,27 @@ function EventsRail({
                 aria-current={active ? 'true' : undefined}
                 className={`block w-full px-2 py-2 text-left transition-colors ${
                   active
-                    ? 'border-l-2 border-[color:var(--accent)] bg-[color:var(--accent)]/8'
-                    : 'border-l-2 border-transparent hover:bg-[color:var(--paper-2)]'
+                    ? 'border-accent bg-accent/8 border-l-2'
+                    : 'hover:bg-bg-secondary border-l-2 border-transparent'
                 }`}
                 onClick={() => onSelect(idx)}
                 type="button"
               >
-                <div className="flex items-baseline justify-between gap-2 font-mono text-[10px] tracking-[0.05em] text-[color:var(--ink-muted)] tabular-nums">
-                  <span className={active ? 'text-[color:var(--accent)]' : ''}>
+                <div className="text-fg-muted flex items-baseline justify-between gap-2 font-mono text-[10px] tracking-[0.05em] tabular-nums">
+                  <span className={active ? 'text-accent' : ''}>
                     {String(idx + 1).padStart(2, '0')}
                   </span>
                   <span>{formatRelative(e.receivedAt)}</span>
                 </div>
                 <div
                   className={`mt-1 truncate font-mono text-[11px] ${
-                    active ? 'text-[color:var(--ink)]' : 'text-[color:var(--ink-soft)]'
+                    active ? 'text-fg' : 'text-fg-secondary'
                   }`}
                   title={e.release}
                 >
                   {e.release}
                 </div>
-                <div className="mt-0.5 flex items-baseline gap-2 font-mono text-[9px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+                <div className="text-fg-muted mt-0.5 flex items-baseline gap-2 font-mono text-[9px] tracking-[0.12em] uppercase">
                   <span>{e.environment}</span>
                   <span className="opacity-60">·</span>
                   <span>{e.platform}</span>
@@ -808,13 +774,13 @@ function StackTab({
         release={event.release}
       />
       {event.traceId && (
-        <div className="flex items-center justify-between gap-3 border-y border-[color:var(--rule)] py-2 text-[13px]">
-          <span className="text-[color:var(--ink-soft)]">
+        <div className="border-border flex items-center justify-between gap-3 border-y py-2 text-[13px]">
+          <span className="text-fg-secondary">
             Captured inside trace{' '}
-            <span className="font-mono text-[color:var(--ink)]">{event.traceId.slice(0, 8)}</span>
+            <span className="text-fg font-mono">{event.traceId.slice(0, 8)}</span>
           </span>
           <Link
-            className="font-mono text-[10px] tracking-[0.18em] whitespace-nowrap text-[color:var(--accent)] uppercase hover:text-[color:var(--accent-strong)]"
+            className="text-accent hover:text-accent-hover font-mono text-[10px] tracking-[0.18em] whitespace-nowrap uppercase"
             to={`/main/org/${orgSlug}/traces/${event.traceId}`}
           >
             open trace →
@@ -875,7 +841,7 @@ function StackList({
   const [hideVendor, setHideVendor] = useState(false)
   if (stack.length === 0) {
     return (
-      <p className="border-y border-[color:var(--rule)] py-3 text-[13px] text-[color:var(--ink-soft)]">
+      <p className="border-border text-fg-secondary border-y py-3 text-[13px]">
         No frames captured.
       </p>
     )
@@ -885,13 +851,13 @@ function StackList({
   return (
     <div>
       {vendorCount > 0 && (
-        <div className="mb-2 flex items-center justify-between gap-2 font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+        <div className="text-fg-muted mb-2 flex items-center justify-between gap-2 font-mono text-[10px] tracking-[0.12em] uppercase">
           <span>
             {stack.length} frame{stack.length === 1 ? '' : 's'} ·{' '}
-            <span className="text-[color:var(--ink-soft)]">{vendorCount}</span> from libraries
+            <span className="text-fg-secondary">{vendorCount}</span> from libraries
           </span>
           <button
-            className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase transition-colors hover:text-[color:var(--accent)]"
+            className="text-fg-muted hover:text-accent font-mono text-[10px] tracking-[0.12em] uppercase transition-colors"
             onClick={() => setHideVendor((v) => !v)}
             type="button"
           >
@@ -899,7 +865,7 @@ function StackList({
           </button>
         </div>
       )}
-      <div className="overflow-hidden border-y border-[color:var(--rule)]">
+      <div className="border-border overflow-hidden border-y">
         {visible.map((f) => {
           // We always pass the ORIGINAL index from `stack` so frame
           // numbering, source drawer lookup, and `↗ src` link don't
@@ -1261,7 +1227,11 @@ const CRUMB_COLOR: Record<Breadcrumb['type'], string> = {
 function BreadcrumbsTab({ event }: { event: EventRow }) {
   const breadcrumbs = event.payload.breadcrumbs ?? []
   if (breadcrumbs.length === 0) {
-    return <ModuleEmpty eyebrow="Breadcrumbs">No breadcrumbs on this event.</ModuleEmpty>
+    return (
+      <Card>
+        <EmptyState description="No breadcrumbs on this event." title="No breadcrumbs" />
+      </Card>
+    )
   }
   return (
     <div className="border-border overflow-hidden rounded-md border">
@@ -1291,7 +1261,12 @@ function BreadcrumbsTab({ event }: { event: EventRow }) {
 function TagsTab({ event }: { event: EventRow }) {
   const tags = event.payload.tags ?? {}
   const keys = Object.keys(tags)
-  if (keys.length === 0) return <ModuleEmpty eyebrow="Tags">No tags on this event.</ModuleEmpty>
+  if (keys.length === 0)
+    return (
+      <Card>
+        <EmptyState description="No tags on this event." title="No tags" />
+      </Card>
+    )
   return (
     <Pane title="Tags">
       <KeyValueGrid data={tags as Record<string, unknown>} />
@@ -1515,19 +1490,19 @@ function EventGlanceStrip({ event, projectId }: { event: EventRow; projectId: st
   }
 
   return (
-    <div className="border-y border-[color:var(--rule)] py-3">
+    <div className="border-border border-y py-3">
       <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1.5">
         {dims.map((d) => (
           <span className="flex items-baseline gap-1.5" key={d.label}>
-            <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+            <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
               {d.label}
             </span>
-            <span className="font-mono text-[12px] text-[color:var(--ink)]">{d.value}</span>
+            <span className="text-fg font-mono text-[12px]">{d.value}</span>
           </span>
         ))}
       </div>
       <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+        <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
           attached
         </span>
         <Badge label="screenshot" present={has('screenshot')} />
@@ -1535,9 +1510,7 @@ function EventGlanceStrip({ event, projectId }: { event: EventRow; projectId: st
         <Badge label="state" present={has('stateSnapshot')} />
         <Badge label="trail" present={has('sessionTrail')} />
         <Badge label="viewTree" present={has('viewTree')} />
-        {attachmentsQ.isLoading && (
-          <span className="font-mono text-[11px] text-[color:var(--ink-muted)]">…</span>
-        )}
+        {attachmentsQ.isLoading && <span className="text-fg-muted font-mono text-[11px]">…</span>}
       </div>
     </div>
   )
@@ -1547,7 +1520,7 @@ function Badge({ label, present }: { label: string; present: boolean }) {
   return (
     <span
       className={`inline-flex items-baseline gap-1 font-mono text-[11px] tabular-nums ${
-        present ? 'text-[color:var(--accent)]' : 'text-[color:var(--ink-muted)]'
+        present ? 'text-accent' : 'text-fg-muted'
       }`}
     >
       <span aria-hidden>{present ? '●' : '○'}</span>
@@ -1757,11 +1730,12 @@ function FeedbackTab({ issueId, projectId }: { issueId: string; projectId: strin
   }
   if (reports.length === 0) {
     return (
-      <ModuleEmpty eyebrow="No user reports for this issue">
-        {
-          'Host app calls `sentori.sendUserFeedback({ eventId, title, body, email? })` — reports with a matching eventId land here automatically.'
-        }
-      </ModuleEmpty>
+      <Card>
+        <EmptyState
+          description="Host app calls sentori.sendUserFeedback({ eventId, title, body, email? }) — reports with a matching eventId land here automatically."
+          title="No user reports yet"
+        />
+      </Card>
     )
   }
   return (
@@ -1798,8 +1772,8 @@ function FeedbackEntry({ report }: { report: UserReport }) {
 function Pane({ children, title }: { children: React.ReactNode; title: string }) {
   return (
     <section>
-      <header className="sec-head">
-        <span className="sec-head-title">{title}</span>
+      <header className="flex items-baseline gap-3 pt-5 pb-2">
+        <span className="text-fg text-[14px] font-semibold tracking-tight">{title}</span>
       </header>
       <div>{children}</div>
     </section>
@@ -1826,42 +1800,42 @@ function ErrorBodyPane({ event }: { event: EventRow }) {
   const lastCrumbs = (event.payload.breadcrumbs ?? []).slice(-3).reverse()
   return (
     <section>
-      <header className="sec-head">
-        <span className="sec-head-title">Error</span>
-        <span className="sec-head-sub">event {event.id.slice(0, 8)}</span>
+      <header className="flex items-baseline gap-3 pt-5 pb-2">
+        <span className="text-fg text-[14px] font-semibold tracking-tight">Error</span>
+        <span className="text-fg-muted ml-auto font-mono text-[11px] tracking-[0.08em] uppercase">
+          event {event.id.slice(0, 8)}
+        </span>
       </header>
       <div className="space-y-3">
         <div className="grid grid-cols-[120px_1fr] items-baseline gap-x-4">
-          <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+          <span className="text-fg-muted font-mono text-[10px] tracking-[0.22em] uppercase">
             type
           </span>
-          <span className="font-mono text-[13px] break-all text-[color:var(--danger)]">
-            {err.type}
-          </span>
+          <span className="text-danger font-mono text-[13px] break-all">{err.type}</span>
         </div>
         {err.message && (
           <div className="grid grid-cols-[120px_1fr] items-baseline gap-x-4">
-            <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+            <span className="text-fg-muted font-mono text-[10px] tracking-[0.22em] uppercase">
               message
             </span>
-            <pre className="font-sans text-[13px] leading-snug break-words whitespace-pre-wrap text-[color:var(--ink)]">
+            <pre className="text-fg font-sans text-[13px] leading-snug break-words whitespace-pre-wrap">
               {err.message}
             </pre>
           </div>
         )}
         {causeChain.length > 0 && (
           <div className="grid grid-cols-[120px_1fr] items-baseline gap-x-4">
-            <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+            <span className="text-fg-muted font-mono text-[10px] tracking-[0.22em] uppercase">
               caused by
             </span>
             <ul className="space-y-1">
               {causeChain.map((c, i) => (
                 <li className="font-mono text-[12px] break-words" key={i}>
-                  <span className="text-[color:var(--danger)]">{c.type}</span>
+                  <span className="text-danger">{c.type}</span>
                   {c.message && (
                     <>
-                      <span className="text-[color:var(--ink-muted)]">: </span>
-                      <span className="text-[color:var(--ink-soft)]">{c.message}</span>
+                      <span className="text-fg-muted">: </span>
+                      <span className="text-fg-secondary">{c.message}</span>
                     </>
                   )}
                 </li>
@@ -1871,13 +1845,13 @@ function ErrorBodyPane({ event }: { event: EventRow }) {
         )}
         {lastCrumbs.length > 0 && (
           <div className="grid grid-cols-[120px_1fr] items-baseline gap-x-4">
-            <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+            <span className="text-fg-muted font-mono text-[10px] tracking-[0.22em] uppercase">
               breadcrumbs
             </span>
             <ul className="space-y-1.5">
               {lastCrumbs.map((b, i) => (
                 <li className="text-[12px] leading-snug" key={i}>
-                  <span className="font-mono text-[10px] tracking-[0.1em] text-[color:var(--ink-muted)] tabular-nums">
+                  <span className="text-fg-muted font-mono text-[10px] tracking-[0.1em] tabular-nums">
                     {timeOfDay(b.timestamp)}
                   </span>
                   <span
@@ -1885,7 +1859,7 @@ function ErrorBodyPane({ event }: { event: EventRow }) {
                   >
                     {b.type}
                   </span>
-                  <div className="mt-0.5 font-mono text-[11px] break-words text-[color:var(--ink)]">
+                  <div className="text-fg mt-0.5 font-mono text-[11px] break-words">
                     {stringifyData(b.data)}
                   </div>
                 </li>
@@ -1929,7 +1903,7 @@ function DebugCenterEventContext({ event }: { event: EventRow }) {
     <div className="space-y-5">
       <CtxBlock title="Error">
         <Row label="type">
-          <span className="font-mono text-[12px] break-all text-[color:var(--danger)]">
+          <span className="text-danger font-mono text-[12px] break-all">
             {p.error?.type ?? '—'}
           </span>
         </Row>
@@ -2015,12 +1989,12 @@ function DebugCenterEventContext({ event }: { event: EventRow }) {
             Object.entries(p.user.linkHashes).map(([keyType, clientHash]) => (
               <Row key={keyType} label={`linkHash:${keyType}`}>
                 <span className="flex flex-wrap items-baseline gap-2">
-                  <span className="font-mono text-[12px] text-[color:var(--ink-soft)]">
+                  <span className="text-fg-secondary font-mono text-[12px]">
                     {String(clientHash).slice(0, 8)}…
                   </span>
                   <Link
                     aria-label={`Look up this ${keyType} across projects`}
-                    className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--accent)] uppercase hover:underline"
+                    className="text-accent font-mono text-[10px] tracking-[0.12em] uppercase hover:underline"
                     to={`/main/org/${currentOrg.slug}/users?type=${encodeURIComponent(keyType)}&hash=${encodeURIComponent(String(clientHash))}`}
                   >
                     look up across projects →
@@ -2041,7 +2015,7 @@ function DebugCenterEventContext({ event }: { event: EventRow }) {
           <ul className="space-y-1.5">
             {crumbs.map((b, i) => (
               <li key={i} className="text-[11px] leading-snug">
-                <span className="font-mono text-[10px] tracking-[0.1em] text-[color:var(--ink-muted)] tabular-nums">
+                <span className="text-fg-muted font-mono text-[10px] tracking-[0.1em] tabular-nums">
                   {timeOfDay(b.timestamp)}
                 </span>
                 <span
@@ -2049,7 +2023,7 @@ function DebugCenterEventContext({ event }: { event: EventRow }) {
                 >
                   {b.type}
                 </span>
-                <div className="mt-0.5 font-mono text-[11px] break-words text-[color:var(--ink)]">
+                <div className="text-fg mt-0.5 font-mono text-[11px] break-words">
                   {stringifyData(b.data)}
                 </div>
               </li>
@@ -2068,7 +2042,7 @@ function DebugCenterEventContext({ event }: { event: EventRow }) {
 function CtxBlock({ children, title }: { children: React.ReactNode; title: string }) {
   return (
     <div>
-      <div className="mb-1.5 font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+      <div className="text-accent mb-1.5 font-mono text-[10px] tracking-[0.22em] uppercase">
         {title}
       </div>
       <div>{children}</div>
@@ -2082,10 +2056,8 @@ function CtxBlock({ children, title }: { children: React.ReactNode; title: strin
 function Row({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <div className="grid grid-cols-[80px_1fr] items-baseline gap-3 py-1 text-[12px]">
-      <div className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
-        {label}
-      </div>
-      <div className="text-[color:var(--ink)]">{children}</div>
+      <div className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">{label}</div>
+      <div className="text-fg">{children}</div>
     </div>
   )
 }
@@ -2093,10 +2065,10 @@ function Row({ children, label }: { children: React.ReactNode; label: string }) 
 function KeyValueGrid({ data }: { data: Record<string, unknown> }) {
   const entries = Object.entries(data).filter(([, v]) => v !== '' && v != null)
   if (entries.length === 0) {
-    return <p className="text-fg-muted t-md">—</p>
+    return <p className="text-fg-muted text-[13px]">—</p>
   }
   return (
-    <dl className="t-md grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
+    <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-[13px]">
       {entries.map(([k, v]) => (
         <div className="contents" key={k}>
           <dt className="text-fg-muted font-mono">{k}</dt>
@@ -2199,12 +2171,12 @@ function RefingerprintAdmin({
 
   return (
     <>
-      <div className="mt-3 flex items-center gap-2 border-t border-[color:var(--rule-soft)] pt-3">
-        <span className="font-mono text-[9px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+      <div className="border-border-muted mt-3 flex items-center gap-2 border-t pt-3">
+        <span className="text-fg-muted font-mono text-[9px] tracking-[0.22em] uppercase">
           admin
         </span>
         <button
-          className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--accent)]"
+          className="text-fg-muted hover:text-accent font-mono text-[10px] tracking-[0.18em] uppercase"
           onClick={onOpen}
           type="button"
         >
@@ -2212,125 +2184,99 @@ function RefingerprintAdmin({
         </button>
       </div>
 
-      {open && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-[rgba(0,0,0,0.5)] p-4">
-          <div className="w-full max-w-[640px] border border-[color:var(--rule)] bg-[color:var(--paper)] p-5 shadow-xl">
-            <header className="mb-4 flex items-baseline justify-between border-b border-[color:var(--rule)] pb-3">
-              <div>
-                <h2 className="font-mono text-[11px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
-                  re-group by current rules
-                </h2>
-                <p className="mt-1 font-mono text-[11px] text-[color:var(--ink-soft)]">{title}</p>
-              </div>
-              <button
-                className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--ink)]"
-                onClick={onClose}
-                type="button"
-              >
-                close
-              </button>
-            </header>
+      <Dialog
+        description={title}
+        glass
+        onClose={onClose}
+        open={open}
+        title="Re-group by current rules"
+        width="lg"
+      >
+        {dryRunM.isPending && (
+          <p className="text-fg-secondary py-6 text-center text-[13px]">analysing…</p>
+        )}
 
-            {dryRunM.isPending && (
-              <p className="py-6 text-center text-[13px] text-[color:var(--ink-soft)]">
-                analysing…
+        {dryRunM.error && (
+          <Alert title="Re-fingerprint is admin-only" variant="danger">
+            {errOf(dryRunM.error)}
+          </Alert>
+        )}
+
+        {applyM.error && (
+          <Alert title="Apply failed" variant="danger">
+            {errOf(applyM.error)}
+          </Alert>
+        )}
+
+        {applyM.data && applyM.data.applied && (
+          <Alert title="Migration applied" variant="success">
+            {nonCurrentGroups.length} group{nonCurrentGroups.length === 1 ? '' : 's'} migrated.
+          </Alert>
+        )}
+
+        {preview && (
+          <div className="mt-3 space-y-3">
+            <p className="text-fg-secondary font-mono text-[11px]">
+              {preview.totalEvents.toLocaleString()} events. Current fingerprint:{' '}
+              <span className="text-fg">{preview.currentFp.slice(0, 8)}</span>.
+            </p>
+
+            {nothingToSplit ? (
+              <p className="border-border text-fg-secondary border p-3 font-mono text-[11px]">
+                All events already match the current fingerprint — nothing to split.
               </p>
-            )}
-
-            {dryRunM.error && (
-              <p className="py-3 text-center font-mono text-[11px] text-[color:var(--danger)]">
-                {errOf(dryRunM.error)} — re-fingerprint is admin-only.
-              </p>
-            )}
-
-            {applyM.error && (
-              <p className="py-3 text-center font-mono text-[11px] text-[color:var(--danger)]">
-                Apply failed: {errOf(applyM.error)}
-              </p>
-            )}
-
-            {applyM.data && applyM.data.applied && (
-              <p className="mb-3 border border-[color:var(--success)] bg-[color:var(--paper-2)] p-3 font-mono text-[11px] text-[color:var(--success)]">
-                ✓ applied. {nonCurrentGroups.length} group
-                {nonCurrentGroups.length === 1 ? '' : 's'} migrated.
-              </p>
-            )}
-
-            {preview && (
-              <div className="space-y-3">
-                <p className="font-mono text-[11px] text-[color:var(--ink-soft)]">
-                  {preview.totalEvents.toLocaleString()} events. Current fingerprint:{' '}
-                  <span className="text-[color:var(--ink)]">{preview.currentFp.slice(0, 8)}</span>.
+            ) : (
+              <>
+                <p className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
+                  {nonCurrentGroups.length} group{nonCurrentGroups.length === 1 ? '' : 's'} would
+                  migrate:
                 </p>
-
-                {nothingToSplit ? (
-                  <p className="border border-[color:var(--rule)] p-3 font-mono text-[11px] text-[color:var(--ink-soft)]">
-                    All events already match the current fingerprint — nothing to split.
-                  </p>
-                ) : (
-                  <>
-                    <p className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
-                      {nonCurrentGroups.length} group
-                      {nonCurrentGroups.length === 1 ? '' : 's'} would migrate:
-                    </p>
-                    <ul className="divide-y divide-[color:var(--rule-soft)] border border-[color:var(--rule)]">
-                      {preview.groups.map((g) => (
-                        <li className="flex items-baseline gap-3 px-3 py-2" key={g.fp}>
-                          <span className="basis-[6ch] font-mono text-[10px] text-[color:var(--ink-muted)]">
-                            {g.fp.slice(0, 6)}
-                          </span>
-                          <span
-                            className={`basis-[6ch] font-mono text-[11px] tabular-nums ${
-                              g.staysInCurrent
-                                ? 'text-[color:var(--success)]'
-                                : 'text-[color:var(--accent)]'
-                            }`}
-                          >
-                            {g.count.toLocaleString()}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-[12px] text-[color:var(--ink)]">
-                            {g.sample}
-                          </span>
-                          <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
-                            {g.staysInCurrent ? 'stays' : g.targetIssueId ? 'merges' : 'new'}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-              </div>
+                <ul className="divide-border-muted border-border divide-y border">
+                  {preview.groups.map((g) => (
+                    <li className="flex items-baseline gap-3 px-3 py-2" key={g.fp}>
+                      <span className="text-fg-muted basis-[6ch] font-mono text-[10px]">
+                        {g.fp.slice(0, 6)}
+                      </span>
+                      <span
+                        className={`basis-[6ch] font-mono text-[11px] tabular-nums ${
+                          g.staysInCurrent ? 'text-success' : 'text-accent'
+                        }`}
+                      >
+                        {g.count.toLocaleString()}
+                      </span>
+                      <span className="text-fg min-w-0 flex-1 truncate text-[12px]">
+                        {g.sample}
+                      </span>
+                      <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
+                        {g.staysInCurrent ? 'stays' : g.targetIssueId ? 'merges' : 'new'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
-
-            <div className="mt-4 flex items-center justify-end gap-2 border-t border-[color:var(--rule)] pt-3">
-              <button
-                className="inline-flex h-7 items-center px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--ink)]"
-                onClick={onClose}
-                type="button"
-              >
-                cancel
-              </button>
-              <button
-                className="inline-flex h-7 items-center bg-[color:var(--accent)] px-4 font-mono text-[11px] tracking-[0.05em] text-[color:var(--paper)] uppercase transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={
-                  !preview ||
-                  nothingToSplit ||
-                  applyM.isPending ||
-                  (!!applyM.data && applyM.data.applied)
-                }
-                onClick={() => applyM.mutate()}
-                type="button"
-              >
-                {applyM.isPending
-                  ? 'applying…'
-                  : applyM.data?.applied
-                    ? 'applied'
-                    : 'apply migration'}
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        <DialogFooter>
+          <Button onClick={onClose} size="sm" variant="ghost">
+            Cancel
+          </Button>
+          <Button
+            disabled={
+              !preview ||
+              nothingToSplit ||
+              applyM.isPending ||
+              (!!applyM.data && applyM.data.applied)
+            }
+            onClick={() => applyM.mutate()}
+            size="sm"
+            variant="primary"
+          >
+            {applyM.isPending ? 'Applying…' : applyM.data?.applied ? 'Applied' : 'Apply migration'}
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </>
   )
 }
@@ -2377,16 +2323,16 @@ function RelatedAcrossReleasesPanel({
   if (q.isLoading || related.length === 0) return null
 
   return (
-    <section className="mt-6 border-y border-[color:var(--rule)] py-3">
+    <section className="border-border mt-6 border-y py-3">
       <header className="mb-2 flex items-baseline justify-between">
-        <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+        <span className="text-accent font-mono text-[10px] tracking-[0.22em] uppercase">
           related across releases
         </span>
-        <span className="font-mono text-[10px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase">
+        <span className="text-fg-muted font-mono text-[10px] tracking-[0.08em] uppercase">
           same error_type · different release
         </span>
       </header>
-      <ul className="divide-y divide-[color:var(--rule-soft)]">
+      <ul className="divide-border-muted divide-y">
         {related.map((r) => (
           <RelatedRow currentOrgSlug={currentOrgSlug} key={r.id} row={r} />
         ))}
@@ -2405,26 +2351,26 @@ function RelatedRow({
   return (
     <li className="flex items-baseline gap-3 py-2">
       <Link
-        className="min-w-0 flex-1 truncate text-[13px] text-[color:var(--ink)] hover:text-[color:var(--accent)]"
+        className="text-fg hover:text-accent min-w-0 flex-1 truncate text-[13px]"
         to={`/main/org/${currentOrgSlug}/issues/${row.id}`}
       >
         {row.messageSample || '(no message)'}
       </Link>
-      <span className="font-mono text-[10px] tracking-[0.08em] text-[color:var(--ink-muted)]">
+      <span className="text-fg-muted font-mono text-[10px] tracking-[0.08em]">
         {row.lastRelease || '—'}
       </span>
       <span
         className={`font-mono text-[10px] tracking-[0.18em] uppercase ${
           row.status === 'resolved'
-            ? 'text-[color:var(--success)]'
+            ? 'text-success'
             : row.status === 'active' || row.status === 'regressed'
-              ? 'text-[color:var(--warning)]'
-              : 'text-[color:var(--ink-muted)]'
+              ? 'text-warning'
+              : 'text-fg-muted'
         }`}
       >
         {row.status}
       </span>
-      <span className="font-mono text-[10px] text-[color:var(--ink-muted)] tabular-nums">
+      <span className="text-fg-muted font-mono text-[10px] tabular-nums">
         {row.eventCount.toLocaleString()}
       </span>
     </li>
@@ -2463,32 +2409,32 @@ function AffectedUsersPanel({
   if (!data || data.totalDistinct === 0) return null
 
   return (
-    <section className="mt-6 border-y border-[color:var(--rule)] py-3">
+    <section className="border-border mt-6 border-y py-3">
       <header className="mb-2 flex items-baseline justify-between">
-        <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+        <span className="text-accent font-mono text-[10px] tracking-[0.22em] uppercase">
           affected users · last {data.windowDays}d
         </span>
-        <span className="font-mono text-[10px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase">
+        <span className="text-fg-muted font-mono text-[10px] tracking-[0.08em] uppercase">
           showing top {data.rows.length} of {data.totalDistinct.toLocaleString()}
         </span>
       </header>
-      <ul className="divide-y divide-[color:var(--rule-soft)]">
+      <ul className="divide-border-muted divide-y">
         {data.rows.map((r) => (
           <li
             key={r.fingerprintHex + r.keyType}
             className="grid grid-cols-[260px_1fr_auto_auto] items-baseline gap-3 py-1.5"
           >
             <Link
-              className="truncate font-mono text-[12px] text-[color:var(--ink)] hover:text-[color:var(--accent)]"
+              className="text-fg hover:text-accent truncate font-mono text-[12px]"
               to={`/main/org/${currentOrgSlug}/users/${r.fingerprintHex}?window=${WINDOW_DAYS}`}
             >
               {r.fingerprintHex.slice(0, 12)}…
             </Link>
-            <span className="font-mono text-[11px] text-[color:var(--ink-soft)]">{r.keyType}</span>
-            <span className="font-mono text-[10px] text-[color:var(--ink-muted)] tabular-nums">
+            <span className="text-fg-secondary font-mono text-[11px]">{r.keyType}</span>
+            <span className="text-fg-muted font-mono text-[10px] tabular-nums">
               {r.eventCount.toLocaleString()} ev
             </span>
-            <span className="font-mono text-[10px] text-[color:var(--ink-muted)] tabular-nums">
+            <span className="text-fg-muted font-mono text-[10px] tabular-nums">
               {formatRelative(r.lastSeen)}
             </span>
           </li>

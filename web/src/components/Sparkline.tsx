@@ -13,7 +13,7 @@ export function Sparkline({
   values,
   width = 240,
   height = 40,
-  stroke = 'var(--accent)',
+  stroke = 'currentColor',
   strokeWidth = 1.5,
   ariaLabel,
 }: {
