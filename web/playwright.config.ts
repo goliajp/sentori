@@ -69,10 +69,18 @@ export default defineConfig({
       stderr: 'pipe',
     },
     {
-      command: 'bun run dev -- --host 127.0.0.1 --port 5173',
+      // Use `vite preview` (production-built bundle) instead of `vite
+      // dev`. The dev server's esbuild prebundling cross-chunks GDS
+      // (@goliapkg/gds ESM 370-entry package) and emits a broken
+      // `require_isUnsafeProperty` reference, which crashes every
+      // page on mount. `bun run build` (rollup) handles the same
+      // graph correctly. e2e against the production bundle is closer
+      // to what users hit anyway.
+      command:
+        'bun run vite build --logLevel error && bun run vite preview --host 127.0.0.1 --port 5173',
       url: 'http://127.0.0.1:5173',
       reuseExistingServer: true,
-      timeout: 60_000,
+      timeout: 180_000, // build adds ~30s on a fresh runner
       stdout: 'ignore',
       stderr: 'pipe',
     },
