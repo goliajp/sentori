@@ -177,6 +177,7 @@ mod activity;
 mod events;
 pub mod explore;
 mod frame_source;
+pub mod identity_erase;
 pub mod identity_lookup;
 pub mod users_detail;
 pub mod users_overview;

@@ -480,6 +480,16 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/orgs/{slug}/users/lookup",
             post(api::admin::identity_lookup::lookup),
         )
+        // v2.3 — GDPR-aligned DSR erase. Same body shape as lookup
+        // (keyType + clientHash); adds `dryRun: bool`. dryRun=true
+        // returns the affected-event count without mutating;
+        // dryRun=false (or absent) pseudonymises payload.user across
+        // every matching event + drops identity_fingerprints rows.
+        // Audit log entry per call.
+        .route(
+            "/orgs/{slug}/users/erase",
+            post(api::admin::identity_erase::erase),
+        )
         // v2.4 — Users page default view. Aggregates over the org's
         // default identity scope; returns kpi + top-affected fingerprints
         // + per-release / per-key_type breakdown.

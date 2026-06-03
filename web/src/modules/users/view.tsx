@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { PageHeader } from '@/layout/page-header'
 
+import { UsersErase } from './erase'
 import { UsersLookup } from './lookup'
 import { UsersOverview } from './overview'
 
@@ -26,6 +27,11 @@ function hasLookupDeepLink(): boolean {
  */
 export function UsersView() {
   const [lookupOpen, setLookupOpen] = useState(() => hasLookupDeepLink())
+  // v2.3 — DSR erase bar. Off by default since it's a destructive
+  // op, but a single click opens the inline form. No deep-link
+  // analogue: erase requires a typed-confirmation gate every time;
+  // we deliberately don't let a URL preload the dangerous state.
+  const [eraseOpen, setEraseOpen] = useState(false)
 
   return (
     <div className="sentori-page-in">
@@ -34,7 +40,7 @@ export function UsersView() {
         title="Users"
       />
 
-      <div className="mb-6">
+      <div className="mb-2">
         <button
           aria-expanded={lookupOpen}
           className="flex w-full items-center gap-2 border-y border-[color:var(--rule)] py-2 font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--ink-soft)]"
@@ -47,6 +53,23 @@ export function UsersView() {
         {lookupOpen && (
           <div className="mt-2">
             <UsersLookup />
+          </div>
+        )}
+      </div>
+
+      <div className="mb-6">
+        <button
+          aria-expanded={eraseOpen}
+          className="flex w-full items-center gap-2 border-y border-[color:var(--rule)] py-2 font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--danger)]"
+          onClick={() => setEraseOpen((v) => !v)}
+          type="button"
+        >
+          <span aria-hidden>{eraseOpen ? '▾' : '▸'}</span>
+          <span>erase identity (DSR)</span>
+        </button>
+        {eraseOpen && (
+          <div className="mt-2">
+            <UsersErase />
           </div>
         )}
       </div>

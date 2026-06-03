@@ -357,7 +357,20 @@ export type ServerEvent = {
   flags?: Record<string, string>
   timestamp: string
   traceId: null | string
-  user: null | { anonymous?: boolean; id?: string }
+  user: null | {
+    anonymous?: boolean
+    id?: string
+    /** v2.3 — display name. Host's choice whether to put real PII
+     *  here; the SDK stores it raw on send. */
+    name?: string
+    /** v2.3 — client-side hashed identity values keyed by `keyType`
+     *  (email / phone / googleSub / appleSub / username / custom).
+     *  Each value is the 64-char lowercase hex sha256 of the
+     *  normalised raw value; the dashboard can compute the same
+     *  hash from operator input via `crypto.subtle.digest` and
+     *  match against this map without ever seeing the raw value. */
+    linkHashes?: Record<string, string>
+  }
   /** Phase 42 sub-C.09: SDK-uploaded attachments (screenshots, view
    *  trees, state snapshots). Each `ref` is server-issued; the
    *  dashboard fetches the blob via
@@ -2060,6 +2073,20 @@ export type IdentityLookupResp = {
 }
 
 /**
+ * v2.3 — `orgsApi.usersErase` response. Same shape on dry-run and
+ * live runs; `dryRun` echoes the request flag. Sample IDs help the
+ * operator spot-check before confirming a live erase.
+ */
+export type IdentityEraseResp = {
+  scopeId: string
+  keyType: string
+  dryRun: boolean
+  affectedCount: number
+  sampleEventIds: string[]
+  fingerprintPrefix: string
+}
+
+/**
  * v2.4 — Users page default overview. Mirrors
  * `server/src/api/admin/users_overview.rs::OverviewResp`. Fingerprints
  * surface as 64-char lowercase hex; no raw identity ever crosses the
@@ -2151,6 +2178,20 @@ export const orgsApi = {
     const qs = params.toString()
     return adminFetch<UsersDetailResp>(`/orgs/${slug}/users/${fingerprintHex}${qs ? `?${qs}` : ''}`)
   },
+
+  /**
+   * v2.3 — GDPR-aligned DSR erase. Same `(keyType, clientHash)` shape
+   * as usersLookup; adds `dryRun: true` for a side-effect-free count.
+   * Live (dryRun=false) call deletes identity_fingerprints rows for
+   * the subject + pseudonymises `payload.user` on every matching
+   * event. Audit log entry per call. Dashboard typed-confirmation
+   * gate sits in front of the live call.
+   */
+  usersErase: (slug: string, body: { keyType: string; clientHash: string; dryRun?: boolean }) =>
+    adminFetch<IdentityEraseResp>(`/orgs/${slug}/users/erase`, {
+      body: JSON.stringify(body),
+      method: 'POST',
+    }),
 
   /**
    * v2.4 — Users page default overview. KPI + most-affected

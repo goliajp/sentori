@@ -395,11 +395,25 @@ Phase 4 starts modifying ingest.
 
 ---
 
-## Phase 4 — Identity layer + project-scope carve + DSR delete (W6.2 expanded)
+## Phase 4 — Identity layer + DSR delete (W6.2 expanded)
 
-**Goal:** Land the full identity layer per design §5, plus the two
-recovered defers that belong here: **project-level identity-scope
-carve** and **GDPR DSR delete endpoint**.
+**Goal:** Land the full identity layer per design §5, plus the
+**GDPR DSR delete endpoint** (a recovered defer).
+
+**Status:** most of the W6.2 surface had already landed pre-plan
+(migrations `0065_identity_scopes` / `0066_identity_fingerprints` /
+`0067_backfill_identity_fingerprints`, `server/src/identity.rs`,
+`api/admin/identity_lookup.rs`, defensive PII strip on
+`event::User`, SDK `setUser({ linkBy })` + SubtleCrypto hash,
+Users dashboard module). Phase 4 closes the remaining gap: DSR
+erase endpoint + UI + Issue Detail link-up to the Users
+fingerprint lookup.
+
+**Re-deferred:** project-level identity-scope carve. The 0065
+migration explicitly chose "org-default scope only" for v2.3 —
+adding a `projects.identity_scope_id` column on the shipped schema
+needs a separate backfill story. Tracked as v2.4+ work in the
+Recovered defers table below.
 
 **Inputs:** Phase 3 (init.identity field).
 
@@ -796,7 +810,7 @@ The v2.3 design doc §8 listed seven items as "Out of v2.3 scope
 
 | Defer item | Re-home |
 |---|---|
-| Project-level identity-scope carve | **Phase 4** (`identity_scopes.project_id` column + carve-out UI). |
+| Project-level identity-scope carve | **Re-deferred to v2.4+.** Phase 4 discovered the 0065 migration explicitly chose "org-default scope only, project carve column lands later." Adding the column post-hoc on a shipped schema needs a separate backfill story; keep deferred until a concrete carved-scope use case lands. |
 | Operator-driven identity merge | **Phase 7** (`identity_merges` table + merge action on Users view). |
 | GDPR DSR delete endpoint | **Phase 4** (`/erase` endpoint + dashboard UI with dry-run confirm). |
 | Verify rig run for perf numbers | **Phase 0** (baseline) + **Phase 3** (diff vs baseline; +5% CPU / +1ms per-tick blocks ship). |

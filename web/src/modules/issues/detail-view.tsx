@@ -1894,6 +1894,7 @@ function ErrorBodyPane({ event }: { event: EventRow }) {
  * strip grows new fields.
  */
 function DebugCenterEventContext({ event }: { event: EventRow }) {
+  const { currentOrg } = useOrg()
   const p = event.payload
   const errMsg = p.error?.message
   const crumbs = (p.breadcrumbs ?? []).slice(-3).reverse()
@@ -1974,13 +1975,47 @@ function DebugCenterEventContext({ event }: { event: EventRow }) {
         )}
       </CtxBlock>
 
-      {(p.user?.id || flagEntries.length > 0) && (
+      {(p.user?.id ||
+        p.user?.name ||
+        (p.user?.linkHashes && Object.keys(p.user.linkHashes).length > 0) ||
+        flagEntries.length > 0) && (
         <CtxBlock title="User & flags">
           {p.user?.id && (
             <Row label="user.id">
               <span className="font-mono text-[12px] break-all">{p.user.id}</span>
             </Row>
           )}
+          {p.user?.name && (
+            <Row label="user.name">
+              <span className="font-sans text-[12px]">{p.user.name}</span>
+            </Row>
+          )}
+          {/* v2.3 — identity fingerprints attached to this event.
+           *   - Display the key types only (e.g. "email, googleSub") + an
+           *     8-hex prefix derived from the client-side hash so the
+           *     operator can correlate across pages without seeing raw
+           *     PII (never shown anywhere in the dashboard).
+           *   - "Look up across projects" link routes into
+           *     /main/<org>/users with the full 64-char hash in the URL.
+           *     The Users module computes the salted server fingerprint
+           *     and renders cross-project hits. */}
+          {p.user?.linkHashes &&
+            Object.entries(p.user.linkHashes).map(([keyType, clientHash]) => (
+              <Row key={keyType} label={`linkHash:${keyType}`}>
+                <span className="flex flex-wrap items-baseline gap-2">
+                  <span className="font-mono text-[12px] text-[color:var(--ink-soft)]">
+                    {String(clientHash).slice(0, 8)}…
+                  </span>
+                  <Link
+                    aria-label={`Look up this ${keyType} across projects`}
+                    className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--accent)] uppercase hover:underline"
+                    to={`/main/org/${currentOrg.slug}/users?type=${encodeURIComponent(keyType)}&hash=${encodeURIComponent(String(clientHash))}`}
+                  >
+                    look up across projects →
+                  </Link>
+                </span>
+              </Row>
+            ))}
           {flagEntries.map(([k, v]) => (
             <Row key={k} label={`flag:${k}`}>
               <span className="font-mono text-[12px]">{String(v)}</span>

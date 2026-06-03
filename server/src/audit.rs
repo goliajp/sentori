@@ -42,6 +42,14 @@ pub mod actions {
     pub const ALERT_RULE_CREATED: &str = "alert_rule.created";
     pub const ALERT_RULE_PATCHED: &str = "alert_rule.patched";
     pub const ALERT_RULE_DELETED: &str = "alert_rule.deleted";
+
+    /// v2.3 — GDPR-aligned DSR erasure. Operator invokes the
+    /// /admin/api/orgs/{slug}/users/erase endpoint with a fingerprint;
+    /// server clears `payload.user` PII on every matching event and
+    /// drops the matching identity_fingerprints rows so further
+    /// look-ups can't surface the subject's events.
+    pub const IDENTITY_ERASED: &str = "identity.erased";
+    pub const IDENTITY_ERASE_DRY_RUN: &str = "identity.erase.dry_run";
 }
 
 pub mod targets {
@@ -55,6 +63,9 @@ pub mod targets {
     pub const TRANSFER: &str = "transfer";
     pub const RELEASE: &str = "release";
     pub const ALERT_RULE: &str = "alert_rule";
+    /// v2.3 — target of `identity.erased`. `target_id` carries the
+    /// identity_scope_id (the salt boundary the erasure ran inside).
+    pub const IDENTITY_SCOPE: &str = "identity_scope";
 }
 
 /// Phase 20 sub-A: human-readable English labels for the action codes,
@@ -91,6 +102,8 @@ pub fn label_for(action: &str) -> &str {
         actions::ALERT_RULE_CREATED => "Alert rule created",
         actions::ALERT_RULE_PATCHED => "Alert rule updated",
         actions::ALERT_RULE_DELETED => "Alert rule deleted",
+        actions::IDENTITY_ERASED => "Identity erased (DSR)",
+        actions::IDENTITY_ERASE_DRY_RUN => "Identity erase dry-run",
         // Unknown code — fall back to the raw input so the UI shows
         // *something* instead of crashing. The lifetime borrows from the
         // caller's &str.
@@ -125,6 +138,8 @@ pub fn all_labels() -> Vec<(&'static str, &'static str)> {
         actions::ALERT_RULE_CREATED,
         actions::ALERT_RULE_PATCHED,
         actions::ALERT_RULE_DELETED,
+        actions::IDENTITY_ERASED,
+        actions::IDENTITY_ERASE_DRY_RUN,
     ]
     .iter()
     .map(|c| (*c, label_for(c)))
