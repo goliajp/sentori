@@ -62,3 +62,4 @@ data/
 # transient artifacts (bug repros, throwaway notes, scratch)
 tmp/
 .claude/
+.npmrc

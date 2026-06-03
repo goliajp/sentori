@@ -1,5 +1,99 @@
 # @goliapkg/sentori-core
 
+## 1.2.0
+
+### Minor Changes
+
+- [`c26c88c`](https://github.com/goliajp/sentori/commit/c26c88c690bb9260881651e0d787c5d5b4b87bc3) Thanks [@doracawl](https://github.com/doracawl)! - v2.3 W6.0 — silent-by-default SDK logger.
+
+  The SDK now ships a centralised logger module (`logger.error/warn/info/debug`)
+  gated by a single `LogLevel` setting. Default level is `'warn'`: a normal Sentori
+  install adds zero `[sentori]` lines to the host's console under healthy
+  operation. Real problems (transport sustained failure, native module not bound,
+  SDK-internal exception) still surface.
+
+  New init fields:
+
+  - `init({ logLevel: 'silent' | 'error' | 'warn' | 'info' | 'debug' })` — gates
+    the host-facing console output. Default `'warn'`.
+  - `init({ onReady: (info) => ... })` — fires once after init completes with a
+    shared `ReadyInfo` shape (`sdkVersion`, plus RN-only `coldStartMs` + `native`).
+    Use this to know the SDK is live without scanning the console.
+
+  New host APIs (re-exported from each SDK):
+
+  - `setLogLevel(level)` / `getLogLevel()` — change the gate at runtime.
+  - `setLogTransport(fn)` — route Sentori-internal lines into the host's own
+    logger (Datadog, OpenTelemetry, etc.); pass `null` to restore console.
+  - `logger` namespace + `LogLevel` / `LogTransport` types for hosts that want to
+    produce subsystem-prefixed lines themselves.
+
+  JS SDK additions (RN was already wired in prior commits): `logLevel`, `onReady`,
+  and the new canonical `sample` field (alongside the existing `sampling`
+  back-compat alias). No behaviour change beyond log silence; existing init calls
+  keep working.
+
+  Mechanical perf bench (`sdk/core/src/__tests__/perf.bench.ts`) extended with
+  logger budgets — gated-out `logger.debug` < 1 µs/op, emit through transport
+  < 5 µs/op, `setLogLevel` toggle < 1 µs/op. Baseline numbers recorded at
+  `docs/perf-baselines/v2.2.1.md` for Phase 3 (W6.1) to diff against.
+
+- [`f1559cb`](https://github.com/goliajp/sentori/commit/f1559cbad697cc23e286f8f5d68f172b182d7d58) Thanks [@doracawl](https://github.com/doracawl)! - v2.3 W6.1 — `beforeSend` hook + unified `withSpan` entry point.
+
+  Two additive surface changes per `docs/design/sdk-v2.3-redesign.md` §2:
+
+  **`init({ beforeSend })` — host PII scrub hook**
+
+  A sync host-supplied function called once per event just before
+  transport enqueue. Return the event (possibly mutated) to ship it,
+  or `null` to drop it entirely. Use for application-specific PII
+  scrubbing the SDK can't do automatically.
+
+  NEVER rule applies: a throwing hook is caught, one-shot warned, and
+  the SDK falls back to the unmodified event. A non-event return
+  (typo, `undefined`, etc.) gets the same treatment. Server-side
+  `privacy_lab` continues running regardless of whether `beforeSend`
+  is configured — `beforeSend` is the host's own defence layer in
+  front of the existing server scrubber.
+
+  ```ts
+  sentori.init({
+    token: "st_pk_…",
+    release: "myapp@1.0.0",
+    beforeSend(event) {
+      if (event.tags?.flow === "kyc") return null; // never ship KYC events
+      return { ...event, user: undefined }; // strip user
+    },
+  });
+  ```
+
+  **`withSpan` — unified entry point per design §2.3**
+
+  `withSpan` now overloads by first-argument type:
+
+  - `withSpan(name: string, fn)` — high-level wrap helper. Opens a
+    span, runs `fn`, ends the span. Same semantics as
+    `withScopedSpan(name, fn)`.
+  - `withSpan(span: SpanContextLike, fn)` — low-level active-span
+    manager. Pushes the span onto the active-context stack so child
+    spans inherit it. Same semantics as the prior `withSpan` export
+    (and the new explicit name `withActiveSpan`).
+
+  The pre-v2.3 export name `withSpan` continues to work via the new
+  overload (dispatching on first-arg type), so `withSpan(span, fn)`
+  call sites are source-compatible. The explicit name
+  `withActiveSpan` is exported for hosts that prefer disambiguation.
+  `withScopedSpan` remains exported as the explicit name for the
+  high-level path.
+
+  Tests: new RN `applyBeforeSend` dispatcher unit tests + JS SDK
+  `beforeSend` end-to-end tests via the fetch mock + core
+  `withSpan(name, fn)` overload coverage (5 new tests on top of the
+  v2.2 spans suite).
+
+  `BeforeSendHook` type is exported from `@goliapkg/sentori-core` and
+  re-exported by both SDKs.
+
 ## 1.1.1
 
 ### Patch Changes
