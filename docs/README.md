@@ -2,8 +2,10 @@
 
 Source markdown for protocol spec, getting-started, SDK guide,
 self-hosting, teams / RBAC, and design tokens. The `docs-site/` Astro
-Starlight project mirrors these files into the published documentation
-site at `docs.sentori.golia.jp`.
+Starlight project (Astro `base: '/docs'`) ships the published
+documentation at `sentori.golia.jp/docs/*`. The legacy host
+`docs.sentori.golia.jp` 301-redirects to the new path so old links
+keep working.
 
 ## Reference & getting started
 

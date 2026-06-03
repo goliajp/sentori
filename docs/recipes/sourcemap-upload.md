@@ -20,7 +20,7 @@ npx @goliapkg/sentori-cli@latest upload sourcemap \
 ```
 
 `--token` falls back to `$SENTORI_TOKEN`, `--api-url` to
-`$SENTORI_API_URL` (default `https://api.sentori.golia.jp`; for a
+`$SENTORI_API_URL` (default `https://sentori.golia.jp`; for a
 self-hosted instance, your host). `--ingest-url` is accepted as an
 alias for `--api-url`. `--dry-run` lists what would be uploaded.
 

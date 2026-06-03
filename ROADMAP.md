@@ -29,7 +29,7 @@
 
 > 版本管理：从这套 polish 起，monorepo 改用 [Changesets](./docs/runbook/release-sdks.md) 管理多包 semver，避免空 bump。
 
-公开 surface：`sentori.golia.jp`（marketing） / `app.sentori.golia.jp`（dashboard） / `api.sentori.golia.jp` / `ingest.sentori.golia.jp` / `docs.sentori.golia.jp`。
+公开 surface（v2.4 起单域名拓扑）：`sentori.golia.jp/`（marketing） + `sentori.golia.jp/main/*`（dashboard SPA） + `sentori.golia.jp/admin/api/*` + `sentori.golia.jp/api/*`（auth / admin / org backend） + `sentori.golia.jp/docs/*`（文档站，Astro Starlight `base: '/docs'`）；独立 host：`ingest.sentori.golia.jp`（SDK 上报，保留独立 host 以免破坏已发出的 customer token） + `cdn.sentori.golia.jp`（SDK install script / CLI 二进制） + `status.sentori.golia.jp`（Better Stack）。`app.sentori.golia.jp` / `docs.sentori.golia.jp` / `api.sentori.golia.jp` 仍解析到 lx64 origin 做 301 redirect 兼容老链接。详见 [`docs/design/single-domain-routing.md`](./docs/design/single-domain-routing.md)。
 
 ---
 
@@ -42,28 +42,29 @@
 
 ---
 
-## Subdomain 拓扑（sentori.golia.jp）
+## Subdomain 拓扑（v2.4 单域名整合后）
 
-| Subdomain | 段数 | 用途 | 渲染 | 后端 | CF 模式 |
-|---|---|---|---|---|---|
-| `sentori.golia.jp` | 3 | Marketing 主站 | 静态（Astro） | Cloudflare Pages | orange（proxy） |
-| `app.sentori.golia.jp` | 4 | Dashboard SPA | 静态（web/dist） | origin VM Caddy（静态托管 + 反代 api） | grey（DNS-only） |
-| `ingest.sentori.golia.jp` | 4 | SDK 上报端点 | 动态 | origin VM Caddy 反代 → sentori-server | grey |
-| `api.sentori.golia.jp` | 4 | Admin API | 动态 | origin VM Caddy 反代 → sentori-server | grey |
-| `docs.sentori.golia.jp` | 4 | 文档站 | 静态（Starlight build 出物） | origin VM Caddy 静态托管 | grey |
-| `cdn.sentori.golia.jp` | 4 | SDK install script / CLI 二进制 | 静态 | origin VM Caddy 静态托管 | grey |
-| `status.sentori.golia.jp` | 4 | 状态页 | 第三方 | Better Stack（CNAME） | grey |
+| Host + path | 用途 | 渲染 | 后端 | 备注 |
+|---|---|---|---|---|
+| `sentori.golia.jp/` | Marketing 主站 | 静态（Astro） | origin Caddy `/apps/sentori/marketing-dist` | v2.4 起从 CF Pages 搬到 lx64 origin |
+| `sentori.golia.jp/docs/*` | 文档站 | 静态（Starlight build，`base: '/docs'`） | origin Caddy `/apps/sentori/docs-dist` | 老 `docs.sentori.golia.jp` 301 redirect |
+| `sentori.golia.jp/login`、`/register`、`/verify`、`/forgot-password`、`/reset-password/<t>`、`/invite/<t>`、`/transfers/<t>` | SPA auth + accept flows | 静态（web/dist） | nginx in `sentori-web` | 根 path，未登录路径 |
+| `sentori.golia.jp/main`、`/main/*` | SPA dashboard | 静态（web/dist） | nginx in `sentori-web` | 登录后的 dashboard 都在这里 |
+| `sentori.golia.jp/admin/api/*`、`/api/*` | Admin / auth / org backend | 动态 | Caddy reverse_proxy → `sentori-server:8080` | 老 `api.sentori.golia.jp` 也走这里 |
+| `ingest.sentori.golia.jp/v1/*` | SDK 上报端点 | 动态 | Caddy reverse_proxy → `sentori-server:8080` | **保留独立 host** —— 已发出的 customer SDK token 写死了这个 URL，迁移成本 = 强制每个 customer 重 init |
+| `cdn.sentori.golia.jp` | SDK install script / CLI 二进制 | 静态 | origin VM Caddy 静态托管 | 不涉 v2.4 整合 |
+| `status.sentori.golia.jp` | 状态页 | 第三方 | Better Stack（CNAME） | 不涉 v2.4 整合 |
 
-**TLS 路径（已校准）：**
+**legacy redirect**：`app.sentori.golia.jp/<path>` → 301 → `sentori.golia.jp/main/<path>`；`docs.sentori.golia.jp/<path>` → 301 → `sentori.golia.jp/docs/<path>`。Caddy 块见 [`docs/design/single-domain-routing.md`](./docs/design/single-domain-routing.md)。
 
-- **3 段** `sentori.golia.jp`：Cloudflare Universal SSL（免费，自动覆盖 `*.golia.jp`），orange cloud + CF Pages
-- **4 段子域**：grey cloud（DNS-only，不挂 CF proxy）+ origin VM 上的 Caddy 自动 ACME（Let's Encrypt HTTP-01 / DNS-01），每个 subdomain 各一张独立证书
+**TLS 路径：**
 
-为什么 4 段不走 CF Pages：Cloudflare Pages 的 custom domain 必须 orange cloud；orange cloud 下 4 段子域**不被 Universal SSL 覆盖**，需要付费 Advanced Cert（$20/月+）才能签。grey + origin Caddy 是零成本路径。
+- 所有 host 都由 origin VM Caddy 自动 ACME 签 Let's Encrypt 证书。`sentori.golia.jp`（根域）+ `ingest.sentori.golia.jp` 都各一张独立证书。
+- 不再走 Cloudflare Pages，全部 origin-hosted 后路径整合是天然的：一份 Caddyfile 一个 docker-compose 就能拉起整个 dashboard + marketing + docs + backend。
 
 **DNS 管理：通过 devops 项目（不直调 Cloudflare API）**
 
-DNS 由 `~/workspace/goliajp/devops/` 项目里的 `crates/devops-core/src/dns/` 管理，唯一入口是 `zones.yaml`（`golia.jp` zone 下加 records）。`local_to_cf_name`（`cloudflare.rs:77`）对 record `name` 层级深度无限制，写 `name: app.sentori` 直接产出 `app.sentori.golia.jp`。每次同步前必须先 `devops dns diff` review（删除必须显式确认）。
+DNS 由 `~/workspace/goliajp/devops/` 项目里的 `crates/devops-core/src/dns/` 管理，唯一入口是 `zones.yaml`（`golia.jp` zone 下加 records）。`local_to_cf_name`（`cloudflare.rs:77`）对 record `name` 层级深度无限制，写 `name: sentori` 产出 `sentori.golia.jp`、`name: ingest.sentori` 产出 `ingest.sentori.golia.jp`。每次同步前必须先 `devops dns diff` review（删除必须显式确认）。
 
 ---
 

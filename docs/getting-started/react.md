@@ -115,8 +115,8 @@ function PayButton() {
 
 ## 5. View on the dashboard
 
-Open your dashboard (`https://app.sentori.golia.jp` for SaaS, or
-`http://localhost:8000` self-hosted). The new issue appears within a
+Open your dashboard (`https://sentori.golia.jp/main` for SaaS, or
+`http://localhost:8000/main` self-hosted). The new issue appears within a
 few seconds on the Issues list.
 
 If you don't see it:

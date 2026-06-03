@@ -124,7 +124,7 @@ filters, same window, same numbers — by construction.
 curl -X POST \
   -H "Content-Type: application/json" \
   -H "Cookie: <your admin session>" \
-  https://api.sentori.golia.jp/admin/api/projects/$PROJ/explore \
+  https://sentori.golia.jp/admin/api/projects/$PROJ/explore \
   --data '{
     "dim": "issue",
     "measures": ["event_count", "unique_users"],

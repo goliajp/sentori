@@ -49,15 +49,18 @@ one — which is what you want, since CLI ops live on the admin path.
 
 1. `--api-url <value>` flag (also accepts `--ingest-url` as alias)
 2. `SENTORI_ADMIN_URL` env
-3. `SENTORI_INGEST_URL` env with `ingest.` → `api.` substitution
-4. default `https://api.sentori.golia.jp`
+3. `SENTORI_INGEST_URL` env with `ingest.` → `` (host strip)
+   substitution
+4. default `https://sentori.golia.jp`
 
-`app.sentori.golia.jp`, `api.sentori.golia.jp`, and
-`ingest.sentori.golia.jp` all serve the same backend in our prod
-compose — the subdomain split is CORS-only (see
-`devops/services/sentori/docker-compose.yml`). Functionally you can
-hit any of them with the right bearer; canonical naming for CLI is
-`api.sentori.golia.jp`, for SDK is `ingest.sentori.golia.jp`.
+v2.4 consolidation collapsed the dashboard / admin-api / docs hosts
+into one root. The CLI now hits `https://sentori.golia.jp/admin/api/...`
+for everything. The SDK still posts to `ingest.sentori.golia.jp/v1/*`
+(kept as its own host so the customer SDK tokens issued before v2.4
+keep working without a forced re-init). Legacy hosts
+`app.sentori.golia.jp` and `api.sentori.golia.jp` 301-redirect to the
+new root, so CLI calls against the old URLs still work — but the
+canonical naming is now just `sentori.golia.jp`.
 
 ## Recommended call-site pattern (release.ts / build hooks)
 

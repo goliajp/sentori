@@ -1,5 +1,17 @@
 # Sentori — DNS / TLS
 
+> **Superseded by v2.4 single-domain consolidation** (see
+> [`docs/design/single-domain-routing.md`](../design/single-domain-routing.md)).
+> Below is the original Phase 11 subdomain split — kept for the
+> historical record of how the seven subdomains were set up — but
+> production now runs a single `sentori.golia.jp` host with path
+> routing (`/`, `/docs/*`, `/main/*`, `/admin/api/*`) plus the
+> separate `ingest.sentori.golia.jp` host for SDK ingest. The
+> legacy `app.sentori.golia.jp` / `docs.sentori.golia.jp` /
+> `api.sentori.golia.jp` hosts still resolve and 301-redirect into
+> the new layout. Don't follow the Caddy snippet in this file for
+> a fresh deploy — use the block in single-domain-routing.md.
+
 Reference for the seven subdomains under `sentori.golia.jp` and how
 they're served. DNS is owned by the devops project's `zones.yaml`; this
 file is the per-project view, with copy-pasteable fragments so a

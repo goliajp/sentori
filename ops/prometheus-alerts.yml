@@ -30,7 +30,7 @@ groups:
           team: sentori
         annotations:
           summary: "Sentori has accepted zero events for 15 minutes"
-          description: "Either the SDK is broken at the edge or the server is wedged. Check `app.sentori.golia.jp` health, Valkey, and recent deploys."
+          description: "Either the SDK is broken at the edge or the server is wedged. Check `sentori.golia.jp/main` health, Valkey, and recent deploys."
 
   - name: sentori-host
     interval: 60s

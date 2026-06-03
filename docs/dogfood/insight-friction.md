@@ -48,7 +48,7 @@ Record observations below.
 # Phase 30 sub-A — Insight onboarding stopwatch & friction log
 
 > Goal: measure end-to-end time from `bun remove` (old SDK) to "first
-> event visible in `app.sentori.golia.jp` dashboard" against
+> event visible in `sentori.golia.jp/main` dashboard" against
 > `@goliapkg/sentori-react-native@latest`, log every speed bump along
 > the way, and emit a top-5 priority table that drives Phase 30 sub-B.
 
@@ -60,7 +60,7 @@ Record observations below.
 | Run by | doracawl |
 | Host | macOS / Xcode 26.x / iPhone 17 Pro simulator |
 | Insight repo | `/Users/doracawl/workspace/qualcomm/insight` |
-| Sentori dashboard | https://app.sentori.golia.jp |
+| Sentori dashboard | <https://sentori.golia.jp/main> |
 | SDK before | `@goliapkg/sentori-react-native@0.1.3` (last pre-tracing) |
 | SDK after | `@goliapkg/sentori-react-native@latest` (≥ 0.5.3) |
 | Total elapsed | TODO seconds (north-star: ≤ 300 s = 5 min) |
@@ -78,7 +78,7 @@ Record observations below.
 |---|---|---|---|
 | 1 | `cd qualcomm/insight && bun remove @goliapkg/sentori-react-native` | TODO | TODO |
 | 2 | `bun add @goliapkg/sentori-react-native@latest` | TODO | TODO |
-| 3 | Find / copy project token from `app.sentori.golia.jp` → settings → tokens | TODO | TODO |
+| 3 | Find / copy project token from `sentori.golia.jp/main` → settings → tokens | TODO | TODO |
 | 4 | Locate the SDK integration docs (`sentori.init` shape, where to call it) | TODO | TODO |
 | 5 | Update `sentori.init({ token, release, environment, ingestUrl })` in app entry | TODO | TODO |
 | 6 | iOS: `cd ios && bundle exec pod install` (Expo autolink picks up new SDK) | TODO | TODO |
