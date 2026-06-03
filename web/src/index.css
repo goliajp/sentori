@@ -1,5 +1,17 @@
+@import '@goliapkg/gds/tokens.css';
+@import '@goliapkg/gds/theme.css';
 @import 'tailwindcss';
 @import './styles/syntax.css';
+
+/* Tailwind v4 only scans `src/` by default, so the utility classes
+ * GDS components emit at runtime (`bg-accent`, `text-fg-muted`,
+ * `gds-pad`, `gds-h-sm`, the `Tabs`/`Dialog`/`ToggleGroup` internal
+ * tokens, etc.) never end up in the generated CSS bundle. Without
+ * this directive every GDS component renders as a structural
+ * skeleton — correct DOM, zero color, zero spacing. Pattern lifted
+ * verbatim from devops/web; GDS dist is plain ESM so Tailwind's
+ * source scanner picks className strings out of the compiled JS. */
+@source '../node_modules/@goliapkg/gds/dist/**/*.js';
 
 /*
  * Sentori dashboard — local CSS layer.
