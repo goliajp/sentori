@@ -68,6 +68,7 @@ const MetricsView = lazyView(() =>
 const RuntimeMetricsView = lazyView(() =>
   import('./metrics/runtime-view').then((m) => ({ default: m.RuntimeMetricsView }))
 )
+const HealthView = lazyView(() => import('./health/view').then((m) => ({ default: m.HealthView })))
 const MomentsView = lazyView(() =>
   import('./moments/view').then((m) => ({ default: m.MomentsView }))
 )
@@ -195,6 +196,18 @@ export const MODULES: ModuleDef[] = [
     label: 'Runtime',
     path: 'runtime',
     view: RuntimeMetricsView,
+  },
+  // v2.1 W4 — endpoint health (outside-in synthetic probe).
+  // Auto-creates an issue on consecutive-2 fail; auto-resolves
+  // on consecutive-2 pass. The probe cron is server-side, no
+  // SDK involvement.
+  {
+    group: 'monitor',
+    iconPath: 'M3 12h4l3-8 4 16 3-8h4',
+    id: 'health',
+    label: 'Health',
+    path: 'health',
+    view: HealthView,
   },
   {
     group: 'monitor',

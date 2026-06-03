@@ -775,6 +775,71 @@ export const adminApi = {
   listCertObservations: (projectId: string) =>
     adminFetch<CertObservation[]>(`/projects/${projectId}/cert-monitor/observations`),
 
+  /** v2.1 W4 — endpoint health: list all checks for a project. */
+  listEndpointChecks: (projectId: string) =>
+    adminFetch<EndpointCheck[]>(`/projects/${projectId}/endpoint-checks`),
+
+  /** v2.1 W4 — create a new endpoint check. */
+  createEndpointCheck: (projectId: string, body: NewEndpointCheck) =>
+    adminFetch<{ id: string }>(`/projects/${projectId}/endpoint-checks`, {
+      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    }),
+
+  /** v2.1 W4 — get one check. */
+  getEndpointCheck: (projectId: string, id: string) =>
+    adminFetch<EndpointCheck>(`/projects/${projectId}/endpoint-checks/${id}`),
+
+  /** v2.1 W4 — patch a check (any subset of fields). */
+  updateEndpointCheck: (
+    projectId: string,
+    id: string,
+    body: Partial<NewEndpointCheck> & { paused?: boolean }
+  ) =>
+    adminFetch<void>(`/projects/${projectId}/endpoint-checks/${id}`, {
+      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT',
+    }),
+
+  /** v2.1 W4 — delete a check (cascades to its probes). */
+  deleteEndpointCheck: (projectId: string, id: string) =>
+    adminFetch<void>(`/projects/${projectId}/endpoint-checks/${id}`, {
+      method: 'DELETE',
+    }),
+
+  /** v2.1 W4 — probe log for one check (last 24 h by default). */
+  listEndpointProbes: (
+    projectId: string,
+    id: string,
+    params: { from?: string; limit?: number; to?: string } = {}
+  ) => {
+    const usp = new URLSearchParams()
+    if (params.from) usp.set('from', params.from)
+    if (params.to) usp.set('to', params.to)
+    if (params.limit !== undefined) usp.set('limit', String(params.limit))
+    const qs = usp.toString()
+    return adminFetch<EndpointProbeRow[]>(
+      `/projects/${projectId}/endpoint-checks/${id}/probes${qs ? '?' + qs : ''}`
+    )
+  },
+
+  /** v2.1 W4 — 1h rollup for one check (24 h sparkline data). */
+  listEndpointRollup: (
+    projectId: string,
+    id: string,
+    params: { from?: string; to?: string } = {}
+  ) => {
+    const usp = new URLSearchParams()
+    if (params.from) usp.set('from', params.from)
+    if (params.to) usp.set('to', params.to)
+    const qs = usp.toString()
+    return adminFetch<EndpointRollupRow[]>(
+      `/projects/${projectId}/endpoint-checks/${id}/rollup${qs ? '?' + qs : ''}`
+    )
+  },
+
   /** v2.1 W3 — runtime metrics BI query. Server picks the rollup
    *  tier (raw / _1m / _1h / _1d) based on the (bucket, from, to)
    *  window and returns one series per dim tuple. */
@@ -1506,6 +1571,49 @@ export type RuntimeMetricsSeries = {
 export type RuntimeMetricsPoint = {
   ts: string
   value: number
+}
+
+// v2.1 W4 — endpoint health types.
+export type EndpointCheck = {
+  id: string
+  projectId: string
+  name: string
+  targetUrl: string
+  method: string
+  intervalSec: number
+  assertionStatusCodes: number[]
+  assertionBodySubstring: null | string
+  assertionMaxLatencyMs: null | number
+  paused: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type NewEndpointCheck = {
+  name: string
+  targetUrl: string
+  method?: string
+  intervalSec?: number
+  assertionStatusCodes?: number[]
+  assertionBodySubstring?: string
+  assertionMaxLatencyMs?: number
+}
+
+export type EndpointProbeRow = {
+  ts: string
+  statusCode: number
+  latencyMs: number
+  ok: boolean
+  errorKind: null | string
+}
+
+export type EndpointRollupRow = {
+  bucketTs: string
+  probeCount: number
+  okCount: number
+  uptimePct: number
+  p50LatencyMs: number
+  p95LatencyMs: number
 }
 
 // v0.8.2 — end-user-submitted bug reports.

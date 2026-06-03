@@ -97,6 +97,16 @@ export const qk = {
     trustScores: (projectId: Id) => tuple('trust-scores', projectId),
   },
 
+  // ── v2.1 W4: endpoint health ────────────────────────────────────────
+  endpointChecks: {
+    list: (projectId: Id) => tuple('endpoint-checks', projectId),
+    detail: (projectId: Id, id: Id) => tuple('endpoint-check', projectId, id),
+    probes: (projectId: Id, id: Id, from: string, to: string) =>
+      tuple('endpoint-check-probes', projectId, id, from, to),
+    rollup: (projectId: Id, id: Id, from: string, to: string) =>
+      tuple('endpoint-check-rollup', projectId, id, from, to),
+  },
+
   // ── metrics / moments / vitals ──────────────────────────────────────
   metrics: {
     names: (projectId: Id) => tuple('metric-names', projectId),
