@@ -152,8 +152,16 @@ export const qk = {
     status: string,
     release: string,
     errorType: string,
-    env: string
-  ) => tuple('explore-issues', projectId, measure, windowKey, status, release, errorType, env),
+    env: string,
+    // v2.3 — server-side search (filters.search). Added to the key
+    // so the cached result distinguishes "TypeError" vs "Network".
+    search: string
+  ) =>
+    tuple('explore-issues', projectId, measure, windowKey, status, release, errorType, env, search),
+  // v2.3 — per-issue sparkline. Each Issues rail row fetches one
+  // `dim=time_bucket` query keyed on (project, issue, window).
+  exploreIssueSparkline: (projectId: Id, issueId: Id, windowKey: string) =>
+    tuple('explore-issue-sparkline', projectId, issueId, windowKey),
   releaseArtifacts: (projectId: Id, release: string) =>
     tuple('release-artifacts', projectId, release),
   sourcemapStatus: (projectId: Id) => tuple('sourcemap-status', projectId),

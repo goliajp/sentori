@@ -11,6 +11,7 @@ import {
 import { qk } from '@/api/query-keys'
 import { useOrg } from '@/auth/orgContext'
 import { RailEmpty } from '@/components/Hint'
+import { Sparkline } from '@/components/Sparkline'
 import { formatRelative } from '@/lib/format'
 import { useUrlParam } from '@/lib/url-state'
 
@@ -164,7 +165,13 @@ export function IssuesView() {
             </RailEmpty>
           )}
           {rows.map((row) => (
-            <RailRow key={row.id} row={row} selected={row.id === issueId} />
+            <RailRow
+              key={row.id}
+              projectId={projectId}
+              row={row}
+              selected={row.id === issueId}
+              windowKey={windowKey}
+            />
           ))}
         </div>
       </aside>
@@ -250,6 +257,10 @@ function useIssuesRail(params: {
       ...(releaseFilter ? { releaseEq: releaseFilter } : {}),
       ...(tab === 'all' ? {} : { statusIn: [tab] }),
       ...(windowGte ? { receivedAtGte: windowGte } : {}),
+      // v2.3 — server-side fuzzy match against issues.error_type +
+      // issues.message_sample. Replaces the v2.2 W3 client-side
+      // search stub. Empty string acts as no filter.
+      ...(searchFilter ? { search: searchFilter } : {}),
     },
     limit: 100,
     measures: ['event_count', 'unique_users', 'first_seen', 'last_seen'],
@@ -266,16 +277,13 @@ function useIssuesRail(params: {
       tab,
       releaseFilter,
       errorTypeFilter,
-      envFilter
+      envFilter,
+      searchFilter
     ),
   })
 
   const exploreRows = exploreQ.data?.rows ?? []
-  const normalised = exploreRows.map(normaliseExplore).filter(Boolean) as RailIssueRow[]
-  // Server `/explore` has no full-text filter in the v2.2 grammar;
-  // apply the search match client-side so the `?q=` URL param keeps
-  // working without expanding the agent-callable surface.
-  const filtered = normalised.filter((r) => matchesClientSearch(r, searchFilter))
+  const rows = exploreRows.map(normaliseExplore).filter(Boolean) as RailIssueRow[]
   return {
     error: exploreQ.error,
     isLoading: exploreQ.isLoading,
@@ -283,19 +291,8 @@ function useIssuesRail(params: {
       tookMs: exploreQ.data?.meta.tookMs,
       windowGte,
     },
-    rows: filtered,
+    rows,
   }
-}
-
-function matchesClientSearch(
-  row: { errorType: string; messageSample: string },
-  q: string
-): boolean {
-  if (!q) return true
-  const needle = q.toLowerCase()
-  return (
-    row.errorType.toLowerCase().includes(needle) || row.messageSample.toLowerCase().includes(needle)
-  )
 }
 
 /** Project one /explore `dim=issue` row into the rail shape. Falls
@@ -322,6 +319,44 @@ function pickString(v: ExploreRow[string]): null | string {
 }
 function pickNumber(v: ExploreRow[string]): number {
   return typeof v === 'number' ? v : 0
+}
+
+/**
+ * v2.3 — per-row sparkline. Issues the same `/explore` endpoint with
+ * `dim=time_bucket` + `issueEq=<issueId>` so the result is the row's
+ * event count bucketed inside the active window. The sparkline data
+ * is `staleTime: 30_000` so navigating around the dashboard doesn't
+ * re-fetch every visible row's chart on each render.
+ *
+ * Returns the values array directly (empty during load) so the
+ * caller can hand it straight to `<Sparkline values={...} />`. Per
+ * RailRow uses one of these hooks — React Query batches the calls
+ * naturally; with `limit=100` rows in the rail and ~50 ms server
+ * latency the full batch typically lands < 500 ms wall-clock.
+ */
+function useIssueSparkline(
+  projectId: null | string,
+  issueId: string,
+  windowKey: WindowKey
+): number[] {
+  const windowGte = windowGteRfc3339(windowKey)
+  const sparkReq: ExploreReq = {
+    dim: 'time_bucket',
+    filters: {
+      issueEq: issueId,
+      ...(windowGte ? { receivedAtGte: windowGte } : {}),
+    },
+    limit: 200,
+    measures: ['event_count'],
+  }
+  const q = useQuery<ExploreResp>({
+    enabled: !!projectId,
+    queryFn: () => adminApi.explore(projectId!, sparkReq),
+    queryKey: qk.exploreIssueSparkline(projectId, issueId, windowKey),
+    staleTime: 30_000,
+  })
+  if (!q.data) return []
+  return q.data.rows.map((r) => pickNumber(r.event_count))
 }
 
 // ── rail components ─────────────────────────────────────────────────────────
@@ -466,8 +501,19 @@ function RailHeader({
   )
 }
 
-function RailRow({ row, selected }: { row: RailIssueRow; selected: boolean }) {
+function RailRow({
+  projectId,
+  row,
+  selected,
+  windowKey,
+}: {
+  projectId: null | string
+  row: RailIssueRow
+  selected: boolean
+  windowKey: WindowKey
+}) {
   const { currentOrg } = useOrg()
+  const sparkValues = useIssueSparkline(projectId, row.id, windowKey)
   return (
     <Link
       className={`group relative block border-b border-[color:var(--rule-soft)] px-4 py-3 transition-colors ${
@@ -528,8 +574,22 @@ function RailRow({ row, selected }: { row: RailIssueRow; selected: boolean }) {
           ·
         </span>
         <span className="tabular-nums">{row.lastSeen ? formatRelative(row.lastSeen) : '—'}</span>
+        {/* v2.3 — per-row sparkline. Uses /explore dim=time_bucket +
+         *   issueEq=row.id; one query per visible row (React Query
+         *   caches by issueId+windowKey). Renders empty SVG while
+         *   loading so layout doesn't reflow. */}
+        <span aria-hidden className="ml-auto opacity-70">
+          <Sparkline
+            ariaLabel={`Event trend for ${row.errorType}`}
+            height={16}
+            stroke="var(--ink-muted)"
+            strokeWidth={1}
+            values={sparkValues}
+            width={64}
+          />
+        </span>
         {row.assigneeEmail && (
-          <span className="ml-auto truncate text-[color:var(--accent)]">
+          <span className="ml-2 truncate text-[color:var(--accent)]">
             @{row.assigneeEmail.split('@')[0]}
           </span>
         )}

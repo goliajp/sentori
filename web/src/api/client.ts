@@ -129,7 +129,15 @@ export type RelatedAcrossReleasesResp = {
  * Same endpoint backs UI module rendering AND LLM agent queries —
  * keep this type narrow + well-named so both consumers can read it.
  */
-export type ExploreDim = 'issue' | 'release' | 'time_bucket'
+export type ExploreDim =
+  | 'issue'
+  | 'release'
+  | 'time_bucket'
+  // v2.3 — additions per docs/roadmap/post-v2.2-plan.md Phase 2.
+  | 'device_os'
+  | 'issue_priority'
+  | 'severity'
+  | 'route'
 export type ExploreBucket = 'day' | 'hour' | 'week'
 export type ExploreMeasure =
   | 'event_count'
@@ -138,6 +146,12 @@ export type ExploreMeasure =
   | 'unique_users'
   | 'first_seen'
   | 'last_seen'
+  // v2.3 — additions. `crash_free_rate` is reserved but the server
+  // rejects it pending session-schema work (see Phase 1 audit).
+  | 'new_issue_count'
+  | 'p50_duration'
+  | 'p95_duration'
+  | 'crash_free_rate'
 export type ExploreFilters = {
   receivedAtGte?: string // RFC-3339
   receivedAtLt?: string
@@ -148,6 +162,23 @@ export type ExploreFilters = {
   releaseEq?: string
   /** `dim=issue` only — filter by status. */
   statusIn?: string[]
+  /** v2.3 — single-issue filter. Most useful with
+   *  `dim=time_bucket` to render a per-issue sparkline (the v2.2 W3
+   *  stub). Ignored on `dim=issue` where row identity already is
+   *  the issue. */
+  issueEq?: string
+  /** v2.3 — single-user filter. `payload.user.id = X`. Phase 7
+   *  find-user lens uses this. */
+  userIdEq?: string
+  /** v2.3 — single-route filter. `payload.tags.route = X`. Phase 8
+   *  find-slow drill key. */
+  routeEq?: string
+  /** v2.3 — `payload.device.os = X`. */
+  osEq?: string
+  /** v2.3 — server-side fuzzy match against `error.type`,
+   *  `error.message`, `message`. Replaces the v2.2 W3 client-side
+   *  search stub. */
+  search?: string
 }
 export type ExploreReq = {
   dim: ExploreDim
