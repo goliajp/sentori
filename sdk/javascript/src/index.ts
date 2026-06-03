@@ -46,7 +46,21 @@ export type {
   Event,
   Frame,
   InitOptions,
+  ReadyInfo,
   SentoriError,
   Tags,
   User,
 } from './types.js'
+/** v2.3 — logger surface re-exported from core so hosts can
+ *  `import { setLogLevel } from '@goliapkg/sentori-javascript'`
+ *  per design §3 ("Production override"). `setLogTransport` lets
+ *  hosts route Sentori-internal lines into their own log
+ *  aggregator. */
+export {
+  getLogLevel,
+  type LogLevel,
+  logger,
+  type LogTransport,
+  setLogLevel,
+  setLogTransport,
+} from '@goliapkg/sentori-core'

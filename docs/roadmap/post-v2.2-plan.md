@@ -161,11 +161,16 @@ touching the public API.
     design §3. Includes deletion of the `'sentori: initialized
     (dev) · cold N ms'` line; surface that via `onReady` instead.
   - `setLogTransport` hook per design §9 resolution 5.
-- Performance verify (carries the design §6 "Verify rig" recovered
-  defer): run sim-sentori (iOS) + Pixel 10 Pro AVD smoke through
-  `apps/rn-example` with `logLevel: 'silent'` AND `'debug'`, record
-  CPU + frame-rate baseline in `docs/perf-baselines/v2.2.1.md` for
-  Phase 3 to diff against.
+- Performance baseline (carries the design §6 "Verify rig"
+  recovered defer, mechanical half):
+  - Extend `sdk/core/src/__tests__/perf.bench.ts` with logger
+    hot-path budgets (`logger.debug` gated-out, `logger.warn`
+    emit through transport, `setLogLevel` toggle).
+  - Doc `docs/perf-baselines/v2.2.1.md` records the bench
+    numbers + the empty device-smoke table that Phase 3 must
+    fill before W6.1 implementation starts. Device-smoke
+    requires a host with sim-sentori + Pixel 10 Pro AVD live;
+    that capture lives in the Phase 3 entry gate, not here.
 
 **Acceptance:**
 
@@ -177,9 +182,13 @@ touching the public API.
       regression in observability).
 - [ ] `setLogTransport(fn)` suppresses console and routes to `fn`;
       `setLogTransport(null)` restores console.
-- [ ] `bun run check` + `bun run test` + `bun run build:sdks` green.
-- [ ] Performance baseline doc committed with measured numbers from
-      both sims (iOS + Android).
+- [ ] `bun run build:sdks` + `bun run test:sdks` + web `bun run
+      check` + `bun run test` green (top-level monorepo has no
+      `check` script — these are the per-workspace equivalents).
+- [ ] `sdk/core/src/__tests__/perf.bench.ts` extended with logger
+      benches and all 12 budgets pass.
+- [ ] `docs/perf-baselines/v2.2.1.md` committed with mechanical
+      bench numbers + empty device-smoke table.
 - [ ] CI build + sdk-perf + deploy green after push (`gh run list`).
 - [ ] npm patch matrix published via changesets:
       `@goliapkg/sentori-core@1.2.0` (logger module is new — minor),
@@ -352,12 +361,18 @@ adds `beforeSend` hook (a recovered defer).
 - Tests: every renamed surface has unit tests in
   `sdk/core/src/__tests__/` and `sdk/react-native/src/__tests__/`.
 
-**Perf verify (uses Phase 0 rig):**
+**Perf verify (Phase 3 entry gate + exit gate):**
 
-- Run the same iOS sim + Pixel 10 Pro AVD smoke as Phase 0 with
-  every capture flag toggled both default and opt-in; diff
-  against the Phase 0 baseline doc. Any regression > 5%
-  CPU / > 1ms per-tick → blocks ship.
+- **Entry gate (before W6.1 implementation starts):** fill the
+  device-smoke table in `docs/perf-baselines/v2.2.1.md` with
+  sim-sentori (iOS) + Pixel 10 Pro AVD numbers for both
+  `logLevel: 'silent'` and `'debug'`. This is the baseline
+  Phase 3's exit gate diffs against.
+- **Exit gate (after W6.1 lands):** re-measure the same table
+  with every capture flag toggled both default and opt-in; diff
+  vs entry-gate numbers. Any regression > 5% CPU / > 1 ms
+  per-tick → blocks ship. Mechanical bench (`perf.bench.ts`)
+  must also stay green throughout.
 
 **Acceptance:**
 

@@ -1,3 +1,5 @@
+import { type ReadyInfo, setLogLevel } from '@goliapkg/sentori-core'
+
 import { setConfig } from './config.js'
 import { installBrowserHooks } from './hooks/browser.js'
 import { installFetchInstrumentation } from './hooks/fetch.js'
@@ -7,6 +9,8 @@ import { startRuntimeMetricsTimer } from './runtime-metrics.js'
 import { startSession } from './session-tracker.js'
 import { flushSpans, startSpanFlush } from './transport.js'
 import type { InitOptions } from './types.js'
+
+const SDK_VERSION = '2.3.0'
 
 /**
  * Configure the SDK and (by default) wire global error handlers.
@@ -23,8 +27,16 @@ import type { InitOptions } from './types.js'
  * session lifecycle so test harnesses can drive everything manually.
  */
 export function initSentori(options: InitOptions): void {
+  // v2.3 — set log level FIRST so any startup-time logger calls
+  // are gated correctly. Default 'warn' from logger.ts; an explicit
+  // host setting overrides.
+  setLogLevel(options.logLevel)
+
   setConfig(options)
-  if (options.enableGlobalHooks === false) return
+  if (options.enableGlobalHooks === false) {
+    fireOnReady(options)
+    return
+  }
   // Browser comes first because both globals can exist in some
   // bundlers' shims; we want browser semantics on the web.
   if (!installBrowserHooks()) installNodeHooks()
@@ -50,5 +62,20 @@ export function initSentori(options: InitOptions): void {
   // directly.
   if (options.capture?.runtimeMetrics === true) {
     startRuntimeMetricsTimer()
+  }
+
+  fireOnReady(options)
+}
+
+function fireOnReady(options: InitOptions): void {
+  if (!options.onReady) return
+  // JS SDK has no native module — `native` is omitted; the shared
+  // `ReadyInfo` type marks it optional for exactly this case.
+  // `coldStartMs` is also RN-only.
+  const info: ReadyInfo = { sdkVersion: SDK_VERSION }
+  try {
+    options.onReady(info)
+  } catch {
+    // Host's onReady threw. NEVER rule — swallow.
   }
 }

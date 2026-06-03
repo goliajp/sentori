@@ -280,6 +280,23 @@ export type CommonInitOptions = {
 }
 
 /**
+ * v2.3 — payload handed to `init({ onReady })` after init completes.
+ * Shared across SDKs so a host that switches from web to RN reads the
+ * same shape. `native` is optional because non-mobile SDKs never have
+ * a native module to bind. `coldStartMs` is also optional — only the
+ * RN SDK measures it via the native bridge timing.
+ */
+export type ReadyInfo = {
+  /** npm version of the SDK package that fired this. */
+  sdkVersion: string
+  /** Milliseconds between cold-start signal and `init()` completion.
+   *  Only populated by the RN SDK; undefined elsewhere. */
+  coldStartMs?: number
+  /** Native module bind status. Present on RN; absent on web / JS. */
+  native?: { bound: boolean; methods: string[] }
+}
+
+/**
  * Phase 44 sub-A — per-event-class client-side sampling. Each rate
  * is in `[0, 1]`; absent / null → 1.0 (keep everything). The
  * **client** drops sampled-out events before they ever leave the

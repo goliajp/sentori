@@ -17,6 +17,7 @@ export type {
   Geo,
   MessageLevel,
   Platform,
+  ReadyInfo,
   SamplingConfig,
   SentoriError,
   Span,
