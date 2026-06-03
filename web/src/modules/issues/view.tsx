@@ -1,7 +1,12 @@
-import { Alert, Tabs as GdsTabs } from '@goliapkg/gds/molecules'
-import { Badge, Skeleton } from '@goliapkg/gds/primitives'
-import { Chip, ToggleGroup } from '@goliapkg/gds/atoms'
-import { EmptyState } from '@goliapkg/gds/patterns'
+import {
+  Alert,
+  Badge,
+  Chip,
+  EmptyState,
+  Tabs as GdsTabs,
+  Skeleton,
+  ToggleGroup,
+} from '@goliapkg/gds'
 import { useQuery } from '@tanstack/react-query'
 import { Link, Outlet, useParams } from 'react-router'
 
