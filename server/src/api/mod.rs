@@ -32,6 +32,10 @@ pub mod runtime_metrics;
 /// Reads from the rollup tier (raw / _1m / _1h / _1d) appropriate
 /// for the requested (bucket, from, to) window.
 pub mod runtime_metrics_query;
+/// v2.1 W4 — admin CRUD + probe log + 1h rollup query for endpoint
+/// health checks. Probes themselves are driven by the
+/// `endpoint_probe` cron module in the crate root.
+pub mod endpoint_checks;
 pub mod orgs;
 pub mod privacy;
 pub mod projects;

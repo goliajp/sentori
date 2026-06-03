@@ -200,6 +200,16 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("metrics rollup cron spawned (60s tick raw→1m, hourly 1m→1h, daily 1h→1d)");
     }
 
+    // v2.1 W4 — endpoint health probe. Single cron call spawns
+    // three tokio tasks (60 s probe scan-due + fan-out, hourly
+    // 1h rollup, hourly partition lifecycle + daily DROP at hour
+    // 03). Assertion engine + consecutive-2 auto-issue lifecycle
+    // live in the same module.
+    if let Some(p) = pool.as_ref() {
+        sentori_server::endpoint_probe::spawn_cron(p.clone());
+        tracing::info!("endpoint probe cron spawned (60s scan-due, 32 concurrent probes, 30d retention)");
+    }
+
     let addr: SocketAddr = "0.0.0.0:8080".parse()?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
 

@@ -351,6 +351,27 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/runtime-metrics/query",
             get(api::runtime_metrics_query::query),
         )
+        // v2.1 W4 — endpoint health admin CRUD + probe log + 1h
+        // rollup query. The probe cron itself spawns from main.rs.
+        .route(
+            "/projects/{project_id}/endpoint-checks",
+            axum::routing::post(api::endpoint_checks::create)
+                .get(api::endpoint_checks::list),
+        )
+        .route(
+            "/projects/{project_id}/endpoint-checks/{id}",
+            get(api::endpoint_checks::get_one)
+                .put(api::endpoint_checks::update)
+                .delete(api::endpoint_checks::delete),
+        )
+        .route(
+            "/projects/{project_id}/endpoint-checks/{id}/probes",
+            get(api::endpoint_checks::list_probes),
+        )
+        .route(
+            "/projects/{project_id}/endpoint-checks/{id}/rollup",
+            get(api::endpoint_checks::list_rollup),
+        )
         // v0.9.0 #6 — moments aggregation + samples.
         .route(
             "/projects/{project_id}/moments",

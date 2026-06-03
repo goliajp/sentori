@@ -27,6 +27,11 @@ pub mod metrics_partition;
 /// (with 10 s late-arrival safety margin), hourly _1m → _1h,
 /// daily _1h → _1d. Schema in migrations 0068 / 0069.
 pub mod metrics_rollup;
+/// v2.1 W4 — endpoint health probe cron + assertion engine +
+/// hourly rollup + day-partition lifecycle + consecutive-2 auto-
+/// issue lifecycle. Schema in migrations 0070 / 0071 / 0072,
+/// design rationale in docs/design/v2-endpoint-health.md.
+pub mod endpoint_probe;
 pub mod notification_digest;
 pub mod notification_email;
 pub mod notifications;
