@@ -840,6 +840,15 @@ export const adminApi = {
     )
   },
 
+  /** v2.1.3 — "Probe now" dry-run. Runs one probe against the check's
+   *  current config but writes nothing to `endpoint_probe` and does
+   *  not touch the issue lifecycle — purely a UX sanity-check for an
+   *  operator who just edited a check. */
+  probeEndpointCheckNow: (projectId: string, id: string) =>
+    adminFetch<EndpointProbeNowResult>(`/projects/${projectId}/endpoint-checks/${id}/probe-now`, {
+      method: 'POST',
+    }),
+
   /** v2.1 W3 — runtime metrics BI query. Server picks the rollup
    *  tier (raw / _1m / _1h / _1d) based on the (bucket, from, to)
    *  window and returns one series per dim tuple. */
@@ -1614,6 +1623,16 @@ export type EndpointRollupRow = {
   uptimePct: number
   p50LatencyMs: number
   p95LatencyMs: number
+}
+
+// v2.1.3 — "Probe now" dry-run response shape. `errorKind` is null
+// on success, otherwise one of: status / body / latency / dns / tcp /
+// tls / timeout (same taxonomy the cron writes into endpoint_probe).
+export type EndpointProbeNowResult = {
+  ok: boolean
+  statusCode: number
+  latencyMs: number
+  errorKind: null | string
 }
 
 // v0.8.2 — end-user-submitted bug reports.

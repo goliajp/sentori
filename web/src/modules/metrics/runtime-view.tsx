@@ -12,11 +12,13 @@
 // resolution badge below the chart.
 
 import { useQuery } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router'
 
 import { adminApi } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
 import { CenteredEmpty } from '@/components/Hint'
+import { RowSkeleton } from '@/components/Skeleton'
 import { qk } from '@/api/query-keys'
 
 type MetricSpec = {
@@ -81,6 +83,23 @@ function isoNow(): string {
   return new Date().toISOString()
 }
 
+/** Width in ms of one bucket, used by the drill modal to size the
+ *  "issues in this window" query around the clicked point. */
+function bucketMs(bucket: '1d' | '1h' | '1m' | '5m' | '15m'): number {
+  switch (bucket) {
+    case '1m':
+      return 60_000
+    case '5m':
+      return 5 * 60_000
+    case '15m':
+      return 15 * 60_000
+    case '1h':
+      return 60 * 60_000
+    case '1d':
+      return 24 * 60 * 60_000
+  }
+}
+
 /** Format a raw metric value for hero card display. */
 function formatHero(value: number, unit: string): string {
   if (unit === 'MB') return (value / 1_000_000).toFixed(1)
@@ -92,7 +111,7 @@ function formatHero(value: number, unit: string): string {
 }
 
 export function RuntimeMetricsView() {
-  const { currentProject } = useOrg()
+  const { currentOrg, currentProject } = useOrg()
   const projectId = currentProject?.id ?? null
 
   const [selected, setSelected] = useState<string>(METRICS[0]!.name)
@@ -103,6 +122,12 @@ export function RuntimeMetricsView() {
     selectedSpec.measure
   )
   const [bucket, setBucket] = useState<'1d' | '1h' | '1m' | '5m' | '15m'>('5m')
+
+  const [drill, setDrill] = useState<null | {
+    ts: string
+    value: number
+    seriesLabel: string
+  }>(null)
 
   const window = useMemo(
     () => ({ from: isoDaysAgo(1), to: isoNow() }),
@@ -237,11 +262,7 @@ export function RuntimeMetricsView() {
 
         {/* Chart */}
         <div className="rounded border border-[color:var(--rule)] bg-[color:var(--paper-2)] p-4">
-          {chartQ.isLoading && (
-            <div className="py-8 text-center text-[12px] text-[color:var(--ink-muted)]">
-              Loading…
-            </div>
-          )}
+          {chartQ.isLoading && <RowSkeleton count={3} height="60px" />}
           {chartQ.error && <CenteredEmpty>Failed to load this metric.</CenteredEmpty>}
           {chartQ.data && chartQ.data.series.every((s) => s.points.length === 0) && (
             <CenteredEmpty>
@@ -254,17 +275,185 @@ export function RuntimeMetricsView() {
           )}
           {chartQ.data && chartQ.data.series.some((s) => s.points.length > 0) && (
             <>
-              <TimeseriesSvg series={chartQ.data.series} unit={selectedSpec.unit} />
+              <TimeseriesSvg
+                series={chartQ.data.series}
+                unit={selectedSpec.unit}
+                onPointClick={(ts, value, seriesLabel) => setDrill({ seriesLabel, ts, value })}
+              />
               <div className="mt-2 flex items-center justify-between font-mono text-[10px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase">
                 <span>
                   resolution: <code>{chartQ.data.tier}</code>
                 </span>
-                <span>{chartQ.data.series.length} series</span>
+                <span>{chartQ.data.series.length} series · click a point to drill</span>
               </div>
             </>
           )}
         </div>
       </section>
+
+      {drill && projectId && currentOrg && (
+        <DrillModal
+          bucket={bucket}
+          metricLabel={selectedSpec.label}
+          onClose={() => setDrill(null)}
+          orgSlug={currentOrg.slug}
+          point={drill}
+          projectId={projectId}
+          unit={selectedSpec.unit}
+        />
+      )}
+    </div>
+  )
+}
+
+type DrillModalProps = {
+  bucket: '1d' | '1h' | '1m' | '5m' | '15m'
+  metricLabel: string
+  onClose: () => void
+  orgSlug: string
+  point: { ts: string; value: number; seriesLabel: string }
+  projectId: string
+  unit: string
+}
+
+/** Drill from a chart point → issues active in that bucket window.
+ *  Listing is a thin wrapper around `listIssuesPage(..., {
+ *  lastSeenAfter })`; the bucket-end is the floor for "still active
+ *  here" since the issues endpoint has no upper-bound filter. Each
+ *  row links to the canonical issue detail page so the drill is a
+ *  one-click step into the existing triage flow.
+ *
+ *  Modeled on the CmdK overlay (no Dialog library — backdrop click +
+ *  Escape close, mirroring `CmdK.tsx`'s pattern). */
+function DrillModal({
+  bucket,
+  metricLabel,
+  onClose,
+  orgSlug,
+  point,
+  projectId,
+  unit,
+}: DrillModalProps) {
+  const tsMs = new Date(point.ts).getTime()
+  const halfMs = bucketMs(bucket) / 2
+  const windowFromIso = new Date(tsMs - halfMs).toISOString()
+
+  const issuesQ = useQuery({
+    queryFn: () => adminApi.listIssuesPage(projectId, { lastSeenAfter: windowFromIso, limit: 10 }),
+    // Carve out a distinct key namespace so the drill panel's
+    // narrowly-filtered list doesn't collide with the main Issues
+    // page cache (which keys off `qk.issue.list(projectId, tab)`).
+    queryKey: ['runtime-drill-issues', projectId, windowFromIso] as const,
+  })
+
+  // Escape-to-close, matching CmdK.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const formattedTs = new Date(point.ts).toLocaleString(undefined, {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  })
+  const formattedValue = formatHero(point.value, unit)
+  const issues = issuesQ.data?.issues ?? []
+
+  return (
+    <div
+      aria-modal
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] backdrop-blur-sm"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+      role="dialog"
+      style={{ background: 'rgb(from var(--ink) r g b / 0.32)' }}
+    >
+      <div
+        className="w-[36rem] max-w-[92vw] overflow-hidden border border-[color:var(--rule)] bg-[color:var(--paper)]"
+        style={{ boxShadow: '0 24px 64px -16px rgb(from var(--ink) r g b / 0.5)' }}
+      >
+        <div className="border-b border-[color:var(--rule)] px-5 py-3">
+          <div className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--accent)] uppercase">
+            drill
+          </div>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span
+              className="text-[color:var(--ink)]"
+              style={{
+                fontFamily: 'var(--font-sans)',
+                fontVariationSettings: "'wdth' 95, 'opsz' 32, 'wght' 580",
+                fontSize: '16px',
+              }}
+            >
+              {metricLabel}
+            </span>
+            <span className="font-mono text-[11px] text-[color:var(--ink-muted)]">
+              {point.seriesLabel || '—'} · {formattedValue} {unit}
+            </span>
+          </div>
+          <div className="mt-1 font-mono text-[10px] text-[color:var(--ink-muted)]">
+            {formattedTs} (± {bucket})
+          </div>
+        </div>
+
+        <div className="max-h-[60vh] overflow-y-auto">
+          {issuesQ.isLoading && (
+            <div className="px-5 py-3">
+              <RowSkeleton count={4} height="44px" />
+            </div>
+          )}
+          {issuesQ.error && (
+            <p className="px-5 py-4 text-[12px] text-[color:var(--ink-muted)]">
+              Failed to load issues.
+            </p>
+          )}
+          {issuesQ.data && issues.length === 0 && (
+            <p className="px-5 py-4 text-[12px] text-[color:var(--ink-muted)]">
+              No issues active in this window.
+            </p>
+          )}
+          {issues.length > 0 && (
+            <ul>
+              {issues.map((iss) => (
+                <li key={iss.id}>
+                  <Link
+                    className="block border-b border-[color:var(--rule-soft)] px-5 py-2 transition-colors hover:bg-[color:var(--paper-2)]"
+                    onClick={onClose}
+                    to={`/main/org/${orgSlug}/issues/${iss.id}`}
+                  >
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="truncate text-[13px] text-[color:var(--ink)]">
+                        {iss.errorType}
+                      </span>
+                      <span className="shrink-0 font-mono text-[10px] text-[color:var(--ink-muted)] tabular-nums">
+                        {iss.eventCount}×
+                      </span>
+                    </div>
+                    <div className="truncate font-mono text-[11px] text-[color:var(--ink-muted)]">
+                      {iss.messageSample}
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 border-t border-[color:var(--rule)] bg-[color:var(--paper-2)] px-5 py-2 font-mono text-[10px] tracking-[0.15em] text-[color:var(--ink-muted)] uppercase">
+          <span>esc to close</span>
+          <Link
+            className="ml-auto text-[color:var(--accent)] hover:underline"
+            onClick={onClose}
+            to={`/main/org/${orgSlug}/issues`}
+          >
+            all issues →
+          </Link>
+        </div>
+      </div>
     </div>
   )
 }
@@ -370,10 +559,16 @@ function Picker<T extends string>({ label, onChange, options, value }: PickerPro
 // the BI panel doesn't need per-point markers because the bucket
 // picker already controls resolution. No external dep — keeps the
 // dashboard bundle slim.
+//
+// v2.1.2 — per-point invisible hit targets (`r=8` transparent
+// circles) feed `onPointClick` so the parent can open a drill modal
+// scoped to that timestamp.
 function TimeseriesSvg({
+  onPointClick,
   series,
   unit,
 }: {
+  onPointClick?: (ts: string, value: number, seriesLabel: string) => void
   series: { label: string; points: { ts: string; value: number }[] }[]
   unit: string
 }) {
@@ -436,6 +631,34 @@ function TimeseriesSvg({
           />
         ) : null
       )}
+      {/* Per-point hit targets. Transparent circles sized larger than
+       *  the stroke so the cursor doesn't have to land on a 1.5 px
+       *  line. Visible feedback is just the cursor change (pointer)
+       *  + opacity bump on hover, no fixed markers — that keeps the
+       *  chart visually clean. */}
+      {onPointClick &&
+        series.map((s, i) =>
+          s.points.map((p, j) => (
+            <circle
+              cx={xOf(p.ts)}
+              cy={yOf(p.value)}
+              fill={palette[i % palette.length]}
+              fillOpacity={0}
+              key={`hit-${i}-${j}`}
+              onClick={() => onPointClick(p.ts, p.value, s.label)}
+              onMouseEnter={(e) => {
+                e.currentTarget.setAttribute('fill-opacity', '0.7')
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.setAttribute('fill-opacity', '0')
+              }}
+              r={8}
+              style={{ cursor: 'pointer' }}
+            >
+              <title>{`${s.label || 'series'} · ${p.value.toFixed(2)} ${unit} · ${new Date(p.ts).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}`}</title>
+            </circle>
+          ))
+        )}
       {/* X axis label — just the unit, time scale is implied (24 h). */}
       <text fill="var(--ink-muted)" fontSize="10" x={PAD_L} y={H - 6}>
         {unit}

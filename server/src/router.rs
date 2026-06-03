@@ -372,6 +372,13 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/endpoint-checks/{id}/rollup",
             get(api::endpoint_checks::list_rollup),
         )
+        // v2.1.3 — manual "probe now" dry-run; bypasses DB write +
+        // issue lifecycle so an operator can verify a check without
+        // polluting probe history.
+        .route(
+            "/projects/{project_id}/endpoint-checks/{id}/probe-now",
+            axum::routing::post(api::endpoint_checks::probe_now),
+        )
         // v0.9.0 #6 — moments aggregation + samples.
         .route(
             "/projects/{project_id}/moments",

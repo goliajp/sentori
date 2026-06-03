@@ -22,9 +22,11 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+use crate::endpoint_probe::{ProbeConfig, ProbeOutcome, run_probe};
 use crate::error::AppError;
 use crate::recent::AppState;
 
@@ -319,6 +321,80 @@ pub struct RollupRow {
     pub uptime_pct: f64,
     pub p50_latency_ms: i32,
     pub p95_latency_ms: i32,
+}
+
+/// v2.1.3 — "Probe now" dry-run.
+///
+/// Runs a one-shot probe against the check's current target/method/
+/// assertions using the same `run_probe` the cron uses, but DOES NOT
+/// write a row to `endpoint_probe` and DOES NOT touch the
+/// consecutive-2 issue lifecycle. The result is returned synchronously
+/// for the dashboard to render so an operator can verify a fresh
+/// check (or one they just edited) without waiting for the next 60 s
+/// tick or polluting the probe history with a manual sample.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProbeNowResponse {
+    pub ok: bool,
+    pub status_code: i32,
+    pub latency_ms: i32,
+    /// `null` when `ok == true`; one of `status` / `body` / `latency` /
+    /// `dns` / `tcp` / `tls` / `timeout` otherwise.
+    pub error_kind: Option<String>,
+}
+
+pub async fn probe_now(
+    State(state): State<AppState>,
+    Path((project_id, id)): Path<(Uuid, Uuid)>,
+) -> Result<Response, AppError> {
+    let Some(pool) = &state.db else {
+        return Err(AppError::Internal("db not configured".into()));
+    };
+    let row: Option<EndpointCheckRow> = sqlx::query_as(
+        "SELECT id, project_id, name, target_url, method, interval_sec, \
+                assertion_status_codes, assertion_body_substring, \
+                assertion_max_latency_ms, paused, created_at, updated_at \
+         FROM endpoint_check \
+         WHERE id = $1 AND project_id = $2",
+    )
+    .bind(id)
+    .bind(project_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+    let Some(check) = row else {
+        return Err(AppError::NotFound);
+    };
+    let cfg = ProbeConfig {
+        check_id: check.id,
+        project_id: check.project_id,
+        target_url: check.target_url,
+        method: check.method,
+        status_codes: check.assertion_status_codes,
+        body_substring: check.assertion_body_substring,
+        max_latency_ms: check.assertion_max_latency_ms,
+    };
+    // Build a transient client per request. The dashboard CTA is
+    // human-triggered (one click → one probe), so the extra few ms
+    // of TLS setup vs a pooled client is invisible and we avoid
+    // threading state through AppState for one endpoint.
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .user_agent("sentori-endpoint-probe/2.1 (probe-now)")
+        .build()
+        .map_err(|e| AppError::Internal(format!("probe client init: {e}")))?;
+    let probe = run_probe(&client, &cfg).await;
+    let (ok, error_kind) = match probe.outcome {
+        ProbeOutcome::Ok => (true, None),
+        ProbeOutcome::Fail(k) => (false, Some(k.to_string())),
+    };
+    let body = ProbeNowResponse {
+        ok,
+        status_code: probe.status_code,
+        latency_ms: probe.latency_ms,
+        error_kind,
+    };
+    Ok(Json(body).into_response())
 }
 
 pub async fn list_rollup(

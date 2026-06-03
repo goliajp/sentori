@@ -69,6 +69,12 @@ const RuntimeMetricsView = lazyView(() =>
   import('./metrics/runtime-view').then((m) => ({ default: m.RuntimeMetricsView }))
 )
 const HealthView = lazyView(() => import('./health/view').then((m) => ({ default: m.HealthView })))
+const HealthDetailView = lazyView(() =>
+  import('./health/detail-view').then((m) => ({ default: m.HealthDetailView }))
+)
+const HealthFormView = lazyView(() =>
+  import('./health/form-view').then((m) => ({ default: m.HealthFormView }))
+)
 const MomentsView = lazyView(() =>
   import('./moments/view').then((m) => ({ default: m.MomentsView }))
 )
@@ -128,6 +134,12 @@ export type ModuleDef = {
    *  view file stays in the tree; flip this off once the polish
    *  lands. */
   hidden?: boolean
+  /** Single lowercase letter that, when pressed after `g`, jumps
+   *  to this module within the current org. e.g. `chord: 'r'`
+   *  binds `g r` → `/main/org/<slug>/runtime`. Optional — modules
+   *  without a chord are unreachable via keyboard nav. Listener
+   *  lives in `web/src/components/GoChord.tsx`. */
+  chord?: string
 }
 
 export const GROUPS: { id: ModuleGroup; label: string }[] = [
@@ -137,6 +149,7 @@ export const GROUPS: { id: ModuleGroup; label: string }[] = [
 
 export const MODULES: ModuleDef[] = [
   {
+    chord: 'o',
     group: null,
     iconPath: 'M3 3h8v8H3zM13 3h8v5h-8zM13 12h8v9h-8zM3 15h8v6H3z',
     id: 'overview',
@@ -146,6 +159,7 @@ export const MODULES: ModuleDef[] = [
   },
   {
     children: [{ path: ':issueId', view: IssueDetailView }],
+    chord: 'i',
     group: 'monitor',
     iconPath:
       'M10.3 3.3a2 2 0 0 1 3.4 0l8 14a2 2 0 0 1-1.7 3H3.99a2 2 0 0 1-1.7-3zM12 9v4M12 17h.01',
@@ -190,6 +204,7 @@ export const MODULES: ModuleDef[] = [
   // sidebar; the v0.8.3 `metrics` module (recordMetric custom
   // channel) stays hidden as the secondary surface.
   {
+    chord: 'r',
     group: 'monitor',
     iconPath: 'M3 17l6-6 4 4 8-8M14 7h7v7',
     id: 'runtime',
@@ -202,6 +217,16 @@ export const MODULES: ModuleDef[] = [
   // on consecutive-2 pass. The probe cron is server-side, no
   // SDK involvement.
   {
+    // v2.1.3 — list at `health`, dedicated routes for `new`,
+    // `:checkId` (detail), and `:checkId/edit` (edit). The parent
+    // HealthView is a router shell that swaps between the list and
+    // the matched child.
+    children: [
+      { path: 'new', view: HealthFormView },
+      { path: ':checkId', view: HealthDetailView },
+      { path: ':checkId/edit', view: HealthFormView },
+    ],
+    chord: 'h',
     group: 'monitor',
     iconPath: 'M3 12h4l3-8 4 16 3-8h4',
     id: 'health',
@@ -278,6 +303,7 @@ export const MODULES: ModuleDef[] = [
   },
   {
     children: [{ path: ':release', view: ReleaseDetailView }],
+    chord: 'e',
     group: 'monitor',
     // v2.2 — first re-opened module under the "find-bug" lens.
     // Backed by the `/explore` query endpoint with a preset query
@@ -295,6 +321,7 @@ export const MODULES: ModuleDef[] = [
     // the hash. Server resolves to the org's default identity_scope
     // and queries identity_fingerprints for cross-project hits.
     // See `docs/design/sdk-v2.3-redesign.md` §5.
+    chord: 'u',
     group: 'monitor',
     iconPath:
       'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 11a4 4 0 0 0-4-4M22 21v-2a4 4 0 0 0-3-3.87',
@@ -315,6 +342,7 @@ export const MODULES: ModuleDef[] = [
     view: AlertsView,
   },
   {
+    chord: 't',
     group: 'organize',
     iconPath:
       'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M12 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
@@ -362,6 +390,7 @@ export const MODULES: ModuleDef[] = [
     view: AuditLogView,
   },
   {
+    chord: 's',
     group: 'organize',
     iconPath:
       'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73zM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',

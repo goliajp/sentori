@@ -51,6 +51,7 @@ export default defineConfig({
             { label: 'Manual moment', slug: 'recipes/manual-moment' },
             { label: 'Manual breadcrumb', slug: 'recipes/manual-breadcrumb' },
             { label: 'Track + metrics', slug: 'recipes/track-and-metrics' },
+            { label: 'Runtime metrics', slug: 'recipes/runtime-metrics' },
             { label: 'v1 → v2 migration', slug: 'recipes/v1-to-v2-migration' },
           ],
         },
@@ -66,6 +67,7 @@ export default defineConfig({
             { label: 'Source map upload (CI)', slug: 'recipes/sourcemap-upload' },
             { label: 'Release versioning', slug: 'recipes/release-versioning' },
             { label: 'Multi-environment', slug: 'recipes/multi-environment' },
+            { label: 'Endpoint health', slug: 'recipes/endpoint-health' },
           ],
         },
         {

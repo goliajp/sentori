@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router'
 
 import { CmdK } from '@/components/CmdK'
+import { GoChord } from '@/components/GoChord'
 import { StatusBar } from '@/components/status-bar'
 import { Toolbar } from '@/components/toolbar'
 import { VerifyBanner } from '@/components/verify-banner'
@@ -38,6 +39,7 @@ export function AppShell() {
       </div>
       <StatusBar />
       <CmdK />
+      <GoChord />
     </div>
   )
 }
