@@ -1,15 +1,21 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, Outlet, useParams } from 'react-router'
 
-import { adminApi, type IssueRow, type IssueStatus } from '@/api/client'
-import { RailEmpty } from '@/components/Hint'
-import { LabelChip, PriorityChip } from './triage-chips'
-// `qk` import removed in v2.2 W5 — IssuesView's query key is now
-// an inline literal that includes all the filter params. Other
-// modules still use the central `qk` registry.
+import {
+  type ExploreReq,
+  type ExploreResp,
+  type ExploreRow,
+  type IssueRow,
+  type IssueStatus,
+  adminApi,
+} from '@/api/client'
+import { qk } from '@/api/query-keys'
 import { useOrg } from '@/auth/orgContext'
+import { RailEmpty } from '@/components/Hint'
 import { formatRelative } from '@/lib/format'
 import { useUrlParam } from '@/lib/url-state'
+
+import { LabelChip, PriorityChip } from './triage-chips'
 
 type Tab = IssueStatus | 'all'
 
@@ -22,6 +28,26 @@ const STATUS_TABS: { key: Tab; label: string }[] = [
   { key: 'all', label: 'all' },
 ]
 const TAB_KEYS = new Set<Tab>(['active', 'regressed', 'muted', 'resolved', 'silenced', 'all'])
+
+// v2.2 W3 — measure picker for the /explore consumer path.
+type Measure = 'event_count' | 'first_seen' | 'last_seen' | 'unique_users'
+const MEASURES: { key: Measure; label: string }[] = [
+  { key: 'event_count', label: 'events' },
+  { key: 'unique_users', label: 'users' },
+  { key: 'last_seen', label: 'last seen' },
+  { key: 'first_seen', label: 'first seen' },
+]
+const MEASURE_KEYS = new Set<Measure>(['event_count', 'unique_users', 'last_seen', 'first_seen'])
+
+type WindowKey = '1d' | '7d' | '30d' | 'all'
+const WINDOWS: WindowKey[] = ['1d', '7d', '30d', 'all']
+const WINDOW_KEYS = new Set<WindowKey>(['1d', '7d', '30d', 'all'])
+
+function windowGteRfc3339(w: WindowKey): string | undefined {
+  if (w === 'all') return undefined
+  const days = w === '1d' ? 1 : w === '7d' ? 7 : 30
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+}
 
 /**
  * Issues — master/detail layout, editorial chrome.
@@ -38,50 +64,61 @@ const TAB_KEYS = new Set<Tab>(['active', 'regressed', 'muted', 'resolved', 'sile
  * accent-soft. Selected row carries a left tora strip.
  *
  * URL state:
- *   `?status=`  active filter tab (default 'active')
- *   `:issueId`  selected issue. When present the detail pane renders
- *               via `<Outlet />`; otherwise the rail-empty placeholder.
+ *   `?status=`    active filter tab (default 'active')
+ *   `?measure=`   v2.2 sort dim (default 'event_count')
+ *   `?window=`    v2.2 time window (default '7d')
+ *   `?release=`   slice by release
+ *   `?errorType=` slice by error type (Sentori kind)
+ *   `?env=`       slice by environment
+ *   `?q=`         client-side search across error_type + message_sample
+ *   `?legacy=1`   v2.2 W3 rollback flag — calls listIssuesPage instead
+ *                 of /explore. Removed in W4 closeout once dogfood signs
+ *                 off on the explore-backed list.
+ *   `:issueId`    selected issue. When present the detail pane renders
+ *                 via `<Outlet />`; otherwise the rail-empty placeholder.
  */
 export function IssuesView() {
   const { currentProject } = useOrg()
   const { issueId } = useParams<{ issueId?: string }>()
   const projectId = currentProject?.id ?? null
+
   const [tab, setTab] = useUrlParam<Tab>('status', 'active', (raw) =>
     TAB_KEYS.has(raw as Tab) ? (raw as Tab) : null
   )
-  // v2.2 — Issues is the universal "filter-able list of issues"
-  // view. Other modules (Releases, Related-across-releases) deep-
-  // link in via these URL params; refreshing / sharing preserves
-  // the slice. Each filter has a clear "× remove" chip at the top
-  // of the rail so the operator can see + zero them out.
+  const [measure, setMeasure] = useUrlParam<Measure>('measure', 'event_count', (raw) =>
+    MEASURE_KEYS.has(raw as Measure) ? (raw as Measure) : null
+  )
+  const [windowKey, setWindowKey] = useUrlParam<WindowKey>('window', '7d', (raw) =>
+    WINDOW_KEYS.has(raw as WindowKey) ? (raw as WindowKey) : null
+  )
+
+  // Cross-module deep-link filters. Other modules (Releases, Related)
+  // link in via these URL params; refreshing / sharing preserves the
+  // slice. Each filter has a clear "× remove" chip at the top of the
+  // rail so the operator can see + zero them out.
   const [releaseFilter, setReleaseFilter] = useUrlParam<string>('release', '')
   const [errorTypeFilter, setErrorTypeFilter] = useUrlParam<string>('errorType', '')
   const [envFilter, setEnvFilter] = useUrlParam<string>('env', '')
   const [searchFilter, setSearchFilter] = useUrlParam<string>('q', '')
 
-  const { data, error, isLoading } = useQuery({
-    enabled: !!projectId,
-    queryFn: () =>
-      adminApi.listIssuesPage(projectId!, {
-        limit: 100,
-        status: tab === 'all' ? undefined : tab,
-        ...(releaseFilter ? { release: releaseFilter } : {}),
-        ...(errorTypeFilter ? { errorType: errorTypeFilter } : {}),
-        ...(envFilter ? { env: envFilter } : {}),
-        ...(searchFilter ? { search: searchFilter } : {}),
-      }),
-    queryKey: [
-      'issues-list',
-      projectId,
-      tab,
-      releaseFilter,
-      errorTypeFilter,
-      envFilter,
-      searchFilter,
-    ],
-  })
+  // v2.2 W3 — rollback flag. Anything non-empty falls back to the
+  // pre-v2.2 listIssuesPage path while we dogfood the explore-backed
+  // implementation. Validator collapses every truthy value to '1' so
+  // the cache key is stable.
+  const [legacy] = useUrlParam<string>('legacy', '', (raw) => (raw ? '1' : ''))
+  const isLegacy = legacy === '1'
 
-  const issues = data?.issues ?? []
+  const { error, isLoading, meta, rows } = useIssuesRail({
+    envFilter,
+    errorTypeFilter,
+    isLegacy,
+    measure,
+    projectId,
+    releaseFilter,
+    searchFilter,
+    tab,
+    windowKey,
+  })
 
   const activeFilters: FilterChip[] = []
   if (releaseFilter)
@@ -112,15 +149,25 @@ export function IssuesView() {
   return (
     <div className="-mx-4 -my-3 flex h-[calc(100%+1.5rem)] min-h-0 overflow-hidden bg-[color:var(--paper)]">
       <aside className="flex w-[22rem] shrink-0 flex-col overflow-hidden border-r border-[color:var(--rule)] bg-[color:var(--paper-2)]">
-        <RailHeader count={issues.length} current={tab} onChange={setTab} />
+        <RailHeader
+          count={rows.length}
+          current={tab}
+          isLegacy={isLegacy}
+          measure={measure}
+          meta={meta}
+          onChangeMeasure={setMeasure}
+          onChangeTab={setTab}
+          onChangeWindow={setWindowKey}
+          windowKey={windowKey}
+        />
         {activeFilters.length > 0 && <FilterChips filters={activeFilters} />}
         <div className="min-h-0 flex-1 overflow-y-auto">
           {!projectId && (
             <RailEmpty>Create a project in org settings to start ingesting.</RailEmpty>
           )}
           {projectId && isLoading && <RailSkeleton />}
-          {projectId && error && <RailEmpty>Failed to load — check your network.</RailEmpty>}
-          {projectId && !isLoading && !error && issues.length === 0 && (
+          {projectId && !!error && <RailEmpty>Failed to load — check your network.</RailEmpty>}
+          {projectId && !isLoading && !error && rows.length === 0 && (
             <RailEmpty>
               {activeFilters.length > 0
                 ? 'No issues match these filters. Try clearing one or more.'
@@ -129,7 +176,7 @@ export function IssuesView() {
                   : 'No issues match this filter.'}
             </RailEmpty>
           )}
-          {issues.map((row) => (
+          {rows.map((row) => (
             <RailRow key={row.id} row={row} selected={row.id === issueId} />
           ))}
         </div>
@@ -148,13 +195,205 @@ export function IssuesView() {
   )
 }
 
-type FilterChip = { label: string; value: string; onClear: () => void }
+// ── data hook ───────────────────────────────────────────────────────────────
 
 /**
- * v2.2 — active filter chips at the rail top. Each chip shows
- * "label: value × " and removes that filter on click. Hidden when
- * no filters are active.
+ * Normalised row shape rendered by `RailRow`. Both code paths (legacy
+ * `listIssuesPage` and v2.2 `/explore`) produce this so the UI doesn't
+ * branch on the source. Fields that exist on `IssueRow` but not in the
+ * `/explore` projection (`priority`, `labels`, `assigneeEmail`,
+ * `lastEnvironment`) are typed optional — RailRow tolerates absence.
+ *
+ * Issue detail (`detail-view.tsx`) re-fetches the full `IssueRow` via
+ * `adminApi.issueDetail`, so this slim shape only has to drive the
+ * rail row, not power the detail screen.
  */
+type RailIssueRow = {
+  id: string
+  errorType: string
+  messageSample: string
+  status: IssueStatus
+  eventCount: number
+  lastSeen: string
+  lastRelease: null | string
+  /** Optional — only available when the legacy path is in use. */
+  priority?: IssueRow['priority']
+  labels?: string[]
+  assigneeEmail?: null | string
+}
+
+type RailMeta = null | {
+  source: 'explore' | 'legacy'
+  tookMs?: number
+  windowGte?: string
+}
+
+function useIssuesRail(params: {
+  envFilter: string
+  errorTypeFilter: string
+  isLegacy: boolean
+  measure: Measure
+  projectId: null | string
+  releaseFilter: string
+  searchFilter: string
+  tab: Tab
+  windowKey: WindowKey
+}): {
+  error: unknown
+  isLoading: boolean
+  meta: RailMeta
+  rows: RailIssueRow[]
+} {
+  const {
+    envFilter,
+    errorTypeFilter,
+    isLegacy,
+    measure,
+    projectId,
+    releaseFilter,
+    searchFilter,
+    tab,
+    windowKey,
+  } = params
+
+  // ── legacy path ─────────────────────────────────────────────────────────
+  const legacyQ = useQuery({
+    enabled: !!projectId && isLegacy,
+    queryFn: () =>
+      adminApi.listIssuesPage(projectId!, {
+        limit: 100,
+        status: tab === 'all' ? undefined : tab,
+        ...(releaseFilter ? { release: releaseFilter } : {}),
+        ...(errorTypeFilter ? { errorType: errorTypeFilter } : {}),
+        ...(envFilter ? { env: envFilter } : {}),
+        ...(searchFilter ? { search: searchFilter } : {}),
+      }),
+    queryKey: [
+      'issues-list-legacy',
+      projectId,
+      tab,
+      releaseFilter,
+      errorTypeFilter,
+      envFilter,
+      searchFilter,
+    ] as const,
+  })
+
+  // ── /explore path (v2.2 default) ────────────────────────────────────────
+  const windowGte = windowGteRfc3339(windowKey)
+  const exploreReq: ExploreReq = {
+    dim: 'issue',
+    filters: {
+      ...(envFilter ? { environmentEq: envFilter } : {}),
+      ...(errorTypeFilter ? { kindIn: [errorTypeFilter] } : {}),
+      ...(releaseFilter ? { releaseEq: releaseFilter } : {}),
+      ...(tab === 'all' ? {} : { statusIn: [tab] }),
+      ...(windowGte ? { receivedAtGte: windowGte } : {}),
+    },
+    limit: 100,
+    measures: ['event_count', 'unique_users', 'first_seen', 'last_seen'],
+    orderBy: measure,
+    orderDir: 'desc',
+  }
+  const exploreQ = useQuery<ExploreResp>({
+    enabled: !!projectId && !isLegacy,
+    queryFn: () => adminApi.explore(projectId!, exploreReq),
+    queryKey: qk.exploreIssues(
+      projectId,
+      measure,
+      windowKey,
+      tab,
+      releaseFilter,
+      errorTypeFilter,
+      envFilter
+    ),
+  })
+
+  if (isLegacy) {
+    const legacyRows = legacyQ.data?.issues ?? []
+    const filtered = legacyRows.filter((r) => matchesClientSearch(r, searchFilter))
+    return {
+      error: legacyQ.error,
+      isLoading: legacyQ.isLoading,
+      meta: { source: 'legacy' },
+      rows: filtered.map(normaliseLegacy),
+    }
+  }
+
+  const exploreRows = exploreQ.data?.rows ?? []
+  const normalised = exploreRows.map(normaliseExplore).filter(Boolean) as RailIssueRow[]
+  // Server `/explore` ignores `search` (no full-text in the v2.2
+  // grammar); apply the same lightweight match as the legacy path
+  // client-side so the URL param keeps working unchanged.
+  const filtered = normalised.filter((r) => matchesClientSearch(r, searchFilter))
+  return {
+    error: exploreQ.error,
+    isLoading: exploreQ.isLoading,
+    meta: {
+      source: 'explore',
+      tookMs: exploreQ.data?.meta.tookMs,
+      windowGte,
+    },
+    rows: filtered,
+  }
+}
+
+function matchesClientSearch(
+  row: { errorType: string; messageSample: string },
+  q: string
+): boolean {
+  if (!q) return true
+  const needle = q.toLowerCase()
+  return (
+    row.errorType.toLowerCase().includes(needle) || row.messageSample.toLowerCase().includes(needle)
+  )
+}
+
+function normaliseLegacy(r: IssueRow): RailIssueRow {
+  return {
+    assigneeEmail: r.assigneeEmail,
+    errorType: r.errorType,
+    eventCount: r.eventCount,
+    id: r.id,
+    labels: r.labels,
+    lastRelease: r.lastRelease,
+    lastSeen: r.lastSeen,
+    messageSample: r.messageSample,
+    priority: r.priority,
+    status: r.status,
+  }
+}
+
+/** Project one /explore `dim=issue` row into the rail shape. Falls
+ *  back to safe defaults on missing fields — the server always emits
+ *  `issue_id`, `error_type`, `message_sample`, `last_release`,
+ *  `status` and the requested measures (see explore.rs
+ *  `project_issue_row`), so the only nulls are absent timestamps. */
+function normaliseExplore(r: ExploreRow): null | RailIssueRow {
+  const id = pickString(r.issue_id)
+  if (!id) return null
+  return {
+    errorType: pickString(r.error_type) ?? '',
+    eventCount: pickNumber(r.event_count),
+    id,
+    lastRelease: pickString(r.last_release) || null,
+    lastSeen: pickString(r.last_seen) ?? '',
+    messageSample: pickString(r.message_sample) ?? '',
+    status: (pickString(r.status) as IssueStatus) ?? 'active',
+  }
+}
+
+function pickString(v: ExploreRow[string]): null | string {
+  return typeof v === 'string' ? v : null
+}
+function pickNumber(v: ExploreRow[string]): number {
+  return typeof v === 'number' ? v : 0
+}
+
+// ── rail components ─────────────────────────────────────────────────────────
+
+type FilterChip = { label: string; onClear: () => void; value: string }
+
 function FilterChips({ filters }: { filters: FilterChip[] }) {
   return (
     <div className="shrink-0 border-b border-[color:var(--rule-soft)] px-4 py-2">
@@ -187,11 +426,23 @@ function FilterChips({ filters }: { filters: FilterChip[] }) {
 function RailHeader({
   count,
   current,
-  onChange,
+  isLegacy,
+  measure,
+  meta,
+  onChangeMeasure,
+  onChangeTab,
+  onChangeWindow,
+  windowKey,
 }: {
   count: number
   current: Tab
-  onChange: (k: Tab) => void
+  isLegacy: boolean
+  measure: Measure
+  meta: RailMeta
+  onChangeMeasure: (m: Measure) => void
+  onChangeTab: (k: Tab) => void
+  onChangeWindow: (w: WindowKey) => void
+  windowKey: WindowKey
 }) {
   return (
     <header className="shrink-0 border-b border-[color:var(--rule)] px-4 py-3">
@@ -200,8 +451,8 @@ function RailHeader({
           className="text-[color:var(--ink)]"
           style={{
             fontFamily: 'var(--font-sans)',
-            fontVariationSettings: "'wdth' 95, 'opsz' 24, 'wght' 550",
             fontSize: '17px',
+            fontVariationSettings: "'wdth' 95, 'opsz' 24, 'wght' 550",
             letterSpacing: '-0.01em',
           }}
         >
@@ -222,7 +473,7 @@ function RailHeader({
                   : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]'
               }`}
               key={t.key}
-              onClick={() => onChange(t.key)}
+              onClick={() => onChangeTab(t.key)}
               type="button"
             >
               {t.label}
@@ -231,11 +482,68 @@ function RailHeader({
           )
         })}
       </div>
+      {/* v2.2 picker bar — measure + window. Hidden in legacy mode
+          since listIssuesPage doesn't honour either. */}
+      {!isLegacy && (
+        <div className="mt-3 flex flex-wrap items-baseline gap-3 font-mono text-[10px] tracking-[0.1em] uppercase">
+          <span className="text-[color:var(--ink-muted)]">sort</span>
+          <div className="flex flex-wrap items-baseline gap-2">
+            {MEASURES.map((m, i) => (
+              <span className="flex items-baseline gap-2" key={m.key}>
+                {i > 0 && <span className="text-[color:var(--rule)]">/</span>}
+                <button
+                  className={
+                    m.key === measure
+                      ? 'text-[color:var(--accent)]'
+                      : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink-soft)]'
+                  }
+                  onClick={() => onChangeMeasure(m.key)}
+                  type="button"
+                >
+                  {m.label}
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {!isLegacy && (
+        <div className="mt-1.5 flex flex-wrap items-baseline gap-3 font-mono text-[10px] tracking-[0.1em] uppercase">
+          <span className="text-[color:var(--ink-muted)]">window</span>
+          <div className="flex flex-wrap items-baseline gap-2">
+            {WINDOWS.map((w, i) => (
+              <span className="flex items-baseline gap-2" key={w}>
+                {i > 0 && <span className="text-[color:var(--rule)]">/</span>}
+                <button
+                  className={
+                    w === windowKey
+                      ? 'text-[color:var(--accent)]'
+                      : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink-soft)]'
+                  }
+                  onClick={() => onChangeWindow(w)}
+                  type="button"
+                >
+                  {w}
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* Hint footer — explore latency + source flag so dogfood can
+          tell at a glance which path is hot. */}
+      <div className="mt-2 font-mono text-[9px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+        {isLegacy
+          ? 'source: legacy · ?legacy=1'
+          : meta?.source === 'explore' && typeof meta.tookMs === 'number'
+            ? `source: /explore · ${meta.tookMs} ms`
+            : 'source: /explore'}
+      </div>
     </header>
   )
 }
 
-function RailRow({ row, selected }: { row: IssueRow; selected: boolean }) {
+function RailRow({ row, selected }: { row: RailIssueRow; selected: boolean }) {
   const { currentOrg } = useOrg()
   return (
     <Link
@@ -252,7 +560,7 @@ function RailRow({ row, selected }: { row: IssueRow; selected: boolean }) {
         }`}
       />
       <div className="flex min-w-0 items-baseline gap-2">
-        {row.priority !== 'p3' && <PriorityChip priority={row.priority} />}
+        {row.priority && row.priority !== 'p3' && <PriorityChip priority={row.priority} />}
         {/* v2.0 — distinguish manual `captureMessage` events from
          *  error/anr/nearCrash events. The server synthesises
          *  `errorType = 'Message'` for kind=message issues, so the
@@ -274,15 +582,12 @@ function RailRow({ row, selected }: { row: IssueRow; selected: boolean }) {
         </span>
         <StatusTag status={row.status} />
       </div>
-      {/* Subtitle: the message body. For manual `captureMessage`
-       *  events the title already shows the body, so skip the
-       *  redundant subtitle to keep the row compact. */}
       {row.errorType !== 'Message' && (
         <div className="mt-0.5 line-clamp-1 text-[12px] text-[color:var(--ink-soft)]">
           {displayMessage(row.messageSample)}
         </div>
       )}
-      {row.labels.length > 0 && (
+      {row.labels && row.labels.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-1">
           {row.labels.slice(0, 3).map((l) => (
             <LabelChip key={l} label={l} />
@@ -294,24 +599,18 @@ function RailRow({ row, selected }: { row: IssueRow; selected: boolean }) {
           )}
         </div>
       )}
-      {/* Compact meta row — each atomic unit (`25 ev`, `14h`, assignee)
-       *  is non-breakable so the rail's narrow column can't split a
-       *  number off its unit ("25" \n "ev"). */}
       <div className="mt-2 flex items-center gap-2 font-mono text-[10px] tracking-[0.05em] whitespace-nowrap text-[color:var(--ink-muted)]">
         <span className="tabular-nums">{row.eventCount.toLocaleString()} ev</span>
         <span aria-hidden className="opacity-40">
           ·
         </span>
-        <span className="tabular-nums">{formatRelative(row.lastSeen)}</span>
+        <span className="tabular-nums">{row.lastSeen ? formatRelative(row.lastSeen) : '—'}</span>
         {row.assigneeEmail && (
           <span className="ml-auto truncate text-[color:var(--accent)]">
             @{row.assigneeEmail.split('@')[0]}
           </span>
         )}
       </div>
-      {/* Release on its own line — it's the longest field and the most
-       *  expendable; let it own a full-width truncation row so it
-       *  never elbows the meta numbers into pieces. */}
       {row.lastRelease && (
         <div className="mt-0.5 truncate font-mono text-[10px] tracking-[0.05em] text-[color:var(--ink-muted)] opacity-80">
           {row.lastRelease}
@@ -322,9 +621,6 @@ function RailRow({ row, selected }: { row: IssueRow; selected: boolean }) {
 }
 
 function StatusTag({ status }: { status: IssueStatus }) {
-  // Status maps to ink-scale + accent for regressed (the one that
-  // wants the eye). active = mid ink, resolved = muted, silenced =
-  // muted. The accent is reserved for the only "this is hot" state.
   const cls =
     status === 'regressed'
       ? 'text-[color:var(--accent)]'
@@ -362,8 +658,8 @@ function DetailPlaceholder() {
           className="mb-3 text-[color:var(--ink)]"
           style={{
             fontFamily: 'var(--font-sans)',
-            fontVariationSettings: "'wdth' 95, 'opsz' 24, 'wght' 550",
             fontSize: '22px',
+            fontVariationSettings: "'wdth' 95, 'opsz' 24, 'wght' 550",
             letterSpacing: '-0.01em',
           }}
         >

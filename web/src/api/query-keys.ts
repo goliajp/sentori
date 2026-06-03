@@ -138,6 +138,22 @@ export const qk = {
     windowKey === undefined
       ? tuple('releases', projectId)
       : tuple('releases', projectId, windowKey),
+
+  // ── v2.2 W3: /explore consumers ─────────────────────────────────────
+  // Distinct namespace so the explore-driven Issues list doesn't share
+  // cache with the legacy `listIssuesPage` consumer behind ?legacy=1.
+  // Each call site provides its full payload as part of the key so the
+  // cache reflects the actual server query (window / measure / filters
+  // all live in the key).
+  exploreIssues: (
+    projectId: Id,
+    measure: string,
+    windowKey: string,
+    status: string,
+    release: string,
+    errorType: string,
+    env: string
+  ) => tuple('explore-issues', projectId, measure, windowKey, status, release, errorType, env),
   releaseArtifacts: (projectId: Id, release: string) =>
     tuple('release-artifacts', projectId, release),
   sourcemapStatus: (projectId: Id) => tuple('sourcemap-status', projectId),
