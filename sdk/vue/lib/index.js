@@ -56,5 +56,8 @@ const plugin = {
 export default plugin;
 export { plugin as sentori };
 export { addBreadcrumb, captureException, captureException as captureError, captureMessage, captureStep, getUser, setUser, } from '@goliapkg/sentori-javascript';
+// v2.1 W2 — runtime metrics surface. Off by default; opt in
+// via `initSentori({ capture: { runtimeMetrics: true } })`.
+export { RuntimeMetricBuffer, drainRuntimeMetricsForFlush, emitMetric, flushRuntimeMetrics, rebufferRuntimeMetrics, startRuntimeMetricsTimer, stopRuntimeMetricsTimer, } from '@goliapkg/sentori-javascript';
 export { SentoriErrorBoundary } from './ErrorBoundary.js';
 //# sourceMappingURL=index.js.map

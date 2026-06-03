@@ -205,3 +205,74 @@ describe('captureMessage (v2.0)', () => {
     // the host code didn't throw — that's the NEVER guarantee.
   })
 })
+
+describe('beforeSend hook (v2.3)', () => {
+  test('mutate path: hook return value lands on the wire', async () => {
+    setConfig({
+      beforeSend: (ev) => ({ ...ev, tags: { ...ev.tags, scrubbed: '1' } }),
+      enableGlobalHooks: false,
+      environment: 'test',
+      ingestUrl: 'https://ingest.example.com',
+      release: 'myapp@1.2.3+456',
+      token: 'st_pk_testtokentoken',
+    })
+    captureMessage('redact me', { tags: { plan: 'pro' } })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(sent.length).toBe(1)
+    expect(sent[0]!.tags?.scrubbed).toBe('1')
+    expect(sent[0]!.tags?.plan).toBe('pro')
+  })
+
+  test('drop path: returning null suppresses the send', async () => {
+    setConfig({
+      beforeSend: () => null,
+      enableGlobalHooks: false,
+      environment: 'test',
+      ingestUrl: 'https://ingest.example.com',
+      release: 'myapp@1.2.3+456',
+      token: 'st_pk_testtokentoken',
+    })
+    captureMessage('dropped', { tags: { feature: 'x' } })
+    captureError(new Error('also dropped'))
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(sent.length).toBe(0)
+  })
+
+  test('throw path: SDK falls back to unmodified event (NEVER rule)', async () => {
+    setConfig({
+      beforeSend: () => {
+        throw new Error('hook boom')
+      },
+      enableGlobalHooks: false,
+      environment: 'test',
+      ingestUrl: 'https://ingest.example.com',
+      release: 'myapp@1.2.3+456',
+      token: 'st_pk_testtokentoken',
+    })
+    expect(() => captureMessage('survives a bad hook')).not.toThrow()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(sent.length).toBe(1)
+    expect(sent[0]!.message).toBe('survives a bad hook')
+  })
+
+  test('non-event return: SDK falls back to unmodified event', async () => {
+    setConfig({
+      // @ts-expect-error — host returns garbage; v2.3 contract is "fall back unmodified"
+      beforeSend: () => 42,
+      enableGlobalHooks: false,
+      environment: 'test',
+      ingestUrl: 'https://ingest.example.com',
+      release: 'myapp@1.2.3+456',
+      token: 'st_pk_testtokentoken',
+    })
+    captureMessage('survives bad return')
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(sent.length).toBe(1)
+    expect(sent[0]!.message).toBe('survives bad return')
+  })
+})

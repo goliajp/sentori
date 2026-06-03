@@ -17,6 +17,7 @@ deploy. Self-host on a VM today; managed SaaS at
 | | What | Where |
 |---|---|---|
 | 📡 | **SDKs** | `sdk/` — `@goliapkg/sentori-{core,javascript,react,react-native,next,vue,svelte,solid,expo}` |
+| ✋ | **Manual instrumentation** | `sentori.captureMessage` / `startTrace` / `startSpan` / `withScopedSpan` / `track` / `recordMetric(..., { parent })` / `addBreadcrumb` — one first-class API per signal. See `docs-site` recipes: `manual-issue`, `manual-trace`, `manual-span`, `manual-moment`, `track-and-metrics`, `manual-breadcrumb`, `v1-to-v2-migration` |
 | 🔁 | **Sentry compat** | `@goliapkg/sentori-{javascript,react-native,…}/compat` — drop-in `import * as Sentry from "@goliapkg/sentori-react-native/compat"` |
 | 🖥️ | **Dashboard** | `web/` — React 19 + Vite + Tailwind v4 SPA, served at `/main` |
 | 🚀 | **iOS showcase** | `apps/ios-showcase/` — SwiftUI 6 / iOS 26 native demo |

@@ -1,5 +1,162 @@
 # @goliapkg/sentori-vue
 
+## 1.1.0
+
+### Minor Changes
+
+- [`cb55b42`](https://github.com/goliajp/sentori/commit/cb55b4216dc45d2ddb58ef5fae31307685f54ebe) Thanks [@doracawl](https://github.com/doracawl)! - v2.1.1 — web matrix runtime metrics wiring + perf budget CI
+
+  **Web SDKs now ship the runtime-metrics surface**
+
+  `@goliapkg/sentori-javascript`:
+
+  - New `runtime-metrics.ts` flusher mirroring the RN module —
+    drains core's ring every 30 s and POSTs to
+    `/v1/runtime-metrics:batch` via the same transport shape (auth
+    - `Sentori-Sdk` header + `keepalive: true`). On failure,
+      rebuffers + self-reports through the circuit breaker per the
+      NEVER rule.
+  - `initSentori({ capture: { runtimeMetrics: true } })` opt-in
+    starts the flusher. Defaults `false` in JS because the
+    auto-instrument modules (FPS / heap / network bytes) are
+    RN-only in 2.1.0; web hosts that want to push metrics today
+    call `emitMetric()` directly from their own polling.
+  - Re-exports `emitMetric` / `RuntimeMetricBuffer` /
+    `drainRuntimeMetricsForFlush` / `rebufferRuntimeMetrics` /
+    `flushRuntimeMetrics` / `startRuntimeMetricsTimer` /
+    `stopRuntimeMetricsTimer` so framework adapters don't have
+    to pull in `@goliapkg/sentori-core` directly.
+
+  `@goliapkg/sentori-svelte` / `-vue` / `-solid`:
+
+  - Re-export the runtime-metrics surface from
+    `@goliapkg/sentori-javascript` (matching each package's
+    existing `addBreadcrumb` / `captureException` re-export
+    convention).
+
+  `@goliapkg/sentori-react` / `-next`:
+
+  - Not updated in this patch — these packages don't re-export
+    capture surfaces from `@goliapkg/sentori-javascript` at the
+    index level (their convention is to ship providers / hooks /
+    components only). Hosts using React or Next can import
+    `emitMetric` directly from `@goliapkg/sentori-javascript`.
+
+  **Performance budget CI gate**
+
+  - `.github/workflows/sdk-perf.yml` runs `sdk/core` perf bench on
+    every push to `master` + every PR touching `sdk/core/**`,
+    `sdk/react-native/**`, `sdk/javascript/**`, or the workflow
+    itself. A regression in any hot path (uuid / sampling / span /
+    breadcrumb / trail / emitMetric / drain) fails the suite.
+  - New `sdk/core` bench entries:
+    - `emitMetric (no tags) < 5 µs/op` — currently ~0.2 µs (25x margin)
+    - `emitMetric (3 tags) < 10 µs/op` — currently ~0.3 µs (33x margin)
+    - `drainRuntimeMetricsForFlush (300 pts) < 1000 µs` — currently ~48 µs (20x margin)
+
+  The big margins give the bench room to absorb shared-runner
+  variance without flaking; a real regression nudges times into
+  the same order of magnitude as the budget and the test fails
+  loudly.
+
+  **Core patch**
+
+  - `@goliapkg/sentori-core` gets a patch bump because the perf
+    bench file was modified; no API change.
+
+### Patch Changes
+
+- Updated dependencies [[`cb55b42`](https://github.com/goliajp/sentori/commit/cb55b4216dc45d2ddb58ef5fae31307685f54ebe)]:
+  - @goliapkg/sentori-core@1.1.1
+  - @goliapkg/sentori-javascript@1.1.0
+
+## 1.0.0
+
+### Major Changes
+
+- v2.0 — manual instrumentation v2 (W1–W4 closeout)
+
+  The SDK gets its first major release since v1. Every change is
+  either a rename (v1 aliases gone), a move (advanced surfaces
+  behind subpath imports), or an additive new API. Wire format is
+  forever back-compat with v1 — v1 SDK still reports against a
+  v2 server and vice-versa. Migration is purely syntactic; estimated
+  effort for a typical app is ~15 minutes. See the migration recipe
+  at `docs.sentori.golia.jp/recipes/v1-to-v2-migration`.
+
+  **Renamed (v1 aliases removed)**
+
+  - `sentori.captureError(err)` → `sentori.captureException(err)`
+  - `sentori.initSentori({ ... })` → `sentori.init({ ... })`
+  - `span.finish()` → `span.end()`
+  - Positional `addBreadcrumb('msg', { route })` → object-form
+    `addBreadcrumb({ type, data })`
+  - `Event` type → `SentoriEvent` (avoids DOM `Event` collision)
+  - `SpanHandle` / `MomentHandle` types → `Span` / `Moment`
+
+  **Moved (subpath imports — bundle hygiene)**
+
+  - `FeedbackButton` → `import { FeedbackButton } from
+'@goliapkg/sentori-react-native/feedback'` (top-level re-export
+    retained for one release cycle)
+  - `Sentry` compat layer → `import { Sentry } from
+'@goliapkg/sentori-react-native/compat'` (already present in
+    v1.x; reaffirmed here)
+
+  **Additive — new in v2.0**
+
+  - `sentori.captureMessage(msg, { level, tags })` — issues without
+    a thrown `Error`. Lands in the Issues module with a 💬 icon
+    next to thrown errors. Recipe:
+    `docs.sentori.golia.jp/recipes/manual-issue`.
+  - Formal `Span` / `Trace` surface — `startTrace(name)`,
+    `startSpan(op, opts)`, `withSpan(span, fn)`, `withScopedSpan(op,
+fn, opts)`. `Span` gains `.end()` / `.setAttribute()` /
+    `.setStatus()` / `.recordException()` / `.isRecording()`,
+    OTel-aligned. Recipes: `manual-trace`, `manual-span`.
+  - `sentori.recordMetric(name, value, tags?, { parent: span })` —
+    ties the metric point to its emitting span via `tags.span_id`,
+    and the dashboard's trace detail view renders a **related
+    metrics row** under that span. Recipe: `track-and-metrics`.
+  - `init.capture.trackAutoBreadcrumb: true` — every
+    `sentori.track(name, props)` also pushes a `{ type: 'track',
+data: { name, props } }` breadcrumb, so a later
+    `captureException` carries the customer journey. Defaults
+    `false` to preserve v1 breadcrumb shape on upgrade; recommended
+    `true` for new integrations.
+  - `BreadcrumbType` union adds `'track'`; server `BreadcrumbType`
+    enum adds matching `Track` variant.
+
+  **Safety guarantee — NEVER rule**
+
+  Every public `sentori.*` API is wrapped via `safeFn` /
+  `safeAsync` (`sdk/core/src/safe.ts`); internal errors silently
+  fail and optionally self-report via the circuit breaker. The host
+  app never sees a thrown error, a rejected promise, a frame drop,
+  a network failure, or anything else attributable to Sentori — per
+  `.claude/CLAUDE.md` performance budgets (< 1 % main-thread
+  sustained, < 5 ms per tick).
+
+  **Server compatibility**
+
+  v1 and v2 SDK requests parse cleanly against either v1 or v2
+  server. Regression suites `server/tests/v1_compat.rs` (existing)
+  and `server/tests/v20_compat.rs` (added with v2.1 W1) gate this.
+
+  **Rollout**
+
+  We dogfood the SDK on the SaaS dashboard. Recommended customer
+  sequence: lockstep upgrade + run the codemod (15 min), opt into
+  `trackAutoBreadcrumb`, adopt `captureMessage` / `withSpan` /
+  `recordMetric({ parent })` for the cases v1 didn't fit. Mixed
+  v1 / v2 fleets are supported indefinitely — there's no flag day.
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @goliapkg/sentori-core@1.0.0
+  - @goliapkg/sentori-javascript@1.0.0
+
 ## 0.3.0
 
 ### Minor Changes

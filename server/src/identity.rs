@@ -38,20 +38,32 @@ pub fn is_valid_client_hash(s: &str) -> bool {
 }
 
 /// Resolve which `identity_scope_id` an event ingested for the given
-/// project should hash against. v2.3 logic: project's org's default
-/// scope. v2.4+ may also honour a `projects.identity_scope_id`
-/// override; the schema is ready, the resolution code isn't here yet.
+/// project should hash against.
+///
+/// Resolution order (v2.5+):
+///   1. `projects.identity_scope_id` — explicit project carve.
+///   2. `org_identity_scopes.is_default = true` — the org-default
+///      scope created at migration 0065 / on org create.
+///
+/// Returns `None` only when the project's org has no default
+/// scope (shouldn't happen post-0065).
 pub async fn resolve_scope_for_project(
     pool: &PgPool,
     project_id: Uuid,
 ) -> Result<Option<(Uuid, Vec<u8>)>, AppError> {
+    // COALESCE drives the precedence: prefer the carved scope when
+    // present, otherwise fall through to the org default. One round
+    // trip; the partial index `projects_identity_scope_idx` makes
+    // the carved branch cheap when the column is mostly null.
     let row: Option<(Uuid, Vec<u8>)> = sqlx::query_as(
         r#"
         SELECT s.id, s.salt
         FROM projects p
         JOIN orgs o ON o.id = p.org_id
-        JOIN org_identity_scopes ois ON ois.org_id = o.id AND ois.is_default = true
-        JOIN identity_scopes s ON s.id = ois.scope_id
+        LEFT JOIN org_identity_scopes ois
+               ON ois.org_id = o.id AND ois.is_default = true
+        JOIN identity_scopes s
+               ON s.id = COALESCE(p.identity_scope_id, ois.scope_id)
         WHERE p.id = $1
         LIMIT 1
         "#,

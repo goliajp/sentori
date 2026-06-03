@@ -33,7 +33,7 @@ export function FederationView() {
   return (
     <div className="space-y-6">
       <form
-        className="flex flex-wrap items-baseline gap-3 border-b border-[color:var(--rule)] pb-4"
+        className="border-border flex flex-wrap items-baseline gap-3 border-b pb-4"
         onSubmit={(e) => {
           e.preventDefault()
           const subject = subjectDraft.trim()
@@ -42,11 +42,11 @@ export function FederationView() {
           setSubmitted({ provider: p, subject })
         }}
       >
-        <label className="font-mono text-[11px] tracking-[0.18em] text-[color:var(--accent)] uppercase">
+        <label className="text-accent font-mono text-[11px] tracking-[0.18em] uppercase">
           provider
         </label>
         <input
-          className="basis-[18ch] border-b border-[color:var(--rule)] bg-transparent py-1 font-mono text-[13px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+          className="border-border text-fg focus:border-accent basis-[18ch] border-b bg-transparent py-1 font-mono text-[13px] focus:outline-none"
           list="federation-providers"
           onChange={(e) => setProvider(e.target.value)}
           placeholder="google"
@@ -59,17 +59,17 @@ export function FederationView() {
           <option value="microsoft" />
         </datalist>
 
-        <label className="font-mono text-[11px] tracking-[0.18em] text-[color:var(--accent)] uppercase">
+        <label className="text-accent font-mono text-[11px] tracking-[0.18em] uppercase">
           subject
         </label>
         <input
-          className="min-w-0 flex-1 border-b border-[color:var(--rule)] bg-transparent py-1 font-mono text-[13px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+          className="border-border text-fg focus:border-accent min-w-0 flex-1 border-b bg-transparent py-1 font-mono text-[13px] focus:outline-none"
           onChange={(e) => setSubjectDraft(e.target.value)}
           placeholder="opaque OAuth sub (NOT email)"
           value={subjectDraft}
         />
         <button
-          className="border border-[color:var(--rule)] px-3 py-1 font-mono text-[11px] tracking-[0.18em] text-[color:var(--ink)] uppercase hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+          className="border-border text-fg hover:border-accent hover:text-accent border px-3 py-1 font-mono text-[11px] tracking-[0.18em] uppercase"
           type="submit"
         >
           Lookup
@@ -139,25 +139,25 @@ function ResultsTable({
 
 function FedRow({ row }: { row: FederationRow }) {
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] items-baseline gap-3 border-b border-[color:var(--rule-soft)] py-2 last:border-b-0">
-      <span className="min-w-0 truncate font-mono text-[12px] text-[color:var(--ink)]">
+    <li className="border-border-muted grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] items-baseline gap-3 border-b py-2 last:border-b-0">
+      <span className="text-fg min-w-0 truncate font-mono text-[12px]">
         {row.projectName ?? row.projectId}
       </span>
-      <span className="min-w-0 truncate font-mono text-[11px] text-[color:var(--ink-soft)]">
+      <span className="text-fg-secondary min-w-0 truncate font-mono text-[11px]">
         {row.userId ? (
           <>user&nbsp;{row.userId}</>
         ) : (
-          <span className="text-[color:var(--ink-muted)]">no userId</span>
+          <span className="text-fg-muted">no userId</span>
         )}
       </span>
-      <span className="min-w-0 truncate font-mono text-[11px] text-[color:var(--ink-soft)]">
+      <span className="text-fg-secondary min-w-0 truncate font-mono text-[11px]">
         {row.installId ? (
           <>install&nbsp;{row.installId.slice(0, 12)}…</>
         ) : (
-          <span className="text-[color:var(--ink-muted)]">no installId</span>
+          <span className="text-fg-muted">no installId</span>
         )}
       </span>
-      <span className="font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
+      <span className="text-fg-muted font-mono text-[11px] tabular-nums">
         {new Date(row.createdAt).toLocaleString()}
       </span>
     </li>

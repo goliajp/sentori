@@ -33,9 +33,9 @@ export function PrivacyView() {
   const findings = findingsQ.data ?? []
 
   const riskTone: Record<string, string> = {
-    high: 'text-[color:var(--danger)]',
-    low: 'text-[color:var(--success)]',
-    medium: 'text-[color:var(--warning)]',
+    high: 'text-danger',
+    low: 'text-success',
+    medium: 'text-warning',
   }
 
   return (
@@ -53,30 +53,27 @@ export function PrivacyView() {
       {score && (
         <div className="rule-grid grid-cols-1 sm:grid-cols-3">
           <ScoreCell label="release">
-            <span className="font-mono text-[18px] text-[color:var(--ink)]">{score.release}</span>
+            <span className="text-fg font-mono text-[18px]">{score.release}</span>
           </ScoreCell>
           <ScoreCell label="score">
-            <div className={`tabular-nums ${riskTone[score.risk] ?? 'text-[color:var(--ink)]'}`}>
+            <div className={`tabular-nums ${riskTone[score.risk] ?? 'text-fg'}`}>
               {score.score}
-              <span className="ml-1 text-[20px] text-[color:var(--ink-muted)]">/100</span>
+              <span className="text-fg-muted ml-1 text-[20px]">/100</span>
             </div>
             <div
               className={`mt-1.5 font-mono text-[11px] tracking-[0.2em] uppercase ${
-                riskTone[score.risk] ?? 'text-[color:var(--ink-muted)]'
+                riskTone[score.risk] ?? 'text-fg-muted'
               }`}
             >
               {score.risk} risk
             </div>
           </ScoreCell>
           <ScoreCell label="leaks">
-            <div className="text-[color:var(--ink)] tabular-nums">
+            <div className="text-fg tabular-nums">
               {score.leakingEvents.toLocaleString()}
-              <span className="text-[color:var(--ink-muted)]">
-                {' '}
-                / {score.totalEvents.toLocaleString()}
-              </span>
+              <span className="text-fg-muted"> / {score.totalEvents.toLocaleString()}</span>
             </div>
-            <div className="mt-1.5 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink-muted)]">
+            <div className="text-fg-muted mt-1.5 font-mono text-[11px] tracking-[0.05em]">
               {Object.entries(score.leaksByKind)
                 .map(([k, v]) => `${k}=${v}`)
                 .join(' · ') || '—'}
@@ -131,7 +128,7 @@ export function PrivacyView() {
                   <td>{f.release}</td>
                   <td className="lead">{f.fieldPath}</td>
                   <td>{f.patternKind}</td>
-                  <td className="max-w-[40ch] truncate text-[color:var(--ink-soft)]">{f.sample}</td>
+                  <td className="text-fg-secondary max-w-[40ch] truncate">{f.sample}</td>
                 </tr>
               ))}
             </tbody>
@@ -147,9 +144,8 @@ function ScoreCell({ children, label }: { children: React.ReactNode; label: stri
     <div className="rule-cell">
       <div className="t-tag">{label}</div>
       <div
-        className="mt-3 text-[color:var(--ink)]"
+        className="text-fg mt-3"
         style={{
-          fontFamily: 'var(--font-sans)',
           fontVariationSettings: "'wdth' 100, 'opsz' 48, 'wght' 550",
           fontSize: '32px',
           letterSpacing: '-0.016em',

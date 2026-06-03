@@ -10,13 +10,13 @@ export function StubView() {
   return (
     <div className="sentori-page-in">
       <PageHeader subtitle="not yet implemented" title={title} />
-      <div className="border-y border-[color:var(--rule)] px-4 py-10 text-center">
-        <div className="mb-1.5 font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+      <div className="border-border border-y px-4 py-10 text-center">
+        <div className="text-accent mb-1.5 font-mono text-[10px] tracking-[0.22em] uppercase">
           Coming soon
         </div>
-        <div className="text-[13px] text-[color:var(--ink-soft)]">
-          <span className="font-mono text-[color:var(--ink)]">{title}</span> is wired into the
-          router but the view body lands in a follow-up.
+        <div className="text-fg-secondary text-[13px]">
+          <span className="text-fg font-mono">{title}</span> is wired into the router but the view
+          body lands in a follow-up.
         </div>
       </div>
     </div>

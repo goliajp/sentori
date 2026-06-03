@@ -1,4 +1,5 @@
 import {
+  type BeforeSendHook,
   type CaptureMessageOptions,
   hashIdentities,
   type LinkBy,
@@ -296,10 +297,48 @@ export const captureError = (error: Error, extras?: CaptureExtras): void => {
         'kinds=', (event.attachments ?? []).map((a) => a.kind).join(',') || '(none)',
         'breadcrumbsAtEnqueue=', __peekBreadcrumbCount(),
       );
-    enqueue(event);
+    // v2.3 — host beforeSend hook. Sync; drops on null, falls back
+    // to unmutated event on throw or non-event return.
+    const finalEvent = applyBeforeSend(event, config.beforeSend);
+    if (finalEvent === null) return;
+    enqueue(finalEvent);
   };
   void pipeline();
 };
+
+/**
+ * v2.3 — invoke the host's `beforeSend` hook (if any) under the
+ * NEVER rule. Returns the (possibly mutated) event, or null to
+ * drop. A throw / non-event return is treated as a no-op
+ * (one-shot warn + send unmodified) so a buggy host hook can't
+ * stall captures.
+ */
+let _beforeSendThrewWarned = false;
+function applyBeforeSend(event: Event, hook: BeforeSendHook | undefined): Event | null {
+  if (!hook) return event;
+  try {
+    const result = hook(event);
+    if (result === null) {
+      logger.debug('capture', 'beforeSend dropped event', 'eventId=', event.id);
+      return null;
+    }
+    if (typeof result !== 'object' || !result || typeof (result as Event).id !== 'string') {
+      // Host returned a non-event shape; fall back.
+      if (!_beforeSendThrewWarned) {
+        _beforeSendThrewWarned = true;
+        logger.warn('capture', 'beforeSend returned non-event shape; falling back to unmodified event');
+      }
+      return event;
+    }
+    return result;
+  } catch (e) {
+    if (!_beforeSendThrewWarned) {
+      _beforeSendThrewWarned = true;
+      logger.warn('capture', 'beforeSend threw; falling back to unmodified event', e);
+    }
+    return event;
+  }
+}
 
 /** v0.9.6 #2 — upload the wireframe replay ring as a `replay`
  *  attachment. Plain NDJSON (one snapshot per line) — server may
@@ -452,7 +491,9 @@ export const captureMessage = safeFn(
       breadcrumbs: crumbs,
     };
 
-    enqueue(event);
+    const finalEvent = applyBeforeSend(event, config.beforeSend);
+    if (finalEvent === null) return;
+    enqueue(finalEvent);
   },
 );
 
@@ -461,6 +502,11 @@ export const captureMessage = safeFn(
  *  on 2026-05-18 needs a behaviour-level test that exercises the
  *  same code path captureException runs in production. */
 export const __captureAndAttachReplayForTests = captureAndAttachReplay;
+
+/** v2.3 — test hook for the beforeSend dispatcher. The dispatcher
+ *  is internal so the unit test reaches it directly without
+ *  needing to stub the whole transport pipeline. */
+export const __applyBeforeSendForTests = applyBeforeSend;
 
 /** Phase 42 sub-D.08: per-session screenshot quota gate. */
 function allowScreenshot(): boolean {

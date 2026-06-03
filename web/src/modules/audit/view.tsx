@@ -79,9 +79,9 @@ export function AuditLogView() {
               {rows.map((e) => (
                 <tr key={e.id}>
                   <td className="num">{formatRelative(e.createdAt)}</td>
-                  <td className="text-[color:var(--accent)]">{e.actorEmail ?? 'system'}</td>
+                  <td className="text-accent">{e.actorEmail ?? 'system'}</td>
                   <td className="lead">{e.action}</td>
-                  <td className="text-[color:var(--ink-soft)]">
+                  <td className="text-fg-secondary">
                     {e.targetType}:{e.targetId ?? '—'}
                   </td>
                 </tr>
@@ -90,9 +90,9 @@ export function AuditLogView() {
           </table>
 
           {q.hasNextPage && (
-            <div className="flex items-center justify-center border-y border-[color:var(--rule)] py-4">
+            <div className="border-border flex items-center justify-center border-y py-4">
               <button
-                className="inline-flex h-8 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-4 font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink)] uppercase transition-colors hover:border-[color:var(--accent)] hover:text-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
+                className="border-border bg-bg-secondary text-fg hover:border-accent hover:text-accent inline-flex h-8 items-center border px-4 font-mono text-[11px] tracking-[0.08em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={isLoadingMore}
                 onClick={() => void q.fetchNextPage()}
                 type="button"
@@ -102,7 +102,7 @@ export function AuditLogView() {
             </div>
           )}
           {!q.hasNextPage && rows.length >= PAGE_SIZE && (
-            <p className="border-y border-[color:var(--rule)] py-3 text-center font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+            <p className="border-border text-fg-muted border-y py-3 text-center font-mono text-[10px] tracking-[0.18em] uppercase">
               end of history
             </p>
           )}

@@ -7,7 +7,7 @@ name: deploy
 # .env from repo secrets, then `docker compose up -d`.
 #
 # Trigger surface (Phase 48 sub-H — every dashboard change must be
-# visible on app.sentori.golia.jp without a manual branch push):
+# visible on sentori.golia.jp/main without a manual branch push):
 #
 #   - push to master → deploy automatically AFTER the `build` workflow
 #     completes green for the same SHA. We gate on the build run

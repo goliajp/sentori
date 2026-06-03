@@ -17,6 +17,7 @@
 // Hosts that don't use react-navigation can call
 // `sentori.track('$pageview', { route: 'Cart' })` themselves.
 
+import { addInternalBreadcrumb } from './breadcrumbs';
 import { getCurrentUserId } from './capture';
 import { getConfig, isInitialized } from './config';
 import { sendTrackBatch } from './transport';
@@ -74,6 +75,14 @@ export function track(name: string, props?: TrackProps, route?: string): void {
     userId: getCurrentUserId(),
   };
   _buf.push(ev);
+  // v2.0 W3 — auto-breadcrumb. When `init.capture.trackAutoBreadcrumb`
+  // is `true`, push a `{ type: 'track', data: { name, props } }`
+  // breadcrumb so the customer journey leading up to a later
+  // `captureException` / `captureMessage` is visible in the dashboard.
+  // Defaults off — see Config.trackAutoBreadcrumb docstring.
+  if (config?.trackAutoBreadcrumb === true) {
+    addInternalBreadcrumb('track', props ? { name, props } : { name });
+  }
   if (_buf.length >= MAX_BUFFER) {
     void flushTrack();
   }

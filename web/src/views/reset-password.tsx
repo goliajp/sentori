@@ -44,7 +44,7 @@ export function ResetPasswordView() {
   return (
     <AuthShell title="Set a new password">
       {done ? (
-        <p className="text-[13px] text-[color:var(--ink-soft)]">
+        <p className="text-fg-secondary text-[13px]">
           Password reset. All your other sessions were signed out. Redirecting to sign-in…
         </p>
       ) : (
@@ -60,13 +60,13 @@ export function ResetPasswordView() {
           <PrimaryButton busy={busy} disabled={password.length < 8}>
             {busy ? 'resetting…' : 'set password'}
           </PrimaryButton>
-          <p className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+          <p className="text-fg-muted font-mono text-[10px] tracking-[0.12em] uppercase">
             8 characters minimum
           </p>
         </form>
       )}
       <FooterLinks>
-        <Link className="hover:text-[color:var(--accent)]" to="/login">
+        <Link className="hover:text-accent" to="/login">
           back to sign in
         </Link>
       </FooterLinks>

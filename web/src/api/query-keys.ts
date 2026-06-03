@@ -58,6 +58,9 @@ export const qk = {
     activity: (projectId: Id, issueId: Id) => tuple('issue-activity', projectId, issueId),
     userReports: (projectId: Id, issueId: Id) => tuple('issue-user-reports', projectId, issueId),
     culprits: (projectId: Id, issueId: Id) => tuple('culprits', projectId, issueId),
+    // v2.4 — find-user lens: per-issue affected fingerprints panel.
+    affectedUsers: (projectId: Id, issueId: Id, days: number) =>
+      tuple('issue-affected-users', projectId, issueId, days),
   },
 
   // ── traces ──────────────────────────────────────────────────────────
@@ -97,10 +100,31 @@ export const qk = {
     trustScores: (projectId: Id) => tuple('trust-scores', projectId),
   },
 
+  // ── v2.1 W4: endpoint health ────────────────────────────────────────
+  endpointChecks: {
+    list: (projectId: Id) => tuple('endpoint-checks', projectId),
+    detail: (projectId: Id, id: Id) => tuple('endpoint-check', projectId, id),
+    probes: (projectId: Id, id: Id, from: string, to: string) =>
+      tuple('endpoint-check-probes', projectId, id, from, to),
+    rollup: (projectId: Id, id: Id, from: string, to: string) =>
+      tuple('endpoint-check-rollup', projectId, id, from, to),
+  },
+
   // ── metrics / moments / vitals ──────────────────────────────────────
   metrics: {
     names: (projectId: Id) => tuple('metric-names', projectId),
     points: (projectId: Id, name: Id) => tuple('metric-points', projectId, name),
+    /** v2.1 W3 — runtime metrics BI query. Folds every dim into
+     *  the cache key so different slices don't collide. */
+    runtime: (
+      projectId: Id,
+      name: string,
+      dim: string,
+      measure: string,
+      bucket: string,
+      from: string,
+      to: string
+    ) => tuple('runtime-metrics-query', projectId, name, dim, measure, bucket, from, to),
   },
   moments: {
     list: (projectId: Id) => tuple('moments', projectId),
@@ -117,6 +141,30 @@ export const qk = {
     windowKey === undefined
       ? tuple('releases', projectId)
       : tuple('releases', projectId, windowKey),
+
+  // ── v2.2 W3: /explore consumers ─────────────────────────────────────
+  // Distinct namespace so the explore-driven Issues list doesn't share
+  // cache with the legacy `listIssuesPage` consumer behind ?legacy=1.
+  // Each call site provides its full payload as part of the key so the
+  // cache reflects the actual server query (window / measure / filters
+  // all live in the key).
+  exploreIssues: (
+    projectId: Id,
+    measure: string,
+    windowKey: string,
+    status: string,
+    release: string,
+    errorType: string,
+    env: string,
+    // v2.3 — server-side search (filters.search). Added to the key
+    // so the cached result distinguishes "TypeError" vs "Network".
+    search: string
+  ) =>
+    tuple('explore-issues', projectId, measure, windowKey, status, release, errorType, env, search),
+  // v2.3 — per-issue sparkline. Each Issues rail row fetches one
+  // `dim=time_bucket` query keyed on (project, issue, window).
+  exploreIssueSparkline: (projectId: Id, issueId: Id, windowKey: string) =>
+    tuple('explore-issue-sparkline', projectId, issueId, windowKey),
   releaseArtifacts: (projectId: Id, release: string) =>
     tuple('release-artifacts', projectId, release),
   sourcemapStatus: (projectId: Id) => tuple('sourcemap-status', projectId),

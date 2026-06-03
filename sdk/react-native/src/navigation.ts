@@ -22,7 +22,7 @@
 
 import { useEffect, useRef } from 'react';
 
-import { setActiveSpan, startSpan, type SpanHandle } from '@goliapkg/sentori-core';
+import { emitMetric, setActiveSpan, startSpan, type SpanHandle } from '@goliapkg/sentori-core';
 
 import {
   getNativeFrameCounters,
@@ -161,6 +161,19 @@ export function useTraceNavigation(navigationRef: NavigationRefLike): void {
       const prev = lastRouteRef.current;
       if (next === null || next === prev) return;
       const dwellMs = finishOpenSpanWithDwell();
+      // v2.1 W2 — emit dwell as a runtime metric so the BI panel
+      // can rank screens by how long users sat on them. Tagged
+      // with `from` + `to` so a release-over-release diff can spot
+      // a 2x dwell regression on Onboarding etc. emit is cheap +
+      // bounded by the core ring cap; if `capture.runtimeMetrics:
+      // false` the flush is off but the ring still records up to
+      // the cap before dropping oldest.
+      if (typeof dwellMs === 'number' && dwellMs >= 0) {
+        emitMetric('runtime.route_nav_ms', dwellMs, {
+          from: prev ?? '',
+          to: next ?? '',
+        });
+      }
       openScreenSpan(prev, next, dwellMs);
     });
 

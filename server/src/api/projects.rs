@@ -130,6 +130,14 @@ pub struct PatchProjectBody {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(deserialize_with = "deserialize_optional_field")]
     pub source_repo_url: Option<Option<String>>,
+    /// v2.5+ — project-level identity scope carve. `Some(Some(id))`
+    /// points the project at an existing identity_scope (must
+    /// belong to the project's org for safety); `Some(None)` clears
+    /// the override, letting ingest fall back to the org default;
+    /// absent leaves the column alone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(deserialize_with = "deserialize_optional_uuid")]
+    pub identity_scope_id: Option<Option<Uuid>>,
 }
 
 // serde idiom for distinguishing absent vs explicit null: deserialize
@@ -139,6 +147,13 @@ where
     D: serde::Deserializer<'de>,
 {
     Ok(Some(Option::<String>::deserialize(de)?))
+}
+
+fn deserialize_optional_uuid<'de, D>(de: D) -> Result<Option<Option<Uuid>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Some(Option::<Uuid>::deserialize(de)?))
 }
 
 /// PATCH /admin/api/projects/{project_id}
@@ -224,6 +239,57 @@ pub async fn patch_project(
             crate::audit::targets::PROJECT,
             Some(project_id),
             json!({ "sourceRepoUrl": value }),
+        )
+        .await;
+    }
+
+    // v2.5+ — project-level identity scope carve. `Some(Some(id))`
+    // points the project at the named scope; `Some(None)` clears.
+    // We validate that the target scope (a) exists and (b) belongs
+    // to the same org as the project — cross-org carves would let
+    // an admin leak identity correlations across tenants.
+    if let Some(opt) = body.identity_scope_id {
+        if let Some(scope_id) = opt {
+            // Safety: only allow scopes that live in this org.
+            // Schema doesn't carry an `org_id` on identity_scopes
+            // directly; check via the org_identity_scopes mapping.
+            let owns: bool = sqlx::query_scalar::<_, bool>(
+                "SELECT EXISTS ( \
+                   SELECT 1 FROM org_identity_scopes \
+                   WHERE org_id = $1 AND scope_id = $2 \
+                 )",
+            )
+            .bind(org_id)
+            .bind(scope_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap_or(false);
+            if !owns {
+                return bad_request("identityScopeNotInOrg");
+            }
+        }
+        if let Err(e) =
+            sqlx::query("UPDATE projects SET identity_scope_id = $1 WHERE id = $2")
+                .bind(opt)
+                .bind(project_id)
+                .execute(&pool)
+                .await
+        {
+            tracing::error!(error = %e, %project_id, "patch_project identity_scope_id failed");
+            return server_error("dbError");
+        }
+        let actor = match &caller {
+            AdminCaller::User { id, .. } => Some(*id),
+            _ => None,
+        };
+        crate::audit::record(
+            &pool,
+            org_id,
+            actor,
+            crate::audit::actions::PROJECT_UPDATED,
+            crate::audit::targets::PROJECT,
+            Some(project_id),
+            json!({ "identityScopeId": opt }),
         )
         .await;
     }

@@ -48,7 +48,11 @@ export type CaptureMessageOptions = {
    *  ring-buffer snapshot is sealed and attached. */
   breadcrumbs?: Breadcrumb[]
 }
-export type BreadcrumbType = 'custom' | 'log' | 'nav' | 'net' | 'user'
+/** v2.0 W3 — `track` joins the breadcrumb type axis. Emitted
+ *  automatically by `sentori.track()` when `init.capture.trackAutoBreadcrumb`
+ *  is `true`, so a later `captureException` carries the customer
+ *  journey leading up to the failure. */
+export type BreadcrumbType = 'custom' | 'log' | 'nav' | 'net' | 'track' | 'user'
 
 export type Event = {
   app: App
@@ -248,8 +252,23 @@ export type Span = {
   traceId: string
 }
 
+/** v2.0 W3 — capture-time policy knobs shared across SDKs. Optional
+ *  block; absent → all defaults. Defaults are conservative to avoid
+ *  changing existing customer breadcrumb shape; new integrations are
+ *  encouraged to set `trackAutoBreadcrumb: true`. */
+export type CaptureOptions = {
+  /** When `true`, every `track(name, props)` call also pushes a
+   *  breadcrumb of `{ type: 'track', data: { name, props } }` so the
+   *  customer journey shows up on a subsequent `captureException` /
+   *  `captureMessage`. Defaults to `false` to preserve v1 behaviour
+   *  on upgrade. */
+  trackAutoBreadcrumb?: boolean
+}
+
 /** Subset of init options that every SDK accepts. SDKs may extend. */
 export type CommonInitOptions = {
+  /** v2.0 W3 — capture-time policy knobs. See `CaptureOptions`. */
+  capture?: CaptureOptions
   /** "prod" / "dev" / "staging" / whatever you want. */
   environment: string
   /** e.g. https://ingest.sentori.golia.jp */
@@ -259,6 +278,40 @@ export type CommonInitOptions = {
   /** Public token, format `st_pk_<26 base32 chars>`. */
   token: string
 }
+
+/**
+ * v2.3 — payload handed to `init({ onReady })` after init completes.
+ * Shared across SDKs so a host that switches from web to RN reads the
+ * same shape. `native` is optional because non-mobile SDKs never have
+ * a native module to bind. `coldStartMs` is also optional — only the
+ * RN SDK measures it via the native bridge timing.
+ */
+export type ReadyInfo = {
+  /** npm version of the SDK package that fired this. */
+  sdkVersion: string
+  /** Milliseconds between cold-start signal and `init()` completion.
+   *  Only populated by the RN SDK; undefined elsewhere. */
+  coldStartMs?: number
+  /** Native module bind status. Present on RN; absent on web / JS. */
+  native?: { bound: boolean; methods: string[] }
+}
+
+/**
+ * v2.3 — host-supplied filter / mutator hook. Called once per event
+ * just before transport enqueue. Return the event (possibly mutated)
+ * to send it, or `null` to drop it entirely. Synchronous — async
+ * pre-send mutation is intentionally not supported (would let the
+ * host stall the SDK's hot path).
+ *
+ * If the hook throws, SDK swallows the error (NEVER rule), emits one
+ * one-shot `logger.warn`, and falls back to the un-mutated event.
+ * If it returns a non-event (e.g. `undefined`), same treatment.
+ *
+ * Use for host-side PII scrubbing the SDK can't do automatically
+ * (custom field names, application-specific redaction). Server-side
+ * privacy_lab still runs even when no beforeSend is configured.
+ */
+export type BeforeSendHook = (event: Event) => Event | null
 
 /**
  * Phase 44 sub-A — per-event-class client-side sampling. Each rate

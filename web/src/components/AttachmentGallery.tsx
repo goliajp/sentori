@@ -24,16 +24,16 @@ function InfoBox({
   title: string
   variant?: 'danger' | 'info' | 'warning'
 }) {
-  const accent = variant === 'danger' ? 'var(--danger)' : 'var(--accent)'
+  const accent = variant === 'danger' ? 'var(--color-danger)' : 'var(--color-accent)'
   return (
-    <div className="border-t border-b px-0 py-3" style={{ borderColor: 'var(--rule)' }}>
+    <div className="border-t border-b px-0 py-3" style={{ borderColor: 'var(--color-border)' }}>
       <div
         className="mb-1.5 font-mono text-[10px] tracking-[0.22em] uppercase"
         style={{ color: accent }}
       >
         {title}
       </div>
-      <div className="text-[13px] text-[color:var(--ink-soft)]">{children}</div>
+      <div className="text-fg-secondary text-[13px]">{children}</div>
     </div>
   )
 }
@@ -120,7 +120,7 @@ export function AttachmentGallery({
     // event-swaps from hitting this branch.
     return (
       <Frame>
-        <p className="text-[12px] text-[color:var(--ink-muted)]">Loading attachments…</p>
+        <p className="text-fg-muted text-[12px]">Loading attachments…</p>
       </Frame>
     )
   }
@@ -266,7 +266,7 @@ function DetailsSlot({
   trailing?: string
 }) {
   return (
-    <div className="mt-4 border-t border-[color:var(--rule)]">
+    <div className="border-border mt-4 border-t">
       <button
         aria-expanded={isOpen}
         className="flex w-full cursor-pointer items-baseline gap-3 py-3 text-left"
@@ -275,17 +275,17 @@ function DetailsSlot({
       >
         <span
           aria-hidden
-          className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)]"
+          className="text-fg-muted font-mono text-[10px] tracking-[0.18em]"
           style={{ display: 'inline-block', width: 10 }}
         >
           {isOpen ? '▾' : '▸'}
         </span>
-        <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+        <span className="text-accent font-mono text-[10px] tracking-[0.22em] uppercase">
           {label}
         </span>
-        <span className="font-sans text-[14px] text-[color:var(--ink)]">{subtitle}</span>
+        <span className="text-fg font-sans text-[14px]">{subtitle}</span>
         {trailing && (
-          <span className="ml-auto font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+          <span className="text-fg-muted ml-auto font-mono text-[10px] tracking-[0.18em] uppercase">
             {trailing}
           </span>
         )}
@@ -331,15 +331,13 @@ function ScreenshotTile({
       title={`Open in debug center · ${attachment.source ?? 'unknown'}`}
       type="button"
     >
-      <span className="block max-h-44 w-fit overflow-hidden outline outline-1 outline-offset-0 outline-[color:var(--rule)] transition-colors group-hover:outline-[color:var(--accent)]">
+      <span className="outline-border group-hover:outline-accent block max-h-44 w-fit overflow-hidden outline outline-1 outline-offset-0 transition-colors">
         <StableImage alt="Crash screenshot" className="block max-h-44 w-auto" src={url} />
       </span>
-      <span className="mt-1.5 block font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase transition-colors group-hover:text-[color:var(--accent)]">
+      <span className="text-fg-muted group-hover:text-accent mt-1.5 block font-mono text-[10px] tracking-[0.18em] uppercase transition-colors">
         screenshot
-        {attachment.source && (
-          <span className="ml-2 text-[color:var(--ink-muted)]">· {attachment.source}</span>
-        )}
-        <span className="ml-2 tracking-normal text-[color:var(--ink-muted)] normal-case group-hover:text-[color:var(--accent)]">
+        {attachment.source && <span className="text-fg-muted ml-2">· {attachment.source}</span>}
+        <span className="text-fg-muted group-hover:text-accent ml-2 tracking-normal normal-case">
           ↗ open
         </span>
       </span>
@@ -385,14 +383,14 @@ function NonImageTile({
 }) {
   return (
     <button
-      className="flex flex-col items-start gap-1 border-l-2 border-[color:var(--rule)] px-3 py-2 text-[color:var(--ink-soft)] transition-colors hover:border-[color:var(--accent)] hover:text-[color:var(--ink)]"
+      className="border-border text-fg-secondary hover:border-accent hover:text-fg flex flex-col items-start gap-1 border-l-2 px-3 py-2 transition-colors"
       onClick={onOpen}
       title={`Open in debug center · ${attachment.kind}`}
       type="button"
     >
       <span className="font-mono text-[12px]">{attachment.kind}</span>
       {attachment.source && (
-        <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+        <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
           {attachment.source}
         </span>
       )}

@@ -74,7 +74,7 @@ export function UsersOverview() {
           No identified users yet in this org over the last {windowDays} day
           {windowDays === 1 ? '' : 's'}.
           <br />
-          <span className="font-mono text-[11px] text-[color:var(--ink-muted)]">
+          <span className="text-fg-muted font-mono text-[11px]">
             (SDKs need a call to{' '}
             <code>
               setUser({'{'} identities: {'{'} … {'}'} {'}'})
@@ -88,10 +88,7 @@ export function UsersOverview() {
 
   return (
     <Container days={days} onWindowChange={onWindowChange}>
-      <section
-        aria-label="kpi"
-        className="grid grid-cols-1 border-y border-[color:var(--rule)] sm:grid-cols-3"
-      >
+      <section aria-label="kpi" className="border-border grid grid-cols-1 border-y sm:grid-cols-3">
         <Stat
           label={`identified · ${windowDays}d`}
           sub="distinct fingerprints"
@@ -111,11 +108,11 @@ export function UsersOverview() {
       </section>
 
       <section>
-        <header className="mb-3 flex items-baseline justify-between border-b border-[color:var(--rule)] pb-2">
-          <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+        <header className="border-border mb-3 flex items-baseline justify-between border-b pb-2">
+          <span className="text-accent font-mono text-[10px] tracking-[0.22em] uppercase">
             most affected · last {windowDays}d
           </span>
-          <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+          <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
             top {top.length}
           </span>
         </header>
@@ -141,7 +138,7 @@ function Container({
 }) {
   return (
     <div className="space-y-8">
-      <div className="flex items-baseline justify-end border-b border-[color:var(--rule)] pb-2">
+      <div className="border-border flex items-baseline justify-end border-b pb-2">
         <WindowSwitcher onChange={onWindowChange} value={days} />
       </div>
       {children}
@@ -152,7 +149,7 @@ function Container({
 function TopList({ orgSlug, rows }: { orgSlug: string; rows: UsersOverviewTopRow[] }) {
   if (rows.length === 0) {
     return (
-      <p className="py-4 text-center font-mono text-[11px] text-[color:var(--ink-muted)]">
+      <p className="text-fg-muted py-4 text-center font-mono text-[11px]">
         no identified user activity in this window.
       </p>
     )
@@ -175,13 +172,13 @@ function TopList({ orgSlug, rows }: { orgSlug: string; rows: UsersOverviewTopRow
           <tr key={r.fingerprintHex}>
             <td className="lead">
               <Link
-                className="text-[color:var(--ink)] hover:text-[color:var(--accent)]"
+                className="text-fg hover:text-accent"
                 to={`/main/org/${orgSlug}/users/${r.fingerprintHex}`}
               >
                 <span className="font-mono text-[11px]">{r.fingerprintHex.slice(0, 12)}…</span>
               </Link>
             </td>
-            <td className="font-mono text-[11px] text-[color:var(--ink-soft)]">{r.keyType}</td>
+            <td className="text-fg-secondary font-mono text-[11px]">{r.keyType}</td>
             <td className="num tabular-nums">{r.eventCount.toLocaleString()}</td>
             <td className="num tabular-nums">{r.issueCount.toLocaleString()}</td>
             <td className="font-mono text-[11px]">{r.primaryRelease ?? '—'}</td>
@@ -197,16 +194,16 @@ function TopList({ orgSlug, rows }: { orgSlug: string; rows: UsersOverviewTopRow
 function BreakdownCard({ rows, title }: { rows: UsersOverviewBreakdownRow[]; title: string }) {
   return (
     <div>
-      <header className="mb-2 flex items-baseline justify-between border-b border-[color:var(--rule)] pb-1">
-        <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+      <header className="border-border mb-2 flex items-baseline justify-between border-b pb-1">
+        <span className="text-accent font-mono text-[10px] tracking-[0.22em] uppercase">
           {title}
         </span>
-        <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+        <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
           top {Math.min(rows.length, 5)}
         </span>
       </header>
       {rows.length === 0 ? (
-        <p className="py-2 font-mono text-[11px] text-[color:var(--ink-muted)]">no data yet</p>
+        <p className="text-fg-muted py-2 font-mono text-[11px]">no data yet</p>
       ) : (
         <ul>
           {rows.slice(0, 5).map((r) => {
@@ -215,17 +212,17 @@ function BreakdownCard({ rows, title }: { rows: UsersOverviewBreakdownRow[]; tit
             return (
               <li
                 key={r.label}
-                className="flex items-baseline gap-3 border-b border-[color:var(--rule-soft)] py-1.5 last:border-b-0"
+                className="border-border-muted flex items-baseline gap-3 border-b py-1.5 last:border-b-0"
               >
-                <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-[color:var(--ink)]">
+                <span className="text-fg min-w-0 flex-1 truncate font-mono text-[12px]">
                   {r.label}
                 </span>
-                <span className="font-mono text-[11px] text-[color:var(--ink-soft)] tabular-nums">
+                <span className="text-fg-secondary font-mono text-[11px] tabular-nums">
                   {r.fingerprintCount.toLocaleString()}
                 </span>
                 <span
                   aria-hidden
-                  className="block h-[2px] basis-[80px] bg-[color:var(--accent)]"
+                  className="bg-accent block h-[2px] basis-[80px]"
                   style={{ opacity: 0.25 + (pct / 100) * 0.6, width: `${pct}%` }}
                 />
               </li>

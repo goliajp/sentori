@@ -8,6 +8,7 @@
 // the buffer. The SDK's transport flushes whatever's in the buffer
 // at its own cadence.
 
+import { withActiveSpan as withActiveSpanImpl } from './trace-context.js'
 import type { Span, SpanStatus } from './types.js'
 import { uuidV7 } from './uuid.js'
 
@@ -316,6 +317,42 @@ export function withScopedSpan<T>(
     span.end({ status: 'error' })
     throw e
   }
+}
+
+/**
+ * v2.3 — unified `withSpan` entry point per design §2.3. Dispatches
+ * by first-argument type:
+ *
+ *   `withSpan(name: string, fn)`  → high-level wrap helper.
+ *                                   Opens a span, runs fn, ends
+ *                                   the span. Same as
+ *                                   `withScopedSpan(name, fn)`.
+ *
+ *   `withSpan(span: SpanContextLike, fn)` → low-level active-span
+ *                                   manager. Pushes the span onto
+ *                                   the active-context stack for the
+ *                                   duration of fn so child spans
+ *                                   inherit it as parent. Same as
+ *                                   `withActiveSpan(span, fn)`.
+ *
+ * `withScopedSpan` + `withActiveSpan` remain exported for callers
+ * who want the explicit name; both compile to the same runtime.
+ */
+export function withSpan<T>(span: SpanContextLike, fn: () => T): T
+export function withSpan<T>(
+  name: string,
+  fn: (span: SpanHandle) => T,
+  opts?: StartSpanOptions,
+): T
+export function withSpan<T>(
+  arg: SpanContextLike | string,
+  fn: ((span: SpanHandle) => T) | (() => T),
+  opts: StartSpanOptions = {},
+): T {
+  if (typeof arg === 'string') {
+    return withScopedSpan(arg, fn as (s: SpanHandle) => T, opts)
+  }
+  return withActiveSpanImpl(arg, fn as () => T)
 }
 
 /** Snapshot the global buffer (does not drain). */

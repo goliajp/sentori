@@ -43,6 +43,19 @@ export default defineConfig({
           ],
         },
         {
+          label: 'Manual instrumentation',
+          items: [
+            { label: 'Manual issue reporting', slug: 'recipes/manual-issue' },
+            { label: 'Manual trace', slug: 'recipes/manual-trace' },
+            { label: 'Manual span', slug: 'recipes/manual-span' },
+            { label: 'Manual moment', slug: 'recipes/manual-moment' },
+            { label: 'Manual breadcrumb', slug: 'recipes/manual-breadcrumb' },
+            { label: 'Track + metrics', slug: 'recipes/track-and-metrics' },
+            { label: 'Runtime metrics', slug: 'recipes/runtime-metrics' },
+            { label: 'v1 → v2 migration', slug: 'recipes/v1-to-v2-migration' },
+          ],
+        },
+        {
           label: 'Recipes',
           items: [
             { label: 'Next.js', slug: 'recipes/nextjs' },
@@ -54,6 +67,29 @@ export default defineConfig({
             { label: 'Source map upload (CI)', slug: 'recipes/sourcemap-upload' },
             { label: 'Release versioning', slug: 'recipes/release-versioning' },
             { label: 'Multi-environment', slug: 'recipes/multi-environment' },
+            { label: 'Endpoint health', slug: 'recipes/endpoint-health' },
+            { label: 'Find bugs with /explore', slug: 'recipes/find-bugs-with-explore' },
+            { label: 'Find users affected', slug: 'recipes/find-users-affected' },
+            { label: 'Find slow routes', slug: 'recipes/find-slow' },
+          ],
+        },
+        {
+          label: 'API reference',
+          items: [
+            { label: 'sentori.init()', slug: 'api/init' },
+            { label: 'captureException / captureMessage', slug: 'api/capture' },
+            { label: 'Scope (setUser / setTag / addBreadcrumb)', slug: 'api/scope' },
+            { label: 'Tracing (startSpan / withSpan / startTrace)', slug: 'api/tracing' },
+            { label: 'SDK logger', slug: 'api/logger' },
+            { label: 'init.beforeSend hook', slug: 'api/before-send' },
+          ],
+        },
+        {
+          label: 'Privacy & compliance',
+          items: [
+            { label: 'Identity layer', slug: 'privacy/identity' },
+            { label: 'GDPR DSR erase', slug: 'privacy/dsr' },
+            { label: 'Sentry compat', slug: 'sentry-compat' },
           ],
         },
         {

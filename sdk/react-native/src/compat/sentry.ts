@@ -67,6 +67,10 @@ type SentryInitOpts = {
   [other: string]: unknown
 }
 
+/** Exported for tests only — direct callers should use `Sentry.init`,
+ *  which threads the parsed DSN through the rest of the init machinery. */
+export const __parseDsnForTests = parseDsn
+
 function parseDsn(dsn: string): { token: string; ingestUrl: string } {
   // Sentry DSN shape: `https://<key>@<host>[:port][/<projectId>]`
   // Sentori cares about `<key>` (must be `st_pk_…`) and `<host>`.
@@ -342,6 +346,10 @@ type SentryBreadcrumb = {
 }
 
 type SentoriBreadcrumbType = 'custom' | 'log' | 'nav' | 'net' | 'user'
+
+/** Exported for tests only. */
+export const __mapCategoryToTypeForTests = mapCategoryToType
+export const __mapLevelForTests = mapLevel
 
 function mapCategoryToType(category: string | undefined): SentoriBreadcrumbType | undefined {
   if (!category) return undefined

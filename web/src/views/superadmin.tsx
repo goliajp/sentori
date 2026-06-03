@@ -20,7 +20,7 @@ export function SuperadminLayout() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       <Link
-        className="inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--accent)]"
+        className="text-fg-muted hover:text-accent inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.08em] uppercase"
         to="/main"
       >
         ← back to dashboard
@@ -29,7 +29,7 @@ export function SuperadminLayout() {
 
       <nav
         aria-label="Superadmin sections"
-        className="mt-2 flex items-baseline gap-5 border-b border-[color:var(--rule)] pb-px"
+        className="border-border mt-2 flex items-baseline gap-5 border-b pb-px"
       >
         <Tab to="/main/superadmin/users">Users</Tab>
         <Tab to="/main/superadmin/orgs">Orgs</Tab>
@@ -48,9 +48,7 @@ function Tab({ children, to }: { children: React.ReactNode; to: string }) {
     <NavLink
       className={({ isActive }) =>
         `relative pb-2 font-mono text-[11px] tracking-[0.1em] uppercase transition-colors ${
-          isActive
-            ? 'text-[color:var(--ink)]'
-            : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]'
+          isActive ? 'text-fg' : 'text-fg-muted hover:text-fg'
         }`
       }
       end
@@ -60,10 +58,7 @@ function Tab({ children, to }: { children: React.ReactNode; to: string }) {
         <>
           {children}
           {isActive && (
-            <span
-              aria-hidden
-              className="absolute right-0 -bottom-px left-0 h-[2px] bg-[color:var(--accent)]"
-            />
+            <span aria-hidden className="bg-accent absolute right-0 -bottom-px left-0 h-[2px]" />
           )}
         </>
       )}
@@ -137,17 +132,17 @@ function UserRow({
   return (
     <tr>
       <td className="lead">{row.email}</td>
-      <td className="text-[color:var(--ink-soft)]">{row.displayName ?? '—'}</td>
+      <td className="text-fg-secondary">{row.displayName ?? '—'}</td>
       <td>
         {row.emailVerified ? (
-          <span className="font-mono text-[10px] text-[color:var(--success)]">verified</span>
+          <span className="text-success font-mono text-[10px]">verified</span>
         ) : (
-          <span className="font-mono text-[10px] text-[color:var(--warning)]">unverified</span>
+          <span className="text-warning font-mono text-[10px]">unverified</span>
         )}
       </td>
-      <td className="font-mono text-[color:var(--ink-soft)]">{row.oauthProvider ?? '—'}</td>
+      <td className="text-fg-secondary font-mono">{row.oauthProvider ?? '—'}</td>
       <td className="num">{row.orgCount}</td>
-      <td className="font-mono text-[11px] text-[color:var(--ink-soft)]">
+      <td className="text-fg-secondary font-mono text-[11px]">
         {new Date(row.createdAt).toLocaleDateString()}
       </td>
       <td>
@@ -155,8 +150,8 @@ function UserRow({
           aria-pressed={row.isSuperadmin}
           className={`inline-flex h-6 items-center border px-2 font-mono text-[10px] tracking-[0.1em] uppercase transition-colors disabled:opacity-40 ${
             row.isSuperadmin
-              ? 'border-[color:var(--accent)] bg-[color:var(--accent-soft)] text-[color:var(--accent)] hover:border-[color:var(--danger)] hover:text-[color:var(--danger)]'
-              : 'border-[color:var(--rule)] text-[color:var(--ink-muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]'
+              ? 'border-accent bg-accent/10 text-accent hover:border-danger hover:text-danger'
+              : 'border-border text-fg-muted hover:border-accent hover:text-accent'
           }`}
           disabled={disabled || isSelf}
           onClick={() => onToggle(!row.isSuperadmin)}
@@ -200,20 +195,17 @@ export function SuperadminOrgsView() {
             {rows.map((r) => (
               <tr key={r.id}>
                 <td className="lead">
-                  <Link
-                    className="text-[color:var(--ink)] hover:text-[color:var(--accent)]"
-                    to={`/main/org/${r.slug}/overview`}
-                  >
+                  <Link className="text-fg hover:text-accent" to={`/main/org/${r.slug}/overview`}>
                     {r.name}
                   </Link>
                 </td>
-                <td className="font-mono text-[color:var(--ink-soft)]">{r.slug}</td>
-                <td className="font-mono text-[color:var(--ink-soft)]">
+                <td className="text-fg-secondary font-mono">{r.slug}</td>
+                <td className="text-fg-secondary font-mono">
                   {r.ownerEmail ?? r.ownerId.slice(0, 8)}
                 </td>
                 <td className="num">{r.memberCount}</td>
                 <td className="num">{r.projectCount}</td>
-                <td className="font-mono text-[11px] text-[color:var(--ink-soft)]">
+                <td className="text-fg-secondary font-mono text-[11px]">
                   {new Date(r.createdAt).toLocaleDateString()}
                 </td>
               </tr>
@@ -260,17 +252,17 @@ export function SuperadminProjectsView() {
                 <td className="lead">{r.name}</td>
                 <td>
                   <Link
-                    className="font-mono text-[color:var(--ink)] hover:text-[color:var(--accent)]"
+                    className="text-fg hover:text-accent font-mono"
                     to={`/main/org/${r.orgSlug}/overview`}
                   >
                     {r.orgSlug}
                   </Link>
                 </td>
-                <td className="font-mono text-[11px] text-[color:var(--ink-soft)]">{r.id}</td>
-                <td className="font-mono text-[11px] text-[color:var(--ink-soft)]">
+                <td className="text-fg-secondary font-mono text-[11px]">{r.id}</td>
+                <td className="text-fg-secondary font-mono text-[11px]">
                   {r.sourceRepoUrl ? (
                     <a
-                      className="hover:text-[color:var(--accent)]"
+                      className="hover:text-accent"
                       href={r.sourceRepoUrl}
                       rel="noopener noreferrer"
                       target="_blank"
@@ -284,7 +276,7 @@ export function SuperadminProjectsView() {
                 <td className="num">{r.eventCount30d.toLocaleString()}</td>
                 <td>
                   <Link
-                    className="font-mono text-[10px] tracking-[0.1em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--accent)]"
+                    className="text-fg-muted hover:text-accent font-mono text-[10px] tracking-[0.1em] uppercase"
                     to={`/main/org/${r.orgSlug}/issues?project=${r.id}`}
                   >
                     open →

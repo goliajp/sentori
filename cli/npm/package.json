@@ -1,6 +1,6 @@
 {
   "name": "@goliapkg/sentori-cli",
-  "version": "0.2.0",
+  "version": "0.5.3",
   "description": "Sentori CLI — upload source maps + other release artifacts to a Sentori server. Thin wrapper that downloads the matching prebuilt Rust binary at install time.",
   "license": "MIT",
   "homepage": "https://sentori.golia.jp",

@@ -19,8 +19,8 @@
 export function Hint({ children, danger }: { children: React.ReactNode; danger?: boolean }) {
   return (
     <p
-      className={`border-y border-[color:var(--rule)] py-4 text-[13px] ${
-        danger ? 'text-[color:var(--danger)]' : 'text-[color:var(--ink-soft)]'
+      className={`border-border border-y py-4 text-[13px] ${
+        danger ? 'text-danger' : 'text-fg-secondary'
       }`}
     >
       {children}
@@ -31,8 +31,8 @@ export function Hint({ children, danger }: { children: React.ReactNode; danger?:
 export function EmptyState({ children, danger }: { children: React.ReactNode; danger?: boolean }) {
   return (
     <p
-      className={`border-y border-[color:var(--rule)] py-6 text-center text-[13px] ${
-        danger ? 'text-[color:var(--danger)]' : 'text-[color:var(--ink-soft)]'
+      className={`border-border border-y py-6 text-center text-[13px] ${
+        danger ? 'text-danger' : 'text-fg-secondary'
       }`}
     >
       {children}
@@ -54,11 +54,11 @@ export function EmptyState({ children, danger }: { children: React.ReactNode; da
 export function ModuleEmpty({ children, eyebrow }: { children: React.ReactNode; eyebrow: string }) {
   return (
     <div className="px-5 py-10 text-center">
-      <div className="mb-2 font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+      <div className="text-accent mb-2 font-mono text-[10px] tracking-[0.22em] uppercase">
         {eyebrow}
       </div>
       <div
-        className="mx-auto text-[13px] leading-relaxed text-[color:var(--ink-soft)]"
+        className="text-fg-secondary mx-auto text-[13px] leading-relaxed"
         style={{ maxWidth: '56ch' }}
       >
         {children}
@@ -87,11 +87,11 @@ export function RailEmpty({
 }) {
   return (
     <div className="px-4 py-8 text-center">
-      <div className="mb-2 font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+      <div className="text-accent mb-2 font-mono text-[10px] tracking-[0.22em] uppercase">
         {eyebrow}
       </div>
       <div
-        className="mx-auto text-[13px] leading-relaxed text-[color:var(--ink-soft)]"
+        className="text-fg-secondary mx-auto text-[13px] leading-relaxed"
         style={{ maxWidth: '28ch' }}
       >
         {children}
@@ -120,11 +120,11 @@ export function CenteredEmpty({
     <div className="flex h-full items-center justify-center px-6">
       <div className="text-center">
         {eyebrow != null && (
-          <div className="mb-2 font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+          <div className="text-accent mb-2 font-mono text-[10px] tracking-[0.22em] uppercase">
             {eyebrow}
           </div>
         )}
-        <div className="text-[13px] text-[color:var(--ink-soft)]">{children}</div>
+        <div className="text-fg-secondary text-[13px]">{children}</div>
       </div>
     </div>
   )

@@ -1,21 +1,12 @@
-import type { LogLevel } from '@goliapkg/sentori-core';
+import type { BeforeSendHook, LogLevel, ReadyInfo } from '@goliapkg/sentori-core';
 
 /**
- * Optional structured signal handed to `onReady` after init
- * completes. Host wires the callback if they want to know the SDK
- * is live (alternative to scanning console).
+ * v2.3 — `ReadyInfo` is shared across SDKs via `@goliapkg/sentori-core`
+ * so a host that switches from web to RN reads the same shape. The RN
+ * SDK always populates `native` + `coldStartMs`; the core type marks
+ * both optional for the web SDK's benefit (web has no native module).
  */
-export type ReadyInfo = {
-  /** npm version string of @goliapkg/sentori-react-native */
-  sdkVersion: string;
-  /** Milliseconds between RN cold-start signal and SDK init
-   *  completion. May be undefined if native module wasn't bound. */
-  coldStartMs?: number;
-  /** Native module status. `bound: false` means screenshot /
-   *  wireframe / native crash capture won't fire — useful for
-   *  host to know if e.g. they forgot to autolink. */
-  native: { bound: boolean; methods: string[] };
-};
+export type { ReadyInfo };
 
 export type Config = {
   token: string;
@@ -36,6 +27,11 @@ export type Config = {
    *  session-trail buffer and uploads it as a `sessionTrail`
    *  attachment. Defaults to false. */
   sessionTrailEnabled: boolean;
+  /** v2.0 W3 — when true, every `track(name, props)` call also
+   *  pushes a `{ type: 'track', data: { name, props } }` breadcrumb
+   *  so a subsequent capture carries the customer journey. Defaults
+   *  to false to preserve v1 customer breadcrumb shape on upgrade. */
+  trackAutoBreadcrumb: boolean;
   /** v2.3 — Sentori console output gate.
    *
    *  Default `warn`: SDK is silent on host's console unless
@@ -51,6 +47,12 @@ export type Config = {
    *  the native-module bind status + cold-start timing. Host
    *  wraps any host-side logging here. */
   onReady?: (info: ReadyInfo) => void;
+  /** v2.3 — host-side mutate-or-drop hook called once per event
+   *  just before transport enqueue. Return the event to send it,
+   *  `null` to drop. Sync only. If the hook throws or returns a
+   *  non-event, SDK falls back to the un-mutated event and emits
+   *  one one-shot warn. */
+  beforeSend?: BeforeSendHook;
 };
 
 let _config: Config | null = null;

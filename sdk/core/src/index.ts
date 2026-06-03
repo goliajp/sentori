@@ -3,6 +3,7 @@ export type {
   AttachmentKind,
   AttachmentMeta,
   AttachmentSource,
+  BeforeSendHook,
   Breadcrumb,
   BreadcrumbType,
   Bundle,
@@ -17,6 +18,7 @@ export type {
   Geo,
   MessageLevel,
   Platform,
+  ReadyInfo,
   SamplingConfig,
   SentoriError,
   Span,
@@ -67,6 +69,11 @@ export {
   startSpan,
   startTrace,
   withScopedSpan,
+  // v2.3 — `withSpan` is now the unified entry point per design §2.3.
+  // Overloaded: `withSpan(name, fn)` = high-level wrap helper
+  // (equivalent to `withScopedSpan`); `withSpan(span, fn)` = low-level
+  // active-span manager (equivalent to `withActiveSpan`).
+  withSpan,
 } from './spans.js'
 
 export {
@@ -74,7 +81,10 @@ export {
   __useFallbackTraceContextForTests,
   activeSpan,
   setActiveSpan,
-  withSpan,
+  // v2.3 — renamed from `withSpan` (which now dispatches in spans.ts).
+  // `withActiveSpan(span, fn)` is the explicit name for the
+  // low-level active-context manager.
+  withActiveSpan,
 } from './trace-context.js'
 
 export {
@@ -103,3 +113,19 @@ export {
 } from './logger.js'
 
 export { hashIdentities, type LinkBy } from './identity.js'
+
+/** v2.1 W2 — runtime metrics ring + emit API. Storage primitive
+ *  only — transport (POST /v1/runtime-metrics:batch) lives in
+ *  the per-platform SDK. Auto-instrument modules (FPS / heap /
+ *  cold-start / route-nav / network) push via `emitMetric`; the
+ *  per-SDK flusher drains via `drainRuntimeMetricsForFlush()`
+ *  on its 30 s tick, coalesced with the existing event flush. */
+export {
+  RuntimeMetricBuffer,
+  __peekRuntimeMetricsSize,
+  __resetRuntimeMetricsForTests,
+  drainRuntimeMetricsForFlush,
+  emitMetric,
+  rebufferRuntimeMetrics,
+  type RuntimeMetricPoint,
+} from './runtime-metrics.js'

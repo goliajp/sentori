@@ -437,4 +437,10 @@ pub enum BreadcrumbType {
     Log,
     User,
     Custom,
+    /// v2.0 W3 — emitted automatically by the SDK when
+    /// `init.capture.trackAutoBreadcrumb` is `true`. Carries
+    /// `data: { name, props? }` from the corresponding
+    /// `sentori.track(name, props)` callsite so a later
+    /// `captureException` shows the customer journey.
+    Track,
 }

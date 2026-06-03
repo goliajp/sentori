@@ -22,11 +22,19 @@
 - **v1.2** ✅ Linear/Slack/Jira 集成深化 + 标签 / 静音 / 时间线（W1–W10，闭于 2026-05-20）。
 - **v1.3** ✅ Webhook + 通知通道 + 源码 bundle（W11–W15，闭于 2026-05-20）。
 - **v1.4** ✅ v1.x 系列收口：W16–W29 一次性全部 ship（Email/digest/per-issue mute/Jira OAuth/GitHub App Valkey/webhook retry UI/cross-org templates/label catalog+SLA/source-bundle streaming+multi+per-release status/RN build-time uploader/snapshot tests），v1.x defer backlog 归零。详见 [`docs/roadmap/v1.4.md`](./docs/roadmap/v1.4.md)。
-- **v2.0** ⏸ placeholder — 等用户定 L2 边界后开工。详见 [`docs/roadmap/v2.0.md`](./docs/roadmap/v2.0.md)。
+- **v2.0** ✅ shipped 2026-06-03 — manual instrumentation v2 (W1–W4)：SDK matrix major bump via changesets（`react-native@2.0.0` / `core@1.0.0` / `javascript@1.0.0` / `react@1.0.0` / `vue@1.0.0` / `svelte@1.0.0` / `solid@1.0.0` / `next@1.0.0` / `expo@3.0.0`） + 7 recipes (`manual-issue` / `-trace` / `-span` / `-moment` / `-breadcrumb` / `track-and-metrics` / `v1-to-v2-migration`) + docs-site Manual instrumentation sidebar 上线 + `BreadcrumbType::Track` server enum + dashboard span-detail "related metrics" row。详见 [`docs/roadmap/v2.0.md`](./docs/roadmap/v2.0.md)。
+- **v2.1** ✅ shipped 2026-06-03 — Runtime metrics auto-instrument（W1+W2：server ingest path + 5 RN instruments cold-start/FPS/heap/route-nav/network + 30s flush + web matrix wiring）+ BI dashboard（W3：6 hero cards + dim×measure×bucket query panel）+ Endpoint health synthetic probe（W4：admin CRUD + 60s probe cron + assertion engine + consecutive-2 auto-issue lifecycle + dashboard）。SDK matrix minor bump via changesets（`@goliapkg/sentori-core@1.1.1` + `@goliapkg/sentori-javascript@1.1.0` + `@goliapkg/sentori-react-native@2.1.0` + `@goliapkg/sentori-vue/svelte/solid@1.1.0`）+ perf budget CI gate（`.github/workflows/sdk-perf.yml`）。详见 [`docs/roadmap/v2.1.md`](./docs/roadmap/v2.1.md)。
+- **v2.1.x** ✅ shipped 2026-06-03 — polish patch（commit `50451ed`）：v2.1.1 docs recipes（`runtime-metrics.md` + `endpoint-health.md` + sidebar 注册）+ v2.1.2 Runtime dashboard polish（drill modal 点击 chart 列窗口内 issues + `ModuleDef.chord` 字段 + `GoChord` 监听器实现 `g r` / `g h` 等 8 个 chord + chart skeleton shimmer 替 `Loading…` 文本）+ v2.1.3 Health dashboard polish（拆 detail page `:checkId` 路由 + `new` / `:checkId/edit` form 路由分离 + 新 server endpoint `POST .../endpoint-checks/{id}/probe-now` 的 dry-run + detail 页 1h/24h/7d 窗口切换）。零 SDK 改动。
+- **v2.2** ✅ shipped 2026-06-03 — find-bug lens dashboard 重设计：`/explore` 单查询端点（`dim × measure × filter` 白名单，UI 和 LLM agent 共用一个 query 形状）+ Issues / Releases 模块全部改成 `/explore` 消费者。W1（端点）+ W2（Releases list+detail）+ W3（Issues list 改写 with measure/window picker + URL state）+ W4（recipe `find-bugs-with-explore.md` + closeout、删 `?legacy=1` rollback flag + listIssuesPage 旧分支）全 ship。零 SDK 改动 —— v2.2 是纯 read-side dashboard 工作。其它隐藏模块（traces / metrics / vitals / moments / audience / cert-monitor / posture / privacy / live-debug / alerts）继续 hidden 等待各自的 lens（find-slow / find-user / find-threat / engineering-hygiene）在 v2.3+ 开。详见 [`docs/roadmap/v2.2.md`](./docs/roadmap/v2.2.md)。
+- **Post-v2.2 master plan** ✅ Phases 0–6 closed 2026-06-03 — 跨 v2.3 / v2.4 / v2.5 的 8-phase 计划，按依赖排序（不按 ROI）。Phases 0–6 内闭：v2.2.1 logger hotfix → hidden-modules audit → `/explore` grammar extension → SDK W6.0/W6.1/W6.2/W6.3 → v2.3 docs+release。Phases 7–8（find-user lens v2.4 + find-slow lens v2.5）on deck。详见 [`docs/roadmap/post-v2.2-plan.md`](./docs/roadmap/post-v2.2-plan.md)。
+- **v2.3** ✅ shipped 2026-06-03 — SDK redesign: silent-by-default logger + `init.onReady` + `init.beforeSend` host hook (recovered defer) + unified `withSpan` overload dispatch + identity layer with cross-project user lookup + GDPR DSR erase endpoint + UI + `@goliapkg/sentori-react-native/compat` Sentry drop-in (DSN parser + full translation table + warn-once dedup). `/explore` grammar gains 5 filters / 4 dims / 4 measures including v2.2 W3 stub `issueEq` → Issues list per-row sparkline. SDK matrix bumped via changesets (core@1.2.0, javascript@1.2.0, react-native@2.2.0 — two minor changesets per package merge to one minor bump under semver). 详见 [`docs/roadmap/v2.3.md`](./docs/roadmap/v2.3.md)。
+- **v2.4** ✅ shipped 2026-06-03 — **find-user lens**: Issue Detail "Affected users" panel (top-N fingerprints touching the issue, click into single-user timeline) + Users-view operator-driven identity merge (`identity_merges` table + `/users/merge` + `/users/merge/undo` endpoints + soft 7-day undo + audit log) + lookup follow-through (one-hop alias → primary). Audience module verdict (per Phase 1 audit): subsumed by Users overview's KPI + most-affected list + breakdown — stays `hidden: true`. Zero SDK change. 详见 [`docs/roadmap/v2.4.md`](./docs/roadmap/v2.4.md)。
+- **v2.5** ✅ shipped 2026-06-03 — **find-slow lens**: Vitals 模块 flip visible(`hidden: true` 摘掉 + chord `g v`)+ URL-state column sort(默认 `ttid p95` desc)+ multi-row compare(checkbox 最多 4 行,delta strip 显示 ±ms/% + slow-frame delta,阈值染色)+ per-route drill 链接到 Issues filtered by `tags.route`。零 SDK 改、零 server 改 — 纯 dashboard 重塑现有 `api/vitals.rs` aggregation 数据。详见 [`docs/roadmap/v2.5.md`](./docs/roadmap/v2.5.md)。
+- **v2.5.x** ✅ shipped 2026-06-03 — defer cleanup pass: (1) `projects.identity_scope_id` migration `0074` + ingest path resolution + PATCH endpoint(server side 完成 project-level scope carve;UI 仍 defer 到 use case 出现);(2) `metrics` 模块 flip visible 作 utility surface(v0.8.3 `recordMetric` 业务指标 channel,非 lens);(3) `docs/design/salt-rotation.md` 设计 placeholder 落档(等触发条件再实施)。Region scope 仍 defer — 多 region 是独立 infra 项目。
 
 > 版本管理：从这套 polish 起，monorepo 改用 [Changesets](./docs/runbook/release-sdks.md) 管理多包 semver，避免空 bump。
 
-公开 surface：`sentori.golia.jp`（marketing） / `app.sentori.golia.jp`（dashboard） / `api.sentori.golia.jp` / `ingest.sentori.golia.jp` / `docs.sentori.golia.jp`。
+公开 surface（v2.4 起单域名拓扑）：`sentori.golia.jp/`（marketing） + `sentori.golia.jp/main/*`（dashboard SPA） + `sentori.golia.jp/admin/api/*` + `sentori.golia.jp/api/*`（auth / admin / org backend） + `sentori.golia.jp/docs/*`（文档站，Astro Starlight `base: '/docs'`）；独立 host：`ingest.sentori.golia.jp`（SDK 上报，保留独立 host 以免破坏已发出的 customer token） + `cdn.sentori.golia.jp`（SDK install script / CLI 二进制） + `status.sentori.golia.jp`（Better Stack）。`app.sentori.golia.jp` / `docs.sentori.golia.jp` / `api.sentori.golia.jp` 仍解析到 lx64 origin 做 301 redirect 兼容老链接。详见 [`docs/design/single-domain-routing.md`](./docs/design/single-domain-routing.md)。
 
 ---
 
@@ -39,28 +47,29 @@
 
 ---
 
-## Subdomain 拓扑（sentori.golia.jp）
+## Subdomain 拓扑（v2.4 单域名整合后）
 
-| Subdomain | 段数 | 用途 | 渲染 | 后端 | CF 模式 |
-|---|---|---|---|---|---|
-| `sentori.golia.jp` | 3 | Marketing 主站 | 静态（Astro） | Cloudflare Pages | orange（proxy） |
-| `app.sentori.golia.jp` | 4 | Dashboard SPA | 静态（web/dist） | origin VM Caddy（静态托管 + 反代 api） | grey（DNS-only） |
-| `ingest.sentori.golia.jp` | 4 | SDK 上报端点 | 动态 | origin VM Caddy 反代 → sentori-server | grey |
-| `api.sentori.golia.jp` | 4 | Admin API | 动态 | origin VM Caddy 反代 → sentori-server | grey |
-| `docs.sentori.golia.jp` | 4 | 文档站 | 静态（Starlight build 出物） | origin VM Caddy 静态托管 | grey |
-| `cdn.sentori.golia.jp` | 4 | SDK install script / CLI 二进制 | 静态 | origin VM Caddy 静态托管 | grey |
-| `status.sentori.golia.jp` | 4 | 状态页 | 第三方 | Better Stack（CNAME） | grey |
+| Host + path | 用途 | 渲染 | 后端 | 备注 |
+|---|---|---|---|---|
+| `sentori.golia.jp/` | Marketing 主站 | 静态（Astro） | origin Caddy `/apps/sentori/marketing-dist` | v2.4 起从 CF Pages 搬到 lx64 origin |
+| `sentori.golia.jp/docs/*` | 文档站 | 静态（Starlight build，`base: '/docs'`） | origin Caddy `/apps/sentori/docs-dist` | 老 `docs.sentori.golia.jp` 301 redirect |
+| `sentori.golia.jp/login`、`/register`、`/verify`、`/forgot-password`、`/reset-password/<t>`、`/invite/<t>`、`/transfers/<t>` | SPA auth + accept flows | 静态（web/dist） | nginx in `sentori-web` | 根 path，未登录路径 |
+| `sentori.golia.jp/main`、`/main/*` | SPA dashboard | 静态（web/dist） | nginx in `sentori-web` | 登录后的 dashboard 都在这里 |
+| `sentori.golia.jp/admin/api/*`、`/api/*` | Admin / auth / org backend | 动态 | Caddy reverse_proxy → `sentori-server:8080` | 老 `api.sentori.golia.jp` 也走这里 |
+| `ingest.sentori.golia.jp/v1/*` | SDK 上报端点 | 动态 | Caddy reverse_proxy → `sentori-server:8080` | **保留独立 host** —— 已发出的 customer SDK token 写死了这个 URL，迁移成本 = 强制每个 customer 重 init |
+| `cdn.sentori.golia.jp` | SDK install script / CLI 二进制 | 静态 | origin VM Caddy 静态托管 | 不涉 v2.4 整合 |
+| `status.sentori.golia.jp` | 状态页 | 第三方 | Better Stack（CNAME） | 不涉 v2.4 整合 |
 
-**TLS 路径（已校准）：**
+**legacy redirect**：`app.sentori.golia.jp/<path>` → 301 → `sentori.golia.jp/main/<path>`；`docs.sentori.golia.jp/<path>` → 301 → `sentori.golia.jp/docs/<path>`。Caddy 块见 [`docs/design/single-domain-routing.md`](./docs/design/single-domain-routing.md)。
 
-- **3 段** `sentori.golia.jp`：Cloudflare Universal SSL（免费，自动覆盖 `*.golia.jp`），orange cloud + CF Pages
-- **4 段子域**：grey cloud（DNS-only，不挂 CF proxy）+ origin VM 上的 Caddy 自动 ACME（Let's Encrypt HTTP-01 / DNS-01），每个 subdomain 各一张独立证书
+**TLS 路径：**
 
-为什么 4 段不走 CF Pages：Cloudflare Pages 的 custom domain 必须 orange cloud；orange cloud 下 4 段子域**不被 Universal SSL 覆盖**，需要付费 Advanced Cert（$20/月+）才能签。grey + origin Caddy 是零成本路径。
+- 所有 host 都由 origin VM Caddy 自动 ACME 签 Let's Encrypt 证书。`sentori.golia.jp`（根域）+ `ingest.sentori.golia.jp` 都各一张独立证书。
+- 不再走 Cloudflare Pages，全部 origin-hosted 后路径整合是天然的：一份 Caddyfile 一个 docker-compose 就能拉起整个 dashboard + marketing + docs + backend。
 
 **DNS 管理：通过 devops 项目（不直调 Cloudflare API）**
 
-DNS 由 `~/workspace/goliajp/devops/` 项目里的 `crates/devops-core/src/dns/` 管理，唯一入口是 `zones.yaml`（`golia.jp` zone 下加 records）。`local_to_cf_name`（`cloudflare.rs:77`）对 record `name` 层级深度无限制，写 `name: app.sentori` 直接产出 `app.sentori.golia.jp`。每次同步前必须先 `devops dns diff` review（删除必须显式确认）。
+DNS 由 `~/workspace/goliajp/devops/` 项目里的 `crates/devops-core/src/dns/` 管理，唯一入口是 `zones.yaml`（`golia.jp` zone 下加 records）。`local_to_cf_name`（`cloudflare.rs:77`）对 record `name` 层级深度无限制，写 `name: sentori` 产出 `sentori.golia.jp`、`name: ingest.sentori` 产出 `ingest.sentori.golia.jp`。每次同步前必须先 `devops dns diff` review（删除必须显式确认）。
 
 ---
 

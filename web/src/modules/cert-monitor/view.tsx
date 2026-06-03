@@ -51,7 +51,7 @@ export function CertMonitorView() {
       <SubSection sub={`${domains.length} watched`} title="Watched domains">
         <ul>
           {domains.length === 0 && !domainsQ.isLoading && (
-            <li className="border-y border-[color:var(--rule)] py-4 text-[13px] text-[color:var(--ink-soft)]">
+            <li className="border-border text-fg-secondary border-y py-4 text-[13px]">
               Add a domain below. The server polls crt.sh every 10 min and emails when a new
               certificate appears in the public CT logs.
             </li>
@@ -60,12 +60,12 @@ export function CertMonitorView() {
             <li
               className={`flex items-center justify-between gap-3 py-2.5 ${
                 i === 0 ? 'border-t' : ''
-              } border-b border-[color:var(--rule-soft)]`}
+              } border-border-muted border-b`}
               key={d.id}
             >
-              <span className="font-mono text-[13px] text-[color:var(--ink)]">{d.domain}</span>
+              <span className="text-fg font-mono text-[13px]">{d.domain}</span>
               <button
-                className="font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase transition-colors hover:text-[color:var(--danger)]"
+                className="text-fg-muted hover:text-danger font-mono text-[11px] tracking-[0.08em] uppercase transition-colors"
                 onClick={() => deleteM.mutate(d.id)}
                 type="button"
               >
@@ -76,20 +76,20 @@ export function CertMonitorView() {
         </ul>
 
         <form
-          className="mt-3 flex items-center gap-3 border-t border-[color:var(--rule)] pt-3"
+          className="border-border mt-3 flex items-center gap-3 border-t pt-3"
           onSubmit={(e) => {
             e.preventDefault()
             if (canSubmit) addM.mutate(trimmed)
           }}
         >
           <label
-            className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase"
+            className="text-fg-muted font-mono text-[10px] tracking-[0.22em] uppercase"
             htmlFor="cert-domain"
           >
             domain
           </label>
           <input
-            className="flex-1 border-b border-[color:var(--rule)] bg-transparent py-1 font-mono text-[13px] text-[color:var(--ink)] placeholder:text-[color:var(--ink-muted)] focus:border-[color:var(--accent)] focus:outline-none"
+            className="border-border text-fg placeholder:text-fg-muted focus:border-accent flex-1 border-b bg-transparent py-1 font-mono text-[13px] focus:outline-none"
             id="cert-domain"
             maxLength={253}
             onChange={(e) => setDraft(e.target.value)}
@@ -97,7 +97,7 @@ export function CertMonitorView() {
             value={draft}
           />
           <button
-            className="bg-[color:var(--accent)] px-3 py-1 font-mono text-[11px] tracking-[0.1em] text-[color:var(--paper)] uppercase disabled:cursor-not-allowed disabled:opacity-50"
+            className="bg-accent text-bg px-3 py-1 font-mono text-[11px] tracking-[0.1em] uppercase disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!canSubmit}
             type="submit"
           >
@@ -108,12 +108,12 @@ export function CertMonitorView() {
 
       <SubSection sub={`${observations.length} seen`} title="Recent observations">
         {observationsQ.isLoading && (
-          <p className="border-y border-[color:var(--rule)] py-4 text-center text-[13px] text-[color:var(--ink-soft)]">
+          <p className="border-border text-fg-secondary border-y py-4 text-center text-[13px]">
             Loading…
           </p>
         )}
         {!observationsQ.isLoading && observations.length === 0 && (
-          <p className="border-y border-[color:var(--rule)] py-6 text-center text-[13px] text-[color:var(--ink-soft)]">
+          <p className="border-border text-fg-secondary border-y py-6 text-center text-[13px]">
             No certificates observed yet — newly-watched domains take up to 10 min for the first
             poll.
           </p>
@@ -121,25 +121,25 @@ export function CertMonitorView() {
         <ul>
           {observations.map((o) => (
             <li
-              className="border-b border-[color:var(--rule-soft)] py-3 first:border-t first:border-[color:var(--rule)]"
+              className="border-border-muted first:border-border border-b py-3 first:border-t"
               key={o.id}
             >
               <div className="flex items-baseline justify-between gap-3">
-                <span className="font-mono text-[13px] text-[color:var(--ink)]">{o.domain}</span>
-                <span className="font-mono text-[10px] tracking-[0.05em] text-[color:var(--ink-muted)] tabular-nums">
+                <span className="text-fg font-mono text-[13px]">{o.domain}</span>
+                <span className="text-fg-muted font-mono text-[10px] tracking-[0.05em] tabular-nums">
                   {formatRelative(o.firstSeen)}
                 </span>
               </div>
-              <div className="mt-1 text-[13px] text-[color:var(--ink-soft)]">
+              <div className="text-fg-secondary mt-1 text-[13px]">
                 {o.commonName ?? '(no common name)'}
               </div>
-              <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 font-mono text-[11px] text-[color:var(--ink-muted)]">
+              <div className="text-fg-muted mt-1.5 flex flex-wrap items-baseline gap-x-3 font-mono text-[11px]">
                 <span>issuer · {o.issuerName}</span>
                 <span>
                   valid {o.notBefore} → {o.notAfter}
                 </span>
                 <a
-                  className="ml-auto text-[color:var(--accent)] hover:underline"
+                  className="text-accent ml-auto hover:underline"
                   href={`https://crt.sh/?id=${o.certId}`}
                   rel="noopener noreferrer"
                   target="_blank"

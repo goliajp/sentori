@@ -39,6 +39,12 @@ export function resolveConfig(side, cfg = {}) {
         if (v)
             out[k] = v;
     }
+    // v2.0 W3 — `capture` is nested, env can't drive it. Carry the
+    // explicit value through so callers can still pass
+    // `capture: { trackAutoBreadcrumb: true }` to resolveConfig().
+    if (cfg.capture !== undefined) {
+        out.capture = cfg.capture;
+    }
     // Defaults: ingestUrl points at the public SaaS if nothing was set.
     if (!out.ingestUrl)
         out.ingestUrl = 'https://ingest.sentori.golia.jp';

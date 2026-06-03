@@ -80,4 +80,8 @@ export function traceNavigation(navigating) {
     }
 }
 export { addBreadcrumb, captureException, captureException as captureError, captureMessage, captureStep, getUser, setUser, } from '@goliapkg/sentori-javascript';
+// v2.1 W2 — runtime metrics surface. Hosts call `emitMetric()`
+// from their own instrumentation; flusher off by default (opt
+// in via `initSentori({ capture: { runtimeMetrics: true } })`).
+export { RuntimeMetricBuffer, drainRuntimeMetricsForFlush, emitMetric, flushRuntimeMetrics, rebufferRuntimeMetrics, startRuntimeMetricsTimer, stopRuntimeMetricsTimer, } from '@goliapkg/sentori-javascript';
 //# sourceMappingURL=index.js.map

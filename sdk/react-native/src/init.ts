@@ -12,6 +12,14 @@ import {
 } from './launch-crash-guard';
 import { getInstallId } from './install-id';
 import { startMetricsTimer } from './metrics';
+import {
+  emitColdStart,
+  markColdStartT0,
+  startRuntimeMetricsTimer,
+} from './runtime-metrics';
+import { startFpsInstrument } from './runtime-metrics-fps';
+import { startHeapInstrument } from './runtime-metrics-heap';
+import { startNetworkBytesInstrument } from './runtime-metrics-network';
 import { startTrackTimer } from './track';
 import { drainNativePending, markNativeJsBridgeReady, setNativeConfig } from './native';
 import { getColdStartMs } from './mobile-vitals';
@@ -73,6 +81,24 @@ export type InitOptions = {
      *  the buffer is sealed and uploaded as a `sessionTrail`
      *  attachment. Defaults to false. */
     sessionTrail?: boolean;
+    /** v2.0 W3 — when `true`, every `sentori.track(name, props)`
+     *  also pushes a `{ type: 'track', data: { name, props } }`
+     *  breadcrumb so a subsequent `captureException` /
+     *  `captureMessage` carries the customer journey leading up to
+     *  the failure. Defaults to `false` to preserve v1 customer
+     *  breadcrumb shape on upgrade; recommended `true` for new
+     *  integrations. See `docs/recipes/track-and-metrics.md`. */
+    trackAutoBreadcrumb?: boolean;
+    /** v2.1 W2 — auto-instrument runtime metrics (FPS, JS heap,
+     *  cold-start, route nav timing, network bytes). Drains the
+     *  shared `@goliapkg/sentori-core` ring to
+     *  `/v1/runtime-metrics:batch` every 30 s. Defaults to `true`
+     *  in W2 part 2 — cold-start only, ~6 emits per session
+     *  per device, ~zero main-thread cost. Higher-cost instruments
+     *  (FPS / route-nav) land in W2 part 3 with per-tick perf
+     *  budget tests as stop-ship gates per
+     *  `.claude/CLAUDE.md` performance bedrock. */
+    runtimeMetrics?: boolean;
     /** v0.9.1 +S4 — pre-crash sentinel. Subscribes to JS-thread
      *  frame timing; when ≥ 50% of a 60-frame window misses the
      *  budget (default 32 ms / < 30 fps), emits a `kind: nearCrash`
@@ -150,6 +176,13 @@ export type InitOptions = {
    *  SDK is live instead of scanning the console. The `ReadyInfo`
    *  carries native-module bind status + cold-start timing. */
   onReady?: (info: ReadyInfo) => void;
+  /** v2.3 — mutate-or-drop hook on each outbound event (sync).
+   *  Return the event to ship it (possibly mutated), or `null` to
+   *  drop. See `BeforeSendHook` for the throwing / non-event
+   *  fallback policy. Used for host-side PII scrubbing the SDK
+   *  can't do automatically; server-side privacy_lab still runs
+   *  regardless. */
+  beforeSend?: import('@goliapkg/sentori-core').BeforeSendHook;
 };
 
 const DEFAULT_INGEST_URL = 'https://ingest.sentori.golia.jp';
@@ -197,6 +230,14 @@ export const init = (options: InitOptions): void => {
     traceSampleRate: options.sample?.traces ?? options.sampling?.traces ?? null,
     messageSampleRate: options.sample?.messages ?? options.sampling?.messages ?? null,
     sessionTrailEnabled: options.capture?.sessionTrail === true,
+    // v2.0 W3 — when true, every `track()` also pushes a
+    // `type: 'track'` breadcrumb so a subsequent captureException
+    // carries the customer journey. Defaults false to preserve v1
+    // breadcrumb shape on upgrade.
+    trackAutoBreadcrumb: options.capture?.trackAutoBreadcrumb === true,
+    // v2.3 — host-side beforeSend hook (sync). Stored on Config so
+    // capture.ts can pull it without re-resolving the InitOptions.
+    beforeSend: options.beforeSend,
   });
 
   // Tell the native crash handler about the config so the JSON it writes
@@ -236,6 +277,36 @@ export const init = (options: InitOptions): void => {
   startMetricsTimer();
   // v1.1 chunk B — drain `sentori.track()` ring every 30 s.
   startTrackTimer();
+  // v2.1 W2 — runtime metrics auto-instrument. Defaults on; host
+  // can opt out with `capture: { runtimeMetrics: false }`. The
+  // ring + emit live in `@goliapkg/sentori-core`; we own the
+  // 30 s flusher + the cold-start one-shot here. FPS / heap /
+  // route-nav / network instruments ship in W2 part 3 (each
+  // gated on its own per-tick perf budget CI test).
+  if (options.capture?.runtimeMetrics !== false) {
+    markColdStartT0();
+    startRuntimeMetricsTimer();
+    // Defer the emit one tick so React's first paint settles
+    // before we stamp "cold-start ended". 0-delay setTimeout puts
+    // the call after the current microtask queue drains.
+    setTimeout(emitColdStart, 0);
+    // FPS via rAF (per-tick budget < 0.5 ms — see
+    // runtime-metrics-fps.ts header). Heap is a 30 s polling
+    // tick; no-op when performance.memory isn't exposed (most
+    // RN engines today; we ship the wiring anyway so the same
+    // SDK works on web targets via @goliapkg/sentori-javascript).
+    startFpsInstrument();
+    startHeapInstrument();
+    // Network bytes counters drain every 30 s. The counters
+    // themselves are incremented inline by handlers/network.ts
+    // on every fetch round-trip — see the recordNetworkBytes
+    // call site there. No-op when `capture.network: false` is
+    // set (no fetch patch → no counter increments).
+    startNetworkBytesInstrument();
+    // Route-nav dwell timing emits inline from `navigation.ts`'s
+    // useTraceNavigation state listener — no extra start call
+    // needed; the host already mounts that hook for tracing.
+  }
   // v1.1 chunk S1 — warm the install-id cache. Fire-and-forget;
   // any event captured before the first resolve simply omits
   // `device.installId`. Subsequent captures pick it up via the

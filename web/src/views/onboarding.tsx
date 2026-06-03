@@ -36,7 +36,7 @@ export function OnboardingView() {
         <PrimaryButton busy={busy} disabled={!name || !slug}>
           {busy ? 'creating…' : 'create org'}
         </PrimaryButton>
-        <p className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+        <p className="text-fg-muted font-mono text-[10px] tracking-[0.12em] uppercase">
           slug is lowercase, used in URLs (`/org/{'<slug>'}/…`)
         </p>
       </form>

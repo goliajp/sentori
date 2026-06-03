@@ -2,6 +2,13 @@ import { normalizeUrl, startSpan } from '@goliapkg/sentori-core';
 
 import { addBreadcrumb } from '../breadcrumbs';
 import { getConfig } from '../config';
+// v2.1 W2 — bytes counters drive the runtime.network.{sent,received}
+// metrics. Cheap two-add per request, no allocation.
+import {
+  estimateRequestBytes,
+  estimateResponseBytes,
+  recordNetworkBytes,
+} from '../runtime-metrics-network';
 
 let _installed = false;
 let _graphqlEnabled = true;
@@ -88,6 +95,10 @@ function patchFetch(): void {
       const resp = await original(input, reqInit);
       span.setTag('http.status', String(resp.status));
       span.finish({ status: resp.status >= 400 ? 'error' : 'ok' });
+      // v2.1 W2 — bytes accounting. Sent estimated from
+      // init.body; received read from response Content-Length
+      // header (0 when missing / chunked — undercount-safe).
+      recordNetworkBytes(estimateRequestBytes(init), estimateResponseBytes(resp.headers));
       addBreadcrumb({
         type: 'net',
         data: gqlOp

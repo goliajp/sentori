@@ -22,6 +22,20 @@ pub mod mappings;
 pub mod metrics;
 pub mod moments;
 pub mod oauth;
+/// v2.1 W1 — auto-instrument runtime metrics ingest. Separate
+/// from `metrics` (which carries the v0.8.3 recordMetric custom
+/// channel) because the validation rules, storage shape, and
+/// rate-limit budget all differ. Writes to `runtime_metrics_raw`
+/// (partitioned-by-day) and is rolled up by `metrics_rollup`.
+pub mod runtime_metrics;
+/// v2.1 W3 — dashboard BI query endpoint for runtime metrics.
+/// Reads from the rollup tier (raw / _1m / _1h / _1d) appropriate
+/// for the requested (bucket, from, to) window.
+pub mod runtime_metrics_query;
+/// v2.1 W4 — admin CRUD + probe log + 1h rollup query for endpoint
+/// health checks. Probes themselves are driven by the
+/// `endpoint_probe` cron module in the crate root.
+pub mod endpoint_checks;
 pub mod orgs;
 pub mod privacy;
 pub mod projects;

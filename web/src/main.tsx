@@ -1,6 +1,9 @@
 import './index.css'
+import '@goliapkg/gds/tokens.css'
+import '@goliapkg/gds/theme.css'
 
 import { SentoriErrorBoundary, SentoriProvider } from '@goliapkg/sentori-react'
+import { DEFAULT_THEME, loadPersistedTheme, resolveThemeCssVars } from '@goliapkg/gds/systems'
 import { QueryClient } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 
@@ -12,7 +15,6 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 import { AuthProvider } from './auth/AuthProvider'
 import { DashboardLegacyRedirect } from './auth/DashboardLegacyRedirect'
 import { ProtectedLayout } from './auth/ProtectedLayout'
-import { installThemeWiring } from './components/theme'
 import { ROUTED_MODULES } from './modules/registry'
 import { AccountView } from './views/account'
 import { ForgotPasswordView } from './views/forgot-password'
@@ -50,7 +52,31 @@ const sentoriConfig = {
   token: sentoriToken ?? 'st_pk_unconfigured00000000000',
 }
 
-installThemeWiring()
+// Pre-render GDS theme CSS vars before React mounts to avoid FOUC.
+// `loadPersistedTheme()` returns the user's last saved 5-axis theme
+// (mode/density/elevation/glass/motion/shape) from localStorage, or
+// null on first visit. `resolveThemeCssVars()` materializes those
+// axes to a flat `{ '--gds-bg': '#...', '--gds-fg': '#...', ... }`
+// map that we paint onto <html> in one synchronous pass — `<App>`
+// then mounts with the right colors already on the document, and
+// `useThemeEffect()` (inside <AppShell>) takes over for reactive
+// updates when the user toggles theme later.
+{
+  // Sentori first-time default = system mode + compact density. Once
+  // the user touches the ThemeToggle, persistTheme() writes their
+  // choice back and loadPersistedTheme() takes over.
+  const saved = loadPersistedTheme() ?? { ...DEFAULT_THEME, mode: 'system', density: 'compact' }
+  const mode =
+    saved.mode === 'system'
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light'
+      : saved.mode
+  const vars = resolveThemeCssVars(saved, mode)
+  const root = document.documentElement
+  for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v)
+  root.dataset.theme = mode
+}
 
 /**
  * Modules with `children` get a NESTED route so the parent renders

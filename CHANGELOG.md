@@ -6,6 +6,35 @@
 
 ---
 
+## v2.3 — SDK redesign + identity layer + DSR + Sentry compat
+
+**Shipped:** 2026-06-03. See [`docs/roadmap/v2.3.md`](./docs/roadmap/v2.3.md).
+
+**Package bumps:**
+
+- `@goliapkg/sentori-core` → **1.2.0** (minor — two minor changesets merged: logger surface + ReadyInfo shared type + `BeforeSendHook` type + `withSpan` overload dispatch + `withActiveSpan` explicit name)
+- `@goliapkg/sentori-javascript` → **1.2.0** (minor — two minor changesets merged: `init.logLevel` + `init.onReady` + `init.sample` canonical name + `init.beforeSend`)
+- `@goliapkg/sentori-react-native` → **2.2.0** (minor — two minor + one patch changeset, merged into one minor bump: `init.beforeSend` + logger surface re-export + `ReadyInfo` from core + `/compat` Sentry drop-in unit-test coverage)
+
+**Highlights:**
+
+- **Silent by default.** Logger module gates the SDK's console output at `'warn'` by default — a healthy install adds zero `[sentori]` lines to host metro/browser console. `init.logLevel: 'silent' | 'error' | 'warn' | 'info' | 'debug'` controls the gate. `setLogTransport(fn)` routes Sentori-internal lines into the host's own log aggregator instead of console.
+- **`init.onReady`.** Fires once after init completes; carries `sdkVersion` + (RN-only) `coldStartMs` + `native: { bound, methods }`. Hosts no longer need to scan the console to know the SDK is live.
+- **`init.beforeSend`.** Sync host-supplied mutate-or-drop hook on each outbound event. Returns the (possibly mutated) event or `null` to drop. Throwing / non-event return falls back to the unmodified event under the NEVER rule.
+- **Unified `withSpan`.** `withSpan(name, fn)` is the new high-level wrap helper per design §2.3; `withSpan(span, fn)` keeps working via overload dispatch (delegates to `withActiveSpan`). `withScopedSpan` remains as the explicit high-level name.
+- **Identity layer + cross-project user lookup.** `setUser({ id, name?, linkBy: { email?, phone?, googleSub?, ... } })` — raw identity values are normalised + SubtleCrypto SHA-256 hashed client-side; only the hash leaves the device. Server layers a per-scope salt before storing fingerprints. Operator dashboard's Users module looks up cross-project hits without ever seeing raw values.
+- **GDPR DSR erase.** `POST /admin/api/orgs/{slug}/users/erase` with `dryRun` flag; pseudonymises `payload.user` across every matching event + drops identity_fingerprints rows. Dashboard UI with typed-confirmation gate. Audit log entry per call.
+- **Sentry compat drop-in.** `import * as Sentry from '@goliapkg/sentori-react-native/compat'` — full translation table for code an LLM has been trained on against `@sentry/react-native`. DSN parser, `Sentry.init/captureException/captureMessage/setUser/setTag/addBreadcrumb/withScope/startTransaction/close/flush`. Drops `ip_address` (Sentori never stores IP). Warn-once dedup per (api, dropped_field).
+- **`/explore` grammar extension.** 5 new filters (`issueEq`, `userIdEq`, `routeEq`, `osEq`, `search`), 4 new dims (`device_os`, `issue_priority`, `severity`, `route`), 4 new measures (`new_issue_count`, `p50_duration`, `p95_duration`, `crash_free_rate` reserved-pending-session-schema). Unlocks v2.2 W3 per-row sparkline stub on Issues list + foundation for Phase 7 / 8 lenses.
+
+**Migration:**
+
+- Existing v2.2 init calls keep working unchanged. Pre-existing `sampling` field stays accepted as a back-compat alias for `sample`.
+- `setUser({ id, email })`-style Sentry calls reach the same internal state via `/compat`; mapping is automatic but warn-once hints fire at `info` level pointing to native equivalents.
+- Hosts that grepped metro for `[sentori]` to confirm SDK liveness should wire `onReady` or set `logLevel: 'debug'`.
+
+---
+
 ## v1.0.0-rc.10 — default capture rate 4 Hz → 2 Hz per perf rule
 
 **Theme:** iOS sim measured 0.99 ms / tick at 4 Hz on a thin (11-node) dev panel, well within budget — but extrapolation to a 200-node Insight-class dense UI puts JS-thread occupancy at ~1.2–1.6 % on iOS and ~3.6–4.8 % on Android (reflective Drawable colour extraction amplifies cost there). That crosses the project's "几乎不能造成性能抖动" rule (CLAUDE.md). Roll the default back; keep the encoding gains.

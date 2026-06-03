@@ -79,5 +79,17 @@ export type {
   CaptureMessageOptions,
   MessageLevel,
 } from '@goliapkg/sentori-javascript'
+// v2.1 W2 — runtime metrics surface. Off by default; opt in
+// via `initSentori({ capture: { runtimeMetrics: true } })`.
+export {
+  RuntimeMetricBuffer,
+  drainRuntimeMetricsForFlush,
+  emitMetric,
+  flushRuntimeMetrics,
+  rebufferRuntimeMetrics,
+  startRuntimeMetricsTimer,
+  stopRuntimeMetricsTimer,
+  type RuntimeMetricPoint,
+} from '@goliapkg/sentori-javascript'
 
 export { SentoriErrorBoundary } from './ErrorBoundary.js'

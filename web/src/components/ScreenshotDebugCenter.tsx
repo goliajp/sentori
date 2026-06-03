@@ -97,22 +97,20 @@ export function ScreenshotDebugCenter({
     >
       <div className="flex h-full flex-col" onClick={(e) => e.stopPropagation()}>
         {/* ── Topbar ────────────────────────────────────────────────── */}
-        <header className="flex items-center gap-6 border-b border-[color:var(--rule)] bg-[color:var(--paper)] px-5 py-3">
-          <span className="font-mono text-[11px] tracking-[0.2em] text-[color:var(--accent)] uppercase">
+        <header className="border-border bg-bg flex items-center gap-6 border-b px-5 py-3">
+          <span className="text-accent font-mono text-[11px] tracking-[0.2em] uppercase">
             Screenshot Debug
           </span>
-          <span className="font-mono text-[12px] text-[color:var(--ink-soft)] tabular-nums">
-            event <span className="text-[color:var(--ink)]">{eventId.slice(0, 8)}</span>
+          <span className="text-fg-secondary font-mono text-[12px] tabular-nums">
+            event <span className="text-fg">{eventId.slice(0, 8)}</span>
           </span>
-          <span className="font-mono text-[11px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+          <span className="text-fg-muted font-mono text-[11px] tracking-[0.18em] uppercase">
             {active.kind}
-            {active.source && (
-              <span className="ml-2 text-[color:var(--ink-soft)]">· {active.source}</span>
-            )}
+            {active.source && <span className="text-fg-secondary ml-2">· {active.source}</span>}
           </span>
-          {topMeta && <div className="text-[12px] text-[color:var(--ink-soft)]">{topMeta}</div>}
+          {topMeta && <div className="text-fg-secondary text-[12px]">{topMeta}</div>}
           <div className="ml-auto flex items-center gap-4 font-mono text-[11px]">
-            <span className="tracking-[0.1em] text-[color:var(--ink-muted)]">
+            <span className="text-fg-muted tracking-[0.1em]">
               {idx + 1} / {ordered.length}
             </span>
             {ordered.length > 1 && (
@@ -127,7 +125,7 @@ export function ScreenshotDebugCenter({
             )}
             {isImage && (
               <>
-                <span className="h-3 w-px bg-[color:var(--rule)]" />
+                <span className="bg-border h-3 w-px" />
                 <ToolbarButton
                   active={zoom === 'fit'}
                   onClick={() => setZoom('fit')}
@@ -144,9 +142,9 @@ export function ScreenshotDebugCenter({
                 </ToolbarButton>
               </>
             )}
-            <span className="h-3 w-px bg-[color:var(--rule)]" />
+            <span className="bg-border h-3 w-px" />
             <a
-              className="tracking-[0.05em] text-[color:var(--ink-soft)] hover:text-[color:var(--ink)]"
+              className="text-fg-secondary hover:text-fg tracking-[0.05em]"
               download
               href={url}
               rel="noopener noreferrer"
@@ -161,9 +159,9 @@ export function ScreenshotDebugCenter({
         </header>
 
         {/* ── Three-pane body ───────────────────────────────────────── */}
-        <div className="grid min-h-0 flex-1 grid-cols-[180px_minmax(0,1fr)_320px] divide-x divide-[color:var(--rule)] bg-[color:var(--paper-2)]">
+        <div className="divide-border bg-bg-secondary grid min-h-0 flex-1 grid-cols-[180px_minmax(0,1fr)_320px] divide-x">
           {/* Left: thumbnail rail with all attachments. */}
-          <aside className="overflow-y-auto bg-[color:var(--paper)]">
+          <aside className="bg-bg overflow-y-auto">
             <RailGroup label="Screenshots">
               {ordered
                 .filter((a) => a.kind === 'screenshot')
@@ -205,19 +203,23 @@ export function ScreenshotDebugCenter({
                     alt="Crash screenshot"
                     className="block max-h-[calc(100vh-180px)] max-w-full"
                     src={url}
-                    style={{ boxShadow: '0 24px 64px -24px rgb(from var(--ink) r g b / 0.35)' }}
+                    style={{
+                      boxShadow: '0 24px 64px -24px rgb(from var(--color-fg) r g b / 0.35)',
+                    }}
                   />
                 ) : (
                   <img
                     alt="Crash screenshot (1:1)"
                     className="block"
                     src={url}
-                    style={{ boxShadow: '0 24px 64px -24px rgb(from var(--ink) r g b / 0.35)' }}
+                    style={{
+                      boxShadow: '0 24px 64px -24px rgb(from var(--color-fg) r g b / 0.35)',
+                    }}
                   />
                 )
               ) : (
                 <a
-                  className="font-mono text-[12px] tracking-[0.18em] text-[color:var(--ink-soft)] uppercase hover:text-[color:var(--accent)]"
+                  className="text-fg-secondary hover:text-accent font-mono text-[12px] tracking-[0.18em] uppercase"
                   href={url}
                   rel="noopener noreferrer"
                   target="_blank"
@@ -229,13 +231,13 @@ export function ScreenshotDebugCenter({
           </div>
 
           {/* Right: debug context. children slot from issue-detail. */}
-          <aside className="overflow-y-auto bg-[color:var(--paper)]">
-            <div className="border-b border-[color:var(--rule)] px-5 py-3">
-              <div className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+          <aside className="bg-bg overflow-y-auto">
+            <div className="border-border border-b px-5 py-3">
+              <div className="text-accent font-mono text-[10px] tracking-[0.22em] uppercase">
                 Debug context
               </div>
               <div
-                className="mt-1 font-sans text-[color:var(--ink)]"
+                className="text-fg mt-1 font-sans"
                 style={{
                   fontVariationSettings: "'wdth' 100, 'opsz' 24, 'wght' 550",
                   fontSize: '15px',
@@ -247,7 +249,7 @@ export function ScreenshotDebugCenter({
             </div>
             <div className="space-y-5 px-5 py-4">
               {children ?? (
-                <div className="text-[12px] text-[color:var(--ink-muted)]">
+                <div className="text-fg-muted text-[12px]">
                   No context provided. The page that opened this debug center can pass an
                   event-context block via the
                   <code className="mx-1 font-mono">children</code>
@@ -256,8 +258,8 @@ export function ScreenshotDebugCenter({
               )}
               {/* Attachment-meta block — always shown so the operator
                *  can correlate to server logs. */}
-              <div className="border-t border-[color:var(--rule-soft)] pt-4">
-                <div className="mb-2 font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+              <div className="border-border-muted border-t pt-4">
+                <div className="text-accent mb-2 font-mono text-[10px] tracking-[0.22em] uppercase">
                   Attachment
                 </div>
                 <DefRow
@@ -300,9 +302,7 @@ function ToolbarButton({
   return (
     <button
       className={`font-mono tracking-[0.05em] transition-colors ${
-        active
-          ? 'text-[color:var(--accent)]'
-          : 'text-[color:var(--ink-soft)] hover:text-[color:var(--ink)]'
+        active ? 'text-accent' : 'text-fg-secondary hover:text-fg'
       }`}
       onClick={onClick}
       title={title}
@@ -315,8 +315,8 @@ function ToolbarButton({
 
 function RailGroup({ children, label }: { children: React.ReactNode; label: string }) {
   return (
-    <div className="border-b border-[color:var(--rule)] px-4 py-3">
-      <div className="mb-2 font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+    <div className="border-border border-b px-4 py-3">
+      <div className="text-fg-muted mb-2 font-mono text-[10px] tracking-[0.22em] uppercase">
         {label}
       </div>
       <div className="space-y-2">{children}</div>
@@ -349,10 +349,10 @@ function ThumbButton({
       type="button"
     >
       <div
-        className={`relative w-full overflow-hidden bg-[color:var(--paper-2)] ${
+        className={`bg-bg-secondary relative w-full overflow-hidden ${
           active
-            ? 'outline outline-2 outline-offset-2 outline-[color:var(--accent)]'
-            : 'outline outline-1 outline-offset-0 outline-[color:var(--rule)]'
+            ? 'outline-accent outline outline-2 outline-offset-2'
+            : 'outline-border outline outline-1 outline-offset-0'
         }`}
       >
         {/* Keep the screenshot's native aspect — phone shots are portrait,
@@ -365,12 +365,12 @@ function ThumbButton({
           src={thumbUrl}
         />
         {active && (
-          <div className="absolute right-1 bottom-1 bg-[color:var(--accent)] px-1.5 py-0.5 font-mono text-[9px] tracking-[0.12em] text-[color:var(--paper)] uppercase">
+          <div className="bg-accent text-bg absolute right-1 bottom-1 px-1.5 py-0.5 font-mono text-[9px] tracking-[0.12em] uppercase">
             current
           </div>
         )}
       </div>
-      <div className="mt-1.5 flex items-center justify-between font-mono text-[10px] tracking-[0.05em] text-[color:var(--ink-muted)]">
+      <div className="text-fg-muted mt-1.5 flex items-center justify-between font-mono text-[10px] tracking-[0.05em]">
         <span className="tabular-nums">{String(index + 1).padStart(2, '0')}</span>
         {source && <span className="uppercase">{source}</span>}
       </div>
@@ -393,15 +393,15 @@ function NonImageRail({
     <button
       className={`block w-full border-l-2 px-2 py-1.5 text-left transition-colors ${
         active
-          ? 'border-[color:var(--accent)] bg-[color:var(--accent-soft)] text-[color:var(--ink)]'
-          : 'border-transparent text-[color:var(--ink-soft)] hover:bg-[color:var(--paper-2)] hover:text-[color:var(--ink)]'
+          ? 'border-accent bg-accent/10 text-fg'
+          : 'text-fg-secondary hover:bg-bg-secondary hover:text-fg border-transparent'
       }`}
       onClick={onClick}
       type="button"
     >
       <div className="font-mono text-[12px] tabular-nums">{kind}</div>
       {source && (
-        <div className="mt-0.5 font-mono text-[9px] tracking-[0.15em] text-[color:var(--ink-muted)] uppercase">
+        <div className="text-fg-muted mt-0.5 font-mono text-[9px] tracking-[0.15em] uppercase">
           {source}
         </div>
       )}
@@ -417,10 +417,8 @@ function NonImageRail({
 export function DefRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[80px_1fr] items-baseline gap-3 py-1 text-[12px]">
-      <div className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
-        {label}
-      </div>
-      <div className="font-mono break-words text-[color:var(--ink)]">{value}</div>
+      <div className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">{label}</div>
+      <div className="text-fg font-mono break-words">{value}</div>
     </div>
   )
 }

@@ -123,5 +123,5 @@ gh workflow run deploy --repo goliajp/sentori --ref release/v0.2.0
 ```
 
 Verify the rotation by registering a fresh user on
-`https://app.sentori.golia.jp/register` and watching for the
+`https://sentori.golia.jp/register` and watching for the
 verification email to land in the recipient's inbox.

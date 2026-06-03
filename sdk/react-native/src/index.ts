@@ -121,6 +121,20 @@ export type {
   CaptureMessageOptions,
   MessageLevel,
 } from '@goliapkg/sentori-core';
+/** v2.3 — logger surface re-exported from core so hosts can
+ *  `import { setLogLevel } from '@goliapkg/sentori-react-native'`
+ *  per design §3 ("Production override"). `setLogTransport` lets
+ *  hosts route Sentori-internal lines into their own log
+ *  aggregator (Datadog, etc.). */
+export {
+  getLogLevel,
+  type LogLevel,
+  logger,
+  type LogTransport,
+  setLogLevel,
+  setLogTransport,
+} from '@goliapkg/sentori-core';
+export type { ReadyInfo } from './config';
 export { ErrorBoundary } from './error-boundary';
 export { FeedbackButton, type FeedbackButtonHandle, type FeedbackButtonProps } from './feedback-widget';
 export {

@@ -331,6 +331,45 @@ export const sendMetricsBatch = async (
 };
 
 /**
+ * v2.1 W2 — POST a batched set of auto-instrument runtime metric
+ * points. Sibling of sendMetricsBatch; different endpoint
+ * (`/v1/runtime-metrics:batch`) because the storage shape +
+ * validation rules + rate-limit budget differ — see
+ * docs/design/v2-metrics.md.
+ *
+ * Returns true on 2xx so the caller can leave the batch drained;
+ * returns false on anything else (network error / non-2xx) so the
+ * caller rebuffer-and-retries on the next flush via
+ * `rebufferRuntimeMetrics(batch)`.
+ */
+export const sendRuntimeMetricsBatch = async (
+  ingestUrl: string,
+  token: string,
+  metrics: Array<{
+    name: string;
+    tags?: Record<string, string>;
+    ts: string;
+    value: number;
+  }>,
+): Promise<boolean> => {
+  if (metrics.length === 0) return true;
+  try {
+    const resp = await fetch(`${ingestUrl}/v1/runtime-metrics:batch`, {
+      body: JSON.stringify({ metrics }),
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Sentori-Sdk': `react-native/${SDK_VERSION}`,
+      },
+      method: 'POST',
+    });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+};
+
+/**
  * v0.8.2 — submit a user-supplied bug report. Fire-and-forget; resolves
  * with the server-assigned id on success or `null` on any failure.
  * The host app typically calls this from a "Report a problem" form;

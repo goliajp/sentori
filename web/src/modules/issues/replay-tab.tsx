@@ -168,13 +168,13 @@ export function ReplayTab({ eventId, projectId }: { eventId: string; projectId: 
       role="region"
       tabIndex={0}
     >
-      <header className="flex items-baseline gap-4 border-b border-[color:var(--rule)] pb-2">
-        <span className="text-[15px] font-medium text-[color:var(--ink)]">Wireframe replay</span>
-        <span className="font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink-muted)] tabular-nums">
+      <header className="border-border flex items-baseline gap-4 border-b pb-2">
+        <span className="text-fg text-[15px] font-medium">Wireframe replay</span>
+        <span className="text-fg-muted font-mono text-[11px] tracking-[0.08em] tabular-nums">
           {formatSecond(duration)} · {captureTimes.length} capture
           {captureTimes.length === 1 ? '' : 's'} · {keyframeTimes.length} key
         </span>
-        <span className="ml-auto font-mono text-[11px] text-[color:var(--ink-muted)]">
+        <span className="text-fg-muted ml-auto font-mono text-[11px]">
           ref {replayRef.slice(0, 8)}…
         </span>
       </header>
@@ -243,13 +243,13 @@ function ReplayCanvas({
   const ref = right ?? left
   if (!ref) {
     return (
-      <div className="flex h-[420px] items-center justify-center border border-[color:var(--rule)] text-[12px] text-[color:var(--ink-muted)]">
+      <div className="border-border text-fg-muted flex h-[420px] items-center justify-center border text-[12px]">
         no frame
       </div>
     )
   }
   return (
-    <div className="bg-[color:var(--paper-2)]">
+    <div className="bg-bg-secondary">
       <svg
         aria-label={`Wireframe at ${ref.ts}`}
         className="block w-full"
@@ -356,7 +356,7 @@ function ReplayMeta({ nodeCount, playheadRelMs }: { nodeCount: number; playheadR
     <dl className="space-y-2 font-mono text-[11px] tabular-nums">
       <Row label="time" value={formatSecond(playheadRelMs)} />
       <Row label="visible" value={`${nodeCount} nodes`} />
-      <p className="pt-2 text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+      <p className="text-fg-muted pt-2 text-[10px] tracking-[0.12em] uppercase">
         ← / → ±0.25 s · space play
       </p>
     </dl>
@@ -366,10 +366,8 @@ function ReplayMeta({ nodeCount, playheadRelMs }: { nodeCount: number; playheadR
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[80px_1fr] items-baseline gap-x-3">
-      <dt className="text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
-        {label}
-      </dt>
-      <dd className="text-[color:var(--ink)]">{value}</dd>
+      <dt className="text-fg-muted text-[10px] tracking-[0.12em] uppercase">{label}</dt>
+      <dd className="text-fg">{value}</dd>
     </div>
   )
 }
@@ -394,11 +392,11 @@ function TimeScrubber({
   startTs: number
 }) {
   return (
-    <div className="space-y-1 border-t border-[color:var(--rule)] pt-3">
+    <div className="border-border space-y-1 border-t pt-3">
       <div className="flex items-center gap-3">
         <button
           aria-label="Step back 250 ms"
-          className="inline-flex h-7 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink)] uppercase disabled:opacity-40"
+          className="border-border bg-bg-secondary text-fg inline-flex h-7 items-center border px-2 font-mono text-[11px] tracking-[0.05em] uppercase disabled:opacity-40"
           disabled={playheadRelMs <= 0}
           onClick={() => onSeek(playheadRelMs - 250)}
           type="button"
@@ -407,7 +405,7 @@ function TimeScrubber({
         </button>
         <button
           aria-label={playing ? 'Pause' : 'Play'}
-          className="inline-flex h-7 items-center border border-[color:var(--accent)] bg-[color:var(--accent)] px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--paper)] uppercase"
+          className="border-accent bg-accent text-bg inline-flex h-7 items-center border px-3 font-mono text-[11px] tracking-[0.05em] uppercase"
           onClick={onPlayPause}
           type="button"
         >
@@ -415,7 +413,7 @@ function TimeScrubber({
         </button>
         <button
           aria-label="Step forward 250 ms"
-          className="inline-flex h-7 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink)] uppercase disabled:opacity-40"
+          className="border-border bg-bg-secondary text-fg inline-flex h-7 items-center border px-2 font-mono text-[11px] tracking-[0.05em] uppercase disabled:opacity-40"
           disabled={playheadRelMs >= durationMs}
           onClick={() => onSeek(playheadRelMs + 250)}
           type="button"
@@ -424,7 +422,7 @@ function TimeScrubber({
         </button>
         <input
           aria-label="Replay seek (seconds)"
-          className="flex-1 accent-[color:var(--accent)]"
+          className="accent-accent flex-1"
           max={Math.max(durationMs, 0)}
           min={0}
           onChange={(e) => onSeek(Number(e.target.value))}
@@ -432,7 +430,7 @@ function TimeScrubber({
           type="range"
           value={playheadRelMs}
         />
-        <span className="font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
+        <span className="text-fg-muted font-mono text-[11px] tabular-nums">
           {formatSecond(playheadRelMs)} / {formatSecond(durationMs)}
         </span>
       </div>
@@ -471,7 +469,7 @@ function KeyframeTicks({
         return (
           <line
             key={`c${ts}`}
-            stroke="var(--rule)"
+            stroke="var(--color-border)"
             strokeOpacity={0.4}
             strokeWidth={0.5}
             x1={x}
@@ -487,7 +485,7 @@ function KeyframeTicks({
         return (
           <line
             key={`k${ts}`}
-            stroke="var(--accent)"
+            stroke="var(--color-accent)"
             strokeOpacity={0.8}
             strokeWidth={1.2}
             x1={x}
@@ -504,10 +502,10 @@ function KeyframeTicks({
 function Empty({ hint, title }: { hint: string; title: string }) {
   return (
     <section aria-label="Wireframe replay" className="space-y-3">
-      <header className="border-b border-[color:var(--rule)] pb-2">
-        <span className="text-[15px] font-medium text-[color:var(--ink)]">{title}</span>
+      <header className="border-border border-b pb-2">
+        <span className="text-fg text-[15px] font-medium">{title}</span>
       </header>
-      <p className="font-mono text-[12px] text-[color:var(--ink-muted)]">{hint}</p>
+      <p className="text-fg-muted font-mono text-[12px]">{hint}</p>
     </section>
   )
 }

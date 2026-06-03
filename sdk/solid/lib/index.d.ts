@@ -45,4 +45,5 @@ export declare function sentoriOnCatch(err: unknown): void;
 export declare function traceSolidRouter(pathname: string): void;
 export { addBreadcrumb, captureException, captureException as captureError, captureMessage, captureStep, getUser, setUser, } from '@goliapkg/sentori-javascript';
 export type { CaptureMessageOptions, MessageLevel, } from '@goliapkg/sentori-javascript';
+export { RuntimeMetricBuffer, drainRuntimeMetricsForFlush, emitMetric, flushRuntimeMetrics, rebufferRuntimeMetrics, startRuntimeMetricsTimer, stopRuntimeMetricsTimer, type RuntimeMetricPoint, } from '@goliapkg/sentori-javascript';
 //# sourceMappingURL=index.d.ts.map

@@ -129,7 +129,15 @@ export type RelatedAcrossReleasesResp = {
  * Same endpoint backs UI module rendering AND LLM agent queries —
  * keep this type narrow + well-named so both consumers can read it.
  */
-export type ExploreDim = 'issue' | 'release' | 'time_bucket'
+export type ExploreDim =
+  | 'issue'
+  | 'release'
+  | 'time_bucket'
+  // v2.3 — additions per docs/roadmap/post-v2.2-plan.md Phase 2.
+  | 'device_os'
+  | 'issue_priority'
+  | 'severity'
+  | 'route'
 export type ExploreBucket = 'day' | 'hour' | 'week'
 export type ExploreMeasure =
   | 'event_count'
@@ -138,6 +146,12 @@ export type ExploreMeasure =
   | 'unique_users'
   | 'first_seen'
   | 'last_seen'
+  // v2.3 — additions. `crash_free_rate` is reserved but the server
+  // rejects it pending session-schema work (see Phase 1 audit).
+  | 'new_issue_count'
+  | 'p50_duration'
+  | 'p95_duration'
+  | 'crash_free_rate'
 export type ExploreFilters = {
   receivedAtGte?: string // RFC-3339
   receivedAtLt?: string
@@ -148,6 +162,23 @@ export type ExploreFilters = {
   releaseEq?: string
   /** `dim=issue` only — filter by status. */
   statusIn?: string[]
+  /** v2.3 — single-issue filter. Most useful with
+   *  `dim=time_bucket` to render a per-issue sparkline (the v2.2 W3
+   *  stub). Ignored on `dim=issue` where row identity already is
+   *  the issue. */
+  issueEq?: string
+  /** v2.3 — single-user filter. `payload.user.id = X`. Phase 7
+   *  find-user lens uses this. */
+  userIdEq?: string
+  /** v2.3 — single-route filter. `payload.tags.route = X`. Phase 8
+   *  find-slow drill key. */
+  routeEq?: string
+  /** v2.3 — `payload.device.os = X`. */
+  osEq?: string
+  /** v2.3 — server-side fuzzy match against `error.type`,
+   *  `error.message`, `message`. Replaces the v2.2 W3 client-side
+   *  search stub. */
+  search?: string
 }
 export type ExploreReq = {
   dim: ExploreDim
@@ -326,7 +357,20 @@ export type ServerEvent = {
   flags?: Record<string, string>
   timestamp: string
   traceId: null | string
-  user: null | { anonymous?: boolean; id?: string }
+  user: null | {
+    anonymous?: boolean
+    id?: string
+    /** v2.3 — display name. Host's choice whether to put real PII
+     *  here; the SDK stores it raw on send. */
+    name?: string
+    /** v2.3 — client-side hashed identity values keyed by `keyType`
+     *  (email / phone / googleSub / appleSub / username / custom).
+     *  Each value is the 64-char lowercase hex sha256 of the
+     *  normalised raw value; the dashboard can compute the same
+     *  hash from operator input via `crypto.subtle.digest` and
+     *  match against this map without ever seeing the raw value. */
+    linkHashes?: Record<string, string>
+  }
   /** Phase 42 sub-C.09: SDK-uploaded attachments (screenshots, view
    *  trees, state snapshots). Each `ref` is server-issued; the
    *  dashboard fetches the blob via
@@ -584,8 +628,17 @@ export const adminApi = {
 
   /** Phase 42 sub-A.11: update project settings.
    *  `sourceRepoUrl: null` clears the value; omit the key to leave
-   *  it untouched. */
-  patchProject: (projectId: string, body: { sourceRepoUrl?: null | string }) =>
+   *  it untouched. v2.5+ — `identityScopeId: null` clears the
+   *  carved identity scope, reverting the project to the org
+   *  default. Server validates the target scope belongs to the
+   *  same org (returns `identityScopeNotInOrg` otherwise). */
+  patchProject: (
+    projectId: string,
+    body: {
+      sourceRepoUrl?: null | string
+      identityScopeId?: null | string
+    }
+  ) =>
     adminFetch<null>(`/projects/${projectId}`, {
       body: JSON.stringify(body),
       method: 'PATCH',
@@ -666,6 +719,27 @@ export const adminApi = {
     adminFetch<RelatedAcrossReleasesResp>(
       `/projects/${projectId}/issues/${issueId}/related-across-releases`
     ),
+
+  /**
+   * v2.4 — find-user lens. Top-N fingerprints touching this issue
+   * inside a rolling window. Each row links into the existing
+   * single-fingerprint detail page so the operator can drill into
+   * one user's full timeline. See
+   * `server/src/api/admin/issue_affected_users.rs`.
+   */
+  issueAffectedUsers: (
+    projectId: string,
+    issueId: string,
+    opts: { days?: number; limit?: number } = {}
+  ) => {
+    const params = new URLSearchParams()
+    if (opts.days !== undefined) params.set('days', String(opts.days))
+    if (opts.limit !== undefined) params.set('limit', String(opts.limit))
+    const qs = params.toString()
+    return adminFetch<IssueAffectedUsersResp>(
+      `/projects/${projectId}/issues/${issueId}/affected-users${qs ? `?${qs}` : ''}`
+    )
+  },
 
   /** Phase 24 sub-D / Phase 25 sub-F — bulk status / assign. */
   bulkPatchIssues: (
@@ -775,12 +849,118 @@ export const adminApi = {
   listCertObservations: (projectId: string) =>
     adminFetch<CertObservation[]>(`/projects/${projectId}/cert-monitor/observations`),
 
-  /** v0.8.3 — recent points for a metric (defaults to last 24h). */
-  listMetrics: (projectId: string, params: { limit?: number; name?: string; since?: string }) => {
+  /** v2.1 W4 — endpoint health: list all checks for a project. */
+  listEndpointChecks: (projectId: string) =>
+    adminFetch<EndpointCheck[]>(`/projects/${projectId}/endpoint-checks`),
+
+  /** v2.1 W4 — create a new endpoint check. */
+  createEndpointCheck: (projectId: string, body: NewEndpointCheck) =>
+    adminFetch<{ id: string }>(`/projects/${projectId}/endpoint-checks`, {
+      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    }),
+
+  /** v2.1 W4 — get one check. */
+  getEndpointCheck: (projectId: string, id: string) =>
+    adminFetch<EndpointCheck>(`/projects/${projectId}/endpoint-checks/${id}`),
+
+  /** v2.1 W4 — patch a check (any subset of fields). */
+  updateEndpointCheck: (
+    projectId: string,
+    id: string,
+    body: Partial<NewEndpointCheck> & { paused?: boolean }
+  ) =>
+    adminFetch<void>(`/projects/${projectId}/endpoint-checks/${id}`, {
+      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT',
+    }),
+
+  /** v2.1 W4 — delete a check (cascades to its probes). */
+  deleteEndpointCheck: (projectId: string, id: string) =>
+    adminFetch<void>(`/projects/${projectId}/endpoint-checks/${id}`, {
+      method: 'DELETE',
+    }),
+
+  /** v2.1 W4 — probe log for one check (last 24 h by default). */
+  listEndpointProbes: (
+    projectId: string,
+    id: string,
+    params: { from?: string; limit?: number; to?: string } = {}
+  ) => {
+    const usp = new URLSearchParams()
+    if (params.from) usp.set('from', params.from)
+    if (params.to) usp.set('to', params.to)
+    if (params.limit !== undefined) usp.set('limit', String(params.limit))
+    const qs = usp.toString()
+    return adminFetch<EndpointProbeRow[]>(
+      `/projects/${projectId}/endpoint-checks/${id}/probes${qs ? '?' + qs : ''}`
+    )
+  },
+
+  /** v2.1 W4 — 1h rollup for one check (24 h sparkline data). */
+  listEndpointRollup: (
+    projectId: string,
+    id: string,
+    params: { from?: string; to?: string } = {}
+  ) => {
+    const usp = new URLSearchParams()
+    if (params.from) usp.set('from', params.from)
+    if (params.to) usp.set('to', params.to)
+    const qs = usp.toString()
+    return adminFetch<EndpointRollupRow[]>(
+      `/projects/${projectId}/endpoint-checks/${id}/rollup${qs ? '?' + qs : ''}`
+    )
+  },
+
+  /** v2.1.3 — "Probe now" dry-run. Runs one probe against the check's
+   *  current config but writes nothing to `endpoint_probe` and does
+   *  not touch the issue lifecycle — purely a UX sanity-check for an
+   *  operator who just edited a check. */
+  probeEndpointCheckNow: (projectId: string, id: string) =>
+    adminFetch<EndpointProbeNowResult>(`/projects/${projectId}/endpoint-checks/${id}/probe-now`, {
+      method: 'POST',
+    }),
+
+  /** v2.1 W3 — runtime metrics BI query. Server picks the rollup
+   *  tier (raw / _1m / _1h / _1d) based on the (bucket, from, to)
+   *  window and returns one series per dim tuple. */
+  queryRuntimeMetrics: (
+    projectId: string,
+    params: {
+      bucket?: '1d' | '1h' | '1m' | '5m' | '15m'
+      dim?: 'device_class' | 'environment' | 'none' | 'release'
+      from?: string
+      measure?: 'avg' | 'count' | 'p50' | 'p95' | 'p99' | 'sum'
+      name: string
+      to?: string
+    }
+  ) => {
+    const usp = new URLSearchParams()
+    usp.set('name', params.name)
+    if (params.dim && params.dim !== 'none') usp.set('dim', params.dim)
+    if (params.measure) usp.set('measure', params.measure)
+    if (params.bucket) usp.set('bucket', params.bucket)
+    if (params.from) usp.set('from', params.from)
+    if (params.to) usp.set('to', params.to)
+    return adminFetch<RuntimeMetricsQueryResponse>(
+      `/projects/${projectId}/runtime-metrics/query?${usp.toString()}`
+    )
+  },
+
+  /** v0.8.3 — recent points for a metric (defaults to last 24h).
+   *  v2.0 W3 — `spanId` filter ties a metric query to its emitting
+   *  span; drives the dashboard span detail "related metrics" row. */
+  listMetrics: (
+    projectId: string,
+    params: { limit?: number; name?: string; since?: string; spanId?: string }
+  ) => {
     const usp = new URLSearchParams()
     if (params.name) usp.set('name', params.name)
     if (params.since) usp.set('since', params.since)
     if (params.limit !== undefined) usp.set('limit', String(params.limit))
+    if (params.spanId) usp.set('spanId', params.spanId)
     const qs = usp.toString()
     return adminFetch<MetricPoint[]>(`/projects/${projectId}/metrics${qs ? '?' + qs : ''}`)
   },
@@ -1456,6 +1636,79 @@ export type MetricPoint = {
   value: number
 }
 
+// v2.1 W3 — runtime metrics BI query response.
+export type RuntimeMetricsQueryResponse = {
+  /** Which rollup tier the server picked. Surfaced as a
+   *  "resolution" badge in the UI. */
+  tier: '1d' | '1h' | '1m' | 'raw'
+  series: RuntimeMetricsSeries[]
+}
+
+export type RuntimeMetricsSeries = {
+  /** Tag combo identifying the series (e.g. release=v1.0.0).
+   *  Empty when `dim=none`. */
+  label: string
+  points: RuntimeMetricsPoint[]
+}
+
+export type RuntimeMetricsPoint = {
+  ts: string
+  value: number
+}
+
+// v2.1 W4 — endpoint health types.
+export type EndpointCheck = {
+  id: string
+  projectId: string
+  name: string
+  targetUrl: string
+  method: string
+  intervalSec: number
+  assertionStatusCodes: number[]
+  assertionBodySubstring: null | string
+  assertionMaxLatencyMs: null | number
+  paused: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type NewEndpointCheck = {
+  name: string
+  targetUrl: string
+  method?: string
+  intervalSec?: number
+  assertionStatusCodes?: number[]
+  assertionBodySubstring?: string
+  assertionMaxLatencyMs?: number
+}
+
+export type EndpointProbeRow = {
+  ts: string
+  statusCode: number
+  latencyMs: number
+  ok: boolean
+  errorKind: null | string
+}
+
+export type EndpointRollupRow = {
+  bucketTs: string
+  probeCount: number
+  okCount: number
+  uptimePct: number
+  p50LatencyMs: number
+  p95LatencyMs: number
+}
+
+// v2.1.3 — "Probe now" dry-run response shape. `errorKind` is null
+// on success, otherwise one of: status / body / latency / dns / tcp /
+// tls / timeout (same taxonomy the cron writes into endpoint_probe).
+export type EndpointProbeNowResult = {
+  ok: boolean
+  statusCode: number
+  latencyMs: number
+  errorKind: null | string
+}
+
 // v0.8.2 — end-user-submitted bug reports.
 export type UserReport = {
   body: string
@@ -1850,6 +2103,60 @@ export type IdentityLookupResp = {
 }
 
 /**
+ * v2.3 — `orgsApi.usersErase` response. Same shape on dry-run and
+ * live runs; `dryRun` echoes the request flag. Sample IDs help the
+ * operator spot-check before confirming a live erase.
+ */
+export type IdentityEraseResp = {
+  scopeId: string
+  keyType: string
+  dryRun: boolean
+  affectedCount: number
+  sampleEventIds: string[]
+  fingerprintPrefix: string
+}
+
+/**
+ * v2.4 — `orgsApi.usersMerge` response. `created: true` means a
+ * new identity_merges row was inserted; `created: false` means an
+ * identical merge already existed and we just re-activated it
+ * (cleared `undone_at`).
+ */
+export type IdentityMergeResp = {
+  scopeId: string
+  primaryPrefix: string
+  aliasPrefix: string
+  created: boolean
+}
+
+/** v2.4 — `orgsApi.usersMergeUndo` response. `undone: false` means
+ *  no active merge with that alias existed (already undone, or
+ *  never merged). */
+export type IdentityMergeUndoResp = {
+  scopeId: string
+  aliasPrefix: string
+  undone: boolean
+}
+
+/**
+ * v2.4 — `adminApi.issueAffectedUsers` response. One row per
+ * (fingerprint, keyType) pair touching the issue inside the window.
+ * `totalDistinct` is the unfiltered count so the dashboard can
+ * render "showing top 20 of 412".
+ */
+export type IssueAffectedUsersResp = {
+  issueId: string
+  windowDays: number
+  totalDistinct: number
+  rows: {
+    fingerprintHex: string
+    keyType: string
+    eventCount: number
+    lastSeen: string
+  }[]
+}
+
+/**
  * v2.4 — Users page default overview. Mirrors
  * `server/src/api/admin/users_overview.rs::OverviewResp`. Fingerprints
  * surface as 64-char lowercase hex; no raw identity ever crosses the
@@ -1941,6 +2248,51 @@ export const orgsApi = {
     const qs = params.toString()
     return adminFetch<UsersDetailResp>(`/orgs/${slug}/users/${fingerprintHex}${qs ? `?${qs}` : ''}`)
   },
+
+  /**
+   * v2.3 — GDPR-aligned DSR erase. Same `(keyType, clientHash)` shape
+   * as usersLookup; adds `dryRun: true` for a side-effect-free count.
+   * Live (dryRun=false) call deletes identity_fingerprints rows for
+   * the subject + pseudonymises `payload.user` on every matching
+   * event. Audit log entry per call. Dashboard typed-confirmation
+   * gate sits in front of the live call.
+   */
+  usersErase: (slug: string, body: { keyType: string; clientHash: string; dryRun?: boolean }) =>
+    adminFetch<IdentityEraseResp>(`/orgs/${slug}/users/erase`, {
+      body: JSON.stringify(body),
+      method: 'POST',
+    }),
+
+  /**
+   * v2.4 — operator-driven identity merge. Maps alias → primary
+   * inside the org's default identity scope; subsequent lookup
+   * calls against the alias hash transparently return the primary's
+   * events (one-hop follow). Same body shape on both sides:
+   * `(keyType, clientHash)` pairs.
+   */
+  usersMerge: (
+    slug: string,
+    body: {
+      primary: { keyType: string; clientHash: string }
+      alias: { keyType: string; clientHash: string }
+    }
+  ) =>
+    adminFetch<IdentityMergeResp>(`/orgs/${slug}/users/merge`, {
+      body: JSON.stringify(body),
+      method: 'POST',
+    }),
+
+  /**
+   * v2.4 — undo a previously-written merge (soft; the audit row
+   * survives, only the lookup-follow effect is reversed). Server
+   * enforces no time gate — the dashboard surfaces a 7-day window
+   * for the undo affordance.
+   */
+  usersMergeUndo: (slug: string, body: { alias: { keyType: string; clientHash: string } }) =>
+    adminFetch<IdentityMergeUndoResp>(`/orgs/${slug}/users/merge/undo`, {
+      body: JSON.stringify(body),
+      method: 'POST',
+    }),
 
   /**
    * v2.4 — Users page default overview. KPI + most-affected

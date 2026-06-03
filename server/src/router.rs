@@ -158,6 +158,14 @@ pub fn build(cfg: ServerConfig) -> Router {
         // v0.8.3 — custom metrics (counters / gauges / timings) from
         // the host app. Up to 500 points per batch.
         .route("/v1/metrics:batch", post(api::metrics::ingest_batch).layer(small_body.clone()))
+        // v2.1 W1 — auto-instrument runtime metrics. Sibling of
+        // /v1/metrics:batch; writes to runtime_metrics_raw
+        // (partitioned by day, rolled up by metrics_rollup) and
+        // applies a stricter name regex + tag cardinality cap.
+        .route(
+            "/v1/runtime-metrics:batch",
+            post(api::runtime_metrics::ingest_batch).layer(small_body.clone()),
+        )
         // v1.1 chunk B — analytics `track` events (page views, custom
         // funnels). Separate table + endpoint from /v1/events so the
         // high-volume analytics path doesn't share the error retention
@@ -336,6 +344,41 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/metric-names",
             get(api::metrics::list_metric_names),
         )
+        // v2.1 W3 — runtime metrics BI query. Picks the rollup
+        // tier (raw / _1m / _1h / _1d) based on (bucket, from, to)
+        // and returns one series per dim tuple.
+        .route(
+            "/projects/{project_id}/runtime-metrics/query",
+            get(api::runtime_metrics_query::query),
+        )
+        // v2.1 W4 — endpoint health admin CRUD + probe log + 1h
+        // rollup query. The probe cron itself spawns from main.rs.
+        .route(
+            "/projects/{project_id}/endpoint-checks",
+            axum::routing::post(api::endpoint_checks::create)
+                .get(api::endpoint_checks::list),
+        )
+        .route(
+            "/projects/{project_id}/endpoint-checks/{id}",
+            get(api::endpoint_checks::get_one)
+                .put(api::endpoint_checks::update)
+                .delete(api::endpoint_checks::delete),
+        )
+        .route(
+            "/projects/{project_id}/endpoint-checks/{id}/probes",
+            get(api::endpoint_checks::list_probes),
+        )
+        .route(
+            "/projects/{project_id}/endpoint-checks/{id}/rollup",
+            get(api::endpoint_checks::list_rollup),
+        )
+        // v2.1.3 — manual "probe now" dry-run; bypasses DB write +
+        // issue lifecycle so an operator can verify a check without
+        // polluting probe history.
+        .route(
+            "/projects/{project_id}/endpoint-checks/{id}/probe-now",
+            axum::routing::post(api::endpoint_checks::probe_now),
+        )
         // v0.9.0 #6 — moments aggregation + samples.
         .route(
             "/projects/{project_id}/moments",
@@ -436,6 +479,39 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route(
             "/orgs/{slug}/users/lookup",
             post(api::admin::identity_lookup::lookup),
+        )
+        // v2.3 — GDPR-aligned DSR erase. Same body shape as lookup
+        // (keyType + clientHash); adds `dryRun: bool`. dryRun=true
+        // returns the affected-event count without mutating;
+        // dryRun=false (or absent) pseudonymises payload.user across
+        // every matching event + drops identity_fingerprints rows.
+        // Audit log entry per call.
+        .route(
+            "/orgs/{slug}/users/erase",
+            post(api::admin::identity_erase::erase),
+        )
+        // v2.4 — operator-driven identity merge. POST writes one row
+        // in identity_merges mapping alias → primary; subsequent
+        // /users/lookup against the alias transparently returns the
+        // primary's events (one-hop follow). /undo soft-undoes
+        // (sets undone_at) so the merge stops affecting lookups
+        // but the audit row survives forever.
+        .route(
+            "/orgs/{slug}/users/merge",
+            post(api::admin::identity_merge::merge),
+        )
+        .route(
+            "/orgs/{slug}/users/merge/undo",
+            post(api::admin::identity_merge::undo_merge),
+        )
+        // v2.4 — find-user lens primary drill: Issue Detail panel
+        // listing the top-N fingerprints touching this issue inside
+        // the active window. One row per (fingerprint, key_type)
+        // pair; each row links into the existing single-fingerprint
+        // detail page.
+        .route(
+            "/projects/{project_id}/issues/{issue_id}/affected-users",
+            axum::routing::get(api::admin::issue_affected_users::affected_users),
         )
         // v2.4 — Users page default view. Aggregates over the org's
         // default identity scope; returns kpi + top-affected fingerprints

@@ -34,13 +34,12 @@ export function MetricsView() {
   const points = pointsQ.data ?? []
 
   return (
-    <div className="-mx-4 -my-3 flex h-[calc(100%+1.5rem)] min-h-0 overflow-hidden bg-[color:var(--paper)]">
-      <aside className="flex w-[20rem] shrink-0 flex-col overflow-hidden border-r border-[color:var(--rule)] bg-[color:var(--paper-2)]">
-        <header className="shrink-0 border-b border-[color:var(--rule)] px-4 py-3">
+    <div className="bg-bg -mx-4 -my-3 flex h-[calc(100%+1.5rem)] min-h-0 overflow-hidden">
+      <aside className="border-border bg-bg-secondary flex w-[20rem] shrink-0 flex-col overflow-hidden border-r">
+        <header className="border-border shrink-0 border-b px-4 py-3">
           <h1
-            className="text-[color:var(--ink)]"
+            className="text-fg"
             style={{
-              fontFamily: 'var(--font-sans)',
               fontVariationSettings: "'wdth' 95, 'opsz' 24, 'wght' 550",
               fontSize: '17px',
               letterSpacing: '-0.01em',
@@ -48,7 +47,7 @@ export function MetricsView() {
           >
             Metrics
           </h1>
-          <div className="mt-1 font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase">
+          <div className="text-fg-muted mt-1 font-mono text-[11px] tracking-[0.08em] uppercase">
             last 24 hours
           </div>
         </header>
@@ -62,8 +61,8 @@ export function MetricsView() {
             const active = selected === n.name
             return (
               <button
-                className={`relative block w-full border-b border-[color:var(--rule-soft)] px-4 py-2.5 text-left transition-colors ${
-                  active ? 'bg-[color:var(--accent-soft)]' : 'hover:bg-[color:var(--paper)]'
+                className={`border-border-muted relative block w-full border-b px-4 py-2.5 text-left transition-colors ${
+                  active ? 'bg-accent/10' : 'hover:bg-bg'
                 }`}
                 key={n.name}
                 onClick={() => setSelected(n.name)}
@@ -71,10 +70,10 @@ export function MetricsView() {
               >
                 <span
                   aria-hidden
-                  className={`absolute top-0 bottom-0 left-0 w-[2px] ${active ? 'bg-[color:var(--accent)]' : 'bg-transparent'}`}
+                  className={`absolute top-0 bottom-0 left-0 w-[2px] ${active ? 'bg-accent' : 'bg-transparent'}`}
                 />
-                <div className="font-mono text-[13px] text-[color:var(--ink)]">{n.name}</div>
-                <div className="mt-1 flex items-center gap-2 font-mono text-[10px] tracking-[0.05em] text-[color:var(--ink-muted)]">
+                <div className="text-fg font-mono text-[13px]">{n.name}</div>
+                <div className="text-fg-muted mt-1 flex items-center gap-2 font-mono text-[10px] tracking-[0.05em]">
                   <span className="tabular-nums">{n.count.toLocaleString()} points</span>
                   <span aria-hidden className="opacity-40">
                     /
@@ -87,7 +86,7 @@ export function MetricsView() {
         </div>
       </aside>
 
-      <section className="min-w-0 flex-1 overflow-y-auto bg-[color:var(--paper)]">
+      <section className="bg-bg min-w-0 flex-1 overflow-y-auto">
         {!selected && (
           <CenteredEmpty eyebrow="Pick a metric">
             The left rail lists every metric name seen in the last 24 h.
@@ -100,10 +99,10 @@ export function MetricsView() {
         {selected && !pointsQ.isLoading && !pointsQ.isError && points.length > 0 && (
           <div className="space-y-4 p-6">
             <header className="pb-2">
-              <div className="font-mono text-[11px] tracking-[0.18em] text-[color:var(--accent)] uppercase">
+              <div className="text-accent font-mono text-[11px] tracking-[0.18em] uppercase">
                 metric
               </div>
-              <h2 className="mt-1 font-mono text-[20px] text-[color:var(--ink)]">{selected}</h2>
+              <h2 className="text-fg mt-1 font-mono text-[20px]">{selected}</h2>
             </header>
             <Sparkline values={points.map((p) => p.value).reverse()} />
             <table className="bench">
@@ -135,7 +134,7 @@ export function MetricsView() {
 function Sparkline({ values }: { values: number[] }) {
   if (values.length < 2) {
     return (
-      <div className="border-y border-[color:var(--rule)] py-3 text-center font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase">
+      <div className="border-border text-fg-muted border-y py-3 text-center font-mono text-[11px] tracking-[0.08em] uppercase">
         not enough points for a trend yet
       </div>
     )
@@ -150,10 +149,10 @@ function Sparkline({ values }: { values: number[] }) {
     .map((v, i) => `${(i * dx).toFixed(1)},${(H - ((v - min) / range) * H).toFixed(1)}`)
     .join(' ')
   return (
-    <div className="border-y border-[color:var(--rule)] py-3">
+    <div className="border-border border-y py-3">
       <svg className="w-full" height={H} preserveAspectRatio="none" viewBox={`0 0 ${W} ${H}`}>
         <polyline
-          fill="var(--accent)"
+          fill="var(--color-accent)"
           fillOpacity="0.08"
           points={`0,${H} ${points} ${W},${H}`}
           stroke="none"
@@ -161,12 +160,12 @@ function Sparkline({ values }: { values: number[] }) {
         <polyline
           fill="none"
           points={points}
-          stroke="var(--accent)"
+          stroke="var(--color-accent)"
           strokeWidth="1.5"
           vectorEffect="non-scaling-stroke"
         />
       </svg>
-      <div className="mt-2 flex justify-between font-mono text-[10px] tracking-[0.05em] text-[color:var(--ink-muted)] uppercase tabular-nums">
+      <div className="text-fg-muted mt-2 flex justify-between font-mono text-[10px] tracking-[0.05em] uppercase tabular-nums">
         <span>min {min.toLocaleString()}</span>
         <span>max {max.toLocaleString()}</span>
       </div>
