@@ -21,9 +21,7 @@ export function InviteAcceptView() {
 
   return (
     <AuthShell title="Accept invite">
-      {m.isPending && (
-        <p className="text-[13px] text-[color:var(--ink-soft)]">Accepting your invite…</p>
-      )}
+      {m.isPending && <p className="text-fg-secondary text-[13px]">Accepting your invite…</p>}
       {m.error && (
         <AuthError>
           {m.error instanceof Error ? m.error.message : 'Failed to accept invite.'}

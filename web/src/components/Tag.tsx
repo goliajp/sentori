@@ -25,14 +25,11 @@ import type { ReactNode } from 'react'
 export type TagVariant = 'accent' | 'danger' | 'default' | 'success' | 'warning'
 
 const VARIANT_CLS: Record<TagVariant, string> = {
-  accent: 'bg-[color:var(--accent-soft)] text-[color:var(--accent)] border-[color:var(--accent)]',
-  danger:
-    'bg-[color:var(--danger-bg)] text-[color:var(--danger)] border-[color:var(--danger-border)]',
-  default: 'bg-[color:var(--paper-2)] text-[color:var(--ink-soft)] border-[color:var(--rule)]',
-  success:
-    'bg-[color:var(--success-bg)] text-[color:var(--success)] border-[color:var(--success-border)]',
-  warning:
-    'bg-[color:var(--warning-bg)] text-[color:var(--warning)] border-[color:var(--warning-border)]',
+  accent: 'bg-accent/10 text-accent border-accent',
+  danger: 'bg-danger/15 text-danger border-danger/30',
+  default: 'bg-bg-secondary text-fg-secondary border-border',
+  success: 'bg-success/15 text-success border-success/30',
+  warning: 'bg-warning/15 text-warning border-warning/30',
 }
 
 export function Tag({

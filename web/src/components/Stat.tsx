@@ -33,9 +33,8 @@ export function Stat({
     <div className="rule-cell">
       <div className="t-tag">{label}</div>
       <div
-        className={highlight ? 'mt-3 text-[color:var(--accent)]' : 'mt-3 text-[color:var(--ink)]'}
+        className={highlight ? 'text-accent mt-3' : 'text-fg mt-3'}
         style={{
-          fontFamily: 'var(--font-sans)',
           fontSize: '28px',
           fontVariationSettings: "'wdth' 100, 'opsz' 48, 'wght' 550",
           letterSpacing: '-0.014em',
@@ -45,9 +44,7 @@ export function Stat({
         {value}
       </div>
       {sub != null && (
-        <div className="mt-1.5 font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
-          {sub}
-        </div>
+        <div className="text-fg-muted mt-1.5 font-mono text-[11px] tabular-nums">{sub}</div>
       )}
     </div>
   )

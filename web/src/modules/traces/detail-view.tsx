@@ -52,20 +52,17 @@ export function TraceDetailView() {
   return (
     <div className="sentori-page-in space-y-4">
       <Link
-        className="inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase transition-colors hover:text-[color:var(--accent)]"
+        className="text-fg-muted hover:text-accent inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.08em] uppercase transition-colors"
         to={`/main/org/${currentOrg.slug}/traces`}
       >
         ← back to traces
       </Link>
 
       <header>
-        <div className="font-mono text-[11px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
-          trace
-        </div>
+        <div className="text-fg-muted font-mono text-[11px] tracking-[0.18em] uppercase">trace</div>
         <h1
-          className="mt-1 text-[color:var(--ink)]"
+          className="text-fg mt-1"
           style={{
-            fontFamily: 'var(--font-sans)',
             fontVariationSettings: "'wdth' 95, 'opsz' 48, 'wght' 600",
             fontSize: '26px',
             letterSpacing: '-0.018em',
@@ -74,9 +71,7 @@ export function TraceDetailView() {
         >
           {trace?.rootOp ?? trace?.rootName ?? `trace ${traceId.slice(0, 8)}`}
         </h1>
-        <div className="mt-2 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink-muted)]">
-          {traceId}
-        </div>
+        <div className="text-fg-muted mt-2 font-mono text-[11px] tracking-[0.05em]">{traceId}</div>
       </header>
 
       {isLoading && <EmptyState>Loading trace…</EmptyState>}
@@ -112,7 +107,7 @@ export function TraceDetailView() {
                 const related = relatedBySpan.get(s.id) ?? []
                 const rows = [
                   <tr key={s.id}>
-                    <td className="text-[color:var(--ink-soft)]">{s.op}</td>
+                    <td className="text-fg-secondary">{s.op}</td>
                     <td className="lead">{s.name}</td>
                     <td className="num">{s.durationMs.toLocaleString()}ms</td>
                     <td
@@ -120,8 +115,8 @@ export function TraceDetailView() {
                         s.status === 'ok'
                           ? undefined
                           : s.status === 'error'
-                            ? 'text-[color:var(--danger)]'
-                            : 'text-[color:var(--ink-muted)]'
+                            ? 'text-danger'
+                            : 'text-fg-muted'
                       }
                     >
                       {s.status}
@@ -137,19 +132,19 @@ export function TraceDetailView() {
                 if (related.length > 0) {
                   rows.push(
                     <tr key={`${s.id}-metrics`}>
-                      <td className="text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+                      <td className="text-fg-muted text-[10px] tracking-[0.12em] uppercase">
                         metrics
                       </td>
                       <td className="text-[11px]" colSpan={3}>
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[color:var(--ink-soft)]">
+                        <div className="text-fg-secondary flex flex-wrap items-center gap-x-3 gap-y-1">
                           {related.map((m) => (
                             <span
                               className="inline-flex items-center gap-1 font-mono"
                               key={m.id}
                               title={`${m.ts} • ${JSON.stringify(m.tags)}`}
                             >
-                              <span className="text-[color:var(--ink)]">{m.name}</span>
-                              <span className="text-[color:var(--accent)] tabular-nums">
+                              <span className="text-fg">{m.name}</span>
+                              <span className="text-accent tabular-nums">
                                 {Number.isInteger(m.value) ? m.value : m.value.toFixed(2)}
                               </span>
                             </span>

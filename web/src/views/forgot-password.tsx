@@ -40,13 +40,13 @@ export function ForgotPasswordView() {
     <AuthShell title="Forgot password">
       {sent ? (
         <div className="space-y-3">
-          <p className="text-[13px] text-[color:var(--ink-soft)]">
-            If <span className="font-mono text-[color:var(--ink)]">{email}</span> matches an
-            account, a reset link is on its way. The link expires in 48 hours.
+          <p className="text-fg-secondary text-[13px]">
+            If <span className="text-fg font-mono">{email}</span> matches an account, a reset link
+            is on its way. The link expires in 48 hours.
           </p>
-          <p className="border-t border-[color:var(--rule-soft)] pt-3 font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
-            self-hosting w/o smtp? grep <span className="text-[color:var(--ink)]">docker logs</span>{' '}
-            — the link is at info.
+          <p className="border-border-muted text-fg-muted border-t pt-3 font-mono text-[10px] tracking-[0.12em] uppercase">
+            self-hosting w/o smtp? grep <span className="text-fg">docker logs</span> — the link is
+            at info.
           </p>
         </div>
       ) : (
@@ -63,7 +63,7 @@ export function ForgotPasswordView() {
         </form>
       )}
       <FooterLinks>
-        <Link className="hover:text-[color:var(--accent)]" to="/login">
+        <Link className="hover:text-accent" to="/login">
           back to sign in
         </Link>
       </FooterLinks>

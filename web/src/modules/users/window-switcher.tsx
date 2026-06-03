@@ -21,13 +21,9 @@ export function WindowSwitcher({
     <div className="flex items-baseline gap-3 font-mono text-[11px] tracking-[0.18em] uppercase">
       {WINDOW_DAYS.map((w, i) => (
         <span key={w.days} className="flex items-baseline gap-3">
-          {i > 0 && <span className="text-[color:var(--rule)]">/</span>}
+          {i > 0 && <span className="text-border">/</span>}
           <button
-            className={
-              value === w.days
-                ? 'text-[color:var(--accent)]'
-                : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink-soft)]'
-            }
+            className={value === w.days ? 'text-accent' : 'text-fg-muted hover:text-fg-secondary'}
             onClick={() => onChange(w.days)}
             type="button"
           >

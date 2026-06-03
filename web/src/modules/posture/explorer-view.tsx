@@ -91,11 +91,9 @@ export function TrustExplorerView({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-6">
-      <p className="font-mono text-[11px] text-[color:var(--ink-muted)]">
+      <p className="text-fg-muted font-mono text-[11px]">
         adjust weights below · scores recompute in-browser via Rust → WebAssembly ·{' '}
-        <span className="text-[color:var(--accent)]">
-          {kernelReady ? 'wasm ready' : 'wasm loading…'}
-        </span>
+        <span className="text-accent">{kernelReady ? 'wasm ready' : 'wasm loading…'}</span>
       </p>
 
       <SliderRow
@@ -123,7 +121,7 @@ function SliderRow({
       <header className="sec-head">
         <span className="sec-head-title">Weight knobs</span>
         <button
-          className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--accent)]"
+          className="text-fg-muted hover:text-accent font-mono text-[10px] tracking-[0.18em] uppercase"
           onClick={onReset}
           type="button"
         >
@@ -134,16 +132,11 @@ function SliderRow({
         {KIND_ORDER.map((k) => {
           const v = weights[k] ?? DEFAULT_WEIGHTS[k] ?? UNKNOWN_DEFAULT
           return (
-            <li
-              className="flex items-baseline gap-3 border-b border-[color:var(--rule-soft)] py-1.5"
-              key={k}
-            >
-              <span className="basis-[14ch] font-mono text-[11px] text-[color:var(--ink-soft)]">
-                {k}
-              </span>
+            <li className="border-border-muted flex items-baseline gap-3 border-b py-1.5" key={k}>
+              <span className="text-fg-secondary basis-[14ch] font-mono text-[11px]">{k}</span>
               <input
                 aria-label={`${k} weight`}
-                className="min-w-0 flex-1 accent-[color:var(--accent)]"
+                className="accent-accent min-w-0 flex-1"
                 max={100}
                 min={0}
                 onChange={(e) => onChange({ ...weights, [k]: Number(e.target.value) })}
@@ -151,7 +144,7 @@ function SliderRow({
                 type="range"
                 value={v}
               />
-              <span className="basis-[3ch] text-right font-mono text-[12px] text-[color:var(--ink)] tabular-nums">
+              <span className="text-fg basis-[3ch] text-right font-mono text-[12px] tabular-nums">
                 {v}
               </span>
             </li>
@@ -189,12 +182,12 @@ function SimRow({ row }: { row: TrustScoreRow & { simScore: number } }) {
   const delta = row.simScore - row.score
   const tone =
     row.simScore < 30
-      ? 'var(--danger)'
+      ? 'var(--color-danger)'
       : row.simScore < 70
-        ? 'var(--warning, var(--accent))'
-        : 'var(--ink-soft)'
+        ? 'var(--color-warning, var(--color-accent))'
+        : 'var(--color-fg-secondary)'
   return (
-    <li className="grid grid-cols-[5ch_5ch_minmax(0,1fr)_auto_auto] items-baseline gap-3 border-b border-[color:var(--rule-soft)] py-2 last:border-b-0">
+    <li className="border-border-muted grid grid-cols-[5ch_5ch_minmax(0,1fr)_auto_auto] items-baseline gap-3 border-b py-2 last:border-b-0">
       <span
         className="font-mono text-[16px] font-medium tabular-nums"
         style={{ color: tone }}
@@ -205,23 +198,26 @@ function SimRow({ row }: { row: TrustScoreRow & { simScore: number } }) {
       <span
         className="font-mono text-[10px] tabular-nums"
         style={{
-          color: delta === 0 ? 'var(--ink-muted)' : delta < 0 ? 'var(--danger)' : 'var(--accent)',
+          color:
+            delta === 0
+              ? 'var(--color-fg-muted)'
+              : delta < 0
+                ? 'var(--color-danger)'
+                : 'var(--color-accent)',
         }}
         title={`Baseline ${row.score}, sim ${row.simScore}`}
       >
         {delta === 0 ? '·' : delta > 0 ? `+${delta}` : delta}
       </span>
-      <span className="min-w-0 truncate font-mono text-[12px] text-[color:var(--ink)]">
-        {row.installId}
-      </span>
-      <span className="font-mono text-[11px] text-[color:var(--ink-muted)]">
+      <span className="text-fg min-w-0 truncate font-mono text-[12px]">{row.installId}</span>
+      <span className="text-fg-muted font-mono text-[11px]">
         {Object.entries(row.kinds)
           .sort((a, b) => b[1] - a[1])
           .slice(0, 3)
           .map(([k, n]) => `${k}×${n}`)
           .join(' · ')}
       </span>
-      <span className="font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
+      <span className="text-fg-muted font-mono text-[11px] tabular-nums">
         {new Date(row.lastSeen).toLocaleString()}
       </span>
     </li>

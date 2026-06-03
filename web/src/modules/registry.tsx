@@ -30,7 +30,7 @@ function lazyView(loader: () => Promise<{ default: ComponentType }>): ComponentT
       <Suspense
         fallback={
           <div className="sentori-page-in">
-            <div className="border-y border-[color:var(--rule)] py-6 text-center font-mono text-[11px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+            <div className="border-border text-fg-muted border-y py-6 text-center font-mono text-[11px] tracking-[0.18em] uppercase">
               Loading…
             </div>
           </div>

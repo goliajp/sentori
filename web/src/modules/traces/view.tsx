@@ -75,14 +75,14 @@ function TraceList() {
                 >
                   <td className="lead">
                     <Link
-                      className="text-[color:var(--ink)] hover:text-[color:var(--accent)]"
+                      className="text-fg hover:text-accent"
                       onClick={(e) => e.stopPropagation()}
                       to={href}
                     >
                       {t.rootOp ?? t.rootName ?? `trace ${t.traceId.slice(0, 8)}`}
                     </Link>
                   </td>
-                  <td className="num text-[color:var(--ink)]">
+                  <td className="num text-fg">
                     {t.durationMs >= 1000
                       ? `${(t.durationMs / 1000).toFixed(2)}s`
                       : `${t.durationMs}ms`}

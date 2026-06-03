@@ -60,11 +60,8 @@ export function UserDetailView() {
           Fingerprint segment must be 64-char lowercase hex. Got
           <span className="ml-1 font-mono">{fingerprintHex || '(empty)'}</span>.
         </Hint>
-        <p className="mt-3 font-mono text-[11px] text-[color:var(--ink-muted)]">
-          <Link
-            className="hover:text-[color:var(--ink-soft)]"
-            to={`/main/org/${currentOrg.slug}/users`}
-          >
+        <p className="text-fg-muted mt-3 font-mono text-[11px]">
+          <Link className="hover:text-fg-secondary" to={`/main/org/${currentOrg.slug}/users`}>
             ← back to Users
           </Link>
         </p>
@@ -102,15 +99,12 @@ export function UserDetailView() {
     <div className="sentori-page-in">
       <PageHeader subtitle={short(fingerprintHex)} title="User detail" />
 
-      <div className="mb-4 flex flex-wrap items-baseline gap-3 font-mono text-[11px] text-[color:var(--ink-muted)]">
-        <Link
-          className="hover:text-[color:var(--ink-soft)]"
-          to={`/main/org/${currentOrg.slug}/users`}
-        >
+      <div className="text-fg-muted mb-4 flex flex-wrap items-baseline gap-3 font-mono text-[11px]">
+        <Link className="hover:text-fg-secondary" to={`/main/org/${currentOrg.slug}/users`}>
           ← back to Users
         </Link>
         <span>
-          scope <span className="text-[color:var(--ink-soft)]">{data.scopeId.slice(0, 8)}</span>
+          scope <span className="text-fg-secondary">{data.scopeId.slice(0, 8)}</span>
         </span>
         <FingerprintCopy hex={fingerprintHex} />
         <span className="ml-auto">
@@ -127,7 +121,7 @@ export function UserDetailView() {
         <div className="space-y-8">
           <section
             aria-label="kpi"
-            className="grid grid-cols-1 border-y border-[color:var(--rule)] sm:grid-cols-3"
+            className="border-border grid grid-cols-1 border-y sm:grid-cols-3"
           >
             <Stat
               label={`events · ${data.windowDays}d`}
@@ -163,9 +157,7 @@ function Timeline({ buckets }: { buckets: UsersDetailTimelineBucket[] }) {
     return (
       <section>
         <Header title="Timeline" />
-        <p className="py-2 font-mono text-[11px] text-[color:var(--ink-muted)]">
-          no events in this window.
-        </p>
+        <p className="text-fg-muted py-2 font-mono text-[11px]">no events in this window.</p>
       </section>
     )
   }
@@ -179,7 +171,7 @@ function Timeline({ buckets }: { buckets: UsersDetailTimelineBucket[] }) {
   return (
     <section>
       <Header title="Timeline" />
-      <div className="flex h-16 items-end gap-[1px] border-b border-[color:var(--rule)] py-3">
+      <div className="border-border flex h-16 items-end gap-[1px] border-b py-3">
         {buckets.map((b) => {
           const h = (b.eventCount / maxCount) * 56
           const errPct = b.eventCount === 0 ? 0 : b.errorCount / b.eventCount
@@ -190,7 +182,7 @@ function Timeline({ buckets }: { buckets: UsersDetailTimelineBucket[] }) {
               title={`${new Date(b.hourBucket).toLocaleString()} — ${b.eventCount} events (${b.errorCount} error)`}
             >
               <div
-                className="absolute right-0 bottom-0 left-0 bg-[color:var(--ink-soft)]"
+                className="bg-fg-secondary absolute right-0 bottom-0 left-0"
                 style={{
                   height: `${h}px`,
                   opacity: 0.35 + errPct * 0.55,
@@ -198,7 +190,7 @@ function Timeline({ buckets }: { buckets: UsersDetailTimelineBucket[] }) {
               />
               {b.errorCount > 0 && (
                 <div
-                  className="absolute right-0 bottom-0 left-0 bg-[color:var(--danger)]"
+                  className="bg-danger absolute right-0 bottom-0 left-0"
                   style={{
                     height: `${h * errPct}px`,
                   }}
@@ -208,7 +200,7 @@ function Timeline({ buckets }: { buckets: UsersDetailTimelineBucket[] }) {
           )
         })}
       </div>
-      <div className="mt-2 flex items-baseline justify-between font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+      <div className="text-fg-muted mt-2 flex items-baseline justify-between font-mono text-[10px] tracking-[0.18em] uppercase">
         <span>{firstTs ? new Date(firstTs).toLocaleString() : ''}</span>
         <span>hourly · grey events · red errors</span>
         <span>{lastTs ? new Date(lastTs).toLocaleString() : ''}</span>
@@ -236,7 +228,7 @@ function FingerprintCopy({ hex }: { hex: string }) {
   }
   return (
     <button
-      className="font-mono text-[11px] text-[color:var(--ink-muted)] underline decoration-dotted underline-offset-4 hover:text-[color:var(--ink-soft)]"
+      className="text-fg-muted hover:text-fg-secondary font-mono text-[11px] underline decoration-dotted underline-offset-4"
       onClick={onCopy}
       title={hex}
       type="button"
@@ -251,7 +243,7 @@ function IssuesSection({ issues, orgSlug }: { issues: UsersDetailTopIssue[]; org
     <section>
       <Header title="Top issues touched" />
       {issues.length === 0 ? (
-        <p className="py-2 font-mono text-[11px] text-[color:var(--ink-muted)]">
+        <p className="text-fg-muted py-2 font-mono text-[11px]">
           this fingerprint has no issue-classified events.
         </p>
       ) : (
@@ -268,7 +260,7 @@ function IssuesSection({ issues, orgSlug }: { issues: UsersDetailTopIssue[]; org
               <tr key={i.issueId}>
                 <td className="lead">
                   <Link
-                    className="text-[color:var(--ink)] hover:text-[color:var(--accent)]"
+                    className="text-fg hover:text-accent"
                     to={`/main/org/${orgSlug}/projects/${i.projectId}/issues/${i.issueId}`}
                   >
                     {i.title}
@@ -298,7 +290,7 @@ function ProjectsSection({
     <section>
       <Header title="Per-project hits" />
       {hits.length === 0 ? (
-        <p className="py-2 font-mono text-[11px] text-[color:var(--ink-muted)]">
+        <p className="text-fg-muted py-2 font-mono text-[11px]">
           no project ever ingested an event for this fingerprint.
         </p>
       ) : (
@@ -317,7 +309,7 @@ function ProjectsSection({
               <tr key={h.projectId}>
                 <td className="lead">
                   <Link
-                    className="text-[color:var(--ink)] hover:text-[color:var(--accent)]"
+                    className="text-fg hover:text-accent"
                     to={`/main/org/${orgSlug}/issues?user=${encodeURIComponent(fingerprintHex)}`}
                   >
                     <span className="font-mono text-[11px]">{h.projectId}</span>
@@ -338,10 +330,8 @@ function ProjectsSection({
 
 function Header({ title }: { title: string }) {
   return (
-    <header className="mb-3 border-b border-[color:var(--rule)] pb-2">
-      <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
-        {title}
-      </span>
+    <header className="border-border mb-3 border-b pb-2">
+      <span className="text-accent font-mono text-[10px] tracking-[0.22em] uppercase">{title}</span>
     </header>
   )
 }

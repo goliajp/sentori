@@ -28,7 +28,7 @@ export function OverviewView() {
       <Hero count={projectCount} orgName={currentOrg.name ?? currentOrg.slug} />
 
       {projectsQ.isError && (
-        <p className="border-y border-[color:var(--rule)] py-6 text-center text-[13px] text-[color:var(--danger)]">
+        <p className="border-border text-danger border-y py-6 text-center text-[13px]">
           Failed to load projects. Refresh to retry.
         </p>
       )}
@@ -42,9 +42,8 @@ function Hero({ count, orgName }: { count: number; orgName: string }) {
   return (
     <div className="py-6">
       <h2
-        className="max-w-prose text-[color:var(--ink)]"
+        className="text-fg max-w-prose"
         style={{
-          fontFamily: 'var(--font-sans)',
           fontSize: 'clamp(30px, 4.4vw, 46px)',
           fontVariationSettings: "'wdth' 100, 'opsz' 96, 'wght' 600",
           letterSpacing: '-0.022em',
@@ -54,7 +53,7 @@ function Hero({ count, orgName }: { count: number; orgName: string }) {
         Errors, traces &amp;{' '}
         <span
           style={{
-            color: 'var(--accent)',
+            color: 'var(--color-accent)',
             fontVariationSettings: "'wdth' 100, 'opsz' 96, 'wght' 600",
           }}
         >
@@ -62,10 +61,10 @@ function Hero({ count, orgName }: { count: number; orgName: string }) {
         </span>{' '}
         — at the speed of triage.
       </h2>
-      <p className="mt-4 max-w-[56ch] text-[14px] leading-relaxed text-[color:var(--ink-soft)]">
+      <p className="text-fg-secondary mt-4 max-w-[56ch] text-[14px] leading-relaxed">
         Watching {count.toLocaleString()} project{count === 1 ? '' : 's'} for{' '}
-        <span className="font-mono text-[color:var(--ink)]">{orgName}</span>. Pick one below to dive
-        into its issues, traces, and live debug.
+        <span className="text-fg font-mono">{orgName}</span>. Pick one below to dive into its
+        issues, traces, and live debug.
       </p>
     </div>
   )
@@ -90,7 +89,7 @@ function ProjectGrid({
       </header>
 
       {!isLoading && projects.length === 0 && (
-        <p className="border-y border-[color:var(--rule)] py-8 text-center text-[13px] text-[color:var(--ink-soft)]">
+        <p className="border-border text-fg-secondary border-y py-8 text-center text-[13px]">
           No projects in this org yet — create one via the CLI or the server admin endpoint, then
           point your SDK at it with the ingest token.
         </p>
@@ -120,26 +119,26 @@ function ProjectCard({ orgSlug, project }: { orgSlug: string; project: ProjectRo
 
   return (
     <li
-      className="group relative flex flex-col gap-2 border border-[color:var(--rule)] bg-[color:var(--paper-2)] p-4 transition-colors hover:border-[color:var(--accent)]"
+      className="group border-border bg-bg-secondary hover:border-accent relative flex flex-col gap-2 border p-4 transition-colors"
       key={project.id}
     >
       <div className="flex items-baseline justify-between gap-3">
         <Link
-          className="text-[15px] font-medium text-[color:var(--ink)] hover:text-[color:var(--accent)]"
+          className="text-fg hover:text-accent text-[15px] font-medium"
           to={`/main/org/${orgSlug}/issues?project=${project.id}`}
         >
           {project.name}
         </Link>
-        <span className="font-mono text-[10px] tracking-[0.08em] text-[color:var(--ink-muted)] tabular-nums">
+        <span className="text-fg-muted font-mono text-[10px] tracking-[0.08em] tabular-nums">
           {new Date(project.createdAt).toLocaleDateString()}
         </span>
       </div>
 
-      <div className="font-mono text-[11px] text-[color:var(--ink-muted)]">{project.id}</div>
+      <div className="text-fg-muted font-mono text-[11px]">{project.id}</div>
 
       {project.sourceRepoUrl && (
         <a
-          className="font-mono text-[11px] text-[color:var(--ink-soft)] hover:text-[color:var(--accent)]"
+          className="text-fg-secondary hover:text-accent font-mono text-[11px]"
           href={project.sourceRepoUrl}
           rel="noopener noreferrer"
           target="_blank"
@@ -148,27 +147,27 @@ function ProjectCard({ orgSlug, project }: { orgSlug: string; project: ProjectRo
         </a>
       )}
 
-      <div className="mt-1 flex items-center justify-between gap-3 border-t border-[color:var(--rule-soft)] pt-2 font-mono text-[10px] tracking-[0.1em] text-[color:var(--ink-muted)] uppercase">
+      <div className="border-border-muted text-fg-muted mt-1 flex items-center justify-between gap-3 border-t pt-2 font-mono text-[10px] tracking-[0.1em] uppercase">
         <Link
-          className="hover:text-[color:var(--accent)]"
+          className="hover:text-accent"
           to={`/main/org/${orgSlug}/issues?project=${project.id}`}
         >
           issues →
         </Link>
         <Link
-          className="hover:text-[color:var(--accent)]"
+          className="hover:text-accent"
           to={`/main/org/${orgSlug}/traces?project=${project.id}`}
         >
           traces →
         </Link>
         <Link
-          className="hover:text-[color:var(--accent)]"
+          className="hover:text-accent"
           to={`/main/org/${orgSlug}/vitals?project=${project.id}`}
         >
           vitals →
         </Link>
         <Link
-          className="text-[color:var(--accent)] hover:text-[color:var(--accent-strong)]"
+          className="text-accent hover:text-accent-hover"
           to={`/main/org/${orgSlug}/integrate?project=${project.id}`}
           title="Install SDK + ingest tokens"
         >
@@ -198,23 +197,23 @@ function PlatformHealthStrip() {
       ? 'var(--success)'
       : data.overall === 'amber'
         ? 'var(--warning)'
-        : 'var(--danger)'
+        : 'var(--color-danger)'
   const rt = (n: null | number | undefined): string =>
     n === null || n === undefined ? '—' : n < 0 ? 'down' : `${n}ms`
   return (
-    <div className="mb-6 flex items-center gap-4 border-y border-[color:var(--rule)] py-2 font-mono text-[11px]">
+    <div className="border-border mb-6 flex items-center gap-4 border-y py-2 font-mono text-[11px]">
       <span aria-hidden style={{ color }}>
         ●
       </span>
       <span className="tracking-[0.18em] uppercase" style={{ color }}>
         {data.overall}
       </span>
-      <span className="text-[color:var(--ink-muted)]">·</span>
-      <span className="text-[color:var(--ink-soft)]">build {data.serverVersion}</span>
-      <span className="text-[color:var(--ink-muted)]">·</span>
-      <span className="text-[color:var(--ink-soft)]">db {rt(data.dbRtMs)}</span>
-      <span className="text-[color:var(--ink-muted)]">·</span>
-      <span className="text-[color:var(--ink-soft)]">valkey {rt(data.valkeyRtMs)}</span>
+      <span className="text-fg-muted">·</span>
+      <span className="text-fg-secondary">build {data.serverVersion}</span>
+      <span className="text-fg-muted">·</span>
+      <span className="text-fg-secondary">db {rt(data.dbRtMs)}</span>
+      <span className="text-fg-muted">·</span>
+      <span className="text-fg-secondary">valkey {rt(data.valkeyRtMs)}</span>
     </div>
   )
 }

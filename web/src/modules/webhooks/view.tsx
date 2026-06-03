@@ -55,15 +55,13 @@ export function WebhooksView() {
     <div className="sentori-page-in">
       <PageHeader subtitle="alert webhook retry queue" title="Webhooks" />
 
-      <div className="mb-3 flex items-baseline gap-3 border-b border-[color:var(--rule)] pb-1">
+      <div className="border-border mb-3 flex items-baseline gap-3 border-b pb-1">
         {STATUS_TABS.map((t) => {
           const active = status === t.key
           return (
             <button
               className={`relative pb-2 font-mono text-[11px] tracking-[0.1em] uppercase transition-colors focus:outline-none ${
-                active
-                  ? 'text-[color:var(--ink)]'
-                  : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]'
+                active ? 'text-fg' : 'text-fg-muted hover:text-fg'
               }`}
               key={t.key}
               onClick={() => setStatus(t.key)}
@@ -73,7 +71,7 @@ export function WebhooksView() {
               {active && (
                 <span
                   aria-hidden
-                  className="absolute right-0 -bottom-px left-0 h-[2px] bg-[color:var(--accent)]"
+                  className="bg-accent absolute right-0 -bottom-px left-0 h-[2px]"
                 />
               )}
             </button>
@@ -82,7 +80,7 @@ export function WebhooksView() {
       </div>
 
       {deliveriesQ.isLoading && (
-        <p className="border-y border-[color:var(--rule)] py-6 text-center text-[13px] text-[color:var(--ink-soft)]">
+        <p className="border-border text-fg-secondary border-y py-6 text-center text-[13px]">
           Loading…
         </p>
       )}
@@ -94,7 +92,7 @@ export function WebhooksView() {
       )}
 
       {!deliveriesQ.isLoading && !deliveriesQ.error && rows.length === 0 && (
-        <p className="border-y border-[color:var(--rule)] py-6 text-center text-[13px] text-[color:var(--ink-soft)]">
+        <p className="border-border text-fg-secondary border-y py-6 text-center text-[13px]">
           No {status === 'any' ? '' : `${status} `}webhook deliveries yet.
         </p>
       )}
@@ -146,10 +144,10 @@ function DeliveryRow({
 }) {
   const statusCls =
     row.status === 'delivered'
-      ? 'text-[color:var(--success)]'
+      ? 'text-success'
       : row.status === 'failed'
-        ? 'text-[color:var(--danger)]'
-        : 'text-[color:var(--ink-muted)]'
+        ? 'text-danger'
+        : 'text-fg-muted'
   return (
     <tr>
       <td className="lead">{row.ruleName ?? row.ruleId.slice(0, 8)}</td>
@@ -159,10 +157,7 @@ function DeliveryRow({
         {row.lastStatus !== null ? ` (HTTP ${row.lastStatus})` : ''}
       </td>
       <td className="num tabular-nums">{row.attempt} / 6</td>
-      <td
-        className="truncate font-mono text-[11px] text-[color:var(--ink-muted)]"
-        title={row.lastError ?? ''}
-      >
+      <td className="text-fg-muted truncate font-mono text-[11px]" title={row.lastError ?? ''}>
         {row.lastError ?? '—'}
       </td>
       <td className="num text-[11px] tabular-nums">

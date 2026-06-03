@@ -121,7 +121,7 @@ export function HealthDetailView() {
       <header className="space-y-3">
         <div className="flex items-baseline gap-3">
           <Link
-            className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--accent)]"
+            className="text-fg-muted hover:text-accent font-mono text-[10px] tracking-[0.18em] uppercase"
             to={`/main/org/${orgSlug}/health`}
           >
             ← health
@@ -132,9 +132,8 @@ export function HealthDetailView() {
             <div className="flex items-center gap-2">
               <StatusDot kind={status.kind} />
               <h1
-                className="truncate text-[color:var(--ink)]"
+                className="text-fg truncate"
                 style={{
-                  fontFamily: 'var(--font-sans)',
                   fontSize: '22px',
                   fontVariationSettings: "'wdth' 95, 'opsz' 32, 'wght' 580",
                   letterSpacing: '-0.012em',
@@ -143,15 +142,15 @@ export function HealthDetailView() {
                 {check.name}
               </h1>
               {check.paused && (
-                <span className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+                <span className="text-fg-muted font-mono text-[10px] tracking-[0.12em] uppercase">
                   paused
                 </span>
               )}
             </div>
-            <div className="mt-1 truncate font-mono text-[11px] text-[color:var(--ink-muted)]">
+            <div className="text-fg-muted mt-1 truncate font-mono text-[11px]">
               {check.method} {check.targetUrl}
             </div>
-            <div className="mt-1 font-mono text-[10px] text-[color:var(--ink-muted)]">
+            <div className="text-fg-muted mt-1 font-mono text-[10px]">
               every {check.intervalSec}s · status ∈ [{check.assertionStatusCodes.join(', ')}]
               {check.assertionMaxLatencyMs ? `, < ${check.assertionMaxLatencyMs}ms` : ''}
               {check.assertionBodySubstring ? `, body ⊃ "${check.assertionBodySubstring}"` : ''}
@@ -159,13 +158,13 @@ export function HealthDetailView() {
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Link
-              className="rounded border border-[color:var(--rule)] px-2.5 py-1 text-[11px] text-[color:var(--ink)] hover:border-[color:var(--accent)]"
+              className="border-border text-fg hover:border-accent rounded border px-2.5 py-1 text-[11px]"
               to={`/main/org/${orgSlug}/health/${check.id}/edit`}
             >
               Edit
             </Link>
             <button
-              className="rounded border border-[color:var(--rule)] px-2.5 py-1 text-[11px] text-[color:var(--ink)] disabled:opacity-50"
+              className="border-border text-fg rounded border px-2.5 py-1 text-[11px] disabled:opacity-50"
               disabled={togglePause.isPending}
               onClick={() => togglePause.mutate(!check.paused)}
               type="button"
@@ -173,7 +172,7 @@ export function HealthDetailView() {
               {check.paused ? 'Resume' : 'Pause'}
             </button>
             <button
-              className="rounded border border-[color:var(--rule)] px-2.5 py-1 text-[11px] text-[color:var(--danger)] disabled:opacity-50"
+              className="border-border text-danger rounded border px-2.5 py-1 text-[11px] disabled:opacity-50"
               disabled={del.isPending}
               onClick={() => {
                 if (confirm(`Delete check "${check.name}"? Cascades to its probe history.`)) {
@@ -188,18 +187,16 @@ export function HealthDetailView() {
         </div>
       </header>
 
-      <section className="space-y-3 rounded border border-[color:var(--rule)] bg-[color:var(--paper-2)] p-4">
+      <section className="border-border bg-bg-secondary space-y-3 rounded border p-4">
         <div className="flex items-center justify-between">
-          <div className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+          <div className="text-fg-muted font-mono text-[10px] tracking-[0.12em] uppercase">
             uptime · {windowKey}
           </div>
           <div className="flex gap-1">
             {(['1h', '24h', '7d'] as const).map((w) => (
               <button
                 className={`rounded border px-2 py-0.5 font-mono text-[10px] tracking-[0.1em] uppercase ${
-                  w === windowKey
-                    ? 'border-[color:var(--accent)] text-[color:var(--accent)]'
-                    : 'border-[color:var(--rule)] text-[color:var(--ink-muted)]'
+                  w === windowKey ? 'border-accent text-accent' : 'border-border text-fg-muted'
                 }`}
                 key={w}
                 onClick={() => setWindowKey(w)}
@@ -212,14 +209,14 @@ export function HealthDetailView() {
         </div>
         {rollupQ.isLoading && <RowSkeleton count={1} height="48px" />}
         {rollupQ.data && rollup.length === 0 && (
-          <p className="py-4 text-center text-[11px] text-[color:var(--ink-muted)]">
+          <p className="text-fg-muted py-4 text-center text-[11px]">
             No rollup data in this window yet.
           </p>
         )}
         {rollup.length > 0 && (
           <>
             <Sparkline height={48} rollup={rollup} width={640} />
-            <div className="flex flex-wrap gap-x-6 gap-y-1 font-mono text-[11px] text-[color:var(--ink-muted)]">
+            <div className="text-fg-muted flex flex-wrap gap-x-6 gap-y-1 font-mono text-[11px]">
               <span>uptime {rollup[0]!.uptimePct.toFixed(2)}%</span>
               <span>p50 {rollup[0]!.p50LatencyMs}ms</span>
               <span>p95 {p95}ms</span>
@@ -229,13 +226,13 @@ export function HealthDetailView() {
         )}
       </section>
 
-      <section className="space-y-3 rounded border border-[color:var(--rule)] bg-[color:var(--paper-2)] p-4">
+      <section className="border-border bg-bg-secondary space-y-3 rounded border p-4">
         <div className="flex items-center justify-between">
-          <div className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+          <div className="text-fg-muted font-mono text-[10px] tracking-[0.12em] uppercase">
             probe now
           </div>
           <button
-            className="rounded border border-[color:var(--accent)] px-2.5 py-1 text-[11px] text-[color:var(--accent)] disabled:opacity-50"
+            className="border-accent text-accent rounded border px-2.5 py-1 text-[11px] disabled:opacity-50"
             disabled={probeNow.isPending}
             onClick={() => probeNow.mutate()}
             type="button"
@@ -243,7 +240,7 @@ export function HealthDetailView() {
             {probeNow.isPending ? 'Probing…' : 'Probe now'}
           </button>
         </div>
-        <p className="text-[11px] text-[color:var(--ink-muted)]">
+        <p className="text-fg-muted text-[11px]">
           Runs a one-shot probe with the current config — result is shown below, nothing is written
           to the probe history, and the issue lifecycle isn't touched.
         </p>
@@ -251,8 +248,8 @@ export function HealthDetailView() {
           <div
             className="rounded border px-3 py-2 font-mono text-[11px]"
             style={{
-              borderColor: probeNowResult.ok ? 'var(--accent)' : 'var(--danger)',
-              color: probeNowResult.ok ? 'var(--accent)' : 'var(--danger)',
+              borderColor: probeNowResult.ok ? 'var(--color-accent)' : 'var(--color-danger)',
+              color: probeNowResult.ok ? 'var(--color-accent)' : 'var(--color-danger)',
             }}
           >
             {probeNowResult.ok ? 'OK' : 'FAIL'} · {probeNowResult.statusCode} ·{' '}
@@ -261,31 +258,29 @@ export function HealthDetailView() {
           </div>
         )}
         {probeNow.error && (
-          <p className="text-[11px] text-[color:var(--danger)]">
-            {(probeNow.error as Error).message}
-          </p>
+          <p className="text-danger text-[11px]">{(probeNow.error as Error).message}</p>
         )}
       </section>
 
-      <section className="space-y-3 rounded border border-[color:var(--rule)] bg-[color:var(--paper-2)] p-4">
+      <section className="border-border bg-bg-secondary space-y-3 rounded border p-4">
         <div className="flex items-center justify-between">
-          <div className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+          <div className="text-fg-muted font-mono text-[10px] tracking-[0.12em] uppercase">
             probe log · {windowKey}
           </div>
-          <span className="font-mono text-[10px] text-[color:var(--ink-muted)]">
+          <span className="text-fg-muted font-mono text-[10px]">
             showing {probesQ.data?.length ?? 0} of ≤ {probeLimit}
           </span>
         </div>
         {probesQ.isLoading && <RowSkeleton count={5} height="20px" />}
         {probesQ.data && probesQ.data.length === 0 && (
-          <p className="py-4 text-center text-[11px] text-[color:var(--ink-muted)]">
+          <p className="text-fg-muted py-4 text-center text-[11px]">
             No probes in this window yet.
           </p>
         )}
         {probesQ.data && probesQ.data.length > 0 && <ProbeLog rows={probesQ.data} />}
         {probesQ.data && probesQ.data.length >= probeLimit && probeLimit < 5000 && (
           <button
-            className="rounded border border-[color:var(--rule)] px-2.5 py-1 font-mono text-[10px] tracking-[0.1em] text-[color:var(--ink-muted)] uppercase hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+            className="border-border text-fg-muted hover:border-accent hover:text-accent rounded border px-2.5 py-1 font-mono text-[10px] tracking-[0.1em] uppercase"
             onClick={() => setProbeLimit((n) => Math.min(5000, n * 5))}
             type="button"
           >

@@ -64,7 +64,7 @@ export function ProjectIntegrationView() {
     return (
       <div className="sentori-page-in">
         <PageHeader subtitle="install · ingest tokens" title="Integrate" />
-        <p className="border-y border-[color:var(--rule)] py-4 text-[13px] text-[color:var(--ink-soft)]">
+        <p className="border-border text-fg-secondary border-y py-4 text-[13px]">
           Pick a project in the sidebar to mint an ingest token and grab the SDK quickstart snippet.
         </p>
       </div>
@@ -80,7 +80,7 @@ export function ProjectIntegrationView() {
           <span className="sec-head-title">Project</span>
           <span className="sec-head-sub">stable identifiers</span>
         </header>
-        <div className="border-y border-[color:var(--rule)] py-2">
+        <div className="border-border border-y py-2">
           <RoRow label="name" value={project?.name ?? '—'} />
           <RoRow label="project id" value={projectId} mono />
           <RoRow label="org" value={currentOrg.slug} mono />
@@ -97,15 +97,15 @@ export function ProjectIntegrationView() {
         </header>
 
         {justMinted && (
-          <div className="mb-4 border border-[color:var(--accent)] bg-[color:var(--accent-soft)] px-4 py-3">
-            <div className="mb-1 font-mono text-[10px] tracking-[0.18em] text-[color:var(--accent-strong)] uppercase">
+          <div className="border-accent bg-accent/10 mb-4 border px-4 py-3">
+            <div className="text-accent-hover mb-1 font-mono text-[10px] tracking-[0.18em] uppercase">
               New token — copy now, this is the only time it&apos;s shown
             </div>
-            <code className="block font-mono text-[13px] break-all text-[color:var(--ink)] select-all">
+            <code className="text-fg block font-mono text-[13px] break-all select-all">
               {justMinted.secret}
             </code>
             <button
-              className="mt-2 font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--accent)]"
+              className="text-fg-muted hover:text-accent mt-2 font-mono text-[10px] tracking-[0.12em] uppercase"
               onClick={() => setJustMinted(null)}
               type="button"
             >
@@ -115,25 +115,25 @@ export function ProjectIntegrationView() {
         )}
 
         <form
-          className="mb-4 flex items-end gap-2 border-y border-[color:var(--rule)] py-3"
+          className="border-border mb-4 flex items-end gap-2 border-y py-3"
           onSubmit={(e) => {
             e.preventDefault()
             createM.mutate()
           }}
         >
           <label className="flex flex-1 flex-col gap-1">
-            <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+            <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
               label (optional)
             </span>
             <input
-              className="h-7 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[12px] text-[color:var(--ink)] placeholder:text-[color:var(--ink-muted)] focus:border-[color:var(--accent)] focus:outline-none"
+              className="border-border bg-bg-secondary text-fg placeholder:text-fg-muted focus:border-accent h-7 border px-2 font-mono text-[12px] focus:outline-none"
               onChange={(e) => setLabel(e.target.value)}
               placeholder="insight-prod"
               value={label}
             />
           </label>
           <button
-            className="inline-flex h-7 items-center bg-[color:var(--accent)] px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--paper)] uppercase transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="bg-accent text-bg inline-flex h-7 items-center px-3 font-mono text-[11px] tracking-[0.05em] uppercase transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={createM.isPending}
             type="submit"
           >
@@ -160,16 +160,16 @@ export function ProjectIntegrationView() {
               {tokens.map((t) => (
                 <tr key={t.id}>
                   <td className="lead">{t.label ?? <em>(unlabeled)</em>}</td>
-                  <td className="font-mono text-[color:var(--ink-soft)]">{t.kind}</td>
-                  <td className="font-mono text-[color:var(--ink-soft)]">
+                  <td className="text-fg-secondary font-mono">{t.kind}</td>
+                  <td className="text-fg-secondary font-mono">
                     {t.last4 ? `••••${t.last4}` : '—'}
                   </td>
-                  <td className="font-mono text-[11px] text-[color:var(--ink-soft)]">
+                  <td className="text-fg-secondary font-mono text-[11px]">
                     {new Date(t.createdAt).toLocaleDateString()}
                   </td>
                   <td>
                     <button
-                      className="font-mono text-[10px] tracking-[0.1em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--danger)] disabled:opacity-40"
+                      className="text-fg-muted hover:text-danger font-mono text-[10px] tracking-[0.1em] uppercase disabled:opacity-40"
                       disabled={revokeM.isPending}
                       onClick={() => {
                         if (
@@ -195,10 +195,10 @@ export function ProjectIntegrationView() {
       {/* ── Quickstart ── */}
       <Quickstart latestSecret={justMinted?.secret ?? null} sampleToken={tokens[0] ?? null} />
 
-      <p className="mt-6 font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+      <p className="text-fg-muted mt-6 font-mono text-[10px] tracking-[0.12em] uppercase">
         Once events arrive,{' '}
         <Link
-          className="text-[color:var(--ink)] hover:text-[color:var(--accent)]"
+          className="text-fg hover:text-accent"
           to={`/main/org/${currentOrg.slug}/issues?project=${projectId}`}
         >
           open issues →
@@ -236,11 +236,11 @@ Sentori.init({
         <span className="sec-head-title">React Native quickstart</span>
         <span className="sec-head-sub">copy + paste, two files</span>
       </header>
-      <div className="border-y border-[color:var(--rule)] py-4">
+      <div className="border-border border-y py-4">
         <SnippetBlock label="install" code={install} />
         <SnippetBlock label="init (App.tsx / index.ts entry)" code={init} />
       </div>
-      <p className="mt-3 max-w-prose text-[12px] text-[color:var(--ink-soft)]">
+      <p className="text-fg-secondary mt-3 max-w-prose text-[12px]">
         Default ingest endpoint is <code>https://ingest.sentori.golia.jp</code>. Override with{' '}
         <code>ingestUrl</code> on the init options if you self-host. The init call is idempotent —
         safe to import at the top of the entry module.
@@ -263,18 +263,18 @@ function SnippetBlock({ code, label }: { code: string; label: string }) {
   return (
     <div className="mb-3 last:mb-0">
       <div className="mb-1 flex items-baseline justify-between">
-        <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+        <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
           {label}
         </span>
         <button
-          className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--accent)]"
+          className="text-fg-muted hover:text-accent font-mono text-[10px] tracking-[0.12em] uppercase"
           onClick={() => void copy()}
           type="button"
         >
           {copied ? 'copied ✓' : 'copy'}
         </button>
       </div>
-      <pre className="overflow-x-auto border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-3 py-2 font-mono text-[12px] leading-relaxed text-[color:var(--ink)]">
+      <pre className="border-border bg-bg-secondary text-fg overflow-x-auto border px-3 py-2 font-mono text-[12px] leading-relaxed">
         {code}
       </pre>
     </div>
@@ -284,12 +284,10 @@ function SnippetBlock({ code, label }: { code: string; label: string }) {
 function RoRow({ label, mono, value }: { label: string; mono?: boolean; value: string }) {
   return (
     <div className="grid grid-cols-[120px_1fr] items-baseline gap-3 py-1.5">
-      <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+      <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
         {label}
       </span>
-      <span
-        className={`text-[13px] break-all text-[color:var(--ink)] ${mono ? 'font-mono text-[12px]' : ''}`}
-      >
+      <span className={`text-fg text-[13px] break-all ${mono ? 'font-mono text-[12px]' : ''}`}>
         {value}
       </span>
     </div>

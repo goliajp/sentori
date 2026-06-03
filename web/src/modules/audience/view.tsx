@@ -41,12 +41,11 @@ export function AudienceView() {
 
   return (
     <div className="space-y-6">
-      <header className="border-b border-[color:var(--rule)] pb-3">
+      <header className="border-border border-b pb-3">
         <div className="flex items-baseline gap-3">
           <h1
-            className="text-[color:var(--ink)]"
+            className="text-fg"
             style={{
-              fontFamily: 'var(--font-sans)',
               fontSize: '17px',
               fontVariationSettings: "'wdth' 95, 'opsz' 24, 'wght' 550",
               letterSpacing: '-0.01em',
@@ -79,13 +78,9 @@ function TabSwitcher({
     <div className="flex items-baseline gap-3 font-mono text-[11px] tracking-[0.18em] uppercase">
       {TABS.map((t, i) => (
         <span key={t} className="flex items-baseline gap-3">
-          {i > 0 && <span className="text-[color:var(--rule)]">/</span>}
+          {i > 0 && <span className="text-border">/</span>}
           <button
-            className={
-              tab === t
-                ? 'text-[color:var(--accent)]'
-                : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink-soft)]'
-            }
+            className={tab === t ? 'text-accent' : 'text-fg-muted hover:text-fg-secondary'}
             onClick={() => onChange(t)}
             type="button"
           >
@@ -122,13 +117,13 @@ function LivePanel({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-6">
-      <p className="font-mono text-[11px] text-[color:var(--ink-muted)]">
+      <p className="text-fg-muted font-mono text-[11px]">
         users seen in the last {snap.windowSeconds}s · refreshes every 5s
       </p>
 
-      <section className="border-b border-[color:var(--rule)] pb-6">
+      <section className="border-border border-b pb-6">
         <div
-          className="font-mono text-[color:var(--ink)] tabular-nums"
+          className="text-fg font-mono tabular-nums"
           style={{
             fontSize: 'clamp(48px, 8vw, 80px)',
             fontVariationSettings: "'wdth' 95, 'opsz' 96, 'wght' 500",
@@ -138,7 +133,7 @@ function LivePanel({ projectId }: { projectId: string }) {
         >
           {snap.concurrent.toLocaleString()}
         </div>
-        <div className="mt-1 font-mono text-[10px] tracking-[0.22em] text-[color:var(--ink-muted)] uppercase">
+        <div className="text-fg-muted mt-1 font-mono text-[10px] tracking-[0.22em] uppercase">
           concurrent
         </div>
       </section>
@@ -162,16 +157,16 @@ function BreakdownCard({
 }) {
   return (
     <div>
-      <header className="mb-2 flex items-baseline justify-between border-b border-[color:var(--rule)] pb-1">
-        <span className="font-mono text-[10px] tracking-[0.22em] text-[color:var(--accent)] uppercase">
+      <header className="border-border mb-2 flex items-baseline justify-between border-b pb-1">
+        <span className="text-accent font-mono text-[10px] tracking-[0.22em] uppercase">
           {title}
         </span>
-        <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+        <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
           top {Math.min(rows.length, 5)}
         </span>
       </header>
       {rows.length === 0 ? (
-        <p className="py-2 font-mono text-[11px] text-[color:var(--ink-muted)]">no data yet</p>
+        <p className="text-fg-muted py-2 font-mono text-[11px]">no data yet</p>
       ) : (
         <ul>
           {rows.map((r) => {
@@ -180,17 +175,17 @@ function BreakdownCard({
             return (
               <li
                 key={r.label}
-                className="flex items-baseline gap-3 border-b border-[color:var(--rule-soft)] py-1.5 last:border-b-0"
+                className="border-border-muted flex items-baseline gap-3 border-b py-1.5 last:border-b-0"
               >
-                <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-[color:var(--ink)]">
+                <span className="text-fg min-w-0 flex-1 truncate font-mono text-[12px]">
                   {r.label}
                 </span>
-                <span className="font-mono text-[11px] text-[color:var(--ink-soft)] tabular-nums">
+                <span className="text-fg-secondary font-mono text-[11px] tabular-nums">
                   {r.count.toLocaleString()}
                 </span>
                 <span
                   aria-hidden
-                  className="block h-[2px] basis-[80px] bg-[color:var(--accent)]"
+                  className="bg-accent block h-[2px] basis-[80px]"
                   style={{ opacity: 0.25 + (pct / 100) * 0.6, width: `${pct}%` }}
                 />
               </li>

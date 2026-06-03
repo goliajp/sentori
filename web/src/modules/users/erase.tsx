@@ -134,14 +134,14 @@ export function UsersErase() {
 
   return (
     <div>
-      <form className="border-y border-[color:var(--rule)] py-4" onSubmit={onPreview}>
+      <form className="border-border border-y py-4" onSubmit={onPreview}>
         <div className="grid grid-cols-[160px_1fr_auto] items-end gap-3">
           <label className="block">
-            <span className="mb-1 block font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+            <span className="text-fg-muted mb-1 block font-mono text-[10px] tracking-[0.18em] uppercase">
               identity type
             </span>
             <select
-              className="h-8 w-full border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[12px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+              className="border-border bg-bg-secondary text-fg focus:border-accent h-8 w-full border px-2 font-mono text-[12px] focus:outline-none"
               onChange={(e) => onChangeKeyType(e.target.value as IdentityKeyType)}
               value={keyType}
             >
@@ -154,12 +154,12 @@ export function UsersErase() {
           </label>
 
           <label className="block">
-            <span className="mb-1 block font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+            <span className="text-fg-muted mb-1 block font-mono text-[10px] tracking-[0.18em] uppercase">
               value to erase (hashed before send)
             </span>
             <input
               autoComplete="off"
-              className="h-8 w-full border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[12px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+              className="border-border bg-bg-secondary text-fg focus:border-accent h-8 w-full border px-2 font-mono text-[12px] focus:outline-none"
               onBlur={() => setRawInput('')}
               onChange={(e) => setRawInput(e.target.value)}
               placeholder={KEY_TYPES.find((k) => k.value === keyType)?.description ?? 'value'}
@@ -169,18 +169,16 @@ export function UsersErase() {
           </label>
 
           <button
-            className="h-8 cursor-pointer border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-4 font-mono text-[10px] tracking-[0.18em] uppercase hover:bg-[color:var(--paper)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="border-border bg-bg-secondary hover:bg-bg h-8 cursor-pointer border px-4 font-mono text-[10px] tracking-[0.18em] uppercase disabled:cursor-not-allowed disabled:opacity-40"
             disabled={previewM.isPending || rawInput.trim() === ''}
             type="submit"
           >
             {previewM.isPending ? 'previewing…' : 'preview impact'}
           </button>
         </div>
-        {submitError && (
-          <div className="mt-2 font-mono text-[11px] text-[color:var(--danger)]">{submitError}</div>
-        )}
+        {submitError && <div className="text-danger mt-2 font-mono text-[11px]">{submitError}</div>}
         {previewM.error && (
-          <div className="mt-2 font-mono text-[11px] text-[color:var(--danger)]">
+          <div className="text-danger mt-2 font-mono text-[11px]">
             Preview failed: {previewM.error.message}
           </div>
         )}
@@ -188,59 +186,59 @@ export function UsersErase() {
 
       {/* Preview result + confirmation gate. */}
       {preview && !liveResult && (
-        <div className="border-b border-[color:var(--rule)] py-4">
+        <div className="border-border border-b py-4">
           {preview.affectedCount === 0 ? (
-            <div className="font-mono text-[12px] text-[color:var(--ink-soft)]">
+            <div className="text-fg-secondary font-mono text-[12px]">
               No events match this fingerprint in the org's default identity scope. Nothing to
               erase.
             </div>
           ) : (
             <>
-              <div className="mb-2 font-mono text-[12px] text-[color:var(--ink)]">
+              <div className="text-fg mb-2 font-mono text-[12px]">
                 Would erase{' '}
-                <span className="font-bold text-[color:var(--danger)] tabular-nums">
+                <span className="text-danger font-bold tabular-nums">
                   {preview.affectedCount.toLocaleString()}
                 </span>{' '}
                 event{preview.affectedCount === 1 ? '' : 's'} from scope{' '}
-                <span className="font-mono text-[11px] text-[color:var(--ink-muted)]">
+                <span className="text-fg-muted font-mono text-[11px]">
                   {preview.scopeId.slice(0, 8)}…
                 </span>{' '}
                 · fingerprint{' '}
-                <span className="font-mono text-[11px] text-[color:var(--ink-muted)]">
+                <span className="text-fg-muted font-mono text-[11px]">
                   {preview.fingerprintPrefix}…
                 </span>
               </div>
-              <div className="mb-3 font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+              <div className="text-fg-muted mb-3 font-mono text-[10px] tracking-[0.12em] uppercase">
                 sample event ids (first 10)
               </div>
-              <ul className="mb-4 space-y-0.5 font-mono text-[11px] text-[color:var(--ink-soft)]">
+              <ul className="text-fg-secondary mb-4 space-y-0.5 font-mono text-[11px]">
                 {preview.sampleEventIds.map((id) => (
                   <li key={id} className="tabular-nums">
                     {id}
                   </li>
                 ))}
               </ul>
-              <div className="border-t border-[color:var(--rule)] pt-3">
-                <div className="mb-2 font-mono text-[11px] text-[color:var(--ink-soft)]">
+              <div className="border-border border-t pt-3">
+                <div className="text-fg-secondary mb-2 font-mono text-[11px]">
                   Erasure is irreversible. Per-event `payload.user` is overwritten with an empty
                   object; identity_fingerprints rows for this subject are dropped. Aggregate stats
                   (event count, issue grouping) survive.
                 </div>
                 <div className="flex items-center gap-3">
                   <label className="block flex-1">
-                    <span className="mb-1 block font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+                    <span className="text-fg-muted mb-1 block font-mono text-[10px] tracking-[0.18em] uppercase">
                       type "{CONFIRM_PHRASE}" to confirm
                     </span>
                     <input
                       autoComplete="off"
-                      className="h-8 w-full border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[12px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+                      className="border-border bg-bg-secondary text-fg focus:border-accent h-8 w-full border px-2 font-mono text-[12px] focus:outline-none"
                       onChange={(e) => setConfirmPhrase(e.target.value)}
                       type="text"
                       value={confirmPhrase}
                     />
                   </label>
                   <button
-                    className="h-8 cursor-pointer border border-[color:var(--danger)] bg-[color:var(--danger)] px-4 font-mono text-[10px] tracking-[0.18em] text-white uppercase hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="border-danger bg-danger h-8 cursor-pointer border px-4 font-mono text-[10px] tracking-[0.18em] text-white uppercase hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                     disabled={!canErase}
                     onClick={onConfirmErase}
                     type="button"
@@ -251,7 +249,7 @@ export function UsersErase() {
                   </button>
                 </div>
                 {eraseM.error && (
-                  <div className="mt-2 font-mono text-[11px] text-[color:var(--danger)]">
+                  <div className="text-danger mt-2 font-mono text-[11px]">
                     Erase failed: {eraseM.error.message}
                   </div>
                 )}
@@ -262,8 +260,8 @@ export function UsersErase() {
       )}
 
       {liveResult && (
-        <div className="border-b border-[color:var(--rule)] py-4">
-          <div className="font-mono text-[12px] text-[color:var(--ink)]">
+        <div className="border-border border-b py-4">
+          <div className="text-fg font-mono text-[12px]">
             Erased{' '}
             <span className="font-bold tabular-nums">
               {liveResult.affectedCount.toLocaleString()}

@@ -29,7 +29,7 @@ export function AudienceBehaviorView({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-6">
-      <p className="font-mono text-[11px] text-[color:var(--ink-muted)]">
+      <p className="text-fg-muted font-mono text-[11px]">
         most-viewed routes from $pageview events · last 7 days
       </p>
       {rows.length === 0 ? (
@@ -57,26 +57,26 @@ function RouteList({ rows }: { rows: TopRouteRow[] }) {
           const pct = (r.views / max) * 100
           return (
             <li
-              className="flex items-baseline gap-3 border-b border-[color:var(--rule-soft)] py-2 last:border-b-0"
+              className="border-border-muted flex items-baseline gap-3 border-b py-2 last:border-b-0"
               key={r.route}
             >
-              <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-[color:var(--ink)]">
+              <span className="text-fg min-w-0 flex-1 truncate font-mono text-[13px]">
                 {r.route}
               </span>
               <span className="basis-[60%]">
                 <span
                   aria-hidden
-                  className="block h-[6px] bg-[color:var(--accent)]"
+                  className="bg-accent block h-[6px]"
                   style={{
                     opacity: 0.25 + (pct / 100) * 0.6,
                     width: `${Math.max(pct, 1)}%`,
                   }}
                 />
               </span>
-              <span className="font-mono text-[12px] text-[color:var(--ink)] tabular-nums">
+              <span className="text-fg font-mono text-[12px] tabular-nums">
                 {r.views.toLocaleString()} view{r.views === 1 ? '' : 's'}
               </span>
-              <span className="font-mono text-[11px] text-[color:var(--ink-soft)] tabular-nums">
+              <span className="text-fg-secondary font-mono text-[11px] tabular-nums">
                 {r.uniqueUsers.toLocaleString()} user{r.uniqueUsers === 1 ? '' : 's'}
               </span>
             </li>

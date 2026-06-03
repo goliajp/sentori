@@ -88,7 +88,7 @@ export function SettingsView() {
         </Row>
         <Row label="name">{currentOrg.name}</Row>
         <Row label="your role">
-          <span className="font-mono text-[color:var(--accent)]">{currentOrg.role}</span>
+          <span className="text-accent font-mono">{currentOrg.role}</span>
         </Row>
       </SubSection>
 
@@ -135,13 +135,13 @@ export function SettingsView() {
           <ul>
             {members.map((m, i) => (
               <li
-                className={`flex items-baseline justify-between gap-3 border-b border-[color:var(--rule-soft)] py-2 ${
-                  i === 0 ? 'border-t border-[color:var(--rule)]' : ''
+                className={`border-border-muted flex items-baseline justify-between gap-3 border-b py-2 ${
+                  i === 0 ? 'border-border border-t' : ''
                 }`}
                 key={m.userId}
               >
-                <span className="text-[13px] text-[color:var(--ink)]">{m.email}</span>
-                <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+                <span className="text-fg text-[13px]">{m.email}</span>
+                <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
                   {m.role}
                 </span>
               </li>
@@ -186,14 +186,14 @@ export function SettingsView() {
                 <tr key={t.id}>
                   <td className="lead">
                     <Link
-                      className="text-[color:var(--ink)] hover:text-[color:var(--accent)]"
+                      className="text-fg hover:text-accent"
                       to={`/main/org/${currentOrg.slug}/teams/${t.slug}`}
                     >
                       {t.name}
                     </Link>
                   </td>
-                  <td className="font-mono text-[color:var(--ink-soft)]">{t.slug}</td>
-                  <td className="text-[color:var(--ink-soft)]">{t.description ?? '—'}</td>
+                  <td className="text-fg-secondary font-mono">{t.slug}</td>
+                  <td className="text-fg-secondary">{t.description ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -230,11 +230,11 @@ export function SettingsView() {
               {projects.map((p) => (
                 <tr key={p.id}>
                   <td className="lead">{p.name}</td>
-                  <td className="font-mono text-[11px] text-[color:var(--ink-soft)]">{p.id}</td>
-                  <td className="font-mono text-[11px] text-[color:var(--ink-soft)]">
+                  <td className="text-fg-secondary font-mono text-[11px]">{p.id}</td>
+                  <td className="text-fg-secondary font-mono text-[11px]">
                     {p.sourceRepoUrl ? (
                       <a
-                        className="hover:text-[color:var(--accent)]"
+                        className="hover:text-accent"
                         href={p.sourceRepoUrl}
                         rel="noopener noreferrer"
                         target="_blank"
@@ -248,13 +248,13 @@ export function SettingsView() {
                   <td>
                     <div className="flex items-center justify-end gap-3 font-mono text-[10px] tracking-[0.1em] uppercase">
                       <Link
-                        className="text-[color:var(--ink-muted)] hover:text-[color:var(--accent)]"
+                        className="text-fg-muted hover:text-accent"
                         to={`/main/org/${currentOrg.slug}/integrate?project=${p.id}`}
                       >
                         integrate →
                       </Link>
                       <Link
-                        className="text-[color:var(--ink-muted)] hover:text-[color:var(--accent)]"
+                        className="text-fg-muted hover:text-accent"
                         to={`/main/org/${currentOrg.slug}/issues?project=${p.id}`}
                       >
                         open →
@@ -309,7 +309,7 @@ function LabelsSubSection({ orgSlug }: { orgSlug: string }) {
 
   return (
     <SubSection sub={`${labels.length} total`} title="Labels">
-      <p className="mt-1 text-[12px] text-[color:var(--ink-soft)]">
+      <p className="text-fg-secondary mt-1 text-[12px]">
         Catalog of named labels operators apply to issues. Each label can carry a hex color
         (rendered on issue chips) and an optional p0/p1 SLA in hours (used for the overdue badge on
         the issue list).
@@ -317,33 +317,33 @@ function LabelsSubSection({ orgSlug }: { orgSlug: string }) {
 
       <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={onCreate}>
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+          <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
             name
           </span>
           <input
-            className="h-7 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 text-[13px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+            className="border-border bg-bg-secondary text-fg focus:border-accent h-7 border px-2 text-[13px] focus:outline-none"
             onChange={(e) => setDraftName(e.target.value)}
             placeholder="frontend"
             value={draftName}
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+          <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
             color
           </span>
           <input
-            className="h-7 w-20 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[11px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+            className="border-border bg-bg-secondary text-fg focus:border-accent h-7 w-20 border px-2 font-mono text-[11px] focus:outline-none"
             onChange={(e) => setDraftColor(e.target.value)}
             placeholder="#ff8800"
             value={draftColor}
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+          <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
             sla hours
           </span>
           <input
-            className="h-7 w-20 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[11px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+            className="border-border bg-bg-secondary text-fg focus:border-accent h-7 w-20 border px-2 font-mono text-[11px] focus:outline-none"
             inputMode="numeric"
             onChange={(e) => setDraftSla(e.target.value)}
             placeholder="4"
@@ -351,7 +351,7 @@ function LabelsSubSection({ orgSlug }: { orgSlug: string }) {
           />
         </label>
         <button
-          className="h-7 bg-[color:var(--accent)] px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--paper)] uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="bg-accent text-bg h-7 px-3 font-mono text-[11px] tracking-[0.05em] uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
           disabled={createM.isPending || !draftName.trim()}
           type="submit"
         >
@@ -359,33 +359,29 @@ function LabelsSubSection({ orgSlug }: { orgSlug: string }) {
         </button>
       </form>
       {createM.error && (
-        <p className="mt-2 font-mono text-[11px] text-[color:var(--danger)]">
+        <p className="text-danger mt-2 font-mono text-[11px]">
           {errOf(createM.error) ?? 'create failed'}
         </p>
       )}
 
       {labels.length > 0 && (
-        <ul className="mt-3 divide-y divide-[color:var(--rule-soft)] border-y border-[color:var(--rule)]">
+        <ul className="divide-border-muted border-border mt-3 divide-y border-y">
           {labels.map((l) => (
             <li className="flex items-center gap-3 py-2" key={l.id}>
               <span
                 aria-hidden
-                className="inline-block h-3 w-3 rounded-full border border-[color:var(--rule)]"
-                style={{ backgroundColor: l.color ?? 'var(--paper-2)' }}
+                className="border-border inline-block h-3 w-3 rounded-full border"
+                style={{ backgroundColor: l.color ?? 'var(--color-bg-secondary)' }}
               />
-              <span className="t-md font-mono text-[color:var(--ink)]">{l.name}</span>
-              {l.color && (
-                <span className="font-mono text-[10px] text-[color:var(--ink-muted)]">
-                  {l.color}
-                </span>
-              )}
+              <span className="t-md text-fg font-mono">{l.name}</span>
+              {l.color && <span className="text-fg-muted font-mono text-[10px]">{l.color}</span>}
               {l.slaPriorityHours !== null && (
-                <span className="font-mono text-[10px] tracking-[0.05em] text-[color:var(--ink-muted)] uppercase">
+                <span className="text-fg-muted font-mono text-[10px] tracking-[0.05em] uppercase">
                   SLA {l.slaPriorityHours}h
                 </span>
               )}
               <button
-                className="t-sm ml-auto text-[color:var(--ink-muted)] hover:text-[color:var(--danger)]"
+                className="t-sm text-fg-muted hover:text-danger ml-auto"
                 onClick={() => deleteM.mutate(l.id)}
                 type="button"
               >
@@ -431,7 +427,7 @@ function CollapsibleForm({
     return (
       <div className="flex justify-end pt-2 pb-2">
         <button
-          className="inline-flex h-7 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-3 font-mono text-[11px] tracking-[0.08em] text-[color:var(--ink)] uppercase transition-colors hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
+          className="border-border bg-bg-secondary text-fg hover:border-accent hover:text-accent inline-flex h-7 items-center border px-3 font-mono text-[11px] tracking-[0.08em] uppercase transition-colors"
           onClick={() => setOpen(true)}
           type="button"
         >
@@ -443,7 +439,7 @@ function CollapsibleForm({
 
   return (
     <form
-      className="flex flex-wrap items-end gap-2 border-b border-[color:var(--rule)] py-3"
+      className="border-border flex flex-wrap items-end gap-2 border-b py-3"
       onSubmit={(e) => {
         e.preventDefault()
         onSubmit(values)
@@ -451,12 +447,12 @@ function CollapsibleForm({
     >
       {fields.map((f) => (
         <label className="flex flex-col gap-1" key={f.name}>
-          <span className="font-mono text-[9px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+          <span className="text-fg-muted font-mono text-[9px] tracking-[0.18em] uppercase">
             {f.name}
           </span>
           {f.type === 'select' ? (
             <select
-              className="h-7 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[12px] text-[color:var(--ink)] focus:border-[color:var(--accent)] focus:outline-none"
+              className="border-border bg-bg-secondary text-fg focus:border-accent h-7 border px-2 font-mono text-[12px] focus:outline-none"
               onChange={(e) => setValues({ ...values, [f.name]: e.target.value })}
               value={values[f.name] ?? f.options[0]?.value ?? ''}
             >
@@ -468,7 +464,7 @@ function CollapsibleForm({
             </select>
           ) : (
             <input
-              className="h-7 border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[12px] text-[color:var(--ink)] placeholder:text-[color:var(--ink-muted)] focus:border-[color:var(--accent)] focus:outline-none"
+              className="border-border bg-bg-secondary text-fg placeholder:text-fg-muted focus:border-accent h-7 border px-2 font-mono text-[12px] focus:outline-none"
               onChange={(e) => setValues({ ...values, [f.name]: e.target.value })}
               placeholder={f.placeholder}
               required={f.required}
@@ -479,24 +475,20 @@ function CollapsibleForm({
         </label>
       ))}
       <button
-        className="inline-flex h-7 items-center bg-[color:var(--accent)] px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--paper)] uppercase transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        className="bg-accent text-bg inline-flex h-7 items-center px-3 font-mono text-[11px] tracking-[0.05em] uppercase transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         disabled={disabled}
         type="submit"
       >
         {disabled ? 'creating…' : 'create'}
       </button>
       <button
-        className="inline-flex h-7 items-center px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--ink)]"
+        className="text-fg-muted hover:text-fg inline-flex h-7 items-center px-3 font-mono text-[11px] tracking-[0.05em] uppercase"
         onClick={() => setOpen(false)}
         type="button"
       >
         cancel
       </button>
-      {error && (
-        <span className="basis-full pt-1 font-mono text-[11px] text-[color:var(--danger)]">
-          {error}
-        </span>
-      )}
+      {error && <span className="text-danger basis-full pt-1 font-mono text-[11px]">{error}</span>}
     </form>
   )
 }

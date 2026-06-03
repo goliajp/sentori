@@ -215,7 +215,7 @@ function CanvasFrame({
   const ref = right ?? left
   if (!ref) {
     return (
-      <div className="flex h-[420px] items-center justify-center border border-[color:var(--rule)] text-[12px] text-[color:var(--ink-muted)]">
+      <div className="border-border text-fg-muted flex h-[420px] items-center justify-center border text-[12px]">
         Empty replay.
       </div>
     )
@@ -223,7 +223,7 @@ function CanvasFrame({
   const aspect = ref.width / ref.height
   return (
     <div
-      className="mx-auto border border-[color:var(--rule)] bg-[color:var(--paper-2)]"
+      className="border-border bg-bg-secondary mx-auto border"
       style={{
         aspectRatio: `${aspect}`,
         maxHeight: 480,
@@ -369,7 +369,7 @@ function KeyframeList({
     <div>
       <ol
         aria-label="Replay keyframe list"
-        className="max-h-[420px] overflow-y-auto border-y border-[color:var(--rule)]"
+        className="border-border max-h-[420px] overflow-y-auto border-y"
         role="listbox"
       >
         {keyframeTimes.map((ts, i) => {
@@ -379,10 +379,8 @@ function KeyframeList({
             <li key={ts}>
               <button
                 aria-selected={active}
-                className={`block w-full border-b border-[color:var(--rule-soft)] px-2.5 py-1.5 text-left transition-colors last:border-b-0 ${
-                  active
-                    ? 'bg-[color:var(--accent-soft)] text-[color:var(--ink)]'
-                    : 'text-[color:var(--ink-soft)] hover:bg-[color:var(--paper-2)]'
+                className={`border-border-muted block w-full border-b px-2.5 py-1.5 text-left transition-colors last:border-b-0 ${
+                  active ? 'bg-accent/10 text-fg' : 'text-fg-secondary hover:bg-bg-secondary'
                 }`}
                 onClick={() => onSeek(ts)}
                 role="option"
@@ -392,7 +390,7 @@ function KeyframeList({
                   <span className="font-mono text-[12px] tabular-nums">
                     K{String(i + 1).padStart(2, '0')}
                   </span>
-                  <span className="font-mono text-[10px] text-[color:var(--ink-muted)] tabular-nums">
+                  <span className="text-fg-muted font-mono text-[10px] tabular-nums">
                     {formatSecond(rel)}
                   </span>
                 </div>
@@ -401,7 +399,7 @@ function KeyframeList({
           )
         })}
       </ol>
-      <p className="mt-2 font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+      <p className="text-fg-muted mt-2 font-mono text-[10px] tracking-[0.12em] uppercase">
         keyframes · scrub between for detail
       </p>
     </div>
@@ -432,11 +430,11 @@ function TimeScrubber({
   startTs: number
 }) {
   return (
-    <div className="space-y-1 border-t border-[color:var(--rule)] pt-3">
+    <div className="border-border space-y-1 border-t pt-3">
       <div className="flex items-center gap-3">
         <button
           aria-label="Step back 250 ms"
-          className="inline-flex h-7 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink)] uppercase disabled:opacity-40"
+          className="border-border bg-bg-secondary text-fg inline-flex h-7 items-center border px-2 font-mono text-[11px] tracking-[0.05em] uppercase disabled:opacity-40"
           disabled={!canBack}
           onClick={() => onSeek(playheadRelMs - 250)}
           type="button"
@@ -445,7 +443,7 @@ function TimeScrubber({
         </button>
         <button
           aria-label={playing ? 'Pause' : 'Play'}
-          className="inline-flex h-7 items-center border border-[color:var(--accent)] bg-[color:var(--accent)] px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--paper)] uppercase"
+          className="border-accent bg-accent text-bg inline-flex h-7 items-center border px-3 font-mono text-[11px] tracking-[0.05em] uppercase"
           onClick={onPlayPause}
           type="button"
         >
@@ -453,7 +451,7 @@ function TimeScrubber({
         </button>
         <button
           aria-label="Step forward 250 ms"
-          className="inline-flex h-7 items-center border border-[color:var(--rule)] bg-[color:var(--paper-2)] px-2 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink)] uppercase disabled:opacity-40"
+          className="border-border bg-bg-secondary text-fg inline-flex h-7 items-center border px-2 font-mono text-[11px] tracking-[0.05em] uppercase disabled:opacity-40"
           disabled={!canForward}
           onClick={() => onSeek(playheadRelMs + 250)}
           type="button"
@@ -462,7 +460,7 @@ function TimeScrubber({
         </button>
         <input
           aria-label="Replay seek (seconds)"
-          className="flex-1 accent-[color:var(--accent)]"
+          className="accent-accent flex-1"
           max={Math.max(durationMs, 0)}
           min={0}
           onChange={(e) => onSeek(Number(e.target.value))}
@@ -470,7 +468,7 @@ function TimeScrubber({
           type="range"
           value={playheadRelMs}
         />
-        <span className="font-mono text-[11px] text-[color:var(--ink-muted)] tabular-nums">
+        <span className="text-fg-muted font-mono text-[11px] tabular-nums">
           {formatSecond(playheadRelMs)} / {formatSecond(durationMs)}
         </span>
       </div>
@@ -511,7 +509,7 @@ function KeyframeTicks({
         return (
           <line
             key={`c${ts}`}
-            stroke="var(--rule)"
+            stroke="var(--color-border)"
             strokeOpacity={0.4}
             strokeWidth={0.5}
             x1={x}
@@ -527,7 +525,7 @@ function KeyframeTicks({
         return (
           <line
             key={`k${ts}`}
-            stroke="var(--accent)"
+            stroke="var(--color-accent)"
             strokeOpacity={0.8}
             strokeWidth={1.2}
             x1={x}
@@ -549,8 +547,8 @@ function formatSecond(ms: number): string {
 function Hint({ children, tone }: { children: React.ReactNode; tone?: 'danger' }) {
   return (
     <p
-      className={`border-y border-[color:var(--rule)] py-3 text-[12px] ${
-        tone === 'danger' ? 'text-[color:var(--danger)]' : 'text-[color:var(--ink-muted)]'
+      className={`border-border border-y py-3 text-[12px] ${
+        tone === 'danger' ? 'text-danger' : 'text-fg-muted'
       }`}
     >
       {children}

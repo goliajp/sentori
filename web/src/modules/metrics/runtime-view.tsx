@@ -164,13 +164,12 @@ export function RuntimeMetricsView() {
   return (
     <div className="sentori-page-in space-y-6">
       <header>
-        <div className="font-mono text-[11px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+        <div className="text-fg-muted font-mono text-[11px] tracking-[0.18em] uppercase">
           runtime metrics
         </div>
         <h1
-          className="mt-1 text-[color:var(--ink)]"
+          className="text-fg mt-1"
           style={{
-            fontFamily: 'var(--font-sans)',
             fontVariationSettings: "'wdth' 95, 'opsz' 48, 'wght' 600",
             fontSize: '26px',
             letterSpacing: '-0.018em',
@@ -179,7 +178,7 @@ export function RuntimeMetricsView() {
         >
           Runtime
         </h1>
-        <div className="mt-2 text-[12px] text-[color:var(--ink-muted)]">
+        <div className="text-fg-muted mt-2 text-[12px]">
           Auto-instrumented FPS, heap, cold-start, route nav, and network. Last 24 h.
         </div>
       </header>
@@ -202,12 +201,11 @@ export function RuntimeMetricsView() {
       </div>
 
       {/* BI panel. */}
-      <section className="space-y-3 border-t border-[color:var(--rule)] pt-5">
+      <section className="border-border space-y-3 border-t pt-5">
         <header className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
           <h2
-            className="text-[color:var(--ink)]"
+            className="text-fg"
             style={{
-              fontFamily: 'var(--font-sans)',
               fontVariationSettings: "'wdth' 95, 'opsz' 32, 'wght' 580",
               fontSize: '18px',
               letterSpacing: '-0.012em',
@@ -215,7 +213,7 @@ export function RuntimeMetricsView() {
           >
             {selectedSpec.label}
           </h2>
-          <span className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+          <span className="text-fg-muted font-mono text-[10px] tracking-[0.12em] uppercase">
             {selected}
           </span>
         </header>
@@ -261,7 +259,7 @@ export function RuntimeMetricsView() {
         </div>
 
         {/* Chart */}
-        <div className="rounded border border-[color:var(--rule)] bg-[color:var(--paper-2)] p-4">
+        <div className="border-border bg-bg-secondary rounded border p-4">
           {chartQ.isLoading && <RowSkeleton count={3} height="60px" />}
           {chartQ.error && <CenteredEmpty>Failed to load this metric.</CenteredEmpty>}
           {chartQ.data && chartQ.data.series.every((s) => s.points.length === 0) && (
@@ -280,7 +278,7 @@ export function RuntimeMetricsView() {
                 unit={selectedSpec.unit}
                 onPointClick={(ts, value, seriesLabel) => setDrill({ seriesLabel, ts, value })}
               />
-              <div className="mt-2 flex items-center justify-between font-mono text-[10px] tracking-[0.08em] text-[color:var(--ink-muted)] uppercase">
+              <div className="text-fg-muted mt-2 flex items-center justify-between font-mono text-[10px] tracking-[0.08em] uppercase">
                 <span>
                   resolution: <code>{chartQ.data.tier}</code>
                 </span>
@@ -370,32 +368,29 @@ function DrillModal({
         if (e.target === e.currentTarget) onClose()
       }}
       role="dialog"
-      style={{ background: 'rgb(from var(--ink) r g b / 0.32)' }}
+      style={{ background: 'rgb(from var(--color-fg) r g b / 0.32)' }}
     >
       <div
-        className="w-[36rem] max-w-[92vw] overflow-hidden border border-[color:var(--rule)] bg-[color:var(--paper)]"
-        style={{ boxShadow: '0 24px 64px -16px rgb(from var(--ink) r g b / 0.5)' }}
+        className="border-border bg-bg w-[36rem] max-w-[92vw] overflow-hidden border"
+        style={{ boxShadow: '0 24px 64px -16px rgb(from var(--color-fg) r g b / 0.5)' }}
       >
-        <div className="border-b border-[color:var(--rule)] px-5 py-3">
-          <div className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--accent)] uppercase">
-            drill
-          </div>
+        <div className="border-border border-b px-5 py-3">
+          <div className="text-accent font-mono text-[10px] tracking-[0.18em] uppercase">drill</div>
           <div className="mt-1 flex items-baseline gap-2">
             <span
-              className="text-[color:var(--ink)]"
+              className="text-fg"
               style={{
-                fontFamily: 'var(--font-sans)',
                 fontVariationSettings: "'wdth' 95, 'opsz' 32, 'wght' 580",
                 fontSize: '16px',
               }}
             >
               {metricLabel}
             </span>
-            <span className="font-mono text-[11px] text-[color:var(--ink-muted)]">
+            <span className="text-fg-muted font-mono text-[11px]">
               {point.seriesLabel || '—'} · {formattedValue} {unit}
             </span>
           </div>
-          <div className="mt-1 font-mono text-[10px] text-[color:var(--ink-muted)]">
+          <div className="text-fg-muted mt-1 font-mono text-[10px]">
             {formattedTs} (± {bucket})
           </div>
         </div>
@@ -407,33 +402,27 @@ function DrillModal({
             </div>
           )}
           {issuesQ.error && (
-            <p className="px-5 py-4 text-[12px] text-[color:var(--ink-muted)]">
-              Failed to load issues.
-            </p>
+            <p className="text-fg-muted px-5 py-4 text-[12px]">Failed to load issues.</p>
           )}
           {issuesQ.data && issues.length === 0 && (
-            <p className="px-5 py-4 text-[12px] text-[color:var(--ink-muted)]">
-              No issues active in this window.
-            </p>
+            <p className="text-fg-muted px-5 py-4 text-[12px]">No issues active in this window.</p>
           )}
           {issues.length > 0 && (
             <ul>
               {issues.map((iss) => (
                 <li key={iss.id}>
                   <Link
-                    className="block border-b border-[color:var(--rule-soft)] px-5 py-2 transition-colors hover:bg-[color:var(--paper-2)]"
+                    className="border-border-muted hover:bg-bg-secondary block border-b px-5 py-2 transition-colors"
                     onClick={onClose}
                     to={`/main/org/${orgSlug}/issues/${iss.id}`}
                   >
                     <div className="flex items-baseline justify-between gap-3">
-                      <span className="truncate text-[13px] text-[color:var(--ink)]">
-                        {iss.errorType}
-                      </span>
-                      <span className="shrink-0 font-mono text-[10px] text-[color:var(--ink-muted)] tabular-nums">
+                      <span className="text-fg truncate text-[13px]">{iss.errorType}</span>
+                      <span className="text-fg-muted shrink-0 font-mono text-[10px] tabular-nums">
                         {iss.eventCount}×
                       </span>
                     </div>
-                    <div className="truncate font-mono text-[11px] text-[color:var(--ink-muted)]">
+                    <div className="text-fg-muted truncate font-mono text-[11px]">
                       {iss.messageSample}
                     </div>
                   </Link>
@@ -443,10 +432,10 @@ function DrillModal({
           )}
         </div>
 
-        <div className="flex items-center gap-3 border-t border-[color:var(--rule)] bg-[color:var(--paper-2)] px-5 py-2 font-mono text-[10px] tracking-[0.15em] text-[color:var(--ink-muted)] uppercase">
+        <div className="border-border bg-bg-secondary text-fg-muted flex items-center gap-3 border-t px-5 py-2 font-mono text-[10px] tracking-[0.15em] uppercase">
           <span>esc to close</span>
           <Link
-            className="ml-auto text-[color:var(--accent)] hover:underline"
+            className="text-accent ml-auto hover:underline"
             onClick={onClose}
             to={`/main/org/${orgSlug}/issues`}
           >
@@ -497,21 +486,18 @@ function HeroCard({ isSelected, onSelect, projectId, spec, window }: HeroCardPro
   return (
     <button
       className={`group flex flex-col items-start gap-1 rounded border p-3 text-left transition-colors ${
-        isSelected
-          ? 'border-[color:var(--accent)] bg-[color:var(--paper-2)]'
-          : 'border-[color:var(--rule)] hover:border-[color:var(--ink-muted)]'
+        isSelected ? 'border-accent bg-bg-secondary' : 'border-border hover:border-fg-muted'
       }`}
       onClick={onSelect}
       type="button"
     >
-      <div className="font-mono text-[10px] tracking-[0.12em] text-[color:var(--ink-muted)] uppercase">
+      <div className="text-fg-muted font-mono text-[10px] tracking-[0.12em] uppercase">
         {spec.label}
       </div>
       <div className="flex items-baseline gap-1">
         <span
-          className="text-[color:var(--ink)] tabular-nums"
+          className="text-fg tabular-nums"
           style={{
-            fontFamily: 'var(--font-sans)',
             fontVariationSettings: "'wdth' 90, 'opsz' 48, 'wght' 500",
             fontSize: '26px',
             letterSpacing: '-0.02em',
@@ -520,9 +506,9 @@ function HeroCard({ isSelected, onSelect, projectId, spec, window }: HeroCardPro
         >
           {displayValue}
         </span>
-        <span className="text-[11px] text-[color:var(--ink-muted)]">{spec.unit}</span>
+        <span className="text-fg-muted text-[11px]">{spec.unit}</span>
       </div>
-      <div className="font-mono text-[9px] tracking-[0.1em] text-[color:var(--ink-muted)] uppercase">
+      <div className="text-fg-muted font-mono text-[9px] tracking-[0.1em] uppercase">
         24 h {spec.measure}
       </div>
     </button>
@@ -538,10 +524,10 @@ type PickerProps<T extends string> = {
 
 function Picker<T extends string>({ label, onChange, options, value }: PickerProps<T>) {
   return (
-    <label className="inline-flex items-center gap-1.5 text-[11px] text-[color:var(--ink-muted)]">
+    <label className="text-fg-muted inline-flex items-center gap-1.5 text-[11px]">
       <span className="font-mono tracking-[0.1em] uppercase">{label}</span>
       <select
-        className="rounded border border-[color:var(--rule)] bg-[color:var(--paper)] px-1.5 py-0.5 text-[11px] text-[color:var(--ink)]"
+        className="border-border bg-bg text-fg rounded border px-1.5 py-0.5 text-[11px]"
         onChange={(e) => onChange(e.target.value)}
         value={value}
       >
@@ -593,7 +579,7 @@ function TimeseriesSvg({
   const yOf = (v: number) => H - PAD_B - ((v - vMin) / vSpan) * (H - PAD_T - PAD_B)
 
   // Color palette — series N uses palette[N % palette.length].
-  const palette = ['var(--accent)', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4']
+  const palette = ['var(--color-accent)', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4']
 
   return (
     <svg className="w-full" height={H} viewBox={`0 0 ${W} ${H}`}>
@@ -604,14 +590,20 @@ function TimeseriesSvg({
         return (
           <g key={q}>
             <line
-              stroke="var(--rule)"
+              stroke="var(--color-border)"
               strokeDasharray="2 3"
               x1={PAD_L}
               x2={W - PAD_R}
               y1={y}
               y2={y}
             />
-            <text fill="var(--ink-muted)" fontSize="10" textAnchor="end" x={PAD_L - 4} y={y + 3}>
+            <text
+              fill="var(--color-fg-muted)"
+              fontSize="10"
+              textAnchor="end"
+              x={PAD_L - 4}
+              y={y + 3}
+            >
               {v.toFixed(v < 10 ? 1 : 0)}
             </text>
           </g>
@@ -660,7 +652,7 @@ function TimeseriesSvg({
           ))
         )}
       {/* X axis label — just the unit, time scale is implied (24 h). */}
-      <text fill="var(--ink-muted)" fontSize="10" x={PAD_L} y={H - 6}>
+      <text fill="var(--color-fg-muted)" fontSize="10" x={PAD_L} y={H - 6}>
         {unit}
       </text>
     </svg>

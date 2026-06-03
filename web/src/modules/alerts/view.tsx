@@ -68,7 +68,7 @@ export function AlertsView() {
       <PageHeader
         actions={
           <button
-            className="inline-flex h-7 items-center bg-[color:var(--accent)] px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--paper)] uppercase transition-opacity hover:opacity-90"
+            className="bg-accent text-bg inline-flex h-7 items-center px-3 font-mono text-[11px] tracking-[0.05em] uppercase transition-opacity hover:opacity-90"
             onClick={() => setEditing('new')}
             type="button"
           >
@@ -104,43 +104,39 @@ export function AlertsView() {
               <tr key={r.id}>
                 <td className="lead">{r.name}</td>
                 <td>
-                  <span className="font-mono text-[11px] text-[color:var(--ink-soft)]">
+                  <span className="text-fg-secondary font-mono text-[11px]">
                     {triggerLabel(r.triggerKind, r.triggerConfig)}
                   </span>
                 </td>
                 <td>
                   <span
                     className={
-                      r.muted
-                        ? 'text-[color:var(--warning)]'
-                        : r.enabled
-                          ? 'text-[color:var(--success)]'
-                          : 'text-[color:var(--ink-muted)]'
+                      r.muted ? 'text-warning' : r.enabled ? 'text-success' : 'text-fg-muted'
                     }
                   >
                     {r.muted ? 'muted' : r.enabled ? 'enabled' : 'disabled'}
                   </span>
                 </td>
-                <td className="text-[color:var(--ink-soft)]">
+                <td className="text-fg-secondary">
                   {r.lastFiredAt ? new Date(r.lastFiredAt).toLocaleDateString() : '—'}
                 </td>
                 <td className="text-right whitespace-nowrap">
                   <button
-                    className="mr-2 font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--accent)]"
+                    className="text-fg-muted hover:text-accent mr-2 font-mono text-[10px] tracking-[0.18em] uppercase"
                     onClick={() => patchM.mutate({ body: { enabled: !r.enabled }, id: r.id })}
                     type="button"
                   >
                     {r.enabled ? 'disable' : 'enable'}
                   </button>
                   <button
-                    className="mr-2 font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--accent)]"
+                    className="text-fg-muted hover:text-accent mr-2 font-mono text-[10px] tracking-[0.18em] uppercase"
                     onClick={() => setEditing(r)}
                     type="button"
                   >
                     edit
                   </button>
                   <button
-                    className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--danger)]"
+                    className="text-fg-muted hover:text-danger font-mono text-[10px] tracking-[0.18em] uppercase"
                     onClick={() => {
                       if (
                         confirm(
@@ -242,7 +238,7 @@ function RuleForm({
 
   return (
     <form
-      className="mt-6 border border-[color:var(--rule)] bg-[color:var(--paper-2)] p-4"
+      className="border-border bg-bg-secondary mt-6 border p-4"
       onSubmit={(e) => {
         e.preventDefault()
         if (!name.trim()) return
@@ -277,11 +273,11 @@ function RuleForm({
       }}
     >
       <header className="mb-4 flex items-baseline justify-between">
-        <span className="font-mono text-[11px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase">
+        <span className="text-fg-muted font-mono text-[11px] tracking-[0.18em] uppercase">
           {existing ? 'edit rule' : 'new rule'}
         </span>
         <button
-          className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--ink)]"
+          className="text-fg-muted hover:text-fg font-mono text-[10px] tracking-[0.18em] uppercase"
           onClick={onCancel}
           type="button"
         >
@@ -312,9 +308,7 @@ function RuleForm({
             </option>
           ))}
         </select>
-        <span className="mt-1 block font-mono text-[10px] text-[color:var(--ink-muted)]">
-          {triggerHelp}
-        </span>
+        <span className="text-fg-muted mt-1 block font-mono text-[10px]">{triggerHelp}</span>
       </Row>
 
       {needsThreshold && (
@@ -395,22 +389,22 @@ function RuleForm({
       <Row label="enabled">
         <label className="inline-flex items-center gap-2">
           <input checked={enabled} onChange={(e) => setEnabled(e.target.checked)} type="checkbox" />
-          <span className="font-mono text-[11px] text-[color:var(--ink-soft)]">fire on match</span>
+          <span className="text-fg-secondary font-mono text-[11px]">fire on match</span>
         </label>
       </Row>
 
-      {error && <p className="mt-3 font-mono text-[11px] text-[color:var(--danger)]">{error}</p>}
+      {error && <p className="text-danger mt-3 font-mono text-[11px]">{error}</p>}
 
       <div className="mt-4 flex items-center gap-2">
         <button
-          className="inline-flex h-8 items-center bg-[color:var(--accent)] px-4 font-mono text-[11px] tracking-[0.05em] text-[color:var(--paper)] uppercase transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="bg-accent text-bg inline-flex h-8 items-center px-4 font-mono text-[11px] tracking-[0.05em] uppercase transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={disabled || !name.trim()}
           type="submit"
         >
           {disabled ? (existing ? 'saving…' : 'creating…') : existing ? 'save' : 'create'}
         </button>
         <button
-          className="inline-flex h-8 items-center px-3 font-mono text-[11px] tracking-[0.05em] text-[color:var(--ink-muted)] uppercase hover:text-[color:var(--ink)]"
+          className="text-fg-muted hover:text-fg inline-flex h-8 items-center px-3 font-mono text-[11px] tracking-[0.05em] uppercase"
           onClick={onCancel}
           type="button"
         >
@@ -422,7 +416,7 @@ function RuleForm({
 }
 
 const fieldClass =
-  'h-8 w-full border border-[color:var(--rule)] bg-[color:var(--paper)] px-2 font-mono text-[12px] text-[color:var(--ink)] placeholder:text-[color:var(--ink-muted)] focus:border-[color:var(--accent)] focus:outline-none'
+  'h-8 w-full border border-border bg-bg px-2 font-mono text-[12px] text-fg placeholder:text-fg-muted focus:border-accent focus:outline-none'
 
 function triggerLabel(kind: AlertTriggerKind, cfg: AlertRule['triggerConfig']): string {
   switch (kind) {
