@@ -72,6 +72,25 @@ export default defineConfig({
           ],
         },
         {
+          label: 'API reference',
+          items: [
+            { label: 'sentori.init()', slug: 'api/init' },
+            { label: 'captureException / captureMessage', slug: 'api/capture' },
+            { label: 'Scope (setUser / setTag / addBreadcrumb)', slug: 'api/scope' },
+            { label: 'Tracing (startSpan / withSpan / startTrace)', slug: 'api/tracing' },
+            { label: 'SDK logger', slug: 'api/logger' },
+            { label: 'init.beforeSend hook', slug: 'api/before-send' },
+          ],
+        },
+        {
+          label: 'Privacy & compliance',
+          items: [
+            { label: 'Identity layer', slug: 'privacy/identity' },
+            { label: 'GDPR DSR erase', slug: 'privacy/dsr' },
+            { label: 'Sentry compat', slug: 'sentry-compat' },
+          ],
+        },
+        {
           label: 'Reference',
           items: [
             { label: 'SDK — React', slug: 'sdk-react' },
