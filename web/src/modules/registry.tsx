@@ -234,9 +234,14 @@ export const MODULES: ModuleDef[] = [
     path: 'health',
     view: HealthView,
   },
+  // v2.5 — flipped visible under the find-slow lens. Backed by
+  // the existing vitals admin endpoint (per-route p50/p95 TTID/
+  // TTFD + slow/frozen frame counters, see api/vitals.rs); the
+  // view itself gains window-picker + multi-row compare mode +
+  // per-route drill into the issues list.
   {
+    chord: 'v',
     group: 'monitor',
-    hidden: true,
     iconPath: 'M12 14l4-4M3 12a9 9 0 1 1 18 0M5 12a7 7 0 0 1 14 0',
     id: 'vitals',
     label: 'Vitals',
