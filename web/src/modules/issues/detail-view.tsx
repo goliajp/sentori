@@ -1,6 +1,13 @@
-import { Alert, Card, Dialog, DialogFooter, Tabs as GdsTabs } from '@goliapkg/gds/molecules'
-import { Badge as GdsBadge, Button } from '@goliapkg/gds/primitives'
-import { EmptyState } from '@goliapkg/gds/patterns'
+import {
+  Alert,
+  Badge as GdsBadge,
+  Button,
+  Card,
+  Dialog,
+  DialogFooter,
+  EmptyState,
+  Tabs as GdsTabs,
+} from '@goliapkg/gds'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'

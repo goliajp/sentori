@@ -1,5 +1,4 @@
-import { useFonts } from '@goliapkg/gds'
-import { ToggleGroup } from '@goliapkg/gds/atoms'
+import { ToggleGroup, useFonts } from '@goliapkg/gds'
 import type { ThemeMode } from '@goliapkg/gds/systems'
 import {
   loadPersistedTheme,
