@@ -68,6 +68,7 @@ export default defineConfig({
             { label: 'Release versioning', slug: 'recipes/release-versioning' },
             { label: 'Multi-environment', slug: 'recipes/multi-environment' },
             { label: 'Endpoint health', slug: 'recipes/endpoint-health' },
+            { label: 'Find bugs with /explore', slug: 'recipes/find-bugs-with-explore' },
           ],
         },
         {

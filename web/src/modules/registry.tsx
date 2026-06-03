@@ -175,7 +175,7 @@ export const MODULES: ModuleDef[] = [
     // The trace data continues to flow into the DB; the view is just
     // off the sidebar so the dashboard advertises only what we ship
     // a polished UI for. Flip back on once the redesigned Traces
-    // module lands. See plans/v2.2.md.
+    // module lands. See docs/roadmap/v2.2.md.
     hidden: true,
     iconPath: 'M3 6h18M3 12h13M3 18h9',
     id: 'traces',
@@ -189,7 +189,7 @@ export const MODULES: ModuleDef[] = [
   // perspective. None of the underlying SDK ingest is turned off; the
   // dashboard simply only advertises modules that ship a polished UI.
   // Bring each one back when it's ready, with `hidden: false` and
-  // (probably) a fresh view. See plans/v2.2.md for the redesign plan.
+  // (probably) a fresh view. See docs/roadmap/v2.2.md for the redesign plan.
   {
     group: 'monitor',
     hidden: true,
