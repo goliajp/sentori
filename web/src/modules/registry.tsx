@@ -190,9 +190,15 @@ export const MODULES: ModuleDef[] = [
   // dashboard simply only advertises modules that ship a polished UI.
   // Bring each one back when it's ready, with `hidden: false` and
   // (probably) a fresh view. See docs/roadmap/v2.2.md for the redesign plan.
+  //
+  // v2.5.x — `metrics` flips visible as a **utility surface** (not a
+  // lens). It's the host-defined `recordMetric(name, value, tags?)`
+  // channel from v0.8.3 — business metrics, not a measure-and-drill
+  // dashboard. Phase 1 audit verdict (`docs/roadmap/hidden-modules-audit.md`
+  // §2) called this out: the data path is alive (runtime_metrics_raw
+  // table grows daily), the only thing missing was sidebar advertising.
   {
     group: 'monitor',
-    hidden: true,
     iconPath: 'M4 20V10M10 20V4M16 20V14M22 20H2',
     id: 'metrics',
     label: 'Metrics',

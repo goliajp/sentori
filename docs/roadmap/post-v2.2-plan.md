@@ -810,13 +810,13 @@ The v2.3 design doc §8 listed seven items as "Out of v2.3 scope
 
 | Defer item | Re-home |
 |---|---|
-| Project-level identity-scope carve | **Re-deferred to v2.4+.** Phase 4 discovered the 0065 migration explicitly chose "org-default scope only, project carve column lands later." Adding the column post-hoc on a shipped schema needs a separate backfill story; keep deferred until a concrete carved-scope use case lands. |
+| Project-level identity-scope carve | **Server side shipped in v2.5.x cleanup** — migration `0074_projects_identity_scope.sql` adds the column, `resolve_scope_for_project` honours it, `PATCH /admin/api/projects/{id}` accepts `identityScopeId` with same-org safety check. UI deferred until a real customer carve use case surfaces; operators can drive via API today. |
 | Operator-driven identity merge | **Phase 7** (`identity_merges` table + merge action on Users view). |
 | GDPR DSR delete endpoint | **Phase 4** (`/erase` endpoint + dashboard UI with dry-run confirm). |
 | Verify rig run for perf numbers | **Phase 0** (baseline) + **Phase 3** (diff vs baseline; +5% CPU / +1ms per-tick blocks ship). |
 | Region scope (data residency) | **Kept deferred.** Reason: multi-region routing is a deploy-infrastructure project (Caddy + DNS + Postgres replication) that doesn't fit in any SDK / dashboard phase. Will get its own roadmap doc when there's customer pull. |
 | Native API for in-SDK PII scrub hook (`beforeSend`) | **Phase 3** (init hook + dedicated docs page). |
-| Salt rotation | **Kept deferred.** Reason: requires a historical fingerprint rebuild migration that is data-volume-dependent — design doc to be written when we have a forcing function (e.g. salt leak). Tracked as `docs/design/salt-rotation.md` placeholder to be authored during Phase 4. |
+| Salt rotation | **Design doc landed in v2.5.x cleanup** — `docs/design/salt-rotation.md` covers trigger conditions, schema sketch, rotation flow, grace-window policy, dashboard interaction, audit posture, and open questions. Implementation still deferred until a forcing function (suspected leak / compliance cadence / volume threshold) — by design. |
 
 ## Decisions
 

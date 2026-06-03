@@ -628,8 +628,17 @@ export const adminApi = {
 
   /** Phase 42 sub-A.11: update project settings.
    *  `sourceRepoUrl: null` clears the value; omit the key to leave
-   *  it untouched. */
-  patchProject: (projectId: string, body: { sourceRepoUrl?: null | string }) =>
+   *  it untouched. v2.5+ — `identityScopeId: null` clears the
+   *  carved identity scope, reverting the project to the org
+   *  default. Server validates the target scope belongs to the
+   *  same org (returns `identityScopeNotInOrg` otherwise). */
+  patchProject: (
+    projectId: string,
+    body: {
+      sourceRepoUrl?: null | string
+      identityScopeId?: null | string
+    }
+  ) =>
     adminFetch<null>(`/projects/${projectId}`, {
       body: JSON.stringify(body),
       method: 'PATCH',
