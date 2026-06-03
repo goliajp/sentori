@@ -113,7 +113,18 @@ const UserDetailView = lazyView(() =>
   import('./users/detail-view').then((m) => ({ default: m.UserDetailView }))
 )
 
-export type ModuleGroup = 'monitor' | 'organize'
+// v3.0 — 5-lens sidebar grouping (replaces v2.x 'monitor' | 'organize').
+// Each lens answers a specific operator question, so the sidebar maps
+// to user intent rather than dashboard internals:
+//
+//   find-bug   — what broke? (Issues / Traces / Releases / Live debug)
+//   find-slow  — what's slow? (Vitals / Metrics / Runtime)
+//   find-user  — who's affected? (Users / Audience / Moments)
+//   trust      — is the platform safe? (Posture / Cert / Privacy / Audit)
+//   manage     — setup & admin (Settings / Alerts / Integrations / …)
+//
+// `null` group = pinned at the top of the rail (Overview).
+export type ModuleGroup = 'find-bug' | 'find-slow' | 'find-user' | 'trust' | 'manage'
 
 export type ModuleChildRoute = { path: string; view: ComponentType }
 
@@ -143,8 +154,11 @@ export type ModuleDef = {
 }
 
 export const GROUPS: { id: ModuleGroup; label: string }[] = [
-  { id: 'monitor', label: 'Monitor' },
-  { id: 'organize', label: 'Organize' },
+  { id: 'find-bug', label: 'Find bug' },
+  { id: 'find-slow', label: 'Find slow' },
+  { id: 'find-user', label: 'Find user' },
+  { id: 'trust', label: 'Trust' },
+  { id: 'manage', label: 'Manage' },
 ]
 
 export const MODULES: ModuleDef[] = [
@@ -160,7 +174,7 @@ export const MODULES: ModuleDef[] = [
   {
     children: [{ path: ':issueId', view: IssueDetailView }],
     chord: 'i',
-    group: 'monitor',
+    group: 'find-bug',
     iconPath:
       'M10.3 3.3a2 2 0 0 1 3.4 0l8 14a2 2 0 0 1-1.7 3H3.99a2 2 0 0 1-1.7-3zM12 9v4M12 17h.01',
     id: 'issues',
@@ -170,7 +184,7 @@ export const MODULES: ModuleDef[] = [
   },
   {
     children: [{ path: ':traceId', view: TraceDetailView }],
-    group: 'monitor',
+    group: 'find-bug',
     // v2.2 reset — hidden while we redesign the surface from scratch.
     // The trace data continues to flow into the DB; the view is just
     // off the sidebar so the dashboard advertises only what we ship
@@ -198,7 +212,7 @@ export const MODULES: ModuleDef[] = [
   // §2) called this out: the data path is alive (runtime_metrics_raw
   // table grows daily), the only thing missing was sidebar advertising.
   {
-    group: 'monitor',
+    group: 'find-slow',
     iconPath: 'M4 20V10M10 20V4M16 20V14M22 20H2',
     id: 'metrics',
     label: 'Metrics',
@@ -211,7 +225,7 @@ export const MODULES: ModuleDef[] = [
   // channel) stays hidden as the secondary surface.
   {
     chord: 'r',
-    group: 'monitor',
+    group: 'find-slow',
     iconPath: 'M3 17l6-6 4 4 8-8M14 7h7v7',
     id: 'runtime',
     label: 'Runtime',
@@ -233,7 +247,7 @@ export const MODULES: ModuleDef[] = [
       { path: ':checkId/edit', view: HealthFormView },
     ],
     chord: 'h',
-    group: 'monitor',
+    group: 'manage',
     iconPath: 'M3 12h4l3-8 4 16 3-8h4',
     id: 'health',
     label: 'Health',
@@ -247,7 +261,7 @@ export const MODULES: ModuleDef[] = [
   // per-route drill into the issues list.
   {
     chord: 'v',
-    group: 'monitor',
+    group: 'find-slow',
     iconPath: 'M12 14l4-4M3 12a9 9 0 1 1 18 0M5 12a7 7 0 0 1 14 0',
     id: 'vitals',
     label: 'Vitals',
@@ -255,7 +269,7 @@ export const MODULES: ModuleDef[] = [
     view: VitalsView,
   },
   {
-    group: 'monitor',
+    group: 'find-user',
     hidden: true,
     iconPath: 'M3 3h18l-7 8v8l-4-2v-6L3 3z',
     id: 'moments',
@@ -264,7 +278,7 @@ export const MODULES: ModuleDef[] = [
     view: MomentsView,
   },
   {
-    group: 'monitor',
+    group: 'find-user',
     hidden: true,
     iconPath:
       'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
@@ -274,7 +288,7 @@ export const MODULES: ModuleDef[] = [
     view: AudienceView,
   },
   {
-    group: 'monitor',
+    group: 'trust',
     hidden: true,
     iconPath: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4',
     id: 'cert-monitor',
@@ -283,7 +297,7 @@ export const MODULES: ModuleDef[] = [
     view: CertMonitorView,
   },
   {
-    group: 'monitor',
+    group: 'trust',
     hidden: true,
     iconPath: 'M6 12h12M12 6v12M19 12a7 7 0 1 1-14 0 7 7 0 0 1 14 0M9 9h6v6H9z',
     id: 'posture',
@@ -292,7 +306,7 @@ export const MODULES: ModuleDef[] = [
     view: PostureView,
   },
   {
-    group: 'monitor',
+    group: 'trust',
     hidden: true,
     iconPath:
       'M2 2l20 20M6.7 6.7C4 8.4 2.6 11 2.6 12c0 2 3 6 9.4 6 2.1 0 3.8-.4 5.2-1M11 5c.3 0 .7 0 1 .1M21.4 12c0-2-3-6-9.4-6',
@@ -303,7 +317,7 @@ export const MODULES: ModuleDef[] = [
   },
   {
     adminOnly: true,
-    group: 'monitor',
+    group: 'find-bug',
     hidden: true,
     iconPath:
       'M4.9 19.1A9 9 0 0 1 4.9 4.9M19.1 4.9a9 9 0 0 1 0 14.2M7.8 16.2A5 5 0 0 1 7.8 7.8M16.2 7.8a5 5 0 0 1 0 8.4M12 13a1 1 0 1 1 0-2 1 1 0 0 1 0 2zM12 22v-9',
@@ -315,7 +329,7 @@ export const MODULES: ModuleDef[] = [
   {
     children: [{ path: ':release', view: ReleaseDetailView }],
     chord: 'e',
-    group: 'monitor',
+    group: 'find-bug',
     // v2.2 — first re-opened module under the "find-bug" lens.
     // Backed by the `/explore` query endpoint with a preset query
     // ({dim: release, measures: [event_count, issue_count, ...]}).
@@ -333,7 +347,7 @@ export const MODULES: ModuleDef[] = [
     // and queries identity_fingerprints for cross-project hits.
     // See `docs/design/sdk-v2.3-redesign.md` §5.
     chord: 'u',
-    group: 'monitor',
+    group: 'find-user',
     iconPath:
       'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 11a4 4 0 0 0-4-4M22 21v-2a4 4 0 0 0-3-3.87',
     children: [{ path: ':fingerprintHex', view: UserDetailView }],
@@ -344,7 +358,7 @@ export const MODULES: ModuleDef[] = [
   },
   {
     adminOnly: true,
-    group: 'monitor',
+    group: 'manage',
     hidden: true,
     iconPath: 'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
     id: 'alerts',
@@ -354,7 +368,7 @@ export const MODULES: ModuleDef[] = [
   },
   {
     chord: 't',
-    group: 'organize',
+    group: 'manage',
     iconPath:
       'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M12 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
     id: 'teams',
@@ -364,7 +378,7 @@ export const MODULES: ModuleDef[] = [
   },
   {
     adminOnly: true,
-    group: 'organize',
+    group: 'manage',
     iconPath:
       'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71',
     id: 'integrations',
@@ -374,7 +388,7 @@ export const MODULES: ModuleDef[] = [
   },
   {
     adminOnly: true,
-    group: 'organize',
+    group: 'manage',
     iconPath: 'M22 12.5l-9-9-9 9 9 9zM12 6v6m0 0v6m0-6h6m-6 0H6',
     id: 'webhooks',
     label: 'Webhooks',
@@ -383,7 +397,7 @@ export const MODULES: ModuleDef[] = [
   },
   {
     adminOnly: true,
-    group: 'organize',
+    group: 'manage',
     iconPath: 'M7 7h10M7 12h10M7 17h6M3 4h2M3 9h2M3 14h2M3 19h2',
     id: 'integrate',
     label: 'Integrate',
@@ -392,7 +406,7 @@ export const MODULES: ModuleDef[] = [
   },
   {
     adminOnly: true,
-    group: 'organize',
+    group: 'trust',
     iconPath:
       'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8M8 9h2',
     id: 'audit',
@@ -402,7 +416,7 @@ export const MODULES: ModuleDef[] = [
   },
   {
     chord: 's',
-    group: 'organize',
+    group: 'manage',
     iconPath:
       'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73zM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
     id: 'settings',
