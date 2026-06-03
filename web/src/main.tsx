@@ -1,6 +1,9 @@
+// GDS token + theme CSS is `@import`-ed from inside index.css so
+// Tailwind v4 can resolve the @theme blocks against the same file
+// layer that `@source` scans GDS's dist for utility usage. Loading
+// them from JS instead puts them in a different layer and Tailwind
+// can't generate the right utilities.
 import './index.css'
-import '@goliapkg/gds/tokens.css'
-import '@goliapkg/gds/theme.css'
 
 import { SentoriErrorBoundary, SentoriProvider } from '@goliapkg/sentori-react'
 import { DEFAULT_THEME, loadPersistedTheme, resolveThemeCssVars } from '@goliapkg/gds/systems'
