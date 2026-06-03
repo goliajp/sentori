@@ -25,16 +25,20 @@
  *   rev 0: bg colour same as canvas → invisible (Insight verify).
  */
 
-/** Generic container fallback fill — solid white. The shared
- *  `WIREFRAME_RECT_OPACITY` decides how visible it actually is on
- *  the dark canvas; keeping the fallback solid means overlap
- *  composition matches `node.color` exactly. */
-export const WIREFRAME_RECT_FILL = 'rgb(255,255,255)'
+/** Generic container fallback fill — follows `--color-fg` so the
+ *  wireframe stays visible in both modes:
+ *    - dark canvas → light fg fill @ 0.12 = faint light shapes
+ *    - light canvas → dark fg fill @ 0.12 = faint dark shapes
+ *  Hardcoding white worked when the dashboard was dark-only, but
+ *  GDS gives us a system-following theme — on a light canvas, white
+ *  @ 0.12 vanishes into the background. */
+export const WIREFRAME_RECT_FILL = 'var(--color-fg)'
 
-/** Image fallback fill — solid white. Image nodes use a slightly
- *  higher fill-opacity so media regions read distinct from generic
- *  containers when the SDK didn't pass `node.color`. */
-export const WIREFRAME_IMAGE_FILL = 'rgb(255,255,255)'
+/** Image fallback fill — also follows `--color-fg`. Same mode-flip
+ *  reasoning as `WIREFRAME_RECT_FILL`; the higher fill-opacity
+ *  (`WIREFRAME_IMAGE_OPACITY`) makes media regions read distinct
+ *  from generic containers when the SDK didn't pass `node.color`. */
+export const WIREFRAME_IMAGE_FILL = 'var(--color-fg)'
 
 /** Shared fill-opacity for rect / circle / colour-passed-through
  *  nodes — when the SDK gave us an actual colour. 0.9 keeps brand
