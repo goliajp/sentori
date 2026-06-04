@@ -71,16 +71,10 @@ export function HealthFormView() {
 
   if (!projectId) return null
   if (mode === 'edit' && existingQ.isLoading) {
-    return (
-      <div className="sentori-page-in text-fg-muted py-8 text-center text-[12px]">Loading…</div>
-    )
+    return <div className="text-fg-muted py-8 text-center text-[12px]">Loading…</div>
   }
   if (mode === 'edit' && (existingQ.error || !existingQ.data)) {
-    return (
-      <div className="sentori-page-in text-danger py-8 text-center text-[12px]">
-        Check not found.
-      </div>
-    )
+    return <div className="text-danger py-8 text-center text-[12px]">Check not found.</div>
   }
 
   const initial =
@@ -154,7 +148,7 @@ function FormBody({ checkId, headerTitle, initial, mode, orgSlug, projectId }: F
     mode === 'edit' ? `/main/org/${orgSlug}/health/${checkId}` : `/main/org/${orgSlug}/health`
 
   return (
-    <div className="sentori-page-in max-w-2xl space-y-6">
+    <div className="max-w-2xl space-y-6">
       <header>
         <div className="text-fg-muted font-mono text-[11px] tracking-[0.18em] uppercase">
           endpoint health · {mode === 'edit' ? 'edit' : 'new check'}
