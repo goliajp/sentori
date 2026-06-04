@@ -1,32 +1,18 @@
+import { Alert, Button, Card, DataTable, EmptyState, PageHeader } from '@goliapkg/gds'
 import { useInfiniteQuery } from '@tanstack/react-query'
 
 import { auditApi, type AuditRow } from '@/api/client'
-import { useOrg } from '@/auth/orgContext'
-import { EmptyState } from '@/components/Hint'
-import { RowSkeleton } from '@/components/Skeleton'
-import { PageHeader } from '@/layout/page-header'
-import { formatRelative } from '@/lib/format'
 import { qk } from '@/api/query-keys'
+import { useOrg } from '@/auth/orgContext'
+import { formatRelative } from '@/lib/format'
 
 const PAGE_SIZE = 200
 
 /**
- * v2.1 — proper cursor pagination via `useInfiniteQuery` + the
- * server's `?before=<rfc3339>` cursor.
- *
- * Before this commit: single fetch with `limit=500`, hard ceiling,
- * "showing latest 500" warning when full. Operators of busy orgs
- * couldn't read past the most recent 500 audit entries.
- *
- * Now: first page is 200 rows (fast first paint). Bottom-of-list
- * "Load older" button issues a follow-up fetch with
- * `before=oldestSeen`. Pages accumulate in react-query's internal
- * pageParam machinery; the dashboard flattens them for render.
- * No client-side ceiling — operator can walk back as far as they
- * need.
- *
- * Server respects the same 500 cap per page; the dashboard's
- * page-size of 200 stays under that for snappy round-trips.
+ * Append-only audit log — cursor pagination via useInfiniteQuery +
+ * `?before=<rfc3339>`. First page is 200 rows; the table renders as
+ * GDS DataTable + a "Load older" Button below when more history is
+ * reachable.
  */
 export function AuditLogView() {
   const { currentOrg } = useOrg()
@@ -53,60 +39,100 @@ export function AuditLogView() {
   const isLoadingMore = q.isFetchingNextPage
 
   return (
-    <div className="sentori-page-in">
+    <div className="space-y-4">
       <PageHeader
-        count={rows.length}
-        subtitle="append-only · every mutating action"
+        breadcrumb={[
+          { label: 'sentori', href: '/main' },
+          {
+            label: currentOrg.name ?? currentOrg.slug,
+            href: `/main/org/${currentOrg.slug}/overview`,
+          },
+          { label: 'audit' },
+        ]}
+        subtitle={`${rows.length.toLocaleString()} entries · append-only`}
         title="Audit"
       />
 
-      {isLoading && <RowSkeleton count={6} height="40px" />}
-      {error && <EmptyState>Failed to load audit log.</EmptyState>}
-      {!isLoading && !error && rows.length === 0 && <EmptyState>No entries yet.</EmptyState>}
+      {error && (
+        <Alert title="Failed to load audit log" variant="danger">
+          Refresh to retry.
+        </Alert>
+      )}
 
-      {rows.length > 0 && (
-        <>
-          <table className="bench">
-            <thead>
-              <tr>
-                <th>when</th>
-                <th>actor</th>
-                <th>action</th>
-                <th>target</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((e) => (
-                <tr key={e.id}>
-                  <td className="num">{formatRelative(e.createdAt)}</td>
-                  <td className="text-accent">{e.actorEmail ?? 'system'}</td>
-                  <td className="lead">{e.action}</td>
-                  <td className="text-fg-secondary">
-                    {e.targetType}:{e.targetId ?? '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {!isLoading && !error && rows.length === 0 && (
+        <Card>
+          <EmptyState
+            description="Audit captures every mutating action across the org."
+            title="No entries yet"
+          />
+        </Card>
+      )}
 
-          {q.hasNextPage && (
-            <div className="border-border flex items-center justify-center border-y py-4">
-              <button
-                className="border-border bg-bg-secondary text-fg hover:border-accent hover:text-accent inline-flex h-8 items-center border px-4 font-mono text-[11px] tracking-[0.08em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={isLoadingMore}
-                onClick={() => void q.fetchNextPage()}
-                type="button"
-              >
-                {isLoadingMore ? 'loading…' : '↓ load older'}
-              </button>
-            </div>
-          )}
-          {!q.hasNextPage && rows.length >= PAGE_SIZE && (
-            <p className="border-border text-fg-muted border-y py-3 text-center font-mono text-[10px] tracking-[0.18em] uppercase">
-              end of history
-            </p>
-          )}
-        </>
+      {(isLoading || rows.length > 0) && (
+        <DataTable<AuditRow>
+          columns={[
+            {
+              key: 'createdAt',
+              label: 'When',
+              width: '160px',
+              render: (_v, r) => (
+                <span className="text-fg-muted font-mono text-[11px] tabular-nums">
+                  {formatRelative(r.createdAt)}
+                </span>
+              ),
+            },
+            {
+              key: 'actorEmail',
+              label: 'Actor',
+              width: '220px',
+              render: (_v, r) => (
+                <span className="text-accent font-mono text-[12px]">
+                  {r.actorEmail ?? 'system'}
+                </span>
+              ),
+            },
+            {
+              key: 'action',
+              label: 'Action',
+              render: (_v, r) => <span className="text-fg font-mono text-[12px]">{r.action}</span>,
+            },
+            {
+              key: 'target',
+              label: 'Target',
+              render: (_v, r) => (
+                <span className="text-fg-secondary font-mono text-[11px]">
+                  {r.targetType}:{r.targetId ?? '—'}
+                </span>
+              ),
+            },
+          ]}
+          density="compact"
+          loading={isLoading}
+          loadingRows={6}
+          rowKey="id"
+          rows={rows}
+          stickyHeader
+          striped
+        />
+      )}
+
+      {q.hasNextPage && (
+        <div className="flex items-center justify-center py-2">
+          <Button
+            disabled={isLoadingMore}
+            loading={isLoadingMore}
+            onClick={() => void q.fetchNextPage()}
+            size="sm"
+            variant="secondary"
+          >
+            ↓ Load older
+          </Button>
+        </div>
+      )}
+      {!q.hasNextPage && rows.length >= PAGE_SIZE && (
+        <p className="border-border-muted text-fg-muted border-y py-3 text-center font-mono text-[10px] tracking-[0.18em] uppercase">
+          end of history
+        </p>
       )}
     </div>
   )
