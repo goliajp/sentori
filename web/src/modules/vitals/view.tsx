@@ -1,39 +1,34 @@
-// v0.9.4 #1 / v2.5 — Mobile Vitals dashboard, repositioned as the
-// find-slow lens.
-//
-// Layout:
-//   - Release picker (existing) + window picker (1d/7d/30d/all).
-//   - KPI strip — release + cold-start p50/p95 + routes-tracked.
-//   - Per-route table — TTID p50/p95 / TTFD p50/p95 / slow + frozen
-//     frame totals. Sorted by TTID p95 desc by default (the "where's
-//     the worst slowness?" question).
-//   - Compare mode — checkbox column lets the operator tag up to 4
-//     routes; a delta strip above the table renders the comparison
-//     against the first-selected row.
-//   - Drill: each route's name links into the Issues list filtered
-//     by `tags.route = X` so the operator can pivot from "this
-//     route is slow" to "what errors hit on this route".
-//
-// All numbers come from spans table aggregations
-// (server/src/api/vitals.rs); no new server endpoint in v2.5.
-
+import { Alert, Card, DataTable, EmptyState, PageHeader } from '@goliapkg/gds'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 
 import { adminApi } from '@/api/client'
-import { EmptyState } from '@/components/Hint'
-import { Stat } from '@/components/Stat'
-import { SubSection } from '@/components/SubSection'
-import { useOrg } from '@/auth/orgContext'
-import { PageHeader } from '@/layout/page-header'
-import { formatRelative } from '@/lib/format'
 import { qk } from '@/api/query-keys'
+import { useOrg } from '@/auth/orgContext'
+import { formatRelative } from '@/lib/format'
 import { useUrlParam } from '@/lib/url-state'
 
 type SortKey = 'frozen' | 'route' | 'slow' | 'ttfdP95' | 'ttidP95'
 type Direction = 'asc' | 'desc'
 
+type RouteRow = {
+  route: string
+  navigations: number
+  ttidP50Ms: number
+  ttidP95Ms: number
+  ttfdP50Ms: number
+  ttfdP95Ms: number
+  ttfdSamples: number
+  totalSlowFrames: number
+  totalFrozenFrames: number
+}
+
+/**
+ * Vitals — find-slow lens. KPI strip + per-route DataTable + an
+ * inline compare panel (up to 4 routes, shown when ≥ 2 selected).
+ * Drill: route name links into Issues filtered by `?tag=route:<x>`.
+ */
 export function VitalsView() {
   const { currentOrg, currentProject } = useOrg()
   const projectId = currentProject?.id ?? null
@@ -46,9 +41,6 @@ export function VitalsView() {
   const [direction, setDirection] = useUrlParam<Direction>('dir', 'desc', (raw) =>
     raw === 'asc' || raw === 'desc' ? raw : null
   )
-  // v2.5 — comma-separated route names the operator tagged for
-  // compare. Up to 4 entries — small enough to fit in a single
-  // delta strip without horizontal scroll.
   const [compareParam, setCompareParam] = useUrlParam<string>('compare', '')
   const compareSet = useMemo(() => new Set(compareParam.split(',').filter(Boolean)), [compareParam])
 
@@ -66,7 +58,7 @@ export function VitalsView() {
   const releases = releasesQ.data ?? []
   const report = reportQ.data
 
-  const sortedRoutes = useMemo(() => {
+  const sortedRoutes = useMemo<RouteRow[]>(() => {
     if (!report) return []
     const rows = [...report.perRoute]
     const cmp = (a: number | string, b: number | string) =>
@@ -104,10 +96,7 @@ export function VitalsView() {
     return rows
   }, [report, sortBy, direction])
 
-  const comparedRoutes = useMemo(
-    () => sortedRoutes.filter((r) => compareSet.has(r.route)),
-    [sortedRoutes, compareSet]
-  )
+  const comparedRoutes = sortedRoutes.filter((r) => compareSet.has(r.route))
 
   const toggleCompare = (route: string) => {
     const next = new Set(compareSet)
@@ -115,253 +104,302 @@ export function VitalsView() {
     else if (next.size < 4) next.add(route)
     setCompareParam(Array.from(next).join(','))
   }
-  const onChangeSort = (key: SortKey) => {
-    if (key === sortBy) {
-      setDirection(direction === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortBy(key)
-      // Numeric columns default to desc (worst-first); route name
-      // defaults to asc.
-      setDirection(key === 'route' ? 'asc' : 'desc')
-    }
-  }
 
   return (
-    <div className="sentori-page-in">
+    <div className="space-y-4">
       <PageHeader
-        actions={
-          <select
-            aria-label="Release"
-            className="border-border bg-bg-secondary text-fg focus:border-accent border px-2 py-1 font-mono text-[12px] focus:outline-none"
-            onChange={(e) => setRelease(e.target.value)}
-            value={release}
-          >
-            <option value="">— pick release —</option>
-            {releases.map((r) => (
-              <option key={r.release} value={r.release}>
-                {r.release} · {r.eventCount} ev · {formatRelative(r.lastSeen)}
-              </option>
-            ))}
-          </select>
-        }
-        subtitle="find-slow lens · per-route p50/p95"
+        actions={<ReleaseSelect onChange={setRelease} releases={releases} value={release} />}
+        breadcrumb={[
+          { label: 'sentori', href: '/main' },
+          {
+            label: currentOrg.name ?? currentOrg.slug,
+            href: `/main/org/${currentOrg.slug}/overview`,
+          },
+          { label: 'vitals' },
+        ]}
+        subtitle="find-slow lens · per-route p50 / p95"
         title="Vitals"
       />
 
       {(releasesQ.isError || reportQ.isError) && (
-        <p className="border-border text-danger border-y py-6 text-center text-[13px]">
-          Failed to load vitals. Refresh to retry.
-        </p>
+        <Alert title="Failed to load vitals" variant="danger">
+          Refresh to retry. If this persists, check the dashboard&apos;s connection to the server.
+        </Alert>
       )}
-      {!report && !releasesQ.isError && !reportQ.isError && reportQ.isLoading && (
-        <p className="border-border text-fg-secondary border-y py-6 text-center text-[13px]">
-          Loading…
-        </p>
-      )}
-      {!report &&
-        !releasesQ.isError &&
-        !reportQ.isError &&
-        !reportQ.isLoading &&
-        releases.length === 0 && (
-          <p className="border-border text-fg-secondary border-y py-6 text-center text-[13px]">
-            No releases with vitals data yet. The SDK starts populating after the first cold-start
-            measurement on a build with `mobile-vitals` enabled.
-          </p>
-        )}
 
       {report && (
-        <div className="rule-grid grid-cols-1 sm:grid-cols-3">
-          <Stat label="release" value={<span className="font-mono">{report.release}</span>} />
-          <Stat
+        <div className="grid gap-3 sm:grid-cols-3">
+          <StatCard label="release">
+            <span className="text-fg font-mono text-[15px]">{report.release}</span>
+          </StatCard>
+          <StatCard
             label="cold start"
-            sub={
+            sublabel={
               report.coldStart.samples > 0
-                ? `p95 ${report.coldStart.p95Ms}ms · ${report.coldStart.samples} samples`
+                ? `p95 ${report.coldStart.p95Ms} ms · ${report.coldStart.samples} samples`
                 : 'no samples'
             }
-            value={
-              report.coldStart.samples > 0 ? (
-                <>
-                  <span className="tabular-nums">{report.coldStart.p50Ms}</span>
-                  <span className="text-fg-muted ml-1 text-[14px]">ms p50</span>
-                </>
-              ) : (
-                <span className="text-fg-muted text-[16px]">SDK ≥ 0.8.6 needed</span>
-              )
-            }
-          />
-          <Stat
-            label="routes tracked"
-            value={<span className="tabular-nums">{report.perRoute.length}</span>}
-          />
+          >
+            {report.coldStart.samples > 0 ? (
+              <span className="text-fg">
+                <span className="text-[22px] font-semibold tabular-nums">
+                  {report.coldStart.p50Ms}
+                </span>
+                <span className="text-fg-muted ml-1 text-[13px]">ms p50</span>
+              </span>
+            ) : (
+              <span className="text-fg-muted text-[14px]">SDK ≥ 0.8.6 needed</span>
+            )}
+          </StatCard>
+          <StatCard label="routes tracked">
+            <span className="text-fg text-[22px] font-semibold tabular-nums">
+              {report.perRoute.length}
+            </span>
+          </StatCard>
         </div>
       )}
 
       {comparedRoutes.length >= 2 && (
-        <CompareStrip
+        <CompareCard
           baseline={comparedRoutes[0]!}
-          rows={comparedRoutes.slice(1)}
           onClear={() => setCompareParam('')}
+          rows={comparedRoutes.slice(1)}
         />
       )}
 
-      <SubSection sub={`${report?.perRoute.length ?? 0} routes`} title="Per-route vitals">
-        {!report || report.perRoute.length === 0 ? (
-          <EmptyState>
-            No route vitals yet. Mount{' '}
-            <code className="text-fg font-mono">useTraceNavigation(navigationRef)</code> in your app
-            and pick a release with traffic.
-          </EmptyState>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="bench min-w-[860px]">
-              <thead>
-                <tr>
-                  <th className="w-[34px]">cmp</th>
-                  <SortableTh
-                    direction={direction}
-                    label="route"
-                    name="route"
-                    onClick={() => onChangeSort('route')}
-                    sortBy={sortBy}
-                  />
-                  <th className="num">nav</th>
-                  <th className="num">ttid p50</th>
-                  <SortableTh
-                    direction={direction}
-                    label="ttid p95"
-                    name="ttidP95"
-                    numeric
-                    onClick={() => onChangeSort('ttidP95')}
-                    sortBy={sortBy}
-                  />
-                  <th className="num">ttfd p50</th>
-                  <SortableTh
-                    direction={direction}
-                    label="ttfd p95"
-                    name="ttfdP95"
-                    numeric
-                    onClick={() => onChangeSort('ttfdP95')}
-                    sortBy={sortBy}
-                  />
-                  <SortableTh
-                    direction={direction}
-                    label="slow"
-                    name="slow"
-                    numeric
-                    onClick={() => onChangeSort('slow')}
-                    sortBy={sortBy}
-                  />
-                  <SortableTh
-                    direction={direction}
-                    label="frozen"
-                    name="frozen"
-                    numeric
-                    onClick={() => onChangeSort('frozen')}
-                    sortBy={sortBy}
-                  />
-                </tr>
-              </thead>
-              <tbody>
-                {sortedRoutes.map((r) => {
-                  const isCompared = compareSet.has(r.route)
-                  const canAdd = compareSet.size < 4 || isCompared
-                  return (
-                    <tr key={r.route} className={isCompared ? 'bg-accent/10' : ''}>
-                      <td className="num">
-                        <input
-                          aria-label={`compare ${r.route}`}
-                          checked={isCompared}
-                          disabled={!canAdd}
-                          onChange={() => toggleCompare(r.route)}
-                          type="checkbox"
-                        />
-                      </td>
-                      <td className="lead">
-                        {/* Drill: route → Issues list filtered by tag.route */}
-                        <Link
-                          className="text-fg hover:text-accent"
-                          to={`/main/org/${currentOrg.slug}/issues?tag=route:${encodeURIComponent(r.route)}`}
-                        >
-                          {r.route}
-                        </Link>
-                      </td>
-                      <td className="num">{r.navigations.toLocaleString()}</td>
-                      <td className="num">{r.ttidP50Ms}ms</td>
-                      <td className="num">{r.ttidP95Ms}ms</td>
-                      <td className="num">{r.ttfdSamples > 0 ? `${r.ttfdP50Ms}ms` : '—'}</td>
-                      <td className="num">{r.ttfdSamples > 0 ? `${r.ttfdP95Ms}ms` : '—'}</td>
-                      <td className={`num ${r.totalSlowFrames > 0 ? 'text-warning' : ''}`}>
-                        {r.totalSlowFrames}
-                      </td>
-                      <td className={`num ${r.totalFrozenFrames > 0 ? 'text-danger' : ''}`}>
-                        {r.totalFrozenFrames}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </SubSection>
+      {!report && reportQ.isLoading && (
+        <Card>
+          <EmptyState description="Fetching route vitals…" title="Loading" />
+        </Card>
+      )}
+
+      {report && report.perRoute.length === 0 && (
+        <Card>
+          <EmptyState
+            description="Mount useTraceNavigation(navigationRef) in your app and pick a release with traffic."
+            title="No route vitals yet"
+          />
+        </Card>
+      )}
+
+      {report && report.perRoute.length > 0 && (
+        <DataTable
+          columns={routeColumns(currentOrg.slug, compareSet, toggleCompare)}
+          density="compact"
+          highlightOnHover
+          onSort={(key) => {
+            const k = key as SortKey
+            if (k === sortBy) setDirection(direction === 'asc' ? 'desc' : 'asc')
+            else {
+              setSortBy(k)
+              setDirection(k === 'route' ? 'asc' : 'desc')
+            }
+          }}
+          rowKey="route"
+          rows={sortedRoutes}
+          sortDir={direction}
+          sortKey={sortBy}
+          stickyHeader
+          striped
+        />
+      )}
     </div>
   )
 }
 
-function SortableTh({
-  direction,
+/**
+ * Generic KPI card — GDS `MetricCard` only supports `value:
+ * string | number`, so the dashboard's mixed-content KPI strip
+ * (label tag + big value + optional sublabel + JSX content) gets
+ * its own Card composition. Same density as GDS's MetricCard via
+ * `gds-pad` + `gds-gap`.
+ */
+function StatCard({
+  children,
   label,
-  name,
-  numeric,
-  onClick,
-  sortBy,
+  sublabel,
 }: {
-  direction: Direction
+  children: React.ReactNode
   label: string
-  name: SortKey
-  numeric?: boolean
-  onClick: () => void
-  sortBy: SortKey
+  sublabel?: string
 }) {
-  const active = sortBy === name
   return (
-    <th className={numeric ? 'num' : undefined}>
-      <button
-        className={`hover:text-accent cursor-pointer font-mono text-[10px] tracking-[0.18em] uppercase ${
-          active ? 'text-accent' : 'text-fg-muted'
-        }`}
-        onClick={onClick}
-        type="button"
-      >
-        {label}
-        {active && <span aria-hidden> {direction === 'desc' ? '↓' : '↑'}</span>}
-      </button>
-    </th>
+    <Card>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-fg-muted font-mono text-[10px] tracking-[0.22em] uppercase">
+          {label}
+        </span>
+        <span>{children}</span>
+        {sublabel && (
+          <span className="text-fg-muted font-mono text-[10px] tabular-nums">{sublabel}</span>
+        )}
+      </div>
+    </Card>
   )
 }
 
-/** v2.5 — compare mode. Shows numeric deltas of each subsequent
- *  selected row against the baseline (first-selected). Bold +
- *  coloured when the delta crosses a meaningful threshold for
- *  the measure (TTID p95 ±10%, slow frames any difference). */
-function CompareStrip({
+function routeColumns(
+  orgSlug: string,
+  compareSet: Set<string>,
+  toggleCompare: (route: string) => void
+) {
+  return [
+    {
+      key: 'compare',
+      label: '',
+      width: '40px',
+      render: (_v: unknown, r: RouteRow) => {
+        const isCompared = compareSet.has(r.route)
+        const canAdd = compareSet.size < 4 || isCompared
+        return (
+          <input
+            aria-label={`compare ${r.route}`}
+            checked={isCompared}
+            disabled={!canAdd}
+            onChange={() => toggleCompare(r.route)}
+            type="checkbox"
+          />
+        )
+      },
+    },
+    {
+      key: 'route',
+      label: 'Route',
+      sortable: true,
+      render: (_v: unknown, r: RouteRow) => (
+        <Link
+          className="text-fg hover:text-accent font-mono text-[12px]"
+          to={`/main/org/${orgSlug}/issues?tag=route:${encodeURIComponent(r.route)}`}
+        >
+          {r.route}
+        </Link>
+      ),
+    },
+    {
+      align: 'right' as const,
+      key: 'navigations',
+      label: 'Nav',
+      width: '70px',
+      render: (_v: unknown, r: RouteRow) => (
+        <span className="font-mono text-[12px] tabular-nums">{r.navigations.toLocaleString()}</span>
+      ),
+    },
+    {
+      align: 'right' as const,
+      key: 'ttidP50',
+      label: 'TTID p50',
+      width: '90px',
+      render: (_v: unknown, r: RouteRow) => (
+        <span className="font-mono text-[12px] tabular-nums">{r.ttidP50Ms}ms</span>
+      ),
+    },
+    {
+      align: 'right' as const,
+      key: 'ttidP95',
+      label: 'TTID p95',
+      sortable: true,
+      width: '90px',
+      render: (_v: unknown, r: RouteRow) => (
+        <span className="font-mono text-[12px] tabular-nums">{r.ttidP95Ms}ms</span>
+      ),
+    },
+    {
+      align: 'right' as const,
+      key: 'ttfdP50',
+      label: 'TTFD p50',
+      width: '90px',
+      render: (_v: unknown, r: RouteRow) => (
+        <span className="text-fg-muted font-mono text-[12px] tabular-nums">
+          {r.ttfdSamples > 0 ? `${r.ttfdP50Ms}ms` : '—'}
+        </span>
+      ),
+    },
+    {
+      align: 'right' as const,
+      key: 'ttfdP95',
+      label: 'TTFD p95',
+      sortable: true,
+      width: '90px',
+      render: (_v: unknown, r: RouteRow) => (
+        <span className="text-fg-muted font-mono text-[12px] tabular-nums">
+          {r.ttfdSamples > 0 ? `${r.ttfdP95Ms}ms` : '—'}
+        </span>
+      ),
+    },
+    {
+      align: 'right' as const,
+      key: 'slow',
+      label: 'Slow',
+      sortable: true,
+      width: '70px',
+      render: (_v: unknown, r: RouteRow) => (
+        <span
+          className={`font-mono text-[12px] tabular-nums ${r.totalSlowFrames > 0 ? 'text-warning' : 'text-fg-muted'}`}
+        >
+          {r.totalSlowFrames}
+        </span>
+      ),
+    },
+    {
+      align: 'right' as const,
+      key: 'frozen',
+      label: 'Frozen',
+      sortable: true,
+      width: '70px',
+      render: (_v: unknown, r: RouteRow) => (
+        <span
+          className={`font-mono text-[12px] tabular-nums ${r.totalFrozenFrames > 0 ? 'text-danger' : 'text-fg-muted'}`}
+        >
+          {r.totalFrozenFrames}
+        </span>
+      ),
+    },
+  ]
+}
+
+function ReleaseSelect({
+  onChange,
+  releases,
+  value,
+}: {
+  onChange: (v: string) => void
+  releases: { release: string; eventCount: number; lastSeen: string }[]
+  value: string
+}) {
+  return (
+    <select
+      aria-label="Release"
+      className="border-border bg-bg-secondary text-fg focus:border-accent gds-h-sm gds-pad-x-sm border font-mono text-[12px] focus:outline-none"
+      onChange={(e) => onChange(e.target.value)}
+      value={value}
+    >
+      <option value="">— pick release —</option>
+      {releases.map((r) => (
+        <option key={r.release} value={r.release}>
+          {r.release} · {r.eventCount} ev · {formatRelative(r.lastSeen)}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+/**
+ * Compare panel — `comparedRoutes[0]` is the baseline, subsequent
+ * rows render p50 / p95 / slow deltas. Bold + danger when the delta
+ * crosses a meaningful threshold (p95 ±10%, slow ≠ 0).
+ */
+function CompareCard({
   baseline,
   onClear,
   rows,
 }: {
-  baseline: { route: string; ttidP50Ms: number; ttidP95Ms: number; totalSlowFrames: number }
+  baseline: RouteRow
   onClear: () => void
-  rows: {
-    route: string
-    ttidP50Ms: number
-    ttidP95Ms: number
-    totalSlowFrames: number
-  }[]
+  rows: RouteRow[]
 }) {
   return (
-    <section className="border-border mt-6 border-y py-3">
-      <header className="mb-2 flex items-baseline justify-between">
+    <Card>
+      <header className="mb-3 flex items-baseline justify-between">
         <span className="text-accent font-mono text-[10px] tracking-[0.22em] uppercase">
           compare · baseline {baseline.route}
         </span>
@@ -373,29 +411,41 @@ function CompareStrip({
           clear
         </button>
       </header>
-      <table className="bench">
+      <table className="w-full border-collapse text-[12px]">
         <thead>
-          <tr>
-            <th>route</th>
-            <th className="num">ttid p50 Δ</th>
-            <th className="num">ttid p95 Δ</th>
-            <th className="num">slow Δ</th>
+          <tr className="border-border border-b">
+            <th className="text-fg-muted py-2 text-left font-mono text-[10px] font-medium tracking-[0.15em] uppercase">
+              Route
+            </th>
+            <th className="text-fg-muted py-2 text-right font-mono text-[10px] font-medium tracking-[0.15em] uppercase">
+              TTID p50 Δ
+            </th>
+            <th className="text-fg-muted py-2 text-right font-mono text-[10px] font-medium tracking-[0.15em] uppercase">
+              TTID p95 Δ
+            </th>
+            <th className="text-fg-muted py-2 text-right font-mono text-[10px] font-medium tracking-[0.15em] uppercase">
+              Slow Δ
+            </th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.route}>
-              <td className="lead">{r.route}</td>
-              <td className="num">{deltaMs(r.ttidP50Ms, baseline.ttidP50Ms)}</td>
-              <td className="num">
-                {deltaMs(r.ttidP95Ms, baseline.ttidP95Ms, /* threshold */ 0.1)}
+            <tr className="border-border-muted border-b last:border-0" key={r.route}>
+              <td className="text-fg py-1.5 font-mono">{r.route}</td>
+              <td className="py-1.5 text-right font-mono tabular-nums">
+                {deltaMs(r.ttidP50Ms, baseline.ttidP50Ms)}
               </td>
-              <td className="num">{deltaCount(r.totalSlowFrames, baseline.totalSlowFrames)}</td>
+              <td className="py-1.5 text-right font-mono tabular-nums">
+                {deltaMs(r.ttidP95Ms, baseline.ttidP95Ms, 0.1)}
+              </td>
+              <td className="py-1.5 text-right font-mono tabular-nums">
+                {deltaCount(r.totalSlowFrames, baseline.totalSlowFrames)}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
-    </section>
+    </Card>
   )
 }
 
@@ -407,12 +457,12 @@ function deltaMs(actual: number, baseline: number, threshold = 0.05) {
     const cls = diff > 0 ? 'text-danger' : 'text-success'
     return <span className={`font-bold ${cls}`}>{text}</span>
   }
-  return <span>{text}</span>
+  return <span className="text-fg-secondary">{text}</span>
 }
 
 function deltaCount(actual: number, baseline: number) {
   const diff = actual - baseline
-  if (diff === 0) return '—'
+  if (diff === 0) return <span className="text-fg-muted">—</span>
   const cls = diff > 0 ? 'text-warning' : 'text-success'
   return <span className={`font-bold ${cls}`}>{diff > 0 ? `+${diff}` : diff}</span>
 }
