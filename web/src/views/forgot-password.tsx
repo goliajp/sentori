@@ -44,7 +44,7 @@ export function ForgotPasswordView() {
             If <span className="text-fg font-mono">{email}</span> matches an account, a reset link
             is on its way. The link expires in 48 hours.
           </p>
-          <p className="border-border-muted text-fg-muted border-t pt-3 font-mono text-[10px] tracking-[0.12em] uppercase">
+          <p className="border-border/40 text-fg-muted border-t pt-3 font-mono text-[10px] tracking-[0.12em] uppercase">
             self-hosting w/o smtp? grep <span className="text-fg">docker logs</span> — the link is
             at info.
           </p>

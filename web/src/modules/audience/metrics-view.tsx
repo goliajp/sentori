@@ -115,7 +115,7 @@ function BarSeries({
         <ul className="pt-3">
           {rows.map((r) => (
             <li
-              className="border-border-muted flex items-baseline gap-3 border-b py-1.5 last:border-b-0"
+              className="border-border/40 flex items-baseline gap-3 border-b py-1.5 last:border-b-0"
               key={r.label}
             >
               <span className="text-fg-muted basis-[68px] font-mono text-[11px]">{r.label}</span>

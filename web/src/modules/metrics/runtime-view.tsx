@@ -243,7 +243,7 @@ export function RuntimeMetricsView() {
         </div>
 
         {/* Chart */}
-        <div className="border-border-muted bg-bg mt-3 border p-4">
+        <div className="border-border/40 bg-bg mt-3 border p-4">
           {chartQ.isLoading && <RowSkeleton count={3} height="60px" />}
           {chartQ.error && <CenteredEmpty>Failed to load this metric.</CenteredEmpty>}
           {chartQ.data && chartQ.data.series.every((s) => s.points.length === 0) && (
@@ -396,7 +396,7 @@ function DrillModal({
               {issues.map((iss) => (
                 <li key={iss.id}>
                   <Link
-                    className="border-border-muted hover:bg-bg-secondary block border-b px-5 py-2 transition-colors"
+                    className="border-border/40 hover:bg-bg-secondary block border-b px-5 py-2 transition-colors"
                     onClick={onClose}
                     to={`/main/org/${orgSlug}/issues/${iss.id}`}
                   >

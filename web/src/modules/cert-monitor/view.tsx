@@ -74,7 +74,7 @@ export function CertMonitorView() {
       />
 
       <Card>
-        <header className="border-border-muted mb-3 flex items-baseline justify-between border-b pb-2">
+        <header className="border-border/40 mb-3 flex items-baseline justify-between border-b pb-2">
           <h2 className="text-fg text-[14px] font-semibold">Watched domains</h2>
           <span className="text-fg-muted font-mono text-[11px] tabular-nums">
             {domains.length} watched
@@ -118,7 +118,7 @@ export function CertMonitorView() {
         )}
 
         <form
-          className="border-border-muted mt-4 flex items-end gap-3 border-t pt-3"
+          className="border-border/40 mt-4 flex items-end gap-3 border-t pt-3"
           onSubmit={(e) => {
             e.preventDefault()
             if (canSubmit) addM.mutate(trimmed)
@@ -142,7 +142,7 @@ export function CertMonitorView() {
       </Card>
 
       <Card>
-        <header className="border-border-muted mb-3 flex items-baseline justify-between border-b pb-2">
+        <header className="border-border/40 mb-3 flex items-baseline justify-between border-b pb-2">
           <h2 className="text-fg text-[14px] font-semibold">Recent observations</h2>
           <span className="text-fg-muted font-mono text-[11px] tabular-nums">
             {observations.length} seen
@@ -165,7 +165,7 @@ export function CertMonitorView() {
         {observations.length > 0 && (
           <ul className="space-y-2">
             {observations.map((o) => (
-              <li className="border-border-muted border-b py-3 last:border-0" key={o.id}>
+              <li className="border-border/40 border-b py-3 last:border-0" key={o.id}>
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-fg font-mono text-[13px]">{o.domain}</span>
                   <span className="text-fg-muted font-mono text-[10px] tabular-nums">

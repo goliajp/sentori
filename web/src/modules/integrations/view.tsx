@@ -942,7 +942,7 @@ function TemplatesTab() {
       )}
 
       {templatesQ.isLoading && (
-        <ul className="divide-border-muted border-border divide-y border-y">
+        <ul className="divide-border/40 border-border divide-y border-y">
           {Array.from({ length: 3 }).map((_, i) => (
             <li className="px-2 py-3" key={i}>
               <div className="bg-fg-muted/10 h-4 w-1/2 animate-pulse rounded" />
@@ -962,7 +962,7 @@ function TemplatesTab() {
       )}
 
       {templatesQ.data && templatesQ.data.length > 0 && (
-        <ul className="divide-border-muted border-border divide-y border-y">
+        <ul className="divide-border/40 border-border divide-y border-y">
           {templatesQ.data.map((t) => (
             <li className="flex items-baseline gap-3 px-2 py-3" key={t.id}>
               <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">

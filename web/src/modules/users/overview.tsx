@@ -212,7 +212,7 @@ function BreakdownCard({ rows, title }: { rows: UsersOverviewBreakdownRow[]; tit
             return (
               <li
                 key={r.label}
-                className="border-border-muted flex items-baseline gap-3 border-b py-1.5 last:border-b-0"
+                className="border-border/40 flex items-baseline gap-3 border-b py-1.5 last:border-b-0"
               >
                 <span className="text-fg min-w-0 flex-1 truncate font-mono text-[12px]">
                   {r.label}

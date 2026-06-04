@@ -379,7 +379,7 @@ function KeyframeList({
             <li key={ts}>
               <button
                 aria-selected={active}
-                className={`border-border-muted block w-full border-b px-2.5 py-1.5 text-left transition-colors last:border-b-0 ${
+                className={`border-border/40 block w-full border-b px-2.5 py-1.5 text-left transition-colors last:border-b-0 ${
                   active ? 'bg-accent/10 text-fg' : 'text-fg-secondary hover:bg-bg-secondary'
                 }`}
                 onClick={() => onSeek(ts)}
