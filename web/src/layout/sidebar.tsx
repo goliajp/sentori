@@ -1,22 +1,24 @@
+import { Tooltip } from '@goliapkg/gds'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 
 import type { OrgRow, ProjectRow } from '@/api/client'
 import type { ModuleDef } from '@/modules/registry'
 
-import { useOrg } from '@/auth/orgContext'
 import { useAuth } from '@/auth/state'
+import { useOrg } from '@/auth/orgContext'
 import { GROUPS, modulesInGroup, PINNED_MODULE } from '@/modules/registry'
 
 /**
- * Lens-grouped nav rail. Five lenses answer five operator questions:
- * "what broke?" / "what's slow?" / "who's affected?" / "is the platform
- * safe?" / "setup & admin". Overview is pinned above the lens groups
- * so the most common entry point is one click from the top.
+ * Lens-grouped sidebar — composes GDS depth tokens (`gds-pad`,
+ * `gds-h-sm`) so the rail follows the active density axis. Five
+ * lens sections answer five operator questions ("what broke / slow
+ * / who's affected / safe / setup"); Overview is pinned above.
  *
- * Visuals follow GDS semantic tokens (bg-bg-secondary rail, border-
- * border hairlines, accent strip on active row). Density is controlled
- * by the 5-axis theme — Sentori boots `compact` so the rail reads
- * Bloomberg-style tight without per-class overrides.
+ * Per-module rendering uses react-router `<Link>` for SPA nav (GDS
+ * `SidebarItem` would force a page-load anchor). Active state is
+ * a 2px accent strip on the left edge — matches the GDS bench
+ * `tbody tr.selected` treatment so navigation feels of-a-piece
+ * with the data surfaces it routes to.
  */
 export function Sidebar() {
   const { currentOrg, currentProject, orgs, projects } = useOrg()
@@ -33,7 +35,7 @@ export function Sidebar() {
         projects={projects}
       />
 
-      <div className="flex-1 overflow-y-auto py-2">
+      <nav aria-label="Module navigation" className="flex-1 overflow-y-auto py-2">
         <Section>
           <SideLink module={PINNED_MODULE} orgSlug={currentOrg.slug} />
         </Section>
@@ -50,45 +52,45 @@ export function Sidebar() {
           )
         })}
 
-        {/* Instance-wide superadmin link — only for users with
-         *  `is_superadmin = TRUE` on their row. Rendered with the
-         *  accent color so it reads as "out-of-band power" rather
-         *  than just another module. */}
         {user?.isSuperadmin && (
           <Section title="Operator">
             <Link
-              className="text-accent hover:bg-bg-tertiary group relative block py-1.5 pr-3 pl-4 transition-colors"
+              className="text-accent hover:bg-bg-tertiary group gds-h-sm gds-pad-x relative flex items-center gap-2.5 text-[13px] transition-colors"
               to="/main/superadmin"
             >
               <span aria-hidden className="absolute top-0 bottom-0 left-0 w-[2px] bg-transparent" />
-              <span className="flex items-center gap-2.5 text-[13px]">
-                <svg
-                  aria-hidden
-                  className="h-3.5 w-3.5 shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.5"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M12 2 4 6v6c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6Z" />
-                </svg>
-                <span className="truncate">Superadmin</span>
-              </span>
+              <ShieldIcon />
+              <span className="truncate">Superadmin</span>
             </Link>
           </Section>
         )}
-      </div>
+      </nav>
 
       <FooterStrip />
     </aside>
   )
 }
 
+function ShieldIcon() {
+  return (
+    <svg
+      aria-hidden
+      className="h-3.5 w-3.5 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.5"
+      viewBox="0 0 24 24"
+    >
+      <path d="M12 2 4 6v6c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6Z" />
+    </svg>
+  )
+}
+
 function FooterStrip() {
   return (
-    <div className="border-border bg-bg-tertiary border-t px-4 py-2.5">
+    <div className="border-border bg-bg-tertiary gds-pad-x border-t py-2.5">
       <div className="flex items-center justify-between font-mono text-[10px] tracking-[0.18em] uppercase">
         <a
           className="text-fg-muted hover:text-accent transition-colors"
@@ -112,10 +114,10 @@ function FooterStrip() {
 }
 
 /**
- * Top-of-sidebar context — answers "what am I looking at?" before the
- * user even reads a module label. Two rows (org / project), each a
- * native <select> when there are ≥ 2 entries, otherwise a static
- * label. The trailing `+` button creates a new org / project.
+ * Org / project selectors at the top of the rail. Native `<select>`
+ * elements keep keyboard nav (Tab + arrow keys) and screen-reader
+ * support for free; styling sits on the wrapping div so the rail's
+ * density (`gds-pad`) governs the row size.
  */
 function ContextBlock({
   canCreateProject,
@@ -139,8 +141,6 @@ function ContextBlock({
     navigate(`/main/org/${slug}/overview`)
   }
 
-  // Switch project by mutating ?project= only — keeps the current page
-  // (Issues / Vitals / …) so users don't get yanked back to Overview.
   const switchProject = (projectId: string) => {
     const next = new URLSearchParams(searchParams)
     next.set('project', projectId)
@@ -153,7 +153,7 @@ function ContextBlock({
   void location
 
   return (
-    <div className="border-border bg-bg-tertiary border-b px-4 pt-3.5 pb-3">
+    <div className="border-border bg-bg-tertiary gds-pad-x border-b pt-3.5 pb-3">
       <ContextRow
         label="org"
         meta={
@@ -211,25 +211,27 @@ function ContextBlock({
 
 function PlusButton({ onClick, title }: { onClick: () => void; title: string }) {
   return (
-    <button
-      aria-label={title}
-      className="text-fg-muted hover:bg-bg hover:text-accent flex h-5 w-5 shrink-0 items-center justify-center transition-colors"
-      onClick={onClick}
-      title={title}
-      type="button"
-    >
-      <svg
-        aria-hidden
-        className="h-3 w-3"
-        fill="none"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.6"
-        viewBox="0 0 24 24"
+    <Tooltip content={title} placement="bottom">
+      <button
+        aria-label={title}
+        className="text-fg-muted hover:bg-bg hover:text-accent flex h-5 w-5 shrink-0 items-center justify-center transition-colors"
+        onClick={onClick}
+        title={title}
+        type="button"
       >
-        <path d="M12 5v14M5 12h14" />
-      </svg>
-    </button>
+        <svg
+          aria-hidden
+          className="h-3 w-3"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeWidth="1.6"
+          viewBox="0 0 24 24"
+        >
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </button>
+    </Tooltip>
   )
 }
 
@@ -264,7 +266,7 @@ function Section({ children, title }: { children: React.ReactNode; title?: strin
   return (
     <div className="mb-1 last:mb-0">
       {title && (
-        <div className="border-border-muted border-t px-4 pt-5 pb-2">
+        <div className="border-border-muted gds-pad-x border-t pt-5 pb-2">
           <span className="text-fg-muted font-mono text-[10px] tracking-[0.22em] uppercase">
             {title}
           </span>
@@ -281,7 +283,7 @@ function SideLink({ module, orgSlug }: { module: ModuleDef; orgSlug: string }) {
   const active = location.pathname === target || location.pathname.startsWith(`${target}/`)
   return (
     <Link
-      className={`group relative block py-1.5 pr-3 pl-4 transition-colors ${
+      className={`group gds-h-sm gds-pad-x relative flex items-center gap-2.5 text-[13px] transition-colors ${
         active ? 'bg-bg-tertiary text-fg' : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
       }`}
       to={target}
@@ -290,10 +292,8 @@ function SideLink({ module, orgSlug }: { module: ModuleDef; orgSlug: string }) {
         aria-hidden
         className={`absolute top-0 bottom-0 left-0 w-[2px] ${active ? 'bg-accent' : 'bg-transparent'}`}
       />
-      <span className="flex items-center gap-2.5 text-[13px]">
-        <NavIcon path={module.iconPath} active={active} />
-        <span className="truncate">{module.label}</span>
-      </span>
+      <NavIcon path={module.iconPath} active={active} />
+      <span className="truncate">{module.label}</span>
     </Link>
   )
 }

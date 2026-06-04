@@ -20,23 +20,24 @@ import { VerifyBanner } from '@/components/verify-banner'
 import { Sidebar } from './sidebar'
 
 /**
- * Five-piece shell — same physical layout as before (top bar, sidebar
- * + main, status bar) but driven by GDS tokens and theme runtime
- * instead of the editorial paper/tora palette.
+ * Sentori shell — GDS-idiomatic layout.
  *
- *   TopBar   (h-12, logo + cmd-k trigger + theme + notifications + account)
- *   Sidebar  (lens-grouped) | <Outlet />
- *   StatusBar (h-8)
+ *   skip-nav
+ *   verify-banner (host email unverified)
+ *   ┌─ NavBar ──────────────────────────────────────────────────┐
+ *   │  SENTORI ● v1.x       search ⌘K        🔔 ☀/◐/☾ avatar    │
+ *   ├─ Sidebar ──┬─ main (gds-pad, density-aware) ──────────────┤
+ *   │  context   │                                              │
+ *   │  Overview  │       <Outlet />                             │
+ *   │  Find Bug  │                                              │
+ *   │  …         │                                              │
+ *   └────────────┴──────────────────────────────────────────────┘
+ *   StatusBar (GDS StatusBarComponent — version · ingest · clock)
  *
- * GDS theme runtime is installed here (root of the dashboard tree):
- *   - useThemeEffect()   syncs themeAtom → CSS vars on every change
- *   - useFonts()         loads GDS default fonts (Lexend / Inter / Mono)
- *   - mount-time defaults — only fired on first visit (no persisted
- *     theme), so users who toggled dark/light keep their choice.
- *
- * The pre-render in main.tsx already painted the initial CSS vars so
- * this component mounts without a FOUC; useThemeEffect() then takes
- * over for reactive updates when the ThemeToggle fires.
+ * Theme: GDS owns colors, spacing, density. AppShell mounts the
+ * runtime (useThemeEffect + useFonts) and primes first-visit
+ * defaults (mode=system, density=compact). Persisted user choices
+ * always win on subsequent loads.
  */
 export function AppShell() {
   useThemeEffect()
@@ -56,12 +57,12 @@ export function AppShell() {
       <a className="skip-to-content" href="#sentori-main">
         Skip to content
       </a>
-      <TopBar />
       <VerifyBanner />
+      <NavBar />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <main className="min-w-0 flex-1 overflow-y-auto" id="sentori-main">
-          <div className="h-full min-h-0 px-4 py-3">
+        <main className="bg-bg min-w-0 flex-1 overflow-y-auto" id="sentori-main">
+          <div className="gds-pad h-full min-h-0">
             <Outlet />
           </div>
         </main>
@@ -74,14 +75,14 @@ export function AppShell() {
 }
 
 /**
- * Top app bar — three-column grid (1fr / auto / 1fr) so the CmdK
- * trigger always sits at geometric center regardless of side-slot
- * widths. Wordmark stays as a plain text logo with a single accent
- * dot — GDS provides no built-in branding component.
+ * Top NavBar — three-column grid (brand / search / actions). Brand
+ * left, CmdK trigger centered, actions (notifications + theme +
+ * account) right-aligned. Sits flush against the viewport edge with
+ * a bottom hairline; no sticky behaviour (the body owns scroll).
  */
-function TopBar() {
+function NavBar() {
   return (
-    <header className="bg-bg-secondary border-border grid h-12 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 border-b px-5">
+    <header className="bg-bg-secondary border-border gds-h-lg grid grid-cols-[1fr_auto_1fr] items-center gap-4 border-b px-5">
       <Link className="justify-self-start" to="/" aria-label="Sentori — home">
         <span className="text-fg text-[15px] font-semibold tracking-[0.22em] uppercase">
           SENTORI
@@ -93,7 +94,7 @@ function TopBar() {
       </Link>
 
       <button
-        className="bg-bg border-border text-fg-muted hover:border-border-strong hover:text-fg flex w-[min(30rem,42vw)] items-center gap-3 border px-3 py-1.5 transition-colors"
+        className="bg-bg border-border text-fg-muted hover:border-border-strong hover:text-fg gds-h-sm gds-pad-x-sm flex w-[min(30rem,42vw)] items-center gap-3 border transition-colors"
         onClick={openCmdKPalette}
         type="button"
       >
@@ -105,7 +106,7 @@ function TopBar() {
         </span>
       </button>
 
-      <div className="flex items-center gap-3 justify-self-end">
+      <div className="flex items-center gap-2 justify-self-end">
         <NotificationBell />
         <ModeToggle />
         <AccountMenu />
@@ -116,11 +117,8 @@ function TopBar() {
 
 /**
  * Three-mode theme switcher (light / system / dark). GDS ships a
- * built-in `<ThemeToggle>` but it only supports dark↔light — Sentori
- * exposes the third `system` option so users on OS-level auto-dark
- * can keep their dashboard following the OS. Built with GDS
- * `<ToggleGroup exclusive>` so visuals/density inherit from the
- * theme axes automatically.
+ * 2-mode ThemeToggle; this wrapper preserves the `system` axis
+ * value by going through ToggleGroup directly.
  */
 const MODE_ITEMS: { value: ThemeMode; label: React.ReactNode }[] = [
   { value: 'light', label: <ModeIcon kind="light" /> },
@@ -176,7 +174,6 @@ function ModeIcon({ kind }: { kind: 'light' | 'system' | 'dark' }) {
   )
 }
 
-/** Synthesize Cmd+K so the self-contained <CmdK /> palette opens. */
 function openCmdKPalette(): void {
   window.dispatchEvent(
     new KeyboardEvent('keydown', {
