@@ -47,7 +47,11 @@ export function AppShell() {
   const setDensity = useSetThemeDensity()
   useEffect(() => {
     if (loadPersistedTheme() === null) {
-      setMode('system')
+      // First-time visitors land on dark + compact. See main.tsx for
+      // the rationale (GDS is dark-native; light mode is the
+      // derived-adaptation surface; marketing + main site default
+      // dark too).
+      setMode('dark')
       setDensity('compact')
     }
   }, [setMode, setDensity])

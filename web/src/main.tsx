@@ -65,10 +65,17 @@ const sentoriConfig = {
 // `useThemeEffect()` (inside <AppShell>) takes over for reactive
 // updates when the user toggles theme later.
 {
-  // Sentori first-time default = system mode + compact density. Once
-  // the user touches the ThemeToggle, persistTheme() writes their
-  // choice back and loadPersistedTheme() takes over.
-  const saved = loadPersistedTheme() ?? { ...DEFAULT_THEME, mode: 'system', density: 'compact' }
+  // Sentori first-time default = dark mode + compact density. GDS is
+  // dark-native (one of its ten design principles — light mode is a
+  // derived adaptation), and 30+ minutes staring at a data-dense
+  // dashboard in light mode is tangibly more tiring than dark, even
+  // though both technically render correctly. Marketing
+  // (sentori.golia.jp) and golia.jp main site also default dark, so
+  // the cross-surface experience stays consistent. Users who prefer
+  // light or system can flip via the ModeToggle in the top nav; the
+  // choice persists via persistTheme() and overrides this default on
+  // every subsequent visit.
+  const saved = loadPersistedTheme() ?? { ...DEFAULT_THEME, mode: 'dark', density: 'compact' }
   const mode =
     saved.mode === 'system'
       ? window.matchMedia('(prefers-color-scheme: dark)').matches
