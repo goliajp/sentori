@@ -1,21 +1,29 @@
-// v0.9.2 +S6 — Privacy Lab dashboard.
-//
-// Score + risk + leak breakdown at top; "top leaking surfaces" middle;
-// recent findings tail. One-click "add mask rule" deferred to v1.0
-// (needs a server-side scrubber config endpoint we don't have yet).
-
+import { Alert, Card, DataTable, EmptyState, PageHeader } from '@goliapkg/gds'
 import { useQuery } from '@tanstack/react-query'
 
 import { adminApi } from '@/api/client'
-import { EmptyState } from '@/components/Hint'
-import { SubSection } from '@/components/SubSection'
-import { useOrg } from '@/auth/orgContext'
-import { PageHeader } from '@/layout/page-header'
-import { formatRelative } from '@/lib/format'
 import { qk } from '@/api/query-keys'
+import { useOrg } from '@/auth/orgContext'
+import { formatRelative } from '@/lib/format'
 
+type TopField = { fieldPath: string; kind: string; count: number }
+type Finding = {
+  id: string
+  seenAt: string
+  release: string
+  fieldPath: string
+  patternKind: string
+  sample: string
+}
+
+/**
+ * Privacy Lab — score + risk strip on top, top leaking surfaces +
+ * recent findings as stacked DataTables underneath. Score / risk /
+ * leak count live in three GDS Cards (the score Card colors itself
+ * by risk tier).
+ */
 export function PrivacyView() {
-  const { currentProject } = useOrg()
+  const { currentOrg, currentProject } = useOrg()
   const projectId = currentProject?.id ?? null
 
   const scoreQ = useQuery({
@@ -30,7 +38,8 @@ export function PrivacyView() {
   })
 
   const score = scoreQ.data
-  const findings = findingsQ.data ?? []
+  const findings = (findingsQ.data ?? []) as Finding[]
+  const topFields = (score?.topFields ?? []) as TopField[]
 
   const riskTone: Record<string, string> = {
     high: 'text-danger',
@@ -39,121 +48,196 @@ export function PrivacyView() {
   }
 
   return (
-    <div className="sentori-page-in">
+    <div className="space-y-4">
       <PageHeader
-        subtitle={score?.release ? `release · ${score.release}` : 'per-release scan'}
+        breadcrumb={[
+          { label: 'sentori', href: '/main' },
+          {
+            label: currentOrg.name ?? currentOrg.slug,
+            href: `/main/org/${currentOrg.slug}/overview`,
+          },
+          { label: 'privacy' },
+        ]}
+        subtitle={score?.release ? `Per-release scan · ${score.release}` : 'per-release scan'}
         title="Privacy"
       />
 
-      {scoreQ.isLoading && <EmptyState>Computing score for the most-recent release…</EmptyState>}
       {(scoreQ.isError || findingsQ.isError) && (
-        <EmptyState danger>Failed to load privacy data. Refresh to retry.</EmptyState>
+        <Alert title="Failed to load privacy data" variant="danger">
+          Refresh to retry.
+        </Alert>
+      )}
+
+      {scoreQ.isLoading && !score && (
+        <Card>
+          <EmptyState description="Computing score for the most-recent release…" title="Loading" />
+        </Card>
       )}
 
       {score && (
-        <div className="rule-grid grid-cols-1 sm:grid-cols-3">
-          <ScoreCell label="release">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <ScoreCard label="release">
             <span className="text-fg font-mono text-[18px]">{score.release}</span>
-          </ScoreCell>
-          <ScoreCell label="score">
+          </ScoreCard>
+          <ScoreCard label="score">
             <div className={`tabular-nums ${riskTone[score.risk] ?? 'text-fg'}`}>
-              {score.score}
-              <span className="text-fg-muted ml-1 text-[20px]">/100</span>
+              <span className="text-[28px] font-semibold">{score.score}</span>
+              <span className="text-fg-muted ml-1 text-[16px]">/100</span>
             </div>
             <div
-              className={`mt-1.5 font-mono text-[11px] tracking-[0.2em] uppercase ${
+              className={`mt-1 font-mono text-[10px] tracking-[0.2em] uppercase ${
                 riskTone[score.risk] ?? 'text-fg-muted'
               }`}
             >
               {score.risk} risk
             </div>
-          </ScoreCell>
-          <ScoreCell label="leaks">
+          </ScoreCard>
+          <ScoreCard label="leaks">
             <div className="text-fg tabular-nums">
-              {score.leakingEvents.toLocaleString()}
-              <span className="text-fg-muted"> / {score.totalEvents.toLocaleString()}</span>
+              <span className="text-[24px] font-semibold">
+                {score.leakingEvents.toLocaleString()}
+              </span>
+              <span className="text-fg-muted text-[14px]">
+                {' '}
+                / {score.totalEvents.toLocaleString()}
+              </span>
             </div>
-            <div className="text-fg-muted mt-1.5 font-mono text-[11px] tracking-[0.05em]">
+            <div className="text-fg-muted mt-1 font-mono text-[10px]">
               {Object.entries(score.leaksByKind)
                 .map(([k, v]) => `${k}=${v}`)
                 .join(' · ') || '—'}
             </div>
-          </ScoreCell>
+          </ScoreCard>
         </div>
       )}
 
-      <SubSection sub={`${score?.topFields.length ?? 0} surfaces`} title="Top leaking surfaces">
-        {!score || score.topFields.length === 0 ? (
-          <EmptyState>No leaks observed in the current release. Good.</EmptyState>
+      <Card>
+        <header className="border-border-muted mb-3 flex items-baseline justify-between border-b pb-2">
+          <h2 className="text-fg text-[14px] font-semibold">Top leaking surfaces</h2>
+          <span className="text-fg-muted font-mono text-[11px] tabular-nums">
+            {topFields.length} surfaces
+          </span>
+        </header>
+        {topFields.length === 0 ? (
+          <EmptyState
+            description="No leaks observed in the current release. Good."
+            title="All clear"
+          />
         ) : (
-          <table className="bench">
-            <thead>
-              <tr>
-                <th>field</th>
-                <th>kind</th>
-                <th className="num">occurrences</th>
-              </tr>
-            </thead>
-            <tbody>
-              {score.topFields.map((f, i) => (
-                <tr key={`${f.fieldPath}-${f.kind}-${i}`}>
-                  <td className="lead">{f.fieldPath}</td>
-                  <td>{f.kind}</td>
-                  <td className="num">{f.count.toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable<TopField>
+            columns={[
+              {
+                key: 'fieldPath',
+                label: 'Field',
+                render: (_v, f) => (
+                  <span className="text-fg font-mono text-[12px]">{f.fieldPath}</span>
+                ),
+              },
+              {
+                key: 'kind',
+                label: 'Kind',
+                width: '160px',
+                render: (_v, f) => (
+                  <span className="text-fg-secondary font-mono text-[12px]">{f.kind}</span>
+                ),
+              },
+              {
+                align: 'right',
+                key: 'count',
+                label: 'Occurrences',
+                sortable: true,
+                width: '130px',
+                render: (_v, f) => (
+                  <span className="text-fg font-mono text-[12px] tabular-nums">
+                    {f.count.toLocaleString()}
+                  </span>
+                ),
+              },
+            ]}
+            density="compact"
+            rowKey={(f) => `${f.fieldPath}-${f.kind}`}
+            rows={topFields}
+            striped
+          />
         )}
-      </SubSection>
+      </Card>
 
-      <SubSection sub="50 most recent" title="Recent findings">
+      <Card>
+        <header className="border-border-muted mb-3 flex items-baseline justify-between border-b pb-2">
+          <h2 className="text-fg text-[14px] font-semibold">Recent findings</h2>
+          <span className="text-fg-muted font-mono text-[11px] tabular-nums">50 most recent</span>
+        </header>
         {findings.length === 0 ? (
-          <EmptyState>No findings yet.</EmptyState>
+          <EmptyState
+            description="Privacy patterns surface here as the scan picks them up."
+            title="No findings yet"
+          />
         ) : (
-          <table className="bench">
-            <thead>
-              <tr>
-                <th>seen</th>
-                <th>release</th>
-                <th>field</th>
-                <th>kind</th>
-                <th>sample</th>
-              </tr>
-            </thead>
-            <tbody>
-              {findings.map((f) => (
-                <tr key={f.id}>
-                  <td className="num">{formatRelative(f.seenAt)}</td>
-                  <td>{f.release}</td>
-                  <td className="lead">{f.fieldPath}</td>
-                  <td>{f.patternKind}</td>
-                  <td className="text-fg-secondary max-w-[40ch] truncate">{f.sample}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable<Finding>
+            columns={[
+              {
+                key: 'seenAt',
+                label: 'Seen',
+                width: '130px',
+                render: (_v, f) => (
+                  <span className="text-fg-muted font-mono text-[11px] tabular-nums">
+                    {formatRelative(f.seenAt)}
+                  </span>
+                ),
+              },
+              {
+                key: 'release',
+                label: 'Release',
+                width: '140px',
+                render: (_v, f) => (
+                  <span className="text-fg-muted font-mono text-[11px]">{f.release}</span>
+                ),
+              },
+              {
+                key: 'fieldPath',
+                label: 'Field',
+                render: (_v, f) => (
+                  <span className="text-fg font-mono text-[12px]">{f.fieldPath}</span>
+                ),
+              },
+              {
+                key: 'patternKind',
+                label: 'Kind',
+                width: '120px',
+                render: (_v, f) => (
+                  <span className="text-fg-secondary font-mono text-[11px]">{f.patternKind}</span>
+                ),
+              },
+              {
+                key: 'sample',
+                label: 'Sample',
+                render: (_v, f) => (
+                  <span className="text-fg-secondary max-w-[40ch] truncate text-[12px]">
+                    {f.sample}
+                  </span>
+                ),
+              },
+            ]}
+            density="compact"
+            rowKey="id"
+            rows={findings}
+            striped
+          />
         )}
-      </SubSection>
+      </Card>
     </div>
   )
 }
 
-function ScoreCell({ children, label }: { children: React.ReactNode; label: string }) {
+function ScoreCard({ children, label }: { children: React.ReactNode; label: string }) {
   return (
-    <div className="rule-cell">
-      <div className="t-tag">{label}</div>
-      <div
-        className="text-fg mt-3"
-        style={{
-          fontVariationSettings: "'wdth' 100, 'opsz' 48, 'wght' 550",
-          fontSize: '32px',
-          letterSpacing: '-0.016em',
-          lineHeight: 1.05,
-        }}
-      >
-        {children}
+    <Card>
+      <div className="flex flex-col gap-2">
+        <span className="text-fg-muted font-mono text-[10px] tracking-[0.22em] uppercase">
+          {label}
+        </span>
+        <div>{children}</div>
       </div>
-    </div>
+    </Card>
   )
 }
