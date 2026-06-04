@@ -86,7 +86,7 @@ export function LiveDebugView() {
   const connected = status === 'connected'
 
   return (
-    <div className="sentori-page-in">
+    <div className="">
       <PageHeader
         actions={
           <span

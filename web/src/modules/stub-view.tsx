@@ -8,7 +8,7 @@ export function StubView() {
   const last = pathname.replace(/\/$/, '').split('/').pop() ?? 'view'
   const title = last.charAt(0).toUpperCase() + last.slice(1)
   return (
-    <div className="sentori-page-in">
+    <div className="">
       <PageHeader subtitle="not yet implemented" title={title} />
       <div className="border-border border-y px-4 py-10 text-center">
         <div className="text-accent mb-1.5 font-mono text-[10px] tracking-[0.22em] uppercase">

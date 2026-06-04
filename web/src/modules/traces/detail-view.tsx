@@ -50,7 +50,7 @@ export function TraceDetailView() {
   const trace = data?.trace
 
   return (
-    <div className="sentori-page-in space-y-4">
+    <div className="space-y-4">
       <Link
         className="text-fg-muted hover:text-accent inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.08em] uppercase transition-colors"
         to={`/main/org/${currentOrg.slug}/traces`}

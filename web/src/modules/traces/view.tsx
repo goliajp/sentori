@@ -28,7 +28,7 @@ function TraceList() {
   const traces = data?.traces ?? []
 
   return (
-    <div className="sentori-page-in space-y-5">
+    <div className="space-y-5">
       <PageHeader
         count={traces.length}
         subtitle="Distributed root spans · last 24h"

@@ -54,7 +54,7 @@ export function UserDetailView() {
 
   if (!looksValid) {
     return (
-      <div className="sentori-page-in">
+      <div className="">
         <PageHeader subtitle="malformed fingerprint" title="User detail" />
         <Hint danger>
           Fingerprint segment must be 64-char lowercase hex. Got
@@ -70,7 +70,7 @@ export function UserDetailView() {
   }
   if (isLoading && !data) {
     return (
-      <div className="sentori-page-in">
+      <div className="">
         <PageHeader subtitle={short(fingerprintHex)} title="User detail" />
         <Hint>Loading fingerprint detail…</Hint>
       </div>
@@ -78,7 +78,7 @@ export function UserDetailView() {
   }
   if (error) {
     return (
-      <div className="sentori-page-in">
+      <div className="">
         <PageHeader subtitle={short(fingerprintHex)} title="User detail" />
         <Hint danger>Failed to load fingerprint detail.</Hint>
       </div>
@@ -96,7 +96,7 @@ export function UserDetailView() {
   const distinctProjects = data.hits.length
 
   return (
-    <div className="sentori-page-in">
+    <div className="">
       <PageHeader subtitle={short(fingerprintHex)} title="User detail" />
 
       <div className="text-fg-muted mb-4 flex flex-wrap items-baseline gap-3 font-mono text-[11px]">

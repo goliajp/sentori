@@ -62,7 +62,7 @@ export function ProjectIntegrationView() {
 
   if (!projectId) {
     return (
-      <div className="sentori-page-in">
+      <div className="">
         <PageHeader subtitle="install · ingest tokens" title="Integrate" />
         <p className="border-border text-fg-secondary border-y py-4 text-[13px]">
           Pick a project in the sidebar to mint an ingest token and grab the SDK quickstart snippet.
@@ -72,7 +72,7 @@ export function ProjectIntegrationView() {
   }
 
   return (
-    <div className="sentori-page-in">
+    <div className="">
       <PageHeader subtitle={`${project?.name ?? '—'} · ${currentOrg.slug}`} title="Integrate" />
 
       <section>
