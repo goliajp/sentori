@@ -1,11 +1,12 @@
+import { Alert, Button, Card, Input } from '@goliapkg/gds'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 
 import { userAuthApi } from '@/api/client'
 import { useAuth } from '@/auth/state'
-import { SENTORI_VERSION } from '@/version'
 import { qk } from '@/api/query-keys'
+import { SENTORI_VERSION } from '@/version'
 
 export function LoginView() {
   const { isAuthed, login } = useAuth()
@@ -17,11 +18,6 @@ export function LoginView() {
   const [err, setErr] = useState<null | string>(null)
 
   if (isAuthed) {
-    // v2.4 — post-login destination is the dashboard (`/main`), not
-    // the marketing landing at `/`. `location.state.from` survives
-    // a ProtectedLayout-triggered redirect (e.g. a deep-link to
-    // `/main/org/foo/issues` while logged out → bounced to /login
-    // with from=that path → after login, returned there).
     const to = (location.state as { from?: string } | null)?.from ?? '/main'
     return <Navigate replace to={to} />
   }
@@ -69,43 +65,21 @@ export function LoginView() {
 }
 
 /**
- * Editorial auth-page shell. Paper page + centered column, wordmark
- * + accent terminal dot + version micro-tag floating above a single
- * hairline-bracketed content strip. No card, no rounded chrome —
- * matches the dashboard's rule-grid lexicon.
- *
- *   SENTORI ·  ← wordmark with tora-orange dot
- *   v1.0.0     ← mono micro-tag
- *
- *   ── SIGN IN ────────────  ← top hairline + caps title
- *   <content>
- *   ───────────────────────  ← bottom hairline
- *   create account · forgot
+ * Centered auth shell — sentori wordmark + version pin above a GDS
+ * `Card` housing the form. Replaces the hand-rolled border-y strip
+ * with a proper card composition so the auth surface inherits the
+ * same depth + density rules as the dashboard.
  */
 export function AuthShell({ children, title }: { children: React.ReactNode; title: string }) {
   return (
     <div className="bg-bg flex min-h-full items-center justify-center px-4 py-12">
-      <div className="w-full max-w-[360px]">
-        <div className="mb-7 flex items-baseline justify-center gap-2">
-          <span
-            className="text-fg uppercase"
-            style={{
-              fontVariationSettings: "'wdth' 95, 'opsz' 48, 'wght' 600",
-              fontSize: '18px',
-              letterSpacing: '0.24em',
-            }}
-          >
+      <div className="w-full max-w-[380px]">
+        <div className="mb-6 flex items-baseline justify-center gap-2">
+          <span className="text-fg text-[18px] font-semibold tracking-[0.24em] uppercase">
             SENTORI
             <span
               aria-hidden
-              className="ml-1.5 inline-block"
-              style={{
-                background: 'var(--color-accent)',
-                borderRadius: '50%',
-                height: '6px',
-                transform: 'translateY(-2px)',
-                width: '6px',
-              }}
+              className="bg-accent ml-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle"
             />
           </span>
           <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
@@ -113,28 +87,27 @@ export function AuthShell({ children, title }: { children: React.ReactNode; titl
           </span>
         </div>
 
-        <div className="border-border border-y">
-          <header className="flex items-baseline gap-3 px-px py-2.5">
+        <Card>
+          <header className="border-border-muted mb-4 flex items-baseline gap-3 border-b pb-3">
             <span className="text-accent font-mono text-[10px] tracking-[0.22em] uppercase">·</span>
-            <h2
-              className="text-fg"
-              style={{
-                fontSize: '11px',
-                fontWeight: 500,
-                letterSpacing: '0.22em',
-                textTransform: 'uppercase',
-              }}
-            >
+            <h2 className="text-fg font-mono text-[11px] font-medium tracking-[0.22em] uppercase">
               {title}
             </h2>
           </header>
-          <div className="border-border-muted border-t px-px py-5">{children}</div>
-        </div>
+          {children}
+        </Card>
       </div>
     </div>
   )
 }
 
+/**
+ * Form field — preserves the implicit `<label><span>…</span><input/></label>`
+ * wrapping pattern (playwright e2e relies on `getByLabel('email')` /
+ * `getByLabel('password')` which only matches implicit / explicit
+ * `for/id`-paired labels). The Input is GDS so it gets density-aware
+ * sizing, focus ring, error state, etc. for free.
+ */
 export function Field({
   autoComplete,
   label,
@@ -153,9 +126,9 @@ export function Field({
       <span className="text-fg-muted mb-1 block font-mono text-[10px] tracking-[0.18em] uppercase">
         {label}
       </span>
-      <input
+      <Input
         autoComplete={autoComplete}
-        className="border-border bg-bg-secondary text-fg focus:border-accent h-9 w-full border px-2.5 text-[13px] outline-none"
+        inputSize="default"
         onChange={(e) => onChange(e.target.value)}
         required
         type={type}
@@ -175,24 +148,25 @@ export function PrimaryButton({
   disabled?: boolean
 }) {
   return (
-    <button
-      className="bg-accent text-bg mt-1 inline-flex h-9 w-full items-center justify-center px-3 font-mono text-[11px] tracking-[0.12em] uppercase transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-      disabled={busy || disabled}
+    <Button
+      className="mt-1 w-full"
+      disabled={disabled}
+      loading={busy}
       type="submit"
+      variant="primary"
     >
       {children}
-    </button>
+    </Button>
   )
 }
 
 export function AuthError({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      aria-live="polite"
-      className="border-danger/30 bg-danger/15 text-danger border px-2.5 py-1.5 font-mono text-[11px]"
-    >
-      {children}
-    </div>
+    <Alert variant="danger">
+      <span aria-live="polite" className="font-mono text-[11px]">
+        {children}
+      </span>
+    </Alert>
   )
 }
 
@@ -205,14 +179,9 @@ export function FooterLinks({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * OAuth provider buttons — Google + GitHub. Polls
- * `/auth/oauth/providers` to see which the server has env-vars for,
- * hides the rest. When neither is configured the whole block is
- * suppressed (no awkward divider over an empty list).
- *
- * Style matches the editorial form: paper-2 fill with a hairline
- * border, mono-cap label, hover ramps to ink-soft border. No rounded
- * corners — the rest of the page is square.
+ * OAuth provider buttons — Google + GitHub. Each renders as a GDS
+ * `Button variant="secondary"` with the provider icon; the divider
+ * row underneath uses a single muted border line.
  */
 export function OAuthButtons() {
   const providersQ = useQuery({
@@ -228,19 +197,17 @@ export function OAuthButtons() {
   return (
     <div className="mb-5 space-y-2">
       {providers.github && (
-        <a
-          className="border-border bg-bg-secondary text-fg hover:border-fg-secondary flex h-9 w-full items-center justify-center gap-2 border px-3 text-[13px] transition-colors"
-          href="/api/auth/oauth/github/start"
-        >
-          <GitHubGlyph /> Continue with GitHub
+        <a className="block" href="/api/auth/oauth/github/start">
+          <Button className="w-full" icon={<GitHubGlyph />} variant="secondary">
+            Continue with GitHub
+          </Button>
         </a>
       )}
       {providers.google && (
-        <a
-          className="border-border bg-bg-secondary text-fg hover:border-fg-secondary flex h-9 w-full items-center justify-center gap-2 border px-3 text-[13px] transition-colors"
-          href="/api/auth/oauth/google/start"
-        >
-          <GoogleGlyph /> Continue with Google
+        <a className="block" href="/api/auth/oauth/google/start">
+          <Button className="w-full" icon={<GoogleGlyph />} variant="secondary">
+            Continue with Google
+          </Button>
         </a>
       )}
       <div className="text-fg-muted relative my-3 flex items-center gap-2 font-mono text-[10px] tracking-[0.22em] uppercase">
