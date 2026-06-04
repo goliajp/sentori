@@ -19,7 +19,7 @@
 export function Hint({ children, danger }: { children: React.ReactNode; danger?: boolean }) {
   return (
     <p
-      className={`border-border border-y py-4 text-[13px] ${
+      className={`border-border/40 border-y py-4 text-[13px] ${
         danger ? 'text-danger' : 'text-fg-secondary'
       }`}
     >
@@ -31,7 +31,7 @@ export function Hint({ children, danger }: { children: React.ReactNode; danger?:
 export function EmptyState({ children, danger }: { children: React.ReactNode; danger?: boolean }) {
   return (
     <p
-      className={`border-border border-y py-6 text-center text-[13px] ${
+      className={`border-border/40 border-y py-6 text-center text-[13px] ${
         danger ? 'text-danger' : 'text-fg-secondary'
       }`}
     >

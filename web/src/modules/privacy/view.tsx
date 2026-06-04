@@ -112,7 +112,7 @@ export function PrivacyView() {
       )}
 
       <Card>
-        <header className="border-border-muted mb-3 flex items-baseline justify-between border-b pb-2">
+        <header className="border-border/40 mb-3 flex items-baseline justify-between border-b pb-2">
           <h2 className="text-fg text-[14px] font-semibold">Top leaking surfaces</h2>
           <span className="text-fg-muted font-mono text-[11px] tabular-nums">
             {topFields.length} surfaces
@@ -163,7 +163,7 @@ export function PrivacyView() {
       </Card>
 
       <Card>
-        <header className="border-border-muted mb-3 flex items-baseline justify-between border-b pb-2">
+        <header className="border-border/40 mb-3 flex items-baseline justify-between border-b pb-2">
           <h2 className="text-fg text-[14px] font-semibold">Recent findings</h2>
           <span className="text-fg-muted font-mono text-[11px] tabular-nums">50 most recent</span>
         </header>

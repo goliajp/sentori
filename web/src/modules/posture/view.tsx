@@ -120,7 +120,7 @@ function PinAnomalyPanel({ projectId }: { projectId: string }) {
 
   return (
     <Card>
-      <header className="border-border-muted mb-3 flex items-baseline justify-between border-b pb-2">
+      <header className="border-border/40 mb-3 flex items-baseline justify-between border-b pb-2">
         <h2 className="text-fg text-[14px] font-semibold">Top servers</h2>
         <span className="text-fg-muted font-mono text-[11px] tabular-nums">
           {rows.length} servers
@@ -138,7 +138,7 @@ function PinAnomalyPanel({ projectId }: { projectId: string }) {
 function AnomalyRow({ row }: { row: PinAnomalyRow }) {
   const suspicious = row.installCount >= 3
   return (
-    <li className="border-border-muted flex items-baseline gap-4 border-b py-2 last:border-b-0">
+    <li className="border-border/40 flex items-baseline gap-4 border-b py-2 last:border-b-0">
       <span className="text-fg min-w-0 flex-1 truncate font-mono text-[13px]">
         {row.serverName ?? '(unknown server)'}
       </span>
@@ -197,7 +197,7 @@ function TrustScorePanel({ projectId }: { projectId: string }) {
 
   return (
     <Card>
-      <header className="border-border-muted mb-3 flex items-baseline justify-between border-b pb-2">
+      <header className="border-border/40 mb-3 flex items-baseline justify-between border-b pb-2">
         <h2 className="text-fg text-[14px] font-semibold">Lowest trust scores</h2>
         <span className="text-fg-muted font-mono text-[11px] tabular-nums">
           {rows.length} installs
@@ -216,7 +216,7 @@ function TrustRow({ row }: { row: TrustScoreRow }) {
   const tone =
     row.score < 30 ? 'text-danger' : row.score < 70 ? 'text-warning' : 'text-fg-secondary'
   return (
-    <li className="border-border-muted grid grid-cols-[5ch_minmax(0,1fr)_auto_auto] items-baseline gap-3 border-b py-2 last:border-b-0">
+    <li className="border-border/40 grid grid-cols-[5ch_minmax(0,1fr)_auto_auto] items-baseline gap-3 border-b py-2 last:border-b-0">
       <span
         className={`font-mono text-[16px] font-medium tabular-nums ${tone}`}
         title={`Score ${row.score} / 100`}

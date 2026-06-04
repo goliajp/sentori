@@ -27,7 +27,7 @@ export function RowSkeleton({ count = 1, height = '52px' }: { count?: number; he
   return (
     <div aria-busy="true" role="status">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="sentori-skeleton border-border-muted border-b" style={{ height }} />
+        <div key={i} className="sentori-skeleton border-border/40 border-b" style={{ height }} />
       ))}
       <span className="sr-only">Loading…</span>
     </div>

@@ -707,7 +707,7 @@ function EventsRail({
         <span>{total.toLocaleString()} total</span>
       </header>
       <ul
-        className="divide-border-muted divide-y overflow-y-auto"
+        className="divide-border/40 divide-y overflow-y-auto"
         ref={listRef}
         style={{ maxHeight: 'calc(100vh - 260px)' }}
       >
@@ -2178,7 +2178,7 @@ function RefingerprintAdmin({
 
   return (
     <>
-      <div className="border-border-muted mt-3 flex items-center gap-2 border-t pt-3">
+      <div className="border-border/40 mt-3 flex items-center gap-2 border-t pt-3">
         <span className="text-fg-muted font-mono text-[9px] tracking-[0.22em] uppercase">
           admin
         </span>
@@ -2238,7 +2238,7 @@ function RefingerprintAdmin({
                   {nonCurrentGroups.length} group{nonCurrentGroups.length === 1 ? '' : 's'} would
                   migrate:
                 </p>
-                <ul className="divide-border-muted border-border divide-y border">
+                <ul className="divide-border/40 border-border divide-y border">
                   {preview.groups.map((g) => (
                     <li className="flex items-baseline gap-3 px-3 py-2" key={g.fp}>
                       <span className="text-fg-muted basis-[6ch] font-mono text-[10px]">
@@ -2339,7 +2339,7 @@ function RelatedAcrossReleasesPanel({
           same error_type · different release
         </span>
       </header>
-      <ul className="divide-border-muted divide-y">
+      <ul className="divide-border/40 divide-y">
         {related.map((r) => (
           <RelatedRow currentOrgSlug={currentOrgSlug} key={r.id} row={r} />
         ))}
@@ -2425,7 +2425,7 @@ function AffectedUsersPanel({
           showing top {data.rows.length} of {data.totalDistinct.toLocaleString()}
         </span>
       </header>
-      <ul className="divide-border-muted divide-y">
+      <ul className="divide-border/40 divide-y">
         {data.rows.map((r) => (
           <li
             key={r.fingerprintHex + r.keyType}

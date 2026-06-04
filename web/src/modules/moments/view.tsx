@@ -59,7 +59,7 @@ export function MomentsView() {
             const active = selected === n.name
             return (
               <button
-                className={`border-border-muted relative block w-full border-b px-4 py-2.5 text-left transition-colors ${
+                className={`border-border/40 relative block w-full border-b px-4 py-2.5 text-left transition-colors ${
                   active ? 'bg-accent/10' : 'hover:bg-bg'
                 }`}
                 key={n.name}

@@ -94,7 +94,7 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
   const time = new Date(entry.t).toLocaleTimeString()
   if (entry.source === 'error') {
     return (
-      <li className="border-border-muted grid grid-cols-[auto_8ch_1fr] items-baseline gap-3 border-b py-2 last:border-b-0">
+      <li className="border-border/40 grid grid-cols-[auto_8ch_1fr] items-baseline gap-3 border-b py-2 last:border-b-0">
         <span className="text-fg-muted font-mono text-[11px] tabular-nums">{time}</span>
         <span
           className="font-mono text-[10px] tracking-[0.18em] uppercase"
@@ -110,7 +110,7 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
     )
   }
   return (
-    <li className="border-border-muted grid grid-cols-[auto_8ch_1fr] items-baseline gap-3 border-b py-2 last:border-b-0">
+    <li className="border-border/40 grid grid-cols-[auto_8ch_1fr] items-baseline gap-3 border-b py-2 last:border-b-0">
       <span className="text-fg-muted font-mono text-[11px] tabular-nums">{time}</span>
       <span className="text-accent font-mono text-[10px] tracking-[0.18em] uppercase">
         {entry.name === '$pageview' ? 'page' : 'track'}

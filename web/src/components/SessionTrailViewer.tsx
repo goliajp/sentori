@@ -128,7 +128,7 @@ export function SessionTrailViewer({
           <li key={i}>
             <button
               aria-selected={effectiveFocus === i}
-              className={`border-border-muted block w-full border-b px-2.5 py-1.5 text-left transition-colors last:border-b-0 ${
+              className={`border-border/40 block w-full border-b px-2.5 py-1.5 text-left transition-colors last:border-b-0 ${
                 effectiveFocus === i
                   ? 'bg-accent/10 text-fg'
                   : 'text-fg-secondary hover:bg-bg-secondary'

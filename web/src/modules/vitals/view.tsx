@@ -430,7 +430,7 @@ function CompareCard({
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr className="border-border-muted border-b last:border-0" key={r.route}>
+            <tr className="border-border/40 border-b last:border-0" key={r.route}>
               <td className="text-fg py-1.5 font-mono">{r.route}</td>
               <td className="py-1.5 text-right font-mono tabular-nums">
                 {deltaMs(r.ttidP50Ms, baseline.ttidP50Ms)}
