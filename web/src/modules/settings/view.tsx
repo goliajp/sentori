@@ -1,14 +1,14 @@
+import { PageHeader } from '@goliapkg/gds'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 
 import { adminApi, type OrgRole, orgsApi, teamsApi } from '@/api/client'
-import { Row } from '@/components/Row'
-import { SubSection } from '@/components/SubSection'
+import { qk } from '@/api/query-keys'
 import { useOrg } from '@/auth/orgContext'
 import { Hint } from '@/components/Hint'
-import { PageHeader } from '@/layout/page-header'
-import { qk } from '@/api/query-keys'
+import { Row } from '@/components/Row'
+import { SubSection } from '@/components/SubSection'
 
 /**
  * Settings — org-wide config that doesn't belong on a single module.
@@ -79,8 +79,19 @@ export function SettingsView() {
   })
 
   return (
-    <div className="sentori-page-in">
-      <PageHeader subtitle="org configuration" title="Settings" />
+    <div className="space-y-4">
+      <PageHeader
+        breadcrumb={[
+          { label: 'sentori', href: '/main' },
+          {
+            label: currentOrg.name ?? currentOrg.slug,
+            href: `/main/org/${currentOrg.slug}/overview`,
+          },
+          { label: 'settings' },
+        ]}
+        subtitle="Org configuration · members / teams / projects / labels"
+        title="Settings"
+      />
 
       <SubSection title="Organization">
         <Row label="slug">

@@ -1,3 +1,4 @@
+import { PageHeader } from '@goliapkg/gds'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
@@ -8,12 +9,11 @@ import {
   type AlertTriggerKind,
   orgsApi,
 } from '@/api/client'
-import { useOrg } from '@/auth/orgContext'
-import { Row } from '@/components/Row'
-import { EmptyState } from '@/components/Hint'
-import { RowSkeleton } from '@/components/Skeleton'
-import { PageHeader } from '@/layout/page-header'
 import { qk } from '@/api/query-keys'
+import { useOrg } from '@/auth/orgContext'
+import { EmptyState } from '@/components/Hint'
+import { Row } from '@/components/Row'
+import { RowSkeleton } from '@/components/Skeleton'
 
 /**
  * v2.1 W2 — alerts module now manages its own rules end-to-end.
@@ -64,7 +64,7 @@ export function AlertsView() {
   const rules = rulesQ.data ?? []
 
   return (
-    <div className="sentori-page-in">
+    <div className="space-y-4">
       <PageHeader
         actions={
           <button
@@ -75,8 +75,12 @@ export function AlertsView() {
             + new rule
           </button>
         }
-        count={rules.length}
-        subtitle="new issue · regression · threshold"
+        breadcrumb={[
+          { label: 'sentori', href: '/main' },
+          { label: currentOrg.name ?? currentOrg.slug, href: `/main/org/${slug}/overview` },
+          { label: 'alerts' },
+        ]}
+        subtitle={`${rules.length.toLocaleString()} rules · new issue / regression / threshold`}
         title="Alert rules"
       />
 
