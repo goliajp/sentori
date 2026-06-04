@@ -98,7 +98,7 @@ export function NotificationBell() {
               </button>
             )}
           </div>
-          <ul className="divide-border-muted max-h-[60vh] divide-y overflow-y-auto">
+          <ul className="divide-border/40 max-h-[60vh] divide-y overflow-y-auto">
             {(recent ?? unread ?? []).length === 0 && (
               <li className="text-fg-muted px-3 py-6 text-center text-[12px]">Nothing here yet.</li>
             )}

@@ -258,7 +258,7 @@ export function ScreenshotDebugCenter({
               )}
               {/* Attachment-meta block — always shown so the operator
                *  can correlate to server logs. */}
-              <div className="border-border-muted border-t pt-4">
+              <div className="border-border/40 border-t pt-4">
                 <div className="text-accent mb-2 font-mono text-[10px] tracking-[0.22em] uppercase">
                   Attachment
                 </div>

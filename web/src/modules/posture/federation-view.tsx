@@ -139,7 +139,7 @@ function ResultsTable({
 
 function FedRow({ row }: { row: FederationRow }) {
   return (
-    <li className="border-border-muted grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] items-baseline gap-3 border-b py-2 last:border-b-0">
+    <li className="border-border/40 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] items-baseline gap-3 border-b py-2 last:border-b-0">
       <span className="text-fg min-w-0 truncate font-mono text-[12px]">
         {row.projectName ?? row.projectId}
       </span>

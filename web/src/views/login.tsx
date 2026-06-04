@@ -88,7 +88,7 @@ export function AuthShell({ children, title }: { children: React.ReactNode; titl
         </div>
 
         <Card>
-          <header className="border-border-muted mb-4 flex items-baseline gap-3 border-b pb-3">
+          <header className="border-border/40 mb-4 flex items-baseline gap-3 border-b pb-3">
             <span className="text-accent font-mono text-[10px] tracking-[0.22em] uppercase">·</span>
             <h2 className="text-fg font-mono text-[11px] font-medium tracking-[0.22em] uppercase">
               {title}

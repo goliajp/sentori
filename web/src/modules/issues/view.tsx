@@ -97,7 +97,7 @@ function IssueListPage() {
   const [releaseFilter, setReleaseFilter] = useUrlParam<string>('release', '')
   const [errorTypeFilter, setErrorTypeFilter] = useUrlParam<string>('errorType', '')
   const [envFilter, setEnvFilter] = useUrlParam<string>('env', '')
-  const [searchFilter, setSearchFilter] = useUrlParam<string>('q', '')
+  const [searchFilter] = useUrlParam<string>('q', '')
 
   const { error, isLoading, meta, rows } = useIssuesRail({
     envFilter,
@@ -217,34 +217,17 @@ function IssueListPage() {
         <DataTable
           columns={ISSUE_COLUMNS}
           density="compact"
-          error={null}
-          globalFilter
-          globalFilterPlaceholder="Search by type or message…"
-          globalFilterValue={searchFilter}
           highlightOnHover
           loading={isLoading}
           loadingRows={8}
-          onGlobalFilterChange={setSearchFilter}
           onRowClick={(row) => navigate(`/main/org/${currentOrg.slug}/issues/${row.id}`)}
           onSort={(key) => {
             if (key === 'eventCount') setMeasure('event_count')
-            else if (key === 'uniqueUsers') setMeasure('unique_users')
             else if (key === 'lastSeen') setMeasure('last_seen')
-            else if (key === 'firstSeen') setMeasure('first_seen')
           }}
+          pageSize={200}
           rowKey="id"
           rows={rows}
-          sortDir="desc"
-          sortKey={
-            measure === 'event_count'
-              ? 'eventCount'
-              : measure === 'unique_users'
-                ? 'uniqueUsers'
-                : measure === 'last_seen'
-                  ? 'lastSeen'
-                  : 'firstSeen'
-          }
-          stickyHeader
           striped
         />
       )}

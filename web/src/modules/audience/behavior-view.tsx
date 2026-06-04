@@ -57,7 +57,7 @@ function RouteList({ rows }: { rows: TopRouteRow[] }) {
           const pct = (r.views / max) * 100
           return (
             <li
-              className="border-border-muted flex items-baseline gap-3 border-b py-2 last:border-b-0"
+              className="border-border/40 flex items-baseline gap-3 border-b py-2 last:border-b-0"
               key={r.route}
             >
               <span className="text-fg min-w-0 flex-1 truncate font-mono text-[13px]">

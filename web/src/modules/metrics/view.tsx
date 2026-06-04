@@ -112,7 +112,7 @@ export function MetricsView() {
 
       {selected && (
         <Card>
-          <header className="border-border-muted mb-3 flex items-baseline justify-between border-b pb-2">
+          <header className="border-border/40 mb-3 flex items-baseline justify-between border-b pb-2">
             <span className="text-accent font-mono text-[10px] tracking-[0.22em] uppercase">
               metric
             </span>
@@ -142,7 +142,7 @@ export function MetricsView() {
           )}
           {points.length > 0 && (
             <>
-              <div className="border-border-muted mb-3 border-y py-3">
+              <div className="border-border/40 mb-3 border-y py-3">
                 <Sparkline
                   ariaLabel={`${selected} trend`}
                   height={64}

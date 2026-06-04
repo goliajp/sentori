@@ -132,7 +132,7 @@ function SliderRow({
         {KIND_ORDER.map((k) => {
           const v = weights[k] ?? DEFAULT_WEIGHTS[k] ?? UNKNOWN_DEFAULT
           return (
-            <li className="border-border-muted flex items-baseline gap-3 border-b py-1.5" key={k}>
+            <li className="border-border/40 flex items-baseline gap-3 border-b py-1.5" key={k}>
               <span className="text-fg-secondary basis-[14ch] font-mono text-[11px]">{k}</span>
               <input
                 aria-label={`${k} weight`}
@@ -187,7 +187,7 @@ function SimRow({ row }: { row: TrustScoreRow & { simScore: number } }) {
         ? 'var(--color-warning, var(--color-accent))'
         : 'var(--color-fg-secondary)'
   return (
-    <li className="border-border-muted grid grid-cols-[5ch_5ch_minmax(0,1fr)_auto_auto] items-baseline gap-3 border-b py-2 last:border-b-0">
+    <li className="border-border/40 grid grid-cols-[5ch_5ch_minmax(0,1fr)_auto_auto] items-baseline gap-3 border-b py-2 last:border-b-0">
       <span
         className="font-mono text-[16px] font-medium tabular-nums"
         style={{ color: tone }}

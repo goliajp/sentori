@@ -130,7 +130,7 @@ export function AuditLogView() {
         </div>
       )}
       {!q.hasNextPage && rows.length >= PAGE_SIZE && (
-        <p className="border-border-muted text-fg-muted border-y py-3 text-center font-mono text-[10px] tracking-[0.18em] uppercase">
+        <p className="border-border/40 text-fg-muted border-y py-3 text-center font-mono text-[10px] tracking-[0.18em] uppercase">
           end of history
         </p>
       )}

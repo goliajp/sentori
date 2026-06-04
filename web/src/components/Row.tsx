@@ -12,7 +12,7 @@
  */
 export function Row({ children, label }: { children: React.ReactNode; label: string }) {
   return (
-    <div className="border-border-muted first:border-border grid grid-cols-[120px_1fr] items-baseline gap-x-4 border-b py-2 first:border-t">
+    <div className="border-border/40 grid grid-cols-[120px_1fr] items-baseline gap-x-4 border-b py-2 first:border-t">
       <span className="text-fg-muted font-mono text-[10px] tracking-[0.22em] uppercase">
         {label}
       </span>

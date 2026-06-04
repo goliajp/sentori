@@ -124,7 +124,7 @@ function ProjectCard({ orgSlug, project }: { orgSlug: string; project: ProjectRo
           </a>
         )}
 
-        <div className="border-border-muted text-fg-muted flex items-center justify-between gap-3 border-t pt-2 font-mono text-[10px] tracking-[0.1em] uppercase">
+        <div className="border-border/40 text-fg-muted flex items-center justify-between gap-3 border-t pt-2 font-mono text-[10px] tracking-[0.1em] uppercase">
           <Link
             className="hover:text-accent"
             to={`/main/org/${orgSlug}/issues?project=${project.id}`}

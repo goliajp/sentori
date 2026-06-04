@@ -245,7 +245,7 @@ function SourceBundlesPanel({
           to enable inline native source view.
         </p>
       ) : (
-        <ul className="divide-border-muted border-border divide-y border-y">
+        <ul className="divide-border/40 border-border divide-y border-y">
           {artifacts.map((a) => {
             const platform = a.kind.replace(/^source_bundle_/, '')
             return (

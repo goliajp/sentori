@@ -144,7 +144,7 @@ export function StateTimetravelViewer({
           <li key={i}>
             <button
               aria-selected={effectiveFocus === i}
-              className={`border-border-muted block w-full border-b px-2.5 py-1.5 text-left transition-colors last:border-b-0 ${
+              className={`border-border/40 block w-full border-b px-2.5 py-1.5 text-left transition-colors last:border-b-0 ${
                 effectiveFocus === i
                   ? 'bg-accent/10 text-fg'
                   : 'text-fg-secondary hover:bg-bg-secondary'
@@ -173,7 +173,7 @@ export function StateTimetravelViewer({
         ))}
       </ol>
       <div className="border-border border-y">
-        <div className="border-border-muted flex items-center justify-between border-b px-3 py-2">
+        <div className="border-border/40 flex items-center justify-between border-b px-3 py-2">
           <div className="text-[12px]">
             <span className="text-fg-muted mr-1.5 font-mono text-[10px] tracking-[0.18em] uppercase">
               Snapshot

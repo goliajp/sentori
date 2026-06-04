@@ -146,8 +146,8 @@ export function SettingsView() {
           <ul>
             {members.map((m, i) => (
               <li
-                className={`border-border-muted flex items-baseline justify-between gap-3 border-b py-2 ${
-                  i === 0 ? 'border-border border-t' : ''
+                className={`border-border/40 flex items-baseline justify-between gap-3 border-b py-2 ${
+                  i === 0 ? 'border-border/40 border-t' : ''
                 }`}
                 key={m.userId}
               >
@@ -376,7 +376,7 @@ function LabelsSubSection({ orgSlug }: { orgSlug: string }) {
       )}
 
       {labels.length > 0 && (
-        <ul className="divide-border-muted border-border mt-3 divide-y border-y">
+        <ul className="divide-border/40 border-border/40 mt-3 divide-y border-y">
           {labels.map((l) => (
             <li className="flex items-center gap-3 py-2" key={l.id}>
               <span

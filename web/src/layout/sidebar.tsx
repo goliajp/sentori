@@ -266,7 +266,7 @@ function Section({ children, title }: { children: React.ReactNode; title?: strin
   return (
     <div className="mb-1 last:mb-0">
       {title && (
-        <div className="border-border-muted gds-pad-x border-t pt-5 pb-2">
+        <div className="border-border/40 gds-pad-x border-t pt-5 pb-2">
           <span className="text-fg-muted font-mono text-[10px] tracking-[0.22em] uppercase">
             {title}
           </span>
