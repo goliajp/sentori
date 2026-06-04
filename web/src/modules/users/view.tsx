@@ -1,100 +1,46 @@
-import { useState } from 'react'
-
-import { PageHeader } from '@/layout/page-header'
+import { Accordion, AccordionItem, PageHeader } from '@goliapkg/gds'
 
 import { UsersErase } from './erase'
 import { UsersLookup } from './lookup'
 import { UsersMerge } from './merge'
 import { UsersOverview } from './overview'
 
-function hasLookupDeepLink(): boolean {
-  if (typeof window === 'undefined') return false
+function deepLinkedAccordion(): string[] {
+  if (typeof window === 'undefined') return []
   const params = new URLSearchParams(window.location.search)
   const hash = params.get('hash')
-  return !!hash && /^[a-f0-9]{64}$/.test(hash)
+  if (hash && /^[a-f0-9]{64}$/.test(hash)) return ['lookup']
+  return []
 }
 
 /**
  * v2.4 — Users module shell.
  *
- * Default view is the overview (KPI band + most-affected
- * fingerprints + per-release / per-key-type breakdown) loaded over
- * the org's default identity scope. The cross-project lookup form
- * (v2.3) lives in a collapsible "lookup by identity" bar at the top.
- *
- * Deep-link rule: if the URL already carries a `?hash=…&type=…` (an
- * existing share link or a back-navigation), the lookup bar opens
- * itself so the operator lands directly on the result.
+ * Page is a GDS `Accordion` over three operator actions (lookup /
+ * merge / erase) stacked above `UsersOverview`. Deep-link rule:
+ * arriving via `?hash=…` auto-expands the lookup section so the
+ * operator lands on the resolved result instead of an empty form.
+ * Erase + merge stay collapsed by default (destructive / rare).
  */
 export function UsersView() {
-  const [lookupOpen, setLookupOpen] = useState(() => hasLookupDeepLink())
-  // v2.3 — DSR erase bar. Off by default since it's a destructive
-  // op, but a single click opens the inline form. No deep-link
-  // analogue: erase requires a typed-confirmation gate every time;
-  // we deliberately don't let a URL preload the dangerous state.
-  const [eraseOpen, setEraseOpen] = useState(false)
-  // v2.4 — operator-driven identity merge bar. Reversible (soft
-  // undo within 7 days) so we don't typed-confirmation-gate it
-  // like erase. Off by default — merges are rare + intentional.
-  const [mergeOpen, setMergeOpen] = useState(false)
-
   return (
-    <div className="sentori-page-in">
+    <div className="space-y-4">
       <PageHeader
         subtitle="identified fingerprints · raw values never leave your browser"
         title="Users"
       />
 
-      <div className="mb-2">
-        <button
-          aria-expanded={lookupOpen}
-          className="border-border text-fg-muted hover:text-fg-secondary flex w-full items-center gap-2 border-y py-2 font-mono text-[10px] tracking-[0.22em] uppercase"
-          onClick={() => setLookupOpen((v) => !v)}
-          type="button"
-        >
-          <span aria-hidden>{lookupOpen ? '▾' : '▸'}</span>
-          <span>lookup by identity</span>
-        </button>
-        {lookupOpen && (
-          <div className="mt-2">
-            <UsersLookup />
-          </div>
-        )}
-      </div>
-
-      <div className="mb-2">
-        <button
-          aria-expanded={mergeOpen}
-          className="border-border text-fg-muted hover:text-fg-secondary flex w-full items-center gap-2 border-y py-2 font-mono text-[10px] tracking-[0.22em] uppercase"
-          onClick={() => setMergeOpen((v) => !v)}
-          type="button"
-        >
-          <span aria-hidden>{mergeOpen ? '▾' : '▸'}</span>
-          <span>merge identities</span>
-        </button>
-        {mergeOpen && (
-          <div className="mt-2">
-            <UsersMerge />
-          </div>
-        )}
-      </div>
-
-      <div className="mb-6">
-        <button
-          aria-expanded={eraseOpen}
-          className="border-border text-fg-muted hover:text-danger flex w-full items-center gap-2 border-y py-2 font-mono text-[10px] tracking-[0.22em] uppercase"
-          onClick={() => setEraseOpen((v) => !v)}
-          type="button"
-        >
-          <span aria-hidden>{eraseOpen ? '▾' : '▸'}</span>
-          <span>erase identity (DSR)</span>
-        </button>
-        {eraseOpen && (
-          <div className="mt-2">
-            <UsersErase />
-          </div>
-        )}
-      </div>
+      <Accordion defaultExpanded={deepLinkedAccordion()} type="multiple">
+        <AccordionItem id="lookup" title="Lookup by identity">
+          <UsersLookup />
+        </AccordionItem>
+        <AccordionItem id="merge" title="Merge identities">
+          <UsersMerge />
+        </AccordionItem>
+        <AccordionItem id="erase" title="Erase identity (DSR)">
+          <UsersErase />
+        </AccordionItem>
+      </Accordion>
 
       <UsersOverview />
     </div>
