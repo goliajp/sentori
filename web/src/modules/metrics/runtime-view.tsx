@@ -11,6 +11,7 @@
 // docs/design/v2-metrics.md. UI surfaces the picked tier as a
 // resolution badge below the chart.
 
+import { Card, PageHeader } from '@goliapkg/gds'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
@@ -162,26 +163,19 @@ export function RuntimeMetricsView() {
   if (!projectId) return null
 
   return (
-    <div className="sentori-page-in space-y-6">
-      <header>
-        <div className="text-fg-muted font-mono text-[11px] tracking-[0.18em] uppercase">
-          runtime metrics
-        </div>
-        <h1
-          className="text-fg mt-1"
-          style={{
-            fontVariationSettings: "'wdth' 95, 'opsz' 48, 'wght' 600",
-            fontSize: '26px',
-            letterSpacing: '-0.018em',
-            lineHeight: 1.05,
-          }}
-        >
-          Runtime
-        </h1>
-        <div className="text-fg-muted mt-2 text-[12px]">
-          Auto-instrumented FPS, heap, cold-start, route nav, and network. Last 24 h.
-        </div>
-      </header>
+    <div className="space-y-5">
+      <PageHeader
+        breadcrumb={[
+          { label: 'sentori', href: '/main' },
+          {
+            label: currentOrg.name ?? currentOrg.slug,
+            href: `/main/org/${currentOrg.slug}/overview`,
+          },
+          { label: 'runtime' },
+        ]}
+        subtitle="Auto-instrumented FPS, heap, cold-start, route nav, network. Last 24 h."
+        title="Runtime"
+      />
 
       {/* Hero cards. Click a card to drive the chart below. */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
@@ -200,19 +194,9 @@ export function RuntimeMetricsView() {
         ))}
       </div>
 
-      {/* BI panel. */}
-      <section className="border-border space-y-3 border-t pt-5">
-        <header className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
-          <h2
-            className="text-fg"
-            style={{
-              fontVariationSettings: "'wdth' 95, 'opsz' 32, 'wght' 580",
-              fontSize: '18px',
-              letterSpacing: '-0.012em',
-            }}
-          >
-            {selectedSpec.label}
-          </h2>
+      <Card>
+        <header className="mb-3 flex flex-wrap items-baseline gap-x-4 gap-y-2">
+          <h2 className="text-fg text-[16px] font-semibold tracking-tight">{selectedSpec.label}</h2>
           <span className="text-fg-muted font-mono text-[10px] tracking-[0.12em] uppercase">
             {selected}
           </span>
@@ -259,7 +243,7 @@ export function RuntimeMetricsView() {
         </div>
 
         {/* Chart */}
-        <div className="border-border bg-bg-secondary rounded border p-4">
+        <div className="border-border-muted bg-bg mt-3 border p-4">
           {chartQ.isLoading && <RowSkeleton count={3} height="60px" />}
           {chartQ.error && <CenteredEmpty>Failed to load this metric.</CenteredEmpty>}
           {chartQ.data && chartQ.data.series.every((s) => s.points.length === 0) && (
@@ -287,7 +271,7 @@ export function RuntimeMetricsView() {
             </>
           )}
         </div>
-      </section>
+      </Card>
 
       {drill && projectId && currentOrg && (
         <DrillModal
