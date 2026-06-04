@@ -48,6 +48,37 @@ body,
   margin: 0;
 }
 
+/*
+ * Light-mode contrast boost. GDS is dark-native (Principle #4), and
+ * its derived light tokens skew gentle — `--gds-fg` defaults to a
+ * mid-gray that reads "softer than a Linear / Vercel / Notion
+ * dashboard". Operator feedback after the GDS migration:
+ *
+ *   "字太看不清了, 表格也好像不是专业表格"
+ *
+ * is largely a light-mode contrast complaint. We override the GDS-
+ * injected `--gds-*` vars at the document root for `data-theme='light'`
+ * with crisper neutrals — body text drops to near-slate-900 (#0f172a),
+ * secondary + muted tiers split clearly, and the divider color steps
+ * up to slate-200 (#e2e8f0) so DataTable row hairlines + Card edges
+ * actually read against the page. `!important` is required because
+ * `useThemeEffect()` writes the GDS defaults as inline styles on the
+ * <html> element; only an !important stylesheet rule can win against
+ * inline.
+ *
+ * Dark mode untouched — GDS's dark tokens are already tuned + the
+ * stark contrast pulls the eye without these tweaks.
+ */
+html[data-theme='light'] {
+  --gds-fg: #0f172a !important;
+  --gds-fg-secondary: #334155 !important;
+  --gds-fg-muted: #64748b !important;
+  --gds-border: #cbd5e1 !important;
+  --gds-border-strong: #94a3b8 !important;
+  --gds-bg-secondary: #f1f5f9 !important;
+  --gds-bg-tertiary: #e2e8f0 !important;
+}
+
 body {
   color: var(--color-fg);
   background-color: var(--color-bg);
