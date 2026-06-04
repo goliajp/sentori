@@ -28,10 +28,11 @@ import {
   type IntegrationTemplateRow,
   isStructuredError,
 } from '@/api/client'
-import { useOrg } from '@/auth/orgContext'
-import { PageHeader } from '@/layout/page-header'
+import { PageHeader } from '@goliapkg/gds'
+
 import { qk } from '@/api/query-keys'
 import { useUrlParam } from '@/lib/url-state'
+import { useOrg } from '@/auth/orgContext'
 
 type AdapterDef = {
   description: string
@@ -347,9 +348,17 @@ export function IntegrationsView() {
   )
 
   return (
-    <div className="sentori-page-in">
+    <div className="space-y-4">
       <PageHeader
-        subtitle={`per-org connections · ${connections.length} active`}
+        breadcrumb={[
+          { label: 'sentori', href: '/main' },
+          {
+            label: currentOrg.name ?? currentOrg.slug,
+            href: `/main/org/${currentOrg.slug}/overview`,
+          },
+          { label: 'integrations' },
+        ]}
+        subtitle={`Per-org connections · ${connections.length} active`}
         title="Integrations"
       />
 
