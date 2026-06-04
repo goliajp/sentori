@@ -77,7 +77,7 @@ export function ReleaseDetailView() {
   const issuesByStatus = groupByStatus(issueRows)
 
   return (
-    <div className="sentori-page-in">
+    <div className="">
       <PageHeader count={issueRows.length} subtitle={release || '—'} title="Release" />
 
       <Link

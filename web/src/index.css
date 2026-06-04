@@ -369,20 +369,6 @@ body {
   animation: sentori-toast-in 180ms ease-out;
 }
 
-@keyframes sentori-page-in {
-  from {
-    opacity: 0;
-    transform: translateY(2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.sentori-page-in {
-  animation: sentori-page-in 180ms ease-out;
-}
-
 @keyframes sentori-row-out {
   from {
     opacity: 1;

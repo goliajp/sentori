@@ -98,14 +98,14 @@ export function HealthDetailView() {
   if (!projectId || !checkId) return null
   if (checkQ.isLoading) {
     return (
-      <div className="sentori-page-in space-y-3">
+      <div className="space-y-3">
         <RowSkeleton count={3} height="48px" />
       </div>
     )
   }
   if (checkQ.error || !checkQ.data) {
     return (
-      <div className="sentori-page-in">
+      <div className="">
         <CenteredEmpty>Check not found.</CenteredEmpty>
       </div>
     )
@@ -117,7 +117,7 @@ export function HealthDetailView() {
   const p95 = lastP95(rollup)
 
   return (
-    <div className="sentori-page-in space-y-6">
+    <div className="space-y-6">
       <header className="space-y-3">
         <div className="flex items-baseline gap-3">
           <Link
