@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router'
 import { adminApi, type MetricPoint } from '@/api/client'
 import { Stat } from '@/components/Stat'
 import { useOrg } from '@/auth/orgContext'
-import { EmptyState } from '@/components/Hint'
+import { InlineEmpty } from '@/components/Hint'
 import { qk } from '@/api/query-keys'
 
 export function TraceDetailView() {
@@ -74,8 +74,8 @@ export function TraceDetailView() {
         <div className="text-fg-muted mt-2 font-mono text-[11px] tracking-[0.05em]">{traceId}</div>
       </header>
 
-      {isLoading && <EmptyState>Loading trace…</EmptyState>}
-      {error && <EmptyState>Failed to load this trace.</EmptyState>}
+      {isLoading && <InlineEmpty>Loading trace…</InlineEmpty>}
+      {error && <InlineEmpty>Failed to load this trace.</InlineEmpty>}
       {data && (
         <>
           <div className="rule-grid grid-cols-3">
