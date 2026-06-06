@@ -533,6 +533,12 @@ function Picker<T extends string>({ label, onChange, options, value }: PickerPro
 // v2.1.2 — per-point invisible hit targets (`r=8` transparent
 // circles) feed `onPointClick` so the parent can open a drill modal
 // scoped to that timestamp.
+//
+// v3 — stays on raw SVG, not `@goliapkg/gds` `LineChart`. GDS chart
+// primitives are fixed-single-series (one `dataKey`) with no
+// per-point click hook, while this view needs multi-series overlay +
+// per-point drill into the issues that landed in that bucket. Revisit
+// when GDS exposes a multi-series chart with click/hover handlers.
 function TimeseriesSvg({
   onPointClick,
   series,

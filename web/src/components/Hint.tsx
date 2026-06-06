@@ -7,10 +7,12 @@
  *   surrounding context already establishes the eye-level — Linear's
  *   "muted helper paragraph under a field" pattern.
  *
- * - `<EmptyState>`: top-level empty / loading-failure message
+ * - `<InlineEmpty>`: top-level empty / loading-failure message
  *   (py-6, centered). Use it when a list / table query returned no
  *   rows or errored — the message stands alone on the page below
- *   the PageHeader.
+ *   the PageHeader. Named `InlineEmpty` (not `EmptyState`) to avoid
+ *   colliding with `@goliapkg/gds`'s own `EmptyState` pattern
+ *   (which takes title/description/icon/action — different shape).
  *
  * Both accept `danger` to recolor the text in `--danger` (red) for
  * error messages. Default `--ink-soft` (muted) is the right tone
@@ -28,7 +30,7 @@ export function Hint({ children, danger }: { children: React.ReactNode; danger?:
   )
 }
 
-export function EmptyState({ children, danger }: { children: React.ReactNode; danger?: boolean }) {
+export function InlineEmpty({ children, danger }: { children: React.ReactNode; danger?: boolean }) {
   return (
     <p
       className={`border-border/40 border-y py-6 text-center text-[13px] ${

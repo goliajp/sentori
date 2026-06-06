@@ -11,7 +11,7 @@ import {
 } from '@/api/client'
 import { qk } from '@/api/query-keys'
 import { useOrg } from '@/auth/orgContext'
-import { EmptyState } from '@/components/Hint'
+import { InlineEmpty } from '@/components/Hint'
 import { Row } from '@/components/Row'
 import { RowSkeleton } from '@/components/Skeleton'
 
@@ -85,11 +85,11 @@ export function AlertsView() {
       />
 
       {rulesQ.isLoading && <RowSkeleton count={4} height="48px" />}
-      {rulesQ.error && <EmptyState danger>Failed to load alert rules.</EmptyState>}
+      {rulesQ.error && <InlineEmpty danger>Failed to load alert rules.</InlineEmpty>}
       {!rulesQ.isLoading && !rulesQ.error && rules.length === 0 && editing === null && (
-        <EmptyState>
+        <InlineEmpty>
           No rules yet. Click <b>+ new rule</b> to create your first one.
-        </EmptyState>
+        </InlineEmpty>
       )}
 
       {rules.length > 0 && (

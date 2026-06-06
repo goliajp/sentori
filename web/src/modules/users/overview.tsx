@@ -8,7 +8,7 @@ import {
   type UsersOverviewTopRow,
 } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
-import { EmptyState, Hint } from '@/components/Hint'
+import { InlineEmpty, Hint } from '@/components/Hint'
 import { Stat } from '@/components/Stat'
 import { qk } from '@/api/query-keys'
 import { formatRelative } from '@/lib/format'
@@ -70,7 +70,7 @@ export function UsersOverview() {
   if (everEmpty) {
     return (
       <Container days={days} onWindowChange={onWindowChange}>
-        <EmptyState>
+        <InlineEmpty>
           No identified users yet in this org over the last {windowDays} day
           {windowDays === 1 ? '' : 's'}.
           <br />
@@ -81,7 +81,7 @@ export function UsersOverview() {
             </code>{' '}
             for users to surface here.)
           </span>
-        </EmptyState>
+        </InlineEmpty>
       </Container>
     )
   }

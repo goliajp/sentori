@@ -9,7 +9,7 @@ import {
   Tabs as GdsTabs,
 } from '@goliapkg/gds'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
 import { Link, useNavigate, useParams } from 'react-router'
 
@@ -223,7 +223,15 @@ export function IssueDetailView() {
       )}
 
       {selectedEvent && projectId && (
-        <EventGlanceStrip event={selectedEvent} projectId={projectId} />
+        <EventGlanceStrip
+          event={selectedEvent}
+          eventIdx={safeIdx}
+          loadedCount={events.length}
+          onNext={() => setEventIdx((i) => Math.min(events.length - 1, i + 1))}
+          onPrev={() => setEventIdx((i) => Math.max(0, i - 1))}
+          projectId={projectId}
+          total={issue.eventCount}
+        />
       )}
 
       <Tabs current={tab} onChange={setTab} />
@@ -242,44 +250,34 @@ export function IssueDetailView() {
         </Card>
       )}
 
-      {/* v1.1 #ux: 3-pane content area on lg+.
-       *  Left rail: events list (scrollable, sticky on lg).
-       *  Right: tab content. The Stack tab itself splits into a
-       *  further 2-column grid on xl+ (text on left, visuals on
-       *  right) so a 1440px screen no longer wastes its horizontal
-       *  budget. */}
+      {/* v3 — single-column content. The events-rail master/sub-detail
+       *  was dropped; the EventGlanceStrip above now hosts the
+       *  prev/next picker and `[ ` / `] ` keymap is unchanged. The
+       *  Events tab still gives the full list-and-click affordance. */}
       {events.length > 0 && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start">
-          <EventsRail
-            events={events}
-            onSelect={setEventIdx}
-            selectedIdx={safeIdx}
-            total={issue.eventCount}
-          />
-          <div className="min-w-0 space-y-3">
-            {selectedEvent && tab === 'stack' && projectId && (
-              <StackTab
-                event={selectedEvent}
-                orgSlug={currentOrg.slug}
-                projectId={projectId}
-                sourceRepoUrl={currentProject?.sourceRepoUrl ?? null}
-              />
-            )}
-            {selectedEvent && tab === 'replay' && projectId && (
-              <ReplayTab eventId={selectedEvent.id} projectId={projectId} />
-            )}
-            {selectedEvent && tab === 'breadcrumbs' && <BreadcrumbsTab event={selectedEvent} />}
-            {selectedEvent && tab === 'tags' && <TagsTab event={selectedEvent} />}
-            {tab === 'events' && (
-              <EventsTab events={events} onSelect={setEventIdx} selectedIdx={safeIdx} />
-            )}
-            {tab === 'activity' && projectId && (
-              <ActivityTab issueId={issueId} projectId={projectId} />
-            )}
-            {tab === 'feedback' && projectId && (
-              <FeedbackTab issueId={issueId} projectId={projectId} />
-            )}
-          </div>
+        <div className="min-w-0 space-y-3">
+          {selectedEvent && tab === 'stack' && projectId && (
+            <StackTab
+              event={selectedEvent}
+              orgSlug={currentOrg.slug}
+              projectId={projectId}
+              sourceRepoUrl={currentProject?.sourceRepoUrl ?? null}
+            />
+          )}
+          {selectedEvent && tab === 'replay' && projectId && (
+            <ReplayTab eventId={selectedEvent.id} projectId={projectId} />
+          )}
+          {selectedEvent && tab === 'breadcrumbs' && <BreadcrumbsTab event={selectedEvent} />}
+          {selectedEvent && tab === 'tags' && <TagsTab event={selectedEvent} />}
+          {tab === 'events' && (
+            <EventsTab events={events} onSelect={setEventIdx} selectedIdx={safeIdx} />
+          )}
+          {tab === 'activity' && projectId && (
+            <ActivityTab issueId={issueId} projectId={projectId} />
+          )}
+          {tab === 'feedback' && projectId && (
+            <FeedbackTab issueId={issueId} projectId={projectId} />
+          )}
         </div>
       )}
       {selectedEvent && projectId && (
@@ -661,95 +659,6 @@ function TriageRow({
         </Button>
       )}
     </div>
-  )
-}
-
-/** v1.1 #ux — vertical events sidebar that replaced the chevron-only
- *  picker. Each row carries release / time / env so the operator can
- *  scan-and-click instead of blind-walking with [ and ]. Hotkeys
- *  still work; the rail just makes them optional.
- *
- *  Scrolls independently on lg+ (sticky to the top of the detail
- *  scroll area), max-h `calc(100vh - 240px)` so it doesn't overlap
- *  the page header. Keeps the selected row in view via scrollIntoView. */
-function EventsRail({
-  events,
-  onSelect,
-  selectedIdx,
-  total,
-}: {
-  events: EventRow[]
-  onSelect: (i: number) => void
-  selectedIdx: number
-  total: number
-}) {
-  const listRef = useRef<HTMLUListElement | null>(null)
-  useEffect(() => {
-    const el = listRef.current?.querySelector<HTMLElement>(`[data-event-idx="${selectedIdx}"]`)
-    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }, [selectedIdx])
-
-  return (
-    <aside className="lg:sticky lg:top-3 lg:max-h-[calc(100vh-220px)]">
-      <header className="border-border text-fg-muted flex items-baseline justify-between border-b pb-2 font-mono text-[10px] tracking-[0.18em] uppercase">
-        <span>
-          events <span className="text-fg tabular-nums">{events.length}</span>
-          {/* v2.0 — explicit hint when fetch capped below total so
-           *  triage doesn't silently miss older events. Cursor
-           *  pagination is the v2.1 fix; until then this is the
-           *  honest signal that some events aren't loaded. */}
-          {events.length >= 500 && total > events.length && (
-            <span className="text-warning ml-1 normal-case">
-              (capped — {total - events.length} older not loaded)
-            </span>
-          )}
-        </span>
-        <span>{total.toLocaleString()} total</span>
-      </header>
-      <ul
-        className="divide-border/40 divide-y overflow-y-auto"
-        ref={listRef}
-        style={{ maxHeight: 'calc(100vh - 260px)' }}
-      >
-        {events.map((e, idx) => {
-          const active = idx === selectedIdx
-          return (
-            <li data-event-idx={idx} key={e.id}>
-              <button
-                aria-current={active ? 'true' : undefined}
-                className={`block w-full px-2 py-2 text-left transition-colors ${
-                  active
-                    ? 'border-accent bg-accent/8 border-l-2'
-                    : 'hover:bg-bg-secondary border-l-2 border-transparent'
-                }`}
-                onClick={() => onSelect(idx)}
-                type="button"
-              >
-                <div className="text-fg-muted flex items-baseline justify-between gap-2 font-mono text-[10px] tracking-[0.05em] tabular-nums">
-                  <span className={active ? 'text-accent' : ''}>
-                    {String(idx + 1).padStart(2, '0')}
-                  </span>
-                  <span>{formatRelative(e.receivedAt)}</span>
-                </div>
-                <div
-                  className={`mt-1 truncate font-mono text-[11px] ${
-                    active ? 'text-fg' : 'text-fg-secondary'
-                  }`}
-                  title={e.release}
-                >
-                  {e.release}
-                </div>
-                <div className="text-fg-muted mt-0.5 flex items-baseline gap-2 font-mono text-[9px] tracking-[0.12em] uppercase">
-                  <span>{e.environment}</span>
-                  <span className="opacity-60">·</span>
-                  <span>{e.platform}</span>
-                </div>
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-    </aside>
   )
 }
 
@@ -1457,7 +1366,23 @@ function describeStateEntry(entry: Exclude<ActivityEntry, { kind: 'comment' }>):
 // Single dense row pulling key dims from the selected event payload
 // + a row of attachment availability badges so the operator knows
 // what kinds of attached evidence exist before clicking through tabs.
-function EventGlanceStrip({ event, projectId }: { event: EventRow; projectId: string }) {
+function EventGlanceStrip({
+  event,
+  eventIdx,
+  loadedCount,
+  onNext,
+  onPrev,
+  projectId,
+  total,
+}: {
+  event: EventRow
+  eventIdx: number
+  loadedCount: number
+  onNext: () => void
+  onPrev: () => void
+  projectId: string
+  total: number
+}) {
   const p = event.payload
   const attachmentsQ = useQuery({
     placeholderData: (prev) => prev,
@@ -1467,6 +1392,9 @@ function EventGlanceStrip({ event, projectId }: { event: EventRow; projectId: st
   })
   const attachments = attachmentsQ.data ?? []
   const has = (kind: string) => attachments.some((a) => a.kind === kind)
+  const capped = loadedCount >= 500 && total > loadedCount
+  const prevDisabled = eventIdx === 0
+  const nextDisabled = eventIdx >= loadedCount - 1
 
   const dims: { label: string; value: string }[] = []
   dims.push({ label: 'release', value: p.release })
@@ -1498,6 +1426,45 @@ function EventGlanceStrip({ event, projectId }: { event: EventRow; projectId: st
 
   return (
     <div className="border-border border-y py-3">
+      <div className="mb-2.5 flex items-baseline justify-between gap-3">
+        <div className="flex items-baseline gap-2 font-mono text-[11px] tabular-nums">
+          <span className="text-fg-muted text-[10px] tracking-[0.18em] uppercase">event</span>
+          <span className="text-fg">
+            {String(eventIdx + 1).padStart(2, '0')}
+            <span className="text-fg-muted"> / {loadedCount.toLocaleString()}</span>
+            {total > loadedCount && (
+              <span className="text-fg-muted"> of {total.toLocaleString()}</span>
+            )}
+          </span>
+          <span className="text-fg-muted">·</span>
+          <span className="text-fg-secondary">{formatRelative(event.receivedAt)}</span>
+          {capped && (
+            <span className="text-warning ml-2 text-[10px] tracking-[0.05em] uppercase">
+              capped — {total - loadedCount} older not loaded
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            aria-label="previous event (hotkey: [ )"
+            disabled={prevDisabled}
+            onClick={onPrev}
+            size="sm"
+            variant="ghost"
+          >
+            ← <kbd className="text-fg-muted ml-1 font-mono text-[10px]">[</kbd>
+          </Button>
+          <Button
+            aria-label="next event (hotkey: ] )"
+            disabled={nextDisabled}
+            onClick={onNext}
+            size="sm"
+            variant="ghost"
+          >
+            <kbd className="text-fg-muted mr-1 font-mono text-[10px]">]</kbd> →
+          </Button>
+        </div>
+      </div>
       <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1.5">
         {dims.map((d) => (
           <span className="flex items-baseline gap-1.5" key={d.label}>
