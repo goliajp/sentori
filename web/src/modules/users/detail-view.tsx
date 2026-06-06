@@ -9,7 +9,7 @@ import {
   type UsersDetailTopIssue,
 } from '@/api/client'
 import { useOrg } from '@/auth/orgContext'
-import { EmptyState, Hint } from '@/components/Hint'
+import { InlineEmpty, Hint } from '@/components/Hint'
 import { Stat } from '@/components/Stat'
 import { qk } from '@/api/query-keys'
 import { formatRelative } from '@/lib/format'
@@ -113,10 +113,10 @@ export function UserDetailView() {
       </div>
 
       {everEmpty ? (
-        <EmptyState>
+        <InlineEmpty>
           No events match this fingerprint in your org over the last {data.windowDays} day
           {data.windowDays === 1 ? '' : 's'}.
-        </EmptyState>
+        </InlineEmpty>
       ) : (
         <div className="space-y-8">
           <section
