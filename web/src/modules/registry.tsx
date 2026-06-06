@@ -287,9 +287,12 @@ export const MODULES: ModuleDef[] = [
     path: 'audience',
     view: AudienceView,
   },
+  // v2.6 — find-threat lens. CT monitor + Posture come out of hiding
+  // together; Privacy stays hidden as the engineering-hygiene anchor.
+  // See docs/roadmap/v2.6.md.
   {
+    chord: 'c',
     group: 'trust',
-    hidden: true,
     iconPath: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4',
     id: 'cert-monitor',
     label: 'Cert monitor',
@@ -297,8 +300,8 @@ export const MODULES: ModuleDef[] = [
     view: CertMonitorView,
   },
   {
+    chord: 'p',
     group: 'trust',
-    hidden: true,
     iconPath: 'M6 12h12M12 6v12M19 12a7 7 0 1 1-14 0 7 7 0 0 1 14 0M9 9h6v6H9z',
     id: 'posture',
     label: 'Posture',
