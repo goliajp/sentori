@@ -197,6 +197,9 @@ export const qk = {
       ? tuple('cert-observations', projectId)
       : tuple('cert-observations', projectId, domain),
 
+  // v2.11 — push credentials per project.
+  pushCredentials: (projectId: Id) => tuple('push-credentials', projectId),
+
   // ── privacy ─────────────────────────────────────────────────────────
   privacy: {
     score: (projectId: Id) => tuple('privacy-score', projectId),
