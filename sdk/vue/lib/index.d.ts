@@ -35,4 +35,6 @@ export { addBreadcrumb, captureException, captureException as captureError, capt
 export type { CaptureMessageOptions, MessageLevel, } from '@goliapkg/sentori-javascript';
 export { RuntimeMetricBuffer, drainRuntimeMetricsForFlush, emitMetric, flushRuntimeMetrics, rebufferRuntimeMetrics, startRuntimeMetricsTimer, stopRuntimeMetricsTimer, type RuntimeMetricPoint, } from '@goliapkg/sentori-javascript';
 export { SentoriErrorBoundary } from './ErrorBoundary.js';
+export { registerWeb, unregisterWeb, readCachedIpt, type RegisterWebOptions, type RegisterWebResult, } from '@goliapkg/sentori-javascript';
+export type { PushMessage, PushOptions, PushPriority, PushReceipt, PushTicket, PushTicketStatus, } from '@goliapkg/sentori-core';
 //# sourceMappingURL=index.d.ts.map

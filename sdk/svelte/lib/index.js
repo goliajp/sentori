@@ -84,4 +84,8 @@ export { addBreadcrumb, captureException, captureException as captureError, capt
 // from their own instrumentation; flusher off by default (opt
 // in via `initSentori({ capture: { runtimeMetrics: true } })`).
 export { RuntimeMetricBuffer, drainRuntimeMetricsForFlush, emitMetric, flushRuntimeMetrics, rebufferRuntimeMetrics, startRuntimeMetricsTimer, stopRuntimeMetricsTimer, } from '@goliapkg/sentori-javascript';
+// v2.12 — Push notifications passthrough. Svelte hosts can build a
+// store around `registerWeb` in idiomatic Svelte; we ship the
+// primitives and the types and stop short of a framework store.
+export { registerWeb, unregisterWeb, readCachedIpt, } from '@goliapkg/sentori-javascript';
 //# sourceMappingURL=index.js.map
