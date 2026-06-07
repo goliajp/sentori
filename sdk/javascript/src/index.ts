@@ -64,3 +64,14 @@ export {
   setLogLevel,
   setLogTransport,
 } from '@goliapkg/sentori-core'
+
+// v2.8 — Web Push opt-in API. `registerWeb()` walks the browser
+// permission → Service Worker → PushSubscription → server-register
+// flow; default off, host app calls when ready.
+export {
+  registerWeb,
+  unregisterWeb,
+  readCachedIpt,
+  type RegisterWebOptions,
+  type RegisterWebResult,
+} from './push.js'

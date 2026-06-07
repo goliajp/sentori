@@ -43,6 +43,10 @@
     "./app-router": {
       "types": "./lib/app-router.d.ts",
       "default": "./lib/app-router.js"
+    },
+    "./push": {
+      "types": "./lib/push.d.ts",
+      "default": "./lib/push.js"
     }
   },
   "files": [

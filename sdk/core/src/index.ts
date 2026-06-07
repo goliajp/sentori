@@ -25,6 +25,13 @@ export type {
   SpanStatus,
   Tags,
   User,
+  // v2.8 — Push notification wire types.
+  PushMessage,
+  PushOptions,
+  PushPriority,
+  PushReceipt,
+  PushTicket,
+  PushTicketStatus,
 } from './types.js'
 
 export { coerceError } from './coerce-error.js'
