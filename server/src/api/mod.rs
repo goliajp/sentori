@@ -39,6 +39,10 @@ pub mod endpoint_checks;
 pub mod orgs;
 pub mod privacy;
 pub mod projects;
+/// v2.7 — push notification subsystem HTTP routes (token register /
+/// send / receipts + Expo-compat alt endpoints). Sits on the
+/// ingestion router with Bearer + rate-limit middleware.
+pub mod push;
 pub mod recent;
 pub mod recipients;
 pub mod repro;

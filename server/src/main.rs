@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use anyhow::Context;
 use sentori_server::{
-    db, digest, metrics, notifier, quotas, regression, retention, router, rule_eval, seed,
+    db, digest, metrics, notifier, push, quotas, regression, retention, router, rule_eval, seed,
     trace_emit, valkey, webhook_dispatch,
 };
 
@@ -184,6 +184,16 @@ async fn main() -> anyhow::Result<()> {
     if let Some(p) = pool.as_ref() {
         webhook_dispatch::spawn_cron(p.clone());
         tracing::info!("webhook dispatch cron spawned (30s interval)");
+    }
+
+    // v2.7 — push dispatch cron. Same shape as webhook_dispatch: 30s
+    // tick, claim pending push_sends, fan out via provider trait.
+    // In v2.7 the per-row dispatch loop is a stub (W4/W5 fill APNs +
+    // FCM); the cron itself is wired so subsequent commits land
+    // without touching main.rs.
+    if let Some(p) = pool.as_ref() {
+        push::dispatch_cron::spawn_cron(p.clone());
+        tracing::info!("push dispatch cron spawned (30s interval)");
     }
 
     // v2.1 W1 — runtime metrics auxiliary crons:
