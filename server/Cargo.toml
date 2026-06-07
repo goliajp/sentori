@@ -102,6 +102,15 @@ jsonwebtoken = "10"
 # secret sealing.
 aes-gcm = "0.10"
 hkdf = "0.12"
+# v2.8 W1 — P-256 ECDH for Web Push RFC 8291 payload encryption.
+# Pure Rust (RustCrypto); no OpenSSL pull-in. ECDH gives the
+# shared secret between our ephemeral key and the browser's
+# subscription p256dh; HKDF + AES-GCM (above) do the rest.
+p256 = { version = "0.13", features = ["ecdh", "arithmetic"] }
+# v2.8 — base64url encoding/decoding for VAPID `k=` header and the
+# Web Push subscription's `p256dh` / `auth` fields. URL-safe alphabet
+# without padding per the spec.
+base64 = "0.22"
 
 [dev-dependencies]
 reqwest = { version = "0.13", default-features = false, features = ["json", "query"] }

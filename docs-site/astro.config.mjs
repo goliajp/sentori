@@ -71,6 +71,7 @@ export default defineConfig({
             { label: 'Find bugs with /explore', slug: 'recipes/find-bugs-with-explore' },
             { label: 'Find users affected', slug: 'recipes/find-users-affected' },
             { label: 'Find slow routes', slug: 'recipes/find-slow' },
+            { label: 'Push notifications (Next.js)', slug: 'recipes/push-from-nextjs' },
           ],
         },
         {

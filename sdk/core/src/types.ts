@@ -337,3 +337,67 @@ export type SamplingConfig = {
    *  default would defeat the point. */
   messages?: null | number
 }
+
+// v2.8 — Push notification types. Mirror the Sentori-native wire
+// shape of `/v1/push/send`. Re-exported by every framework wrapper
+// so server-side helpers (`sentori-next`'s `sentoriPush`) share one
+// canonical message contract with the dashboard's send dialog and
+// the SDK's documentation.
+
+/** Priority hint for the delivery channel.
+ *
+ *  - `'high'` maps to APNs `apns-priority: 10`, FCM `priority: high`,
+ *    Web Push `Urgency: high`. Suitable for user-perceptible alerts
+ *    that must wake the device.
+ *  - `'normal'` is the default; mapped to APNs `5` / FCM `normal` /
+ *    Web Push `normal`. Suitable for background data sync. */
+export type PushPriority = 'normal' | 'high'
+
+/** Per-message delivery options. Each field is best-effort —
+ *  providers ignore fields they don't understand. The server-side
+ *  normalises sounds + badges per platform; you pass the same
+ *  options object regardless of who's receiving. */
+export type PushOptions = {
+  sound?: null | string
+  badge?: number
+  priority?: PushPriority
+  ttl?: number
+  mutableContent?: boolean
+  contentAvailable?: boolean
+  collapseKey?: string
+  channelId?: string
+  category?: string
+}
+
+/** Wire shape for `POST /v1/push/send`. `to` accepts a single
+ *  `ipt_*` handle or an array — the server fans the array out into
+ *  one queued row per recipient and returns a ticket per row. */
+export type PushMessage = {
+  to: string | string[]
+  title?: string
+  body?: string
+  data?: Record<string, unknown>
+  options?: PushOptions
+  /** Idempotency key scoped per project. Two POSTs with the same
+   *  (project, idempotencyKey) collapse to one queued send. */
+  idempotencyKey?: string
+}
+
+/** Lifecycle state of one send. */
+export type PushTicketStatus = 'queued' | 'sent' | 'failed'
+
+/** Server response shape — one element per recipient in the send. */
+export type PushTicket = {
+  id: string
+  status: PushTicketStatus
+  providerOutcome?: string
+  error?: string
+  retryCount: number
+  createdAt: string
+  sentAt?: string
+}
+
+/** Wire shape returned by `GET /v1/push/receipts/{id}`. */
+export type PushReceipt = {
+  ticket: PushTicket
+}

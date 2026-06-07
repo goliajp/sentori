@@ -21,3 +21,11 @@ export {
   useCaptureError,
   useSentori,
 } from '@goliapkg/sentori-react'
+
+// v2.8 — server-side Push helper. Re-export from the dedicated
+// `/push` subpath so server-only code can `import { sentoriPush }
+// from '@goliapkg/sentori-next/push'` and avoid pulling the rest of
+// the surface. The top-level re-export here keeps `import { ... }
+// from '@goliapkg/sentori-next'` working for the common case.
+export { sentoriPush } from './push.js'
+export type { SentoriPushConfig, SentoriPushClient } from './push.js'
