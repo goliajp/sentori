@@ -353,3 +353,18 @@ Remaining hidden after v2.14:
 - moments — still needs v3 GDS migration (v2.15 candidate)
 - audience — subsumed by Users overview
 - alerts — cross-cutting, needs own redesign
+
+## Update 2026-06-07 — v2.15 close (moments flip)
+
+- **moments** ✅ flipped visible in v2.15. group **changed from
+  `find-user` to `find-slow`** (Audit verdict revised: business-
+  flow vital, sibling to v2.5 vitals device-level vital — same
+  find-slow lens, different abstraction level). chord `g m`.
+  view + new detail-view both went through v3 GDS migration:
+  master-detail rail → full-screen DataTable + click-row →
+  per-sample timeline (`:momentName` child route). Same pattern
+  as v2.14 traces / Issues v3.
+
+Remaining hidden after v2.15 (2 modules only):
+- audience — subsumed by Users overview (verdict: keep hidden)
+- alerts — cross-cutting, needs own redesign (independent release)
