@@ -81,6 +81,8 @@ const MomentsView = lazyView(() =>
 const PostureView = lazyView(() =>
   import('./posture/view').then((m) => ({ default: m.PostureView }))
 )
+// v2.11 — Push notifications module (credential CRUD).
+const PushView = lazyView(() => import('./push/view').then((m) => ({ default: m.PushView })))
 const PrivacyView = lazyView(() =>
   import('./privacy/view').then((m) => ({ default: m.PrivacyView }))
 )
@@ -397,6 +399,20 @@ export const MODULES: ModuleDef[] = [
     label: 'Webhooks',
     path: 'webhooks',
     view: WebhooksView,
+  },
+  // v2.11 — Push notifications credential CRUD. Chord `g n`
+  // ("notifications"). Group `manage` per design doc — push is
+  // configure-and-watch, not a triage lens. First non-hidden lens
+  // module added since v2.6 (cert-monitor + posture).
+  {
+    adminOnly: true,
+    chord: 'n',
+    group: 'manage',
+    iconPath: 'M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0',
+    id: 'push',
+    label: 'Push',
+    path: 'push',
+    view: PushView,
   },
   {
     adminOnly: true,

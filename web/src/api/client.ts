@@ -849,6 +849,32 @@ export const adminApi = {
   listCertObservations: (projectId: string) =>
     adminFetch<CertObservation[]>(`/projects/${projectId}/cert-monitor/observations`),
 
+  /** v2.11 — list push provider credentials for a project. The
+   *  encrypted `secret_blob` is never returned; only the non-secret
+   *  `config` JSONB + provider + updated_at. */
+  listPushCredentials: (projectId: string) =>
+    adminFetch<PushCredentialRow[]>(`/projects/${projectId}/push/credentials`),
+
+  /** v2.11 — upsert one provider credential (apns/fcm/webpush/hcm/mipush).
+   *  `secret` is sealed via the server's `secrets::seal` (AES-256-GCM)
+   *  before insertion. */
+  upsertPushCredential: (
+    projectId: string,
+    provider: PushProviderKind,
+    config: unknown,
+    secret: unknown
+  ) =>
+    adminFetch<{ ok: boolean }>(`/projects/${projectId}/push/credentials`, {
+      body: JSON.stringify({ provider, config, secret }),
+      method: 'PUT',
+    }),
+
+  /** v2.11 — delete one provider's credential row. */
+  deletePushCredential: (projectId: string, provider: PushProviderKind) =>
+    adminFetch<null>(`/projects/${projectId}/push/credentials/${provider}`, {
+      method: 'DELETE',
+    }),
+
   /** v2.1 W4 — endpoint health: list all checks for a project. */
   listEndpointChecks: (projectId: string) =>
     adminFetch<EndpointCheck[]>(`/projects/${projectId}/endpoint-checks`),
@@ -1542,6 +1568,16 @@ export type CertObservation = {
   nameValue: null | string
   notAfter: string
   notBefore: string
+}
+
+// v2.11 — push credential row. Server NEVER returns `secret_blob` /
+// `secret_nonce`; only the public config + provider + last-updated.
+export type PushProviderKind = 'apns' | 'fcm' | 'webpush' | 'hcm' | 'mipush'
+
+export type PushCredentialRow = {
+  provider: PushProviderKind
+  config: Record<string, unknown>
+  updatedAt: string
 }
 
 // v0.9.4 #1 — mobile vitals shapes.
