@@ -87,4 +87,8 @@ export { addBreadcrumb, captureException, captureException as captureError, capt
 // v2.1 W2 — runtime metrics surface. Off by default; opt in
 // via `initSentori({ capture: { runtimeMetrics: true } })`.
 export { RuntimeMetricBuffer, drainRuntimeMetricsForFlush, emitMetric, flushRuntimeMetrics, rebufferRuntimeMetrics, startRuntimeMetricsTimer, stopRuntimeMetricsTimer, } from '@goliapkg/sentori-javascript';
+// v2.12 — Push notifications passthrough. Solid hosts wrap
+// `registerWeb` in a `createResource` / `createSignal` chain
+// idiomatically; we ship the primitives + types.
+export { registerWeb, unregisterWeb, readCachedIpt, } from '@goliapkg/sentori-javascript';
 //# sourceMappingURL=index.js.map

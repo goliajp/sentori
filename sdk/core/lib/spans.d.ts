@@ -146,6 +146,27 @@ export declare function startTrace(name: string, opts?: Omit<StartSpanOptions, '
  * active-context stack). This one creates + auto-finishes.
  */
 export declare function withScopedSpan<T>(op: string, fn: (span: SpanHandle) => T, opts?: StartSpanOptions): T;
+/**
+ * v2.3 — unified `withSpan` entry point per design §2.3. Dispatches
+ * by first-argument type:
+ *
+ *   `withSpan(name: string, fn)`  → high-level wrap helper.
+ *                                   Opens a span, runs fn, ends
+ *                                   the span. Same as
+ *                                   `withScopedSpan(name, fn)`.
+ *
+ *   `withSpan(span: SpanContextLike, fn)` → low-level active-span
+ *                                   manager. Pushes the span onto
+ *                                   the active-context stack for the
+ *                                   duration of fn so child spans
+ *                                   inherit it as parent. Same as
+ *                                   `withActiveSpan(span, fn)`.
+ *
+ * `withScopedSpan` + `withActiveSpan` remain exported for callers
+ * who want the explicit name; both compile to the same runtime.
+ */
+export declare function withSpan<T>(span: SpanContextLike, fn: () => T): T;
+export declare function withSpan<T>(name: string, fn: (span: SpanHandle) => T, opts?: StartSpanOptions): T;
 /** Snapshot the global buffer (does not drain). */
 export declare function getSpans(): Span[];
 /** Take everything out of the global buffer (used by transport flush). */

@@ -256,6 +256,41 @@ export type CommonInitOptions = {
     token: string;
 };
 /**
+ * v2.3 — payload handed to `init({ onReady })` after init completes.
+ * Shared across SDKs so a host that switches from web to RN reads the
+ * same shape. `native` is optional because non-mobile SDKs never have
+ * a native module to bind. `coldStartMs` is also optional — only the
+ * RN SDK measures it via the native bridge timing.
+ */
+export type ReadyInfo = {
+    /** npm version of the SDK package that fired this. */
+    sdkVersion: string;
+    /** Milliseconds between cold-start signal and `init()` completion.
+     *  Only populated by the RN SDK; undefined elsewhere. */
+    coldStartMs?: number;
+    /** Native module bind status. Present on RN; absent on web / JS. */
+    native?: {
+        bound: boolean;
+        methods: string[];
+    };
+};
+/**
+ * v2.3 — host-supplied filter / mutator hook. Called once per event
+ * just before transport enqueue. Return the event (possibly mutated)
+ * to send it, or `null` to drop it entirely. Synchronous — async
+ * pre-send mutation is intentionally not supported (would let the
+ * host stall the SDK's hot path).
+ *
+ * If the hook throws, SDK swallows the error (NEVER rule), emits one
+ * one-shot `logger.warn`, and falls back to the un-mutated event.
+ * If it returns a non-event (e.g. `undefined`), same treatment.
+ *
+ * Use for host-side PII scrubbing the SDK can't do automatically
+ * (custom field names, application-specific redaction). Server-side
+ * privacy_lab still runs even when no beforeSend is configured.
+ */
+export type BeforeSendHook = (event: Event) => Event | null;
+/**
  * Phase 44 sub-A — per-event-class client-side sampling. Each rate
  * is in `[0, 1]`; absent / null → 1.0 (keep everything). The
  * **client** drops sampled-out events before they ever leave the
@@ -278,5 +313,57 @@ export type SamplingConfig = {
      *  rarer than auto-captured errors / traces, so dropping them by
      *  default would defeat the point. */
     messages?: null | number;
+};
+/** Priority hint for the delivery channel.
+ *
+ *  - `'high'` maps to APNs `apns-priority: 10`, FCM `priority: high`,
+ *    Web Push `Urgency: high`. Suitable for user-perceptible alerts
+ *    that must wake the device.
+ *  - `'normal'` is the default; mapped to APNs `5` / FCM `normal` /
+ *    Web Push `normal`. Suitable for background data sync. */
+export type PushPriority = 'normal' | 'high';
+/** Per-message delivery options. Each field is best-effort —
+ *  providers ignore fields they don't understand. The server-side
+ *  normalises sounds + badges per platform; you pass the same
+ *  options object regardless of who's receiving. */
+export type PushOptions = {
+    sound?: null | string;
+    badge?: number;
+    priority?: PushPriority;
+    ttl?: number;
+    mutableContent?: boolean;
+    contentAvailable?: boolean;
+    collapseKey?: string;
+    channelId?: string;
+    category?: string;
+};
+/** Wire shape for `POST /v1/push/send`. `to` accepts a single
+ *  `ipt_*` handle or an array — the server fans the array out into
+ *  one queued row per recipient and returns a ticket per row. */
+export type PushMessage = {
+    to: string | string[];
+    title?: string;
+    body?: string;
+    data?: Record<string, unknown>;
+    options?: PushOptions;
+    /** Idempotency key scoped per project. Two POSTs with the same
+     *  (project, idempotencyKey) collapse to one queued send. */
+    idempotencyKey?: string;
+};
+/** Lifecycle state of one send. */
+export type PushTicketStatus = 'queued' | 'sent' | 'failed';
+/** Server response shape — one element per recipient in the send. */
+export type PushTicket = {
+    id: string;
+    status: PushTicketStatus;
+    providerOutcome?: string;
+    error?: string;
+    retryCount: number;
+    createdAt: string;
+    sentAt?: string;
+};
+/** Wire shape returned by `GET /v1/push/receipts/{id}`. */
+export type PushReceipt = {
+    ticket: PushTicket;
 };
 //# sourceMappingURL=types.d.ts.map

@@ -60,4 +60,10 @@ export { addBreadcrumb, captureException, captureException as captureError, capt
 // via `initSentori({ capture: { runtimeMetrics: true } })`.
 export { RuntimeMetricBuffer, drainRuntimeMetricsForFlush, emitMetric, flushRuntimeMetrics, rebufferRuntimeMetrics, startRuntimeMetricsTimer, stopRuntimeMetricsTimer, } from '@goliapkg/sentori-javascript';
 export { SentoriErrorBoundary } from './ErrorBoundary.js';
+// v2.12 — Push notifications passthrough. Vue hosts call
+// `registerWeb` directly from a `setup()` block or wrap in a
+// composable inside the host app (the composable shape is
+// idiomatic enough that we don't ship one here — Vue 3's hook
+// patterns are short and host-specific).
+export { registerWeb, unregisterWeb, readCachedIpt, } from '@goliapkg/sentori-javascript';
 //# sourceMappingURL=index.js.map
