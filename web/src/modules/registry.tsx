@@ -184,15 +184,13 @@ export const MODULES: ModuleDef[] = [
     path: 'issues',
     view: IssuesView,
   },
+  // v2.14 — Traces flipped visible after v3 GDS migration. find-slow
+  // lens fallback per audit verdict; drill from vitals/runtime down
+  // to the full span timeline here.
   {
     children: [{ path: ':traceId', view: TraceDetailView }],
+    chord: 'a',
     group: 'find-bug',
-    // v2.2 reset — hidden while we redesign the surface from scratch.
-    // The trace data continues to flow into the DB; the view is just
-    // off the sidebar so the dashboard advertises only what we ship
-    // a polished UI for. Flip back on once the redesigned Traces
-    // module lands. See docs/roadmap/v2.2.md.
-    hidden: true,
     iconPath: 'M3 6h18M3 12h13M3 18h9',
     id: 'traces',
     label: 'Traces',
@@ -324,10 +322,13 @@ export const MODULES: ModuleDef[] = [
     path: 'privacy',
     view: PrivacyView,
   },
+  // v2.14 — Live debug flipped visible after v3 GDS migration.
+  // adminOnly utility; common workflow is "I'm debugging a specific
+  // user.id right now" so it lives in find-bug group.
   {
     adminOnly: true,
+    chord: 'l',
     group: 'find-bug',
-    hidden: true,
     iconPath:
       'M4.9 19.1A9 9 0 0 1 4.9 4.9M19.1 4.9a9 9 0 0 1 0 14.2M7.8 16.2A5 5 0 0 1 7.8 7.8M16.2 7.8a5 5 0 0 1 0 8.4M12 13a1 1 0 1 1 0-2 1 1 0 0 1 0 2zM12 22v-9',
     id: 'live-debug',
