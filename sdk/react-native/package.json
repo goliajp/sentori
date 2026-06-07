@@ -32,6 +32,10 @@
       "types": "./lib/compat/sentry.d.ts",
       "default": "./lib/compat/sentry.js"
     },
+    "./expo-compat": {
+      "types": "./lib/expo-compat.d.ts",
+      "default": "./lib/expo-compat.js"
+    },
     "./feedback": {
       "types": "./lib/feedback.d.ts",
       "default": "./lib/feedback.js"
@@ -59,9 +63,9 @@
     "prepack": "bun run build"
   },
   "peerDependencies": {
-    "expo-modules-core": ">=2.0",
-    "react": ">=18",
-    "react-native": ">=0.74"
+    "expo-modules-core": ">=55.0.0 <57.0.0",
+    "react": ">=19",
+    "react-native": ">=0.81.0"
   },
   "peerDependenciesMeta": {
     "@react-native-async-storage/async-storage": {

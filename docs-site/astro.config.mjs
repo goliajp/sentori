@@ -74,6 +74,7 @@ export default defineConfig({
             { label: 'Push notifications (Next.js)', slug: 'recipes/push-from-nextjs' },
             { label: 'Push notifications (React Native iOS)', slug: 'recipes/push-from-react-native-ios' },
             { label: 'Push notifications (React Native Android)', slug: 'recipes/push-from-react-native-android' },
+            { label: 'Migrate from expo-notifications', slug: 'recipes/migrate-from-expo-notifications' },
           ],
         },
         {
