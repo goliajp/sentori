@@ -43,6 +43,13 @@ function lazyView(loader: () => Promise<{ default: ComponentType }>): ComponentT
 }
 
 const AlertsView = lazyView(() => import('./alerts/view').then((m) => ({ default: m.AlertsView })))
+// v2.16 — Alerts cross-cutting redesign added detail + form sub-views.
+const AlertDetailView = lazyView(() =>
+  import('./alerts/detail-view').then((m) => ({ default: m.AlertDetailView }))
+)
+const AlertFormView = lazyView(() =>
+  import('./alerts/form-view').then((m) => ({ default: m.AlertFormView }))
+)
 const AudienceView = lazyView(() =>
   import('./audience/view').then((m) => ({ default: m.AudienceView }))
 )
@@ -374,10 +381,18 @@ export const MODULES: ModuleDef[] = [
     path: 'users',
     view: UsersView,
   },
+  // v2.16 — Alerts cross-cutting redesign + flip visible. Not a
+  // lens — manage utility surface. Children routes mirror Health:
+  // `new` (create) + `:ruleId` (detail) + `:ruleId/edit` (form).
   {
     adminOnly: true,
+    children: [
+      { path: 'new', view: AlertFormView },
+      { path: ':ruleId', view: AlertDetailView },
+      { path: ':ruleId/edit', view: AlertFormView },
+    ],
+    chord: 'k',
     group: 'manage',
-    hidden: true,
     iconPath: 'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
     id: 'alerts',
     label: 'Alerts',
