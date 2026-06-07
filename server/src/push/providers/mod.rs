@@ -6,6 +6,7 @@
 // or FCM OAuth.
 
 use async_trait::async_trait;
+use std::sync::Arc;
 use thiserror::Error;
 
 use crate::push::types::NativeMessage;
@@ -119,4 +120,38 @@ pub trait Provider: Send + Sync {
         env: Option<&str>,
         msg: &NativeMessage,
     ) -> Result<ProviderResult, ProviderError>;
+}
+
+/// Process-wide provider registry. Built once on startup with the
+/// shared http_client. Providers internal to v2.7 (APNs, FCM) hold
+/// caches inside their own struct (FCM's OAuth token cache); the
+/// others are stateless stubs until their lens-specific release.
+pub struct Providers {
+    pub apns: Arc<dyn Provider>,
+    pub fcm: Arc<dyn Provider>,
+    pub webpush: Arc<dyn Provider>,
+    pub hcm: Arc<dyn Provider>,
+    pub mipush: Arc<dyn Provider>,
+}
+
+impl Providers {
+    pub fn new(http_client: reqwest::Client) -> Self {
+        Self {
+            apns: Arc::new(apns::ApnsProvider::new(http_client.clone())),
+            fcm: Arc::new(fcm::FcmProvider::new(http_client.clone())),
+            webpush: Arc::new(webpush::WebPushProvider::new(http_client.clone())),
+            hcm: Arc::new(hcm::HcmProvider::new(http_client.clone())),
+            mipush: Arc::new(mipush::MiPushProvider::new(http_client)),
+        }
+    }
+
+    pub fn pick(&self, kind: ProviderKind) -> &Arc<dyn Provider> {
+        match kind {
+            ProviderKind::Apns => &self.apns,
+            ProviderKind::Fcm => &self.fcm,
+            ProviderKind::WebPush => &self.webpush,
+            ProviderKind::Hcm => &self.hcm,
+            ProviderKind::MiPush => &self.mipush,
+        }
+    }
 }

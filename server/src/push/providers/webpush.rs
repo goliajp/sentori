@@ -13,17 +13,14 @@ use async_trait::async_trait;
 use super::{Credential, Provider, ProviderError, ProviderKind, ProviderResult};
 use crate::push::types::NativeMessage;
 
-pub struct WebPushProvider;
-
-impl WebPushProvider {
-    pub fn new() -> Self {
-        Self
-    }
+pub struct WebPushProvider {
+    #[allow(dead_code)]
+    http_client: reqwest::Client,
 }
 
-impl Default for WebPushProvider {
-    fn default() -> Self {
-        Self::new()
+impl WebPushProvider {
+    pub fn new(http_client: reqwest::Client) -> Self {
+        Self { http_client }
     }
 }
 

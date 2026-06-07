@@ -10,17 +10,14 @@ use async_trait::async_trait;
 use super::{Credential, Provider, ProviderError, ProviderKind, ProviderResult};
 use crate::push::types::NativeMessage;
 
-pub struct HcmProvider;
-
-impl HcmProvider {
-    pub fn new() -> Self {
-        Self
-    }
+pub struct HcmProvider {
+    #[allow(dead_code)]
+    http_client: reqwest::Client,
 }
 
-impl Default for HcmProvider {
-    fn default() -> Self {
-        Self::new()
+impl HcmProvider {
+    pub fn new(http_client: reqwest::Client) -> Self {
+        Self { http_client }
     }
 }
 

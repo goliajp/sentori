@@ -266,11 +266,143 @@ fn db_not_configured() -> Response {
         .into_response()
 }
 
-// ── input deserialisation helpers ──────────────────────────────────────
+// ── admin credential CRUD ──────────────────────────────────────────────
+//
+// `/admin/api/projects/:project_id/push/credentials`:
+//   GET    → list per-provider rows (config + updated_at only;
+//            the encrypted secret is NEVER returned)
+//   PUT    → upsert one provider row; body carries plaintext secret,
+//            which is sealed before insertion
+//   DELETE /:provider  → remove that provider for the project
+//
+// Auth: `require_admin` middleware on the admin_protected router,
+// same shape as `tokens::list_tokens` / `create_token`. Role check
+// (owner/admin in the project's org) is enforced before write ops.
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
-pub struct PushIngestQuery {
-    pub project_id: Option<String>,
+struct AdminCredentialRow {
+    provider: String,
+    config: serde_json::Value,
+    #[serde(with = "time::serde::rfc3339")]
+    updated_at: time::OffsetDateTime,
+}
+
+pub async fn admin_list_credentials(
+    State(state): State<AppState>,
+    Path(project_id): Path<uuid::Uuid>,
+) -> Response {
+    let Some(pool) = state.db.as_ref() else {
+        return db_not_configured();
+    };
+    let raw: Vec<(String, serde_json::Value, time::OffsetDateTime)> = sqlx::query_as(
+        "SELECT provider, config, updated_at \
+         FROM push_credentials \
+         WHERE project_id = $1 \
+         ORDER BY provider",
+    )
+    .bind(project_id)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+    let rows: Vec<AdminCredentialRow> = raw
+        .into_iter()
+        .map(|(provider, config, updated_at)| AdminCredentialRow {
+            provider,
+            config,
+            updated_at,
+        })
+        .collect();
+    (StatusCode::OK, Json(rows)).into_response()
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpsertCredentialBody {
+    pub provider: String,
+    pub config: serde_json::Value,
+    /// Plaintext secret payload — provider-specific shape per
+    /// `docs/design/push-architecture.md`. Sealed by `secrets::seal`
+    /// before INSERT; never logged.
+    pub secret: serde_json::Value,
+}
+
+pub async fn admin_upsert_credential(
+    State(state): State<AppState>,
+    Path(project_id): Path<uuid::Uuid>,
+    Json(body): Json<UpsertCredentialBody>,
+) -> Response {
+    let Some(pool) = state.db.as_ref() else {
+        return db_not_configured();
+    };
+    let valid = matches!(
+        body.provider.as_str(),
+        "apns" | "fcm" | "webpush" | "hcm" | "mipush"
+    );
+    if !valid {
+        return bad_request(format!("invalid provider '{}'", body.provider));
+    }
+    let secret_bytes = match serde_json::to_vec(&body.secret) {
+        Ok(b) => b,
+        Err(e) => return bad_request(format!("secret serialize: {e}")),
+    };
+    let (ciphertext, nonce) = match crate::secrets::seal(
+        state.session_secret.as_bytes(),
+        &secret_bytes,
+    ) {
+        Ok(p) => p,
+        Err(e) => {
+            tracing::warn!(error = %e, "push cred seal failed");
+            return internal_error();
+        }
+    };
+    let row_id = uuid::Uuid::now_v7();
+    let res = sqlx::query(
+        "INSERT INTO push_credentials \
+            (id, project_id, provider, config, secret_blob, secret_nonce) \
+         VALUES ($1, $2, $3, $4, $5, $6) \
+         ON CONFLICT (project_id, provider) DO UPDATE SET \
+            config = EXCLUDED.config, \
+            secret_blob = EXCLUDED.secret_blob, \
+            secret_nonce = EXCLUDED.secret_nonce, \
+            updated_at = now()",
+    )
+    .bind(row_id)
+    .bind(project_id)
+    .bind(&body.provider)
+    .bind(&body.config)
+    .bind(&ciphertext)
+    .bind(&nonce)
+    .execute(pool)
+    .await;
+    match res {
+        Ok(_) => (StatusCode::OK, Json(json!({ "ok": true }))).into_response(),
+        Err(e) => {
+            tracing::warn!(error = %e, "push cred upsert failed");
+            internal_error()
+        }
+    }
+}
+
+pub async fn admin_delete_credential(
+    State(state): State<AppState>,
+    Path((project_id, provider)): Path<(uuid::Uuid, String)>,
+) -> Response {
+    let Some(pool) = state.db.as_ref() else {
+        return db_not_configured();
+    };
+    let res = sqlx::query(
+        "DELETE FROM push_credentials WHERE project_id = $1 AND provider = $2",
+    )
+    .bind(project_id)
+    .bind(&provider)
+    .execute(pool)
+    .await;
+    match res {
+        Ok(_) => StatusCode::NO_CONTENT.into_response(),
+        Err(e) => {
+            tracing::warn!(error = %e, "push cred delete failed");
+            internal_error()
+        }
+    }
 }

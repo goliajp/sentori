@@ -364,6 +364,18 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/tokens/{token_id}",
             axum::routing::delete(api::tokens::revoke_token),
         )
+        // v2.7 W10 — push credential CRUD (APNs p8 / FCM service-
+        // account JSON / VAPID private key / HCM appSecret / MiPush
+        // appSecret). The encrypted secret blob is never returned;
+        // GET surfaces only `{ provider, config, updated_at }`.
+        .route(
+            "/projects/{project_id}/push/credentials",
+            get(api::push::admin_list_credentials).put(api::push::admin_upsert_credential),
+        )
+        .route(
+            "/projects/{project_id}/push/credentials/{provider}",
+            axum::routing::delete(api::push::admin_delete_credential),
+        )
         .route(
             "/projects/{project_id}/issues",
             get(api::admin::list_issues),
