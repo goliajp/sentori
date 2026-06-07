@@ -122,3 +122,22 @@ export {
   stopRuntimeMetricsTimer,
   type RuntimeMetricPoint,
 } from '@goliapkg/sentori-javascript'
+
+// v2.12 — Push notifications passthrough. Svelte hosts can build a
+// store around `registerWeb` in idiomatic Svelte; we ship the
+// primitives and the types and stop short of a framework store.
+export {
+  registerWeb,
+  unregisterWeb,
+  readCachedIpt,
+  type RegisterWebOptions,
+  type RegisterWebResult,
+} from '@goliapkg/sentori-javascript'
+export type {
+  PushMessage,
+  PushOptions,
+  PushPriority,
+  PushReceipt,
+  PushTicket,
+  PushTicketStatus,
+} from '@goliapkg/sentori-core'

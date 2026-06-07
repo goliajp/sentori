@@ -119,3 +119,22 @@ export {
   stopRuntimeMetricsTimer,
   type RuntimeMetricPoint,
 } from '@goliapkg/sentori-javascript'
+
+// v2.12 — Push notifications passthrough. Solid hosts wrap
+// `registerWeb` in a `createResource` / `createSignal` chain
+// idiomatically; we ship the primitives + types.
+export {
+  registerWeb,
+  unregisterWeb,
+  readCachedIpt,
+  type RegisterWebOptions,
+  type RegisterWebResult,
+} from '@goliapkg/sentori-javascript'
+export type {
+  PushMessage,
+  PushOptions,
+  PushPriority,
+  PushReceipt,
+  PushTicket,
+  PushTicketStatus,
+} from '@goliapkg/sentori-core'
