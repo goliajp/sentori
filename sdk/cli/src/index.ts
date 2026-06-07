@@ -4,6 +4,14 @@ import { parseArgs } from 'node:util'
 import { formatIssueLine, issueList, issuePatch } from './issue.js'
 import { runMcpServer } from './mcp.js'
 import { uploadDsym, uploadMapping } from './native-artifacts.js'
+import {
+  parseJsonArg,
+  pushCredsDelete,
+  pushCredsList,
+  pushCredsSet,
+  pushReceipt,
+  pushSend,
+} from './push.js'
 import { reactNativeUpload } from './react-native.js'
 import { uploadSourceBundle } from './source-bundle.js'
 import { uploadSourcemaps } from './upload.js'
@@ -598,9 +606,188 @@ async function main(argv: string[]): Promise<number> {
   if (a === 'issue' && b === 'resolve') return cmdIssuePatch(rest, { status: 'resolved' }, 'resolved')
   if (a === 'issue' && b === 'silence') return cmdIssuePatch(rest, { status: 'silenced' }, 'silenced')
   if (a === 'issue' && b === 'close') return cmdIssuePatch(rest, { status: 'closed' }, 'closed')
+  if (a === 'push' && b === 'send') return cmdPushSend(rest)
+  if (a === 'push' && b === 'receipt') return cmdPushReceipt(rest)
+  if (a === 'push' && b === 'creds') {
+    const [c, ...rest2] = rest
+    if (c === 'list') return cmdPushCredsList(rest2)
+    if (c === 'set') return cmdPushCredsSet(rest2)
+    if (c === 'delete') return cmdPushCredsDelete(rest2)
+  }
   console.error(`unknown command: ${[a, b].filter(Boolean).join(' ') || '(none)'}\n`)
   console.error(HELP)
   return 2
+}
+
+// ── push commands (v2.12) ─────────────────────────────────────────
+
+async function cmdPushSend(argv: string[]): Promise<number> {
+  const parsed = parseArgs({
+    args: argv,
+    options: {
+      'api-url': { type: 'string' },
+      body: { type: 'string' },
+      data: { type: 'string' },
+      'idempotency-key': { type: 'string' },
+      'ingest-url': { type: 'string' },
+      priority: { type: 'string' },
+      project: { type: 'string' },
+      title: { type: 'string' },
+      to: { type: 'string' },
+      token: { type: 'string' },
+      ttl: { type: 'string' },
+    },
+    strict: true,
+  })
+  const cfg = parseAdminCfg(parsed.values)
+  if (!cfg) return 2
+  const to = parsed.values.to as string | undefined
+  if (!to) {
+    console.error('error: --to <ipt_handle> is required')
+    return 2
+  }
+  try {
+    const data = parsed.values.data ? (parseJsonArg(parsed.values.data as string, '--data') as Record<string, unknown>) : undefined
+    const priority = parsed.values.priority as 'high' | 'normal' | undefined
+    const ticket = await pushSend(cfg, {
+      to,
+      title: parsed.values.title as string | undefined,
+      body: parsed.values.body as string | undefined,
+      data,
+      priority,
+      ttl: parsed.values.ttl ? Number(parsed.values.ttl) : undefined,
+      idempotencyKey: parsed.values['idempotency-key'] as string | undefined,
+    })
+    console.log(`${ticket.id} ${ticket.status}`)
+    return 0
+  } catch (e) {
+    console.error(`push send failed: ${(e as Error).message}`)
+    return 1
+  }
+}
+
+async function cmdPushReceipt(argv: string[]): Promise<number> {
+  const parsed = parseArgs({
+    args: argv,
+    options: {
+      'api-url': { type: 'string' },
+      'ingest-url': { type: 'string' },
+      project: { type: 'string' },
+      token: { type: 'string' },
+    },
+    allowPositionals: true,
+    strict: true,
+  })
+  const sendId = parsed.positionals[0]
+  if (!sendId) {
+    console.error('error: <send-id> positional is required')
+    return 2
+  }
+  const cfg = parseAdminCfg(parsed.values)
+  if (!cfg) return 2
+  try {
+    const r = await pushReceipt(cfg, sendId)
+    console.log(`${r.ticket.id} ${r.ticket.status}${r.ticket.providerOutcome ? ` (${r.ticket.providerOutcome})` : ''}${r.ticket.error ? ` — ${r.ticket.error}` : ''}`)
+    return 0
+  } catch (e) {
+    console.error(`push receipt failed: ${(e as Error).message}`)
+    return 1
+  }
+}
+
+async function cmdPushCredsList(argv: string[]): Promise<number> {
+  const parsed = parseArgs({
+    args: argv,
+    options: {
+      'api-url': { type: 'string' },
+      'ingest-url': { type: 'string' },
+      project: { type: 'string' },
+      token: { type: 'string' },
+    },
+    strict: true,
+  })
+  const cfg = parseAdminCfg(parsed.values)
+  if (!cfg) return 2
+  try {
+    const rows = await pushCredsList(cfg)
+    if (rows.length === 0) {
+      console.log('(no providers configured)')
+      return 0
+    }
+    for (const r of rows) {
+      console.log(`${r.provider}\t${r.updatedAt}\t${JSON.stringify(r.config)}`)
+    }
+    return 0
+  } catch (e) {
+    console.error(`push creds list failed: ${(e as Error).message}`)
+    return 1
+  }
+}
+
+async function cmdPushCredsSet(argv: string[]): Promise<number> {
+  const parsed = parseArgs({
+    args: argv,
+    options: {
+      'api-url': { type: 'string' },
+      config: { type: 'string' },
+      'ingest-url': { type: 'string' },
+      project: { type: 'string' },
+      secret: { type: 'string' },
+      token: { type: 'string' },
+    },
+    allowPositionals: true,
+    strict: true,
+  })
+  const provider = parsed.positionals[0]
+  if (!provider) {
+    console.error('error: <provider> positional (apns/fcm/webpush/hcm/mipush) is required')
+    return 2
+  }
+  const cfg = parseAdminCfg(parsed.values)
+  if (!cfg) return 2
+  if (!parsed.values.config || !parsed.values.secret) {
+    console.error('error: --config @file.json and --secret @file.json are both required')
+    return 2
+  }
+  try {
+    const config = parseJsonArg(parsed.values.config as string, '--config')
+    const secret = parseJsonArg(parsed.values.secret as string, '--secret')
+    await pushCredsSet(cfg, provider, config, secret)
+    console.log(`${provider} ✓ saved`)
+    return 0
+  } catch (e) {
+    console.error(`push creds set failed: ${(e as Error).message}`)
+    return 1
+  }
+}
+
+async function cmdPushCredsDelete(argv: string[]): Promise<number> {
+  const parsed = parseArgs({
+    args: argv,
+    options: {
+      'api-url': { type: 'string' },
+      'ingest-url': { type: 'string' },
+      project: { type: 'string' },
+      token: { type: 'string' },
+    },
+    allowPositionals: true,
+    strict: true,
+  })
+  const provider = parsed.positionals[0]
+  if (!provider) {
+    console.error('error: <provider> positional is required')
+    return 2
+  }
+  const cfg = parseAdminCfg(parsed.values)
+  if (!cfg) return 2
+  try {
+    await pushCredsDelete(cfg, provider)
+    console.log(`${provider} ✓ deleted`)
+    return 0
+  } catch (e) {
+    console.error(`push creds delete failed: ${(e as Error).message}`)
+    return 1
+  }
 }
 
 main(process.argv.slice(2)).then(

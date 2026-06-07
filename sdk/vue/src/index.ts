@@ -93,3 +93,24 @@ export {
 } from '@goliapkg/sentori-javascript'
 
 export { SentoriErrorBoundary } from './ErrorBoundary.js'
+
+// v2.12 — Push notifications passthrough. Vue hosts call
+// `registerWeb` directly from a `setup()` block or wrap in a
+// composable inside the host app (the composable shape is
+// idiomatic enough that we don't ship one here — Vue 3's hook
+// patterns are short and host-specific).
+export {
+  registerWeb,
+  unregisterWeb,
+  readCachedIpt,
+  type RegisterWebOptions,
+  type RegisterWebResult,
+} from '@goliapkg/sentori-javascript'
+export type {
+  PushMessage,
+  PushOptions,
+  PushPriority,
+  PushReceipt,
+  PushTicket,
+  PushTicketStatus,
+} from '@goliapkg/sentori-core'
