@@ -187,6 +187,32 @@ export {
 } from './session-tracker';
 export { type NavigationRefLike, useTraceNavigation } from './navigation';
 
+// v2.9 — Push notifications (iOS this release; v2.10 lights Android).
+// Surfaced as a `sentori.push` sub-namespace from the default barrel.
+// Opt-in: `sentori.push.register({...})` triggers the OS permission
+// prompt. Sentori never prompts on its own.
+import * as _push from './push';
+export const push = {
+  register: _push.register,
+  unregister: _push.unregister,
+  getCachedIpt: _push.getCachedIpt,
+  getStatus: _push.getStatus,
+  requestPermission: _push.requestPermission,
+};
+export type {
+  PushRegisterOptions,
+  PushRegisterResult,
+  PushNotificationPayload,
+} from './push';
+export type {
+  PushMessage,
+  PushOptions,
+  PushPriority,
+  PushReceipt,
+  PushTicket,
+  PushTicketStatus,
+} from '@goliapkg/sentori-core';
+
 export type {
   Event,
   SentoriError,

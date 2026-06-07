@@ -111,5 +111,44 @@ public class SentoriModule: Module {
                 ).raise()
             }
         }
+
+        // v2.9 — push notification bridge.
+        //
+        // Five Functions / AsyncFunctions form the surface that
+        // `sdk/react-native/src/push.ts` consumes:
+        //
+        //   pushGetStatus         — non-prompting status read
+        //   pushRequestPermission — triggers the OS prompt if undecided
+        //   pushRegister          — UIApplication.registerForRemoteNotifications
+        //   pushUnregister        — UIApplication.unregisterForRemoteNotifications
+        //   pushDrainState        — token / notifications / taps buffer drain
+        //
+        // All five route through `SentoriPushNotifications.shared`,
+        // which also installs the AppDelegate method swizzle that
+        // routes APNs token callbacks into the buffer.
+
+        AsyncFunction("pushGetStatus") { (promise: Promise) in
+            SentoriPushNotifications.shared.currentPermission { status in
+                promise.resolve(status)
+            }
+        }
+
+        AsyncFunction("pushRequestPermission") { (promise: Promise) in
+            SentoriPushNotifications.shared.requestPermission { status in
+                promise.resolve(status)
+            }
+        }
+
+        Function("pushRegister") {
+            SentoriPushNotifications.shared.registerForRemoteNotifications()
+        }
+
+        Function("pushUnregister") {
+            SentoriPushNotifications.shared.unregisterForRemoteNotifications()
+        }
+
+        AsyncFunction("pushDrainState") { () -> [String: Any] in
+            return SentoriPushNotifications.shared.drainState()
+        }
     }
 }

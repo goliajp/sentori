@@ -123,6 +123,45 @@ type SentoriNativeModule = {
   stopAnrWatchdog?: () => void
   /** Dev-only — example app uses this to verify the crash flow. */
   triggerTestNativeCrash?: () => void
+  /**
+   * v2.9 — current iOS push permission status without prompting.
+   * Returns `granted` / `denied` / `notDetermined` / `provisional`
+   * / `ephemeral` (iOS-specific) mirroring web `Notification.permission`.
+   */
+  pushGetStatus?: () => Promise<string>
+  /**
+   * v2.9 — triggers the OS permission prompt the first time, or
+   * returns the cached decision. Same return shape as
+   * `pushGetStatus`.
+   */
+  pushRequestPermission?: () => Promise<string>
+  /**
+   * v2.9 — kicks off `UIApplication.registerForRemoteNotifications`.
+   * The token comes back asynchronously via the AppDelegate swizzle
+   * and lands in the native buffer — JS retrieves it through
+   * `pushDrainState`.
+   */
+  pushRegister?: () => void
+  /**
+   * v2.9 — counterpart to `pushRegister`. Calls
+   * `UIApplication.unregisterForRemoteNotifications` + clears the
+   * cached token. The server-side DELETE is the JS layer's
+   * responsibility.
+   */
+  pushUnregister?: () => void
+  /**
+   * v2.9 — snapshot the buffered token, foreground notifications,
+   * and tap responses, and clear the buffers atomically. Returns
+   *   { token?: string, error?: string, notifications: [...], taps: [...] }
+   * where each notification carries
+   *   { id, title, body, subtitle?, category?, userInfo, receivedAt }.
+   */
+  pushDrainState?: () => Promise<{
+    token?: string
+    error?: string
+    notifications: Array<Record<string, unknown>>
+    taps: Array<Record<string, unknown>>
+  }>
 }
 
 let _native: SentoriNativeModule | null | undefined
@@ -210,6 +249,69 @@ export function startAnrWatchdog(options?: {
     native()?.startAnrWatchdog?.(options)
   } catch {
     // never throw from init helpers
+  }
+}
+
+// ── v2.9 push wrappers ──────────────────────────────────────────
+
+/** Returns the current iOS push permission status without
+ *  prompting. `null` when the native module isn't available. */
+export async function pushGetStatus(): Promise<null | string> {
+  const n = native()
+  if (!n?.pushGetStatus) return null
+  try {
+    return await n.pushGetStatus()
+  } catch {
+    return null
+  }
+}
+
+/** Prompts for permission (or returns cached decision). `null` when
+ *  the native module isn't available. */
+export async function pushRequestPermission(): Promise<null | string> {
+  const n = native()
+  if (!n?.pushRequestPermission) return null
+  try {
+    return await n.pushRequestPermission()
+  } catch {
+    return null
+  }
+}
+
+export function pushRegister(): void {
+  try {
+    native()?.pushRegister?.()
+  } catch {
+    /* never throw */
+  }
+}
+
+export function pushUnregister(): void {
+  try {
+    native()?.pushUnregister?.()
+  } catch {
+    /* never throw */
+  }
+}
+
+export type PushDrainState = {
+  token?: string
+  error?: string
+  notifications: Array<Record<string, unknown>>
+  taps: Array<Record<string, unknown>>
+}
+
+/** Snapshot + clear the native push buffers. Returns empty state
+ *  when the native module isn't available. */
+export async function pushDrainState(): Promise<PushDrainState> {
+  const n = native()
+  if (!n?.pushDrainState) {
+    return { notifications: [], taps: [] }
+  }
+  try {
+    return await n.pushDrainState()
+  } catch {
+    return { notifications: [], taps: [] }
   }
 }
 
