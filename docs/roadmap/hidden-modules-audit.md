@@ -317,3 +317,23 @@ Per the master plan's Phase 1 acceptance:
 - alerts is **not** a lens — needs its own redesign batch when
   the find-* lenses are done. Carry forward as a v2.x backlog
   item, not as part of any lens batch.
+
+## Update 2026-06-07 — v2.13 close (engineering-hygiene lens)
+
+- **privacy** ✅ flipped visible in v2.13. group `trust`, chord `g y`
+  (hygiene). View was already GDS-aligned (v3 round 6 polished
+  the chrome); `privacy_lab` server cron unchanged.
+- **moments** — verdict remains `keep`, but **needs v3 GDS migration
+  before flip**. Current view is v2.x master-detail rail + legacy
+  `<table className="bench">` (predates v3 because the module was
+  hidden when v3 rewrite happened). Flipping it as-is would create
+  a visual inconsistency in the sidebar. v2.14 candidate: rewrite
+  to full-screen DataTable + click-row navigation matching the
+  Issues v3 pattern, then flip.
+
+Remaining hidden after v2.13:
+- traces — find-slow fallback
+- moments — needs v3 GDS migration (v2.14 candidate)
+- audience — subsumed by Users overview
+- live-debug — utility, not a lens
+- alerts — cross-cutting, needs own redesign
