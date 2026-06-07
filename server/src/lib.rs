@@ -48,7 +48,13 @@ pub mod recent;
 pub mod roles;
 pub mod router;
 pub mod seed;
+pub mod secrets;
 pub mod session;
+/// v2.7 — push-notification subsystem (APNs / FCM / Web Push / HCM /
+/// MiPush dispatcher). Module tree mirrors webhook_dispatch's
+/// outbound-with-retry shape; provider trait lives in
+/// `push::providers`. See docs/design/push-architecture.md.
+pub mod push;
 pub mod source_bundle;
 pub mod symbolicate;
 pub mod symbolicate_android;

@@ -94,6 +94,12 @@ pub struct AppState {
     /// `SENTORI_GEOIP_DB_PATH` isn't set or load failed; ingest just
     /// skips enrichment in that case.
     pub geoip: Option<crate::geoip::GeoIpReader>,
+    /// v2.7 — shared outbound HTTP/2 client. Reused by every push
+    /// provider (APNs, FCM, Web Push, HCM, MiPush) and by future
+    /// outbound integrations (webhooks today still build their own;
+    /// backfill is a follow-up). 5s connect / 10s read / HTTP/2 PK
+    /// enabled by builder defaults.
+    pub http_client: reqwest::Client,
 }
 
 impl FromRef<AppState> for AuthState {
