@@ -116,6 +116,19 @@ pub fn build(cfg: ServerConfig) -> Router {
             None => reader,
         }
     });
+    // v2.7 — single shared outbound client. Reused by push providers
+    // and any future outbound integration; webhook + integrations
+    // backfill is a follow-up. Logging the build failure rather than
+    // panicking — if the platform somehow can't construct a HTTP
+    // client we fall back to reqwest's defaults via Client::new().
+    let http_client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(5))
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .unwrap_or_else(|e| {
+            tracing::warn!(error = %e, "shared http_client build failed; falling back to default");
+            reqwest::Client::new()
+        });
     let state = AppState {
         auth: auth_state.clone(),
         recent,
@@ -136,6 +149,7 @@ pub fn build(cfg: ServerConfig) -> Router {
             std::collections::HashMap::new(),
         )),
         geoip,
+        http_client,
     };
 
     // Per-route body-stream cap for small-payload ingest endpoints.
@@ -194,6 +208,38 @@ pub fn build(cfg: ServerConfig) -> Router {
         // v1.1 +S7 升级 — SDK polls this every ~30s to discover its
         // live-mode flag. SDK enters immediate-send mode when set.
         .route("/v1/control/poll", get(api::live_debug::poll))
+        // v2.7 — push notification subsystem.
+        //   POST /v1/push/tokens               — register / refresh device handle
+        //   DELETE /v1/push/tokens/{handle}    — revoke
+        //   POST /v1/push/send                 — Sentori-native send (single or array)
+        //   GET  /v1/push/receipts/{send_id}   — receipt
+        //   POST /v1/push/expo-compat/send     — Expo wire-shape adapter
+        //   GET  /v1/push/expo-compat/receipts/{send_id}
+        // All inherit small_body cap, rate_limit, require_token.
+        .route(
+            "/v1/push/tokens",
+            post(api::push::register_token).layer(small_body.clone()),
+        )
+        .route(
+            "/v1/push/tokens/{handle}",
+            axum::routing::delete(api::push::revoke_token),
+        )
+        .route(
+            "/v1/push/send",
+            post(api::push::send_native).layer(small_body.clone()),
+        )
+        .route(
+            "/v1/push/receipts/{send_id}",
+            get(api::push::get_receipt),
+        )
+        .route(
+            "/v1/push/expo-compat/send",
+            post(api::push::send_expo_compat).layer(small_body.clone()),
+        )
+        .route(
+            "/v1/push/expo-compat/receipts/{send_id}",
+            get(api::push::get_receipt_expo_compat),
+        )
         .route(
             "/v1/events/{event_id}/attachments/{kind}",
             post(api::attachments::upload).layer((
@@ -317,6 +363,18 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route(
             "/projects/{project_id}/tokens/{token_id}",
             axum::routing::delete(api::tokens::revoke_token),
+        )
+        // v2.7 W10 — push credential CRUD (APNs p8 / FCM service-
+        // account JSON / VAPID private key / HCM appSecret / MiPush
+        // appSecret). The encrypted secret blob is never returned;
+        // GET surfaces only `{ provider, config, updated_at }`.
+        .route(
+            "/projects/{project_id}/push/credentials",
+            get(api::push::admin_list_credentials).put(api::push::admin_upsert_credential),
+        )
+        .route(
+            "/projects/{project_id}/push/credentials/{provider}",
+            axum::routing::delete(api::push::admin_delete_credential),
         )
         .route(
             "/projects/{project_id}/issues",

@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use anyhow::Context;
 use sentori_server::{
-    db, digest, metrics, notifier, quotas, regression, retention, router, rule_eval, seed,
+    db, digest, metrics, notifier, push, quotas, regression, retention, router, rule_eval, seed,
     trace_emit, valkey, webhook_dispatch,
 };
 
@@ -184,6 +184,30 @@ async fn main() -> anyhow::Result<()> {
     if let Some(p) = pool.as_ref() {
         webhook_dispatch::spawn_cron(p.clone());
         tracing::info!("webhook dispatch cron spawned (30s interval)");
+    }
+
+    // v2.7 — push dispatch cron. Same shape as webhook_dispatch: 30s
+    // tick, claim pending push_sends, decrypt credentials, fan out
+    // via the provider registry. APNs + FCM go live; Web Push / HCM
+    // / MiPush providers respond NotImplemented until their lens
+    // releases (v2.8 / v2.12).
+    if let Some(p) = pool.as_ref() {
+        let http_client = reqwest::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(5))
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .unwrap_or_else(|e| {
+                tracing::warn!(error = %e, "push http_client build failed; falling back to default");
+                reqwest::Client::new()
+            });
+        let providers = std::sync::Arc::new(push::providers::Providers::new(http_client));
+        let handle = push::dispatch_cron::DispatchHandle::new(
+            p.clone(),
+            providers,
+            session_secret.clone().into_bytes(),
+        );
+        push::dispatch_cron::spawn_cron(handle);
+        tracing::info!("push dispatch cron spawned (30s interval)");
     }
 
     // v2.1 W1 — runtime metrics auxiliary crons:

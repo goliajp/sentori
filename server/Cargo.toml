@@ -93,6 +93,15 @@ tar = "0.4"
 # for an installation access token. `jsonwebtoken` is the standard
 # crate; uses ring for the underlying RSA so no system OpenSSL.
 jsonwebtoken = "10"
+# v2.7 W1 — application-level secret encryption layer (`src/secrets.rs`).
+# AES-256-GCM is FIPS-compatible, hardware-accelerated on every modern
+# CPU, and a tiny pure-Rust dep with no system OpenSSL pull-in. First
+# user: push provider credentials (APNs p8, FCM service-account JSON).
+# hkdf derives the per-instance master key from SENTORI_SESSION_SECRET
+# so a single shared secret bootstraps both session signing and
+# secret sealing.
+aes-gcm = "0.10"
+hkdf = "0.12"
 
 [dev-dependencies]
 reqwest = { version = "0.13", default-features = false, features = ["json", "query"] }
