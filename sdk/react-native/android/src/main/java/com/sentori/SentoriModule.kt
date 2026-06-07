@@ -104,5 +104,48 @@ class SentoriModule : Module() {
                 throw RuntimeException("Sentori test native crash")
             }, 50)
         }
+
+        // v2.10 — push notification bridge.
+        //
+        // Same surface as iOS so the JS layer (sdk/react-native/src/push.ts)
+        // doesn't branch on Platform.OS. The Android flow uses
+        // FirebaseMessaging behind a runtime `Class.forName` gate so
+        // non-push hosts pay nothing.
+
+        AsyncFunction("pushGetStatus") {
+            val ctx = appContext.reactContext ?: return@AsyncFunction "unavailable"
+            SentoriPushNotifications.currentPermission(ctx)
+        }
+
+        AsyncFunction("pushRequestPermission") { promise: expo.modules.kotlin.Promise ->
+            val activity = appContext.currentActivity
+            if (activity == null) {
+                val ctx = appContext.reactContext
+                // No Activity to run the permission flow against; fall
+                // back to the (non-prompting) current status. Same
+                // behaviour as iOS when there's no UI scene.
+                promise.resolve(
+                    if (ctx != null) SentoriPushNotifications.currentPermission(ctx) else "unavailable"
+                )
+                return@AsyncFunction
+            }
+            SentoriPushNotifications.requestPermission(activity) { status ->
+                promise.resolve(status)
+            }
+        }
+
+        Function("pushRegister") {
+            val ctx = appContext.reactContext ?: return@Function
+            SentoriPushNotifications.registerForRemoteNotifications(ctx)
+        }
+
+        Function("pushUnregister") {
+            val ctx = appContext.reactContext ?: return@Function
+            SentoriPushNotifications.unregisterForRemoteNotifications(ctx)
+        }
+
+        AsyncFunction("pushDrainState") {
+            SentoriPushNotifications.drainState()
+        }
     }
 }

@@ -35,4 +35,16 @@ android {
 dependencies {
     implementation project(':expo-modules-core')
     implementation "org.jetbrains.kotlin:kotlin-stdlib:${rootProject.ext.kotlinVersion ?: '2.0.21'}"
+
+    // v2.10 — Firebase Cloud Messaging. `compileOnly` so non-push
+    // hosts aren't forced to ship Firebase. Hosts that want push add
+    // `com.google.firebase:firebase-messaging` themselves (plus
+    // `google-services.json` + the gradle plugin) — the SDK's
+    // `SentoriPushNotifications` code then sees the FCM classes on
+    // the runtime classpath and proceeds. Hosts without those deps
+    // see the SDK no-op cleanly via the runtime Class.forName probe.
+    compileOnly 'com.google.firebase:firebase-messaging:24.0.3'
+    // androidx.core for ContextCompat.checkSelfPermission +
+    // ActivityCompat.requestPermissions (Android 13+ POST_NOTIFICATIONS).
+    implementation 'androidx.core:core:1.13.1'
 }

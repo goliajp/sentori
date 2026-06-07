@@ -49,7 +49,7 @@ mock.module('../config', () => ({
   },
 }))
 
-import { register, unregister, getCachedIpt } from '../push'
+import { register, unregister, getCachedIpt, __setPlatformForTests } from '../push'
 
 type FetchCall = { url: string; method: string; body?: string }
 let _fetchCalls: FetchCall[] = []
@@ -141,6 +141,22 @@ describe('push.register', () => {
     expect(seen).toHaveLength(1)
     expect(seen[0]?.title).toBe('Hi')
     expect(seen[0]?.body).toBe('hello')
+  })
+})
+
+describe('push.register — Android (FCM) branch', () => {
+  beforeEach(() => __setPlatformForTests('android'))
+  afterEach(() => __setPlatformForTests(null))
+
+  it('POSTs with provider:"fcm" and omits env on Android', async () => {
+    _permissionAnswer = 'granted'
+    _drainQueue = [{ token: 'fcm-reg-token', notifications: [], taps: [] }]
+    await register()
+    expect(_fetchCalls).toHaveLength(1)
+    const body = JSON.parse(_fetchCalls[0]?.body ?? '{}') as Record<string, unknown>
+    expect(body.provider).toBe('fcm')
+    expect(body.nativeToken).toBe('fcm-reg-token')
+    expect('env' in body).toBe(false)
   })
 })
 
