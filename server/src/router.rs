@@ -129,6 +129,14 @@ pub fn build(cfg: ServerConfig) -> Router {
             tracing::warn!(error = %e, "shared http_client build failed; falling back to default");
             reqwest::Client::new()
         });
+    // v2.19 — providers registry shared with dispatch_cron. We build
+    // it here so the admin `verify credential` endpoint can reuse
+    // FCM's OAuth token cache instead of re-minting on every refresh.
+    // `main.rs` reads `state.push_providers` back and hands it to the
+    // dispatch handle, so both paths share the same `Arc<Providers>`.
+    let push_providers = std::sync::Arc::new(
+        crate::push::providers::Providers::new(http_client.clone()),
+    );
     let state = AppState {
         auth: auth_state.clone(),
         recent,
@@ -150,6 +158,7 @@ pub fn build(cfg: ServerConfig) -> Router {
         )),
         geoip,
         http_client,
+        push_providers: Some(push_providers),
     };
 
     // Per-route body-stream cap for small-payload ingest endpoints.
@@ -375,6 +384,37 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route(
             "/projects/{project_id}/push/credentials/{provider}",
             axum::routing::delete(api::push::admin_delete_credential),
+        )
+        // v2.19 — push monitoring + management surface. Powers the
+        // Push module's Overview/Devices/Sends/Credentials tabs and
+        // the new Push fleet module under the manage group.
+        .route(
+            "/projects/{project_id}/push/stats",
+            get(api::push::admin_push_stats),
+        )
+        .route(
+            "/projects/{project_id}/push/devices",
+            get(api::push::admin_list_push_devices),
+        )
+        .route(
+            "/projects/{project_id}/push/sends",
+            get(api::push::admin_list_push_sends),
+        )
+        .route(
+            "/projects/{project_id}/push/sends/{send_id}",
+            get(api::push::admin_get_push_send_detail),
+        )
+        .route(
+            "/projects/{project_id}/push/sends/{send_id}/retry",
+            post(api::push::admin_retry_push_send),
+        )
+        .route(
+            "/projects/{project_id}/push/credentials/{provider}/verify",
+            post(api::push::admin_verify_push_credential),
+        )
+        .route(
+            "/orgs/{org_slug}/push/projects",
+            get(api::push::admin_list_org_push_projects),
         )
         .route(
             "/projects/{project_id}/issues",

@@ -875,6 +875,65 @@ export const adminApi = {
       method: 'DELETE',
     }),
 
+  /** v2.19 — KPI rollup for one project's push subsystem. */
+  getPushStats: (projectId: string) =>
+    adminFetch<PushStatsResponse>(`/projects/${projectId}/push/stats`),
+
+  /** v2.19 — paginated active device tokens for one project. */
+  listPushDevices: (
+    projectId: string,
+    opts: { limit?: number; cursor?: string; provider?: PushProviderKind } = {}
+  ) => {
+    const params = new URLSearchParams()
+    if (opts.limit) params.set('limit', String(opts.limit))
+    if (opts.cursor) params.set('cursor', opts.cursor)
+    if (opts.provider) params.set('provider', opts.provider)
+    const qs = params.toString()
+    return adminFetch<PushDevicesPage>(`/projects/${projectId}/push/devices${qs ? `?${qs}` : ''}`)
+  },
+
+  /** v2.19 — paginated push_sends with optional status/provider/token filter. */
+  listPushSends: (
+    projectId: string,
+    opts: {
+      limit?: number
+      cursor?: string
+      status?: PushSendStatus
+      provider?: PushProviderKind
+      tokenId?: string
+    } = {}
+  ) => {
+    const params = new URLSearchParams()
+    if (opts.limit) params.set('limit', String(opts.limit))
+    if (opts.cursor) params.set('cursor', opts.cursor)
+    if (opts.status) params.set('status', opts.status)
+    if (opts.provider) params.set('provider', opts.provider)
+    if (opts.tokenId) params.set('token_id', opts.tokenId)
+    const qs = params.toString()
+    return adminFetch<PushSendsPage>(`/projects/${projectId}/push/sends${qs ? `?${qs}` : ''}`)
+  },
+
+  /** v2.19 — single send + its full delivery_logs timeline. */
+  getPushSendDetail: (projectId: string, sendId: string) =>
+    adminFetch<PushSendDetail>(`/projects/${projectId}/push/sends/${sendId}`),
+
+  /** v2.19 — clone + re-queue one send. Returns the new send's id. */
+  retryPushSend: (projectId: string, sendId: string) =>
+    adminFetch<{ ok: boolean; sendId: string }>(
+      `/projects/${projectId}/push/sends/${sendId}/retry`,
+      { method: 'POST' }
+    ),
+
+  /** v2.19 — exercise one credential's auth path. ~1s p95. */
+  verifyPushCredential: (projectId: string, provider: PushProviderKind) =>
+    adminFetch<PushVerifyResult>(`/projects/${projectId}/push/credentials/${provider}/verify`, {
+      method: 'POST',
+    }),
+
+  /** v2.19 — cross-project Push status for one org. */
+  listOrgPushProjects: (orgSlug: string) =>
+    adminFetch<{ items: OrgPushProjectRow[] }>(`/orgs/${orgSlug}/push/projects`),
+
   /** v2.1 W4 — endpoint health: list all checks for a project. */
   listEndpointChecks: (projectId: string) =>
     adminFetch<EndpointCheck[]>(`/projects/${projectId}/endpoint-checks`),
@@ -1578,6 +1637,112 @@ export type PushCredentialRow = {
   provider: PushProviderKind
   config: Record<string, unknown>
   updatedAt: string
+}
+
+// v2.19 — push monitoring shapes. The server's `status` enum here is
+// a verify-outcome label, not push_sends.status (which is queued/sent/
+// failed). `unverified` covers MiPush — vendor has no cheap ping
+// endpoint so we only know the shape parsed.
+export type PushVerifyStatus = 'malformed' | 'ok' | 'rejected' | 'unreachable' | 'unverified'
+export type PushSendStatus = 'failed' | 'queued' | 'sent'
+
+export type PushProviderRollup = {
+  sent24h: number
+  failed24h: number
+  queued: number
+  devicesActive: number
+}
+
+export type PushStatsResponse = {
+  queuedTotal: number
+  sent24hTotal: number
+  failed24hTotal: number
+  devicesActiveTotal: number
+  perProvider: Record<string, PushProviderRollup>
+  lastSendAt: null | string
+}
+
+export type PushDeviceRow = {
+  id: string
+  provider: PushProviderKind
+  env: null | string
+  badStreak: number
+  revokedAt: null | string
+  lastSeenAt: string
+  createdAt: string
+  userFingerprintHex: null | string
+  metadata: Record<string, unknown>
+}
+
+export type PushDevicesPage = {
+  items: PushDeviceRow[]
+  nextCursor: null | string
+}
+
+export type PushSendRow = {
+  id: string
+  tokenId: string
+  provider: PushProviderKind
+  status: PushSendStatus
+  providerOutcome: null | string
+  error: null | string
+  retryCount: number
+  nextAttemptAt: string
+  createdAt: string
+  sentAt: null | string
+  payloadPreview: { body?: string; deepLink?: string; title?: string }
+}
+
+export type PushSendsPage = {
+  items: PushSendRow[]
+  nextCursor: null | string
+}
+
+export type PushDeliveryLogEntry = {
+  attempt: number
+  outcome: string
+  providerStatus: null | number
+  providerBody: null | string
+  durationMs: null | number
+  createdAt: string
+}
+
+export type PushSendDetail = {
+  send: {
+    id: string
+    tokenId: string
+    provider: PushProviderKind
+    status: PushSendStatus
+    providerOutcome: null | string
+    error: null | string
+    retryCount: number
+    idempotencyKey: null | string
+    nextAttemptAt: string
+    createdAt: string
+    sentAt: null | string
+    payload: Record<string, unknown>
+  }
+  deliveryLogs: PushDeliveryLogEntry[]
+  devicePresent: boolean
+  deviceProvider: null | string
+}
+
+export type PushVerifyResult = {
+  provider: PushProviderKind
+  status: PushVerifyStatus
+  reason: null | string
+  durationMs: number
+}
+
+export type OrgPushProjectRow = {
+  projectId: string
+  projectName: string
+  providersConfigured: PushProviderKind[]
+  devicesActive: number
+  sent24h: number
+  failed24h: number
+  queued: number
+  lastSendAt: null | string
 }
 
 // v0.9.4 #1 — mobile vitals shapes.

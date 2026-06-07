@@ -52,7 +52,10 @@ use serde_json::Value;
 use sha2::Sha256;
 use std::time::Instant;
 
-use super::{Credential, Provider, ProviderError, ProviderKind, ProviderResult, SendOutcome};
+use super::{
+    Credential, Provider, ProviderError, ProviderKind, ProviderResult, SendOutcome,
+    ValidateOutcome,
+};
 use crate::push::types::NativeMessage;
 
 const RECORD_SIZE: u32 = 4096;
@@ -209,6 +212,53 @@ impl Provider for WebPushProvider {
             provider_body: Some(truncate_2k(&raw_body)),
             duration_ms,
         })
+    }
+
+    async fn validate(&self, cred: Credential<'_>) -> ValidateOutcome {
+        // Web Push has no central auth challenge (each push server
+        // belongs to its browser vendor and routing happens per-
+        // subscription). We validate by parsing the VAPID public key
+        // (base64url 65 byte uncompressed P-256) AND the PEM private
+        // key, then check the public key derived from the private
+        // matches the configured public.
+        let config: WebPushConfig = match serde_json::from_value(cred.config.clone()) {
+            Ok(c) => c,
+            Err(e) => return ValidateOutcome::Malformed { reason: format!("config: {e}") },
+        };
+        let secret: WebPushSecret = match serde_json::from_slice(cred.secret_payload) {
+            Ok(s) => s,
+            Err(e) => return ValidateOutcome::Malformed { reason: format!("secret: {e}") },
+        };
+        let pub_bytes = match base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(config.vapid_public.as_bytes())
+        {
+            Ok(b) => b,
+            Err(e) => {
+                return ValidateOutcome::Malformed {
+                    reason: format!("vapid_public base64url: {e}"),
+                }
+            }
+        };
+        if pub_bytes.len() != PUB_LEN {
+            return ValidateOutcome::Malformed {
+                reason: format!("vapid_public must be {PUB_LEN} bytes, got {}", pub_bytes.len()),
+            };
+        }
+        let sk = match SecretKey::from_sec1_pem(&secret.vapid_private) {
+            Ok(s) => s,
+            Err(e) => {
+                return ValidateOutcome::Malformed {
+                    reason: format!("vapid_private parse: {e}"),
+                }
+            }
+        };
+        let derived = sk.public_key().to_encoded_point(false);
+        if derived.as_bytes() != pub_bytes.as_slice() {
+            return ValidateOutcome::Rejected {
+                reason: "vapid_public does not match vapid_private".into(),
+            };
+        }
+        ValidateOutcome::Ok
     }
 }
 

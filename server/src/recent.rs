@@ -100,6 +100,11 @@ pub struct AppState {
     /// backfill is a follow-up). 5s connect / 10s read / HTTP/2 PK
     /// enabled by builder defaults.
     pub http_client: reqwest::Client,
+    /// v2.19 — process-wide push provider registry. Same `Arc` lives
+    /// inside `dispatch_cron::DispatchHandle`; sharing here lets the
+    /// admin "verify credential" endpoint reuse FCM's OAuth token
+    /// cache instead of re-minting on every dashboard refresh.
+    pub push_providers: Option<Arc<crate::push::providers::Providers>>,
 }
 
 impl FromRef<AppState> for AuthState {

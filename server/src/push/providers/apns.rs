@@ -35,7 +35,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::time::Instant;
 
-use super::{Credential, Provider, ProviderError, ProviderKind, ProviderResult, SendOutcome};
+use super::{Credential, Provider, ProviderError, ProviderKind, ProviderResult, SendOutcome, ValidateOutcome};
 use crate::push::types::{NativeMessage, Priority};
 
 const HOST_PROD: &str = "https://api.push.apple.com";
@@ -154,6 +154,25 @@ impl Provider for ApnsProvider {
             provider_body: Some(truncated_body),
             duration_ms,
         })
+    }
+
+    async fn validate(&self, cred: Credential<'_>) -> ValidateOutcome {
+        // APNs has no cheap auth challenge — its `/3/device/<token>`
+        // POST is the only entry, and we have no device token to
+        // address. So validate by parsing the p8 PEM and signing a
+        // throwaway JWT; if that works the cred is structurally fine.
+        let config: ApnsConfig = match serde_json::from_value(cred.config.clone()) {
+            Ok(c) => c,
+            Err(e) => return ValidateOutcome::Malformed { reason: format!("config: {e}") },
+        };
+        let secret: ApnsSecret = match serde_json::from_slice(cred.secret_payload) {
+            Ok(s) => s,
+            Err(e) => return ValidateOutcome::Malformed { reason: format!("secret: {e}") },
+        };
+        match sign_jwt(&secret.p8, &config.team_id, &config.key_id) {
+            Ok(_) => ValidateOutcome::Ok,
+            Err(e) => ValidateOutcome::Malformed { reason: format!("jwt sign: {e}") },
+        }
     }
 }
 
