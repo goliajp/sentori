@@ -78,6 +78,10 @@ const HealthFormView = lazyView(() =>
 const MomentsView = lazyView(() =>
   import('./moments/view').then((m) => ({ default: m.MomentsView }))
 )
+// v2.15 — Moment detail (per-sample timeline).
+const MomentDetailView = lazyView(() =>
+  import('./moments/detail-view').then((m) => ({ default: m.MomentDetailView }))
+)
 const PostureView = lazyView(() =>
   import('./posture/view').then((m) => ({ default: m.PostureView }))
 )
@@ -268,9 +272,13 @@ export const MODULES: ModuleDef[] = [
     path: 'vitals',
     view: VitalsView,
   },
+  // v2.15 — Moments flipped visible after v3 GDS migration. Lens
+  // verdict: find-slow (business-flow vital, sibling to vitals
+  // device-level vital). See docs/roadmap/v2.15.md.
   {
-    group: 'find-user',
-    hidden: true,
+    children: [{ path: ':momentName', view: MomentDetailView }],
+    chord: 'm',
+    group: 'find-slow',
     iconPath: 'M3 3h18l-7 8v8l-4-2v-6L3 3z',
     id: 'moments',
     label: 'Moments',
