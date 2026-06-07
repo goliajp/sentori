@@ -337,3 +337,19 @@ Remaining hidden after v2.13:
 - audience — subsumed by Users overview
 - live-debug — utility, not a lens
 - alerts — cross-cutting, needs own redesign
+
+## Update 2026-06-07 — v2.14 close (traces + live-debug)
+
+- **traces** ✅ flipped visible in v2.14. group `find-bug`, chord `g a`
+  (trAces). view + detail-view both went through v3 GDS migration
+  (`@goliapkg/gds` PageHeader / DataTable / Card / EmptyState).
+  find-slow lens fallback — operators drill from vitals/runtime
+  into a full span timeline.
+- **live-debug** ✅ flipped visible in v2.14. group `find-bug`,
+  chord `g l` (live). adminOnly. view went through v3 GDS migration
+  (Input / Button / DataTable). Server SSE wire unchanged.
+
+Remaining hidden after v2.14:
+- moments — still needs v3 GDS migration (v2.15 candidate)
+- audience — subsumed by Users overview
+- alerts — cross-cutting, needs own redesign
