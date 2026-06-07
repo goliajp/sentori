@@ -204,14 +204,24 @@ async function registerWithServer(
   nativeToken: string,
   opts: PushRegisterOptions,
 ): Promise<string> {
-  const env = typeof __DEV__ !== 'undefined' && __DEV__ ? 'sandbox' : 'production'
-  const body = {
-    provider: 'apns',
-    env,
+  // v2.10 — cross-platform. iOS routes via APNs with a
+  // sandbox/production env; Android routes via FCM with no env
+  // (FCM is a single host). Default to 'apns' when Platform.OS
+  // isn't detectable (e.g. unit tests).
+  const platform = detectPlatform()
+  const isAndroid = platform === 'android'
+  const env = isAndroid
+    ? undefined
+    : typeof __DEV__ !== 'undefined' && __DEV__
+      ? 'sandbox'
+      : 'production'
+  const body: Record<string, unknown> = {
+    provider: isAndroid ? 'fcm' : 'apns',
     nativeToken,
     linkHash: opts.linkHash,
     metadata: opts.metadata ?? {},
   }
+  if (env != null) body.env = env
   const res = await fetch(joinUrl(cfg.ingestUrl, '/v1/push/tokens'), {
     method: 'POST',
     headers: {
@@ -347,6 +357,26 @@ async function tryAsyncStorage(): Promise<AsyncStorageLike | null> {
 
 function joinUrl(base: string, path: string): string {
   return `${base.replace(/\/+$/, '')}${path}`
+}
+
+let _platformOverride: 'ios' | 'android' | 'unknown' | null = null
+
+/** Test-only hook to override Platform.OS detection. Production
+ *  code paths must not call this. */
+export function __setPlatformForTests(p: 'ios' | 'android' | 'unknown' | null): void {
+  _platformOverride = p
+}
+
+function detectPlatform(): 'ios' | 'android' | 'unknown' {
+  if (_platformOverride != null) return _platformOverride
+  try {
+    const rn = require('react-native') as { Platform?: { OS?: string } }
+    const os = rn.Platform?.OS
+    if (os === 'ios' || os === 'android') return os
+  } catch {
+    /* react-native unavailable */
+  }
+  return 'unknown'
 }
 
 declare const __DEV__: boolean | undefined
