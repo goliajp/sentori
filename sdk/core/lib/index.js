@@ -6,8 +6,17 @@ export { BreadcrumbBuffer, addBreadcrumb, clearBreadcrumbs, getBreadcrumbs, } fr
 export { parseStack } from './stack.js';
 export { normalizeUrl } from './url.js';
 export { SessionTracker, } from './session.js';
-export { SpanBuffer, SpanHandle, clearSpans, drainSpans, getSpans, startSpan, startTrace, withScopedSpan, } from './spans.js';
-export { __resetTraceContextForTests, __useFallbackTraceContextForTests, activeSpan, setActiveSpan, withSpan, } from './trace-context.js';
+export { SpanBuffer, SpanHandle, clearSpans, drainSpans, getSpans, startSpan, startTrace, withScopedSpan, 
+// v2.3 — `withSpan` is now the unified entry point per design §2.3.
+// Overloaded: `withSpan(name, fn)` = high-level wrap helper
+// (equivalent to `withScopedSpan`); `withSpan(span, fn)` = low-level
+// active-span manager (equivalent to `withActiveSpan`).
+withSpan, } from './spans.js';
+export { __resetTraceContextForTests, __useFallbackTraceContextForTests, activeSpan, setActiveSpan, 
+// v2.3 — renamed from `withSpan` (which now dispatches in spans.ts).
+// `withActiveSpan(span, fn)` is the explicit name for the
+// low-level active-context manager.
+withActiveSpan, } from './trace-context.js';
 export { TrailBuffer, sealTrail, } from './trail.js';
 export { safeAsync, safeFn } from './safe.js';
 export { __resetCircuitForTests, isCircuitOpen, reportInternal, setInternalReporter, } from './self-report.js';

@@ -126,7 +126,12 @@ export function captureError(error, extras) {
                 event.attachments.push(meta);
             }
         }
-        await send(transportCfg, event);
+        // v2.3 — host beforeSend hook. Same semantics as RN: sync,
+        // null drops, throw / non-event falls back unmodified.
+        const finalEvent = applyBeforeSend(event, cfg.beforeSend);
+        if (finalEvent === null)
+            return;
+        await send(transportCfg, finalEvent);
     };
     void pipeline();
 }
@@ -176,8 +181,42 @@ export const captureMessage = safeFn('captureMessage', (message, opts = {}) => {
         user: opts.user ?? _user,
     };
     const transportCfg = { ingestUrl: cfg.ingestUrl, token: cfg.token };
-    void send(transportCfg, event);
+    const finalEvent = applyBeforeSend(event, cfg.beforeSend);
+    if (finalEvent === null)
+        return;
+    void send(transportCfg, finalEvent);
 });
+/**
+ * v2.3 — invoke the host's `beforeSend` hook (if any) under the
+ * NEVER rule. Returns the (possibly mutated) event, or `null` to
+ * drop. Throw / non-event return falls back to the unmodified
+ * event with a one-shot warn.
+ */
+let _beforeSendThrewWarned = false;
+function applyBeforeSend(event, hook) {
+    if (!hook)
+        return event;
+    try {
+        const result = hook(event);
+        if (result === null)
+            return null;
+        if (typeof result !== 'object' || !result || typeof result.id !== 'string') {
+            if (!_beforeSendThrewWarned) {
+                _beforeSendThrewWarned = true;
+                logger.warn('capture', 'beforeSend returned non-event shape; falling back to unmodified event');
+            }
+            return event;
+        }
+        return result;
+    }
+    catch (e) {
+        if (!_beforeSendThrewWarned) {
+            _beforeSendThrewWarned = true;
+            logger.warn('capture', 'beforeSend threw; falling back to unmodified event', e);
+        }
+        return event;
+    }
+}
 function errorToObject(error) {
     const causeRaw = error.cause;
     let cause = null;

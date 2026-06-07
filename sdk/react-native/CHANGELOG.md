@@ -1,5 +1,559 @@
 # @goliapkg/sentori-react-native
 
+## 3.0.0
+
+### Major Changes
+
+- v2.17 — Drop Expo SDK 50 / 51 / 52 / 53 / 54 support; target Expo 55+ (RN 0.81+).
+
+  `@expo/config-plugins` now ships synced to the Expo SDK version
+  (`~55.0.x` for Expo 55, `~56.0.x` for Expo 56) — the prior
+  `^9 || ^10` dep range was broken from Expo 54 onward and effectively
+  made `@goliapkg/sentori-expo` uninstallable on any current Expo SDK.
+
+  This release aligns peer + dependency ranges with what Expo actually
+  ships today:
+
+  **`@goliapkg/sentori-expo` (major — 5.0.0 → 6.0.0)**
+
+  - `peerDependencies.expo`: `">=50"` → `">=55.0.0 <57.0.0"`
+  - `peerDependencies.expo-application`: `">=5"` → `">=55.0.0 <57.0.0"`
+  - `peerDependencies.react-native`: `">=0.74"` → `">=0.81.0"`
+  - `peerDependencies.@goliapkg/sentori-react-native`: `">=2.2.0"` → `">=3.0.0"`
+  - `dependencies.@expo/config-plugins`: `"^9 || ^10"` → `">=55.0.0 <57.0.0"`
+
+  **`@goliapkg/sentori-react-native` (major — 2.x → 3.0.0)**
+
+  Cascade — Expo SDK 55+ ships `expo-modules-core` versioned with the
+  SDK (no longer the standalone `2.x` line), so the peer range has to
+  move with it.
+
+  - `peerDependencies.expo-modules-core`: `">=2.0"` → `">=55.0.0 <57.0.0"`
+  - `peerDependencies.react`: `">=18"` → `">=19"`
+  - `peerDependencies.react-native`: `">=0.74"` → `">=0.81.0"`
+
+  **Support window**
+
+  Currently-supported Expo SDKs: **55** (Aug 2025, RN 0.81) and
+  **56** (Nov 2025, RN 0.82). Older Expo apps stay on
+  `@goliapkg/sentori-expo@5.x` / `@goliapkg/sentori-react-native@2.x`,
+  which keep the existing Push notification setup the v2.7–v2.12
+  series shipped.
+
+  **No runtime code change.** Every config-plugin API
+  (`withInfoPlist` / `withEntitlementsPlist` / `withAndroidManifest` /
+  `withProjectBuildGradle` / `withAppBuildGradle` / `withDangerousMod` /
+  `withPlugins` / `AndroidConfig.Permissions.addPermission`) used in
+  `app.plugin.js` has been stable since `@expo/config-plugins@4`; the
+  v2.11 Push plugin runs unchanged on the new range.
+
+### Minor Changes
+
+- [`4e12ddf`](https://github.com/goliajp/sentori/commit/4e12ddfb8b87ace79521e9f2a2363e2d0bd79b20) Thanks [@doracawl](https://github.com/doracawl)! - v2.10 — Android FCM push notification opt-in for React Native.
+
+  Fourth phase of the v2.7→v2.12 Push rollout. v2.9 shipped the iOS
+  branch; v2.10 lights the Android FCM branch behind the same JS
+  surface — `sentori.push.register({...})` now resolves to an `ipt_*`
+  handle on Android too.
+
+  **Native — Kotlin**
+
+  - New `android/src/main/java/com/sentori/SentoriPushNotifications.kt`
+    — static singleton owning the 32-slot FIFO buffers (token /
+    notifications / taps), runtime POST_NOTIFICATIONS permission flow
+    for Android 13+, and the FCM token retrieval via
+    `Class.forName("FirebaseMessaging").getInstance().getToken()` so
+    the SDK works whether or not Firebase is on the host's classpath.
+  - New `SentoriFirebaseMessagingService.kt` extends
+    `FirebaseMessagingService` and routes `onNewToken` /
+    `onMessageReceived` into `SentoriPushNotifications`. Manifest-
+    registered in the SDK's `AndroidManifest.xml`; manifest merger
+    combines it with the host app's manifest.
+  - `SentoriModule.kt` gains 5 ModuleDefinition exports identical to
+    iOS: `pushGetStatus`, `pushRequestPermission`, `pushRegister`,
+    `pushUnregister`, `pushDrainState`.
+  - `android/build.gradle` adds `compileOnly` on
+    `com.google.firebase:firebase-messaging:24.0.3` so non-push hosts
+    pay nothing. The host app declares the runtime Firebase dep + the
+    `com.google.gms.google-services` plugin themselves.
+  - `AndroidManifest.xml` declares
+    `<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>`
+    and the FirebaseMessagingService.
+
+  **JS — `src/push.ts` cross-platform**
+
+  - `detectPlatform()` reads `Platform.OS` from `react-native` (with
+    test-only `__setPlatformForTests` hook).
+  - `registerWithServer` now sends `provider: 'fcm'` and omits `env`
+    on Android. iOS still sends `provider: 'apns'` + `env: 'sandbox' |
+'production'` keyed by `__DEV__`.
+  - All other public surface (`register`, `unregister`, `getCachedIpt`,
+    `getStatus`, `requestPermission`) is unchanged — host app code is
+    platform-agnostic.
+
+  **Recipe**
+
+  `docs-site/src/content/docs/recipes/push-from-react-native-android.md`
+  walks the `google-services.json` placement, gradle deps, plugin
+  application, register flow, send via `@goliapkg/sentori-next/push`,
+  and a troubleshooting matrix for the FCM\_\* status codes the server
+  dispatcher surfaces.
+
+  **Tests**
+
+  One new bun test in `src/__tests__/push.test.ts` covers the Android
+  branch — asserts `provider: 'fcm'` is sent and `env` is omitted.
+  Full RN test suite 186 pass / 0 fail.
+
+  **Compatibility**
+
+  Wire shape unchanged from v2.7 / v2.8 / v2.9. Android device tokens
+  land in the same `device_tokens` table with `provider: 'fcm'`. Raw
+  REST customers keep working with no changes.
+
+  v2.11 — Expo config plugin + dashboard Push module — lands next.
+
+- [`cd4aa8e`](https://github.com/goliajp/sentori/commit/cd4aa8e58491d846b3ea575a02aac761791c72bc) Thanks [@doracawl](https://github.com/doracawl)! - v2.18 — `expo-notifications` drop-in shim at `@goliapkg/sentori-react-native/expo-compat`.
+
+  90% drop-in. Customers migrating from `expo-notifications` change
+  ONE line:
+
+  ```diff
+  - import * as Notifications from 'expo-notifications'
+  + import * as Notifications from '@goliapkg/sentori-react-native/expo-compat'
+  ```
+
+  …and the rest of their client-side code keeps compiling. Type
+  shapes (`Notification` / `NotificationResponse` /
+  `NotificationContent` / `NotificationRequest`) match
+  `expo-notifications` byte-for-byte; constants
+  (`AndroidImportance` / `IosAuthorizationStatus` /
+  `DEFAULT_ACTION_IDENTIFIER` / `SchedulableTriggerInputTypes`) are
+  re-exported with identical values; the listener registry +
+  1 Hz drain loop mirror the upstream's event semantics.
+
+  **Covered today** (just-works after the import swap):
+
+  - `getPermissionsAsync` / `requestPermissionsAsync` (incl. iOS
+    sub-options — `allowProvisional` falls back to regular auth, with
+    a debug-log note)
+  - `getDevicePushTokenAsync` (raw APNs / FCM token)
+  - `getExpoPushTokenAsync` (returns native token wrapped in the same
+    envelope shape; **server-side change required** — POST to Sentori
+    ingest instead of exp.host)
+  - `addNotificationReceivedListener` (foreground)
+  - `addNotificationResponseReceivedListener` (tap)
+  - `addPushTokenListener` (rotation)
+  - `setNotificationHandler` (handler runs; presentation-override
+    flags are a follow-up)
+  - `unregisterForNotificationsAsync`
+
+  **Throws today** (each error message points at the recipe section
+  that documents the workaround):
+
+  `scheduleNotificationAsync` + 7 trigger types · `setBadgeCountAsync`
+  / `getBadgeCountAsync` · `setNotificationChannelAsync` + channel
+  groups · `setNotificationCategoryAsync` + interactive actions ·
+  `useLastNotificationResponse` / `getLastNotificationResponseAsync` ·
+  `subscribeToTopicAsync` / `unsubscribeFromTopicAsync` ·
+  `registerTaskAsync` · `dismissNotificationAsync` /
+  `dismissAllNotificationsAsync` / `getPresentedNotificationsAsync`
+
+  The unsupported list is the follow-up minor backlog — every entry
+  needs a native module surface we don't have yet, but nothing here
+  is a permanent gap.
+
+  **Server-side migration** documented in the recipe at
+  `docs-site/src/content/docs/recipes/migrate-from-expo-notifications.md`
+  — covers the `exp.host` → Sentori ingest swap, the device-token
+  shape change (`ExponentPushToken[...]` → `ipt_<uuid>`), and the
+  credential upload flow.
+
+  **Coexistence** — `expo-notifications` AND
+  `@goliapkg/sentori-react-native/expo-compat` can run side-by-side in
+  the same app; they register separately with the OS push service.
+  Useful for a 1-week cut-over where you compare delivery rates.
+
+  **Compatibility** — additive subpath export. The existing
+  `sentori.push.*` namespace is unchanged. Wire shape with
+  `/v1/push/*` is the same as v2.7–v2.12 Push series.
+
+- [`fd81428`](https://github.com/goliajp/sentori/commit/fd81428f380da7bbadbae24eccc9270b1b59144a) Thanks [@doracawl](https://github.com/doracawl)! - v2.9 — iOS push notification opt-in for React Native.
+
+  Third phase of the v2.7→v2.12 Push rollout. v2.7 shipped the server
+  foundation (APNs + FCM providers + dispatch cron + secrets-sealed
+  credentials + `/v1/push/*` routes); v2.8 shipped Web Push end-to-end;
+  v2.9 lights the iOS APNs branch for `@goliapkg/sentori-react-native`.
+
+  **New surface — `sentori.push.*`**
+
+  ```ts
+  const { ipt } = await sentori.push.register({
+    linkHash: '...',
+    onMessage: (m) => { ... },
+    onTap: (data) => { ... },
+  })
+  await sentori.push.unregister()
+  sentori.push.getCachedIpt() // ipt_... | null
+  await sentori.push.getStatus() // 'granted' | 'denied' | 'notDetermined' | ...
+  await sentori.push.requestPermission()
+  ```
+
+  **Native iOS module**
+
+  A new `SentoriPushNotifications.swift` owns:
+
+  - UNUserNotificationCenter delegate (foreground + tap)
+  - AppDelegate method swizzle for
+    `application:didRegisterForRemoteNotificationsWithDeviceToken:` +
+    the failure variant. Idempotent; opt-out via Info.plist
+    `Sentori.disableAppDelegateSwizzle = YES`.
+  - In-memory buffers (32-slot FIFO each) for the token, foreground
+    notifications, and tap responses. JS drains them via a 1 Hz loop
+    that pauses on background (battery rule).
+
+  `SentoriModule.swift` adds 5 ModuleDefinition exports:
+  `pushGetStatus`, `pushRequestPermission`, `pushRegister`,
+  `pushUnregister`, `pushDrainState`.
+
+  **JS flow**
+
+  `register()`:
+
+  1. `pushRequestPermission()` — OS prompt the first time.
+  2. `pushRegister()` — calls
+     `UIApplication.registerForRemoteNotifications`.
+  3. Polls `pushDrainState()` at 200 ms ticks for up to 8 s waiting
+     for the token; rejects with a tagged error on timeout / native
+     failure / denied permission.
+  4. POSTs `/v1/push/tokens` with
+     `provider: 'apns'`, `env: __DEV__ ? 'sandbox' : 'production'`,
+     `nativeToken: <hex>`, `linkHash?`, `metadata`.
+  5. Caches the `ipt_*` handle to
+     `@react-native-async-storage/async-storage` if installed,
+     otherwise a module-scoped variable.
+  6. Starts a 1 Hz drain loop that fires `onMessage` / `onTap` from
+     buffered events. Pauses on `AppState.change → 'background'`,
+     resumes on `'active'`.
+
+  **Default off** — host calls `register()` when ready. Sentori SDK
+  init never triggers the OS prompt on its own. Same opt-in posture as
+  `trackAutoBreadcrumb` and v2.8's `registerWeb`.
+
+  **Recipe**
+
+  `docs-site/src/content/docs/recipes/push-from-react-native-ios.md` —
+  end-to-end walkthrough: APNs credential upload, Xcode capability +
+  Info.plist + entitlements setup, register flow, send via
+  `@goliapkg/sentori-next/push`, troubleshooting matrix for the APNS\_\*
+  status codes the server's dispatcher surfaces.
+
+  **Compatibility**
+
+  Wire shape is unchanged from v2.7 / v2.8. The new device tokens land
+  in the same `device_tokens` table with `provider: 'apns'`. Customers
+  sending via raw REST keep working with no changes.
+
+  iOS only in this release — Android FCM lands in v2.10, same JS API.
+
+  **Tests**
+
+  6 new bun tests in `src/__tests__/push.test.ts` cover:
+
+  - register rejects cleanly on denied permission
+  - register rejects cleanly on native-token timeout
+  - register POSTs the right shape (provider/env/nativeToken/linkHash)
+    and resolves to the server-issued `ipt_*`
+  - register surfaces server errors
+  - foreground notifications buffered during the token wait flush to
+    `onMessage`
+  - unregister DELETEs the cached `ipt`, clears local state, and calls
+    the native unregister
+
+  Full RN test suite: 185 pass, 0 fail.
+
+### Patch Changes
+
+- Updated dependencies [[`d8e38b2`](https://github.com/goliajp/sentori/commit/d8e38b222a4a5b1d76362514e637bc996c805cc2)]:
+  - @goliapkg/sentori-core@1.3.0
+
+## 3.0.0
+
+### Major Changes
+
+- v2.17 — Drop Expo SDK 50 / 51 / 52 / 53 / 54 support; target Expo 55+ (RN 0.81+).
+
+  `@expo/config-plugins` now ships synced to the Expo SDK version
+  (`~55.0.x` for Expo 55, `~56.0.x` for Expo 56) — the prior
+  `^9 || ^10` dep range was broken from Expo 54 onward and effectively
+  made `@goliapkg/sentori-expo` uninstallable on any current Expo SDK.
+
+  This release aligns peer + dependency ranges with what Expo actually
+  ships today:
+
+  **`@goliapkg/sentori-expo` (major — 5.0.0 → 6.0.0)**
+
+  - `peerDependencies.expo`: `">=50"` → `">=55.0.0 <57.0.0"`
+  - `peerDependencies.expo-application`: `">=5"` → `">=55.0.0 <57.0.0"`
+  - `peerDependencies.react-native`: `">=0.74"` → `">=0.81.0"`
+  - `peerDependencies.@goliapkg/sentori-react-native`: `">=2.2.0"` → `">=3.0.0"`
+  - `dependencies.@expo/config-plugins`: `"^9 || ^10"` → `">=55.0.0 <57.0.0"`
+
+  **`@goliapkg/sentori-react-native` (major — 2.x → 3.0.0)**
+
+  Cascade — Expo SDK 55+ ships `expo-modules-core` versioned with the
+  SDK (no longer the standalone `2.x` line), so the peer range has to
+  move with it.
+
+  - `peerDependencies.expo-modules-core`: `">=2.0"` → `">=55.0.0 <57.0.0"`
+  - `peerDependencies.react`: `">=18"` → `">=19"`
+  - `peerDependencies.react-native`: `">=0.74"` → `">=0.81.0"`
+
+  **Support window**
+
+  Currently-supported Expo SDKs: **55** (Aug 2025, RN 0.81) and
+  **56** (Nov 2025, RN 0.82). Older Expo apps stay on
+  `@goliapkg/sentori-expo@5.x` / `@goliapkg/sentori-react-native@2.x`,
+  which keep the existing Push notification setup the v2.7–v2.12
+  series shipped.
+
+  **No runtime code change.** Every config-plugin API
+  (`withInfoPlist` / `withEntitlementsPlist` / `withAndroidManifest` /
+  `withProjectBuildGradle` / `withAppBuildGradle` / `withDangerousMod` /
+  `withPlugins` / `AndroidConfig.Permissions.addPermission`) used in
+  `app.plugin.js` has been stable since `@expo/config-plugins@4`; the
+  v2.11 Push plugin runs unchanged on the new range.
+
+### Minor Changes
+
+- [`4e12ddf`](https://github.com/goliajp/sentori/commit/4e12ddfb8b87ace79521e9f2a2363e2d0bd79b20) Thanks [@doracawl](https://github.com/doracawl)! - v2.10 — Android FCM push notification opt-in for React Native.
+
+  Fourth phase of the v2.7→v2.12 Push rollout. v2.9 shipped the iOS
+  branch; v2.10 lights the Android FCM branch behind the same JS
+  surface — `sentori.push.register({...})` now resolves to an `ipt_*`
+  handle on Android too.
+
+  **Native — Kotlin**
+
+  - New `android/src/main/java/com/sentori/SentoriPushNotifications.kt`
+    — static singleton owning the 32-slot FIFO buffers (token /
+    notifications / taps), runtime POST_NOTIFICATIONS permission flow
+    for Android 13+, and the FCM token retrieval via
+    `Class.forName("FirebaseMessaging").getInstance().getToken()` so
+    the SDK works whether or not Firebase is on the host's classpath.
+  - New `SentoriFirebaseMessagingService.kt` extends
+    `FirebaseMessagingService` and routes `onNewToken` /
+    `onMessageReceived` into `SentoriPushNotifications`. Manifest-
+    registered in the SDK's `AndroidManifest.xml`; manifest merger
+    combines it with the host app's manifest.
+  - `SentoriModule.kt` gains 5 ModuleDefinition exports identical to
+    iOS: `pushGetStatus`, `pushRequestPermission`, `pushRegister`,
+    `pushUnregister`, `pushDrainState`.
+  - `android/build.gradle` adds `compileOnly` on
+    `com.google.firebase:firebase-messaging:24.0.3` so non-push hosts
+    pay nothing. The host app declares the runtime Firebase dep + the
+    `com.google.gms.google-services` plugin themselves.
+  - `AndroidManifest.xml` declares
+    `<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>`
+    and the FirebaseMessagingService.
+
+  **JS — `src/push.ts` cross-platform**
+
+  - `detectPlatform()` reads `Platform.OS` from `react-native` (with
+    test-only `__setPlatformForTests` hook).
+  - `registerWithServer` now sends `provider: 'fcm'` and omits `env`
+    on Android. iOS still sends `provider: 'apns'` + `env: 'sandbox' |
+'production'` keyed by `__DEV__`.
+  - All other public surface (`register`, `unregister`, `getCachedIpt`,
+    `getStatus`, `requestPermission`) is unchanged — host app code is
+    platform-agnostic.
+
+  **Recipe**
+
+  `docs-site/src/content/docs/recipes/push-from-react-native-android.md`
+  walks the `google-services.json` placement, gradle deps, plugin
+  application, register flow, send via `@goliapkg/sentori-next/push`,
+  and a troubleshooting matrix for the FCM\_\* status codes the server
+  dispatcher surfaces.
+
+  **Tests**
+
+  One new bun test in `src/__tests__/push.test.ts` covers the Android
+  branch — asserts `provider: 'fcm'` is sent and `env` is omitted.
+  Full RN test suite 186 pass / 0 fail.
+
+  **Compatibility**
+
+  Wire shape unchanged from v2.7 / v2.8 / v2.9. Android device tokens
+  land in the same `device_tokens` table with `provider: 'fcm'`. Raw
+  REST customers keep working with no changes.
+
+  v2.11 — Expo config plugin + dashboard Push module — lands next.
+
+- [`cd4aa8e`](https://github.com/goliajp/sentori/commit/cd4aa8e58491d846b3ea575a02aac761791c72bc) Thanks [@doracawl](https://github.com/doracawl)! - v2.18 — `expo-notifications` drop-in shim at `@goliapkg/sentori-react-native/expo-compat`.
+
+  90% drop-in. Customers migrating from `expo-notifications` change
+  ONE line:
+
+  ```diff
+  - import * as Notifications from 'expo-notifications'
+  + import * as Notifications from '@goliapkg/sentori-react-native/expo-compat'
+  ```
+
+  …and the rest of their client-side code keeps compiling. Type
+  shapes (`Notification` / `NotificationResponse` /
+  `NotificationContent` / `NotificationRequest`) match
+  `expo-notifications` byte-for-byte; constants
+  (`AndroidImportance` / `IosAuthorizationStatus` /
+  `DEFAULT_ACTION_IDENTIFIER` / `SchedulableTriggerInputTypes`) are
+  re-exported with identical values; the listener registry +
+  1 Hz drain loop mirror the upstream's event semantics.
+
+  **Covered today** (just-works after the import swap):
+
+  - `getPermissionsAsync` / `requestPermissionsAsync` (incl. iOS
+    sub-options — `allowProvisional` falls back to regular auth, with
+    a debug-log note)
+  - `getDevicePushTokenAsync` (raw APNs / FCM token)
+  - `getExpoPushTokenAsync` (returns native token wrapped in the same
+    envelope shape; **server-side change required** — POST to Sentori
+    ingest instead of exp.host)
+  - `addNotificationReceivedListener` (foreground)
+  - `addNotificationResponseReceivedListener` (tap)
+  - `addPushTokenListener` (rotation)
+  - `setNotificationHandler` (handler runs; presentation-override
+    flags are a follow-up)
+  - `unregisterForNotificationsAsync`
+
+  **Throws today** (each error message points at the recipe section
+  that documents the workaround):
+
+  `scheduleNotificationAsync` + 7 trigger types · `setBadgeCountAsync`
+  / `getBadgeCountAsync` · `setNotificationChannelAsync` + channel
+  groups · `setNotificationCategoryAsync` + interactive actions ·
+  `useLastNotificationResponse` / `getLastNotificationResponseAsync` ·
+  `subscribeToTopicAsync` / `unsubscribeFromTopicAsync` ·
+  `registerTaskAsync` · `dismissNotificationAsync` /
+  `dismissAllNotificationsAsync` / `getPresentedNotificationsAsync`
+
+  The unsupported list is the follow-up minor backlog — every entry
+  needs a native module surface we don't have yet, but nothing here
+  is a permanent gap.
+
+  **Server-side migration** documented in the recipe at
+  `docs-site/src/content/docs/recipes/migrate-from-expo-notifications.md`
+  — covers the `exp.host` → Sentori ingest swap, the device-token
+  shape change (`ExponentPushToken[...]` → `ipt_<uuid>`), and the
+  credential upload flow.
+
+  **Coexistence** — `expo-notifications` AND
+  `@goliapkg/sentori-react-native/expo-compat` can run side-by-side in
+  the same app; they register separately with the OS push service.
+  Useful for a 1-week cut-over where you compare delivery rates.
+
+  **Compatibility** — additive subpath export. The existing
+  `sentori.push.*` namespace is unchanged. Wire shape with
+  `/v1/push/*` is the same as v2.7–v2.12 Push series.
+
+- [`fd81428`](https://github.com/goliajp/sentori/commit/fd81428f380da7bbadbae24eccc9270b1b59144a) Thanks [@doracawl](https://github.com/doracawl)! - v2.9 — iOS push notification opt-in for React Native.
+
+  Third phase of the v2.7→v2.12 Push rollout. v2.7 shipped the server
+  foundation (APNs + FCM providers + dispatch cron + secrets-sealed
+  credentials + `/v1/push/*` routes); v2.8 shipped Web Push end-to-end;
+  v2.9 lights the iOS APNs branch for `@goliapkg/sentori-react-native`.
+
+  **New surface — `sentori.push.*`**
+
+  ```ts
+  const { ipt } = await sentori.push.register({
+    linkHash: '...',
+    onMessage: (m) => { ... },
+    onTap: (data) => { ... },
+  })
+  await sentori.push.unregister()
+  sentori.push.getCachedIpt() // ipt_... | null
+  await sentori.push.getStatus() // 'granted' | 'denied' | 'notDetermined' | ...
+  await sentori.push.requestPermission()
+  ```
+
+  **Native iOS module**
+
+  A new `SentoriPushNotifications.swift` owns:
+
+  - UNUserNotificationCenter delegate (foreground + tap)
+  - AppDelegate method swizzle for
+    `application:didRegisterForRemoteNotificationsWithDeviceToken:` +
+    the failure variant. Idempotent; opt-out via Info.plist
+    `Sentori.disableAppDelegateSwizzle = YES`.
+  - In-memory buffers (32-slot FIFO each) for the token, foreground
+    notifications, and tap responses. JS drains them via a 1 Hz loop
+    that pauses on background (battery rule).
+
+  `SentoriModule.swift` adds 5 ModuleDefinition exports:
+  `pushGetStatus`, `pushRequestPermission`, `pushRegister`,
+  `pushUnregister`, `pushDrainState`.
+
+  **JS flow**
+
+  `register()`:
+
+  1. `pushRequestPermission()` — OS prompt the first time.
+  2. `pushRegister()` — calls
+     `UIApplication.registerForRemoteNotifications`.
+  3. Polls `pushDrainState()` at 200 ms ticks for up to 8 s waiting
+     for the token; rejects with a tagged error on timeout / native
+     failure / denied permission.
+  4. POSTs `/v1/push/tokens` with
+     `provider: 'apns'`, `env: __DEV__ ? 'sandbox' : 'production'`,
+     `nativeToken: <hex>`, `linkHash?`, `metadata`.
+  5. Caches the `ipt_*` handle to
+     `@react-native-async-storage/async-storage` if installed,
+     otherwise a module-scoped variable.
+  6. Starts a 1 Hz drain loop that fires `onMessage` / `onTap` from
+     buffered events. Pauses on `AppState.change → 'background'`,
+     resumes on `'active'`.
+
+  **Default off** — host calls `register()` when ready. Sentori SDK
+  init never triggers the OS prompt on its own. Same opt-in posture as
+  `trackAutoBreadcrumb` and v2.8's `registerWeb`.
+
+  **Recipe**
+
+  `docs-site/src/content/docs/recipes/push-from-react-native-ios.md` —
+  end-to-end walkthrough: APNs credential upload, Xcode capability +
+  Info.plist + entitlements setup, register flow, send via
+  `@goliapkg/sentori-next/push`, troubleshooting matrix for the APNS\_\*
+  status codes the server's dispatcher surfaces.
+
+  **Compatibility**
+
+  Wire shape is unchanged from v2.7 / v2.8. The new device tokens land
+  in the same `device_tokens` table with `provider: 'apns'`. Customers
+  sending via raw REST keep working with no changes.
+
+  iOS only in this release — Android FCM lands in v2.10, same JS API.
+
+  **Tests**
+
+  6 new bun tests in `src/__tests__/push.test.ts` cover:
+
+  - register rejects cleanly on denied permission
+  - register rejects cleanly on native-token timeout
+  - register POSTs the right shape (provider/env/nativeToken/linkHash)
+    and resolves to the server-issued `ipt_*`
+  - register surfaces server errors
+  - foreground notifications buffered during the token wait flush to
+    `onMessage`
+  - unregister DELETEs the cached `ipt`, clears local state, and calls
+    the native unregister
+
+  Full RN test suite: 185 pass, 0 fail.
+
+### Patch Changes
+
+- Updated dependencies [[`d8e38b2`](https://github.com/goliajp/sentori/commit/d8e38b222a4a5b1d76362514e637bc996c805cc2)]:
+  - @goliapkg/sentori-core@1.3.0
+
 ## 2.2.0
 
 ### Minor Changes

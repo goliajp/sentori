@@ -1,5 +1,391 @@
 # @goliapkg/sentori-expo
 
+## 6.0.0
+
+### Major Changes
+
+- v2.17 — Drop Expo SDK 50 / 51 / 52 / 53 / 54 support; target Expo 55+ (RN 0.81+).
+
+  `@expo/config-plugins` now ships synced to the Expo SDK version
+  (`~55.0.x` for Expo 55, `~56.0.x` for Expo 56) — the prior
+  `^9 || ^10` dep range was broken from Expo 54 onward and effectively
+  made `@goliapkg/sentori-expo` uninstallable on any current Expo SDK.
+
+  This release aligns peer + dependency ranges with what Expo actually
+  ships today:
+
+  **`@goliapkg/sentori-expo` (major — 5.0.0 → 6.0.0)**
+
+  - `peerDependencies.expo`: `">=50"` → `">=55.0.0 <57.0.0"`
+  - `peerDependencies.expo-application`: `">=5"` → `">=55.0.0 <57.0.0"`
+  - `peerDependencies.react-native`: `">=0.74"` → `">=0.81.0"`
+  - `peerDependencies.@goliapkg/sentori-react-native`: `">=2.2.0"` → `">=3.0.0"`
+  - `dependencies.@expo/config-plugins`: `"^9 || ^10"` → `">=55.0.0 <57.0.0"`
+
+  **`@goliapkg/sentori-react-native` (major — 2.x → 3.0.0)**
+
+  Cascade — Expo SDK 55+ ships `expo-modules-core` versioned with the
+  SDK (no longer the standalone `2.x` line), so the peer range has to
+  move with it.
+
+  - `peerDependencies.expo-modules-core`: `">=2.0"` → `">=55.0.0 <57.0.0"`
+  - `peerDependencies.react`: `">=18"` → `">=19"`
+  - `peerDependencies.react-native`: `">=0.74"` → `">=0.81.0"`
+
+  **Support window**
+
+  Currently-supported Expo SDKs: **55** (Aug 2025, RN 0.81) and
+  **56** (Nov 2025, RN 0.82). Older Expo apps stay on
+  `@goliapkg/sentori-expo@5.x` / `@goliapkg/sentori-react-native@2.x`,
+  which keep the existing Push notification setup the v2.7–v2.12
+  series shipped.
+
+  **No runtime code change.** Every config-plugin API
+  (`withInfoPlist` / `withEntitlementsPlist` / `withAndroidManifest` /
+  `withProjectBuildGradle` / `withAppBuildGradle` / `withDangerousMod` /
+  `withPlugins` / `AndroidConfig.Permissions.addPermission`) used in
+  `app.plugin.js` has been stable since `@expo/config-plugins@4`; the
+  v2.11 Push plugin runs unchanged on the new range.
+
+### Minor Changes
+
+- [`15bd60e`](https://github.com/goliajp/sentori/commit/15bd60ead7778f0773c248c8251154325d91d6e1) Thanks [@doracawl](https://github.com/doracawl)! - v2.11 — Expo config plugin auto-injects iOS + Android push setup; dashboard gains Push credential CRUD module.
+
+  Fifth phase of the v2.7→v2.12 Push rollout. Two additions:
+
+  **`@goliapkg/sentori-expo` config plugin (minor)**
+
+  Extends the previously-marker-only `app.plugin.js` into a real
+  configuration plugin that, when `'@goliapkg/sentori-expo'` is added
+  to a host's `app.json` plugins array, runs at `expo prebuild` time
+  and auto-injects:
+
+  - **iOS**
+    - `Info.plist`: `UIBackgroundModes` ⊇ `["remote-notification"]`
+    - Entitlements: `aps-environment` = `"production"` (Xcode flips
+      to `"development"` for debug signing automatically)
+  - **Android**
+    - `AndroidManifest.xml`: `<uses-permission POST_NOTIFICATIONS>`
+      via `AndroidConfig.Permissions.addPermission` (idempotent)
+    - Root `build.gradle`: `classpath('com.google.gms:google-services:4.4.2')`
+    - App `build.gradle`: `apply plugin: 'com.google.gms.google-services'` +
+      `implementation platform('com.google.firebase:firebase-bom:33.5.1')` +
+      `implementation 'com.google.firebase:firebase-messaging'`
+    - Copies `google-services.json` from the host root (override via
+      `googleServicesFile` prop) to `android/app/google-services.json`
+      on each prebuild.
+
+  Opt out per platform with `{ ios: false }` / `{ android: false }`;
+  opt out entirely by omitting the plugin. Backwards-compatible: hosts
+  that previously used the marker plugin keep the SDK-version
+  Info.plist injection.
+
+  All modifications are idempotent — re-running `expo prebuild`
+  produces the same native files. Higher-level Expo config-plugins
+  APIs (`withInfoPlist`, `withEntitlementsPlist`,
+  `withAndroidManifest`, `withProjectBuildGradle`, `withAppBuildGradle`,
+  `withDangerousMod`) handle the merge; no string-replace foot-guns.
+
+  **Web dashboard Push module**
+
+  First non-hidden lens module added since v2.6 (cert-monitor + posture):
+
+  - New `web/src/modules/push/view.tsx` — two stacked Cards on the
+    manage group (chord `g n`):
+    - **Configured providers** — `DataTable<PushCredentialRow>` showing
+      every credential row stored server-side. Provider label,
+      operator-readable config summary (e.g. `team_id · bundle_id ·
+env`), updated_at, delete button. Encrypted `secret_blob` is
+      never returned by GET; never surfaced in the UI.
+    - **Add / update credential** — provider dropdown, config JSON
+      textarea (non-secret), secret JSON textarea (sealed before
+      save), Save button. Provider-specific placeholders document the
+      expected shape inline.
+  - `web/src/modules/registry.tsx` — registers `push` under `manage`
+    with chord `n` and an `adminOnly: true` flag. Default visible.
+  - `web/src/api/client.ts` adds three wrappers:
+    `listPushCredentials`, `upsertPushCredential`,
+    `deletePushCredential`. Mirrors the cert-monitor `adminFetch`
+    pattern.
+  - `web/src/api/query-keys.ts` — `pushCredentials(projectId)` key for
+    React Query.
+
+  No server changes — the `/admin/api/projects/{id}/push/credentials`
+  endpoints landed in v2.7 W10 and have been ready since.
+
+  Web dashboard isn't published as an npm package, so the changeset
+  only bumps `@goliapkg/sentori-expo`.
+
+  **Compatibility**
+
+  Wire shape unchanged from v2.7-v2.10. Hosts that don't add
+  `@goliapkg/sentori-expo` to `app.json` plugins see zero changes
+  to their prebuild output. Dashboard module is additive.
+
+  v2.12 — HCM + MiPush providers + framework wrappers + perf bench —
+  lands next, wrapping the push series.
+
+### Patch Changes
+
+- Updated dependencies [[`4e12ddf`](https://github.com/goliajp/sentori/commit/4e12ddfb8b87ace79521e9f2a2363e2d0bd79b20), [`cd4aa8e`](https://github.com/goliajp/sentori/commit/cd4aa8e58491d846b3ea575a02aac761791c72bc), [`fd81428`](https://github.com/goliajp/sentori/commit/fd81428f380da7bbadbae24eccc9270b1b59144a)]:
+  - @goliapkg/sentori-react-native@3.0.0
+
+## 6.0.0
+
+### Major Changes
+
+- v2.17 — Drop Expo SDK 50 / 51 / 52 / 53 / 54 support; target Expo 55+ (RN 0.81+).
+
+  `@expo/config-plugins` now ships synced to the Expo SDK version
+  (`~55.0.x` for Expo 55, `~56.0.x` for Expo 56) — the prior
+  `^9 || ^10` dep range was broken from Expo 54 onward and effectively
+  made `@goliapkg/sentori-expo` uninstallable on any current Expo SDK.
+
+  This release aligns peer + dependency ranges with what Expo actually
+  ships today:
+
+  **`@goliapkg/sentori-expo` (major — 5.0.0 → 6.0.0)**
+
+  - `peerDependencies.expo`: `">=50"` → `">=55.0.0 <57.0.0"`
+  - `peerDependencies.expo-application`: `">=5"` → `">=55.0.0 <57.0.0"`
+  - `peerDependencies.react-native`: `">=0.74"` → `">=0.81.0"`
+  - `peerDependencies.@goliapkg/sentori-react-native`: `">=2.2.0"` → `">=3.0.0"`
+  - `dependencies.@expo/config-plugins`: `"^9 || ^10"` → `">=55.0.0 <57.0.0"`
+
+  **`@goliapkg/sentori-react-native` (major — 2.x → 3.0.0)**
+
+  Cascade — Expo SDK 55+ ships `expo-modules-core` versioned with the
+  SDK (no longer the standalone `2.x` line), so the peer range has to
+  move with it.
+
+  - `peerDependencies.expo-modules-core`: `">=2.0"` → `">=55.0.0 <57.0.0"`
+  - `peerDependencies.react`: `">=18"` → `">=19"`
+  - `peerDependencies.react-native`: `">=0.74"` → `">=0.81.0"`
+
+  **Support window**
+
+  Currently-supported Expo SDKs: **55** (Aug 2025, RN 0.81) and
+  **56** (Nov 2025, RN 0.82). Older Expo apps stay on
+  `@goliapkg/sentori-expo@5.x` / `@goliapkg/sentori-react-native@2.x`,
+  which keep the existing Push notification setup the v2.7–v2.12
+  series shipped.
+
+  **No runtime code change.** Every config-plugin API
+  (`withInfoPlist` / `withEntitlementsPlist` / `withAndroidManifest` /
+  `withProjectBuildGradle` / `withAppBuildGradle` / `withDangerousMod` /
+  `withPlugins` / `AndroidConfig.Permissions.addPermission`) used in
+  `app.plugin.js` has been stable since `@expo/config-plugins@4`; the
+  v2.11 Push plugin runs unchanged on the new range.
+
+### Minor Changes
+
+- [`15bd60e`](https://github.com/goliajp/sentori/commit/15bd60ead7778f0773c248c8251154325d91d6e1) Thanks [@doracawl](https://github.com/doracawl)! - v2.11 — Expo config plugin auto-injects iOS + Android push setup; dashboard gains Push credential CRUD module.
+
+  Fifth phase of the v2.7→v2.12 Push rollout. Two additions:
+
+  **`@goliapkg/sentori-expo` config plugin (minor)**
+
+  Extends the previously-marker-only `app.plugin.js` into a real
+  configuration plugin that, when `'@goliapkg/sentori-expo'` is added
+  to a host's `app.json` plugins array, runs at `expo prebuild` time
+  and auto-injects:
+
+  - **iOS**
+    - `Info.plist`: `UIBackgroundModes` ⊇ `["remote-notification"]`
+    - Entitlements: `aps-environment` = `"production"` (Xcode flips
+      to `"development"` for debug signing automatically)
+  - **Android**
+    - `AndroidManifest.xml`: `<uses-permission POST_NOTIFICATIONS>`
+      via `AndroidConfig.Permissions.addPermission` (idempotent)
+    - Root `build.gradle`: `classpath('com.google.gms:google-services:4.4.2')`
+    - App `build.gradle`: `apply plugin: 'com.google.gms.google-services'` +
+      `implementation platform('com.google.firebase:firebase-bom:33.5.1')` +
+      `implementation 'com.google.firebase:firebase-messaging'`
+    - Copies `google-services.json` from the host root (override via
+      `googleServicesFile` prop) to `android/app/google-services.json`
+      on each prebuild.
+
+  Opt out per platform with `{ ios: false }` / `{ android: false }`;
+  opt out entirely by omitting the plugin. Backwards-compatible: hosts
+  that previously used the marker plugin keep the SDK-version
+  Info.plist injection.
+
+  All modifications are idempotent — re-running `expo prebuild`
+  produces the same native files. Higher-level Expo config-plugins
+  APIs (`withInfoPlist`, `withEntitlementsPlist`,
+  `withAndroidManifest`, `withProjectBuildGradle`, `withAppBuildGradle`,
+  `withDangerousMod`) handle the merge; no string-replace foot-guns.
+
+  **Web dashboard Push module**
+
+  First non-hidden lens module added since v2.6 (cert-monitor + posture):
+
+  - New `web/src/modules/push/view.tsx` — two stacked Cards on the
+    manage group (chord `g n`): - **Configured providers** — `DataTable<PushCredentialRow>` showing
+    every credential row stored server-side. Provider label,
+    operator-readable config summary (e.g. `team_id · bundle_id ·
+env`), updated_at, delete button. Encrypted `secret_blob` is
+    never returned by GET; never surfaced in the UI. - **Add / update credential** — provider dropdown, config JSON
+    textarea (non-secret), secret JSON textarea (sealed before
+    save), Save button. Provider-specific placeholders document the
+    expected shape inline.
+  - `web/src/modules/registry.tsx` — registers `push` under `manage`
+    with chord `n` and an `adminOnly: true` flag. Default visible.
+  - `web/src/api/client.ts` adds three wrappers:
+    `listPushCredentials`, `upsertPushCredential`,
+    `deletePushCredential`. Mirrors the cert-monitor `adminFetch`
+    pattern.
+  - `web/src/api/query-keys.ts` — `pushCredentials(projectId)` key for
+    React Query.
+
+  No server changes — the `/admin/api/projects/{id}/push/credentials`
+  endpoints landed in v2.7 W10 and have been ready since.
+
+  Web dashboard isn't published as an npm package, so the changeset
+  only bumps `@goliapkg/sentori-expo`.
+
+  **Compatibility**
+
+  Wire shape unchanged from v2.7-v2.10. Hosts that don't add
+  `@goliapkg/sentori-expo` to `app.json` plugins see zero changes
+  to their prebuild output. Dashboard module is additive.
+
+  v2.12 — HCM + MiPush providers + framework wrappers + perf bench —
+  lands next, wrapping the push series.
+
+### Patch Changes
+
+- Updated dependencies [[`4e12ddf`](https://github.com/goliajp/sentori/commit/4e12ddfb8b87ace79521e9f2a2363e2d0bd79b20), [`cd4aa8e`](https://github.com/goliajp/sentori/commit/cd4aa8e58491d846b3ea575a02aac761791c72bc), [`fd81428`](https://github.com/goliajp/sentori/commit/fd81428f380da7bbadbae24eccc9270b1b59144a)]:
+  - @goliapkg/sentori-react-native@3.0.0
+
+## 6.0.0
+
+### Major Changes
+
+- v2.17 — Drop Expo SDK 50 / 51 / 52 / 53 / 54 support; target Expo 55+ (RN 0.81+).
+
+  `@expo/config-plugins` now ships synced to the Expo SDK version
+  (`~55.0.x` for Expo 55, `~56.0.x` for Expo 56) — the prior
+  `^9 || ^10` dep range was broken from Expo 54 onward and effectively
+  made `@goliapkg/sentori-expo` uninstallable on any current Expo SDK.
+
+  This release aligns peer + dependency ranges with what Expo actually
+  ships today:
+
+  **`@goliapkg/sentori-expo` (major — 5.0.0 → 6.0.0)**
+
+  - `peerDependencies.expo`: `">=50"` → `">=55.0.0 <57.0.0"`
+  - `peerDependencies.expo-application`: `">=5"` → `">=55.0.0 <57.0.0"`
+  - `peerDependencies.react-native`: `">=0.74"` → `">=0.81.0"`
+  - `peerDependencies.@goliapkg/sentori-react-native`: `">=2.2.0"` → `">=3.0.0"`
+  - `dependencies.@expo/config-plugins`: `"^9 || ^10"` → `">=55.0.0 <57.0.0"`
+
+  **`@goliapkg/sentori-react-native` (major — 2.x → 3.0.0)**
+
+  Cascade — Expo SDK 55+ ships `expo-modules-core` versioned with the
+  SDK (no longer the standalone `2.x` line), so the peer range has to
+  move with it.
+
+  - `peerDependencies.expo-modules-core`: `">=2.0"` → `">=55.0.0 <57.0.0"`
+  - `peerDependencies.react`: `">=18"` → `">=19"`
+  - `peerDependencies.react-native`: `">=0.74"` → `">=0.81.0"`
+
+  **Support window**
+
+  Currently-supported Expo SDKs: **55** (Aug 2025, RN 0.81) and
+  **56** (Nov 2025, RN 0.82). Older Expo apps stay on
+  `@goliapkg/sentori-expo@5.x` / `@goliapkg/sentori-react-native@2.x`,
+  which keep the existing Push notification setup the v2.7–v2.12
+  series shipped.
+
+  **No runtime code change.** Every config-plugin API
+  (`withInfoPlist` / `withEntitlementsPlist` / `withAndroidManifest` /
+  `withProjectBuildGradle` / `withAppBuildGradle` / `withDangerousMod` /
+  `withPlugins` / `AndroidConfig.Permissions.addPermission`) used in
+  `app.plugin.js` has been stable since `@expo/config-plugins@4`; the
+  v2.11 Push plugin runs unchanged on the new range.
+
+### Minor Changes
+
+- [`15bd60e`](https://github.com/goliajp/sentori/commit/15bd60ead7778f0773c248c8251154325d91d6e1) Thanks [@doracawl](https://github.com/doracawl)! - v2.11 — Expo config plugin auto-injects iOS + Android push setup; dashboard gains Push credential CRUD module.
+
+  Fifth phase of the v2.7→v2.12 Push rollout. Two additions:
+
+  **`@goliapkg/sentori-expo` config plugin (minor)**
+
+  Extends the previously-marker-only `app.plugin.js` into a real
+  configuration plugin that, when `'@goliapkg/sentori-expo'` is added
+  to a host's `app.json` plugins array, runs at `expo prebuild` time
+  and auto-injects:
+
+  - **iOS**
+    - `Info.plist`: `UIBackgroundModes` ⊇ `["remote-notification"]`
+    - Entitlements: `aps-environment` = `"production"` (Xcode flips
+      to `"development"` for debug signing automatically)
+  - **Android**
+    - `AndroidManifest.xml`: `<uses-permission POST_NOTIFICATIONS>`
+      via `AndroidConfig.Permissions.addPermission` (idempotent)
+    - Root `build.gradle`: `classpath('com.google.gms:google-services:4.4.2')`
+    - App `build.gradle`: `apply plugin: 'com.google.gms.google-services'` +
+      `implementation platform('com.google.firebase:firebase-bom:33.5.1')` +
+      `implementation 'com.google.firebase:firebase-messaging'`
+    - Copies `google-services.json` from the host root (override via
+      `googleServicesFile` prop) to `android/app/google-services.json`
+      on each prebuild.
+
+  Opt out per platform with `{ ios: false }` / `{ android: false }`;
+  opt out entirely by omitting the plugin. Backwards-compatible: hosts
+  that previously used the marker plugin keep the SDK-version
+  Info.plist injection.
+
+  All modifications are idempotent — re-running `expo prebuild`
+  produces the same native files. Higher-level Expo config-plugins
+  APIs (`withInfoPlist`, `withEntitlementsPlist`,
+  `withAndroidManifest`, `withProjectBuildGradle`, `withAppBuildGradle`,
+  `withDangerousMod`) handle the merge; no string-replace foot-guns.
+
+  **Web dashboard Push module**
+
+  First non-hidden lens module added since v2.6 (cert-monitor + posture):
+
+  - New `web/src/modules/push/view.tsx` — two stacked Cards on the
+    manage group (chord `g n`): - **Configured providers** — `DataTable<PushCredentialRow>` showing
+    every credential row stored server-side. Provider label,
+    operator-readable config summary (e.g. `team_id · bundle_id ·
+env`), updated_at, delete button. Encrypted `secret_blob` is
+    never returned by GET; never surfaced in the UI. - **Add / update credential** — provider dropdown, config JSON
+    textarea (non-secret), secret JSON textarea (sealed before
+    save), Save button. Provider-specific placeholders document the
+    expected shape inline.
+  - `web/src/modules/registry.tsx` — registers `push` under `manage`
+    with chord `n` and an `adminOnly: true` flag. Default visible.
+  - `web/src/api/client.ts` adds three wrappers:
+    `listPushCredentials`, `upsertPushCredential`,
+    `deletePushCredential`. Mirrors the cert-monitor `adminFetch`
+    pattern.
+  - `web/src/api/query-keys.ts` — `pushCredentials(projectId)` key for
+    React Query.
+
+  No server changes — the `/admin/api/projects/{id}/push/credentials`
+  endpoints landed in v2.7 W10 and have been ready since.
+
+  Web dashboard isn't published as an npm package, so the changeset
+  only bumps `@goliapkg/sentori-expo`.
+
+  **Compatibility**
+
+  Wire shape unchanged from v2.7-v2.10. Hosts that don't add
+  `@goliapkg/sentori-expo` to `app.json` plugins see zero changes
+  to their prebuild output. Dashboard module is additive.
+
+  v2.12 — HCM + MiPush providers + framework wrappers + perf bench —
+  lands next, wrapping the push series.
+
+### Patch Changes
+
+- Updated dependencies [[`4e12ddf`](https://github.com/goliajp/sentori/commit/4e12ddfb8b87ace79521e9f2a2363e2d0bd79b20), [`cd4aa8e`](https://github.com/goliajp/sentori/commit/cd4aa8e58491d846b3ea575a02aac761791c72bc), [`fd81428`](https://github.com/goliajp/sentori/commit/fd81428f380da7bbadbae24eccc9270b1b59144a)]:
+  - @goliapkg/sentori-react-native@3.0.0
+
 ## 5.0.0
 
 ### Patch Changes

@@ -7,6 +7,7 @@
 // `finish()` — that's the moment the span is sealed and pushed onto
 // the buffer. The SDK's transport flushes whatever's in the buffer
 // at its own cadence.
+import { withActiveSpan as withActiveSpanImpl } from './trace-context.js';
 import { uuidV7 } from './uuid.js';
 const DEFAULT_CAP = 1000;
 /** Returned from `startSpan`. Mutable; sealed by `end()` (canonical
@@ -258,6 +259,12 @@ export function withScopedSpan(op, fn, opts = {}) {
         span.end({ status: 'error' });
         throw e;
     }
+}
+export function withSpan(arg, fn, opts = {}) {
+    if (typeof arg === 'string') {
+        return withScopedSpan(arg, fn, opts);
+    }
+    return withActiveSpanImpl(arg, fn);
 }
 /** Snapshot the global buffer (does not drain). */
 export function getSpans() {

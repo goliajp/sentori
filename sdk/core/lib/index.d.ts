@@ -1,4 +1,4 @@
-export type { App, AttachmentKind, AttachmentMeta, AttachmentSource, Breadcrumb, BreadcrumbType, Bundle, CaptureExtras, CommonInitOptions, Device, DeviceOS, CaptureMessageOptions, Event, EventKind, Frame, Geo, MessageLevel, Platform, SamplingConfig, SentoriError, Span, SpanStatus, Tags, User, } from './types.js';
+export type { App, AttachmentKind, AttachmentMeta, AttachmentSource, BeforeSendHook, Breadcrumb, BreadcrumbType, Bundle, CaptureExtras, CommonInitOptions, Device, DeviceOS, CaptureMessageOptions, Event, EventKind, Frame, Geo, MessageLevel, Platform, ReadyInfo, SamplingConfig, SentoriError, Span, SpanStatus, Tags, User, PushMessage, PushOptions, PushPriority, PushReceipt, PushTicket, PushTicketStatus, } from './types.js';
 export { coerceError } from './coerce-error.js';
 export { MomentHandle, type MomentProperties, type MomentStatus, startMoment, } from './moments.js';
 export { shouldSample, shouldSampleTrace } from './sampling.js';
@@ -7,8 +7,8 @@ export { BreadcrumbBuffer, addBreadcrumb, clearBreadcrumbs, getBreadcrumbs, } fr
 export { parseStack, type ParseStackOptions } from './stack.js';
 export { normalizeUrl } from './url.js';
 export { type SessionContext, type SessionPing, type SessionStatus, SessionTracker, } from './session.js';
-export { SpanBuffer, SpanHandle, type SpanContextLike, type StartSpanOptions, clearSpans, drainSpans, getSpans, startSpan, startTrace, withScopedSpan, } from './spans.js';
-export { __resetTraceContextForTests, __useFallbackTraceContextForTests, activeSpan, setActiveSpan, withSpan, } from './trace-context.js';
+export { SpanBuffer, SpanHandle, type SpanContextLike, type StartSpanOptions, clearSpans, drainSpans, getSpans, startSpan, startTrace, withScopedSpan, withSpan, } from './spans.js';
+export { __resetTraceContextForTests, __useFallbackTraceContextForTests, activeSpan, setActiveSpan, withActiveSpan, } from './trace-context.js';
 export { TrailBuffer, sealTrail, type SessionTrailPayload, type TrailStep, } from './trail.js';
 export { safeAsync, safeFn } from './safe.js';
 export { __resetCircuitForTests, isCircuitOpen, reportInternal, setInternalReporter, } from './self-report.js';

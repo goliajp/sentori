@@ -105,8 +105,14 @@ export function activeSpan() {
  * Browser/RN: save-and-restore. Correct for linear awaits;
  * concurrent promises forked inside `fn` won't see the active span
  * after the first await suspends.
+ *
+ * v2.3 — exported as `withActiveSpan` (clear semantic name). The
+ * old export name `withSpan` is re-exported through `spans.ts` as
+ * an overloaded function that dispatches by first-arg type
+ * (string → high-level wrap helper; SpanContextLike → this
+ * function). New code should call `withSpan(name, fn)`.
  */
-export function withSpan(span, fn) {
+export function withActiveSpan(span, fn) {
     return impl().run(span, fn);
 }
 /**
