@@ -92,6 +92,26 @@ pub enum ProviderError {
     Internal(String),
 }
 
+/// v2.19 — one credential-validation attempt's result. Drives the
+/// dashboard's "is this row green?" indicator.
+#[derive(Debug, Clone)]
+pub enum ValidateOutcome {
+    /// Parse + (where applicable) auth challenge succeeded.
+    Ok,
+    /// Cred shape parses but auth/identity challenge was rejected
+    /// by the vendor — caller almost certainly has a stale or wrong
+    /// secret.
+    Rejected { reason: String },
+    /// Cred shape itself is malformed (missing fields, bad PEM, etc.).
+    Malformed { reason: String },
+    /// Network unreachable / timeout. Caller is told "unknown — try
+    /// again" rather than "broken".
+    Unreachable { reason: String },
+    /// Provider doesn't expose a fast validation path. The cred shape
+    /// parsed, that's all we can say. UI treats it as "unverified".
+    NotImplemented,
+}
+
 /// One dispatch's full result: what the dispatcher needs to know.
 pub struct ProviderResult {
     pub outcome: SendOutcome,
@@ -120,6 +140,14 @@ pub trait Provider: Send + Sync {
         env: Option<&str>,
         msg: &NativeMessage,
     ) -> Result<ProviderResult, ProviderError>;
+
+    /// v2.19 — fast credential validation. Parses the shape and,
+    /// where the vendor exposes a cheap auth challenge (FCM/HCM
+    /// OAuth mint), exercises it. Should complete in < 1 s on the
+    /// happy path. Default impl returns `NotImplemented`.
+    async fn validate(&self, _cred: Credential<'_>) -> ValidateOutcome {
+        ValidateOutcome::NotImplemented
+    }
 }
 
 /// Process-wide provider registry. Built once on startup with the

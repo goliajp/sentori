@@ -34,7 +34,10 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::Mutex;
 
-use super::{Credential, Provider, ProviderError, ProviderKind, ProviderResult, SendOutcome};
+use super::{
+    Credential, Provider, ProviderError, ProviderKind, ProviderResult, SendOutcome,
+    ValidateOutcome,
+};
 use crate::push::types::{NativeMessage, Priority};
 
 const FCM_SEND_URL: &str = "https://fcm.googleapis.com/v1/projects";
@@ -197,6 +200,40 @@ impl Provider for FcmProvider {
             provider_body: Some(truncated),
             duration_ms,
         })
+    }
+
+    async fn validate(&self, cred: Credential<'_>) -> ValidateOutcome {
+        // FCM exposes a cheap auth challenge: mint an OAuth access
+        // token via the JWT-bearer grant. If Google says 200 the
+        // service-account JSON is well-formed AND active. We reuse
+        // `access_token` so a successful validate populates the
+        // cache for the next actual send.
+        let _: FcmConfig = match serde_json::from_value(cred.config.clone()) {
+            Ok(c) => c,
+            Err(e) => return ValidateOutcome::Malformed { reason: format!("config: {e}") },
+        };
+        let secret: FcmSecret = match serde_json::from_slice(cred.secret_payload) {
+            Ok(s) => s,
+            Err(e) => return ValidateOutcome::Malformed { reason: format!("secret: {e}") },
+        };
+        match self.access_token(&secret).await {
+            Ok(_) => ValidateOutcome::Ok,
+            Err(ProviderError::CredentialMalformed(reason)) => {
+                // `access_token` returns CredentialMalformed for both
+                // PEM parse failures (offline) and OAuth 4xx (Google
+                // rejected the JWT). For UX, treat the offline case
+                // as Malformed and the network reject as Rejected.
+                if reason.starts_with("oauth jwt sign:") {
+                    ValidateOutcome::Malformed { reason }
+                } else {
+                    ValidateOutcome::Rejected { reason }
+                }
+            }
+            Err(ProviderError::HttpTransport(reason)) => {
+                ValidateOutcome::Unreachable { reason }
+            }
+            Err(other) => ValidateOutcome::Rejected { reason: format!("{other}") },
+        }
     }
 }
 

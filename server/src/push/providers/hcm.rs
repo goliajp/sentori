@@ -36,7 +36,10 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::Mutex;
 
-use super::{Credential, Provider, ProviderError, ProviderKind, ProviderResult, SendOutcome};
+use super::{
+    Credential, Provider, ProviderError, ProviderKind, ProviderResult, SendOutcome,
+    ValidateOutcome,
+};
 use crate::push::types::{NativeMessage, Priority};
 
 const HCM_OAUTH_URL: &str = "https://oauth-login.cloud.huawei.com/oauth2/v3/token";
@@ -181,6 +184,29 @@ impl Provider for HcmProvider {
             provider_body: Some(truncate_2k(&raw_body)),
             duration_ms,
         })
+    }
+
+    async fn validate(&self, cred: Credential<'_>) -> ValidateOutcome {
+        // HCM exposes `oauth2/v3/token` with client_credentials grant.
+        // Same shape as FCM: 200 = cred valid, 4xx = rejected.
+        let config: HcmConfig = match serde_json::from_value(cred.config.clone()) {
+            Ok(c) => c,
+            Err(e) => return ValidateOutcome::Malformed { reason: format!("config: {e}") },
+        };
+        let secret: HcmSecret = match serde_json::from_slice(cred.secret_payload) {
+            Ok(s) => s,
+            Err(e) => return ValidateOutcome::Malformed { reason: format!("secret: {e}") },
+        };
+        match self.access_token(&config.app_id, &secret.app_secret).await {
+            Ok(_) => ValidateOutcome::Ok,
+            Err(ProviderError::CredentialMalformed(reason)) => {
+                ValidateOutcome::Rejected { reason }
+            }
+            Err(ProviderError::HttpTransport(reason)) => {
+                ValidateOutcome::Unreachable { reason }
+            }
+            Err(other) => ValidateOutcome::Rejected { reason: format!("{other}") },
+        }
     }
 }
 
