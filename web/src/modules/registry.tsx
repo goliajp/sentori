@@ -310,9 +310,13 @@ export const MODULES: ModuleDef[] = [
     path: 'posture',
     view: PostureView,
   },
+  // v2.13 — engineering-hygiene lens. Privacy 是该 lens 锚点;扫
+  // event payloads 看有没有意外 PII 泄漏(score + 风险条 + top
+  // leaking fields)。Moments(audit verdict 是 hygiene-or-user)
+  // 仍 hidden 等 v2.14 完整 v3 GDS migration。详见 docs/roadmap/v2.13.md。
   {
+    chord: 'y',
     group: 'trust',
-    hidden: true,
     iconPath:
       'M2 2l20 20M6.7 6.7C4 8.4 2.6 11 2.6 12c0 2 3 6 9.4 6 2.1 0 3.8-.4 5.2-1M11 5c.3 0 .7 0 1 .1M21.4 12c0-2-3-6-9.4-6',
     id: 'privacy',
