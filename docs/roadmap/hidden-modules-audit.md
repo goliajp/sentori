@@ -368,3 +368,22 @@ Remaining hidden after v2.14:
 Remaining hidden after v2.15 (2 modules only):
 - audience — subsumed by Users overview (verdict: keep hidden)
 - alerts — cross-cutting, needs own redesign (independent release)
+
+## Update 2026-06-07 — v2.16 close (alerts redesign)
+
+- **alerts** ✅ flipped visible in v2.16. group `manage`, chord
+  `g k` (thinK alerts), adminOnly. Full cross-cutting redesign:
+  view.tsx restructured into router shell + list (DataTable),
+  new detail-view.tsx + form-view.tsx (mirror Health's
+  `:checkId` / `:checkId/edit` / `new` sub-routes). Pure v3 GDS:
+  PageHeader / Card / DataTable / Input / Button / Alert /
+  EmptyState. Server-side AlertRule wire shape unchanged.
+
+Final hidden-module state (1 module remains; verdict permanent):
+- **audience** — `keep` per Phase 1 audit, but **subsumed by Users
+  overview** (v2.4 verdict). The behavioral data still flows; the
+  Users module's KPI + most-affected list covers the operator
+  use case. Leave hidden unless a distinct cohort-explorer workflow
+  surfaces that Users doesn't cover. Likely permanent.
+
+**hidden-modules series CLOSED.**
