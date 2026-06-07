@@ -1,26 +1,47 @@
-// v2.11 — Push notifications credential CRUD dashboard.
+// v2.19 — Push monitoring + management surface.
 //
-// Two stacked Cards, mirroring the cert-monitor / health module pattern:
+// Four GDS tabs:
 //
-//   1. Configured providers — DataTable<{ provider, config summary,
-//      updated_at, delete }> showing every credential row stored on
-//      `push_credentials`. Encrypted secret blob is never surfaced.
+//   1. Overview — per-provider 24h rollup (queued / sent / failed),
+//      device counts, last-send timestamp, configured-provider gaps.
+//      Highest-level "is push healthy" view.
 //
-//   2. Add / update credential — Provider dropdown + config JSON
-//      textarea + secret JSON textarea + Save Button. On Save:
-//      `PUT /admin/api/projects/:id/push/credentials` upserts the
-//      row. Errors surface in an Alert above the form.
+//   2. Devices — paginated active device_tokens. Surfaces user link
+//      (fingerprint hex prefix), env, bad_streak, last_seen.
 //
-// Device list + send-history surfaces are intentionally deferred —
-// the v2.11 dashboard ships credential management only. v2.12 (or
-// later) adds the device + sends views once the server endpoints
-// for those land.
+//   3. Sends — paginated push_sends with status/provider filters.
+//      Each row links to the send-detail sub-route.
+//
+//   4. Credentials — list + upsert/delete + green/red verify status.
+//      Verify mutation pings the vendor's auth endpoint.
+//
+// The send-detail sub-route renders at `:sendId` via the Outlet
+// declared by `registry.tsx` children[]. See `detail-view.tsx`.
 
-import { Alert, Button, Card, DataTable, EmptyState, PageHeader } from '@goliapkg/gds'
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  EmptyState,
+  PageHeader,
+  Tabs as GdsTabs,
+} from '@goliapkg/gds'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { Outlet, useNavigate, useParams } from 'react-router'
 
-import { adminApi, type PushCredentialRow, type PushProviderKind } from '@/api/client'
+import {
+  adminApi,
+  type PushCredentialRow,
+  type PushDeviceRow,
+  type PushProviderKind,
+  type PushSendRow,
+  type PushSendStatus,
+  type PushStatsResponse,
+  type PushVerifyResult,
+} from '@/api/client'
 import { qk } from '@/api/query-keys'
 import { useOrg } from '@/auth/orgContext'
 import { formatRelative } from '@/lib/format'
@@ -35,34 +56,27 @@ const PROVIDER_LABELS: Record<PushProviderKind, string> = {
 
 const PROVIDER_OPTIONS: PushProviderKind[] = ['apns', 'fcm', 'webpush', 'hcm', 'mipush']
 
+type PushTab = 'credentials' | 'devices' | 'overview' | 'sends'
+
+const TABS: { id: PushTab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'devices', label: 'Devices' },
+  { id: 'sends', label: 'Sends' },
+  { id: 'credentials', label: 'Credentials' },
+]
+
 export function PushView() {
   const { currentOrg, currentProject } = useOrg()
   const projectId = currentProject?.id ?? null
-  const qc = useQueryClient()
+  // When a child route (`:sendId`) is active, render only the Outlet.
+  // Detection: useParams gives us back `:sendId` from the parent's
+  // <Route> definition in registry → AppShell.
+  const params = useParams<{ sendId?: string }>()
+  const [tab, setTab] = useState<PushTab>('overview')
 
-  const credsQ = useQuery({
-    enabled: !!projectId,
-    queryFn: () => adminApi.listPushCredentials(projectId!),
-    queryKey: qk.pushCredentials(projectId),
-  })
-
-  const upsertM = useMutation({
-    mutationFn: ({
-      provider,
-      config,
-      secret,
-    }: {
-      provider: PushProviderKind
-      config: unknown
-      secret: unknown
-    }) => adminApi.upsertPushCredential(projectId!, provider, config, secret),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: qk.pushCredentials(projectId) }),
-  })
-
-  const deleteM = useMutation({
-    mutationFn: (provider: PushProviderKind) => adminApi.deletePushCredential(projectId!, provider),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: qk.pushCredentials(projectId) }),
-  })
+  if (params.sendId) {
+    return <Outlet />
+  }
 
   if (!projectId) {
     return (
@@ -70,15 +84,13 @@ export function PushView() {
         <PageHeader title="Push" />
         <Card>
           <EmptyState
-            description="Pick a project from the sidebar to configure push credentials."
+            description="Pick a project from the sidebar to view push state."
             title="No project selected"
           />
         </Card>
       </div>
     )
   }
-
-  const rows = credsQ.data ?? []
 
   return (
     <div className="space-y-4">
@@ -91,10 +103,532 @@ export function PushView() {
           },
           { label: 'push' },
         ]}
-        subtitle="Configure APNs / FCM / Web Push / HCM / MiPush provider credentials. Encrypted at rest via SENTORI_SESSION_SECRET-derived AES-256-GCM."
+        subtitle="Manage credentials, watch device activity, inspect every send + its delivery timeline."
         title="Push"
       />
 
+      <GdsTabs
+        active={tab}
+        onChange={(id) => setTab(id as PushTab)}
+        tabs={TABS}
+        variant="underline"
+      />
+
+      {tab === 'overview' && <OverviewTab projectId={projectId} />}
+      {tab === 'devices' && <DevicesTab projectId={projectId} />}
+      {tab === 'sends' && <SendsTab projectId={projectId} />}
+      {tab === 'credentials' && <CredentialsTab projectId={projectId} />}
+    </div>
+  )
+}
+
+// ── Overview tab ──────────────────────────────────────────────────────
+
+function OverviewTab({ projectId }: { projectId: string }) {
+  const statsQ = useQuery({
+    queryFn: () => adminApi.getPushStats(projectId),
+    queryKey: qk.push.stats(projectId),
+    refetchInterval: 30_000,
+    staleTime: 25_000,
+  })
+
+  if (statsQ.error) {
+    return (
+      <Card>
+        <Alert title="Failed to load stats" variant="danger">
+          {(statsQ.error as Error).message}
+        </Alert>
+      </Card>
+    )
+  }
+  if (statsQ.isLoading || !statsQ.data) {
+    return (
+      <Card>
+        <span className="text-fg-muted font-mono text-[12px]">Loading…</span>
+      </Card>
+    )
+  }
+  const s: PushStatsResponse = statsQ.data
+  const providers = Object.keys(s.perProvider).sort() as PushProviderKind[]
+  const rows = providers.map((p) => ({ provider: p, ...s.perProvider[p] }))
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <KpiCard
+          label="Queued now"
+          value={s.queuedTotal}
+          tone={s.queuedTotal > 0 ? 'warning' : 'neutral'}
+        />
+        <KpiCard label="Sent · 24h" value={s.sent24hTotal} tone="success" />
+        <KpiCard
+          label="Failed · 24h"
+          value={s.failed24hTotal}
+          tone={s.failed24hTotal > 0 ? 'danger' : 'neutral'}
+        />
+        <KpiCard label="Active devices" value={s.devicesActiveTotal} tone="neutral" />
+      </div>
+
+      <Card>
+        <header className="border-border/40 mb-3 flex items-baseline justify-between border-b pb-2">
+          <h2 className="text-fg text-[14px] font-semibold">Per-provider rollup</h2>
+          <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
+            last 24 hours
+          </span>
+        </header>
+
+        {rows.length === 0 ? (
+          <EmptyState
+            description="No credentials configured and no recorded sends. Add a provider under the Credentials tab to start."
+            title="No push activity"
+          />
+        ) : (
+          <DataTable
+            columns={[
+              {
+                key: 'provider',
+                label: 'Provider',
+                render: (_v, r) => (
+                  <span className="text-fg font-mono text-[13px]">
+                    {PROVIDER_LABELS[r.provider]}
+                  </span>
+                ),
+              },
+              {
+                key: 'devices',
+                label: 'Devices',
+                align: 'right',
+                width: '100px',
+                render: (_v, r) => (
+                  <span className="text-fg font-mono text-[12px] tabular-nums">
+                    {r.devicesActive}
+                  </span>
+                ),
+              },
+              {
+                key: 'queued',
+                label: 'Queued',
+                align: 'right',
+                width: '100px',
+                render: (_v, r) => (
+                  <span
+                    className={`font-mono text-[12px] tabular-nums ${r.queued > 0 ? 'text-warning' : 'text-fg-muted'}`}
+                  >
+                    {r.queued}
+                  </span>
+                ),
+              },
+              {
+                key: 'sent24h',
+                label: 'Sent 24h',
+                align: 'right',
+                width: '110px',
+                render: (_v, r) => (
+                  <span className="text-fg font-mono text-[12px] tabular-nums">{r.sent24h}</span>
+                ),
+              },
+              {
+                key: 'failed24h',
+                label: 'Failed 24h',
+                align: 'right',
+                width: '110px',
+                render: (_v, r) => (
+                  <span
+                    className={`font-mono text-[12px] tabular-nums ${r.failed24h > 0 ? 'text-danger' : 'text-fg-muted'}`}
+                  >
+                    {r.failed24h}
+                  </span>
+                ),
+              },
+              {
+                key: 'successRate',
+                label: 'Success',
+                align: 'right',
+                width: '110px',
+                render: (_v, r) => {
+                  const total = r.sent24h + r.failed24h
+                  if (total === 0) {
+                    return <span className="text-fg-muted font-mono text-[11px]">—</span>
+                  }
+                  const rate = (r.sent24h / total) * 100
+                  return (
+                    <span
+                      className={`font-mono text-[12px] tabular-nums ${rate >= 99 ? 'text-success' : rate >= 90 ? 'text-warning' : 'text-danger'}`}
+                    >
+                      {rate.toFixed(1)}%
+                    </span>
+                  )
+                },
+              },
+            ]}
+            density="compact"
+            rowKey={(r) => r.provider}
+            rows={rows}
+            striped
+          />
+        )}
+
+        {s.lastSendAt && (
+          <p className="text-fg-muted mt-3 font-mono text-[11px]">
+            last send · {formatRelative(s.lastSendAt)}
+          </p>
+        )}
+      </Card>
+    </div>
+  )
+}
+
+function KpiCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: number
+  tone: 'danger' | 'neutral' | 'success' | 'warning'
+}) {
+  const toneClass = {
+    danger: 'text-danger',
+    neutral: 'text-fg',
+    success: 'text-success',
+    warning: 'text-warning',
+  }[tone]
+  return (
+    <Card>
+      <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
+        {label}
+      </span>
+      <div className={`mt-2 font-mono text-[28px] font-semibold tabular-nums ${toneClass}`}>
+        {value.toLocaleString()}
+      </div>
+    </Card>
+  )
+}
+
+// ── Devices tab ───────────────────────────────────────────────────────
+
+function DevicesTab({ projectId }: { projectId: string }) {
+  const [provider, setProvider] = useState<'' | PushProviderKind>('')
+  const q = useQuery({
+    queryFn: () =>
+      adminApi.listPushDevices(projectId, {
+        limit: 100,
+        provider: provider || undefined,
+      }),
+    queryKey: qk.push.devices(projectId, provider || undefined),
+    staleTime: 20_000,
+  })
+
+  return (
+    <Card>
+      <header className="border-border/40 mb-3 flex items-center justify-between gap-3 border-b pb-2">
+        <h2 className="text-fg text-[14px] font-semibold">
+          Devices <span className="text-fg-muted font-mono text-[11px]">· active</span>
+        </h2>
+        <label className="flex items-center gap-2">
+          <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
+            provider
+          </span>
+          <select
+            className="border-border bg-bg text-fg gds-h-sm gds-pad-x rounded border font-mono text-[12px]"
+            onChange={(e) => setProvider(e.target.value as '' | PushProviderKind)}
+            value={provider}
+          >
+            <option value="">all</option>
+            {PROVIDER_OPTIONS.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </label>
+      </header>
+
+      {q.error && (
+        <Alert title="Failed to load devices" variant="danger">
+          {(q.error as Error).message}
+        </Alert>
+      )}
+
+      {!q.isLoading && !q.error && (q.data?.items.length ?? 0) === 0 && (
+        <EmptyState
+          description="No client has registered a push token in this project yet. Mobile SDKs register via `sentori.pushRegister()`."
+          title="No active devices"
+        />
+      )}
+
+      {q.data?.items && q.data.items.length > 0 && (
+        <DataTable<PushDeviceRow>
+          columns={[
+            {
+              key: 'provider',
+              label: 'Provider',
+              width: '110px',
+              render: (_v, r) => (
+                <Badge
+                  className="font-mono text-[10px] tracking-[0.18em] uppercase"
+                  variant="default"
+                >
+                  {r.provider}
+                </Badge>
+              ),
+            },
+            {
+              key: 'id',
+              label: 'Device handle',
+              render: (_v, r) => (
+                <span className="text-fg font-mono text-[11px]">ipt_{r.id.slice(0, 10)}…</span>
+              ),
+            },
+            {
+              key: 'user',
+              label: 'User',
+              render: (_v, r) => (
+                <span className="text-fg-secondary font-mono text-[11px]">
+                  {r.userFingerprintHex ? `${r.userFingerprintHex.slice(0, 12)}…` : '—'}
+                </span>
+              ),
+            },
+            {
+              key: 'env',
+              label: 'Env',
+              width: '90px',
+              render: (_v, r) => (
+                <span className="text-fg-muted font-mono text-[11px]">{r.env ?? '—'}</span>
+              ),
+            },
+            {
+              key: 'badStreak',
+              label: 'Bad streak',
+              align: 'right',
+              width: '110px',
+              render: (_v, r) => (
+                <span
+                  className={`font-mono text-[12px] tabular-nums ${r.badStreak > 0 ? 'text-warning' : 'text-fg-muted'}`}
+                >
+                  {r.badStreak}
+                </span>
+              ),
+            },
+            {
+              key: 'lastSeenAt',
+              label: 'Last seen',
+              width: '140px',
+              render: (_v, r) => (
+                <span className="text-fg-muted font-mono text-[11px] tabular-nums">
+                  {formatRelative(r.lastSeenAt)}
+                </span>
+              ),
+            },
+          ]}
+          density="compact"
+          rowKey={(r) => r.id}
+          rows={q.data.items}
+          striped
+        />
+      )}
+    </Card>
+  )
+}
+
+// ── Sends tab ─────────────────────────────────────────────────────────
+
+function SendsTab({ projectId }: { projectId: string }) {
+  const navigate = useNavigate()
+  const [status, setStatus] = useState<'' | PushSendStatus>('')
+  const [provider, setProvider] = useState<'' | PushProviderKind>('')
+  const q = useQuery({
+    queryFn: () =>
+      adminApi.listPushSends(projectId, {
+        limit: 100,
+        status: status || undefined,
+        provider: provider || undefined,
+      }),
+    queryKey: qk.push.sends(projectId, {
+      status: status || undefined,
+      provider: provider || undefined,
+    }),
+    refetchInterval: 30_000,
+    staleTime: 25_000,
+  })
+
+  return (
+    <Card>
+      <header className="border-border/40 mb-3 flex items-center justify-between gap-3 border-b pb-2">
+        <h2 className="text-fg text-[14px] font-semibold">Sends</h2>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2">
+            <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
+              status
+            </span>
+            <select
+              className="border-border bg-bg text-fg gds-h-sm gds-pad-x rounded border font-mono text-[12px]"
+              onChange={(e) => setStatus(e.target.value as '' | PushSendStatus)}
+              value={status}
+            >
+              <option value="">all</option>
+              <option value="queued">queued</option>
+              <option value="sent">sent</option>
+              <option value="failed">failed</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2">
+            <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
+              provider
+            </span>
+            <select
+              className="border-border bg-bg text-fg gds-h-sm gds-pad-x rounded border font-mono text-[12px]"
+              onChange={(e) => setProvider(e.target.value as '' | PushProviderKind)}
+              value={provider}
+            >
+              <option value="">all</option>
+              {PROVIDER_OPTIONS.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </header>
+
+      {q.error && (
+        <Alert title="Failed to load sends" variant="danger">
+          {(q.error as Error).message}
+        </Alert>
+      )}
+
+      {!q.isLoading && !q.error && (q.data?.items.length ?? 0) === 0 && (
+        <EmptyState
+          description="No push sends recorded for this project. Backend integrators POST /v1/push/send."
+          title="No sends yet"
+        />
+      )}
+
+      {q.data?.items && q.data.items.length > 0 && (
+        <DataTable<PushSendRow>
+          columns={[
+            {
+              key: 'status',
+              label: 'Status',
+              width: '110px',
+              render: (_v, r) => (
+                <Badge
+                  className="font-mono text-[10px] tracking-[0.18em] uppercase"
+                  variant={
+                    r.status === 'sent' ? 'success' : r.status === 'failed' ? 'danger' : 'default'
+                  }
+                >
+                  {r.status}
+                </Badge>
+              ),
+            },
+            {
+              key: 'provider',
+              label: 'Provider',
+              width: '90px',
+              render: (_v, r) => (
+                <span className="text-fg-secondary font-mono text-[11px] uppercase">
+                  {r.provider}
+                </span>
+              ),
+            },
+            {
+              key: 'title',
+              label: 'Title / preview',
+              render: (_v, r) => (
+                <span className="text-fg font-mono text-[11px]">
+                  {r.payloadPreview.title ?? r.payloadPreview.body ?? '(no title)'}
+                </span>
+              ),
+            },
+            {
+              key: 'providerOutcome',
+              label: 'Outcome',
+              width: '180px',
+              render: (_v, r) => (
+                <span className="text-fg-muted font-mono text-[10px]">
+                  {r.providerOutcome ?? (r.status === 'queued' ? '—' : '?')}
+                </span>
+              ),
+            },
+            {
+              key: 'retryCount',
+              label: 'Retries',
+              align: 'right',
+              width: '80px',
+              render: (_v, r) => (
+                <span
+                  className={`font-mono text-[12px] tabular-nums ${r.retryCount > 0 ? 'text-warning' : 'text-fg-muted'}`}
+                >
+                  {r.retryCount}
+                </span>
+              ),
+            },
+            {
+              key: 'createdAt',
+              label: 'Created',
+              width: '130px',
+              render: (_v, r) => (
+                <span className="text-fg-muted font-mono text-[11px] tabular-nums">
+                  {formatRelative(r.createdAt)}
+                </span>
+              ),
+            },
+            {
+              key: 'open',
+              label: '',
+              align: 'right',
+              width: '70px',
+              render: (_v, r) => (
+                <Button onClick={() => navigate(r.id)} size="sm" variant="ghost">
+                  Open
+                </Button>
+              ),
+            },
+          ]}
+          density="compact"
+          rowKey={(r) => r.id}
+          rows={q.data.items}
+          striped
+        />
+      )}
+    </Card>
+  )
+}
+
+// ── Credentials tab ───────────────────────────────────────────────────
+
+function CredentialsTab({ projectId }: { projectId: string }) {
+  const qc = useQueryClient()
+
+  const credsQ = useQuery({
+    queryFn: () => adminApi.listPushCredentials(projectId),
+    queryKey: qk.pushCredentials(projectId),
+  })
+
+  const upsertM = useMutation({
+    mutationFn: ({
+      provider,
+      config,
+      secret,
+    }: {
+      provider: PushProviderKind
+      config: unknown
+      secret: unknown
+    }) => adminApi.upsertPushCredential(projectId, provider, config, secret),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: qk.pushCredentials(projectId) }),
+  })
+
+  const deleteM = useMutation({
+    mutationFn: (provider: PushProviderKind) => adminApi.deletePushCredential(projectId, provider),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: qk.pushCredentials(projectId) }),
+  })
+
+  const rows = credsQ.data ?? []
+
+  return (
+    <div className="space-y-4">
       <Card>
         <header className="border-border/40 mb-3 flex items-baseline justify-between border-b pb-2">
           <h2 className="text-fg text-[14px] font-semibold">Configured providers</h2>
@@ -140,7 +674,7 @@ export function PushView() {
               {
                 key: 'updatedAt',
                 label: 'Updated',
-                width: '180px',
+                width: '140px',
                 render: (_v, r) => (
                   <span className="text-fg-muted font-mono text-[11px] tabular-nums">
                     {formatRelative(r.updatedAt)}
@@ -148,10 +682,16 @@ export function PushView() {
                 ),
               },
               {
+                key: 'verify',
+                label: 'Status',
+                width: '180px',
+                render: (_v, r) => <VerifyCell projectId={projectId} provider={r.provider} />,
+              },
+              {
                 align: 'right',
                 key: 'delete',
                 label: '',
-                width: '110px',
+                width: '90px',
                 render: (_v, r) => (
                   <Button
                     onClick={() => {
@@ -188,6 +728,53 @@ export function PushView() {
   )
 }
 
+function VerifyCell({ projectId, provider }: { projectId: string; provider: PushProviderKind }) {
+  const qc = useQueryClient()
+  const verifyM = useMutation({
+    mutationFn: () => adminApi.verifyPushCredential(projectId, provider),
+    onSuccess: (data: PushVerifyResult) => {
+      qc.setQueryData(qk.push.verify(projectId, provider), data)
+    },
+  })
+  // Treat the latest cached verify as the source of truth — surfaces
+  // "you already verified this 30 s ago" without burning another
+  // OAuth mint when the user just hops tabs.
+  const cached = qc.getQueryData<PushVerifyResult>(qk.push.verify(projectId, provider))
+
+  const display = verifyM.data ?? cached ?? null
+  const dot = display
+    ? display.status === 'ok'
+      ? 'bg-success'
+      : display.status === 'unverified'
+        ? 'bg-fg-muted'
+        : display.status === 'unreachable'
+          ? 'bg-warning'
+          : 'bg-danger'
+    : 'bg-fg-muted'
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`inline-block h-2 w-2 rounded-full ${dot}`} />
+      <span className="text-fg-secondary font-mono text-[11px]">
+        {display ? display.status : 'unchecked'}
+      </span>
+      <Button
+        onClick={() => verifyM.mutate()}
+        size="sm"
+        variant="ghost"
+        loading={verifyM.isPending}
+      >
+        {verifyM.isPending ? '…' : 'Verify'}
+      </Button>
+      {display?.reason && display.status !== 'ok' && (
+        <span className="text-fg-muted truncate font-mono text-[10px]" title={display.reason}>
+          {display.reason.slice(0, 30)}
+        </span>
+      )}
+    </div>
+  )
+}
+
 function summariseConfig(provider: PushProviderKind, config: Record<string, unknown>): string {
   switch (provider) {
     case 'apns': {
@@ -201,13 +788,13 @@ function summariseConfig(provider: PushProviderKind, config: Record<string, unkn
       return proj ?? '(no project id)'
     }
     case 'webpush': {
-      const pub = config.vapidPublic as string | undefined
+      const pub = config.vapid_public as string | undefined
       const contact = config.contact as string | undefined
       return [pub ? `key ${pub.slice(0, 10)}…` : null, contact].filter(Boolean).join(' · ')
     }
     case 'hcm':
     case 'mipush': {
-      const appId = (config.app_id ?? config.appId) as string | undefined
+      const appId = (config.app_id ?? config.appId ?? config.package_name) as string | undefined
       return appId ?? '(no app id)'
     }
     default:
@@ -338,10 +925,11 @@ function configPlaceholder(provider: PushProviderKind): string {
     case 'fcm':
       return JSON.stringify({ project_id: 'my-fcm-project' }, null, 2)
     case 'webpush':
-      return JSON.stringify({ vapidPublic: 'BNc...', contact: 'mailto:dev@example.com' }, null, 2)
+      return JSON.stringify({ vapid_public: 'BNc...', contact: 'mailto:dev@example.com' }, null, 2)
     case 'hcm':
+      return JSON.stringify({ app_id: '...' }, null, 2)
     case 'mipush':
-      return JSON.stringify({ app_id: '...', region: 'global' }, null, 2)
+      return JSON.stringify({ package_name: 'com.example.app', region: 'cn' }, null, 2)
     default:
       return ''
   }
@@ -356,16 +944,16 @@ function secretPlaceholder(provider: PushProviderKind): string {
         2
       )
     case 'fcm':
-      return '{ "type": "service_account", "project_id": "…", "private_key": "…", "client_email": "…", "token_uri": "https://oauth2.googleapis.com/token" }'
+      return '{ "type": "service_account", "client_email": "…", "private_key": "…", "token_uri": "https://oauth2.googleapis.com/token" }'
     case 'webpush':
       return JSON.stringify(
-        { vapidPrivate: '-----BEGIN EC PRIVATE KEY-----\\n…\\n-----END EC PRIVATE KEY-----' },
+        { vapid_private: '-----BEGIN EC PRIVATE KEY-----\\n…\\n-----END EC PRIVATE KEY-----' },
         null,
         2
       )
     case 'hcm':
     case 'mipush':
-      return JSON.stringify({ appSecret: '…' }, null, 2)
+      return JSON.stringify({ app_secret: '…' }, null, 2)
     default:
       return ''
   }

@@ -93,7 +93,15 @@ const PostureView = lazyView(() =>
   import('./posture/view').then((m) => ({ default: m.PostureView }))
 )
 // v2.11 — Push notifications module (credential CRUD).
+// v2.19 — expanded to 4 tabs + per-send detail sub-route.
 const PushView = lazyView(() => import('./push/view').then((m) => ({ default: m.PushView })))
+const PushSendDetailView = lazyView(() =>
+  import('./push/send-detail-view').then((m) => ({ default: m.PushSendDetailView }))
+)
+// v2.19 — cross-project Push fleet (org-scoped, under manage group).
+const PushFleetView = lazyView(() =>
+  import('./push-fleet/view').then((m) => ({ default: m.PushFleetView }))
+)
 const PrivacyView = lazyView(() =>
   import('./privacy/view').then((m) => ({ default: m.PrivacyView }))
 )
@@ -432,8 +440,12 @@ export const MODULES: ModuleDef[] = [
   // ("notifications"). Group `manage` per design doc — push is
   // configure-and-watch, not a triage lens. First non-hidden lens
   // module added since v2.6 (cert-monitor + posture).
+  // v2.19 — expanded into 4 tabs (Overview / Devices / Sends /
+  // Credentials); the `:sendId` child route renders the per-send
+  // delivery_logs timeline + retry button.
   {
     adminOnly: true,
+    children: [{ path: ':sendId', view: PushSendDetailView }],
     chord: 'n',
     group: 'manage',
     iconPath: 'M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0',
@@ -441,6 +453,18 @@ export const MODULES: ModuleDef[] = [
     label: 'Push',
     path: 'push',
     view: PushView,
+  },
+  // v2.19 — cross-project Push fleet view. Org-scoped, sits next to
+  // Push under the manage group: one row per project showing
+  // configured providers + 24 h activity + queue depth.
+  {
+    adminOnly: true,
+    group: 'manage',
+    iconPath: 'M3 12h18M3 6h18M3 18h18',
+    id: 'push-fleet',
+    label: 'Push fleet',
+    path: 'push-fleet',
+    view: PushFleetView,
   },
   {
     adminOnly: true,

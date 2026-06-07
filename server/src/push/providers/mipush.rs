@@ -33,7 +33,10 @@ use async_trait::async_trait;
 use serde::Deserialize;
 use std::time::Instant;
 
-use super::{Credential, Provider, ProviderError, ProviderKind, ProviderResult, SendOutcome};
+use super::{
+    Credential, Provider, ProviderError, ProviderKind, ProviderResult, SendOutcome,
+    ValidateOutcome,
+};
 use crate::push::types::{NativeMessage, Priority};
 
 const MIPUSH_URL_CN: &str = "https://api.xmpush.xiaomi.com/v3/message/regid";
@@ -160,6 +163,31 @@ impl Provider for MiPushProvider {
             provider_body: Some(truncate_2k(&raw_body)),
             duration_ms,
         })
+    }
+
+    async fn validate(&self, cred: Credential<'_>) -> ValidateOutcome {
+        // MiPush has no documented "ping" endpoint that doesn't burn
+        // a quota slot. The /v3/message/regid endpoint is the only
+        // auth surface and it consumes the message; we don't want to
+        // emit live messages on every dashboard refresh. So validate
+        // by parsing shape only and require both package_name and
+        // app_secret to be non-empty.
+        let config: MiPushConfig = match serde_json::from_value(cred.config.clone()) {
+            Ok(c) => c,
+            Err(e) => return ValidateOutcome::Malformed { reason: format!("config: {e}") },
+        };
+        let secret: MiPushSecret = match serde_json::from_slice(cred.secret_payload) {
+            Ok(s) => s,
+            Err(e) => return ValidateOutcome::Malformed { reason: format!("secret: {e}") },
+        };
+        if config.package_name.is_empty() {
+            return ValidateOutcome::Malformed { reason: "package_name empty".into() };
+        }
+        if secret.app_secret.is_empty() {
+            return ValidateOutcome::Malformed { reason: "app_secret empty".into() };
+        }
+        // Successful parse is the strongest we get for MiPush.
+        ValidateOutcome::NotImplemented
     }
 }
 

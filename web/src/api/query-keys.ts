@@ -200,6 +200,29 @@ export const qk = {
   // v2.11 — push credentials per project.
   pushCredentials: (projectId: Id) => tuple('push-credentials', projectId),
 
+  // v2.19 — push monitoring + management.
+  push: {
+    stats: (projectId: Id) => tuple('push-stats', projectId),
+    devices: (projectId: Id, provider?: string) =>
+      provider === undefined
+        ? tuple('push-devices', projectId)
+        : tuple('push-devices', projectId, provider),
+    sends: (
+      projectId: Id,
+      filters: { status?: string; provider?: string; tokenId?: string } = {}
+    ) =>
+      tuple(
+        'push-sends',
+        projectId,
+        filters.status ?? '_',
+        filters.provider ?? '_',
+        filters.tokenId ?? '_'
+      ),
+    sendDetail: (projectId: Id, sendId: Id) => tuple('push-send-detail', projectId, sendId),
+    verify: (projectId: Id, provider: string) => tuple('push-verify', projectId, provider),
+    fleet: (orgSlug: Id) => tuple('push-fleet', orgSlug),
+  },
+
   // ── privacy ─────────────────────────────────────────────────────────
   privacy: {
     score: (projectId: Id) => tuple('privacy-score', projectId),
