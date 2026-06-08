@@ -9,7 +9,7 @@ name = "sentori-server"
 # was actually deployed. A repo-root `VERSION` file + build-time
 # substitution is the longer-term cleanup; for now keep the three
 # in sync manually on each cut.
-version = "1.1.1"
+version = "1.1.2"
 edition = "2024"
 authors = ["GOLIA K.K. <takagi@golia.jp>"]
 description = "Sentori ingestion server (axum + Postgres + Valkey)"
@@ -91,8 +91,12 @@ flate2 = "1"
 tar = "0.4"
 # v1.3 W13 — GitHub App auth needs an RSA-SHA256 JWT to exchange
 # for an installation access token. `jsonwebtoken` is the standard
-# crate; uses ring for the underlying RSA so no system OpenSSL.
-jsonwebtoken = "10"
+# crate. v10 made the crypto backend pluggable: one of `rust_crypto`
+# or `aws_lc_rs` must be enabled or the first sign call panics with
+# "Could not automatically determine the process-level CryptoProvider".
+# `rust_crypto` keeps us on the pure-Rust stack (same family as
+# `aes-gcm` / `p256` used in `secrets.rs` and the webpush provider).
+jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 # v2.7 W1 — application-level secret encryption layer (`src/secrets.rs`).
 # AES-256-GCM is FIPS-compatible, hardware-accelerated on every modern
 # CPU, and a tiny pure-Rust dep with no system OpenSSL pull-in. First
