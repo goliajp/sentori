@@ -26,8 +26,11 @@ export function clientInit(cfg: SentoriNextConfig = {}): void {
     initSentori(resolveConfig('client', cfg))
     _initialised = true
   } catch (e) {
+    // Warn — never error — so we don't add red noise to the host app's
+    // console. Sentori must be "free upside": init failure must be
+    // silent-ish, never a crash signal.
     // eslint-disable-next-line no-console
-    console.error('[sentori-next] client init failed', e)
+    console.warn('[sentori-next] client init failed', e)
   }
 }
 
