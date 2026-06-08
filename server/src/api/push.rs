@@ -438,6 +438,7 @@ struct PushStatsResponse {
     failed_24h_total: i64,
     devices_active_total: i64,
     per_provider: std::collections::BTreeMap<String, ProviderRollup>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
     last_send_at: Option<time::OffsetDateTime>,
 }
 
@@ -547,8 +548,11 @@ struct DeviceTokenRow {
     provider: String,
     env: Option<String>,
     bad_streak: i32,
+    #[serde(default, with = "time::serde::rfc3339::option")]
     revoked_at: Option<time::OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339")]
     last_seen_at: time::OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
     created_at: time::OffsetDateTime,
     user_fingerprint_hex: Option<String>,
     metadata: serde_json::Value,
@@ -657,8 +661,11 @@ struct PushSendRow {
     provider_outcome: Option<String>,
     error: Option<String>,
     retry_count: i32,
+    #[serde(with = "time::serde::rfc3339")]
     next_attempt_at: time::OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
     created_at: time::OffsetDateTime,
+    #[serde(default, with = "time::serde::rfc3339::option")]
     sent_at: Option<time::OffsetDateTime>,
     payload_preview: serde_json::Value,
 }
@@ -783,6 +790,7 @@ struct DeliveryLogEntry {
     provider_status: Option<i32>,
     provider_body: Option<String>,
     duration_ms: Option<i32>,
+    #[serde(with = "time::serde::rfc3339")]
     created_at: time::OffsetDateTime,
 }
 
@@ -1091,6 +1099,7 @@ struct OrgFleetProjectRow {
     sent_24h: i64,
     failed_24h: i64,
     queued: i64,
+    #[serde(default, with = "time::serde::rfc3339::option")]
     last_send_at: Option<time::OffsetDateTime>,
 }
 
