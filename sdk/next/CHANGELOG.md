@@ -1,5 +1,21 @@
 # @goliapkg/sentori-next
 
+## 1.1.1
+
+### Patch Changes
+
+- [`5f0fa5b`](https://github.com/goliajp/sentori/commit/5f0fa5b525158cf024b99fa952716b19f1e447f1) Thanks [@doracawl](https://github.com/doracawl)! - fix(sdk): never emit `console.error` from runtime paths — host apps reading red `[sentori]` lines mistake them for their own app crashing and pull Sentori out. Downgraded to `console.warn`:
+
+  - `sentori-core`: `logger.error(...)` now routes to `console.warn` in the default console emit path. Host-supplied log transports still receive the real `error` level so they can route it to their aggregator however they like.
+  - `sentori-react`: `SentoriProvider` init-failure catch block.
+  - `sentori-next`: `clientInit` and `serverInit` failure catch blocks.
+
+  The runtimeMetrics flush-failure channel that triggered the original report runs through `reportInternal → logger.error → console.error` in the host's runtime; the `sentori-core` fix closes the channel at the source for every downstream SDK.
+
+- Updated dependencies [[`5f0fa5b`](https://github.com/goliajp/sentori/commit/5f0fa5b525158cf024b99fa952716b19f1e447f1)]:
+  - @goliapkg/sentori-core@1.3.1
+  - @goliapkg/sentori-react@1.1.1
+
 ## 1.1.0
 
 ### Minor Changes

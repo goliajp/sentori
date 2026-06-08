@@ -1,5 +1,12 @@
 # @sentori/web
 
+## 1.1.3
+
+### Patch Changes
+
+- Updated dependencies [[`5f0fa5b`](https://github.com/goliajp/sentori/commit/5f0fa5b525158cf024b99fa952716b19f1e447f1)]:
+  - @goliapkg/sentori-react@1.1.1
+
 ## 1.1.2
 
 ### Patch Changes
