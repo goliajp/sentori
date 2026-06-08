@@ -111,7 +111,14 @@ function defaultConsoleEmit(level, tag, args) {
     // for genuine problems.
     switch (level) {
         case 'error':
-            console.error(prefix, ...args);
+            // NEVER-rule: Sentori is the host's "free bonus" and must
+            // never emit a real `console.error` red-line — even when the
+            // SDK itself broke. Host devs see `[sentori]` warn and route
+            // it to us; we never want them to mistake an SDK self-report
+            // for their own app crashing. Level stays as `error` for any
+            // host-supplied transport (which can route it to their
+            // aggregator however they like).
+            console.warn(prefix, ...args);
             break;
         case 'warn':
             console.warn(prefix, ...args);

@@ -26,11 +26,11 @@ export function SentoriProvider({ children, config, }) {
             setInitialised(true);
         }
         catch (e) {
-            // Misconfiguration (bad token shape, missing fields). Surface to
-            // console but don't crash the app — the rest of the tree should
-            // still render.
+            // Misconfiguration (bad token shape, missing fields). Warn — never
+            // error — so we don't add red noise to the host app's console.
+            // The rest of the tree should still render.
             // eslint-disable-next-line no-console
-            console.error('[sentori-react] init failed', e);
+            console.warn('[sentori-react] init failed', e);
         }
     }
     const value = useMemo(() => ({
