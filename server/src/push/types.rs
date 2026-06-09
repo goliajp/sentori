@@ -22,6 +22,33 @@ pub struct NativeMessage {
     #[serde(default)]
     pub options: NativeOptions,
     pub idempotency_key: Option<String>,
+    /// v2.34 — preference-center category. When set AND the recipient
+    /// device has a `user_fingerprint_hex`, dispatch checks
+    /// `push_preferences (project, fp, this)`; opted_out rows skip
+    /// silently. Distinct from `NativeOptions.category` which is iOS
+    /// `aps.category` — that one's for action-button groups, this
+    /// one is for end-user opt-out (e.g. "marketing").
+    #[serde(default)]
+    pub preference_category: Option<String>,
+    /// v2.32 — schedule a future send. `next_attempt_at` is clamped
+    /// to `GREATEST(now(), sendAt)` at enqueue time; the dispatch
+    /// cron's existing `next_attempt_at <= now()` filter naturally
+    /// holds the row until the time arrives. Past timestamps =
+    /// "send now".
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub send_at: Option<time::OffsetDateTime>,
+    /// v2.25 — optional free-text tag identifying the campaign this
+    /// send belongs to. Write-only in v2.25; surfaces in v2.27 push-
+    /// correlation BI ("what did campaign X cause?"). Caller defines
+    /// the taxonomy.
+    #[serde(default)]
+    pub campaign_id: Option<String>,
+    /// v2.25 — optional template id (which content variant fired).
+    #[serde(default)]
+    pub template_id: Option<String>,
+    /// v2.25 — optional audience tag (segment / cohort label).
+    #[serde(default)]
+    pub audience_tag: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -29,6 +56,29 @@ pub struct NativeMessage {
 pub enum ToField {
     Single(String),
     Many(Vec<String>),
+    /// v2.31 — topic fanout. `to: { topic: "<name>" }` resolves to
+    /// every `device_tokens` row in the calling project whose
+    /// `device_topics.topic = <name>` AND `revoked_at IS NULL`.
+    Topic(TopicTarget),
+    /// v2.33 — user fanout. `to: { userFingerprintHex: "<hex>" }`
+    /// resolves to every `device_tokens` row in the calling project
+    /// whose `user_fingerprint_hex` matches and `revoked_at IS NULL`.
+    User(UserTarget),
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TopicTarget {
+    pub topic: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserTarget {
+    /// 32-byte identity fingerprint, hex-encoded. SDK side derives
+    /// from `linkHash` via `identity::compute_fingerprint`; admin
+    /// senders can compute the same hash server-side.
+    pub user_fingerprint_hex: String,
 }
 
 impl ToField {
@@ -36,6 +86,22 @@ impl ToField {
         match self {
             ToField::Single(s) => vec![s.clone()],
             ToField::Many(v) => v.clone(),
+            // Topic / User get resolved at enqueue time.
+            ToField::Topic(_) | ToField::User(_) => Vec::new(),
+        }
+    }
+    /// v2.33 — `Some(fingerprint_hex)` when the send is a user fanout.
+    pub fn as_user_fingerprint(&self) -> Option<&str> {
+        match self {
+            ToField::User(u) => Some(u.user_fingerprint_hex.as_str()),
+            _ => None,
+        }
+    }
+    /// v2.31 — `Some(topic)` when the send is a topic fanout.
+    pub fn as_topic(&self) -> Option<&str> {
+        match self {
+            ToField::Topic(t) => Some(t.topic.as_str()),
+            _ => None,
         }
     }
 }
@@ -61,6 +127,70 @@ pub struct NativeOptions {
     pub channel_id: Option<String>,
     /// iOS category id (action button group).
     pub category: Option<String>,
+    /// v2.28 — rich-media attachments. Image only in v2.28; future
+    /// versions may add video/audio. When `imageUrl` is set:
+    ///   - APNs: forces `aps.mutable-content: 1` and emits a top-
+    ///     level `sentori_attachment_url` custom-data key the NSE
+    ///     reads to download + attach.
+    ///   - FCM: sets `message.notification.image` so Android auto-
+    ///     renders BigPicture style.
+    ///   - WebPush: passes through under `data.sentori_attachment_url`
+    ///     for the Service Worker to use as `options.image`.
+    pub rich_media: Option<RichMedia>,
+    /// v2.29 — interactive action buttons. Server passes the list
+    /// through to the device under custom data `sentori_actions`.
+    /// Host app reads on tap to dispatch. iOS category registration
+    /// remains a host-app concern (Apple requires registration at
+    /// launch).
+    #[serde(default)]
+    pub actions: Option<Vec<PushAction>>,
+    /// v2.30 — iOS 15+ interruption-level. One of `passive` /
+    /// `active` / `timeSensitive` / `critical`. Maps to APNs
+    /// `aps.interruption-level`. iOS only; other providers ignore.
+    #[serde(default)]
+    pub interruption_level: Option<String>,
+    /// v2.30 — iOS notification grouping. Maps to APNs
+    /// `aps.thread-id`. iOS uses this to fold same-thread
+    /// notifications into one summary on lock-screen.
+    #[serde(default)]
+    pub thread_identifier: Option<String>,
+    /// v2.30 — Android notification priority. One of `high` /
+    /// `default` / `low` / `min`. Maps to FCM
+    /// `message.android.notification.notification_priority`.
+    /// iOS / others ignore. Distinct from the cross-platform
+    /// `priority: Priority { Normal, High }` which addresses both
+    /// APNs `apns-priority` header and FCM message priority.
+    #[serde(default)]
+    pub channel_importance: Option<String>,
+}
+
+/// v2.28 — rich-media attachment payload. Image only in this version.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RichMedia {
+    /// HTTPS URL of the image to attach. iOS NSE downloads + attaches;
+    /// FCM uses for BigPicture; WebPush passes through.
+    pub image_url: Option<String>,
+}
+
+/// v2.29 — one interactive action button. Renders next to the
+/// notification on platforms that support it. Server passes the
+/// full list under `sentori_actions` custom data; the host app
+/// reads + dispatches.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PushAction {
+    /// Stable id — the host receives this in the tap callback to
+    /// dispatch (`actionId`).
+    pub id: String,
+    /// Visible button title.
+    pub title: String,
+    /// iOS-only: action opens a text input field.
+    #[serde(default)]
+    pub is_text_input: Option<bool>,
+    /// iOS-only: tints the action button red.
+    #[serde(default)]
+    pub is_destructive: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]

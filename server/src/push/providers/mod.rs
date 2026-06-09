@@ -18,7 +18,7 @@ pub mod mipush;
 pub mod webpush;
 
 /// Provider discriminator stored in DB rows.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProviderKind {
     Apns,
     Fcm,
@@ -150,26 +150,64 @@ pub trait Provider: Send + Sync {
     }
 }
 
-/// Process-wide provider registry. Built once on startup with the
-/// shared http_client. Providers internal to v2.7 (APNs, FCM) hold
-/// caches inside their own struct (FCM's OAuth token cache); the
-/// others are stateless stubs until their lens-specific release.
+/// Process-wide provider registry. Built once on startup.
+///
+/// v2.21 changed each provider's constructor to build its own
+/// `reqwest::Client` with provider-tuned pool/idle/timeout settings —
+/// the pre-v2.21 shared `AppState.http_client` is no longer threaded
+/// in. Rationale (docs/design/push-architecture.md §Ironclad rules
+/// #2 — "connection thrash"):
+///
+///   - APNs requires a single persistent HTTP/2 connection — Apple's
+///     guidance is explicit. APNs's client uses long idle (90 s) and
+///     a higher `pool_max_idle_per_host`.
+///   - FCM v1 / HCM are HTTPS OAuth, prefer HTTP/2 but tolerate idle
+///     drops without penalty. Standard 60 s idle.
+///   - Web Push hits a dozen different push services per project (FCM
+///     Web, Apple Web Push, Mozilla autopush, ...). Each connection
+///     is to a different host; pool reuse is per-host.
+///   - MiPush is HTTP/1.1 form-post; pool tuning is irrelevant.
+///
+/// Per-provider clients also mean a quarantined provider's stuck
+/// connections (e.g. a CLOSE_WAIT pile from a misbehaving APNs
+/// shutdown) cannot poison sibling providers' pools.
+///
+/// `quarantine` is the process-wide `(project, kind) → quarantine
+/// state` map (v2.21). Shared with dispatch_cron via the
+/// `Arc<Providers>` already on `AppState`.
 pub struct Providers {
     pub apns: Arc<dyn Provider>,
     pub fcm: Arc<dyn Provider>,
     pub webpush: Arc<dyn Provider>,
     pub hcm: Arc<dyn Provider>,
     pub mipush: Arc<dyn Provider>,
+    /// v2.21 — per-(project, provider) quarantine. See
+    /// `super::quarantine::QuarantineState` for semantics.
+    pub quarantine: Arc<crate::push::quarantine::QuarantineState>,
+    /// v2.22 — three-layer dispatch rate limit
+    /// (L1 per-provider / L2 per-project / L3 global inflight). See
+    /// `super::rate_limit::RateLimiter`.
+    pub rate_limiter: Arc<crate::push::rate_limit::RateLimiter>,
+    /// v2.23 — per-(project, provider) invalid-token health gauge
+    /// + blacklist early-warning. See `super::health::HealthState`.
+    pub health: Arc<crate::push::health::HealthState>,
 }
 
 impl Providers {
-    pub fn new(http_client: reqwest::Client) -> Self {
+    /// Build the registry. Each provider constructs its own
+    /// `reqwest::Client`. The `AppState.http_client` is no longer
+    /// threaded through — it stays for non-push consumers
+    /// (webhooks, GeoIP downloader, integrations).
+    pub fn new() -> Self {
         Self {
-            apns: Arc::new(apns::ApnsProvider::new(http_client.clone())),
-            fcm: Arc::new(fcm::FcmProvider::new(http_client.clone())),
-            webpush: Arc::new(webpush::WebPushProvider::new(http_client.clone())),
-            hcm: Arc::new(hcm::HcmProvider::new(http_client.clone())),
-            mipush: Arc::new(mipush::MiPushProvider::new(http_client)),
+            apns: Arc::new(apns::ApnsProvider::new()),
+            fcm: Arc::new(fcm::FcmProvider::new()),
+            webpush: Arc::new(webpush::WebPushProvider::new()),
+            hcm: Arc::new(hcm::HcmProvider::new()),
+            mipush: Arc::new(mipush::MiPushProvider::new()),
+            quarantine: Arc::new(crate::push::quarantine::QuarantineState::new()),
+            rate_limiter: Arc::new(crate::push::rate_limit::RateLimiter::new()),
+            health: Arc::new(crate::push::health::HealthState::new()),
         }
     }
 
@@ -181,5 +219,11 @@ impl Providers {
             ProviderKind::Hcm => &self.hcm,
             ProviderKind::MiPush => &self.mipush,
         }
+    }
+}
+
+impl Default for Providers {
+    fn default() -> Self {
+        Self::new()
     }
 }

@@ -33,16 +33,12 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::push::providers::{ProviderKind, Providers, SendOutcome};
+use crate::push::retry::{decide_retry, MAX_ATTEMPTS, RetryDecision};
 use crate::push::types::NativeMessage;
 
 const SWEEP_INTERVAL_SECS: u64 = 30;
 const SWEEP_BATCH_SIZE: i64 = 50;
 
-/// Delays between attempts, in seconds. Same shape as
-/// `webhook_dispatch::RETRY_SCHEDULE_SECS`.
-const RETRY_SCHEDULE_SECS: [i32; 6] = [60, 300, 1800, 7200, 43200, 86400];
-
-const MAX_ATTEMPTS: i32 = 6;
 const BAD_STREAK_THRESHOLD: i32 = 3;
 
 /// Cron handle: pool + provider registry + master secret for
@@ -96,16 +92,36 @@ struct PendingRow {
 /// One sweep. Exposed `pub` for integration tests so they can drive
 /// the queue deterministically without waiting for the 30s tick.
 pub async fn sweep_once(handle: &DispatchHandle) -> Result<(), anyhow::Error> {
+    // v2.23 — stale-token soft eviction. A device_tokens row whose
+    // last `/v1/push/tokens` register/refresh is > 90 d ago is almost
+    // certainly OS-revoked (uninstall, fresh install, factory reset,
+    // explicit settings disable). Trying to send to it wastes a
+    // dispatch slot, a delivery_log row, and a slot in the
+    // invalid-rate counter that would drive auto-throttle for the
+    // healthy tokens too. The row itself isn't deleted — operators
+    // can still inspect via the dashboard; we just don't dispatch.
+    // v2.35 — FOR UPDATE SKIP LOCKED makes the sweep safe under
+    // concurrent workers. The inner CTE claims rows (row-level locks);
+    // a sibling worker's CTE skips them. Single-instance behaviour is
+    // identical — SKIP LOCKED is a no-op for the only worker.
     let rows: Vec<PendingRow> = sqlx::query_as(
-        "SELECT s.id AS send_id, s.project_id, s.token_id, s.provider, s.payload, s.retry_count, \
+        "WITH claimed AS ( \
+            SELECT id FROM push_sends \
+             WHERE status = 'queued' \
+               AND next_attempt_at <= now() \
+             ORDER BY next_attempt_at \
+             LIMIT $1 \
+             FOR UPDATE SKIP LOCKED \
+         ) \
+         SELECT s.id AS send_id, s.project_id, s.token_id, s.provider, s.payload, s.retry_count, \
                 d.native_token, d.env, c.config, c.secret_blob, c.secret_nonce \
-         FROM push_sends s \
+         FROM claimed cl \
+         JOIN push_sends s ON s.id = cl.id \
          JOIN device_tokens d ON d.id = s.token_id \
          LEFT JOIN push_credentials c \
                 ON c.project_id = s.project_id AND c.provider = s.provider \
-         WHERE s.status = 'queued' AND s.next_attempt_at <= now() \
-         ORDER BY s.next_attempt_at \
-         LIMIT $1",
+         WHERE d.revoked_at IS NULL \
+           AND d.last_seen_at > now() - interval '90 days'",
     )
     .bind(SWEEP_BATCH_SIZE)
     .fetch_all(&handle.pool)
@@ -118,6 +134,7 @@ pub async fn sweep_once(handle: &DispatchHandle) -> Result<(), anyhow::Error> {
 
 async fn process_one(handle: &DispatchHandle, row: PendingRow) {
     let attempt = row.retry_count + 1;
+    let project_id = row.project_id;
     let Some(kind) = ProviderKind::from_db(&row.provider) else {
         mark_failed(
             handle,
@@ -171,7 +188,7 @@ async fn process_one(handle: &DispatchHandle, row: PendingRow) {
             }
         };
 
-    let msg: NativeMessage = match serde_json::from_value(row.payload.clone()) {
+    let mut msg: NativeMessage = match serde_json::from_value(row.payload.clone()) {
         Ok(m) => m,
         Err(e) => {
             mark_failed(
@@ -189,6 +206,49 @@ async fn process_one(handle: &DispatchHandle, row: PendingRow) {
         }
     };
 
+    // v2.21 — quarantine check. If this (project, provider) tripped
+    // its 5xx-streak threshold recently, defer the send by the
+    // remaining quarantine window WITHOUT burning retry budget. No
+    // delivery_log row written — this isn't an attempt.
+    if let Some(remaining) = handle
+        .providers
+        .quarantine
+        .quarantined(project_id, kind)
+        .await
+    {
+        defer_for_quarantine(handle, row.send_id, remaining).await;
+        return;
+    }
+
+    // v2.22 — three-layer rate limit. Layer-specific defer windows
+    // (L3 1s, L1 provider 2s, L2 project 5s). Acquire returns a
+    // RatePermit; we hold it across `provider.send()` and drop it
+    // afterwards, releasing the L3 inflight slot.
+    let _rate_permit = match handle.providers.rate_limiter.acquire(project_id, kind) {
+        Ok(p) => p,
+        Err(crate::push::rate_limit::RateError::GlobalInflight) => {
+            defer_for_quarantine(handle, row.send_id, 1).await;
+            return;
+        }
+        Err(crate::push::rate_limit::RateError::ProviderRateLimited(_)) => {
+            defer_for_quarantine(handle, row.send_id, 2).await;
+            return;
+        }
+        Err(crate::push::rate_limit::RateError::ProjectRateLimited(_)) => {
+            defer_for_quarantine(handle, row.send_id, 5).await;
+            return;
+        }
+    };
+
+    // v2.25 — Observability link-through ironclad rule #4. Inject the
+    // send_id into the outgoing payload under the reserved
+    // `_sentori.msgId` namespace. SDK side reads in v2.26 → drops a
+    // BreadcrumbType::Push + emits `sentori.push.received` tracked
+    // event tagged with msgId → events.push_origin_msg_id (v2.27 FK)
+    // closes the JOIN for downstream-impact correlation queries.
+    // Legacy SDKs ignore unknown keys — backward compatible.
+    inject_sentori_msg_id(&mut msg, row.send_id);
+
     let provider = handle.providers.pick(kind);
     let cred = crate::push::providers::Credential {
         config: &row.config,
@@ -202,6 +262,8 @@ async fn process_one(handle: &DispatchHandle, row: PendingRow) {
         Ok(provider_result) => {
             apply_outcome(
                 handle,
+                project_id,
+                kind,
                 row.send_id,
                 row.token_id,
                 attempt,
@@ -221,6 +283,8 @@ async fn process_one(handle: &DispatchHandle, row: PendingRow) {
             let outcome = SendOutcome::Transient { retry_after_secs: None };
             apply_outcome(
                 handle,
+                project_id,
+                kind,
                 row.send_id,
                 row.token_id,
                 attempt,
@@ -238,6 +302,8 @@ async fn process_one(handle: &DispatchHandle, row: PendingRow) {
 #[allow(clippy::too_many_arguments)]
 async fn apply_outcome(
     handle: &DispatchHandle,
+    project_id: Uuid,
+    kind: ProviderKind,
     send_id: Uuid,
     token_id: Uuid,
     attempt: i32,
@@ -247,6 +313,84 @@ async fn apply_outcome(
     provider_body: Option<&str>,
     duration_ms: i32,
 ) {
+    // v2.21 — feed the quarantine state machine. Provider-friendly
+    // ironclad rule #2.
+    let quarantine = &handle.providers.quarantine;
+    match &outcome {
+        SendOutcome::Sent
+        | SendOutcome::PermanentlyInvalidToken
+        | SendOutcome::EnvironmentMismatch
+        | SendOutcome::TerminalOther { .. } => {
+            quarantine.note_success_or_permanent(project_id, kind).await;
+        }
+        SendOutcome::Transient { .. } => {
+            if quarantine.note_transient_failure(project_id, kind).await {
+                tracing::info!(
+                    %project_id,
+                    ?kind,
+                    "push provider quarantine tripped — sends deferred for {}s",
+                    crate::push::quarantine::QUARANTINE_DURATION.as_secs()
+                );
+            }
+        }
+    }
+
+    // v2.23 — feed the invalid-rate health gauge. Maps each
+    // SendOutcome to a HealthOutcome bucket. The 429 detection is
+    // a heuristic: provider_status == 429 OR the label looks like
+    // "..._429..." OR provider sent a Retry-After (smart retry
+    // already used the hint). Same for timeout — we look at the
+    // label since SendOutcome::Transient is opaque about cause.
+    use crate::push::health::HealthOutcome;
+    let health_outcome = match &outcome {
+        SendOutcome::Sent => HealthOutcome::Sent,
+        SendOutcome::PermanentlyInvalidToken => HealthOutcome::InvalidToken,
+        SendOutcome::EnvironmentMismatch => HealthOutcome::InvalidToken,
+        SendOutcome::TerminalOther { .. } => HealthOutcome::OtherTransient,
+        SendOutcome::Transient { .. } => {
+            if provider_status == Some(429) {
+                HealthOutcome::RateLimited
+            } else if label
+                .map(|l| l.contains("Timeout") || l.contains("timeout"))
+                .unwrap_or(false)
+            {
+                HealthOutcome::Timeout
+            } else {
+                HealthOutcome::OtherTransient
+            }
+        }
+    };
+    handle
+        .providers
+        .health
+        .record(project_id, kind, health_outcome)
+        .await;
+    if matches!(health_outcome, HealthOutcome::InvalidToken)
+        && handle
+            .providers
+            .health
+            .should_auto_throttle(project_id, kind)
+            .await
+    {
+        let rate = handle
+            .providers
+            .health
+            .invalid_rate(project_id, kind)
+            .await;
+        let total = handle
+            .providers
+            .health
+            .in_window_total(project_id, kind)
+            .await;
+        tracing::warn!(
+            %project_id,
+            ?kind,
+            invalid_rate = format!("{:.1}%", rate * 100.0),
+            window_total = total,
+            "push invalid-rate threshold tripped — sender-reputation at risk"
+        );
+    }
+
     let _ = log_attempt(
         handle,
         send_id,
@@ -290,28 +434,31 @@ async fn apply_outcome(
             .await;
         }
         SendOutcome::Transient { retry_after_secs } => {
-            if attempt >= MAX_ATTEMPTS {
-                mark_failed(
-                    handle,
-                    send_id,
-                    label.unwrap_or("ExceededRetries"),
-                    &format!("max attempts ({MAX_ATTEMPTS}) reached"),
-                    attempt,
-                    None,
-                    None,
-                    duration_ms,
-                )
-                .await;
-                return;
+            // v2.20: delegate to push::retry::decide_retry so the
+            // ladder + provider hint + ±20% jitter math lives in one
+            // place and is unit-tested independently.
+            match decide_retry(
+                &SendOutcome::Transient { retry_after_secs },
+                attempt,
+                retry_after_secs,
+            ) {
+                RetryDecision::DropPermanently => {
+                    mark_failed(
+                        handle,
+                        send_id,
+                        label.unwrap_or("ExceededRetries"),
+                        &format!("max attempts ({MAX_ATTEMPTS}) reached"),
+                        attempt,
+                        None,
+                        None,
+                        duration_ms,
+                    )
+                    .await;
+                }
+                RetryDecision::Retry { after_secs } => {
+                    schedule_retry(handle, send_id, attempt, after_secs).await;
+                }
             }
-            // attempt index is 1-based; convert to 0-based for the
-            // schedule table. Use the provider's hint if set, else
-            // the schedule entry.
-            let idx = ((attempt - 1) as usize).min(RETRY_SCHEDULE_SECS.len() - 1);
-            let delay = retry_after_secs
-                .unwrap_or(RETRY_SCHEDULE_SECS[idx])
-                .max(1);
-            schedule_retry(handle, send_id, attempt, delay).await;
         }
         SendOutcome::TerminalOther { reason } => {
             mark_failed(
@@ -372,6 +519,46 @@ async fn mark_failed(
     .await;
 }
 
+/// v2.25 — inject `_sentori.msgId = <send_id>` into the outgoing
+/// `NativeMessage.data` so the SDK receive path can correlate this
+/// push back to the server-side `push_sends.id`. Reserved namespace —
+/// `data._sentori` is documented as Sentori-only and must not be set
+/// by customer code. If `data` is absent, mints a fresh JSON object.
+/// If `data` is non-object (legacy customer passing a string/array),
+/// we leave it alone to avoid corrupting the original payload — the
+/// correlation just doesn't fire for that send.
+fn inject_sentori_msg_id(msg: &mut NativeMessage, send_id: Uuid) {
+    let msg_id = crate::push::types::format_send_id(send_id);
+    let sentori = serde_json::json!({ "msgId": msg_id });
+    match msg.data.as_mut() {
+        None => {
+            msg.data = Some(serde_json::json!({ "_sentori": sentori }));
+        }
+        Some(serde_json::Value::Object(map)) => {
+            map.insert("_sentori".into(), sentori);
+        }
+        // data is set but not an object (e.g. legacy customer passed a
+        // string). Leave it alone — better to skip the correlation than
+        // to corrupt the original payload shape.
+        Some(_) => {}
+    }
+}
+
+/// v2.21 — defer a send by `delay_secs` seconds *without* bumping
+/// `retry_count`. Used by the quarantine path: the (project, provider)
+/// is temporarily unhealthy, so we wait for the quarantine window
+/// rather than burn a real retry attempt.
+async fn defer_for_quarantine(handle: &DispatchHandle, send_id: Uuid, delay_secs: u32) {
+    let _ = sqlx::query(
+        "UPDATE push_sends SET next_attempt_at = now() + ($2 || ' seconds')::interval \
+         WHERE id=$1",
+    )
+    .bind(send_id)
+    .bind(delay_secs.to_string())
+    .execute(&handle.pool)
+    .await;
+}
+
 async fn schedule_retry(handle: &DispatchHandle, send_id: Uuid, attempt: i32, delay_secs: i32) {
     let _ = sqlx::query(
         "UPDATE push_sends SET retry_count=$2, next_attempt_at = now() + ($3 || ' seconds')::interval \
@@ -422,4 +609,80 @@ async fn log_attempt(
     .execute(&handle.pool)
     .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+    use uuid::Uuid;
+
+    use super::*;
+    use crate::push::types::{NativeMessage, NativeOptions, ToField};
+
+    fn empty_msg() -> NativeMessage {
+        NativeMessage {
+            to: ToField::Single("ipt_x".into()),
+            title: None,
+            body: None,
+            data: None,
+            options: NativeOptions::default(),
+            idempotency_key: None,
+            send_at: None,
+            preference_category: None,
+            campaign_id: None,
+            template_id: None,
+            audience_tag: None,
+        }
+    }
+
+    #[test]
+    fn inject_msg_id_into_absent_data_creates_object() {
+        let mut msg = empty_msg();
+        let send_id = Uuid::now_v7();
+        inject_sentori_msg_id(&mut msg, send_id);
+        let data = msg.data.unwrap();
+        let sentori = data.get("_sentori").and_then(|v| v.as_object()).unwrap();
+        let want = crate::push::types::format_send_id(send_id);
+        assert_eq!(sentori.get("msgId").unwrap().as_str().unwrap(), want);
+    }
+
+    #[test]
+    fn inject_msg_id_preserves_existing_object_keys() {
+        let mut msg = empty_msg();
+        msg.data = Some(json!({ "issueId": "iss_123", "deepLink": "/x" }));
+        let send_id = Uuid::now_v7();
+        inject_sentori_msg_id(&mut msg, send_id);
+        let data = msg.data.unwrap();
+        assert_eq!(data.get("issueId").unwrap().as_str().unwrap(), "iss_123");
+        assert_eq!(data.get("deepLink").unwrap().as_str().unwrap(), "/x");
+        assert!(data.get("_sentori").is_some());
+    }
+
+    #[test]
+    fn inject_msg_id_skips_non_object_data() {
+        // Legacy customer might have passed a string. Don't corrupt
+        // their payload — just skip correlation for this send.
+        let mut msg = empty_msg();
+        msg.data = Some(json!("plain-string-payload"));
+        let send_id = Uuid::now_v7();
+        inject_sentori_msg_id(&mut msg, send_id);
+        assert_eq!(
+            msg.data.unwrap().as_str().unwrap(),
+            "plain-string-payload",
+            "non-object data must pass through unchanged"
+        );
+    }
+
+    #[test]
+    fn inject_msg_id_overwrites_existing_sentori_key() {
+        let mut msg = empty_msg();
+        msg.data = Some(json!({ "_sentori": { "msgId": "old-id" }, "user": "u123" }));
+        let send_id = Uuid::now_v7();
+        inject_sentori_msg_id(&mut msg, send_id);
+        let data = msg.data.unwrap();
+        let sentori = data.get("_sentori").and_then(|v| v.as_object()).unwrap();
+        let want = crate::push::types::format_send_id(send_id);
+        assert_eq!(sentori.get("msgId").unwrap().as_str().unwrap(), want);
+        assert_eq!(data.get("user").unwrap().as_str().unwrap(), "u123");
+    }
 }

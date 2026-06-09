@@ -29,6 +29,7 @@ use crate::push::{
     delivery,
     expo_compat::{self, ExpoRequest, ExpoResponseEnvelope},
     send,
+    send_gate::GateError,
     tokens::{self, RegisterTokenInput},
     types::{parse_send_id, parse_token_handle, NativeMessage, Ticket, ToField},
 };
@@ -83,6 +84,192 @@ pub async fn revoke_token(
     }
 }
 
+// ── v2.34 preference center API ──────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct PreferenceUpsertRequest {
+    pub opted_out: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PreferenceRow {
+    category: String,
+    opted_out: bool,
+}
+
+fn decode_fp(hex: &str) -> Option<Vec<u8>> {
+    if hex.len() % 2 != 0 {
+        return None;
+    }
+    let mut out = Vec::with_capacity(hex.len() / 2);
+    for chunk in hex.as_bytes().chunks_exact(2) {
+        let hi = (chunk[0] as char).to_digit(16)?;
+        let lo = (chunk[1] as char).to_digit(16)?;
+        out.push(((hi << 4) | lo) as u8);
+    }
+    Some(out)
+}
+
+/// v2.34 — upsert one preference. Idempotent.
+pub async fn upsert_preference(
+    State(state): State<AppState>,
+    Extension(caller): Extension<IngestCaller>,
+    Path((fp_hex, category)): Path<(String, String)>,
+    Json(body): Json<PreferenceUpsertRequest>,
+) -> Response {
+    let Some(fp) = decode_fp(&fp_hex) else {
+        return bad_request("invalid hex fingerprint".to_string());
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return db_not_configured();
+    };
+    let project_id = caller_project_id(&caller, &state);
+    let res = sqlx::query(
+        "INSERT INTO push_preferences (project_id, user_fingerprint_hex, category, opted_out) \
+         VALUES ($1, $2, $3, $4) \
+         ON CONFLICT (project_id, user_fingerprint_hex, category) \
+         DO UPDATE SET opted_out = EXCLUDED.opted_out, updated_at = now()",
+    )
+    .bind(project_id)
+    .bind(fp.as_slice())
+    .bind(&category)
+    .bind(body.opted_out)
+    .execute(pool)
+    .await;
+    match res {
+        Ok(_) => (StatusCode::OK, Json(json!({ "ok": true }))).into_response(),
+        Err(e) => {
+            tracing::warn!(error = %e, "push preference upsert failed");
+            internal_error()
+        }
+    }
+}
+
+/// v2.34 — list all preference rows for one user fingerprint.
+pub async fn list_preferences(
+    State(state): State<AppState>,
+    Extension(caller): Extension<IngestCaller>,
+    Path(fp_hex): Path<String>,
+) -> Response {
+    let Some(fp) = decode_fp(&fp_hex) else {
+        return bad_request("invalid hex fingerprint".to_string());
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return db_not_configured();
+    };
+    let project_id = caller_project_id(&caller, &state);
+    let rows: Vec<(String, bool)> = sqlx::query_as(
+        "SELECT category, opted_out FROM push_preferences \
+         WHERE project_id = $1 AND user_fingerprint_hex = $2 \
+         ORDER BY category",
+    )
+    .bind(project_id)
+    .bind(fp.as_slice())
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+    let preferences: Vec<PreferenceRow> = rows
+        .into_iter()
+        .map(|(category, opted_out)| PreferenceRow { category, opted_out })
+        .collect();
+    (StatusCode::OK, Json(json!({ "preferences": preferences }))).into_response()
+}
+
+// ── v2.31 topic pub-sub subscribe / unsubscribe ──────────────────────
+
+#[derive(Deserialize)]
+pub struct TopicSubscribeRequest {
+    pub topic: String,
+}
+
+/// v2.31 — subscribe one device to one topic. Idempotent on the PK
+/// (device_token_id, topic). Owning project verified via the token.
+pub async fn subscribe_topic(
+    State(state): State<AppState>,
+    Extension(caller): Extension<IngestCaller>,
+    Path(handle): Path<String>,
+    Json(body): Json<TopicSubscribeRequest>,
+) -> Response {
+    let Some(token_uuid) = parse_token_handle(&handle) else {
+        return bad_request(format!("invalid token handle '{handle}'"));
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return db_not_configured();
+    };
+    let topic = body.topic.trim();
+    if topic.is_empty() || topic.len() > 200 {
+        return bad_request("topic must be 1-200 chars".to_string());
+    }
+    let project_id = caller_project_id(&caller, &state);
+    // Verify the token belongs to the caller's project + is active.
+    let token_ok: Option<(uuid::Uuid,)> = sqlx::query_as(
+        "SELECT id FROM device_tokens \
+         WHERE id = $1 AND project_id = $2 AND revoked_at IS NULL",
+    )
+    .bind(token_uuid)
+    .bind(project_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    if token_ok.is_none() {
+        return not_found(format!("token '{handle}' not found"));
+    }
+    let res = sqlx::query(
+        "INSERT INTO device_topics (device_token_id, topic) \
+         VALUES ($1, $2) \
+         ON CONFLICT DO NOTHING",
+    )
+    .bind(token_uuid)
+    .bind(topic)
+    .execute(pool)
+    .await;
+    match res {
+        Ok(_) => (StatusCode::OK, Json(json!({ "subscribed": true }))).into_response(),
+        Err(e) => {
+            tracing::warn!(error = %e, "push topic subscribe failed");
+            internal_error()
+        }
+    }
+}
+
+/// v2.31 — unsubscribe one device from one topic. Idempotent — 200
+/// whether the row existed or not (don't leak topic existence).
+pub async fn unsubscribe_topic(
+    State(state): State<AppState>,
+    Extension(caller): Extension<IngestCaller>,
+    Path((handle, topic)): Path<(String, String)>,
+) -> Response {
+    let Some(token_uuid) = parse_token_handle(&handle) else {
+        return bad_request(format!("invalid token handle '{handle}'"));
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return db_not_configured();
+    };
+    let project_id = caller_project_id(&caller, &state);
+    let token_ok: Option<(uuid::Uuid,)> = sqlx::query_as(
+        "SELECT id FROM device_tokens \
+         WHERE id = $1 AND project_id = $2",
+    )
+    .bind(token_uuid)
+    .bind(project_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    if token_ok.is_none() {
+        // 200 regardless — don't leak whether the token exists.
+        return (StatusCode::OK, Json(json!({ "unsubscribed": true }))).into_response();
+    }
+    let _ = sqlx::query(
+        "DELETE FROM device_topics WHERE device_token_id = $1 AND topic = $2",
+    )
+    .bind(token_uuid)
+    .bind(topic)
+    .execute(pool)
+    .await;
+    (StatusCode::OK, Json(json!({ "unsubscribed": true }))).into_response()
+}
+
 // ── send / receipt — Sentori native ────────────────────────────────────
 
 #[derive(Serialize)]
@@ -99,6 +286,22 @@ pub async fn send_native(
     let Some(pool) = state.db.as_ref() else {
         return db_not_configured();
     };
+
+    // v2.20 send-API gate — input-side guards before enqueue.
+    let recipients = msg.to.as_vec();
+    if let Err(err) = crate::push::send_gate::check_batch_size(recipients.len()) {
+        return gate_error_response(err);
+    }
+    let payload_bytes = serde_json::to_vec(&msg).map(|v| v.len()).unwrap_or(0);
+    if let Err(err) = crate::push::send_gate::check_payload_size(payload_bytes) {
+        return gate_error_response(err);
+    }
+    for recipient in &recipients {
+        if let Err(err) = state.send_gate.check_and_record_token(recipient).await {
+            return gate_error_response(err);
+        }
+    }
+
     let project_id = caller_project_id(&caller, &state);
     match send::enqueue_send(pool, project_id, &msg).await {
         Ok(tickets) => (StatusCode::OK, Json(SendResponse { tickets })).into_response(),
@@ -111,6 +314,66 @@ pub async fn send_native(
         Err(send::SendError::Database(e)) => {
             tracing::warn!(error = %e, "push send enqueue failed");
             internal_error()
+        }
+    }
+}
+
+/// Translate a v2.20 [`GateError`] into the customer-facing HTTP
+/// response shape. PayloadTooBig + BatchTooLarge are 400; rate-limit
+/// is 429 with `Retry-After`.
+fn gate_error_response(err: GateError) -> Response {
+    match err {
+        GateError::PayloadTooBig { actual, max } => (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": {
+                    "code": "PayloadTooBig",
+                    "message": format!("payload {actual} bytes exceeds {max} byte cap"),
+                    "actualBytes": actual,
+                    "maxBytes": max,
+                }
+            })),
+        )
+            .into_response(),
+        GateError::BatchTooLarge { actual, max } => (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": {
+                    "code": "BatchTooLarge",
+                    "message": format!("batch of {actual} recipients exceeds {max} cap"),
+                    "actualRecipients": actual,
+                    "maxRecipients": max,
+                }
+            })),
+        )
+            .into_response(),
+        GateError::TokenRateLimited {
+            token,
+            retry_after_secs,
+        } => {
+            // Strip the token to a non-reversible tail so error
+            // surface doesn't echo raw device identifiers to logs.
+            let tail = token
+                .chars()
+                .rev()
+                .take(8)
+                .collect::<String>()
+                .chars()
+                .rev()
+                .collect::<String>();
+            (
+                StatusCode::TOO_MANY_REQUESTS,
+                [("retry-after", retry_after_secs.to_string())],
+                Json(json!({
+                    "error": {
+                        "code": "TokenRateLimited",
+                        "message": "token send rate exceeded — likely host-app integration bug",
+                        "tokenTail": tail,
+                        "retryAfterSecs": retry_after_secs,
+                    }
+                })),
+            )
+                .into_response()
         }
     }
 }
@@ -137,6 +400,115 @@ pub async fn get_receipt(
     }
 }
 
+// ── v2.26 confirmed delivery ack ───────────────────────────────────────
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AckRequest {
+    /// Originating session id from the host app. NULL when the host
+    /// hasn't surfaced a session (e.g. cold-launched from a tap).
+    /// Stored verbatim in `push_sends.ack_session_id` so v2.27
+    /// correlation can join on it.
+    session_id: Option<String>,
+    /// `"received"` (delivered to OS notification center) /
+    /// `"opened"` (user tapped) / `"dismissed"`. Currently observed
+    /// only for tracing; the schema records first-ack wall-clock,
+    /// not per-event.
+    #[allow(dead_code)]
+    event_type: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AckResponse {
+    /// Always true on a 200.
+    acked: bool,
+    /// True when this call was the one that flipped `acked_at` from
+    /// NULL → now. Subsequent calls return `firstAck: false`.
+    first_ack: bool,
+}
+
+/// v2.26 — receive confirmed-delivery ack from the SDK. Idempotent:
+/// first ack records timestamp + session; subsequent acks no-op.
+///
+/// This is the SDK side of the Observability link-through ironclad
+/// rule (#4). `push_sends.acked_at` flips from NULL to wall-clock
+/// when the device's OS notification center accepts the push; the
+/// v2.27 push-correlation BI joins on this column to compute
+/// dispatch-vs-delivery ratios per provider / per project / per
+/// campaign.
+pub async fn ack_send(
+    State(state): State<AppState>,
+    Extension(caller): Extension<IngestCaller>,
+    Path(handle): Path<String>,
+    Json(body): Json<AckRequest>,
+) -> Response {
+    let Some(send_uuid) = parse_send_id(&handle) else {
+        return bad_request(format!("invalid send id '{handle}'"));
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return db_not_configured();
+    };
+    let project_id = caller_project_id(&caller, &state);
+
+    // Single UPDATE — only writes when `acked_at` is currently NULL
+    // and the send belongs to the calling project. Returns 1 if it
+    // was the first ack, 0 if already acked.
+    let rows_affected = match sqlx::query(
+        "UPDATE push_sends \
+         SET acked_at = now(), \
+             ack_session_id = COALESCE($3, ack_session_id) \
+         WHERE id = $1 \
+           AND project_id = $2 \
+           AND acked_at IS NULL",
+    )
+    .bind(send_uuid)
+    .bind(project_id)
+    .bind(body.session_id.as_deref())
+    .execute(pool)
+    .await
+    {
+        Ok(r) => r.rows_affected(),
+        Err(e) => {
+            tracing::warn!(error = %e, send_id = %send_uuid, "push ack update failed");
+            return internal_error();
+        }
+    };
+
+    if rows_affected == 0 {
+        // Either already acked OR row not found. Check which.
+        let exists: Option<(uuid::Uuid,)> = sqlx::query_as(
+            "SELECT id FROM push_sends WHERE id = $1 AND project_id = $2",
+        )
+        .bind(send_uuid)
+        .bind(project_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+        if exists.is_none() {
+            return not_found(format!("send '{handle}' not found"));
+        }
+        // Already acked — idempotent success.
+        return (
+            StatusCode::OK,
+            Json(AckResponse {
+                acked: true,
+                first_ack: false,
+            }),
+        )
+            .into_response();
+    }
+
+    (
+        StatusCode::OK,
+        Json(AckResponse {
+            acked: true,
+            first_ack: true,
+        }),
+    )
+        .into_response()
+}
+
 // ── send / receipt — Expo-compatible ───────────────────────────────────
 
 pub async fn send_expo_compat(
@@ -152,18 +524,49 @@ pub async fn send_expo_compat(
         ExpoRequest::Single(m) => vec![m],
         ExpoRequest::Batch(v) => v,
     };
-    let mut response_tickets = Vec::with_capacity(expo_msgs.len());
-    for expo_msg in expo_msgs {
+
+    // v2.20 send-API gate. Translate first (cheap, no DB), check
+    // total recipient count + per-message payload size, then enter
+    // the dispatch loop. Per-token rate is checked inside the loop
+    // so a 429 on token N doesn't poison enqueues 1..N.
+    let natives: Vec<NativeMessage> = expo_msgs
+        .into_iter()
+        .map(expo_compat::to_native)
+        .collect();
+    let total_recipients: usize = natives.iter().map(|n| n.to.as_vec().len()).sum();
+    if let Err(err) = crate::push::send_gate::check_batch_size(total_recipients) {
+        return gate_error_response(err);
+    }
+    for native in &natives {
+        let payload_bytes = serde_json::to_vec(native).map(|v| v.len()).unwrap_or(0);
+        if let Err(err) = crate::push::send_gate::check_payload_size(payload_bytes) {
+            return gate_error_response(err);
+        }
+    }
+
+    let mut response_tickets = Vec::with_capacity(natives.len());
+    for native in natives {
         // Each Expo message can carry an array `to` (Expo batches
-        // up-to-N tokens per call). We translate, enqueue, and emit
-        // one ExpoTicket per recipient.
-        let native = expo_compat::to_native(expo_msg);
+        // up-to-N tokens per call). We enqueue and emit one
+        // ExpoTicket per recipient.
         let recipients = native.to.as_vec();
         for recipient in recipients {
+            // v2.20 send-API gate: per-token rate is checked here
+            // (instead of pre-loop) so a 429 on token N doesn't waste
+            // enqueues 1..N. On rate hit, surface an Expo-shaped
+            // error ticket for THIS recipient and continue — keeps
+            // the response indexable by input position.
+            if let Err(err) = state.send_gate.check_and_record_token(&recipient).await {
+                response_tickets.push(expo_compat::ExpoTicket::Error {
+                    id: None,
+                    message: err.code().into(),
+                    details: None,
+                });
+                continue;
+            }
             // Reshape the multi-recipient native message into a
             // single-recipient one so enqueue_send returns exactly
-            // one ticket per Expo loop iteration. This keeps the
-            // Expo response indexable by input position.
+            // one ticket per Expo loop iteration.
             let mut single = native.clone();
             single.to = ToField::Single(recipient.clone());
             match send::enqueue_send(pool, project_id, &single).await {
@@ -668,6 +1071,14 @@ struct PushSendRow {
     #[serde(default, with = "time::serde::rfc3339::option")]
     sent_at: Option<time::OffsetDateTime>,
     payload_preview: serde_json::Value,
+    /// v2.26 — confirmed-delivery ack timestamp (NULL until SDK
+    /// reports back). v2.36 webapp polish surfaces this in the
+    /// Sends table as an `acked` column.
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    acked_at: Option<time::OffsetDateTime>,
+    /// v2.25 — campaign tag (when caller set it). Sends list filter
+    /// + dashboard cohort attribution.
+    campaign_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -713,9 +1124,12 @@ pub async fn admin_list_push_sends(
         time::OffsetDateTime,
         Option<time::OffsetDateTime>,
         serde_json::Value,
+        Option<time::OffsetDateTime>,
+        Option<String>,
     )> = match sqlx::query_as(
         "SELECT id, token_id, provider, status, provider_outcome, error, \
-                retry_count, next_attempt_at, created_at, sent_at, payload \
+                retry_count, next_attempt_at, created_at, sent_at, payload, \
+                acked_at, campaign_id \
          FROM push_sends \
          WHERE project_id = $1 \
            AND ($2::text IS NULL OR status = $2) \
@@ -756,6 +1170,8 @@ pub async fn admin_list_push_sends(
                 created_at,
                 sent_at,
                 payload,
+                acked_at,
+                campaign_id,
             )| PushSendRow {
                 id,
                 token_id,
@@ -768,6 +1184,8 @@ pub async fn admin_list_push_sends(
                 created_at,
                 sent_at,
                 payload_preview: payload_summary(&payload),
+                acked_at,
+                campaign_id,
             },
         )
         .collect();
@@ -803,6 +1221,28 @@ struct SendDetailResponse {
     device_provider: Option<String>,
 }
 
+#[derive(sqlx::FromRow)]
+struct SendDetailRow {
+    id: uuid::Uuid,
+    token_id: uuid::Uuid,
+    provider: String,
+    status: String,
+    provider_outcome: Option<String>,
+    error: Option<String>,
+    retry_count: i32,
+    idempotency_key: Option<String>,
+    next_attempt_at: time::OffsetDateTime,
+    created_at: time::OffsetDateTime,
+    sent_at: Option<time::OffsetDateTime>,
+    payload: serde_json::Value,
+    acked_at: Option<time::OffsetDateTime>,
+    ack_session_id: Option<String>,
+    campaign_id: Option<String>,
+    template_id: Option<String>,
+    audience_tag: Option<String>,
+    preference_category: Option<String>,
+}
+
 /// v2.19 — single send + its full delivery_logs timeline. Drives
 /// the send-detail sub-route.
 pub async fn admin_get_push_send_detail(
@@ -813,22 +1253,15 @@ pub async fn admin_get_push_send_detail(
         return db_not_configured();
     };
 
-    let send_row: Option<(
-        uuid::Uuid,
-        uuid::Uuid,
-        String,
-        String,
-        Option<String>,
-        Option<String>,
-        i32,
-        Option<String>,
-        time::OffsetDateTime,
-        time::OffsetDateTime,
-        Option<time::OffsetDateTime>,
-        serde_json::Value,
-    )> = sqlx::query_as(
+    // v2.36 webapp polish — load the v2.25/v2.26/v2.34 columns added
+    // server-side over Phase 2 so the dashboard can render every
+    // facet of a send (BI tags, ack, preference category). 18 columns
+    // exceeds sqlx's tuple FromRow ceiling so we use a FromRow struct.
+    let send_row: Option<SendDetailRow> = sqlx::query_as::<_, SendDetailRow>(
         "SELECT id, token_id, provider, status, provider_outcome, error, \
-                retry_count, idempotency_key, next_attempt_at, created_at, sent_at, payload \
+                retry_count, idempotency_key, next_attempt_at, created_at, sent_at, payload, \
+                acked_at, ack_session_id, campaign_id, template_id, audience_tag, \
+                payload->>'preferenceCategory' AS preference_category \
          FROM push_sends \
          WHERE project_id = $1 AND id = $2",
     )
@@ -838,10 +1271,7 @@ pub async fn admin_get_push_send_detail(
     .await
     .unwrap_or(None);
 
-    let Some(send_row) = send_row else {
-        return not_found(format!("send '{send_id}' not found"));
-    };
-    let (
+    let Some(SendDetailRow {
         id,
         token_id,
         provider,
@@ -854,7 +1284,16 @@ pub async fn admin_get_push_send_detail(
         created_at,
         sent_at,
         payload,
-    ) = send_row;
+        acked_at,
+        ack_session_id,
+        campaign_id,
+        template_id,
+        audience_tag,
+        preference_category,
+    }) = send_row
+    else {
+        return not_found(format!("send '{send_id}' not found"));
+    };
 
     let log_rows: Vec<(
         i32,
@@ -895,6 +1334,15 @@ pub async fn admin_get_push_send_detail(
         "createdAt": created_at,
         "sentAt": sent_at,
         "payload": payload,
+        // v2.26 SDK confirmed-delivery ack
+        "ackedAt": acked_at,
+        "ackSessionId": ack_session_id,
+        // v2.25 BI tags
+        "campaignId": campaign_id,
+        "templateId": template_id,
+        "audienceTag": audience_tag,
+        // v2.34 preference category
+        "preferenceCategory": preference_category,
     });
     let logs: Vec<DeliveryLogEntry> = log_rows
         .into_iter()
@@ -1209,6 +1657,134 @@ fn parse_rfc3339_cursor(s: &str) -> Option<time::OffsetDateTime> {
 }
 
 /// Compact a push_sends.payload for list responses — full JSON can
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PushSendDownstreamResponse {
+    /// `"ok"` when the send has a `sent_at` (i.e. the SDK had a chance
+    /// to receive + correlate). `"n/a"` when still queued / failed
+    /// before delivery — counts are zero and the UI shows an empty
+    /// state instead of misleading numbers.
+    correlation_status: &'static str,
+    event_count: i64,
+    error_event_count: i64,
+    distinct_sessions: i64,
+    /// Seconds from `sent_at` to the first event we found for this
+    /// msgId. Null when no events found.
+    first_seen_secs: Option<i64>,
+    last_seen_secs: Option<i64>,
+    /// Window in seconds used for the query (24 h).
+    window_secs: i64,
+}
+
+const DOWNSTREAM_WINDOW_SECS: i64 = 24 * 3600;
+
+/// v2.27 — given a single push send, report on the downstream events
+/// it correlates to. Reads `events_partitioned.payload->'breadcrumbs'`
+/// for entries with `type='push'` and `data->>'msgId'` equal to this
+/// send's id, within `[sent_at, sent_at + 24h]`.
+///
+/// Powers the "Downstream impact" Card in the dashboard's
+/// send-detail view. Part of Observability link-through (rule #4).
+pub async fn admin_get_push_send_downstream(
+    State(state): State<AppState>,
+    Path((project_id, send_id)): Path<(uuid::Uuid, uuid::Uuid)>,
+) -> Response {
+    let Some(pool) = state.db.as_ref() else {
+        return db_not_configured();
+    };
+
+    let send_row: Option<(Option<time::OffsetDateTime>,)> = sqlx::query_as(
+        "SELECT sent_at FROM push_sends WHERE project_id = $1 AND id = $2",
+    )
+    .bind(project_id)
+    .bind(send_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+
+    let Some((sent_at,)) = send_row else {
+        return not_found(format!("send '{send_id}' not found"));
+    };
+
+    let Some(sent_at) = sent_at else {
+        // Send never made it out. No correlation possible.
+        return (
+            StatusCode::OK,
+            Json(PushSendDownstreamResponse {
+                correlation_status: "n/a",
+                event_count: 0,
+                error_event_count: 0,
+                distinct_sessions: 0,
+                first_seen_secs: None,
+                last_seen_secs: None,
+                window_secs: DOWNSTREAM_WINDOW_SECS,
+            }),
+        )
+            .into_response();
+    };
+
+    let msg_id = crate::push::types::format_send_id(send_id);
+    let until = sent_at + time::Duration::seconds(DOWNSTREAM_WINDOW_SECS);
+
+    // Partition-prune on received_at + JSONB containment match for
+    // breadcrumbs with type=push and matching msgId. The @> operator
+    // tests whether the breadcrumbs array contains the given object —
+    // index-aware via the default GIN on JSONB containment if present.
+    let containment = serde_json::json!([
+        { "type": "push", "data": { "msgId": msg_id } }
+    ]);
+
+    let agg: (i64, i64, i64, Option<time::OffsetDateTime>, Option<time::OffsetDateTime>) =
+        match sqlx::query_as(
+            "SELECT COUNT(*)::bigint AS evt, \
+                    COUNT(*) FILTER (WHERE error_type IS NOT NULL AND error_type <> '')::bigint AS err, \
+                    COUNT(DISTINCT (payload->'session'->>'id'))::bigint AS sess, \
+                    MIN(received_at) AS first_seen, \
+                    MAX(received_at) AS last_seen \
+             FROM events_partitioned \
+             WHERE project_id = $1 \
+               AND received_at >= $2 \
+               AND received_at <= $3 \
+               AND payload->'breadcrumbs' @> $4",
+        )
+        .bind(project_id)
+        .bind(sent_at)
+        .bind(until)
+        .bind(&containment)
+        .fetch_one(pool)
+        .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!(error = %e, "push downstream impact query failed");
+                return internal_error();
+            }
+        };
+
+    let (event_count, error_event_count, distinct_sessions, first_seen, last_seen) = agg;
+
+    fn delta_secs(
+        from: time::OffsetDateTime,
+        to: Option<time::OffsetDateTime>,
+    ) -> Option<i64> {
+        to.map(|t| (t - from).whole_seconds())
+    }
+
+    (
+        StatusCode::OK,
+        Json(PushSendDownstreamResponse {
+            correlation_status: "ok",
+            event_count,
+            error_event_count,
+            distinct_sessions,
+            first_seen_secs: delta_secs(sent_at, first_seen),
+            last_seen_secs: delta_secs(sent_at, last_seen),
+            window_secs: DOWNSTREAM_WINDOW_SECS,
+        }),
+    )
+        .into_response()
+}
+
 /// be 2 KB+ each. We surface only the fields the dashboard renders
 /// as a one-liner: title, body, deep-link.
 fn payload_summary(payload: &serde_json::Value) -> serde_json::Value {
@@ -1224,4 +1800,85 @@ fn payload_summary(payload: &serde_json::Value) -> serde_json::Value {
         }
     }
     serde_json::Value::Object(out)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProviderHealthSnapshot {
+    provider: String,
+    invalid_rate: f64,
+    in_window_total: u32,
+    auto_throttle: bool,
+    /// `max(0, (threshold - invalid_rate) / threshold * 100)`. 100 =
+    /// fully healthy (no in-window invalid); 0 = at or past the
+    /// auto-throttle threshold. The dashboard renders this as a
+    /// "distance to throttle" gauge.
+    safety_margin_pct: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PushHealthResponse {
+    providers: Vec<ProviderHealthSnapshot>,
+    /// Window size in seconds (matches `HEALTH_WINDOW`). Dashboard
+    /// renders this in the card subtitle so operators know what the
+    /// numbers cover.
+    window_secs: u64,
+    /// `invalid_rate` at which `auto_throttle` flips on. Dashboard
+    /// uses to label the gauge tick.
+    threshold_ratio: f64,
+}
+
+/// v2.24 — expose the v2.23 in-memory `HealthState` snapshot. Powers
+/// the Provider Health card in the Push module's Overview tab. Reads
+/// from process memory only — no DB query.
+pub async fn admin_push_health(
+    State(state): State<AppState>,
+    Path(project_id): Path<uuid::Uuid>,
+) -> Response {
+    let Some(providers_arc) = state.push_providers.as_ref() else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({ "error": "providersUnavailable" })),
+        )
+            .into_response();
+    };
+    let health = &providers_arc.health;
+    let threshold = crate::push::health::AUTO_THROTTLE_INVALID_RATIO;
+
+    let mut snapshots = Vec::with_capacity(5);
+    for kind in [
+        crate::push::providers::ProviderKind::Apns,
+        crate::push::providers::ProviderKind::Fcm,
+        crate::push::providers::ProviderKind::WebPush,
+        crate::push::providers::ProviderKind::Hcm,
+        crate::push::providers::ProviderKind::MiPush,
+    ] {
+        let invalid_rate = health.invalid_rate(project_id, kind).await;
+        let in_window_total = health.in_window_total(project_id, kind).await;
+        let auto_throttle = health.should_auto_throttle(project_id, kind).await;
+        let safety_margin_pct = if in_window_total == 0 {
+            // No samples — show "fully healthy" rather than a misleading 0.
+            100.0
+        } else {
+            ((threshold - invalid_rate) / threshold).max(0.0) * 100.0
+        };
+        snapshots.push(ProviderHealthSnapshot {
+            provider: kind.as_str().into(),
+            invalid_rate,
+            in_window_total,
+            auto_throttle,
+            safety_margin_pct,
+        });
+    }
+
+    (
+        StatusCode::OK,
+        Json(PushHealthResponse {
+            providers: snapshots,
+            window_secs: crate::push::health::HEALTH_WINDOW.as_secs(),
+            threshold_ratio: threshold,
+        }),
+    )
+        .into_response()
 }

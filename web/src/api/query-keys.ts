@@ -203,6 +203,11 @@ export const qk = {
   // v2.19 — push monitoring + management.
   push: {
     stats: (projectId: Id) => tuple('push-stats', projectId),
+    // v2.24 — per-provider health (invalid-rate gauge).
+    health: (projectId: Id) => tuple('push-health', projectId),
+    // v2.27 — downstream impact (events correlated to this push).
+    sendDownstream: (projectId: Id, sendId: string) =>
+      tuple('push-send-downstream', projectId, sendId),
     devices: (projectId: Id, provider?: string) =>
       provider === undefined
         ? tuple('push-devices', projectId)

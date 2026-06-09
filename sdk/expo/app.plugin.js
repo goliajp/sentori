@@ -168,15 +168,80 @@ const withSentoriGoogleServicesJson = (config, props = {}) => {
   ])
 }
 
+// ── v2.28 iOS Notification Service Extension scaffolding ──────────
+//
+// Rich-media notifications (images / future video) require an NSE
+// target on the iOS app. The Sentori NSE template downloads the URL
+// at `userInfo.sentori_attachment_url` and attaches it before iOS
+// displays the notification. APNs server side sets this key when
+// `richMedia.imageUrl` is on the send (v2.28+).
+//
+// v2.28 ships the source files via withDangerousMod. Adding the NSE
+// **target** to the Xcode project is a one-time manual step (5 clicks
+// in Xcode → File → New → Target → Notification Service Extension,
+// then drag in our Swift file). The recipe walks the developer through
+// it. v2.28.1 will auto-inject the target via withXcodeProject.
+//
+// Opt out with `{ ios: false }` (which also drops the rest of the iOS
+// push wiring) or with `{ nse: false }` for just this template.
+
+/**
+ * @param {import('@expo/config-plugins').ExpoConfig} config
+ */
+const withSentoriNSE = (config) => {
+  return withDangerousMod(config, [
+    'ios',
+    async (cfg) => {
+      const platformRoot = cfg.modRequest.platformProjectRoot
+      const destDir = path.join(platformRoot, 'SentoriNSE')
+      const templateDir = path.join(__dirname, 'templates', 'ios-nse')
+      const swiftSrc = path.join(templateDir, 'SentoriNotificationServiceExtension.swift')
+      const plistSrc = path.join(templateDir, 'SentoriNSE-Info.plist')
+      if (!fs.existsSync(swiftSrc) || !fs.existsSync(plistSrc)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[sentori-expo] NSE templates missing; skipping. Reinstall the package to restore.'
+        )
+        return cfg
+      }
+      fs.mkdirSync(destDir, { recursive: true })
+      fs.copyFileSync(
+        swiftSrc,
+        path.join(destDir, 'SentoriNotificationServiceExtension.swift')
+      )
+      fs.copyFileSync(plistSrc, path.join(destDir, 'SentoriNSE-Info.plist'))
+      // One-time guidance for first-time setup. Idempotent — appears
+      // on every prebuild until the target exists.
+      const pbxproj = path.join(platformRoot, cfg.modRequest.projectName + '.xcodeproj', 'project.pbxproj')
+      if (fs.existsSync(pbxproj)) {
+        const proj = fs.readFileSync(pbxproj, 'utf8')
+        if (!proj.includes('SentoriNSE')) {
+          // eslint-disable-next-line no-console
+          console.log(
+            '\n[sentori-expo] iOS NSE template files copied to ios/SentoriNSE/.\n' +
+              '             For rich-media (image) notifications to render, add a\n' +
+              '             Notification Service Extension target via Xcode and link\n' +
+              '             these files. Detailed steps in the recipe.\n'
+          )
+        }
+      }
+      return cfg
+    },
+  ])
+}
+
 // ── Composer ───────────────────────────────────────────────────────
 
 /**
  * @param {import('@expo/config-plugins').ExpoConfig} config
- * @param {{ sdkVersion?: string, ios?: boolean, android?: boolean, googleServicesFile?: string }} [props]
+ * @param {{ sdkVersion?: string, ios?: boolean, android?: boolean, nse?: boolean, googleServicesFile?: string }} [props]
  */
 const withSentori = (config, props = {}) => {
   const plugins = [[withSentoriVersion, props]]
-  if (props.ios !== false) plugins.push([withSentoriPushIos, props])
+  if (props.ios !== false) {
+    plugins.push([withSentoriPushIos, props])
+    if (props.nse !== false) plugins.push([withSentoriNSE, props])
+  }
   if (props.android !== false) {
     plugins.push(
       [withSentoriPushAndroidManifest, props],

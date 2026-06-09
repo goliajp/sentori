@@ -160,6 +160,66 @@ describe('push.register — Android (FCM) branch', () => {
   })
 })
 
+describe('push.auto-correlate (v2.26)', () => {
+  it('writes a push breadcrumb when notification carries _sentori.msgId', async () => {
+    const { clearBreadcrumbs, getBreadcrumbs } = await import('@goliapkg/sentori-core')
+    clearBreadcrumbs()
+    _permissionAnswer = 'granted'
+    _drainQueue = [
+      {
+        notifications: [
+          {
+            body: 'a body',
+            id: 'n2',
+            title: 'A title',
+            userInfo: { _sentori: { msgId: 'send_abc123' } },
+          },
+        ],
+        taps: [],
+      },
+      { notifications: [], taps: [], token: 'abcd' },
+    ]
+    await register()
+    const crumbs = getBreadcrumbs()
+    const pushCrumb = crumbs.find((c) => c.type === 'push')
+    expect(pushCrumb).toBeDefined()
+    expect((pushCrumb?.data as Record<string, unknown>)?.msgId).toBe('send_abc123')
+    expect((pushCrumb?.data as Record<string, unknown>)?.title).toBe('A title')
+    expect((pushCrumb?.data as Record<string, unknown>)?.opened).toBe(false)
+  })
+
+  it('skips breadcrumb when payload has no _sentori.msgId', async () => {
+    const { clearBreadcrumbs, getBreadcrumbs } = await import('@goliapkg/sentori-core')
+    clearBreadcrumbs()
+    _permissionAnswer = 'granted'
+    _drainQueue = [
+      { notifications: [{ id: 'n3', title: 'No correlation' }], taps: [] },
+      { notifications: [], taps: [], token: 'abcd' },
+    ]
+    await register()
+    const crumbs = getBreadcrumbs()
+    expect(crumbs.find((c) => c.type === 'push')).toBeUndefined()
+  })
+
+  it('marks tap breadcrumb as opened:true', async () => {
+    const { clearBreadcrumbs, getBreadcrumbs } = await import('@goliapkg/sentori-core')
+    clearBreadcrumbs()
+    _permissionAnswer = 'granted'
+    _drainQueue = [
+      {
+        notifications: [],
+        taps: [{ userInfo: { _sentori: { msgId: 'send_tap' } } }],
+      },
+      { notifications: [], taps: [], token: 'abcd' },
+    ]
+    await register()
+    const pushCrumb = getBreadcrumbs().find((c) => c.type === 'push')
+    expect(pushCrumb).toBeDefined()
+    expect((pushCrumb?.data as Record<string, unknown>)?.opened).toBe(true)
+    expect((pushCrumb?.data as Record<string, unknown>)?.msgId).toBe('send_tap')
+  })
+})
+
 describe('push.unregister', () => {
   it('DELETEs the cached ipt and clears the local state', async () => {
     _permissionAnswer = 'granted'

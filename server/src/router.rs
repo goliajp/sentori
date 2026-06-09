@@ -68,6 +68,12 @@ pub struct ServerConfig {
     /// only when both readers find the IP. `None` skips ASN
     /// enrichment without affecting the City lookup.
     pub asn_db_path: Option<std::path::PathBuf>,
+    /// v2.21 — shared push provider registry. main.rs builds this
+    /// once so dispatch_cron and the admin verify endpoint use the
+    /// same `Arc<Providers>` (same JWT/OAuth caches, same quarantine
+    /// state). Tests + back-compat: `None` causes router::build to
+    /// construct its own, but production main.rs passes `Some`.
+    pub push_providers: Option<std::sync::Arc<crate::push::providers::Providers>>,
 }
 
 pub fn build(cfg: ServerConfig) -> Router {
@@ -129,14 +135,13 @@ pub fn build(cfg: ServerConfig) -> Router {
             tracing::warn!(error = %e, "shared http_client build failed; falling back to default");
             reqwest::Client::new()
         });
-    // v2.19 — providers registry shared with dispatch_cron. We build
-    // it here so the admin `verify credential` endpoint can reuse
-    // FCM's OAuth token cache instead of re-minting on every refresh.
-    // `main.rs` reads `state.push_providers` back and hands it to the
-    // dispatch handle, so both paths share the same `Arc<Providers>`.
-    let push_providers = std::sync::Arc::new(
-        crate::push::providers::Providers::new(http_client.clone()),
-    );
+    // v2.21 — Providers comes from main.rs via ServerConfig so
+    // dispatch_cron + admin verify endpoint share the same instance
+    // (same JWT/OAuth caches, same quarantine state). Tests that
+    // don't supply one get a fresh local registry.
+    let push_providers = cfg.push_providers.unwrap_or_else(|| {
+        std::sync::Arc::new(crate::push::providers::Providers::new())
+    });
     let state = AppState {
         auth: auth_state.clone(),
         recent,
@@ -159,6 +164,7 @@ pub fn build(cfg: ServerConfig) -> Router {
         geoip,
         http_client,
         push_providers: Some(push_providers),
+        send_gate: std::sync::Arc::new(crate::push::send_gate::SendGate::new()),
     };
 
     // Per-route body-stream cap for small-payload ingest endpoints.
@@ -233,6 +239,24 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/v1/push/tokens/{handle}",
             axum::routing::delete(api::push::revoke_token),
         )
+        // v2.34 — preference center.
+        .route(
+            "/v1/push/users/{fp_hex}/preferences",
+            get(api::push::list_preferences),
+        )
+        .route(
+            "/v1/push/users/{fp_hex}/preferences/{category}",
+            axum::routing::put(api::push::upsert_preference).layer(small_body.clone()),
+        )
+        // v2.31 — topic pub-sub.
+        .route(
+            "/v1/push/tokens/{handle}/topics",
+            post(api::push::subscribe_topic).layer(small_body.clone()),
+        )
+        .route(
+            "/v1/push/tokens/{handle}/topics/{topic}",
+            axum::routing::delete(api::push::unsubscribe_topic),
+        )
         .route(
             "/v1/push/send",
             post(api::push::send_native).layer(small_body.clone()),
@@ -240,6 +264,13 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route(
             "/v1/push/receipts/{send_id}",
             get(api::push::get_receipt),
+        )
+        // v2.26 — SDK confirmed-delivery ack. Idempotent first-ack-wins.
+        // Flips push_sends.acked_at from NULL -> wall-clock; records
+        // ack_session_id for v2.27 push-correlation BI.
+        .route(
+            "/v1/push/sends/{send_id}/ack",
+            post(api::push::ack_send).layer(small_body.clone()),
         )
         .route(
             "/v1/push/expo-compat/send",
@@ -392,6 +423,12 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/push/stats",
             get(api::push::admin_push_stats),
         )
+        // v2.24 — provider health snapshot powering the "distance to
+        // blacklist" gauge. Reads v2.23 in-memory HealthState, no DB.
+        .route(
+            "/projects/{project_id}/push/health",
+            get(api::push::admin_push_health),
+        )
         .route(
             "/projects/{project_id}/push/devices",
             get(api::push::admin_list_push_devices),
@@ -403,6 +440,14 @@ pub fn build(cfg: ServerConfig) -> Router {
         .route(
             "/projects/{project_id}/push/sends/{send_id}",
             get(api::push::admin_get_push_send_detail),
+        )
+        // v2.27 — downstream impact of one push within a 24h window.
+        // Scans events_partitioned.payload->'breadcrumbs' for entries
+        // whose type='push' and data.msgId == this send. Part of the
+        // Observability link-through ironclad rule #4.
+        .route(
+            "/projects/{project_id}/push/sends/{send_id}/downstream",
+            get(api::push::admin_get_push_send_downstream),
         )
         .route(
             "/projects/{project_id}/push/sends/{send_id}/retry",
