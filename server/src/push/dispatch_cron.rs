@@ -114,6 +114,7 @@ pub async fn sweep_once(handle: &DispatchHandle) -> Result<(), anyhow::Error> {
 
 async fn process_one(handle: &DispatchHandle, row: PendingRow) {
     let attempt = row.retry_count + 1;
+    let project_id = row.project_id;
     let Some(kind) = ProviderKind::from_db(&row.provider) else {
         mark_failed(
             handle,
@@ -185,6 +186,20 @@ async fn process_one(handle: &DispatchHandle, row: PendingRow) {
         }
     };
 
+    // v2.21 — quarantine check. If this (project, provider) tripped
+    // its 5xx-streak threshold recently, defer the send by the
+    // remaining quarantine window WITHOUT burning retry budget. No
+    // delivery_log row written — this isn't an attempt.
+    if let Some(remaining) = handle
+        .providers
+        .quarantine
+        .quarantined(project_id, kind)
+        .await
+    {
+        defer_for_quarantine(handle, row.send_id, remaining).await;
+        return;
+    }
+
     let provider = handle.providers.pick(kind);
     let cred = crate::push::providers::Credential {
         config: &row.config,
@@ -198,6 +213,8 @@ async fn process_one(handle: &DispatchHandle, row: PendingRow) {
         Ok(provider_result) => {
             apply_outcome(
                 handle,
+                project_id,
+                kind,
                 row.send_id,
                 row.token_id,
                 attempt,
@@ -217,6 +234,8 @@ async fn process_one(handle: &DispatchHandle, row: PendingRow) {
             let outcome = SendOutcome::Transient { retry_after_secs: None };
             apply_outcome(
                 handle,
+                project_id,
+                kind,
                 row.send_id,
                 row.token_id,
                 attempt,
@@ -234,6 +253,8 @@ async fn process_one(handle: &DispatchHandle, row: PendingRow) {
 #[allow(clippy::too_many_arguments)]
 async fn apply_outcome(
     handle: &DispatchHandle,
+    project_id: Uuid,
+    kind: ProviderKind,
     send_id: Uuid,
     token_id: Uuid,
     attempt: i32,
@@ -243,6 +264,28 @@ async fn apply_outcome(
     provider_body: Option<&str>,
     duration_ms: i32,
 ) {
+    // v2.21 — feed the quarantine state machine. Provider-friendly
+    // ironclad rule #2.
+    let quarantine = &handle.providers.quarantine;
+    match &outcome {
+        SendOutcome::Sent
+        | SendOutcome::PermanentlyInvalidToken
+        | SendOutcome::EnvironmentMismatch
+        | SendOutcome::TerminalOther { .. } => {
+            quarantine.note_success_or_permanent(project_id, kind).await;
+        }
+        SendOutcome::Transient { .. } => {
+            if quarantine.note_transient_failure(project_id, kind).await {
+                tracing::info!(
+                    %project_id,
+                    ?kind,
+                    "push provider quarantine tripped — sends deferred for {}s",
+                    crate::push::quarantine::QUARANTINE_DURATION.as_secs()
+                );
+            }
+        }
+    }
+
     let _ = log_attempt(
         handle,
         send_id,
@@ -367,6 +410,21 @@ async fn mark_failed(
     .bind(send_id)
     .bind(label)
     .bind(error)
+    .execute(&handle.pool)
+    .await;
+}
+
+/// v2.21 — defer a send by `delay_secs` seconds *without* bumping
+/// `retry_count`. Used by the quarantine path: the (project, provider)
+/// is temporarily unhealthy, so we wait for the quarantine window
+/// rather than burn a real retry attempt.
+async fn defer_for_quarantine(handle: &DispatchHandle, send_id: Uuid, delay_secs: u32) {
+    let _ = sqlx::query(
+        "UPDATE push_sends SET next_attempt_at = now() + ($2 || ' seconds')::interval \
+         WHERE id=$1",
+    )
+    .bind(send_id)
+    .bind(delay_secs.to_string())
     .execute(&handle.pool)
     .await;
 }

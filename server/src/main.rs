@@ -188,22 +188,16 @@ async fn main() -> anyhow::Result<()> {
 
     // v2.7 — push dispatch cron. Same shape as webhook_dispatch: 30s
     // tick, claim pending push_sends, decrypt credentials, fan out
-    // via the provider registry. APNs + FCM go live; Web Push / HCM
-    // / MiPush providers respond NotImplemented until their lens
-    // releases (v2.8 / v2.12).
+    // via the provider registry.
+    // v2.21 — Providers built once here and shared with the router
+    // via ServerConfig.push_providers, so the admin verify endpoint
+    // and dispatch_cron see the same JWT/OAuth caches + the same
+    // quarantine state.
+    let push_providers = std::sync::Arc::new(push::providers::Providers::new());
     if let Some(p) = pool.as_ref() {
-        let http_client = reqwest::Client::builder()
-            .connect_timeout(std::time::Duration::from_secs(5))
-            .timeout(std::time::Duration::from_secs(10))
-            .build()
-            .unwrap_or_else(|e| {
-                tracing::warn!(error = %e, "push http_client build failed; falling back to default");
-                reqwest::Client::new()
-            });
-        let providers = std::sync::Arc::new(push::providers::Providers::new(http_client));
         let handle = push::dispatch_cron::DispatchHandle::new(
             p.clone(),
-            providers,
+            push_providers.clone(),
             session_secret.clone().into_bytes(),
         );
         push::dispatch_cron::spawn_cron(handle);
@@ -320,6 +314,7 @@ async fn main() -> anyhow::Result<()> {
         attachments: Some(sentori_server::attachments::build_default_store()),
         geoip_db_path,
         asn_db_path,
+        push_providers: Some(push_providers),
     });
     // v0.8.0-d — pass the connecting peer's SocketAddr through to
     // handlers so `ConnectInfo<SocketAddr>` extractors (geoip lookup,
