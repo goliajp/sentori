@@ -329,6 +329,15 @@ fn build_aps_payload(msg: &NativeMessage) -> Value {
             Value::String(url.to_string()),
         );
     }
+    // v2.29 — surface interactive actions list under
+    // `sentori_actions`. Host AppDelegate reads on tap to dispatch.
+    // The category is still emitted via `aps.category` (legacy) when
+    // the customer set it explicitly.
+    if let Some(actions) = msg.options.actions.as_ref() {
+        if let Ok(value) = serde_json::to_value(actions) {
+            root.insert("sentori_actions".into(), value);
+        }
+    }
     Value::Object(root)
 }
 
@@ -486,6 +495,7 @@ mod tests {
                 channel_id: None,
                 category: Some("MSG".into()),
                 rich_media: None,
+                actions: None,
             },
             idempotency_key: None,
             campaign_id: None,
@@ -514,6 +524,7 @@ mod tests {
             options: crate::push::types::NativeOptions {
                 content_available: Some(true),
                 rich_media: None,
+                actions: None,
                 ..Default::default()
             },
             idempotency_key: None,
@@ -569,6 +580,43 @@ BsR53w8xJYvbjbTcbzJ3Jrm5jNav9kOYS4TQS/l0cR0iLZvt+zKEZ+C2\n\
             v.get("sentori_attachment_url").and_then(|x| x.as_str()),
             Some("https://cdn.example/img.jpg")
         );
+    }
+
+    #[test]
+    fn aps_passes_actions_through_sentori_actions_when_set() {
+        let msg = NativeMessage {
+            to: crate::push::types::ToField::Single("ipt_q".into()),
+            title: Some("Reply?".into()),
+            body: Some("From Alex".into()),
+            data: None,
+            options: crate::push::types::NativeOptions {
+                actions: Some(vec![
+                    crate::push::types::PushAction {
+                        id: "REPLY".into(),
+                        title: "Reply".into(),
+                        is_text_input: Some(true),
+                        is_destructive: None,
+                    },
+                    crate::push::types::PushAction {
+                        id: "DISMISS".into(),
+                        title: "Dismiss".into(),
+                        is_text_input: None,
+                        is_destructive: None,
+                    },
+                ]),
+                ..Default::default()
+            },
+            idempotency_key: None,
+            campaign_id: None,
+            template_id: None,
+            audience_tag: None,
+        };
+        let v = build_aps_payload(&msg);
+        let actions = v.get("sentori_actions").and_then(|x| x.as_array()).unwrap();
+        assert_eq!(actions.len(), 2);
+        assert_eq!(actions[0].get("id").and_then(|x| x.as_str()), Some("REPLY"));
+        assert_eq!(actions[0].get("isTextInput").and_then(|x| x.as_bool()), Some(true));
+        assert_eq!(actions[1].get("id").and_then(|x| x.as_str()), Some("DISMISS"));
     }
 
     #[test]
