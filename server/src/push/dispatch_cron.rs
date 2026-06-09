@@ -179,7 +179,7 @@ async fn process_one(handle: &DispatchHandle, row: PendingRow) {
             }
         };
 
-    let msg: NativeMessage = match serde_json::from_value(row.payload.clone()) {
+    let mut msg: NativeMessage = match serde_json::from_value(row.payload.clone()) {
         Ok(m) => m,
         Err(e) => {
             mark_failed(
@@ -230,6 +230,15 @@ async fn process_one(handle: &DispatchHandle, row: PendingRow) {
             return;
         }
     };
+
+    // v2.25 — Observability link-through ironclad rule #4. Inject the
+    // send_id into the outgoing payload under the reserved
+    // `_sentori.msgId` namespace. SDK side reads in v2.26 → drops a
+    // BreadcrumbType::Push + emits `sentori.push.received` tracked
+    // event tagged with msgId → events.push_origin_msg_id (v2.27 FK)
+    // closes the JOIN for downstream-impact correlation queries.
+    // Legacy SDKs ignore unknown keys — backward compatible.
+    inject_sentori_msg_id(&mut msg, row.send_id);
 
     let provider = handle.providers.pick(kind);
     let cred = crate::push::providers::Credential {
@@ -501,6 +510,31 @@ async fn mark_failed(
     .await;
 }
 
+/// v2.25 — inject `_sentori.msgId = <send_id>` into the outgoing
+/// `NativeMessage.data` so the SDK receive path can correlate this
+/// push back to the server-side `push_sends.id`. Reserved namespace —
+/// `data._sentori` is documented as Sentori-only and must not be set
+/// by customer code. If `data` is absent, mints a fresh JSON object.
+/// If `data` is non-object (legacy customer passing a string/array),
+/// we leave it alone to avoid corrupting the original payload — the
+/// correlation just doesn't fire for that send.
+fn inject_sentori_msg_id(msg: &mut NativeMessage, send_id: Uuid) {
+    let msg_id = crate::push::types::format_send_id(send_id);
+    let sentori = serde_json::json!({ "msgId": msg_id });
+    match msg.data.as_mut() {
+        None => {
+            msg.data = Some(serde_json::json!({ "_sentori": sentori }));
+        }
+        Some(serde_json::Value::Object(map)) => {
+            map.insert("_sentori".into(), sentori);
+        }
+        // data is set but not an object (e.g. legacy customer passed a
+        // string). Leave it alone — better to skip the correlation than
+        // to corrupt the original payload shape.
+        Some(_) => {}
+    }
+}
+
 /// v2.21 — defer a send by `delay_secs` seconds *without* bumping
 /// `retry_count`. Used by the quarantine path: the (project, provider)
 /// is temporarily unhealthy, so we wait for the quarantine window
@@ -566,4 +600,78 @@ async fn log_attempt(
     .execute(&handle.pool)
     .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+    use uuid::Uuid;
+
+    use super::*;
+    use crate::push::types::{NativeMessage, NativeOptions, ToField};
+
+    fn empty_msg() -> NativeMessage {
+        NativeMessage {
+            to: ToField::Single("ipt_x".into()),
+            title: None,
+            body: None,
+            data: None,
+            options: NativeOptions::default(),
+            idempotency_key: None,
+            campaign_id: None,
+            template_id: None,
+            audience_tag: None,
+        }
+    }
+
+    #[test]
+    fn inject_msg_id_into_absent_data_creates_object() {
+        let mut msg = empty_msg();
+        let send_id = Uuid::now_v7();
+        inject_sentori_msg_id(&mut msg, send_id);
+        let data = msg.data.unwrap();
+        let sentori = data.get("_sentori").and_then(|v| v.as_object()).unwrap();
+        let want = crate::push::types::format_send_id(send_id);
+        assert_eq!(sentori.get("msgId").unwrap().as_str().unwrap(), want);
+    }
+
+    #[test]
+    fn inject_msg_id_preserves_existing_object_keys() {
+        let mut msg = empty_msg();
+        msg.data = Some(json!({ "issueId": "iss_123", "deepLink": "/x" }));
+        let send_id = Uuid::now_v7();
+        inject_sentori_msg_id(&mut msg, send_id);
+        let data = msg.data.unwrap();
+        assert_eq!(data.get("issueId").unwrap().as_str().unwrap(), "iss_123");
+        assert_eq!(data.get("deepLink").unwrap().as_str().unwrap(), "/x");
+        assert!(data.get("_sentori").is_some());
+    }
+
+    #[test]
+    fn inject_msg_id_skips_non_object_data() {
+        // Legacy customer might have passed a string. Don't corrupt
+        // their payload — just skip correlation for this send.
+        let mut msg = empty_msg();
+        msg.data = Some(json!("plain-string-payload"));
+        let send_id = Uuid::now_v7();
+        inject_sentori_msg_id(&mut msg, send_id);
+        assert_eq!(
+            msg.data.unwrap().as_str().unwrap(),
+            "plain-string-payload",
+            "non-object data must pass through unchanged"
+        );
+    }
+
+    #[test]
+    fn inject_msg_id_overwrites_existing_sentori_key() {
+        let mut msg = empty_msg();
+        msg.data = Some(json!({ "_sentori": { "msgId": "old-id" }, "user": "u123" }));
+        let send_id = Uuid::now_v7();
+        inject_sentori_msg_id(&mut msg, send_id);
+        let data = msg.data.unwrap();
+        let sentori = data.get("_sentori").and_then(|v| v.as_object()).unwrap();
+        let want = crate::push::types::format_send_id(send_id);
+        assert_eq!(sentori.get("msgId").unwrap().as_str().unwrap(), want);
+        assert_eq!(data.get("user").unwrap().as_str().unwrap(), "u123");
+    }
 }

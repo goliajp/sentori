@@ -35,8 +35,11 @@ use tokio::sync::Mutex;
 
 use super::token_cache::{Clock, RealClock};
 
-/// APNs + FCM hard limit. Web Push (RFC 8030 §6) is also 4 KiB-class.
-pub const PAYLOAD_MAX_BYTES: usize = 4 * 1024;
+/// APNs + FCM hard limit is 4 KiB. We cap at 4 KiB minus a 64-byte
+/// headroom so the v2.25 `_sentori.msgId` injection (`{"_sentori":
+/// {"msgId":"send_019eXXXXXXXXXXXXXXXXXXX"}}` ≈ 50 bytes) never pushes
+/// a max-budget customer over the provider ceiling.
+pub const PAYLOAD_MAX_BYTES: usize = 4 * 1024 - 64;
 
 /// Expo's documented batch cap. Matches `sentori-native` chunking too.
 pub const BATCH_MAX_RECIPIENTS: usize = 100;
@@ -189,17 +192,17 @@ mod tests {
 
     #[test]
     fn payload_under_cap_passes() {
-        assert!(check_payload_size(4 * 1024).is_ok());
+        assert!(check_payload_size(PAYLOAD_MAX_BYTES).is_ok());
         assert!(check_payload_size(0).is_ok());
     }
 
     #[test]
     fn payload_over_cap_fails_with_actual_and_max() {
-        let err = check_payload_size(4 * 1024 + 1).unwrap_err();
+        let err = check_payload_size(PAYLOAD_MAX_BYTES + 1).unwrap_err();
         match err {
             GateError::PayloadTooBig { actual, max } => {
-                assert_eq!(actual, 4 * 1024 + 1);
-                assert_eq!(max, 4 * 1024);
+                assert_eq!(actual, PAYLOAD_MAX_BYTES + 1);
+                assert_eq!(max, PAYLOAD_MAX_BYTES);
             }
             other => panic!("expected PayloadTooBig, got {other:?}"),
         }

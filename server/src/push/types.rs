@@ -22,6 +22,18 @@ pub struct NativeMessage {
     #[serde(default)]
     pub options: NativeOptions,
     pub idempotency_key: Option<String>,
+    /// v2.25 — optional free-text tag identifying the campaign this
+    /// send belongs to. Write-only in v2.25; surfaces in v2.27 push-
+    /// correlation BI ("what did campaign X cause?"). Caller defines
+    /// the taxonomy.
+    #[serde(default)]
+    pub campaign_id: Option<String>,
+    /// v2.25 — optional template id (which content variant fired).
+    #[serde(default)]
+    pub template_id: Option<String>,
+    /// v2.25 — optional audience tag (segment / cohort label).
+    #[serde(default)]
+    pub audience_tag: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

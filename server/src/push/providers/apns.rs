@@ -464,6 +464,9 @@ mod tests {
                 category: Some("MSG".into()),
             },
             idempotency_key: None,
+            campaign_id: None,
+            template_id: None,
+            audience_tag: None,
         };
         let v = build_aps_payload(&msg);
         let aps = v.get("aps").and_then(|x| x.as_object()).unwrap();
@@ -489,6 +492,9 @@ mod tests {
                 ..Default::default()
             },
             idempotency_key: None,
+            campaign_id: None,
+            template_id: None,
+            audience_tag: None,
         };
         assert_eq!(aps_push_type(&msg), "background");
         assert_eq!(aps_priority(&msg), 5);

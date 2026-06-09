@@ -476,6 +476,9 @@ mod tests {
                 ..Default::default()
             },
             idempotency_key: None,
+            campaign_id: None,
+            template_id: None,
+            audience_tag: None,
         };
         let v = build_fcm_message("ABCDEF", &msg);
         let m = v.get("message").unwrap();
