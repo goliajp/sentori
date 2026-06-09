@@ -488,4 +488,72 @@ mod tests {
         let body = r#"{"error":{"status":"UNAVAILABLE"}}"#;
         assert_eq!(extract_fcm_error(body).as_deref(), Some("UNAVAILABLE"));
     }
+
+    // Throwaway RSA-2048 PKCS#8 PEM — not tied to any real Google
+    // service account. Generated solely for crypto smoke tests; safe
+    // to commit. v2.20 P4.
+    const TEST_RSA_PEM: &str = "-----BEGIN PRIVATE KEY-----\n\
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC5QQxYXJcPKHmJ\n\
+hj36luX0WWBn6LJCkPRsZPbSV9e2PSJOS1QpieHZiy4rEWgRsxlmic1OFzqZIUNc\n\
+Dy42qN5BiVvc4q7CRwrxMOZyH6khvQVNINnbwDyae2/OG+2M4EkeTxje4woZjIJg\n\
+wJ0ddZY4FiEesA7qD87vRl+Dn25ygzuS2m8yFRlnOTjdowGNww3aV+O0i2JNwjbJ\n\
+LDjp4KkDdYTHnmqLsp6iFrcE6z0w+TB0zMFd4VGHURN+PTbkJFfySm5g9M6M2zv3\n\
+OfioR020dJ1v6C35VJbDgENdxc0Gfi+SbHtnl7t2sgNSOYE2K0ddrp6sewmMrZLe\n\
+coFHRhXzAgMBAAECggEADG/vDb5tnKScs3YLrDEitoRxNTJJexZmd1TrjNSj7h+H\n\
+MZcO5L9vWV6yo0z595I87TlPZMpCpcXQOWdPGxFV42cYf6kvKJ21zadff7lbbm3u\n\
+/XrsO9VZddk930PY73SeKnnbk0wBdHsOXintHAcccwVQhOudNlHVLhN2u/LH6sno\n\
+1BUT7WYbhw8gctrXwwMGAM607gLW0PZ/3MAvvbxbRmb30S67B3NATOidkgu+BT2H\n\
+7o/iwlA4kelq2TIk1fHO/fqIqtm85yd98zNMYE10buZSbwn9DxrvoRDoMTVFkwTq\n\
+G1kDmGgMoGU2S0b2Ned8o8luQ4y5eS8F7L6O9/I5UQKBgQDnNzdJyJqDhUIZip5H\n\
+QbjgjwirBybn01JX98WZ8UwO2jkSuMviYXIggfWcG5sHZD/jOnfqvwWlTM6QR3ql\n\
+ZA4NUf5Wh/2dyL7Dp7V9ZKLI/ehDgaSWNoYkxxTlUmk9afqLji+E6tvHoJjbnYyO\n\
+/iK4LpmXQdEbsvMwhpoPDYaAcQKBgQDNHJnvaGUFcem+4AsTFNGpq6SIfe2yKkzp\n\
+mKzfLMDhAdxvuMjBpq78PuDQYA1/075ZBx4ZMxYtSF0sRSM1bpg60wmI53Jyx/aW\n\
+MCdrPxFRnQyXPxLEAPg2gtZ6qHDQyGiCJP/2DLeoGkByYO3oigf1HFTY3BG4fYIL\n\
+gDm+v24uowKBgQDF1k0MaQUsu/0O9bjwp5+VJU35aSk0+3BdrLf7PKgjnT1wc4ag\n\
+sViB0DFj3YsNDA5OU10AE2q1Qb8NXNvoYHBVnW7Og5XSSE5SA1IbdNyEthzihi9a\n\
+CFVHasDKZ3V9Aw1KE+M9C+f6K8QfRfNa9sCmb9kjv0E5PikvwDxZ3OzVQQKBgQCv\n\
+2iGwPJTAAlYhK/zSszq+eUZrL2wnIFUowZkVDk2fm/TeZFLalInaAh7FCFUKjwPX\n\
+WF7ZxA7za+NWHUB+gv9JD75Q/f4FoqMrSMXDESNMEZXF5nG0UhB8y9gO+XMfzXKs\n\
+ggRhc63SFg/DAI94mz8PSucDtkoLHq/sJFddzsoseQKBgFw93FXHyq7nFCi1nc+G\n\
+Ze8/jlPhmA/aZLOR89wjwAqwt19EG1/w3Ha2nNVHElyegLZle2GdeokqyempJbx9\n\
+dob0cPBqAzsNqJ5eSHZiRfLEJP0uPuhALReKxoDGdN3G1UX9Kqk8t3p0S90ik8NJ\n\
+nnsd9Cq7/706c9AhK0nu6unI\n\
+-----END PRIVATE KEY-----\n";
+
+    /// v2.20 P4 — FCM v1 OAuth assertion RS256 sign smoke test. The
+    /// only RSA path in the push pipeline; same v1.1.2-class
+    /// rationale as the APNs/VAPID ES256 smokes — exercise the
+    /// crypto path so a future crypto-crate breakage fails here, not
+    /// in dispatch_cron.
+    #[test]
+    fn sign_oauth_jwt_rs256_smoke() {
+        use base64::Engine as _;
+        let secret = FcmSecret {
+            client_email: "test@example.iam.gserviceaccount.com".into(),
+            private_key: TEST_RSA_PEM.into(),
+            token_uri: "https://oauth2.googleapis.com/token".into(),
+        };
+        let jwt = sign_oauth_jwt(&secret)
+            .expect("sign_oauth_jwt must not error on a valid RSA-2048 key");
+        let parts: Vec<&str> = jwt.split('.').collect();
+        assert_eq!(parts.len(), 3, "JWT must have header.payload.sig");
+
+        let header_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(parts[0])
+            .expect("header b64");
+        let header: serde_json::Value =
+            serde_json::from_slice(&header_bytes).expect("header json");
+        assert_eq!(header["alg"], "RS256");
+
+        let claims_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(parts[1])
+            .expect("claims b64");
+        let claims: serde_json::Value =
+            serde_json::from_slice(&claims_bytes).expect("claims json");
+        assert_eq!(claims["iss"], "test@example.iam.gserviceaccount.com");
+        assert_eq!(claims["scope"], FCM_SCOPE);
+        assert_eq!(claims["aud"], "https://oauth2.googleapis.com/token");
+        assert!(claims["exp"].as_u64().unwrap_or(0) > claims["iat"].as_u64().unwrap_or(0));
+    }
 }

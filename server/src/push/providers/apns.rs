@@ -485,4 +485,42 @@ mod tests {
         assert!(t.len() <= 2048);
         assert!(t.starts_with("aaaa"));
     }
+
+    // Throwaway P-256 PKCS#8 PEM — public key not associated with any
+    // real Apple developer account. Generated solely for crypto smoke
+    // tests; safe to commit. v2.20 P4.
+    const TEST_P256_PEM: &str = "-----BEGIN PRIVATE KEY-----\n\
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgwLViWNAN7cNJxHa6\n\
+SazKcIgzndxVwvYbpG/4zhIrBWGhRANCAAQh8jYfkJZzsDqWF889zSvQMgn267m/\n\
+BsR53w8xJYvbjbTcbzJ3Jrm5jNav9kOYS4TQS/l0cR0iLZvt+zKEZ+C2\n\
+-----END PRIVATE KEY-----\n";
+
+    /// v2.20 P4 — end-to-end crypto smoke test. The v1.1.2 incident
+    /// (jsonwebtoken `rust_crypto` feature missing → all sign paths
+    /// panic) shipped a green build and only fell over in prod. This
+    /// test exercises the actual ES256 encode path so any future
+    /// crypto crate breakage trips here, not at 2 AM in prod.
+    #[test]
+    fn sign_jwt_es256_smoke() {
+        use base64::Engine as _;
+        let jwt = sign_jwt(TEST_P256_PEM, "TEAM123456", "KEYABC9999")
+            .expect("sign_jwt must not error on a valid P-256 key");
+        // JWT is `header.payload.sig`.
+        let parts: Vec<&str> = jwt.split('.').collect();
+        assert_eq!(parts.len(), 3, "JWT must have header.payload.sig");
+
+        let header_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(parts[0])
+            .expect("header b64");
+        let header: serde_json::Value = serde_json::from_slice(&header_bytes).expect("header json");
+        assert_eq!(header["alg"], "ES256");
+        assert_eq!(header["kid"], "KEYABC9999");
+
+        let claims_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(parts[1])
+            .expect("claims b64");
+        let claims: serde_json::Value = serde_json::from_slice(&claims_bytes).expect("claims json");
+        assert_eq!(claims["iss"], "TEAM123456");
+        assert!(claims["iat"].as_u64().unwrap_or(0) > 0);
+    }
 }

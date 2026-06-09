@@ -657,4 +657,45 @@ mod tests {
         let t = truncate_2k(&s);
         assert!(t.len() <= 2048);
     }
+
+    // Throwaway P-256 PKCS#8 PEM — public key not associated with any
+    // real VAPID identity. Generated solely for crypto smoke tests;
+    // safe to commit. v2.20 P4.
+    const TEST_P256_PEM: &str = "-----BEGIN PRIVATE KEY-----\n\
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgwLViWNAN7cNJxHa6\n\
+SazKcIgzndxVwvYbpG/4zhIrBWGhRANCAAQh8jYfkJZzsDqWF889zSvQMgn267m/\n\
+BsR53w8xJYvbjbTcbzJ3Jrm5jNav9kOYS4TQS/l0cR0iLZvt+zKEZ+C2\n\
+-----END PRIVATE KEY-----\n";
+
+    /// v2.20 P4 — VAPID ES256 sign smoke test. Same v1.1.2-class
+    /// rationale as the APNs smoke: exercise the crypto path so a
+    /// future jsonwebtoken bump doesn't quietly break VAPID at 2 AM.
+    #[test]
+    fn sign_vapid_es256_smoke() {
+        use base64::Engine as _;
+        let jwt = sign_vapid(
+            TEST_P256_PEM,
+            "https://fcm.googleapis.com",
+            "mailto:dev@example.com",
+        )
+        .expect("sign_vapid must not error on a valid P-256 key");
+        let parts: Vec<&str> = jwt.split('.').collect();
+        assert_eq!(parts.len(), 3, "JWT must have header.payload.sig");
+
+        let header_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(parts[0])
+            .expect("header b64");
+        let header: serde_json::Value =
+            serde_json::from_slice(&header_bytes).expect("header json");
+        assert_eq!(header["alg"], "ES256");
+
+        let claims_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(parts[1])
+            .expect("claims b64");
+        let claims: serde_json::Value =
+            serde_json::from_slice(&claims_bytes).expect("claims json");
+        assert_eq!(claims["aud"], "https://fcm.googleapis.com");
+        assert_eq!(claims["sub"], "mailto:dev@example.com");
+        assert!(claims["exp"].as_u64().unwrap_or(0) > 0);
+    }
 }
