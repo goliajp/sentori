@@ -122,11 +122,17 @@ async fn enqueue_one(
     // v2.25 — three optional BI tags (campaign / template / audience)
     // land alongside the existing idempotency_key column. Migration
     // 0079 created the columns nullable + index on campaign_id.
+    // v2.32 — when `send_at` is set, schedule the row by clamping
+    // next_attempt_at to GREATEST(now(), send_at). Past timestamps
+    // collapse to "send now". The existing dispatch_cron filter
+    // (`next_attempt_at <= now()`) naturally holds the row until
+    // the time arrives.
     let row = sqlx::query_as::<_, (Uuid, String, time::OffsetDateTime)>(
         "INSERT INTO push_sends \
             (id, project_id, token_id, provider, payload, idempotency_key, \
-             campaign_id, template_id, audience_tag) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) \
+             campaign_id, template_id, audience_tag, next_attempt_at) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, \
+                 GREATEST(now(), COALESCE($10::TIMESTAMPTZ, now()))) \
          RETURNING id, status, created_at",
     )
     .bind(send_uuid)
@@ -138,6 +144,7 @@ async fn enqueue_one(
     .bind(msg.campaign_id.as_deref())
     .bind(msg.template_id.as_deref())
     .bind(msg.audience_tag.as_deref())
+    .bind(msg.send_at)
     .fetch_one(pool)
     .await?;
     Ok(Ticket {

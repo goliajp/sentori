@@ -22,6 +22,13 @@ pub struct NativeMessage {
     #[serde(default)]
     pub options: NativeOptions,
     pub idempotency_key: Option<String>,
+    /// v2.32 — schedule a future send. `next_attempt_at` is clamped
+    /// to `GREATEST(now(), sendAt)` at enqueue time; the dispatch
+    /// cron's existing `next_attempt_at <= now()` filter naturally
+    /// holds the row until the time arrives. Past timestamps =
+    /// "send now".
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub send_at: Option<time::OffsetDateTime>,
     /// v2.25 — optional free-text tag identifying the campaign this
     /// send belongs to. Write-only in v2.25; surfaces in v2.27 push-
     /// correlation BI ("what did campaign X cause?"). Caller defines

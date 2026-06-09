@@ -113,6 +113,7 @@ pub fn to_native(msg: ExpoMessage) -> NativeMessage {
             channel_importance: None,
         },
         idempotency_key: None,
+            send_at: None,
             campaign_id: None,
             template_id: None,
             audience_tag: None,
