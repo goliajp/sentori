@@ -879,6 +879,10 @@ export const adminApi = {
   getPushStats: (projectId: string) =>
     adminFetch<PushStatsResponse>(`/projects/${projectId}/push/stats`),
 
+  /** v2.24 — per-provider health snapshot (invalid-rate gauge). */
+  getPushHealth: (projectId: string) =>
+    adminFetch<PushHealthResponse>(`/projects/${projectId}/push/health`),
+
   /** v2.19 — paginated active device tokens for one project. */
   listPushDevices: (
     projectId: string,
@@ -1732,6 +1736,22 @@ export type PushVerifyResult = {
   status: PushVerifyStatus
   reason: null | string
   durationMs: number
+}
+
+/** v2.24 — per-provider health snapshot from in-memory HealthState.
+ *  `safetyMarginPct` 100 = healthy / 0 = at auto-throttle threshold. */
+export type ProviderHealthSnapshot = {
+  provider: PushProviderKind
+  invalidRate: number
+  inWindowTotal: number
+  autoThrottle: boolean
+  safetyMarginPct: number
+}
+
+export type PushHealthResponse = {
+  providers: ProviderHealthSnapshot[]
+  windowSecs: number
+  thresholdRatio: number
 }
 
 export type OrgPushProjectRow = {

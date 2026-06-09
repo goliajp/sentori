@@ -1333,3 +1333,84 @@ fn payload_summary(payload: &serde_json::Value) -> serde_json::Value {
     }
     serde_json::Value::Object(out)
 }
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProviderHealthSnapshot {
+    provider: String,
+    invalid_rate: f64,
+    in_window_total: u32,
+    auto_throttle: bool,
+    /// `max(0, (threshold - invalid_rate) / threshold * 100)`. 100 =
+    /// fully healthy (no in-window invalid); 0 = at or past the
+    /// auto-throttle threshold. The dashboard renders this as a
+    /// "distance to throttle" gauge.
+    safety_margin_pct: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PushHealthResponse {
+    providers: Vec<ProviderHealthSnapshot>,
+    /// Window size in seconds (matches `HEALTH_WINDOW`). Dashboard
+    /// renders this in the card subtitle so operators know what the
+    /// numbers cover.
+    window_secs: u64,
+    /// `invalid_rate` at which `auto_throttle` flips on. Dashboard
+    /// uses to label the gauge tick.
+    threshold_ratio: f64,
+}
+
+/// v2.24 — expose the v2.23 in-memory `HealthState` snapshot. Powers
+/// the Provider Health card in the Push module's Overview tab. Reads
+/// from process memory only — no DB query.
+pub async fn admin_push_health(
+    State(state): State<AppState>,
+    Path(project_id): Path<uuid::Uuid>,
+) -> Response {
+    let Some(providers_arc) = state.push_providers.as_ref() else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({ "error": "providersUnavailable" })),
+        )
+            .into_response();
+    };
+    let health = &providers_arc.health;
+    let threshold = crate::push::health::AUTO_THROTTLE_INVALID_RATIO;
+
+    let mut snapshots = Vec::with_capacity(5);
+    for kind in [
+        crate::push::providers::ProviderKind::Apns,
+        crate::push::providers::ProviderKind::Fcm,
+        crate::push::providers::ProviderKind::WebPush,
+        crate::push::providers::ProviderKind::Hcm,
+        crate::push::providers::ProviderKind::MiPush,
+    ] {
+        let invalid_rate = health.invalid_rate(project_id, kind).await;
+        let in_window_total = health.in_window_total(project_id, kind).await;
+        let auto_throttle = health.should_auto_throttle(project_id, kind).await;
+        let safety_margin_pct = if in_window_total == 0 {
+            // No samples — show "fully healthy" rather than a misleading 0.
+            100.0
+        } else {
+            ((threshold - invalid_rate) / threshold).max(0.0) * 100.0
+        };
+        snapshots.push(ProviderHealthSnapshot {
+            provider: kind.as_str().into(),
+            invalid_rate,
+            in_window_total,
+            auto_throttle,
+            safety_margin_pct,
+        });
+    }
+
+    (
+        StatusCode::OK,
+        Json(PushHealthResponse {
+            providers: snapshots,
+            window_secs: crate::push::health::HEALTH_WINDOW.as_secs(),
+            threshold_ratio: threshold,
+        }),
+    )
+        .into_response()
+}
