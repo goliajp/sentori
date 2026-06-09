@@ -239,6 +239,15 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/v1/push/tokens/{handle}",
             axum::routing::delete(api::push::revoke_token),
         )
+        // v2.34 — preference center.
+        .route(
+            "/v1/push/users/{fp_hex}/preferences",
+            get(api::push::list_preferences),
+        )
+        .route(
+            "/v1/push/users/{fp_hex}/preferences/{category}",
+            axum::routing::put(api::push::upsert_preference).layer(small_body.clone()),
+        )
         // v2.31 — topic pub-sub.
         .route(
             "/v1/push/tokens/{handle}/topics",

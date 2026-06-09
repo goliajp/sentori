@@ -84,6 +84,98 @@ pub async fn revoke_token(
     }
 }
 
+// ── v2.34 preference center API ──────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct PreferenceUpsertRequest {
+    pub opted_out: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PreferenceRow {
+    category: String,
+    opted_out: bool,
+}
+
+fn decode_fp(hex: &str) -> Option<Vec<u8>> {
+    if hex.len() % 2 != 0 {
+        return None;
+    }
+    let mut out = Vec::with_capacity(hex.len() / 2);
+    for chunk in hex.as_bytes().chunks_exact(2) {
+        let hi = (chunk[0] as char).to_digit(16)?;
+        let lo = (chunk[1] as char).to_digit(16)?;
+        out.push(((hi << 4) | lo) as u8);
+    }
+    Some(out)
+}
+
+/// v2.34 — upsert one preference. Idempotent.
+pub async fn upsert_preference(
+    State(state): State<AppState>,
+    Extension(caller): Extension<IngestCaller>,
+    Path((fp_hex, category)): Path<(String, String)>,
+    Json(body): Json<PreferenceUpsertRequest>,
+) -> Response {
+    let Some(fp) = decode_fp(&fp_hex) else {
+        return bad_request("invalid hex fingerprint".to_string());
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return db_not_configured();
+    };
+    let project_id = caller_project_id(&caller, &state);
+    let res = sqlx::query(
+        "INSERT INTO push_preferences (project_id, user_fingerprint_hex, category, opted_out) \
+         VALUES ($1, $2, $3, $4) \
+         ON CONFLICT (project_id, user_fingerprint_hex, category) \
+         DO UPDATE SET opted_out = EXCLUDED.opted_out, updated_at = now()",
+    )
+    .bind(project_id)
+    .bind(fp.as_slice())
+    .bind(&category)
+    .bind(body.opted_out)
+    .execute(pool)
+    .await;
+    match res {
+        Ok(_) => (StatusCode::OK, Json(json!({ "ok": true }))).into_response(),
+        Err(e) => {
+            tracing::warn!(error = %e, "push preference upsert failed");
+            internal_error()
+        }
+    }
+}
+
+/// v2.34 — list all preference rows for one user fingerprint.
+pub async fn list_preferences(
+    State(state): State<AppState>,
+    Extension(caller): Extension<IngestCaller>,
+    Path(fp_hex): Path<String>,
+) -> Response {
+    let Some(fp) = decode_fp(&fp_hex) else {
+        return bad_request("invalid hex fingerprint".to_string());
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return db_not_configured();
+    };
+    let project_id = caller_project_id(&caller, &state);
+    let rows: Vec<(String, bool)> = sqlx::query_as(
+        "SELECT category, opted_out FROM push_preferences \
+         WHERE project_id = $1 AND user_fingerprint_hex = $2 \
+         ORDER BY category",
+    )
+    .bind(project_id)
+    .bind(fp.as_slice())
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+    let preferences: Vec<PreferenceRow> = rows
+        .into_iter()
+        .map(|(category, opted_out)| PreferenceRow { category, opted_out })
+        .collect();
+    (StatusCode::OK, Json(json!({ "preferences": preferences }))).into_response()
+}
+
 // ── v2.31 topic pub-sub subscribe / unsubscribe ──────────────────────
 
 #[derive(Deserialize)]

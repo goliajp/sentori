@@ -22,6 +22,14 @@ pub struct NativeMessage {
     #[serde(default)]
     pub options: NativeOptions,
     pub idempotency_key: Option<String>,
+    /// v2.34 — preference-center category. When set AND the recipient
+    /// device has a `user_fingerprint_hex`, dispatch checks
+    /// `push_preferences (project, fp, this)`; opted_out rows skip
+    /// silently. Distinct from `NativeOptions.category` which is iOS
+    /// `aps.category` — that one's for action-button groups, this
+    /// one is for end-user opt-out (e.g. "marketing").
+    #[serde(default)]
+    pub preference_category: Option<String>,
     /// v2.32 — schedule a future send. `next_attempt_at` is clamped
     /// to `GREATEST(now(), sendAt)` at enqueue time; the dispatch
     /// cron's existing `next_attempt_at <= now()` filter naturally

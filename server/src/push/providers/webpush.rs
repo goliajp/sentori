@@ -592,6 +592,7 @@ mod tests {
             options: Default::default(),
             idempotency_key: None,
             send_at: None,
+            preference_category: None,
             campaign_id: None,
             template_id: None,
             audience_tag: None,
