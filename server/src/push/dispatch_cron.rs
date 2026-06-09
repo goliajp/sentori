@@ -100,19 +100,28 @@ pub async fn sweep_once(handle: &DispatchHandle) -> Result<(), anyhow::Error> {
     // invalid-rate counter that would drive auto-throttle for the
     // healthy tokens too. The row itself isn't deleted — operators
     // can still inspect via the dashboard; we just don't dispatch.
+    // v2.35 — FOR UPDATE SKIP LOCKED makes the sweep safe under
+    // concurrent workers. The inner CTE claims rows (row-level locks);
+    // a sibling worker's CTE skips them. Single-instance behaviour is
+    // identical — SKIP LOCKED is a no-op for the only worker.
     let rows: Vec<PendingRow> = sqlx::query_as(
-        "SELECT s.id AS send_id, s.project_id, s.token_id, s.provider, s.payload, s.retry_count, \
+        "WITH claimed AS ( \
+            SELECT id FROM push_sends \
+             WHERE status = 'queued' \
+               AND next_attempt_at <= now() \
+             ORDER BY next_attempt_at \
+             LIMIT $1 \
+             FOR UPDATE SKIP LOCKED \
+         ) \
+         SELECT s.id AS send_id, s.project_id, s.token_id, s.provider, s.payload, s.retry_count, \
                 d.native_token, d.env, c.config, c.secret_blob, c.secret_nonce \
-         FROM push_sends s \
+         FROM claimed cl \
+         JOIN push_sends s ON s.id = cl.id \
          JOIN device_tokens d ON d.id = s.token_id \
          LEFT JOIN push_credentials c \
                 ON c.project_id = s.project_id AND c.provider = s.provider \
-         WHERE s.status = 'queued' \
-           AND s.next_attempt_at <= now() \
-           AND d.revoked_at IS NULL \
-           AND d.last_seen_at > now() - interval '90 days' \
-         ORDER BY s.next_attempt_at \
-         LIMIT $1",
+         WHERE d.revoked_at IS NULL \
+           AND d.last_seen_at > now() - interval '90 days'",
     )
     .bind(SWEEP_BATCH_SIZE)
     .fetch_all(&handle.pool)
