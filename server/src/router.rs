@@ -423,6 +423,14 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/push/sends/{send_id}",
             get(api::push::admin_get_push_send_detail),
         )
+        // v2.27 — downstream impact of one push within a 24h window.
+        // Scans events_partitioned.payload->'breadcrumbs' for entries
+        // whose type='push' and data.msgId == this send. Part of the
+        // Observability link-through ironclad rule #4.
+        .route(
+            "/projects/{project_id}/push/sends/{send_id}/downstream",
+            get(api::push::admin_get_push_send_downstream),
+        )
         .route(
             "/projects/{project_id}/push/sends/{send_id}/retry",
             post(api::push::admin_retry_push_send),

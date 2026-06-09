@@ -921,6 +921,12 @@ export const adminApi = {
   getPushSendDetail: (projectId: string, sendId: string) =>
     adminFetch<PushSendDetail>(`/projects/${projectId}/push/sends/${sendId}`),
 
+  /** v2.27 — downstream impact of one push within a 24h window. */
+  getPushSendDownstream: (projectId: string, sendId: string) =>
+    adminFetch<PushSendDownstreamResponse>(
+      `/projects/${projectId}/push/sends/${sendId}/downstream`
+    ),
+
   /** v2.19 — clone + re-queue one send. Returns the new send's id. */
   retryPushSend: (projectId: string, sendId: string) =>
     adminFetch<{ ok: boolean; sendId: string }>(
@@ -1752,6 +1758,18 @@ export type PushHealthResponse = {
   providers: ProviderHealthSnapshot[]
   windowSecs: number
   thresholdRatio: number
+}
+
+/** v2.27 — downstream impact of one push within a 24h window. */
+export type PushSendDownstreamResponse = {
+  /** 'ok' = correlation possible; 'n/a' = send never delivered. */
+  correlationStatus: 'n/a' | 'ok'
+  eventCount: number
+  errorEventCount: number
+  distinctSessions: number
+  firstSeenSecs: null | number
+  lastSeenSecs: null | number
+  windowSecs: number
 }
 
 export type OrgPushProjectRow = {

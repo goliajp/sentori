@@ -1426,6 +1426,134 @@ fn parse_rfc3339_cursor(s: &str) -> Option<time::OffsetDateTime> {
 }
 
 /// Compact a push_sends.payload for list responses — full JSON can
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PushSendDownstreamResponse {
+    /// `"ok"` when the send has a `sent_at` (i.e. the SDK had a chance
+    /// to receive + correlate). `"n/a"` when still queued / failed
+    /// before delivery — counts are zero and the UI shows an empty
+    /// state instead of misleading numbers.
+    correlation_status: &'static str,
+    event_count: i64,
+    error_event_count: i64,
+    distinct_sessions: i64,
+    /// Seconds from `sent_at` to the first event we found for this
+    /// msgId. Null when no events found.
+    first_seen_secs: Option<i64>,
+    last_seen_secs: Option<i64>,
+    /// Window in seconds used for the query (24 h).
+    window_secs: i64,
+}
+
+const DOWNSTREAM_WINDOW_SECS: i64 = 24 * 3600;
+
+/// v2.27 — given a single push send, report on the downstream events
+/// it correlates to. Reads `events_partitioned.payload->'breadcrumbs'`
+/// for entries with `type='push'` and `data->>'msgId'` equal to this
+/// send's id, within `[sent_at, sent_at + 24h]`.
+///
+/// Powers the "Downstream impact" Card in the dashboard's
+/// send-detail view. Part of Observability link-through (rule #4).
+pub async fn admin_get_push_send_downstream(
+    State(state): State<AppState>,
+    Path((project_id, send_id)): Path<(uuid::Uuid, uuid::Uuid)>,
+) -> Response {
+    let Some(pool) = state.db.as_ref() else {
+        return db_not_configured();
+    };
+
+    let send_row: Option<(Option<time::OffsetDateTime>,)> = sqlx::query_as(
+        "SELECT sent_at FROM push_sends WHERE project_id = $1 AND id = $2",
+    )
+    .bind(project_id)
+    .bind(send_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+
+    let Some((sent_at,)) = send_row else {
+        return not_found(format!("send '{send_id}' not found"));
+    };
+
+    let Some(sent_at) = sent_at else {
+        // Send never made it out. No correlation possible.
+        return (
+            StatusCode::OK,
+            Json(PushSendDownstreamResponse {
+                correlation_status: "n/a",
+                event_count: 0,
+                error_event_count: 0,
+                distinct_sessions: 0,
+                first_seen_secs: None,
+                last_seen_secs: None,
+                window_secs: DOWNSTREAM_WINDOW_SECS,
+            }),
+        )
+            .into_response();
+    };
+
+    let msg_id = crate::push::types::format_send_id(send_id);
+    let until = sent_at + time::Duration::seconds(DOWNSTREAM_WINDOW_SECS);
+
+    // Partition-prune on received_at + JSONB containment match for
+    // breadcrumbs with type=push and matching msgId. The @> operator
+    // tests whether the breadcrumbs array contains the given object —
+    // index-aware via the default GIN on JSONB containment if present.
+    let containment = serde_json::json!([
+        { "type": "push", "data": { "msgId": msg_id } }
+    ]);
+
+    let agg: (i64, i64, i64, Option<time::OffsetDateTime>, Option<time::OffsetDateTime>) =
+        match sqlx::query_as(
+            "SELECT COUNT(*)::bigint AS evt, \
+                    COUNT(*) FILTER (WHERE error_type IS NOT NULL AND error_type <> '')::bigint AS err, \
+                    COUNT(DISTINCT (payload->'session'->>'id'))::bigint AS sess, \
+                    MIN(received_at) AS first_seen, \
+                    MAX(received_at) AS last_seen \
+             FROM events_partitioned \
+             WHERE project_id = $1 \
+               AND received_at >= $2 \
+               AND received_at <= $3 \
+               AND payload->'breadcrumbs' @> $4",
+        )
+        .bind(project_id)
+        .bind(sent_at)
+        .bind(until)
+        .bind(&containment)
+        .fetch_one(pool)
+        .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!(error = %e, "push downstream impact query failed");
+                return internal_error();
+            }
+        };
+
+    let (event_count, error_event_count, distinct_sessions, first_seen, last_seen) = agg;
+
+    fn delta_secs(
+        from: time::OffsetDateTime,
+        to: Option<time::OffsetDateTime>,
+    ) -> Option<i64> {
+        to.map(|t| (t - from).whole_seconds())
+    }
+
+    (
+        StatusCode::OK,
+        Json(PushSendDownstreamResponse {
+            correlation_status: "ok",
+            event_count,
+            error_event_count,
+            distinct_sessions,
+            first_seen_secs: delta_secs(sent_at, first_seen),
+            last_seen_secs: delta_secs(sent_at, last_seen),
+            window_secs: DOWNSTREAM_WINDOW_SECS,
+        }),
+    )
+        .into_response()
+}
+
 /// be 2 KB+ each. We surface only the fields the dashboard renders
 /// as a one-liner: title, body, deep-link.
 fn payload_summary(payload: &serde_json::Value) -> serde_json::Value {
