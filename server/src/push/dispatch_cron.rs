@@ -33,16 +33,12 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::push::providers::{ProviderKind, Providers, SendOutcome};
+use crate::push::retry::{decide_retry, MAX_ATTEMPTS, RetryDecision};
 use crate::push::types::NativeMessage;
 
 const SWEEP_INTERVAL_SECS: u64 = 30;
 const SWEEP_BATCH_SIZE: i64 = 50;
 
-/// Delays between attempts, in seconds. Same shape as
-/// `webhook_dispatch::RETRY_SCHEDULE_SECS`.
-const RETRY_SCHEDULE_SECS: [i32; 6] = [60, 300, 1800, 7200, 43200, 86400];
-
-const MAX_ATTEMPTS: i32 = 6;
 const BAD_STREAK_THRESHOLD: i32 = 3;
 
 /// Cron handle: pool + provider registry + master secret for
@@ -290,28 +286,31 @@ async fn apply_outcome(
             .await;
         }
         SendOutcome::Transient { retry_after_secs } => {
-            if attempt >= MAX_ATTEMPTS {
-                mark_failed(
-                    handle,
-                    send_id,
-                    label.unwrap_or("ExceededRetries"),
-                    &format!("max attempts ({MAX_ATTEMPTS}) reached"),
-                    attempt,
-                    None,
-                    None,
-                    duration_ms,
-                )
-                .await;
-                return;
+            // v2.20: delegate to push::retry::decide_retry so the
+            // ladder + provider hint + ±20% jitter math lives in one
+            // place and is unit-tested independently.
+            match decide_retry(
+                &SendOutcome::Transient { retry_after_secs },
+                attempt,
+                retry_after_secs,
+            ) {
+                RetryDecision::DropPermanently => {
+                    mark_failed(
+                        handle,
+                        send_id,
+                        label.unwrap_or("ExceededRetries"),
+                        &format!("max attempts ({MAX_ATTEMPTS}) reached"),
+                        attempt,
+                        None,
+                        None,
+                        duration_ms,
+                    )
+                    .await;
+                }
+                RetryDecision::Retry { after_secs } => {
+                    schedule_retry(handle, send_id, attempt, after_secs).await;
+                }
             }
-            // attempt index is 1-based; convert to 0-based for the
-            // schedule table. Use the provider's hint if set, else
-            // the schedule entry.
-            let idx = ((attempt - 1) as usize).min(RETRY_SCHEDULE_SECS.len() - 1);
-            let delay = retry_after_secs
-                .unwrap_or(RETRY_SCHEDULE_SECS[idx])
-                .max(1);
-            schedule_retry(handle, send_id, attempt, delay).await;
         }
         SendOutcome::TerminalOther { reason } => {
             mark_failed(
