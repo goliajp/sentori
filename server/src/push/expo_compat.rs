@@ -106,6 +106,7 @@ pub fn to_native(msg: ExpoMessage) -> NativeMessage {
             collapse_key: None,
             channel_id: msg.channel_id,
             category: msg.category_id,
+            rich_media: None,
         },
         idempotency_key: None,
             campaign_id: None,
