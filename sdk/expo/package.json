@@ -36,6 +36,7 @@
     "src/",
     "app.plugin.js",
     "scripts/",
+    "templates/",
     "README.md"
   ],
   "scripts": {

@@ -257,13 +257,24 @@ fn sign_oauth_jwt(secret: &FcmSecret) -> Result<String, String> {
 fn build_fcm_message(native_token: &str, msg: &NativeMessage) -> Value {
     let mut message = serde_json::Map::new();
     message.insert("token".into(), Value::String(native_token.into()));
-    if msg.title.is_some() || msg.body.is_some() {
+    // v2.28 — rich-media image lives on the FCM `notification` envelope;
+    // FCM auto-renders Android BigPicture from it. We have to ensure the
+    // `notification` object exists even when title/body are absent.
+    let rich_image = msg
+        .options
+        .rich_media
+        .as_ref()
+        .and_then(|r| r.image_url.as_deref());
+    if msg.title.is_some() || msg.body.is_some() || rich_image.is_some() {
         let mut notif = serde_json::Map::new();
         if let Some(t) = msg.title.as_ref() {
             notif.insert("title".into(), Value::String(t.clone()));
         }
         if let Some(b) = msg.body.as_ref() {
             notif.insert("body".into(), Value::String(b.clone()));
+        }
+        if let Some(url) = rich_image {
+            notif.insert("image".into(), Value::String(url.to_string()));
         }
         message.insert("notification".into(), Value::Object(notif));
     }
@@ -497,6 +508,61 @@ mod tests {
     fn extract_fcm_error_handles_details() {
         let body = r#"{"error":{"status":"NOT_FOUND","details":[{"errorCode":"UNREGISTERED"}]}}"#;
         assert_eq!(extract_fcm_error(body).as_deref(), Some("UNREGISTERED"));
+    }
+
+    #[test]
+    fn build_fcm_message_includes_notification_image_when_rich_media_set() {
+        // v2.28 — rich-media image URL must land at notification.image
+        // for FCM to auto-render Android BigPicture.
+        let msg = crate::push::types::NativeMessage {
+            to: crate::push::types::ToField::Single("ipt_x".into()),
+            title: Some("Hello".into()),
+            body: Some("World".into()),
+            data: None,
+            options: crate::push::types::NativeOptions {
+                rich_media: Some(crate::push::types::RichMedia {
+                    image_url: Some("https://cdn.example/big.jpg".into()),
+                }),
+                ..Default::default()
+            },
+            idempotency_key: None,
+            campaign_id: None,
+            template_id: None,
+            audience_tag: None,
+        };
+        let v = build_fcm_message("tok_abc", &msg);
+        let notif = v
+            .get("message")
+            .and_then(|m| m.get("notification"))
+            .and_then(|x| x.as_object())
+            .unwrap();
+        assert_eq!(
+            notif.get("image").and_then(|x| x.as_str()),
+            Some("https://cdn.example/big.jpg")
+        );
+        assert_eq!(notif.get("title").and_then(|x| x.as_str()), Some("Hello"));
+    }
+
+    #[test]
+    fn build_fcm_message_omits_image_when_rich_media_absent() {
+        let msg = crate::push::types::NativeMessage {
+            to: crate::push::types::ToField::Single("ipt_x".into()),
+            title: Some("plain".into()),
+            body: Some("plain body".into()),
+            data: None,
+            options: crate::push::types::NativeOptions::default(),
+            idempotency_key: None,
+            campaign_id: None,
+            template_id: None,
+            audience_tag: None,
+        };
+        let v = build_fcm_message("tok_abc", &msg);
+        let notif = v
+            .get("message")
+            .and_then(|m| m.get("notification"))
+            .and_then(|x| x.as_object())
+            .unwrap();
+        assert!(notif.get("image").is_none());
     }
 
     #[test]

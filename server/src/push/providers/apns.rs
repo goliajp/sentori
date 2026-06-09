@@ -284,7 +284,16 @@ fn build_aps_payload(msg: &NativeMessage) -> Value {
     if let Some(b) = msg.options.badge {
         aps.insert("badge".into(), json!(b));
     }
-    if msg.options.mutable_content == Some(true) {
+    // v2.28 — rich-media image forces mutable-content so the NSE has
+    // a chance to download + attach. Customer's explicit
+    // mutable_content stays honored if also set.
+    let has_rich_image = msg
+        .options
+        .rich_media
+        .as_ref()
+        .and_then(|r| r.image_url.as_deref())
+        .is_some();
+    if msg.options.mutable_content == Some(true) || has_rich_image {
         aps.insert("mutable-content".into(), json!(1));
     }
     if msg.options.content_available == Some(true) {
@@ -305,6 +314,20 @@ fn build_aps_payload(msg: &NativeMessage) -> Value {
             }
             root.insert(k.clone(), v.clone());
         }
+    }
+    // v2.28 — surface rich-media image URL where the NSE can pick it
+    // up. The reserved `sentori_attachment_url` key is documented as
+    // Sentori-only; the NSE template reads it, downloads, attaches.
+    if let Some(url) = msg
+        .options
+        .rich_media
+        .as_ref()
+        .and_then(|r| r.image_url.as_deref())
+    {
+        root.insert(
+            "sentori_attachment_url".into(),
+            Value::String(url.to_string()),
+        );
     }
     Value::Object(root)
 }
@@ -462,6 +485,7 @@ mod tests {
                 collapse_key: None,
                 channel_id: None,
                 category: Some("MSG".into()),
+                rich_media: None,
             },
             idempotency_key: None,
             campaign_id: None,
@@ -489,6 +513,7 @@ mod tests {
             data: None,
             options: crate::push::types::NativeOptions {
                 content_available: Some(true),
+                rich_media: None,
                 ..Default::default()
             },
             idempotency_key: None,
@@ -516,6 +541,54 @@ MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgwLViWNAN7cNJxHa6\n\
 SazKcIgzndxVwvYbpG/4zhIrBWGhRANCAAQh8jYfkJZzsDqWF889zSvQMgn267m/\n\
 BsR53w8xJYvbjbTcbzJ3Jrm5jNav9kOYS4TQS/l0cR0iLZvt+zKEZ+C2\n\
 -----END PRIVATE KEY-----\n";
+
+    #[test]
+    fn aps_rich_media_image_forces_mutable_content_and_surfaces_url() {
+        // v2.28 — rich-media image URL must flip mutable-content to 1
+        // and emit `sentori_attachment_url` so the NSE can pick it up.
+        let msg = NativeMessage {
+            to: crate::push::types::ToField::Single("ipt_y".into()),
+            title: Some("Photo".into()),
+            body: Some("Check it out".into()),
+            data: None,
+            options: crate::push::types::NativeOptions {
+                rich_media: Some(crate::push::types::RichMedia {
+                    image_url: Some("https://cdn.example/img.jpg".into()),
+                }),
+                ..Default::default()
+            },
+            idempotency_key: None,
+            campaign_id: None,
+            template_id: None,
+            audience_tag: None,
+        };
+        let v = build_aps_payload(&msg);
+        let aps = v.get("aps").and_then(|x| x.as_object()).unwrap();
+        assert_eq!(aps.get("mutable-content").unwrap(), 1);
+        assert_eq!(
+            v.get("sentori_attachment_url").and_then(|x| x.as_str()),
+            Some("https://cdn.example/img.jpg")
+        );
+    }
+
+    #[test]
+    fn aps_without_rich_media_does_not_add_attachment_url() {
+        let msg = NativeMessage {
+            to: crate::push::types::ToField::Single("ipt_z".into()),
+            title: Some("Plain".into()),
+            body: Some("text only".into()),
+            data: None,
+            options: crate::push::types::NativeOptions::default(),
+            idempotency_key: None,
+            campaign_id: None,
+            template_id: None,
+            audience_tag: None,
+        };
+        let v = build_aps_payload(&msg);
+        let aps = v.get("aps").and_then(|x| x.as_object()).unwrap();
+        assert!(aps.get("mutable-content").is_none());
+        assert!(v.get("sentori_attachment_url").is_none());
+    }
 
     /// v2.20 P4 — end-to-end crypto smoke test. The v1.1.2 incident
     /// (jsonwebtoken `rust_crypto` feature missing → all sign paths

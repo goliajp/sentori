@@ -73,6 +73,25 @@ pub struct NativeOptions {
     pub channel_id: Option<String>,
     /// iOS category id (action button group).
     pub category: Option<String>,
+    /// v2.28 — rich-media attachments. Image only in v2.28; future
+    /// versions may add video/audio. When `imageUrl` is set:
+    ///   - APNs: forces `aps.mutable-content: 1` and emits a top-
+    ///     level `sentori_attachment_url` custom-data key the NSE
+    ///     reads to download + attach.
+    ///   - FCM: sets `message.notification.image` so Android auto-
+    ///     renders BigPicture style.
+    ///   - WebPush: passes through under `data.sentori_attachment_url`
+    ///     for the Service Worker to use as `options.image`.
+    pub rich_media: Option<RichMedia>,
+}
+
+/// v2.28 — rich-media attachment payload. Image only in this version.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RichMedia {
+    /// HTTPS URL of the image to attach. iOS NSE downloads + attaches;
+    /// FCM uses for BigPicture; WebPush passes through.
+    pub image_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
