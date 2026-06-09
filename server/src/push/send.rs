@@ -95,10 +95,14 @@ async fn enqueue_one(
     let send_uuid = Uuid::now_v7();
     let payload = serde_json::to_value(msg)
         .map_err(|e| SendError::Database(sqlx::Error::Decode(Box::new(e))))?;
+    // v2.25 — three optional BI tags (campaign / template / audience)
+    // land alongside the existing idempotency_key column. Migration
+    // 0079 created the columns nullable + index on campaign_id.
     let row = sqlx::query_as::<_, (Uuid, String, time::OffsetDateTime)>(
         "INSERT INTO push_sends \
-            (id, project_id, token_id, provider, payload, idempotency_key) \
-         VALUES ($1, $2, $3, $4, $5, $6) \
+            (id, project_id, token_id, provider, payload, idempotency_key, \
+             campaign_id, template_id, audience_tag) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) \
          RETURNING id, status, created_at",
     )
     .bind(send_uuid)
@@ -107,6 +111,9 @@ async fn enqueue_one(
     .bind(&token_row.1)
     .bind(payload)
     .bind(msg.idempotency_key.as_deref())
+    .bind(msg.campaign_id.as_deref())
+    .bind(msg.template_id.as_deref())
+    .bind(msg.audience_tag.as_deref())
     .fetch_one(pool)
     .await?;
     Ok(Ticket {

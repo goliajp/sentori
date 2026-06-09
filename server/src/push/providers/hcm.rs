@@ -379,6 +379,9 @@ mod tests {
                 ..Default::default()
             },
             idempotency_key: None,
+            campaign_id: None,
+            template_id: None,
+            audience_tag: None,
         };
         let v = build_hms_message("HMS_REGID", &msg);
         let m = v.get("message").unwrap();

@@ -108,6 +108,9 @@ pub fn to_native(msg: ExpoMessage) -> NativeMessage {
             category: msg.category_id,
         },
         idempotency_key: None,
+            campaign_id: None,
+            template_id: None,
+            audience_tag: None,
     }
 }
 
