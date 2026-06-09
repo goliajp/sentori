@@ -40,7 +40,14 @@ FROM rust:1-bookworm AS builder
 WORKDIR /build/server
 
 # Pre-fetch deps to a separate layer for better caching.
-COPY server/Cargo.toml server/Cargo.lock ./
+# v2.20 — root VERSION file is the single source of truth. server/build.rs
+# panics if Cargo.toml drifts. WORKDIR is /build/server, build.rs resolves
+# `../VERSION` from CARGO_MANIFEST_DIR, so the file lands at /build/VERSION.
+# Cargo.toml + Cargo.lock + build.rs + VERSION all need to be present
+# before the layer-cache primer runs, otherwise the build script panics
+# (or, worse, doesn't run at all, weakening our drift fence).
+COPY server/Cargo.toml server/Cargo.lock server/build.rs ./
+COPY VERSION ../VERSION
 RUN mkdir -p src && echo 'fn main(){}' > src/main.rs \
     && cargo build --release --bin sentori-server || true \
     && rm -rf src

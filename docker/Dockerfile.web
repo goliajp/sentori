@@ -56,6 +56,12 @@ RUN for i in 1 2 3; do \
 # Source layer — re-runs on any file change.
 COPY sdk ./sdk
 COPY web ./web
+# v2.20 — root VERSION file is the single source of truth (web/vite.config.ts
+# panics if web/package.json drifts). Image build context is the repo root,
+# so the file lives at /build/VERSION which is what `readFileSync(resolve(
+# import.meta.dirname, '..', 'VERSION'))` in vite.config.ts resolves to from
+# /build/web.
+COPY VERSION ./VERSION
 
 WORKDIR /build/web
 RUN bun run build
