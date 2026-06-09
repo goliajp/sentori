@@ -38,6 +38,30 @@ pub async fn enqueue_send(
     project_id: Uuid,
     msg: &NativeMessage,
 ) -> Result<Vec<Ticket>, SendError> {
+    // v2.31 — topic fanout. When `to: { topic }` we resolve to every
+    // active device subscribed to that topic in this project, then
+    // delegate to the per-token enqueue loop. Empty subscriber set
+    // returns empty tickets (no error).
+    if let Some(topic) = msg.to.as_topic() {
+        let token_ids: Vec<Uuid> = sqlx::query_scalar(
+            "SELECT d.id FROM device_tokens d \
+             JOIN device_topics t ON t.device_token_id = d.id \
+             WHERE d.project_id = $1 \
+               AND d.revoked_at IS NULL \
+               AND t.topic = $2",
+        )
+        .bind(project_id)
+        .bind(topic)
+        .fetch_all(pool)
+        .await?;
+        let mut tickets = Vec::with_capacity(token_ids.len());
+        for token_uuid in token_ids {
+            let ticket = enqueue_one(pool, project_id, token_uuid, msg).await?;
+            tickets.push(ticket);
+        }
+        return Ok(tickets);
+    }
+
     let recipients = msg.to.as_vec();
     let mut tickets = Vec::with_capacity(recipients.len());
     for recipient in recipients {
