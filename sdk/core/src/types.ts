@@ -51,8 +51,12 @@ export type CaptureMessageOptions = {
 /** v2.0 W3 — `track` joins the breadcrumb type axis. Emitted
  *  automatically by `sentori.track()` when `init.capture.trackAutoBreadcrumb`
  *  is `true`, so a later `captureException` carries the customer
- *  journey leading up to the failure. */
-export type BreadcrumbType = 'custom' | 'log' | 'nav' | 'net' | 'track' | 'user'
+ *  journey leading up to the failure.
+ *  v2.26 — `push` joins the type axis. Emitted automatically by
+ *  the SDK push receive path when the incoming payload carries
+ *  `_sentori.msgId`. Data shape: `{ msgId, title?, body?, opened:
+ *  bool, provider }`. Part of Observability link-through (rule #4). */
+export type BreadcrumbType = 'custom' | 'log' | 'nav' | 'net' | 'push' | 'track' | 'user'
 
 export type Event = {
   app: App
