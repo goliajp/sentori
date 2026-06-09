@@ -90,6 +90,24 @@ pub struct NativeOptions {
     /// launch).
     #[serde(default)]
     pub actions: Option<Vec<PushAction>>,
+    /// v2.30 — iOS 15+ interruption-level. One of `passive` /
+    /// `active` / `timeSensitive` / `critical`. Maps to APNs
+    /// `aps.interruption-level`. iOS only; other providers ignore.
+    #[serde(default)]
+    pub interruption_level: Option<String>,
+    /// v2.30 — iOS notification grouping. Maps to APNs
+    /// `aps.thread-id`. iOS uses this to fold same-thread
+    /// notifications into one summary on lock-screen.
+    #[serde(default)]
+    pub thread_identifier: Option<String>,
+    /// v2.30 — Android notification priority. One of `high` /
+    /// `default` / `low` / `min`. Maps to FCM
+    /// `message.android.notification.notification_priority`.
+    /// iOS / others ignore. Distinct from the cross-platform
+    /// `priority: Priority { Normal, High }` which addresses both
+    /// APNs `apns-priority` header and FCM message priority.
+    #[serde(default)]
+    pub channel_importance: Option<String>,
 }
 
 /// v2.28 — rich-media attachment payload. Image only in this version.
