@@ -41,6 +41,16 @@ pub struct NativeMessage {
 pub enum ToField {
     Single(String),
     Many(Vec<String>),
+    /// v2.31 — topic fanout. `to: { topic: "<name>" }` resolves to
+    /// every `device_tokens` row in the calling project whose
+    /// `device_topics.topic = <name>` AND `revoked_at IS NULL`.
+    Topic(TopicTarget),
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TopicTarget {
+    pub topic: String,
 }
 
 impl ToField {
@@ -48,6 +58,18 @@ impl ToField {
         match self {
             ToField::Single(s) => vec![s.clone()],
             ToField::Many(v) => v.clone(),
+            // Topic gets resolved at enqueue time; the wire-level
+            // shape returns an empty handle list so legacy code
+            // paths don't accidentally treat the topic name as a
+            // device handle.
+            ToField::Topic(_) => Vec::new(),
+        }
+    }
+    /// v2.31 — `Some(topic)` when the send is a topic fanout.
+    pub fn as_topic(&self) -> Option<&str> {
+        match self {
+            ToField::Topic(t) => Some(t.topic.as_str()),
+            _ => None,
         }
     }
 }

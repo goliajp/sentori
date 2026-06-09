@@ -84,6 +84,100 @@ pub async fn revoke_token(
     }
 }
 
+// ── v2.31 topic pub-sub subscribe / unsubscribe ──────────────────────
+
+#[derive(Deserialize)]
+pub struct TopicSubscribeRequest {
+    pub topic: String,
+}
+
+/// v2.31 — subscribe one device to one topic. Idempotent on the PK
+/// (device_token_id, topic). Owning project verified via the token.
+pub async fn subscribe_topic(
+    State(state): State<AppState>,
+    Extension(caller): Extension<IngestCaller>,
+    Path(handle): Path<String>,
+    Json(body): Json<TopicSubscribeRequest>,
+) -> Response {
+    let Some(token_uuid) = parse_token_handle(&handle) else {
+        return bad_request(format!("invalid token handle '{handle}'"));
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return db_not_configured();
+    };
+    let topic = body.topic.trim();
+    if topic.is_empty() || topic.len() > 200 {
+        return bad_request("topic must be 1-200 chars".to_string());
+    }
+    let project_id = caller_project_id(&caller, &state);
+    // Verify the token belongs to the caller's project + is active.
+    let token_ok: Option<(uuid::Uuid,)> = sqlx::query_as(
+        "SELECT id FROM device_tokens \
+         WHERE id = $1 AND project_id = $2 AND revoked_at IS NULL",
+    )
+    .bind(token_uuid)
+    .bind(project_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    if token_ok.is_none() {
+        return not_found(format!("token '{handle}' not found"));
+    }
+    let res = sqlx::query(
+        "INSERT INTO device_topics (device_token_id, topic) \
+         VALUES ($1, $2) \
+         ON CONFLICT DO NOTHING",
+    )
+    .bind(token_uuid)
+    .bind(topic)
+    .execute(pool)
+    .await;
+    match res {
+        Ok(_) => (StatusCode::OK, Json(json!({ "subscribed": true }))).into_response(),
+        Err(e) => {
+            tracing::warn!(error = %e, "push topic subscribe failed");
+            internal_error()
+        }
+    }
+}
+
+/// v2.31 — unsubscribe one device from one topic. Idempotent — 200
+/// whether the row existed or not (don't leak topic existence).
+pub async fn unsubscribe_topic(
+    State(state): State<AppState>,
+    Extension(caller): Extension<IngestCaller>,
+    Path((handle, topic)): Path<(String, String)>,
+) -> Response {
+    let Some(token_uuid) = parse_token_handle(&handle) else {
+        return bad_request(format!("invalid token handle '{handle}'"));
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return db_not_configured();
+    };
+    let project_id = caller_project_id(&caller, &state);
+    let token_ok: Option<(uuid::Uuid,)> = sqlx::query_as(
+        "SELECT id FROM device_tokens \
+         WHERE id = $1 AND project_id = $2",
+    )
+    .bind(token_uuid)
+    .bind(project_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    if token_ok.is_none() {
+        // 200 regardless — don't leak whether the token exists.
+        return (StatusCode::OK, Json(json!({ "unsubscribed": true }))).into_response();
+    }
+    let _ = sqlx::query(
+        "DELETE FROM device_topics WHERE device_token_id = $1 AND topic = $2",
+    )
+    .bind(token_uuid)
+    .bind(topic)
+    .execute(pool)
+    .await;
+    (StatusCode::OK, Json(json!({ "unsubscribed": true }))).into_response()
+}
+
 // ── send / receipt — Sentori native ────────────────────────────────────
 
 #[derive(Serialize)]

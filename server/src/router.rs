@@ -239,6 +239,15 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/v1/push/tokens/{handle}",
             axum::routing::delete(api::push::revoke_token),
         )
+        // v2.31 — topic pub-sub.
+        .route(
+            "/v1/push/tokens/{handle}/topics",
+            post(api::push::subscribe_topic).layer(small_body.clone()),
+        )
+        .route(
+            "/v1/push/tokens/{handle}/topics/{topic}",
+            axum::routing::delete(api::push::unsubscribe_topic),
+        )
         .route(
             "/v1/push/send",
             post(api::push::send_native).layer(small_body.clone()),
