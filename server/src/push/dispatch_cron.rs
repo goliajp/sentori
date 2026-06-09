@@ -92,6 +92,14 @@ struct PendingRow {
 /// One sweep. Exposed `pub` for integration tests so they can drive
 /// the queue deterministically without waiting for the 30s tick.
 pub async fn sweep_once(handle: &DispatchHandle) -> Result<(), anyhow::Error> {
+    // v2.23 — stale-token soft eviction. A device_tokens row whose
+    // last `/v1/push/tokens` register/refresh is > 90 d ago is almost
+    // certainly OS-revoked (uninstall, fresh install, factory reset,
+    // explicit settings disable). Trying to send to it wastes a
+    // dispatch slot, a delivery_log row, and a slot in the
+    // invalid-rate counter that would drive auto-throttle for the
+    // healthy tokens too. The row itself isn't deleted — operators
+    // can still inspect via the dashboard; we just don't dispatch.
     let rows: Vec<PendingRow> = sqlx::query_as(
         "SELECT s.id AS send_id, s.project_id, s.token_id, s.provider, s.payload, s.retry_count, \
                 d.native_token, d.env, c.config, c.secret_blob, c.secret_nonce \
@@ -99,7 +107,10 @@ pub async fn sweep_once(handle: &DispatchHandle) -> Result<(), anyhow::Error> {
          JOIN device_tokens d ON d.id = s.token_id \
          LEFT JOIN push_credentials c \
                 ON c.project_id = s.project_id AND c.provider = s.provider \
-         WHERE s.status = 'queued' AND s.next_attempt_at <= now() \
+         WHERE s.status = 'queued' \
+           AND s.next_attempt_at <= now() \
+           AND d.revoked_at IS NULL \
+           AND d.last_seen_at > now() - interval '90 days' \
          ORDER BY s.next_attempt_at \
          LIMIT $1",
     )
@@ -304,6 +315,62 @@ async fn apply_outcome(
                 );
             }
         }
+    }
+
+    // v2.23 — feed the invalid-rate health gauge. Maps each
+    // SendOutcome to a HealthOutcome bucket. The 429 detection is
+    // a heuristic: provider_status == 429 OR the label looks like
+    // "..._429..." OR provider sent a Retry-After (smart retry
+    // already used the hint). Same for timeout — we look at the
+    // label since SendOutcome::Transient is opaque about cause.
+    use crate::push::health::HealthOutcome;
+    let health_outcome = match &outcome {
+        SendOutcome::Sent => HealthOutcome::Sent,
+        SendOutcome::PermanentlyInvalidToken => HealthOutcome::InvalidToken,
+        SendOutcome::EnvironmentMismatch => HealthOutcome::InvalidToken,
+        SendOutcome::TerminalOther { .. } => HealthOutcome::OtherTransient,
+        SendOutcome::Transient { .. } => {
+            if provider_status == Some(429) {
+                HealthOutcome::RateLimited
+            } else if label
+                .map(|l| l.contains("Timeout") || l.contains("timeout"))
+                .unwrap_or(false)
+            {
+                HealthOutcome::Timeout
+            } else {
+                HealthOutcome::OtherTransient
+            }
+        }
+    };
+    handle
+        .providers
+        .health
+        .record(project_id, kind, health_outcome)
+        .await;
+    if matches!(health_outcome, HealthOutcome::InvalidToken)
+        && handle
+            .providers
+            .health
+            .should_auto_throttle(project_id, kind)
+            .await
+    {
+        let rate = handle
+            .providers
+            .health
+            .invalid_rate(project_id, kind)
+            .await;
+        let total = handle
+            .providers
+            .health
+            .in_window_total(project_id, kind)
+            .await;
+        tracing::warn!(
+            %project_id,
+            ?kind,
+            invalid_rate = format!("{:.1}%", rate * 100.0),
+            window_total = total,
+            "push invalid-rate threshold tripped — sender-reputation at risk"
+        );
     }
 
     let _ = log_attempt(
