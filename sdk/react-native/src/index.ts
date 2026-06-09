@@ -198,6 +198,9 @@ export const push = {
   getCachedIpt: _push.getCachedIpt,
   getStatus: _push.getStatus,
   requestPermission: _push.requestPermission,
+  // v2.26 — let the host stamp the current session id on outgoing
+  // ack POSTs so v2.27 push-correlation BI can JOIN on session_id.
+  setSessionContext: _push.setSessionContext,
 };
 export type {
   PushRegisterOptions,

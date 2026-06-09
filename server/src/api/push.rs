@@ -214,6 +214,115 @@ pub async fn get_receipt(
     }
 }
 
+// ── v2.26 confirmed delivery ack ───────────────────────────────────────
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AckRequest {
+    /// Originating session id from the host app. NULL when the host
+    /// hasn't surfaced a session (e.g. cold-launched from a tap).
+    /// Stored verbatim in `push_sends.ack_session_id` so v2.27
+    /// correlation can join on it.
+    session_id: Option<String>,
+    /// `"received"` (delivered to OS notification center) /
+    /// `"opened"` (user tapped) / `"dismissed"`. Currently observed
+    /// only for tracing; the schema records first-ack wall-clock,
+    /// not per-event.
+    #[allow(dead_code)]
+    event_type: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AckResponse {
+    /// Always true on a 200.
+    acked: bool,
+    /// True when this call was the one that flipped `acked_at` from
+    /// NULL → now. Subsequent calls return `firstAck: false`.
+    first_ack: bool,
+}
+
+/// v2.26 — receive confirmed-delivery ack from the SDK. Idempotent:
+/// first ack records timestamp + session; subsequent acks no-op.
+///
+/// This is the SDK side of the Observability link-through ironclad
+/// rule (#4). `push_sends.acked_at` flips from NULL to wall-clock
+/// when the device's OS notification center accepts the push; the
+/// v2.27 push-correlation BI joins on this column to compute
+/// dispatch-vs-delivery ratios per provider / per project / per
+/// campaign.
+pub async fn ack_send(
+    State(state): State<AppState>,
+    Extension(caller): Extension<IngestCaller>,
+    Path(handle): Path<String>,
+    Json(body): Json<AckRequest>,
+) -> Response {
+    let Some(send_uuid) = parse_send_id(&handle) else {
+        return bad_request(format!("invalid send id '{handle}'"));
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return db_not_configured();
+    };
+    let project_id = caller_project_id(&caller, &state);
+
+    // Single UPDATE — only writes when `acked_at` is currently NULL
+    // and the send belongs to the calling project. Returns 1 if it
+    // was the first ack, 0 if already acked.
+    let rows_affected = match sqlx::query(
+        "UPDATE push_sends \
+         SET acked_at = now(), \
+             ack_session_id = COALESCE($3, ack_session_id) \
+         WHERE id = $1 \
+           AND project_id = $2 \
+           AND acked_at IS NULL",
+    )
+    .bind(send_uuid)
+    .bind(project_id)
+    .bind(body.session_id.as_deref())
+    .execute(pool)
+    .await
+    {
+        Ok(r) => r.rows_affected(),
+        Err(e) => {
+            tracing::warn!(error = %e, send_id = %send_uuid, "push ack update failed");
+            return internal_error();
+        }
+    };
+
+    if rows_affected == 0 {
+        // Either already acked OR row not found. Check which.
+        let exists: Option<(uuid::Uuid,)> = sqlx::query_as(
+            "SELECT id FROM push_sends WHERE id = $1 AND project_id = $2",
+        )
+        .bind(send_uuid)
+        .bind(project_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+        if exists.is_none() {
+            return not_found(format!("send '{handle}' not found"));
+        }
+        // Already acked — idempotent success.
+        return (
+            StatusCode::OK,
+            Json(AckResponse {
+                acked: true,
+                first_ack: false,
+            }),
+        )
+            .into_response();
+    }
+
+    (
+        StatusCode::OK,
+        Json(AckResponse {
+            acked: true,
+            first_ack: true,
+        }),
+    )
+        .into_response()
+}
+
 // ── send / receipt — Expo-compatible ───────────────────────────────────
 
 pub async fn send_expo_compat(

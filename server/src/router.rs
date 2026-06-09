@@ -247,6 +247,13 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/v1/push/receipts/{send_id}",
             get(api::push::get_receipt),
         )
+        // v2.26 — SDK confirmed-delivery ack. Idempotent first-ack-wins.
+        // Flips push_sends.acked_at from NULL -> wall-clock; records
+        // ack_session_id for v2.27 push-correlation BI.
+        .route(
+            "/v1/push/sends/{send_id}/ack",
+            post(api::push::ack_send).layer(small_body.clone()),
+        )
         .route(
             "/v1/push/expo-compat/send",
             post(api::push::send_expo_compat).layer(small_body.clone()),

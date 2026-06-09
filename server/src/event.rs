@@ -443,4 +443,10 @@ pub enum BreadcrumbType {
     /// `sentori.track(name, props)` callsite so a later
     /// `captureException` shows the customer journey.
     Track,
+    /// v2.26 — emitted automatically by the SDK push receive path
+    /// when the incoming payload carries `_sentori.msgId`. Data:
+    /// `{ msgId, title?, body?, opened: bool, provider }`. Ties a
+    /// later `captureException` to the push that just arrived —
+    /// part of Observability link-through ironclad rule #4.
+    Push,
 }

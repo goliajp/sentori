@@ -21,7 +21,9 @@
 //      buffered events while the app is foreground. Pauses on
 //      background, resumes on active, per the perf iron rule.
 
-import { logger } from '@goliapkg/sentori-core'
+import { addBreadcrumb, logger } from '@goliapkg/sentori-core'
+
+import { track } from './track.js'
 // AppState is RN-only; we treat it dynamically so the SDK keeps
 // importing cleanly under Bun / web.
 type AppStateModule = {
@@ -49,6 +51,15 @@ let _backgrounded = false
 
 let _onMessage: PushRegisterOptions['onMessage'] = undefined
 let _onTap: PushRegisterOptions['onTap'] = undefined
+
+// v2.26 — confirmed delivery ack pipeline. msgIds extracted from
+// received pushes are queued here and flushed to the server every
+// 5 s. Server-side `push_sends.acked_at` flips from NULL to
+// wall-clock on first ack. See docs/roadmap/v2.26.md.
+const ACK_FLUSH_INTERVAL_MS = 5000
+let _ackQueue: string[] = []
+let _ackFlushInterval: ReturnType<typeof setInterval> | null = null
+let _sessionId: null | string = null
 
 export type PushRegisterOptions = {
   /** Identity-link hash. Pass `hashIdentities({ email }).email` if
@@ -259,6 +270,11 @@ function teardownBufferDrain(): void {
   }
   _appStateSubscription?.remove()
   _appStateSubscription = null
+  if (_ackFlushInterval) {
+    clearInterval(_ackFlushInterval)
+    _ackFlushInterval = null
+  }
+  _ackQueue = []
 }
 
 async function pumpOnce(): Promise<void> {
@@ -270,16 +286,98 @@ function flushBuffered(
   notifications: Array<Record<string, unknown>>,
   taps: Array<Record<string, unknown>>,
 ): void {
-  if (_onMessage) {
-    for (const raw of notifications) {
-      _onMessage(coerceNotification(raw))
+  for (const raw of notifications) {
+    // v2.26 — Observability link-through (rule #4). If the server
+    // injected `_sentori.msgId` in v2.25+, drop a `push` breadcrumb,
+    // emit `sentori.push.received` track, and queue the ack.
+    autoCorrelate(raw, 'received')
+    _onMessage?.(coerceNotification(raw))
+  }
+  for (const raw of taps) {
+    autoCorrelate(raw, 'opened')
+    _onTap?.(raw.userInfo ?? raw)
+  }
+}
+
+/** v2.26 — process one drained notification or tap for downstream
+ *  correlation. No-op if the payload didn't carry `_sentori.msgId`
+ *  (e.g. older server, or push from a non-Sentori sender). */
+function autoCorrelate(
+  raw: Record<string, unknown>,
+  eventType: 'received' | 'opened',
+): void {
+  const userInfo = (raw.userInfo as Record<string, unknown> | undefined) ?? raw
+  const sentori = (userInfo._sentori as Record<string, unknown> | undefined) ?? undefined
+  const msgId = typeof sentori?.msgId === 'string' ? sentori.msgId : undefined
+  if (!msgId) return
+
+  const provider = guessProvider(raw)
+  const title = typeof raw.title === 'string' ? raw.title : undefined
+  const body = typeof raw.body === 'string' ? raw.body : undefined
+
+  // Breadcrumb buffer: O(1) in-memory push. Tag both event types
+  // ('received' vs 'opened') so a later captureException shows
+  // whether the user actually saw the push.
+  addBreadcrumb('push', { body, msgId, opened: eventType === 'opened', provider, title })
+
+  // Track event: reuses the existing SDK event pipeline. Two
+  // distinct names so dashboards can separate delivery from open.
+  const trackName = eventType === 'opened' ? 'sentori.push.opened' : 'sentori.push.received'
+  track(trackName, { msgId, provider })
+
+  // Enqueue ack — batched, see drainAckQueue.
+  enqueueAck(msgId)
+}
+
+function guessProvider(raw: Record<string, unknown>): string {
+  if (typeof raw.provider === 'string') return raw.provider
+  // iOS native delegate sets `category`; FCM service sets a top-level
+  // `from`. Use either as a heuristic; default 'unknown' rather than
+  // crashing the pipeline.
+  if (raw.from) return 'fcm'
+  if (raw.category) return 'apns'
+  return 'unknown'
+}
+
+function enqueueAck(msgId: string): void {
+  if (_ackQueue.includes(msgId)) return
+  _ackQueue.push(msgId)
+  if (!_ackFlushInterval) {
+    _ackFlushInterval = setInterval(() => {
+      void drainAckQueue()
+    }, ACK_FLUSH_INTERVAL_MS)
+  }
+}
+
+async function drainAckQueue(): Promise<void> {
+  if (_ackQueue.length === 0) return
+  const cfg = tryGetRuntimeConfig()
+  if (!cfg) return
+  const batch = _ackQueue.splice(0, _ackQueue.length)
+  // Fire-and-forget — server records first-ack only; subsequent
+  // requests are idempotent. Network failure means we lose that
+  // ack, which downgrades correlation precision but never breaks
+  // the user flow.
+  for (const msgId of batch) {
+    try {
+      await fetch(joinUrl(cfg.ingestUrl, `/v1/push/sends/${msgId}/ack`), {
+        body: JSON.stringify({ eventType: 'received', sessionId: _sessionId }),
+        headers: {
+          authorization: `Bearer ${cfg.token}`,
+          'content-type': 'application/json',
+        },
+        method: 'POST',
+      })
+    } catch {
+      /* best-effort; ignore */
     }
   }
-  if (_onTap) {
-    for (const raw of taps) {
-      _onTap(raw.userInfo ?? raw)
-    }
-  }
+}
+
+/** v2.26 — set the host's current session id so the next ack carries
+ *  it. Useful for v2.27 correlation (push -> session -> events). */
+export function setSessionContext(sessionId: null | string): void {
+  _sessionId = sessionId
 }
 
 function coerceNotification(raw: Record<string, unknown>): PushNotificationPayload {
