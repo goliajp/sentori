@@ -188,6 +188,9 @@ pub struct Providers {
     /// (L1 per-provider / L2 per-project / L3 global inflight). See
     /// `super::rate_limit::RateLimiter`.
     pub rate_limiter: Arc<crate::push::rate_limit::RateLimiter>,
+    /// v2.23 — per-(project, provider) invalid-token health gauge
+    /// + blacklist early-warning. See `super::health::HealthState`.
+    pub health: Arc<crate::push::health::HealthState>,
 }
 
 impl Providers {
@@ -204,6 +207,7 @@ impl Providers {
             mipush: Arc::new(mipush::MiPushProvider::new()),
             quarantine: Arc::new(crate::push::quarantine::QuarantineState::new()),
             rate_limiter: Arc::new(crate::push::rate_limit::RateLimiter::new()),
+            health: Arc::new(crate::push::health::HealthState::new()),
         }
     }
 

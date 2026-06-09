@@ -21,6 +21,7 @@
 pub mod delivery;
 pub mod dispatch_cron;
 pub mod expo_compat;
+pub mod health;
 pub mod providers;
 pub mod quarantine;
 pub mod rate_limit;
