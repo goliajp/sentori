@@ -313,9 +313,30 @@ fn build_fcm_message(native_token: &str, msg: &NativeMessage) -> Value {
             Value::String(format!("{}s", ttl.max(0))),
         );
     }
-    if let Some(chan) = msg.options.channel_id.as_ref() {
+    // v2.30 — `channel_importance` maps to FCM's
+    // `notification_priority` enum on the Android notification
+    // envelope. Combine with the existing `channel_id` write below.
+    let importance = msg
+        .options
+        .channel_importance
+        .as_deref()
+        .map(|i| match i {
+            "high" => "PRIORITY_HIGH",
+            "low" => "PRIORITY_LOW",
+            "min" => "PRIORITY_MIN",
+            _ => "PRIORITY_DEFAULT",
+        });
+    if msg.options.channel_id.is_some() || importance.is_some() {
         let mut notif_android = serde_json::Map::new();
-        notif_android.insert("channel_id".into(), Value::String(chan.clone()));
+        if let Some(chan) = msg.options.channel_id.as_ref() {
+            notif_android.insert("channel_id".into(), Value::String(chan.clone()));
+        }
+        if let Some(prio) = importance {
+            notif_android.insert(
+                "notification_priority".into(),
+                Value::String(prio.to_string()),
+            );
+        }
         android.insert("notification".into(), Value::Object(notif_android));
     }
     if !android.is_empty() {

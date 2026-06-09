@@ -302,6 +302,16 @@ fn build_aps_payload(msg: &NativeMessage) -> Value {
     if let Some(c) = msg.options.category.as_ref() {
         aps.insert("category".into(), Value::String(c.clone()));
     }
+    // v2.30 — iOS 15+ interruption-level + thread-identifier.
+    if let Some(level) = msg.options.interruption_level.as_deref() {
+        aps.insert(
+            "interruption-level".into(),
+            Value::String(level.to_string()),
+        );
+    }
+    if let Some(thread) = msg.options.thread_identifier.as_deref() {
+        aps.insert("thread-id".into(), Value::String(thread.to_string()));
+    }
     let mut root = serde_json::Map::new();
     root.insert("aps".into(), Value::Object(aps));
     // Custom data fields land at the top level alongside `aps` per
@@ -496,6 +506,9 @@ mod tests {
                 category: Some("MSG".into()),
                 rich_media: None,
                 actions: None,
+                interruption_level: None,
+                thread_identifier: None,
+                channel_importance: None,
             },
             idempotency_key: None,
             campaign_id: None,
@@ -525,6 +538,9 @@ mod tests {
                 content_available: Some(true),
                 rich_media: None,
                 actions: None,
+                interruption_level: None,
+                thread_identifier: None,
+                channel_importance: None,
                 ..Default::default()
             },
             idempotency_key: None,
