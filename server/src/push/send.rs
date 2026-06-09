@@ -33,11 +33,53 @@ pub enum SendError {
 
 /// Enqueue a send for every recipient. Returns one Ticket per
 /// recipient, in input order.
+/// v2.33 — strict-paired hex decoder. Returns None on odd length or
+/// non-hex chars. We avoid `hex` crate to keep the dep surface tight.
+fn hex_decode(s: &str) -> Option<Vec<u8>> {
+    if s.len() % 2 != 0 {
+        return None;
+    }
+    let mut out = Vec::with_capacity(s.len() / 2);
+    let bytes = s.as_bytes();
+    for chunk in bytes.chunks_exact(2) {
+        let hi = (chunk[0] as char).to_digit(16)?;
+        let lo = (chunk[1] as char).to_digit(16)?;
+        out.push(((hi << 4) | lo) as u8);
+    }
+    Some(out)
+}
+
 pub async fn enqueue_send(
     pool: &PgPool,
     project_id: Uuid,
     msg: &NativeMessage,
 ) -> Result<Vec<Ticket>, SendError> {
+    // v2.33 — user fanout. When `to: { userFingerprintHex }` we
+    // resolve to every active device the user has registered in
+    // this project. Empty set returns empty tickets (no error).
+    if let Some(fp_hex) = msg.to.as_user_fingerprint() {
+        let fp_bytes = match hex_decode(fp_hex) {
+            Some(b) => b,
+            None => return Err(SendError::InvalidTokenHandle(fp_hex.to_string())),
+        };
+        let token_ids: Vec<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM device_tokens \
+             WHERE project_id = $1 \
+               AND user_fingerprint_hex = $2 \
+               AND revoked_at IS NULL",
+        )
+        .bind(project_id)
+        .bind(&fp_bytes)
+        .fetch_all(pool)
+        .await?;
+        let mut tickets = Vec::with_capacity(token_ids.len());
+        for token_uuid in token_ids {
+            let ticket = enqueue_one(pool, project_id, token_uuid, msg).await?;
+            tickets.push(ticket);
+        }
+        return Ok(tickets);
+    }
+
     // v2.31 — topic fanout. When `to: { topic }` we resolve to every
     // active device subscribed to that topic in this project, then
     // delegate to the per-token enqueue loop. Empty subscriber set

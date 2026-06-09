@@ -52,6 +52,10 @@ pub enum ToField {
     /// every `device_tokens` row in the calling project whose
     /// `device_topics.topic = <name>` AND `revoked_at IS NULL`.
     Topic(TopicTarget),
+    /// v2.33 — user fanout. `to: { userFingerprintHex: "<hex>" }`
+    /// resolves to every `device_tokens` row in the calling project
+    /// whose `user_fingerprint_hex` matches and `revoked_at IS NULL`.
+    User(UserTarget),
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -60,16 +64,29 @@ pub struct TopicTarget {
     pub topic: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserTarget {
+    /// 32-byte identity fingerprint, hex-encoded. SDK side derives
+    /// from `linkHash` via `identity::compute_fingerprint`; admin
+    /// senders can compute the same hash server-side.
+    pub user_fingerprint_hex: String,
+}
+
 impl ToField {
     pub fn as_vec(&self) -> Vec<String> {
         match self {
             ToField::Single(s) => vec![s.clone()],
             ToField::Many(v) => v.clone(),
-            // Topic gets resolved at enqueue time; the wire-level
-            // shape returns an empty handle list so legacy code
-            // paths don't accidentally treat the topic name as a
-            // device handle.
-            ToField::Topic(_) => Vec::new(),
+            // Topic / User get resolved at enqueue time.
+            ToField::Topic(_) | ToField::User(_) => Vec::new(),
+        }
+    }
+    /// v2.33 — `Some(fingerprint_hex)` when the send is a user fanout.
+    pub fn as_user_fingerprint(&self) -> Option<&str> {
+        match self {
+            ToField::User(u) => Some(u.user_fingerprint_hex.as_str()),
+            _ => None,
         }
     }
     /// v2.31 — `Some(topic)` when the send is a topic fanout.
