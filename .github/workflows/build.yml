@@ -108,6 +108,9 @@ jobs:
       - name: check rfc3339 serde annotations (phase 29 sub-C)
         run: bash scripts/check-rfc3339.sh
 
+      - name: check cargo features (v2.20 P2 — anti-feature-drift)
+        run: bash scripts/check-cargo-features.sh
+
       - name: cargo test (server)
         run: cargo test --manifest-path server/Cargo.toml --all-targets
 
