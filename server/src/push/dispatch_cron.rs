@@ -200,6 +200,26 @@ async fn process_one(handle: &DispatchHandle, row: PendingRow) {
         return;
     }
 
+    // v2.22 — three-layer rate limit. Layer-specific defer windows
+    // (L3 1s, L1 provider 2s, L2 project 5s). Acquire returns a
+    // RatePermit; we hold it across `provider.send()` and drop it
+    // afterwards, releasing the L3 inflight slot.
+    let _rate_permit = match handle.providers.rate_limiter.acquire(project_id, kind) {
+        Ok(p) => p,
+        Err(crate::push::rate_limit::RateError::GlobalInflight) => {
+            defer_for_quarantine(handle, row.send_id, 1).await;
+            return;
+        }
+        Err(crate::push::rate_limit::RateError::ProviderRateLimited(_)) => {
+            defer_for_quarantine(handle, row.send_id, 2).await;
+            return;
+        }
+        Err(crate::push::rate_limit::RateError::ProjectRateLimited(_)) => {
+            defer_for_quarantine(handle, row.send_id, 5).await;
+            return;
+        }
+    };
+
     let provider = handle.providers.pick(kind);
     let cred = crate::push::providers::Credential {
         config: &row.config,

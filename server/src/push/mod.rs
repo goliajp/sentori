@@ -23,6 +23,7 @@ pub mod dispatch_cron;
 pub mod expo_compat;
 pub mod providers;
 pub mod quarantine;
+pub mod rate_limit;
 pub mod retry;
 pub mod send;
 pub mod send_gate;

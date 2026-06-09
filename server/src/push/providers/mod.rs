@@ -184,6 +184,10 @@ pub struct Providers {
     /// v2.21 — per-(project, provider) quarantine. See
     /// `super::quarantine::QuarantineState` for semantics.
     pub quarantine: Arc<crate::push::quarantine::QuarantineState>,
+    /// v2.22 — three-layer dispatch rate limit
+    /// (L1 per-provider / L2 per-project / L3 global inflight). See
+    /// `super::rate_limit::RateLimiter`.
+    pub rate_limiter: Arc<crate::push::rate_limit::RateLimiter>,
 }
 
 impl Providers {
@@ -199,6 +203,7 @@ impl Providers {
             hcm: Arc::new(hcm::HcmProvider::new()),
             mipush: Arc::new(mipush::MiPushProvider::new()),
             quarantine: Arc::new(crate::push::quarantine::QuarantineState::new()),
+            rate_limiter: Arc::new(crate::push::rate_limit::RateLimiter::new()),
         }
     }
 
