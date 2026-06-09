@@ -68,6 +68,12 @@ pub struct ServerConfig {
     /// only when both readers find the IP. `None` skips ASN
     /// enrichment without affecting the City lookup.
     pub asn_db_path: Option<std::path::PathBuf>,
+    /// v2.21 — shared push provider registry. main.rs builds this
+    /// once so dispatch_cron and the admin verify endpoint use the
+    /// same `Arc<Providers>` (same JWT/OAuth caches, same quarantine
+    /// state). Tests + back-compat: `None` causes router::build to
+    /// construct its own, but production main.rs passes `Some`.
+    pub push_providers: Option<std::sync::Arc<crate::push::providers::Providers>>,
 }
 
 pub fn build(cfg: ServerConfig) -> Router {
@@ -129,14 +135,13 @@ pub fn build(cfg: ServerConfig) -> Router {
             tracing::warn!(error = %e, "shared http_client build failed; falling back to default");
             reqwest::Client::new()
         });
-    // v2.19 — providers registry shared with dispatch_cron. We build
-    // it here so the admin `verify credential` endpoint can reuse
-    // FCM's OAuth token cache instead of re-minting on every refresh.
-    // `main.rs` reads `state.push_providers` back and hands it to the
-    // dispatch handle, so both paths share the same `Arc<Providers>`.
-    let push_providers = std::sync::Arc::new(
-        crate::push::providers::Providers::new(http_client.clone()),
-    );
+    // v2.21 — Providers comes from main.rs via ServerConfig so
+    // dispatch_cron + admin verify endpoint share the same instance
+    // (same JWT/OAuth caches, same quarantine state). Tests that
+    // don't supply one get a fresh local registry.
+    let push_providers = cfg.push_providers.unwrap_or_else(|| {
+        std::sync::Arc::new(crate::push::providers::Providers::new())
+    });
     let state = AppState {
         auth: auth_state.clone(),
         recent,

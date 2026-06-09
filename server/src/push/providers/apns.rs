@@ -57,7 +57,23 @@ pub struct ApnsProvider {
 }
 
 impl ApnsProvider {
-    pub fn new(http_client: reqwest::Client) -> Self {
+    /// v2.21 — APNs gets its own `reqwest::Client` tuned for Apple's
+    /// "single persistent HTTP/2 connection" guidance. Longer
+    /// `pool_idle_timeout` (90 s) and higher idle-pool ceiling than
+    /// the FCM/HCM/MiPush defaults so HTTP/2 streams to
+    /// `api.push.apple.com` survive low-traffic moments without
+    /// reconnect cost.
+    pub fn new() -> Self {
+        let http_client = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(10))
+            .pool_idle_timeout(Some(Duration::from_secs(90)))
+            .pool_max_idle_per_host(8)
+            .build()
+            .unwrap_or_else(|e| {
+                tracing::warn!(error = %e, "apns client build failed; using default");
+                reqwest::Client::new()
+            });
         Self {
             http_client,
             jwt_cache: TokenCache::new(),

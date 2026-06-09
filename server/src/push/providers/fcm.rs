@@ -58,7 +58,20 @@ pub struct FcmProvider {
 }
 
 impl FcmProvider {
-    pub fn new(http_client: reqwest::Client) -> Self {
+    /// v2.21 — FCM gets its own `reqwest::Client`. HTTP/2 OAuth +
+    /// per-project `messages:send` connections to
+    /// `fcm.googleapis.com`. Standard 60 s idle.
+    pub fn new() -> Self {
+        let http_client = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(10))
+            .pool_idle_timeout(Some(Duration::from_secs(60)))
+            .pool_max_idle_per_host(4)
+            .build()
+            .unwrap_or_else(|e| {
+                tracing::warn!(error = %e, "fcm client build failed; using default");
+                reqwest::Client::new()
+            });
         Self {
             http_client,
             token_cache: TokenCache::new(),

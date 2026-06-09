@@ -47,7 +47,20 @@ pub struct MiPushProvider {
 }
 
 impl MiPushProvider {
-    pub fn new(http_client: reqwest::Client) -> Self {
+    /// v2.21 — MiPush gets its own `reqwest::Client`. HTTP/1.1
+    /// form-post; pool tuning is mostly cosmetic but isolated from
+    /// other providers in case Xiaomi's endpoint starts misbehaving.
+    pub fn new() -> Self {
+        let http_client = reqwest::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(5))
+            .timeout(std::time::Duration::from_secs(10))
+            .pool_idle_timeout(Some(std::time::Duration::from_secs(60)))
+            .pool_max_idle_per_host(2)
+            .build()
+            .unwrap_or_else(|e| {
+                tracing::warn!(error = %e, "mipush client build failed; using default");
+                reqwest::Client::new()
+            });
         Self { http_client }
     }
 }

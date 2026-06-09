@@ -79,7 +79,22 @@ pub struct WebPushProvider {
 }
 
 impl WebPushProvider {
-    pub fn new(http_client: reqwest::Client) -> Self {
+    /// v2.21 — Web Push gets its own `reqwest::Client`. Each push
+    /// goes to a different push-service host (FCM Web, Apple Web
+    /// Push, Mozilla autopush, ...). Pool reuse is per-host; lower
+    /// `pool_max_idle_per_host` since per-host concurrency is
+    /// naturally low.
+    pub fn new() -> Self {
+        let http_client = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(10))
+            .pool_idle_timeout(Some(Duration::from_secs(60)))
+            .pool_max_idle_per_host(2)
+            .build()
+            .unwrap_or_else(|e| {
+                tracing::warn!(error = %e, "webpush client build failed; using default");
+                reqwest::Client::new()
+            });
         Self {
             http_client,
             jwt_cache: TokenCache::new(),
