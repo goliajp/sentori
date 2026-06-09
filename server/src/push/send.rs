@@ -149,8 +149,10 @@ async fn enqueue_one(
     // Resolve the device token row + capture its provider for the
     // push_sends row (denormalised so the dispatcher doesn't need
     // a JOIN). Reject revoked rows up front.
-    let token_row = sqlx::query_as::<_, (Uuid, String)>(
-        "SELECT id, provider FROM device_tokens \
+    // v2.34 — also load user_fingerprint_hex for the preference
+    // check.
+    let token_row = sqlx::query_as::<_, (Uuid, String, Option<Vec<u8>>)>(
+        "SELECT id, provider, user_fingerprint_hex FROM device_tokens \
          WHERE id = $1 AND project_id = $2 AND revoked_at IS NULL",
     )
     .bind(token_uuid)
@@ -158,6 +160,37 @@ async fn enqueue_one(
     .fetch_optional(pool)
     .await?
     .ok_or_else(|| SendError::TokenNotFound(token_uuid.to_string()))?;
+
+    // v2.34 — preference center check. When the message has a
+    // preference_category AND the device has a user fingerprint,
+    // look up the opt-out flag; on `opted_out=true` skip silently
+    // (return a synthetic ticket marked 'skipped' rather than
+    // failing the whole batch).
+    if let (Some(category), Some(ref fp)) = (
+        msg.preference_category.as_deref(),
+        token_row.2.as_ref(),
+    ) {
+        let opted: Option<(bool,)> = sqlx::query_as(
+            "SELECT opted_out FROM push_preferences \
+             WHERE project_id = $1 AND user_fingerprint_hex = $2 AND category = $3",
+        )
+        .bind(project_id)
+        .bind(fp.as_slice())
+        .bind(category)
+        .fetch_optional(pool)
+        .await?;
+        if let Some((true,)) = opted {
+            return Ok(Ticket {
+                id: format_send_id(token_uuid),
+                status: SendStatus::from_db("failed"),
+                provider_outcome: Some("PreferenceOptedOut".into()),
+                error: None,
+                retry_count: 0,
+                created_at: time::OffsetDateTime::now_utc(),
+                sent_at: None,
+            });
+        }
+    }
     let send_uuid = Uuid::now_v7();
     let payload = serde_json::to_value(msg)
         .map_err(|e| SendError::Database(sqlx::Error::Decode(Box::new(e))))?;
