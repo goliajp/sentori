@@ -50,12 +50,13 @@ use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::Sha256;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use super::{
     Credential, Provider, ProviderError, ProviderKind, ProviderResult, SendOutcome,
     ValidateOutcome,
 };
+use crate::push::token_cache::TokenCache;
 use crate::push::types::NativeMessage;
 
 const RECORD_SIZE: u32 = 4096;
@@ -65,13 +66,47 @@ const TAG_LEN: usize = 16;
 const KEY_LEN: usize = 16;
 const PUB_LEN: usize = 65;
 
+/// VAPID JWT inner `exp` is `now + 12 h` (well under RFC 8292's 24 h
+/// cap). Cache the signed JWT for `12 h − 1 h` so we never hand out a
+/// token that's already in its dying window.
+const VAPID_CACHE_TTL: Duration = Duration::from_secs(11 * 3600);
+
 pub struct WebPushProvider {
     http_client: reqwest::Client,
+    /// VAPID JWT cache keyed by `(vapid_public, push_service_origin)`
+    /// — one JWT per (publisher identity, audience). v2.20 added.
+    jwt_cache: TokenCache<(String, String), String>,
 }
 
 impl WebPushProvider {
     pub fn new(http_client: reqwest::Client) -> Self {
-        Self { http_client }
+        Self {
+            http_client,
+            jwt_cache: TokenCache::new(),
+        }
+    }
+
+    /// Returns a valid VAPID JWT for `(vapid_public, aud)`, signing
+    /// one only if the cached entry is missing or expired. The aud is
+    /// the push service origin (e.g. `https://fcm.googleapis.com`),
+    /// which is the JWT's `aud` claim per RFC 8292.
+    async fn vapid_jwt(
+        &self,
+        vapid_public: &str,
+        aud: &str,
+        sub: &str,
+        private_pem: &str,
+    ) -> Result<String, String> {
+        let key = (vapid_public.to_string(), aud.to_string());
+        let aud_owned = aud.to_string();
+        let sub_owned = sub.to_string();
+        let private_owned = private_pem.to_string();
+        self.jwt_cache
+            .get_or_insert_with(key, move || async move {
+                let jwt = sign_vapid(&private_owned, &aud_owned, &sub_owned)?;
+                Ok::<_, String>((jwt, Instant::now() + VAPID_CACHE_TTL))
+            })
+            .await
     }
 }
 
@@ -168,7 +203,9 @@ impl Provider for WebPushProvider {
                     subscription.endpoint
                 ))
             })?;
-        let jwt = sign_vapid(&secret.vapid_private, &aud, &config.contact)
+        let jwt = self
+            .vapid_jwt(&config.vapid_public, &aud, &config.contact, &secret.vapid_private)
+            .await
             .map_err(|e| ProviderError::CredentialMalformed(format!("vapid sign: {e}")))?;
 
         let ttl = msg.options.ttl.unwrap_or(3600).max(0);

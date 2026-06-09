@@ -1,10 +1,14 @@
 // v2.7 W4 — Apple Push Notification service provider.
 //
 // Auth: ES256 JWT signed with the project's APNs p8 private key.
-// Apple requires the JWT to be valid < 1 h; we sign per request for
-// simplicity (signing is fast). A future patch can add a per-
-// (project, provider) cache to avoid the ~50 µs of EC scalar mul
-// per send — not measurable at our row rate today.
+// Apple's docs say the JWT can be reused within a 20-60 min window
+// AND that re-signing too often trips `TooManyProviderTokenUpdates`
+// (HTTP 22001) — exactly the symptom that bit v2.7's first real
+// customer (see post-ship memory project-v27-push-postship-hotfixes).
+// v2.20 routes every sign through `push::token_cache::TokenCache`
+// keyed by `(team_id, key_id)`, TTL 20 min. Cache hit ⇒ skip the
+// ~50 µs EC scalar mul; cache miss ⇒ sign and store. Credential
+// rotation should call `invalidate` on the cache (no rotate UI yet).
 //
 // Transport: HTTP/2 POST to api.push.apple.com (production) or
 // api.sandbox.push.apple.com (sandbox). reqwest's rustls stack
@@ -33,21 +37,49 @@ use async_trait::async_trait;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use super::{Credential, Provider, ProviderError, ProviderKind, ProviderResult, SendOutcome, ValidateOutcome};
+use crate::push::token_cache::TokenCache;
 use crate::push::types::{NativeMessage, Priority};
 
 const HOST_PROD: &str = "https://api.push.apple.com";
 const HOST_SANDBOX: &str = "https://api.sandbox.push.apple.com";
 
+/// APNs JWT validity per Apple: 20-60 min. 20 leaves a safety margin
+/// against clock skew + in-flight requests still using the old JWT
+/// when we'd otherwise mint a new one.
+const APNS_JWT_TTL: Duration = Duration::from_secs(20 * 60);
+
 pub struct ApnsProvider {
     http_client: reqwest::Client,
+    jwt_cache: TokenCache<(String, String), String>,
 }
 
 impl ApnsProvider {
     pub fn new(http_client: reqwest::Client) -> Self {
-        Self { http_client }
+        Self {
+            http_client,
+            jwt_cache: TokenCache::new(),
+        }
+    }
+
+    /// Returns a valid APNs provider JWT for `(team_id, key_id)`,
+    /// signing one only if the cached entry is missing or expired.
+    /// This is the v2.20 anti-blacklist hot path.
+    async fn jwt_for(
+        &self,
+        team_id: &str,
+        key_id: &str,
+        p8_pem: &str,
+    ) -> Result<String, String> {
+        let key = (team_id.to_string(), key_id.to_string());
+        self.jwt_cache
+            .get_or_insert_with(key, || async {
+                let jwt = sign_jwt(p8_pem, team_id, key_id)?;
+                Ok::<_, String>((jwt, Instant::now() + APNS_JWT_TTL))
+            })
+            .await
     }
 }
 
@@ -100,9 +132,10 @@ impl Provider for ApnsProvider {
             _ => HOST_PROD,
         };
 
-        let jwt = sign_jwt(&secret.p8, &config.team_id, &config.key_id).map_err(|e| {
-            ProviderError::CredentialMalformed(format!("jwt sign: {e}"))
-        })?;
+        let jwt = self
+            .jwt_for(&config.team_id, &config.key_id, &secret.p8)
+            .await
+            .map_err(|e| ProviderError::CredentialMalformed(format!("jwt sign: {e}")))?;
 
         let body = build_aps_payload(msg);
         let body_bytes = serde_json::to_vec(&body)
@@ -169,7 +202,10 @@ impl Provider for ApnsProvider {
             Ok(s) => s,
             Err(e) => return ValidateOutcome::Malformed { reason: format!("secret: {e}") },
         };
-        match sign_jwt(&secret.p8, &config.team_id, &config.key_id) {
+        match self
+            .jwt_for(&config.team_id, &config.key_id, &secret.p8)
+            .await
+        {
             Ok(_) => ValidateOutcome::Ok,
             Err(e) => ValidateOutcome::Malformed { reason: format!("jwt sign: {e}") },
         }

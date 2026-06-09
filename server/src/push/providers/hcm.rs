@@ -32,78 +32,73 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::sync::Arc;
-use std::time::Instant;
-use tokio::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use super::{
     Credential, Provider, ProviderError, ProviderKind, ProviderResult, SendOutcome,
     ValidateOutcome,
 };
+use crate::push::token_cache::TokenCache;
 use crate::push::types::{NativeMessage, Priority};
 
 const HCM_OAUTH_URL: &str = "https://oauth-login.cloud.huawei.com/oauth2/v3/token";
 const HCM_SEND_BASE: &str = "https://push-api.cloud.huawei.com/v1";
 
+/// HMS OAuth tokens carry `expires_in` (~3600 s). Same TTL margin as
+/// FCM — see [`crate::push::providers::fcm::FCM_OAUTH_TTL_MARGIN`].
+const HCM_OAUTH_TTL_MARGIN: Duration = Duration::from_secs(60);
+
 pub struct HcmProvider {
     http_client: reqwest::Client,
-    token_cache: Arc<Mutex<std::collections::HashMap<String, CachedToken>>>,
+    /// Process-wide access-token cache keyed by `app_id`. v2.20
+    /// switched from a hand-rolled `Arc<Mutex<HashMap>>` to the
+    /// unified `TokenCache` shared with FCM/APNs/VAPID.
+    token_cache: TokenCache<String, String>,
 }
 
 impl HcmProvider {
     pub fn new(http_client: reqwest::Client) -> Self {
         Self {
             http_client,
-            token_cache: Arc::new(Mutex::new(std::collections::HashMap::new())),
+            token_cache: TokenCache::new(),
         }
     }
 
     async fn access_token(&self, app_id: &str, app_secret: &str) -> Result<String, ProviderError> {
-        let now = now_secs();
-        {
-            let cache = self.token_cache.lock().await;
-            if let Some(t) = cache.get(app_id) {
-                if t.expires_at > now + 60 {
-                    return Ok(t.access_token.clone());
-                }
-            }
-        }
-        let resp = self
-            .http_client
-            .post(HCM_OAUTH_URL)
-            .form(&[
-                ("grant_type", "client_credentials"),
-                ("client_id", app_id),
-                ("client_secret", app_secret),
-            ])
-            .send()
-            .await
-            .map_err(|e| ProviderError::HttpTransport(format!("oauth: {e}")))?;
-        if !resp.status().is_success() {
-            let status = resp.status().as_u16();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(ProviderError::CredentialMalformed(format!(
-                "hcm oauth {status}: {}",
-                truncate_2k(&body)
-            )));
-        }
-        let tok: TokenResponse = resp
-            .json()
-            .await
-            .map_err(|e| ProviderError::HttpTransport(format!("oauth body: {e}")))?;
-        let cached = CachedToken {
-            access_token: tok.access_token.clone(),
-            expires_at: now + tok.expires_in.unwrap_or(3600) as u64,
-        };
-        self.token_cache.lock().await.insert(app_id.into(), cached);
-        Ok(tok.access_token)
-    }
-}
+        let http_client = self.http_client.clone();
+        let app_id_owned = app_id.to_string();
+        let app_secret_owned = app_secret.to_string();
 
-#[derive(Clone)]
-struct CachedToken {
-    access_token: String,
-    expires_at: u64,
+        self.token_cache
+            .get_or_insert_with(app_id.to_string(), move || async move {
+                let resp = http_client
+                    .post(HCM_OAUTH_URL)
+                    .form(&[
+                        ("grant_type", "client_credentials"),
+                        ("client_id", app_id_owned.as_str()),
+                        ("client_secret", app_secret_owned.as_str()),
+                    ])
+                    .send()
+                    .await
+                    .map_err(|e| ProviderError::HttpTransport(format!("oauth: {e}")))?;
+                if !resp.status().is_success() {
+                    let status = resp.status().as_u16();
+                    let body = resp.text().await.unwrap_or_default();
+                    return Err(ProviderError::CredentialMalformed(format!(
+                        "hcm oauth {status}: {}",
+                        truncate_2k(&body)
+                    )));
+                }
+                let tok: TokenResponse = resp
+                    .json()
+                    .await
+                    .map_err(|e| ProviderError::HttpTransport(format!("oauth body: {e}")))?;
+                let ttl = Duration::from_secs(tok.expires_in.unwrap_or(3600))
+                    .saturating_sub(HCM_OAUTH_TTL_MARGIN);
+                Ok((tok.access_token, Instant::now() + ttl))
+            })
+            .await
+    }
 }
 
 #[derive(Deserialize)]
@@ -313,13 +308,6 @@ fn truncate_2k(s: &str) -> String {
         out.push(c);
     }
     out
-}
-
-fn now_secs() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
 }
 
 #[cfg(test)]

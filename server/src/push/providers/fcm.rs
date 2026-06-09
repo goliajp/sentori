@@ -30,98 +30,87 @@ use async_trait::async_trait;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::sync::Arc;
-use std::time::Instant;
-use tokio::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use super::{
     Credential, Provider, ProviderError, ProviderKind, ProviderResult, SendOutcome,
     ValidateOutcome,
 };
+use crate::push::token_cache::TokenCache;
 use crate::push::types::{NativeMessage, Priority};
 
 const FCM_SEND_URL: &str = "https://fcm.googleapis.com/v1/projects";
 const FCM_SCOPE: &str = "https://www.googleapis.com/auth/firebase.messaging";
 
+/// FCM v1 OAuth tokens carry `expires_in` (~3600 s). v2.20 caches via
+/// the unified [`TokenCache`] keyed by service-account `client_email`.
+/// Cache TTL = `expires_in` minus this safety margin, so we never hand
+/// out a token already inside its dying window.
+const FCM_OAUTH_TTL_MARGIN: Duration = Duration::from_secs(60);
+
 pub struct FcmProvider {
     http_client: reqwest::Client,
-    /// Process-wide access-token cache keyed by `client_email` (the
-    /// service-account identity). Token lifetime is ~3600 s; cache
-    /// expires 60 s early.
-    token_cache: Arc<Mutex<std::collections::HashMap<String, CachedToken>>>,
+    /// Process-wide access-token cache keyed by `client_email`. v2.20
+    /// switched from a hand-rolled `Arc<Mutex<HashMap>>` to the unified
+    /// `TokenCache` — single code path for all four JWT/OAuth signers
+    /// in the push pipeline, single seam for tests.
+    token_cache: TokenCache<String, String>,
 }
 
 impl FcmProvider {
     pub fn new(http_client: reqwest::Client) -> Self {
         Self {
             http_client,
-            token_cache: Arc::new(Mutex::new(std::collections::HashMap::new())),
+            token_cache: TokenCache::new(),
         }
     }
 
-    async fn access_token(
-        &self,
-        secret: &FcmSecret,
-    ) -> Result<String, ProviderError> {
-        let now = now_secs();
-        {
-            let cache = self.token_cache.lock().await;
-            if let Some(t) = cache.get(&secret.client_email) {
-                if t.expires_at > now + 60 {
-                    return Ok(t.access_token.clone());
-                }
-            }
-        }
-        // Mint a new one.
-        let jwt = sign_oauth_jwt(secret).map_err(|e| {
-            ProviderError::CredentialMalformed(format!("oauth jwt sign: {e}"))
-        })?;
-        let resp = self
-            .http_client
-            .post(&secret.token_uri)
-            .form(&[
-                ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
-                ("assertion", jwt.as_str()),
-            ])
-            .send()
-            .await
-            .map_err(|e| ProviderError::HttpTransport(format!("oauth: {e}")))?;
-        if !resp.status().is_success() {
-            let status = resp.status().as_u16();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(ProviderError::CredentialMalformed(format!(
-                "oauth {status}: {}",
-                truncate_2k(&body)
-            )));
-        }
-        let tok: TokenResponse = resp
-            .json()
-            .await
-            .map_err(|e| ProviderError::HttpTransport(format!("oauth body: {e}")))?;
-        let cached = CachedToken {
-            access_token: tok.access_token.clone(),
-            expires_at: now + tok.expires_in.unwrap_or(3600) as u64,
-        };
+    async fn access_token(&self, secret: &FcmSecret) -> Result<String, ProviderError> {
+        let http_client = self.http_client.clone();
+        let token_uri = secret.token_uri.clone();
+        let client_email = secret.client_email.clone();
+        let secret_clone = secret.clone();
+
         self.token_cache
-            .lock()
+            .get_or_insert_with(client_email, move || async move {
+                let jwt = sign_oauth_jwt(&secret_clone).map_err(|e| {
+                    ProviderError::CredentialMalformed(format!("oauth jwt sign: {e}"))
+                })?;
+                let resp = http_client
+                    .post(&token_uri)
+                    .form(&[
+                        ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
+                        ("assertion", jwt.as_str()),
+                    ])
+                    .send()
+                    .await
+                    .map_err(|e| ProviderError::HttpTransport(format!("oauth: {e}")))?;
+                if !resp.status().is_success() {
+                    let status = resp.status().as_u16();
+                    let body = resp.text().await.unwrap_or_default();
+                    return Err(ProviderError::CredentialMalformed(format!(
+                        "oauth {status}: {}",
+                        truncate_2k(&body)
+                    )));
+                }
+                let tok: TokenResponse = resp
+                    .json()
+                    .await
+                    .map_err(|e| ProviderError::HttpTransport(format!("oauth body: {e}")))?;
+                let ttl = Duration::from_secs(tok.expires_in.unwrap_or(3600))
+                    .saturating_sub(FCM_OAUTH_TTL_MARGIN);
+                Ok((tok.access_token, Instant::now() + ttl))
+            })
             .await
-            .insert(secret.client_email.clone(), cached);
-        Ok(tok.access_token)
     }
 }
 
-#[derive(Clone)]
-struct CachedToken {
-    access_token: String,
-    expires_at: u64,
-}
-
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 struct FcmConfig {
     project_id: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 struct FcmSecret {
     client_email: String,
     private_key: String,
