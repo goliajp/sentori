@@ -518,6 +518,7 @@ mod tests {
                 ..Default::default()
             },
             idempotency_key: None,
+            send_at: None,
             campaign_id: None,
             template_id: None,
             audience_tag: None,
@@ -557,6 +558,7 @@ mod tests {
                 ..Default::default()
             },
             idempotency_key: None,
+            send_at: None,
             campaign_id: None,
             template_id: None,
             audience_tag: None,
@@ -583,6 +585,7 @@ mod tests {
             data: None,
             options: crate::push::types::NativeOptions::default(),
             idempotency_key: None,
+            send_at: None,
             campaign_id: None,
             template_id: None,
             audience_tag: None,

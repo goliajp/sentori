@@ -511,6 +511,7 @@ mod tests {
                 channel_importance: None,
             },
             idempotency_key: None,
+            send_at: None,
             campaign_id: None,
             template_id: None,
             audience_tag: None,
@@ -544,6 +545,7 @@ mod tests {
                 ..Default::default()
             },
             idempotency_key: None,
+            send_at: None,
             campaign_id: None,
             template_id: None,
             audience_tag: None,
@@ -585,6 +587,7 @@ BsR53w8xJYvbjbTcbzJ3Jrm5jNav9kOYS4TQS/l0cR0iLZvt+zKEZ+C2\n\
                 ..Default::default()
             },
             idempotency_key: None,
+            send_at: None,
             campaign_id: None,
             template_id: None,
             audience_tag: None,
@@ -623,6 +626,7 @@ BsR53w8xJYvbjbTcbzJ3Jrm5jNav9kOYS4TQS/l0cR0iLZvt+zKEZ+C2\n\
                 ..Default::default()
             },
             idempotency_key: None,
+            send_at: None,
             campaign_id: None,
             template_id: None,
             audience_tag: None,
@@ -644,6 +648,7 @@ BsR53w8xJYvbjbTcbzJ3Jrm5jNav9kOYS4TQS/l0cR0iLZvt+zKEZ+C2\n\
             data: None,
             options: crate::push::types::NativeOptions::default(),
             idempotency_key: None,
+            send_at: None,
             campaign_id: None,
             template_id: None,
             audience_tag: None,
