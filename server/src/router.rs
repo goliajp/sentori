@@ -398,6 +398,12 @@ pub fn build(cfg: ServerConfig) -> Router {
             "/projects/{project_id}/push/stats",
             get(api::push::admin_push_stats),
         )
+        // v2.24 — provider health snapshot powering the "distance to
+        // blacklist" gauge. Reads v2.23 in-memory HealthState, no DB.
+        .route(
+            "/projects/{project_id}/push/health",
+            get(api::push::admin_push_health),
+        )
         .route(
             "/projects/{project_id}/push/devices",
             get(api::push::admin_list_push_devices),

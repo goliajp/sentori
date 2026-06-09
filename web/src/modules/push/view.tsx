@@ -34,8 +34,10 @@ import { Outlet, useNavigate, useParams } from 'react-router'
 
 import {
   adminApi,
+  type ProviderHealthSnapshot,
   type PushCredentialRow,
   type PushDeviceRow,
+  type PushHealthResponse,
   type PushProviderKind,
   type PushSendRow,
   type PushSendStatus,
@@ -274,6 +276,164 @@ function OverviewTab({ projectId }: { projectId: string }) {
           </p>
         )}
       </Card>
+
+      <ProviderHealthCard projectId={projectId} />
+    </div>
+  )
+}
+
+// ── Provider Health card (v2.24) ──────────────────────────────────────
+//
+// Surfaces the v2.23 in-memory HealthState. Operators see the rolling
+// invalid-rate + "safety margin" gauge before FCM/APNs's abuse
+// heuristics trip. Reads cheap process memory only — no DB query.
+
+function ProviderHealthCard({ projectId }: { projectId: string }) {
+  const q = useQuery({
+    queryFn: () => adminApi.getPushHealth(projectId),
+    queryKey: qk.push.health(projectId),
+    refetchInterval: 30_000,
+    staleTime: 25_000,
+  })
+
+  if (q.error) {
+    return (
+      <Card>
+        <Alert title="Failed to load health" variant="danger">
+          {(q.error as Error).message}
+        </Alert>
+      </Card>
+    )
+  }
+  if (q.isLoading || !q.data) {
+    return (
+      <Card>
+        <header className="border-border/40 mb-3 flex items-baseline justify-between border-b pb-2">
+          <h2 className="text-fg text-[14px] font-semibold">Provider health</h2>
+        </header>
+        <span className="text-fg-muted font-mono text-[12px]">Loading…</span>
+      </Card>
+    )
+  }
+
+  const h: PushHealthResponse = q.data
+  // Sort by safety margin ascending so the riskiest provider sits at
+  // the top — "this is the one to look at first".
+  const rows = [...h.providers].sort((a, b) => a.safetyMarginPct - b.safetyMarginPct)
+  const windowMins = Math.round(h.windowSecs / 60)
+  const thresholdPct = (h.thresholdRatio * 100).toFixed(0)
+
+  return (
+    <Card>
+      <header className="border-border/40 mb-3 flex items-baseline justify-between border-b pb-2">
+        <h2 className="text-fg text-[14px] font-semibold">Provider health</h2>
+        <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
+          rolling {windowMins}m · auto-throttle at {thresholdPct}% invalid
+        </span>
+      </header>
+
+      <DataTable
+        columns={[
+          {
+            key: 'provider',
+            label: 'Provider',
+            render: (_v, r) => (
+              <span className="text-fg font-mono text-[13px]">{PROVIDER_LABELS[r.provider]}</span>
+            ),
+          },
+          {
+            key: 'inWindowTotal',
+            label: 'Sends',
+            align: 'right',
+            width: '90px',
+            render: (_v, r) => (
+              <span className="text-fg font-mono text-[12px] tabular-nums">{r.inWindowTotal}</span>
+            ),
+          },
+          {
+            key: 'invalidRate',
+            label: 'Invalid',
+            align: 'right',
+            width: '110px',
+            render: (_v, r) => {
+              if (r.inWindowTotal === 0) {
+                return <span className="text-fg-muted font-mono text-[11px]">—</span>
+              }
+              const pct = r.invalidRate * 100
+              const tone = healthTone(r)
+              return (
+                <span className={`font-mono text-[12px] tabular-nums ${TONE_CLASS[tone]}`}>
+                  {pct.toFixed(1)}%
+                </span>
+              )
+            },
+          },
+          {
+            key: 'safetyMarginPct',
+            label: 'Safety margin',
+            align: 'right',
+            width: '180px',
+            render: (_v, r) => <SafetyMarginBar row={r} />,
+          },
+          {
+            key: 'autoThrottle',
+            label: 'Throttled',
+            align: 'right',
+            width: '120px',
+            render: (_v, r) =>
+              r.autoThrottle ? (
+                <Badge variant="danger">throttled</Badge>
+              ) : r.inWindowTotal === 0 ? (
+                <span className="text-fg-muted font-mono text-[11px]">idle</span>
+              ) : (
+                <Badge variant="success">healthy</Badge>
+              ),
+          },
+        ]}
+        density="compact"
+        rowKey={(r) => r.provider}
+        rows={rows}
+      />
+
+      <p className="text-fg-muted mt-3 font-mono text-[11px]">
+        invalid = tokens FCM/APNs/HCM rejected as no-longer-registered. Sustained {thresholdPct}%+
+        trips auto-throttle to protect sender reputation (rolling {windowMins} min window, min
+        sample 20 sends).
+      </p>
+    </Card>
+  )
+}
+
+const TONE_CLASS: Record<'danger' | 'muted' | 'success' | 'warning', string> = {
+  danger: 'text-danger',
+  muted: 'text-fg-muted',
+  success: 'text-success',
+  warning: 'text-warning',
+}
+
+function healthTone(r: ProviderHealthSnapshot): 'danger' | 'muted' | 'success' | 'warning' {
+  if (r.inWindowTotal === 0) return 'muted'
+  if (r.autoThrottle) return 'danger'
+  if (r.safetyMarginPct < 40) return 'warning'
+  return 'success'
+}
+
+function SafetyMarginBar({ row }: { row: ProviderHealthSnapshot }) {
+  if (row.inWindowTotal === 0) {
+    return <span className="text-fg-muted font-mono text-[11px]">—</span>
+  }
+  const pct = Math.max(0, Math.min(100, row.safetyMarginPct))
+  const tone = healthTone(row)
+  const barClass =
+    tone === 'danger' ? 'bg-danger/70' : tone === 'warning' ? 'bg-warning/70' : 'bg-success/70'
+  return (
+    <div className="flex items-center justify-end gap-2">
+      <div className="bg-border/30 h-1.5 w-24 overflow-hidden rounded-full">
+        <div className={`h-full ${barClass}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className={`font-mono text-[11px] tabular-nums ${TONE_CLASS[tone]} w-10 text-right`}>
+        {pct.toFixed(0)}%
+      </span>
     </div>
   )
 }
