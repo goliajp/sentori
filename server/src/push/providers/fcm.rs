@@ -279,8 +279,11 @@ fn build_fcm_message(native_token: &str, msg: &NativeMessage) -> Value {
         message.insert("notification".into(), Value::Object(notif));
     }
     // FCM requires data values to be strings.
+    // v2.29 — inject `sentori_actions` (JSON-stringified) into data so
+    // the Android host can read interactive actions out of the FCM
+    // RemoteMessage payload.
+    let mut stringified = serde_json::Map::new();
     if let Some(Value::Object(data)) = msg.data.as_ref() {
-        let mut stringified = serde_json::Map::new();
         for (k, v) in data.iter() {
             let s = match v {
                 Value::String(s) => s.clone(),
@@ -288,6 +291,13 @@ fn build_fcm_message(native_token: &str, msg: &NativeMessage) -> Value {
             };
             stringified.insert(k.clone(), Value::String(s));
         }
+    }
+    if let Some(actions) = msg.options.actions.as_ref() {
+        if let Ok(json_str) = serde_json::to_string(actions) {
+            stringified.insert("sentori_actions".into(), Value::String(json_str));
+        }
+    }
+    if !stringified.is_empty() {
         message.insert("data".into(), Value::Object(stringified));
     }
     let mut android = serde_json::Map::new();

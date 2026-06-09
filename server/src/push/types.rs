@@ -83,6 +83,13 @@ pub struct NativeOptions {
     ///   - WebPush: passes through under `data.sentori_attachment_url`
     ///     for the Service Worker to use as `options.image`.
     pub rich_media: Option<RichMedia>,
+    /// v2.29 — interactive action buttons. Server passes the list
+    /// through to the device under custom data `sentori_actions`.
+    /// Host app reads on tap to dispatch. iOS category registration
+    /// remains a host-app concern (Apple requires registration at
+    /// launch).
+    #[serde(default)]
+    pub actions: Option<Vec<PushAction>>,
 }
 
 /// v2.28 — rich-media attachment payload. Image only in this version.
@@ -92,6 +99,26 @@ pub struct RichMedia {
     /// HTTPS URL of the image to attach. iOS NSE downloads + attaches;
     /// FCM uses for BigPicture; WebPush passes through.
     pub image_url: Option<String>,
+}
+
+/// v2.29 — one interactive action button. Renders next to the
+/// notification on platforms that support it. Server passes the
+/// full list under `sentori_actions` custom data; the host app
+/// reads + dispatches.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PushAction {
+    /// Stable id — the host receives this in the tap callback to
+    /// dispatch (`actionId`).
+    pub id: String,
+    /// Visible button title.
+    pub title: String,
+    /// iOS-only: action opens a text input field.
+    #[serde(default)]
+    pub is_text_input: Option<bool>,
+    /// iOS-only: tints the action button red.
+    #[serde(default)]
+    pub is_destructive: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
