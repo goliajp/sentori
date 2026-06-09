@@ -1,8 +1,23 @@
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+
+import pkg from './package.json' with { type: 'json' }
+
+// v2.20: hard-enforce single-source version. `/VERSION` at repo root
+// is the canonical truth; `server/build.rs` and this config both
+// panic the build if their respective package version drifts from it.
+const rootVersionPath = resolve(import.meta.dirname, '..', 'VERSION')
+const rootVersion = readFileSync(rootVersionPath, 'utf8').trim()
+if (rootVersion !== pkg.version) {
+  throw new Error(
+    `version drift: web/package.json = ${pkg.version}, root VERSION = ${rootVersion}. ` +
+      `Update both to match (and server/Cargo.toml too — build.rs enforces it).`,
+  )
+}
 
 export default defineConfig({
   base: '/',

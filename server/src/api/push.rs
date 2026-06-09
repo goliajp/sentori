@@ -29,6 +29,7 @@ use crate::push::{
     delivery,
     expo_compat::{self, ExpoRequest, ExpoResponseEnvelope},
     send,
+    send_gate::GateError,
     tokens::{self, RegisterTokenInput},
     types::{parse_send_id, parse_token_handle, NativeMessage, Ticket, ToField},
 };
@@ -99,6 +100,22 @@ pub async fn send_native(
     let Some(pool) = state.db.as_ref() else {
         return db_not_configured();
     };
+
+    // v2.20 send-API gate — input-side guards before enqueue.
+    let recipients = msg.to.as_vec();
+    if let Err(err) = crate::push::send_gate::check_batch_size(recipients.len()) {
+        return gate_error_response(err);
+    }
+    let payload_bytes = serde_json::to_vec(&msg).map(|v| v.len()).unwrap_or(0);
+    if let Err(err) = crate::push::send_gate::check_payload_size(payload_bytes) {
+        return gate_error_response(err);
+    }
+    for recipient in &recipients {
+        if let Err(err) = state.send_gate.check_and_record_token(recipient).await {
+            return gate_error_response(err);
+        }
+    }
+
     let project_id = caller_project_id(&caller, &state);
     match send::enqueue_send(pool, project_id, &msg).await {
         Ok(tickets) => (StatusCode::OK, Json(SendResponse { tickets })).into_response(),
@@ -111,6 +128,66 @@ pub async fn send_native(
         Err(send::SendError::Database(e)) => {
             tracing::warn!(error = %e, "push send enqueue failed");
             internal_error()
+        }
+    }
+}
+
+/// Translate a v2.20 [`GateError`] into the customer-facing HTTP
+/// response shape. PayloadTooBig + BatchTooLarge are 400; rate-limit
+/// is 429 with `Retry-After`.
+fn gate_error_response(err: GateError) -> Response {
+    match err {
+        GateError::PayloadTooBig { actual, max } => (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": {
+                    "code": "PayloadTooBig",
+                    "message": format!("payload {actual} bytes exceeds {max} byte cap"),
+                    "actualBytes": actual,
+                    "maxBytes": max,
+                }
+            })),
+        )
+            .into_response(),
+        GateError::BatchTooLarge { actual, max } => (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": {
+                    "code": "BatchTooLarge",
+                    "message": format!("batch of {actual} recipients exceeds {max} cap"),
+                    "actualRecipients": actual,
+                    "maxRecipients": max,
+                }
+            })),
+        )
+            .into_response(),
+        GateError::TokenRateLimited {
+            token,
+            retry_after_secs,
+        } => {
+            // Strip the token to a non-reversible tail so error
+            // surface doesn't echo raw device identifiers to logs.
+            let tail = token
+                .chars()
+                .rev()
+                .take(8)
+                .collect::<String>()
+                .chars()
+                .rev()
+                .collect::<String>();
+            (
+                StatusCode::TOO_MANY_REQUESTS,
+                [("retry-after", retry_after_secs.to_string())],
+                Json(json!({
+                    "error": {
+                        "code": "TokenRateLimited",
+                        "message": "token send rate exceeded — likely host-app integration bug",
+                        "tokenTail": tail,
+                        "retryAfterSecs": retry_after_secs,
+                    }
+                })),
+            )
+                .into_response()
         }
     }
 }
@@ -152,18 +229,49 @@ pub async fn send_expo_compat(
         ExpoRequest::Single(m) => vec![m],
         ExpoRequest::Batch(v) => v,
     };
-    let mut response_tickets = Vec::with_capacity(expo_msgs.len());
-    for expo_msg in expo_msgs {
+
+    // v2.20 send-API gate. Translate first (cheap, no DB), check
+    // total recipient count + per-message payload size, then enter
+    // the dispatch loop. Per-token rate is checked inside the loop
+    // so a 429 on token N doesn't poison enqueues 1..N.
+    let natives: Vec<NativeMessage> = expo_msgs
+        .into_iter()
+        .map(expo_compat::to_native)
+        .collect();
+    let total_recipients: usize = natives.iter().map(|n| n.to.as_vec().len()).sum();
+    if let Err(err) = crate::push::send_gate::check_batch_size(total_recipients) {
+        return gate_error_response(err);
+    }
+    for native in &natives {
+        let payload_bytes = serde_json::to_vec(native).map(|v| v.len()).unwrap_or(0);
+        if let Err(err) = crate::push::send_gate::check_payload_size(payload_bytes) {
+            return gate_error_response(err);
+        }
+    }
+
+    let mut response_tickets = Vec::with_capacity(natives.len());
+    for native in natives {
         // Each Expo message can carry an array `to` (Expo batches
-        // up-to-N tokens per call). We translate, enqueue, and emit
-        // one ExpoTicket per recipient.
-        let native = expo_compat::to_native(expo_msg);
+        // up-to-N tokens per call). We enqueue and emit one
+        // ExpoTicket per recipient.
         let recipients = native.to.as_vec();
         for recipient in recipients {
+            // v2.20 send-API gate: per-token rate is checked here
+            // (instead of pre-loop) so a 429 on token N doesn't waste
+            // enqueues 1..N. On rate hit, surface an Expo-shaped
+            // error ticket for THIS recipient and continue — keeps
+            // the response indexable by input position.
+            if let Err(err) = state.send_gate.check_and_record_token(&recipient).await {
+                response_tickets.push(expo_compat::ExpoTicket::Error {
+                    id: None,
+                    message: err.code().into(),
+                    details: None,
+                });
+                continue;
+            }
             // Reshape the multi-recipient native message into a
             // single-recipient one so enqueue_send returns exactly
-            // one ticket per Expo loop iteration. This keeps the
-            // Expo response indexable by input position.
+            // one ticket per Expo loop iteration.
             let mut single = native.clone();
             single.to = ToField::Single(recipient.clone());
             match send::enqueue_send(pool, project_id, &single).await {

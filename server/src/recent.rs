@@ -105,6 +105,11 @@ pub struct AppState {
     /// admin "verify credential" endpoint reuse FCM's OAuth token
     /// cache instead of re-minting on every dashboard refresh.
     pub push_providers: Option<Arc<crate::push::providers::Providers>>,
+    /// v2.20 — process-wide push send-API gate. Per-token rate
+    /// counter + payload/batch caps. Pulled in here so every public
+    /// `/v1/push/*` send path can `state.send_gate.check_...` before
+    /// touching the DB.
+    pub send_gate: Arc<crate::push::send_gate::SendGate>,
 }
 
 impl FromRef<AppState> for AuthState {

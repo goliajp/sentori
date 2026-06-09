@@ -159,6 +159,7 @@ pub fn build(cfg: ServerConfig) -> Router {
         geoip,
         http_client,
         push_providers: Some(push_providers),
+        send_gate: std::sync::Arc::new(crate::push::send_gate::SendGate::new()),
     };
 
     // Per-route body-stream cap for small-payload ingest endpoints.

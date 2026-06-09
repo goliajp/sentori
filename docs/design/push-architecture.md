@@ -1,6 +1,6 @@
 # Push notifications — architecture
 
-Status: **design accepted 2026-06-07**. Implementation rolls out across v2.7 – v2.12 (see roadmap row for each version).
+Status: **design accepted 2026-06-07, extended 2026-06-10**. Phase 1 (v2.7 – v2.12) shipped foundation + 5 providers + cross-SDK. Phase 2 (v2.20 – v2.37+) hardens for industrial load (anti-blacklist, multi-tenant fairness, observability link-through). See roadmap row for each version.
 
 Reference (read-only): `/Users/doracawl/workspace/qualcomm/insight/apps/insight-push-server` — the insight push server is **studied** as a prior art (APNs + FCM dispatcher + bad-token streak + circuit breaker + retry semantics), not vendored. Sentori's implementation re-writes from the design below, with broader provider coverage (APNs / FCM / Web Push / HCM / MiPush), tighter SDK matrix integration (RN native module + Expo plugin + JS Service Worker), and Sentori's own license (Apache-2.0 OR MIT).
 
@@ -223,12 +223,43 @@ CREATE INDEX push_delivery_logs_send_idx ON push_delivery_logs (send_id, attempt
 - **HTTP client**: AppState gains `http_client: reqwest::Client` reused across providers (5s connect, 10s read timeout, HTTP/2 enabled).
 - **Dispatch cron**: `push::dispatch_cron::spawn_cron()` ticks every 30s, batched 50 rows per sweep. Mirrors `webhook_dispatch`.
 
-## Performance gates (per Sentori铁律)
+## Ironclad rules (every phase ship must self-check)
+
+### 1. Host-app performance (since v2.7)
 
 - SDK register flow may not block main thread > 5ms on cold start (native modules run on background dispatch queue / coroutine).
 - onMessage handler default is no-op — host app opts in to JS work.
 - Webpush Service Worker must not auto-cache resources beyond the push payload (avoid bandwidth surprise).
 - Per-platform: iOS register cost (Instruments Time Profiler) and Android register cost (`dumpsys cpuinfo`) measured before each provider release.
+
+### 2. Provider-friendly (added v2.20)
+
+Every SDK / server path must assume APNs/FCM/HCM will blacklist the entire sender for misbehaviour, and that the cost lands on **all** Sentori customers on this instance. The following are P0 defects:
+
+- **Auth-token churn** — re-signing JWT or re-OAuth per send instead of caching to expiry. Concrete trigger: APNs `TooManyProviderTokenUpdates` (22001). Mitigation: `TokenCache<K, V>` abstraction (v2.20) covers APNs JWT / FCM v1 OAuth / HCM OAuth / VAPID JWT.
+- **Invalid-token mass-send** — sending to a token already revoked by the OS or marked permanently invalid by the provider. Mitigation: stale-token soft eviction at `device_tokens.last_seen_at < 90d`; per-provider rolling invalid-rate counter; auto-throttle when rolling rate crosses warning threshold (v2.23).
+- **Connection thrash** — opening a fresh HTTP/2 connection per send instead of reusing the long-lived stream. Mitigation: per-provider `reqwest::Client` with pool config tuned to APNs's "one persistent connection" guidance (v2.21).
+- **Naive retry** — repeating identical request to a 410/Invalid token, or stampeding after a 429 without honoring `Retry-After`. Mitigation: error-code classified retry + jittered backoff + circuit-breaker per provider (v2.20 retry layer, v2.21 quarantine).
+- **Rate non-limiting** — no per-provider / per-project / global send-rate cap, allowing one burst to trip provider abuse heuristics. Mitigation: three-layer rate limiter (v2.22).
+
+### 3. Multi-tenant fairness (added v2.20)
+
+Self-host is the first-class deployment shape. A single instance runs N projects. Any project's incident must not starve, slow, or blast-radius other projects:
+
+- **Per-project send quota** — token-bucket per `project_id`, default sized for mid-tier self-host, override per project (v2.22).
+- **Per-project resource isolation** — provider quarantine (v2.21) is scoped per `(project_id, provider)`, not global. One project's bad APNs creds do not disable APNs for siblings.
+- **Per-project rate visibility** — admin dashboard surfaces each project's send rate vs quota; noisy-neighbor identification (v2.23).
+- **Per-project credential isolation** — already enforced by `push_credentials.UNIQUE(project_id, provider)` since v2.7. Phase 2 extends to per-project HTTP client connection budgets when needed (v2.21).
+
+### 4. Observability link-through (added v2.20)
+
+Push is **not** a silo. Every send must be bi-directionally traceable to user / session / event / error / issue on Sentori's main observability surface. This is Sentori's differentiator vs Expo/OneSignal — they ship "did it leave?" indicators; we ship "what did it do?":
+
+- **Forward** — dashboard inspects one push → which sessions opened, which events fired, which errors / issues correlate in the post-send window (v2.24 send inspector, v2.27 correlation BI).
+- **Reverse** — inspecting one issue → which push messages reached the affected users in the prior 7 days (v2.27 reverse-attribution API).
+- **Wire primitive** — every push send carries `_sentori.msgId` (= `push_sends.id`) in payload. SDK receive path auto-writes a `BreadcrumbType::Push` breadcrumb and emits `sentori.push.{received, opened, dismissed}` tracked events. New breadcrumb type does not break legacy dashboards (additive enum variant, must sync `sdk/core/src/types.ts` + `server/src/event.rs` per CLAUDE.md).
+- **Backend primitive** — `events.push_origin_msg_id` (nullable FK), `push_impact_30d` materialized view, BI slice support for campaign / template / audience × event / error / issue (v2.27).
+- **Any wire field, SDK path, or dashboard view that separates push from the main observation surface is a design defect.**
 
 ## Versioned rollout
 
@@ -240,14 +271,35 @@ CREATE INDEX push_delivery_logs_send_idx ON push_delivery_logs (send_id, attempt
 | **v2.10** | `sentori-react-native` Android native module (FCM). |
 | **v2.11** | `sentori-expo` config plugin + dashboard `push` module + chord `g n` + cred CRUD UI. |
 | **v2.12** | HCM + MiPush providers + cross-SDK re-exports (react/vue/svelte/solid hooks) + perf bench + docs/recipes consolidated. |
+| **v2.20** | **Industrial-load foundation.** TokenCache abstraction (APNs/FCM/HCM/VAPID). Smart retry — error-code classified + jitter. Send API gate — payload size / per-token rate / batch cap. Root `VERSION` source. `scripts/check-cargo-features.sh` lint. `sign_jwt` smoke tests for apns/webpush/fcm. Closes hotfix follow-up P1-P4. |
+| **v2.21** | Per-provider connection isolation + quarantine. Each provider gets its own `reqwest::Client` (idle/pool/ALPN tuned); consecutive 5xx → quarantine the provider for N seconds. |
+| **v2.22** | Three-layer rate limit. L1 per-provider token-bucket (respect 429 `Retry-After`); L2 per-project quota; L3 global inflight cap. Burst 2-3×. |
+| **v2.23** | Invalid-token health + blacklist early-warning. Rolling invalid / 429 / timeout ratios. Auto-throttle when crossing thresholds. Stale-token soft eviction. Dashboard "safety margin to blacklist" gauge. |
+| **v2.24** | Send inspector + Receipt API + replay. Per-send timeline (enqueue → token cache hit → provider request → response → ack); `GET /v1/push/sends/:id`; "replay last N days" UI. Downstream-impact column joining the post-send window's sessions / events / errors. |
+| **v2.25** | RN wire fields. `collapseId` / `interruptionLevel` / `threadIdentifier` / `categoryId` / `mutableContent` / `contentAvailable` / `richMedia.image` / `ttl + expiration` dual form / Android `tag`. **`_sentori.msgId` payload primitive** + send-API `campaignId / templateId / audienceTag` for BI slicing. |
+| **v2.26** | RN receive/ack loop. confirmed-delivery ack (background batched, never blocks foreground) + token rotation listener (auto re-register) + `setNotificationHandler` + `getPresentedNotifications / dismiss / badge` + provisional/ephemeral permission + background task. Native-side persistent breadcrumb buffer (FIFO + AsyncStorage) merged into SDK on init. Auto-track `sentori.push.{received, opened, dismissed}`. Ack carries `user_fingerprint + session_id`. |
+| **v2.27** | Push × User correlation BI. `events.push_origin_msg_id` FK + index. `push_impact_30d` materialized view. "Push correlation" dashboard view — cohort comparison (recipient vs control on error rate / session rate / retention). Reverse attribution: `GET /admin/api/projects/:id/issues/:id/push-origins`. |
+| **v2.28** | iOS Notification Service Extension + Android BigPicture (rich media). Expo plugin auto-injects NSE target template + entitlements. Android `NotificationCompat.BigPictureStyle` auto-engaged when `richMedia.image` present. NSE runs in a separate process — zero host-app overhead. |
+| **v2.29** | RN interactive actions. iOS `UNNotificationCategory` + button + textInput; Android `RemoteInput` + action buttons. SDK `registerCategory(id, actions)`; handler returns `actionId + userText` to JS. |
+| **v2.30** | RN Android channel API. Channel CRUD / importance / sound / vibration / lights / badge / DnD bypass. SDK `setNotificationChannelAsync`. Default channel `default` auto-created. |
+| **v2.31** | RN local schedule. TIME_INTERVAL / DATE / DAILY / WEEKLY / CALENDAR / `getNextTriggerDateAsync` — purely device-side, OS-managed. |
+| **v2.32** | iOS critical alert + VoIP push (PushKit). Expo plugin capability injection. Wire `interruptionLevel: 'critical'`. PushKit callback bridge. Critical-alert entitlement onboarding. |
+| **v2.33** | Live Activity / Dynamic Island (iOS 16+). ActivityKit + push-to-start token registration. SDK `startActivity / updateActivity / endActivity`. Strict respect for Apple's 4-8/h frequent-update budget (anti-blacklist applies here too). |
+| **v2.34** | Topic / Interest pub-sub. `device.subscribeTopic / unsubscribeTopic`; server `publish to topic`. `device_topics` table. FCM topic publish reused + APNs/MiPush/HCM in-house fanout. |
+| **v2.35** | Scheduled sends. send API `sendAt: rfc3339` + optional `recurring: cron`. Independent scheduler tick. User-timezone column. Dashboard schedule view. |
+| **v2.36** | User-based publishing + multi-device fanout. wire `to: { userId }`; server fanouts to all active `device_tokens` for the user fingerprint; partial-failure logged per device. |
+| **v2.37** | Preference center API. `push_preferences(user, category, opted_out)` table; dispatch-time check; SDK `getPreferences / setPreferences`. API + table only — no hosted end-user UI (left to integrators). |
+| **v2.38** | Queue model upgrade + horizontal workers. `SELECT ... FOR UPDATE SKIP LOCKED` (Pg 12+). Self-adaptive tick (busy / idle ratio). Optional Valkey hot queue. Multi-instance horizontal scaling. `push_sends + push_delivery_logs` audit log unchanged. |
 
-## Out of scope (deferred)
+## Out of scope (definitionally — not push subsystem)
 
-- **Topic / segment broadcasts** (FCM topic publish, APNs group). v2.13+ — needs DB-side groups + UI.
-- **Scheduled sends** ("send at 9 AM local user time"). v2.13+ — needs cron + user timezone column.
-- **A/B test or variant payloads**. Not in the engineering-bug-tracker workflow.
-- **Apple Notification Service Extension auto-injection** (rich media decryption). v2.12+ — Expo plugin or native sample.
-- **Service Worker for service-side data sync** (PWA full offline). Service Worker only handles push payloads in v2.8.
+The following are **not** deferred from the push roadmap; they are different product surfaces. If Sentori roadmap extends to any of them, each opens its own v3.x series (analogous to v3 GDS rewrite):
+
+- **In-App Message overlay SDK / Inbox SDK** — product engagement / messaging UI.
+- **Multi-channel orchestration (email + SMS + Slack)** — messaging orchestration.
+- **Journey / workflow engine** — automation.
+- **A/B variant testing** — experimentation.
+- **Hosted end-user preference UI** — end-user portal (the API + table is in v2.37).
 
 ## License
 

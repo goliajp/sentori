@@ -1,15 +1,13 @@
 [package]
 name = "sentori-server"
-# Bump this in lockstep with `web/package.json` `version` + `web/src/version.ts`
-# `SENTORI_VERSION`. All three back the dashboard's user-visible
-# version string (sidebar footer = web; Overview "build N" strip =
-# server `/self-test::server_version` which reads CARGO_PKG_VERSION).
-# Drift was a real bug (2026-05-22) — the server held rc.1 while
-# the dashboard displayed v1.1.0, confusing operators about what
-# was actually deployed. A repo-root `VERSION` file + build-time
-# substitution is the longer-term cleanup; for now keep the three
-# in sync manually on each cut.
-version = "1.1.4"
+# v2.20: single source of truth is the repo-root `VERSION` file.
+# `build.rs` reads it and panics the build if this `version` field
+# drifts. `web/vite.config.ts` does the symmetrical check against
+# `web/package.json`. Bump all three together; the build will not
+# let you ship a mismatch.
+# Prior incident: 2026-05-22 server held rc.1 while dashboard
+# displayed v1.1.0, confusing operators about what was deployed.
+version = "1.2.0"
 edition = "2024"
 authors = ["GOLIA K.K. <takagi@golia.jp>"]
 description = "Sentori ingestion server (axum + Postgres + Valkey)"
