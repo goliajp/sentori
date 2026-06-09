@@ -162,6 +162,19 @@ export function PushSendDetailView() {
           <KV label="created" value={formatRelative(d.send.createdAt)} />
           <KV label="sent" value={d.send.sentAt ? formatRelative(d.send.sentAt) : '—'} />
           <KV label="next attempt" value={formatRelative(d.send.nextAttemptAt)} />
+          {/* v2.32 — scheduled send badge. When next_attempt_at is in
+              the future AND no sent_at, the row is waiting on
+              dispatch_cron. */}
+          {!d.send.sentAt && new Date(d.send.nextAttemptAt) > new Date() && (
+            <KV
+              label="scheduled"
+              value={
+                <Badge className="font-mono text-[10px] uppercase" variant="default">
+                  ⏰ {formatRelative(d.send.nextAttemptAt)}
+                </Badge>
+              }
+            />
+          )}
           {d.send.idempotencyKey && <KV label="idempotency key" value={d.send.idempotencyKey} />}
         </dl>
 
@@ -210,6 +223,10 @@ export function PushSendDetailView() {
         )}
       </Card>
 
+      <DeliveryAckCard send={d.send} />
+
+      <CampaignTagsCard send={d.send} />
+
       <DownstreamImpactCard projectId={projectId} sendId={sendId} />
 
       <Link
@@ -219,6 +236,87 @@ export function PushSendDetailView() {
         ← back to Sends
       </Link>
     </div>
+  )
+}
+
+// ── Delivery confirmation (v2.26 ack) ────────────────────────────────
+//
+// Surfaces `push_sends.acked_at` flipped when the SDK posts
+// /v1/push/sends/:id/ack on receive. NULL = no ack yet (could be
+// pre-v2.26 SDK, host killed before flush, or network loss).
+
+function DeliveryAckCard({ send }: { send: PushSendDetail['send'] }) {
+  const acked = !!send.ackedAt
+  const sent = !!send.sentAt
+  return (
+    <Card>
+      <header className="border-border/40 mb-3 flex items-baseline justify-between border-b pb-2">
+        <h2 className="text-fg text-[14px] font-semibold">Delivery confirmation</h2>
+        <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
+          v2.26 SDK ack
+        </span>
+      </header>
+      {!sent ? (
+        <p className="text-fg-muted font-mono text-[11px]">
+          Send hasn&apos;t left the queue yet — ack can&apos;t arrive until provider accepts.
+        </p>
+      ) : acked ? (
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[11px] md:grid-cols-3">
+          <KV
+            label="status"
+            value={
+              <Badge className="font-mono text-[10px] uppercase" variant="success">
+                ✓ acked
+              </Badge>
+            }
+          />
+          <KV label="acked at" value={formatRelative(send.ackedAt!)} />
+          {send.ackSessionId && <KV label="session" value={send.ackSessionId.slice(0, 12) + '…'} />}
+        </div>
+      ) : (
+        <p className="text-fg-muted font-mono text-[11px]">
+          Provider accepted at {formatRelative(send.sentAt!)} but the device hasn&apos;t confirmed
+          yet. Pre-v2.26 SDK, host process killed before the 5 s ack flush, or ack POST dropped on
+          the network.
+        </p>
+      )}
+    </Card>
+  )
+}
+
+// ── Campaign / BI tags (v2.25) ────────────────────────────────────────
+//
+// Surfaces the campaignId / templateId / audienceTag the caller passed
+// on send. None set = the dashboard simply shows an empty-state copy
+// so customers know the field exists.
+
+function CampaignTagsCard({ send }: { send: PushSendDetail['send'] }) {
+  const has = !!(send.campaignId || send.templateId || send.audienceTag)
+  if (!has) return null
+  return (
+    <Card>
+      <header className="border-border/40 mb-3 flex items-baseline justify-between border-b pb-2">
+        <h2 className="text-fg text-[14px] font-semibold">Campaign tags</h2>
+        <span className="text-fg-muted font-mono text-[10px] tracking-[0.18em] uppercase">
+          v2.25 BI
+        </span>
+      </header>
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-[11px] md:grid-cols-3">
+        {send.campaignId && <KV label="campaign" value={send.campaignId} />}
+        {send.templateId && <KV label="template" value={send.templateId} />}
+        {send.audienceTag && <KV label="audience" value={send.audienceTag} />}
+        {send.preferenceCategory && (
+          <KV
+            label="preference"
+            value={
+              <span className="font-mono text-[11px]">
+                {send.preferenceCategory} <span className="text-fg-muted text-[10px]">(v2.34)</span>
+              </span>
+            }
+          />
+        )}
+      </dl>
+    </Card>
   )
 }
 

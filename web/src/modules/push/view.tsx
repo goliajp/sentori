@@ -726,6 +726,38 @@ function SendsTab({ projectId }: { projectId: string }) {
               ),
             },
             {
+              // v2.26 — SDK confirmed-delivery ack column. ✓ when
+              // the device posted /v1/push/sends/:id/ack; — for
+              // queued/failed or pre-v2.26 hosts.
+              key: 'ackedAt',
+              label: 'Ack',
+              align: 'right',
+              width: '70px',
+              render: (_v, r) =>
+                r.ackedAt ? (
+                  <span className="text-success font-mono text-[12px]" title={r.ackedAt}>
+                    ✓
+                  </span>
+                ) : (
+                  <span className="text-fg-muted font-mono text-[12px]">—</span>
+                ),
+            },
+            {
+              // v2.25 — BI campaign tag (when caller passed it on
+              // /v1/push/send). Empty for legacy / untagged sends.
+              key: 'campaignId',
+              label: 'Campaign',
+              width: '140px',
+              render: (_v, r) =>
+                r.campaignId ? (
+                  <Badge className="font-mono text-[10px]" variant="default">
+                    {r.campaignId}
+                  </Badge>
+                ) : (
+                  <span className="text-fg-muted font-mono text-[11px]">—</span>
+                ),
+            },
+            {
               key: 'createdAt',
               label: 'Created',
               width: '130px',

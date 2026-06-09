@@ -1071,6 +1071,14 @@ struct PushSendRow {
     #[serde(default, with = "time::serde::rfc3339::option")]
     sent_at: Option<time::OffsetDateTime>,
     payload_preview: serde_json::Value,
+    /// v2.26 — confirmed-delivery ack timestamp (NULL until SDK
+    /// reports back). v2.36 webapp polish surfaces this in the
+    /// Sends table as an `acked` column.
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    acked_at: Option<time::OffsetDateTime>,
+    /// v2.25 — campaign tag (when caller set it). Sends list filter
+    /// + dashboard cohort attribution.
+    campaign_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -1116,9 +1124,12 @@ pub async fn admin_list_push_sends(
         time::OffsetDateTime,
         Option<time::OffsetDateTime>,
         serde_json::Value,
+        Option<time::OffsetDateTime>,
+        Option<String>,
     )> = match sqlx::query_as(
         "SELECT id, token_id, provider, status, provider_outcome, error, \
-                retry_count, next_attempt_at, created_at, sent_at, payload \
+                retry_count, next_attempt_at, created_at, sent_at, payload, \
+                acked_at, campaign_id \
          FROM push_sends \
          WHERE project_id = $1 \
            AND ($2::text IS NULL OR status = $2) \
@@ -1159,6 +1170,8 @@ pub async fn admin_list_push_sends(
                 created_at,
                 sent_at,
                 payload,
+                acked_at,
+                campaign_id,
             )| PushSendRow {
                 id,
                 token_id,
@@ -1171,6 +1184,8 @@ pub async fn admin_list_push_sends(
                 created_at,
                 sent_at,
                 payload_preview: payload_summary(&payload),
+                acked_at,
+                campaign_id,
             },
         )
         .collect();
@@ -1206,6 +1221,28 @@ struct SendDetailResponse {
     device_provider: Option<String>,
 }
 
+#[derive(sqlx::FromRow)]
+struct SendDetailRow {
+    id: uuid::Uuid,
+    token_id: uuid::Uuid,
+    provider: String,
+    status: String,
+    provider_outcome: Option<String>,
+    error: Option<String>,
+    retry_count: i32,
+    idempotency_key: Option<String>,
+    next_attempt_at: time::OffsetDateTime,
+    created_at: time::OffsetDateTime,
+    sent_at: Option<time::OffsetDateTime>,
+    payload: serde_json::Value,
+    acked_at: Option<time::OffsetDateTime>,
+    ack_session_id: Option<String>,
+    campaign_id: Option<String>,
+    template_id: Option<String>,
+    audience_tag: Option<String>,
+    preference_category: Option<String>,
+}
+
 /// v2.19 — single send + its full delivery_logs timeline. Drives
 /// the send-detail sub-route.
 pub async fn admin_get_push_send_detail(
@@ -1216,22 +1253,15 @@ pub async fn admin_get_push_send_detail(
         return db_not_configured();
     };
 
-    let send_row: Option<(
-        uuid::Uuid,
-        uuid::Uuid,
-        String,
-        String,
-        Option<String>,
-        Option<String>,
-        i32,
-        Option<String>,
-        time::OffsetDateTime,
-        time::OffsetDateTime,
-        Option<time::OffsetDateTime>,
-        serde_json::Value,
-    )> = sqlx::query_as(
+    // v2.36 webapp polish — load the v2.25/v2.26/v2.34 columns added
+    // server-side over Phase 2 so the dashboard can render every
+    // facet of a send (BI tags, ack, preference category). 18 columns
+    // exceeds sqlx's tuple FromRow ceiling so we use a FromRow struct.
+    let send_row: Option<SendDetailRow> = sqlx::query_as::<_, SendDetailRow>(
         "SELECT id, token_id, provider, status, provider_outcome, error, \
-                retry_count, idempotency_key, next_attempt_at, created_at, sent_at, payload \
+                retry_count, idempotency_key, next_attempt_at, created_at, sent_at, payload, \
+                acked_at, ack_session_id, campaign_id, template_id, audience_tag, \
+                payload->>'preferenceCategory' AS preference_category \
          FROM push_sends \
          WHERE project_id = $1 AND id = $2",
     )
@@ -1241,10 +1271,7 @@ pub async fn admin_get_push_send_detail(
     .await
     .unwrap_or(None);
 
-    let Some(send_row) = send_row else {
-        return not_found(format!("send '{send_id}' not found"));
-    };
-    let (
+    let Some(SendDetailRow {
         id,
         token_id,
         provider,
@@ -1257,7 +1284,16 @@ pub async fn admin_get_push_send_detail(
         created_at,
         sent_at,
         payload,
-    ) = send_row;
+        acked_at,
+        ack_session_id,
+        campaign_id,
+        template_id,
+        audience_tag,
+        preference_category,
+    }) = send_row
+    else {
+        return not_found(format!("send '{send_id}' not found"));
+    };
 
     let log_rows: Vec<(
         i32,
@@ -1298,6 +1334,15 @@ pub async fn admin_get_push_send_detail(
         "createdAt": created_at,
         "sentAt": sent_at,
         "payload": payload,
+        // v2.26 SDK confirmed-delivery ack
+        "ackedAt": acked_at,
+        "ackSessionId": ack_session_id,
+        // v2.25 BI tags
+        "campaignId": campaign_id,
+        "templateId": template_id,
+        "audienceTag": audience_tag,
+        // v2.34 preference category
+        "preferenceCategory": preference_category,
     });
     let logs: Vec<DeliveryLogEntry> = log_rows
         .into_iter()

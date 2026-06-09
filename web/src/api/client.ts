@@ -1701,6 +1701,10 @@ export type PushSendRow = {
   createdAt: string
   sentAt: null | string
   payloadPreview: { body?: string; deepLink?: string; title?: string }
+  /** v2.26 — SDK confirmed-delivery ack timestamp (NULL = no ack yet). */
+  ackedAt: null | string
+  /** v2.25 — BI campaign tag (when caller set it on send). */
+  campaignId: null | string
 }
 
 export type PushSendsPage = {
@@ -1731,6 +1735,18 @@ export type PushSendDetail = {
     createdAt: string
     sentAt: null | string
     payload: Record<string, unknown>
+    /** v2.26 — SDK confirmed-delivery ack timestamp (NULL until reported). */
+    ackedAt: null | string
+    /** v2.26 — originating session id from the SDK ack. */
+    ackSessionId: null | string
+    /** v2.25 — BI campaign tag. */
+    campaignId: null | string
+    /** v2.25 — BI template tag. */
+    templateId: null | string
+    /** v2.25 — BI audience tag. */
+    audienceTag: null | string
+    /** v2.34 — preference-center category checked at dispatch. */
+    preferenceCategory: null | string
   }
   deliveryLogs: PushDeliveryLogEntry[]
   devicePresent: boolean
