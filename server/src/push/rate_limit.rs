@@ -37,7 +37,7 @@ use std::sync::{
     atomic::{AtomicU32, Ordering},
     Arc, Mutex,
 };
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use uuid::Uuid;
 
@@ -68,6 +68,18 @@ const PROJECT_REFILL_PER_SEC: f64 = 50.0;
 /// (project, provider) combinations.
 pub const GLOBAL_INFLIGHT_MAX: u32 = 200;
 
+/// v2.37 — multiplier applied to a token bucket's refill rate when
+/// the adaptive throttle fires. 0.5 = half-speed. Stays in effect
+/// for [`ADAPTIVE_THROTTLE_WINDOW`], then refill resets.
+pub const ADAPTIVE_THROTTLE_FACTOR: f64 = 0.5;
+
+/// v2.37 — how long an adaptive throttle stays installed. After
+/// this window the bucket reverts to its base refill on the next
+/// `try_acquire`. Matches v2.23's invalid-rate rolling window so a
+/// project that's been throttled for invalid_rate has the same
+/// observation horizon to recover.
+pub const ADAPTIVE_THROTTLE_WINDOW: Duration = Duration::from_secs(5 * 60);
+
 /// Why an `acquire` call failed. Each variant maps to a distinct
 /// defer window in `dispatch_cron`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -96,6 +108,12 @@ impl Drop for RatePermit {
 struct BucketState {
     tokens: f64,
     last_refill: Instant,
+    /// v2.37 — `Some((factor, until))` while a throttle is active.
+    /// `effective refill = refill_per_sec * factor` until `until`,
+    /// then we reset to None and the bucket goes back to the base
+    /// rate automatically. Set by `RateLimiter::throttle_provider`
+    /// or `throttle_project` when health crosses its threshold.
+    throttle: Option<(f64, Instant)>,
 }
 
 /// Classical token bucket. Synchronous — the critical section is
@@ -116,8 +134,28 @@ impl<C: Clock> TokenBucket<C> {
             state: Mutex::new(BucketState {
                 tokens: capacity,
                 last_refill: clock.now(),
+                throttle: None,
             }),
             clock,
+        }
+    }
+
+    /// v2.37 — install an adaptive throttle. `factor` multiplies the
+    /// effective refill rate (0.5 = half speed) until `until`. After
+    /// `until` passes, the next `try_acquire` clears the throttle.
+    pub fn set_throttle(&self, factor: f64, until: Instant) {
+        let mut state = self.state.lock().unwrap();
+        state.throttle = Some((factor, until));
+    }
+
+    /// v2.37 — current throttle factor (1.0 when not throttled or
+    /// expired). Useful for tests + future metrics.
+    pub fn effective_factor(&self) -> f64 {
+        let state = self.state.lock().unwrap();
+        let now = self.clock.now();
+        match state.throttle {
+            Some((f, until)) if until > now => f,
+            _ => 1.0,
         }
     }
 
@@ -126,8 +164,19 @@ impl<C: Clock> TokenBucket<C> {
     pub fn try_acquire(&self, n: f64) -> bool {
         let mut state = self.state.lock().unwrap();
         let now = self.clock.now();
+        // v2.37 — apply active throttle to the effective refill rate;
+        // expired throttle clears automatically.
+        let factor = match state.throttle {
+            Some((f, until)) if until > now => f,
+            Some(_) => {
+                state.throttle = None;
+                1.0
+            }
+            None => 1.0,
+        };
+        let effective_refill = self.refill_per_sec * factor;
         let elapsed = now.saturating_duration_since(state.last_refill).as_secs_f64();
-        state.tokens = (state.tokens + elapsed * self.refill_per_sec).min(self.capacity);
+        state.tokens = (state.tokens + elapsed * effective_refill).min(self.capacity);
         state.last_refill = now;
         if state.tokens >= n {
             state.tokens -= n;
@@ -253,6 +302,47 @@ impl<C: Clock> RateLimiter<C> {
     /// Current L3 inflight count. Useful for tests + metrics.
     pub fn inflight_now(&self) -> u32 {
         self.inflight.load(Ordering::SeqCst)
+    }
+
+    /// v2.37 — install an adaptive throttle on the L1 per-provider
+    /// bucket. Used by the global circuit-breaker when
+    /// `HealthState::should_global_throttle` fires. Default callers
+    /// pass `factor=0.5, duration=5min`. Idempotent: re-arming with
+    /// the same window resets the deadline.
+    pub fn throttle_provider(&self, kind: ProviderKind, factor: f64, duration: Duration) {
+        if let Some(b) = self.provider_buckets.get(&kind) {
+            b.set_throttle(factor, self.clock.now() + duration);
+        }
+    }
+
+    /// v2.37 — install an adaptive throttle on the L2 per-project
+    /// bucket. Used by `HealthState::should_auto_throttle` (per-
+    /// (project, kind) invalid-rate trip). Lazy-creates the bucket
+    /// if not yet seen.
+    pub fn throttle_project(&self, project_id: Uuid, factor: f64, duration: Duration) {
+        let bucket = {
+            let mut map = self.project_buckets.lock().unwrap();
+            map.entry(project_id)
+                .or_insert_with(|| {
+                    Arc::new(TokenBucket::new(
+                        PROJECT_CAPACITY,
+                        PROJECT_REFILL_PER_SEC,
+                        self.clock.clone(),
+                    ))
+                })
+                .clone()
+        };
+        bucket.set_throttle(factor, self.clock.now() + duration);
+    }
+
+    /// v2.37 — effective throttle factor on the L1 bucket for
+    /// `kind`. 1.0 = unthrottled / expired; < 1.0 = under throttle.
+    /// Used by tests + future metrics surface.
+    pub fn provider_throttle_factor(&self, kind: ProviderKind) -> f64 {
+        self.provider_buckets
+            .get(&kind)
+            .map(|b| b.effective_factor())
+            .unwrap_or(1.0)
     }
 }
 
@@ -443,6 +533,92 @@ mod tests {
         ));
         // APNs L1 is untouched — different project, different kind.
         let _ = lim.acquire(p_apns, ProviderKind::Apns).unwrap();
+    }
+
+    #[test]
+    fn bucket_throttle_halves_effective_refill() {
+        let clock = MockClock::new();
+        let b: TokenBucket<MockClock> = TokenBucket::new(10.0, 10.0, clock.clone());
+        // Drain.
+        for _ in 0..10 {
+            assert!(b.try_acquire(1.0));
+        }
+        // Set 50% throttle for 1 minute.
+        b.set_throttle(0.5, clock.now() + Duration::from_secs(60));
+        // 1 second of throttled refill = 5 tokens (was 10).
+        clock.advance(Duration::from_secs(1));
+        let mut acquired = 0;
+        while b.try_acquire(1.0) {
+            acquired += 1;
+        }
+        assert_eq!(acquired, 5, "throttled refill should be half-speed");
+    }
+
+    #[test]
+    fn bucket_throttle_decays_after_window() {
+        let clock = MockClock::new();
+        let b: TokenBucket<MockClock> = TokenBucket::new(20.0, 10.0, clock.clone());
+        // Drain.
+        for _ in 0..20 {
+            assert!(b.try_acquire(1.0));
+        }
+        // Throttle for 60 s.
+        b.set_throttle(0.5, clock.now() + Duration::from_secs(60));
+        assert_eq!(b.effective_factor(), 0.5);
+        // Past the window — factor reverts.
+        clock.advance(Duration::from_secs(120));
+        assert_eq!(b.effective_factor(), 1.0);
+        // First acquire after expiry uses base rate.
+        // After 120 s of refill, bucket should be back at cap.
+        assert!(b.try_acquire(20.0));
+    }
+
+    #[test]
+    fn limiter_throttle_provider_dials_l1_down() {
+        let clock = MockClock::new();
+        let lim: RateLimiter<MockClock> = RateLimiter::with_clock(clock.clone());
+        assert_eq!(lim.provider_throttle_factor(ProviderKind::Apns), 1.0);
+        lim.throttle_provider(ProviderKind::Apns, 0.5, Duration::from_secs(300));
+        assert_eq!(lim.provider_throttle_factor(ProviderKind::Apns), 0.5);
+        // Other providers untouched.
+        assert_eq!(lim.provider_throttle_factor(ProviderKind::Fcm), 1.0);
+        // After window — back to 1.0.
+        clock.advance(Duration::from_secs(400));
+        assert_eq!(lim.provider_throttle_factor(ProviderKind::Apns), 1.0);
+    }
+
+    #[test]
+    fn limiter_throttle_project_creates_bucket_if_missing() {
+        let clock = MockClock::new();
+        let lim: RateLimiter<MockClock> = RateLimiter::with_clock(clock.clone());
+        let p = proj();
+        // Project bucket doesn't exist yet.
+        lim.throttle_project(p, 0.5, Duration::from_secs(300));
+        // Subsequent acquire will use the throttled bucket.
+        // Drain the L2 (100 cap).
+        let mut permits = Vec::new();
+        for _ in 0..PROJECT_CAPACITY as u32 {
+            permits.push(lim.acquire(p, ProviderKind::Apns).unwrap());
+        }
+        assert!(matches!(
+            lim.acquire(p, ProviderKind::Apns),
+            Err(RateError::ProjectRateLimited(_))
+        ));
+        drop(permits);
+        // 1 s passes — base rate would refill 50, throttled refills 25.
+        clock.advance(Duration::from_secs(1));
+        let mut got = 0;
+        while lim.acquire(p, ProviderKind::Apns).is_ok() {
+            got += 1;
+            if got > 30 {
+                break;
+            }
+        }
+        assert!(
+            got <= 26,
+            "throttled L2 refilled {got} in 1s, expected ≈25 not {}",
+            PROJECT_REFILL_PER_SEC as u32
+        );
     }
 
     #[test]
