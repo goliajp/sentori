@@ -382,12 +382,56 @@ async fn apply_outcome(
             .health
             .in_window_total(project_id, kind)
             .await;
+        // v2.37 — actually dial L2 down (v2.23 only emitted the
+        // warning and trusted future-us to wire the throttle).
+        handle.providers.rate_limiter.throttle_project(
+            project_id,
+            crate::push::rate_limit::ADAPTIVE_THROTTLE_FACTOR,
+            crate::push::rate_limit::ADAPTIVE_THROTTLE_WINDOW,
+        );
         tracing::warn!(
             %project_id,
             ?kind,
             invalid_rate = format!("{:.1}%", rate * 100.0),
             window_total = total,
-            "push invalid-rate threshold tripped — sender-reputation at risk"
+            "push invalid-rate threshold tripped — L2 throttle 50% × 5 min applied"
+        );
+    }
+
+    // v2.37 — global per-provider circuit-breaker. When the
+    // AGGREGATE transient rate (across every project sending through
+    // `kind`) crosses the threshold, dial L1 down for the whole
+    // provider so APNs / FCM gets a chance to breathe. Independent
+    // from the per-(project, kind) trigger above. The Insight team's
+    // pile-up-on-iOS scenario specifically wants this kind of
+    // protection: when APNs is having a bad time globally, a healthy-
+    // looking project shouldn't be allowed to keep hammering at L1.
+    if matches!(
+        health_outcome,
+        HealthOutcome::RateLimited | HealthOutcome::Timeout | HealthOutcome::OtherTransient
+    ) && handle
+        .providers
+        .health
+        .should_global_throttle(kind)
+        .await
+    {
+        let rate = handle
+            .providers
+            .health
+            .global_transient_rate(kind)
+            .await;
+        // Re-arming with the same window is idempotent — the bucket
+        // refreshes its deadline; healthy projects don't see extra
+        // accumulation.
+        handle.providers.rate_limiter.throttle_provider(
+            kind,
+            crate::push::rate_limit::ADAPTIVE_THROTTLE_FACTOR,
+            crate::push::rate_limit::ADAPTIVE_THROTTLE_WINDOW,
+        );
+        tracing::warn!(
+            ?kind,
+            global_transient_rate = format!("{:.1}%", rate * 100.0),
+            "push provider global transient rate high — L1 throttle 50% × 5 min applied"
         );
     }
 
