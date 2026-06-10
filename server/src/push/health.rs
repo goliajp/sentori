@@ -219,7 +219,62 @@ impl<C: Clock> HealthState<C> {
         let invalid_rate = counts.invalid as f64 / total as f64;
         invalid_rate >= AUTO_THROTTLE_INVALID_RATIO
     }
+
+    /// v2.37 — aggregate `Counts` across all projects for `kind`.
+    /// Used by the global-circuit-breaker decision below.
+    async fn global_counts(&self, kind: ProviderKind) -> Counts {
+        let now = self.clock.now();
+        let map = self.inner.lock().await;
+        let mut total = Counts::default();
+        for ((_, k), buckets) in map.iter() {
+            if *k == kind {
+                total.merge(&buckets.window_counts(now));
+            }
+        }
+        total
+    }
+
+    /// v2.37 — fraction of all in-window sends to `kind` that hit a
+    /// transient-failure bucket (RateLimited / Timeout /
+    /// OtherTransient). Reported for observability + the dashboard
+    /// hook the Insight team asked for.
+    pub async fn global_transient_rate(&self, kind: ProviderKind) -> f64 {
+        let counts = self.global_counts(kind).await;
+        let total = counts.total();
+        if total == 0 {
+            return 0.0;
+        }
+        let bad = counts.rate_limited + counts.timeout + counts.other_transient;
+        bad as f64 / total as f64
+    }
+
+    /// v2.37 — true when the GLOBAL transient rate (across every
+    /// project sending through `kind`) crosses
+    /// [`GLOBAL_THROTTLE_TRANSIENT_RATIO`] AND the sample is large
+    /// enough to act on. When this fires the caller dials L1 down
+    /// for the whole provider so APNs / FCM gets a chance to
+    /// breathe. Independent from `should_auto_throttle` which is
+    /// per-(project, kind) and watches `InvalidToken` specifically.
+    pub async fn should_global_throttle(&self, kind: ProviderKind) -> bool {
+        let counts = self.global_counts(kind).await;
+        let total = counts.total();
+        if total < GLOBAL_THROTTLE_MIN_SENDS {
+            return false;
+        }
+        let bad = counts.rate_limited + counts.timeout + counts.other_transient;
+        let rate = bad as f64 / total as f64;
+        rate >= GLOBAL_THROTTLE_TRANSIENT_RATIO
+    }
 }
+
+/// v2.37 — global-circuit-breaker threshold. When the aggregate
+/// transient rate across every project on a provider crosses this in
+/// the rolling window, the entire provider's L1 bucket dials down.
+pub const GLOBAL_THROTTLE_TRANSIENT_RATIO: f64 = 0.20;
+
+/// v2.37 — minimum aggregate sample size before global throttle can
+/// fire. A handful of unlucky retries shouldn't take everyone down.
+pub const GLOBAL_THROTTLE_MIN_SENDS: u32 = 50;
 
 #[cfg(test)]
 mod tests {
@@ -361,6 +416,60 @@ mod tests {
         h.record(p, ProviderKind::Apns, HealthOutcome::Sent).await;
         assert!(!h.should_auto_throttle(p, ProviderKind::Apns).await);
         assert_eq!(h.in_window_total(p, ProviderKind::Apns).await, 1);
+    }
+
+    #[tokio::test]
+    async fn global_throttle_aggregates_across_projects() {
+        let clock = MockClock::new();
+        let h: HealthState<MockClock> = HealthState::with_clock(clock);
+        // Three projects, each contributing 20 sends to APNs.
+        // 8 transient / 12 sent per project → 60 sent, 24 transient =
+        // 28.5% > 20% threshold across 60 samples > 50 min.
+        for _ in 0..3 {
+            let p = proj();
+            for _ in 0..12 {
+                h.record(p, ProviderKind::Apns, HealthOutcome::Sent).await;
+            }
+            for _ in 0..8 {
+                h.record(p, ProviderKind::Apns, HealthOutcome::RateLimited)
+                    .await;
+            }
+        }
+        assert!(h.should_global_throttle(ProviderKind::Apns).await);
+        // Other providers untouched.
+        assert!(!h.should_global_throttle(ProviderKind::Fcm).await);
+        let rate = h.global_transient_rate(ProviderKind::Apns).await;
+        assert!(rate > 0.39 && rate < 0.41, "expected ~40%, got {rate}");
+    }
+
+    #[tokio::test]
+    async fn global_throttle_requires_minimum_sample_size() {
+        let clock = MockClock::new();
+        let h: HealthState<MockClock> = HealthState::with_clock(clock);
+        // 100 % transient but only 30 samples — well above
+        // GLOBAL_THROTTLE_MIN_SENDS=50 minimum? No, 30 < 50.
+        let p = proj();
+        for _ in 0..30 {
+            h.record(p, ProviderKind::Apns, HealthOutcome::RateLimited)
+                .await;
+        }
+        assert!(!h.should_global_throttle(ProviderKind::Apns).await);
+    }
+
+    #[tokio::test]
+    async fn global_throttle_does_not_fire_on_healthy_aggregate() {
+        let clock = MockClock::new();
+        let h: HealthState<MockClock> = HealthState::with_clock(clock);
+        // 60 sends, 6 transient = 10 % — under threshold.
+        let p = proj();
+        for _ in 0..54 {
+            h.record(p, ProviderKind::Apns, HealthOutcome::Sent).await;
+        }
+        for _ in 0..6 {
+            h.record(p, ProviderKind::Apns, HealthOutcome::Timeout)
+                .await;
+        }
+        assert!(!h.should_global_throttle(ProviderKind::Apns).await);
     }
 
     #[tokio::test]
