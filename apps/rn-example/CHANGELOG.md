@@ -1,5 +1,12 @@
 # example
 
+## 1.0.8
+
+### Patch Changes
+
+- Updated dependencies [[`9746100`](https://github.com/goliajp/sentori/commit/97461007dfb23059fbf0d85e02b1e0e70752e098), [`8d07add`](https://github.com/goliajp/sentori/commit/8d07add988d737b7699299c26e3712c444660ca9)]:
+  - @goliapkg/sentori-react-native@3.1.0
+
 ## 1.0.7
 
 ### Patch Changes
