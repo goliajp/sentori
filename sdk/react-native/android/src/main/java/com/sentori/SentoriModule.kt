@@ -84,11 +84,12 @@ class SentoriModule : Module() {
         // debugger pausing the main thread. Pass `force: true` to
         // run in debug builds.
         Function("startAnrWatchdog") { options: Map<String, Any?>? ->
-            val ctx = appContext.reactContext ?: return@Function
-            val timeoutMs = (options?.get("timeoutMs") as? Number)?.toLong() ?: 5_000L
-            val intervalMs = (options?.get("intervalMs") as? Number)?.toLong() ?: 1_000L
-            val force = (options?.get("force") as? Boolean) ?: false
-            SentoriAnrWatchdog.start(ctx, timeoutMs, intervalMs, force)
+            appContext.reactContext?.let { ctx ->
+                val timeoutMs = (options?.get("timeoutMs") as? Number)?.toLong() ?: 5_000L
+                val intervalMs = (options?.get("intervalMs") as? Number)?.toLong() ?: 1_000L
+                val force = (options?.get("force") as? Boolean) ?: false
+                SentoriAnrWatchdog.start(ctx, timeoutMs, intervalMs, force)
+            }
         }
 
         Function("stopAnrWatchdog") {
@@ -135,13 +136,15 @@ class SentoriModule : Module() {
         }
 
         Function("pushRegister") {
-            val ctx = appContext.reactContext ?: return@Function
-            SentoriPushNotifications.registerForRemoteNotifications(ctx)
+            appContext.reactContext?.let {
+                SentoriPushNotifications.registerForRemoteNotifications(it)
+            }
         }
 
         Function("pushUnregister") {
-            val ctx = appContext.reactContext ?: return@Function
-            SentoriPushNotifications.unregisterForRemoteNotifications(ctx)
+            appContext.reactContext?.let {
+                SentoriPushNotifications.unregisterForRemoteNotifications(it)
+            }
         }
 
         AsyncFunction("pushDrainState") {
