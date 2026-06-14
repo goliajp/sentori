@@ -1,5 +1,49 @@
 # @goliapkg/sentori-core
 
+## 1.4.0
+
+### Minor Changes
+
+- [`8d07add`](https://github.com/goliajp/sentori/commit/8d07add988d737b7699299c26e3712c444660ca9) Thanks [@doracawl](https://github.com/doracawl)! - v2.26 — RN SDK auto-correlation pipeline.
+
+  - New `BreadcrumbType` `'push'` for the auto-emitted breadcrumb when the SDK
+    receives a push carrying `_sentori.msgId` (server injects in v2.25+).
+    Same union shape on the server (`server/src/event.rs` `BreadcrumbType::Push`).
+  - RN drain loop, on a notification with `_sentori.msgId`:
+    - writes a `{ type: 'push', data: { msgId, title, body, opened, provider } }`
+      breadcrumb so a later `captureException` shows the push that just arrived.
+    - emits `sentori.push.received` (or `sentori.push.opened` for taps) through
+      the existing track pipeline.
+    - enqueues an ack POST to `/v1/push/sends/<msgId>/ack` — flushed every 5s
+      in the background. Server-side `push_sends.acked_at` flips on first ack.
+  - `sentori.push.setSessionContext(sessionId)` stamps the host's current
+    session id on outgoing acks for v2.27 push×session BI correlation.
+  - Zero host-app code change required to opt in. Payloads without
+    `_sentori.msgId` (older server, non-Sentori sender) flow through
+    unchanged — no breadcrumb, no track, no ack.
+
+- [`cb1870e`](https://github.com/goliajp/sentori/commit/cb1870ebc23e515d3d94775536cf2dba2b406be3) Thanks [@doracawl](https://github.com/doracawl)! - v2.28 — Push rich-media (image) support.
+
+  - New wire field `richMedia.imageUrl` on `/v1/push/send`. When set:
+    - **Android (FCM):** server writes `message.notification.image`,
+      FCM auto-renders the Android BigPicture style. Zero device-side
+      work required.
+    - **iOS (APNs):** server forces `aps.mutable-content: 1` and
+      surfaces the URL under the reserved `sentori_attachment_url`
+      key for a Notification Service Extension to download + attach.
+    - **Web Push:** passes through under `data.sentori_attachment_url`
+      for the host's Service Worker to use as `options.image`.
+  - The Sentori Expo plugin now writes a minimal NSE Swift template +
+    `Info.plist` to `ios/SentoriNSE/` on every `expo prebuild`. The
+    one-time Xcode target wiring is documented in the recipe; the
+    template downloads the URL with a 5 s timeout + attaches.
+  - Opt out per-platform / per-template with `{ ios: false }` /
+    `{ nse: false }` in `app.json` plugin props.
+  - Legacy customers (no `richMedia` field) see identical v2.27
+    behaviour. Hosts without the NSE target installed still receive
+    the text-only notification — `mutable-content:1` is harmless when
+    no extension is registered.
+
 ## 1.3.1
 
 ### Patch Changes

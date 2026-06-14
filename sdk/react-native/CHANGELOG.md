@@ -1,5 +1,50 @@
 # @goliapkg/sentori-react-native
 
+## 3.1.0
+
+### Minor Changes
+
+- [`8d07add`](https://github.com/goliajp/sentori/commit/8d07add988d737b7699299c26e3712c444660ca9) Thanks [@doracawl](https://github.com/doracawl)! - v2.26 — RN SDK auto-correlation pipeline.
+
+  - New `BreadcrumbType` `'push'` for the auto-emitted breadcrumb when the SDK
+    receives a push carrying `_sentori.msgId` (server injects in v2.25+).
+    Same union shape on the server (`server/src/event.rs` `BreadcrumbType::Push`).
+  - RN drain loop, on a notification with `_sentori.msgId`:
+    - writes a `{ type: 'push', data: { msgId, title, body, opened, provider } }`
+      breadcrumb so a later `captureException` shows the push that just arrived.
+    - emits `sentori.push.received` (or `sentori.push.opened` for taps) through
+      the existing track pipeline.
+    - enqueues an ack POST to `/v1/push/sends/<msgId>/ack` — flushed every 5s
+      in the background. Server-side `push_sends.acked_at` flips on first ack.
+  - `sentori.push.setSessionContext(sessionId)` stamps the host's current
+    session id on outgoing acks for v2.27 push×session BI correlation.
+  - Zero host-app code change required to opt in. Payloads without
+    `_sentori.msgId` (older server, non-Sentori sender) flow through
+    unchanged — no breadcrumb, no track, no ack.
+
+### Patch Changes
+
+- [`9746100`](https://github.com/goliajp/sentori/commit/97461007dfb23059fbf0d85e02b1e0e70752e098) Thanks [@doracawl](https://github.com/doracawl)! - Fix Android build break on the Kotlin K2 compiler (Expo SDK 56).
+
+  `SentoriModule.kt` used a bare `return@Function` inside no-argument
+  `Function {}` lambdas (`pushRegister`, `pushUnregister`). Under K2 these
+  bind to the no-arg overload whose body is typed `() -> Any?`, where a bare
+  `return` is inferred as `Unit` and rejected:
+
+  ```
+  e: SentoriModule.kt: Return type mismatch: expected 'Any?', actual 'Unit'.
+  ```
+
+  This was a hard compile error that failed `:compileDebugKotlin` and blocked
+  the entire host app's Android build. Rewrote the early-out as idiomatic
+  `appContext.reactContext?.let { ... }` so the lambda's last expression is the
+  only return path. Also applied the same shape to `startAnrWatchdog` (which
+  took a parameter and so still compiled, but carried the identical latent
+  hazard) for consistency and future-proofing.
+
+- Updated dependencies [[`8d07add`](https://github.com/goliajp/sentori/commit/8d07add988d737b7699299c26e3712c444660ca9), [`cb1870e`](https://github.com/goliajp/sentori/commit/cb1870ebc23e515d3d94775536cf2dba2b406be3)]:
+  - @goliapkg/sentori-core@1.4.0
+
 ## 3.0.0
 
 ### Major Changes
