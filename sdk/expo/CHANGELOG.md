@@ -1,5 +1,36 @@
 # @goliapkg/sentori-expo
 
+## 7.0.0
+
+### Minor Changes
+
+- [`cb1870e`](https://github.com/goliajp/sentori/commit/cb1870ebc23e515d3d94775536cf2dba2b406be3) Thanks [@doracawl](https://github.com/doracawl)! - v2.28 — Push rich-media (image) support.
+
+  - New wire field `richMedia.imageUrl` on `/v1/push/send`. When set:
+    - **Android (FCM):** server writes `message.notification.image`,
+      FCM auto-renders the Android BigPicture style. Zero device-side
+      work required.
+    - **iOS (APNs):** server forces `aps.mutable-content: 1` and
+      surfaces the URL under the reserved `sentori_attachment_url`
+      key for a Notification Service Extension to download + attach.
+    - **Web Push:** passes through under `data.sentori_attachment_url`
+      for the host's Service Worker to use as `options.image`.
+  - The Sentori Expo plugin now writes a minimal NSE Swift template +
+    `Info.plist` to `ios/SentoriNSE/` on every `expo prebuild`. The
+    one-time Xcode target wiring is documented in the recipe; the
+    template downloads the URL with a 5 s timeout + attaches.
+  - Opt out per-platform / per-template with `{ ios: false }` /
+    `{ nse: false }` in `app.json` plugin props.
+  - Legacy customers (no `richMedia` field) see identical v2.27
+    behaviour. Hosts without the NSE target installed still receive
+    the text-only notification — `mutable-content:1` is harmless when
+    no extension is registered.
+
+### Patch Changes
+
+- Updated dependencies [[`9746100`](https://github.com/goliajp/sentori/commit/97461007dfb23059fbf0d85e02b1e0e70752e098), [`8d07add`](https://github.com/goliajp/sentori/commit/8d07add988d737b7699299c26e3712c444660ca9)]:
+  - @goliapkg/sentori-react-native@3.1.0
+
 ## 6.0.0
 
 ### Major Changes
@@ -91,16 +122,14 @@
   First non-hidden lens module added since v2.6 (cert-monitor + posture):
 
   - New `web/src/modules/push/view.tsx` — two stacked Cards on the
-    manage group (chord `g n`):
-    - **Configured providers** — `DataTable<PushCredentialRow>` showing
-      every credential row stored server-side. Provider label,
-      operator-readable config summary (e.g. `team_id · bundle_id ·
+    manage group (chord `g n`): - **Configured providers** — `DataTable<PushCredentialRow>` showing
+    every credential row stored server-side. Provider label,
+    operator-readable config summary (e.g. `team_id · bundle_id ·
 env`), updated_at, delete button. Encrypted `secret_blob` is
-      never returned by GET; never surfaced in the UI.
-    - **Add / update credential** — provider dropdown, config JSON
-      textarea (non-secret), secret JSON textarea (sealed before
-      save), Save button. Provider-specific placeholders document the
-      expected shape inline.
+    never returned by GET; never surfaced in the UI. - **Add / update credential** — provider dropdown, config JSON
+    textarea (non-secret), secret JSON textarea (sealed before
+    save), Save button. Provider-specific placeholders document the
+    expected shape inline.
   - `web/src/modules/registry.tsx` — registers `push` under `manage`
     with chord `n` and an `adminOnly: true` flag. Default visible.
   - `web/src/api/client.ts` adds three wrappers:
