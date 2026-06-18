@@ -95,9 +95,13 @@ const withSentoriPushIos = (config) => {
  */
 const withSentoriPushAndroidManifest = (config) => {
   return withAndroidManifest(config, (cfg) => {
-    const manifest = cfg.modResults.manifest
+    // addPermission expects the AndroidManifest object (cfg.modResults);
+    // it dereferences `.manifest['uses-permission']` internally. Passing
+    // `cfg.modResults.manifest` makes that read fail with `Cannot read
+    // properties of undefined (reading 'uses-permission')` and crashes
+    // `expo prebuild`.
     AndroidConfig.Permissions.addPermission(
-      manifest,
+      cfg.modResults,
       'android.permission.POST_NOTIFICATIONS'
     )
     return cfg
