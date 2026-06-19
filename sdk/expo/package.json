@@ -1,6 +1,6 @@
 {
   "name": "@goliapkg/sentori-expo",
-  "version": "7.0.2",
+  "version": "8.0.0",
   "description": "Expo adapter for Sentori — Config Plugin marker, expo-application auto-config, EAS post-build helper. Built on @goliapkg/sentori-react-native.",
   "license": "Apache-2.0 OR MIT",
   "author": "GOLIA K.K. <takagi@golia.jp> (https://golia.jp)",
