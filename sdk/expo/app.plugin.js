@@ -284,13 +284,13 @@ const withSentoriNSE = (config) => {
  *
  * @param {object} pbxproj — `xcode` package's Pbxproj instance
  *   (cfg.modResults inside withXcodeProject)
- * @param {{ mainBundleId: string, deploymentTarget: string }} opts
+ * @param {{ mainBundleId: string, deploymentTarget: string, appleTeamId?: string }} opts
  * @returns {boolean} — true when the target was added, false when no-op
  */
 function injectNSETarget(pbxproj, opts) {
   if (pbxproj.pbxTargetByName(NSE_TARGET)) return false
 
-  const { deploymentTarget, mainBundleId } = opts
+  const { appleTeamId, deploymentTarget, mainBundleId } = opts
   if (!mainBundleId) throw new Error('[sentori-expo] mainBundleId is required for NSE target')
   if (!deploymentTarget) {
     throw new Error('[sentori-expo] deploymentTarget is required for NSE target')
@@ -322,6 +322,14 @@ function injectNSETarget(pbxproj, opts) {
     SWIFT_VERSION: '5.0',
     TARGETED_DEVICE_FAMILY: '"1,2"',
   }
+  // Mirror the host app's signing team onto the NSE target. Without
+  // DEVELOPMENT_TEAM, `expo run:ios --device` falls back to the user's
+  // personal Apple-ID team and Xcode can't issue a provisioning profile
+  // for `<mainBundleId>.SentoriNSE` under the project's actual team —
+  // fails with "No profiles for ... were found". If the host hasn't
+  // configured a team (manual-signing projects), leave it unset so the
+  // user's existing flow keeps working.
+  if (appleTeamId) settings.DEVELOPMENT_TEAM = appleTeamId
   const nseTarget = pbxproj.hash.project.objects.PBXNativeTarget[target.uuid]
   const configListUuid = nseTarget.buildConfigurationList
   const configList = pbxproj.hash.project.objects.XCConfigurationList[configListUuid]
@@ -355,7 +363,8 @@ const withSentoriNSETarget = (config) =>
     // not the top-level ios field. 15.1 matches Expo SDK 55's default.
     const deploymentTarget =
       cfg.ios?.deploymentTarget ?? cfg.ios?.infoPlist?.MinimumOSVersion ?? '15.1'
-    injectNSETarget(cfg.modResults, { deploymentTarget, mainBundleId })
+    const appleTeamId = cfg.ios?.appleTeamId
+    injectNSETarget(cfg.modResults, { appleTeamId, deploymentTarget, mainBundleId })
     return cfg
   })
 
