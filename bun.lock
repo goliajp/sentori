@@ -52,7 +52,7 @@
       "name": "@goliapkg/sentori-expo",
       "version": "7.0.2",
       "dependencies": {
-        "@expo/config-plugins": ">=55.0.0 <57.0.0",
+        "@expo/config-plugins": "^56.0.9",
       },
       "devDependencies": {
         "@goliapkg/sentori-react-native": "workspace:*",
@@ -61,9 +61,9 @@
       },
       "peerDependencies": {
         "@goliapkg/sentori-react-native": ">=3.1.0",
-        "expo": ">=55.0.0 <57.0.0",
-        "expo-application": ">=55.0.0 <57.0.0",
-        "react-native": ">=0.81.0",
+        "expo": ">=56.0.0 <57.0.0",
+        "expo-application": ">=56.0.0 <57.0.0",
+        "react-native": ">=0.82.0",
       },
       "optionalPeers": [
         "expo-application",
