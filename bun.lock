@@ -50,7 +50,7 @@
     },
     "sdk/expo": {
       "name": "@goliapkg/sentori-expo",
-      "version": "7.0.2",
+      "version": "8.0.0",
       "dependencies": {
         "@expo/config-plugins": "^56.0.9",
       },
@@ -142,11 +142,11 @@
       "peerDependencies": {
         "@react-native-async-storage/async-storage": "*",
         "@react-native-community/netinfo": "*",
-        "expo-modules-core": ">=55.0.0 <57.0.0",
+        "expo-modules-core": ">=56.0.0 <57.0.0",
         "expo-sensors": "*",
         "expo-updates": "*",
         "react": ">=19",
-        "react-native": ">=0.81.0",
+        "react-native": ">=0.82.0",
         "react-native-code-push": "*",
       },
       "optionalPeers": [

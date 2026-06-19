@@ -63,9 +63,9 @@
     "prepack": "bun run build"
   },
   "peerDependencies": {
-    "expo-modules-core": ">=55.0.0 <57.0.0",
+    "expo-modules-core": ">=56.0.0 <57.0.0",
     "react": ">=19",
-    "react-native": ">=0.81.0"
+    "react-native": ">=0.82.0"
   },
   "peerDependenciesMeta": {
     "@react-native-async-storage/async-storage": {
