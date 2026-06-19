@@ -103,7 +103,7 @@ API: `GET /admin/api/projects/:projectId/push/sends/:sendId/downstream`.
 ```
 
 - **Android (FCM)**: server writes `message.notification.image`. FCM **auto-renders** BigPicture style on the device with no host code needed.
-- **iOS (APNs)**: server forces `aps.mutable-content: 1` and surfaces the URL under the reserved `sentori_attachment_url` custom-data key. A **Notification Service Extension** (NSE) on the device downloads + attaches the image before iOS displays. `@goliapkg/sentori-expo` v2.28+ writes a ready-to-use NSE template to `ios/SentoriNSE/` on every `expo prebuild`; one-time Xcode target wiring is required (5 clicks). See the [iOS recipe](./push-from-react-native-ios/).
+- **iOS (APNs)**: server forces `aps.mutable-content: 1` and surfaces the URL under the reserved `sentori_attachment_url` custom-data key. A **Notification Service Extension** (NSE) on the device downloads + attaches the image before iOS displays. As of `@goliapkg/sentori-expo@7.0.2` the plugin **fully automates** NSE wiring — it writes the template to `ios/SentoriNSE/`, injects the Xcode target via `withXcodeProject`, and syncs the NSE Info.plist's `CFBundleShortVersionString` / `CFBundleVersion` to the host app's values so the `.appex` signs cleanly. No manual Xcode step. See the [iOS recipe](./push-from-react-native-ios/).
 - **Web Push**: passes through under `data.sentori_attachment_url` so your Service Worker can use it as `options.image`.
 
 ---
@@ -277,6 +277,13 @@ Phase 2 added four nullable migrations — all backward-compatible:
 - `0082_push_preferences.sql` — `push_preferences` PK `(project, fp, category)`
 
 Pre-Phase-2 rows stay NULL; no backfill needed.
+
+## Notes for hosts running companion config plugins
+
+If you write your own Expo config plugins next to `@goliapkg/sentori-expo` (custom `withDangerousMod` / `withInfoPlist` / `withEntitlementsPlist` mods), two behaviours are worth knowing:
+
+- **`dangerousMod` callbacks run LIFO**, not in plugin-registration order. The last-registered plugin's `dangerousMod` runs first. If your mod expects the `ios/SentoriNSE/` directory to exist (e.g. a follow-up file rewrite), register your plugin **before** `@goliapkg/sentori-expo` in `plugins` so its mod runs after sentori's template copy.
+- **`withSentoriPushIos` guards are "first writer wins"**, not "sentori wins". Sentori only sets `UIBackgroundModes ⊇ ['remote-notification']` and `aps-environment` when those keys aren't already present. If you're co-existing with `expo-notifications` or another push plugin that sets these, the value of the plugin that ran last is what ends up on disk.
 
 ## See also
 
