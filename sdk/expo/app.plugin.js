@@ -39,9 +39,18 @@ const {
   withProjectBuildGradle,
   withAppBuildGradle,
   withDangerousMod,
+  withXcodeProject,
   AndroidConfig,
   withPlugins,
 } = require('@expo/config-plugins')
+
+// NSE target wiring constants. Path is relative to the .xcodeproj — the
+// `xcode` package's addBuildPhase resolves filePaths against the project
+// root, not the target subfolder, so the NSE/ prefix is required here
+// even though the source actually lives at ios/SentoriNSE/<basename>.
+const NSE_TARGET = 'SentoriNSE'
+const NSE_SOURCE_REL = 'SentoriNSE/SentoriNotificationServiceExtension.swift'
+const NSE_PLIST_REL = 'SentoriNSE-Info.plist'
 
 const SENTORI_VERSION_KEY = 'SentoriSdkVersion'
 const FIREBASE_BOM_VERSION = '33.5.1'
@@ -172,7 +181,7 @@ const withSentoriGoogleServicesJson = (config, props = {}) => {
   ])
 }
 
-// ── v2.28 iOS Notification Service Extension scaffolding ──────────
+// ── v2.28 iOS Notification Service Extension ─────────────────────
 //
 // Rich-media notifications (images / future video) require an NSE
 // target on the iOS app. The Sentori NSE template downloads the URL
@@ -180,14 +189,48 @@ const withSentoriGoogleServicesJson = (config, props = {}) => {
 // displays the notification. APNs server side sets this key when
 // `richMedia.imageUrl` is on the send (v2.28+).
 //
-// v2.28 ships the source files via withDangerousMod. Adding the NSE
-// **target** to the Xcode project is a one-time manual step (5 clicks
-// in Xcode → File → New → Target → Notification Service Extension,
-// then drag in our Swift file). The recipe walks the developer through
-// it. v2.28.1 will auto-inject the target via withXcodeProject.
+// As of 7.0.2 the wiring is fully automated across two plugins:
 //
-// Opt out with `{ ios: false }` (which also drops the rest of the iOS
-// push wiring) or with `{ nse: false }` for just this template.
+//   - withSentoriNSE         (this section) writes the template files
+//                            into ios/SentoriNSE/ AND syncs the NSE
+//                            Info.plist's CFBundleShortVersionString /
+//                            CFBundleVersion to the host app's values.
+//                            Apple's app-extension verifier rejects an
+//                            .appex whose version keys do not match
+//                            the parent app at signing time, so the
+//                            sync is mandatory.
+//
+//   - withSentoriNSETarget   (further down) creates the actual Xcode
+//                            target via withXcodeProject so signing +
+//                            building succeed without any manual
+//                            Xcode-UI step.
+//
+// Opt out with `{ ios: false }` (which drops the rest of the iOS push
+// wiring too) or with `{ nse: false }` for just NSE (template + target).
+
+/**
+ * Rewrite the NSE Info.plist's marketing + build version strings to
+ * track the host app. Apple rejects an .appex at signing time when its
+ * CFBundleShortVersionString / CFBundleVersion don't match the parent
+ * app — present in every Sentori install that enabled NSE before 7.0.2.
+ *
+ * Pure / exported for unit-test coverage.
+ *
+ * @param {string} contents — current NSE-Info.plist contents
+ * @param {{ version: string, buildNumber: string }} ver
+ * @returns {string}
+ */
+function syncNSEPlistVersion(contents, ver) {
+  return contents
+    .replace(
+      /(<key>CFBundleShortVersionString<\/key>\s*<string>)[^<]*(<\/string>)/,
+      `$1${ver.version}$2`
+    )
+    .replace(
+      /(<key>CFBundleVersion<\/key>\s*<string>)[^<]*(<\/string>)/,
+      `$1${ver.buildNumber}$2`
+    )
+}
 
 /**
  * @param {import('@expo/config-plugins').ExpoConfig} config
@@ -197,7 +240,7 @@ const withSentoriNSE = (config) => {
     'ios',
     async (cfg) => {
       const platformRoot = cfg.modRequest.platformProjectRoot
-      const destDir = path.join(platformRoot, 'SentoriNSE')
+      const destDir = path.join(platformRoot, NSE_TARGET)
       const templateDir = path.join(__dirname, 'templates', 'ios-nse')
       const swiftSrc = path.join(templateDir, 'SentoriNotificationServiceExtension.swift')
       const plistSrc = path.join(templateDir, 'SentoriNSE-Info.plist')
@@ -213,26 +256,108 @@ const withSentoriNSE = (config) => {
         swiftSrc,
         path.join(destDir, 'SentoriNotificationServiceExtension.swift')
       )
-      fs.copyFileSync(plistSrc, path.join(destDir, 'SentoriNSE-Info.plist'))
-      // One-time guidance for first-time setup. Idempotent — appears
-      // on every prebuild until the target exists.
-      const pbxproj = path.join(platformRoot, cfg.modRequest.projectName + '.xcodeproj', 'project.pbxproj')
-      if (fs.existsSync(pbxproj)) {
-        const proj = fs.readFileSync(pbxproj, 'utf8')
-        if (!proj.includes('SentoriNSE')) {
-          // eslint-disable-next-line no-console
-          console.log(
-            '\n[sentori-expo] iOS NSE template files copied to ios/SentoriNSE/.\n' +
-              '             For rich-media (image) notifications to render, add a\n' +
-              '             Notification Service Extension target via Xcode and link\n' +
-              '             these files. Detailed steps in the recipe.\n'
-          )
-        }
+      const plistDest = path.join(destDir, NSE_PLIST_REL)
+      fs.copyFileSync(plistSrc, plistDest)
+
+      // Version-sync the freshly-copied plist in the same callback so
+      // the read+write is atomic with the copy (no dependency on
+      // Expo's cross-plugin dangerousMod ordering, which is LIFO and
+      // therefore brittle to reason about). Expo defaults the host
+      // app's CFBundleVersion to '1' when ios.buildNumber is unset.
+      const version = cfg.version
+      const buildNumber = cfg.ios?.buildNumber ?? '1'
+      if (version) {
+        const current = fs.readFileSync(plistDest, 'utf-8')
+        const updated = syncNSEPlistVersion(current, { buildNumber, version })
+        if (updated !== current) fs.writeFileSync(plistDest, updated)
       }
       return cfg
     },
   ])
 }
+
+/**
+ * Pure pbxproj mutation. Adds the NSE target + build phases + build
+ * settings, or returns false when the target already exists.
+ *
+ * Exported for unit-test coverage.
+ *
+ * @param {object} pbxproj — `xcode` package's Pbxproj instance
+ *   (cfg.modResults inside withXcodeProject)
+ * @param {{ mainBundleId: string, deploymentTarget: string }} opts
+ * @returns {boolean} — true when the target was added, false when no-op
+ */
+function injectNSETarget(pbxproj, opts) {
+  if (pbxproj.pbxTargetByName(NSE_TARGET)) return false
+
+  const { deploymentTarget, mainBundleId } = opts
+  if (!mainBundleId) throw new Error('[sentori-expo] mainBundleId is required for NSE target')
+  if (!deploymentTarget) {
+    throw new Error('[sentori-expo] deploymentTarget is required for NSE target')
+  }
+
+  // addTarget creates the PBXNativeTarget + XCBuildConfigurationList with
+  // INFOPLIST_FILE / PRODUCT_NAME / SKIP_INSTALL pre-set, and wires the
+  // produced .appex into a "Copy Files" phase on the main app target —
+  // that is Xcode's "Embed App Extensions" phase under a different name.
+  const target = pbxproj.addTarget(
+    NSE_TARGET,
+    'app_extension',
+    NSE_TARGET,
+    `${mainBundleId}.${NSE_TARGET}`
+  )
+
+  pbxproj.addBuildPhase([NSE_SOURCE_REL], 'PBXSourcesBuildPhase', 'Sources', target.uuid)
+  pbxproj.addBuildPhase([], 'PBXResourcesBuildPhase', 'Resources', target.uuid)
+  pbxproj.addBuildPhase([], 'PBXFrameworksBuildPhase', 'Frameworks', target.uuid)
+
+  // xcode 3.0.x stores native target names quoted (`'"SentoriNSE"'`), so
+  // `pbxTargetByName('SentoriNSE')` / `updateBuildProperty(..., 'SentoriNSE')`
+  // miss the target via string equality. Patch the buildSettings dictionary
+  // for the NSE build configurations directly off the project hash.
+  const settings = {
+    CLANG_ENABLE_MODULES: 'YES',
+    CODE_SIGN_STYLE: 'Automatic',
+    IPHONEOS_DEPLOYMENT_TARGET: deploymentTarget,
+    SWIFT_VERSION: '5.0',
+    TARGETED_DEVICE_FAMILY: '"1,2"',
+  }
+  const nseTarget = pbxproj.hash.project.objects.PBXNativeTarget[target.uuid]
+  const configListUuid = nseTarget.buildConfigurationList
+  const configList = pbxproj.hash.project.objects.XCConfigurationList[configListUuid]
+  for (const { value: configUuid } of configList.buildConfigurations) {
+    const config = pbxproj.hash.project.objects.XCBuildConfiguration[configUuid]
+    Object.assign(config.buildSettings, settings)
+  }
+
+  return true
+}
+
+/**
+ * @param {import('@expo/config-plugins').ExpoConfig} config
+ */
+const withSentoriNSETarget = (config) =>
+  withXcodeProject(config, (cfg) => {
+    const mainBundleId = cfg.ios?.bundleIdentifier
+    if (!mainBundleId) {
+      // Skip silently rather than throw — a host without an iOS
+      // bundleIdentifier configured is mid-setup, not broken.
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[sentori-expo] ios.bundleIdentifier not set; skipping NSE target injection. Add it to app.json and re-prebuild.'
+      )
+      return cfg
+    }
+    // Match the host app's deployment target so the NSE links against
+    // the same minimum iOS. Multi-source fallback because cfg.ios?.deploymentTarget
+    // is not reliably populated — Expo readers prefer the
+    // `expo-build-properties` config plugin's value or the Podfile,
+    // not the top-level ios field. 15.1 matches Expo SDK 55's default.
+    const deploymentTarget =
+      cfg.ios?.deploymentTarget ?? cfg.ios?.infoPlist?.MinimumOSVersion ?? '15.1'
+    injectNSETarget(cfg.modResults, { deploymentTarget, mainBundleId })
+    return cfg
+  })
 
 // ── Composer ───────────────────────────────────────────────────────
 
@@ -244,7 +369,9 @@ const withSentori = (config, props = {}) => {
   const plugins = [[withSentoriVersion, props]]
   if (props.ios !== false) {
     plugins.push([withSentoriPushIos, props])
-    if (props.nse !== false) plugins.push([withSentoriNSE, props])
+    if (props.nse !== false) {
+      plugins.push([withSentoriNSE, props], [withSentoriNSETarget, props])
+    }
   }
   if (props.android !== false) {
     plugins.push(
@@ -257,3 +384,7 @@ const withSentori = (config, props = {}) => {
 }
 
 module.exports = withSentori
+// Exported for unit-test coverage of the pure helpers.
+module.exports.injectNSETarget = injectNSETarget
+module.exports.syncNSEPlistVersion = syncNSEPlistVersion
+module.exports.NSE_TARGET = NSE_TARGET
