@@ -387,15 +387,8 @@ pub fn build(cfg: ServerConfig) -> Router {
             axum::routing::patch(api::admin::update_label)
                 .delete(api::admin::delete_label),
         )
-        .route(
-            "/projects/{project_id}/teams",
-            get(api::teams::list_project_teams),
-        )
-        .route(
-            "/projects/{project_id}/teams/{team_slug}",
-            post(api::teams::assign_project_to_team)
-                .delete(api::teams::unassign_project_from_team),
-        )
+        // Phase A.1 Stage B-3 — /projects/{id}/teams 删 (per §08, teams 砍).
+        // 视觉性 grouping 改走 project_user_visibility (B-3c+ 加).
         .route(
             "/projects/{project_id}/tokens",
             get(api::tokens::list_tokens).post(api::tokens::create_token),
@@ -972,73 +965,23 @@ pub fn build(cfg: ServerConfig) -> Router {
         .merge(user_auth_open)
         .merge(user_auth_authed);
 
-    // Phase 13 sub-C: orgs / memberships / invites. All require_user.
+    // Phase A.1 Stage B-3 — orgs / teams / invites / transfer / audit 整段删
+    // (per .claude/state/product-architecture.html §08 identity 重整).
+    //
+    // 这段原来挂着 orgs CRUD + members CRUD + teams 全套 + ownership transfer
+    // + org audit + federation + cross-org views/alert-rules/digests 等。
+    // 全部归宿:
+    //   - orgs CRUD → tenants (saas crate, B-3d 起填实)
+    //   - org members CRUD → workspace_members (B-3c+ 加新 endpoint 在 core)
+    //   - teams 整组 → 删 (per §08, enterprise/project_groups v0.2+)
+    //   - ownership transfer → workspace_members 单边 transfer (per §08.5)
+    //   - org audit → project-scoped audit (per §08.7 step 7)
+    //   - federation lookup → app_user_identities (rename, 留 core, B-3c 加 route)
+    //   - cross-org views/alert-rules/digests/labels → workspace-scoped 或 project-scoped
+    //     (case-by-case, B-3c+ 决定)
+    // Empty Router placeholder — B-3c+ 起加 workspace_members + workspace_invites
+    // 等 new endpoint。 暂时 empty 让 cargo build 通过。
     let orgs = Router::new()
-        .route("/orgs", post(api::orgs::create_org).get(api::orgs::list_my_orgs))
-        .route(
-            "/orgs/{slug}",
-            get(api::orgs::get_org)
-                .patch(api::orgs::patch_org)
-                .delete(api::orgs::delete_org),
-        )
-        .route("/orgs/{slug}/usage", get(api::orgs::org_usage))
-        .route("/orgs/{slug}/export", get(api::orgs::export_org))
-        // v1.1 chunk S4 — cross-project federation lookup. Returns
-        // every project in the org that has a link for (provider,
-        // subject); a single Google account that signed into 3 apps
-        // surfaces as 3 rows here.
-        .route(
-            "/orgs/{slug}/federation/{provider}/{subject}",
-            get(api::federation::lookup_by_subject),
-        )
-        .route("/orgs/{slug}/members", get(api::orgs::list_members))
-        .route(
-            "/orgs/{slug}/members/{user_id}",
-            axum::routing::patch(api::orgs::patch_member).delete(api::orgs::delete_member),
-        )
-        .route(
-            "/orgs/{slug}/teams",
-            get(api::teams::list_teams).post(api::teams::create_team),
-        )
-        .route(
-            "/orgs/{slug}/teams/{team_slug}",
-            get(api::teams::get_team)
-                .patch(api::teams::patch_team)
-                .delete(api::teams::delete_team),
-        )
-        .route(
-            "/orgs/{slug}/teams/{team_slug}/members",
-            get(api::teams::list_team_members).post(api::teams::add_team_member),
-        )
-        .route(
-            "/orgs/{slug}/teams/{team_slug}/members/{user_id}",
-            axum::routing::patch(api::teams::patch_team_member)
-                .delete(api::teams::remove_team_member),
-        )
-        .route(
-            "/orgs/{slug}/teams/{team_slug}/projects",
-            get(api::teams::list_team_projects),
-        )
-        .route(
-            "/orgs/{slug}/invites",
-            post(api::orgs::create_invite).get(api::orgs::list_invites),
-        )
-        .route(
-            "/orgs/{slug}/invites/{token}",
-            axum::routing::delete(api::orgs::delete_invite),
-        )
-        .route("/invites/{token}/accept", post(api::orgs::accept_invite))
-        .route(
-            "/orgs/{slug}/transfer",
-            post(api::orgs::create_transfer),
-        )
-        .route(
-            "/orgs/transfers/{token}/accept",
-            post(api::orgs::accept_transfer),
-        )
-        .route("/orgs/{slug}/audit", get(api::orgs::list_audit))
-        .route("/audit/actions", get(api::orgs::list_audit_actions))
-        .route("/users/me/activity", get(api::orgs::list_my_activity))
         .route(
             "/users/me/digests",
             get(api::digests::list_my_digests).post(api::digests::subscribe),

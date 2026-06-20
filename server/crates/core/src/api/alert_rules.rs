@@ -23,7 +23,7 @@ use serde_json::{Value as JsonValue, json};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::api::teams::resolve_membership;
+use crate::api::resolve_membership;
 use crate::api::user_auth::CurrentUser;
 use crate::recent::AppState;
 

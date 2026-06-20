@@ -36,7 +36,10 @@ pub mod runtime_metrics_query;
 /// health checks. Probes themselves are driven by the
 /// `endpoint_probe` cron module in the crate root.
 pub mod endpoint_checks;
-pub mod orgs;
+// Phase A.1 Stage B-3 — orgs 删 (per §08 identity 重整 + sprint-0/S14).
+// orgs → tenants (saas crate). Workspace 内 member CRUD 在新 workspace_members
+// module (B-3c+ 加). API 路径 /orgs/* 暂时全 410 Gone 或路由删 (router.rs).
+// pub mod orgs;
 pub mod privacy;
 pub mod projects;
 /// v2.7 — push notification subsystem HTTP routes (token register /
@@ -54,7 +57,9 @@ pub mod source_bundle;
 pub mod sessions;
 pub mod superadmin;
 pub mod spans;
-pub mod teams;
+// Phase A.1 Stage B-3 — teams 删 (per §08).
+// teams → enterprise/project_groups (v0.2+);现 visibility 走 project_user_visibility.
+// pub mod teams;
 pub mod tokens;
 pub mod traces;
 pub mod track;
@@ -63,3 +68,17 @@ pub mod user_auth;
 pub mod user_reports;
 pub mod views;
 pub mod vitals;
+
+// Phase A.1 Stage B-3 transitional stub —
+// teams module 删后, api/alert_rules.rs + api/views.rs 仍引用
+// `resolve_membership(pool, slug, user_id) -> Option<(org_id, role_string)>`.
+// B-3c+ 把这两个 module rewrite 成 workspace_members + project_id-based 后
+// 此 stub 删。 stub 暂时永远 None 让 cargo 通 + 这两个 module API 暂时
+// 全返 404 (consumer 看到 orgNotFound, 不破坏 cargo build)。
+pub async fn resolve_membership(
+    _pool: &sqlx::PgPool,
+    _slug: &str,
+    _user_id: uuid::Uuid,
+) -> Option<(uuid::Uuid, String)> {
+    None
+}
