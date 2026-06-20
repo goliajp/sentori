@@ -29,7 +29,7 @@ BLANK_LINE       = re.compile(r'^\s*$')
 DOC_COMMENT      = re.compile(r'^\s*///?')
 
 violations = []
-for path in sorted(Path('server/src').rglob('*.rs')):
+for path in sorted(Path('server/crates/core/src').rglob('*.rs')):
     in_block = False
     depth = 0
     serde_aware = False

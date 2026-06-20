@@ -13,7 +13,8 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-const SERVER_SRC = 'server/src'
+// Phase A.1 — workspace reorg: server/src → server/crates/core/src
+const SERVER_SRC = 'server/crates/core/src'
 const DOCS = 'docs/errors'
 
 // Each line under one of these prefixes is a candidate; we extract

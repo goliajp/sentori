@@ -37,25 +37,36 @@ RUN set -eux; \
     gunzip db.mmdb.gz
 
 FROM rust:1-bookworm AS builder
-WORKDIR /build/server
+WORKDIR /build
+
+# Phase A.1 — workspace reorganization:
+# server/Cargo.toml is now a [workspace] root pointing at crates/core.
+# build.rs reads root VERSION via ../../../VERSION from crates/core, so
+# the file must land at the repo root path inside the container too.
+# Layout in container:
+#   /build/VERSION
+#   /build/server/Cargo.toml                     (workspace root)
+#   /build/server/crates/core/Cargo.toml         (package)
+#   /build/server/crates/core/build.rs
+#   /build/server/crates/core/src/
+#   /build/server/crates/core/migrations/
+COPY VERSION ./VERSION
+COPY server/Cargo.toml ./server/Cargo.toml
+COPY server/Cargo.lock ./server/Cargo.lock
+COPY server/crates/core/Cargo.toml ./server/crates/core/Cargo.toml
+COPY server/crates/core/build.rs   ./server/crates/core/build.rs
 
 # Pre-fetch deps to a separate layer for better caching.
-# v2.20 — root VERSION file is the single source of truth. server/build.rs
-# panics if Cargo.toml drifts. WORKDIR is /build/server, build.rs resolves
-# `../VERSION` from CARGO_MANIFEST_DIR, so the file lands at /build/VERSION.
-# Cargo.toml + Cargo.lock + build.rs + VERSION all need to be present
-# before the layer-cache primer runs, otherwise the build script panics
-# (or, worse, doesn't run at all, weakening our drift fence).
-COPY server/Cargo.toml server/Cargo.lock server/build.rs ./
-COPY VERSION ../VERSION
-RUN mkdir -p src && echo 'fn main(){}' > src/main.rs \
+WORKDIR /build/server
+RUN mkdir -p crates/core/src \
+    && echo 'fn main(){}' > crates/core/src/main.rs \
     && cargo build --release --bin sentori-server || true \
-    && rm -rf src
+    && rm -rf crates/core/src
 
 # Real build.
-COPY server/src ./src
-COPY server/migrations ./migrations
-RUN touch src/main.rs && cargo build --release --bin sentori-server
+COPY server/crates/core/src        ./crates/core/src
+COPY server/crates/core/migrations ./crates/core/migrations
+RUN touch crates/core/src/main.rs && cargo build --release --bin sentori-server
 
 # Runtime: distroless cc (glibc + libgcc + libstdc++, no shell).
 FROM gcr.io/distroless/cc-debian12

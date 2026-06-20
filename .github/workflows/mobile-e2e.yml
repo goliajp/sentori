@@ -111,7 +111,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Apply migrations
         run: |
-          for f in server/migrations/*.sql; do
+          for f in server/crates/core/migrations/*.sql; do
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
           done
       - name: Build + start server
@@ -159,7 +159,7 @@ jobs:
           SENTORI_BASE_URL: http://localhost:8080
         run: |
           sudo apt-get update && sudo apt-get install -y postgresql-client
-          for f in server/migrations/*.sql; do
+          for f in server/crates/core/migrations/*.sql; do
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
           done
           cargo build --manifest-path server/Cargo.toml

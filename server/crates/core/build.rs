@@ -14,7 +14,13 @@ use std::path::PathBuf;
 fn main() {
     let manifest_dir =
         PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set"));
-    let version_path = manifest_dir.join("..").join("VERSION");
+    // Phase A.1 — crate 现在在 server/crates/core/, 跳 3 层 (../../..)
+    // 到 repo root.
+    let version_path = manifest_dir
+        .join("..")
+        .join("..")
+        .join("..")
+        .join("VERSION");
     println!("cargo:rerun-if-changed={}", version_path.display());
 
     let root_version = fs::read_to_string(&version_path)
