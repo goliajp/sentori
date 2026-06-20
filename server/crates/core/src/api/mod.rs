@@ -68,6 +68,9 @@ pub mod user_auth;
 pub mod user_reports;
 pub mod views;
 pub mod vitals;
+// Phase A.1 Stage B-3c — new workspace_members + project_user_visibility module skeleton.
+// Endpoint impl 留 Stage B-3d+ 填实。
+pub mod workspace;
 
 // Phase A.1 Stage B-3 transitional stub —
 // teams module 删后, api/alert_rules.rs + api/views.rs 仍引用
