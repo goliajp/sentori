@@ -2,7 +2,7 @@
 resolver = "3"
 members = [
     "crates/core",
+    "crates/saas",
     "bin/sentori-selfhosted",
     "bin/sentori-saas",
-    # Stage B-2 加: "crates/saas"
 ]

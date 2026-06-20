@@ -1,0 +1,41 @@
+[package]
+# Phase A.1 Stage B-2 — sentori-saas crate (lib).
+# saas-only multi-tenant 工具 — tenants 抽象 + scoping middleware +
+# saasadmin 视角 + Stripe 接入 + 内部 subscriptions/invoices/license JWT 签发。
+# 跟 sentori-core 解耦 — core 不知 tenant 概念, saas 包一层。
+# 闭源 proprietary — 不进 OSS mirror (per .claude/state/product-architecture.html §11.1
+# git-filter-repo invert-paths)。
+name = "sentori-saas-lib"   # lib 跟 bin/sentori-saas (binary) 名字区分
+version = "1.3.0"
+edition = "2024"
+authors = ["GOLIA K.K. <takagi@golia.jp>"]
+description = "Sentori SaaS multi-tenant layer — proprietary, GOLIA internal"
+license = "Proprietary"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+sentori-core = { path = "../core" }
+
+# Stage B-2 skeleton 依赖 — 实际 module 实现 (stripe / license / tenants /
+# saasadmin) Stage B-3+ 加。
+axum = { version = "0.8", features = ["multipart"] }
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "time", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v7", "serde"] }
+tracing = "0.1"
+anyhow = "1"
+thiserror = "2"
+
+# License JWT (per .claude/state/sprint-0/S4-license-jwt-poc.md)
+jsonwebtoken = { version = "10", features = ["rust_crypto"] }
+
+# Stripe (per .claude/state/sprint-0/S5-stripe-poc.md)
+# async-stripe = { version = "0.41", default-features = false,
+#                  features = ["runtime-tokio-hyper-rustls", "billing",
+#                              "webhook-events", "checkout", "customer-portal"] }
+# 暂时注释 — Stage B-3 实际接 Stripe 时 enable

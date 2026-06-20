@@ -18,7 +18,7 @@ path = "src/main.rs"
 
 [dependencies]
 sentori-core = { path = "../../crates/core" }
-# sentori-saas = { path = "../../crates/saas" }   # Stage B-2 加入
+sentori-saas-lib = { path = "../../crates/saas" }   # Stage B-2 加入 — 现仅 skeleton, B-3 真用
 
 # Bin wrapper 依赖
 anyhow = "1"
