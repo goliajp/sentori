@@ -2,7 +2,7 @@
 resolver = "3"
 members = [
     "crates/core",
-    # Phase A.1 — workspace skeleton 第一步, 现仅 core crate;
-    # crates/saas + bin/sentori-selfhosted + bin/sentori-saas 在
-    # Stage B (后续 session) 加入。
+    "bin/sentori-selfhosted",
+    "bin/sentori-saas",
+    # Stage B-2 加: "crates/saas"
 ]

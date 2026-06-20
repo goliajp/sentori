@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
 use anyhow::Context;
-use sentori_server::{
+use sentori_core::{
     db, digest, metrics, notifier, push, quotas, regression, retention, router, rule_eval, seed,
     trace_emit, valkey, webhook_dispatch,
 };
@@ -96,7 +96,7 @@ async fn main() -> anyhow::Result<()> {
     // closes. Only fires when SMTP is configured; otherwise logs a
     // skip + bumps the digest_runs row so we don't busy-loop.
     if let Some(p) = pool.as_ref() {
-        sentori_server::notification_digest::spawn(std::sync::Arc::new(p.clone()));
+        sentori_core::notification_digest::spawn(std::sync::Arc::new(p.clone()));
         tracing::info!("notification digest worker spawned (60s tick)");
     }
 
@@ -105,7 +105,7 @@ async fn main() -> anyhow::Result<()> {
     // instances share install tokens and don't burn the GitHub App
     // /access_tokens endpoint per-instance (it's lightly rate-limited).
     if let Some(v) = valkey.as_ref() {
-        sentori_server::integrations::github::init_valkey_cache(v.clone());
+        sentori_core::integrations::github::init_valkey_cache(v.clone());
         tracing::info!("github app install-token Valkey cache wired");
     }
 
@@ -123,7 +123,7 @@ async fn main() -> anyhow::Result<()> {
     if let Some(p) = pool.as_ref() {
         retention::spawn_retention_task(
             p.clone(),
-            sentori_server::attachments::build_default_store(),
+            sentori_core::attachments::build_default_store(),
         );
         tracing::info!("retention task spawned (24h interval)");
     }
@@ -157,7 +157,7 @@ async fn main() -> anyhow::Result<()> {
     // and fan out a notification email to the project's recipient
     // list. Only spawn when both the db and the notifier are wired.
     if let (Some(p), Some(tx)) = (pool.as_ref(), notifier_tx.as_ref()) {
-        sentori_server::cert_monitor::spawn(p.clone(), tx.clone());
+        sentori_core::cert_monitor::spawn(p.clone(), tx.clone());
         tracing::info!("cert-monitor spawned (10m interval)");
     }
 
@@ -165,7 +165,7 @@ async fn main() -> anyhow::Result<()> {
     // 30m count vs the prior 30m bucket; trips on ratio ≥ 3 with ≥ 20
     // events absolute. Dedupes via velocity_state table.
     if let (Some(p), Some(tx)) = (pool.as_ref(), notifier_tx.as_ref()) {
-        sentori_server::velocity::spawn_cron(p.clone(), tx.clone());
+        sentori_core::velocity::spawn_cron(p.clone(), tx.clone());
         tracing::info!("velocity cron spawned (5m interval)");
     }
 
@@ -174,7 +174,7 @@ async fn main() -> anyhow::Result<()> {
     // strings (email/phone/cc/address) and records findings for the
     // dashboard's Privacy module.
     if let Some(p) = pool.as_ref() {
-        sentori_server::privacy_lab::spawn(p.clone());
+        sentori_core::privacy_lab::spawn(p.clone());
         tracing::info!("privacy lab spawned (15m interval)");
     }
 
@@ -212,9 +212,9 @@ async fn main() -> anyhow::Result<()> {
     //   • metrics_rollup: 60s tick raw→1m + hourly 1m→1h +
     //     daily 1h→1d. See docs/design/v2-metrics.md.
     if let Some(p) = pool.as_ref() {
-        sentori_server::metrics_partition::spawn_cron(p.clone());
+        sentori_core::metrics_partition::spawn_cron(p.clone());
         tracing::info!("metrics partition cron spawned (1h interval, 3d window, 90d retention)");
-        sentori_server::metrics_rollup::spawn_cron(p.clone());
+        sentori_core::metrics_rollup::spawn_cron(p.clone());
         tracing::info!("metrics rollup cron spawned (60s tick raw→1m, hourly 1m→1h, daily 1h→1d)");
     }
 
@@ -224,7 +224,7 @@ async fn main() -> anyhow::Result<()> {
     // 03). Assertion engine + consecutive-2 auto-issue lifecycle
     // live in the same module.
     if let Some(p) = pool.as_ref() {
-        sentori_server::endpoint_probe::spawn_cron(p.clone());
+        sentori_core::endpoint_probe::spawn_cron(p.clone());
         tracing::info!("endpoint probe cron spawned (60s scan-due, 32 concurrent probes, 30d retention)");
     }
 
@@ -311,7 +311,7 @@ async fn main() -> anyhow::Result<()> {
         base_url,
         metrics: Some(metrics_handle),
         self_trace,
-        attachments: Some(sentori_server::attachments::build_default_store()),
+        attachments: Some(sentori_core::attachments::build_default_store()),
         geoip_db_path,
         asn_db_path,
         push_providers: Some(push_providers),

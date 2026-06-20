@@ -3286,7 +3286,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sentori-server"
+name = "sentori-core"
 version = "1.3.0"
 dependencies = [
  "addr2line 0.26.1",
@@ -3336,6 +3336,36 @@ dependencies = [
  "uuid",
  "validator",
  "wasmtime",
+]
+
+[[package]]
+name = "sentori-saas"
+version = "1.3.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "redis",
+ "sentori-core",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "sentori-selfhosted"
+version = "1.3.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "redis",
+ "sentori-core",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]

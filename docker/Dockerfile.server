@@ -3,7 +3,7 @@
 # so the runtime image does not need them.
 #
 # Build context: repo root.
-#   docker build -f docker/Dockerfile.server -t sentori-server .
+#   docker build -f docker/Dockerfile.server -t sentori-selfhosted .
 
 # v0.8.4 — GeoIP db fetch stage. Pulls DB-IP Lite IP-to-Country
 # (CC-BY 4.0) at image build time so the resulting image self-contains
@@ -39,41 +39,46 @@ RUN set -eux; \
 FROM rust:1-bookworm AS builder
 WORKDIR /build
 
-# Phase A.1 — workspace reorganization:
-# server/Cargo.toml is now a [workspace] root pointing at crates/core.
-# build.rs reads root VERSION via ../../../VERSION from crates/core, so
-# the file must land at the repo root path inside the container too.
-# Layout in container:
+# Phase A.1 Stage B — workspace + 2 bin (sentori-selfhosted + sentori-saas):
+# Container layout:
 #   /build/VERSION
-#   /build/server/Cargo.toml                     (workspace root)
-#   /build/server/crates/core/Cargo.toml         (package)
-#   /build/server/crates/core/build.rs
-#   /build/server/crates/core/src/
-#   /build/server/crates/core/migrations/
+#   /build/server/Cargo.toml                            (workspace root)
+#   /build/server/crates/core/{Cargo.toml,build.rs,src,migrations}
+#   /build/server/bin/sentori-selfhosted/{Cargo.toml,src}
+#   /build/server/bin/sentori-saas/{Cargo.toml,src}
+# 这个 Dockerfile build OSS selfhosted bin (默认 image)。
+# saas bin 在 saas-only docker-compose / 内部 prod deploy 用单独 Dockerfile.saas (待 Stage B 后建)。
 COPY VERSION ./VERSION
 COPY server/Cargo.toml ./server/Cargo.toml
 COPY server/Cargo.lock ./server/Cargo.lock
-COPY server/crates/core/Cargo.toml ./server/crates/core/Cargo.toml
-COPY server/crates/core/build.rs   ./server/crates/core/build.rs
+COPY server/crates/core/Cargo.toml          ./server/crates/core/Cargo.toml
+COPY server/crates/core/build.rs            ./server/crates/core/build.rs
+COPY server/bin/sentori-selfhosted/Cargo.toml ./server/bin/sentori-selfhosted/Cargo.toml
+COPY server/bin/sentori-saas/Cargo.toml       ./server/bin/sentori-saas/Cargo.toml
 
 # Pre-fetch deps to a separate layer for better caching.
 WORKDIR /build/server
-RUN mkdir -p crates/core/src \
-    && echo 'fn main(){}' > crates/core/src/main.rs \
-    && cargo build --release --bin sentori-server || true \
-    && rm -rf crates/core/src
+RUN mkdir -p crates/core/src bin/sentori-selfhosted/src bin/sentori-saas/src \
+    && echo 'pub fn _placeholder() {}' > crates/core/src/lib.rs \
+    && echo 'fn main(){}' > bin/sentori-selfhosted/src/main.rs \
+    && echo 'fn main(){}' > bin/sentori-saas/src/main.rs \
+    && cargo build --release --bin sentori-selfhosted || true \
+    && rm -rf crates/core/src bin/sentori-selfhosted/src bin/sentori-saas/src
 
 # Real build.
-COPY server/crates/core/src        ./crates/core/src
-COPY server/crates/core/migrations ./crates/core/migrations
-RUN touch crates/core/src/main.rs && cargo build --release --bin sentori-server
+COPY server/crates/core/src             ./crates/core/src
+COPY server/crates/core/migrations      ./crates/core/migrations
+COPY server/bin/sentori-selfhosted/src  ./bin/sentori-selfhosted/src
+COPY server/bin/sentori-saas/src        ./bin/sentori-saas/src
+RUN touch crates/core/src/lib.rs bin/sentori-selfhosted/src/main.rs \
+    && cargo build --release --bin sentori-selfhosted
 
 # Runtime: distroless cc (glibc + libgcc + libstdc++, no shell).
 FROM gcr.io/distroless/cc-debian12
 WORKDIR /app
-COPY --from=builder /build/server/target/release/sentori-server /app/sentori-server
+COPY --from=builder /build/server/target/release/sentori-selfhosted /app/sentori-selfhosted
 # DB-IP Lite GeoIP db. ~3 MB, loaded once at server startup,
 # referenced read-only by maxminddb::Reader.
 COPY --from=geoip /geoip/db.mmdb /app/data/geo.mmdb
 EXPOSE 8080
-ENTRYPOINT ["/app/sentori-server"]
+ENTRYPOINT ["/app/sentori-selfhosted"]
