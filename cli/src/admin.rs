@@ -674,6 +674,52 @@ pub async fn comment_list(
     Ok(())
 }
 
+pub async fn push_sends_list(
+    project_id: String,
+    status: Option<String>,
+    limit: u32,
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let mut url = format!(
+        "{}/admin/api/projects/{project_id}/push/sends?limit={limit}",
+        resolve_api_url(api_url)
+    );
+    if let Some(s) = status {
+        url.push_str(&format!("&status={s}"));
+    }
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    let rows = body["sends"].as_array().cloned().unwrap_or_default();
+    println!(
+        "{:<10}  {:<8}  {:<10}  {:>4}  {}",
+        "id", "provider", "status", "rty", "outcome / error"
+    );
+    for s in &rows {
+        println!(
+            "{:<10}  {:<8}  {:<10}  {:>4}  {}",
+            s["id"]
+                .as_str()
+                .map(|x| &x[..x.len().min(8)])
+                .unwrap_or("?"),
+            s["provider"].as_str().unwrap_or("?"),
+            s["status"].as_str().unwrap_or("?"),
+            s["retry_count"].as_i64().unwrap_or(0),
+            s["error"]
+                .as_str()
+                .or_else(|| s["provider_outcome"].as_str())
+                .unwrap_or("—"),
+        );
+    }
+    Ok(())
+}
+
 pub async fn push_test(
     project_id: String,
     device_token_id: String,

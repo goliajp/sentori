@@ -243,6 +243,21 @@ enum Command {
         #[arg(long = "api-url")]
         api_url: Option<String>,
     },
+    /// Recent push sends with status / retry / error (triage / DLQ).
+    PushSends {
+        #[arg(long = "project")]
+        project_id: String,
+        #[arg(long)]
+        status: Option<String>,
+        #[arg(long, default_value_t = 50)]
+        limit: u32,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
     /// Queue a real test push for a known device_token (uses
     /// the configured vendor + credentials). Session-gated.
     PushTest {
@@ -1021,6 +1036,16 @@ async fn main() -> Result<()> {
             token,
             api_url,
         } => admin::issue_watch(issue_id, token, api_url).await,
+        Command::PushSends {
+            project_id,
+            status,
+            limit,
+            token,
+            api_url,
+            json,
+        } => {
+            admin::push_sends_list(project_id, status, limit, token, api_url, json).await
+        }
         Command::PushTest {
             project_id,
             device_token_id,

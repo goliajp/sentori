@@ -12,6 +12,7 @@ pub mod invites;
 pub mod members;
 pub mod projects;
 pub mod push_credentials;
+pub mod push_sends;
 pub mod releases;
 pub mod saas;
 pub mod test_push;
