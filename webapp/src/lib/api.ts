@@ -353,6 +353,22 @@ export class Api {
   projectStats(projectId: string): Promise<ProjectStats> {
     return this.get(`/v1/projects/${projectId}/stats`);
   }
+  /// Returns the decompressed NDJSON replay blob as raw text.
+  /// Client parses frame-by-frame.
+  async replayNdjson(
+    projectId: string,
+    replayId: string,
+  ): Promise<string> {
+    const r = await fetch(
+      `${(this as unknown as { baseUrl: string }).baseUrl}/v1/projects/${projectId}/replays/${replayId}/ndjson`,
+      {
+        credentials: 'include',
+        headers: this.authHeaders(),
+      },
+    );
+    if (!r.ok) throw new ApiError(r.status, await r.text());
+    return r.text();
+  }
   patchIssue(
     projectId: string,
     issueId: string,

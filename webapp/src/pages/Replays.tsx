@@ -62,24 +62,24 @@ export default function Replays() {
                   key={r.id}
                   className="flex items-center justify-between gap-3 px-2 py-3"
                 >
-                  <div className="min-w-0 flex-1">
+                  <Link
+                    to={`/projects/${projectId}/replays/${r.id}`}
+                    className="min-w-0 flex-1 block hover:bg-zinc-900/40 -m-2 p-2 rounded"
+                  >
                     <div className="flex items-center gap-2">
                       <Badge>{(r.duration_ms / 1000).toFixed(1)}s</Badge>
                       <Badge variant="muted">
                         {formatNumber(r.frame_count)} frames
                       </Badge>
-                      <Link
-                        to={`/projects/${projectId}/events?issue_id=${r.event_id}`}
-                        className="font-mono text-[11px] text-emerald-400 hover:underline"
-                      >
+                      <span className="font-mono text-[11px] text-emerald-400">
                         event {r.event_id.slice(0, 8)}…
-                      </Link>
+                      </span>
                     </div>
                     <div className="font-mono text-[10px] text-zinc-500 mt-1">
                       blob {r.blob_hash.slice(0, 16)}… ·{' '}
                       {formatRelative(r.created_at)}
                     </div>
-                  </div>
+                  </Link>
                 </li>
               ))}
             </ul>
