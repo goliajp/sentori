@@ -1,0 +1,116 @@
+name: mirror — core + self-hosted build/test (mirror-repo only)
+
+# This workflow only runs IN the sentori-selfhosted mirror
+# repository. The path filter `saas/**` skips it on the
+# monorepo. Splits from `v0.1-core.yml` because the mirror
+# tree has no saas/ — running the saas-binary job there
+# would always fail.
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - 'saas/**'
+  pull_request:
+    branches: [master]
+    paths-ignore:
+      - 'saas/**'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+  RUST_BACKTRACE: 1
+
+jobs:
+  guard:
+    name: gate — only run in mirror
+    runs-on: ubuntu-latest
+    outputs:
+      is_mirror: ${{ steps.gate.outputs.is_mirror }}
+    steps:
+      - id: gate
+        run: |
+          # Mirror has no saas/ dir; monorepo does. Use
+          # that to gate, since GH events don't directly
+          # tell us "this is the mirror".
+          if [[ -d saas ]]; then
+            echo "is_mirror=false" >> "$GITHUB_OUTPUT"
+            echo "skipping — saas/ present, this is the monorepo"
+          else
+            echo "is_mirror=true" >> "$GITHUB_OUTPUT"
+          fi
+        # Need a checkout for the dir check.
+      - uses: actions/checkout@v4
+        if: false  # gate runs without checkout; just sets output
+
+  core:
+    name: core/ workspace
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip if not mirror
+        id: skip
+        run: |
+          if [[ -d saas ]]; then
+            echo "skipping; this is the monorepo (use v0.1-core.yml)" >&2
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.skip.outputs.skip != 'true'
+        with:
+          toolchain: "1.88"
+          components: clippy, rustfmt
+      - uses: actions/cache@v4
+        if: steps.skip.outputs.skip != 'true'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('core/Cargo.lock') }}
+      - if: steps.skip.outputs.skip != 'true'
+        working-directory: core
+        run: cargo fmt --all -- --check
+      - if: steps.skip.outputs.skip != 'true'
+        working-directory: core
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - if: steps.skip.outputs.skip != 'true'
+        working-directory: core
+        run: cargo test --workspace -- --test-threads=2
+
+  self-hosted-binary:
+    name: self-hosted/server binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip if not mirror
+        id: skip
+        run: |
+          if [[ -d saas ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.skip.outputs.skip != 'true'
+        with:
+          toolchain: "1.88"
+          components: clippy
+      - if: steps.skip.outputs.skip != 'true'
+        working-directory: self-hosted/server
+        run: cargo build --release

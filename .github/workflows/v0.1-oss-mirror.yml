@@ -1,0 +1,46 @@
+name: v0.1 OSS mirror — sync monorepo subset → sentori-selfhosted public repo
+
+on:
+  # Mirror fires only on production-ready master push +
+  # manual dispatch. develop / feature / release/* don't
+  # sync to the public OSS mirror — only what's merged to
+  # master is OSS.
+  push:
+    branches: [master]
+    paths:
+      - 'core/**'
+      - 'self-hosted/**'
+      - 'docs-v0.1/**'
+      - 'scripts/mirror-sync.sh'
+      - 'LICENSE-*'
+      - 'NOTICES.md'
+      - '.github/workflows/v0.1-oss-mirror.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install git-filter-repo
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git-filter-repo
+
+      - name: Configure git
+        run: |
+          git config --global user.name "Sentori OSS Mirror Bot"
+          git config --global user.email "bots@golia.jp"
+
+      - name: Build mirror tree
+        env:
+          MIRROR_REPO: ${{ secrets.SENTORI_SELFHOSTED_MIRROR_REPO }}   # e.g. goliajp/sentori-selfhosted
+          MIRROR_TOKEN: ${{ secrets.SENTORI_SELFHOSTED_MIRROR_TOKEN }}  # PAT with repo:write
+        run: |
+          bash scripts/mirror-sync.sh "$MIRROR_REPO" "$MIRROR_TOKEN"

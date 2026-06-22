@@ -1,0 +1,1 @@
+../../core/migrations/0002_auth_session.sql

@@ -1,0 +1,131 @@
+name: v0.1 core — build / test / clippy / fmt / doc
+
+on:
+  # Per .claude/git-flow.md: only master + release/*
+  # push trigger CI; develop / feature / fix / hotfix
+  # push don't (local preflight is the only gate
+  # there). PRs into master/develop also build so
+  # reviewers see green/red.
+  push:
+    branches: [master, 'release/**']
+    paths:
+      - 'core/**'
+      - 'self-hosted/server/**'
+      - 'saas/server/**'
+      - '.github/workflows/v0.1-core.yml'
+  pull_request:
+    branches: [master, develop]
+    paths:
+      - 'core/**'
+      - 'self-hosted/server/**'
+      - 'saas/server/**'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+  RUST_BACKTRACE: 1
+
+jobs:
+  core:
+    name: core/ workspace
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.88"
+          components: clippy, rustfmt
+
+      - name: cargo registry cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('core/Cargo.lock') }}
+
+      - name: fmt
+        working-directory: core
+        run: cargo fmt --all -- --check
+
+      - name: clippy (-D warnings)
+        working-directory: core
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: test (single-thread to keep docker bridge happy)
+        working-directory: core
+        run: cargo test --workspace -- --test-threads=2
+
+      - name: doc (--deny warnings)
+        working-directory: core
+        env:
+          RUSTDOCFLAGS: "--deny warnings"
+        run: cargo doc --workspace --no-deps
+
+      - name: cargo audit
+        working-directory: core
+        run: |
+          cargo install --locked cargo-audit || true
+          # RUSTSEC-2023-0071 (rsa Marvin Attack) is
+          # transitively pulled by sqlx-mysql which we
+          # don't use. Documented in
+          # docs-v0.1/reference/security-audit.md.
+          cargo audit --ignore RUSTSEC-2023-0071
+
+  self-hosted-binary:
+    name: self-hosted/server binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.88"
+          components: clippy
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            self-hosted/server/target
+          key: selfhosted-${{ runner.os }}-${{ hashFiles('self-hosted/server/Cargo.lock') }}
+      - working-directory: self-hosted/server
+        run: cargo clippy -- -D warnings
+      - working-directory: self-hosted/server
+        run: cargo build --release
+
+  saas-binary:
+    name: saas/server binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.88"
+          components: clippy
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            saas/server/target
+          key: saas-${{ runner.os }}-${{ hashFiles('saas/server/Cargo.lock') }}
+      - working-directory: saas/server
+        run: cargo clippy -- -D warnings
+      - working-directory: saas/server
+        run: cargo build --release

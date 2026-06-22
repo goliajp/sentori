@@ -1,0 +1,44 @@
+# Sentori SaaS control plane local dev stack.
+#
+# postgres (control-plane DB) + saas control-plane server.
+# Tenant workloads are spun up SEPARATELY (one
+# self-hosted/server container per tenant) by the
+# provisioner (out-of-band CLI).
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sentori_saas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-sentori_saas}
+    volumes:
+      - sentori-saas-pgdata:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sentori_saas}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  saas:
+    build:
+      context: ../..
+      dockerfile: saas/docker/Dockerfile
+    image: sentori-saas:${SENTORI_SAAS_VERSION:-0.1.0}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SENTORI_SAAS_CONTROL_PLANE_DB_URL: postgres://${POSTGRES_USER:-sentori_saas}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-sentori_saas}
+      SENTORI_SAAS_TENANT_DB_ADMIN_URL: postgres://${POSTGRES_USER:-sentori_saas}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/postgres
+      SENTORI_SAAS_BIND: 0.0.0.0:9090
+      SENTORI_STRIPE_WEBHOOK_SECRET: ${SENTORI_STRIPE_WEBHOOK_SECRET:-}
+      RUST_LOG: ${RUST_LOG:-info,sqlx=warn}
+    ports:
+      - "${SENTORI_SAAS_PORT:-9090}:9090"
+    restart: unless-stopped
+
+volumes:
+  sentori-saas-pgdata:

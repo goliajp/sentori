@@ -1,0 +1,18 @@
+apiVersion: v2
+name: sentori-selfhosted
+description: Sentori — self-hosted OSS error monitoring + APM. Single-workspace deployment.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://sentori.golia.jp/self-hosted
+sources:
+  - https://github.com/goliajp/sentori-selfhosted
+maintainers:
+  - name: GOLIA K.K.
+    email: takagi@golia.jp
+keywords:
+  - sentori
+  - error-monitoring
+  - apm
+  - observability
+  - self-hosted

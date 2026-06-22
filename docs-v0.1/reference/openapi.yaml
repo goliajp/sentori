@@ -1,0 +1,346 @@
+openapi: 3.1.0
+info:
+  title: Sentori HTTP API
+  version: 0.1.0
+  description: |
+    Sentori v0.1 HTTP API. Covers both deployment modes:
+      * Self-hosted server — every /v1/* below.
+      * SaaS control plane — only /v1/saas/* below.
+    The same SDK posts to the self-hosted server's
+    /v1/events/{project_id} ingest endpoint regardless
+    of deployment mode.
+  license:
+    name: Apache-2.0 OR MIT
+    url: https://github.com/goliajp/sentori-selfhosted
+  contact:
+    email: security@golia.jp
+
+servers:
+  - url: http://localhost:8080
+    description: Self-hosted dev (docker compose default)
+  - url: http://localhost:9090
+    description: SaaS control plane dev (docker compose default)
+
+tags:
+  - name: health
+  - name: ingest
+  - name: projects
+  - name: issues
+  - name: usage
+  - name: saas
+  - name: saasadmin
+
+paths:
+  /healthz:
+    get:
+      tags: [health]
+      summary: Liveness + DB ping
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          description: Degraded (DB down, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+
+  /v1/projects:
+    get:
+      tags: [projects]
+      summary: List projects in this workspace
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+
+  /v1/projects/{project_id}/issues:
+    get:
+      tags: [issues]
+      summary: List issues for a project
+      parameters:
+        - in: path
+          name: project_id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, resolved, regressed, ignored]
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Issue'
+
+  /v1/events/{project_id}:
+    post:
+      tags: [ingest]
+      summary: Ingest one event
+      parameters:
+        - in: path
+          name: project_id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestRequest'
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestResponse'
+        '400':
+          description: Validation failure
+        '404':
+          description: Project not found
+        '429':
+          description: Quota exceeded (K17 over-limit)
+
+  /v1/events:
+    post:
+      tags: [ingest]
+      summary: Legacy ingest path (token-resolved project)
+      description: |
+        Returns 501 in v0.1 — the token middleware (K2) is
+        not wired yet. SDKs should POST to
+        `/v1/events/{project_id}` until v0.1.x. Documented
+        in `docs-v0.1/reference/api-compat.md`.
+      responses:
+        '501':
+          description: Not Implemented
+
+  /v1/usage:
+    get:
+      tags: [usage]
+      summary: Workspace usage panel (current period)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsagePanel'
+
+  /v1/saas/tenants:
+    get:
+      tags: [saas]
+      summary: List tenants (SaaS control plane only)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tenant'
+    post:
+      tags: [saas]
+      summary: Provision a new tenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TenantCreate'
+      responses:
+        '202':
+          description: Provisioning queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantCreateResponse'
+        '409':
+          description: Slug taken
+
+  /v1/saas/tenants/{id}:
+    delete:
+      tags: [saas]
+      summary: Soft-delete tenant (status='deleted')
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Not found
+
+  /v1/saas/tenants/{id}/suspend:
+    post:
+      tags: [saas]
+      summary: Suspend tenant (active → suspended)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Suspended }
+        '404': { description: Not active / missing }
+
+  /v1/saas/tenants/{id}/resume:
+    post:
+      tags: [saas]
+      summary: Resume tenant (suspended → active)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Resumed }
+        '404': { description: Not suspended / missing }
+
+  /v1/saas/saasadmin/login:
+    post:
+      tags: [saasadmin]
+      summary: Saasadmin login → session token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_token: { type: string }
+                  user_id: { type: string, format: uuid }
+                  role: { type: string, enum: [staff, super] }
+        '401': { description: Invalid credentials }
+
+  /v1/saas/stripe/webhook:
+    post:
+      tags: [saas]
+      summary: Stripe webhook ingest
+      description: |
+        Verifies signature via S5 stripe-webhook-verify
+        stone. Dedups via stripe_events.stripe_event_id
+        UNIQUE index. Returns 200 always (so Stripe stops
+        retrying) — actual payload processing is
+        out-of-band.
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { type: object } }
+      responses:
+        '200': { description: OK }
+        '400': { description: Bad signature }
+        '503': { description: Stripe webhook disabled (no secret configured) }
+
+components:
+  schemas:
+    Health:
+      type: object
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        db: { type: string, enum: [ok, down] }
+        version: { type: string }
+    Project:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+    Issue:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        fingerprint: { type: string }
+        error_type: { type: string }
+        message_sample: { type: string }
+        kind: { type: string, enum: [error, anr, near_crash, message] }
+        status: { type: string, enum: [active, resolved, regressed, ignored] }
+        event_count: { type: integer, format: int64 }
+        first_seen: { type: string, format: date-time }
+        last_seen: { type: string, format: date-time }
+        last_release: { type: string }
+        last_environment: { type: string }
+    IngestRequest:
+      type: object
+      required: [kind, error_type, message, platform]
+      properties:
+        kind: { type: string, enum: [error, message, anr, near_crash] }
+        error_type: { type: string }
+        message: { type: string }
+        platform: { type: string, enum: [ios, android, javascript, web, node] }
+        release: { type: string }
+        environment: { type: string }
+    IngestResponse:
+      type: object
+      properties:
+        event_id: { type: string, format: uuid }
+        issue_id: { type: string, format: uuid }
+        is_new: { type: boolean }
+    UsagePanel:
+      type: object
+      properties:
+        plan: { type: string, enum: [free, pro, enterprise] }
+        status: { type: string, enum: [active, past_due, canceled, trialing, unpaid] }
+        period_yyyymm: { type: string }
+        events: { $ref: '#/components/schemas/CounterTotal' }
+        spans: { $ref: '#/components/schemas/CounterTotal' }
+        replays: { $ref: '#/components/schemas/CounterTotal' }
+    CounterTotal:
+      type: object
+      properties:
+        count: { type: integer, format: int64 }
+        dropped: { type: integer, format: int64 }
+        limit: { type: integer, format: int64 }
+    Tenant:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        display_name: { type: string }
+        status: { type: string, enum: [provisioning, active, suspended, deleted] }
+        created_at: { type: string, format: date-time }
+    TenantCreate:
+      type: object
+      required: [slug, display_name, owner_email]
+      properties:
+        slug: { type: string, pattern: '^[a-z][a-z0-9-]{1,30}[a-z0-9]$' }
+        display_name: { type: string }
+        owner_email: { type: string, format: email }
+    TenantCreateResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        db_name: { type: string }
+        status: { type: string, enum: [provisioning] }
