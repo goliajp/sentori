@@ -14,6 +14,29 @@ export function AlertsPage() {
   const [alerts, setAlerts] = useState<AlertRule[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [refreshTok, setRefreshTok] = useState(0);
+  const [showCreate, setShowCreate] = useState(false);
+  const [name, setName] = useState('');
+  const [throttle, setThrottle] = useState(10);
+
+  async function create() {
+    if (!name.trim()) return;
+    try {
+      await api.createAlert({
+        name: name.trim(),
+        enabled: true,
+        trigger_kind: 'issue_new',
+        trigger_config: {},
+        filter_config: {},
+        channels: {},
+        throttle_minutes: throttle,
+      });
+      setName('');
+      setShowCreate(false);
+      setRefreshTok(t => t + 1);
+    } catch (e) {
+      setErr(String(e));
+    }
+  }
 
   useEffect(() => {
     api
@@ -39,14 +62,48 @@ export function AlertsPage() {
     <div className="p-8">
       <PageHeader
         title="Alert rules"
-        subtitle="Workspace-wide rules. K14 backend: new_issue / regression / event_count / crash_free_drop."
+        subtitle="Workspace-wide rules. Trigger kinds: issue_new / regression / event_count / crash_free_drop."
         action={
-          <Button variant="primary" size="sm" onClick={() => alert('New alert form lands in v0.1.x')}>
-            + New rule
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => setShowCreate(!showCreate)}
+          >
+            {showCreate ? 'Cancel' : '+ New rule'}
           </Button>
         }
       />
       {err && <ErrorBanner>{err}</ErrorBanner>}
+
+      {showCreate && (
+        <Card className="mb-4 p-4">
+          <p className="mb-2 text-xs text-zinc-500">
+            Minimal create — trigger_kind defaults to "issue_new" + filter
+            / channels empty. Tune via PATCH /v1/alerts/:id afterward.
+          </p>
+          <div className="flex gap-2">
+            <input
+              className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+              placeholder='Name (e.g. "production new issues")'
+              value={name}
+              onChange={e => setName(e.target.value)}
+            />
+            <input
+              type="number"
+              className="w-24 rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+              value={throttle}
+              onChange={e =>
+                setThrottle(parseInt(e.target.value, 10) || 10)
+              }
+              title="Throttle (minutes)"
+            />
+            <Button onClick={create} size="sm">
+              Create
+            </Button>
+          </div>
+        </Card>
+      )}
+
       <Card>
         <DataTable
           rowKey={(r) => r.id}

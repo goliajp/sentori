@@ -42,6 +42,7 @@ const SHORTCUTS: Record<string, string> = {
   h: '/health',
   o: '/saas',
   n: '/notifications',
+  '/': '/search',
 };
 
 export function useNavShortcuts() {

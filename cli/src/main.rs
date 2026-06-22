@@ -243,6 +243,20 @@ enum Command {
         #[arg(long = "api-url")]
         api_url: Option<String>,
     },
+    /// Email + password login; prints session token for export.
+    Login {
+        email: String,
+        password: String,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
+    /// Server-side session logout.
+    Logout {
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// List push credentials for a project.
     PushCred {
         #[arg(long = "project")]
@@ -945,6 +959,12 @@ async fn main() -> Result<()> {
             token,
             api_url,
         } => admin::issue_watch(issue_id, token, api_url).await,
+        Command::Login {
+            email,
+            password,
+            api_url,
+        } => admin::auth_login(email, password, api_url).await,
+        Command::Logout { token, api_url } => admin::auth_logout(token, api_url).await,
         Command::PushCred {
             project_id,
             token,

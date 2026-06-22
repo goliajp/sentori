@@ -674,6 +674,50 @@ pub async fn comment_list(
     Ok(())
 }
 
+pub async fn auth_login(
+    email: String,
+    password: String,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!("{}/auth/login", resolve_api_url(api_url));
+    let c = reqwest::Client::new();
+    let resp = c
+        .post(&url)
+        .json(&serde_json::json!({
+            "email": email,
+            "password": password,
+        }))
+        .send()
+        .await?
+        .error_for_status()?;
+    let body: Value = resp.json().await?;
+    let token = body["session_token"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("missing session_token"))?;
+    println!("Logged in as {}", body["email"].as_str().unwrap_or("?"));
+    println!();
+    println!("export SENTORI_ADMIN_TOKEN={token}");
+    println!();
+    println!("Or save to ~/.sentori-token for sentori-cli auto-pickup:");
+    println!("  echo {token} > ~/.sentori-token");
+    Ok(())
+}
+
+pub async fn auth_logout(
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!("{}/auth/logout", resolve_api_url(api_url));
+    let c = client(&token_value(token)?)?;
+    c.post(&url)
+        .json(&serde_json::json!({}))
+        .send()
+        .await?
+        .error_for_status()?;
+    println!("logged out");
+    Ok(())
+}
+
 pub async fn push_cred_list(
     project_id: String,
     token: Option<String>,

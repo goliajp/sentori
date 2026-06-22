@@ -24,6 +24,7 @@ import SavedViews from './pages/SavedViews';
 import EndpointProbes from './pages/EndpointProbes';
 import Metrics from './pages/Metrics';
 import Notifications from './pages/Notifications';
+import Search from './pages/Search';
 import Shortcuts from './pages/Shortcuts';
 import Replays from './pages/Replays';
 import ReplayDetail from './pages/ReplayDetail';
@@ -69,6 +70,7 @@ createRoot(rootEl).render(
           <Route path="/saved-views" element={<SavedViews />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/shortcuts" element={<Shortcuts />} />
+          <Route path="/search" element={<Search />} />
           <Route path="/projects/:id/traces" element={<Traces />} />
           <Route
             path="/projects/:id/traces/:traceId"
