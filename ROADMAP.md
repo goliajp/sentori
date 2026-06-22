@@ -5,6 +5,21 @@
 
 ## 当前状态
 
+> **v0.2 fresh-start pivot**（2026-06-22 起,branch `feature/v0.2-foundation`）
+> 大仓 → SaaS 内置 + self-hosted OSS repo + 定制产品。SaaS 与 self-hosted 同版本号同终端 SDK。SDK 对外协议保持向后兼容（`st_pk_<26 base32>` token 永久契约）。详见 [`CHANGELOG.md#v02`](./CHANGELOG.md) + [`docs-v0.2/DEPLOY.md`](./docs-v0.2/DEPLOY.md) + [`docs-v0.2/CUTOVER.md`](./docs-v0.2/CUTOVER.md)。
+>
+> 58 commits / 89+ backend endpoints / 20 webapp pages / 16 cli commands / 13 ETL table sets。**Self-hosted Docker 单镜像 = 全栈**。**SaaS 双 binary 同 DB row-level isolation**。**cutover plan 待用户拍板执行**。
+>
+> v0.3+ 留:
+> - WebPush / APNs / FCM / HCM / MiPush 真 vendor adapter（替换 push_worker mock_send）
+> - 剩 27 个 legacy ETL 表（billing / saas_only / identity_extras）
+> - Saved view 高级 query builder UI
+> - HTTPS 自动 TLS via embedded Caddy 模式
+> - Spans / replays / metrics dashboard views（数据已落表，UI 缺）
+> - Replay viewer scrubber 重新接 v0.2 schema
+
+> **以下是 legacy v0.1-v2.0 roadmap 历史**（2025-11 起到 2026-06-03 ship）—— 数据保留在 legacy SaaS DB，via sentori-migrate 业务层 ETL 同步到 v0.2 schema。
+
 - **v0.1** ✅ self-hosted MVP（Phase 0-10）—— 详见 [CHANGELOG.md](./CHANGELOG.md)
 - **v0.1.x** ✅ SaaS 上线 + dogfood（Phase 11-17）—— 详见 CHANGELOG.md
 - **v0.2** ✅ 账户结构 + SDK 矩阵 + 数据呈现（Phase 18-28）—— 详见 CHANGELOG.md
