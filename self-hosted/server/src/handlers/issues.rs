@@ -118,6 +118,52 @@ pub async fn list(
     ))
 }
 
+/// PATCH /v1/projects/:project_id/issues/:issue_id
+///
+/// Body: `{ status?: "active" | "resolved" | "regressed" | "ignored",
+///           resolved_in_release?: string }`
+pub async fn patch(
+    State(state): State<Arc<AppState>>,
+    Path((_project_id, issue_id)): Path<(Uuid, Uuid)>,
+    Json(body): Json<PatchBody>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    use sentori_event_pipeline::IssueStatus;
+    use sentori_issue_store::IssuePatch;
+
+    let status = match body.status.as_deref() {
+        None => None,
+        Some("active") => Some(IssueStatus::Active),
+        Some("resolved") => Some(IssueStatus::Resolved),
+        Some("regressed") => Some(IssueStatus::Regressed),
+        Some("ignored") => Some(IssueStatus::Ignored),
+        Some(other) => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("invalid status: {other}"),
+            ));
+        }
+    };
+    let patch = IssuePatch {
+        status,
+        assignee_user_id: None,
+        priority: None,
+        labels: None,
+        resolved_in_release: body.resolved_in_release,
+    };
+    state
+        .issues
+        .patch(issue_id, patch, OffsetDateTime::now_utc())
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Deserialize, Default)]
+pub struct PatchBody {
+    pub status: Option<String>,
+    pub resolved_in_release: Option<String>,
+}
+
 /// GET /v1/projects/:project_id/issues/:issue_id
 pub async fn get(
     State(state): State<Arc<AppState>>,

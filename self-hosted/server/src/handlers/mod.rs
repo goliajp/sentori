@@ -209,7 +209,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/v1/projects/:project_id/issues", get(issues::list))
         .route(
             "/v1/projects/:project_id/issues/:issue_id",
-            get(issues::get),
+            get(issues::get).patch(issues::patch),
         )
         .route("/v1/projects/:project_id/events", get(events::list))
         .route("/v1/projects/:project_id/events/trend", get(events::trend))
