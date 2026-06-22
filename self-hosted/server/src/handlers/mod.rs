@@ -26,6 +26,7 @@ mod audit;
 mod auth;
 mod cert;
 mod events;
+mod events_live;
 mod health;
 mod ingest;
 mod issues;
@@ -217,6 +218,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         )
         .route("/v1/projects/:project_id/events", get(events::list))
         .route("/v1/projects/:project_id/events/trend", get(events::trend))
+        .route(
+            "/v1/projects/:project_id/events/_recent",
+            get(events_live::handle),
+        )
         .route(
             "/v1/projects/:project_id/traces",
             get(spans::list_traces),
