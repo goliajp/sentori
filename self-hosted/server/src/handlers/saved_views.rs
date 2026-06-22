@@ -87,6 +87,54 @@ pub async fn create(
     Ok((StatusCode::CREATED, Json(serde_json::json!({"id": id}))))
 }
 
+pub async fn get(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let view = state
+        .saved_views
+        .find(id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or((StatusCode::NOT_FOUND, "saved_view not found".to_string()))?;
+    Ok(Json(serde_json::json!({
+        "id": view.id.to_string(),
+        "name": view.name,
+        "project_id": view.project_id.map(|u| u.to_string()),
+        "target": format!("{:?}", view.target),
+        "scope": format!("{:?}", view.scope),
+        "user_id": view.user_id.map(|u| u.to_string()),
+        "payload": view.payload,
+        "created_at": view.created_at,
+        "updated_at": view.updated_at,
+    })))
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PatchBody {
+    pub name: Option<String>,
+    pub payload: Option<serde_json::Value>,
+}
+
+pub async fn patch(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+    Json(body): Json<PatchBody>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    use sentori_saved_view::SavedViewPatch;
+    let p = SavedViewPatch {
+        name: body.name,
+        payload: body.payload,
+    };
+    state
+        .saved_views
+        .update(id, p)
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    Ok(StatusCode::OK)
+}
+
 pub async fn delete(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,

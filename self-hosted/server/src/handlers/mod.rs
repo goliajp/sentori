@@ -209,13 +209,18 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/v1/alerts", get(alerts::list_workspace).post(alerts::create))
         .route(
             "/v1/alerts/:id",
-            patch(alerts::update).delete(alerts::delete),
+            get(alerts::get).patch(alerts::update).delete(alerts::delete),
         )
         .route(
             "/v1/saved-views",
             get(saved_views::list_workspace).post(saved_views::create),
         )
-        .route("/v1/saved-views/:id", delete(saved_views::delete))
+        .route(
+            "/v1/saved-views/:id",
+            get(saved_views::get)
+                .patch(saved_views::patch)
+                .delete(saved_views::delete),
+        )
         // legacy fresh-start ingest stubs (defer to SDK-auth path)
         .route("/v1/projects/:project_id/ingest", post(ingest::ingest_event))
         // ── auth: dashboard user lifecycle (public) ──────

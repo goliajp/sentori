@@ -163,3 +163,31 @@ pub async fn delete(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(StatusCode::NO_CONTENT)
 }
+
+pub async fn get(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let rule = state
+        .alerts
+        .find(id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or((StatusCode::NOT_FOUND, "alert_rule not found".to_string()))?;
+    Ok(Json(serde_json::json!({
+        "id": rule.id.to_string(),
+        "project_id": rule.project_id.map(|u| u.to_string()),
+        "name": rule.name,
+        "enabled": rule.enabled,
+        "trigger_kind": format!("{:?}", rule.trigger_kind),
+        "trigger_config": rule.trigger_config,
+        "filter_config": rule.filter_config,
+        "channels": rule.channels,
+        "throttle_minutes": rule.throttle_minutes,
+        "last_fired_at": rule.last_fired_at,
+        "muted": rule.muted,
+        "snoozed_until": rule.snoozed_until,
+        "created_at": rule.created_at,
+        "updated_at": rule.updated_at,
+    })))
+}
