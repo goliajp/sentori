@@ -71,6 +71,12 @@ pub async fn handle(
     }
 }
 
+/// Public alias for use by `events_batch::handle`.
+#[inline]
+pub(crate) fn map_payload_pub(p: Value) -> Result<Event, String> {
+    map_payload(p)
+}
+
 /// Map legacy SDK wire JSON to v0.1 `Event`.
 fn map_payload(mut p: Value) -> Result<Event, String> {
     let obj = p.as_object_mut().ok_or("expected JSON object")?;
