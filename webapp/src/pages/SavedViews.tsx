@@ -95,11 +95,26 @@ export default function SavedViews() {
   }
 
   function targetRoute(v: SavedView): string {
-    if (v.target === 'issues' && v.project_id) {
-      return `/projects/${v.project_id}/issues`;
+    if (!v.project_id) return '#';
+    const payload = (v.payload ?? {}) as Record<string, string | undefined>;
+    const params = new URLSearchParams();
+    // Status filter — Issues page reads `?status=` to seed the
+    // tab. "all" is encoded as no param (legacy compatible).
+    if (payload.status && payload.status !== 'all') {
+      params.set('status', String(payload.status));
     }
-    if (v.target === 'events' && v.project_id) {
-      return `/projects/${v.project_id}/events`;
+    const qs = params.toString();
+    const suffix = qs ? `?${qs}` : '';
+    if (v.target === 'issues') {
+      return `/projects/${v.project_id}/issues${suffix}`;
+    }
+    if (v.target === 'events') {
+      // Events page reads ?issue_id= for narrowing
+      if (payload.issue_id) {
+        params.set('issue_id', String(payload.issue_id));
+      }
+      const q2 = params.toString();
+      return `/projects/${v.project_id}/events${q2 ? `?${q2}` : ''}`;
     }
     return '#';
   }

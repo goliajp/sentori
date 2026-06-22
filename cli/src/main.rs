@@ -71,6 +71,61 @@ enum Command {
         #[command(subcommand)]
         kind: InviteKind,
     },
+    /// Alert rule list / delete via /v1/alerts.
+    Alert {
+        #[command(subcommand)]
+        kind: AlertKind,
+    },
+    /// Saved view list / delete via /v1/saved-views.
+    View {
+        #[command(subcommand)]
+        kind: ViewKind,
+    },
+}
+
+#[derive(Subcommand)]
+enum AlertKind {
+    /// List workspace alert rules.
+    List {
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Delete an alert rule.
+    Delete {
+        alert_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum ViewKind {
+    /// List saved views for a target.
+    List {
+        /// `issues` / `events` / `spans` / `replays` / `metrics`.
+        #[arg(long, default_value = "issues")]
+        target: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Delete a saved view.
+    Delete {
+        view_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -447,6 +502,31 @@ async fn main() -> Result<()> {
                 )
                 .await
             }
+        },
+        Command::Alert { kind } => match kind {
+            AlertKind::List {
+                token,
+                api_url,
+                json,
+            } => admin::alert_list(token, api_url, json).await,
+            AlertKind::Delete {
+                alert_id,
+                token,
+                api_url,
+            } => admin::alert_delete(alert_id, token, api_url).await,
+        },
+        Command::View { kind } => match kind {
+            ViewKind::List {
+                target,
+                token,
+                api_url,
+                json,
+            } => admin::view_list(target, token, api_url, json).await,
+            ViewKind::Delete {
+                view_id,
+                token,
+                api_url,
+            } => admin::view_delete(view_id, token, api_url).await,
         },
     }
 }

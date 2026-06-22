@@ -295,6 +295,98 @@ pub async fn invite_mint(
     Ok(())
 }
 
+// ── alert ──────────────────────────────────────────────────
+
+pub async fn alert_list(
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!("{}/v1/alerts", resolve_api_url(api_url));
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Vec<Value> = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    println!(
+        "{:<38}  {:<6}  {:<32}  {:<6}  trigger",
+        "id", "active", "name", "throttle"
+    );
+    for a in &body {
+        println!(
+            "{:<38}  {:<6}  {:<32}  {:<6}  {}",
+            a["id"].as_str().unwrap_or("?"),
+            if a["enabled"].as_bool().unwrap_or(true) {
+                "on"
+            } else {
+                "off"
+            },
+            a["name"].as_str().unwrap_or("?"),
+            a["throttle_minutes"].as_i64().unwrap_or(0),
+            a["trigger_kind"].as_str().unwrap_or("?"),
+        );
+    }
+    Ok(())
+}
+
+pub async fn alert_delete(
+    alert_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!("{}/v1/alerts/{alert_id}", resolve_api_url(api_url));
+    let c = client(&token_value(token)?)?;
+    c.delete(&url).send().await?.error_for_status()?;
+    println!("deleted alert {alert_id}");
+    Ok(())
+}
+
+// ── saved-view ─────────────────────────────────────────────
+
+pub async fn view_list(
+    target: String,
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!(
+        "{}/v1/saved-views?target={target}",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Vec<Value> = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    println!("{:<38}  {:<10}  {:<10}  name", "id", "target", "scope");
+    for v in &body {
+        println!(
+            "{:<38}  {:<10}  {:<10}  {}",
+            v["id"].as_str().unwrap_or("?"),
+            v["target"].as_str().unwrap_or("?"),
+            v["scope"].as_str().unwrap_or("?"),
+            v["name"].as_str().unwrap_or("?"),
+        );
+    }
+    Ok(())
+}
+
+pub async fn view_delete(
+    view_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!("{}/v1/saved-views/{view_id}", resolve_api_url(api_url));
+    let c = client(&token_value(token)?)?;
+    c.delete(&url).send().await?.error_for_status()?;
+    println!("deleted view {view_id}");
+    Ok(())
+}
+
 pub async fn invite_list(
     token: Option<String>,
     api_url: Option<String>,
