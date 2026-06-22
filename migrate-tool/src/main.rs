@@ -73,6 +73,7 @@ async fn main() -> Result<()> {
             "dashboard_extra",
             "analytics",
             "metrics",
+            "ops",
         ]
     } else {
         cli.tables.split(',').map(str::trim).collect()
@@ -106,6 +107,7 @@ async fn main() -> Result<()> {
             "metrics" => {
                 tables::metrics::migrate(&src, &dst, cli.dry_run, &mut report).await
             }
+            "ops" => tables::ops::migrate(&src, &dst, cli.dry_run, &mut report).await,
             other => {
                 error!(set = %other, "unknown table set");
                 continue;

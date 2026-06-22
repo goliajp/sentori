@@ -14,6 +14,7 @@ pub mod dashboard_extra;
 pub mod events;
 pub mod issues;
 pub mod metrics;
+pub mod ops;
 pub mod push;
 pub mod releases;
 pub mod sessions;
