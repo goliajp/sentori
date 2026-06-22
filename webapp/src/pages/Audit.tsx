@@ -123,6 +123,45 @@ export function AuditPage() {
             onChange={v => setLimit(parseInt(v, 10) || 200)}
             placeholder="200"
           />
+          <div className="col-span-4 flex gap-2 text-xs">
+            <span className="text-zinc-500">Quick:</span>
+            <button
+              onClick={() => {
+                setAction('token.mint');
+                setTimeout(load, 0);
+              }}
+              className="text-emerald-400 hover:underline"
+            >
+              token mints
+            </button>
+            <button
+              onClick={() => {
+                setAction('project.create');
+                setTimeout(load, 0);
+              }}
+              className="text-emerald-400 hover:underline"
+            >
+              project creates
+            </button>
+            <button
+              onClick={() => {
+                setAction('issue.status');
+                setTimeout(load, 0);
+              }}
+              className="text-emerald-400 hover:underline"
+            >
+              issue status
+            </button>
+            <button
+              onClick={() => {
+                setAction('push_credentials.upsert');
+                setTimeout(load, 0);
+              }}
+              className="text-emerald-400 hover:underline"
+            >
+              push creds
+            </button>
+          </div>
           <div className="col-span-4 flex gap-2">
             <Button onClick={load}>Apply</Button>
             <Button variant="secondary" onClick={clear}>

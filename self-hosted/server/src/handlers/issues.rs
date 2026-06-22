@@ -167,6 +167,17 @@ pub async fn patch(
             }),
         )
         .await;
+        crate::notify::audit(
+            &state.pool,
+            state.workspace_id.into_uuid(),
+            None,
+            None,
+            "issue.status",
+            Some("issue"),
+            Some(&issue_id.to_string()),
+            serde_json::json!({ "status": status_label }),
+        )
+        .await;
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -212,6 +223,23 @@ pub async fn bulk_patch(
         .bulk_patch(&body.ids, patch, OffsetDateTime::now_utc())
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if let Some(status_label) = body.status.as_deref() {
+        crate::notify::audit(
+            &state.pool,
+            state.workspace_id.into_uuid(),
+            None,
+            None,
+            "issue.bulk_status",
+            Some("issue"),
+            None,
+            serde_json::json!({
+                "status": status_label,
+                "count": body.ids.len(),
+                "updated": outcome.updated,
+            }),
+        )
+        .await;
+    }
     Ok(Json(serde_json::json!({
         "updated": outcome.updated,
     })))
