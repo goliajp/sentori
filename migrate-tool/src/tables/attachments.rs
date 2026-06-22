@@ -83,21 +83,99 @@ async fn event_attachments(
 }
 
 async fn dsyms(
-    _src: &PgPool,
-    _dst: &PgPool,
-    _dry_run: bool,
+    src: &PgPool,
+    dst: &PgPool,
+    dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
-    report.note_read("dsyms", 0);
-    Ok(0)
+    // Metadata-only ETL — actual blob copy is out-of-band
+    // (rsync of the on-disk dsym blob store happens separately).
+    let rows = sqlx::query(
+        "SELECT d.id, p.org_id AS workspace_id, d.project_id, d.uuid, d.arch, \
+                d.image_name, d.bin_kind, d.size_bytes, d.blob_hash, d.uploaded_at \
+         FROM dsyms d JOIN projects p ON p.id = d.project_id",
+    )
+    .fetch_all(src)
+    .await?;
+    report.note_read("dsyms", rows.len() as u64);
+    let mut written = 0u64;
+    let mut skipped = 0u64;
+    for r in &rows {
+        if dry_run {
+            continue;
+        }
+        let res = sqlx::query(
+            "INSERT INTO dsyms (id, workspace_id, project_id, uuid, arch, image_name, \
+                bin_kind, size_bytes, blob_hash, uploaded_at) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (id) DO NOTHING",
+        )
+        .bind(r.get::<uuid::Uuid, _>("id"))
+        .bind(r.get::<uuid::Uuid, _>("workspace_id"))
+        .bind(r.get::<uuid::Uuid, _>("project_id"))
+        .bind(r.get::<String, _>("uuid"))
+        .bind(r.try_get::<Option<String>, _>("arch").ok().flatten())
+        .bind(r.try_get::<Option<String>, _>("image_name").ok().flatten())
+        .bind(r.try_get::<Option<String>, _>("bin_kind").ok().flatten())
+        .bind(r.try_get::<i64, _>("size_bytes").unwrap_or(0))
+        .bind(r.get::<String, _>("blob_hash"))
+        .bind(r.get::<time::OffsetDateTime, _>("uploaded_at"))
+        .execute(dst)
+        .await?;
+        if res.rows_affected() > 0 {
+            written += 1;
+        } else {
+            skipped += 1;
+        }
+    }
+    report.note_written("dsyms", written);
+    report.note_skipped("dsyms", skipped);
+    info!(read = rows.len(), written, skipped, "dsyms");
+    Ok(written)
 }
 
 async fn proguard_mappings(
-    _src: &PgPool,
-    _dst: &PgPool,
-    _dry_run: bool,
+    src: &PgPool,
+    dst: &PgPool,
+    dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
-    report.note_read("proguard_mappings", 0);
-    Ok(0)
+    let rows = sqlx::query(
+        "SELECT pm.id, p.org_id AS workspace_id, pm.project_id, pm.uuid, pm.release_id, \
+                pm.size_bytes, pm.blob_hash, pm.uploaded_at \
+         FROM proguard_mappings pm JOIN projects p ON p.id = pm.project_id",
+    )
+    .fetch_all(src)
+    .await?;
+    report.note_read("proguard_mappings", rows.len() as u64);
+    let mut written = 0u64;
+    let mut skipped = 0u64;
+    for r in &rows {
+        if dry_run {
+            continue;
+        }
+        let res = sqlx::query(
+            "INSERT INTO proguard_mappings (id, workspace_id, project_id, uuid, release_id, \
+                size_bytes, blob_hash, uploaded_at) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING",
+        )
+        .bind(r.get::<uuid::Uuid, _>("id"))
+        .bind(r.get::<uuid::Uuid, _>("workspace_id"))
+        .bind(r.get::<uuid::Uuid, _>("project_id"))
+        .bind(r.get::<String, _>("uuid"))
+        .bind(r.try_get::<Option<uuid::Uuid>, _>("release_id").ok().flatten())
+        .bind(r.try_get::<i64, _>("size_bytes").unwrap_or(0))
+        .bind(r.get::<String, _>("blob_hash"))
+        .bind(r.get::<time::OffsetDateTime, _>("uploaded_at"))
+        .execute(dst)
+        .await?;
+        if res.rows_affected() > 0 {
+            written += 1;
+        } else {
+            skipped += 1;
+        }
+    }
+    report.note_written("proguard_mappings", written);
+    report.note_skipped("proguard_mappings", skipped);
+    info!(read = rows.len(), written, skipped, "proguard_mappings");
+    Ok(written)
 }

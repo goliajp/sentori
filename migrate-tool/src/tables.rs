@@ -13,6 +13,7 @@ pub mod dashboard;
 pub mod dashboard_extra;
 pub mod events;
 pub mod issues;
+pub mod metrics;
 pub mod push;
 pub mod releases;
 pub mod sessions;
