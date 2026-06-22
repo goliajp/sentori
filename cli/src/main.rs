@@ -243,6 +243,37 @@ enum Command {
         #[arg(long = "api-url")]
         api_url: Option<String>,
     },
+    /// List workspace alert rules.
+    Alerts {
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Fire-test an alert rule's channels.
+    AlertFire {
+        alert_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
+    /// Patch an alert rule (enabled/muted/throttle).
+    AlertPatch {
+        alert_id: String,
+        #[arg(long)]
+        enabled: Option<bool>,
+        #[arg(long)]
+        muted: Option<bool>,
+        #[arg(long = "throttle-minutes")]
+        throttle_minutes: Option<i32>,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// Send a test webhook payload (Slack-compatible URL, etc).
     WebhookTest {
         url: String,
@@ -1067,6 +1098,34 @@ async fn main() -> Result<()> {
             token,
             api_url,
         } => admin::issue_watch(issue_id, token, api_url).await,
+        Command::Alerts {
+            token,
+            api_url,
+            json,
+        } => admin::alerts_list(token, api_url, json).await,
+        Command::AlertFire {
+            alert_id,
+            token,
+            api_url,
+        } => admin::alert_fire_test(alert_id, token, api_url).await,
+        Command::AlertPatch {
+            alert_id,
+            enabled,
+            muted,
+            throttle_minutes,
+            token,
+            api_url,
+        } => {
+            admin::alert_patch(
+                alert_id,
+                enabled,
+                muted,
+                throttle_minutes,
+                token,
+                api_url,
+            )
+            .await
+        }
         Command::WebhookTest {
             url,
             secret,

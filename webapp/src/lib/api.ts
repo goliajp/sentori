@@ -772,6 +772,11 @@ export class Api {
       {},
     );
   }
+  fireTestAlert(
+    alertId: string,
+  ): Promise<{ delivered: number; errors: string[] }> {
+    return this.post(`/v1/alerts/${alertId}/_fire_test`, {});
+  }
 
   // ── admin: members ─────────────────────────────────────
   listMembers(): Promise<{ members: MemberRow[] }> {

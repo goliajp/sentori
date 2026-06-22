@@ -22,6 +22,7 @@ use crate::state::AppState;
 
 mod admin;
 mod alerts;
+mod alerts_fire;
 mod audit;
 mod auth;
 mod cert;
@@ -357,6 +358,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(
             "/v1/alerts/:id",
             get(alerts::get).patch(alerts::update).delete(alerts::delete),
+        )
+        .route(
+            "/v1/alerts/:id/_fire_test",
+            post(alerts_fire::fire_test),
         )
         .route(
             "/v1/saved-views",

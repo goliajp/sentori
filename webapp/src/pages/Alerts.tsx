@@ -48,6 +48,19 @@ export function AlertsPage() {
       });
   }, [refreshTok]);
 
+  async function fireTest(id: string) {
+    try {
+      const r = await api.fireTestAlert(id);
+      const msg =
+        r.errors.length > 0
+          ? `Delivered ${r.delivered}; errors:\n${r.errors.join('\n')}`
+          : `Delivered to ${r.delivered} channel(s).`;
+      alert(msg);
+    } catch (e) {
+      setErr(String(e));
+    }
+  }
+
   async function deleteAlert(id: string) {
     if (!confirm('Delete this alert rule?')) return;
     try {
@@ -145,6 +158,20 @@ export function AlertsPage() {
                 ) : (
                   <span className="text-xs text-zinc-600">never</span>
                 ),
+            },
+            {
+              key: 'fire',
+              label: '',
+              width: '14%',
+              render: (r) => (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => fireTest(r.id)}
+                >
+                  Fire test
+                </Button>
+              ),
             },
             {
               key: 'id',
