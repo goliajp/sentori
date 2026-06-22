@@ -39,6 +39,7 @@ use tracing::info;
 
 mod bootstrap;
 mod handlers;
+mod push_worker;
 mod state;
 
 use state::AppState;
@@ -62,7 +63,11 @@ async fn main() -> anyhow::Result<()> {
         tracing::warn!(error = %e, "bootstrap first owner skipped");
     }
 
-    let state = Arc::new(AppState::new(pool, bootstrap::default_workspace_id()));
+    let state = Arc::new(AppState::new(pool.clone(), bootstrap::default_workspace_id()));
+
+    // Start the push dispatcher background worker.
+    push_worker::spawn(pool);
+
     let app = handlers::router(state);
 
     let listener = TcpListener::bind(&bind).await.context("bind")?;
