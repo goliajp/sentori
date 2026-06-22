@@ -20,13 +20,12 @@
 - 4 background workers:push_worker(5s)+ probe_worker(10s)+ archive_worker(24h prune sent>30d/failed>90d)+ periodic_alert_worker(5min)
 - Auth + session:HttpOnly cookie + Bearer dual auth + 可独立 revoke + saasadmin role gate + IP/UA capture
 - Audit log:10+ action types + actor_user_id + IP/UA enrich + client-side IP filter
-- 5 lens 真实 ingest + 真实 ETL:62/68 表(91%)from legacy
+- 5 lens 真实 ingest + 真实 ETL:**68/68 表(100%)from legacy**(saas_stripe_customers / saas_stripe_invoices / saas_org_quotas / saas_billing_events 补全)
 - /healthz + Health page + **/metrics(Prometheus text format)** + **/livez + /readyz(k8s probes)** + 工作流可视(stat grid + 4 workers + 5 vendor adapters)
 - audit log payload._ip server-side substring filter(LIMIT 之前 filter,可靠)
 - 4 test 触发器(webhook-test / push-test / alert-fire-test / ingest-test)
 
 **已知 defer v0.3+:**
-- 6 个 saas_* 内部表 ETL(saas-control 自有)
 - HCM/MiPush 中国 vendor adapter token cache(目前每 send OAuth)
 - Saved view 高级 query builder UI
 
