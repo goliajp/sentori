@@ -591,6 +591,21 @@ export class Api {
     return this.send(`/v1/saved-views/${id}`, 'PATCH', body);
   }
 
+  listSessions(): Promise<{
+    sessions: {
+      id_hash_hex: string;
+      created_at: string;
+      last_used_at: string | null;
+      expires_at: string;
+      ip: string | null;
+      user_agent: string | null;
+    }[];
+  }> {
+    return this.get('/auth/sessions');
+  }
+  revokeSession(idHashHex: string): Promise<void> {
+    return this.send(`/auth/sessions/${idHashHex}`, 'DELETE');
+  }
   authMe(): Promise<{
     user_id: string;
     email: string;

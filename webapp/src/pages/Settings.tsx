@@ -120,6 +120,10 @@ export function SettingsPage() {
         </Card>
       </Section>
 
+      <Section title="Active sessions">
+        <SessionsCard />
+      </Section>
+
       <Section title="API ingest">
         <Card>
           <div className="p-6 text-sm text-zinc-300">
@@ -156,5 +160,80 @@ function Cell({
       </p>
       <div>{children}</div>
     </div>
+  );
+}
+
+function SessionsCard() {
+  const [rows, setRows] = useState<
+    {
+      id_hash_hex: string;
+      created_at: string;
+      last_used_at: string | null;
+      expires_at: string;
+      ip: string | null;
+      user_agent: string | null;
+    }[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+
+  async function refresh() {
+    setLoading(true);
+    try {
+      const r = await api.listSessions();
+      setRows(r.sessions);
+    } catch {
+      // noop
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  async function revoke(id: string) {
+    if (!confirm('Revoke this session?')) return;
+    await api.revokeSession(id);
+    await refresh();
+  }
+
+  return (
+    <Card>
+      <div className="p-4 text-sm">
+        {loading ? (
+          <p className="text-zinc-500 text-xs">Loading…</p>
+        ) : rows.length === 0 ? (
+          <p className="text-zinc-500 text-xs">No active sessions.</p>
+        ) : (
+          <ul className="divide-y divide-zinc-800">
+            {rows.map(s => (
+              <li
+                key={s.id_hash_hex}
+                className="flex items-center justify-between py-2"
+              >
+                <div>
+                  <p className="font-mono text-[10px] text-zinc-400">
+                    {s.id_hash_hex.slice(0, 12)}…
+                  </p>
+                  <p className="text-[10px] text-zinc-500">
+                    {s.ip ?? '?'} · {s.user_agent?.slice(0, 40) ?? '?'}
+                  </p>
+                  <p className="text-[10px] text-zinc-500">
+                    expires {s.expires_at}
+                  </p>
+                </div>
+                <button
+                  onClick={() => revoke(s.id_hash_hex)}
+                  className="rounded border border-red-700 px-2 py-1 text-[10px] text-red-300 hover:bg-red-700/30"
+                >
+                  Revoke
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Card>
   );
 }
