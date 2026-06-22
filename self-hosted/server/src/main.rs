@@ -40,6 +40,7 @@ use tracing::info;
 mod apns;
 mod blob_store;
 mod bootstrap;
+mod fcm;
 mod handlers;
 mod notify;
 mod push_worker;
