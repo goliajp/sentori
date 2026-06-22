@@ -14,4 +14,5 @@ pub mod projects;
 pub mod push_credentials;
 pub mod releases;
 pub mod saas;
+pub mod test_push;
 pub mod tokens;

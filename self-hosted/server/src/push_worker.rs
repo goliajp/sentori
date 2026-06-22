@@ -70,7 +70,16 @@ async fn drain_once(pool: &PgPool, batch: usize) -> Result<usize, sqlx::Error> {
 }
 
 async fn dispatch_one(pool: &PgPool, send_id: Uuid, provider: &str) -> Result<(), sqlx::Error> {
-    // Try real vendor send first. Currently webpush only.
+    use sqlx::Row;
+    // Resolve token_id for quarantine bookkeeping after the send.
+    let token_id: Option<Uuid> = sqlx::query(
+        "SELECT token_id FROM push_sends WHERE id = $1",
+    )
+    .bind(send_id)
+    .fetch_optional(pool)
+    .await?
+    .and_then(|r| r.try_get("token_id").ok());
+
     let real_outcome = match provider {
         "webpush" => try_webpush(pool, send_id).await,
         "apns" => try_apns(pool, send_id).await,
@@ -80,9 +89,35 @@ async fn dispatch_one(pool: &PgPool, send_id: Uuid, provider: &str) -> Result<()
         _ => Err("provider_not_wired".to_string()),
     };
     let (status, outcome, provider_status, duration_ms) = match real_outcome {
-        Ok((code, dur)) => ("sent", "ok", code as i32, dur as i32),
-        Err(_reason) => {
-            // Self-hosted dev / missing credentials → mock success.
+        Ok((code, dur)) => {
+            // Successful send → reset bad_streak.
+            if let Some(t) = token_id {
+                crate::push_quarantine::reset_streak(pool, t).await;
+            }
+            // Some vendors return 2xx but contain an error field in body;
+            // permanent_token_failure on non-2xx → quarantine.
+            let _ = code; // body parsing is provider-specific; deferred
+            ("sent", "ok", code as i32, dur as i32)
+        }
+        Err(reason) => {
+            // Try to extract HTTP status from rejection string for quarantine
+            // logic (e.g. "apns rejected: status=410 body=...").
+            if let Some(t) = token_id {
+                let http_status = extract_http_status(&reason);
+                if let Some(code) = http_status {
+                    if crate::push_quarantine::is_permanent_token_failure(provider, code) {
+                        crate::push_quarantine::quarantine_token(
+                            pool,
+                            t,
+                            &format!("{provider}: HTTP {code}"),
+                        )
+                        .await;
+                    } else {
+                        crate::push_quarantine::bump_streak(pool, t).await;
+                    }
+                }
+                let _ = reason;
+            }
             ("sent", "mock", 0, 0)
         }
     };
@@ -338,6 +373,14 @@ async fn try_webpush(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String
 fn mock_send(provider: &str) -> (&'static str, &'static str) {
     let _ = provider;
     ("sent", "ok")
+}
+
+/// Best-effort: parse an HTTP status code out of vendor error
+/// strings like "apns rejected: status=410 body=...".
+fn extract_http_status(s: &str) -> Option<u16> {
+    let after = s.split("status=").nth(1)?;
+    let digits: String = after.chars().take_while(|c| c.is_ascii_digit()).collect();
+    digits.parse().ok()
 }
 
 fn env_enabled() -> bool {

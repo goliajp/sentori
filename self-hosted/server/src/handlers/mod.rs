@@ -149,6 +149,11 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/projects/:project_id/push/credentials/:kind",
             delete(admin::push_credentials::delete),
         )
+        // ── admin: test push send ──────────────────────────
+        .route(
+            "/admin/api/projects/:project_id/push/test",
+            post(admin::test_push::handle),
+        )
         .route("/admin/api/members", get(admin::members::list))
         .route(
             "/admin/api/members/:user_id",
