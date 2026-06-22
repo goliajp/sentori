@@ -188,12 +188,18 @@ export default function PushCredentials() {
             <DataTable
               columns={[
                 { key: 'kind', label: 'Provider' },
+                { key: 'config', label: 'Config (no secret)' },
                 { key: 'status', label: 'Last validate' },
                 { key: 'actions', label: '' },
               ]}
               rows={rows.map(c => ({
                 key: c.id,
                 kind: <Badge>{c.kind}</Badge>,
+                config: (
+                  <code className="text-[10px] font-mono text-zinc-500">
+                    {JSON.stringify(c.config).slice(0, 80)}
+                  </code>
+                ),
                 status:
                   c.last_validate_status === 'ok' ? (
                     <Badge variant="ok">ok</Badge>
