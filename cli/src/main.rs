@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use walkdir::WalkDir;
 
+mod admin;
 mod dsym;
 mod issue;
 
@@ -32,6 +33,84 @@ enum Command {
     Issue {
         #[command(subcommand)]
         kind: IssueKind,
+    },
+    /// Project CRUD via /admin/api/projects/*.
+    Project {
+        #[command(subcommand)]
+        kind: ProjectKind,
+    },
+    /// SDK ingest token CRUD via /admin/api/projects/<id>/tokens.
+    Token {
+        #[command(subcommand)]
+        kind: TokenKind,
+    },
+}
+
+#[derive(Subcommand)]
+enum ProjectKind {
+    /// List all projects in the workspace.
+    List {
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Create a new project (name + slug).
+    Create {
+        name: String,
+        slug: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
+    /// Delete a project (cascades events / issues / spans).
+    Delete {
+        project_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum TokenKind {
+    /// List ingest tokens for a project.
+    List {
+        #[arg(long = "project")]
+        project_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Mint a new ingest token. Plaintext shown ONCE.
+    Mint {
+        #[arg(long = "project")]
+        project_id: String,
+        /// Display label, e.g. "production iOS".
+        #[arg(long)]
+        label: Option<String>,
+        /// `public` (default — SDK ingest) or `admin`.
+        #[arg(long, default_value = "public")]
+        kind: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
+    /// Revoke an ingest token by id.
+    Revoke {
+        token_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
     },
 }
 
@@ -203,6 +282,44 @@ async fn main() -> Result<()> {
                 token,
                 api_url,
             } => issue::silence(issue_id, project_id, token, api_url).await,
+        },
+        Command::Project { kind } => match kind {
+            ProjectKind::List {
+                token,
+                api_url,
+                json,
+            } => admin::project_list(token, api_url, json).await,
+            ProjectKind::Create {
+                name,
+                slug,
+                token,
+                api_url,
+            } => admin::project_create(name, slug, token, api_url).await,
+            ProjectKind::Delete {
+                project_id,
+                token,
+                api_url,
+            } => admin::project_delete(project_id, token, api_url).await,
+        },
+        Command::Token { kind } => match kind {
+            TokenKind::List {
+                project_id,
+                token,
+                api_url,
+                json,
+            } => admin::token_list(project_id, token, api_url, json).await,
+            TokenKind::Mint {
+                project_id,
+                label,
+                kind: tk,
+                token,
+                api_url,
+            } => admin::token_mint(project_id, label, tk, token, api_url).await,
+            TokenKind::Revoke {
+                token_id,
+                token,
+                api_url,
+            } => admin::token_revoke(token_id, token, api_url).await,
         },
     }
 }
