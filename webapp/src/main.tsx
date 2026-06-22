@@ -18,6 +18,7 @@ import Members from './pages/Members';
 import Projects from './pages/Projects';
 import PushCredentials from './pages/PushCredentials';
 import PushSends from './pages/PushSends';
+import Sessions from './pages/Sessions';
 import Register from './pages/Register';
 import Releases from './pages/Releases';
 import SaasAdmin from './pages/SaasAdmin';
@@ -73,6 +74,7 @@ createRoot(rootEl).render(
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/shortcuts" element={<Shortcuts />} />
           <Route path="/search" element={<Search />} />
+          <Route path="/sessions" element={<Sessions />} />
           <Route path="/projects/:id/traces" element={<Traces />} />
           <Route
             path="/projects/:id/traces/:traceId"
