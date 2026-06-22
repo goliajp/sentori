@@ -81,6 +81,66 @@ enum Command {
         #[command(subcommand)]
         kind: ViewKind,
     },
+    /// Cert monitor ops via /v1/projects/<id>/cert/* + /admin/api/.../cert/watches.
+    Cert {
+        #[command(subcommand)]
+        kind: CertKind,
+    },
+    /// Workspace usage report via /v1/usage.
+    Usage {
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Per-project 24h lens counts via /v1/projects/<id>/stats.
+    Stats {
+        #[arg(long = "project")]
+        project_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum CertKind {
+    /// List observed certs for a project.
+    List {
+        #[arg(long = "project")]
+        project_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Add a domain to the watch list.
+    Watch {
+        #[arg(long = "project")]
+        project_id: String,
+        domain: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
+    /// Stop watching a domain.
+    Unwatch {
+        #[arg(long = "project")]
+        project_id: String,
+        domain: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -528,6 +588,37 @@ async fn main() -> Result<()> {
                 api_url,
             } => admin::view_delete(view_id, token, api_url).await,
         },
+        Command::Cert { kind } => match kind {
+            CertKind::List {
+                project_id,
+                token,
+                api_url,
+                json,
+            } => admin::cert_list(project_id, token, api_url, json).await,
+            CertKind::Watch {
+                project_id,
+                domain,
+                token,
+                api_url,
+            } => admin::cert_watch(project_id, domain, token, api_url).await,
+            CertKind::Unwatch {
+                project_id,
+                domain,
+                token,
+                api_url,
+            } => admin::cert_unwatch(project_id, domain, token, api_url).await,
+        },
+        Command::Usage {
+            token,
+            api_url,
+            json,
+        } => admin::usage_show(token, api_url, json).await,
+        Command::Stats {
+            project_id,
+            token,
+            api_url,
+            json,
+        } => admin::stats_show(project_id, token, api_url, json).await,
     }
 }
 

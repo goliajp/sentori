@@ -387,6 +387,156 @@ pub async fn view_delete(
     Ok(())
 }
 
+// ── cert ───────────────────────────────────────────────────
+
+pub async fn cert_list(
+    project_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!(
+        "{}/v1/projects/{project_id}/cert/observations",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Vec<Value> = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    println!(
+        "{:<40}  {:<25}  expires",
+        "domain", "issuer"
+    );
+    for o in &body {
+        println!(
+            "{:<40}  {:<25}  {}",
+            o["domain"].as_str().unwrap_or("?"),
+            o["issuer_name"]
+                .as_str()
+                .map(|s| &s[..s.len().min(25)])
+                .unwrap_or("?"),
+            o["not_after"].as_str().unwrap_or("?"),
+        );
+    }
+    Ok(())
+}
+
+pub async fn cert_watch(
+    project_id: String,
+    domain: String,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!(
+        "{}/admin/api/projects/{project_id}/cert/watches",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    c.post(&url)
+        .json(&serde_json::json!({ "domain": domain }))
+        .send()
+        .await?
+        .error_for_status()?;
+    println!("now watching {domain}");
+    Ok(())
+}
+
+pub async fn cert_unwatch(
+    project_id: String,
+    domain: String,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!(
+        "{}/admin/api/projects/{project_id}/cert/watches/{domain}",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    c.delete(&url).send().await?.error_for_status()?;
+    println!("stopped watching {domain}");
+    Ok(())
+}
+
+// ── usage ──────────────────────────────────────────────────
+
+pub async fn usage_show(
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!("{}/v1/usage", resolve_api_url(api_url));
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    println!(
+        "plan: {}    status: {}    period: {}",
+        body["plan"].as_str().unwrap_or("?"),
+        body["status"].as_str().unwrap_or("?"),
+        body["period_yyyymm"].as_str().unwrap_or("?"),
+    );
+    for key in ["events", "spans", "replays"] {
+        let g = &body[key];
+        let count = g["count"].as_i64().unwrap_or(0);
+        let limit = g["limit"].as_i64().unwrap_or(0);
+        let dropped = g["dropped"].as_i64().unwrap_or(0);
+        println!(
+            "  {:<8} {:>10} / {:>10}  dropped {:>6}",
+            key, count, limit, dropped
+        );
+    }
+    Ok(())
+}
+
+// ── stats ──────────────────────────────────────────────────
+
+pub async fn stats_show(
+    project_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!(
+        "{}/v1/projects/{project_id}/stats",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    println!("project {project_id}");
+    println!(
+        "  events 24h:    {:>10}",
+        body["events_24h"].as_i64().unwrap_or(0)
+    );
+    println!(
+        "  issues active: {:>10}",
+        body["issues_active"].as_i64().unwrap_or(0)
+    );
+    println!(
+        "  spans 24h:     {:>10}",
+        body["spans_24h"].as_i64().unwrap_or(0)
+    );
+    println!(
+        "  metrics 24h:   {:>10}  (buckets)",
+        body["metrics_buckets_24h"].as_i64().unwrap_or(0)
+    );
+    println!(
+        "  replays 24h:   {:>10}",
+        body["replays_24h"].as_i64().unwrap_or(0)
+    );
+    Ok(())
+}
+
 pub async fn invite_list(
     token: Option<String>,
     api_url: Option<String>,
