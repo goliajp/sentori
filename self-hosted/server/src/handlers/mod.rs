@@ -29,6 +29,7 @@ mod events;
 mod events_live;
 mod health;
 mod activity_log;
+mod api_describe;
 mod ingest;
 mod issue_comments;
 mod issue_watchers;
@@ -245,6 +246,7 @@ pub fn router(state: Arc<AppState>) -> Router {
     // behind the same session middleware via env-var flip).
     Router::new()
         .route("/healthz", get(health::healthz))
+        .route("/v1/_describe", get(api_describe::describe))
         .route("/v1/projects", get(projects::list))
         .route("/v1/projects/:project_id/issues", get(issues::list))
         .route(
