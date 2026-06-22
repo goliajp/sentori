@@ -101,9 +101,21 @@ export default function Tokens() {
               Copy this now — it won't be shown again. Plaintext lives only in
               your dashboard session.
             </div>
-            <Button onClick={() => setNewToken(null)} className="mt-2">
-              Done
-            </Button>
+            <div className="mt-2 flex gap-2">
+              <Button
+                onClick={() => {
+                  navigator.clipboard?.writeText(newToken);
+                }}
+              >
+                Copy
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setNewToken(null)}
+              >
+                Done
+              </Button>
+            </div>
           </Section>
         </Card>
       )}

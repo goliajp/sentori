@@ -161,6 +161,22 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Send a test push notification.
+    PushSend {
+        /// Native device tokens (apns / fcm / webpush endpoint URLs).
+        #[arg(long = "to", value_delimiter = ',')]
+        native_tokens: Vec<String>,
+        #[arg(long, default_value = "Sentori test")]
+        title: String,
+        #[arg(long = "body", default_value = "hello from sentori-cli")]
+        body_text: String,
+        /// Must be a `public` token for the project that owns
+        /// the device tokens.
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// Subscribe (watch) an issue for the current session user.
     Watch {
         issue_id: String,
@@ -752,6 +768,13 @@ async fn main() -> Result<()> {
             api_url,
             json,
         } => admin::comment_list(issue_id, token, api_url, json).await,
+        Command::PushSend {
+            native_tokens,
+            title,
+            body_text,
+            token,
+            api_url,
+        } => admin::push_send(native_tokens, title, body_text, token, api_url).await,
         Command::Watch {
             issue_id,
             token,

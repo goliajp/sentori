@@ -693,6 +693,33 @@ pub async fn issue_watch(
     Ok(())
 }
 
+pub async fn push_send(
+    native_tokens: Vec<String>,
+    title: String,
+    body_text: String,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!("{}/v1/push/send", resolve_api_url(api_url));
+    let c = client(&token_value(token)?)?;
+    let resp = c
+        .post(&url)
+        .json(&serde_json::json!({
+            "nativeTokens": native_tokens,
+            "payload": { "title": title, "body": body_text },
+        }))
+        .send()
+        .await?
+        .error_for_status()?;
+    let body: Value = resp.json().await?;
+    println!(
+        "queued {} push(es): {}",
+        body["queued"].as_i64().unwrap_or(0),
+        serde_json::to_string(&body["send_ids"])?,
+    );
+    Ok(())
+}
+
 pub async fn replay_download(
     project_id: String,
     replay_id: String,

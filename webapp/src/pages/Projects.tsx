@@ -109,7 +109,15 @@ export default function Projects() {
               className="w-full rounded border border-zinc-300 px-3 py-2 text-sm"
               placeholder="Display name (e.g. 'MyApp iOS')"
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={e => {
+                const v = e.target.value;
+                setName(v);
+                // Auto-suggest slug from name only if user hasn't
+                // typed a custom slug already
+                if (!slug || slug === slugify(name)) {
+                  setSlug(slugify(v));
+                }
+              }}
             />
             <input
               className="mt-2 w-full rounded border border-zinc-300 px-3 py-2 text-sm font-mono"
@@ -187,4 +195,13 @@ export default function Projects() {
       </Card>
     </div>
   );
+}
+
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
 }
