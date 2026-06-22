@@ -121,6 +121,19 @@ export function SettingsPage() {
       </Section>
 
       <Section title="Active sessions">
+        <Card>
+          <div className="p-4 flex items-center justify-between">
+            <p className="text-sm text-zinc-300">
+              Detailed list, IP+UA per session, revoke individual entries.
+            </p>
+            <button
+              onClick={() => navigate('/sessions')}
+              className="rounded border border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-800"
+            >
+              Open Sessions →
+            </button>
+          </div>
+        </Card>
         <SessionsCard />
       </Section>
 

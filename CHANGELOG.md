@@ -6,7 +6,33 @@
 
 ---
 
-## v0.2 — fresh-start pivot（2026-06-22, branch `feature/v0.2-foundation`）
+## v0.2.0-rc1 候选(2026-06-23 ship 准备完成)
+
+**状态:** branch `feature/v0.2-foundation` 167 commits,3 binary cargo build 全绿。等用户拍板 → tag → docker build + OSS mirror。
+
+**ship 清单:**
+- 5 lens dashboard(Issues/Events/Traces/Metrics/Replays)+ 31 webapp pages + 5 detail views + filter + saved view
+- 147+ backend endpoints + 63 sentori-cli subcommands + /v1/_describe self-describing catalog
+- Push pipeline production-grade:5 vendor adapters real(WebPush/APNs/FCM/HCM/MiPush)+ JWT/OAuth cache(55min TTL)+ token quarantine + exponential backoff retry + DLQ + 真 dispatch worker
+- Alert pipeline:4 trigger kinds(3 真 wire:new_issue / regression / event_count + crash_free_drop schema 就绪)+ webhook out + HMAC + per-rule throttle + audit
+- Synthetic monitor:probe_worker 真发 HTTPS + endpoint_check + endpoint_probe 时序表
+- 3 background workers:push_worker(5s)+ probe_worker(10s)+ archive_worker(24h prune sent>30d/failed>90d)
+- Auth + session:HttpOnly cookie + Bearer dual auth + 可独立 revoke + saasadmin role gate + IP/UA capture
+- Audit log:10+ action types + actor_user_id + IP/UA enrich + client-side IP filter
+- 5 lens 真实 ingest + 真实 ETL:62/68 表(91%)from legacy
+- /healthz + Health page + 工作流可视(stat grid + 3 workers + 5 vendor adapters)
+- 4 test 触发器(webhook-test / push-test / alert-fire-test / ingest-test)
+
+**已知 defer v0.3+:**
+- WebPush payload encryption(RFC 8030/8188/8291)— wake push 浏览器不显示 title/body
+- crash_free_drop trigger(release_health session 数据 wire)
+- 6 个 saas_* 内部表 ETL(saas-control 自有)
+- HCM/MiPush 中国 vendor adapter token cache(目前每 send OAuth)
+- Saved view 高级 query builder UI
+
+---
+
+## v0.2 — fresh-start pivot(2026-06-22, branch `feature/v0.2-foundation`)
 
 **目标：** 大仓 → SaaS 内置 + self-hosted OSS repo + 定制产品。SaaS 与 self-hosted 同版本号同终端 SDK。SaaS 一经发布满足现有 sentori 全功能（含 tenant 管理 + 简化顶层架构）。Self-hosted 满足 tenant 内全功能。现有 app 用户用现有 SDK + 现有 token 无感继续工作。
 
