@@ -1,6 +1,6 @@
 [package]
 name = "sentori-cli"
-version = "0.5.3"
+version = "0.6.0-rc1"
 edition = "2024"
 authors = ["GOLIA K.K. <takagi@golia.jp>"]
 description = "Sentori CLI — upload source maps and other release artifacts"
