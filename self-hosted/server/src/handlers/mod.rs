@@ -57,7 +57,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/v1/events", post(sdk::events::handle))
         .route("/v1/events:batch", post(sdk::events_batch::handle))
         .route(
-            "/v1/events/:event_id/attachments/:kind",
+            "/v1/events/{event_id}/attachments/{kind}",
             post(sdk::events_attachments::handle),
         )
         .route("/v1/events/_recent", get(sdk::events_recent::handle))
@@ -84,24 +84,24 @@ pub fn router(state: Arc<AppState>) -> Router {
         // ── push (11 endpoints) ──
         .route("/v1/push/tokens", post(sdk::push::register_token::handle))
         .route(
-            "/v1/push/tokens/:handle",
+            "/v1/push/tokens/{handle}",
             delete(sdk::push::revoke_token::handle),
         )
         .route(
-            "/v1/push/tokens/:handle/topics",
+            "/v1/push/tokens/{handle}/topics",
             post(sdk::push::subscribe_topic::handle),
         )
         .route(
-            "/v1/push/tokens/:handle/topics/:topic",
+            "/v1/push/tokens/{handle}/topics/{topic}",
             delete(sdk::push::unsubscribe_topic::handle),
         )
         .route("/v1/push/send", post(sdk::push::send::handle))
         .route(
-            "/v1/push/receipts/:send_id",
+            "/v1/push/receipts/{send_id}",
             get(sdk::push::receipt::handle),
         )
         .route(
-            "/v1/push/sends/:send_id/ack",
+            "/v1/push/sends/{send_id}/ack",
             post(sdk::push::ack::handle),
         )
         .route(
@@ -109,15 +109,15 @@ pub fn router(state: Arc<AppState>) -> Router {
             post(sdk::push::expo_send::handle),
         )
         .route(
-            "/v1/push/expo-compat/receipts/:send_id",
+            "/v1/push/expo-compat/receipts/{send_id}",
             get(sdk::push::expo_receipt::handle),
         )
         .route(
-            "/v1/push/users/:fp_hex/preferences",
+            "/v1/push/users/{fp_hex}/preferences",
             get(sdk::push::get_preferences::handle),
         )
         .route(
-            "/v1/push/users/:fp_hex/preferences/:category",
+            "/v1/push/users/{fp_hex}/preferences/{category}",
             axum::routing::put(sdk::push::put_preference::handle),
         )
         .layer(axum_middleware::from_fn_with_state(
@@ -129,45 +129,45 @@ pub fn router(state: Arc<AppState>) -> Router {
     // Admin routes — session-gated (cookie or Bearer session_token).
     let admin_routes = Router::new()
         .route(
-            "/admin/api/projects/:project_id/tokens",
+            "/admin/api/projects/{project_id}/tokens",
             get(admin::tokens::list).post(admin::tokens::create),
         )
         .route(
-            "/admin/api/tokens/:token_id",
+            "/admin/api/tokens/{token_id}",
             delete(admin::tokens::revoke),
         )
         .route("/admin/api/projects", post(admin::projects::create))
         .route(
-            "/admin/api/projects/:project_id",
+            "/admin/api/projects/{project_id}",
             get(admin::projects::get)
                 .patch(admin::projects::update)
                 .delete(admin::projects::delete),
         )
         .route(
-            "/admin/api/projects/:project_id/push/credentials",
+            "/admin/api/projects/{project_id}/push/credentials",
             get(admin::push_credentials::list)
                 .post(admin::push_credentials::upsert),
         )
         .route(
-            "/admin/api/projects/:project_id/push/credentials/:kind",
+            "/admin/api/projects/{project_id}/push/credentials/{kind}",
             delete(admin::push_credentials::delete),
         )
         // ── admin: test push send ──────────────────────────
         .route(
-            "/admin/api/projects/:project_id/push/test",
+            "/admin/api/projects/{project_id}/push/test",
             post(admin::test_push::handle),
         )
         // ── admin: push sends list (DLQ / triage) ─────────
         .route(
-            "/admin/api/projects/:project_id/push/sends",
+            "/admin/api/projects/{project_id}/push/sends",
             get(admin::push_sends::list),
         )
         .route(
-            "/admin/api/projects/:project_id/push/sends/:send_id/retry",
+            "/admin/api/projects/{project_id}/push/sends/{send_id}/retry",
             post(admin::push_sends::retry),
         )
         .route(
-            "/admin/api/projects/:project_id/push/sends/_retry_all_failed",
+            "/admin/api/projects/{project_id}/push/sends/_retry_all_failed",
             post(admin::push_sends::retry_all_failed),
         )
         .route(
@@ -176,70 +176,70 @@ pub fn router(state: Arc<AppState>) -> Router {
         )
         .route("/admin/api/members", get(admin::members::list))
         .route(
-            "/admin/api/members/:user_id",
+            "/admin/api/members/{user_id}",
             patch(admin::members::update_role).delete(admin::members::remove),
         )
         .route(
             "/admin/api/invites",
             get(admin::invites::list).post(admin::invites::create),
         )
-        .route("/admin/api/invites/:id", delete(admin::invites::revoke))
+        .route("/admin/api/invites/{id}", delete(admin::invites::revoke))
         .route(
-            "/admin/api/projects/:project_id/cert/watches",
+            "/admin/api/projects/{project_id}/cert/watches",
             post(admin::cert_watch::add),
         )
         .route(
-            "/admin/api/projects/:project_id/cert/watches/:domain",
+            "/admin/api/projects/{project_id}/cert/watches/{domain}",
             delete(admin::cert_watch::remove),
         )
         .route(
-            "/admin/api/projects/:project_id/integrations",
+            "/admin/api/projects/{project_id}/integrations",
             get(admin::integrations::list).post(admin::integrations::upsert),
         )
         .route(
-            "/admin/api/projects/:project_id/integrations/:kind",
+            "/admin/api/projects/{project_id}/integrations/{kind}",
             delete(admin::integrations::delete),
         )
         .route(
-            "/admin/api/projects/:project_id/integrations/:kind/active",
+            "/admin/api/projects/{project_id}/integrations/{kind}/active",
             patch(admin::integrations::set_active),
         )
         // ── admin: issue watchers (session-scoped current user) ──
         .route(
-            "/admin/api/issues/:issue_id/watchers",
+            "/admin/api/issues/{issue_id}/watchers",
             post(issue_watchers::join).delete(issue_watchers::leave),
         )
         // ── admin: issue comments (session-scoped author) ──
         .route(
-            "/admin/api/issues/:issue_id/comments",
+            "/admin/api/issues/{issue_id}/comments",
             post(issue_comments::create),
         )
         .route(
-            "/admin/api/issues/:issue_id/comments/:comment_id",
+            "/admin/api/issues/{issue_id}/comments/{comment_id}",
             delete(issue_comments::delete),
         )
         // ── admin: endpoint probes (synthetic monitor) ──
         .route(
-            "/admin/api/projects/:project_id/endpoint-probes",
+            "/admin/api/projects/{project_id}/endpoint-probes",
             get(admin::endpoint_probes::list)
                 .post(admin::endpoint_probes::create),
         )
         .route(
-            "/admin/api/endpoint-probes/:probe_id",
+            "/admin/api/endpoint-probes/{probe_id}",
             patch(admin::endpoint_probes::patch)
                 .delete(admin::endpoint_probes::delete),
         )
         // ── admin: releases ───────────────────────────────
         .route(
-            "/admin/api/projects/:project_id/releases",
+            "/admin/api/projects/{project_id}/releases",
             get(admin::releases::list),
         )
         .route(
-            "/admin/api/projects/:project_id/releases/:release_id/artifacts",
+            "/admin/api/projects/{project_id}/releases/{release_id}/artifacts",
             get(admin::releases::list_artifacts),
         )
         .route(
-            "/admin/api/releases/:release_id",
+            "/admin/api/releases/{release_id}",
             delete(admin::releases::delete),
         )
         // Session-scoped self endpoints
@@ -247,7 +247,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/auth/logout", post(auth::logout))
         .route("/auth/sessions", get(sessions_admin::list))
         .route(
-            "/auth/sessions/:id_hash_hex",
+            "/auth/sessions/{id_hash_hex}",
             delete(sessions_admin::revoke),
         )
         .route(
@@ -259,7 +259,7 @@ pub fn router(state: Arc<AppState>) -> Router {
             post(notifications::read_all),
         )
         .route(
-            "/auth/notifications/:id/read",
+            "/auth/notifications/{id}/read",
             post(notifications::read_one),
         )
         .layer(axum_middleware::from_fn_with_state(
@@ -290,83 +290,83 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/v1/_describe", get(api_describe::describe))
         .route("/v1/_self_test", get(self_test::handle))
         .route("/v1/projects", get(projects::list))
-        .route("/v1/projects/:project_id/issues", get(issues::list))
+        .route("/v1/projects/{project_id}/issues", get(issues::list))
         .route(
-            "/v1/projects/:project_id/issues/:issue_id",
+            "/v1/projects/{project_id}/issues/{issue_id}",
             get(issues::get).patch(issues::patch),
         )
         .route(
-            "/v1/issues/:issue_id/watchers",
+            "/v1/issues/{issue_id}/watchers",
             get(issue_watchers::list),
         )
         .route(
-            "/v1/issues/:issue_id/comments",
+            "/v1/issues/{issue_id}/comments",
             get(issue_comments::list),
         )
         .route(
-            "/v1/issues/:issue_id/activity",
+            "/v1/issues/{issue_id}/activity",
             get(activity_log::list),
         )
         .route(
-            "/v1/projects/:project_id/issues/_bulk_patch",
+            "/v1/projects/{project_id}/issues/_bulk_patch",
             post(issues::bulk_patch),
         )
-        .route("/v1/projects/:project_id/events", get(events::list))
-        .route("/v1/projects/:project_id/events/trend", get(events::trend))
+        .route("/v1/projects/{project_id}/events", get(events::list))
+        .route("/v1/projects/{project_id}/events/trend", get(events::trend))
         .route(
-            "/v1/projects/:project_id/events/_recent",
+            "/v1/projects/{project_id}/events/_recent",
             get(events_live::handle),
         )
         .route(
-            "/v1/projects/:project_id/traces",
+            "/v1/projects/{project_id}/traces",
             get(spans::list_traces),
         )
         .route(
-            "/v1/projects/:project_id/traces/:trace_id",
+            "/v1/projects/{project_id}/traces/{trace_id}",
             get(spans::get_trace),
         )
         .route(
-            "/v1/projects/:project_id/metrics",
+            "/v1/projects/{project_id}/metrics",
             get(metrics::list_names),
         )
         .route(
-            "/v1/projects/:project_id/metrics/:name/timeseries",
+            "/v1/projects/{project_id}/metrics/{name}/timeseries",
             get(metrics::timeseries),
         )
         .route(
-            "/v1/projects/:project_id/replays",
+            "/v1/projects/{project_id}/replays",
             get(replays::list),
         )
         .route(
-            "/v1/projects/:project_id/replays/:replay_id/ndjson",
+            "/v1/projects/{project_id}/replays/{replay_id}/ndjson",
             get(replays::ndjson),
         )
         .route(
-            "/v1/projects/:project_id/stats",
+            "/v1/projects/{project_id}/stats",
             get(stats::project_stats),
         )
         .route(
-            "/v1/projects/:project_id/search",
+            "/v1/projects/{project_id}/search",
             get(search::search),
         )
-        .route("/v1/projects/:project_id/cert/watches", get(cert::list_watches))
+        .route("/v1/projects/{project_id}/cert/watches", get(cert::list_watches))
         .route(
-            "/v1/projects/:project_id/cert/observations",
+            "/v1/projects/{project_id}/cert/observations",
             get(cert::list_observations),
         )
         .route(
-            "/v1/projects/:project_id/alerts",
+            "/v1/projects/{project_id}/alerts",
             get(alerts::list_for_project),
         )
         .route("/v1/usage", get(usage::current))
         .route("/v1/audit", get(audit::list))
         .route("/v1/alerts", get(alerts::list_workspace).post(alerts::create))
         .route(
-            "/v1/alerts/:id",
+            "/v1/alerts/{id}",
             get(alerts::get).patch(alerts::update).delete(alerts::delete),
         )
         .route(
-            "/v1/alerts/:id/_fire_test",
+            "/v1/alerts/{id}/_fire_test",
             post(alerts_fire::fire_test),
         )
         .route(
@@ -374,13 +374,13 @@ pub fn router(state: Arc<AppState>) -> Router {
             get(saved_views::list_workspace).post(saved_views::create),
         )
         .route(
-            "/v1/saved-views/:id",
+            "/v1/saved-views/{id}",
             get(saved_views::get)
                 .patch(saved_views::patch)
                 .delete(saved_views::delete),
         )
         // legacy fresh-start ingest stubs (defer to SDK-auth path)
-        .route("/v1/projects/:project_id/ingest", post(ingest::ingest_event))
+        .route("/v1/projects/{project_id}/ingest", post(ingest::ingest_event))
         // ── auth: dashboard user lifecycle (public) ──────
         .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login))

@@ -2371,6 +2371,7 @@ version = "0.2.0"
 dependencies = [
  "axum",
  "data-encoding",
+ "hex",
  "http",
  "rand 0.8.6",
  "sentori-workspace-identity",

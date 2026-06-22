@@ -177,10 +177,14 @@ impl<'a> Sessions<'a> {
         let session_id = SessionId::generate()?;
         let id_hash = session_id.hash();
 
+        // v0.2 schema requires workspace_id on auth_sessions; derive
+        // it from the user row in the same INSERT to avoid a second
+        // round-trip.
         let row = sqlx::query(
             "INSERT INTO auth_sessions \
-             (id_hash, user_id, expires_at, ip, user_agent) \
-             VALUES ($1, $2, $3, $4, $5) \
+             (id_hash, workspace_id, user_id, expires_at, ip, user_agent) \
+             SELECT $1, u.workspace_id, $2, $3, $4, $5 \
+             FROM users u WHERE u.id = $2 \
              RETURNING id_hash, user_id, created_at, last_seen_at, expires_at, ip, user_agent",
         )
         .bind(id_hash.as_slice())

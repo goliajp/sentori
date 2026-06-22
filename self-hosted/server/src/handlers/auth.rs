@@ -90,19 +90,28 @@ pub async fn login(
     use axum::http::header::{HeaderValue, SET_COOKIE};
     use axum::response::IntoResponse;
 
-    match auth(&state).login(&body.email, &body.password, &meta()).await {
+    let auth_svc = auth(&state);
+    match auth_svc.login(&body.email, &body.password, &meta()).await {
         Ok((user, minted)) => {
             info!(user_id = %user.id, "auth.login");
-            let token = minted.session_id.to_wire_string();
+            let raw = minted.session_id.to_wire_string();
+            // Seal the raw wire token into the signed cookie form
+            // that lookup_session expects. session_token in the body
+            // is the signed value too so cli / Bearer clients can use
+            // the exact same string they would put in the cookie.
+            let signed = sentori_cookie_session::SignedCookie::seal(
+                auth_svc.cookie_key(),
+                raw.as_bytes(),
+            );
             let body_json = json!({
                 "user_id": user.id.to_string(),
                 "email": user.email,
-                "session_token": token,
+                "session_token": signed,
                 "expires_at": minted.session.expires_at,
             });
             let mut resp = (StatusCode::OK, Json(body_json)).into_response();
             let cookie = format!(
-                "sentori_session={token}; Path=/; HttpOnly; SameSite=Lax{}",
+                "sentori_session={signed}; Path=/; HttpOnly; SameSite=Lax{}",
                 if secure_cookies() { "; Secure" } else { "" },
             );
             if let Ok(hv) = HeaderValue::from_str(&cookie) {

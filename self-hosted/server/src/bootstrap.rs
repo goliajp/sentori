@@ -87,7 +87,16 @@ pub async fn ensure_first_owner(pool: &PgPool) -> anyhow::Result<()> {
         .add(user.id, Role::Owner, None)
         .await
         .map_err(|e| anyhow::anyhow!("add owner member: {e}"))?;
-    info!(%email, "first owner created");
+    // The env-bootstrapped owner is trusted (operator who set
+    // SENTORI_BOOTSTRAP_OWNER_PASSWORD); skip the verification step
+    // that would otherwise require a mailer + click-through.
+    let _ = sqlx::query(
+        "UPDATE users SET email_verified = TRUE WHERE id = $1",
+    )
+    .bind(user.id.into_uuid())
+    .execute(pool)
+    .await;
+    info!(%email, "first owner created (env-bootstrapped + auto-verified)");
     Ok(())
 }
 
