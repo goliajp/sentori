@@ -142,6 +142,33 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Post a markdown comment to an issue.
+    Comment {
+        issue_id: String,
+        body_md: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
+    /// List comments for an issue.
+    Comments {
+        issue_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Subscribe (watch) an issue for the current session user.
+    Watch {
+        issue_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// Quick LIKE-search across issues + events.
     Search {
         #[arg(long = "project")]
@@ -713,6 +740,23 @@ async fn main() -> Result<()> {
             api_url,
             json,
         } => admin::metric_list(project_id, token, api_url, json).await,
+        Command::Comment {
+            issue_id,
+            body_md,
+            token,
+            api_url,
+        } => admin::comment_post(issue_id, body_md, token, api_url).await,
+        Command::Comments {
+            issue_id,
+            token,
+            api_url,
+            json,
+        } => admin::comment_list(issue_id, token, api_url, json).await,
+        Command::Watch {
+            issue_id,
+            token,
+            api_url,
+        } => admin::issue_watch(issue_id, token, api_url).await,
         Command::Search {
             project_id,
             query,

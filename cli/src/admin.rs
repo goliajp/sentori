@@ -617,6 +617,82 @@ pub async fn metric_list(
     Ok(())
 }
 
+pub async fn comment_post(
+    issue_id: String,
+    body_md: String,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!(
+        "{}/admin/api/issues/{issue_id}/comments",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c
+        .post(&url)
+        .json(&serde_json::json!({ "body_md": body_md }))
+        .send()
+        .await?
+        .error_for_status()?;
+    let body: Value = resp.json().await?;
+    println!(
+        "posted comment {} on issue {}",
+        body["id"].as_str().unwrap_or("?"),
+        body["issue_id"].as_str().unwrap_or("?"),
+    );
+    Ok(())
+}
+
+pub async fn comment_list(
+    issue_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!(
+        "{}/v1/issues/{issue_id}/comments",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    let rows = body["comments"].as_array().cloned().unwrap_or_default();
+    for c in &rows {
+        println!(
+            "  [{}] {}",
+            c["author_user_id"]
+                .as_str()
+                .map(|s| &s[..s.len().min(8)])
+                .unwrap_or("?"),
+            c["body_md"].as_str().unwrap_or("")
+        );
+    }
+    Ok(())
+}
+
+pub async fn issue_watch(
+    issue_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!(
+        "{}/admin/api/issues/{issue_id}/watchers",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    c.post(&url)
+        .json(&serde_json::json!({}))
+        .send()
+        .await?
+        .error_for_status()?;
+    println!("watching {issue_id}");
+    Ok(())
+}
+
 pub async fn replay_download(
     project_id: String,
     replay_id: String,
