@@ -17,6 +17,7 @@ use uuid::Uuid;
 pub enum TriggerKind {
     IssueNew,
     Regression,
+    EventCount,
 }
 
 impl TriggerKind {
@@ -24,6 +25,7 @@ impl TriggerKind {
         match self {
             TriggerKind::IssueNew => "new_issue",
             TriggerKind::Regression => "regression",
+            TriggerKind::EventCount => "event_count",
         }
     }
 }
@@ -64,7 +66,7 @@ async fn fire(
     // Pull matching rules. Throttle: last_fired_at + throttle_minutes
     // ago < now() OR last_fired_at IS NULL.
     let rows = sqlx::query(
-        "SELECT id, name, channels, throttle_minutes \
+        "SELECT id, name, channels, throttle_minutes, trigger_config \
          FROM alert_rules \
          WHERE workspace_id = $1 \
            AND enabled = TRUE \
@@ -84,6 +86,28 @@ async fn fire(
         let alert_id: Uuid = r.get("id");
         let name: String = r.get("name");
         let channels: Value = r.get("channels");
+        let trigger_config: Value = r.try_get("trigger_config").unwrap_or(Value::Null);
+
+        // event_count rule: only fire if issue's total event count >= threshold
+        // (defaults to 100). For new_issue / regression rules: no extra check.
+        if matches!(kind, TriggerKind::EventCount) {
+            let threshold = trigger_config
+                .get("count")
+                .or_else(|| trigger_config.get("threshold"))
+                .and_then(|v| v.as_i64())
+                .unwrap_or(100);
+            let cur: Option<(i64,)> = sqlx::query_as(
+                "SELECT event_count FROM issues WHERE id = $1",
+            )
+            .bind(issue_id)
+            .fetch_optional(pool)
+            .await?;
+            let count = cur.map(|t| t.0).unwrap_or(0);
+            if count < threshold {
+                continue;
+            }
+        }
+
         let arr = channels.as_array().cloned().unwrap_or_default();
         let mut delivered = 0usize;
         for ch in &arr {

@@ -710,6 +710,44 @@ pub async fn alerts_list(
     Ok(())
 }
 
+pub async fn alert_channel_add(
+    alert_id: String,
+    kind: String,
+    url: String,
+    secret: Option<String>,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let base = resolve_api_url(api_url);
+    let c = client(&token_value(token)?)?;
+    // Fetch existing channels.
+    let cur: Value = c
+        .get(format!("{base}/v1/alerts/{alert_id}"))
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    let mut channels = cur["channels"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let mut new_ch = serde_json::Map::new();
+    new_ch.insert("kind".to_string(), Value::String(kind));
+    new_ch.insert("url".to_string(), Value::String(url));
+    if let Some(s) = secret {
+        new_ch.insert("secret".to_string(), Value::String(s));
+    }
+    channels.push(Value::Object(new_ch));
+    c.patch(format!("{base}/v1/alerts/{alert_id}"))
+        .json(&serde_json::json!({ "channels": channels }))
+        .send()
+        .await?
+        .error_for_status()?;
+    println!("added channel ({} total)", channels.len());
+    Ok(())
+}
+
 pub async fn alert_fire_test(
     alert_id: String,
     token: Option<String>,

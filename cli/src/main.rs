@@ -252,6 +252,20 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Append a channel to an alert rule (webhook/slack).
+    AlertChannelAdd {
+        alert_id: String,
+        #[arg(long, default_value = "webhook")]
+        kind: String,
+        #[arg(long)]
+        url: String,
+        #[arg(long)]
+        secret: Option<String>,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// Fire-test an alert rule's channels.
     AlertFire {
         alert_id: String,
@@ -1103,6 +1117,16 @@ async fn main() -> Result<()> {
             api_url,
             json,
         } => admin::alerts_list(token, api_url, json).await,
+        Command::AlertChannelAdd {
+            alert_id,
+            kind,
+            url,
+            secret,
+            token,
+            api_url,
+        } => {
+            admin::alert_channel_add(alert_id, kind, url, secret, token, api_url).await
+        }
         Command::AlertFire {
             alert_id,
             token,

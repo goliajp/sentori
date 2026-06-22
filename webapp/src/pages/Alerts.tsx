@@ -48,6 +48,28 @@ export function AlertsPage() {
       });
   }, [refreshTok]);
 
+  async function editChannels(r: AlertRule) {
+    const initial = JSON.stringify(r.channels ?? [], null, 2);
+    const next = window.prompt(
+      'Channels JSON. Example:\n[{"kind":"webhook","url":"https://hooks.slack.com/services/T.../...","secret":"opt"}]',
+      initial,
+    );
+    if (next == null || next === initial) return;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(next);
+    } catch {
+      setErr('Channels JSON did not parse');
+      return;
+    }
+    try {
+      await api.patchAlert(r.id, { channels: parsed });
+      setRefreshTok(t => t + 1);
+    } catch (e) {
+      setErr(String(e));
+    }
+  }
+
   async function fireTest(id: string) {
     try {
       const r = await api.fireTestAlert(id);
@@ -158,6 +180,20 @@ export function AlertsPage() {
                 ) : (
                   <span className="text-xs text-zinc-600">never</span>
                 ),
+            },
+            {
+              key: 'channels-edit',
+              label: '',
+              width: '14%',
+              render: (r) => (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => editChannels(r)}
+                >
+                  Channels
+                </Button>
+              ),
             },
             {
               key: 'fire',

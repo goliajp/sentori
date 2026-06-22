@@ -80,6 +80,15 @@ pub async fn handle(
                     crate::alert_fire::TriggerKind::Regression,
                 );
             }
+            // event_count rules can fire on any event (rule itself
+            // checks the threshold against issues.event_count).
+            crate::alert_fire::fire_async(
+                state.pool.clone(),
+                ctx.workspace_id.into_uuid(),
+                ctx.project_id.into_uuid(),
+                outcome.issue_id,
+                crate::alert_fire::TriggerKind::EventCount,
+            );
             (
                 StatusCode::ACCEPTED,
                 Json(json!({
