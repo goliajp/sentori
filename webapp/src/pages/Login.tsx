@@ -2,7 +2,7 @@
 // in localStorage (will become HttpOnly cookie once middleware
 // lands in Phase E step 7+) then routes to Overview.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { api } from '../lib/api';
@@ -54,7 +54,7 @@ export function LoginPage() {
         className="w-80 rounded-lg border border-zinc-800 bg-zinc-900 p-6"
       >
         <h1 className="mb-1 text-xl font-semibold">Sign in to Sentori</h1>
-        <p className="mb-6 text-sm text-zinc-500">v0.2</p>
+        <ServerVersion />
         <label className="mb-3 block text-sm">
           <span className="mb-1 block text-zinc-400">Email</span>
           <input
@@ -95,4 +95,15 @@ export function LoginPage() {
       </form>
     </div>
   );
+}
+
+function ServerVersion() {
+  const [v, setV] = useState<string>('…');
+  useEffect(() => {
+    fetch('/healthz')
+      .then(r => r.json())
+      .then(j => setV(`v${j.version ?? '?'}`))
+      .catch(() => setV('v?'));
+  }, []);
+  return <p className="mb-6 font-mono text-xs text-zinc-500">{v}</p>;
 }
