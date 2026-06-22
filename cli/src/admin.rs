@@ -617,6 +617,24 @@ pub async fn metric_list(
     Ok(())
 }
 
+pub async fn replay_download(
+    project_id: String,
+    replay_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!(
+        "{}/v1/projects/{project_id}/replays/{replay_id}/ndjson",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let bytes = c.get(&url).send().await?.error_for_status()?.bytes().await?;
+    // Print raw NDJSON to stdout — pipe to file: > replay.ndjson
+    use std::io::Write;
+    std::io::stdout().write_all(&bytes)?;
+    Ok(())
+}
+
 pub async fn search_project(
     project_id: String,
     query: String,

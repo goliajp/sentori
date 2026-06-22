@@ -121,6 +121,16 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Download raw NDJSON replay blob (pipe to file).
+    ReplayGet {
+        #[arg(long = "project")]
+        project_id: String,
+        replay_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// Per-project metric list via /v1/projects/<id>/metrics.
     Metric {
         #[arg(long = "project")]
@@ -691,6 +701,12 @@ async fn main() -> Result<()> {
             api_url,
             json,
         } => admin::replay_list(project_id, limit, token, api_url, json).await,
+        Command::ReplayGet {
+            project_id,
+            replay_id,
+            token,
+            api_url,
+        } => admin::replay_download(project_id, replay_id, token, api_url).await,
         Command::Metric {
             project_id,
             token,
