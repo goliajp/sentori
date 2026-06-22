@@ -726,6 +726,52 @@ pub async fn me_show(
     Ok(())
 }
 
+pub async fn live_tail(
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    use anyhow::anyhow;
+    use std::io::{self, Write};
+    let url = format!("{}/v1/events/_recent", resolve_api_url(api_url));
+    let c = client(&token_value(token)?)?;
+    let resp = c
+        .get(&url)
+        .header("accept", "text/event-stream")
+        .send()
+        .await?
+        .error_for_status()?;
+    let mut stream = resp.bytes_stream();
+    let mut buf = String::new();
+    use futures::StreamExt;
+    while let Some(chunk) = stream.next().await {
+        let bytes = chunk.map_err(|e| anyhow!("stream: {e}"))?;
+        buf.push_str(&String::from_utf8_lossy(&bytes));
+        while let Some(idx) = buf.find("\n\n") {
+            let frame = buf[..idx].to_string();
+            buf.drain(..idx + 2);
+            for line in frame.lines() {
+                if let Some(data) = line.strip_prefix("data:") {
+                    let json: serde_json::Value = serde_json::from_str(data.trim())
+                        .unwrap_or(serde_json::Value::Null);
+                    println!(
+                        "{}  {}  {}  {}  issue={}",
+                        json["timestamp"].as_str().unwrap_or("?"),
+                        json["kind"].as_str().unwrap_or("?"),
+                        json["platform"].as_str().unwrap_or("?"),
+                        json["release"].as_str().unwrap_or("?"),
+                        json["issue_id"]
+                            .as_str()
+                            .map(|s| &s[..s.len().min(8)])
+                            .unwrap_or("?"),
+                    );
+                    io::stdout().flush().ok();
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 pub async fn release_list(
     project_id: String,
     token: Option<String>,

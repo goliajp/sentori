@@ -173,6 +173,14 @@ enum Command {
         #[arg(long = "api-url")]
         api_url: Option<String>,
     },
+    /// Live-tail recent events for the bearer's project via SSE.
+    /// Streams until ctrl-c.
+    LiveTail {
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// Per-project release list.
     Release {
         #[arg(long = "project")]
@@ -805,6 +813,7 @@ async fn main() -> Result<()> {
         } => admin::comment_list(issue_id, token, api_url, json).await,
         Command::Health { api_url } => admin::health_check(api_url).await,
         Command::Me { token, api_url } => admin::me_show(token, api_url).await,
+        Command::LiveTail { token, api_url } => admin::live_tail(token, api_url).await,
         Command::Release {
             project_id,
             token,
