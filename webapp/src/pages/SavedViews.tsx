@@ -109,12 +109,20 @@ export default function SavedViews() {
       return `/projects/${v.project_id}/issues${suffix}`;
     }
     if (v.target === 'events') {
-      // Events page reads ?issue_id= for narrowing
       if (payload.issue_id) {
         params.set('issue_id', String(payload.issue_id));
       }
       const q2 = params.toString();
       return `/projects/${v.project_id}/events${q2 ? `?${q2}` : ''}`;
+    }
+    if (v.target === 'spans') {
+      return `/projects/${v.project_id}/traces`;
+    }
+    if (v.target === 'replays') {
+      return `/projects/${v.project_id}/replays`;
+    }
+    if (v.target === 'metrics') {
+      return `/projects/${v.project_id}/metrics`;
     }
     return '#';
   }

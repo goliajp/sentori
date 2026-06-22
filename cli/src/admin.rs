@@ -496,6 +496,114 @@ pub async fn usage_show(
 
 // ── stats ──────────────────────────────────────────────────
 
+pub async fn trace_list(
+    project_id: String,
+    limit: u32,
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!(
+        "{}/v1/projects/{project_id}/traces?limit={limit}",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    let rows = body["traces"].as_array().cloned().unwrap_or_default();
+    println!(
+        "{:<38}  {:<10}  {:>8}  {:>6}  name",
+        "trace_id", "root_op", "spans", "ms"
+    );
+    for t in &rows {
+        println!(
+            "{:<38}  {:<10}  {:>8}  {:>6}  {}",
+            t["trace_id"].as_str().unwrap_or("?"),
+            t["root_op"].as_str().unwrap_or("—"),
+            t["span_count"].as_i64().unwrap_or(0),
+            t["duration_ms"].as_i64().unwrap_or(0),
+            t["root_name"].as_str().unwrap_or(""),
+        );
+    }
+    Ok(())
+}
+
+pub async fn replay_list(
+    project_id: String,
+    limit: u32,
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!(
+        "{}/v1/projects/{project_id}/replays?limit={limit}",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    let rows = body["replays"].as_array().cloned().unwrap_or_default();
+    println!(
+        "{:<38}  {:>7}  {:>7}  event",
+        "id", "ms", "frames"
+    );
+    for r in &rows {
+        println!(
+            "{:<38}  {:>7}  {:>7}  {}",
+            r["id"].as_str().unwrap_or("?"),
+            r["duration_ms"].as_i64().unwrap_or(0),
+            r["frame_count"].as_i64().unwrap_or(0),
+            r["event_id"]
+                .as_str()
+                .map(|s| &s[..s.len().min(8)])
+                .unwrap_or("?"),
+        );
+    }
+    Ok(())
+}
+
+pub async fn metric_list(
+    project_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!(
+        "{}/v1/projects/{project_id}/metrics",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    let rows = body["metrics"].as_array().cloned().unwrap_or_default();
+    println!(
+        "{:<40}  {:>10}  {:>10}  last",
+        "name", "24h count", "avg"
+    );
+    for m in &rows {
+        println!(
+            "{:<40}  {:>10}  {:>10.2}  {}",
+            m["name"].as_str().unwrap_or("?"),
+            m["total_count"].as_i64().unwrap_or(0),
+            m["avg_value"].as_f64().unwrap_or(0.0),
+            m["last_bucket"].as_str().unwrap_or("—"),
+        );
+    }
+    Ok(())
+}
+
 pub async fn stats_show(
     project_id: String,
     token: Option<String>,

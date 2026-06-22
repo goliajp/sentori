@@ -95,6 +95,43 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Per-project trace list via /v1/projects/<id>/traces.
+    Trace {
+        #[arg(long = "project")]
+        project_id: String,
+        #[arg(long, default_value_t = 50)]
+        limit: u32,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Per-project replay list via /v1/projects/<id>/replays.
+    Replay {
+        #[arg(long = "project")]
+        project_id: String,
+        #[arg(long, default_value_t = 50)]
+        limit: u32,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Per-project metric list via /v1/projects/<id>/metrics.
+    Metric {
+        #[arg(long = "project")]
+        project_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
     /// Per-project 24h lens counts via /v1/projects/<id>/stats.
     Stats {
         #[arg(long = "project")]
@@ -613,6 +650,26 @@ async fn main() -> Result<()> {
             api_url,
             json,
         } => admin::usage_show(token, api_url, json).await,
+        Command::Trace {
+            project_id,
+            limit,
+            token,
+            api_url,
+            json,
+        } => admin::trace_list(project_id, limit, token, api_url, json).await,
+        Command::Replay {
+            project_id,
+            limit,
+            token,
+            api_url,
+            json,
+        } => admin::replay_list(project_id, limit, token, api_url, json).await,
+        Command::Metric {
+            project_id,
+            token,
+            api_url,
+            json,
+        } => admin::metric_list(project_id, token, api_url, json).await,
         Command::Stats {
             project_id,
             token,
