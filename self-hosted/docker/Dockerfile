@@ -1,12 +1,32 @@
 # syntax=docker/dockerfile:1.7
 #
 # Sentori self-hosted server — multi-stage rust → distroless cc.
-# Build context = repo root. Image goal: < 80 MB.
+# Now bundles the compiled webapp SPA so a single image is the
+# whole self-hosted stack (paired with postgres in compose).
+#
+# Build context = repo root. Image goal: < 100 MB
+# (server bin + tiny static SPA).
 #
 # Usage:
 #   docker build -f self-hosted/docker/Dockerfile -t sentori-selfhosted:dev .
 
-# ── builder ─────────────────────────────────────────────────
+# ── webapp builder ──────────────────────────────────────────
+# Compiles the React/Vite SPA to /webapp/dist
+FROM node:22-bookworm-slim AS webapp-builder
+WORKDIR /webapp
+COPY webapp/package.json webapp/package-lock.json* webapp/bun.lockb* /webapp/
+# Prefer npm — works without bun being installed in the
+# Node image. Vite/Tailwind/etc are dev deps.
+RUN if [ -f package-lock.json ]; then \
+        npm ci --no-audit --no-fund; \
+    else \
+        npm install --no-audit --no-fund; \
+    fi
+COPY webapp/ /webapp/
+RUN npm run build
+# Expected output: /webapp/dist (Vite default)
+
+# ── rust builder ────────────────────────────────────────────
 FROM rust:1.88-slim-bookworm AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -15,8 +35,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /src
 
-# Cache: copy core/ crate manifests first so cargo can pre-
-# fetch deps without invalidating on every src edit.
 COPY core/ /src/core/
 COPY self-hosted/ /src/self-hosted/
 
@@ -27,6 +45,9 @@ RUN cargo build --release --bin sentori-server
 FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
 
 COPY --from=builder /src/self-hosted/server/target/release/sentori-server /usr/local/bin/sentori-server
+# Bundle the SPA. The server's fallback handler serves this
+# directory; SENTORI_WEBAPP_DIST env-var can override.
+COPY --from=webapp-builder /webapp/dist /app/webapp
 
 EXPOSE 8080
 USER nonroot
