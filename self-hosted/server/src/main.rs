@@ -44,6 +44,7 @@ mod push_worker;
 mod saasadmin_mw;
 mod session_mw;
 mod state;
+mod webpush;
 
 use state::AppState;
 

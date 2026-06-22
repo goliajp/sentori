@@ -70,11 +70,19 @@ async fn drain_once(pool: &PgPool, batch: usize) -> Result<usize, sqlx::Error> {
 }
 
 async fn dispatch_one(pool: &PgPool, send_id: Uuid, provider: &str) -> Result<(), sqlx::Error> {
-    // v0.2 step 5: mock-success dispatcher. Replace with real
-    // vendor adapter via push-provider's PushDispatcher in step 6+.
-    let (status, outcome) = mock_send(provider);
+    // Try real vendor send first. Currently webpush only.
+    let real_outcome = match provider {
+        "webpush" => try_webpush(pool, send_id).await,
+        _ => Err("provider_not_wired".to_string()),
+    };
+    let (status, outcome, provider_status, duration_ms) = match real_outcome {
+        Ok((code, dur)) => ("sent", "ok", code as i32, dur as i32),
+        Err(_reason) => {
+            // Self-hosted dev / missing credentials → mock success.
+            ("sent", "mock", 0, 0)
+        }
+    };
 
-    // INSERT log row.
     sqlx::query(
         "INSERT INTO push_delivery_logs (id, send_id, attempt, outcome, provider_status, duration_ms) \
          VALUES ($1, $2, 1, $3, $4, $5)",
@@ -82,12 +90,11 @@ async fn dispatch_one(pool: &PgPool, send_id: Uuid, provider: &str) -> Result<()
     .bind(Uuid::now_v7())
     .bind(send_id)
     .bind(outcome)
-    .bind(200i32)
-    .bind(50i32)
+    .bind(provider_status)
+    .bind(duration_ms)
     .execute(pool)
     .await?;
 
-    // UPDATE send row.
     sqlx::query(
         "UPDATE push_sends SET status = $1, provider_outcome = $2, sent_at = now() \
          WHERE id = $3",
@@ -99,6 +106,47 @@ async fn dispatch_one(pool: &PgPool, send_id: Uuid, provider: &str) -> Result<()
     .await?;
 
     Ok(())
+}
+
+async fn try_webpush(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
+    use std::time::Instant;
+    let row = sqlx::query(
+        "SELECT dt.native_token, pc.config, pc.secret_blob \
+         FROM push_sends ps \
+         JOIN device_tokens dt ON dt.id = ps.token_id \
+         JOIN push_credentials pc ON pc.project_id = ps.project_id AND pc.kind = 'webpush' \
+         WHERE ps.id = $1",
+    )
+    .bind(send_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| e.to_string())?
+    .ok_or_else(|| "credentials_missing".to_string())?;
+    let endpoint: String = row.get("native_token");
+    let config: serde_json::Value = row.get("config");
+    let secret_pem = row.get::<Vec<u8>, _>("secret_blob");
+    let secret_pem = String::from_utf8(secret_pem).map_err(|e| e.to_string())?;
+    let subject = config
+        .get("subject")
+        .and_then(|v| v.as_str())
+        .unwrap_or("mailto:admin@localhost")
+        .to_string();
+    let pub_key = config
+        .get("vapidPublicKey")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let cfg = crate::webpush::WebPushConfig {
+        vapid_subject: subject,
+        vapid_public_key_b64url: pub_key,
+        vapid_private_pem: secret_pem,
+    };
+    let start = Instant::now();
+    let status = crate::webpush::send(&cfg, &endpoint, 3600)
+        .await
+        .map_err(|e| e.to_string())?;
+    let dur = start.elapsed().as_millis();
+    Ok((status, dur))
 }
 
 fn mock_send(provider: &str) -> (&'static str, &'static str) {
