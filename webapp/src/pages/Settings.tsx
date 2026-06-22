@@ -1,12 +1,35 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
 import { api, UsageResponse } from '../lib/api';
 import { Card, PageHeader, Section, Badge } from '../components/ui';
 
 export function SettingsPage() {
   const [usage, setUsage] = useState<UsageResponse | null>(null);
+  const navigate = useNavigate();
+  const email =
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem('sentori_email')
+      : null;
   useEffect(() => {
     api.usage().then(setUsage).catch(() => {});
   }, []);
+
+  async function logout() {
+    try {
+      await fetch('/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          authorization: `Bearer ${localStorage.getItem('sentori_session') ?? ''}`,
+        },
+      });
+    } catch {}
+    localStorage.removeItem('sentori_session');
+    localStorage.removeItem('sentori_user_id');
+    localStorage.removeItem('sentori_email');
+    navigate('/login');
+  }
 
   return (
     <div className="p-8">
@@ -14,6 +37,25 @@ export function SettingsPage() {
         title="Settings"
         subtitle="Workspace + plan + integrations + members."
       />
+
+      {email && (
+        <Section title="Account">
+          <Card>
+            <div className="flex items-center justify-between p-4">
+              <div>
+                <p className="text-xs text-zinc-500">Signed in as</p>
+                <p className="font-mono text-sm">{email}</p>
+              </div>
+              <button
+                onClick={logout}
+                className="rounded border border-red-500 px-3 py-1.5 text-sm text-red-400 hover:bg-red-500 hover:text-white"
+              >
+                Sign out
+              </button>
+            </div>
+          </Card>
+        </Section>
+      )}
 
       <Section title="Plan">
         <Card>

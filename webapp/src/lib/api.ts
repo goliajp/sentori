@@ -382,9 +382,17 @@ export class Api {
     );
   }
 
+  private authHeaders(): HeadersInit {
+    const token = typeof localStorage !== 'undefined'
+      ? localStorage.getItem('sentori_session')
+      : null;
+    return token ? { authorization: `Bearer ${token}` } : {};
+  }
+
   private async get<T>(path: string): Promise<T> {
     const r = await fetch(`${this.baseUrl}${path}`, {
       credentials: 'include',
+      headers: this.authHeaders(),
     });
     if (!r.ok) throw new ApiError(r.status, await r.text());
     return (await r.json()) as T;
@@ -393,7 +401,7 @@ export class Api {
   private async post<T>(path: string, body: unknown): Promise<T> {
     const r = await fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...this.authHeaders() },
       credentials: 'include',
       body: JSON.stringify(body),
     });
@@ -406,9 +414,13 @@ export class Api {
     method: 'PATCH' | 'DELETE',
     body?: unknown,
   ): Promise<void> {
+    const baseHeaders = this.authHeaders();
+    const headers: HeadersInit = body
+      ? { 'content-type': 'application/json', ...baseHeaders }
+      : baseHeaders;
     const r = await fetch(`${this.baseUrl}${path}`, {
       method,
-      headers: body ? { 'content-type': 'application/json' } : undefined,
+      headers,
       credentials: 'include',
       body: body ? JSON.stringify(body) : undefined,
     });
