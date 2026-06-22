@@ -444,7 +444,7 @@ async fn try_apns(
 async fn try_webpush(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
     use std::time::Instant;
     let row = sqlx::query(
-        "SELECT dt.native_token, pc.config, pc.secret_blob \
+        "SELECT dt.native_token, dt.metadata, ps.payload, pc.config, pc.secret_blob \
          FROM push_sends ps \
          JOIN device_tokens dt ON dt.id = ps.token_id \
          JOIN push_credentials pc ON pc.project_id = ps.project_id AND pc.kind = 'webpush' \
@@ -456,6 +456,8 @@ async fn try_webpush(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String
     .map_err(|e| e.to_string())?
     .ok_or_else(|| "credentials_missing".to_string())?;
     let endpoint: String = row.get("native_token");
+    let metadata: serde_json::Value = row.try_get("metadata").unwrap_or(serde_json::Value::Null);
+    let payload: serde_json::Value = row.try_get("payload").unwrap_or(serde_json::Value::Null);
     let config: serde_json::Value = row.get("config");
     let secret_pem = String::from_utf8(row.get::<Vec<u8>, _>("secret_blob"))
         .map_err(|e| e.to_string())?;
@@ -475,9 +477,22 @@ async fn try_webpush(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String
         vapid_private_pem: secret_pem,
     };
     let start = Instant::now();
-    let status = crate::webpush::send(&cfg, &endpoint, 3600)
-        .await
-        .map_err(|e| e.to_string())?;
+    // If the SDK persisted p256dh + auth_secret in
+    // device_tokens.metadata, do an RFC 8291 encrypted send so the
+    // browser actually displays the notification. Otherwise fall
+    // back to wake-only push.
+    let p256dh = metadata.get("p256dh").and_then(|v| v.as_str());
+    let auth_secret = metadata.get("auth").and_then(|v| v.as_str());
+    let status = if let (Some(p), Some(a)) = (p256dh, auth_secret) {
+        let body_bytes = serde_json::to_vec(&payload).unwrap_or_default();
+        crate::webpush::send_with_payload(&cfg, &endpoint, 3600, Some((&body_bytes, p, a)))
+            .await
+            .map_err(|e| e.to_string())?
+    } else {
+        crate::webpush::send(&cfg, &endpoint, 3600)
+            .await
+            .map_err(|e| e.to_string())?
+    };
     let dur = start.elapsed().as_millis();
     Ok((status, dur))
 }

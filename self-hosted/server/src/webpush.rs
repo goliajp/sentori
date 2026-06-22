@@ -58,6 +58,19 @@ pub async fn send(
     sub_endpoint: &str,
     ttl_sec: u32,
 ) -> Result<u16, WebPushError> {
+    send_with_payload(cfg, sub_endpoint, ttl_sec, None).await
+}
+
+/// When `payload` is set with the subscription's `p256dh` +
+/// `auth_secret`, encrypt the payload per RFC 8291 + 8188 and
+/// POST it (browser will receive title/body). When None, sends a
+/// no-payload wake push (SW fires with no body — backwards compat).
+pub async fn send_with_payload(
+    cfg: &WebPushConfig,
+    sub_endpoint: &str,
+    ttl_sec: u32,
+    payload: Option<(&[u8], &str, &str)>,
+) -> Result<u16, WebPushError> {
     let url = url::Url::parse(sub_endpoint)
         .map_err(|e| WebPushError::BadUrl(e.to_string()))?;
     let aud = format!(
@@ -88,13 +101,26 @@ pub async fn send(
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .build()?;
-    let resp = client
+    let mut req = client
         .post(sub_endpoint)
         .header("Authorization", auth_header)
-        .header("TTL", ttl_sec.to_string())
-        .header("Content-Length", "0")
-        .send()
-        .await?;
+        .header("TTL", ttl_sec.to_string());
+
+    if let Some((plain, p256dh, auth_secret)) = payload {
+        let enc = crate::webpush_encrypt::encrypt(plain, p256dh, auth_secret)
+            .map_err(|e| WebPushError::Rejected {
+                status: 0,
+                body: format!("encrypt: {e}"),
+            })?;
+        req = req
+            .header("Content-Encoding", enc.content_encoding)
+            .header("Content-Length", enc.body.len().to_string())
+            .body(enc.body);
+    } else {
+        req = req.header("Content-Length", "0");
+    }
+
+    let resp = req.send().await?;
     let status = resp.status().as_u16();
     if !(200..400).contains(&status) {
         let body = resp.text().await.unwrap_or_default();

@@ -76,6 +76,10 @@ http = "1"
 hex = "0.4"
 hmac = "0.12"
 sha2 = "0.10"
+hkdf = "0.12"
+aes-gcm = "0.10"
+p256 = { version = "0.13", features = ["ecdh"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
 futures = { version = "0.3", default-features = false }
 tokio-stream = { version = "0.1", features = ["sync"] }
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "http2", "form"] }

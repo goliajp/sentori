@@ -13,7 +13,7 @@
 **ship 清单:**
 - 5 lens dashboard(Issues/Events/Traces/Metrics/Replays)+ 31 webapp pages + 5 detail views + filter + saved view
 - 147+ backend endpoints + 63 sentori-cli subcommands + /v1/_describe self-describing catalog
-- Push pipeline production-grade:5 vendor adapters real(WebPush/APNs/FCM/HCM/MiPush)+ JWT/OAuth cache(55min TTL)+ token quarantine + exponential backoff retry + DLQ + 真 dispatch worker
+- Push pipeline production-grade:5 vendor adapters real(WebPush/APNs/FCM/HCM/MiPush)+ JWT/OAuth cache(55min TTL)+ token quarantine + exponential backoff retry + DLQ + 真 dispatch worker + **WebPush 真 payload encryption(RFC 8291/8188 — aes128gcm)** 浏览器收到 title/body
 - Alert pipeline:**4 trigger kinds 全 真 wire**(new_issue / regression / event_count via ingest path + crash_free_drop via 5-min periodic worker)+ webhook out + HMAC + per-rule throttle + audit
 - 4 background workers:push_worker(5s)+ probe_worker(10s)+ archive_worker(24h)+ **periodic_alert_worker(5min)**
 - Synthetic monitor:probe_worker 真发 HTTPS + endpoint_check + endpoint_probe 时序表
@@ -25,7 +25,6 @@
 - 4 test 触发器(webhook-test / push-test / alert-fire-test / ingest-test)
 
 **已知 defer v0.3+:**
-- WebPush payload encryption(RFC 8030/8188/8291)— wake push 浏览器不显示 title/body
 - 6 个 saas_* 内部表 ETL(saas-control 自有)
 - HCM/MiPush 中国 vendor adapter token cache(目前每 send OAuth)
 - Saved view 高级 query builder UI
