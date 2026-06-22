@@ -199,6 +199,14 @@ enum AlertKind {
         #[arg(long = "api-url")]
         api_url: Option<String>,
     },
+    /// Show alert rule detail (raw JSON).
+    Show {
+        alert_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -611,6 +619,11 @@ async fn main() -> Result<()> {
                 token,
                 api_url,
             } => admin::alert_delete(alert_id, token, api_url).await,
+            AlertKind::Show {
+                alert_id,
+                token,
+                api_url,
+            } => admin::alert_show(alert_id, token, api_url).await,
         },
         Command::View { kind } => match kind {
             ViewKind::List {

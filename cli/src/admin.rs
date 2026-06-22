@@ -343,6 +343,19 @@ pub async fn alert_delete(
     Ok(())
 }
 
+pub async fn alert_show(
+    alert_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!("{}/v1/alerts/{alert_id}", resolve_api_url(api_url));
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    println!("{}", serde_json::to_string_pretty(&body)?);
+    Ok(())
+}
+
 // ── saved-view ─────────────────────────────────────────────
 
 pub async fn view_list(

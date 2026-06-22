@@ -62,6 +62,21 @@ export default function TraceDetail() {
     }
   }
 
+  // Compute total wall-clock span for the waterfall bar.
+  const startMin = spans.length
+    ? Math.min(
+        ...spans.map(s => new Date(s.started_at).getTime()),
+      )
+    : 0;
+  const endMax = spans.length
+    ? Math.max(
+        ...spans.map(
+          s => new Date(s.started_at).getTime() + s.duration_ms,
+        ),
+      )
+    : 0;
+  const totalMs = Math.max(1, endMax - startMin);
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -110,6 +125,13 @@ export default function TraceDetail() {
             <ul className="space-y-1">
               {spans.map(s => {
                 const depth = depthFor.get(s.id) ?? 0;
+                const startedMs = new Date(s.started_at).getTime();
+                const offsetPct =
+                  ((startedMs - startMin) / totalMs) * 100;
+                const widthPct = Math.max(
+                  0.3,
+                  (s.duration_ms / totalMs) * 100,
+                );
                 return (
                   <li
                     key={s.id}
@@ -119,7 +141,7 @@ export default function TraceDetail() {
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <Badge>{s.op}</Badge>
-                        <span className="font-mono text-[11px] text-zinc-200">
+                        <span className="font-mono text-[11px] text-zinc-200 truncate">
                           {s.name}
                         </span>
                         <Badge variant={s.status === 'ok' ? 'ok' : 'muted'}>
@@ -129,6 +151,15 @@ export default function TraceDetail() {
                       <span className="font-mono tabular-nums text-zinc-300">
                         {s.duration_ms}ms
                       </span>
+                    </div>
+                    <div className="mt-1 h-1.5 w-full rounded bg-zinc-100 relative overflow-hidden">
+                      <div
+                        className="absolute top-0 h-full rounded bg-emerald-500/70"
+                        style={{
+                          left: `${offsetPct.toFixed(2)}%`,
+                          width: `${widthPct.toFixed(2)}%`,
+                        }}
+                      />
                     </div>
                   </li>
                 );
