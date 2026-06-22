@@ -37,6 +37,7 @@ use sqlx::PgPool;
 use tokio::net::TcpListener;
 use tracing::info;
 
+mod blob_store;
 mod bootstrap;
 mod handlers;
 mod push_worker;
@@ -65,7 +66,14 @@ async fn main() -> anyhow::Result<()> {
         tracing::warn!(error = %e, "bootstrap first owner skipped");
     }
 
-    let state = Arc::new(AppState::new(pool.clone(), bootstrap::default_workspace_id()));
+    let attachments = blob_store::AttachmentStore::from_env()
+        .await
+        .context("attachment store init")?;
+    let state = Arc::new(AppState::new(
+        pool.clone(),
+        bootstrap::default_workspace_id(),
+        attachments,
+    ));
 
     // Start the push dispatcher background worker.
     push_worker::spawn(pool);

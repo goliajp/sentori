@@ -45,10 +45,14 @@ services:
       SENTORI_BOOTSTRAP_OWNER_PASSWORD: ${SENTORI_BOOTSTRAP_OWNER_PASSWORD:-}
       SENTORI_SESSION_SECRET: ${SENTORI_SESSION_SECRET:-}
       SENTORI_PUSH_WORKER_ENABLED: ${SENTORI_PUSH_WORKER_ENABLED:-1}
+      SENTORI_ATTACHMENT_STORE: ${SENTORI_ATTACHMENT_STORE:-fs:/data/blobs}
       RUST_LOG: ${RUST_LOG:-info,sqlx=warn}
+    volumes:
+      - sentori-blobs:/data/blobs
     ports:
       - "${SENTORI_PORT:-8080}:8080"
     restart: unless-stopped
 
 volumes:
   sentori-pgdata:
+  sentori-blobs:

@@ -11,6 +11,8 @@ use sqlx::PgPool;
 
 use sentori_alert_rule::AlertRuleService;
 use sentori_attachment_store::MemoryBlobStore;
+
+use crate::blob_store::AttachmentStore;
 use sentori_audit_event::AuditService;
 use sentori_billing::BillingService;
 use sentori_event_pipeline::{IngestOptions, IngestService};
@@ -49,7 +51,7 @@ pub struct AppState {
     /// Shared blob store for event_attachments (replay /
     /// screenshot / sourcemap / dsym / proguard). Phase D uses
     /// MemoryBlobStore; Phase E swaps to LocalFsBlobStore.
-    pub attachments: Arc<MemoryBlobStore>,
+    pub attachments: AttachmentStore,
 }
 
 impl AppState {
@@ -63,7 +65,7 @@ impl AppState {
     /// vanishingly unlikely failure since it's a process-
     /// boot wiring step.
     #[must_use]
-    pub fn new(pool: PgPool, workspace_id: WorkspaceId) -> Self {
+    pub fn new(pool: PgPool, workspace_id: WorkspaceId, attachments: AttachmentStore) -> Self {
         let identity = Identity::new(pool.clone(), workspace_id);
         let ingest = IngestService::new(pool.clone(), IngestOptions::default())
             .expect("ingest service must build");
@@ -83,7 +85,6 @@ impl AppState {
         let tenant = TenantGuard::new(pool.clone(), workspace_id);
         let billing = BillingService::new(pool.clone(), workspace_id);
         let push_tokens = DeviceTokenStore::new(pool.clone());
-        let attachments = Arc::new(MemoryBlobStore::new());
         Self {
             pool,
             workspace_id,
