@@ -203,6 +203,17 @@ export interface SaasStats {
   users: number;
 }
 
+export interface ReplayRow {
+  id: string;
+  event_id: string;
+  blob_hash: string;
+  started_at: string;
+  ended_at: string;
+  duration_ms: number;
+  frame_count: number;
+  created_at: string;
+}
+
 export interface MetricSummary {
   name: string;
   last_bucket: string | null;
@@ -324,6 +335,12 @@ export class Api {
     return this.get(
       `/v1/projects/${projectId}/metrics/${encodeURIComponent(name)}/timeseries?hours=${hours}`,
     );
+  }
+  listReplays(
+    projectId: string,
+    limit = 50,
+  ): Promise<{ replays: ReplayRow[] }> {
+    return this.get(`/v1/projects/${projectId}/replays?limit=${limit}`);
   }
   patchIssue(
     projectId: string,
