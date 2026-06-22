@@ -128,6 +128,14 @@ export function IssuesPage() {
         }
       />
 
+      <p className="mb-3 text-[10px] text-zinc-500">
+        Shortcuts: <kbd className="rounded bg-zinc-800 px-1">j</kbd>/
+        <kbd className="rounded bg-zinc-800 px-1">k</kbd> navigate ·{' '}
+        <kbd className="rounded bg-zinc-800 px-1">x</kbd> select ·{' '}
+        <kbd className="rounded bg-zinc-800 px-1">e</kbd> resolve ·{' '}
+        <kbd className="rounded bg-zinc-800 px-1">i</kbd> ignore
+      </p>
+
       {selected.size > 0 && (
         <div className="mb-4 flex items-center gap-2 rounded border border-emerald-700/40 bg-emerald-900/20 px-3 py-2 text-xs">
           <span className="text-zinc-300">

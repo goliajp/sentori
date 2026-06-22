@@ -39,6 +39,7 @@ mod metrics;
 mod replays;
 mod search;
 mod sdk;
+mod sessions_admin;
 mod spans;
 mod stats;
 mod usage;
@@ -217,6 +218,11 @@ pub fn router(state: Arc<AppState>) -> Router {
         // Session-scoped self endpoints
         .route("/auth/me", get(auth::me))
         .route("/auth/logout", post(auth::logout))
+        .route("/auth/sessions", get(sessions_admin::list))
+        .route(
+            "/auth/sessions/:id_hash_hex",
+            delete(sessions_admin::revoke),
+        )
         .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             session_middleware,
