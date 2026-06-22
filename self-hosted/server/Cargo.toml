@@ -63,7 +63,7 @@ axum = { version = "0.8", default-features = false, features = ["http1", "json",
 axum-extra = { version = "0.10", default-features = false, features = ["cookie"] }
 tokio = { version = "1", features = ["full"] }
 tower = { version = "0.5", default-features = false }
-tower-http = { version = "0.6", default-features = false }
+tower-http = { version = "0.6", default-features = false, features = ["fs"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "time", "json", "migrate"] }
 uuid = { version = "1", features = ["v7", "serde"] }
 time = { version = "0.3", features = ["serde-well-known", "macros"] }

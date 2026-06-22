@@ -247,4 +247,24 @@ pub fn router(state: Arc<AppState>) -> Router {
         .merge(admin_routes)
         .merge(saas_routes)
         .merge(sdk_routes)
+        .fallback_service(webapp_service())
+}
+
+/// Static-file service for the bundled webapp. Resolves to the
+/// path in `SENTORI_WEBAPP_DIST` env-var, defaulting to
+/// `/app/webapp` inside the container.
+///
+/// Returns 404 on missing files (axum's default ServeDir
+/// behavior) — that's fine because API routes are matched
+/// first; only true SPA paths hit the fallback. SPA-style
+/// path fall-through (`/projects/abc/issues` → `index.html`)
+/// is handled by `not_found_service`.
+fn webapp_service() -> axum::routing::MethodRouter {
+    use tower_http::services::{ServeDir, ServeFile};
+    let root = std::env::var("SENTORI_WEBAPP_DIST")
+        .unwrap_or_else(|_| "/app/webapp".to_string());
+    let index = format!("{root}/index.html");
+    axum::routing::get_service(
+        ServeDir::new(&root).not_found_service(ServeFile::new(index)),
+    )
 }
