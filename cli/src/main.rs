@@ -243,6 +243,22 @@ enum Command {
         #[arg(long = "api-url")]
         api_url: Option<String>,
     },
+    /// Queue a real test push for a known device_token (uses
+    /// the configured vendor + credentials). Session-gated.
+    PushTest {
+        #[arg(long = "project")]
+        project_id: String,
+        #[arg(long = "device-token-id")]
+        device_token_id: String,
+        #[arg(long, default_value = "Sentori test")]
+        title: String,
+        #[arg(long = "body", default_value = "hello from sentori-cli")]
+        body_text: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// Send a synthetic test event (requires public token).
     IngestTest {
         #[arg(long, default_value = "TypeError")]
@@ -1005,6 +1021,24 @@ async fn main() -> Result<()> {
             token,
             api_url,
         } => admin::issue_watch(issue_id, token, api_url).await,
+        Command::PushTest {
+            project_id,
+            device_token_id,
+            title,
+            body_text,
+            token,
+            api_url,
+        } => {
+            admin::push_test(
+                project_id,
+                device_token_id,
+                title,
+                body_text,
+                token,
+                api_url,
+            )
+            .await
+        }
         Command::IngestTest {
             error_type,
             message,

@@ -725,6 +725,19 @@ export class Api {
       'DELETE',
     );
   }
+  testPush(
+    projectId: string,
+    body: {
+      deviceTokenId: string;
+      title?: string;
+      body?: string;
+    },
+  ): Promise<{ send_id: string; provider: string }> {
+    return this.post(
+      `/admin/api/projects/${projectId}/push/test`,
+      body,
+    );
+  }
 
   // ── admin: members ─────────────────────────────────────
   listMembers(): Promise<{ members: MemberRow[] }> {

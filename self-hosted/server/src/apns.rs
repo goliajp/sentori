@@ -63,12 +63,7 @@ struct ApnsErrorBody {
     reason: Option<String>,
 }
 
-pub async fn send(
-    cfg: &ApnsConfig,
-    device_token: &str,
-    title: &str,
-    body_text: &str,
-) -> Result<u16, ApnsError> {
+pub fn mint_jwt(cfg: &ApnsConfig) -> Result<String, ApnsError> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or(Duration::ZERO)
@@ -80,15 +75,53 @@ pub async fn send(
         iat: now,
     };
     let key = EncodingKey::from_ec_pem(cfg.private_pem.as_bytes())?;
-    let jwt = jsonwebtoken::encode(&header, &claims, &key)?;
+    Ok(jsonwebtoken::encode(&header, &claims, &key)?)
+}
 
+pub async fn send_with_jwt(
+    cfg: &ApnsConfig,
+    device_token: &str,
+    title: &str,
+    body_text: &str,
+    jwt: &str,
+) -> Result<u16, ApnsError> {
+    do_send(cfg, device_token, title, body_text, jwt).await
+}
+
+pub async fn send_returning_jwt(
+    cfg: &ApnsConfig,
+    device_token: &str,
+    title: &str,
+    body_text: &str,
+) -> Result<(u16, String), ApnsError> {
+    let jwt = mint_jwt(cfg)?;
+    let status = do_send(cfg, device_token, title, body_text, &jwt).await?;
+    Ok((status, jwt))
+}
+
+pub async fn send(
+    cfg: &ApnsConfig,
+    device_token: &str,
+    title: &str,
+    body_text: &str,
+) -> Result<u16, ApnsError> {
+    let jwt = mint_jwt(cfg)?;
+    do_send(cfg, device_token, title, body_text, &jwt).await
+}
+
+async fn do_send(
+    cfg: &ApnsConfig,
+    device_token: &str,
+    title: &str,
+    body_text: &str,
+    jwt: &str,
+) -> Result<u16, ApnsError> {
     let host = if cfg.production {
         "https://api.push.apple.com"
     } else {
         "https://api.sandbox.push.apple.com"
     };
     let url = format!("{host}/3/device/{device_token}");
-
     let payload = ApsBody {
         aps: Aps {
             alert: ApsAlert {
@@ -97,12 +130,10 @@ pub async fn send(
             },
         },
     };
-
     let client = reqwest::Client::builder()
         .http2_prior_knowledge()
         .timeout(Duration::from_secs(15))
         .build()?;
-
     let resp = client
         .post(&url)
         .header("authorization", format!("bearer {jwt}"))

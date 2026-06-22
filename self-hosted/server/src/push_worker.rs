@@ -16,6 +16,7 @@
 //! - `SENTORI_PUSH_WORKER_INTERVAL_SEC`: poll interval (default 5s)
 //! - `SENTORI_PUSH_WORKER_BATCH`: max sends per poll (default 100)
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use sqlx::{PgPool, Row};
@@ -23,8 +24,10 @@ use tokio::time::sleep;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
+use crate::token_cache::TokenCache;
+
 /// Spawn the worker as a long-running tokio task.
-pub fn spawn(pool: PgPool) {
+pub fn spawn(pool: PgPool, cache: Arc<TokenCache>) {
     if !env_enabled() {
         info!("push worker disabled via SENTORI_PUSH_WORKER_ENABLED");
         return;
@@ -34,7 +37,7 @@ pub fn spawn(pool: PgPool) {
     tokio::spawn(async move {
         info!(interval_sec = interval.as_secs(), batch, "push worker started");
         loop {
-            match drain_once(&pool, batch).await {
+            match drain_once(&pool, &cache, batch).await {
                 Ok(0) => debug!("push worker idle"),
                 Ok(n) => info!(processed = n, "push worker drained batch"),
                 Err(e) => warn!(error = %e, "push worker batch failed"),
@@ -44,7 +47,11 @@ pub fn spawn(pool: PgPool) {
     });
 }
 
-async fn drain_once(pool: &PgPool, batch: usize) -> Result<usize, sqlx::Error> {
+async fn drain_once(
+    pool: &PgPool,
+    cache: &Arc<TokenCache>,
+    batch: usize,
+) -> Result<usize, sqlx::Error> {
     let rows = sqlx::query(
         "SELECT id, token_id, provider, payload FROM push_sends \
          WHERE status = 'queued' AND next_attempt_at <= now() \
@@ -60,7 +67,7 @@ async fn drain_once(pool: &PgPool, batch: usize) -> Result<usize, sqlx::Error> {
     for r in &rows {
         let send_id: Uuid = r.get("id");
         let provider: String = r.get("provider");
-        if let Err(e) = dispatch_one(pool, send_id, &provider).await {
+        if let Err(e) = dispatch_one(pool, cache, send_id, &provider).await {
             warn!(%send_id, error = %e, "push send dispatch failed");
             continue;
         }
@@ -69,7 +76,12 @@ async fn drain_once(pool: &PgPool, batch: usize) -> Result<usize, sqlx::Error> {
     Ok(processed)
 }
 
-async fn dispatch_one(pool: &PgPool, send_id: Uuid, provider: &str) -> Result<(), sqlx::Error> {
+async fn dispatch_one(
+    pool: &PgPool,
+    cache: &Arc<TokenCache>,
+    send_id: Uuid,
+    provider: &str,
+) -> Result<(), sqlx::Error> {
     use sqlx::Row;
     // Resolve token_id for quarantine bookkeeping after the send.
     let token_id: Option<Uuid> = sqlx::query(
@@ -82,9 +94,9 @@ async fn dispatch_one(pool: &PgPool, send_id: Uuid, provider: &str) -> Result<()
 
     let real_outcome = match provider {
         "webpush" => try_webpush(pool, send_id).await,
-        "apns" => try_apns(pool, send_id).await,
+        "apns" => try_apns(pool, cache, send_id).await,
         "fcm" => try_fcm(pool, send_id).await,
-        "hcm" => try_hcm(pool, send_id).await,
+        "hcm" => try_hcm(pool, cache, send_id).await,
         "mipush" => try_mipush(pool, send_id).await,
         _ => Err("provider_not_wired".to_string()),
     };
@@ -147,10 +159,14 @@ async fn dispatch_one(pool: &PgPool, send_id: Uuid, provider: &str) -> Result<()
     Ok(())
 }
 
-async fn try_hcm(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
+async fn try_hcm(
+    pool: &PgPool,
+    cache: &Arc<TokenCache>,
+    send_id: Uuid,
+) -> Result<(u16, u128), String> {
     use std::time::Instant;
     let row = sqlx::query(
-        "SELECT dt.native_token, ps.payload, pc.config, pc.secret_blob \
+        "SELECT dt.native_token, ps.payload, ps.project_id, pc.config, pc.secret_blob \
          FROM push_sends ps \
          JOIN device_tokens dt ON dt.id = ps.token_id \
          JOIN push_credentials pc ON pc.project_id = ps.project_id AND pc.kind = 'hcm' \
@@ -161,6 +177,7 @@ async fn try_hcm(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
     .await
     .map_err(|e| e.to_string())?
     .ok_or_else(|| "credentials_missing".to_string())?;
+    let project_id: Uuid = row.get("project_id");
     let device_token: String = row.get("native_token");
     let payload: serde_json::Value = row.get("payload");
     let config: serde_json::Value = row.get("config");
@@ -185,8 +202,19 @@ async fn try_hcm(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
         client_secret,
         app_id,
     };
+
     let start = Instant::now();
-    let status = crate::hcm::send(&cfg, &device_token, title, body_text)
+    let token = match cache.get(project_id, "hcm_oauth") {
+        Some(t) => t,
+        None => {
+            let t = crate::hcm::fetch_oauth_token(&cfg)
+                .await
+                .map_err(|e| e.to_string())?;
+            cache.put(project_id, "hcm_oauth", t.clone(), Duration::from_secs(3300));
+            t
+        }
+    };
+    let status = crate::hcm::send_with_token(&cfg, &token, &device_token, title, body_text)
         .await
         .map_err(|e| e.to_string())?;
     Ok((status, start.elapsed().as_millis()))
@@ -264,10 +292,14 @@ async fn try_fcm(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
     Ok((status, start.elapsed().as_millis()))
 }
 
-async fn try_apns(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
+async fn try_apns(
+    pool: &PgPool,
+    cache: &Arc<TokenCache>,
+    send_id: Uuid,
+) -> Result<(u16, u128), String> {
     use std::time::Instant;
     let row = sqlx::query(
-        "SELECT dt.native_token, ps.payload, pc.config, pc.secret_blob \
+        "SELECT dt.native_token, ps.payload, ps.project_id, pc.config, pc.secret_blob \
          FROM push_sends ps \
          JOIN device_tokens dt ON dt.id = ps.token_id \
          JOIN push_credentials pc ON pc.project_id = ps.project_id AND pc.kind = 'apns' \
@@ -278,6 +310,7 @@ async fn try_apns(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
     .await
     .map_err(|e| e.to_string())?
     .ok_or_else(|| "credentials_missing".to_string())?;
+    let project_id: Uuid = row.get("project_id");
     let device_token: String = row.get("native_token");
     let payload: serde_json::Value = row.get("payload");
     let config: serde_json::Value = row.get("config");
@@ -322,9 +355,21 @@ async fn try_apns(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
     };
 
     let start = Instant::now();
-    let status = crate::apns::send(&cfg, &device_token, title, body_text)
-        .await
-        .map_err(|e| e.to_string())?;
+    // Try cached JWT first; on cache miss, send-with-mint inside
+    // apns crate (which also returns the freshly-minted JWT for
+    // us to cache going forward).
+    let cached_jwt = cache.get(project_id, "apns_jwt");
+    let status = if let Some(jwt) = cached_jwt {
+        crate::apns::send_with_jwt(&cfg, &device_token, title, body_text, &jwt)
+            .await
+            .map_err(|e| e.to_string())?
+    } else {
+        let (status, jwt) = crate::apns::send_returning_jwt(&cfg, &device_token, title, body_text)
+            .await
+            .map_err(|e| e.to_string())?;
+        cache.put(project_id, "apns_jwt", jwt, Duration::from_secs(3300));
+        status
+    };
     Ok((status, start.elapsed().as_millis()))
 }
 

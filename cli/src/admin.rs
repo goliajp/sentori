@@ -674,6 +674,38 @@ pub async fn comment_list(
     Ok(())
 }
 
+pub async fn push_test(
+    project_id: String,
+    device_token_id: String,
+    title: String,
+    body_text: String,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!(
+        "{}/admin/api/projects/{project_id}/push/test",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c
+        .post(&url)
+        .json(&serde_json::json!({
+            "deviceTokenId": device_token_id,
+            "title": title,
+            "body": body_text,
+        }))
+        .send()
+        .await?
+        .error_for_status()?;
+    let body: Value = resp.json().await?;
+    println!(
+        "queued test push  send_id={}  provider={}",
+        body["send_id"].as_str().unwrap_or("?"),
+        body["provider"].as_str().unwrap_or("?"),
+    );
+    Ok(())
+}
+
 pub async fn ingest_test(
     error_type: String,
     message: String,

@@ -85,7 +85,8 @@ async fn main() -> anyhow::Result<()> {
     ));
 
     // Start the push dispatcher + endpoint probe background workers.
-    push_worker::spawn(pool.clone());
+    let token_cache = std::sync::Arc::new(token_cache::TokenCache::new());
+    push_worker::spawn(pool.clone(), token_cache);
     probe_worker::spawn(pool);
 
     let app = handlers::router(state);

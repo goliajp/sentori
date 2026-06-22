@@ -54,17 +54,10 @@ struct AndroidConfig {
     ttl: &'static str,
 }
 
-pub async fn send(
-    cfg: &HcmConfig,
-    device_token: &str,
-    title: &str,
-    body_text: &str,
-) -> Result<u16, HcmError> {
+pub async fn fetch_oauth_token(cfg: &HcmConfig) -> Result<String, HcmError> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .build()?;
-
-    // 1. OAuth token exchange
     let oauth: serde_json::Value = client
         .post("https://oauth-login.cloud.huawei.com/oauth2/v3/token")
         .form(&[
@@ -79,9 +72,42 @@ pub async fn send(
         .await?;
     let token = oauth["access_token"]
         .as_str()
-        .ok_or(HcmError::NoAccessToken)?;
+        .ok_or(HcmError::NoAccessToken)?
+        .to_string();
+    Ok(token)
+}
 
-    // 2. Send
+pub async fn send_with_token(
+    cfg: &HcmConfig,
+    token: &str,
+    device_token: &str,
+    title: &str,
+    body_text: &str,
+) -> Result<u16, HcmError> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()?;
+    do_send(&client, cfg, token, device_token, title, body_text).await
+}
+
+pub async fn send(
+    cfg: &HcmConfig,
+    device_token: &str,
+    title: &str,
+    body_text: &str,
+) -> Result<u16, HcmError> {
+    let token = fetch_oauth_token(cfg).await?;
+    send_with_token(cfg, &token, device_token, title, body_text).await
+}
+
+async fn do_send(
+    client: &reqwest::Client,
+    cfg: &HcmConfig,
+    token: &str,
+    device_token: &str,
+    title: &str,
+    body_text: &str,
+) -> Result<u16, HcmError> {
     let url = format!(
         "https://push-api.cloud.huawei.com/v1/{}/messages:send",
         cfg.app_id
