@@ -6,6 +6,96 @@
 
 ---
 
+## v0.2 — fresh-start pivot（2026-06-22, branch `feature/v0.2-foundation`）
+
+**目标：** 大仓 → SaaS 内置 + self-hosted OSS repo + 定制产品。SaaS 与 self-hosted 同版本号同终端 SDK。SaaS 一经发布满足现有 sentori 全功能（含 tenant 管理 + 简化顶层架构）。Self-hosted 满足 tenant 内全功能。现有 app 用户用现有 SDK + 现有 token 无感继续工作。
+
+**数据策略：** SaaS 由 row-level `workspaces` × `workspace_id` 替代 database-per-tenant；ETL 是业务层（读 legacy DB → 写 v0.2 DB），不是 schema ALTER；self-hosted 总是 fresh DB（Docker pull + migrations + env-var bootstrap admin）。
+
+### Phase A — Legacy inventory ✅
+
+- 82 migrations / 68 tables / 360 cols 全量盘点 → `docs-v0.2/internal/legacy-inventory.md`
+- 28 SDK `/v1/*` endpoint + 11 push endpoint + 95 admin endpoint + 13 auth endpoint = 136 surface
+- 永久契约：token format `st_pk_<26 base32>`、SHA-256 hashed、`sentori-ingest-token` crate 承载
+
+### Phase B — Workspace 重组 + cargo 工作区适配 ✅
+
+- 5 stub crate 占位（push-provider Mock / mock vendor adapters / etc）
+- `sentori-server` / `sentori-saas-control` / `sentori-cli` 三 binary 改名 align v0.2
+- GitHub workflows: `v0.2-core-check` + `v0.2-self-hosted-image` + `v0.2-oss-mirror`
+
+### Phase B.5 — Schema 补全 ✅
+
+- 15 新 migration（0016-0030）覆盖 legacy 33 张缺漏表
+- 列名沿用 legacy 表名以支持 ETL INSERT-透传
+
+### Phase C — SDK 28 endpoints port ✅ 27 业务 / 1 SSE stub
+
+- `sentori-ingest-token` crate: Bearer middleware + `IngestContext { workspace_id, project_id, token_kind }`
+- 17 SDK handler 全部 ship 业务实现（events / events:batch / events_attachments / spans / spans:batch / sessions / heartbeat / deploys / metrics / runtime_metrics / track / security_report / security_link / security_score / control / user_reports）
+- `/v1/events/_recent` SSE 留 stub（Phase G 接 dashboard SSE 时落地）
+
+### Phase D — Push 11 endpoints ✅ 全业务 + worker
+
+- 11 endpoint 全 wire（register_token 双写 push_tokens + device_tokens / revoke / subscribe / unsubscribe / send / receipt / ack / expo-compat send/receipt / get_preferences / put_preference）
+- `push_worker.rs` background task：drain `push_sends.status='queued'` → MockProvider → INSERT push_delivery_logs + UPDATE status
+- env-tunable interval/batch；`FOR UPDATE SKIP LOCKED` 横向 scale-out 安全
+- 真 vendor adapter（APNs/FCM/WebPush/HCM/MiPush）留 K7.x
+
+### Phase E — Admin endpoints + Session middleware ✅
+
+- 33 admin endpoint port: tokens / projects / push-credentials / members / invites / cert-watch / integrations / releases / saved-views（detail+patch）/ alerts（detail）/ saas（cross-workspace list + stats）
+- `session_mw.rs`：cookie 或 Bearer session token gate；`Extension<SessionContext>` 注入
+- `/auth/{register,login,verify,forgot,reset,change-password,me,logout}` 6+2 endpoint
+- saas-control binary aligned to row-level pivot（删 `tenant_provision`，workspaces CRUD + workspace_billing 状态 → suspend/resume/delete）
+
+### Phase F — Docker + OSS mirror ✅
+
+- `self-hosted/docker/Dockerfile` multi-stage Rust → distroless
+- `.github/workflows/v0.2-self-hosted-image.yml`：多架构 build → ghcr.io/goliajp/sentori/sentori-server
+- `.github/workflows/v0.2-oss-mirror.yml`：master push + v0.2.* tag → mirror to `goliajp/sentori-selfhosted` public repo
+
+### Phase G — Webapp 18 页 ✅
+
+Login / Register / ForgotPassword / Overview / SaasAdmin / Projects / Members / Tokens / Push / Integrations / Releases / Issues / Events / Cert / Alerts / Audit / Settings / Health。
+
+- `lib/api.ts`：auth + admin + saas API methods + auto-inject Bearer session header
+- session 在 localStorage（HttpOnly cookie middleware 后续）
+- Sign out 闭环：POST /auth/logout → clear → /login
+
+### Phase H — sentori-migrate ETL binary ✅ 13 sets / 41 表覆盖
+
+- 业务层 ETL（read legacy DB → transform identity layer → write v0.2 DB）
+- table sets：identity / tokens / releases / events / issues / sessions / spans / push / attachments / dashboard / dashboard_extra / analytics / metrics / ops
+- 41 of 68 legacy 表覆盖；剩 27 为 SaaS-only billing / 内部 rollup / 低优先级
+- `--dry-run` count rows without writing；`--tables` 选择 set；`ON CONFLICT DO NOTHING` 幂等
+
+### sentori-cli — admin commands
+
+- `project list/create/delete` + `token list/mint/revoke` via /admin/api/*
+- Bearer token via `SENTORI_ADMIN_TOKEN` env-fallback
+
+### 总产出
+
+- 40 commits on `feature/v0.2-foundation`
+- 3 binary `cargo build` 全绿
+- Backend endpoints: 84+（28 SDK + 11 push + 6 auth + 33 admin + saas-control + healthz）
+- Webapp pages: 18
+- Migrations: 30 sql / ~58 表
+- ETL: 13 sets / 41 表
+- Docker image + OSS mirror workflow 就绪
+
+### 留 v0.3+
+
+- 真 vendor adapter K7.1-K7.5（APNs / FCM / WebPush / HCM / MiPush）替换 push_worker mock_send
+- 剩 27 ETL 表
+- SaaSadmin role-based RBAC（v0.2 的 session middleware 不区分 saasadmin vs workspace user）
+- HttpOnly cookie session 替代 localStorage（前端友好性）
+- `/v1/events/_recent` SSE
+- Cutover 部署（user-gate）
+
+---
+
 ## v2.3 — SDK redesign + identity layer + DSR + Sentry compat
 
 **Shipped:** 2026-06-03. See [`docs/roadmap/v2.3.md`](./docs/roadmap/v2.3.md).
