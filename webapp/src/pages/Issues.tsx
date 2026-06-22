@@ -26,6 +26,7 @@ export function IssuesPage() {
   const statusFilter = search.get('status') ?? '';
   const [issues, setIssues] = useState<Issue[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!projectId) return;
@@ -37,6 +38,32 @@ export function IssuesPage() {
         else setErr(String(e));
       });
   }, [projectId, statusFilter]);
+
+  async function quickAction(
+    issueId: string,
+    next: 'resolved' | 'ignored' | 'active',
+  ) {
+    if (!projectId) return;
+    setBusy(b => new Set(b).add(issueId));
+    try {
+      await api.patchIssue(projectId, issueId, { status: next });
+      setIssues(rows =>
+        rows
+          ? rows.map(r =>
+              r.id === issueId ? { ...r, status: next } : r,
+            )
+          : rows,
+      );
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(b => {
+        const c = new Set(b);
+        c.delete(issueId);
+        return c;
+      });
+    }
+  }
 
   if (!projectId) return <div className="p-8">no project id</div>;
 
@@ -135,11 +162,50 @@ export function IssuesPage() {
             {
               key: 'last_seen',
               label: 'Last seen',
-              width: '15%',
+              width: '12%',
               render: (r) => (
                 <span className="text-xs text-zinc-500">
                   {formatRelative(r.last_seen)}
                 </span>
+              ),
+            },
+            {
+              key: 'actions',
+              label: '',
+              width: '14%',
+              render: (r) => (
+                <div className="flex gap-1">
+                  {r.status !== 'resolved' && (
+                    <button
+                      onClick={() => quickAction(r.id, 'resolved')}
+                      disabled={busy.has(r.id)}
+                      title="Resolve"
+                      className="rounded bg-emerald-700/30 px-2 py-0.5 text-[11px] text-emerald-300 hover:bg-emerald-700/60 disabled:opacity-50"
+                    >
+                      ✓ Resolve
+                    </button>
+                  )}
+                  {r.status !== 'ignored' && (
+                    <button
+                      onClick={() => quickAction(r.id, 'ignored')}
+                      disabled={busy.has(r.id)}
+                      title="Ignore"
+                      className="rounded bg-zinc-700/40 px-2 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-600 disabled:opacity-50"
+                    >
+                      ⊘
+                    </button>
+                  )}
+                  {r.status !== 'active' && (
+                    <button
+                      onClick={() => quickAction(r.id, 'active')}
+                      disabled={busy.has(r.id)}
+                      title="Reopen"
+                      className="rounded bg-orange-700/30 px-2 py-0.5 text-[11px] text-orange-300 hover:bg-orange-700/60 disabled:opacity-50"
+                    >
+                      ↺
+                    </button>
+                  )}
+                </div>
               ),
             },
           ]}
