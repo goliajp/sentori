@@ -29,6 +29,7 @@ mod events;
 mod events_live;
 mod health;
 mod ingest;
+mod issue_watchers;
 mod issues;
 mod projects;
 mod saved_views;
@@ -173,6 +174,11 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/projects/:project_id/integrations/:kind/active",
             patch(admin::integrations::set_active),
         )
+        // ── admin: issue watchers (session-scoped current user) ──
+        .route(
+            "/admin/api/issues/:issue_id/watchers",
+            post(issue_watchers::join).delete(issue_watchers::leave),
+        )
         // ── admin: releases ───────────────────────────────
         .route(
             "/admin/api/projects/:project_id/releases",
@@ -216,6 +222,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(
             "/v1/projects/:project_id/issues/:issue_id",
             get(issues::get).patch(issues::patch),
+        )
+        .route(
+            "/v1/issues/:issue_id/watchers",
+            get(issue_watchers::list),
         )
         .route("/v1/projects/:project_id/events", get(events::list))
         .route("/v1/projects/:project_id/events/trend", get(events::trend))

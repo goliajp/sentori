@@ -26,6 +26,35 @@ export default function IssueDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [watchers, setWatchers] = useState<string[]>([]);
+  const myUserId =
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem('sentori_user_id')
+      : null;
+  const watching = myUserId ? watchers.includes(myUserId) : false;
+
+  useEffect(() => {
+    if (!issueId) return;
+    api
+      .listWatchers(issueId)
+      .then(r => setWatchers(r.watchers.map(w => w.user_id)))
+      .catch(() => {});
+  }, [issueId]);
+
+  async function toggleWatch() {
+    if (!issueId || !myUserId) return;
+    try {
+      if (watching) {
+        await api.unwatchIssue(issueId);
+        setWatchers(ws => ws.filter(w => w !== myUserId));
+      } else {
+        await api.watchIssue(issueId);
+        setWatchers(ws => [...ws, myUserId]);
+      }
+    } catch (e) {
+      setError(String(e));
+    }
+  }
 
   async function act(status: 'active' | 'resolved' | 'ignored') {
     if (!projectId || !issueId) return;
@@ -104,6 +133,15 @@ export default function IssueDetail() {
                 disabled={busy}
               >
                 Reopen
+              </Button>
+            )}
+            {myUserId && (
+              <Button
+                size="sm"
+                variant={watching ? 'primary' : 'secondary'}
+                onClick={toggleWatch}
+              >
+                {watching ? `★ Watching (${watchers.length})` : `☆ Watch (${watchers.length})`}
               </Button>
             )}
             <Link

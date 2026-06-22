@@ -411,6 +411,20 @@ export class Api {
       body,
     );
   }
+  listWatchers(
+    issueId: string,
+  ): Promise<{ watchers: { user_id: string; started_at: string }[] }> {
+    return this.get(`/v1/issues/${issueId}/watchers`);
+  }
+  watchIssue(issueId: string): Promise<void> {
+    return this.post(
+      `/admin/api/issues/${issueId}/watchers`,
+      {},
+    ) as Promise<void>;
+  }
+  unwatchIssue(issueId: string): Promise<void> {
+    return this.send(`/admin/api/issues/${issueId}/watchers`, 'DELETE');
+  }
   ingestEvent(
     projectId: string,
     body: IngestRequest,
