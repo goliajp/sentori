@@ -25,7 +25,7 @@ pub async fn list(
     Path(issue_id): Path<Uuid>,
 ) -> Json<Value> {
     let rows = sqlx::query(
-        "SELECT user_id, started_at FROM issue_watchers WHERE issue_id = $1 ORDER BY started_at",
+        "SELECT user_id, since AS started_at FROM watchers WHERE issue_id = $1 ORDER BY since",
     )
     .bind(issue_id)
     .fetch_all(&state.pool)
@@ -49,7 +49,7 @@ pub async fn join(
     Path(issue_id): Path<Uuid>,
 ) -> StatusCode {
     let _ = sqlx::query(
-        "INSERT INTO issue_watchers (issue_id, user_id) VALUES ($1, $2) \
+        "INSERT INTO watchers (issue_id, user_id) VALUES ($1, $2) \
          ON CONFLICT (issue_id, user_id) DO NOTHING",
     )
     .bind(issue_id)
@@ -65,7 +65,7 @@ pub async fn leave(
     Path(issue_id): Path<Uuid>,
 ) -> StatusCode {
     let _ = sqlx::query(
-        "DELETE FROM issue_watchers WHERE issue_id = $1 AND user_id = $2",
+        "DELETE FROM watchers WHERE issue_id = $1 AND user_id = $2",
     )
     .bind(issue_id)
     .bind(ctx.user_id.into_uuid())

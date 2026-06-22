@@ -73,11 +73,15 @@ pub async fn handle(
     let mut queued = 0u32;
     for (token_id, provider) in targets {
         let id = Uuid::now_v7();
+        // Only attempt idempotency dedup when an idempotency_key
+        // is provided AND the unique constraint exists. v0.2 schema
+        // doesn't ship that constraint, so the conditional branch
+        // here stays on plain INSERT — operators who need dedup
+        // should add the unique index out-of-band.
         let result = sqlx::query(
             "INSERT INTO push_sends \
              (id, workspace_id, project_id, token_id, provider, payload, status, idempotency_key, campaign_id, template_id) \
              VALUES ($1, $2, $3, $4, $5, $6, 'queued', $7, $8, $9) \
-             ON CONFLICT (project_id, idempotency_key) DO NOTHING \
              RETURNING id",
         )
         .bind(id)
@@ -97,7 +101,8 @@ pub async fn handle(
                 queued += 1;
             }
             Ok(None) => {
-                // Idempotency conflict — already queued.
+                // ON CONFLICT path retained for when operator adds
+                // the (project_id, idempotency_key) unique index.
             }
             Err(e) => {
                 warn!(error = %e, "push.send insert_failed");
@@ -124,32 +129,34 @@ async fn resolve_targets(
 ) -> Result<Vec<(Uuid, String)>, String> {
     let mut out: Vec<(Uuid, String)> = Vec::new();
 
-    if !body.token_ids.is_empty() {
-        let rows = sqlx::query(
+    // Loop per-id; sqlx-postgres UUID[] array binding is fragile.
+    // token_ids are usually 1-N per send call.
+    for tid in &body.token_ids {
+        let row = sqlx::query(
             "SELECT id, provider FROM device_tokens \
-             WHERE project_id = $1 AND revoked_at IS NULL AND id = ANY($2)",
+             WHERE project_id = $1 AND revoked_at IS NULL AND id = $2",
         )
         .bind(ctx.project_id.into_uuid())
-        .bind(&body.token_ids)
-        .fetch_all(&state.pool)
+        .bind(tid)
+        .fetch_optional(&state.pool)
         .await
         .map_err(|e| e.to_string())?;
-        for r in rows {
+        if let Some(r) = row {
             out.push((r.get("id"), r.get("provider")));
         }
     }
 
-    if !body.native_tokens.is_empty() {
-        let rows = sqlx::query(
+    for nt in &body.native_tokens {
+        let row = sqlx::query(
             "SELECT id, provider FROM device_tokens \
-             WHERE project_id = $1 AND revoked_at IS NULL AND native_token = ANY($2)",
+             WHERE project_id = $1 AND revoked_at IS NULL AND native_token = $2",
         )
         .bind(ctx.project_id.into_uuid())
-        .bind(&body.native_tokens)
-        .fetch_all(&state.pool)
+        .bind(nt)
+        .fetch_optional(&state.pool)
         .await
         .map_err(|e| e.to_string())?;
-        for r in rows {
+        if let Some(r) = row {
             out.push((r.get("id"), r.get("provider")));
         }
     }

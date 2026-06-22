@@ -24,7 +24,7 @@ pub async fn list(
     Path(issue_id): Path<Uuid>,
 ) -> Json<Value> {
     let rows = sqlx::query(
-        "SELECT id, author_user_id, body_md, created_at, edited_at \
+        "SELECT id, author_id, body, created_at \
          FROM issue_comments WHERE issue_id = $1 ORDER BY created_at",
     )
     .bind(issue_id)
@@ -36,10 +36,14 @@ pub async fn list(
         .map(|r| {
             json!({
                 "id": r.get::<Uuid, _>("id").to_string(),
-                "author_user_id": r.get::<Uuid, _>("author_user_id").to_string(),
-                "body_md": r.get::<String, _>("body_md"),
+                "author_user_id": r
+                    .try_get::<Option<Uuid>, _>("author_id")
+                    .ok()
+                    .flatten()
+                    .map(|u| u.to_string()),
+                "body_md": r.get::<String, _>("body"),
                 "created_at": r.get::<time::OffsetDateTime, _>("created_at"),
-                "edited_at": r.try_get::<Option<time::OffsetDateTime>, _>("edited_at").ok().flatten(),
+                "edited_at": Option::<time::OffsetDateTime>::None,
             })
         })
         .collect();
@@ -66,7 +70,7 @@ pub async fn create(
     }
     let id = Uuid::now_v7();
     let res = sqlx::query(
-        "INSERT INTO issue_comments (id, issue_id, author_user_id, body_md) \
+        "INSERT INTO issue_comments (id, issue_id, author_id, body) \
          VALUES ($1, $2, $3, $4) RETURNING created_at",
     )
     .bind(id)
@@ -115,7 +119,7 @@ pub async fn delete(
 ) -> StatusCode {
     // Only the author can delete their own comment.
     let res = sqlx::query(
-        "DELETE FROM issue_comments WHERE id = $1 AND author_user_id = $2",
+        "DELETE FROM issue_comments WHERE id = $1 AND author_id = $2",
     )
     .bind(comment_id)
     .bind(ctx.user_id.into_uuid())

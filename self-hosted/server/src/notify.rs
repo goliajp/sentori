@@ -91,9 +91,9 @@ pub async fn notify_issue_watchers(
     payload: Value,
 ) {
     let _ = sqlx::query(
-        "INSERT INTO notifications (id, user_id, kind, payload) \
-         SELECT gen_random_uuid(), w.user_id, $1, $2 \
-         FROM issue_watchers w \
+        "INSERT INTO notifications (user_id, issue_id, kind, payload) \
+         SELECT w.user_id, $3, $1, $2 \
+         FROM watchers w \
          WHERE w.issue_id = $3 AND w.user_id IS DISTINCT FROM $4",
     )
     .bind(kind)

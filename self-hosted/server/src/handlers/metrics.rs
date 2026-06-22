@@ -18,12 +18,13 @@ pub async fn list_names(
     State(state): State<Arc<AppState>>,
     Path(project_id): Path<Uuid>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    // v0.2 stores per-row metrics; aggregate at read time.
     let rows = sqlx::query(
-        "SELECT name, MAX(bucket) AS last_bucket, SUM(count)::bigint AS total_count, \
-                AVG(sum / GREATEST(count, 1))::float8 AS avg_value \
-         FROM metric_minute \
+        "SELECT name, MAX(ts) AS last_bucket, COUNT(*)::bigint AS total_count, \
+                AVG(value)::float8 AS avg_value \
+         FROM metrics \
          WHERE project_id = $1 \
-           AND bucket >= now() - interval '24 hours' \
+           AND ts >= now() - interval '24 hours' \
          GROUP BY name ORDER BY last_bucket DESC LIMIT 100",
     )
     .bind(project_id)
@@ -56,11 +57,12 @@ pub async fn timeseries(
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let hours = q.hours.unwrap_or(24).clamp(1, 720) as i64;
     let rows = sqlx::query(
-        "SELECT bucket, SUM(sum)::float8 AS sum, SUM(count)::bigint AS count, \
-                MIN(min)::float8 AS min, MAX(max)::float8 AS max \
-         FROM metric_minute \
+        "SELECT date_trunc('minute', ts) AS bucket, SUM(value)::float8 AS sum, \
+                COUNT(*)::bigint AS count, MIN(value)::float8 AS min, \
+                MAX(value)::float8 AS max \
+         FROM metrics \
          WHERE project_id = $1 AND name = $2 \
-           AND bucket >= now() - ($3 || ' hours')::interval \
+           AND ts >= now() - ($3 || ' hours')::interval \
          GROUP BY bucket ORDER BY bucket",
     )
     .bind(project_id)

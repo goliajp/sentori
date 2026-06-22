@@ -39,7 +39,7 @@ pub async fn project_stats(
     .await?;
     let metrics_buckets: i64 = scalar_count(
         &state,
-        "SELECT COUNT(*)::bigint FROM metric_minute WHERE project_id = $1 AND bucket >= now() - interval '24 hours'",
+        "SELECT COUNT(*)::bigint FROM metrics WHERE project_id = $1 AND ts >= now() - interval '24 hours'",
         project_id,
     )
     .await?;

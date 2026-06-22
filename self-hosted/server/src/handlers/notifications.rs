@@ -32,7 +32,7 @@ pub async fn list(
         .iter()
         .map(|r| {
             json!({
-                "id": r.get::<Uuid, _>("id").to_string(),
+                "id": r.get::<i64, _>("id").to_string(),
                 "kind": r.get::<String, _>("kind"),
                 "payload": r.try_get::<Value, _>("payload").unwrap_or(Value::Null),
                 "read_at": r.try_get::<Option<time::OffsetDateTime>, _>("read_at").ok().flatten(),
@@ -55,7 +55,7 @@ pub async fn list(
 pub async fn read_one(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
-    Path(notif_id): Path<Uuid>,
+    Path(notif_id): Path<i64>,
 ) -> StatusCode {
     let _ = sqlx::query(
         "UPDATE notifications SET read_at = now() \

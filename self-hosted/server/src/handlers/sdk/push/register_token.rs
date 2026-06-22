@@ -45,12 +45,11 @@ pub async fn handle(
         }
     };
 
-    // Double-write: push_tokens (v0.1 push-provider crate path —
-    // used by the dispatcher) + device_tokens (v0.2 legacy-compat
-    // path — used by topic / preference subscriptions). Same
-    // (project_id, kind, native_token) is the dedup key on both.
-    let device_token_id = uuid::Uuid::now_v7();
-    let _ = sqlx::query(
+    // v0.2 canonical store is `device_tokens` (push.send /
+    // subscribe_topic / preferences all query it). UPSERT here +
+    // RETURNING id so client gets the actual device_tokens.id back.
+    let new_id = uuid::Uuid::now_v7();
+    let row = sqlx::query(
         "INSERT INTO device_tokens \
          (id, workspace_id, project_id, provider, env, native_token) \
          VALUES ($1, $2, $3, $4, $5, $6) \
@@ -58,18 +57,21 @@ pub async fn handle(
             env = COALESCE(EXCLUDED.env, device_tokens.env), \
             revoked_at = NULL, \
             last_seen_at = now(), \
-            updated_at = now()",
+            updated_at = now() \
+         RETURNING id, (xmax = 0) AS is_new",
     )
-    .bind(device_token_id)
+    .bind(new_id)
     .bind(ctx.workspace_id.into_uuid())
     .bind(ctx.project_id.into_uuid())
     .bind(&body.kind)
     .bind(body.env.as_deref())
     .bind(&body.native_token)
-    .execute(&state.pool)
+    .fetch_one(&state.pool)
     .await;
 
-    match state
+    // Also UPSERT into the push-provider crate's push_tokens for
+    // the legacy dispatcher path. Not load-bearing for v0.2; ignore.
+    let _ = state
         .push_tokens
         .upsert(
             ctx.project_id,
@@ -78,32 +80,28 @@ pub async fn handle(
             body.env.as_deref(),
             body.app_user_id.as_deref(),
         )
-        .await
-    {
-        Ok(minted) => {
+        .await;
+
+    match row {
+        Ok(row) => {
+            use sqlx::Row;
+            let device_id: uuid::Uuid = row.get("id");
+            let is_new: bool = row.try_get("is_new").unwrap_or(true);
             info!(
                 workspace_id = %ctx.workspace_id,
                 project_id = %ctx.project_id,
-                token_id = %minted.id,
-                is_new = minted.is_new,
+                token_id = %device_id,
+                is_new,
                 "push.register_token upserted",
             );
             (
                 StatusCode::ACCEPTED,
                 Json(json!({
-                    "token_id": minted.id.to_string(),
-                    "is_new": minted.is_new,
+                    "token_id": device_id.to_string(),
+                    "is_new": is_new,
                 })),
             )
         }
-        Err(PushError::ProjectNotFound(_)) => (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({ "error": "project_not_found" })),
-        ),
-        Err(PushError::InvalidInput(msg)) => (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "invalid_input", "detail": msg })),
-        ),
         Err(e) => {
             warn!(workspace_id = %ctx.workspace_id, error = %e, "push.register_token db_error");
             (
