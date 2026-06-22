@@ -15,6 +15,7 @@ export function AuditPage() {
   const [projectId, setProjectId] = useState('');
   const [actor, setActor] = useState('');
   const [action, setAction] = useState('');
+  const [ipFilter, setIpFilter] = useState('');
   const [limit, setLimit] = useState(200);
 
   async function load() {
@@ -42,10 +43,21 @@ export function AuditPage() {
     setProjectId('');
     setActor('');
     setAction('');
+    setIpFilter('');
     setLimit(200);
-    // Reload with cleared filters after state flush
     setTimeout(load, 0);
   }
+
+  // Client-side IP filter — the backend's audit endpoint accepts
+  // project/actor/action but not free-text payload search; filter
+  // locally over the rows the server already returned.
+  const visibleEntries =
+    entries && ipFilter.trim()
+      ? entries.filter(e => {
+          const ip = (e.payload as Record<string, unknown> | null)?._ip;
+          return typeof ip === 'string' && ip.includes(ipFilter.trim());
+        })
+      : entries;
 
   function exportCsv() {
     if (!entries || entries.length === 0) return;
@@ -123,6 +135,12 @@ export function AuditPage() {
             onChange={v => setLimit(parseInt(v, 10) || 200)}
             placeholder="200"
           />
+          <Field
+            label="IP (client-side filter)"
+            value={ipFilter}
+            onChange={setIpFilter}
+            placeholder="e.g. 198.51.100"
+          />
           <div className="col-span-4 flex gap-2 text-xs">
             <span className="text-zinc-500">Quick:</span>
             <button
@@ -172,16 +190,24 @@ export function AuditPage() {
       </Card>
 
       <Card>
-        {entries?.length === 0 ? (
+        {visibleEntries?.length === 0 ? (
           <div className="p-8 text-center text-sm text-zinc-500">
-            No audit entries yet.
+            {ipFilter ? `No entries match IP "${ipFilter}".` : 'No audit entries yet.'}
           </div>
         ) : (
-          <ul className="divide-y divide-zinc-800">
-            {entries?.map(e => (
-              <AuditRow key={e.id} entry={e} />
-            ))}
-          </ul>
+          <>
+            {ipFilter && (
+              <div className="border-b border-zinc-800 px-4 py-2 text-[10px] text-zinc-500">
+                Showing {visibleEntries?.length ?? 0} of {entries?.length ?? 0}
+                {' '}entries matching IP "{ipFilter}".
+              </div>
+            )}
+            <ul className="divide-y divide-zinc-800">
+              {visibleEntries?.map(e => (
+                <AuditRow key={e.id} entry={e} />
+              ))}
+            </ul>
+          </>
         )}
       </Card>
     </div>
