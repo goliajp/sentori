@@ -243,6 +243,12 @@ enum Command {
         #[arg(long = "api-url")]
         api_url: Option<String>,
     },
+    /// Interactive bootstrap wizard — probe server, login,
+    /// list projects, print next-step commands.
+    Init {
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// Email + password login; prints session token for export.
     Login {
         email: String,
@@ -959,6 +965,7 @@ async fn main() -> Result<()> {
             token,
             api_url,
         } => admin::issue_watch(issue_id, token, api_url).await,
+        Command::Init { api_url } => admin::init_wizard(api_url).await,
         Command::Login {
             email,
             password,

@@ -674,6 +674,90 @@ pub async fn comment_list(
     Ok(())
 }
 
+pub async fn init_wizard(api_url: Option<String>) -> Result<()> {
+    use std::io::{self, BufRead, Write};
+    let api = resolve_api_url(api_url);
+    println!("sentori-cli init — server: {api}");
+    println!();
+
+    // 1. Server probe.
+    let c = reqwest::Client::new();
+    let health: Value = c
+        .get(format!("{api}/healthz"))
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    println!(
+        "✓ server reachable  version={}  db={}",
+        health["version"].as_str().unwrap_or("?"),
+        health["db"].as_str().unwrap_or("?"),
+    );
+
+    // 2. Login.
+    let stdin = io::stdin();
+    let mut input = stdin.lock();
+    print!("email: ");
+    io::stdout().flush()?;
+    let mut email = String::new();
+    input.read_line(&mut email)?;
+    let email = email.trim().to_string();
+    print!("password: ");
+    io::stdout().flush()?;
+    let mut password = String::new();
+    input.read_line(&mut password)?;
+    let password = password.trim().to_string();
+
+    let body: Value = c
+        .post(format!("{api}/auth/login"))
+        .json(&serde_json::json!({ "email": email, "password": password }))
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    let session_token = body["session_token"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("missing session_token"))?
+        .to_string();
+    println!("✓ logged in as {}", body["email"].as_str().unwrap_or("?"));
+
+    // 3. List projects.
+    let projects: Vec<Value> = c
+        .get(format!("{api}/v1/projects"))
+        .header("authorization", format!("Bearer {session_token}"))
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    if projects.is_empty() {
+        println!("⚠ no projects yet. Create one via:");
+        println!(
+            "   sentori-cli project create \"MyApp\" myapp --token {session_token} \\\n     --api-url {api}"
+        );
+    } else {
+        println!("✓ {} project(s):", projects.len());
+        for p in &projects {
+            println!(
+                "    {}  {}  {}",
+                p["id"].as_str().unwrap_or("?"),
+                p["name"].as_str().unwrap_or("?"),
+                p["slug"].as_str().unwrap_or("?"),
+            );
+        }
+    }
+
+    println!();
+    println!("Done. Next steps:");
+    println!("  export SENTORI_ADMIN_TOKEN={session_token}");
+    println!("  export SENTORI_ADMIN_URL={api}");
+    println!("  sentori-cli describe       # endpoint catalog");
+    println!("  sentori-cli stats --project <id>");
+    Ok(())
+}
+
 pub async fn auth_login(
     email: String,
     password: String,
