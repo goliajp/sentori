@@ -40,6 +40,7 @@ use tracing::info;
 mod bootstrap;
 mod handlers;
 mod push_worker;
+mod saasadmin_mw;
 mod session_mw;
 mod state;
 

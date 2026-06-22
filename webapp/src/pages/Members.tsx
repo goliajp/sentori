@@ -24,7 +24,11 @@ export default function Members() {
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'admin' | 'user'>('user');
-  const [invitedBy, setInvitedBy] = useState('');
+  const [invitedBy, setInvitedBy] = useState(
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem('sentori_user_id') ?? ''
+      : '',
+  );
   const [newInviteToken, setNewInviteToken] = useState<string | null>(null);
 
   async function refresh() {

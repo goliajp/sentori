@@ -16,6 +16,7 @@ use axum::middleware as axum_middleware;
 use axum::routing::{delete, get, patch, post};
 use sentori_ingest_token::{TokenStore, bearer_middleware};
 
+use crate::saasadmin_mw::saasadmin_only;
 use crate::session_mw::session_middleware;
 use crate::state::AppState;
 
@@ -179,12 +180,21 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/releases/:release_id",
             delete(admin::releases::delete),
         )
-        // ── saas: cross-workspace overview ────────────────
-        .route("/admin/api/saas/workspaces", get(admin::saas::workspaces))
-        .route("/admin/api/saas/stats", get(admin::saas::workspace_stats))
         // Session-scoped self endpoints
         .route("/auth/me", get(auth::me))
         .route("/auth/logout", post(auth::logout))
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            session_middleware,
+        ))
+        .with_state(state.clone());
+
+    // SaaS cross-workspace endpoints — session-gated AND
+    // saasadmin-role-gated (env-driven allowlist).
+    let saas_routes = Router::new()
+        .route("/admin/api/saas/workspaces", get(admin::saas::workspaces))
+        .route("/admin/api/saas/stats", get(admin::saas::workspace_stats))
+        .layer(axum_middleware::from_fn(saasadmin_only))
         .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             session_middleware,
@@ -235,5 +245,6 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/auth/change-password", post(auth::change_password))
         .with_state(state)
         .merge(admin_routes)
+        .merge(saas_routes)
         .merge(sdk_routes)
 }
