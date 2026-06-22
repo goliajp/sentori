@@ -106,6 +106,26 @@ export function HealthPage() {
           </div>
 
           <Card>
+            <CardHeader title="Scrape endpoints" />
+            <Section>
+              <ul className="space-y-1 text-xs font-mono text-zinc-400">
+                <li>
+                  GET <code>/healthz</code> — JSON snapshot (this page
+                  uses it)
+                </li>
+                <li>
+                  GET <code>/metrics</code> — Prometheus text format
+                  exposition (pool / push / events / issues / alerts /
+                  sessions gauges)
+                </li>
+                <li>
+                  GET <code>/v1/_describe</code> — endpoint catalog
+                </li>
+              </ul>
+            </Section>
+          </Card>
+
+          <Card>
             <CardHeader title="Background workers" />
             <Section>
               <ul className="space-y-1 text-xs font-mono text-zinc-400">
