@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, ApiError, Project, UsageResponse } from '../lib/api';
+import { api, ApiError, Project, ProjectStats, UsageResponse } from '../lib/api';
 import { Sparkline } from '../components/Sparkline';
 import {
   Card,
@@ -15,24 +15,42 @@ export function OverviewPage() {
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [trends, setTrends] = useState<Record<string, number[]>>({});
+  const [stats, setStats] = useState<Record<string, ProjectStats>>({});
 
   useEffect(() => {
     Promise.all([api.listProjects(), api.usage()])
       .then(async ([p, u]) => {
         setProjects(p);
         setUsage(u);
-        // Fetch 7-day trend per project in parallel
-        const t = await Promise.all(
-          p.map(async pr => {
-            try {
-              const series = await api.eventsTrend(pr.id, 7);
-              return [pr.id, series.map(d => d.count)] as const;
-            } catch {
-              return [pr.id, []] as const;
-            }
-          }),
-        );
+        // Fetch 7-day trend + 24h lens stats per project in parallel
+        const [t, s] = await Promise.all([
+          Promise.all(
+            p.map(async pr => {
+              try {
+                const series = await api.eventsTrend(pr.id, 7);
+                return [pr.id, series.map(d => d.count)] as const;
+              } catch {
+                return [pr.id, []] as const;
+              }
+            }),
+          ),
+          Promise.all(
+            p.map(async pr => {
+              try {
+                const st = await api.projectStats(pr.id);
+                return [pr.id, st] as const;
+              } catch {
+                return [pr.id, null] as const;
+              }
+            }),
+          ),
+        ]);
         setTrends(Object.fromEntries(t));
+        setStats(
+          Object.fromEntries(
+            s.filter(([, v]) => v !== null) as [string, ProjectStats][],
+          ),
+        );
       })
       .catch((e: unknown) => {
         if (e instanceof ApiError) setErr(`${e.status}: ${e.body}`);
@@ -86,20 +104,35 @@ export function OverviewPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <p className="font-mono text-xs text-zinc-400">7d events</p>
-                    <p className="font-mono text-sm text-zinc-200">
-                      {trends[p.id]
-                        ? formatNumber(
-                            trends[p.id].reduce((a, b) => a + b, 0),
-                          )
-                        : '—'}
-                    </p>
-                  </div>
+                  {stats[p.id] && (
+                    <div className="flex gap-2 text-[10px]">
+                      <LensPill
+                        label="events"
+                        value={stats[p.id].events_24h}
+                      />
+                      <LensPill
+                        label="active"
+                        value={stats[p.id].issues_active}
+                        tone="warn"
+                      />
+                      <LensPill
+                        label="spans"
+                        value={stats[p.id].spans_24h}
+                      />
+                      <LensPill
+                        label="metrics"
+                        value={stats[p.id].metrics_buckets_24h}
+                      />
+                      <LensPill
+                        label="replays"
+                        value={stats[p.id].replays_24h}
+                      />
+                    </div>
+                  )}
                   <Sparkline
                     values={trends[p.id] ?? []}
-                    width={140}
-                    height={36}
+                    width={120}
+                    height={32}
                   />
                   <Link
                     to={`/projects/${p.id}/issues`}
@@ -153,5 +186,34 @@ function UsageCard({
         </div>
       )}
     </div>
+  );
+}
+
+function LensPill({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone?: 'warn';
+}) {
+  if (value === 0) {
+    return (
+      <span className="rounded bg-zinc-900 px-1.5 py-0.5 font-mono text-zinc-600">
+        {label} 0
+      </span>
+    );
+  }
+  return (
+    <span
+      className={`rounded px-1.5 py-0.5 font-mono ${
+        tone === 'warn'
+          ? 'bg-orange-900/40 text-orange-300'
+          : 'bg-zinc-800 text-zinc-300'
+      }`}
+    >
+      {label} {formatNumber(value)}
+    </span>
   );
 }

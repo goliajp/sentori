@@ -203,6 +203,14 @@ export interface SaasStats {
   users: number;
 }
 
+export interface ProjectStats {
+  events_24h: number;
+  issues_active: number;
+  spans_24h: number;
+  metrics_buckets_24h: number;
+  replays_24h: number;
+}
+
 export interface ReplayRow {
   id: string;
   event_id: string;
@@ -341,6 +349,9 @@ export class Api {
     limit = 50,
   ): Promise<{ replays: ReplayRow[] }> {
     return this.get(`/v1/projects/${projectId}/replays?limit=${limit}`);
+  }
+  projectStats(projectId: string): Promise<ProjectStats> {
+    return this.get(`/v1/projects/${projectId}/stats`);
   }
   patchIssue(
     projectId: string,
