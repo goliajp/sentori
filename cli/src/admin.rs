@@ -690,6 +690,22 @@ pub async fn push_retry(
     Ok(())
 }
 
+pub async fn push_retry_all_failed(
+    project_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!(
+        "{}/admin/api/projects/{project_id}/push/sends/_retry_all_failed",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c.post(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    println!("requeued {} failed sends", body["requeued"].as_i64().unwrap_or(0));
+    Ok(())
+}
+
 pub async fn push_sends_list(
     project_id: String,
     status: Option<String>,

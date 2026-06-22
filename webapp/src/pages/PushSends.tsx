@@ -63,6 +63,17 @@ export default function PushSends() {
     }
   }
 
+  async function retryAllFailed() {
+    if (!projectId) return;
+    if (!confirm(`Re-queue all ${counts.failed} failed sends?`)) return;
+    try {
+      await api.retryAllFailedPushSends(projectId);
+      await refresh();
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
   if (!projectId) return <ErrorBanner>Project id missing</ErrorBanner>;
 
   const counts = {
@@ -76,6 +87,13 @@ export default function PushSends() {
       <PageHeader
         title="Push sends"
         subtitle="Last 100 push attempts + retry-now for the DLQ."
+        actions={
+          counts.failed > 0 && (
+            <Button size="sm" onClick={retryAllFailed}>
+              Retry all {counts.failed} failed
+            </Button>
+          )
+        }
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
 

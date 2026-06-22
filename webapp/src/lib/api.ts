@@ -766,6 +766,12 @@ export class Api {
       {},
     );
   }
+  retryAllFailedPushSends(projectId: string): Promise<{ requeued: number }> {
+    return this.post(
+      `/admin/api/projects/${projectId}/push/sends/_retry_all_failed`,
+      {},
+    );
+  }
 
   // ── admin: members ─────────────────────────────────────
   listMembers(): Promise<{ members: MemberRow[] }> {

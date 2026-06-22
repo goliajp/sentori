@@ -253,6 +253,15 @@ enum Command {
         #[arg(long = "api-url")]
         api_url: Option<String>,
     },
+    /// Re-queue every failed push send for a project at once.
+    PushRetryAll {
+        #[arg(long = "project")]
+        project_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// Recent push sends with status / retry / error (triage / DLQ).
     PushSends {
         #[arg(long = "project")]
@@ -1052,6 +1061,11 @@ async fn main() -> Result<()> {
             token,
             api_url,
         } => admin::push_retry(project_id, send_id, token, api_url).await,
+        Command::PushRetryAll {
+            project_id,
+            token,
+            api_url,
+        } => admin::push_retry_all_failed(project_id, token, api_url).await,
         Command::PushSends {
             project_id,
             status,

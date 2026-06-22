@@ -64,6 +64,38 @@ pub async fn retry(
     }
 }
 
+/// POST /admin/api/projects/:project_id/push/sends/_retry_all_failed
+/// Unstuck the whole DLQ at once. Useful after fixing a bad
+/// credential — all the rows that piled up while the cred was
+/// wrong get one more chance.
+pub async fn retry_all_failed(
+    State(state): State<Arc<AppState>>,
+    Path(project_id): Path<Uuid>,
+) -> Json<Value> {
+    let res = sqlx::query(
+        "UPDATE push_sends SET status = 'queued', next_attempt_at = now(), \
+            retry_count = 0, error = NULL \
+         WHERE project_id = $1 AND status = 'failed' RETURNING id",
+    )
+    .bind(project_id)
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default();
+    let count = res.len();
+    crate::notify::audit(
+        &state.pool,
+        state.workspace_id.into_uuid(),
+        Some(project_id),
+        None,
+        "push.retry_all_failed",
+        Some("push_send"),
+        None,
+        json!({ "count": count }),
+    )
+    .await;
+    Json(json!({ "requeued": count }))
+}
+
 pub async fn list(
     State(state): State<Arc<AppState>>,
     Path(project_id): Path<Uuid>,

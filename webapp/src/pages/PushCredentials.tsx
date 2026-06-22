@@ -91,7 +91,17 @@ export default function PushCredentials() {
         title="Push credentials"
         subtitle="Vendor secrets used by /v1/push/send. APNs p8, FCM service-account, WebPush VAPID, HCM/MiPush client secrets."
         actions={
-          <Button onClick={() => setShowUpload(true)}>+ Upload</Button>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() =>
+                (window.location.href = `/projects/${projectId}/push-sends`)
+              }
+            >
+              View sends
+            </Button>
+            <Button onClick={() => setShowUpload(true)}>+ Upload</Button>
+          </div>
         }
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
