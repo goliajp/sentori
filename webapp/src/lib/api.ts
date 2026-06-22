@@ -119,6 +119,24 @@ export interface SavedView {
   created_at: string;
 }
 
+export interface TokenSummary {
+  id: string;
+  kind: 'public' | 'admin';
+  label: string | null;
+  last4: string | null;
+  created_at: string;
+  revoked_at: string | null;
+}
+
+export interface PushCredential {
+  id: string;
+  kind: string;
+  config: unknown;
+  created_at: string;
+  last_validated_at: string | null;
+  last_validate_status: string | null;
+}
+
 const DEFAULT_BASE = '';
 
 export class ApiError extends Error {
@@ -201,6 +219,56 @@ export class Api {
   }
   deleteSavedView(id: string): Promise<void> {
     return this.send(`/v1/saved-views/${id}`, 'DELETE');
+  }
+
+  // ── admin: tokens ──────────────────────────────────────
+  listTokens(projectId: string): Promise<{ tokens: TokenSummary[] }> {
+    return this.get(`/admin/api/projects/${projectId}/tokens`);
+  }
+  mintToken(
+    projectId: string,
+    body: { label?: string; kind?: 'public' | 'admin' },
+  ): Promise<{ token_id: string; token: string; kind: string; label?: string }> {
+    return this.post(`/admin/api/projects/${projectId}/tokens`, body);
+  }
+  revokeToken(tokenId: string): Promise<void> {
+    return this.send(`/admin/api/tokens/${tokenId}`, 'DELETE');
+  }
+
+  // ── admin: projects CRUD ───────────────────────────────
+  createProject(body: { name: string; slug: string }): Promise<Project> {
+    return this.post('/admin/api/projects', body);
+  }
+  getProject(projectId: string): Promise<Project> {
+    return this.get(`/admin/api/projects/${projectId}`);
+  }
+  renameProject(projectId: string, name: string): Promise<void> {
+    return this.send(`/admin/api/projects/${projectId}`, 'PATCH', { name });
+  }
+  deleteProject(projectId: string): Promise<void> {
+    return this.send(`/admin/api/projects/${projectId}`, 'DELETE');
+  }
+
+  // ── admin: push credentials ────────────────────────────
+  listPushCredentials(
+    projectId: string,
+  ): Promise<{ credentials: PushCredential[] }> {
+    return this.get(`/admin/api/projects/${projectId}/push/credentials`);
+  }
+  upsertPushCredential(
+    projectId: string,
+    body: { provider: string; config: unknown; secret?: string },
+  ): Promise<{ id: string; provider: string }> {
+    return this.post(
+      `/admin/api/projects/${projectId}/push/credentials`,
+      body,
+    );
+  }
+  deletePushCredential(projectId: string, kind: string): Promise<void> {
+    return this.send(
+      `/admin/api/projects/${projectId}/push/credentials/${kind}`,
+      'DELETE',
+    );
   }
 
   private async get<T>(path: string): Promise<T> {

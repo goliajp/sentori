@@ -12,6 +12,7 @@ import { IssuesPage } from './pages/Issues';
 import { LoginPage } from './pages/Login';
 import { OverviewPage } from './pages/Overview';
 import { SettingsPage } from './pages/Settings';
+import Tokens from './pages/Tokens';
 
 import './styles/index.css';
 
@@ -34,6 +35,7 @@ createRoot(rootEl).render(
           <Route path="/projects/:id/issues" element={<IssuesPage />} />
           <Route path="/projects/:id/events" element={<EventsPage />} />
           <Route path="/projects/:id/cert" element={<CertPage />} />
+          <Route path="/projects/:id/tokens" element={<Tokens />} />
         </Route>
       </Routes>
     </BrowserRouter>
