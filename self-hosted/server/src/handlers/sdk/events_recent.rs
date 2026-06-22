@@ -1,22 +1,55 @@
-//! GET `/v1/events/_recent` — live tick SSE feed (internal,
-//! used by dashboard).
+//! GET `/v1/events/_recent` — live event tail Server-Sent Events
+//! stream, scoped to the bearer token's project.
 //!
-//! Phase C step 2 stub. Returns 501 Not Implemented until SSE
-//! infrastructure wired. Phase C step 3+ replaces with broadcast
-//! channel + axum SSE stream.
+//! Subscribers see only events for their own project_id. Slow
+//! consumers are dropped (`broadcast::error::RecvError::Lagged`)
+//! rather than blocking the publisher.
 
-use axum::{Extension, Json, http::StatusCode};
+use std::convert::Infallible;
+use std::sync::Arc;
+
+use axum::{
+    Extension,
+    extract::State,
+    response::sse::{Event as SseEvent, KeepAlive, Sse},
+};
+use futures::stream::{Stream, StreamExt};
 use sentori_ingest_token::IngestContext;
-use serde_json::{Value, json};
+use serde_json::json;
+use tokio_stream::wrappers::BroadcastStream;
 
-pub async fn handle(Extension(ctx): Extension<IngestContext>) -> (StatusCode, Json<Value>) {
-    tracing::info!(
-        workspace_id = %ctx.workspace_id,
-        project_id = %ctx.project_id,
-        "sdk.events_recent",
-    );
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        Json(json!({ "error": "events_recent SSE not yet wired", "stub": "events_recent" })),
-    )
+use crate::state::AppState;
+
+pub async fn handle(
+    Extension(ctx): Extension<IngestContext>,
+    State(state): State<Arc<AppState>>,
+) -> Sse<impl Stream<Item = Result<SseEvent, Infallible>>> {
+    let project_id = ctx.project_id.into_uuid();
+    let rx = state.events_bus.subscribe();
+    let stream = BroadcastStream::new(rx).filter_map(move |result| {
+        let pid = project_id;
+        async move {
+            match result {
+                Ok(tick) if tick.project_id == pid => {
+                    let payload = json!({
+                        "event_id": tick.event_id.to_string(),
+                        "issue_id": tick.issue_id.to_string(),
+                        "kind": tick.kind,
+                        "platform": tick.platform,
+                        "release": tick.release,
+                        "environment": tick.environment,
+                        "timestamp": tick.timestamp,
+                    });
+                    Some(Ok::<_, Infallible>(
+                        SseEvent::default()
+                            .event("event")
+                            .json_data(payload)
+                            .unwrap_or_default(),
+                    ))
+                }
+                _ => None,
+            }
+        }
+    });
+    Sse::new(stream).keep_alive(KeepAlive::default())
 }

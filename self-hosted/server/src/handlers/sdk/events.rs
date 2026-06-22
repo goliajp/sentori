@@ -33,6 +33,13 @@ pub async fn handle(
         }
     };
 
+    let event_tick_snapshot = (
+        event.kind.as_db_str().to_string(),
+        event.release.clone(),
+        event.environment.clone(),
+        event.platform.as_db_str().to_string(),
+        event.timestamp,
+    );
     match state.ingest.ingest(ctx.project_id, event).await {
         Ok(outcome) => {
             info!(
@@ -43,6 +50,18 @@ pub async fn handle(
                 regressed = outcome.regressed,
                 "sdk.events ingested",
             );
+            // Best-effort broadcast to live SSE subscribers.
+            let (kind, release, environment, platform, ts) = event_tick_snapshot;
+            let _ = state.events_bus.send(crate::state::RecentEventTick {
+                project_id: ctx.project_id.into_uuid(),
+                issue_id: outcome.issue_id,
+                event_id: outcome.event_id,
+                kind,
+                release,
+                environment,
+                platform,
+                timestamp: ts,
+            });
             (
                 StatusCode::ACCEPTED,
                 Json(json!({
