@@ -63,6 +63,23 @@ pub async fn handle(
         match state.ingest.ingest(ctx.project_id, event).await {
             Ok(outcome) => {
                 accepted += 1;
+                if outcome.is_new_issue {
+                    crate::alert_fire::fire_async(
+                        state.pool.clone(),
+                        ctx.workspace_id.into_uuid(),
+                        ctx.project_id.into_uuid(),
+                        outcome.issue_id,
+                        crate::alert_fire::TriggerKind::IssueNew,
+                    );
+                } else if outcome.regressed {
+                    crate::alert_fire::fire_async(
+                        state.pool.clone(),
+                        ctx.workspace_id.into_uuid(),
+                        ctx.project_id.into_uuid(),
+                        outcome.issue_id,
+                        crate::alert_fire::TriggerKind::Regression,
+                    );
+                }
                 results.push(json!({
                     "ok": true,
                     "event_id": outcome.event_id.to_string(),

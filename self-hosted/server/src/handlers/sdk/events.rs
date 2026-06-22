@@ -62,6 +62,24 @@ pub async fn handle(
                 platform,
                 timestamp: ts,
             });
+            // Best-effort alert dispatch on new-issue / regression.
+            if outcome.is_new_issue {
+                crate::alert_fire::fire_async(
+                    state.pool.clone(),
+                    ctx.workspace_id.into_uuid(),
+                    ctx.project_id.into_uuid(),
+                    outcome.issue_id,
+                    crate::alert_fire::TriggerKind::IssueNew,
+                );
+            } else if outcome.regressed {
+                crate::alert_fire::fire_async(
+                    state.pool.clone(),
+                    ctx.workspace_id.into_uuid(),
+                    ctx.project_id.into_uuid(),
+                    outcome.issue_id,
+                    crate::alert_fire::TriggerKind::Regression,
+                );
+            }
             (
                 StatusCode::ACCEPTED,
                 Json(json!({

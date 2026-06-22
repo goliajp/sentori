@@ -24,7 +24,7 @@ export function AlertsPage() {
       await api.createAlert({
         name: name.trim(),
         enabled: true,
-        trigger_kind: 'issue_new',
+        trigger_kind: 'new_issue',
         trigger_config: {},
         filter_config: {},
         channels: {},

@@ -37,6 +37,7 @@ use sqlx::PgPool;
 use tokio::net::TcpListener;
 use tracing::info;
 
+mod alert_fire;
 mod apns;
 mod archive_worker;
 mod blob_store;
