@@ -110,6 +110,7 @@ async fn fire(
 
         let arr = channels.as_array().cloned().unwrap_or_default();
         let mut delivered = 0usize;
+        let mut per_channel = Vec::<Value>::new();
         for ch in &arr {
             let ch_kind = ch.get("kind").and_then(|v| v.as_str()).unwrap_or("");
             if ch_kind != "webhook" && ch_kind != "slack" {
@@ -128,8 +129,29 @@ async fn fire(
                 "issue_id": issue_id.to_string(),
                 "issue_title": issue_title,
             });
-            if let Ok(_) = crate::webhook::deliver(url, secret, &payload).await {
-                delivered += 1;
+            // Truncate URL for the log entry (don't leak secrets via
+            // query-string-tokenized Slack URLs).
+            let host_only = url
+                .split("://")
+                .nth(1)
+                .and_then(|h| h.split('/').next())
+                .unwrap_or(url);
+            match crate::webhook::deliver(url, secret, &payload).await {
+                Ok(status) => {
+                    delivered += 1;
+                    per_channel.push(json!({
+                        "host": host_only,
+                        "ok": true,
+                        "status": status,
+                    }));
+                }
+                Err(e) => {
+                    per_channel.push(json!({
+                        "host": host_only,
+                        "ok": false,
+                        "error": e.to_string().chars().take(120).collect::<String>(),
+                    }));
+                }
             }
         }
         let _ = sqlx::query(
@@ -146,7 +168,11 @@ async fn fire(
             &format!("alert.fire.{}", kind.as_str()),
             Some("alert"),
             Some(&alert_id.to_string()),
-            json!({ "delivered": delivered, "issue_id": issue_id.to_string() }),
+            json!({
+                "delivered": delivered,
+                "issue_id": issue_id.to_string(),
+                "channels": per_channel,
+            }),
         )
         .await;
     }

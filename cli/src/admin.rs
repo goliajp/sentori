@@ -1449,6 +1449,58 @@ pub async fn health_check(api_url: Option<String>) -> Result<()> {
     Ok(())
 }
 
+pub async fn ops_report(api_url: Option<String>) -> Result<()> {
+    let base = resolve_api_url(api_url.clone());
+    let c = reqwest::Client::new();
+
+    // healthz
+    println!("== /healthz ==");
+    if let Ok(resp) = c.get(format!("{base}/healthz")).send().await {
+        let status = resp.status().as_u16();
+        let body: Value = resp.json().await.unwrap_or(Value::Null);
+        println!(
+            "  HTTP {} status={} db={} version={} pool={}/{} push_queued={} push_failed_24h={}",
+            status,
+            body["status"].as_str().unwrap_or("?"),
+            body["db"].as_str().unwrap_or("?"),
+            body["version"].as_str().unwrap_or("?"),
+            body["pool_size"].as_u64().unwrap_or(0),
+            body["pool_idle"].as_u64().unwrap_or(0),
+            body["push_queued"].as_u64().unwrap_or(0),
+            body["push_failed_24h"].as_u64().unwrap_or(0),
+        );
+    }
+
+    // self-test
+    println!("\n== /v1/_self_test ==");
+    let _ = self_test(api_url.clone()).await;
+
+    // metrics summary (grep a few known names)
+    println!("\n== /metrics (highlights) ==");
+    if let Ok(text) = c
+        .get(format!("{base}/metrics"))
+        .send()
+        .await
+        .and_then(|r| Ok(r.error_for_status()?))
+    {
+        if let Ok(s) = text.text().await {
+            for line in s.lines() {
+                if line.starts_with("sentori_db_pool_")
+                    || line.starts_with("sentori_push_")
+                    || line.starts_with("sentori_events_")
+                    || line.starts_with("sentori_issues_")
+                    || line.starts_with("sentori_alerts_active")
+                    || line.starts_with("sentori_user_sessions_active")
+                    || line.starts_with("sentori_build_info")
+                {
+                    println!("  {line}");
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 pub async fn self_test(api_url: Option<String>) -> Result<()> {
     let url = format!("{}/v1/_self_test", resolve_api_url(api_url));
     let c = reqwest::Client::new();
