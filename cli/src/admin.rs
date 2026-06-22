@@ -166,3 +166,160 @@ pub async fn token_revoke(
     println!("revoked token {token_id}");
     Ok(())
 }
+
+// ── audit ──────────────────────────────────────────────────
+
+pub async fn audit_list(
+    project_id: Option<String>,
+    actor: Option<String>,
+    action: Option<String>,
+    limit: u32,
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let mut url = format!("{}/v1/audit?limit={limit}", resolve_api_url(api_url));
+    if let Some(p) = project_id {
+        url.push_str(&format!("&project_id={p}"));
+    }
+    if let Some(a) = actor {
+        url.push_str(&format!("&actor_user_id={a}"));
+    }
+    if let Some(act) = action {
+        url.push_str(&format!("&action={act}"));
+    }
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Vec<Value> = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    println!(
+        "{:<24}  {:<28}  {:<10}  {:<10}",
+        "when", "action", "actor", "project"
+    );
+    for e in &body {
+        println!(
+            "{:<24}  {:<28}  {:<10}  {:<10}",
+            e["created_at"].as_str().unwrap_or("?"),
+            e["action"].as_str().unwrap_or("?"),
+            e["actor_user_id"]
+                .as_str()
+                .map(|s| &s[..s.len().min(8)])
+                .unwrap_or("system"),
+            e["project_id"]
+                .as_str()
+                .map(|s| &s[..s.len().min(8)])
+                .unwrap_or("workspace"),
+        );
+    }
+    Ok(())
+}
+
+// ── member ─────────────────────────────────────────────────
+
+pub async fn member_list(
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!("{}/admin/api/members", resolve_api_url(api_url));
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    let rows = body["members"].as_array().cloned().unwrap_or_default();
+    println!("{:<38}  {:<8}  added", "user_id", "role");
+    for m in &rows {
+        println!(
+            "{:<38}  {:<8}  {}",
+            m["user_id"].as_str().unwrap_or("?"),
+            m["role"].as_str().unwrap_or("?"),
+            m["added_at"].as_str().unwrap_or("?"),
+        );
+    }
+    Ok(())
+}
+
+pub async fn member_remove(
+    user_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!("{}/admin/api/members/{user_id}", resolve_api_url(api_url));
+    let c = client(&token_value(token)?)?;
+    c.delete(&url).send().await?.error_for_status()?;
+    println!("removed member {user_id}");
+    Ok(())
+}
+
+// ── invite ─────────────────────────────────────────────────
+
+pub async fn invite_mint(
+    email: String,
+    role: String,
+    invited_by: String,
+    expires_in_days: i64,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!("{}/admin/api/invites", resolve_api_url(api_url));
+    let c = client(&token_value(token)?)?;
+    let resp = c
+        .post(&url)
+        .json(&serde_json::json!({
+            "email": email,
+            "role": role,
+            "invited_by": invited_by,
+            "expires_in_days": expires_in_days,
+        }))
+        .send()
+        .await?
+        .error_for_status()?;
+    let body: Value = resp.json().await?;
+    println!(
+        "invite {} for {} (role {}, expires {})",
+        body["invite_id"],
+        email,
+        role,
+        body["expires_at"].as_str().unwrap_or("?")
+    );
+    println!();
+    println!("  {}", body["token"].as_str().unwrap_or("?"));
+    println!();
+    println!("Forward this token to {email} — they paste into /auth/invites/<token>/accept.");
+    Ok(())
+}
+
+pub async fn invite_list(
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!("{}/admin/api/invites", resolve_api_url(api_url));
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    let rows = body["invites"].as_array().cloned().unwrap_or_default();
+    println!("{:<38}  {:<28}  {:<6}  status", "id", "email", "role");
+    for i in &rows {
+        let accepted = !i["accepted_at"].is_null();
+        let status = if accepted { "accepted" } else { "pending" };
+        println!(
+            "{:<38}  {:<28}  {:<6}  {}",
+            i["id"].as_str().unwrap_or("?"),
+            i["email"].as_str().unwrap_or("?"),
+            i["role"].as_str().unwrap_or("?"),
+            status,
+        );
+    }
+    Ok(())
+}

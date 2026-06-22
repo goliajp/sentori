@@ -44,6 +44,84 @@ enum Command {
         #[command(subcommand)]
         kind: TokenKind,
     },
+    /// Workspace audit log (list / filter via /v1/audit).
+    Audit {
+        #[arg(long = "project")]
+        project_id: Option<String>,
+        #[arg(long = "actor")]
+        actor: Option<String>,
+        #[arg(long)]
+        action: Option<String>,
+        #[arg(long, default_value_t = 50)]
+        limit: u32,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Workspace member ops via /admin/api/members.
+    Member {
+        #[command(subcommand)]
+        kind: MemberKind,
+    },
+    /// Workspace invite ops via /admin/api/invites.
+    Invite {
+        #[command(subcommand)]
+        kind: InviteKind,
+    },
+}
+
+#[derive(Subcommand)]
+enum MemberKind {
+    /// List workspace members.
+    List {
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Remove a member from the workspace.
+    Remove {
+        user_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum InviteKind {
+    /// List pending + accepted invites.
+    List {
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Mint a new invite token.
+    Mint {
+        email: String,
+        /// `admin` or `user` (default `user`).
+        #[arg(long, default_value = "user")]
+        role: String,
+        /// Inviter user_id (your UUID).
+        #[arg(long = "invited-by")]
+        invited_by: String,
+        /// Days until expiry.
+        #[arg(long, default_value_t = 7)]
+        expires_in_days: i64,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -320,6 +398,55 @@ async fn main() -> Result<()> {
                 token,
                 api_url,
             } => admin::token_revoke(token_id, token, api_url).await,
+        },
+        Command::Audit {
+            project_id,
+            actor,
+            action,
+            limit,
+            token,
+            api_url,
+            json,
+        } => {
+            admin::audit_list(project_id, actor, action, limit, token, api_url, json)
+                .await
+        }
+        Command::Member { kind } => match kind {
+            MemberKind::List {
+                token,
+                api_url,
+                json,
+            } => admin::member_list(token, api_url, json).await,
+            MemberKind::Remove {
+                user_id,
+                token,
+                api_url,
+            } => admin::member_remove(user_id, token, api_url).await,
+        },
+        Command::Invite { kind } => match kind {
+            InviteKind::List {
+                token,
+                api_url,
+                json,
+            } => admin::invite_list(token, api_url, json).await,
+            InviteKind::Mint {
+                email,
+                role,
+                invited_by,
+                expires_in_days,
+                token,
+                api_url,
+            } => {
+                admin::invite_mint(
+                    email,
+                    role,
+                    invited_by,
+                    expires_in_days,
+                    token,
+                    api_url,
+                )
+                .await
+            }
         },
     }
 }
