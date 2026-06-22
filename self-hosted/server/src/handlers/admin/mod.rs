@@ -6,6 +6,7 @@
 //! for now they're open (single-tenant self-hosted dev).
 
 pub mod cert_watch;
+pub mod integrations;
 pub mod invites;
 pub mod members;
 pub mod projects;

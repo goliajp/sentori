@@ -189,6 +189,19 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/projects/:project_id/cert/watches/:domain",
             delete(admin::cert_watch::remove),
         )
+        // ── admin: integrations ───────────────────────────
+        .route(
+            "/admin/api/projects/:project_id/integrations",
+            get(admin::integrations::list).post(admin::integrations::upsert),
+        )
+        .route(
+            "/admin/api/projects/:project_id/integrations/:kind",
+            delete(admin::integrations::delete),
+        )
+        .route(
+            "/admin/api/projects/:project_id/integrations/:kind/active",
+            patch(admin::integrations::set_active),
+        )
         .with_state(state)
         .merge(sdk_routes)
 }
