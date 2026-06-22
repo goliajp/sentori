@@ -123,47 +123,15 @@ export default function TraceDetail() {
             </div>
           ) : (
             <ul className="space-y-1">
-              {spans.map(s => {
-                const depth = depthFor.get(s.id) ?? 0;
-                const startedMs = new Date(s.started_at).getTime();
-                const offsetPct =
-                  ((startedMs - startMin) / totalMs) * 100;
-                const widthPct = Math.max(
-                  0.3,
-                  (s.duration_ms / totalMs) * 100,
-                );
-                return (
-                  <li
-                    key={s.id}
-                    className="rounded border border-zinc-200 p-2 text-xs"
-                    style={{ marginLeft: `${depth * 16}px` }}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Badge>{s.op}</Badge>
-                        <span className="font-mono text-[11px] text-zinc-200 truncate">
-                          {s.name}
-                        </span>
-                        <Badge variant={s.status === 'ok' ? 'ok' : 'muted'}>
-                          {s.status}
-                        </Badge>
-                      </div>
-                      <span className="font-mono tabular-nums text-zinc-300">
-                        {s.duration_ms}ms
-                      </span>
-                    </div>
-                    <div className="mt-1 h-1.5 w-full rounded bg-zinc-100 relative overflow-hidden">
-                      <div
-                        className="absolute top-0 h-full rounded bg-emerald-500/70"
-                        style={{
-                          left: `${offsetPct.toFixed(2)}%`,
-                          width: `${widthPct.toFixed(2)}%`,
-                        }}
-                      />
-                    </div>
-                  </li>
-                );
-              })}
+              {spans.map(s => (
+                <SpanRowItem
+                  key={s.id}
+                  span={s}
+                  depth={depthFor.get(s.id) ?? 0}
+                  startMin={startMin}
+                  totalMs={totalMs}
+                />
+              ))}
             </ul>
           )}
         </Section>
@@ -188,3 +156,68 @@ function Cell({
     </div>
   );
 }
+
+function SpanRowItem({
+  span: s,
+  depth,
+  startMin,
+  totalMs,
+}: {
+  span: SpanRow;
+  depth: number;
+  startMin: number;
+  totalMs: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const startedMs = new Date(s.started_at).getTime();
+  const offsetPct = ((startedMs - startMin) / totalMs) * 100;
+  const widthPct = Math.max(0.3, (s.duration_ms / totalMs) * 100);
+  const hasTags = s.tags && typeof s.tags === 'object'
+    ? Object.keys(s.tags as object).length > 0
+    : false;
+
+  return (
+    <li
+      className="rounded border border-zinc-200 p-2 text-xs"
+      style={{ marginLeft: `${depth * 16}px` }}
+    >
+      <button
+        onClick={() => hasTags && setOpen(!open)}
+        className={`flex w-full items-center justify-between gap-2 text-left ${hasTags ? '' : 'cursor-default'}`}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          {hasTags && (
+            <span className="font-mono text-[10px] text-zinc-500 w-3">
+              {open ? '▼' : '▶'}
+            </span>
+          )}
+          <Badge>{s.op}</Badge>
+          <span className="font-mono text-[11px] text-zinc-200 truncate">
+            {s.name}
+          </span>
+          <Badge variant={s.status === 'ok' ? 'ok' : 'muted'}>
+            {s.status}
+          </Badge>
+        </div>
+        <span className="font-mono tabular-nums text-zinc-300">
+          {s.duration_ms}ms
+        </span>
+      </button>
+      <div className="mt-1 h-1.5 w-full rounded bg-zinc-100 relative overflow-hidden">
+        <div
+          className="absolute top-0 h-full rounded bg-emerald-500/70"
+          style={{
+            left: `${offsetPct.toFixed(2)}%`,
+            width: `${widthPct.toFixed(2)}%`,
+          }}
+        />
+      </div>
+      {open && hasTags && (
+        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all bg-zinc-950 p-2 text-[10px] font-mono text-zinc-300">
+          {JSON.stringify(s.tags, null, 2)}
+        </pre>
+      )}
+    </li>
+  );
+}
+
