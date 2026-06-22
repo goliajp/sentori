@@ -31,7 +31,7 @@ async fn event_attachments(
     let mut skipped = 0u64;
     let mut offset: i64 = 0;
     loop {
-        let rows = sqlx::query(
+        let Ok(rows) = sqlx::query(
             "SELECT a.id, p.org_id AS workspace_id, a.project_id, a.event_id, a.kind, \
                     a.content_type, a.size_bytes, a.blob_hash, a.received_at \
              FROM event_attachments a JOIN projects p ON p.id = a.project_id \
@@ -40,7 +40,11 @@ async fn event_attachments(
         .bind(PAGE)
         .bind(offset)
         .fetch_all(src)
-        .await?;
+        .await
+        else {
+            report.note_read("event_attachments", 0);
+            break;
+        };
         if rows.is_empty() {
             break;
         }

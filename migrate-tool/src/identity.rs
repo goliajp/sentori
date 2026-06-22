@@ -77,8 +77,16 @@ async fn orgs_to_workspaces(
 }
 
 async fn users(src: &PgPool, dst: &PgPool, dry_run: bool, report: &mut Report) -> Result<u64> {
+    // v0.2 users.workspace_id is NOT NULL. Derive from membership
+    // (or, for users with no membership, fall back to the first
+    // workspace as a salvage anchor).
     let rows = sqlx::query(
-        "SELECT id, email, password_hash, email_verified, created_at FROM users",
+        "SELECT u.id, u.email, u.password_hash, u.email_verified, u.created_at, \
+                COALESCE( \
+                    (SELECT org_id FROM memberships m WHERE m.user_id = u.id ORDER BY added_at ASC LIMIT 1), \
+                    (SELECT id FROM orgs ORDER BY created_at ASC LIMIT 1) \
+                ) AS workspace_id \
+         FROM users u",
     )
     .fetch_all(src)
     .await?;
@@ -90,15 +98,22 @@ async fn users(src: &PgPool, dst: &PgPool, dry_run: bool, report: &mut Report) -
             continue;
         }
         let id: uuid::Uuid = r.get("id");
+        let workspace_id: Option<uuid::Uuid> = r.try_get("workspace_id").ok();
+        let Some(workspace_id) = workspace_id else {
+            // No membership AND no workspace exists → can't assign.
+            skipped += 1;
+            continue;
+        };
         let email: String = r.get("email");
         let password_hash: String = r.get("password_hash");
         let email_verified: bool = r.get("email_verified");
         let created_at: time::OffsetDateTime = r.get("created_at");
         let res = sqlx::query(
-            "INSERT INTO users (id, email, password_hash, email_verified, created_at) \
-             VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING",
+            "INSERT INTO users (id, workspace_id, email, password_hash, email_verified, created_at) \
+             VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING",
         )
         .bind(id)
+        .bind(workspace_id)
         .bind(&email)
         .bind(&password_hash)
         .bind(email_verified)
