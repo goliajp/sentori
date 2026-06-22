@@ -70,6 +70,7 @@ async fn main() -> Result<()> {
             "push",
             "attachments",
             "dashboard",
+            "dashboard_extra",
             "analytics",
         ]
     } else {
@@ -94,6 +95,9 @@ async fn main() -> Result<()> {
             }
             "dashboard" => {
                 tables::dashboard::migrate(&src, &dst, cli.dry_run, &mut report).await
+            }
+            "dashboard_extra" => {
+                tables::dashboard_extra::migrate(&src, &dst, cli.dry_run, &mut report).await
             }
             "analytics" => {
                 tables::analytics::migrate(&src, &dst, cli.dry_run, &mut report).await

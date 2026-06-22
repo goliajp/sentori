@@ -10,6 +10,7 @@
 pub mod analytics;
 pub mod attachments;
 pub mod dashboard;
+pub mod dashboard_extra;
 pub mod events;
 pub mod issues;
 pub mod push;
