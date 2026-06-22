@@ -24,7 +24,9 @@ export function LoginPage() {
     setLoading(true);
     try {
       const r = await api.authLogin({ email, password });
-      localStorage.setItem('sentori_session', r.session_token);
+      // Session is stored as HttpOnly cookie server-side. We
+      // only stash UI-display fields here (user_id + email),
+      // never the token itself.
       localStorage.setItem('sentori_user_id', r.user_id);
       localStorage.setItem('sentori_email', r.email);
       navigate('/');

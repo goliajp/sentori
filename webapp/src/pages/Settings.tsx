@@ -16,16 +16,15 @@ export function SettingsPage() {
   }, []);
 
   async function logout() {
+    // Cookie is HttpOnly; the server clears it via Set-Cookie
+    // Max-Age=0 in its response. We just hit the endpoint and
+    // tidy up the UI-display localStorage entries.
     try {
       await fetch('/auth/logout', {
         method: 'POST',
         credentials: 'include',
-        headers: {
-          authorization: `Bearer ${localStorage.getItem('sentori_session') ?? ''}`,
-        },
       });
     } catch {}
-    localStorage.removeItem('sentori_session');
     localStorage.removeItem('sentori_user_id');
     localStorage.removeItem('sentori_email');
     navigate('/login');

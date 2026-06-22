@@ -440,8 +440,11 @@ export class Api {
   }
 
   private authHeaders(): HeadersInit {
+    // Cookie is HttpOnly + auto-attached via credentials: include.
+    // Only fall back to Bearer when an explicit override is in
+    // localStorage (CLI-style flows in the browser dev console).
     const token = typeof localStorage !== 'undefined'
-      ? localStorage.getItem('sentori_session')
+      ? localStorage.getItem('sentori_bearer_override')
       : null;
     return token ? { authorization: `Bearer ${token}` } : {};
   }
