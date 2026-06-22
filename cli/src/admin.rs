@@ -674,6 +674,53 @@ pub async fn comment_list(
     Ok(())
 }
 
+pub async fn watcher_list(
+    issue_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!(
+        "{}/v1/issues/{issue_id}/watchers",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    let rows = body["watchers"].as_array().cloned().unwrap_or_default();
+    println!("watchers: {}", rows.len());
+    for w in &rows {
+        println!(
+            "  {} (since {})",
+            w["user_id"]
+                .as_str()
+                .map(|s| &s[..s.len().min(8)])
+                .unwrap_or("?"),
+            w["started_at"].as_str().unwrap_or("?"),
+        );
+    }
+    Ok(())
+}
+
+pub async fn unwatch_issue(
+    issue_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!(
+        "{}/admin/api/issues/{issue_id}/watchers",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    c.delete(&url).send().await?.error_for_status()?;
+    println!("unwatched {issue_id}");
+    Ok(())
+}
+
 pub async fn issue_watch(
     issue_id: String,
     token: Option<String>,

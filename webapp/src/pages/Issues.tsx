@@ -31,6 +31,20 @@ export function IssuesPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [cursor, setCursor] = useState(0);
 
+  // Scroll cursor row into view after j/k navigation.
+  useEffect(() => {
+    if (!issues?.[cursor]) return;
+    const el = document.querySelector(
+      `[data-issue-id="${issues[cursor].id}"]`,
+    );
+    if (el && 'scrollIntoView' in el) {
+      (el as HTMLElement).scrollIntoView({
+        block: 'nearest',
+        behavior: 'smooth',
+      });
+    }
+  }, [cursor, issues]);
+
   useKeyHandlers({
     j: () => setCursor(c => Math.min((issues?.length ?? 1) - 1, c + 1)),
     k: () => setCursor(c => Math.max(0, c - 1)),

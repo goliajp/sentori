@@ -243,6 +243,24 @@ enum Command {
         #[arg(long = "api-url")]
         api_url: Option<String>,
     },
+    /// List watchers of an issue.
+    Watchers {
+        issue_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Unwatch an issue.
+    Unwatch {
+        issue_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// Subscribe (watch) an issue for the current session user.
     Watch {
         issue_id: String,
@@ -871,6 +889,17 @@ async fn main() -> Result<()> {
             token,
             api_url,
         } => admin::issue_watch(issue_id, token, api_url).await,
+        Command::Watchers {
+            issue_id,
+            token,
+            api_url,
+            json,
+        } => admin::watcher_list(issue_id, token, api_url, json).await,
+        Command::Unwatch {
+            issue_id,
+            token,
+            api_url,
+        } => admin::unwatch_issue(issue_id, token, api_url).await,
         Command::Search {
             project_id,
             query,
