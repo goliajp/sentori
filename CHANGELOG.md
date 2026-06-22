@@ -85,14 +85,37 @@ Login / Register / ForgotPassword / Overview / SaasAdmin / Projects / Members / 
 - ETL: 13 sets / 41 表
 - Docker image + OSS mirror workflow 就绪
 
+### 之后增量(2026-06-22 → 2026-06-23, branch 仍 feature/v0.2-foundation)
+
+| 项 | 完成 |
+|---|---|
+| WebPush 真 vendor adapter | ✅ VAPID ES256 + 浏览器 WebCrypto keypair wizard |
+| APNs 真 vendor adapter | ✅ token-based ES256 over HTTP/2 |
+| FCM 真 vendor adapter | ✅ Legacy HTTP API(server key) |
+| SaaSadmin role-based RBAC | ✅ env-allowlist `SENTORI_SAASADMIN_USER_IDS` |
+| HttpOnly cookie session | ✅ |
+| `/v1/events/_recent` SSE 真实现 | ✅ + Events 页 Live toggle |
+| ETL 全 14 sets,coverage | ✅ 62/68 表(91%)|
+| 5 lens project dashboard | ✅ Issues / Events / Traces / Metrics / Replays + detail + filter + save 路径全闭环 |
+| Issue triage workflow | ✅ list inline ✓⊘↺ + bulk select + detail + comments + activity + watchers + notification fanout |
+| Notifications inbox + sidebar badge | ✅ 60s 轮询 |
+| Linear UX | ✅ ⌘K palette + `g<letter>` + per-page j/k/x/e/i + `?` cheatsheet + HttpOnly cookie + 401 redirect + return-to |
+| /v1/_describe self-describing catalog | ✅ sentori-cli describe 用 |
+| Endpoint probes admin CRUD | ✅(后台 poller worker 留 v0.3)|
+| sentori-cli 44 subcommands | ✅ 全 admin / lens / ops 覆盖 |
+| Replay scrubber + raw NDJSON download via cli | ✅(完整 canvas/DOM replayer 留 v0.3)|
+
 ### 留 v0.3+
 
-- 真 vendor adapter K7.1-K7.5（APNs / FCM / WebPush / HCM / MiPush）替换 push_worker mock_send
-- 剩 27 ETL 表
-- SaaSadmin role-based RBAC（v0.2 的 session middleware 不区分 saasadmin vs workspace user）
-- HttpOnly cookie session 替代 localStorage（前端友好性）
-- `/v1/events/_recent` SSE
-- Cutover 部署（user-gate）
+- WebPush payload encryption(RFC 8030/8188/8291)— v0.2 只 wake push
+- HCM / MiPush vendor adapter(中国市场)
+- 剩 6 个 saas_* 内部表 ETL(saas-control 自有,不影响 cutover)
+- Endpoint probes background poller worker
+- Replay canvas/DOM 真实 replayer
+- Saved view 高级 query builder UI
+- HTTPS 自动 TLS via embedded rustls + Let's Encrypt
+- SDK 类型生成器
+- Cutover 部署执行(user-gate;CUTOVER.md 就绪)
 
 ---
 
