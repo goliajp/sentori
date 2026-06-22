@@ -35,18 +35,35 @@ jobs:
       - name: Filter to self-hosted-only tree
         run: |
           mkdir -p /tmp/mirror
-          # Self-hosted public set (core libs + binary + docker + SDK + docs)
+          # Minimal public set: server binary source + core libs +
+          # docker + bundled SPA source + licenses + the README.
+          # Everything else (docs, contributing templates, internal
+          # planning, saas-control, marketing, sdk pkg matrix) stays
+          # private — the public mirror is consumption-only.
           rsync -a --delete \
             --exclude='saas/' \
             --exclude='server/' \
             --exclude='web/' \
+            --exclude='marketing/' \
+            --exclude='docs/' \
+            --exclude='docs-site/' \
+            --exclude='docs-v0.1/' \
+            --exclude='docs-v0.2/' \
+            --exclude='ROADMAP.md' \
+            --exclude='CHANGELOG.md' \
+            --exclude='CONTRIBUTING.md' \
+            --exclude='CODE_OF_CONDUCT.md' \
+            --exclude='SECURITY.md' \
+            --exclude='.github/ISSUE_TEMPLATE/' \
+            --exclude='.github/PULL_REQUEST_TEMPLATE.md' \
+            --exclude='.github/CONTRIBUTING.md' \
+            --exclude='.github/SECURITY.md' \
             --exclude='.github/workflows/v0.2-oss-mirror.yml' \
             --exclude='.github/workflows/v0.2-core-check.yml' \
             --exclude='target/' \
             --exclude='node_modules/' \
             --exclude='.claude/' \
             ./ /tmp/mirror/
-          # Public-facing README + LICENSE markers
           ls /tmp/mirror/ | head -20
 
       - name: Push to sentori-selfhosted public repo

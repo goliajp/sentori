@@ -1,144 +1,90 @@
 # Sentori self-hosted
 
-OSS RN-first error monitoring + APM.
+Run sentori on your own server. One docker compose command,
+postgres + server + bundled SPA in a single image.
 
-[![License](https://img.shields.io/badge/license-Apache--2.0%20OR%20MIT-blue.svg)](../LICENSE-APACHE)
-[![Docker](https://img.shields.io/badge/ghcr.io-sentori--selfhosted-blue.svg)](https://github.com/orgs/goliajp/packages/container/package/sentori-selfhosted)
+## Quick start
 
-## Try it in 30 seconds
+```bash
+git clone <this-repo>
+cd sentori-selfhosted
+
+cp self-hosted/docker/.env.example .env
+# Edit POSTGRES_PASSWORD + SENTORI_SESSION_SECRET +
+# SENTORI_BOOTSTRAP_OWNER_EMAIL + SENTORI_BOOTSTRAP_OWNER_PASSWORD
+
+docker compose -f self-hosted/docker/docker-compose.yml up -d
+
+# Open http://localhost:8080
+# Sign in with the bootstrap owner credentials
+```
+
+Or pull the prebuilt image:
 
 ```bash
 docker run -d --name sentori-pg \
-    -e POSTGRES_PASSWORD=changeme -p 5432:5432 \
-    postgres:18-alpine
+  -e POSTGRES_PASSWORD=changeme -p 5432:5432 \
+  postgres:18-alpine
 
 docker run -d --name sentori \
-    -e SENTORI_DATABASE_URL='postgres://postgres:changeme@host.docker.internal:5432/postgres' \
-    -e SENTORI_BOOTSTRAP_OWNER_EMAIL='you@example.com' \
-    -e SENTORI_BOOTSTRAP_OWNER_PASSWORD='change-me-please' \
-    -p 8080:8080 \
-    ghcr.io/goliajp/sentori-selfhosted:latest
-
-curl http://localhost:8080/healthz
-# → {"status":"ok","db":"ok","version":"0.1.0"}
+  -e SENTORI_DATABASE_URL='postgres://postgres:changeme@host.docker.internal:5432/postgres' \
+  -e SENTORI_SESSION_SECRET="$(openssl rand -base64 24 | head -c 32)" \
+  -e SENTORI_BOOTSTRAP_OWNER_EMAIL='you@example.com' \
+  -e SENTORI_BOOTSTRAP_OWNER_PASSWORD='change-me-please' \
+  -p 8080:8080 \
+  ghcr.io/goliajp/sentori-selfhosted:latest
 ```
 
-For the complete stack with healthchecks +
-`docker-compose`: see [`docker/`](./docker/) or read the
-[Docker quick start](../docs-v0.1/quick-start/docker-compose.md).
+## HTTPS in production
 
-For Kubernetes:
+Put any reverse proxy in front of port 8080:
 
-```bash
-helm install sentori oci://ghcr.io/goliajp/charts/sentori-selfhosted \
-    --namespace sentori --create-namespace \
-    --set server.bootstrap.ownerEmail=you@example.com \
-    --set server.bootstrap.ownerPassword='change-me-please'
-```
-
-Full guide: [Helm quick start](../docs-v0.1/quick-start/helm.md).
-
-## What's inside
-
-| Path | Description |
-|---|---|
-| [`server/`](./server/) | The axum binary. Standalone Cargo workspace (independent of `core/`'s workspace so the docker layer builds cleanly). Composes every K crate from `core/`. |
-| [`migrations/`](./migrations/) | Symlinks to `core/migrations/0001-0015`. Single source of truth for schema. |
-| [`docker/`](./docker/) | `Dockerfile` (multi-stage → distroless cc, < 80 MB) + `docker-compose.yml` (postgres + server) + `.env.example`. |
-| [`helm/`](./helm/) | Chart `sentori-selfhosted` v0.1.0 — Deployment + StatefulSet postgres + Service + Ingress + NOTES. |
-
-Per [cement-stone methodology](../.claude/state/refactor-standards.md),
-everything here is **水泥** (cement) — selfhosted-specific
-composition over the 17 K-tier (钢筋) and 13 stones in
-`core/`.
-
-## Architecture (the short version)
-
-- **Single workspace per database** — one Sentori install
-  = one Postgres database. No multi-tenant logic in the
-  data plane.
-- **17 K-tier crates** in `core/crates/` handle every
-  ingest concern: events (K4), issues (K5), spans (K6),
-  push tokens (K7), replays (K8), runtime metrics (K9),
-  CT log monitoring (K10), notifier (K11), integrations
-  (K12), audit log (K13), alert rules (K14), saved views
-  (K15), ACL gate (K16), billing quotas (K17).
-- **13 stones** in `core/crates/` are pure libraries
-  (S1 license JWT, S2 privacy salt, S3 issue fingerprint,
-  S4 event ringbuffer, S5 Stripe webhook verify, S6/S7/S8
-  sourcemap/DWARF/ProGuard resolvers, S9 cookie session,
-  S10 rate limiter, S11 geoip reader, S12 secrets vault,
-  S13 argon2 password).
-- **0 unsafe code** in `core/`
-  (`#![forbid(unsafe_code)]`).
-- **All K-tier services share one Postgres pool** via
-  `AppState` in `self-hosted/server/src/state.rs`.
-
-Read [`docs-v0.1/concept/overview.md`](../docs-v0.1/concept/overview.md)
-for the full picture.
-
-## SDK ingest
-
-```
-POST /v1/events/{project_id}
-Content-Type: application/json
-
-{
-  "kind": "error",
-  "error_type": "TypeError",
-  "message": "x is undefined",
-  "platform": "javascript",
-  "release": "myapp@1.0.0",
-  "environment": "production"
+```caddyfile
+sentori.example.com {
+    encode zstd gzip
+    reverse_proxy localhost:8080
 }
 ```
 
-See [SDK integration reference](../docs-v0.1/reference/sdk-integration.md).
+Keep `SENTORI_COOKIE_SECURE=1` (default) so the session cookie
+sets the `Secure` flag.
 
-## Environment variables
+## Env vars
 
-See [reference/env-vars.md](../docs-v0.1/reference/env-vars.md).
-Required: `SENTORI_DATABASE_URL`. Optional but
-recommended: `SENTORI_BOOTSTRAP_OWNER_EMAIL` +
-`SENTORI_BOOTSTRAP_OWNER_PASSWORD` for first-boot Owner
-creation.
+See `self-hosted/docker/.env.example` for the full list with
+inline docs. Required:
 
-## Versioning
+- `POSTGRES_PASSWORD`
+- `SENTORI_SESSION_SECRET` — `openssl rand -base64 24 | head -c 32`
+- `SENTORI_BOOTSTRAP_OWNER_EMAIL` + `SENTORI_BOOTSTRAP_OWNER_PASSWORD`
+  (first boot only)
 
-`v0.x.y` is an active-development line — minor versions
-may introduce breaking changes documented in the changelog
-+ migration notes. The v1.0.0 stability promise lands
-when the SDK + dashboard surface is frozen.
+Optional:
 
-Docker tags:
-- `:latest` — newest stable release.
-- `:0.1.0` (and other semver) — pinned releases.
-- `:edge` — main-branch build (latest commit).
-- `:sha-<7chars>` — commit-pinned image.
+- `SENTORI_ATTACHMENT_STORE=fs:/data/blobs` (default — persistent
+  blob volume)
+- `SENTORI_PUSH_WORKER_ENABLED=1` (default — background push dispatcher)
+- `SENTORI_COOKIE_SECURE=1` (default — flip to 0 for local-dev HTTP)
+- `SENTORI_SAASADMIN_USER_IDS=<uuid,uuid>` (limits /admin/api/saas/*
+  visibility; leave unset on single-workspace self-hosted)
 
-## Issues + contributing
+## SDK integration
 
-- Bug? open an issue with the
-  [bug report template](../.github/ISSUE_TEMPLATE/bug_report.md).
-- Feature? open one with the
-  [feature template](../.github/ISSUE_TEMPLATE/feature_request.md).
-- PRs welcome — read
-  [CONTRIBUTING.md](../.github/CONTRIBUTING.md) first.
-- Security issues: **security@golia.jp** (see
-  [SECURITY.md](../.github/SECURITY.md)).
+```ts
+import { init } from '@sentori/core';
+init({
+  token: 'st_pk_...',          // from /tokens page in dashboard
+  ingestUrl: 'https://sentori.example.com',
+});
+```
+
+The token format `st_pk_<26 base32>` is a permanent contract.
 
 ## License
 
-Dual-licensed Apache-2.0 OR MIT at the user's choice.
-Copyright © GOLIA K.K. See
-[`LICENSE-APACHE`](../LICENSE-APACHE),
-[`LICENSE-MIT`](../LICENSE-MIT), and
-[`NOTICES.md`](../NOTICES.md).
+Apache-2.0 OR MIT. Copyright © GOLIA K.K.
 
-## Zero dependency on `legacy server/`
+---
 
-The `server/` + `web/` directories at the monorepo root
-are the **legacy** sentori implementation, kept as
-read-only reference until SH6 retire. The v0.1
-self-hosted binary is a fresh-start implementation that
-does NOT import any legacy code.
+This repo is a read-only mirror of the upstream sentori monorepo.
+Issues / PRs are not accepted here.
