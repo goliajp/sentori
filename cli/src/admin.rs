@@ -693,6 +693,54 @@ pub async fn issue_watch(
     Ok(())
 }
 
+pub async fn notification_list(
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!("{}/auth/notifications", resolve_api_url(api_url));
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    println!(
+        "unread: {}",
+        body["unread"].as_i64().unwrap_or(0)
+    );
+    let rows = body["notifications"].as_array().cloned().unwrap_or_default();
+    for n in &rows {
+        let read = n["read_at"].is_string();
+        println!(
+            "  {} [{}] {}",
+            if read { "·" } else { "●" },
+            n["kind"].as_str().unwrap_or("?"),
+            n["created_at"].as_str().unwrap_or("?"),
+        );
+    }
+    Ok(())
+}
+
+pub async fn notification_read_all(
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!(
+        "{}/auth/notifications/_read_all",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    c.post(&url)
+        .json(&serde_json::json!({}))
+        .send()
+        .await?
+        .error_for_status()?;
+    println!("marked all read");
+    Ok(())
+}
+
 pub async fn describe(api_url: Option<String>, json: bool) -> Result<()> {
     let url = format!("{}/v1/_describe", resolve_api_url(api_url));
     let c = reqwest::Client::new();

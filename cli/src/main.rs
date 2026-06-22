@@ -161,6 +161,22 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// User's notification inbox (Bearer or session cookie).
+    Inbox {
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Mark all current-user notifications read.
+    InboxReadAll {
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// Self-describing API catalog (route surface + version).
     Describe {
         #[arg(long = "api-url")]
@@ -818,6 +834,14 @@ async fn main() -> Result<()> {
             api_url,
             json,
         } => admin::comment_list(issue_id, token, api_url, json).await,
+        Command::Inbox {
+            token,
+            api_url,
+            json,
+        } => admin::notification_list(token, api_url, json).await,
+        Command::InboxReadAll { token, api_url } => {
+            admin::notification_read_all(token, api_url).await
+        }
         Command::Describe { api_url, json } => admin::describe(api_url, json).await,
         Command::Health { api_url } => admin::health_check(api_url).await,
         Command::Me { token, api_url } => admin::me_show(token, api_url).await,
