@@ -179,6 +179,9 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/releases/:release_id",
             delete(admin::releases::delete),
         )
+        // ── saas: cross-workspace overview ────────────────
+        .route("/admin/api/saas/workspaces", get(admin::saas::workspaces))
+        .route("/admin/api/saas/stats", get(admin::saas::workspace_stats))
         // Session-scoped self endpoints
         .route("/auth/me", get(auth::me))
         .route("/auth/logout", post(auth::logout))

@@ -178,6 +178,23 @@ export interface ReleaseArtifact {
   created_at: string;
 }
 
+export interface WorkspaceRow {
+  id: string;
+  name: string;
+  plan: string;
+  status: string;
+  project_count: number;
+  member_count: number;
+  created_at: string;
+}
+
+export interface SaasStats {
+  workspaces: number;
+  active_workspaces: number;
+  projects: number;
+  users: number;
+}
+
 const DEFAULT_BASE = '';
 
 export class ApiError extends Error {
@@ -412,6 +429,14 @@ export class Api {
   }
   deleteRelease(releaseId: string): Promise<void> {
     return this.send(`/admin/api/releases/${releaseId}`, 'DELETE');
+  }
+
+  // ── saas: cross-workspace ──────────────────────────────
+  listWorkspaces(): Promise<{ workspaces: WorkspaceRow[] }> {
+    return this.get('/admin/api/saas/workspaces');
+  }
+  saasStats(): Promise<SaasStats> {
+    return this.get('/admin/api/saas/stats');
   }
 
   private authHeaders(): HeadersInit {

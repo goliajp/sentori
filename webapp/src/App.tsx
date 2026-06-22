@@ -39,6 +39,7 @@ function Sidebar() {
         <NavItem to="/audit" label="Audit" />
         <NavItem to="/settings" label="Settings" />
         <NavItem to="/health" label="Health" />
+        <NavItem to="/saas" label="SaaS admin" />
 
         {projectScoped && (
           <>
