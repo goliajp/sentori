@@ -1449,6 +1449,42 @@ pub async fn health_check(api_url: Option<String>) -> Result<()> {
     Ok(())
 }
 
+pub async fn self_test(api_url: Option<String>) -> Result<()> {
+    let url = format!("{}/v1/_self_test", resolve_api_url(api_url));
+    let c = reqwest::Client::new();
+    let resp = c.get(&url).send().await?;
+    let status = resp.status().as_u16();
+    let body: Value = resp.json().await?;
+    let overall = body["ok"].as_bool().unwrap_or(false);
+    println!(
+        "{} v{}  (HTTP {})",
+        if overall { "✓ all checks pass" } else { "✗ some checks failed" },
+        body["version"].as_str().unwrap_or("?"),
+        status,
+    );
+    for c in body["checks"].as_array().cloned().unwrap_or_default() {
+        let ok = c["ok"].as_bool().unwrap_or(false);
+        println!(
+            "  {}  {}{}",
+            if ok { "✓" } else { "✗" },
+            c["name"].as_str().unwrap_or("?"),
+            c["detail"].as_str().map(|d| format!("  ({d})")).unwrap_or_default(),
+        );
+    }
+    if !overall {
+        std::process::exit(1);
+    }
+    Ok(())
+}
+
+pub async fn metrics_raw(api_url: Option<String>) -> Result<()> {
+    let url = format!("{}/metrics", resolve_api_url(api_url));
+    let c = reqwest::Client::new();
+    let text = c.get(&url).send().await?.error_for_status()?.text().await?;
+    print!("{text}");
+    Ok(())
+}
+
 pub async fn me_show(
     token: Option<String>,
     api_url: Option<String>,

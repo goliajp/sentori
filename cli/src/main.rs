@@ -189,6 +189,16 @@ enum Command {
         #[arg(long = "api-url")]
         api_url: Option<String>,
     },
+    /// Run /v1/_self_test smoke checks; exit 1 if any fail.
+    SelfTest {
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
+    /// Dump raw Prometheus /metrics text (pipe into grep/awk).
+    Metrics {
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// Show the current session user (Bearer or session cookie).
     #[command(alias = "whoami")]
     Me {
@@ -1086,6 +1096,8 @@ async fn main() -> Result<()> {
         }
         Command::Describe { api_url, json } => admin::describe(api_url, json).await,
         Command::Health { api_url } => admin::health_check(api_url).await,
+        Command::SelfTest { api_url } => admin::self_test(api_url).await,
+        Command::Metrics { api_url } => admin::metrics_raw(api_url).await,
         Command::Me { token, api_url } => admin::me_show(token, api_url).await,
         Command::LiveTail { token, api_url } => admin::live_tail(token, api_url).await,
         Command::Release {
