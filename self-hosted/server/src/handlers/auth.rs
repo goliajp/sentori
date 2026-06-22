@@ -86,25 +86,44 @@ pub struct LoginBody {
 pub async fn login(
     State(state): State<Arc<AppState>>,
     Json(body): Json<LoginBody>,
-) -> (StatusCode, Json<Value>) {
+) -> axum::response::Response {
+    use axum::http::header::{HeaderValue, SET_COOKIE};
+    use axum::response::IntoResponse;
+
     match auth(&state).login(&body.email, &body.password, &meta()).await {
         Ok((user, minted)) => {
             info!(user_id = %user.id, "auth.login");
-            (
-                StatusCode::OK,
-                Json(json!({
-                    "user_id": user.id.to_string(),
-                    "email": user.email,
-                    "session_token": minted.session_id.to_wire_string(),
-                    "expires_at": minted.session.expires_at,
-                })),
-            )
+            let token = minted.session_id.to_wire_string();
+            let body_json = json!({
+                "user_id": user.id.to_string(),
+                "email": user.email,
+                "session_token": token,
+                "expires_at": minted.session.expires_at,
+            });
+            let mut resp = (StatusCode::OK, Json(body_json)).into_response();
+            let cookie = format!(
+                "sentori_session={token}; Path=/; HttpOnly; SameSite=Lax{}",
+                if secure_cookies() { "; Secure" } else { "" },
+            );
+            if let Ok(hv) = HeaderValue::from_str(&cookie) {
+                resp.headers_mut().insert(SET_COOKIE, hv);
+            }
+            resp
         }
         Err(e) => (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "error": e.to_string() })),
-        ),
+        )
+            .into_response(),
     }
+}
+
+fn secure_cookies() -> bool {
+    // Default ON; flip OFF for local-dev plain HTTP.
+    !matches!(
+        std::env::var("SENTORI_COOKIE_SECURE").ok().as_deref(),
+        Some("0") | Some("false")
+    )
 }
 
 #[derive(Deserialize)]
@@ -189,7 +208,10 @@ pub struct ChangePasswordBody {
 pub async fn logout(
     State(state): State<Arc<AppState>>,
     headers: axum::http::HeaderMap,
-) -> StatusCode {
+) -> axum::response::Response {
+    use axum::http::header::{HeaderValue, SET_COOKIE};
+    use axum::response::IntoResponse;
+
     if let Some(token) = extract_session_token(&headers) {
         let svc = auth(&state);
         if let Ok(Some((_user, session))) = svc.lookup_session(&token).await {
@@ -202,7 +224,15 @@ pub async fn logout(
             }
         }
     }
-    StatusCode::NO_CONTENT
+    let mut resp = StatusCode::NO_CONTENT.into_response();
+    let cookie = format!(
+        "sentori_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax{}",
+        if secure_cookies() { "; Secure" } else { "" },
+    );
+    if let Ok(hv) = HeaderValue::from_str(&cookie) {
+        resp.headers_mut().insert(SET_COOKIE, hv);
+    }
+    resp
 }
 
 pub async fn me(
