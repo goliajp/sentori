@@ -152,6 +152,15 @@ export default function IssueDetail() {
                 {watching ? `★ Watching (${watchers.length})` : `☆ Watch (${watchers.length})`}
               </Button>
             )}
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                navigator.clipboard?.writeText(window.location.href);
+              }}
+            >
+              Copy link
+            </Button>
             <Link
               to={`/projects/${projectId}/issues`}
               className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50"

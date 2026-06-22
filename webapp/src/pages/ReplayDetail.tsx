@@ -108,12 +108,23 @@ export default function ReplayDetail() {
         title="Replay"
         subtitle={`${formatNumber(frames.length)} frames · ${replayId.slice(0, 16)}…`}
         actions={
-          <Link
-            to={`/projects/${projectId}/replays`}
-            className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50"
-          >
-            ← All replays
-          </Link>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                navigator.clipboard?.writeText(window.location.href);
+              }}
+            >
+              Copy link
+            </Button>
+            <Link
+              to={`/projects/${projectId}/replays`}
+              className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50"
+            >
+              ← All replays
+            </Link>
+          </div>
         }
       />
 
