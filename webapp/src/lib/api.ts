@@ -203,6 +203,28 @@ export interface SaasStats {
   users: number;
 }
 
+export interface TraceRow {
+  trace_id: string;
+  root_op: string | null;
+  root_name: string | null;
+  first_seen: string;
+  last_seen: string;
+  span_count: number;
+  status: string;
+  duration_ms: number;
+}
+
+export interface SpanRow {
+  id: string;
+  parent_span_id: string | null;
+  op: string;
+  name: string;
+  status: string;
+  started_at: string;
+  duration_ms: number;
+  tags: unknown;
+}
+
 export interface IssueDetail {
   id: string;
   project_id: string;
@@ -263,6 +285,18 @@ export class Api {
   }
   getIssue(projectId: string, issueId: string): Promise<IssueDetail> {
     return this.get(`/v1/projects/${projectId}/issues/${issueId}`);
+  }
+  listTraces(
+    projectId: string,
+    limit = 50,
+  ): Promise<{ traces: TraceRow[] }> {
+    return this.get(`/v1/projects/${projectId}/traces?limit=${limit}`);
+  }
+  getTrace(
+    projectId: string,
+    traceId: string,
+  ): Promise<{ trace: TraceRow; spans: SpanRow[] }> {
+    return this.get(`/v1/projects/${projectId}/traces/${traceId}`);
   }
   patchIssue(
     projectId: string,

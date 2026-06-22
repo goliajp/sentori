@@ -1,0 +1,159 @@
+// Single trace — meta + flat span list. Span tree visualizer
+// (waterfall chart) is a future enhancement; v0.2 starts with
+// indented list keyed by parent_span_id.
+
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+
+import { api, SpanRow, TraceRow } from '../lib/api';
+import {
+  Badge,
+  Card,
+  CardHeader,
+  ErrorBanner,
+  PageHeader,
+  Section,
+  formatNumber,
+  formatRelative,
+} from '../components/ui';
+
+export default function TraceDetail() {
+  const { id: projectId, traceId } = useParams<{
+    id: string;
+    traceId: string;
+  }>();
+  const [trace, setTrace] = useState<TraceRow | null>(null);
+  const [spans, setSpans] = useState<SpanRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!projectId || !traceId) return;
+    api
+      .getTrace(projectId, traceId)
+      .then(r => {
+        setTrace(r.trace);
+        setSpans(r.spans);
+      })
+      .catch(e => setError(String(e)))
+      .finally(() => setLoading(false));
+  }, [projectId, traceId]);
+
+  if (!projectId || !traceId) {
+    return <ErrorBanner>Missing project / trace id</ErrorBanner>;
+  }
+  if (loading) {
+    return (
+      <div className="py-16 text-center text-sm text-zinc-500">Loading…</div>
+    );
+  }
+  if (error) return <ErrorBanner>{error}</ErrorBanner>;
+  if (!trace) return <ErrorBanner>Trace not found</ErrorBanner>;
+
+  // Build depth map from parent_span_id chains so the flat list
+  // can be visually nested without recursion.
+  const depthFor: Map<string, number> = new Map();
+  for (const s of spans) {
+    if (!s.parent_span_id) {
+      depthFor.set(s.id, 0);
+    } else {
+      const pd = depthFor.get(s.parent_span_id) ?? 0;
+      depthFor.set(s.id, pd + 1);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title={trace.root_name ?? trace.trace_id.slice(0, 16) + '…'}
+        subtitle={`Trace ${trace.trace_id}`}
+        actions={
+          <Link
+            to={`/projects/${projectId}/traces`}
+            className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50"
+          >
+            ← All traces
+          </Link>
+        }
+      />
+
+      <Card>
+        <CardHeader title="Meta" />
+        <Section>
+          <div className="grid grid-cols-4 gap-4">
+            <Cell label="Status">
+              <Badge variant={trace.status === 'ok' ? 'ok' : 'muted'}>
+                {trace.status}
+              </Badge>
+            </Cell>
+            <Cell label="Root op">
+              <span className="font-mono text-xs">{trace.root_op ?? '—'}</span>
+            </Cell>
+            <Cell label="Spans">{formatNumber(trace.span_count)}</Cell>
+            <Cell label="Duration">
+              {formatNumber(trace.duration_ms)} ms
+            </Cell>
+            <Cell label="First seen">{formatRelative(trace.first_seen)}</Cell>
+            <Cell label="Last seen">{formatRelative(trace.last_seen)}</Cell>
+          </div>
+        </Section>
+      </Card>
+
+      <Card>
+        <CardHeader title={`Spans (${spans.length})`} />
+        <Section>
+          {spans.length === 0 ? (
+            <div className="py-8 text-center text-sm text-zinc-500">
+              No spans recorded.
+            </div>
+          ) : (
+            <ul className="space-y-1">
+              {spans.map(s => {
+                const depth = depthFor.get(s.id) ?? 0;
+                return (
+                  <li
+                    key={s.id}
+                    className="rounded border border-zinc-200 p-2 text-xs"
+                    style={{ marginLeft: `${depth * 16}px` }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Badge>{s.op}</Badge>
+                        <span className="font-mono text-[11px] text-zinc-200">
+                          {s.name}
+                        </span>
+                        <Badge variant={s.status === 'ok' ? 'ok' : 'muted'}>
+                          {s.status}
+                        </Badge>
+                      </div>
+                      <span className="font-mono tabular-nums text-zinc-300">
+                        {s.duration_ms}ms
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Section>
+      </Card>
+    </div>
+  );
+}
+
+function Cell({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-wide text-zinc-500">
+        {label}
+      </p>
+      <div className="mt-1 text-sm">{children}</div>
+    </div>
+  );
+}

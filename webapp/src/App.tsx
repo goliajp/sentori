@@ -83,6 +83,7 @@ function Sidebar() {
             <SectionLabel className="mt-6">Project</SectionLabel>
             <NavItem to={`/projects/${projectScoped}/issues`} label="Issues" />
             <NavItem to={`/projects/${projectScoped}/events`} label="Events" />
+            <NavItem to={`/projects/${projectScoped}/traces`} label="Traces" />
             <NavItem
               to={`/projects/${projectScoped}/cert`}
               label="Cert monitor"
