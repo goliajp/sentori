@@ -55,6 +55,9 @@ sentori-tenant-scoping     = { path = "../../core/crates/tenant-scoping" }
 sentori-billing            = { path = "../../core/crates/billing" }
 sentori-argon2-password    = { path = "../../core/crates/argon2-password" }
 sentori-cookie-session     = { path = "../../core/crates/cookie-session" }
+sentori-ingest-token       = { path = "../../core/crates/ingest-token" }
+sentori-push-provider      = { path = "../../core/crates/push-provider" }
+sentori-cert-monitor       = { path = "../../core/crates/cert-monitor" }
 
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio", "tower-log", "tracing", "macros"] }
 axum-extra = { version = "0.10", default-features = false, features = ["cookie"] }

@@ -24,6 +24,7 @@ members = [
     "crates/geoip-reader",
     "crates/secrets-vault",
     "crates/argon2-password",
+    "crates/ingest-token",
     "crates/workspace-identity",
     "crates/auth-session",
     "crates/attachment-store",
