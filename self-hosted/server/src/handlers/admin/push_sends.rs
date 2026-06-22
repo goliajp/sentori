@@ -22,6 +22,48 @@ pub struct ListQuery {
     pub limit: Option<u32>,
 }
 
+pub async fn retry(
+    State(state): State<Arc<AppState>>,
+    Path((_project_id, send_id)): Path<(Uuid, Uuid)>,
+) -> (axum::http::StatusCode, Json<Value>) {
+    use axum::http::StatusCode;
+    let res = sqlx::query(
+        "UPDATE push_sends SET status = 'queued', next_attempt_at = now(), \
+            retry_count = 0, error = NULL \
+         WHERE id = $1 AND status = 'failed' RETURNING id",
+    )
+    .bind(send_id)
+    .fetch_optional(&state.pool)
+    .await;
+    match res {
+        Ok(Some(_)) => {
+            crate::notify::audit(
+                &state.pool,
+                state.workspace_id.into_uuid(),
+                None,
+                None,
+                "push.retry",
+                Some("push_send"),
+                Some(&send_id.to_string()),
+                json!({}),
+            )
+            .await;
+            (
+                StatusCode::ACCEPTED,
+                Json(json!({ "send_id": send_id.to_string(), "status": "queued" })),
+            )
+        }
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "not_failed_or_missing" })),
+        ),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "internal" })),
+        ),
+    }
+}
+
 pub async fn list(
     State(state): State<Arc<AppState>>,
     Path(project_id): Path<Uuid>,

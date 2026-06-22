@@ -159,6 +159,10 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/projects/:project_id/push/sends",
             get(admin::push_sends::list),
         )
+        .route(
+            "/admin/api/projects/:project_id/push/sends/:send_id/retry",
+            post(admin::push_sends::retry),
+        )
         .route("/admin/api/members", get(admin::members::list))
         .route(
             "/admin/api/members/:user_id",

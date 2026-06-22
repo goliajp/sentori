@@ -243,6 +243,16 @@ enum Command {
         #[arg(long = "api-url")]
         api_url: Option<String>,
     },
+    /// Retry-now a single failed push send (DLQ unstuck).
+    PushRetry {
+        #[arg(long = "project")]
+        project_id: String,
+        send_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// Recent push sends with status / retry / error (triage / DLQ).
     PushSends {
         #[arg(long = "project")]
@@ -1036,6 +1046,12 @@ async fn main() -> Result<()> {
             token,
             api_url,
         } => admin::issue_watch(issue_id, token, api_url).await,
+        Command::PushRetry {
+            project_id,
+            send_id,
+            token,
+            api_url,
+        } => admin::push_retry(project_id, send_id, token, api_url).await,
         Command::PushSends {
             project_id,
             status,

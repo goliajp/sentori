@@ -17,6 +17,7 @@ import Integrations from './pages/Integrations';
 import Members from './pages/Members';
 import Projects from './pages/Projects';
 import PushCredentials from './pages/PushCredentials';
+import PushSends from './pages/PushSends';
 import Register from './pages/Register';
 import Releases from './pages/Releases';
 import SaasAdmin from './pages/SaasAdmin';
@@ -64,6 +65,7 @@ createRoot(rootEl).render(
           <Route path="/members" element={<Members />} />
           <Route path="/projects/:id/tokens" element={<Tokens />} />
           <Route path="/projects/:id/push" element={<PushCredentials />} />
+          <Route path="/projects/:id/push-sends" element={<PushSends />} />
           <Route path="/projects/:id/integrations" element={<Integrations />} />
           <Route path="/projects/:id/releases" element={<Releases />} />
           <Route path="/saas" element={<SaasAdmin />} />

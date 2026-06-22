@@ -674,6 +674,22 @@ pub async fn comment_list(
     Ok(())
 }
 
+pub async fn push_retry(
+    project_id: String,
+    send_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!(
+        "{}/admin/api/projects/{project_id}/push/sends/{send_id}/retry",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    c.post(&url).send().await?.error_for_status()?;
+    println!("requeued {send_id}");
+    Ok(())
+}
+
 pub async fn push_sends_list(
     project_id: String,
     status: Option<String>,

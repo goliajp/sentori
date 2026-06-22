@@ -738,6 +738,34 @@ export class Api {
       body,
     );
   }
+  listPushSends(
+    projectId: string,
+    opts: { status?: string; limit?: number } = {},
+  ): Promise<{
+    sends: {
+      id: string;
+      token_id: string;
+      provider: string;
+      status: string;
+      provider_outcome: string | null;
+      error: string | null;
+      retry_count: number;
+      created_at: string;
+      sent_at: string | null;
+      next_attempt_at: string | null;
+    }[];
+  }> {
+    const qs = buildQS({ status: opts.status, limit: opts.limit });
+    return this.get(
+      `/admin/api/projects/${projectId}/push/sends${qs}`,
+    );
+  }
+  retryPushSend(projectId: string, sendId: string): Promise<{ status: string }> {
+    return this.post(
+      `/admin/api/projects/${projectId}/push/sends/${sendId}/retry`,
+      {},
+    );
+  }
 
   // ── admin: members ─────────────────────────────────────
   listMembers(): Promise<{ members: MemberRow[] }> {
