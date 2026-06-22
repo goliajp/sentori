@@ -251,9 +251,8 @@ async fn try_webpush(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String
     Ok((status, dur))
 }
 
+#[allow(dead_code)]
 fn mock_send(provider: &str) -> (&'static str, &'static str) {
-    // For now every push "succeeds" — same shape as a real provider
-    // would write upon 200 OK + valid token.
     let _ = provider;
     ("sent", "ok")
 }

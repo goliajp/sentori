@@ -6,6 +6,8 @@
 //! be reused for up to an hour across many sends, but we mint a
 //! fresh one per call here for simplicity. Caching is a follow-up.
 
+#![allow(dead_code)]
+
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};

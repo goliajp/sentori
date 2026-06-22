@@ -14,6 +14,9 @@ use sentori_attachment_store::MemoryBlobStore;
 
 use crate::blob_store::AttachmentStore;
 
+// Future services accessed during request handling.
+#[allow(dead_code)]
+
 /// One row of the broadcast bus — minimal so the channel stays
 /// cheap to clone per fanout.
 #[derive(Clone, Debug)]

@@ -9,6 +9,8 @@
 //! encrypted-payload WebPush (RFC 8030 + 8188 + 8291) is K7.3
 //! follow-up.
 
+#![allow(dead_code)]
+
 use base64::{Engine, engine::general_purpose};
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
