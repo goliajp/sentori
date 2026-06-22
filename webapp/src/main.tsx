@@ -21,6 +21,7 @@ import Register from './pages/Register';
 import Releases from './pages/Releases';
 import SaasAdmin from './pages/SaasAdmin';
 import SavedViews from './pages/SavedViews';
+import Metrics from './pages/Metrics';
 import Traces from './pages/Traces';
 import TraceDetail from './pages/TraceDetail';
 import { SettingsPage } from './pages/Settings';
@@ -66,6 +67,7 @@ createRoot(rootEl).render(
             path="/projects/:id/traces/:traceId"
             element={<TraceDetail />}
           />
+          <Route path="/projects/:id/metrics" element={<Metrics />} />
         </Route>
       </Routes>
     </BrowserRouter>

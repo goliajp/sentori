@@ -31,6 +31,7 @@ mod ingest;
 mod issues;
 mod projects;
 mod saved_views;
+mod metrics;
 mod sdk;
 mod spans;
 mod usage;
@@ -221,6 +222,14 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(
             "/v1/projects/:project_id/traces/:trace_id",
             get(spans::get_trace),
+        )
+        .route(
+            "/v1/projects/:project_id/metrics",
+            get(metrics::list_names),
+        )
+        .route(
+            "/v1/projects/:project_id/metrics/:name/timeseries",
+            get(metrics::timeseries),
         )
         .route("/v1/projects/:project_id/cert/watches", get(cert::list_watches))
         .route(

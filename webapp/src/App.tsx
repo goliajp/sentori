@@ -85,6 +85,10 @@ function Sidebar() {
             <NavItem to={`/projects/${projectScoped}/events`} label="Events" />
             <NavItem to={`/projects/${projectScoped}/traces`} label="Traces" />
             <NavItem
+              to={`/projects/${projectScoped}/metrics`}
+              label="Metrics"
+            />
+            <NavItem
               to={`/projects/${projectScoped}/cert`}
               label="Cert monitor"
             />

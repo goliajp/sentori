@@ -203,6 +203,21 @@ export interface SaasStats {
   users: number;
 }
 
+export interface MetricSummary {
+  name: string;
+  last_bucket: string | null;
+  total_count: number;
+  avg_value: number;
+}
+
+export interface MetricPoint {
+  bucket: string;
+  sum: number;
+  count: number;
+  min: number | null;
+  max: number | null;
+}
+
 export interface TraceRow {
   trace_id: string;
   root_op: string | null;
@@ -297,6 +312,18 @@ export class Api {
     traceId: string,
   ): Promise<{ trace: TraceRow; spans: SpanRow[] }> {
     return this.get(`/v1/projects/${projectId}/traces/${traceId}`);
+  }
+  listMetrics(projectId: string): Promise<{ metrics: MetricSummary[] }> {
+    return this.get(`/v1/projects/${projectId}/metrics`);
+  }
+  metricsTimeseries(
+    projectId: string,
+    name: string,
+    hours = 24,
+  ): Promise<{ name: string; hours: number; points: MetricPoint[] }> {
+    return this.get(
+      `/v1/projects/${projectId}/metrics/${encodeURIComponent(name)}/timeseries?hours=${hours}`,
+    );
   }
   patchIssue(
     projectId: string,
