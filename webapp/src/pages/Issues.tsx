@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api, ApiError, IngestRequest, Issue } from '../lib/api';
+import { useKeyHandlers } from '../lib/useShortcuts';
 import {
   Badge,
   Button,
@@ -28,6 +29,29 @@ export function IssuesPage() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [cursor, setCursor] = useState(0);
+
+  useKeyHandlers({
+    j: () => setCursor(c => Math.min((issues?.length ?? 1) - 1, c + 1)),
+    k: () => setCursor(c => Math.max(0, c - 1)),
+    x: () => {
+      if (issues?.[cursor]) {
+        const id = issues[cursor].id;
+        setSelected(s => {
+          const c = new Set(s);
+          if (c.has(id)) c.delete(id);
+          else c.add(id);
+          return c;
+        });
+      }
+    },
+    e: () => {
+      if (issues?.[cursor]) quickAction(issues[cursor].id, 'resolved');
+    },
+    i: () => {
+      if (issues?.[cursor]) quickAction(issues[cursor].id, 'ignored');
+    },
+  });
 
   async function bulkApply(status: 'resolved' | 'ignored') {
     if (!projectId || selected.size === 0) return;
@@ -161,22 +185,31 @@ export function IssuesPage() {
             {
               key: 'select',
               label: '',
-              width: '3%',
-              render: (r) => (
-                <input
-                  type="checkbox"
-                  checked={selected.has(r.id)}
-                  onChange={e => {
-                    setSelected(s => {
-                      const c = new Set(s);
-                      if (e.target.checked) c.add(r.id);
-                      else c.delete(r.id);
-                      return c;
-                    });
-                  }}
-                  className="cursor-pointer"
-                />
-              ),
+              width: '4%',
+              render: (r) => {
+                const idx = issues?.findIndex(x => x.id === r.id) ?? -1;
+                const isCursor = idx === cursor;
+                return (
+                  <div className="flex items-center gap-1">
+                    {isCursor && (
+                      <span className="text-emerald-500 text-xs">▸</span>
+                    )}
+                    <input
+                      type="checkbox"
+                      checked={selected.has(r.id)}
+                      onChange={e => {
+                        setSelected(s => {
+                          const c = new Set(s);
+                          if (e.target.checked) c.add(r.id);
+                          else c.delete(r.id);
+                          return c;
+                        });
+                      }}
+                      className="cursor-pointer"
+                    />
+                  </div>
+                );
+              },
             },
             {
               key: 'status',

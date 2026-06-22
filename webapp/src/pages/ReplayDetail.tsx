@@ -3,9 +3,10 @@
 // canvas/DOM replay player is K7-replay work (v0.3).
 
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { api } from '../lib/api';
+import { useKeyHandlers } from '../lib/useShortcuts';
 import {
   Badge,
   Card,
@@ -32,6 +33,12 @@ export default function ReplayDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [idx, setIdx] = useState(0);
+  const navigate = useNavigate();
+  useKeyHandlers({
+    Escape: () => projectId && navigate(`/projects/${projectId}/replays`),
+    ArrowLeft: () => setIdx(i => Math.max(0, i - 1)),
+    ArrowRight: () => setIdx(i => i + 1),
+  });
 
   useEffect(() => {
     if (!projectId || !replayId) return;

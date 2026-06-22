@@ -5,7 +5,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
+import { useNavigate } from 'react-router-dom';
+
 import { api, SpanRow, TraceRow } from '../lib/api';
+import { useKeyHandlers } from '../lib/useShortcuts';
 import {
   Badge,
   Card,
@@ -26,6 +29,10 @@ export default function TraceDetail() {
   const [spans, setSpans] = useState<SpanRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  useKeyHandlers({
+    Escape: () => projectId && navigate(`/projects/${projectId}/traces`),
+  });
 
   useEffect(() => {
     if (!projectId || !traceId) return;
