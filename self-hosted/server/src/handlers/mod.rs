@@ -104,7 +104,8 @@ pub fn router(state: Arc<AppState>) -> Router {
         .layer(axum_middleware::from_fn_with_state(
             token_store,
             bearer_middleware,
-        ));
+        ))
+        .with_state(state.clone());
 
     // Dashboard / admin routes — Phase E will add cookie session
     // auth. For now they share AppState.
