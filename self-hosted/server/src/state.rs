@@ -15,6 +15,7 @@ use sentori_event_pipeline::{IngestOptions, IngestService};
 use sentori_integration_traits::IntegrationService;
 use sentori_issue_store::IssueStore;
 use sentori_notifier::NotifierService;
+use sentori_push_provider::DeviceTokenStore;
 use sentori_replay_store::ReplayStore;
 use sentori_runtime_metrics::MetricsStore;
 use sentori_saved_view::SavedViewService;
@@ -42,6 +43,7 @@ pub struct AppState {
     pub saved_views: SavedViewService,
     pub tenant: TenantGuard,
     pub billing: BillingService,
+    pub push_tokens: DeviceTokenStore,
 }
 
 impl AppState {
@@ -74,6 +76,7 @@ impl AppState {
         let saved_views = SavedViewService::new(pool.clone());
         let tenant = TenantGuard::new(pool.clone(), workspace_id);
         let billing = BillingService::new(pool.clone(), workspace_id);
+        let push_tokens = DeviceTokenStore::new(pool.clone());
         Self {
             pool,
             workspace_id,
@@ -90,6 +93,7 @@ impl AppState {
             saved_views,
             tenant,
             billing,
+            push_tokens,
         }
     }
 }

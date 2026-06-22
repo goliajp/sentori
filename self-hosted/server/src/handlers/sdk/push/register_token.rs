@@ -1,26 +1,102 @@
-//! POST `/v1/push/tokens` — register device for push
+//! POST `/v1/push/tokens` — register device for push.
 //!
-//! Phase D stub. Accepts payload (where applicable), logs the
-//! call with token context, returns 202 Accepted with minimal
-//! body. Phase D step 2+ replaces with push-provider crate
-//! integration.
+//! UPSERT into `push_tokens` via push-provider's
+//! `DeviceTokenStore::upsert`. Idempotent on (project_id, kind,
+//! native_token).
 
-use axum::{Extension, Json, http::StatusCode};
+use std::sync::Arc;
+
+use axum::{Extension, Json, extract::State, http::StatusCode};
 use sentori_ingest_token::IngestContext;
+use sentori_push_provider::{ProviderKind, PushError};
+use serde::Deserialize;
 use serde_json::{Value, json};
-use tracing::info;
+use tracing::{info, warn};
+
+use crate::state::AppState;
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegisterBody {
+    /// Provider: `apns` / `fcm` / `webpush` / `hcm` / `mipush`.
+    pub kind: String,
+    /// Provider-native token (APNs hex, FCM reg id, web sub JSON).
+    pub native_token: String,
+    /// Optional environment hint (`production` / `sandbox` for APNs).
+    #[serde(default)]
+    pub env: Option<String>,
+    /// App-side user identifier for targeted dispatch.
+    #[serde(default)]
+    pub app_user_id: Option<String>,
+}
 
 pub async fn handle(
     Extension(ctx): Extension<IngestContext>,
-    Json(payload): Json<Value>,
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<RegisterBody>,
 ) -> (StatusCode, Json<Value>) {
-    info!(
-        workspace_id = %ctx.workspace_id,
-        project_id = %ctx.project_id,
-        "push.register_token",
-    );
-    (
-        StatusCode::ACCEPTED,
-        Json(json!({ "status": "accepted", "stub": "push_register_token" })),
-    )
+    let kind = match parse_kind(&body.kind) {
+        Some(k) => k,
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "invalid_kind", "got": body.kind })),
+            );
+        }
+    };
+
+    match state
+        .push_tokens
+        .upsert(
+            ctx.project_id,
+            kind,
+            &body.native_token,
+            body.env.as_deref(),
+            body.app_user_id.as_deref(),
+        )
+        .await
+    {
+        Ok(minted) => {
+            info!(
+                workspace_id = %ctx.workspace_id,
+                project_id = %ctx.project_id,
+                token_id = %minted.id,
+                is_new = minted.is_new,
+                "push.register_token upserted",
+            );
+            (
+                StatusCode::ACCEPTED,
+                Json(json!({
+                    "token_id": minted.id.to_string(),
+                    "is_new": minted.is_new,
+                })),
+            )
+        }
+        Err(PushError::ProjectNotFound(_)) => (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "error": "project_not_found" })),
+        ),
+        Err(PushError::InvalidInput(msg)) => (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid_input", "detail": msg })),
+        ),
+        Err(e) => {
+            warn!(workspace_id = %ctx.workspace_id, error = %e, "push.register_token db_error");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "internal" })),
+            )
+        }
+    }
+}
+
+fn parse_kind(s: &str) -> Option<ProviderKind> {
+    match s {
+        "apns" => Some(ProviderKind::Apns),
+        "fcm" => Some(ProviderKind::Fcm),
+        "webpush" => Some(ProviderKind::WebPush),
+        "hcm" => Some(ProviderKind::Hcm),
+        "mipush" => Some(ProviderKind::MiPush),
+        _ => None,
+    }
 }
