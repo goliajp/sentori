@@ -14,7 +14,7 @@ use std::sync::Arc;
 use axum::{
     Json,
     extract::{Extension, Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
 };
 
 use crate::session_mw::SessionContext;
@@ -44,6 +44,7 @@ pub async fn upsert(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
+    headers: HeaderMap,
     Json(body): Json<UpsertBody>,
 ) -> (StatusCode, Json<Value>) {
     if !matches!(
@@ -88,6 +89,7 @@ pub async fn upsert(
                 provider = %body.provider,
                 "admin.push_credentials upserted",
             );
+            let (ip, ua) = crate::notify::extract_request_meta(&headers);
             crate::notify::audit(
                 &state.pool,
                 state.workspace_id.into_uuid(),
@@ -96,7 +98,11 @@ pub async fn upsert(
                 "push_credentials.upsert",
                 Some("push_credentials"),
                 Some(&id.to_string()),
-                json!({ "provider": body.provider }),
+                crate::notify::enrich_payload(
+                    json!({ "provider": body.provider }),
+                    ip.as_deref(),
+                    ua.as_deref(),
+                ),
             )
             .await;
             (

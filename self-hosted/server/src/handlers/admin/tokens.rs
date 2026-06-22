@@ -145,11 +145,13 @@ pub async fn revoke(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
     Path(token_id): Path<Uuid>,
+    headers: HeaderMap,
 ) -> StatusCode {
     let store = TokenStore::new(state.pool.clone());
     match store.revoke(token_id).await {
         Ok(()) => {
             info!(%token_id, "admin.tokens revoked");
+            let (ip, ua) = crate::notify::extract_request_meta(&headers);
             crate::notify::audit(
                 &state.pool,
                 state.workspace_id.into_uuid(),
@@ -158,7 +160,7 @@ pub async fn revoke(
                 "token.revoke",
                 Some("token"),
                 Some(&token_id.to_string()),
-                json!({}),
+                crate::notify::enrich_payload(json!({}), ip.as_deref(), ua.as_deref()),
             )
             .await;
             StatusCode::NO_CONTENT

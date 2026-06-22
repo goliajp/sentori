@@ -13,7 +13,7 @@ use std::sync::Arc;
 use axum::{
     Json,
     extract::{Extension, Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
 };
 
 use crate::session_mw::SessionContext;
@@ -36,6 +36,7 @@ pub struct CreateBody {
 pub async fn create(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
+    headers: HeaderMap,
     Json(body): Json<CreateBody>,
 ) -> (StatusCode, Json<Value>) {
     if body.name.is_empty() || body.slug.is_empty() {
@@ -60,6 +61,7 @@ pub async fn create(
                 slug = %body.slug,
                 "admin.projects created",
             );
+            let (ip, ua) = crate::notify::extract_request_meta(&headers);
             crate::notify::audit(
                 &state.pool,
                 state.workspace_id.into_uuid(),
@@ -68,7 +70,11 @@ pub async fn create(
                 "project.create",
                 Some("project"),
                 Some(&p.id.to_string()),
-                json!({ "name": body.name, "slug": body.slug }),
+                crate::notify::enrich_payload(
+                    json!({ "name": body.name, "slug": body.slug }),
+                    ip.as_deref(),
+                    ua.as_deref(),
+                ),
             )
             .await;
             (
@@ -173,6 +179,7 @@ pub async fn delete(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
+    headers: HeaderMap,
 ) -> StatusCode {
     match state
         .identity
@@ -182,6 +189,7 @@ pub async fn delete(
     {
         Ok(()) => {
             info!(%project_id, "admin.projects deleted");
+            let (ip, ua) = crate::notify::extract_request_meta(&headers);
             crate::notify::audit(
                 &state.pool,
                 state.workspace_id.into_uuid(),
@@ -190,7 +198,7 @@ pub async fn delete(
                 "project.delete",
                 Some("project"),
                 Some(&project_id.to_string()),
-                json!({}),
+                crate::notify::enrich_payload(json!({}), ip.as_deref(), ua.as_deref()),
             )
             .await;
             StatusCode::NO_CONTENT

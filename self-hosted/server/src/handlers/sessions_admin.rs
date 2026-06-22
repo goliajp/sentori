@@ -9,7 +9,7 @@ use std::sync::Arc;
 use axum::{
     Json,
     extract::{Extension, Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
 };
 use serde_json::{Value, json};
 use sqlx::Row;
@@ -50,6 +50,7 @@ pub async fn revoke(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
     Path(id_hash_hex): Path<String>,
+    headers: HeaderMap,
 ) -> StatusCode {
     let res = sqlx::query(
         "DELETE FROM sessions WHERE user_id = $1 AND id_hash_hex = $2",
@@ -60,6 +61,7 @@ pub async fn revoke(
     .await;
     match res {
         Ok(r) if r.rows_affected() > 0 => {
+            let (ip, ua) = crate::notify::extract_request_meta(&headers);
             crate::notify::audit(
                 &state.pool,
                 state.workspace_id.into_uuid(),
@@ -68,7 +70,7 @@ pub async fn revoke(
                 "session.revoke",
                 Some("session"),
                 Some(&id_hash_hex),
-                serde_json::json!({}),
+                crate::notify::enrich_payload(json!({}), ip.as_deref(), ua.as_deref()),
             )
             .await;
             StatusCode::NO_CONTENT
