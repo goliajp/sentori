@@ -76,7 +76,21 @@ pub async fn create(
     .fetch_optional(&state.pool)
     .await;
     match res {
-        Ok(Some(row)) => (
+        Ok(Some(row)) => {
+            // Fan out notifications to other watchers.
+            crate::notify::notify_issue_watchers(
+                &state.pool,
+                issue_id,
+                Some(ctx.user_id.into_uuid()),
+                "comment",
+                json!({
+                    "issue_id": issue_id.to_string(),
+                    "comment_id": id.to_string(),
+                    "preview": body.body_md.trim().chars().take(80).collect::<String>(),
+                }),
+            )
+            .await;
+            (
             StatusCode::CREATED,
             Json(json!({
                 "id": id.to_string(),
@@ -85,7 +99,8 @@ pub async fn create(
                 "body_md": body.body_md.trim(),
                 "created_at": row.get::<time::OffsetDateTime, _>("created_at"),
             })),
-        ),
+            )
+        }
         _ => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": "internal" })),

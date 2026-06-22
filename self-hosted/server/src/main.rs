@@ -40,6 +40,7 @@ use tracing::info;
 mod blob_store;
 mod bootstrap;
 mod handlers;
+mod notify;
 mod push_worker;
 mod saasadmin_mw;
 mod session_mw;

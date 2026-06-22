@@ -155,6 +155,19 @@ pub async fn patch(
         .patch(issue_id, patch, OffsetDateTime::now_utc())
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if let Some(status_label) = body.status.as_deref() {
+        crate::notify::notify_issue_watchers(
+            &state.pool,
+            issue_id,
+            None,
+            "issue_status",
+            serde_json::json!({
+                "issue_id": issue_id.to_string(),
+                "status": status_label,
+            }),
+        )
+        .await;
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

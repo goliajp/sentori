@@ -133,6 +133,36 @@ export default function PushCredentials() {
               placeholder="-----BEGIN PRIVATE KEY-----\n..."
             />
 
+            {provider === 'webpush' && (
+              <div className="mt-3">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    const out = await generateVapidKeypair();
+                    setConfig(
+                      JSON.stringify(
+                        {
+                          subject: 'mailto:admin@example.com',
+                          vapidPublicKey: out.publicKeyB64url,
+                        },
+                        null,
+                        2,
+                      ),
+                    );
+                    setSecret(out.privatePem);
+                  }}
+                >
+                  Generate VAPID keypair
+                </Button>
+                <p className="mt-1 text-[10px] text-zinc-500">
+                  Browser-side WebCrypto. Public key goes into config
+                  (for SDK), private PEM goes into secret. Never leaves
+                  this browser → sent to server only on Save.
+                </p>
+              </div>
+            )}
+
             <div className="mt-3 flex gap-2">
               <Button onClick={upload}>Save</Button>
               <Button variant="secondary" onClick={() => setShowUpload(false)}>
@@ -188,4 +218,39 @@ export default function PushCredentials() {
       </Card>
     </div>
   );
+}
+
+/// Generate a VAPID-compatible EC P-256 keypair using Web Crypto.
+/// Returns the public key as base64url uncompressed (65 bytes,
+/// 0x04 || X || Y → 87 b64url chars) and the private key wrapped
+/// in PEM-encoded PKCS8 (jsonwebtoken's expected input).
+async function generateVapidKeypair(): Promise<{
+  publicKeyB64url: string;
+  privatePem: string;
+}> {
+  const { subtle } = window.crypto;
+  const kp = await subtle.generateKey(
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    true,
+    ['sign', 'verify'],
+  );
+  // Public key: raw uncompressed point (0x04 || X || Y) — VAPID
+  // wants this base64url-encoded.
+  const rawPub = await subtle.exportKey('raw', kp.publicKey);
+  const publicKeyB64url = bytesToB64url(new Uint8Array(rawPub));
+
+  // Private key: PKCS8 DER → wrap in PEM.
+  const pkcs8 = new Uint8Array(await subtle.exportKey('pkcs8', kp.privateKey));
+  const b64 = btoa(String.fromCharCode(...pkcs8));
+  const pemBody = b64.match(/.{1,64}/g)?.join('\n') ?? b64;
+  const privatePem = `-----BEGIN PRIVATE KEY-----\n${pemBody}\n-----END PRIVATE KEY-----\n`;
+
+  return { publicKeyB64url, privatePem };
+}
+
+function bytesToB64url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
