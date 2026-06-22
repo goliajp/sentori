@@ -180,10 +180,19 @@ fn map_payload(mut p: Value) -> Result<Event, String> {
         .and_then(|v| v.as_str())
         .map(String::from);
 
+    // v1.x SDK sends `error.message` (nested) for Exception-shape
+    // events. Top-level `message` is the Message-kind body. Fall
+    // back so both layouts work.
     let message = obj
         .get("message")
         .and_then(|v| v.as_str())
-        .map(String::from);
+        .map(String::from)
+        .or_else(|| {
+            obj.get("error")
+                .and_then(|v| v.get("message"))
+                .and_then(|v| v.as_str())
+                .map(String::from)
+        });
 
     let level = obj
         .get("level")
