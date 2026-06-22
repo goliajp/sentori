@@ -45,7 +45,15 @@ export function IssuesPage() {
       <PageHeader
         title="Issues"
         subtitle={`Project ${projectId.slice(0, 8)}…`}
-        action={<TestIngestButton projectId={projectId} />}
+        action={
+          <div className="flex gap-2">
+            <SaveViewButton
+              projectId={projectId}
+              statusFilter={statusFilter}
+            />
+            <TestIngestButton projectId={projectId} />
+          </div>
+        }
       />
 
       <div className="mb-4">
@@ -173,6 +181,53 @@ function TestIngestButton({ projectId }: { projectId: string }) {
       )}
       <Button onClick={send} disabled={sending} variant="primary" size="sm">
         {sending ? 'Sending…' : 'Test ingest'}
+      </Button>
+    </div>
+  );
+}
+
+function SaveViewButton({
+  projectId,
+  statusFilter,
+}: {
+  projectId: string;
+  statusFilter: string;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function save() {
+    const name = prompt(
+      'Saved view name',
+      `Issues ${statusFilter || 'all'} – ${new Date().toLocaleDateString()}`,
+    );
+    if (!name) return;
+    setSaving(true);
+    setMsg(null);
+    try {
+      await api.createSavedView({
+        name,
+        target: 'issues',
+        scope: 'workspace',
+        project_id: projectId,
+        payload: { status: statusFilter || 'all' },
+      });
+      setMsg('Saved');
+      setTimeout(() => setMsg(null), 2000);
+    } catch (e) {
+      setMsg(String(e).slice(0, 40));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      {msg && (
+        <span className="font-mono text-xs text-zinc-500">{msg}</span>
+      )}
+      <Button onClick={save} disabled={saving} variant="secondary" size="sm">
+        {saving ? 'Saving…' : 'Save filter'}
       </Button>
     </div>
   );
