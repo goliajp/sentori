@@ -201,6 +201,8 @@ export interface SaasStats {
   active_workspaces: number;
   projects: number;
   users: number;
+  events_24h?: number;
+  tokens_active?: number;
 }
 
 export interface ProjectStats {

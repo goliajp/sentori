@@ -617,6 +617,68 @@ pub async fn metric_list(
     Ok(())
 }
 
+pub async fn search_project(
+    project_id: String,
+    query: String,
+    limit: u32,
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    // Minimal manual encode: replace unsafe chars. Good enough
+    // for typical search terms (alphanumerics + spaces + dots).
+    let encoded = query
+        .chars()
+        .map(|c| match c {
+            'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => {
+                c.to_string()
+            }
+            ' ' => "+".to_string(),
+            _ => format!("%{:02X}", c as u32),
+        })
+        .collect::<String>();
+    let url = format!(
+        "{}/v1/projects/{project_id}/search?q={encoded}&limit={limit}",
+        resolve_api_url(api_url),
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    let issues = body["issues"].as_array().cloned().unwrap_or_default();
+    let events = body["events"].as_array().cloned().unwrap_or_default();
+    if !issues.is_empty() {
+        println!("── Issues ──");
+        for i in &issues {
+            println!(
+                "  [{}] {} — {}",
+                i["status"].as_str().unwrap_or("?"),
+                i["error_type"].as_str().unwrap_or("?"),
+                i["message_sample"]
+                    .as_str()
+                    .map(|s| &s[..s.len().min(60)])
+                    .unwrap_or(""),
+            );
+        }
+    }
+    if !events.is_empty() {
+        println!("── Events ──");
+        for e in &events {
+            println!(
+                "  {} {} {} {}",
+                e["timestamp"].as_str().unwrap_or("?"),
+                e["kind"].as_str().unwrap_or("?"),
+                e["release"].as_str().unwrap_or("?"),
+                e["environment"].as_str().unwrap_or("?"),
+            );
+        }
+    }
+    Ok(())
+}
+
 pub async fn stats_show(
     project_id: String,
     token: Option<String>,

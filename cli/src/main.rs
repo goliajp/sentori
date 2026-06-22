@@ -132,6 +132,20 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Quick LIKE-search across issues + events.
+    Search {
+        #[arg(long = "project")]
+        project_id: String,
+        query: String,
+        #[arg(long, default_value_t = 10)]
+        limit: u32,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
     /// Per-project 24h lens counts via /v1/projects/<id>/stats.
     Stats {
         #[arg(long = "project")]
@@ -683,6 +697,14 @@ async fn main() -> Result<()> {
             api_url,
             json,
         } => admin::metric_list(project_id, token, api_url, json).await,
+        Command::Search {
+            project_id,
+            query,
+            limit,
+            token,
+            api_url,
+            json,
+        } => admin::search_project(project_id, query, limit, token, api_url, json).await,
         Command::Stats {
             project_id,
             token,

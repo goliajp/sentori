@@ -82,10 +82,26 @@ pub async fn workspace_stats(State(state): State<Arc<AppState>>) -> Json<Value> 
         .await
         .map(|r| r.get("n"))
         .unwrap_or(0);
+    let events_24h: i64 = sqlx::query(
+        "SELECT COUNT(*) AS n FROM events WHERE received_at >= now() - interval '24 hours'",
+    )
+    .fetch_one(&state.pool)
+    .await
+    .map(|r| r.get("n"))
+    .unwrap_or(0);
+    let tokens_active: i64 = sqlx::query(
+        "SELECT COUNT(*) AS n FROM tokens WHERE revoked_at IS NULL",
+    )
+    .fetch_one(&state.pool)
+    .await
+    .map(|r| r.get("n"))
+    .unwrap_or(0);
     Json(json!({
         "workspaces": workspaces,
         "active_workspaces": active,
         "projects": projects,
         "users": users,
+        "events_24h": events_24h,
+        "tokens_active": tokens_active,
     }))
 }

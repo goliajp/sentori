@@ -43,7 +43,7 @@ export default function SaasAdmin() {
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       {stats && (
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-6 gap-3">
           <StatCard label="Workspaces" value={stats.workspaces} />
           <StatCard
             label="Active"
@@ -52,6 +52,14 @@ export default function SaasAdmin() {
           />
           <StatCard label="Projects" value={stats.projects} />
           <StatCard label="Users" value={stats.users} />
+          <StatCard
+            label="Events 24h"
+            value={stats.events_24h ?? 0}
+          />
+          <StatCard
+            label="Tokens"
+            value={stats.tokens_active ?? 0}
+          />
         </div>
       )}
 
