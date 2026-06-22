@@ -1,29 +1,10 @@
-//! POST `/v1/runtime-metrics:batch` — auto-instrumented perf rollups
+//! POST `/v1/runtime-metrics:batch` — auto-instrumented perf
+//! rollups.
 //!
-//! Phase C step 2 stub. Accepts the legacy SDK wire format
-//! (serde_json::Value), logs the call with token context,
-//! returns 202 Accepted with minimal body. Phase C step 3+
-//! replaces this with the actual service-crate integration.
+//! Same logic as `/v1/metrics:batch` — both write into the
+//! `runtime_metrics_raw` partitioned table via
+//! `MetricsStore::ingest_batch`. Distinct routes preserved for
+//! legacy SDK compatibility (some SDKs hardcode one path or
+//! the other).
 
-use axum::{Extension, Json, http::StatusCode};
-use sentori_ingest_token::IngestContext;
-use serde_json::{Value, json};
-use tracing::info;
-
-pub async fn handle(
-    Extension(ctx): Extension<IngestContext>,
-    Json(payload): Json<Value>,
-) -> (StatusCode, Json<Value>) {
-    let payload_size = serde_json::to_string(&payload).map(|s| s.len()).unwrap_or(0);
-    info!(
-        workspace_id = %ctx.workspace_id,
-        project_id = %ctx.project_id,
-        token_kind = ?ctx.token_kind,
-        payload_bytes = payload_size,
-        "sdk.runtime_metrics",
-    );
-    (
-        StatusCode::ACCEPTED,
-        Json(json!({ "status": "accepted", "stub": "runtime_metrics" })),
-    )
-}
+pub use super::metrics::handle;

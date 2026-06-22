@@ -1,29 +1,72 @@
-//! POST `/v1/spans:batch` — batched spans (≤100)
-//!
-//! Phase C step 2 stub. Accepts the legacy SDK wire format
-//! (serde_json::Value), logs the call with token context,
-//! returns 202 Accepted with minimal body. Phase C step 3+
-//! replaces this with the actual service-crate integration.
+//! POST `/v1/spans:batch` — batched spans (≤ 100).
 
-use axum::{Extension, Json, http::StatusCode};
+use std::sync::Arc;
+
+use axum::{Extension, Json, extract::State, http::StatusCode};
 use sentori_ingest_token::IngestContext;
+use sentori_span_store::SpanInput;
 use serde_json::{Value, json};
-use tracing::info;
+use tracing::{info, warn};
+
+use crate::state::AppState;
+
+const MAX_BATCH_SIZE: usize = 100;
 
 pub async fn handle(
     Extension(ctx): Extension<IngestContext>,
+    State(state): State<Arc<AppState>>,
     Json(payload): Json<Value>,
 ) -> (StatusCode, Json<Value>) {
-    let payload_size = serde_json::to_string(&payload).map(|s| s.len()).unwrap_or(0);
+    let arr = if let Some(a) = payload.as_array() {
+        a.clone()
+    } else if let Some(a) = payload.get("spans").and_then(|v| v.as_array()) {
+        a.clone()
+    } else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "expected array or { spans: [...] }" })),
+        );
+    };
+
+    if arr.len() > MAX_BATCH_SIZE {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": "batch too large",
+                "max": MAX_BATCH_SIZE,
+                "got": arr.len(),
+            })),
+        );
+    }
+
+    let mut accepted = 0u32;
+    let mut failed = 0u32;
+    for raw in arr {
+        let input: SpanInput = match serde_json::from_value(raw) {
+            Ok(s) => s,
+            Err(_) => {
+                failed += 1;
+                continue;
+            }
+        };
+        match state.spans.ingest_span(ctx.project_id, input).await {
+            Ok(_) => accepted += 1,
+            Err(e) => {
+                failed += 1;
+                warn!(workspace_id = %ctx.workspace_id, error = %e, "sdk.spans_batch item_failed");
+            }
+        }
+    }
+
     info!(
         workspace_id = %ctx.workspace_id,
         project_id = %ctx.project_id,
-        token_kind = ?ctx.token_kind,
-        payload_bytes = payload_size,
-        "sdk.spans_batch",
+        accepted, failed,
+        "sdk.spans_batch processed",
     );
+
     (
         StatusCode::ACCEPTED,
-        Json(json!({ "status": "accepted", "stub": "spans_batch" })),
+        Json(json!({ "accepted": accepted, "failed": failed })),
     )
 }

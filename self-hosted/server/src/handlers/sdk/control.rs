@@ -1,17 +1,25 @@
-//! GET `/v1/control/poll` — SDK discovers live-mode flag.
+//! GET `/v1/control/poll` — SDK polls server-side flags.
 //!
-//! Phase C step 2 stub. Returns `{ "live": false }` placeholder.
-//! Phase C step 3+ replaces with control-channel crate integration.
+//! Returns a flat object the SDK can react to without rebuilding.
+//! Currently:
+//! - `live`: false. Phase C step 7+ wires live-mode control
+//!   (per-project flag in DB or env-var driven).
+//! - `sample_rate`: 1.0 default. Project-level override comes from
+//!   the projects table in a later phase.
 
 use axum::{Extension, Json};
 use sentori_ingest_token::IngestContext;
 use serde_json::{Value, json};
+use tracing::info;
 
 pub async fn handle(Extension(ctx): Extension<IngestContext>) -> Json<Value> {
-    tracing::info!(
+    info!(
         workspace_id = %ctx.workspace_id,
         project_id = %ctx.project_id,
         "sdk.control_poll",
     );
-    Json(json!({ "live": false, "stub": "control_poll" }))
+    Json(json!({
+        "live": false,
+        "sample_rate": 1.0,
+    }))
 }

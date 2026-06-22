@@ -1,29 +1,51 @@
-//! POST `/v1/spans` — single trace span
-//!
-//! Phase C step 2 stub. Accepts the legacy SDK wire format
-//! (serde_json::Value), logs the call with token context,
-//! returns 202 Accepted with minimal body. Phase C step 3+
-//! replaces this with the actual service-crate integration.
+//! POST `/v1/spans` — single distributed trace span.
 
-use axum::{Extension, Json, http::StatusCode};
+use std::sync::Arc;
+
+use axum::{Extension, Json, extract::State, http::StatusCode};
 use sentori_ingest_token::IngestContext;
+use sentori_span_store::{SpanInput, SpanStoreError};
 use serde_json::{Value, json};
-use tracing::info;
+use tracing::{info, warn};
+
+use crate::state::AppState;
 
 pub async fn handle(
     Extension(ctx): Extension<IngestContext>,
-    Json(payload): Json<Value>,
+    State(state): State<Arc<AppState>>,
+    Json(input): Json<SpanInput>,
 ) -> (StatusCode, Json<Value>) {
-    let payload_size = serde_json::to_string(&payload).map(|s| s.len()).unwrap_or(0);
-    info!(
-        workspace_id = %ctx.workspace_id,
-        project_id = %ctx.project_id,
-        token_kind = ?ctx.token_kind,
-        payload_bytes = payload_size,
-        "sdk.spans",
-    );
-    (
-        StatusCode::ACCEPTED,
-        Json(json!({ "status": "accepted", "stub": "spans" })),
-    )
+    match state.spans.ingest_span(ctx.project_id, input).await {
+        Ok(span) => {
+            info!(
+                workspace_id = %ctx.workspace_id,
+                project_id = %ctx.project_id,
+                span_id = %span.id,
+                trace_id = %span.trace_id,
+                "sdk.spans ingested",
+            );
+            (
+                StatusCode::ACCEPTED,
+                Json(json!({
+                    "span_id": span.id.to_string(),
+                    "trace_id": span.trace_id.to_string(),
+                })),
+            )
+        }
+        Err(SpanStoreError::ProjectNotFound(_)) => (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "error": "project_not_found" })),
+        ),
+        Err(SpanStoreError::InvalidSpan(msg)) => (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid_span", "detail": msg })),
+        ),
+        Err(e) => {
+            warn!(workspace_id = %ctx.workspace_id, error = %e, "sdk.spans db_error");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "internal" })),
+            )
+        }
+    }
 }
