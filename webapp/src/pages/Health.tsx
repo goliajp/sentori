@@ -125,6 +125,12 @@ export function HealthPage() {
                   every <code>SENTORI_ARCHIVE_INTERVAL_SEC</code> (24h)
                 </li>
                 <li>
+                  <span className="text-emerald-400">●</span>{' '}
+                  periodic_alert_worker — evaluates crash_free_drop
+                  rules every <code>SENTORI_PERIODIC_ALERT_INTERVAL_SEC</code>{' '}
+                  (5min)
+                </li>
+                <li>
                   <span className="text-emerald-400">●</span> session
                   middleware — HttpOnly cookie + Bearer dual auth
                 </li>

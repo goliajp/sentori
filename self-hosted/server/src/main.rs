@@ -47,6 +47,7 @@ mod handlers;
 mod hcm;
 mod mipush;
 mod notify;
+mod periodic_alert_worker;
 mod probe_worker;
 mod push_quarantine;
 mod push_worker;
@@ -91,6 +92,7 @@ async fn main() -> anyhow::Result<()> {
     let token_cache = std::sync::Arc::new(token_cache::TokenCache::new());
     push_worker::spawn(pool.clone(), token_cache);
     probe_worker::spawn(pool.clone());
+    periodic_alert_worker::spawn(pool.clone());
     archive_worker::spawn(pool);
 
     let app = handlers::router(state);
