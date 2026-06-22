@@ -70,6 +70,17 @@ pub async fn create(
                 role = %body.role,
                 "admin.invites minted",
             );
+            crate::notify::audit(
+                &state.pool,
+                state.workspace_id.into_uuid(),
+                None,
+                Some(body.invited_by),
+                "invite.mint",
+                Some("invite"),
+                Some(&minted.invite.id.to_string()),
+                json!({ "email": body.email, "role": body.role }),
+            )
+            .await;
             (
                 StatusCode::CREATED,
                 Json(json!({

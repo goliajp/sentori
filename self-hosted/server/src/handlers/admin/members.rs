@@ -98,6 +98,17 @@ pub async fn remove(
     match state.identity.members().remove(uid).await {
         Ok(()) => {
             info!(%user_id, "admin.members removed");
+            crate::notify::audit(
+                &state.pool,
+                state.workspace_id.into_uuid(),
+                None,
+                None,
+                "member.remove",
+                Some("user"),
+                Some(&user_id.to_string()),
+                serde_json::json!({}),
+            )
+            .await;
             StatusCode::NO_CONTENT
         }
         Err(e) => {
