@@ -34,7 +34,7 @@ services:
     build:
       context: ../..
       dockerfile: self-hosted/docker/Dockerfile
-    image: sentori-selfhosted:${SENTORI_VERSION:-0.1.0}
+    image: sentori-selfhosted:${SENTORI_VERSION:-0.2.0}
     depends_on:
       postgres:
         condition: service_healthy
@@ -43,6 +43,8 @@ services:
       SENTORI_BIND: 0.0.0.0:8080
       SENTORI_BOOTSTRAP_OWNER_EMAIL: ${SENTORI_BOOTSTRAP_OWNER_EMAIL:-}
       SENTORI_BOOTSTRAP_OWNER_PASSWORD: ${SENTORI_BOOTSTRAP_OWNER_PASSWORD:-}
+      SENTORI_SESSION_SECRET: ${SENTORI_SESSION_SECRET:-}
+      SENTORI_PUSH_WORKER_ENABLED: ${SENTORI_PUSH_WORKER_ENABLED:-1}
       RUST_LOG: ${RUST_LOG:-info,sqlx=warn}
     ports:
       - "${SENTORI_PORT:-8080}:8080"
