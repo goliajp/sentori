@@ -468,6 +468,46 @@ export class Api {
   }> {
     return this.get(`/v1/issues/${issueId}/activity`);
   }
+  listEndpointProbes(
+    projectId: string,
+  ): Promise<{
+    probes: {
+      id: string;
+      endpoint_url: string;
+      method: string;
+      expected_status: number;
+      interval_sec: number;
+      timeout_ms: number;
+      enabled: boolean;
+      created_at: string;
+    }[];
+  }> {
+    return this.get(
+      `/admin/api/projects/${projectId}/endpoint-probes`,
+    );
+  }
+  createEndpointProbe(
+    projectId: string,
+    body: {
+      endpoint_url: string;
+      method?: string;
+      expected_status?: number;
+      interval_sec?: number;
+    },
+  ): Promise<{ id: string }> {
+    return this.post(
+      `/admin/api/projects/${projectId}/endpoint-probes`,
+      body,
+    );
+  }
+  setEndpointProbeEnabled(probeId: string, enabled: boolean): Promise<void> {
+    return this.send(`/admin/api/endpoint-probes/${probeId}`, 'PATCH', {
+      enabled,
+    });
+  }
+  deleteEndpointProbe(probeId: string): Promise<void> {
+    return this.send(`/admin/api/endpoint-probes/${probeId}`, 'DELETE');
+  }
   bulkPatchIssues(
     projectId: string,
     body: {

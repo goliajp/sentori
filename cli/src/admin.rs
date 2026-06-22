@@ -693,6 +693,71 @@ pub async fn issue_watch(
     Ok(())
 }
 
+pub async fn release_list(
+    project_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!(
+        "{}/admin/api/projects/{project_id}/releases",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    let rows = body["releases"].as_array().cloned().unwrap_or_default();
+    println!("{:<38}  deploy_at            name", "id");
+    for r in &rows {
+        println!(
+            "{:<38}  {:<20}  {}",
+            r["id"].as_str().unwrap_or("?"),
+            r["deploy_at"].as_str().unwrap_or("—"),
+            r["name"].as_str().unwrap_or("?"),
+        );
+    }
+    Ok(())
+}
+
+pub async fn release_artifacts(
+    project_id: String,
+    release_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!(
+        "{}/admin/api/projects/{project_id}/releases/{release_id}/artifacts",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    let rows = body["artifacts"].as_array().cloned().unwrap_or_default();
+    println!("{:<10}  {:>10}  hash             name", "kind", "size");
+    for a in &rows {
+        println!(
+            "{:<10}  {:>10}  {:<14}  {}",
+            a["kind"].as_str().unwrap_or("?"),
+            a["size_bytes"].as_i64().unwrap_or(0),
+            a["content_hash"]
+                .as_str()
+                .map(|s| &s[..s.len().min(14)])
+                .unwrap_or("?"),
+            a["name"].as_str().unwrap_or("?"),
+        );
+    }
+    Ok(())
+}
+
 pub async fn push_send(
     native_tokens: Vec<String>,
     title: String,

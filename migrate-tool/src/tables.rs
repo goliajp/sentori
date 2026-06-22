@@ -16,6 +16,7 @@ pub mod events;
 pub mod identity_extras;
 pub mod issues;
 pub mod metrics;
+pub mod misc;
 pub mod notifications_email;
 pub mod ops;
 pub mod push;

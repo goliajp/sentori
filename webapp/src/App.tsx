@@ -116,6 +116,10 @@ function Sidebar() {
               to={`/projects/${projectScoped}/cert`}
               label="Cert monitor"
             />
+            <NavItem
+              to={`/projects/${projectScoped}/probes`}
+              label="Endpoint probes"
+            />
             <NavItem to={`/projects/${projectScoped}/tokens`} label="Tokens" />
             <NavItem to={`/projects/${projectScoped}/push`} label="Push" />
             <NavItem

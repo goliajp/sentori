@@ -161,6 +161,29 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Per-project release list.
+    Release {
+        #[arg(long = "project")]
+        project_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Per-release artifact list (sourcemap / dsym / proguard).
+    ReleaseArtifacts {
+        #[arg(long = "project")]
+        project_id: String,
+        release_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
     /// Send a test push notification.
     PushSend {
         /// Native device tokens (apns / fcm / webpush endpoint URLs).
@@ -768,6 +791,19 @@ async fn main() -> Result<()> {
             api_url,
             json,
         } => admin::comment_list(issue_id, token, api_url, json).await,
+        Command::Release {
+            project_id,
+            token,
+            api_url,
+            json,
+        } => admin::release_list(project_id, token, api_url, json).await,
+        Command::ReleaseArtifacts {
+            project_id,
+            release_id,
+            token,
+            api_url,
+            json,
+        } => admin::release_artifacts(project_id, release_id, token, api_url, json).await,
         Command::PushSend {
             native_tokens,
             title,

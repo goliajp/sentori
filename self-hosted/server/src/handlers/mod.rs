@@ -190,6 +190,17 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/issues/:issue_id/comments/:comment_id",
             delete(issue_comments::delete),
         )
+        // ── admin: endpoint probes (synthetic monitor) ──
+        .route(
+            "/admin/api/projects/:project_id/endpoint-probes",
+            get(admin::endpoint_probes::list)
+                .post(admin::endpoint_probes::create),
+        )
+        .route(
+            "/admin/api/endpoint-probes/:probe_id",
+            patch(admin::endpoint_probes::patch)
+                .delete(admin::endpoint_probes::delete),
+        )
         // ── admin: releases ───────────────────────────────
         .route(
             "/admin/api/projects/:project_id/releases",
