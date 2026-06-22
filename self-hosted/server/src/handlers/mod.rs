@@ -1,15 +1,20 @@
 //! HTTP handler aggregation.
 //!
-//! v0.1 essential routes only — full surface lives in
-//! Phase 4 once the dashboard wiring lands. The skeleton
-//! gives `docker compose up` a working server that
-//! migrate-runs, bootstraps the owner, and exposes
-//! enough surface for SDK ingest + healthcheck.
+//! Two route groups:
+//! - **SDK ingest** (`/v1/*`): Bearer st_pk_<token> authenticated
+//!   via `sentori-ingest-token`'s `bearer_middleware`. Each handler
+//!   receives `Extension<IngestContext>` with the resolved
+//!   `(workspace_id, project_id, token_kind)`.
+//! - **Dashboard / admin** (`/healthz`, `/v1/projects/...`,
+//!   `/v1/usage`, ...): unauthenticated for v0.2 step 2; Phase E
+//!   will gate with cookie session.
 
 use std::sync::Arc;
 
 use axum::Router;
-use axum::routing::{get, post};
+use axum::middleware as axum_middleware;
+use axum::routing::{delete, get, patch, post};
+use sentori_ingest_token::{TokenStore, bearer_middleware};
 
 use crate::state::AppState;
 
@@ -22,23 +27,62 @@ mod ingest;
 mod issues;
 mod projects;
 mod saved_views;
+mod sdk;
 mod usage;
 
 pub fn router(state: Arc<AppState>) -> Router {
-    use axum::routing::{delete, patch};
+    // SDK ingest routes — Bearer st_pk_ gated.
+    let token_store = TokenStore::new(state.pool.clone());
+    let sdk_routes = Router::new()
+        // ── events ──
+        .route("/v1/events", post(sdk::events::handle))
+        .route("/v1/events:batch", post(sdk::events_batch::handle))
+        .route(
+            "/v1/events/:event_id/attachments/:kind",
+            post(sdk::events_attachments::handle),
+        )
+        .route("/v1/events/_recent", get(sdk::events_recent::handle))
+        // ── tracing ──
+        .route("/v1/spans", post(sdk::spans::handle))
+        .route("/v1/spans:batch", post(sdk::spans_batch::handle))
+        // ── lifecycle ──
+        .route("/v1/heartbeat", post(sdk::heartbeat::handle))
+        .route("/v1/sessions", post(sdk::sessions::handle))
+        .route("/v1/deploys", post(sdk::deploys::handle))
+        // ── metrics ──
+        .route("/v1/metrics:batch", post(sdk::metrics::handle))
+        .route("/v1/runtime-metrics:batch", post(sdk::runtime_metrics::handle))
+        // ── analytics ──
+        .route("/v1/track:batch", post(sdk::track::handle))
+        // ── security ──
+        .route("/v1/security:report", post(sdk::security_report::handle))
+        .route("/v1/security/link", post(sdk::security_link::handle))
+        .route("/v1/security/score", get(sdk::security_score::handle))
+        // ── control ──
+        .route("/v1/control/poll", get(sdk::control::handle))
+        // ── feedback ──
+        .route("/v1/user-reports", post(sdk::user_reports::handle))
+        .layer(axum_middleware::from_fn_with_state(
+            token_store,
+            bearer_middleware,
+        ));
+
+    // Dashboard / admin routes — Phase E will add cookie session
+    // auth. For now they share AppState.
     Router::new()
         .route("/healthz", get(health::healthz))
-        // ── projects ────────────────────────────────────
         .route("/v1/projects", get(projects::list))
         .route("/v1/projects/:project_id/issues", get(issues::list))
         .route("/v1/projects/:project_id/events", get(events::list))
         .route("/v1/projects/:project_id/cert/watches", get(cert::list_watches))
-        .route("/v1/projects/:project_id/cert/observations", get(cert::list_observations))
+        .route(
+            "/v1/projects/:project_id/cert/observations",
+            get(cert::list_observations),
+        )
         .route(
             "/v1/projects/:project_id/alerts",
             get(alerts::list_for_project),
         )
-        // ── workspace-wide ──────────────────────────────
         .route("/v1/usage", get(usage::current))
         .route("/v1/audit", get(audit::list))
         .route("/v1/alerts", get(alerts::list_workspace).post(alerts::create))
@@ -51,9 +95,8 @@ pub fn router(state: Arc<AppState>) -> Router {
             get(saved_views::list_workspace).post(saved_views::create),
         )
         .route("/v1/saved-views/:id", delete(saved_views::delete))
-        // ── ingest ──────────────────────────────────────
-        .route("/v1/events/:project_id", post(ingest::ingest_event))
-        // legacy-compat — see docs-v0.1/reference/api-compat.md
-        .route("/v1/events", post(ingest::ingest_event_legacy))
+        // legacy fresh-start ingest stubs (defer to SDK-auth path)
+        .route("/v1/projects/:project_id/ingest", post(ingest::ingest_event))
         .with_state(state)
+        .merge(sdk_routes)
 }
