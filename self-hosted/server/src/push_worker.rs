@@ -73,6 +73,7 @@ async fn dispatch_one(pool: &PgPool, send_id: Uuid, provider: &str) -> Result<()
     // Try real vendor send first. Currently webpush only.
     let real_outcome = match provider {
         "webpush" => try_webpush(pool, send_id).await,
+        "apns" => try_apns(pool, send_id).await,
         _ => Err("provider_not_wired".to_string()),
     };
     let (status, outcome, provider_status, duration_ms) = match real_outcome {
@@ -108,6 +109,70 @@ async fn dispatch_one(pool: &PgPool, send_id: Uuid, provider: &str) -> Result<()
     Ok(())
 }
 
+async fn try_apns(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
+    use std::time::Instant;
+    let row = sqlx::query(
+        "SELECT dt.native_token, ps.payload, pc.config, pc.secret_blob \
+         FROM push_sends ps \
+         JOIN device_tokens dt ON dt.id = ps.token_id \
+         JOIN push_credentials pc ON pc.project_id = ps.project_id AND pc.kind = 'apns' \
+         WHERE ps.id = $1",
+    )
+    .bind(send_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| e.to_string())?
+    .ok_or_else(|| "credentials_missing".to_string())?;
+    let device_token: String = row.get("native_token");
+    let payload: serde_json::Value = row.get("payload");
+    let config: serde_json::Value = row.get("config");
+    let secret_pem = String::from_utf8(row.get::<Vec<u8>, _>("secret_blob"))
+        .map_err(|e| e.to_string())?;
+
+    let team_id = config
+        .get("teamId")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "teamId missing".to_string())?
+        .to_string();
+    let key_id = config
+        .get("keyId")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "keyId missing".to_string())?
+        .to_string();
+    let topic = config
+        .get("topic")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "topic missing".to_string())?
+        .to_string();
+    let production = config
+        .get("production")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+
+    let title = payload
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Sentori");
+    let body_text = payload
+        .get("body")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let cfg = crate::apns::ApnsConfig {
+        team_id,
+        key_id,
+        topic,
+        private_pem: secret_pem,
+        production,
+    };
+
+    let start = Instant::now();
+    let status = crate::apns::send(&cfg, &device_token, title, body_text)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok((status, start.elapsed().as_millis()))
+}
+
 async fn try_webpush(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
     use std::time::Instant;
     let row = sqlx::query(
@@ -124,8 +189,8 @@ async fn try_webpush(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String
     .ok_or_else(|| "credentials_missing".to_string())?;
     let endpoint: String = row.get("native_token");
     let config: serde_json::Value = row.get("config");
-    let secret_pem = row.get::<Vec<u8>, _>("secret_blob");
-    let secret_pem = String::from_utf8(secret_pem).map_err(|e| e.to_string())?;
+    let secret_pem = String::from_utf8(row.get::<Vec<u8>, _>("secret_blob"))
+        .map_err(|e| e.to_string())?;
     let subject = config
         .get("subject")
         .and_then(|v| v.as_str())

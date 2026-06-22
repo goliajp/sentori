@@ -76,7 +76,7 @@ http = "1"
 hex = "0.4"
 futures = { version = "0.3", default-features = false }
 tokio-stream = { version = "0.1", features = ["sync"] }
-reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "http2"] }
 jsonwebtoken = { version = "10", default-features = false, features = ["aws_lc_rs", "use_pem"] }
 base64 = "0.22"
 url = "2"
