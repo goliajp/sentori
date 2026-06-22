@@ -76,6 +76,8 @@ async fn drain_once(
     Ok(processed)
 }
 
+const MAX_RETRIES: i32 = 5;
+
 async fn dispatch_one(
     pool: &PgPool,
     cache: &Arc<TokenCache>,
@@ -83,14 +85,20 @@ async fn dispatch_one(
     provider: &str,
 ) -> Result<(), sqlx::Error> {
     use sqlx::Row;
-    // Resolve token_id for quarantine bookkeeping after the send.
-    let token_id: Option<Uuid> = sqlx::query(
-        "SELECT token_id FROM push_sends WHERE id = $1",
+    let send_meta = sqlx::query(
+        "SELECT token_id, retry_count FROM push_sends WHERE id = $1",
     )
     .bind(send_id)
     .fetch_optional(pool)
-    .await?
-    .and_then(|r| r.try_get("token_id").ok());
+    .await?;
+    let (token_id, retry_count): (Option<Uuid>, i32) = match send_meta {
+        Some(r) => (
+            r.try_get("token_id").ok(),
+            r.try_get("retry_count").unwrap_or(0),
+        ),
+        None => return Ok(()),
+    };
+    let attempt = retry_count + 1;
 
     let real_outcome = match provider {
         "webpush" => try_webpush(pool, send_id).await,
@@ -100,62 +108,122 @@ async fn dispatch_one(
         "mipush" => try_mipush(pool, send_id).await,
         _ => Err("provider_not_wired".to_string()),
     };
-    let (status, outcome, provider_status, duration_ms) = match real_outcome {
+
+    match real_outcome {
         Ok((code, dur)) => {
-            // Successful send → reset bad_streak.
             if let Some(t) = token_id {
                 crate::push_quarantine::reset_streak(pool, t).await;
             }
-            // Some vendors return 2xx but contain an error field in body;
-            // permanent_token_failure on non-2xx → quarantine.
-            let _ = code; // body parsing is provider-specific; deferred
-            ("sent", "ok", code as i32, dur as i32)
+            log_attempt(pool, send_id, attempt, "ok", code as i32, dur as i32).await?;
+            mark_sent(pool, send_id, "ok").await?;
         }
         Err(reason) => {
-            // Try to extract HTTP status from rejection string for quarantine
-            // logic (e.g. "apns rejected: status=410 body=...").
+            let http_status = extract_http_status(&reason).unwrap_or(0);
+            let is_perm = http_status > 0
+                && crate::push_quarantine::is_permanent_token_failure(provider, http_status);
             if let Some(t) = token_id {
-                let http_status = extract_http_status(&reason);
-                if let Some(code) = http_status {
-                    if crate::push_quarantine::is_permanent_token_failure(provider, code) {
-                        crate::push_quarantine::quarantine_token(
-                            pool,
-                            t,
-                            &format!("{provider}: HTTP {code}"),
-                        )
-                        .await;
-                    } else {
-                        crate::push_quarantine::bump_streak(pool, t).await;
-                    }
+                if is_perm {
+                    crate::push_quarantine::quarantine_token(
+                        pool,
+                        t,
+                        &format!("{provider}: HTTP {http_status}"),
+                    )
+                    .await;
+                } else {
+                    crate::push_quarantine::bump_streak(pool, t).await;
                 }
-                let _ = reason;
             }
-            ("sent", "mock", 0, 0)
+            log_attempt(
+                pool,
+                send_id,
+                attempt,
+                if is_perm { "permanent_failure" } else { "transient_failure" },
+                http_status as i32,
+                0,
+            )
+            .await?;
+            if is_perm || retry_count >= MAX_RETRIES {
+                mark_failed(pool, send_id, http_status, &reason).await?;
+            } else {
+                // Schedule retry with exponential backoff (30s, 60s,
+                // 120s, 240s, 480s — cap 30min).
+                let backoff = (30u64 * (1 << retry_count.min(6))).min(1800);
+                requeue(pool, send_id, retry_count + 1, backoff).await?;
+            }
         }
-    };
+    }
+    Ok(())
+}
 
+async fn log_attempt(
+    pool: &PgPool,
+    send_id: Uuid,
+    attempt: i32,
+    outcome: &str,
+    provider_status: i32,
+    duration_ms: i32,
+) -> Result<(), sqlx::Error> {
     sqlx::query(
         "INSERT INTO push_delivery_logs (id, send_id, attempt, outcome, provider_status, duration_ms) \
-         VALUES ($1, $2, 1, $3, $4, $5)",
+         VALUES ($1, $2, $3, $4, $5, $6)",
     )
     .bind(Uuid::now_v7())
     .bind(send_id)
+    .bind(attempt)
     .bind(outcome)
     .bind(provider_status)
     .bind(duration_ms)
     .execute(pool)
     .await?;
+    Ok(())
+}
 
+async fn mark_sent(pool: &PgPool, send_id: Uuid, outcome: &str) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "UPDATE push_sends SET status = $1, provider_outcome = $2, sent_at = now() \
-         WHERE id = $3",
+        "UPDATE push_sends SET status = 'sent', provider_outcome = $1, sent_at = now() \
+         WHERE id = $2",
     )
-    .bind(status)
     .bind(outcome)
     .bind(send_id)
     .execute(pool)
     .await?;
+    Ok(())
+}
 
+async fn mark_failed(
+    pool: &PgPool,
+    send_id: Uuid,
+    http_status: u16,
+    reason: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE push_sends SET status = 'failed', provider_outcome = $1, error = $2 \
+         WHERE id = $3",
+    )
+    .bind(format!("http_{http_status}"))
+    .bind(reason.chars().take(500).collect::<String>())
+    .bind(send_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+async fn requeue(
+    pool: &PgPool,
+    send_id: Uuid,
+    new_retry_count: i32,
+    backoff_sec: u64,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE push_sends SET status = 'queued', retry_count = $1, \
+            next_attempt_at = now() + ($2 || ' seconds')::interval \
+         WHERE id = $3",
+    )
+    .bind(new_retry_count)
+    .bind(backoff_sec.to_string())
+    .bind(send_id)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
