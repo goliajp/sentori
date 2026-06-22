@@ -606,6 +606,30 @@ export class Api {
   revokeSession(idHashHex: string): Promise<void> {
     return this.send(`/auth/sessions/${idHashHex}`, 'DELETE');
   }
+  listNotifications(): Promise<{
+    notifications: {
+      id: string;
+      kind: string;
+      payload: unknown;
+      read_at: string | null;
+      created_at: string;
+    }[];
+    unread: number;
+  }> {
+    return this.get('/auth/notifications');
+  }
+  markNotificationRead(id: string): Promise<void> {
+    return this.post(
+      `/auth/notifications/${id}/read`,
+      {},
+    ) as Promise<void>;
+  }
+  markAllNotificationsRead(): Promise<void> {
+    return this.post(
+      '/auth/notifications/_read_all',
+      {},
+    ) as Promise<void>;
+  }
   authMe(): Promise<{
     user_id: string;
     email: string;

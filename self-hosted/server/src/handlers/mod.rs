@@ -37,6 +37,7 @@ mod issues;
 mod projects;
 mod saved_views;
 mod metrics;
+mod notifications;
 mod replays;
 mod search;
 mod sdk;
@@ -223,6 +224,18 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(
             "/auth/sessions/:id_hash_hex",
             delete(sessions_admin::revoke),
+        )
+        .route(
+            "/auth/notifications",
+            get(notifications::list),
+        )
+        .route(
+            "/auth/notifications/_read_all",
+            post(notifications::read_all),
+        )
+        .route(
+            "/auth/notifications/:id/read",
+            post(notifications::read_one),
         )
         .layer(axum_middleware::from_fn_with_state(
             state.clone(),

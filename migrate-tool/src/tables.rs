@@ -21,6 +21,7 @@ pub mod notifications_email;
 pub mod ops;
 pub mod push;
 pub mod releases;
+pub mod saas;
 pub mod sessions;
 pub mod spans;
 pub mod tokens;

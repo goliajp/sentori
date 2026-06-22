@@ -693,6 +693,27 @@ pub async fn issue_watch(
     Ok(())
 }
 
+pub async fn describe(api_url: Option<String>, json: bool) -> Result<()> {
+    let url = format!("{}/v1/_describe", resolve_api_url(api_url));
+    let c = reqwest::Client::new();
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    println!("server: {}", body["version"].as_str().unwrap_or("?"));
+    println!("token prefix: {}", body["sdk_token_prefix"].as_str().unwrap_or("?"));
+    println!("session cookie: {}", body["session_cookie"].as_str().unwrap_or("?"));
+    if let Some(groups) = body["endpoints"].as_object() {
+        for (group, list) in groups {
+            let n = list.as_array().map(|a| a.len()).unwrap_or(0);
+            println!("  {group:<15}  {n:>3} endpoints");
+        }
+    }
+    Ok(())
+}
+
 pub async fn health_check(api_url: Option<String>) -> Result<()> {
     let url = format!("{}/healthz", resolve_api_url(api_url));
     // No auth needed

@@ -161,6 +161,13 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Self-describing API catalog (route surface + version).
+    Describe {
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
     /// Server healthz check (no auth needed).
     Health {
         #[arg(long = "api-url")]
@@ -811,6 +818,7 @@ async fn main() -> Result<()> {
             api_url,
             json,
         } => admin::comment_list(issue_id, token, api_url, json).await,
+        Command::Describe { api_url, json } => admin::describe(api_url, json).await,
         Command::Health { api_url } => admin::health_check(api_url).await,
         Command::Me { token, api_url } => admin::me_show(token, api_url).await,
         Command::LiveTail { token, api_url } => admin::live_tail(token, api_url).await,

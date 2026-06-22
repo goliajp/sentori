@@ -79,6 +79,7 @@ async fn main() -> Result<()> {
             "notifications_email",
             "workflow",
             "misc",
+            "saas",
         ]
     } else {
         cli.tables.split(',').map(str::trim).collect()
@@ -122,6 +123,7 @@ async fn main() -> Result<()> {
             }
             "workflow" => tables::workflow::migrate(&src, &dst, cli.dry_run, &mut report).await,
             "misc" => tables::misc::migrate(&src, &dst, cli.dry_run, &mut report).await,
+            "saas" => tables::saas::migrate(&src, &dst, cli.dry_run, &mut report).await,
             other => {
                 error!(set = %other, "unknown table set");
                 continue;

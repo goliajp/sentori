@@ -23,6 +23,7 @@ import SaasAdmin from './pages/SaasAdmin';
 import SavedViews from './pages/SavedViews';
 import EndpointProbes from './pages/EndpointProbes';
 import Metrics from './pages/Metrics';
+import Notifications from './pages/Notifications';
 import Replays from './pages/Replays';
 import ReplayDetail from './pages/ReplayDetail';
 import Traces from './pages/Traces';
@@ -65,6 +66,7 @@ createRoot(rootEl).render(
           <Route path="/projects/:id/releases" element={<Releases />} />
           <Route path="/saas" element={<SaasAdmin />} />
           <Route path="/saved-views" element={<SavedViews />} />
+          <Route path="/notifications" element={<Notifications />} />
           <Route path="/projects/:id/traces" element={<Traces />} />
           <Route
             path="/projects/:id/traces/:traceId"

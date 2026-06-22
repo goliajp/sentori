@@ -93,6 +93,7 @@ function Sidebar() {
         <NavItem to="/members" label="Members" />
         <NavItem to="/alerts" label="Alerts" />
         <NavItem to="/saved-views" label="Saved views" />
+        <NotificationsNavItem />
         <NavItem to="/audit" label="Audit" />
         <NavItem to="/settings" label="Settings" />
         <NavItem to="/health" label="Health" />
@@ -136,6 +137,45 @@ function Sidebar() {
 
       <UserFooter />
     </aside>
+  );
+}
+
+function NotificationsNavItem() {
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    api
+      .listNotifications()
+      .then(r => setUnread(r.unread))
+      .catch(() => {});
+    const id = setInterval(() => {
+      api
+        .listNotifications()
+        .then(r => setUnread(r.unread))
+        .catch(() => {});
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <NavLink
+      to="/notifications"
+      end
+      className={({ isActive }) =>
+        `flex items-center justify-between rounded px-2.5 py-1.5 transition ${
+          isActive
+            ? 'bg-zinc-800 text-zinc-100'
+            : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'
+        }`
+      }
+    >
+      <span>Inbox</span>
+      {unread > 0 && (
+        <span className="rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-mono text-white">
+          {unread}
+        </span>
+      )}
+    </NavLink>
   );
 }
 
