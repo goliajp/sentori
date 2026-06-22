@@ -36,6 +36,7 @@ function Sidebar() {
         <NavItem to="/projects" label="Projects" />
         <NavItem to="/members" label="Members" />
         <NavItem to="/alerts" label="Alerts" />
+        <NavItem to="/saved-views" label="Saved views" />
         <NavItem to="/audit" label="Audit" />
         <NavItem to="/settings" label="Settings" />
         <NavItem to="/health" label="Health" />

@@ -342,6 +342,12 @@ export class Api {
   deleteSavedView(id: string): Promise<void> {
     return this.send(`/v1/saved-views/${id}`, 'DELETE');
   }
+  patchSavedView(
+    id: string,
+    body: { name?: string; payload?: unknown },
+  ): Promise<void> {
+    return this.send(`/v1/saved-views/${id}`, 'PATCH', body);
+  }
 
   // ── auth: dashboard user lifecycle ─────────────────────
   authRegister(body: { email: string; password: string }): Promise<{
