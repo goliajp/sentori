@@ -11,6 +11,8 @@ import { HealthPage } from './pages/Health';
 import { IssuesPage } from './pages/Issues';
 import { LoginPage } from './pages/Login';
 import { OverviewPage } from './pages/Overview';
+import Projects from './pages/Projects';
+import PushCredentials from './pages/PushCredentials';
 import { SettingsPage } from './pages/Settings';
 import Tokens from './pages/Tokens';
 
@@ -35,7 +37,9 @@ createRoot(rootEl).render(
           <Route path="/projects/:id/issues" element={<IssuesPage />} />
           <Route path="/projects/:id/events" element={<EventsPage />} />
           <Route path="/projects/:id/cert" element={<CertPage />} />
+          <Route path="/projects" element={<Projects />} />
           <Route path="/projects/:id/tokens" element={<Tokens />} />
+          <Route path="/projects/:id/push" element={<PushCredentials />} />
         </Route>
       </Routes>
     </BrowserRouter>

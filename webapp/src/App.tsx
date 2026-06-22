@@ -27,12 +27,13 @@ function Sidebar() {
         <h1 className="text-base font-semibold tracking-tight text-zinc-100">
           Sentori
         </h1>
-        <p className="font-mono text-[10px] text-zinc-600">v0.1</p>
+        <p className="font-mono text-[10px] text-zinc-600">v0.2</p>
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 text-sm">
         <SectionLabel>Workspace</SectionLabel>
         <NavItem to="/" label="Overview" />
+        <NavItem to="/projects" label="Projects" />
         <NavItem to="/alerts" label="Alerts" />
         <NavItem to="/audit" label="Audit" />
         <NavItem to="/settings" label="Settings" />
@@ -48,6 +49,7 @@ function Sidebar() {
               label="Cert monitor"
             />
             <NavItem to={`/projects/${projectScoped}/tokens`} label="Tokens" />
+            <NavItem to={`/projects/${projectScoped}/push`} label="Push" />
           </>
         )}
       </nav>
