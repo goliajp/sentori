@@ -349,6 +349,15 @@ export class Api {
     return this.send(`/v1/saved-views/${id}`, 'PATCH', body);
   }
 
+  authMe(): Promise<{
+    user_id: string;
+    email: string;
+    email_verified: boolean;
+    created_at: string;
+  }> {
+    return this.get('/auth/me');
+  }
+
   // ── auth: dashboard user lifecycle ─────────────────────
   authRegister(body: { email: string; password: string }): Promise<{
     user_id: string;
@@ -524,7 +533,10 @@ export class Api {
       credentials: 'include',
       headers: this.authHeaders(),
     });
-    if (!r.ok) throw new ApiError(r.status, await r.text());
+    if (!r.ok) {
+      this.handleAuthFailure(r.status, path);
+      throw new ApiError(r.status, await r.text());
+    }
     return (await r.json()) as T;
   }
 
@@ -535,7 +547,10 @@ export class Api {
       credentials: 'include',
       body: JSON.stringify(body),
     });
-    if (!r.ok) throw new ApiError(r.status, await r.text());
+    if (!r.ok) {
+      this.handleAuthFailure(r.status, path);
+      throw new ApiError(r.status, await r.text());
+    }
     return (await r.json()) as T;
   }
 
@@ -554,7 +569,33 @@ export class Api {
       credentials: 'include',
       body: body ? JSON.stringify(body) : undefined,
     });
-    if (!r.ok) throw new ApiError(r.status, await r.text());
+    if (!r.ok) {
+      this.handleAuthFailure(r.status, path);
+      throw new ApiError(r.status, await r.text());
+    }
+  }
+
+  /// On 401 from /admin/api/* or /auth/me, redirect to /login
+  /// stashing the current URL so we can bounce back after.
+  /// Skips when already on the auth flow pages (login / register
+  /// / forgot-password) to avoid infinite loops.
+  private handleAuthFailure(status: number, path: string) {
+    if (status !== 401) return;
+    if (typeof window === 'undefined') return;
+    const here = window.location.pathname;
+    if (
+      here === '/login' ||
+      here === '/register' ||
+      here === '/forgot-password' ||
+      path === '/auth/login' ||
+      path === '/auth/register'
+    ) {
+      return;
+    }
+    try {
+      sessionStorage.setItem('sentori_return_to', here + window.location.search);
+    } catch {}
+    window.location.href = '/login';
   }
 }
 

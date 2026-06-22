@@ -29,7 +29,17 @@ export function LoginPage() {
       // never the token itself.
       localStorage.setItem('sentori_user_id', r.user_id);
       localStorage.setItem('sentori_email', r.email);
-      navigate('/');
+      // If the user was bounced here by the 401 redirect, bring
+      // them back to where they were.
+      let returnTo = '/';
+      try {
+        const stashed = sessionStorage.getItem('sentori_return_to');
+        if (stashed) {
+          returnTo = stashed;
+          sessionStorage.removeItem('sentori_return_to');
+        }
+      } catch {}
+      navigate(returnTo);
     } catch (e) {
       setErr(String(e));
     } finally {

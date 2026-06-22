@@ -1,8 +1,44 @@
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useParams } from 'react-router-dom';
+
+import { api } from './lib/api';
 
 /// Main app shell — sidebar + content outlet. Wraps every
 /// authenticated page.
 export function App() {
+  const [verified, setVerified] = useState(false);
+
+  // Boot-time session probe. If the cookie + bearer header are
+  // missing or invalid, api.authMe() throws and the 401 handler
+  // in api.ts kicks the user to /login. We just track verified
+  // so the shell doesn't flicker the dashboard before redirect.
+  useEffect(() => {
+    api
+      .authMe()
+      .then(me => {
+        if (me?.user_id) {
+          // Stash UI display fields so the rest of the app can
+          // show them without hitting /auth/me on every render.
+          try {
+            localStorage.setItem('sentori_user_id', me.user_id);
+            localStorage.setItem('sentori_email', me.email);
+          } catch {}
+        }
+        setVerified(true);
+      })
+      .catch(() => {
+        // 401 handler will redirect — leave verified=false so the
+        // shell renders a neutral spinner until the redirect lands.
+      });
+  }, []);
+
+  if (!verified) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-zinc-950 text-sm text-zinc-500">
+        Loading…
+      </div>
+    );
+  }
   return (
     <div className="flex h-screen">
       <Sidebar />
