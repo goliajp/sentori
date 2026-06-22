@@ -44,6 +44,7 @@ export function CommandPalette({ open, onClose }: Props) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
   const [projects, setProjects] = useState<PaletteItem[]>([]);
+  const [searchHits, setSearchHits] = useState<PaletteItem[]>([]);
 
   // Reset + autofocus on open + load projects.
   useEffect(() => {
@@ -92,7 +93,7 @@ export function CommandPalette({ open, onClose }: Props) {
   }, [open]);
 
   const items = useMemo(() => {
-    const all = [...WORKSPACE_ROUTES, ...projects];
+    const all = [...WORKSPACE_ROUTES, ...projects, ...searchHits];
     const q = query.trim().toLowerCase();
     if (!q) return all.slice(0, 50);
     return all
@@ -102,7 +103,45 @@ export function CommandPalette({ open, onClose }: Props) {
           (i.hint?.toLowerCase().includes(q) ?? false),
       )
       .slice(0, 50);
-  }, [query, projects]);
+  }, [query, projects, searchHits]);
+
+  // Backend search: when query > 2 chars, fire searchProject
+  // against the first project in the workspace (good enough for
+  // single-project self-hosted; future improvement: per-project
+  // scope selector).
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 3) {
+      setSearchHits([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const ps = await api.listProjects();
+        if (!ps[0]) return;
+        const projectId = ps[0].id;
+        const r = await api.searchProject(projectId, q, 8);
+        const hits: PaletteItem[] = [
+          ...r.issues.map(i => ({
+            id: `si-${i.id}`,
+            label: `[${i.status}] ${i.error_type}`,
+            hint: i.message_sample.slice(0, 30),
+            route: `/projects/${projectId}/issues/${i.id}`,
+          })),
+          ...r.events.map(e => ({
+            id: `se-${e.id}`,
+            label: `event ${e.kind} · ${e.release}`,
+            hint: e.environment,
+            route: `/projects/${projectId}/issues/${e.issue_id}`,
+          })),
+        ];
+        setSearchHits(hits);
+      } catch {
+        setSearchHits([]);
+      }
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   useEffect(() => {
     setSelected(0);

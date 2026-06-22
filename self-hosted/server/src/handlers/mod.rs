@@ -34,6 +34,7 @@ mod projects;
 mod saved_views;
 mod metrics;
 mod replays;
+mod search;
 mod sdk;
 mod spans;
 mod stats;
@@ -249,6 +250,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(
             "/v1/projects/:project_id/stats",
             get(stats::project_stats),
+        )
+        .route(
+            "/v1/projects/:project_id/search",
+            get(search::search),
         )
         .route("/v1/projects/:project_id/cert/watches", get(cert::list_watches))
         .route(

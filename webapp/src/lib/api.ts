@@ -353,6 +353,32 @@ export class Api {
   projectStats(projectId: string): Promise<ProjectStats> {
     return this.get(`/v1/projects/${projectId}/stats`);
   }
+  searchProject(
+    projectId: string,
+    q: string,
+    limit = 10,
+  ): Promise<{
+    q: string;
+    issues: Array<{
+      id: string;
+      error_type: string;
+      message_sample: string;
+      status: string;
+      last_seen: string;
+    }>;
+    events: Array<{
+      id: string;
+      issue_id: string;
+      kind: string;
+      release: string;
+      environment: string;
+      timestamp: string;
+    }>;
+  }> {
+    return this.get(
+      `/v1/projects/${projectId}/search?q=${encodeURIComponent(q)}&limit=${limit}`,
+    );
+  }
   /// Returns the decompressed NDJSON replay blob as raw text.
   /// Client parses frame-by-frame.
   async replayNdjson(
