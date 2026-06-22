@@ -69,6 +69,8 @@ async fn main() -> Result<()> {
             "spans",
             "push",
             "attachments",
+            "dashboard",
+            "analytics",
         ]
     } else {
         cli.tables.split(',').map(str::trim).collect()
@@ -89,6 +91,12 @@ async fn main() -> Result<()> {
             "push" => tables::push::migrate(&src, &dst, cli.dry_run, &mut report).await,
             "attachments" => {
                 tables::attachments::migrate(&src, &dst, cli.dry_run, &mut report).await
+            }
+            "dashboard" => {
+                tables::dashboard::migrate(&src, &dst, cli.dry_run, &mut report).await
+            }
+            "analytics" => {
+                tables::analytics::migrate(&src, &dst, cli.dry_run, &mut report).await
             }
             other => {
                 error!(set = %other, "unknown table set");

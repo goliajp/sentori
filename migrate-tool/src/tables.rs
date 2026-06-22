@@ -7,7 +7,9 @@
 //! transform layer is mostly identity (just substitute
 //! `org_id` → `workspace_id`).
 
+pub mod analytics;
 pub mod attachments;
+pub mod dashboard;
 pub mod events;
 pub mod issues;
 pub mod push;
