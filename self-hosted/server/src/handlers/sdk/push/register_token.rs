@@ -45,6 +45,30 @@ pub async fn handle(
         }
     };
 
+    // Double-write: push_tokens (v0.1 push-provider crate path —
+    // used by the dispatcher) + device_tokens (v0.2 legacy-compat
+    // path — used by topic / preference subscriptions). Same
+    // (project_id, kind, native_token) is the dedup key on both.
+    let device_token_id = uuid::Uuid::now_v7();
+    let _ = sqlx::query(
+        "INSERT INTO device_tokens \
+         (id, workspace_id, project_id, provider, env, native_token) \
+         VALUES ($1, $2, $3, $4, $5, $6) \
+         ON CONFLICT (project_id, provider, native_token) DO UPDATE SET \
+            env = COALESCE(EXCLUDED.env, device_tokens.env), \
+            revoked_at = NULL, \
+            last_seen_at = now(), \
+            updated_at = now()",
+    )
+    .bind(device_token_id)
+    .bind(ctx.workspace_id.into_uuid())
+    .bind(ctx.project_id.into_uuid())
+    .bind(&body.kind)
+    .bind(body.env.as_deref())
+    .bind(&body.native_token)
+    .execute(&state.pool)
+    .await;
+
     match state
         .push_tokens
         .upsert(

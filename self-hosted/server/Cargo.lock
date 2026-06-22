@@ -2346,6 +2346,7 @@ dependencies = [
  "anyhow",
  "axum",
  "axum-extra",
+ "hex",
  "http",
  "sentori-alert-rule",
  "sentori-argon2-password",
