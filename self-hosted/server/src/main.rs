@@ -38,6 +38,7 @@ use tokio::net::TcpListener;
 use tracing::info;
 
 mod apns;
+mod archive_worker;
 mod blob_store;
 mod bootstrap;
 mod fcm;
@@ -87,7 +88,8 @@ async fn main() -> anyhow::Result<()> {
     // Start the push dispatcher + endpoint probe background workers.
     let token_cache = std::sync::Arc::new(token_cache::TokenCache::new());
     push_worker::spawn(pool.clone(), token_cache);
-    probe_worker::spawn(pool);
+    probe_worker::spawn(pool.clone());
+    archive_worker::spawn(pool);
 
     let app = handlers::router(state);
 
