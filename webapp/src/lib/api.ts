@@ -195,6 +195,24 @@ export interface SaasStats {
   users: number;
 }
 
+export interface IssueDetail {
+  id: string;
+  project_id: string;
+  fingerprint: string;
+  error_type: string;
+  message_sample: string;
+  kind: string;
+  status: 'active' | 'resolved' | 'regressed' | 'ignored';
+  event_count: number;
+  first_seen: string;
+  last_seen: string;
+  last_release: string;
+  last_environment: string;
+  regressed_at: string | null;
+  regressed_in_release: string | null;
+  resolved_at: string | null;
+}
+
 const DEFAULT_BASE = '';
 
 export class ApiError extends Error {
@@ -234,6 +252,9 @@ export class Api {
     days = 7,
   ): Promise<{ day: string; count: number }[]> {
     return this.get(`/v1/projects/${projectId}/events/trend?days=${days}`);
+  }
+  getIssue(projectId: string, issueId: string): Promise<IssueDetail> {
+    return this.get(`/v1/projects/${projectId}/issues/${issueId}`);
   }
   ingestEvent(
     projectId: string,

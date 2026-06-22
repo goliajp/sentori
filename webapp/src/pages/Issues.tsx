@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api, ApiError, IngestRequest, Issue } from '../lib/api';
 import {
   Badge,
@@ -87,12 +87,15 @@ export function IssuesPage() {
               key: 'error_type',
               label: 'Issue',
               render: (r) => (
-                <div>
+                <Link
+                  to={`/projects/${projectId}/issues/${r.id}`}
+                  className="block hover:bg-zinc-900/40 -m-2 p-2 rounded"
+                >
                   <div className="font-medium text-zinc-100">{r.error_type}</div>
                   <div className="font-mono text-[11px] text-zinc-500">
                     {r.message_sample.slice(0, 80)}
                   </div>
-                </div>
+                </Link>
               ),
             },
             {

@@ -9,6 +9,7 @@ import { CertPage } from './pages/Cert';
 import { EventsPage } from './pages/Events';
 import { HealthPage } from './pages/Health';
 import { IssuesPage } from './pages/Issues';
+import IssueDetail from './pages/IssueDetail';
 import { LoginPage } from './pages/Login';
 import { OverviewPage } from './pages/Overview';
 import ForgotPassword from './pages/ForgotPassword';
@@ -43,6 +44,10 @@ createRoot(rootEl).render(
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/health" element={<HealthPage />} />
           <Route path="/projects/:id/issues" element={<IssuesPage />} />
+          <Route
+            path="/projects/:id/issues/:issueId"
+            element={<IssueDetail />}
+          />
           <Route path="/projects/:id/events" element={<EventsPage />} />
           <Route path="/projects/:id/cert" element={<CertPage />} />
           <Route path="/projects" element={<Projects />} />
