@@ -114,6 +114,14 @@ export function HealthPage() {
                   uses it)
                 </li>
                 <li>
+                  GET <code>/livez</code> — k8s livenessProbe (always
+                  200; never restart on DB outage)
+                </li>
+                <li>
+                  GET <code>/readyz</code> — k8s readinessProbe (200 if
+                  DB up; 503 to shift traffic away)
+                </li>
+                <li>
                   GET <code>/metrics</code> — Prometheus text format
                   exposition (pool / push / events / issues / alerts /
                   sessions gauges)
