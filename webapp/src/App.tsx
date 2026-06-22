@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
 
+import { CommandPalette } from './components/CommandPalette';
 import { api } from './lib/api';
 import { useNavShortcuts } from './lib/useShortcuts';
 
@@ -8,7 +9,20 @@ import { useNavShortcuts } from './lib/useShortcuts';
 /// authenticated page.
 export function App() {
   const [verified, setVerified] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   useNavShortcuts();
+
+  // Global Cmd-K / Ctrl-K to toggle the command palette.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setPaletteOpen(o => !o);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Boot-time session probe. If the cookie + bearer header are
   // missing or invalid, api.authMe() throws and the 401 handler
@@ -47,6 +61,10 @@ export function App() {
       <main className="flex-1 overflow-y-auto">
         <Outlet />
       </main>
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+      />
     </div>
   );
 }
