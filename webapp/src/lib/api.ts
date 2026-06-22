@@ -109,6 +109,14 @@ export interface CertObservation {
   observed_at: string;
 }
 
+export interface CertWatch {
+  id: string;
+  project_id: string;
+  domain: string;
+  added_by: string | null;
+  added_at: string;
+}
+
 export interface SavedView {
   id: string;
   project_id: string | null;
@@ -256,6 +264,20 @@ export class Api {
   getIssue(projectId: string, issueId: string): Promise<IssueDetail> {
     return this.get(`/v1/projects/${projectId}/issues/${issueId}`);
   }
+  patchIssue(
+    projectId: string,
+    issueId: string,
+    body: {
+      status?: 'active' | 'resolved' | 'regressed' | 'ignored';
+      resolved_in_release?: string;
+    },
+  ): Promise<void> {
+    return this.send(
+      `/v1/projects/${projectId}/issues/${issueId}`,
+      'PATCH',
+      body,
+    );
+  }
   ingestEvent(
     projectId: string,
     body: IngestRequest,
@@ -291,6 +313,21 @@ export class Api {
   }
   listCertObservations(projectId: string): Promise<CertObservation[]> {
     return this.get(`/v1/projects/${projectId}/cert/observations`);
+  }
+  listCertWatches(projectId: string): Promise<CertWatch[]> {
+    return this.get(`/v1/projects/${projectId}/cert/watches`);
+  }
+  addCertWatch(projectId: string, domain: string): Promise<void> {
+    return this.post(
+      `/admin/api/projects/${projectId}/cert/watches`,
+      { domain },
+    ) as Promise<void>;
+  }
+  removeCertWatch(projectId: string, domain: string): Promise<void> {
+    return this.send(
+      `/admin/api/projects/${projectId}/cert/watches/${encodeURIComponent(domain)}`,
+      'DELETE',
+    );
   }
   listSavedViews(
     target: string,

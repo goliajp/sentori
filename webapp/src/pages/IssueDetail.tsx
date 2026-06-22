@@ -6,6 +6,7 @@ import { Link, useParams } from 'react-router-dom';
 import { api, EventRow, IssueDetail as Issue } from '../lib/api';
 import {
   Badge,
+  Button,
   Card,
   CardHeader,
   ErrorBanner,
@@ -24,6 +25,21 @@ export default function IssueDetail() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function act(status: 'active' | 'resolved' | 'ignored') {
+    if (!projectId || !issueId) return;
+    setBusy(true);
+    try {
+      await api.patchIssue(projectId, issueId, { status });
+      const next = await api.getIssue(projectId, issueId);
+      setIssue(next);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!projectId || !issueId) return;
@@ -60,12 +76,43 @@ export default function IssueDetail() {
         title={issue.error_type}
         subtitle={issue.message_sample}
         actions={
-          <Link
-            to={`/projects/${projectId}/issues`}
-            className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50"
-          >
-            ← All issues
-          </Link>
+          <div className="flex items-center gap-2">
+            {issue.status !== 'resolved' && (
+              <Button
+                size="sm"
+                onClick={() => act('resolved')}
+                disabled={busy}
+              >
+                Resolve
+              </Button>
+            )}
+            {issue.status !== 'ignored' && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => act('ignored')}
+                disabled={busy}
+              >
+                Ignore
+              </Button>
+            )}
+            {issue.status !== 'active' && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => act('active')}
+                disabled={busy}
+              >
+                Reopen
+              </Button>
+            )}
+            <Link
+              to={`/projects/${projectId}/issues`}
+              className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50"
+            >
+              ← All
+            </Link>
+          </div>
         }
       />
 
