@@ -6,6 +6,27 @@ use serde_json::Value;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+/// Inject IP + user-agent into the audit payload before writing.
+/// Pass `(None, None)` from background workers / non-request paths.
+pub fn enrich_payload(
+    mut payload: Value,
+    ip: Option<&str>,
+    user_agent: Option<&str>,
+) -> Value {
+    if ip.is_none() && user_agent.is_none() {
+        return payload;
+    }
+    if let Some(map) = payload.as_object_mut() {
+        if let Some(ip) = ip {
+            map.insert("_ip".to_string(), Value::String(ip.to_string()));
+        }
+        if let Some(ua) = user_agent {
+            map.insert("_ua".to_string(), Value::String(ua.to_string()));
+        }
+    }
+    payload
+}
+
 /// Write an audit_log row. Best-effort; failure does not bubble
 /// up — admin endpoint success is decoupled from the audit write.
 pub async fn audit(

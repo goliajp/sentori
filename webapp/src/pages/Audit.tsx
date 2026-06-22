@@ -190,10 +190,13 @@ export function AuditPage() {
 
 function AuditRow({ entry: e }: { entry: AuditEntry }) {
   const [open, setOpen] = useState(false);
-  const hasPayload =
+  const payloadObject =
     e.payload && typeof e.payload === 'object'
-      ? Object.keys(e.payload as object).length > 0
-      : Boolean(e.payload);
+      ? (e.payload as Record<string, unknown>)
+      : null;
+  const hasPayload = payloadObject
+    ? Object.keys(payloadObject).length > 0
+    : Boolean(e.payload);
 
   return (
     <li>
@@ -226,9 +229,24 @@ function AuditRow({ entry: e }: { entry: AuditEntry }) {
         </span>
       </button>
       {open && hasPayload && (
-        <pre className="overflow-x-auto whitespace-pre-wrap break-all bg-zinc-950 px-12 py-3 text-[11px] font-mono text-zinc-300">
-          {JSON.stringify(e.payload, null, 2)}
-        </pre>
+        <div className="bg-zinc-950 px-12 py-3">
+          {payloadObject?._ip && (
+            <div className="font-mono text-[10px] text-zinc-500">
+              IP: <span className="text-zinc-300">{String(payloadObject._ip)}</span>
+              {payloadObject._ua && (
+                <>
+                  {' · UA: '}
+                  <span className="text-zinc-300">
+                    {String(payloadObject._ua).slice(0, 80)}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+          <pre className="overflow-x-auto whitespace-pre-wrap break-all text-[11px] font-mono text-zinc-300">
+            {JSON.stringify(e.payload, null, 2)}
+          </pre>
+        </div>
       )}
     </li>
   );
