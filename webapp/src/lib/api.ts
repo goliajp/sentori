@@ -493,10 +493,12 @@ export class Api {
   createEndpointProbe(
     projectId: string,
     body: {
-      endpoint_url: string;
+      name?: string;
+      target_url: string;
       method?: string;
-      expected_status?: number;
       interval_sec?: number;
+      assertion_status_codes?: number[];
+      assertion_max_latency_ms?: number;
     },
   ): Promise<{ id: string }> {
     return this.post(

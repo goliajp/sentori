@@ -104,6 +104,7 @@ function Sidebar() {
       <nav className="flex flex-1 flex-col gap-1 text-sm">
         <SectionLabel>Workspace</SectionLabel>
         <NavItem to="/" label="Overview" />
+        <NavItem to="/search" label="Search" />
         <NavItem to="/projects" label="Projects" />
         <NavItem to="/members" label="Members" />
         <NavItem to="/alerts" label="Alerts" />

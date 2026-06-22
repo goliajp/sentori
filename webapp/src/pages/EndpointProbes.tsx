@@ -61,7 +61,8 @@ export default function EndpointProbes() {
     if (!projectId || !url.trim()) return;
     try {
       await api.createEndpointProbe(projectId, {
-        endpoint_url: url.trim(),
+        name: url.trim(),
+        target_url: url.trim(),
         method,
         interval_sec: interval,
       });

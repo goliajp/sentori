@@ -43,6 +43,7 @@ mod bootstrap;
 mod fcm;
 mod handlers;
 mod notify;
+mod probe_worker;
 mod push_worker;
 mod saasadmin_mw;
 mod session_mw;
@@ -79,8 +80,9 @@ async fn main() -> anyhow::Result<()> {
         attachments,
     ));
 
-    // Start the push dispatcher background worker.
-    push_worker::spawn(pool);
+    // Start the push dispatcher + endpoint probe background workers.
+    push_worker::spawn(pool.clone());
+    probe_worker::spawn(pool);
 
     let app = handlers::router(state);
 

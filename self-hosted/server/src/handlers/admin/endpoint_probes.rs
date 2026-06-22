@@ -1,9 +1,5 @@
-//! Endpoint probe admin endpoints — synthetic HTTP monitor CRUD.
-//!
-//! GET    /admin/api/projects/:project_id/endpoint-probes — list
-//! POST   /admin/api/projects/:project_id/endpoint-probes — create
-//! PATCH  /admin/api/endpoint-probes/:probe_id (toggle enabled)
-//! DELETE /admin/api/endpoint-probes/:probe_id
+//! Endpoint check admin CRUD — synthetic HTTP monitor.
+//! Schema per migration 0029 (endpoint_check + endpoint_probe).
 
 use std::sync::Arc;
 
@@ -23,15 +19,16 @@ use crate::state::AppState;
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateBody {
-    pub endpoint_url: String,
+    pub name: String,
+    pub target_url: String,
     #[serde(default)]
     pub method: Option<String>,
     #[serde(default)]
-    pub expected_status: Option<i32>,
-    #[serde(default)]
     pub interval_sec: Option<i32>,
     #[serde(default)]
-    pub timeout_ms: Option<i32>,
+    pub assertion_status_codes: Option<Vec<i32>>,
+    #[serde(default)]
+    pub assertion_max_latency_ms: Option<i32>,
 }
 
 pub async fn create(
@@ -39,33 +36,38 @@ pub async fn create(
     Path(project_id): Path<Uuid>,
     Json(body): Json<CreateBody>,
 ) -> (StatusCode, Json<Value>) {
-    if body.endpoint_url.is_empty() {
+    if body.target_url.is_empty() {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "endpoint_url required" })),
+            Json(json!({ "error": "target_url required" })),
         );
     }
     let id = Uuid::now_v7();
+    let interval = body.interval_sec.unwrap_or(60).max(60);
+    let codes = body
+        .assertion_status_codes
+        .unwrap_or_else(|| vec![200]);
     let result = sqlx::query(
-        "INSERT INTO endpoint_probes (id, workspace_id, project_id, endpoint_url, method, \
-            expected_status, interval_sec, timeout_ms, headers, enabled) \
-         SELECT $1, p.workspace_id, $2, $3, $4, $5, $6, $7, '{}'::jsonb, TRUE \
+        "INSERT INTO endpoint_check (id, workspace_id, project_id, name, target_url, method, \
+            interval_sec, assertion_status_codes, assertion_max_latency_ms) \
+         SELECT $1, p.workspace_id, $2, $3, $4, $5, $6, $7, $8 \
          FROM projects p WHERE p.id = $2 \
          RETURNING id",
     )
     .bind(id)
     .bind(project_id)
-    .bind(&body.endpoint_url)
+    .bind(&body.name)
+    .bind(&body.target_url)
     .bind(body.method.as_deref().unwrap_or("GET"))
-    .bind(body.expected_status.unwrap_or(200))
-    .bind(body.interval_sec.unwrap_or(60))
-    .bind(body.timeout_ms.unwrap_or(5000))
+    .bind(interval)
+    .bind(&codes)
+    .bind(body.assertion_max_latency_ms)
     .fetch_optional(&state.pool)
     .await;
     match result {
         Ok(Some(row)) => {
             let id: Uuid = row.get("id");
-            info!(%project_id, url = %body.endpoint_url, "admin.endpoint_probes created");
+            info!(%project_id, url = %body.target_url, "admin.endpoint_check created");
             (StatusCode::CREATED, Json(json!({ "id": id.to_string() })))
         }
         Ok(None) => (
@@ -73,7 +75,7 @@ pub async fn create(
             Json(json!({ "error": "project_not_found" })),
         ),
         Err(e) => {
-            warn!(error = %e, "admin.endpoint_probes create_failed");
+            warn!(error = %e, "admin.endpoint_check create_failed");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({ "error": "internal" })),
@@ -87,9 +89,9 @@ pub async fn list(
     Path(project_id): Path<Uuid>,
 ) -> Json<Value> {
     let rows = sqlx::query(
-        "SELECT id, endpoint_url, method, expected_status, interval_sec, timeout_ms, \
-                enabled, created_at \
-         FROM endpoint_probes WHERE project_id = $1 ORDER BY created_at DESC",
+        "SELECT id, name, target_url, method, interval_sec, assertion_status_codes, \
+                assertion_max_latency_ms, paused, created_at \
+         FROM endpoint_check WHERE project_id = $1 ORDER BY created_at DESC",
     )
     .bind(project_id)
     .fetch_all(&state.pool)
@@ -100,12 +102,18 @@ pub async fn list(
         .map(|r| {
             json!({
                 "id": r.get::<Uuid, _>("id").to_string(),
-                "endpoint_url": r.get::<String, _>("endpoint_url"),
+                "name": r.get::<String, _>("name"),
+                "endpoint_url": r.get::<String, _>("target_url"),
                 "method": r.get::<String, _>("method"),
-                "expected_status": r.get::<i32, _>("expected_status"),
+                "expected_status": r
+                    .try_get::<Vec<i32>, _>("assertion_status_codes")
+                    .unwrap_or_default()
+                    .first()
+                    .copied()
+                    .unwrap_or(200),
                 "interval_sec": r.get::<i32, _>("interval_sec"),
-                "timeout_ms": r.get::<i32, _>("timeout_ms"),
-                "enabled": r.get::<bool, _>("enabled"),
+                "timeout_ms": r.try_get::<Option<i32>, _>("assertion_max_latency_ms").ok().flatten().unwrap_or(5000),
+                "enabled": !r.get::<bool, _>("paused"),
                 "created_at": r.get::<time::OffsetDateTime, _>("created_at"),
             })
         })
@@ -121,27 +129,25 @@ pub struct PatchBody {
 
 pub async fn patch(
     State(state): State<Arc<AppState>>,
-    Path(probe_id): Path<Uuid>,
+    Path(check_id): Path<Uuid>,
     Json(body): Json<PatchBody>,
 ) -> StatusCode {
     if let Some(en) = body.enabled {
-        let _ = sqlx::query(
-            "UPDATE endpoint_probes SET enabled = $1 WHERE id = $2",
-        )
-        .bind(en)
-        .bind(probe_id)
-        .execute(&state.pool)
-        .await;
+        let _ = sqlx::query("UPDATE endpoint_check SET paused = $1 WHERE id = $2")
+            .bind(!en)
+            .bind(check_id)
+            .execute(&state.pool)
+            .await;
     }
     StatusCode::NO_CONTENT
 }
 
 pub async fn delete(
     State(state): State<Arc<AppState>>,
-    Path(probe_id): Path<Uuid>,
+    Path(check_id): Path<Uuid>,
 ) -> StatusCode {
-    let _ = sqlx::query("DELETE FROM endpoint_probes WHERE id = $1")
-        .bind(probe_id)
+    let _ = sqlx::query("DELETE FROM endpoint_check WHERE id = $1")
+        .bind(check_id)
         .execute(&state.pool)
         .await;
     StatusCode::NO_CONTENT
