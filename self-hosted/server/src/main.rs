@@ -40,6 +40,7 @@ use tracing::info;
 mod bootstrap;
 mod handlers;
 mod push_worker;
+mod session_mw;
 mod state;
 
 use state::AppState;

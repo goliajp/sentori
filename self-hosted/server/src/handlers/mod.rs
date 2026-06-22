@@ -16,6 +16,7 @@ use axum::middleware as axum_middleware;
 use axum::routing::{delete, get, patch, post};
 use sentori_ingest_token::{TokenStore, bearer_middleware};
 
+use crate::session_mw::session_middleware;
 use crate::state::AppState;
 
 mod admin;
@@ -109,8 +110,73 @@ pub fn router(state: Arc<AppState>) -> Router {
         ))
         .with_state(state.clone());
 
-    // Dashboard / admin routes — Phase E will add cookie session
-    // auth. For now they share AppState.
+    // Admin routes — session-gated (cookie or Bearer session_token).
+    let admin_routes = Router::new()
+        .route(
+            "/admin/api/projects/:project_id/tokens",
+            get(admin::tokens::list).post(admin::tokens::create),
+        )
+        .route(
+            "/admin/api/tokens/:token_id",
+            delete(admin::tokens::revoke),
+        )
+        .route("/admin/api/projects", post(admin::projects::create))
+        .route(
+            "/admin/api/projects/:project_id",
+            get(admin::projects::get)
+                .patch(admin::projects::update)
+                .delete(admin::projects::delete),
+        )
+        .route(
+            "/admin/api/projects/:project_id/push/credentials",
+            get(admin::push_credentials::list)
+                .post(admin::push_credentials::upsert),
+        )
+        .route(
+            "/admin/api/projects/:project_id/push/credentials/:kind",
+            delete(admin::push_credentials::delete),
+        )
+        .route("/admin/api/members", get(admin::members::list))
+        .route(
+            "/admin/api/members/:user_id",
+            patch(admin::members::update_role).delete(admin::members::remove),
+        )
+        .route(
+            "/admin/api/invites",
+            get(admin::invites::list).post(admin::invites::create),
+        )
+        .route("/admin/api/invites/:id", delete(admin::invites::revoke))
+        .route(
+            "/admin/api/projects/:project_id/cert/watches",
+            post(admin::cert_watch::add),
+        )
+        .route(
+            "/admin/api/projects/:project_id/cert/watches/:domain",
+            delete(admin::cert_watch::remove),
+        )
+        .route(
+            "/admin/api/projects/:project_id/integrations",
+            get(admin::integrations::list).post(admin::integrations::upsert),
+        )
+        .route(
+            "/admin/api/projects/:project_id/integrations/:kind",
+            delete(admin::integrations::delete),
+        )
+        .route(
+            "/admin/api/projects/:project_id/integrations/:kind/active",
+            patch(admin::integrations::set_active),
+        )
+        // Session-scoped self endpoints
+        .route("/auth/me", get(auth::me))
+        .route("/auth/logout", post(auth::logout))
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            session_middleware,
+        ))
+        .with_state(state.clone());
+
+    // Dashboard / public routes (open in v0.2; can be locked
+    // behind the same session middleware via env-var flip).
     Router::new()
         .route("/healthz", get(health::healthz))
         .route("/v1/projects", get(projects::list))
@@ -139,71 +205,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/v1/saved-views/:id", delete(saved_views::delete))
         // legacy fresh-start ingest stubs (defer to SDK-auth path)
         .route("/v1/projects/:project_id/ingest", post(ingest::ingest_event))
-        // ── admin: tokens (new-customer onboarding) ──────
-        .route(
-            "/admin/api/projects/:project_id/tokens",
-            get(admin::tokens::list).post(admin::tokens::create),
-        )
-        .route(
-            "/admin/api/tokens/:token_id",
-            delete(admin::tokens::revoke),
-        )
-        // ── admin: projects CRUD ──────────────────────────
-        .route("/admin/api/projects", post(admin::projects::create))
-        .route(
-            "/admin/api/projects/:project_id",
-            get(admin::projects::get)
-                .patch(admin::projects::update)
-                .delete(admin::projects::delete),
-        )
-        // ── admin: push credentials ───────────────────────
-        .route(
-            "/admin/api/projects/:project_id/push/credentials",
-            get(admin::push_credentials::list)
-                .post(admin::push_credentials::upsert),
-        )
-        .route(
-            "/admin/api/projects/:project_id/push/credentials/:kind",
-            delete(admin::push_credentials::delete),
-        )
-        // ── admin: members ────────────────────────────────
-        .route("/admin/api/members", get(admin::members::list))
-        .route(
-            "/admin/api/members/:user_id",
-            patch(admin::members::update_role).delete(admin::members::remove),
-        )
-        // ── admin: invites ────────────────────────────────
-        .route(
-            "/admin/api/invites",
-            get(admin::invites::list).post(admin::invites::create),
-        )
-        .route(
-            "/admin/api/invites/:id",
-            delete(admin::invites::revoke),
-        )
-        // ── admin: cert watch domains ────────────────────
-        .route(
-            "/admin/api/projects/:project_id/cert/watches",
-            post(admin::cert_watch::add),
-        )
-        .route(
-            "/admin/api/projects/:project_id/cert/watches/:domain",
-            delete(admin::cert_watch::remove),
-        )
-        // ── admin: integrations ───────────────────────────
-        .route(
-            "/admin/api/projects/:project_id/integrations",
-            get(admin::integrations::list).post(admin::integrations::upsert),
-        )
-        .route(
-            "/admin/api/projects/:project_id/integrations/:kind",
-            delete(admin::integrations::delete),
-        )
-        .route(
-            "/admin/api/projects/:project_id/integrations/:kind/active",
-            patch(admin::integrations::set_active),
-        )
-        // ── auth: dashboard user lifecycle ────────────────
+        // ── auth: dashboard user lifecycle (public) ──────
         .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login))
         .route("/auth/verify", post(auth::verify))
@@ -211,5 +213,6 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/auth/reset-password", post(auth::reset))
         .route("/auth/change-password", post(auth::change_password))
         .with_state(state)
+        .merge(admin_routes)
         .merge(sdk_routes)
 }

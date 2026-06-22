@@ -186,6 +186,64 @@ pub struct ChangePasswordBody {
     pub keep_session_id_hex: String,
 }
 
+pub async fn logout(
+    State(state): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
+) -> StatusCode {
+    if let Some(token) = extract_session_token(&headers) {
+        let svc = auth(&state);
+        if let Ok(Some((_user, session))) = svc.lookup_session(&token).await {
+            if let Ok(hash) = hex::decode(&session.id_hash_hex) {
+                if hash.len() == 32 {
+                    let mut arr = [0u8; 32];
+                    arr.copy_from_slice(&hash);
+                    let _ = svc.logout(&arr).await;
+                }
+            }
+        }
+    }
+    StatusCode::NO_CONTENT
+}
+
+pub async fn me(
+    axum::extract::Extension(ctx): axum::extract::Extension<
+        crate::session_mw::SessionContext,
+    >,
+    State(state): State<Arc<AppState>>,
+) -> Json<Value> {
+    match state.identity.users().find_by_id(ctx.user_id).await {
+        Ok(Some(u)) => Json(json!({
+            "user_id": u.id.to_string(),
+            "email": u.email,
+            "email_verified": u.email_verified,
+            "created_at": u.created_at,
+        })),
+        _ => Json(json!({ "error": "user_not_found" })),
+    }
+}
+
+fn extract_session_token(headers: &axum::http::HeaderMap) -> Option<String> {
+    use axum::http::header;
+    if let Some(auth) = headers.get(header::AUTHORIZATION) {
+        if let Ok(s) = auth.to_str() {
+            if let Some(rest) = s.strip_prefix("Bearer ") {
+                return Some(rest.trim().to_string());
+            }
+        }
+    }
+    if let Some(cookie_hdr) = headers.get(header::COOKIE) {
+        if let Ok(s) = cookie_hdr.to_str() {
+            for part in s.split(';') {
+                let p = part.trim();
+                if let Some(rest) = p.strip_prefix("sentori_session=") {
+                    return Some(rest.trim().to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
 pub async fn change_password(
     State(state): State<Arc<AppState>>,
     Json(body): Json<ChangePasswordBody>,
