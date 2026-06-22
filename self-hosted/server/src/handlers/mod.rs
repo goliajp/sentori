@@ -238,6 +238,10 @@ pub fn router(state: Arc<AppState>) -> Router {
             get(replays::list),
         )
         .route(
+            "/v1/projects/:project_id/replays/:replay_id/ndjson",
+            get(replays::ndjson),
+        )
+        .route(
             "/v1/projects/:project_id/stats",
             get(stats::project_stats),
         )

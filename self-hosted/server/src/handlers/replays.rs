@@ -55,3 +55,33 @@ pub async fn list(
         .collect();
     Ok(Json(json!({ "replays": out })))
 }
+
+/// GET /v1/projects/:project_id/replays/:replay_id/ndjson
+///
+/// Streams the decompressed NDJSON frame blob (text/plain).
+/// The webapp parses it client-side to render a per-frame
+/// timeline. Cap is ~10 MB raw per session (SDK-side limit).
+pub async fn ndjson(
+    State(state): State<Arc<AppState>>,
+    Path((_project_id, replay_id)): Path<(Uuid, Uuid)>,
+) -> Result<axum::response::Response, (StatusCode, String)> {
+    use axum::response::IntoResponse;
+    match state.replays.fetch(replay_id).await {
+        Ok(bytes) => {
+            let mut resp = bytes.into_response();
+            resp.headers_mut().insert(
+                axum::http::header::CONTENT_TYPE,
+                axum::http::HeaderValue::from_static("application/x-ndjson"),
+            );
+            Ok(resp)
+        }
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("not found") {
+                Err((StatusCode::NOT_FOUND, msg))
+            } else {
+                Err((StatusCode::INTERNAL_SERVER_ERROR, msg))
+            }
+        }
+    }
+}
