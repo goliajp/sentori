@@ -21,6 +21,7 @@ use crate::state::AppState;
 mod admin;
 mod alerts;
 mod audit;
+mod auth;
 mod cert;
 mod events;
 mod health;
@@ -202,6 +203,13 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/projects/:project_id/integrations/:kind/active",
             patch(admin::integrations::set_active),
         )
+        // ── auth: dashboard user lifecycle ────────────────
+        .route("/auth/register", post(auth::register))
+        .route("/auth/login", post(auth::login))
+        .route("/auth/verify", post(auth::verify))
+        .route("/auth/forgot-password", post(auth::forgot))
+        .route("/auth/reset-password", post(auth::reset))
+        .route("/auth/change-password", post(auth::change_password))
         .with_state(state)
         .merge(sdk_routes)
 }
