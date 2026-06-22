@@ -15,7 +15,7 @@
 [workspace]
 
 [package]
-name = "sentori-saas-server"
+name = "sentori-saas-control"
 version = "0.1.0"
 edition = "2024"
 authors = ["GOLIA K.K. <takagi@golia.jp>"]
@@ -25,7 +25,7 @@ rust-version = "1.88"
 description = "Sentori SaaS control-plane axum server — tenant provisioning + billing webhooks + saasadmin dashboard."
 
 [[bin]]
-name = "sentori-saas"
+name = "sentori-saas-control"
 path = "src/main.rs"
 
 [lints.rust]

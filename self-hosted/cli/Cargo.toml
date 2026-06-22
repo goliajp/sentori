@@ -11,7 +11,7 @@
 [workspace]
 
 [package]
-name = "sentori-operator-cli"
+name = "sentori-cli"
 version = "0.1.0"
 edition = "2024"
 authors = ["GOLIA K.K. <takagi@golia.jp>"]
@@ -21,7 +21,7 @@ rust-version = "1.88"
 description = "Sentori operator CLI — export / import / dump / restore for self-hosted operators."
 
 [[bin]]
-name = "sentorictl"
+name = "sentori-cli"
 path = "src/main.rs"
 
 [lints.rust]

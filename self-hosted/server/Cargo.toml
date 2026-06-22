@@ -12,7 +12,7 @@
 [workspace]
 
 [package]
-name = "sentori-selfhosted-server"
+name = "sentori-server"
 version = "0.1.0"
 edition = "2024"
 authors = ["GOLIA K.K. <takagi@golia.jp>"]
