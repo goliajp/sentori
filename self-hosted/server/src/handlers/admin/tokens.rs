@@ -14,7 +14,7 @@ use std::sync::Arc;
 use axum::{
     Json,
     extract::{Extension, Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
 };
 
 use crate::session_mw::SessionContext;
@@ -42,6 +42,7 @@ pub async fn create(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
+    headers: HeaderMap,
     Json(body): Json<CreateBody>,
 ) -> (StatusCode, Json<Value>) {
     let kind = match body.kind.as_deref() {
@@ -72,6 +73,7 @@ pub async fn create(
                 kind = ?kind,
                 "admin.tokens minted",
             );
+            let (ip, ua) = crate::notify::extract_request_meta(&headers);
             crate::notify::audit(
                 &state.pool,
                 state.workspace_id.into_uuid(),
@@ -80,7 +82,11 @@ pub async fn create(
                 "token.mint",
                 Some("token"),
                 Some(&id.to_string()),
-                json!({ "kind": kind.as_db_str(), "label": body.label }),
+                crate::notify::enrich_payload(
+                    json!({ "kind": kind.as_db_str(), "label": body.label }),
+                    ip.as_deref(),
+                    ua.as_deref(),
+                ),
             )
             .await;
             (

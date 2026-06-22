@@ -6,6 +6,32 @@ use serde_json::Value;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+/// Extract requester IP + user-agent from request headers.
+/// IP is honored from `X-Forwarded-For` (first hop) if present,
+/// then `X-Real-IP`. UA from `User-Agent`. Both optional.
+pub fn extract_request_meta(
+    headers: &axum::http::HeaderMap,
+) -> (Option<String>, Option<String>) {
+    let ip = headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .map(|s| s.trim().to_string())
+        .or_else(|| {
+            headers
+                .get("x-real-ip")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string())
+        })
+        .filter(|s| !s.is_empty());
+    let ua = headers
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.chars().take(200).collect::<String>())
+        .filter(|s| !s.is_empty());
+    (ip, ua)
+}
+
 /// Inject IP + user-agent into the audit payload before writing.
 /// Pass `(None, None)` from background workers / non-request paths.
 pub fn enrich_payload(
