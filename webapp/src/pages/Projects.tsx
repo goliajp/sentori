@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { api, Project } from '../lib/api';
+import { api, Project, ProjectStats } from '../lib/api';
 import {
   Button,
   Card,
@@ -17,6 +17,7 @@ import {
 
 export default function Projects() {
   const [rows, setRows] = useState<Project[]>([]);
+  const [stats, setStats] = useState<Record<string, ProjectStats>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -29,6 +30,22 @@ export default function Projects() {
     try {
       const rows = await api.listProjects();
       setRows(rows);
+      // Parallel per-project stats fetch
+      const pairs = await Promise.all(
+        rows.map(async p => {
+          try {
+            const s = await api.projectStats(p.id);
+            return [p.id, s] as const;
+          } catch {
+            return [p.id, null] as const;
+          }
+        }),
+      );
+      setStats(
+        Object.fromEntries(
+          pairs.filter(([, v]) => v !== null) as [string, ProjectStats][],
+        ),
+      );
     } catch (e) {
       setError(String(e));
     } finally {
@@ -126,6 +143,8 @@ export default function Projects() {
               columns={[
                 { key: 'name', label: 'Name' },
                 { key: 'slug', label: 'Slug' },
+                { key: 'events', label: '24h events' },
+                { key: 'active', label: 'Active' },
                 { key: 'actions', label: '' },
               ]}
               rows={rows.map(p => ({
@@ -139,6 +158,18 @@ export default function Projects() {
                   </Link>
                 ),
                 slug: <span className="font-mono text-xs">{p.slug}</span>,
+                events: (
+                  <span className="font-mono tabular-nums text-zinc-300">
+                    {stats[p.id]
+                      ? stats[p.id].events_24h.toLocaleString()
+                      : '—'}
+                  </span>
+                ),
+                active: (
+                  <span className="font-mono tabular-nums text-orange-300">
+                    {stats[p.id] ? stats[p.id].issues_active : '—'}
+                  </span>
+                ),
                 actions: (
                   <div className="flex gap-1">
                     <Button size="sm" variant="secondary" onClick={() => rename(p)}>

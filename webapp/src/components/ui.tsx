@@ -166,10 +166,12 @@ export function PageHeader({
   title,
   subtitle,
   action,
+  actions,
 }: {
   title: string;
   subtitle?: string;
   action?: ReactNode;
+  actions?: ReactNode;
 }) {
   return (
     <div className="mb-6 flex items-start justify-between">
@@ -179,7 +181,7 @@ export function PageHeader({
           <p className="mt-1 text-sm text-zinc-500">{subtitle}</p>
         )}
       </div>
-      {action}
+      {action ?? actions}
     </div>
   );
 }

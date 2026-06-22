@@ -47,11 +47,52 @@ export function AuditPage() {
     setTimeout(load, 0);
   }
 
+  function exportCsv() {
+    if (!entries || entries.length === 0) return;
+    const headers = [
+      'id',
+      'created_at',
+      'action',
+      'actor_user_id',
+      'project_id',
+      'target_type',
+      'target_id',
+      'payload',
+    ];
+    const escape = (v: unknown): string => {
+      if (v === null || v === undefined) return '';
+      const s = typeof v === 'string' ? v : JSON.stringify(v);
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+    const csv = [
+      headers.join(','),
+      ...entries.map(e =>
+        headers
+          .map(h => escape((e as unknown as Record<string, unknown>)[h]))
+          .join(','),
+      ),
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="p-8">
       <PageHeader
         title="Audit log"
         subtitle="Workspace-wide admin actions, append-only."
+        action={
+          entries && entries.length > 0 ? (
+            <Button variant="secondary" size="sm" onClick={exportCsv}>
+              Export CSV
+            </Button>
+          ) : null
+        }
       />
       {err && <ErrorBanner>{err}</ErrorBanner>}
 
