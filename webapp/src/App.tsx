@@ -55,6 +55,10 @@ function Sidebar() {
               to={`/projects/${projectScoped}/integrations`}
               label="Integrations"
             />
+            <NavItem
+              to={`/projects/${projectScoped}/releases`}
+              label="Releases"
+            />
           </>
         )}
       </nav>

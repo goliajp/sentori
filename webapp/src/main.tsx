@@ -17,6 +17,7 @@ import Members from './pages/Members';
 import Projects from './pages/Projects';
 import PushCredentials from './pages/PushCredentials';
 import Register from './pages/Register';
+import Releases from './pages/Releases';
 import { SettingsPage } from './pages/Settings';
 import Tokens from './pages/Tokens';
 
@@ -48,6 +49,7 @@ createRoot(rootEl).render(
           <Route path="/projects/:id/tokens" element={<Tokens />} />
           <Route path="/projects/:id/push" element={<PushCredentials />} />
           <Route path="/projects/:id/integrations" element={<Integrations />} />
+          <Route path="/projects/:id/releases" element={<Releases />} />
         </Route>
       </Routes>
     </BrowserRouter>

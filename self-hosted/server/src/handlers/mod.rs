@@ -166,6 +166,19 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/projects/:project_id/integrations/:kind/active",
             patch(admin::integrations::set_active),
         )
+        // ── admin: releases ───────────────────────────────
+        .route(
+            "/admin/api/projects/:project_id/releases",
+            get(admin::releases::list),
+        )
+        .route(
+            "/admin/api/projects/:project_id/releases/:release_id/artifacts",
+            get(admin::releases::list_artifacts),
+        )
+        .route(
+            "/admin/api/releases/:release_id",
+            delete(admin::releases::delete),
+        )
         // Session-scoped self endpoints
         .route("/auth/me", get(auth::me))
         .route("/auth/logout", post(auth::logout))

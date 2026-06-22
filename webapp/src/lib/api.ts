@@ -162,6 +162,22 @@ export interface IntegrationRow {
   active: boolean;
 }
 
+export interface ReleaseRow {
+  id: string;
+  name: string;
+  created_at: string;
+  deploy_at: string | null;
+}
+
+export interface ReleaseArtifact {
+  id: string;
+  kind: string;
+  name: string;
+  content_hash: string;
+  size_bytes: number;
+  created_at: string;
+}
+
 const DEFAULT_BASE = '';
 
 export class ApiError extends Error {
@@ -380,6 +396,22 @@ export class Api {
       'PATCH',
       { active },
     );
+  }
+
+  // ── admin: releases ────────────────────────────────────
+  listReleases(projectId: string): Promise<{ releases: ReleaseRow[] }> {
+    return this.get(`/admin/api/projects/${projectId}/releases`);
+  }
+  listArtifacts(
+    projectId: string,
+    releaseId: string,
+  ): Promise<{ artifacts: ReleaseArtifact[] }> {
+    return this.get(
+      `/admin/api/projects/${projectId}/releases/${releaseId}/artifacts`,
+    );
+  }
+  deleteRelease(releaseId: string): Promise<void> {
+    return this.send(`/admin/api/releases/${releaseId}`, 'DELETE');
   }
 
   private authHeaders(): HeadersInit {
