@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   CardHeader,
-  DataTable,
   ErrorBanner,
   PageHeader,
   formatRelative,
@@ -93,65 +92,65 @@ export function AuditPage() {
       </Card>
 
       <Card>
-        <DataTable
-          rowKey={(r) => r.id}
-          empty="No audit entries yet."
-          rows={entries ?? []}
-          columns={[
-            {
-              key: 'action',
-              label: 'Action',
-              render: (r) => (
-                <div>
-                  <div className="font-mono text-sm text-zinc-100">{r.action}</div>
-                  {(r.target_type || r.target_id) && (
-                    <div className="font-mono text-[11px] text-zinc-500">
-                      {r.target_type ?? ''} {r.target_id ?? ''}
-                    </div>
-                  )}
-                </div>
-              ),
-            },
-            {
-              key: 'actor_user_id',
-              label: 'Actor',
-              width: '20%',
-              render: (r) =>
-                r.actor_user_id ? (
-                  <span className="font-mono text-xs text-zinc-400">
-                    {r.actor_user_id.slice(0, 8)}…
-                  </span>
-                ) : (
-                  <span className="text-xs text-zinc-600">system</span>
-                ),
-            },
-            {
-              key: 'project_id',
-              label: 'Project',
-              width: '15%',
-              render: (r) =>
-                r.project_id ? (
-                  <span className="font-mono text-xs text-zinc-400">
-                    {r.project_id.slice(0, 8)}…
-                  </span>
-                ) : (
-                  <span className="text-xs text-zinc-600">workspace</span>
-                ),
-            },
-            {
-              key: 'created_at',
-              label: 'When',
-              width: '15%',
-              render: (r) => (
-                <span className="text-xs text-zinc-500">
-                  {formatRelative(r.created_at)}
-                </span>
-              ),
-            },
-          ]}
-        />
+        {entries?.length === 0 ? (
+          <div className="p-8 text-center text-sm text-zinc-500">
+            No audit entries yet.
+          </div>
+        ) : (
+          <ul className="divide-y divide-zinc-800">
+            {entries?.map(e => (
+              <AuditRow key={e.id} entry={e} />
+            ))}
+          </ul>
+        )}
       </Card>
     </div>
+  );
+}
+
+function AuditRow({ entry: e }: { entry: AuditEntry }) {
+  const [open, setOpen] = useState(false);
+  const hasPayload =
+    e.payload && typeof e.payload === 'object'
+      ? Object.keys(e.payload as object).length > 0
+      : Boolean(e.payload);
+
+  return (
+    <li>
+      <button
+        onClick={() => hasPayload && setOpen(!open)}
+        className={`flex w-full items-center gap-4 px-5 py-3 text-left ${hasPayload ? 'hover:bg-zinc-900/40' : 'cursor-default'}`}
+      >
+        <span className="font-mono text-xs text-zinc-500 w-4">
+          {hasPayload ? (open ? '▼' : '▶') : ''}
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="font-mono text-sm text-zinc-100">{e.action}</div>
+          {(e.target_type || e.target_id) && (
+            <div className="font-mono text-[11px] text-zinc-500">
+              {e.target_type ?? ''}{' '}
+              {e.target_id ? `${e.target_id.slice(0, 16)}…` : ''}
+            </div>
+          )}
+        </div>
+        <span className="font-mono text-xs text-zinc-400 w-24 text-right">
+          {e.actor_user_id
+            ? e.actor_user_id.slice(0, 8) + '…'
+            : 'system'}
+        </span>
+        <span className="font-mono text-xs text-zinc-400 w-20 text-right">
+          {e.project_id ? e.project_id.slice(0, 8) + '…' : 'workspace'}
+        </span>
+        <span className="text-xs text-zinc-500 w-24 text-right">
+          {formatRelative(e.created_at)}
+        </span>
+      </button>
+      {open && hasPayload && (
+        <pre className="overflow-x-auto whitespace-pre-wrap break-all bg-zinc-950 px-12 py-3 text-[11px] font-mono text-zinc-300">
+          {JSON.stringify(e.payload, null, 2)}
+        </pre>
+      )}
+    </li>
   );
 }
 
