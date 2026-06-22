@@ -102,15 +102,20 @@ pub async fn suspend_tenant(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    // Row-level pivot: status lives on workspace_billing now.
     let res = sqlx::query(
-        "UPDATE tenants SET status = 'suspended' WHERE id = $1 AND status = 'active'",
+        "UPDATE workspace_billing SET status = 'past_due', updated_at = now() \
+         WHERE workspace_id = $1 AND status = 'active'",
     )
     .bind(id)
     .execute(&state.pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     if res.rows_affected() == 0 {
-        return Err((StatusCode::NOT_FOUND, "tenant not active / missing".into()));
+        return Err((
+            StatusCode::NOT_FOUND,
+            "workspace billing row not active / missing".into(),
+        ));
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -120,14 +125,18 @@ pub async fn resume_tenant(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     let res = sqlx::query(
-        "UPDATE tenants SET status = 'active' WHERE id = $1 AND status = 'suspended'",
+        "UPDATE workspace_billing SET status = 'active', updated_at = now() \
+         WHERE workspace_id = $1 AND status = 'past_due'",
     )
     .bind(id)
     .execute(&state.pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     if res.rows_affected() == 0 {
-        return Err((StatusCode::NOT_FOUND, "tenant not suspended / missing".into()));
+        return Err((
+            StatusCode::NOT_FOUND,
+            "workspace billing row not past_due / missing".into(),
+        ));
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -136,18 +145,14 @@ pub async fn delete_tenant(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    // Soft delete only — preserves billing history. Actual
-    // DROP DATABASE is a separate ops-driven step after a
-    // grace period.
-    let res = sqlx::query(
-        "UPDATE tenants SET status = 'deleted' WHERE id = $1 AND status != 'deleted'",
-    )
-    .bind(id)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    // Hard delete cascades via FK to projects / events / etc.
+    let res = sqlx::query("DELETE FROM workspaces WHERE id = $1")
+        .bind(id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     if res.rows_affected() == 0 {
-        return Err((StatusCode::NOT_FOUND, "already deleted / missing".into()));
+        return Err((StatusCode::NOT_FOUND, "workspace not found".into()));
     }
     Ok(StatusCode::NO_CONTENT)
 }

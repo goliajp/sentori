@@ -1,61 +1,80 @@
-//! /v1/saas/tenants — list + create.
+//! /v1/saas/workspaces — saasadmin tenant (workspace) CRUD.
+//!
+//! After the 2026-06-22 row-level pivot, "tenants" are no longer
+//! per-DB. They're just rows in the shared `workspaces` table
+//! (created by self-hosted's `0001_workspace_identity.sql`) with
+//! their workspace_id used to filter every other row across the
+//! shared DB via app-level scoping.
+//!
+//! This handler runs in `sentori-saas-control` (SaaS-only
+//! binary) and exposes the saasadmin cross-tenant view.
 
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
+use sqlx::Row;
 use time::OffsetDateTime;
+use tracing::info;
 use uuid::Uuid;
 
 use crate::state::AppState;
-use crate::tenant_provision::{create_tenant_db, is_safe_db_name, record_step};
 
 #[derive(Serialize)]
-pub struct TenantRow {
+pub struct WorkspaceRow {
     pub id: Uuid,
-    pub slug: String,
-    pub display_name: String,
-    pub status: String,
+    pub name: String,
     pub created_at: OffsetDateTime,
+    /// Billing-table-driven status; defaults to "active" when no
+    /// billing row exists yet.
+    pub status: String,
+    /// Aggregate project count (workspace-scoped).
+    pub project_count: i64,
 }
 
 pub async fn list(
     State(state): State<Arc<AppState>>,
-) -> Result<Json<Vec<TenantRow>>, (StatusCode, String)> {
-    let rows: Vec<(Uuid, String, String, String, OffsetDateTime)> = sqlx::query_as(
-        "SELECT id, slug, display_name, status, created_at FROM tenants \
-         WHERE status != 'deleted' ORDER BY created_at DESC LIMIT 200",
+) -> Result<Json<Vec<WorkspaceRow>>, (StatusCode, String)> {
+    let rows = sqlx::query(
+        "SELECT w.id, w.name, w.created_at, \
+                COALESCE(wb.status, 'active') AS status, \
+                COALESCE((SELECT COUNT(*) FROM projects WHERE workspace_id = w.id), 0) AS project_count \
+         FROM workspaces w \
+         LEFT JOIN workspace_billing wb ON wb.workspace_id = w.id \
+         ORDER BY w.created_at DESC LIMIT 500",
     )
     .fetch_all(&state.pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
     Ok(Json(
-        rows.into_iter()
-            .map(|(id, slug, display_name, status, created_at)| TenantRow {
-                id,
-                slug,
-                display_name,
-                status,
-                created_at,
+        rows.iter()
+            .map(|r| WorkspaceRow {
+                id: r.get("id"),
+                name: r.get("name"),
+                created_at: r.get("created_at"),
+                status: r.get("status"),
+                project_count: r.get("project_count"),
             })
             .collect(),
     ))
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateBody {
-    pub slug: String,
-    pub display_name: String,
-    pub owner_email: String,
+    pub name: String,
+    #[serde(default)]
+    pub owner_email: Option<String>,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateResponse {
     pub id: Uuid,
-    pub slug: String,
-    pub db_name: String,
+    pub name: String,
     pub status: String,
 }
 
@@ -63,67 +82,99 @@ pub async fn create(
     State(state): State<Arc<AppState>>,
     Json(body): Json<CreateBody>,
 ) -> Result<(StatusCode, Json<CreateResponse>), (StatusCode, String)> {
-    let slug = body.slug.trim().to_ascii_lowercase();
-    if slug.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "slug required".into()));
+    if body.name.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "name required".into()));
     }
-    let db_name = format!("sentori_t_{}", slug.replace('-', "_"));
-    if !is_safe_db_name(&db_name) {
-        return Err((StatusCode::BAD_REQUEST, "slug fails safety check".into()));
-    }
-
     let id = Uuid::now_v7();
-    // Register the tenant row first (status='provisioning')
-    // so a crashed mid-provision is observable.
+
+    // INSERT workspaces row (uses the shared sentori-server DB).
+    sqlx::query("INSERT INTO workspaces (id, name) VALUES ($1, $2)")
+        .bind(id)
+        .bind(body.name.trim())
+        .execute(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Bootstrap a billing row at "active" / "free" plan. Stripe
+    // wiring lives in stripe_webhook.rs; this is the initial seed
+    // before any payment event.
+    let billing_id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tenants (id, slug, display_name, db_name, owner_email) \
-         VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO workspace_billing (id, workspace_id, plan, status) \
+         VALUES ($1, $2, 'free', 'active') ON CONFLICT (workspace_id) DO NOTHING",
     )
+    .bind(billing_id)
     .bind(id)
-    .bind(&slug)
-    .bind(body.display_name.trim())
-    .bind(&db_name)
-    .bind(body.owner_email.trim())
     .execute(&state.pool)
     .await
-    .map_err(|e| match &e {
-        sqlx::Error::Database(db_err) if db_err.code().as_deref() == Some("23505") => {
-            (StatusCode::CONFLICT, format!("slug {slug:?} already exists"))
-        }
-        _ => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-    })?;
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    // create_db step.
-    let _ = record_step(&state.pool, id, "create_db", "running", None).await;
-    if let Err(e) = create_tenant_db(&state.tenant_db_admin_url, &db_name).await {
-        let _ = record_step(&state.pool, id, "create_db", "failed", Some(&e.to_string())).await;
-        return Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("create tenant DB: {e}"),
-        ));
-    }
-    let _ = record_step(&state.pool, id, "create_db", "done", None).await;
-
-    // migrate + seed_owner steps run async — for v0.1, they
-    // happen out-of-band via the `sentori-saas-provisioner`
-    // CLI (defer to ops follow-up). The tenant row stays in
-    // 'provisioning' until activated.
-    let _ = record_step(
-        &state.pool,
-        id,
-        "migrate",
-        "pending",
-        Some("pending — run sentori-saas-provisioner activate"),
-    )
-    .await;
-
+    info!(workspace_id = %id, name = %body.name, "saas.workspaces created");
     Ok((
-        StatusCode::ACCEPTED,
+        StatusCode::CREATED,
         Json(CreateResponse {
             id,
-            slug,
-            db_name,
-            status: "provisioning".into(),
+            name: body.name.trim().to_string(),
+            status: "active".into(),
         }),
     ))
+}
+
+pub async fn suspend(
+    State(state): State<Arc<AppState>>,
+    Path(workspace_id): Path<Uuid>,
+) -> StatusCode {
+    let result = sqlx::query(
+        "UPDATE workspace_billing SET status = 'past_due', updated_at = now() \
+         WHERE workspace_id = $1",
+    )
+    .bind(workspace_id)
+    .execute(&state.pool)
+    .await;
+    match result {
+        Ok(_) => {
+            info!(%workspace_id, "saas.workspaces suspended");
+            StatusCode::NO_CONTENT
+        }
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+pub async fn resume(
+    State(state): State<Arc<AppState>>,
+    Path(workspace_id): Path<Uuid>,
+) -> StatusCode {
+    let result = sqlx::query(
+        "UPDATE workspace_billing SET status = 'active', updated_at = now() \
+         WHERE workspace_id = $1",
+    )
+    .bind(workspace_id)
+    .execute(&state.pool)
+    .await;
+    match result {
+        Ok(_) => {
+            info!(%workspace_id, "saas.workspaces resumed");
+            StatusCode::NO_CONTENT
+        }
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+pub async fn delete(
+    State(state): State<Arc<AppState>>,
+    Path(workspace_id): Path<Uuid>,
+) -> StatusCode {
+    // Hard delete cascades via FK (workspaces.id → projects.workspace_id
+    // → events.workspace_id, etc. all ON DELETE CASCADE).
+    let result = sqlx::query("DELETE FROM workspaces WHERE id = $1")
+        .bind(workspace_id)
+        .execute(&state.pool)
+        .await;
+    match result {
+        Ok(_) => {
+            info!(%workspace_id, "saas.workspaces deleted");
+            StatusCode::NO_CONTENT
+        }
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
 }

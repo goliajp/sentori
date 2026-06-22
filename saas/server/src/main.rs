@@ -1,17 +1,19 @@
 //! Sentori SaaS control-plane axum server.
 //!
-//! NOT the tenant workload — that's `self-hosted/server/`
-//! pointed at each tenant's database. This binary handles:
+//! Post 2026-06-22 row-level pivot, this binary shares the same
+//! Postgres database as `sentori-server` (no per-tenant DBs).
+//! It exposes saasadmin-only endpoints for cross-workspace
+//! management:
 //!
-//! - Signup landing page + saasadmin login
-//! - Tenant CRUD + provisioning (creates a fresh
-//!   `sentori_t_<slug>` postgres DB + runs core migrations
-//!   + seeds the owner user)
-//! - Stripe webhook ingest (S5 stone) + subscription state
-//!   sync into the `subscriptions` table
-//! - Cross-tenant health dashboard for support staff
+//! - saasadmin login (session for the SaaS support staff)
+//! - Workspace CRUD (create/list/suspend/resume/delete);
+//!   "workspace" replaces the old "tenant" naming.
+//! - Stripe webhook ingest — drives workspace_billing.plan +
+//!   status flips per subscription lifecycle
+//! - Cross-workspace health view for support
 //!
-//! Per CSaas1+5 autonomous design 2026-06-21.
+//! The `tenant_db_admin_url` config + `CREATE DATABASE` logic
+//! from the original v0.1 saas/server is retired.
 
 #![forbid(unsafe_code)]
 #![allow(
@@ -33,7 +35,6 @@ use tracing::info;
 mod handlers;
 mod state;
 mod stripe;
-mod tenant_provision;
 
 use state::AppState;
 
@@ -41,17 +42,19 @@ use state::AppState;
 async fn main() -> anyhow::Result<()> {
     init_tracing();
     let bind = std::env::var("SENTORI_SAAS_BIND").unwrap_or_else(|_| "0.0.0.0:9090".to_string());
-    let cp_db_url = std::env::var("SENTORI_SAAS_CONTROL_PLANE_DB_URL")
-        .context("SENTORI_SAAS_CONTROL_PLANE_DB_URL env var required")?;
-    let tenant_db_admin_url = std::env::var("SENTORI_SAAS_TENANT_DB_ADMIN_URL")
-        .context("SENTORI_SAAS_TENANT_DB_ADMIN_URL env var required (used to CREATE DATABASE for new tenants)")?;
+    let db_url = std::env::var("SENTORI_SAAS_DATABASE_URL")
+        .or_else(|_| std::env::var("SENTORI_SAAS_CONTROL_PLANE_DB_URL"))
+        .or_else(|_| std::env::var("DATABASE_URL"))
+        .context("SENTORI_SAAS_DATABASE_URL (or DATABASE_URL) env var required")?;
     let stripe_secret = std::env::var("SENTORI_STRIPE_WEBHOOK_SECRET").ok();
 
     info!(%bind, "sentori SaaS control-plane boot");
-    let pool = PgPool::connect(&cp_db_url).await.context("control-plane db connect")?;
-    sqlx::migrate!("../migrations").run(&pool).await.context("control-plane migrate")?;
+    let pool = PgPool::connect(&db_url).await.context("db connect")?;
+    // Note: schema migrations are owned by sentori-server. saas-
+    // control reads/writes workspaces/workspace_billing etc.
+    // directly — no separate control-plane migrations any more.
 
-    let state = Arc::new(AppState::new(pool, tenant_db_admin_url, stripe_secret));
+    let state = Arc::new(AppState::new(pool, stripe_secret));
     let app = handlers::router(state);
 
     let listener = TcpListener::bind(&bind).await.context("bind")?;

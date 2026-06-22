@@ -1,30 +1,27 @@
-//! Shared app state for the control plane.
+//! Shared app state for the SaaS control plane.
+//!
+//! Post 2026-06-22 row-level pivot, this binary shares the same
+//! Postgres database as `sentori-server` (all workspaces in one
+//! DB, row-level isolation by workspace_id). The `tenant_db_admin_url`
+//! field is retired — `CREATE DATABASE` is no longer part of
+//! tenant provisioning.
 
 use sqlx::PgPool;
 
 #[derive(Clone)]
 pub struct AppState {
-    /// Control-plane postgres pool (sentori_saas DB).
+    /// Shared postgres pool — same DB as sentori-server.
     pub pool: PgPool,
-    /// Admin postgres URL for `CREATE DATABASE` on tenant
-    /// provision. Typically points at the `postgres` super
-    /// database with create-DB privileges.
-    pub tenant_db_admin_url: String,
-    /// Stripe webhook secret (`whsec_xxx`). None disables
-    /// the webhook endpoint (self-hosted dev mode).
+    /// Stripe webhook secret (`whsec_xxx`). None disables the
+    /// webhook endpoint (dev mode).
     pub stripe_secret: Option<String>,
 }
 
 impl AppState {
     #[must_use]
-    pub const fn new(
-        pool: PgPool,
-        tenant_db_admin_url: String,
-        stripe_secret: Option<String>,
-    ) -> Self {
+    pub const fn new(pool: PgPool, stripe_secret: Option<String>) -> Self {
         Self {
             pool,
-            tenant_db_admin_url,
             stripe_secret,
         }
     }
