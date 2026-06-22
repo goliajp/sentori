@@ -5,4 +5,6 @@
 //! endpoints will be cookie-session gated in Phase E step 2+;
 //! for now they're open (single-tenant self-hosted dev).
 
+pub mod projects;
+pub mod push_credentials;
 pub mod tokens;

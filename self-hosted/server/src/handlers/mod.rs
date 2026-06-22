@@ -147,6 +147,24 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/tokens/:token_id",
             delete(admin::tokens::revoke),
         )
+        // ── admin: projects CRUD ──────────────────────────
+        .route("/admin/api/projects", post(admin::projects::create))
+        .route(
+            "/admin/api/projects/:project_id",
+            get(admin::projects::get)
+                .patch(admin::projects::update)
+                .delete(admin::projects::delete),
+        )
+        // ── admin: push credentials ───────────────────────
+        .route(
+            "/admin/api/projects/:project_id/push/credentials",
+            get(admin::push_credentials::list)
+                .post(admin::push_credentials::upsert),
+        )
+        .route(
+            "/admin/api/projects/:project_id/push/credentials/:kind",
+            delete(admin::push_credentials::delete),
+        )
         .with_state(state)
         .merge(sdk_routes)
 }
