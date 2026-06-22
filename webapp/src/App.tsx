@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useParams } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
 
 import { api } from './lib/api';
+import { useNavShortcuts } from './lib/useShortcuts';
 
 /// Main app shell — sidebar + content outlet. Wraps every
 /// authenticated page.
 export function App() {
   const [verified, setVerified] = useState(false);
+  useNavShortcuts();
 
   // Boot-time session probe. If the cookie + bearer header are
   // missing or invalid, api.authMe() throws and the 401 handler
@@ -109,7 +111,52 @@ function Sidebar() {
           </>
         )}
       </nav>
+
+      <UserFooter />
     </aside>
+  );
+}
+
+function UserFooter() {
+  const navigate = useNavigate();
+  const email =
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem('sentori_email')
+      : null;
+
+  async function signOut() {
+    try {
+      await fetch('/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {}
+    try {
+      localStorage.removeItem('sentori_user_id');
+      localStorage.removeItem('sentori_email');
+    } catch {}
+    navigate('/login');
+  }
+
+  if (!email) return null;
+  return (
+    <div className="mt-4 border-t border-zinc-800 pt-3 text-[11px]">
+      <div className="flex items-center justify-between gap-1">
+        <span
+          className="truncate font-mono text-zinc-400"
+          title={email}
+        >
+          {email}
+        </span>
+        <button
+          onClick={signOut}
+          title="Sign out"
+          className="rounded px-1.5 py-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+        >
+          ⎋
+        </button>
+      </div>
+    </div>
   );
 }
 
