@@ -5,6 +5,36 @@
 
 ## 当前状态
 
+> **v0.2 fresh-start pivot**（2026-06-22 起,branch `feature/v0.2-foundation`）
+> 大仓 → SaaS 内置 + self-hosted OSS repo + 定制产品。SaaS 与 self-hosted 同版本号同终端 SDK。SDK 对外协议保持向后兼容（`st_pk_<26 base32>` token 永久契约）。详见 [`CHANGELOG.md#v02`](./CHANGELOG.md) + [`docs-v0.2/DEPLOY.md`](./docs-v0.2/DEPLOY.md) + [`docs-v0.2/CUTOVER.md`](./docs-v0.2/CUTOVER.md)。
+>
+> **当前 (2026-06-23)**:120 commits / 130+ backend endpoints / 28 webapp pages / 44 cli subcommands / 14 ETL table sets / 62/68 表 (91%)。**Self-hosted Docker 单镜像 = 全栈**(server + bundled SPA + persistent blob volume)。**SaaS 双 binary 同 DB row-level isolation**。**cutover plan 待用户拍板执行**。
+>
+> 已完成产品 surface:
+> - 5 lens(Issues / Events / Traces / Metrics / Replays)+ 每页 list / detail / filter / save
+> - Real-time event tail via SSE
+> - Issue triage workflow:list inline ✓⊘↺ + bulk select + detail + comments + activity + watchers
+> - Notifications inbox(per-user)+ event-driven fanout 到 watchers
+> - WebPush vendor adapter(VAPID ES256,no-payload wake push 真发)
+> - HttpOnly cookie session + saasadmin role gate + sessions list/revoke
+> - Linear-style UX:⌘K palette + g\<letter\> shortcuts + per-page j/k/x/e/i + ? cheatsheet
+> - Push credentials VAPID browser wizard
+> - sentori-cli 44 subcommands(全 admin / lens / ops 覆盖)
+> - GET /v1/_describe self-describing catalog
+> - Endpoint probes admin CRUD(synthetic monitor;poller worker 留 v0.3)
+>
+> v0.3+ 留:
+> - WebPush payload encryption(RFC 8030 + 8188 + 8291)— v0.2 ships no-payload wake push
+> - APNs / FCM / HCM / MiPush 真 vendor adapter
+> - 剩 6 个 saas_* 内部 ETL 表(saas-control 自有,生产 cutover 不需要)
+> - Saved view 高级 query builder UI(目前 payload 直接 JSON)
+> - HTTPS auto TLS via embedded rustls + Let's Encrypt
+> - Endpoint probe background poller
+> - Replay viewer canvas/DOM replayer(scrubber + raw NDJSON ship 了)
+> - SDK 类型生成器(via /v1/_describe)
+
+> **以下是 legacy v0.1-v2.0 roadmap 历史**（2025-11 起到 2026-06-03 ship）—— 数据保留在 legacy SaaS DB，via sentori-migrate 业务层 ETL 同步到 v0.2 schema。
+
 - **v0.1** ✅ self-hosted MVP（Phase 0-10）—— 详见 [CHANGELOG.md](./CHANGELOG.md)
 - **v0.1.x** ✅ SaaS 上线 + dogfood（Phase 11-17）—— 详见 CHANGELOG.md
 - **v0.2** ✅ 账户结构 + SDK 矩阵 + 数据呈现（Phase 18-28）—— 详见 CHANGELOG.md

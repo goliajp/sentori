@@ -1,0 +1,90 @@
+name: v0.2 OSS — mirror to sentori-selfhosted public repo
+
+# Syncs self-hosted + core + sdk + docker assets to the public
+# sentori-selfhosted repo (goliajp/sentori-selfhosted) so the
+# community can fork / inspect / contribute. The public repo's
+# own CI (v0.2-self-hosted-image.yml, also synced) builds the
+# docker image users pull.
+#
+# Required secrets:
+#   SENTORI_SELFHOSTED_MIRROR_REPO   — e.g. goliajp/sentori-selfhosted
+#   SENTORI_SELFHOSTED_MIRROR_TOKEN  — PAT with repo write access
+#
+# Triggers:
+#   - master push (continuous mirror)
+#   - tag v0.2.* (release-aligned mirror)
+#   - manual dispatch
+
+on:
+  push:
+    branches: [master]
+    tags: ['v0.2.*']
+  workflow_dispatch:
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ vars.SENTORI_SELFHOSTED_MIRROR_REPO != '' }}
+    steps:
+      - name: Checkout sentori (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Filter to self-hosted-only tree
+        run: |
+          mkdir -p /tmp/mirror
+          # Minimal public set: server binary source + core libs +
+          # docker + bundled SPA source + licenses + the README.
+          # Everything else (docs, contributing templates, internal
+          # planning, saas-control, marketing, sdk pkg matrix) stays
+          # private — the public mirror is consumption-only.
+          rsync -a --delete \
+            --exclude='saas/' \
+            --exclude='server/' \
+            --exclude='web/' \
+            --exclude='marketing/' \
+            --exclude='docs/' \
+            --exclude='docs-site/' \
+            --exclude='docs-v0.1/' \
+            --exclude='docs-v0.2/' \
+            --exclude='ROADMAP.md' \
+            --exclude='CHANGELOG.md' \
+            --exclude='CONTRIBUTING.md' \
+            --exclude='CODE_OF_CONDUCT.md' \
+            --exclude='SECURITY.md' \
+            --exclude='.github/ISSUE_TEMPLATE/' \
+            --exclude='.github/PULL_REQUEST_TEMPLATE.md' \
+            --exclude='.github/CONTRIBUTING.md' \
+            --exclude='.github/SECURITY.md' \
+            --exclude='.github/workflows/v0.2-oss-mirror.yml' \
+            --exclude='.github/workflows/v0.2-core-check.yml' \
+            --exclude='target/' \
+            --exclude='node_modules/' \
+            --exclude='.claude/' \
+            ./ /tmp/mirror/
+          ls /tmp/mirror/ | head -20
+
+      - name: Push to sentori-selfhosted public repo
+        env:
+          MIRROR_REPO: ${{ vars.SENTORI_SELFHOSTED_MIRROR_REPO }}
+          MIRROR_TOKEN: ${{ secrets.SENTORI_SELFHOSTED_MIRROR_TOKEN }}
+        run: |
+          if [ -z "$MIRROR_TOKEN" ]; then
+            echo "SENTORI_SELFHOSTED_MIRROR_TOKEN not set, skipping push"
+            exit 0
+          fi
+          cd /tmp/mirror
+          git init -b master
+          git config user.email "ci@golia.jp"
+          git config user.name "sentori-mirror-bot"
+          git add -A
+          git commit -m "mirror: ${{ github.sha }} from goliajp/sentori@${{ github.ref_name }}"
+          git remote add origin "https://x-access-token:${MIRROR_TOKEN}@github.com/${MIRROR_REPO}.git"
+          git push -f origin master
+          # Mirror tag too if this run is for a tag
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            git tag "${{ github.ref_name }}"
+            git push origin "${{ github.ref_name }}"
+          fi

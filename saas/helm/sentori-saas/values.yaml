@@ -1,0 +1,45 @@
+# Sentori SaaS control plane Helm values.
+
+image:
+  repository: ghcr.io/goliajp/sentori-saas
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+server:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  service:
+    type: ClusterIP
+    port: 9090
+  env:
+    RUST_LOG: "info,sqlx=warn"
+
+# Control-plane DB (must already exist + be migratable).
+controlPlaneDatabase:
+  url: ""   # set this; e.g. "postgres://saas:pw@pg.svc:5432/sentori_saas"
+
+# Postgres admin URL used to CREATE DATABASE for new tenants.
+# Usually points at the `postgres` super database.
+tenantDatabaseAdmin:
+  url: ""   # set this
+
+# Stripe webhook secret (whsec_xxx).
+stripe:
+  secretRef:
+    name: sentori-saas-stripe
+    key: webhookSecret
+
+ingress:
+  enabled: false
+  className: ""
+  host: api.sentori.example.com
+  tls:
+    enabled: false
+    secretName: sentori-saas-tls
+  annotations: {}

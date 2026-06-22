@@ -1,0 +1,34 @@
+name: v0.2 core — fmt + clippy + check
+
+on:
+  push:
+    branches: [feature/v0.2-**, develop, master]
+    paths:
+      - 'core/**'
+      - '.github/workflows/v0.2-core-check.yml'
+  pull_request:
+    branches: [develop, master]
+    paths:
+      - 'core/**'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      - name: fmt
+        run: cargo fmt --all -- --check
+      - name: clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: check
+        run: cargo check --workspace --all-targets
