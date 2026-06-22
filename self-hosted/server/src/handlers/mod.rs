@@ -165,6 +165,30 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/projects/:project_id/push/credentials/:kind",
             delete(admin::push_credentials::delete),
         )
+        // ── admin: members ────────────────────────────────
+        .route("/admin/api/members", get(admin::members::list))
+        .route(
+            "/admin/api/members/:user_id",
+            patch(admin::members::update_role).delete(admin::members::remove),
+        )
+        // ── admin: invites ────────────────────────────────
+        .route(
+            "/admin/api/invites",
+            get(admin::invites::list).post(admin::invites::create),
+        )
+        .route(
+            "/admin/api/invites/:id",
+            delete(admin::invites::revoke),
+        )
+        // ── admin: cert watch domains ────────────────────
+        .route(
+            "/admin/api/projects/:project_id/cert/watches",
+            post(admin::cert_watch::add),
+        )
+        .route(
+            "/admin/api/projects/:project_id/cert/watches/:domain",
+            delete(admin::cert_watch::remove),
+        )
         .with_state(state)
         .merge(sdk_routes)
 }
