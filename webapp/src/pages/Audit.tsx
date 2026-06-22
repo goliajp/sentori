@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError, AuditEntry } from '../lib/api';
 import {
+  Button,
   Card,
+  CardHeader,
   DataTable,
   ErrorBanner,
   PageHeader,
@@ -11,24 +13,85 @@ import {
 export function AuditPage() {
   const [entries, setEntries] = useState<AuditEntry[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState('');
+  const [actor, setActor] = useState('');
+  const [action, setAction] = useState('');
+  const [limit, setLimit] = useState(200);
+
+  async function load() {
+    try {
+      const r = await api.listAudit({
+        project_id: projectId.trim() || undefined,
+        actor_user_id: actor.trim() || undefined,
+        action: action.trim() || undefined,
+        limit,
+      });
+      setEntries(r);
+      setErr(null);
+    } catch (e) {
+      if (e instanceof ApiError) setErr(`${e.status}: ${e.body}`);
+      else setErr(String(e));
+    }
+  }
 
   useEffect(() => {
-    api
-      .listAudit({ limit: 200 })
-      .then(setEntries)
-      .catch((e: unknown) => {
-        if (e instanceof ApiError) setErr(`${e.status}: ${e.body}`);
-        else setErr(String(e));
-      });
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function clear() {
+    setProjectId('');
+    setActor('');
+    setAction('');
+    setLimit(200);
+    // Reload with cleared filters after state flush
+    setTimeout(load, 0);
+  }
 
   return (
     <div className="p-8">
       <PageHeader
         title="Audit log"
-        subtitle="Workspace-wide admin actions, append-only. K13."
+        subtitle="Workspace-wide admin actions, append-only."
       />
       {err && <ErrorBanner>{err}</ErrorBanner>}
+
+      <Card className="mb-4">
+        <CardHeader title="Filter" />
+        <div className="grid grid-cols-4 gap-2 p-4">
+          <Field
+            label="Project ID"
+            value={projectId}
+            onChange={setProjectId}
+            placeholder="UUID (optional)"
+          />
+          <Field
+            label="Actor user ID"
+            value={actor}
+            onChange={setActor}
+            placeholder="UUID (optional)"
+          />
+          <Field
+            label="Action"
+            value={action}
+            onChange={setAction}
+            placeholder="e.g. project.create"
+          />
+          <Field
+            label="Limit"
+            value={String(limit)}
+            onChange={v => setLimit(parseInt(v, 10) || 200)}
+            placeholder="200"
+          />
+          <div className="col-span-4 flex gap-2">
+            <Button onClick={load}>Apply</Button>
+            <Button variant="secondary" onClick={clear}>
+              Clear
+            </Button>
+          </div>
+        </div>
+      </Card>
+
       <Card>
         <DataTable
           rowKey={(r) => r.id}
@@ -88,6 +151,33 @@ export function AuditPage() {
           ]}
         />
       </Card>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500">
+        {label}
+      </p>
+      <input
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm font-mono focus:border-brand-500 focus:outline-none"
+      />
     </div>
   );
 }
