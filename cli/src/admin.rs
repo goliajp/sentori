@@ -674,6 +674,33 @@ pub async fn comment_list(
     Ok(())
 }
 
+pub async fn webhook_test(
+    url: String,
+    secret: Option<String>,
+    message: Option<String>,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let endpoint = format!("{}/admin/api/webhooks/test", resolve_api_url(api_url));
+    let c = client(&token_value(token)?)?;
+    let resp = c
+        .post(&endpoint)
+        .json(&serde_json::json!({
+            "url": url,
+            "secret": secret,
+            "message": message,
+        }))
+        .send()
+        .await?;
+    let body: Value = resp.json().await?;
+    if body["delivered"].as_bool().unwrap_or(false) {
+        println!("✓ delivered, status={}", body["status"].as_i64().unwrap_or(0));
+    } else {
+        println!("✗ {}", body["error"].as_str().unwrap_or("unknown"));
+    }
+    Ok(())
+}
+
 pub async fn push_retry(
     project_id: String,
     send_id: String,

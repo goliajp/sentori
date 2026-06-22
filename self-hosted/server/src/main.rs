@@ -53,6 +53,7 @@ mod saasadmin_mw;
 mod session_mw;
 mod state;
 mod token_cache;
+mod webhook;
 mod webpush;
 
 use state::AppState;

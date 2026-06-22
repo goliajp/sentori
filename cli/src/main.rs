@@ -243,6 +243,18 @@ enum Command {
         #[arg(long = "api-url")]
         api_url: Option<String>,
     },
+    /// Send a test webhook payload (Slack-compatible URL, etc).
+    WebhookTest {
+        url: String,
+        #[arg(long)]
+        secret: Option<String>,
+        #[arg(long)]
+        message: Option<String>,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// Retry-now a single failed push send (DLQ unstuck).
     PushRetry {
         #[arg(long = "project")]
@@ -1055,6 +1067,13 @@ async fn main() -> Result<()> {
             token,
             api_url,
         } => admin::issue_watch(issue_id, token, api_url).await,
+        Command::WebhookTest {
+            url,
+            secret,
+            message,
+            token,
+            api_url,
+        } => admin::webhook_test(url, secret, message, token, api_url).await,
         Command::PushRetry {
             project_id,
             send_id,
