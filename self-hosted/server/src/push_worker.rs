@@ -75,6 +75,8 @@ async fn dispatch_one(pool: &PgPool, send_id: Uuid, provider: &str) -> Result<()
         "webpush" => try_webpush(pool, send_id).await,
         "apns" => try_apns(pool, send_id).await,
         "fcm" => try_fcm(pool, send_id).await,
+        "hcm" => try_hcm(pool, send_id).await,
+        "mipush" => try_mipush(pool, send_id).await,
         _ => Err("provider_not_wired".to_string()),
     };
     let (status, outcome, provider_status, duration_ms) = match real_outcome {
@@ -108,6 +110,87 @@ async fn dispatch_one(pool: &PgPool, send_id: Uuid, provider: &str) -> Result<()
     .await?;
 
     Ok(())
+}
+
+async fn try_hcm(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
+    use std::time::Instant;
+    let row = sqlx::query(
+        "SELECT dt.native_token, ps.payload, pc.config, pc.secret_blob \
+         FROM push_sends ps \
+         JOIN device_tokens dt ON dt.id = ps.token_id \
+         JOIN push_credentials pc ON pc.project_id = ps.project_id AND pc.kind = 'hcm' \
+         WHERE ps.id = $1",
+    )
+    .bind(send_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| e.to_string())?
+    .ok_or_else(|| "credentials_missing".to_string())?;
+    let device_token: String = row.get("native_token");
+    let payload: serde_json::Value = row.get("payload");
+    let config: serde_json::Value = row.get("config");
+    let client_secret = String::from_utf8(row.get::<Vec<u8>, _>("secret_blob"))
+        .map_err(|e| e.to_string())?
+        .trim()
+        .to_string();
+    let client_id = config
+        .get("clientId")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "clientId missing".to_string())?
+        .to_string();
+    let app_id = config
+        .get("appId")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "appId missing".to_string())?
+        .to_string();
+    let title = payload.get("title").and_then(|v| v.as_str()).unwrap_or("Sentori");
+    let body_text = payload.get("body").and_then(|v| v.as_str()).unwrap_or("");
+    let cfg = crate::hcm::HcmConfig {
+        client_id,
+        client_secret,
+        app_id,
+    };
+    let start = Instant::now();
+    let status = crate::hcm::send(&cfg, &device_token, title, body_text)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok((status, start.elapsed().as_millis()))
+}
+
+async fn try_mipush(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
+    use std::time::Instant;
+    let row = sqlx::query(
+        "SELECT dt.native_token, ps.payload, pc.config, pc.secret_blob \
+         FROM push_sends ps \
+         JOIN device_tokens dt ON dt.id = ps.token_id \
+         JOIN push_credentials pc ON pc.project_id = ps.project_id AND pc.kind = 'mipush' \
+         WHERE ps.id = $1",
+    )
+    .bind(send_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| e.to_string())?
+    .ok_or_else(|| "credentials_missing".to_string())?;
+    let device_token: String = row.get("native_token");
+    let payload: serde_json::Value = row.get("payload");
+    let config: serde_json::Value = row.get("config");
+    let app_secret = String::from_utf8(row.get::<Vec<u8>, _>("secret_blob"))
+        .map_err(|e| e.to_string())?
+        .trim()
+        .to_string();
+    let package_name = config
+        .get("packageName")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "packageName missing".to_string())?
+        .to_string();
+    let title = payload.get("title").and_then(|v| v.as_str()).unwrap_or("Sentori");
+    let body_text = payload.get("body").and_then(|v| v.as_str()).unwrap_or("");
+    let cfg = crate::mipush::MiPushConfig { app_secret, package_name };
+    let start = Instant::now();
+    let status = crate::mipush::send(&cfg, &device_token, title, body_text)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok((status, start.elapsed().as_millis()))
 }
 
 async fn try_fcm(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {

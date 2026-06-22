@@ -674,6 +674,44 @@ pub async fn comment_list(
     Ok(())
 }
 
+pub async fn ingest_test(
+    error_type: String,
+    message: String,
+    release: String,
+    environment: String,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!("{}/v1/events", resolve_api_url(api_url));
+    let c = client(&token_value(token)?)?;
+    let resp = c
+        .post(&url)
+        .json(&serde_json::json!({
+            "kind": "error",
+            "error_type": error_type,
+            "message": message,
+            "platform": "javascript",
+            "release": release,
+            "environment": environment,
+            "timestamp": null,
+        }))
+        .send()
+        .await?
+        .error_for_status()?;
+    let body: Value = resp.json().await?;
+    println!(
+        "{}: issue={} event={}",
+        if body["is_new_issue"].as_bool().unwrap_or(false) {
+            "new"
+        } else {
+            "existing"
+        },
+        body["issue_id"].as_str().unwrap_or("?"),
+        body["event_id"].as_str().unwrap_or("?"),
+    );
+    Ok(())
+}
+
 pub async fn probe_list(
     project_id: String,
     token: Option<String>,

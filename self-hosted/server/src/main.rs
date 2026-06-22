@@ -42,6 +42,8 @@ mod blob_store;
 mod bootstrap;
 mod fcm;
 mod handlers;
+mod hcm;
+mod mipush;
 mod notify;
 mod probe_worker;
 mod push_worker;

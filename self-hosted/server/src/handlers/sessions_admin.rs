@@ -59,7 +59,20 @@ pub async fn revoke(
     .execute(&state.pool)
     .await;
     match res {
-        Ok(r) if r.rows_affected() > 0 => StatusCode::NO_CONTENT,
+        Ok(r) if r.rows_affected() > 0 => {
+            crate::notify::audit(
+                &state.pool,
+                state.workspace_id.into_uuid(),
+                None,
+                Some(ctx.user_id.into_uuid()),
+                "session.revoke",
+                Some("session"),
+                Some(&id_hash_hex),
+                serde_json::json!({}),
+            )
+            .await;
+            StatusCode::NO_CONTENT
+        }
         Ok(_) => StatusCode::NOT_FOUND,
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }

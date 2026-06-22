@@ -796,6 +796,27 @@ export class Api {
   deleteRelease(releaseId: string): Promise<void> {
     return this.send(`/admin/api/releases/${releaseId}`, 'DELETE');
   }
+  /// Mark a release deployed using the public SDK endpoint
+  /// (requires the SDK Bearer token, not the dashboard cookie).
+  /// Webapp Releases page surfaces this only when the user
+  /// pastes a project's public token.
+  createDeploy(
+    body: { name: string; deploy_at?: string },
+    overrideToken: string,
+  ): Promise<{ id: string }> {
+    return fetch(`${(this as unknown as { baseUrl: string }).baseUrl}/v1/deploys`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${overrideToken}`,
+      },
+      body: JSON.stringify(body),
+    }).then(async r => {
+      if (!r.ok) throw new ApiError(r.status, await r.text());
+      return r.json();
+    });
+  }
 
   // ── saas: cross-workspace ──────────────────────────────
   listWorkspaces(): Promise<{ workspaces: WorkspaceRow[] }> {

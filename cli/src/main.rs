@@ -243,6 +243,21 @@ enum Command {
         #[arg(long = "api-url")]
         api_url: Option<String>,
     },
+    /// Send a synthetic test event (requires public token).
+    IngestTest {
+        #[arg(long, default_value = "TypeError")]
+        error_type: String,
+        #[arg(long, default_value = "x is undefined (cli test)")]
+        message: String,
+        #[arg(long, default_value = "cli-test@0.0.1")]
+        release: String,
+        #[arg(long, default_value = "development")]
+        environment: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// List endpoint probes for a project.
     Probe {
         #[arg(long = "project")]
@@ -990,6 +1005,24 @@ async fn main() -> Result<()> {
             token,
             api_url,
         } => admin::issue_watch(issue_id, token, api_url).await,
+        Command::IngestTest {
+            error_type,
+            message,
+            release,
+            environment,
+            token,
+            api_url,
+        } => {
+            admin::ingest_test(
+                error_type,
+                message,
+                release,
+                environment,
+                token,
+                api_url,
+            )
+            .await
+        }
         Command::Probe {
             project_id,
             token,

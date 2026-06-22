@@ -28,6 +28,25 @@ export default function Releases() {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [sdkToken, setSdkToken] = useState('');
+
+  async function create() {
+    if (!newName.trim() || !sdkToken.trim()) return;
+    try {
+      await api.createDeploy(
+        { name: newName.trim(), deploy_at: new Date().toISOString() },
+        sdkToken.trim(),
+      );
+      setNewName('');
+      setSdkToken('');
+      setShowCreate(false);
+      await refresh();
+    } catch (e) {
+      setError(String(e));
+    }
+  }
 
   async function refresh() {
     if (!projectId) return;
@@ -83,7 +102,42 @@ export default function Releases() {
       <PageHeader
         title="Releases"
         subtitle="Deploy markers + uploaded symbolicator blobs (sourcemap / dsym / proguard)."
+        actions={
+          <Button onClick={() => setShowCreate(!showCreate)} size="sm">
+            {showCreate ? 'Cancel' : '+ Deploy marker'}
+          </Button>
+        }
       />
+
+      {showCreate && (
+        <Card>
+          <CardHeader title="Mark deploy" />
+          <Section>
+            <p className="text-xs text-zinc-500 mb-2">
+              Mints a release row via the public /v1/deploys endpoint.
+              Requires a project SDK token (st_pk_...).
+            </p>
+            <input
+              className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+              placeholder="Release name (e.g. myapp@1.2.3+456)"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+            />
+            <input
+              type="password"
+              className="mt-2 w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-mono"
+              placeholder="Project SDK token (st_pk_...)"
+              value={sdkToken}
+              onChange={e => setSdkToken(e.target.value)}
+            />
+            <div className="mt-2 flex gap-2">
+              <Button onClick={create} size="sm">
+                Mark deployed
+              </Button>
+            </div>
+          </Section>
+        </Card>
+      )}
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       <Card>
