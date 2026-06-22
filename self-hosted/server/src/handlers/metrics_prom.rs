@@ -19,6 +19,14 @@ use crate::state::AppState;
 pub async fn handle(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let mut out = String::with_capacity(2048);
 
+    // ── build info ──────────────────────────────────────────
+    out.push_str("# HELP sentori_build_info Server build metadata.\n");
+    out.push_str("# TYPE sentori_build_info gauge\n");
+    out.push_str(&format!(
+        "sentori_build_info{{version=\"{}\"}} 1\n",
+        env!("CARGO_PKG_VERSION")
+    ));
+
     // ── pool ────────────────────────────────────────────────
     let pool_size = state.pool.size();
     let pool_idle = state.pool.num_idle();

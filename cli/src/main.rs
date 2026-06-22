@@ -190,6 +190,7 @@ enum Command {
         api_url: Option<String>,
     },
     /// Show the current session user (Bearer or session cookie).
+    #[command(alias = "whoami")]
     Me {
         #[arg(long)]
         token: Option<String>,
