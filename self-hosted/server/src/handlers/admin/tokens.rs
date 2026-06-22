@@ -13,9 +13,11 @@ use std::sync::Arc;
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Extension, Path, State},
     http::StatusCode,
 };
+
+use crate::session_mw::SessionContext;
 use sentori_ingest_token::{TokenKind, TokenStore};
 use sentori_workspace_identity::ProjectId;
 use serde::Deserialize;
@@ -38,6 +40,7 @@ pub struct CreateBody {
 
 pub async fn create(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
     Json(body): Json<CreateBody>,
 ) -> (StatusCode, Json<Value>) {
@@ -73,7 +76,7 @@ pub async fn create(
                 &state.pool,
                 state.workspace_id.into_uuid(),
                 Some(project_id),
-                None,
+                Some(ctx.user_id.into_uuid()),
                 "token.mint",
                 Some("token"),
                 Some(&id.to_string()),
@@ -134,6 +137,7 @@ pub async fn list(
 
 pub async fn revoke(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(token_id): Path<Uuid>,
 ) -> StatusCode {
     let store = TokenStore::new(state.pool.clone());
@@ -144,7 +148,7 @@ pub async fn revoke(
                 &state.pool,
                 state.workspace_id.into_uuid(),
                 None,
-                None,
+                Some(ctx.user_id.into_uuid()),
                 "token.revoke",
                 Some("token"),
                 Some(&token_id.to_string()),

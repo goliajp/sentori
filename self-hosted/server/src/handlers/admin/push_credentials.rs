@@ -13,9 +13,11 @@ use std::sync::Arc;
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Extension, Path, State},
     http::StatusCode,
 };
+
+use crate::session_mw::SessionContext;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlx::Row;
@@ -40,6 +42,7 @@ pub struct UpsertBody {
 
 pub async fn upsert(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
     Json(body): Json<UpsertBody>,
 ) -> (StatusCode, Json<Value>) {
@@ -89,7 +92,7 @@ pub async fn upsert(
                 &state.pool,
                 state.workspace_id.into_uuid(),
                 Some(project_id),
-                None,
+                Some(ctx.user_id.into_uuid()),
                 "push_credentials.upsert",
                 Some("push_credentials"),
                 Some(&id.to_string()),

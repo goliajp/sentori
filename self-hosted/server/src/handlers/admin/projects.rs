@@ -12,9 +12,11 @@ use std::sync::Arc;
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Extension, Path, State},
     http::StatusCode,
 };
+
+use crate::session_mw::SessionContext;
 use sentori_workspace_identity::ProjectId;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -33,6 +35,7 @@ pub struct CreateBody {
 
 pub async fn create(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Json(body): Json<CreateBody>,
 ) -> (StatusCode, Json<Value>) {
     if body.name.is_empty() || body.slug.is_empty() {
@@ -61,7 +64,7 @@ pub async fn create(
                 &state.pool,
                 state.workspace_id.into_uuid(),
                 Some(p.id.into_uuid()),
-                None,
+                Some(ctx.user_id.into_uuid()),
                 "project.create",
                 Some("project"),
                 Some(&p.id.to_string()),
@@ -168,6 +171,7 @@ pub async fn update(
 
 pub async fn delete(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
 ) -> StatusCode {
     match state
@@ -182,7 +186,7 @@ pub async fn delete(
                 &state.pool,
                 state.workspace_id.into_uuid(),
                 Some(project_id),
-                None,
+                Some(ctx.user_id.into_uuid()),
                 "project.delete",
                 Some("project"),
                 Some(&project_id.to_string()),
