@@ -243,6 +243,23 @@ enum Command {
         #[arg(long = "api-url")]
         api_url: Option<String>,
     },
+    /// List current user's active sessions.
+    Sessions {
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Revoke a specific session by id_hash_hex.
+    SessionRevoke {
+        id_hash_hex: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// List watchers of an issue.
     Watchers {
         issue_id: String,
@@ -889,6 +906,16 @@ async fn main() -> Result<()> {
             token,
             api_url,
         } => admin::issue_watch(issue_id, token, api_url).await,
+        Command::Sessions {
+            token,
+            api_url,
+            json,
+        } => admin::session_list(token, api_url, json).await,
+        Command::SessionRevoke {
+            id_hash_hex,
+            token,
+            api_url,
+        } => admin::session_revoke(id_hash_hex, token, api_url).await,
         Command::Watchers {
             issue_id,
             token,

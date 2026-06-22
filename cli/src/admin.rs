@@ -674,6 +674,50 @@ pub async fn comment_list(
     Ok(())
 }
 
+pub async fn session_list(
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!("{}/auth/sessions", resolve_api_url(api_url));
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    let rows = body["sessions"].as_array().cloned().unwrap_or_default();
+    println!("sessions: {}", rows.len());
+    for s in &rows {
+        println!(
+            "  {}  expires {}  ip {}",
+            s["id_hash_hex"]
+                .as_str()
+                .map(|h| &h[..h.len().min(12)])
+                .unwrap_or("?"),
+            s["expires_at"].as_str().unwrap_or("?"),
+            s["ip"].as_str().unwrap_or("?"),
+        );
+    }
+    Ok(())
+}
+
+pub async fn session_revoke(
+    id_hash_hex: String,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!(
+        "{}/auth/sessions/{id_hash_hex}",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    c.delete(&url).send().await?.error_for_status()?;
+    println!("revoked session {id_hash_hex}");
+    Ok(())
+}
+
 pub async fn watcher_list(
     issue_id: String,
     token: Option<String>,
