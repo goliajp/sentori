@@ -5,6 +5,8 @@
 //! constant `DEFAULT_WORKSPACE_ID` and every workspace-bound
 //! service is constructed scoped to it.
 
+use std::sync::Arc;
+
 use sqlx::PgPool;
 
 use sentori_alert_rule::AlertRuleService;
@@ -44,6 +46,10 @@ pub struct AppState {
     pub tenant: TenantGuard,
     pub billing: BillingService,
     pub push_tokens: DeviceTokenStore,
+    /// Shared blob store for event_attachments (replay /
+    /// screenshot / sourcemap / dsym / proguard). Phase D uses
+    /// MemoryBlobStore; Phase E swaps to LocalFsBlobStore.
+    pub attachments: Arc<MemoryBlobStore>,
 }
 
 impl AppState {
@@ -77,6 +83,7 @@ impl AppState {
         let tenant = TenantGuard::new(pool.clone(), workspace_id);
         let billing = BillingService::new(pool.clone(), workspace_id);
         let push_tokens = DeviceTokenStore::new(pool.clone());
+        let attachments = Arc::new(MemoryBlobStore::new());
         Self {
             pool,
             workspace_id,
@@ -94,6 +101,7 @@ impl AppState {
             tenant,
             billing,
             push_tokens,
+            attachments,
         }
     }
 }
