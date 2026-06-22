@@ -209,6 +209,9 @@ export default function IssueDetail() {
         </Section>
       </Card>
 
+      <Comments issueId={issueId} myUserId={myUserId} />
+      <Activity issueId={issueId} />
+
       <Card>
         <CardHeader title={`Recent events (${events.length})`} />
         <Section>
@@ -262,5 +265,150 @@ function Cell({
       </p>
       <div className="mt-1 text-sm">{children}</div>
     </div>
+  );
+}
+
+function Comments({
+  issueId,
+  myUserId,
+}: {
+  issueId: string;
+  myUserId: string | null;
+}) {
+  const [rows, setRows] = useState<
+    {
+      id: string;
+      author_user_id: string;
+      body_md: string;
+      created_at: string;
+    }[]
+  >([]);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api
+      .listComments(issueId)
+      .then(r => setRows(r.comments))
+      .catch(() => {});
+  }, [issueId]);
+
+  async function post() {
+    if (!text.trim()) return;
+    setBusy(true);
+    try {
+      const c = await api.createComment(issueId, text.trim());
+      setRows(rs => [...rs, c]);
+      setText('');
+    } catch {
+      /* noop */
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function del(id: string) {
+    if (!confirm('Delete comment?')) return;
+    try {
+      await api.deleteComment(issueId, id);
+      setRows(rs => rs.filter(r => r.id !== id));
+    } catch {
+      /* noop */
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader title={`Comments (${rows.length})`} />
+      <Section>
+        <div className="space-y-2">
+          {rows.map(c => (
+            <div
+              key={c.id}
+              className="rounded border border-zinc-200 p-2 text-xs"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[10px] text-zinc-500">
+                  {c.author_user_id.slice(0, 8)}… ·{' '}
+                  {formatRelative(c.created_at)}
+                </span>
+                {myUserId === c.author_user_id && (
+                  <button
+                    onClick={() => del(c.id)}
+                    className="text-[10px] text-zinc-500 hover:text-red-400"
+                  >
+                    delete
+                  </button>
+                )}
+              </div>
+              <p className="mt-1 whitespace-pre-wrap text-zinc-200">
+                {c.body_md}
+              </p>
+            </div>
+          ))}
+          {myUserId && (
+            <div className="space-y-2 pt-2">
+              <textarea
+                value={text}
+                onChange={e => setText(e.target.value)}
+                placeholder="Add a comment (Markdown)…"
+                className="w-full h-20 rounded border border-zinc-300 p-2 text-xs"
+              />
+              <Button
+                size="sm"
+                onClick={post}
+                disabled={busy || !text.trim()}
+              >
+                Post
+              </Button>
+            </div>
+          )}
+        </div>
+      </Section>
+    </Card>
+  );
+}
+
+function Activity({ issueId }: { issueId: string }) {
+  const [rows, setRows] = useState<
+    {
+      id: string;
+      actor_user_id: string | null;
+      kind: string;
+      created_at: string;
+    }[]
+  >([]);
+  useEffect(() => {
+    api
+      .listActivity(issueId)
+      .then(r => setRows(r.activity))
+      .catch(() => {});
+  }, [issueId]);
+
+  if (rows.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader title={`Activity (${rows.length})`} />
+      <Section>
+        <ul className="space-y-1 text-xs">
+          {rows.map(a => (
+            <li
+              key={a.id}
+              className="flex items-center justify-between text-zinc-400"
+            >
+              <span>
+                <Badge>{a.kind}</Badge>{' '}
+                {a.actor_user_id
+                  ? a.actor_user_id.slice(0, 8) + '…'
+                  : 'system'}
+              </span>
+              <span className="font-mono text-[10px]">
+                {formatRelative(a.created_at)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Section>
+    </Card>
   );
 }

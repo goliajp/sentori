@@ -28,7 +28,9 @@ mod cert;
 mod events;
 mod events_live;
 mod health;
+mod activity_log;
 mod ingest;
+mod issue_comments;
 mod issue_watchers;
 mod issues;
 mod projects;
@@ -179,6 +181,15 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/issues/:issue_id/watchers",
             post(issue_watchers::join).delete(issue_watchers::leave),
         )
+        // ── admin: issue comments (session-scoped author) ──
+        .route(
+            "/admin/api/issues/:issue_id/comments",
+            post(issue_comments::create),
+        )
+        .route(
+            "/admin/api/issues/:issue_id/comments/:comment_id",
+            delete(issue_comments::delete),
+        )
         // ── admin: releases ───────────────────────────────
         .route(
             "/admin/api/projects/:project_id/releases",
@@ -226,6 +237,18 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(
             "/v1/issues/:issue_id/watchers",
             get(issue_watchers::list),
+        )
+        .route(
+            "/v1/issues/:issue_id/comments",
+            get(issue_comments::list),
+        )
+        .route(
+            "/v1/issues/:issue_id/activity",
+            get(activity_log::list),
+        )
+        .route(
+            "/v1/projects/:project_id/issues/_bulk_patch",
+            post(issues::bulk_patch),
         )
         .route("/v1/projects/:project_id/events", get(events::list))
         .route("/v1/projects/:project_id/events/trend", get(events::trend))

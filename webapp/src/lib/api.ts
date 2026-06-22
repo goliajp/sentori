@@ -425,6 +425,61 @@ export class Api {
   unwatchIssue(issueId: string): Promise<void> {
     return this.send(`/admin/api/issues/${issueId}/watchers`, 'DELETE');
   }
+  listComments(
+    issueId: string,
+  ): Promise<{
+    comments: {
+      id: string;
+      author_user_id: string;
+      body_md: string;
+      created_at: string;
+      edited_at: string | null;
+    }[];
+  }> {
+    return this.get(`/v1/issues/${issueId}/comments`);
+  }
+  createComment(
+    issueId: string,
+    body_md: string,
+  ): Promise<{
+    id: string;
+    author_user_id: string;
+    body_md: string;
+    created_at: string;
+  }> {
+    return this.post(`/admin/api/issues/${issueId}/comments`, { body_md });
+  }
+  deleteComment(issueId: string, commentId: string): Promise<void> {
+    return this.send(
+      `/admin/api/issues/${issueId}/comments/${commentId}`,
+      'DELETE',
+    );
+  }
+  listActivity(
+    issueId: string,
+  ): Promise<{
+    activity: {
+      id: string;
+      actor_user_id: string | null;
+      kind: string;
+      payload: unknown;
+      created_at: string;
+    }[];
+  }> {
+    return this.get(`/v1/issues/${issueId}/activity`);
+  }
+  bulkPatchIssues(
+    projectId: string,
+    body: {
+      ids: string[];
+      status?: 'active' | 'resolved' | 'regressed' | 'ignored';
+    },
+  ): Promise<{ updated: number }> {
+    return this.post(
+      `/v1/projects/${projectId}/issues/_bulk_patch`,
+      body,
+    );
+  }
   ingestEvent(
     projectId: string,
     body: IngestRequest,

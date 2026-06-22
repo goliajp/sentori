@@ -27,6 +27,27 @@ export function IssuesPage() {
   const [issues, setIssues] = useState<Issue[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  async function bulkApply(status: 'resolved' | 'ignored') {
+    if (!projectId || selected.size === 0) return;
+    try {
+      await api.bulkPatchIssues(projectId, {
+        ids: Array.from(selected),
+        status,
+      });
+      setIssues(rows =>
+        rows
+          ? rows.map(r =>
+              selected.has(r.id) ? { ...r, status } : r,
+            )
+          : rows,
+      );
+      setSelected(new Set());
+    } catch (e) {
+      setErr(String(e));
+    }
+  }
 
   useEffect(() => {
     if (!projectId) return;
@@ -83,6 +104,31 @@ export function IssuesPage() {
         }
       />
 
+      {selected.size > 0 && (
+        <div className="mb-4 flex items-center gap-2 rounded border border-emerald-700/40 bg-emerald-900/20 px-3 py-2 text-xs">
+          <span className="text-zinc-300">
+            {selected.size} selected
+          </span>
+          <Button size="sm" onClick={() => bulkApply('resolved')}>
+            Resolve all
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => bulkApply('ignored')}
+          >
+            Ignore all
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setSelected(new Set())}
+          >
+            Clear
+          </Button>
+        </div>
+      )}
+
       <div className="mb-4">
         <Tabs
           value={statusFilter || 'all'}
@@ -112,6 +158,26 @@ export function IssuesPage() {
           empty="No issues. Send some events with the SDK to populate."
           rows={issues ?? []}
           columns={[
+            {
+              key: 'select',
+              label: '',
+              width: '3%',
+              render: (r) => (
+                <input
+                  type="checkbox"
+                  checked={selected.has(r.id)}
+                  onChange={e => {
+                    setSelected(s => {
+                      const c = new Set(s);
+                      if (e.target.checked) c.add(r.id);
+                      else c.delete(r.id);
+                      return c;
+                    });
+                  }}
+                  className="cursor-pointer"
+                />
+              ),
+            },
             {
               key: 'status',
               label: '',
