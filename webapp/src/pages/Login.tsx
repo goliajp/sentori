@@ -1,27 +1,38 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+// Dashboard sign-in. Calls /auth/login → stashes session token
+// in localStorage (will become HttpOnly cookie once middleware
+// lands in Phase E step 7+) then routes to Overview.
 
-/// Login page — v0.1 skeleton. Real auth lands once the K2
-/// auth-session HTTP middleware is wired into the
-/// self-hosted server. Until then this is a UI shell only.
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+
+import { api } from '../lib/api';
+
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    // Stub: in v0.1.x once /v1/auth/login lands, this will
-    // call api.login(email, password). For now just route
-    // to /projects (the dashboard is anonymous-readable in
-    // the skeleton).
     if (!email || !password) {
       setErr('email + password required');
       return;
     }
-    navigate('/projects');
+    setLoading(true);
+    try {
+      const r = await api.authLogin({ email, password });
+      localStorage.setItem('sentori_session', r.session_token);
+      localStorage.setItem('sentori_user_id', r.user_id);
+      localStorage.setItem('sentori_email', r.email);
+      navigate('/');
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -31,16 +42,14 @@ export function LoginPage() {
         className="w-80 rounded-lg border border-zinc-800 bg-zinc-900 p-6"
       >
         <h1 className="mb-1 text-xl font-semibold">Sign in to Sentori</h1>
-        <p className="mb-6 text-sm text-zinc-500">
-          v0.1 skeleton — full auth lands next.
-        </p>
+        <p className="mb-6 text-sm text-zinc-500">v0.2</p>
         <label className="mb-3 block text-sm">
           <span className="mb-1 block text-zinc-400">Email</span>
           <input
             type="email"
             autoFocus
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={e => setEmail(e.target.value)}
             className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
           />
         </label>
@@ -49,19 +58,28 @@ export function LoginPage() {
           <input
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={e => setPassword(e.target.value)}
             className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
           />
         </label>
         {err && (
-          <p className="mb-3 text-sm text-red-400">{err}</p>
+          <p className="mb-3 text-xs text-red-400 break-all">{err}</p>
         )}
         <button
           type="submit"
-          className="w-full rounded bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
+          disabled={loading}
+          className="w-full rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
         >
-          Sign in
+          {loading ? 'Signing in…' : 'Sign in'}
         </button>
+        <div className="mt-4 flex justify-between text-xs text-zinc-500">
+          <Link to="/register" className="hover:text-zinc-300">
+            Create account
+          </Link>
+          <Link to="/forgot-password" className="hover:text-zinc-300">
+            Forgot password?
+          </Link>
+        </div>
       </form>
     </div>
   );

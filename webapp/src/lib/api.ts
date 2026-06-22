@@ -246,6 +246,37 @@ export class Api {
     return this.send(`/v1/saved-views/${id}`, 'DELETE');
   }
 
+  // ── auth: dashboard user lifecycle ─────────────────────
+  authRegister(body: { email: string; password: string }): Promise<{
+    user_id: string;
+    verify_token: string;
+  }> {
+    return this.post('/auth/register', body);
+  }
+  authLogin(body: { email: string; password: string }): Promise<{
+    user_id: string;
+    email: string;
+    session_token: string;
+    expires_at: string;
+  }> {
+    return this.post('/auth/login', body);
+  }
+  authVerify(token: string): Promise<{ user_id: string }> {
+    return this.post('/auth/verify', { token });
+  }
+  authForgotPassword(email: string): Promise<{ reset_token?: string }> {
+    return this.post('/auth/forgot-password', { email });
+  }
+  authResetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<{ user_id: string }> {
+    return this.post('/auth/reset-password', {
+      token,
+      new_password: newPassword,
+    });
+  }
+
   // ── admin: tokens ──────────────────────────────────────
   listTokens(projectId: string): Promise<{ tokens: TokenSummary[] }> {
     return this.get(`/admin/api/projects/${projectId}/tokens`);

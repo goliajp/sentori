@@ -11,10 +11,12 @@ import { HealthPage } from './pages/Health';
 import { IssuesPage } from './pages/Issues';
 import { LoginPage } from './pages/Login';
 import { OverviewPage } from './pages/Overview';
+import ForgotPassword from './pages/ForgotPassword';
 import Integrations from './pages/Integrations';
 import Members from './pages/Members';
 import Projects from './pages/Projects';
 import PushCredentials from './pages/PushCredentials';
+import Register from './pages/Register';
 import { SettingsPage } from './pages/Settings';
 import Tokens from './pages/Tokens';
 
@@ -30,6 +32,8 @@ createRoot(rootEl).render(
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route element={<App />}>
           <Route index element={<OverviewPage />} />
           <Route path="/alerts" element={<AlertsPage />} />
