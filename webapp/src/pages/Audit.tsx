@@ -24,6 +24,7 @@ export function AuditPage() {
         project_id: projectId.trim() || undefined,
         actor_user_id: actor.trim() || undefined,
         action: action.trim() || undefined,
+        ip: ipFilter.trim() || undefined,
         limit,
       });
       setEntries(r);
@@ -48,16 +49,9 @@ export function AuditPage() {
     setTimeout(load, 0);
   }
 
-  // Client-side IP filter — the backend's audit endpoint accepts
-  // project/actor/action but not free-text payload search; filter
-  // locally over the rows the server already returned.
-  const visibleEntries =
-    entries && ipFilter.trim()
-      ? entries.filter(e => {
-          const ip = (e.payload as Record<string, unknown> | null)?._ip;
-          return typeof ip === 'string' && ip.includes(ipFilter.trim());
-        })
-      : entries;
+  // IP filter is now applied server-side (backend filters by
+  // payload._ip substring match).
+  const visibleEntries = entries;
 
   function exportCsv() {
     if (!entries || entries.length === 0) return;
@@ -136,7 +130,7 @@ export function AuditPage() {
             placeholder="200"
           />
           <Field
-            label="IP (client-side filter)"
+            label="IP (substring match)"
             value={ipFilter}
             onChange={setIpFilter}
             placeholder="e.g. 198.51.100"

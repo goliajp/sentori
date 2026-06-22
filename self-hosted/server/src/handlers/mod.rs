@@ -283,6 +283,8 @@ pub fn router(state: Arc<AppState>) -> Router {
     // behind the same session middleware via env-var flip).
     Router::new()
         .route("/healthz", get(health::healthz))
+        .route("/livez", get(health::livez))
+        .route("/readyz", get(health::readyz))
         .route("/metrics", get(metrics_prom::handle))
         .route("/v1/_describe", get(api_describe::describe))
         .route("/v1/projects", get(projects::list))

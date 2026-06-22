@@ -59,3 +59,20 @@ pub async fn healthz(State(state): State<Arc<AppState>>) -> (StatusCode, Json<He
         }),
     )
 }
+
+/// k8s livenessProbe. Returns 200 unconditionally — the process is
+/// up. (DB outage shouldn't trigger pod restart; that's readyz' job.)
+pub async fn livez() -> StatusCode {
+    StatusCode::OK
+}
+
+/// k8s readinessProbe. Returns 200 if DB is reachable, 503 otherwise.
+/// The kubelet uses this to decide whether to send traffic to this
+/// pod — when DB is down we want traffic shifted to peers, not
+/// errors served back.
+pub async fn readyz(State(state): State<Arc<AppState>>) -> StatusCode {
+    match sqlx::query("SELECT 1").execute(&state.pool).await {
+        Ok(_) => StatusCode::OK,
+        Err(_) => StatusCode::SERVICE_UNAVAILABLE,
+    }
+}

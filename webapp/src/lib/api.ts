@@ -555,6 +555,7 @@ export class Api {
     actor_user_id?: string;
     action?: string;
     limit?: number;
+    ip?: string;
   } = {}): Promise<AuditEntry[]> {
     const qs = buildQS(opts as Record<string, string | number | undefined>);
     return this.get(`/v1/audit${qs}`);
