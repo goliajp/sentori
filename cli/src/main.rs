@@ -243,6 +243,45 @@ enum Command {
         #[arg(long = "api-url")]
         api_url: Option<String>,
     },
+    /// List push credentials for a project.
+    PushCred {
+        #[arg(long = "project")]
+        project_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Upsert a push credential.
+    PushCredUpsert {
+        #[arg(long = "project")]
+        project_id: String,
+        #[arg(long)]
+        provider: String,
+        /// Config JSON. Example for webpush:
+        ///   '{"subject":"mailto:a@b.com","vapidPublicKey":"BMqS..."}'
+        #[arg(long)]
+        config: String,
+        /// Path to a file containing the secret (PEM, server key, etc).
+        #[arg(long = "secret-file")]
+        secret_path: Option<String>,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
+    /// Delete a push credential by kind.
+    PushCredDelete {
+        #[arg(long = "project")]
+        project_id: String,
+        kind: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// List current user's active sessions.
     Sessions {
         #[arg(long)]
@@ -906,6 +945,36 @@ async fn main() -> Result<()> {
             token,
             api_url,
         } => admin::issue_watch(issue_id, token, api_url).await,
+        Command::PushCred {
+            project_id,
+            token,
+            api_url,
+            json,
+        } => admin::push_cred_list(project_id, token, api_url, json).await,
+        Command::PushCredUpsert {
+            project_id,
+            provider,
+            config,
+            secret_path,
+            token,
+            api_url,
+        } => {
+            admin::push_cred_upsert(
+                project_id,
+                provider,
+                config,
+                secret_path,
+                token,
+                api_url,
+            )
+            .await
+        }
+        Command::PushCredDelete {
+            project_id,
+            kind,
+            token,
+            api_url,
+        } => admin::push_cred_delete(project_id, kind, token, api_url).await,
         Command::Sessions {
             token,
             api_url,

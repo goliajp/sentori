@@ -674,6 +674,92 @@ pub async fn comment_list(
     Ok(())
 }
 
+pub async fn push_cred_list(
+    project_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!(
+        "{}/admin/api/projects/{project_id}/push/credentials",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    let rows = body["credentials"].as_array().cloned().unwrap_or_default();
+    println!("{:<10}  {:<10}  {:<20}", "kind", "validated", "created");
+    for c in &rows {
+        println!(
+            "{:<10}  {:<10}  {:<20}",
+            c["kind"].as_str().unwrap_or("?"),
+            c["last_validate_status"].as_str().unwrap_or("never"),
+            c["created_at"].as_str().unwrap_or("?"),
+        );
+    }
+    Ok(())
+}
+
+pub async fn push_cred_upsert(
+    project_id: String,
+    provider: String,
+    config_json: String,
+    secret_path: Option<String>,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    use std::fs;
+    let config: Value =
+        serde_json::from_str(&config_json).context("config json invalid")?;
+    let secret = if let Some(p) = secret_path {
+        Some(fs::read_to_string(&p).context("read secret file")?)
+    } else {
+        None
+    };
+    let url = format!(
+        "{}/admin/api/projects/{project_id}/push/credentials",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c
+        .post(&url)
+        .json(&serde_json::json!({
+            "provider": provider,
+            "config": config,
+            "secret": secret,
+        }))
+        .send()
+        .await?
+        .error_for_status()?;
+    let body: Value = resp.json().await?;
+    println!(
+        "upserted push credentials id={} provider={}",
+        body["id"].as_str().unwrap_or("?"),
+        body["provider"].as_str().unwrap_or("?")
+    );
+    Ok(())
+}
+
+pub async fn push_cred_delete(
+    project_id: String,
+    kind: String,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!(
+        "{}/admin/api/projects/{project_id}/push/credentials/{kind}",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    c.delete(&url).send().await?.error_for_status()?;
+    println!("deleted {kind} credentials for project {project_id}");
+    Ok(())
+}
+
 pub async fn session_list(
     token: Option<String>,
     api_url: Option<String>,

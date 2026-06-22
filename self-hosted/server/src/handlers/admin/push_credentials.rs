@@ -85,6 +85,17 @@ pub async fn upsert(
                 provider = %body.provider,
                 "admin.push_credentials upserted",
             );
+            crate::notify::audit(
+                &state.pool,
+                state.workspace_id.into_uuid(),
+                Some(project_id),
+                None,
+                "push_credentials.upsert",
+                Some("push_credentials"),
+                Some(&id.to_string()),
+                json!({ "provider": body.provider }),
+            )
+            .await;
             (
                 StatusCode::CREATED,
                 Json(json!({ "id": id.to_string(), "provider": body.provider })),

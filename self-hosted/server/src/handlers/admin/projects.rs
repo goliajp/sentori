@@ -57,6 +57,17 @@ pub async fn create(
                 slug = %body.slug,
                 "admin.projects created",
             );
+            crate::notify::audit(
+                &state.pool,
+                state.workspace_id.into_uuid(),
+                Some(p.id.into_uuid()),
+                None,
+                "project.create",
+                Some("project"),
+                Some(&p.id.to_string()),
+                json!({ "name": body.name, "slug": body.slug }),
+            )
+            .await;
             (
                 StatusCode::CREATED,
                 Json(json!({
@@ -167,6 +178,17 @@ pub async fn delete(
     {
         Ok(()) => {
             info!(%project_id, "admin.projects deleted");
+            crate::notify::audit(
+                &state.pool,
+                state.workspace_id.into_uuid(),
+                Some(project_id),
+                None,
+                "project.delete",
+                Some("project"),
+                Some(&project_id.to_string()),
+                json!({}),
+            )
+            .await;
             StatusCode::NO_CONTENT
         }
         Err(e) => {

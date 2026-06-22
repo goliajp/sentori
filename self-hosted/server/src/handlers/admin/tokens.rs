@@ -69,6 +69,17 @@ pub async fn create(
                 kind = ?kind,
                 "admin.tokens minted",
             );
+            crate::notify::audit(
+                &state.pool,
+                state.workspace_id.into_uuid(),
+                Some(project_id),
+                None,
+                "token.mint",
+                Some("token"),
+                Some(&id.to_string()),
+                json!({ "kind": kind.as_db_str(), "label": body.label }),
+            )
+            .await;
             (
                 StatusCode::CREATED,
                 Json(json!({
@@ -129,6 +140,17 @@ pub async fn revoke(
     match store.revoke(token_id).await {
         Ok(()) => {
             info!(%token_id, "admin.tokens revoked");
+            crate::notify::audit(
+                &state.pool,
+                state.workspace_id.into_uuid(),
+                None,
+                None,
+                "token.revoke",
+                Some("token"),
+                Some(&token_id.to_string()),
+                json!({}),
+            )
+            .await;
             StatusCode::NO_CONTENT
         }
         Err(e) => {
