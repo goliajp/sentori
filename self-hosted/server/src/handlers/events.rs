@@ -83,3 +83,47 @@ pub async fn list(
             .collect(),
     ))
 }
+
+/// GET /v1/projects/:project_id/events/trend?days=N
+///
+/// Returns `[{ day: "YYYY-MM-DD", count: N }]` for the last
+/// `days` days (default 7, max 90). Used by the dashboard
+/// Overview sparkline.
+pub async fn trend(
+    State(state): State<Arc<AppState>>,
+    Path(project_id): Path<Uuid>,
+    Query(q): Query<TrendQuery>,
+) -> Result<Json<Vec<TrendRow>>, (StatusCode, String)> {
+    let days = q.days.unwrap_or(7).clamp(1, 90) as i64;
+    let rows: Vec<(time::Date, i64)> = sqlx::query_as(
+        "SELECT (received_at AT TIME ZONE 'UTC')::date AS day, COUNT(*)::bigint \
+         FROM events \
+         WHERE project_id = $1 \
+           AND received_at >= now() - ($2 || ' days')::interval \
+         GROUP BY day ORDER BY day",
+    )
+    .bind(project_id)
+    .bind(days.to_string())
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(
+        rows.into_iter()
+            .map(|(day, count)| TrendRow {
+                day: day.to_string(),
+                count,
+            })
+            .collect(),
+    ))
+}
+
+#[derive(Deserialize, Default)]
+pub struct TrendQuery {
+    pub days: Option<u32>,
+}
+
+#[derive(Serialize)]
+pub struct TrendRow {
+    pub day: String,
+    pub count: i64,
+}

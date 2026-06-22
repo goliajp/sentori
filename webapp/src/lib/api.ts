@@ -229,6 +229,12 @@ export class Api {
     const qs = buildQS({ issue_id: opts.issue_id, limit: opts.limit });
     return this.get(`/v1/projects/${projectId}/events${qs}`);
   }
+  eventsTrend(
+    projectId: string,
+    days = 7,
+  ): Promise<{ day: string; count: number }[]> {
+    return this.get(`/v1/projects/${projectId}/events/trend?days=${days}`);
+  }
   ingestEvent(
     projectId: string,
     body: IngestRequest,

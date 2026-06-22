@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError, Project, UsageResponse } from '../lib/api';
+import { Sparkline } from '../components/Sparkline';
 import {
   Card,
   CardHeader,
@@ -13,12 +14,25 @@ export function OverviewPage() {
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [trends, setTrends] = useState<Record<string, number[]>>({});
 
   useEffect(() => {
     Promise.all([api.listProjects(), api.usage()])
-      .then(([p, u]) => {
+      .then(async ([p, u]) => {
         setProjects(p);
         setUsage(u);
+        // Fetch 7-day trend per project in parallel
+        const t = await Promise.all(
+          p.map(async pr => {
+            try {
+              const series = await api.eventsTrend(pr.id, 7);
+              return [pr.id, series.map(d => d.count)] as const;
+            } catch {
+              return [pr.id, []] as const;
+            }
+          }),
+        );
+        setTrends(Object.fromEntries(t));
       })
       .catch((e: unknown) => {
         if (e instanceof ApiError) setErr(`${e.status}: ${e.body}`);
@@ -60,7 +74,7 @@ export function OverviewPage() {
                 key={p.id}
                 className="flex items-center justify-between px-5 py-3"
               >
-                <div>
+                <div className="min-w-0 flex-1">
                   <Link
                     to={`/projects/${p.id}/issues`}
                     className="text-sm font-medium text-zinc-100 hover:text-brand-400"
@@ -71,12 +85,29 @@ export function OverviewPage() {
                     {p.slug}
                   </p>
                 </div>
-                <Link
-                  to={`/projects/${p.id}/issues`}
-                  className="rounded bg-zinc-800 px-3 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
-                >
-                  Issues →
-                </Link>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="font-mono text-xs text-zinc-400">7d events</p>
+                    <p className="font-mono text-sm text-zinc-200">
+                      {trends[p.id]
+                        ? formatNumber(
+                            trends[p.id].reduce((a, b) => a + b, 0),
+                          )
+                        : '—'}
+                    </p>
+                  </div>
+                  <Sparkline
+                    values={trends[p.id] ?? []}
+                    width={140}
+                    height={36}
+                  />
+                  <Link
+                    to={`/projects/${p.id}/issues`}
+                    className="rounded bg-zinc-800 px-3 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
+                  >
+                    Issues →
+                  </Link>
+                </div>
               </li>
             ))}
           </ul>
