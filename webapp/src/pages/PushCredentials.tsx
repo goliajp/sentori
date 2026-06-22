@@ -95,6 +95,17 @@ export default function PushCredentials() {
         }
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
+      <Card className="mb-2">
+        <CardHeader title="Test push" />
+        <Section>
+          <p className="text-xs text-zinc-500 mb-2">
+            Send a real test notification to a known device token to
+            verify credentials + vendor adapter end-to-end.
+          </p>
+          <TestPushForm projectId={projectId} />
+        </Section>
+      </Card>
+
       {showUpload && (
         <Card>
           <CardHeader title="Upload credentials" />
@@ -259,4 +270,59 @@ function bytesToB64url(bytes: Uint8Array): string {
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '');
+}
+
+function TestPushForm({ projectId }: { projectId: string }) {
+  const [tokenId, setTokenId] = useState('');
+  const [title, setTitle] = useState('Sentori test');
+  const [bodyText, setBodyText] = useState('hello from dashboard');
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function send() {
+    if (!tokenId.trim()) return;
+    setMsg(null);
+    try {
+      const r = await api.testPush(projectId, {
+        deviceTokenId: tokenId.trim(),
+        title,
+        body: bodyText,
+      });
+      setMsg(`queued send_id=${r.send_id.slice(0, 8)}… provider=${r.provider}`);
+    } catch (e) {
+      setMsg(String(e).slice(0, 80));
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <input
+        className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-mono"
+        placeholder="device_token_id (UUID)"
+        value={tokenId}
+        onChange={e => setTokenId(e.target.value)}
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          className="rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+          placeholder="Title"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+        />
+        <input
+          className="rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+          placeholder="Body"
+          value={bodyText}
+          onChange={e => setBodyText(e.target.value)}
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <Button onClick={send} size="sm">
+          Send test
+        </Button>
+        {msg && (
+          <span className="font-mono text-[10px] text-zinc-500">{msg}</span>
+        )}
+      </div>
+    </div>
+  );
 }
