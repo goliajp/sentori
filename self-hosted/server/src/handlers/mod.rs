@@ -18,6 +18,7 @@ use sentori_ingest_token::{TokenStore, bearer_middleware};
 
 use crate::state::AppState;
 
+mod admin;
 mod alerts;
 mod audit;
 mod cert;
@@ -137,6 +138,15 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/v1/saved-views/:id", delete(saved_views::delete))
         // legacy fresh-start ingest stubs (defer to SDK-auth path)
         .route("/v1/projects/:project_id/ingest", post(ingest::ingest_event))
+        // ── admin: tokens (new-customer onboarding) ──────
+        .route(
+            "/admin/api/projects/:project_id/tokens",
+            get(admin::tokens::list).post(admin::tokens::create),
+        )
+        .route(
+            "/admin/api/tokens/:token_id",
+            delete(admin::tokens::revoke),
+        )
         .with_state(state)
         .merge(sdk_routes)
 }
