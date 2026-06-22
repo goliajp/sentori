@@ -8,6 +8,10 @@ export interface HealthResponse {
   status: 'ok' | 'degraded';
   db: 'ok' | 'down';
   version: string;
+  pool_size?: number;
+  pool_idle?: number;
+  push_queued?: number;
+  push_failed_24h?: number;
 }
 
 export interface Project {

@@ -13,16 +13,31 @@ export function App() {
   useNavShortcuts();
 
   // Global Cmd-K / Ctrl-K to toggle the command palette.
+  // Also '?' to jump to /shortcuts cheatsheet.
+  const navigate = useNavigate();
   useEffect(() => {
+    function inEditable(): boolean {
+      const a = document.activeElement;
+      if (!a) return false;
+      const tag = a.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+      if ((a as HTMLElement).isContentEditable) return true;
+      return false;
+    }
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         setPaletteOpen(o => !o);
+        return;
+      }
+      if (e.key === '?' && !inEditable() && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        navigate('/shortcuts');
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [navigate]);
 
   // Boot-time session probe. If the cookie + bearer header are
   // missing or invalid, api.authMe() throws and the 401 handler

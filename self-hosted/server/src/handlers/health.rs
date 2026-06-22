@@ -1,4 +1,4 @@
-//! GET /healthz — liveness + DB pool ping.
+//! GET /healthz — liveness + DB pool ping + queue depth.
 
 use std::sync::Arc;
 
@@ -6,6 +6,7 @@ use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
 use serde::Serialize;
+use sqlx::Row;
 
 use crate::state::AppState;
 
@@ -14,6 +15,10 @@ pub struct Health {
     status: &'static str,
     db: &'static str,
     version: &'static str,
+    pool_size: u32,
+    pool_idle: u32,
+    push_queued: i64,
+    push_failed_24h: i64,
 }
 
 pub async fn healthz(State(state): State<Arc<AppState>>) -> (StatusCode, Json<Health>) {
@@ -21,13 +26,36 @@ pub async fn healthz(State(state): State<Arc<AppState>>) -> (StatusCode, Json<He
         Ok(_) => "ok",
         Err(_) => "down",
     };
-    let code = if db == "ok" { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE };
+    let code = if db == "ok" {
+        StatusCode::OK
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    };
+    let push_queued: i64 = sqlx::query(
+        "SELECT COUNT(*) FROM push_sends WHERE status = 'queued'",
+    )
+    .fetch_one(&state.pool)
+    .await
+    .map(|r| r.get::<i64, _>(0))
+    .unwrap_or(0);
+    let push_failed_24h: i64 = sqlx::query(
+        "SELECT COUNT(*) FROM push_sends WHERE status = 'failed' \
+         AND created_at >= now() - interval '24 hours'",
+    )
+    .fetch_one(&state.pool)
+    .await
+    .map(|r| r.get::<i64, _>(0))
+    .unwrap_or(0);
     (
         code,
         Json(Health {
             status: if db == "ok" { "ok" } else { "degraded" },
             db,
             version: env!("CARGO_PKG_VERSION"),
+            pool_size: state.pool.size(),
+            pool_idle: state.pool.num_idle() as u32,
+            push_queued,
+            push_failed_24h,
         }),
     )
 }
