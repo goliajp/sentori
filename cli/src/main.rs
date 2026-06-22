@@ -161,6 +161,18 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Server healthz check (no auth needed).
+    Health {
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
+    /// Show the current session user (Bearer or session cookie).
+    Me {
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// Per-project release list.
     Release {
         #[arg(long = "project")]
@@ -791,6 +803,8 @@ async fn main() -> Result<()> {
             api_url,
             json,
         } => admin::comment_list(issue_id, token, api_url, json).await,
+        Command::Health { api_url } => admin::health_check(api_url).await,
+        Command::Me { token, api_url } => admin::me_show(token, api_url).await,
         Command::Release {
             project_id,
             token,

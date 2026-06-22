@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { api, EventRow, IssueDetail as Issue } from '../lib/api';
+import { useKeyHandlers } from '../lib/useShortcuts';
 import {
   Badge,
   Button,
@@ -55,6 +56,13 @@ export default function IssueDetail() {
       setError(String(e));
     }
   }
+
+  useKeyHandlers({
+    e: () => act('resolved'),
+    i: () => act('ignored'),
+    r: () => act('active'),
+    w: () => toggleWatch(),
+  });
 
   async function act(status: 'active' | 'resolved' | 'ignored') {
     if (!projectId || !issueId) return;

@@ -693,6 +693,39 @@ pub async fn issue_watch(
     Ok(())
 }
 
+pub async fn health_check(api_url: Option<String>) -> Result<()> {
+    let url = format!("{}/healthz", resolve_api_url(api_url));
+    // No auth needed
+    let c = reqwest::Client::new();
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    println!(
+        "status:  {}\ndb:      {}\nversion: {}",
+        body["status"].as_str().unwrap_or("?"),
+        body["db"].as_str().unwrap_or("?"),
+        body["version"].as_str().unwrap_or("?"),
+    );
+    Ok(())
+}
+
+pub async fn me_show(
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!("{}/auth/me", resolve_api_url(api_url));
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    println!(
+        "user_id:        {}\nemail:          {}\nemail_verified: {}\ncreated_at:     {}",
+        body["user_id"].as_str().unwrap_or("?"),
+        body["email"].as_str().unwrap_or("?"),
+        body["email_verified"].as_bool().unwrap_or(false),
+        body["created_at"].as_str().unwrap_or("?"),
+    );
+    Ok(())
+}
+
 pub async fn release_list(
     project_id: String,
     token: Option<String>,
