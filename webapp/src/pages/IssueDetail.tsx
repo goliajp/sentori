@@ -156,6 +156,15 @@ export default function IssueDetail() {
               size="sm"
               variant="secondary"
               onClick={() => {
+                navigator.clipboard?.writeText(issueId);
+              }}
+            >
+              Copy ID
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
                 navigator.clipboard?.writeText(window.location.href);
               }}
             >

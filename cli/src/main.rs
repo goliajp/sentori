@@ -243,6 +243,31 @@ enum Command {
         #[arg(long = "api-url")]
         api_url: Option<String>,
     },
+    /// List endpoint probes for a project.
+    Probe {
+        #[arg(long = "project")]
+        project_id: String,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Create a new endpoint probe.
+    ProbeCreate {
+        #[arg(long = "project")]
+        project_id: String,
+        target_url: String,
+        #[arg(long, default_value = "GET")]
+        method: String,
+        #[arg(long, default_value_t = 60)]
+        interval_sec: i32,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long = "api-url")]
+        api_url: Option<String>,
+    },
     /// Interactive bootstrap wizard — probe server, login,
     /// list projects, print next-step commands.
     Init {
@@ -965,6 +990,20 @@ async fn main() -> Result<()> {
             token,
             api_url,
         } => admin::issue_watch(issue_id, token, api_url).await,
+        Command::Probe {
+            project_id,
+            token,
+            api_url,
+            json,
+        } => admin::probe_list(project_id, token, api_url, json).await,
+        Command::ProbeCreate {
+            project_id,
+            target_url,
+            method,
+            interval_sec,
+            token,
+            api_url,
+        } => admin::probe_create(project_id, target_url, method, interval_sec, token, api_url).await,
         Command::Init { api_url } => admin::init_wizard(api_url).await,
         Command::Login {
             email,

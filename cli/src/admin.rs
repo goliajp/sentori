@@ -674,6 +674,73 @@ pub async fn comment_list(
     Ok(())
 }
 
+pub async fn probe_list(
+    project_id: String,
+    token: Option<String>,
+    api_url: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let url = format!(
+        "{}/admin/api/projects/{project_id}/endpoint-probes",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c.get(&url).send().await?.error_for_status()?;
+    let body: Value = resp.json().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&body)?);
+        return Ok(());
+    }
+    let rows = body["probes"].as_array().cloned().unwrap_or_default();
+    println!("{:<10}  {:<6}  {:>5}  url", "id", "on", "every");
+    for p in &rows {
+        println!(
+            "{:<10}  {:<6}  {:>5}  {}",
+            p["id"]
+                .as_str()
+                .map(|s| &s[..s.len().min(8)])
+                .unwrap_or("?"),
+            if p["enabled"].as_bool().unwrap_or(true) {
+                "on"
+            } else {
+                "off"
+            },
+            p["interval_sec"].as_i64().unwrap_or(60),
+            p["endpoint_url"].as_str().unwrap_or("?"),
+        );
+    }
+    Ok(())
+}
+
+pub async fn probe_create(
+    project_id: String,
+    target_url: String,
+    method: String,
+    interval_sec: i32,
+    token: Option<String>,
+    api_url: Option<String>,
+) -> Result<()> {
+    let url = format!(
+        "{}/admin/api/projects/{project_id}/endpoint-probes",
+        resolve_api_url(api_url)
+    );
+    let c = client(&token_value(token)?)?;
+    let resp = c
+        .post(&url)
+        .json(&serde_json::json!({
+            "name": target_url,
+            "target_url": target_url,
+            "method": method,
+            "interval_sec": interval_sec,
+        }))
+        .send()
+        .await?
+        .error_for_status()?;
+    let body: Value = resp.json().await?;
+    println!("created probe {}", body["id"].as_str().unwrap_or("?"));
+    Ok(())
+}
+
 pub async fn init_wizard(api_url: Option<String>) -> Result<()> {
     use std::io::{self, BufRead, Write};
     let api = resolve_api_url(api_url);
