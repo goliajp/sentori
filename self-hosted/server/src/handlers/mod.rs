@@ -62,6 +62,45 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/v1/control/poll", get(sdk::control::handle))
         // ── feedback ──
         .route("/v1/user-reports", post(sdk::user_reports::handle))
+        // ── push (11 endpoints) ──
+        .route("/v1/push/tokens", post(sdk::push::register_token::handle))
+        .route(
+            "/v1/push/tokens/:handle",
+            delete(sdk::push::revoke_token::handle),
+        )
+        .route(
+            "/v1/push/tokens/:handle/topics",
+            post(sdk::push::subscribe_topic::handle),
+        )
+        .route(
+            "/v1/push/tokens/:handle/topics/:topic",
+            delete(sdk::push::unsubscribe_topic::handle),
+        )
+        .route("/v1/push/send", post(sdk::push::send::handle))
+        .route(
+            "/v1/push/receipts/:send_id",
+            get(sdk::push::receipt::handle),
+        )
+        .route(
+            "/v1/push/sends/:send_id/ack",
+            post(sdk::push::ack::handle),
+        )
+        .route(
+            "/v1/push/expo-compat/send",
+            post(sdk::push::expo_send::handle),
+        )
+        .route(
+            "/v1/push/expo-compat/receipts/:send_id",
+            get(sdk::push::expo_receipt::handle),
+        )
+        .route(
+            "/v1/push/users/:fp_hex/preferences",
+            get(sdk::push::get_preferences::handle),
+        )
+        .route(
+            "/v1/push/users/:fp_hex/preferences/:category",
+            axum::routing::put(sdk::push::put_preference::handle),
+        )
         .layer(axum_middleware::from_fn_with_state(
             token_store,
             bearer_middleware,

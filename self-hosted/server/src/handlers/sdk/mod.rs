@@ -19,6 +19,7 @@ pub mod events_batch;
 pub mod events_recent;
 pub mod heartbeat;
 pub mod metrics;
+pub mod push;
 pub mod runtime_metrics;
 pub mod security_link;
 pub mod security_report;
