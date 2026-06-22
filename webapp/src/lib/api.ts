@@ -137,6 +137,31 @@ export interface PushCredential {
   last_validate_status: string | null;
 }
 
+export interface MemberRow {
+  user_id: string;
+  role: 'owner' | 'admin' | 'user';
+  added_by: string | null;
+  added_at: string;
+}
+
+export interface InviteRow {
+  id: string;
+  email: string;
+  role: 'admin' | 'user';
+  expires_at: string;
+  accepted_at: string | null;
+  created_at: string;
+}
+
+export interface IntegrationRow {
+  id: string;
+  kind: string;
+  config: unknown;
+  connected_by: string | null;
+  connected_at: string;
+  active: boolean;
+}
+
 const DEFAULT_BASE = '';
 
 export class ApiError extends Error {
@@ -268,6 +293,61 @@ export class Api {
     return this.send(
       `/admin/api/projects/${projectId}/push/credentials/${kind}`,
       'DELETE',
+    );
+  }
+
+  // ── admin: members ─────────────────────────────────────
+  listMembers(): Promise<{ members: MemberRow[] }> {
+    return this.get('/admin/api/members');
+  }
+  updateMemberRole(userId: string, role: 'admin' | 'user'): Promise<void> {
+    return this.send(`/admin/api/members/${userId}`, 'PATCH', { role });
+  }
+  removeMember(userId: string): Promise<void> {
+    return this.send(`/admin/api/members/${userId}`, 'DELETE');
+  }
+
+  // ── admin: invites ─────────────────────────────────────
+  listInvites(): Promise<{ invites: InviteRow[] }> {
+    return this.get('/admin/api/invites');
+  }
+  mintInvite(body: {
+    email: string;
+    role: 'admin' | 'user';
+    invited_by: string;
+    expires_in_days?: number;
+  }): Promise<{ invite_id: string; token: string; expires_at: string }> {
+    return this.post('/admin/api/invites', body);
+  }
+  revokeInvite(id: string): Promise<void> {
+    return this.send(`/admin/api/invites/${id}`, 'DELETE');
+  }
+
+  // ── admin: integrations ────────────────────────────────
+  listIntegrations(projectId: string): Promise<{ integrations: IntegrationRow[] }> {
+    return this.get(`/admin/api/projects/${projectId}/integrations`);
+  }
+  upsertIntegration(
+    projectId: string,
+    body: { kind: string; config: unknown; connected_by?: string },
+  ): Promise<{ id: string; kind: string }> {
+    return this.post(`/admin/api/projects/${projectId}/integrations`, body);
+  }
+  deleteIntegration(projectId: string, kind: string): Promise<void> {
+    return this.send(
+      `/admin/api/projects/${projectId}/integrations/${kind}`,
+      'DELETE',
+    );
+  }
+  setIntegrationActive(
+    projectId: string,
+    kind: string,
+    active: boolean,
+  ): Promise<void> {
+    return this.send(
+      `/admin/api/projects/${projectId}/integrations/${kind}/active`,
+      'PATCH',
+      { active },
     );
   }
 

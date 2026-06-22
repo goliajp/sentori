@@ -34,6 +34,7 @@ function Sidebar() {
         <SectionLabel>Workspace</SectionLabel>
         <NavItem to="/" label="Overview" />
         <NavItem to="/projects" label="Projects" />
+        <NavItem to="/members" label="Members" />
         <NavItem to="/alerts" label="Alerts" />
         <NavItem to="/audit" label="Audit" />
         <NavItem to="/settings" label="Settings" />
@@ -50,6 +51,10 @@ function Sidebar() {
             />
             <NavItem to={`/projects/${projectScoped}/tokens`} label="Tokens" />
             <NavItem to={`/projects/${projectScoped}/push`} label="Push" />
+            <NavItem
+              to={`/projects/${projectScoped}/integrations`}
+              label="Integrations"
+            />
           </>
         )}
       </nav>
