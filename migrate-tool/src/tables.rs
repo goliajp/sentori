@@ -9,9 +9,11 @@
 
 pub mod analytics;
 pub mod attachments;
+pub mod billing;
 pub mod dashboard;
 pub mod dashboard_extra;
 pub mod events;
+pub mod identity_extras;
 pub mod issues;
 pub mod metrics;
 pub mod ops;
