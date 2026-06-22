@@ -21,6 +21,8 @@ export function EventsPage() {
   const [events, setEvents] = useState<EventRow[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [live, setLive] = useState(false);
+  const [liveCount, setLiveCount] = useState(0);
 
   useEffect(() => {
     if (!projectId) return;
@@ -35,6 +37,35 @@ export function EventsPage() {
         else setErr(String(e));
       });
   }, [projectId, issueFilter]);
+
+  // Live tail subscription. Uses EventSource (cookie auth) — the
+  // dashboard endpoint at /v1/projects/:id/events/_recent is
+  // session-cookie-gated, not Bearer.
+  useEffect(() => {
+    if (!projectId || !live) return;
+    const es = new EventSource(
+      `/v1/projects/${projectId}/events/_recent`,
+      { withCredentials: true },
+    );
+    es.addEventListener('event', (ev: MessageEvent) => {
+      try {
+        const data = JSON.parse(ev.data) as EventRow;
+        if (issueFilter && data.issue_id !== issueFilter) return;
+        setEvents(rows => {
+          const next = [data, ...(rows ?? [])];
+          return next.slice(0, 200);
+        });
+        setLiveCount(c => c + 1);
+      } catch {
+        /* ignore */
+      }
+    });
+    es.onerror = () => {
+      // Browser will auto-reconnect; just surface in UI.
+      setErr('live tail disconnected (auto-retrying)…');
+    };
+    return () => es.close();
+  }, [projectId, live, issueFilter]);
 
   async function saveView() {
     if (!projectId) return;
@@ -72,6 +103,16 @@ export function EventsPage() {
                 {saveMsg}
               </span>
             )}
+            <Button
+              onClick={() => {
+                setLive(l => !l);
+                setLiveCount(0);
+              }}
+              variant={live ? 'primary' : 'secondary'}
+              size="sm"
+            >
+              {live ? `● Live (${liveCount})` : 'Live ○'}
+            </Button>
             <Button onClick={saveView} variant="secondary" size="sm">
               Save filter
             </Button>
