@@ -30,7 +30,7 @@ export default function Sessions() {
 
   useEffect(() => {
     api
-      .listAuthSessions()
+      .listSessions()
       .then(r => setRows(r.sessions))
       .catch(e => setError(String(e)));
   }, [tick]);
@@ -38,7 +38,7 @@ export default function Sessions() {
   async function revoke(hash: string) {
     if (!confirm('Revoke this session?')) return;
     try {
-      await api.revokeAuthSession(hash);
+      await api.revokeSession(hash);
       setTick(t => t + 1);
     } catch (e) {
       setError(String(e));

@@ -777,21 +777,6 @@ export class Api {
   ): Promise<{ delivered: number; errors: string[] }> {
     return this.post(`/v1/alerts/${alertId}/_fire_test`, {});
   }
-  listAuthSessions(): Promise<{
-    sessions: {
-      id_hash_hex: string;
-      created_at: string;
-      last_used_at: string | null;
-      expires_at: string;
-      ip: string | null;
-      user_agent: string | null;
-    }[];
-  }> {
-    return this.get('/auth/sessions');
-  }
-  revokeAuthSession(idHashHex: string): Promise<void> {
-    return this.send(`/auth/sessions/${idHashHex}`, 'DELETE');
-  }
 
   // ── admin: members ─────────────────────────────────────
   listMembers(): Promise<{ members: MemberRow[] }> {
