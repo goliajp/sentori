@@ -21,7 +21,7 @@ edition = "2024"
 authors = ["GOLIA K.K. <takagi@golia.jp>"]
 license = "Apache-2.0 OR MIT"
 publish = false
-rust-version = "1.88"
+rust-version = "1.97"
 description = "Sentori SaaS control-plane axum server — tenant provisioning + billing webhooks + saasadmin dashboard."
 
 [[bin]]

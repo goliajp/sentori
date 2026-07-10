@@ -7,7 +7,7 @@ edition = "2024"
 authors = ["GOLIA K.K. <takagi@golia.jp>"]
 license = "Apache-2.0 OR MIT"
 publish = false
-rust-version = "1.88"
+rust-version = "1.97"
 description = "Business-layer ETL: reads legacy sentori prod DB → writes v0.2 sentori DB. Identity-layer rename (orgs→workspaces, viewer→user) + 1:1 INSERT透传 for project-scoped business tables."
 
 [[bin]]
