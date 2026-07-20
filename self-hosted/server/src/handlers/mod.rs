@@ -47,6 +47,7 @@ mod self_test;
 mod sessions_admin;
 mod spans;
 mod stats;
+pub mod tenant;
 mod usage;
 
 pub fn router(state: Arc<AppState>) -> Router {

@@ -6,6 +6,24 @@
 
 ---
 
+## v1.4.8(2026-07-20 — 租户隔离 ⚠️ 安全)
+
+v1.4.7 补上了**鉴权**(必须登录),本版补上**授权**(只能看自己的)。此前任一已登录用户可读写全部租户数据。
+
+- **`SessionContext` 现携带 `workspace_id`**,由中间件解析一次。此前它只有 `user_id`,过滤全靠每个 handler 自己记得 —— 于是六个忘了。现在过滤是 handler 必须主动丢弃的东西
+- **两层防御**:`handlers::tenant` 的 `guard_project` / `guard_issue` 先校验 id 归属,查询层再约束 `workspace_id`;后加的 handler 即使忘了守卫也跨不过边界。外来 id 与不存在的 id 返回同样的 404 —— 403 会确认 id 存在,把接口变成猜测他人 id 的探针
+- **覆盖**:projects / events / spans / traces / metrics / replays / search / stats / cert / issues(读+写)/ issue watchers / comments / activity log,共 17 条查询获得 workspace 约束
+- **`bulk_patch` 的 body-id 攻击路径**:它的 issue id 来自请求体而非路径,守卫路径的 project_id 对其无效 —— 攻击者可在路径放自己的 project、在 body 放他人 issue id 批量篡改。现先经 workspace 约束的 SELECT 收窄 id 集合。已实测:跨租户 `bulk_patch` 返回 `updated: 0`,目标 issue 状态未变
+- **SSE 实时流 `events_live`** 此前零鉴权,仅按路径 project_id 过滤,可旁听他人事件流;现加守卫
+- **审计行 workspace 写错**:这些 handler 记审计用的是服务器配置的 workspace 而非调用者的,审计落到了错误租户名下
+- **回归测试**(7 个,CI 内运行,无需数据库):扫 handler 源码断言每条 dashboard SELECT 都约束 workspace_id、每个从路径取 id 的 handler 都调守卫 —— 缺陷本身是"少了一行",所以检查"那一行在不在"
+
+**端到端验证**:建两个分属 GOLIA / Qualcomm 的账号,双向确认各自只见己方项目、交叉访问 issues/events/stats/replays/traces/metrics 全部 404、跨租户写入被拒。
+
+**已知限制**:`IssueStore::patch` / `bulk_patch`(core crate)无 workspace 参数,故 issue 写路径上仅守卫一层,缺查询层第二道防线。把 workspace 推进 store 是根治方案。
+
+---
+
 ## v1.4.7(2026-07-20 — 两处未鉴权访问修复 ⚠️ 安全)
 
 **背景**:为让 SaaS 面可用而排查时,发现两处接口在公网无需任何鉴权即可访问。两次访问日志审计均显示**仅有本人验证请求(21 次,同一 IP),无外部访问,数据完整**。发现后立即在 t01 边缘封锁,修复上线后恢复。

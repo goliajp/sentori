@@ -25,9 +25,19 @@ use tracing::warn;
 
 use crate::state::AppState;
 
+/// Who the caller is, and which workspace their reads are confined
+/// to.
+///
+/// `workspace_id` is resolved here rather than left to each handler:
+/// dashboard queries used to select across the whole table, so any
+/// authenticated user saw every tenant's projects, events, spans,
+/// metrics and replays. Carrying the scope on the request makes the
+/// filter something a handler has to actively drop rather than
+/// something it has to remember to add.
 #[derive(Clone, Copy, Debug)]
 pub struct SessionContext {
     pub user_id: UserId,
+    pub workspace_id: sentori_workspace_identity::WorkspaceId,
 }
 
 pub async fn session_middleware(
@@ -44,8 +54,25 @@ pub async fn session_middleware(
     let auth = build_auth(&state);
     match auth.lookup_session(&token).await {
         Ok(Some((user, _session))) => {
-            req.extensions_mut()
-                .insert(SessionContext { user_id: user.id });
+            // users.workspace_id is NOT NULL, so a live session always
+            // resolves to exactly one workspace.
+            let ws: Result<Option<(uuid::Uuid,)>, _> =
+                sqlx::query_as("SELECT workspace_id FROM users WHERE id = $1")
+                    .bind(user.id.into_uuid())
+                    .fetch_optional(&state.pool)
+                    .await;
+            let workspace_id = match ws {
+                Ok(Some((id,))) => sentori_workspace_identity::WorkspaceId::from_uuid(id),
+                Ok(None) => return reject("session user no longer exists"),
+                Err(e) => {
+                    warn!(error = %e, "workspace lookup failed");
+                    return reject("internal");
+                }
+            };
+            req.extensions_mut().insert(SessionContext {
+                user_id: user.id,
+                workspace_id,
+            });
             next.run(req).await
         }
         Ok(None) => reject("session expired or invalid"),

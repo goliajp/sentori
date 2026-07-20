@@ -3287,7 +3287,7 @@ dependencies = [
 
 [[package]]
 name = "sentori-server"
-version = "1.4.7"
+version = "1.4.8"
 dependencies = [
  "addr2line 0.26.1",
  "aes-gcm",

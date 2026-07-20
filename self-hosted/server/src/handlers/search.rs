@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Extension, Path, Query, State};
 use axum::http::StatusCode;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -28,9 +28,12 @@ const fn default_limit() -> u32 {
 
 pub async fn search(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<crate::session_mw::SessionContext>,
     Path(project_id): Path<Uuid>,
     Query(q): Query<SearchQuery>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    super::tenant::guard_project(&state, ctx.workspace_id, project_id).await?;
+
     let needle = q.q.trim();
     if needle.is_empty() {
         return Ok(Json(json!({ "issues": [], "events": [] })));
@@ -41,11 +44,12 @@ pub async fn search(
     let issues = sqlx::query(
         "SELECT id, error_type, message_sample, status, last_seen \
          FROM issues \
-         WHERE project_id = $1 \
-           AND (error_type ILIKE $2 OR message_sample ILIKE $2 OR fingerprint ILIKE $2) \
-         ORDER BY last_seen DESC LIMIT $3",
+         WHERE project_id = $1 AND workspace_id = $2 \
+           AND (error_type ILIKE $3 OR message_sample ILIKE $3 OR fingerprint ILIKE $3) \
+         ORDER BY last_seen DESC LIMIT $4",
     )
     .bind(project_id)
+    .bind(ctx.workspace_id.into_uuid())
     .bind(&pattern)
     .bind(limit)
     .fetch_all(&state.pool)
@@ -55,12 +59,13 @@ pub async fn search(
     let events = sqlx::query(
         "SELECT id, issue_id, kind, release, environment, timestamp \
          FROM events \
-         WHERE project_id = $1 \
+         WHERE project_id = $1 AND workspace_id = $2 \
            AND received_at >= now() - interval '7 days' \
-           AND (release ILIKE $2 OR environment ILIKE $2) \
-         ORDER BY timestamp DESC LIMIT $3",
+           AND (release ILIKE $3 OR environment ILIKE $3) \
+         ORDER BY timestamp DESC LIMIT $4",
     )
     .bind(project_id)
+    .bind(ctx.workspace_id.into_uuid())
     .bind(&pattern)
     .bind(limit)
     .fetch_all(&state.pool)
