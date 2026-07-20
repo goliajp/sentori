@@ -72,9 +72,11 @@ async fn scalar_count(
     state: &Arc<AppState>,
     sql: &str,
     project_id: Uuid,
+    workspace_id: Uuid,
 ) -> Result<i64, (StatusCode, String)> {
     let row = sqlx::query(sql)
         .bind(project_id)
+        .bind(workspace_id)
         .fetch_one(&state.pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
