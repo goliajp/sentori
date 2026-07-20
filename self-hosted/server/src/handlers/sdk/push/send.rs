@@ -32,12 +32,10 @@ pub struct SendBody {
     pub native_tokens: Vec<String>,
     #[serde(default)]
     pub topic: Option<String>,
-    /// Accepted and documented above, but `resolve_targets` does not
-    /// yet implement this targeting mode, so a send that only sets
-    /// `appUserId` currently resolves zero devices. Kept (rather than
-    /// deleted) so the advertised field stays visible as a known gap
-    /// instead of silently vanishing from the request shape.
-    #[allow(dead_code)]
+    /// Advertised as a targeting mode but not implemented. A send
+    /// that sets only this is refused with a 400 rather than
+    /// resolving zero devices and reporting success — see
+    /// `resolve_targets`.
     #[serde(default)]
     pub app_user_id: Option<String>,
     /// Vendor payload (passed through verbatim to vendor adapter).
@@ -133,6 +131,22 @@ async fn resolve_targets(
     ctx: &IngestContext,
     body: &SendBody,
 ) -> Result<Vec<(Uuid, String)>, String> {
+    // Refuse rather than resolve nothing. `appUserId` is advertised as
+    // a targeting mode but was never implemented, so a caller relying
+    // on it got a 200 and no delivery — the failure mode that looks
+    // like success. An explicit 400 tells them the mode is unavailable
+    // instead of letting the notification vanish.
+    if body.app_user_id.is_some()
+        && body.token_ids.is_empty()
+        && body.native_tokens.is_empty()
+        && body.topic.is_none()
+    {
+        return Err(
+            "appUserId targeting is not implemented; send to tokenIds, nativeTokens or topic"
+                .to_string(),
+        );
+    }
+
     let mut out: Vec<(Uuid, String)> = Vec::new();
 
     // Loop per-id; sqlx-postgres UUID[] array binding is fragile.
