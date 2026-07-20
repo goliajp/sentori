@@ -69,6 +69,20 @@ jobs:
             sdk:
               - 'sdk/**'
 
+  # A workflow file GitHub can't parse is accepted by `git push` and
+  # then fails as a run with zero jobs and no readable log. Validate
+  # them here so that failure mode can't reach master.
+  workflows:
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+
   server-test:
     needs: changes
     if: needs.changes.outputs.server == 'true' || needs.changes.outputs.infra == 'true'
@@ -301,7 +315,7 @@ jobs:
     # `result == skipped` which `!failure() && !cancelled()` accepts —
     # so when web is the only thing that changed, server-test and sdk
     # are skipped but this job still proceeds.
-    needs: [changes, server-test, web, webapp, web-e2e, sdk]
+    needs: [changes, workflows, server-test, web, webapp, web-e2e, sdk]
     if: |
       always()
       && !failure()
