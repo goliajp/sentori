@@ -6,6 +6,14 @@
 
 ---
 
+## v1.4.5(2026-07-20 — 两处生产静默错误内容修复)
+
+- **未匹配的 API 路径返回 SPA 而非 404**:所有未命中路由都落到 `fallback_service(webapp_service())`,于是 `/v1/does-not-exist`、`/admin/api/nope`、`/auth/nope` 一律回 `200 <!doctype html>`。已发货的 SDK 调到本服务未实现的端点时会把它当成功,随后在离现场很远的地方 JSON 解析失败。legacy 没这问题 —— 那时 SPA 与 API 是 Caddy 后面两个容器,未知 `/api` 路径会吃到 server 的真 404;单体化引入了这个回归。现按路径前缀分流:四个 API 前缀返回 `{"error":"not_found"}` + 404,其余仍解析到 index.html + 200 供 React Router 接管。附 3 个前缀判定回归测试(含 `/v1` `/apidocs` `/authors` 这类相邻路径不得误判)
+- **saas-control 部署了但公网无路由**:`:18091` 容器健康在跑、直连返回正确 JSON,但 `/v1/saas/*` 在公网落到 SPA,回 HTML 200 —— 文档化的 SaaS 控制面 API 对任何调用方都是"看起来成功的垃圾"。t01 Caddy 增加 `/v1/saas/*` → `:18091`(置于 catch-all 之前),按安全路径改 live → validate → reload → `devops caddy import` → 同步 repo mirror
+- `docs-v0.2/DEPLOY.md` 的路由拓扑对齐现实(此前仍写 v2.4 之前的 `api.sentori.golia.jp` 分域形态,且未说明 `/v1/saas/*` 必须先于 catch-all —— 正是控制面回 HTML 的原因)
+
+---
+
 ## v1.4.4(2026-07-20 — workflow 解析修复 + workflow 质量门)
 
 - **v1.4.3 的镜像 workflow 从未运行过**:run-step 注释里为了说明"Actions 表达式不能做参数展开"而写了字面量的空 `${{ }}`,GitHub 把它当真表达式解析并拒收整个文件 —— 连续四次 run 秒失败、零 job、无可读日志,唯一线索是 run 名显示为文件路径而非 workflow 名
