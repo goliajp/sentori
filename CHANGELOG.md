@@ -6,6 +6,15 @@
 
 ---
 
+## v1.4.4(2026-07-20 — workflow 解析修复 + workflow 质量门)
+
+- **v1.4.3 的镜像 workflow 从未运行过**:run-step 注释里为了说明"Actions 表达式不能做参数展开"而写了字面量的空 `${{ }}`,GitHub 把它当真表达式解析并拒收整个文件 —— 连续四次 run 秒失败、零 job、无可读日志,唯一线索是 run 名显示为文件路径而非 workflow 名
+- **OSS mirror workflow 带着同一个死 tag 过滤器**(`v0.2.*`,而实际 tag 是 `v1.4.x`),所以"顺带镜像 tag"那段分支一次都没执行过,公开 repo 从未从 CI 收到版本 tag。改为 `v<x>.<y>.<z>`
+- **补门**:`scripts/check-workflows.sh`(actionlint)进 preflight,build.yml 新增 `workflows` job 且 docker-build 依赖它 —— 解析不了的 workflow 文件今后进不了 master
+- 附带:actionlint 配置 lx64 自建 runner 标签、deploy.yml 未使用的循环变量、`ls | head` 换 `find`、一处 actionlint 表达式桩造成的 SC2193 误报显式标注
+
+---
+
 ## v1.4.3(2026-07-20 — CI 与发布镜像修复)
 
 - **self-hosted 镜像从来拿不到版本 tag**:workflow 只在 `v0.2.*` tag 触发,而实际发布 tag 是 `v1.4.x` —— 没有一次 tagged run 触发过,metadata-action 的 semver 模式从未生效,发布镜像只有 `master` 和 `sha-<short>`。同时 `self-hosted/README.md` 让用户 pull `ghcr.io/goliajp/sentori-selfhosted:latest`,而 workflow 推的是 `ghcr.io/goliajp/sentori/sentori-server` —— 镜像名与 tag 皆不存在。现改为 `v<x>.<y>.<z>` 触发 + tagged 构建加 `latest`,README 指向真实镜像
