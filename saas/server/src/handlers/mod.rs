@@ -20,13 +20,13 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/v1/saas/workspaces",
             get(tenants::list).post(tenants::create),
         )
-        .route("/v1/saas/workspaces/:id", delete(tenants::delete))
+        .route("/v1/saas/workspaces/{id}", delete(tenants::delete))
         .route(
-            "/v1/saas/workspaces/:id/suspend",
+            "/v1/saas/workspaces/{id}/suspend",
             post(saasadmin::suspend_tenant),
         )
         .route(
-            "/v1/saas/workspaces/:id/resume",
+            "/v1/saas/workspaces/{id}/resume",
             post(saasadmin::resume_tenant),
         )
         // Legacy /tenants aliases preserved so existing
@@ -35,13 +35,13 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/v1/saas/tenants",
             get(tenants::list).post(tenants::create),
         )
-        .route("/v1/saas/tenants/:id", delete(tenants::delete))
+        .route("/v1/saas/tenants/{id}", delete(tenants::delete))
         .route(
-            "/v1/saas/tenants/:id/suspend",
+            "/v1/saas/tenants/{id}/suspend",
             post(saasadmin::suspend_tenant),
         )
         .route(
-            "/v1/saas/tenants/:id/resume",
+            "/v1/saas/tenants/{id}/resume",
             post(saasadmin::resume_tenant),
         )
         .route("/v1/saas/saasadmin/login", post(saasadmin::login))

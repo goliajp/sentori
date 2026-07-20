@@ -46,7 +46,8 @@ impl TenantGuard {
     ///
     /// [`TenantError::Db`] on backend failure.
     pub async fn member_role(&self, user: UserId) -> Result<Option<Role>, TenantError> {
-        let member = self.identity()
+        let member = self
+            .identity()
             .members()
             .find(user)
             .await
@@ -101,7 +102,8 @@ impl TenantGuard {
                     .map(|(u,)| ProjectId::from_uuid(u))
                     .collect())
             }
-            Some(Role::User) => self.identity()
+            Some(Role::User) => self
+                .identity()
                 .visibility()
                 .list_for_user(user)
                 .await

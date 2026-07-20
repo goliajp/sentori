@@ -449,19 +449,19 @@ impl IntegrationService {
 }
 
 fn translate_fk(err: sqlx::Error, project_id: ProjectId) -> IntegrationError {
-    if let sqlx::Error::Database(db_err) = &err {
-        if db_err.code().as_deref() == Some("23503") {
-            return IntegrationError::ProjectNotFound(project_id.into_uuid());
-        }
+    if let sqlx::Error::Database(db_err) = &err
+        && db_err.code().as_deref() == Some("23503")
+    {
+        return IntegrationError::ProjectNotFound(project_id.into_uuid());
     }
     IntegrationError::Db(err)
 }
 
 fn translate_issue_fk(err: sqlx::Error, issue_id: Uuid) -> IntegrationError {
-    if let sqlx::Error::Database(db_err) = &err {
-        if db_err.code().as_deref() == Some("23503") {
-            return IntegrationError::IssueNotFound(issue_id);
-        }
+    if let sqlx::Error::Database(db_err) = &err
+        && db_err.code().as_deref() == Some("23503")
+    {
+        return IntegrationError::IssueNotFound(issue_id);
     }
     IntegrationError::Db(err)
 }

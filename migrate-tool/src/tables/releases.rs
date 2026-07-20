@@ -68,11 +68,15 @@ async fn release_artifacts(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
-    // legacy release_artifacts columns: id, release_id, kind, name, content_hash,
-    // blob_path, size_bytes, created_at + (v0.7) entry_count, uncompressed_size_bytes
-    // + (later) module_label. We pass through everything via direct column copy.
+    // Legacy release_artifacts: id, release_id, kind, name,
+    // content_hash, blob_path, created_at, entry_count (INT4,
+    // nullable), uncompressed_size_bytes (INT8, nullable),
+    // module_label (nullable). Dst 0022/0017 mirrors the set and
+    // adds workspace_id, derived via release → project → org.
     let rows = sqlx::query(
-        "SELECT ra.*, p.org_id AS workspace_id \
+        "SELECT ra.id, p.org_id AS workspace_id, ra.release_id, ra.kind, ra.name, \
+                ra.content_hash, ra.blob_path, ra.entry_count, \
+                ra.uncompressed_size_bytes, ra.module_label, ra.created_at \
          FROM release_artifacts ra \
          JOIN releases r ON r.id = ra.release_id \
          JOIN projects p ON p.id = r.project_id",
@@ -88,8 +92,10 @@ async fn release_artifacts(
         }
         let res = sqlx::query(
             "INSERT INTO release_artifacts (id, workspace_id, release_id, kind, name, \
-                content_hash, blob_path, size_bytes, created_at) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (id) DO NOTHING",
+                content_hash, blob_path, entry_count, uncompressed_size_bytes, \
+                module_label, created_at) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) \
+             ON CONFLICT (id) DO NOTHING",
         )
         .bind(row.get::<uuid::Uuid, _>("id"))
         .bind(row.get::<uuid::Uuid, _>("workspace_id"))
@@ -98,7 +104,9 @@ async fn release_artifacts(
         .bind(row.get::<String, _>("name"))
         .bind(row.get::<String, _>("content_hash"))
         .bind(row.get::<String, _>("blob_path"))
-        .bind(row.try_get::<i64, _>("size_bytes").unwrap_or(0))
+        .bind(row.get::<Option<i32>, _>("entry_count"))
+        .bind(row.get::<Option<i64>, _>("uncompressed_size_bytes"))
+        .bind(row.get::<Option<String>, _>("module_label"))
         .bind(row.get::<time::OffsetDateTime, _>("created_at"))
         .execute(dst)
         .await?;

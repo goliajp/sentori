@@ -18,20 +18,20 @@ use serde_json::Value;
 /// match-permissively rather than reject-and-drop).
 #[must_use]
 pub fn matches_filter(filter: &Value, error_type: &str, environment: &str, release: &str) -> bool {
-    if let Some(want) = filter.get("environment").and_then(Value::as_str) {
-        if want != environment {
-            return false;
-        }
+    if let Some(want) = filter.get("environment").and_then(Value::as_str)
+        && want != environment
+    {
+        return false;
     }
-    if let Some(want) = filter.get("release").and_then(Value::as_str) {
-        if want != release {
-            return false;
-        }
+    if let Some(want) = filter.get("release").and_then(Value::as_str)
+        && want != release
+    {
+        return false;
     }
-    if let Some(want) = filter.get("errorType").and_then(Value::as_str) {
-        if want != error_type {
-            return false;
-        }
+    if let Some(want) = filter.get("errorType").and_then(Value::as_str)
+        && want != error_type
+    {
+        return false;
     }
     true
 }

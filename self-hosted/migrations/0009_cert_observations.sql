@@ -1,1 +1,0 @@
-../../core/migrations/0009_cert_observations.sql

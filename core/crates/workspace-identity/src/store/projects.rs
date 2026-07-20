@@ -164,13 +164,11 @@ impl<'a> Projects<'a> {
     ///   exist in this workspace.
     /// - [`IdentityError::Db`] on database failure.
     pub async fn delete(&self, id: ProjectId) -> Result<(), IdentityError> {
-        let result = sqlx::query(
-            "DELETE FROM projects WHERE id = $1 AND workspace_id = $2",
-        )
-        .bind(id.into_uuid())
-        .bind(self.workspace_id.into_uuid())
-        .execute(self.pool)
-        .await?;
+        let result = sqlx::query("DELETE FROM projects WHERE id = $1 AND workspace_id = $2")
+            .bind(id.into_uuid())
+            .bind(self.workspace_id.into_uuid())
+            .execute(self.pool)
+            .await?;
         if result.rows_affected() == 0 {
             Err(IdentityError::ProjectNotFound(id.into_uuid()))
         } else {
@@ -190,14 +188,13 @@ fn row_to_project(row: &sqlx::postgres::PgRow) -> Project {
 }
 
 fn translate_slug_taken(err: sqlx::Error, slug: &str) -> IdentityError {
-    if let sqlx::Error::Database(db_err) = &err {
-        if db_err.code().as_deref() == Some("23505")
-            && db_err
-                .constraint()
-                .is_none_or(|c| c == "projects_workspace_slug_idx" || c == "projects_slug_key")
-        {
-            return IdentityError::SlugTaken(slug.to_string());
-        }
+    if let sqlx::Error::Database(db_err) = &err
+        && db_err.code().as_deref() == Some("23505")
+        && db_err
+            .constraint()
+            .is_none_or(|c| c == "projects_workspace_slug_idx" || c == "projects_slug_key")
+    {
+        return IdentityError::SlugTaken(slug.to_string());
     }
     IdentityError::Db(err)
 }

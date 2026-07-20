@@ -63,8 +63,10 @@ async fn main() -> Result<()> {
             "identity",
             "tokens",
             "releases",
-            "events",
+            // issues BEFORE events — events.issue_id FK references
+            // issues(id); the reverse order leaves events at 0 rows.
             "issues",
+            "events",
             "sessions",
             "spans",
             "push",

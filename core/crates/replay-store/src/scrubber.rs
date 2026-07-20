@@ -110,7 +110,7 @@ impl Scrubber {
 
     /// Number of patterns configured.
     #[must_use]
-    pub fn pattern_count(&self) -> usize {
+    pub const fn pattern_count(&self) -> usize {
         self.patterns.len()
     }
 

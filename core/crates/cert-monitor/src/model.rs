@@ -78,13 +78,13 @@ pub struct PollOutcome {
 impl PollOutcome {
     /// How many domains errored on this tick.
     #[must_use]
-    pub fn domains_failed(&self) -> usize {
+    pub const fn domains_failed(&self) -> usize {
         self.per_domain_errors.len()
     }
 
     /// Total new certs surfaced this tick.
     #[must_use]
-    pub fn new_count(&self) -> usize {
+    pub const fn new_count(&self) -> usize {
         self.new_observations.len()
     }
 }

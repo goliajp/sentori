@@ -109,7 +109,7 @@ async fn create_and_find_round_trip() {
     let svc = AlertRuleService::new(pool);
     let id = svc
         .create_rule(
-            AlertRuleDraft::new(workspace_id,"New issues", TriggerKind::NewIssue)
+            AlertRuleDraft::new(workspace_id, "New issues", TriggerKind::NewIssue)
                 .for_project(pid)
                 .with_channels(json!([{"type": "email", "to": ["a@b.com"]}]))
                 .with_throttle(15),
@@ -130,7 +130,11 @@ async fn create_workspace_wide() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = AlertRuleService::new(pool);
     let id = svc
-        .create_rule(AlertRuleDraft::new(workspace_id,"global", TriggerKind::Regression))
+        .create_rule(AlertRuleDraft::new(
+            workspace_id,
+            "global",
+            TriggerKind::Regression,
+        ))
         .await
         .unwrap();
     let r = svc.find(id).await.unwrap().unwrap();
@@ -142,7 +146,11 @@ async fn create_rejects_empty_name() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = AlertRuleService::new(pool);
     let err = svc
-        .create_rule(AlertRuleDraft::new(workspace_id,"  ", TriggerKind::NewIssue))
+        .create_rule(AlertRuleDraft::new(
+            workspace_id,
+            "  ",
+            TriggerKind::NewIssue,
+        ))
         .await
         .unwrap_err();
     assert!(matches!(err, AlertRuleError::InvalidInput(_)));
@@ -154,7 +162,8 @@ async fn create_rejects_non_array_channels() {
     let svc = AlertRuleService::new(pool);
     let err = svc
         .create_rule(
-            AlertRuleDraft::new(workspace_id,"x", TriggerKind::NewIssue).with_channels(json!({"oops": true})),
+            AlertRuleDraft::new(workspace_id, "x", TriggerKind::NewIssue)
+                .with_channels(json!({"oops": true})),
         )
         .await
         .unwrap_err();
@@ -166,7 +175,10 @@ async fn create_unknown_project_fk() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = AlertRuleService::new(pool);
     let err = svc
-        .create_rule(AlertRuleDraft::new(workspace_id,"x", TriggerKind::NewIssue).for_project(ProjectId::new()))
+        .create_rule(
+            AlertRuleDraft::new(workspace_id, "x", TriggerKind::NewIssue)
+                .for_project(ProjectId::new()),
+        )
         .await
         .unwrap_err();
     assert!(matches!(err, AlertRuleError::ProjectNotFound(_)));
@@ -177,12 +189,18 @@ async fn list_for_project_includes_workspace_wide() {
     let (pool, workspace_id) = fresh_pool().await;
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let svc = AlertRuleService::new(pool);
-    svc.create_rule(AlertRuleDraft::new(workspace_id,"scoped", TriggerKind::NewIssue).for_project(pid))
-        .await
-        .unwrap();
-    svc.create_rule(AlertRuleDraft::new(workspace_id,"global", TriggerKind::NewIssue))
-        .await
-        .unwrap();
+    svc.create_rule(
+        AlertRuleDraft::new(workspace_id, "scoped", TriggerKind::NewIssue).for_project(pid),
+    )
+    .await
+    .unwrap();
+    svc.create_rule(AlertRuleDraft::new(
+        workspace_id,
+        "global",
+        TriggerKind::NewIssue,
+    ))
+    .await
+    .unwrap();
     let list = svc.list_for_project(pid).await.unwrap();
     assert_eq!(list.len(), 2);
 }
@@ -192,12 +210,18 @@ async fn list_workspace_wide_excludes_scoped() {
     let (pool, workspace_id) = fresh_pool().await;
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let svc = AlertRuleService::new(pool);
-    svc.create_rule(AlertRuleDraft::new(workspace_id,"scoped", TriggerKind::NewIssue).for_project(pid))
-        .await
-        .unwrap();
-    svc.create_rule(AlertRuleDraft::new(workspace_id,"global", TriggerKind::NewIssue))
-        .await
-        .unwrap();
+    svc.create_rule(
+        AlertRuleDraft::new(workspace_id, "scoped", TriggerKind::NewIssue).for_project(pid),
+    )
+    .await
+    .unwrap();
+    svc.create_rule(AlertRuleDraft::new(
+        workspace_id,
+        "global",
+        TriggerKind::NewIssue,
+    ))
+    .await
+    .unwrap();
     let list = svc.list_workspace_wide().await.unwrap();
     assert_eq!(list.len(), 1);
     assert!(list[0].project_id.is_none());
@@ -208,20 +232,34 @@ async fn list_active_by_kind_filters() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = AlertRuleService::new(pool);
     let enabled = svc
-        .create_rule(AlertRuleDraft::new(workspace_id,"ok", TriggerKind::EventCount))
+        .create_rule(AlertRuleDraft::new(
+            workspace_id,
+            "ok",
+            TriggerKind::EventCount,
+        ))
         .await
         .unwrap();
-    svc.create_rule(AlertRuleDraft::new(workspace_id,"disabled", TriggerKind::EventCount).disabled())
-        .await
-        .unwrap();
+    svc.create_rule(
+        AlertRuleDraft::new(workspace_id, "disabled", TriggerKind::EventCount).disabled(),
+    )
+    .await
+    .unwrap();
     let muted = svc
-        .create_rule(AlertRuleDraft::new(workspace_id,"muted", TriggerKind::EventCount))
+        .create_rule(AlertRuleDraft::new(
+            workspace_id,
+            "muted",
+            TriggerKind::EventCount,
+        ))
         .await
         .unwrap();
     svc.set_muted(muted, true).await.unwrap();
-    svc.create_rule(AlertRuleDraft::new(workspace_id,"wrong-kind", TriggerKind::NewIssue))
-        .await
-        .unwrap();
+    svc.create_rule(AlertRuleDraft::new(
+        workspace_id,
+        "wrong-kind",
+        TriggerKind::NewIssue,
+    ))
+    .await
+    .unwrap();
 
     let active = svc
         .list_active_by_kind(TriggerKind::EventCount)
@@ -238,7 +276,9 @@ async fn update_patches_only_set_fields() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = AlertRuleService::new(pool);
     let id = svc
-        .create_rule(AlertRuleDraft::new(workspace_id,"orig", TriggerKind::NewIssue).with_throttle(10))
+        .create_rule(
+            AlertRuleDraft::new(workspace_id, "orig", TriggerKind::NewIssue).with_throttle(10),
+        )
         .await
         .unwrap();
     svc.update(
@@ -271,7 +311,11 @@ async fn set_enabled_round_trip() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = AlertRuleService::new(pool);
     let id = svc
-        .create_rule(AlertRuleDraft::new(workspace_id,"x", TriggerKind::NewIssue))
+        .create_rule(AlertRuleDraft::new(
+            workspace_id,
+            "x",
+            TriggerKind::NewIssue,
+        ))
         .await
         .unwrap();
     svc.set_enabled(id, false).await.unwrap();
@@ -285,7 +329,11 @@ async fn snooze_round_trip() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = AlertRuleService::new(pool);
     let id = svc
-        .create_rule(AlertRuleDraft::new(workspace_id,"x", TriggerKind::NewIssue))
+        .create_rule(AlertRuleDraft::new(
+            workspace_id,
+            "x",
+            TriggerKind::NewIssue,
+        ))
         .await
         .unwrap();
     let until = OffsetDateTime::now_utc() + time::Duration::hours(1);
@@ -300,7 +348,11 @@ async fn delete_round_trip() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = AlertRuleService::new(pool);
     let id = svc
-        .create_rule(AlertRuleDraft::new(workspace_id,"x", TriggerKind::NewIssue))
+        .create_rule(AlertRuleDraft::new(
+            workspace_id,
+            "x",
+            TriggerKind::NewIssue,
+        ))
         .await
         .unwrap();
     svc.delete(id).await.unwrap();
@@ -316,12 +368,18 @@ async fn try_fire_returns_matched_rules() {
     let (pool, workspace_id) = fresh_pool().await;
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let svc = AlertRuleService::new(pool);
-    svc.create_rule(AlertRuleDraft::new(workspace_id,"project-scoped", TriggerKind::NewIssue).for_project(pid))
-        .await
-        .unwrap();
-    svc.create_rule(AlertRuleDraft::new(workspace_id,"global", TriggerKind::NewIssue))
-        .await
-        .unwrap();
+    svc.create_rule(
+        AlertRuleDraft::new(workspace_id, "project-scoped", TriggerKind::NewIssue).for_project(pid),
+    )
+    .await
+    .unwrap();
+    svc.create_rule(AlertRuleDraft::new(
+        workspace_id,
+        "global",
+        TriggerKind::NewIssue,
+    ))
+    .await
+    .unwrap();
 
     let matched = svc.try_fire_for_event(&ctx_for(pid, false)).await.unwrap();
     assert_eq!(matched.len(), 2);
@@ -338,7 +396,7 @@ async fn try_fire_filters_environment() {
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let svc = AlertRuleService::new(pool);
     svc.create_rule(
-        AlertRuleDraft::new(workspace_id,"prod-only", TriggerKind::NewIssue)
+        AlertRuleDraft::new(workspace_id, "prod-only", TriggerKind::NewIssue)
             .for_project(pid)
             .with_filter(json!({"environment": "staging"})),
     )
@@ -355,19 +413,23 @@ async fn try_fire_skips_disabled_muted_snoozed() {
     let svc = AlertRuleService::new(pool);
     let disabled = svc
         .create_rule(
-            AlertRuleDraft::new(workspace_id,"dis", TriggerKind::NewIssue)
+            AlertRuleDraft::new(workspace_id, "dis", TriggerKind::NewIssue)
                 .for_project(pid)
                 .disabled(),
         )
         .await
         .unwrap();
     let muted = svc
-        .create_rule(AlertRuleDraft::new(workspace_id,"mut", TriggerKind::NewIssue).for_project(pid))
+        .create_rule(
+            AlertRuleDraft::new(workspace_id, "mut", TriggerKind::NewIssue).for_project(pid),
+        )
         .await
         .unwrap();
     svc.set_muted(muted, true).await.unwrap();
     let snoozed = svc
-        .create_rule(AlertRuleDraft::new(workspace_id,"snz", TriggerKind::NewIssue).for_project(pid))
+        .create_rule(
+            AlertRuleDraft::new(workspace_id, "snz", TriggerKind::NewIssue).for_project(pid),
+        )
         .await
         .unwrap();
     svc.snooze(
@@ -389,12 +451,16 @@ async fn try_fire_regression_only_matches_regression_kind() {
     let (pool, workspace_id) = fresh_pool().await;
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let svc = AlertRuleService::new(pool);
-    svc.create_rule(AlertRuleDraft::new(workspace_id,"reg", TriggerKind::Regression).for_project(pid))
-        .await
-        .unwrap();
-    svc.create_rule(AlertRuleDraft::new(workspace_id,"ni", TriggerKind::NewIssue).for_project(pid))
-        .await
-        .unwrap();
+    svc.create_rule(
+        AlertRuleDraft::new(workspace_id, "reg", TriggerKind::Regression).for_project(pid),
+    )
+    .await
+    .unwrap();
+    svc.create_rule(
+        AlertRuleDraft::new(workspace_id, "ni", TriggerKind::NewIssue).for_project(pid),
+    )
+    .await
+    .unwrap();
     let matched = svc.try_fire_for_event(&ctx_for(pid, true)).await.unwrap();
     assert_eq!(matched.len(), 1);
     assert_eq!(matched[0].rule.trigger_kind, TriggerKind::Regression);
@@ -408,7 +474,7 @@ async fn try_fire_throttle_blocks_second_fire() {
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let svc = AlertRuleService::new(pool);
     svc.create_rule(
-        AlertRuleDraft::new(workspace_id,"x", TriggerKind::NewIssue)
+        AlertRuleDraft::new(workspace_id, "x", TriggerKind::NewIssue)
             .for_project(pid)
             .with_throttle(60),
     )
@@ -427,7 +493,9 @@ async fn try_claim_first_caller_wins_race() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = AlertRuleService::new(pool);
     let id = svc
-        .create_rule(AlertRuleDraft::new(workspace_id,"x", TriggerKind::EventCount).with_throttle(60))
+        .create_rule(
+            AlertRuleDraft::new(workspace_id, "x", TriggerKind::EventCount).with_throttle(60),
+        )
         .await
         .unwrap();
     let svc2 = svc.clone();
@@ -449,7 +517,9 @@ async fn try_claim_zero_throttle_always_succeeds() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = AlertRuleService::new(pool);
     let id = svc
-        .create_rule(AlertRuleDraft::new(workspace_id,"x", TriggerKind::EventCount).with_throttle(0))
+        .create_rule(
+            AlertRuleDraft::new(workspace_id, "x", TriggerKind::EventCount).with_throttle(0),
+        )
         .await
         .unwrap();
     assert!(svc.try_claim(id, 0).await.unwrap());
@@ -464,7 +534,9 @@ async fn project_cascade_drops_scoped_rules() {
     let pid = seed_project(&pool, workspace_id, "doomed").await;
     let svc = AlertRuleService::new(pool.clone());
     let id = svc
-        .create_rule(AlertRuleDraft::new(workspace_id,"scoped", TriggerKind::NewIssue).for_project(pid))
+        .create_rule(
+            AlertRuleDraft::new(workspace_id, "scoped", TriggerKind::NewIssue).for_project(pid),
+        )
         .await
         .unwrap();
     sqlx::query("DELETE FROM projects WHERE id = $1")

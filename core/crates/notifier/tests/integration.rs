@@ -370,7 +370,8 @@ async fn list_recent_returns_ordered() {
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let (svc, _) = build_service_with_mock(pool);
     for i in 0..5 {
-        let n = Notification::new(workspace_id, Channel::Mock, "ops", format!("s{i}"), "b").with_project(pid);
+        let n = Notification::new(workspace_id, Channel::Mock, "ops", format!("s{i}"), "b")
+            .with_project(pid);
         svc.dispatch(&n).await.unwrap();
     }
     let recent = svc

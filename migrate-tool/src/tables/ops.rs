@@ -1,5 +1,10 @@
-//! Ops / monitoring tables — endpoint_probes, endpoint_alerts,
+//! Ops / monitoring tables — endpoint_check, endpoint_probe,
 //! pii_findings, digest_subscriptions, webhook_deliveries.
+//!
+//! Real legacy names: endpoint_check + endpoint_probe (dst 0029),
+//! pii_findings (dst 0030), digest_subscriptions +
+//! webhook_deliveries (dst 0026). Only pii_findings has rows in
+//! legacy prod; the rest are guarded.
 
 use anyhow::Result;
 use serde_json::Value;
@@ -8,6 +13,8 @@ use tracing::info;
 
 use crate::report::Report;
 
+use super::dashboard::guard;
+
 pub async fn migrate(
     src: &PgPool,
     dst: &PgPool,
@@ -15,29 +22,38 @@ pub async fn migrate(
     report: &mut Report,
 ) -> Result<u64> {
     let mut total = 0u64;
-    total += endpoint_probes(src, dst, dry_run, report).await?;
-    total += endpoint_alerts(src, dst, dry_run, report).await?;
+    total += endpoint_check(src, dst, dry_run, report).await?;
+    total += endpoint_probe(src, dst, dry_run, report).await?;
     total += pii_findings(src, dst, dry_run, report).await?;
     total += digest_subscriptions(src, dst, dry_run, report).await?;
     total += webhook_deliveries(src, dst, dry_run, report).await?;
     Ok(total)
 }
 
-async fn endpoint_probes(
+async fn endpoint_check(
     src: &PgPool,
     dst: &PgPool,
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "endpoint_check", report).await? {
+        return Ok(0);
+    }
+    // Legacy + dst 0029: id, project_id, name, target_url,
+    // method, interval_sec, assertion_status_codes INT4[],
+    // assertion_body_substring, assertion_max_latency_ms,
+    // paused, created_by, created_at, updated_at; dst adds
+    // workspace_id.
     let rows = sqlx::query(
-        "SELECT ep.id, p.org_id AS workspace_id, ep.project_id, ep.endpoint_url, ep.method, \
-                ep.expected_status, ep.body_template, ep.headers, ep.timeout_ms, ep.interval_sec, \
-                ep.enabled, ep.created_at \
-         FROM endpoint_probes ep JOIN projects p ON p.id = ep.project_id",
+        "SELECT ec.id, p.org_id AS workspace_id, ec.project_id, ec.name, ec.target_url, \
+                ec.method, ec.interval_sec, ec.assertion_status_codes, \
+                ec.assertion_body_substring, ec.assertion_max_latency_ms, ec.paused, \
+                ec.created_by, ec.created_at, ec.updated_at \
+         FROM endpoint_check ec JOIN projects p ON p.id = ec.project_id",
     )
     .fetch_all(src)
     .await?;
-    report.note_read("endpoint_probes", rows.len() as u64);
+    report.note_read("endpoint_check", rows.len() as u64);
     let mut written = 0u64;
     let mut skipped = 0u64;
     for r in &rows {
@@ -45,22 +61,26 @@ async fn endpoint_probes(
             continue;
         }
         let res = sqlx::query(
-            "INSERT INTO endpoint_probes (id, workspace_id, project_id, endpoint_url, method, \
-                expected_status, body_template, headers, timeout_ms, interval_sec, enabled, created_at) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT (id) DO NOTHING",
+            "INSERT INTO endpoint_check (id, workspace_id, project_id, name, target_url, \
+                method, interval_sec, assertion_status_codes, assertion_body_substring, \
+                assertion_max_latency_ms, paused, created_by, created_at, updated_at) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) \
+             ON CONFLICT (id) DO NOTHING",
         )
         .bind(r.get::<uuid::Uuid, _>("id"))
         .bind(r.get::<uuid::Uuid, _>("workspace_id"))
         .bind(r.get::<uuid::Uuid, _>("project_id"))
-        .bind(r.get::<String, _>("endpoint_url"))
-        .bind(r.try_get::<String, _>("method").unwrap_or_else(|_| "GET".into()))
-        .bind(r.try_get::<i32, _>("expected_status").unwrap_or(200))
-        .bind(r.try_get::<Option<String>, _>("body_template").ok().flatten())
-        .bind(r.try_get::<Value, _>("headers").unwrap_or(Value::Null))
-        .bind(r.try_get::<i32, _>("timeout_ms").unwrap_or(5000))
-        .bind(r.try_get::<i32, _>("interval_sec").unwrap_or(60))
-        .bind(r.try_get::<bool, _>("enabled").unwrap_or(true))
+        .bind(r.get::<String, _>("name"))
+        .bind(r.get::<String, _>("target_url"))
+        .bind(r.get::<String, _>("method"))
+        .bind(r.get::<i32, _>("interval_sec"))
+        .bind(r.get::<Vec<i32>, _>("assertion_status_codes"))
+        .bind(r.get::<Option<String>, _>("assertion_body_substring"))
+        .bind(r.get::<Option<i32>, _>("assertion_max_latency_ms"))
+        .bind(r.get::<bool, _>("paused"))
+        .bind(r.get::<Option<uuid::Uuid>, _>("created_by"))
         .bind(r.get::<time::OffsetDateTime, _>("created_at"))
+        .bind(r.get::<time::OffsetDateTime, _>("updated_at"))
         .execute(dst)
         .await?;
         if res.rows_affected() > 0 {
@@ -69,26 +89,31 @@ async fn endpoint_probes(
             skipped += 1;
         }
     }
-    report.note_written("endpoint_probes", written);
-    report.note_skipped("endpoint_probes", skipped);
-    info!(read = rows.len(), written, skipped, "endpoint_probes");
+    report.note_written("endpoint_check", written);
+    report.note_skipped("endpoint_check", skipped);
+    info!(read = rows.len(), written, skipped, "endpoint_check");
     Ok(written)
 }
 
-async fn endpoint_alerts(
+async fn endpoint_probe(
     src: &PgPool,
     dst: &PgPool,
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "endpoint_probe", report).await? {
+        return Ok(0);
+    }
+    // Legacy + dst 0029: ts, check_id, status_code, latency_ms,
+    // ok, error_kind. Both sides are RANGE-partitioned by ts;
+    // the dst DEFAULT partition catches rows outside pre-created
+    // daily partitions.
     let rows = sqlx::query(
-        "SELECT ea.id, p.org_id AS workspace_id, ea.project_id, ea.probe_id, ea.status, \
-                ea.error_message, ea.duration_ms, ea.observed_at \
-         FROM endpoint_alerts ea JOIN projects p ON p.id = ea.project_id",
+        "SELECT ts, check_id, status_code, latency_ms, ok, error_kind FROM endpoint_probe",
     )
     .fetch_all(src)
     .await?;
-    report.note_read("endpoint_alerts", rows.len() as u64);
+    report.note_read("endpoint_probe", rows.len() as u64);
     let mut written = 0u64;
     let mut skipped = 0u64;
     for r in &rows {
@@ -96,18 +121,15 @@ async fn endpoint_alerts(
             continue;
         }
         let res = sqlx::query(
-            "INSERT INTO endpoint_alerts (id, workspace_id, project_id, probe_id, status, \
-                error_message, duration_ms, observed_at) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING",
+            "INSERT INTO endpoint_probe (ts, check_id, status_code, latency_ms, ok, error_kind) \
+             VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (check_id, ts) DO NOTHING",
         )
-        .bind(r.get::<uuid::Uuid, _>("id"))
-        .bind(r.get::<uuid::Uuid, _>("workspace_id"))
-        .bind(r.get::<uuid::Uuid, _>("project_id"))
-        .bind(r.get::<uuid::Uuid, _>("probe_id"))
-        .bind(r.get::<String, _>("status"))
-        .bind(r.try_get::<Option<String>, _>("error_message").ok().flatten())
-        .bind(r.try_get::<Option<i32>, _>("duration_ms").ok().flatten())
-        .bind(r.get::<time::OffsetDateTime, _>("observed_at"))
+        .bind(r.get::<time::OffsetDateTime, _>("ts"))
+        .bind(r.get::<uuid::Uuid, _>("check_id"))
+        .bind(r.get::<i32, _>("status_code"))
+        .bind(r.get::<i32, _>("latency_ms"))
+        .bind(r.get::<bool, _>("ok"))
+        .bind(r.get::<Option<String>, _>("error_kind"))
         .execute(dst)
         .await?;
         if res.rows_affected() > 0 {
@@ -116,9 +138,9 @@ async fn endpoint_alerts(
             skipped += 1;
         }
     }
-    report.note_written("endpoint_alerts", written);
-    report.note_skipped("endpoint_alerts", skipped);
-    info!(read = rows.len(), written, skipped, "endpoint_alerts");
+    report.note_written("endpoint_probe", written);
+    report.note_skipped("endpoint_probe", skipped);
+    info!(read = rows.len(), written, skipped, "endpoint_probe");
     Ok(written)
 }
 
@@ -128,9 +150,12 @@ async fn pii_findings(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    // Legacy: id, project_id, release, event_id, field_path,
+    // pattern_kind, sample, seen_at. Dst 0030 mirrors it and
+    // adds workspace_id (derived via projects.org_id).
     let rows = sqlx::query(
-        "SELECT pf.id, p.org_id AS workspace_id, pf.project_id, pf.event_id, pf.field_path, \
-                pf.kind, pf.severity, pf.created_at \
+        "SELECT pf.id, p.org_id AS workspace_id, pf.project_id, pf.release, pf.event_id, \
+                pf.field_path, pf.pattern_kind, pf.sample, pf.seen_at \
          FROM pii_findings pf JOIN projects p ON p.id = pf.project_id",
     )
     .fetch_all(src)
@@ -143,18 +168,19 @@ async fn pii_findings(
             continue;
         }
         let res = sqlx::query(
-            "INSERT INTO pii_findings (id, workspace_id, project_id, event_id, field_path, \
-                kind, severity, created_at) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING",
+            "INSERT INTO pii_findings (id, workspace_id, project_id, release, event_id, \
+                field_path, pattern_kind, sample, seen_at) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (id) DO NOTHING",
         )
         .bind(r.get::<uuid::Uuid, _>("id"))
         .bind(r.get::<uuid::Uuid, _>("workspace_id"))
         .bind(r.get::<uuid::Uuid, _>("project_id"))
-        .bind(r.try_get::<Option<uuid::Uuid>, _>("event_id").ok().flatten())
+        .bind(r.get::<String, _>("release"))
+        .bind(r.get::<uuid::Uuid, _>("event_id"))
         .bind(r.get::<String, _>("field_path"))
-        .bind(r.get::<String, _>("kind"))
-        .bind(r.try_get::<String, _>("severity").unwrap_or_else(|_| "low".into()))
-        .bind(r.get::<time::OffsetDateTime, _>("created_at"))
+        .bind(r.get::<String, _>("pattern_kind"))
+        .bind(r.get::<String, _>("sample"))
+        .bind(r.get::<time::OffsetDateTime, _>("seen_at"))
         .execute(dst)
         .await?;
         if res.rows_affected() > 0 {
@@ -175,10 +201,14 @@ async fn digest_subscriptions(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "digest_subscriptions", report).await? {
+        return Ok(0);
+    }
+    // Legacy: user_id, org_id, frequency, last_sent_at,
+    // created_at. Dst 0026 renames org_id → workspace_id,
+    // PK (user_id, workspace_id, frequency).
     let rows = sqlx::query(
-        "SELECT ds.id, p.org_id AS workspace_id, ds.project_id, ds.user_id, ds.cadence, \
-                ds.timezone, ds.next_send_at, ds.last_sent_at, ds.enabled \
-         FROM digest_subscriptions ds JOIN projects p ON p.id = ds.project_id",
+        "SELECT user_id, org_id, frequency, last_sent_at, created_at FROM digest_subscriptions",
     )
     .fetch_all(src)
     .await?;
@@ -190,19 +220,15 @@ async fn digest_subscriptions(
             continue;
         }
         let res = sqlx::query(
-            "INSERT INTO digest_subscriptions (id, workspace_id, project_id, user_id, cadence, \
-                timezone, next_send_at, last_sent_at, enabled) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (id) DO NOTHING",
+            "INSERT INTO digest_subscriptions (user_id, workspace_id, frequency, last_sent_at, created_at) \
+             VALUES ($1, $2, $3, $4, $5) \
+             ON CONFLICT (user_id, workspace_id, frequency) DO NOTHING",
         )
-        .bind(r.get::<uuid::Uuid, _>("id"))
-        .bind(r.get::<uuid::Uuid, _>("workspace_id"))
-        .bind(r.get::<uuid::Uuid, _>("project_id"))
         .bind(r.get::<uuid::Uuid, _>("user_id"))
-        .bind(r.get::<String, _>("cadence"))
-        .bind(r.try_get::<Option<String>, _>("timezone").ok().flatten())
-        .bind(r.try_get::<Option<time::OffsetDateTime>, _>("next_send_at").ok().flatten())
-        .bind(r.try_get::<Option<time::OffsetDateTime>, _>("last_sent_at").ok().flatten())
-        .bind(r.try_get::<bool, _>("enabled").unwrap_or(true))
+        .bind(r.get::<uuid::Uuid, _>("org_id"))
+        .bind(r.get::<String, _>("frequency"))
+        .bind(r.get::<Option<time::OffsetDateTime>, _>("last_sent_at"))
+        .bind(r.get::<time::OffsetDateTime, _>("created_at"))
         .execute(dst)
         .await?;
         if res.rows_affected() > 0 {
@@ -223,11 +249,16 @@ async fn webhook_deliveries(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "webhook_deliveries", report).await? {
+        return Ok(0);
+    }
+    // Legacy + dst 0026 (identical): id, rule_id, payload,
+    // target_url, secret, attempt, next_attempt_at, last_status,
+    // last_error, status, created_at, delivered_at.
     let rows = sqlx::query(
-        "SELECT wd.id, p.org_id AS workspace_id, wd.project_id, wd.integration_id, wd.event_kind, \
-                wd.payload, wd.status, wd.response_status, wd.response_body, wd.attempt, \
-                wd.next_retry_at, wd.created_at, wd.completed_at \
-         FROM webhook_deliveries wd JOIN projects p ON p.id = wd.project_id",
+        "SELECT id, rule_id, payload, target_url, secret, attempt, next_attempt_at, \
+                last_status, last_error, status, created_at, delivered_at \
+         FROM webhook_deliveries",
     )
     .fetch_all(src)
     .await?;
@@ -239,25 +270,24 @@ async fn webhook_deliveries(
             continue;
         }
         let res = sqlx::query(
-            "INSERT INTO webhook_deliveries (id, workspace_id, project_id, integration_id, event_kind, \
-                payload, status, response_status, response_body, attempt, next_retry_at, \
-                created_at, completed_at) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) \
+            "INSERT INTO webhook_deliveries (id, rule_id, payload, target_url, secret, \
+                attempt, next_attempt_at, last_status, last_error, status, created_at, \
+                delivered_at) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) \
              ON CONFLICT (id) DO NOTHING",
         )
         .bind(r.get::<uuid::Uuid, _>("id"))
-        .bind(r.get::<uuid::Uuid, _>("workspace_id"))
-        .bind(r.get::<uuid::Uuid, _>("project_id"))
-        .bind(r.get::<uuid::Uuid, _>("integration_id"))
-        .bind(r.get::<String, _>("event_kind"))
-        .bind(r.try_get::<Value, _>("payload").unwrap_or(Value::Null))
+        .bind(r.get::<uuid::Uuid, _>("rule_id"))
+        .bind(r.get::<Value, _>("payload"))
+        .bind(r.get::<String, _>("target_url"))
+        .bind(r.get::<String, _>("secret"))
+        .bind(r.get::<i32, _>("attempt"))
+        .bind(r.get::<time::OffsetDateTime, _>("next_attempt_at"))
+        .bind(r.get::<Option<i32>, _>("last_status"))
+        .bind(r.get::<Option<String>, _>("last_error"))
         .bind(r.get::<String, _>("status"))
-        .bind(r.try_get::<Option<i32>, _>("response_status").ok().flatten())
-        .bind(r.try_get::<Option<String>, _>("response_body").ok().flatten())
-        .bind(r.try_get::<i32, _>("attempt").unwrap_or(1))
-        .bind(r.try_get::<Option<time::OffsetDateTime>, _>("next_retry_at").ok().flatten())
         .bind(r.get::<time::OffsetDateTime, _>("created_at"))
-        .bind(r.try_get::<Option<time::OffsetDateTime>, _>("completed_at").ok().flatten())
+        .bind(r.get::<Option<time::OffsetDateTime>, _>("delivered_at"))
         .execute(dst)
         .await?;
         if res.rows_affected() > 0 {

@@ -304,22 +304,22 @@ fn translate_fk(
     project_id: Option<ProjectId>,
     actor: Option<UserId>,
 ) -> AuditError {
-    if let sqlx::Error::Database(db_err) = &err {
-        if db_err.code().as_deref() == Some("23503") {
-            // FK could be project or actor. Constraint name
-            // includes the column the FK references.
-            let constraint = db_err.constraint().unwrap_or("");
-            if constraint.contains("project") {
-                if let Some(p) = project_id {
-                    return AuditError::ProjectNotFound(p.into_uuid());
-                }
-            }
-            if let Some(a) = actor {
-                return AuditError::ActorNotFound(a.into_uuid());
-            }
-            if let Some(p) = project_id {
-                return AuditError::ProjectNotFound(p.into_uuid());
-            }
+    if let sqlx::Error::Database(db_err) = &err
+        && db_err.code().as_deref() == Some("23503")
+    {
+        // FK could be project or actor. Constraint name
+        // includes the column the FK references.
+        let constraint = db_err.constraint().unwrap_or("");
+        if constraint.contains("project")
+            && let Some(p) = project_id
+        {
+            return AuditError::ProjectNotFound(p.into_uuid());
+        }
+        if let Some(a) = actor {
+            return AuditError::ActorNotFound(a.into_uuid());
+        }
+        if let Some(p) = project_id {
+            return AuditError::ProjectNotFound(p.into_uuid());
         }
     }
     AuditError::Db(err)

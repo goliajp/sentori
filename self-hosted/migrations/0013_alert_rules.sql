@@ -1,1 +1,0 @@
-../../core/migrations/0013_alert_rules.sql

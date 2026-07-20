@@ -1,14 +1,52 @@
 //! Dashboard / admin tables — saved_views, alert_rules,
-//! integrations, audit_logs, watchers, notifications,
-//! activity_log. All INSERT-透传 with workspace_id derived via
-//! projects FK subquery.
+//! integrations, audit_logs.
+//!
+//! Also hosts `src_count`, the shared guard used by every set
+//! whose legacy table is empty or absent: to_regclass probe →
+//! COUNT(*) → only then run the real query.
 
 use anyhow::Result;
 use serde_json::Value;
 use sqlx::{PgPool, Row};
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::report::Report;
+
+/// Guard probe for legacy tables that may be absent or empty.
+///
+/// Returns `None` if the table does not exist in the legacy DB,
+/// otherwise `Some(row_count)`. Real query errors propagate.
+pub(crate) async fn src_count(src: &PgPool, table: &str) -> Result<Option<i64>> {
+    let exists: Option<String> = sqlx::query_scalar("SELECT to_regclass($1)::text")
+        .bind(table)
+        .fetch_one(src)
+        .await?;
+    if exists.is_none() {
+        return Ok(None);
+    }
+    let n: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {table}"))
+        .fetch_one(src)
+        .await?;
+    Ok(Some(n))
+}
+
+/// Apply the uniform guard: `Ok(true)` means "proceed with the
+/// real query"; `Ok(false)` means the caller should return 0
+/// (absent → warn, empty → silent).
+pub(crate) async fn guard(src: &PgPool, table: &str, report: &mut Report) -> Result<bool> {
+    match src_count(src, table).await? {
+        None => {
+            warn!("{table}: not present in legacy, skipping");
+            report.note_read(table, 0);
+            Ok(false)
+        }
+        Some(0) => {
+            report.note_read(table, 0);
+            Ok(false)
+        }
+        Some(_) => Ok(true),
+    }
+}
 
 pub async fn migrate(
     src: &PgPool,
@@ -30,10 +68,18 @@ async fn saved_views(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "saved_views", report).await? {
+        return Ok(0);
+    }
+    // Legacy: id, org_id, target, scope ('personal'|'team'|'org'),
+    // team_id, user_id, name, payload, created_at, created_by,
+    // updated_at. Dst 0014 has no team scope / team_id and no
+    // org column (workspace_id instead); project_id is a new
+    // nullable column → NULL for migrated org-level views.
     let rows = sqlx::query(
-        "SELECT sv.id, p.org_id AS workspace_id, sv.project_id, sv.target, sv.scope, \
-                sv.user_id, sv.name, sv.payload, sv.created_at, sv.created_by, sv.updated_at \
-         FROM saved_views sv LEFT JOIN projects p ON p.id = sv.project_id",
+        "SELECT id, org_id, target, scope, team_id, user_id, name, payload, \
+                created_at, created_by, updated_at \
+         FROM saved_views",
     )
     .fetch_all(src)
     .await?;
@@ -44,21 +90,32 @@ async fn saved_views(
         if dry_run {
             continue;
         }
+        let scope: String = r.get("scope");
+        // Dst 0014 only knows 'personal' | 'workspace'; legacy
+        // 'org' maps to 'workspace', 'team' has no destination.
+        let scope = match scope.as_str() {
+            "org" => "workspace".to_string(),
+            "team" => {
+                skipped += 1;
+                continue;
+            }
+            other => other.to_string(),
+        };
         let res = sqlx::query(
             "INSERT INTO saved_views (id, workspace_id, project_id, target, scope, user_id, \
                 name, payload, created_at, created_by, updated_at) \
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (id) DO NOTHING",
         )
         .bind(r.get::<uuid::Uuid, _>("id"))
-        .bind(r.try_get::<Option<uuid::Uuid>, _>("workspace_id").ok().flatten())
-        .bind(r.try_get::<Option<uuid::Uuid>, _>("project_id").ok().flatten())
+        .bind(r.get::<uuid::Uuid, _>("org_id"))
+        .bind(None::<uuid::Uuid>)
         .bind(r.get::<String, _>("target"))
-        .bind(r.get::<String, _>("scope"))
-        .bind(r.try_get::<Option<uuid::Uuid>, _>("user_id").ok().flatten())
+        .bind(scope)
+        .bind(r.get::<Option<uuid::Uuid>, _>("user_id"))
         .bind(r.get::<String, _>("name"))
-        .bind(r.try_get::<Value, _>("payload").unwrap_or(Value::Null))
+        .bind(r.get::<Value, _>("payload"))
         .bind(r.get::<time::OffsetDateTime, _>("created_at"))
-        .bind(r.try_get::<Option<uuid::Uuid>, _>("created_by").ok().flatten())
+        .bind(r.get::<Option<uuid::Uuid>, _>("created_by"))
         .bind(r.get::<time::OffsetDateTime, _>("updated_at"))
         .execute(dst)
         .await?;
@@ -139,10 +196,23 @@ async fn integrations(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "integrations", report).await? {
+        return Ok(0);
+    }
+    // Legacy: id, org_id, kind, config, created_at, revoked_at —
+    // org-level rows with no project. Dst 0011 attaches per
+    // project (project_id NOT NULL) → derive the org's oldest
+    // project; orgs without a project skip the row. Mapping:
+    // connected_at ← created_at, active ← revoked_at IS NULL,
+    // connected_by ← NULL (legacy never recorded it).
     let rows = sqlx::query(
-        "SELECT i.id, p.org_id AS workspace_id, i.project_id, i.kind, i.config, \
-                i.connected_by, i.connected_at, i.active \
-         FROM integrations i JOIN projects p ON p.id = i.project_id",
+        "SELECT i.id, i.org_id, pj.id AS project_id, i.kind, i.config, \
+                i.created_at, i.revoked_at \
+         FROM integrations i \
+         LEFT JOIN LATERAL ( \
+             SELECT id FROM projects WHERE org_id = i.org_id \
+             ORDER BY created_at LIMIT 1 \
+         ) pj ON true",
     )
     .fetch_all(src)
     .await?;
@@ -153,19 +223,25 @@ async fn integrations(
         if dry_run {
             continue;
         }
+        let project_id: Option<uuid::Uuid> = r.get("project_id");
+        let Some(project_id) = project_id else {
+            skipped += 1;
+            continue;
+        };
+        let revoked_at: Option<time::OffsetDateTime> = r.get("revoked_at");
         let res = sqlx::query(
             "INSERT INTO integrations (id, workspace_id, project_id, kind, config, \
                 connected_by, connected_at, active) \
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING",
         )
         .bind(r.get::<uuid::Uuid, _>("id"))
-        .bind(r.get::<uuid::Uuid, _>("workspace_id"))
-        .bind(r.get::<uuid::Uuid, _>("project_id"))
+        .bind(r.get::<uuid::Uuid, _>("org_id"))
+        .bind(project_id)
         .bind(r.get::<String, _>("kind"))
-        .bind(r.try_get::<Value, _>("config").unwrap_or(Value::Null))
-        .bind(r.try_get::<Option<uuid::Uuid>, _>("connected_by").ok().flatten())
-        .bind(r.get::<time::OffsetDateTime, _>("connected_at"))
-        .bind(r.try_get::<bool, _>("active").unwrap_or(true))
+        .bind(r.get::<Value, _>("config"))
+        .bind(None::<uuid::Uuid>)
+        .bind(r.get::<time::OffsetDateTime, _>("created_at"))
+        .bind(revoked_at.is_none())
         .execute(dst)
         .await?;
         if res.rows_affected() > 0 {
@@ -186,11 +262,15 @@ async fn audit_logs(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    // Legacy: id, org_id (nullable), actor_user_id, action,
+    // target_type, target_id UUID, payload, created_at.
+    // Dst: workspace_id NOT NULL, project_id nullable (new),
+    // target_id TEXT → cast; rows without an org have no valid
+    // workspace and are skipped.
     let rows = sqlx::query(
-        "SELECT al.id, COALESCE(p.org_id, '00000000-0000-0000-0000-000000000000'::uuid) AS workspace_id, \
-                al.project_id, al.actor_user_id, al.action, al.target_type, al.target_id, \
-                al.payload, al.created_at \
-         FROM audit_logs al LEFT JOIN projects p ON p.id = al.project_id",
+        "SELECT id, org_id, actor_user_id, action, target_type, \
+                target_id::text AS target_id, payload, created_at \
+         FROM audit_logs",
     )
     .fetch_all(src)
     .await?;
@@ -201,19 +281,24 @@ async fn audit_logs(
         if dry_run {
             continue;
         }
+        let org_id: Option<uuid::Uuid> = r.get("org_id");
+        let Some(org_id) = org_id else {
+            skipped += 1;
+            continue;
+        };
         let res = sqlx::query(
             "INSERT INTO audit_logs (id, workspace_id, project_id, actor_user_id, action, \
                 target_type, target_id, payload, created_at) \
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (id) DO NOTHING",
         )
         .bind(r.get::<uuid::Uuid, _>("id"))
-        .bind(r.get::<uuid::Uuid, _>("workspace_id"))
-        .bind(r.try_get::<Option<uuid::Uuid>, _>("project_id").ok().flatten())
-        .bind(r.try_get::<Option<uuid::Uuid>, _>("actor_user_id").ok().flatten())
+        .bind(org_id)
+        .bind(None::<uuid::Uuid>)
+        .bind(r.get::<Option<uuid::Uuid>, _>("actor_user_id"))
         .bind(r.get::<String, _>("action"))
-        .bind(r.try_get::<Option<String>, _>("target_type").ok().flatten())
-        .bind(r.try_get::<Option<String>, _>("target_id").ok().flatten())
-        .bind(r.try_get::<Value, _>("payload").unwrap_or(Value::Null))
+        .bind(r.get::<Option<String>, _>("target_type"))
+        .bind(r.get::<Option<String>, _>("target_id"))
+        .bind(r.get::<Value, _>("payload"))
         .bind(r.get::<time::OffsetDateTime, _>("created_at"))
         .execute(dst)
         .await?;

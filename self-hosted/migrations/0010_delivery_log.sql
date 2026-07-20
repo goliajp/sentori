@@ -1,1 +1,0 @@
-../../core/migrations/0010_delivery_log.sql

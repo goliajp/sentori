@@ -1,16 +1,18 @@
-//! Push platform tables: device_tokens, push_credentials, push_sends,
-//! push_delivery_logs, device_topics, push_preferences.
+//! Push platform tables: device_tokens, push_sends, device_topics,
+//! push_preferences (dst 0024 mirrors legacy column names, plus
+//! workspace_id derived via projects join).
 //!
-//! All schema-equivalent to legacy (migration 0024 deliberately
-//! mirrors legacy column names) so this is pure INSERT-透传 with
-//! workspace_id derived via projects FK subquery.
+//! push_credentials is intentionally NOT migrated — see the
+//! function comment (legacy-key-encrypted secrets).
 
 use anyhow::Result;
 use serde_json::Value;
 use sqlx::{PgPool, Row};
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::report::Report;
+
+use super::dashboard::guard;
 
 pub async fn migrate(
     src: &PgPool,
@@ -84,18 +86,47 @@ async fn device_tokens(
 
 async fn push_credentials(
     src: &PgPool,
+    _dst: &PgPool,
+    _dry_run: bool,
+    report: &mut Report,
+) -> Result<u64> {
+    // Deliberately NOT migrated: legacy `secret_blob` is AES-GCM
+    // ciphertext under the LEGACY server's master key — the v0.2
+    // secrets vault cannot decrypt it, so copying the ciphertext
+    // would be data corruption dressed as a migration.
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM push_credentials")
+        .fetch_one(src)
+        .await?;
+    warn!(
+        rows = n,
+        "push_credentials: not migrated — secrets are encrypted under the \
+         legacy master key; re-enter credentials in the dashboard"
+    );
+    report.note_read("push_credentials", n as u64);
+    report.note_skipped("push_credentials", n as u64);
+    Ok(0)
+}
+
+async fn push_sends(
+    src: &PgPool,
     dst: &PgPool,
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "push_sends", report).await? {
+        return Ok(0);
+    }
+    // dst 0024 mirrors legacy verbatim + workspace_id.
     let rows = sqlx::query(
-        "SELECT pc.id, p.org_id AS workspace_id, pc.project_id, pc.kind, pc.config, \
-                pc.secret_blob, pc.created_at, pc.last_validated_at, pc.last_validate_status \
-         FROM push_credentials pc JOIN projects p ON p.id = pc.project_id",
+        "SELECT s.id, p.org_id AS workspace_id, s.project_id, s.token_id, s.provider, \
+                s.payload, s.status, s.provider_outcome, s.error, s.retry_count, \
+                s.idempotency_key, s.next_attempt_at, s.created_at, s.sent_at, \
+                s.campaign_id, s.template_id, s.audience_tag, s.acked_at, s.ack_session_id \
+         FROM push_sends s JOIN projects p ON p.id = s.project_id",
     )
     .fetch_all(src)
     .await?;
-    report.note_read("push_credentials", rows.len() as u64);
+    report.note_read("push_sends", rows.len() as u64);
     let mut written = 0u64;
     let mut skipped = 0u64;
     for r in &rows {
@@ -103,18 +134,32 @@ async fn push_credentials(
             continue;
         }
         let res = sqlx::query(
-            "INSERT INTO push_credentials (id, workspace_id, project_id, kind, config, \
-                secret_blob, last_validated_at, last_validate_status) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING",
+            "INSERT INTO push_sends (id, workspace_id, project_id, token_id, provider, \
+                payload, status, provider_outcome, error, retry_count, idempotency_key, \
+                next_attempt_at, created_at, sent_at, campaign_id, template_id, \
+                audience_tag, acked_at, ack_session_id) \
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) \
+             ON CONFLICT (id) DO NOTHING",
         )
         .bind(r.get::<uuid::Uuid, _>("id"))
         .bind(r.get::<uuid::Uuid, _>("workspace_id"))
         .bind(r.get::<uuid::Uuid, _>("project_id"))
-        .bind(r.get::<String, _>("kind"))
-        .bind(r.get::<Value, _>("config"))
-        .bind(r.get::<Vec<u8>, _>("secret_blob"))
-        .bind(r.try_get::<Option<time::OffsetDateTime>, _>("last_validated_at").ok().flatten())
-        .bind(r.try_get::<Option<String>, _>("last_validate_status").ok().flatten())
+        .bind(r.get::<uuid::Uuid, _>("token_id"))
+        .bind(r.get::<String, _>("provider"))
+        .bind(r.get::<serde_json::Value, _>("payload"))
+        .bind(r.get::<String, _>("status"))
+        .bind(r.get::<Option<String>, _>("provider_outcome"))
+        .bind(r.get::<Option<String>, _>("error"))
+        .bind(r.get::<i32, _>("retry_count"))
+        .bind(r.get::<Option<String>, _>("idempotency_key"))
+        .bind(r.get::<time::OffsetDateTime, _>("next_attempt_at"))
+        .bind(r.get::<time::OffsetDateTime, _>("created_at"))
+        .bind(r.get::<Option<time::OffsetDateTime>, _>("sent_at"))
+        .bind(r.get::<Option<String>, _>("campaign_id"))
+        .bind(r.get::<Option<String>, _>("template_id"))
+        .bind(r.get::<Option<String>, _>("audience_tag"))
+        .bind(r.get::<Option<time::OffsetDateTime>, _>("acked_at"))
+        .bind(r.get::<Option<String>, _>("ack_session_id"))
         .execute(dst)
         .await?;
         if res.rows_affected() > 0 {
@@ -123,22 +168,10 @@ async fn push_credentials(
             skipped += 1;
         }
     }
-    report.note_written("push_credentials", written);
-    report.note_skipped("push_credentials", skipped);
-    info!(read = rows.len(), written, skipped, "push_credentials");
+    report.note_written("push_sends", written);
+    report.note_skipped("push_sends", skipped);
+    info!(read = rows.len(), written, skipped, "push_sends");
     Ok(written)
-}
-
-async fn push_sends(
-    _src: &PgPool,
-    _dst: &PgPool,
-    _dry_run: bool,
-    report: &mut Report,
-) -> Result<u64> {
-    // High-volume — leave for incremental ETL phase. Schema-1:1
-    // so when wired, just paginate like events.rs.
-    report.note_read("push_sends", 0);
-    Ok(0)
 }
 
 async fn device_topics(
@@ -147,6 +180,9 @@ async fn device_topics(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "device_topics", report).await? {
+        return Ok(0);
+    }
     let rows =
         sqlx::query("SELECT device_token_id, topic, created_at FROM device_topics")
             .fetch_all(src)
@@ -185,6 +221,9 @@ async fn push_preferences(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "push_preferences", report).await? {
+        return Ok(0);
+    }
     let rows = sqlx::query(
         "SELECT project_id, user_fingerprint_hex, category, opted_out, updated_at \
          FROM push_preferences",

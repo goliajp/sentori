@@ -359,10 +359,16 @@ mod tests {
     #[test]
     fn builder_helpers_chain() {
         let pid = sentori_workspace_identity::ProjectId::new();
-        let n = Notification::new(WorkspaceId::new(), Channel::Email, "x@y.com", "subj", "body")
-            .with_project(pid)
-            .with_dedup_key("k1")
-            .with_metadata(serde_json::json!({"foo": 1}));
+        let n = Notification::new(
+            WorkspaceId::new(),
+            Channel::Email,
+            "x@y.com",
+            "subj",
+            "body",
+        )
+        .with_project(pid)
+        .with_dedup_key("k1")
+        .with_metadata(serde_json::json!({"foo": 1}));
         assert_eq!(n.project_id, Some(pid));
         assert_eq!(n.dedup_key.as_deref(), Some("k1"));
         assert_eq!(n.metadata["foo"], 1);

@@ -25,7 +25,7 @@ impl Policy {
     /// let `MemoryBackend`'s `VecDeque<Instant>` grow without
     /// bound on hot keys; pin a ceiling at construction time
     /// rather than discover it via OOM in prod.
-    pub const MAX_WINDOW: Duration = Duration::from_secs(3600);
+    pub const MAX_WINDOW: Duration = Duration::from_hours(1);
 
     /// Build a new policy.
     ///
@@ -56,7 +56,7 @@ impl Policy {
     /// Same as [`Self::new`] minus `ZeroWindow` (60s is always
     /// non-zero) and `WindowTooLong` (60s is always ≤ 1h).
     pub fn per_minute(max: u32) -> Result<Self, PolicyError> {
-        Self::new(max, Duration::from_secs(60))
+        Self::new(max, Duration::from_mins(1))
     }
 
     /// Convenience for "N per second".
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn rejects_zero_max() {
-        let err = Policy::new(0, Duration::from_secs(60)).expect_err("zero");
+        let err = Policy::new(0, Duration::from_mins(1)).expect_err("zero");
         assert!(matches!(err, PolicyError::ZeroMaxRequests));
     }
 

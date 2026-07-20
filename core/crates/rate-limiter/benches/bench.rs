@@ -26,7 +26,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use sentori_rate_limiter::{Limiter, MemoryBackend, Policy, SystemClock};
 
 fn bench_check_allowed(c: &mut Criterion) {
-    let policy = Policy::new(1_000_000, Duration::from_secs(60)).expect("policy");
+    let policy = Policy::new(1_000_000, Duration::from_mins(1)).expect("policy");
     let limiter = Limiter::new(MemoryBackend::new(), SystemClock, policy);
     c.bench_function("check_allowed_hot", |b| {
         b.iter(|| {
@@ -37,7 +37,7 @@ fn bench_check_allowed(c: &mut Criterion) {
 }
 
 fn bench_check_distinct_keys(c: &mut Criterion) {
-    let policy = Policy::new(10, Duration::from_secs(60)).expect("policy");
+    let policy = Policy::new(10, Duration::from_mins(1)).expect("policy");
     let limiter = Limiter::new(MemoryBackend::new(), SystemClock, policy);
     c.bench_function("check_distinct_keys", |b| {
         let mut i: u64 = 0;

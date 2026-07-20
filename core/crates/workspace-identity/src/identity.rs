@@ -23,7 +23,7 @@ use crate::store::{Invites, Members, Projects, Users, Visibility};
 ///
 /// ## Pool routing for saas
 ///
-/// In SaaS deployments the per-request middleware should set the
+/// In `SaaS` deployments the per-request middleware should set the
 /// `app.current_workspace` GUC on the borrowed connection so the
 /// RLS policies (see migration 0001) match. The store methods
 /// here also explicitly bind `workspace_id` in WHERE clauses /
@@ -89,7 +89,7 @@ impl Identity {
 }
 
 /// Bootstrap a new workspace row. Used at server startup
-/// (self-hosted's default workspace) and by SaaS signup flow.
+/// (self-hosted's default workspace) and by `SaaS` signup flow.
 ///
 /// Returns the new [`WorkspaceId`]; immediately usable as
 /// argument to [`Identity::new`].
@@ -97,10 +97,7 @@ impl Identity {
 /// # Errors
 ///
 /// Forwards any sqlx error.
-pub async fn bootstrap_workspace(
-    pool: &PgPool,
-    name: &str,
-) -> Result<WorkspaceId, sqlx::Error> {
+pub async fn bootstrap_workspace(pool: &PgPool, name: &str) -> Result<WorkspaceId, sqlx::Error> {
     let id = WorkspaceId::new();
     sqlx::query("INSERT INTO workspaces (id, name) VALUES ($1, $2)")
         .bind(id.into_uuid())
@@ -111,7 +108,7 @@ pub async fn bootstrap_workspace(
 }
 
 /// Ensure a workspace exists with the given id (idempotent). The
-/// SaaS signup flow uses this to round-trip through transactions
+/// `SaaS` signup flow uses this to round-trip through transactions
 /// where the workspace id is minted before the row commits.
 ///
 /// # Errors

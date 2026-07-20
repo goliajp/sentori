@@ -439,10 +439,10 @@ fn validate_domain(domain: &str) -> Result<(), CertMonitorError> {
 }
 
 fn translate_fk(err: sqlx::Error, project_id: ProjectId) -> CertMonitorError {
-    if let sqlx::Error::Database(db_err) = &err {
-        if db_err.code().as_deref() == Some("23503") {
-            return CertMonitorError::ProjectNotFound(project_id.into_uuid());
-        }
+    if let sqlx::Error::Database(db_err) = &err
+        && db_err.code().as_deref() == Some("23503")
+    {
+        return CertMonitorError::ProjectNotFound(project_id.into_uuid());
     }
     CertMonitorError::Db(err)
 }

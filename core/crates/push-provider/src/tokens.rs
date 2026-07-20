@@ -209,10 +209,10 @@ fn row_to_token(row: &sqlx::postgres::PgRow) -> Result<DeviceToken, PushError> {
 }
 
 fn translate_fk(err: sqlx::Error, project_id: ProjectId) -> PushError {
-    if let sqlx::Error::Database(db_err) = &err {
-        if db_err.code().as_deref() == Some("23503") {
-            return PushError::ProjectNotFound(project_id.into_uuid());
-        }
+    if let sqlx::Error::Database(db_err) = &err
+        && db_err.code().as_deref() == Some("23503")
+    {
+        return PushError::ProjectNotFound(project_id.into_uuid());
     }
     PushError::Db(err)
 }

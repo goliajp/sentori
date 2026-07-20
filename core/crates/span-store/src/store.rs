@@ -289,19 +289,19 @@ fn validate_span(input: &SpanInput) -> Result<(), SpanStoreError> {
             "name must be 1..={MAX_NAME_CHARS} chars, got {name_chars}"
         )));
     }
-    if let Some(tp) = input.traceparent.as_deref() {
-        if tp.chars().count() > MAX_TRACEPARENT_CHARS {
-            return Err(SpanStoreError::InvalidSpan("traceparent too long".into()));
-        }
+    if let Some(tp) = input.traceparent.as_deref()
+        && tp.chars().count() > MAX_TRACEPARENT_CHARS
+    {
+        return Err(SpanStoreError::InvalidSpan("traceparent too long".into()));
     }
     Ok(())
 }
 
 fn translate_fk(err: sqlx::Error, project_id: ProjectId) -> SpanStoreError {
-    if let sqlx::Error::Database(db_err) = &err {
-        if db_err.code().as_deref() == Some("23503") {
-            return SpanStoreError::ProjectNotFound(project_id.into_uuid());
-        }
+    if let sqlx::Error::Database(db_err) = &err
+        && db_err.code().as_deref() == Some("23503")
+    {
+        return SpanStoreError::ProjectNotFound(project_id.into_uuid());
     }
     SpanStoreError::Db(err)
 }

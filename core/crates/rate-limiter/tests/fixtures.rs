@@ -59,7 +59,7 @@ fn limiter_is_send_sync_via_arc() {
 
 #[test]
 fn policy_construction_rejects_zero() {
-    let err = Policy::new(0, Duration::from_secs(60)).expect_err("zero");
+    let err = Policy::new(0, Duration::from_mins(1)).expect_err("zero");
     assert!(matches!(err, PolicyError::ZeroMaxRequests));
     let err = Policy::new(10, Duration::ZERO).expect_err("zero");
     assert!(matches!(err, PolicyError::ZeroWindow));
@@ -74,7 +74,7 @@ fn backend_trait_object_works() {
     // `Box<dyn RateBackend>` to work. Lock that here.
     let backend: Box<dyn RateBackend> = Box::new(MemoryBackend::new());
     let now = Instant::now();
-    let policy = Policy::new(2, Duration::from_secs(60)).expect("policy");
+    let policy = Policy::new(2, Duration::from_mins(1)).expect("policy");
     assert!(matches!(
         backend.check_and_consume("k", policy, now),
         Verdict::Allowed { .. }

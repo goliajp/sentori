@@ -131,7 +131,7 @@ impl<'a> Invites<'a> {
     }
 
     /// Accept an invite. Validates token + workspace + freshness,
-    /// marks invite accepted, inserts matching workspace_members
+    /// marks invite accepted, inserts matching `workspace_members`
     /// row — all in one transaction.
     ///
     /// # Errors
@@ -139,11 +139,7 @@ impl<'a> Invites<'a> {
     /// - [`IdentityError::InviteInvalid`] for bad token / no
     ///   match / wrong workspace / expired / already-accepted.
     /// - [`IdentityError::Db`] on database failure.
-    pub async fn accept(
-        &self,
-        token_wire: &str,
-        user_id: UserId,
-    ) -> Result<Member, IdentityError> {
+    pub async fn accept(&self, token_wire: &str, user_id: UserId) -> Result<Member, IdentityError> {
         let token_hash = InviteToken::parse_and_hash(token_wire)?;
 
         let mut tx = self.pool.begin().await?;

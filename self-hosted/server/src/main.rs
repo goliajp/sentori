@@ -3,8 +3,7 @@
 //! Single-workspace OSS deployment. Composes the 17 K
 //! crates from `core/` into a single HTTP server with:
 //!
-//! - sqlx migrate from `self-hosted/migrations/` (symlinks
-//!   to core migrations) at boot.
+//! - sqlx migrate from `core/migrations/` at boot.
 //! - Optional env-driven first-owner bootstrap (sets up
 //!   the workspace + user on a fresh DB so `docker compose
 //!   up` is one-shot ready).
@@ -122,7 +121,11 @@ async fn run_migrations(pool: &PgPool) -> anyhow::Result<()> {
     // sqlx::migrate! resolves at compile time, embedding
     // the SQL into the binary so no on-disk migrations dir
     // is needed at runtime.
-    sqlx::migrate!("../migrations").run(pool).await?;
+    // core/migrations is the single source of truth (0001-0030).
+    // self-hosted/migrations was a byte-identical copy of 0001-0015
+    // that drifted (never gained 0016+) — removed 2026-07-20; sqlx
+    // checksums match so existing DBs continue at the next version.
+    sqlx::migrate!("../../core/migrations").run(pool).await?;
     Ok(())
 }
 
