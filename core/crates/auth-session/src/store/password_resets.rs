@@ -1,6 +1,6 @@
 //! `password_resets` CRUD.
 
-use sentori_workspace_identity::UserId;
+use sentori_workspace_identity::{UserId, WorkspaceId};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Row};
 use time::OffsetDateTime;
@@ -51,13 +51,15 @@ pub struct MintedPasswordReset {
 #[derive(Debug, Clone, Copy)]
 pub struct PasswordResets<'a> {
     pool: &'a PgPool,
+    workspace_id: WorkspaceId,
 }
 
 impl<'a> PasswordResets<'a> {
-    /// Construct over a borrowed pool.
+    /// Construct over a borrowed pool, scoped to a workspace
+    /// (the table's `workspace_id` is NOT NULL).
     #[must_use]
-    pub const fn new(pool: &'a PgPool) -> Self {
-        Self { pool }
+    pub const fn new(pool: &'a PgPool, workspace_id: WorkspaceId) -> Self {
+        Self { pool, workspace_id }
     }
 
     /// Mint a new password-reset token for `user_id`.
@@ -76,11 +78,12 @@ impl<'a> PasswordResets<'a> {
 
         let row = sqlx::query(
             "INSERT INTO password_resets \
-             (id, user_id, token_hash, expires_at) \
-             VALUES ($1, $2, $3, $4) \
+             (id, workspace_id, user_id, token_hash, expires_at) \
+             VALUES ($1, $2, $3, $4, $5) \
              RETURNING id, user_id, expires_at, used_at, created_at",
         )
         .bind(id)
+        .bind(self.workspace_id.into_uuid())
         .bind(user_id.into_uuid())
         .bind(token.hash().as_bytes().as_slice())
         .bind(expires_at)

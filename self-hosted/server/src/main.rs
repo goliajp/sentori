@@ -44,6 +44,7 @@ mod bootstrap;
 mod fcm;
 mod handlers;
 mod hcm;
+mod mailer;
 mod mipush;
 mod notify;
 mod periodic_alert_worker;
@@ -104,17 +105,12 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn init_tracing() {
+    // RUST_LOG-style filter, compact single-line format to
+    // stdout — docker logs / journald pick it up as-is.
     let filter = std::env::var("RUST_LOG").unwrap_or_else(|_| "info,sqlx=warn".to_string());
-    tracing_subscriber_init(&filter);
-}
-
-fn tracing_subscriber_init(filter: &str) {
-    // Minimal — workspace doesn't have tracing-subscriber
-    // as a dep yet; pull from env via the `tracing` crate
-    // re-exports.  For v0.1 simplicity, a no-op when
-    // unavailable is acceptable since stdout JSON logger
-    // is wired in production via the docker-compose level.
-    let _ = filter;
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::new(filter))
+        .init();
 }
 
 async fn run_migrations(pool: &PgPool) -> anyhow::Result<()> {

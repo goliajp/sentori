@@ -6,6 +6,14 @@
 
 ---
 
+## v1.4.1(2026-07-20 — auth 安全修复 + 注册/重置全链路打通)
+
+- **安全**:`/auth/forgot-password` 曾把 reset token 直接放进 HTTP 响应(任何人 POST 目标邮箱即可接管账号);`/auth/register` 同样回传 verify token。两者改为仅经邮件发送(新 Mailer,`SENTORI_SMTP_*` + `SENTORI_BASE_URL`;无 SMTP 配置时 token 仅落服务器日志)
+- **修复**:email_verifications / password_resets 的 INSERT 缺 NOT NULL 的 workspace_id —— 自助注册与忘记密码在生产必 500(K2 store 首次对真 schema 跑通);webapp reset 请求体 snake/camel 失配
+- **新增**:webapp `/verify` + `/reset-password` 落点页;Register/ForgotPassword 不再展示 token
+
+---
+
 ## v1.4.0(2026-07-20 — v0.2 fresh-start 正式 release + 生产 cutover)
 
 v0.2.0-rc1(下节)转正。相对 rc1 的增量:
