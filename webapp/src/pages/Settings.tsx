@@ -24,7 +24,9 @@ export function SettingsPage() {
         method: 'POST',
         credentials: 'include',
       });
-    } catch {}
+    } catch {
+      // Best-effort: local state is cleared below regardless.
+    }
     localStorage.removeItem('sentori_user_id');
     localStorage.removeItem('sentori_email');
     navigate('/login');

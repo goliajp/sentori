@@ -10,7 +10,9 @@ import { useNavigate } from 'react-router-dom';
 /// (callers pass a fresh object literal every render).
 export function useKeyHandlers(map: Record<string, () => void>) {
   const stable = useRef(map);
-  stable.current = map;
+  useEffect(() => {
+    stable.current = map;
+  });
   useEffect(() => {
     function inEditable(): boolean {
       const a = document.activeElement;
