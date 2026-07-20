@@ -18,7 +18,7 @@ use tracing::{info, warn};
 
 use crate::state::AppState;
 
-fn auth(state: &Arc<AppState>) -> AuthService {
+pub(crate) fn auth(state: &Arc<AppState>) -> AuthService {
     let raw = std::env::var("SENTORI_SESSION_SECRET").ok();
     let key = match raw {
         Some(s) if s.len() >= 32 => {
@@ -117,10 +117,7 @@ pub async fn login(
                 "expires_at": minted.session.expires_at,
             });
             let mut resp = (StatusCode::OK, Json(body_json)).into_response();
-            let cookie = format!(
-                "sentori_session={signed}; Path=/; HttpOnly; SameSite=Lax{}",
-                if secure_cookies() { "; Secure" } else { "" },
-            );
+            let cookie = session_cookie_header(&signed);
             if let Ok(hv) = HeaderValue::from_str(&cookie) {
                 resp.headers_mut().insert(SET_COOKIE, hv);
             }
@@ -134,7 +131,19 @@ pub async fn login(
     }
 }
 
-fn secure_cookies() -> bool {
+/// The one place the session cookie's name and flags are written.
+///
+/// OAuth login (`handlers::oauth`) mints a session outside this
+/// module and must set a byte-identical cookie, or the two login
+/// paths drift apart the next time a flag changes here.
+pub(crate) fn session_cookie_header(signed: &str) -> String {
+    format!(
+        "sentori_session={signed}; Path=/; HttpOnly; SameSite=Lax{}",
+        if secure_cookies() { "; Secure" } else { "" },
+    )
+}
+
+pub(crate) fn secure_cookies() -> bool {
     // Default ON; flip OFF for local-dev plain HTTP.
     !matches!(
         std::env::var("SENTORI_COOKIE_SECURE").ok().as_deref(),

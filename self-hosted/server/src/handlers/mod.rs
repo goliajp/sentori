@@ -38,6 +38,7 @@ mod issues;
 mod metrics;
 mod metrics_prom;
 mod notifications;
+mod oauth;
 mod projects;
 mod replays;
 mod saved_views;
@@ -399,6 +400,13 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/auth/forgot-password", post(auth::forgot))
         .route("/auth/reset-password", post(auth::reset))
         .route("/auth/change-password", post(auth::change_password))
+        // ── auth: dashboard OAuth (public) ──────────────
+        // Public for the same reason the rows above are: these are
+        // how a session is obtained, so gating them on one would
+        // lock every OAuth user out.
+        .route("/auth/oauth/providers", get(oauth::providers))
+        .route("/auth/oauth/{provider}/start", get(oauth::start))
+        .route("/auth/oauth/{provider}/callback", get(oauth::callback))
         .with_state(state)
         .merge(dashboard_routes)
         .merge(admin_routes)
