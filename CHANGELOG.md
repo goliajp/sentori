@@ -6,6 +6,17 @@
 
 ---
 
+## v1.4.0(2026-07-20 — v0.2 fresh-start 正式 release + 生产 cutover)
+
+v0.2.0-rc1(下节)转正。相对 rc1 的增量:
+
+- **生产 wire**:deploy.yml 构建/拉起 v0.2 栈(server-v2 :18090 + saas-control :18091 + postgres-v2)与 legacy 栈并存;legacy 保留作 rollback,直至 t01 Caddy 切流
+- **Dockerfile 修正**:rust 1.88 → 1.97(msrv)、saas 二进制名 sentori-saas → sentori-saas-control、webapp builder npm → bun --frozen-lockfile;新增 migrate-tool/Dockerfile(compose 网络内一次性 ETL)
+- **webapp typecheck 修复**:96 个 tsc 错误(页面与 ui.tsx 组件契约漂移;CI 从未对 webapp/ 跑过 tsc)——Badge variant→tone、EmptyState message→hint、Section title 可选化、DataTable rowKey 可选化(修掉 14 页非空表格的潜伏 runtime crash)、useKeyHandlers useCallback 误用
+- **cutover**:sentori.golia.jp + ingest.sentori.golia.jp 切至 v0.2 栈;legacy 数据经 sentori-migrate 全量 ETL(幂等)
+
+---
+
 ## v0.2.0-rc1 候选(2026-06-23 ship 准备完成)
 
 **状态:** branch `feature/v0.2-foundation` 167 commits,3 binary cargo build 全绿。等用户拍板 → tag → docker build + OSS mirror。
