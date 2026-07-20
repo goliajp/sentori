@@ -92,7 +92,7 @@ pub fn encrypt(
     info.extend_from_slice(&p256dh_bytes);
     info.extend_from_slice(server_pub_bytes);
 
-    let prk_key = Hkdf::<Sha256>::new(Some(&auth_secret), ikm_ecdh.as_slice());
+    let prk_key = Hkdf::<Sha256>::new(Some(&auth_secret), ikm_ecdh);
     let mut ikm = [0u8; 32];
     prk_key
         .expand(&info, &mut ikm)
