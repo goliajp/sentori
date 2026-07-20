@@ -174,11 +174,13 @@ mod tests {
         let t = MockTransport::with_inbox(inbox.clone());
         // Add directly via Arc to avoid async fan-out in
         // this sync test.
-        t.inbox
-            .inner
-            .lock()
-            .unwrap()
-            .push(Notification::new(WorkspaceId::new(), Channel::Mock, "x", "s", "b"));
+        t.inbox.inner.lock().unwrap().push(Notification::new(
+            WorkspaceId::new(),
+            Channel::Mock,
+            "x",
+            "s",
+            "b",
+        ));
         assert_eq!(inbox.len(), 1);
         inbox.clear();
         assert!(inbox.is_empty());

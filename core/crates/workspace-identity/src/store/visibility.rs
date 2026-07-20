@@ -157,10 +157,10 @@ async fn lookup_role(
 }
 
 fn translate_project_fk(err: sqlx::Error, project_id: ProjectId) -> IdentityError {
-    if let sqlx::Error::Database(db_err) = &err {
-        if db_err.code().as_deref() == Some("23503") {
-            return IdentityError::ProjectNotFound(project_id.into_uuid());
-        }
+    if let sqlx::Error::Database(db_err) = &err
+        && db_err.code().as_deref() == Some("23503")
+    {
+        return IdentityError::ProjectNotFound(project_id.into_uuid());
     }
     IdentityError::Db(err)
 }

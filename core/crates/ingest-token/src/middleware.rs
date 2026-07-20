@@ -2,11 +2,11 @@
 //! `(ProjectId, WorkspaceId)` as request extensions.
 
 use axum::{
+    Json,
     extract::{Request, State},
     http::{HeaderMap, StatusCode, header},
     middleware::Next,
     response::{IntoResponse, Response},
-    Json,
 };
 use serde::Serialize;
 

@@ -388,12 +388,11 @@ fn validate(n: &Notification) -> Result<(), NotifierError> {
 }
 
 fn translate_fk(err: sqlx::Error, project_id: Option<ProjectId>) -> NotifierError {
-    if let sqlx::Error::Database(db_err) = &err {
-        if db_err.code().as_deref() == Some("23503") {
-            if let Some(pid) = project_id {
-                return NotifierError::ProjectNotFound(pid.into_uuid());
-            }
-        }
+    if let sqlx::Error::Database(db_err) = &err
+        && db_err.code().as_deref() == Some("23503")
+        && let Some(pid) = project_id
+    {
+        return NotifierError::ProjectNotFound(pid.into_uuid());
     }
     NotifierError::Db(err)
 }

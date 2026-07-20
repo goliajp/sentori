@@ -361,12 +361,12 @@ fn validate_event(event: &Event) -> Result<(), IngestError> {
     }
     // Fingerprint override length sanity — S3's `from_override`
     // enforces hard limits; we surface a clean error here.
-    if let Some(fp) = event.fingerprint_override.as_deref() {
-        if fp.len() > 200 {
-            return Err(IngestError::InvalidEvent(
-                "fingerprint override too long".into(),
-            ));
-        }
+    if let Some(fp) = event.fingerprint_override.as_deref()
+        && fp.len() > 200
+    {
+        return Err(IngestError::InvalidEvent(
+            "fingerprint override too long".into(),
+        ));
     }
     Ok(())
 }

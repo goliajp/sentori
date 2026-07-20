@@ -182,7 +182,13 @@ mod tests {
     #[test]
     fn build_message_constructs_envelope() {
         let t = EmailTransport::new(cfg()).unwrap();
-        let n = Notification::new(WorkspaceId::new(), Channel::Email, "alice@example.com", "hello", "world body");
+        let n = Notification::new(
+            WorkspaceId::new(),
+            Channel::Email,
+            "alice@example.com",
+            "hello",
+            "world body",
+        );
         let msg = t.build_message(&n).unwrap();
         let raw = String::from_utf8_lossy(&msg.formatted()).to_string();
         assert!(raw.contains("From: sentori@example.com"));

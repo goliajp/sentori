@@ -25,7 +25,7 @@ impl<'a> Members<'a> {
     ///
     /// To insert an owner, the caller must first ensure no
     /// existing `role='owner'` row exists FOR THIS WORKSPACE —
-    /// the DB-level partial unique index on (workspace_id) WHERE
+    /// the DB-level partial unique index on (`workspace_id`) WHERE
     /// role='owner' will otherwise reject the insert.
     ///
     /// # Errors
@@ -70,13 +70,12 @@ impl<'a> Members<'a> {
                 "cannot remove the sole owner — transfer first".into(),
             )));
         }
-        let result = sqlx::query(
-            "DELETE FROM workspace_members WHERE workspace_id = $1 AND user_id = $2",
-        )
-        .bind(self.workspace_id.into_uuid())
-        .bind(user_id.into_uuid())
-        .execute(self.pool)
-        .await?;
+        let result =
+            sqlx::query("DELETE FROM workspace_members WHERE workspace_id = $1 AND user_id = $2")
+                .bind(self.workspace_id.into_uuid())
+                .bind(user_id.into_uuid())
+                .execute(self.pool)
+                .await?;
         if result.rows_affected() == 0 {
             Err(IdentityError::NotAMember(user_id))
         } else {

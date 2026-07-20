@@ -346,7 +346,8 @@ mod tests {
     #[test]
     fn draft_owned_by_sets_created_by_default() {
         let user = UserId::new();
-        let d = SavedViewDraft::new(WorkspaceId::new(), "x", Target::Issues, Scope::Personal).owned_by(user);
+        let d = SavedViewDraft::new(WorkspaceId::new(), "x", Target::Issues, Scope::Personal)
+            .owned_by(user);
         assert_eq!(d.user_id, Some(user));
         assert_eq!(d.created_by, Some(user));
     }

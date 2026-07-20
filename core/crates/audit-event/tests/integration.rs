@@ -146,7 +146,10 @@ async fn record_minimal_draft() {
 async fn record_rejects_empty_action() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = AuditService::new(pool);
-    let err = svc.record(AuditEntryDraft::new(workspace_id, "   ")).await.unwrap_err();
+    let err = svc
+        .record(AuditEntryDraft::new(workspace_id, "   "))
+        .await
+        .unwrap_err();
     assert!(matches!(err, AuditError::InvalidInput(_)));
 }
 
@@ -155,7 +158,10 @@ async fn record_rejects_oversize_action() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = AuditService::new(pool);
     let long = "x".repeat(500);
-    let err = svc.record(AuditEntryDraft::new(workspace_id, long)).await.unwrap_err();
+    let err = svc
+        .record(AuditEntryDraft::new(workspace_id, long))
+        .await
+        .unwrap_err();
     assert!(matches!(err, AuditError::InvalidInput(_)));
 }
 
@@ -164,7 +170,10 @@ async fn record_unknown_project_fk() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = AuditService::new(pool);
     let err = svc
-        .record(AuditEntryDraft::new(workspace_id, actions::PROJECT_CREATED).with_project(ProjectId::new()))
+        .record(
+            AuditEntryDraft::new(workspace_id, actions::PROJECT_CREATED)
+                .with_project(ProjectId::new()),
+        )
         .await
         .unwrap_err();
     // FK fires — either Project or Actor variant is acceptable
@@ -225,7 +234,9 @@ async fn query_filters_by_actor() {
     svc.record(AuditEntryDraft::new(workspace_id, "b").with_actor(actor))
         .await
         .unwrap();
-    svc.record(AuditEntryDraft::new(workspace_id, "c")).await.unwrap();
+    svc.record(AuditEntryDraft::new(workspace_id, "c"))
+        .await
+        .unwrap();
     let rows = svc
         .query(AuditQuery::default().with_actor(actor))
         .await
@@ -274,7 +285,10 @@ async fn query_filters_by_target() {
 async fn query_filters_by_time_window() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = AuditService::new(pool);
-    let id1 = svc.record(AuditEntryDraft::new(workspace_id, "a")).await.unwrap();
+    let id1 = svc
+        .record(AuditEntryDraft::new(workspace_id, "a"))
+        .await
+        .unwrap();
     let e1 = svc.find(id1).await.unwrap().unwrap();
     let future = e1.created_at + Duration::seconds(1);
     let rows = svc
@@ -296,7 +310,9 @@ async fn query_orders_descending_by_created_at() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = AuditService::new(pool);
     for _ in 0..5 {
-        svc.record(AuditEntryDraft::new(workspace_id, "x")).await.unwrap();
+        svc.record(AuditEntryDraft::new(workspace_id, "x"))
+            .await
+            .unwrap();
     }
     let rows = svc.query(AuditQuery::default()).await.unwrap();
     assert_eq!(rows.len(), 5);
@@ -310,7 +326,9 @@ async fn query_limit_caps_results() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = AuditService::new(pool);
     for _ in 0..10 {
-        svc.record(AuditEntryDraft::new(workspace_id, "x")).await.unwrap();
+        svc.record(AuditEntryDraft::new(workspace_id, "x"))
+            .await
+            .unwrap();
     }
     let rows = svc
         .query(AuditQuery::default().with_limit(3))
@@ -324,7 +342,9 @@ async fn count_independent_of_limit() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = AuditService::new(pool);
     for _ in 0..7 {
-        svc.record(AuditEntryDraft::new(workspace_id, "x")).await.unwrap();
+        svc.record(AuditEntryDraft::new(workspace_id, "x"))
+            .await
+            .unwrap();
     }
     let n = svc
         .count(AuditQuery::default().with_limit(3))

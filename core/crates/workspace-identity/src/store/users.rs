@@ -120,7 +120,7 @@ impl<'a> Users<'a> {
     }
 
     /// Resolve the workspace a user belongs to (for login flow
-    /// — caller uses the returned WorkspaceId to construct a
+    /// — caller uses the returned `WorkspaceId` to construct a
     /// scoped Identity for subsequent operations).
     ///
     /// # Errors
@@ -193,15 +193,13 @@ fn row_to_user(row: &sqlx::postgres::PgRow) -> User {
 }
 
 fn translate_unique_email(err: sqlx::Error) -> IdentityError {
-    if let sqlx::Error::Database(db_err) = &err {
-        if db_err.code().as_deref() == Some("23505") {
-            if db_err
-                .constraint()
-                .is_none_or(|c| c == "users_email_ci_idx" || c == "users_pkey")
-            {
-                return IdentityError::EmailTaken;
-            }
-        }
+    if let sqlx::Error::Database(db_err) = &err
+        && db_err.code().as_deref() == Some("23505")
+        && db_err
+            .constraint()
+            .is_none_or(|c| c == "users_email_ci_idx" || c == "users_pkey")
+    {
+        return IdentityError::EmailTaken;
     }
     IdentityError::Db(err)
 }

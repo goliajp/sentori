@@ -12,7 +12,9 @@
 use std::sync::OnceLock;
 
 use sentori_tenant_scoping::{Permission, TenantError, TenantGuard};
-use sentori_workspace_identity::{Identity, ProjectId, Role, UserId, WorkspaceId, bootstrap_workspace};
+use sentori_workspace_identity::{
+    Identity, ProjectId, Role, UserId, WorkspaceId, bootstrap_workspace,
+};
 use sqlx::{Executor, PgPool};
 use testcontainers_modules::{
     postgres::Postgres,
@@ -118,7 +120,7 @@ async fn member_role_returns_none_for_non_member() {
 async fn member_role_returns_role() {
     let (pool, workspace_id) = fresh_pool().await;
     let user = seed_user(&pool, workspace_id, "u@x.com").await;
-    add_member(&pool, workspace_id,user, Role::Owner).await;
+    add_member(&pool, workspace_id, user, Role::Owner).await;
     let guard = TenantGuard::new(pool, workspace_id);
     assert_eq!(guard.member_role(user).await.unwrap(), Some(Role::Owner));
 }
@@ -129,7 +131,7 @@ async fn member_role_returns_role() {
 async fn owner_can_view_any_project() {
     let (pool, workspace_id) = fresh_pool().await;
     let user = seed_user(&pool, workspace_id, "o@x.com").await;
-    add_member(&pool, workspace_id,user, Role::Owner).await;
+    add_member(&pool, workspace_id, user, Role::Owner).await;
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let guard = TenantGuard::new(pool, workspace_id);
     assert!(guard.can_view_project(user, pid).await.unwrap());
@@ -139,7 +141,7 @@ async fn owner_can_view_any_project() {
 async fn admin_can_view_any_project() {
     let (pool, workspace_id) = fresh_pool().await;
     let user = seed_user(&pool, workspace_id, "a@x.com").await;
-    add_member(&pool, workspace_id,user, Role::Admin).await;
+    add_member(&pool, workspace_id, user, Role::Admin).await;
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let guard = TenantGuard::new(pool, workspace_id);
     assert!(guard.can_view_project(user, pid).await.unwrap());
@@ -149,9 +151,9 @@ async fn admin_can_view_any_project() {
 async fn user_can_view_only_granted_project() {
     let (pool, workspace_id) = fresh_pool().await;
     let owner = seed_user(&pool, workspace_id, "o@x.com").await;
-    add_member(&pool, workspace_id,owner, Role::Owner).await;
+    add_member(&pool, workspace_id, owner, Role::Owner).await;
     let user = seed_user(&pool, workspace_id, "u@x.com").await;
-    add_member(&pool, workspace_id,user, Role::User).await;
+    add_member(&pool, workspace_id, user, Role::User).await;
     let pid_seen = seed_project(&pool, workspace_id, "yes").await;
     let pid_unseen = seed_project(&pool, workspace_id, "no").await;
 
@@ -182,7 +184,7 @@ async fn non_member_cannot_view_anything() {
 async fn admin_visible_projects_returns_all() {
     let (pool, workspace_id) = fresh_pool().await;
     let user = seed_user(&pool, workspace_id, "a@x.com").await;
-    add_member(&pool, workspace_id,user, Role::Admin).await;
+    add_member(&pool, workspace_id, user, Role::Admin).await;
     let _p1 = seed_project(&pool, workspace_id, "p1").await;
     let _p2 = seed_project(&pool, workspace_id, "p2").await;
     let _p3 = seed_project(&pool, workspace_id, "p3").await;
@@ -194,9 +196,9 @@ async fn admin_visible_projects_returns_all() {
 async fn user_visible_projects_returns_granted_only() {
     let (pool, workspace_id) = fresh_pool().await;
     let owner = seed_user(&pool, workspace_id, "o@x.com").await;
-    add_member(&pool, workspace_id,owner, Role::Owner).await;
+    add_member(&pool, workspace_id, owner, Role::Owner).await;
     let user = seed_user(&pool, workspace_id, "u@x.com").await;
-    add_member(&pool, workspace_id,user, Role::User).await;
+    add_member(&pool, workspace_id, user, Role::User).await;
     let p1 = seed_project(&pool, workspace_id, "p1").await;
     let _p2 = seed_project(&pool, workspace_id, "p2").await;
     Identity::new(pool.clone(), workspace_id)
@@ -225,7 +227,7 @@ async fn non_member_visible_projects_empty() {
 async fn owner_can_perform_all_permissions() {
     let (pool, workspace_id) = fresh_pool().await;
     let user = seed_user(&pool, workspace_id, "o@x.com").await;
-    add_member(&pool, workspace_id,user, Role::Owner).await;
+    add_member(&pool, workspace_id, user, Role::Owner).await;
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let guard = TenantGuard::new(pool, workspace_id);
     for p in Permission::ALL {
@@ -241,7 +243,7 @@ async fn owner_can_perform_all_permissions() {
 async fn admin_blocked_on_promote_and_transfer() {
     let (pool, workspace_id) = fresh_pool().await;
     let user = seed_user(&pool, workspace_id, "a@x.com").await;
-    add_member(&pool, workspace_id,user, Role::Admin).await;
+    add_member(&pool, workspace_id, user, Role::Admin).await;
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let guard = TenantGuard::new(pool, workspace_id);
     for p in [Permission::PromoteToAdmin, Permission::TransferOwner] {
@@ -255,9 +257,9 @@ async fn admin_blocked_on_promote_and_transfer() {
 async fn user_role_project_scoped_requires_visibility() {
     let (pool, workspace_id) = fresh_pool().await;
     let owner = seed_user(&pool, workspace_id, "o@x.com").await;
-    add_member(&pool, workspace_id,owner, Role::Owner).await;
+    add_member(&pool, workspace_id, owner, Role::Owner).await;
     let user = seed_user(&pool, workspace_id, "u@x.com").await;
-    add_member(&pool, workspace_id,user, Role::User).await;
+    add_member(&pool, workspace_id, user, Role::User).await;
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let guard = TenantGuard::new(pool.clone(), workspace_id);
 
@@ -284,7 +286,7 @@ async fn user_role_project_scoped_requires_visibility() {
 async fn user_role_workspace_scoped_blocked_by_role() {
     let (pool, workspace_id) = fresh_pool().await;
     let user = seed_user(&pool, workspace_id, "u@x.com").await;
-    add_member(&pool, workspace_id,user, Role::User).await;
+    add_member(&pool, workspace_id, user, Role::User).await;
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let guard = TenantGuard::new(pool, workspace_id);
     // ManageMembers is workspace-scoped (not project-gated)
@@ -315,9 +317,9 @@ async fn non_member_blocked_by_not_a_member() {
 async fn owner_can_grant_visibility() {
     let (pool, workspace_id) = fresh_pool().await;
     let owner = seed_user(&pool, workspace_id, "o@x.com").await;
-    add_member(&pool, workspace_id,owner, Role::Owner).await;
+    add_member(&pool, workspace_id, owner, Role::Owner).await;
     let user = seed_user(&pool, workspace_id, "u@x.com").await;
-    add_member(&pool, workspace_id,user, Role::User).await;
+    add_member(&pool, workspace_id, user, Role::User).await;
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let guard = TenantGuard::new(pool, workspace_id);
     guard.grant_visibility(owner, user, pid).await.unwrap();
@@ -328,9 +330,9 @@ async fn owner_can_grant_visibility() {
 async fn admin_can_grant_visibility() {
     let (pool, workspace_id) = fresh_pool().await;
     let admin = seed_user(&pool, workspace_id, "a@x.com").await;
-    add_member(&pool, workspace_id,admin, Role::Admin).await;
+    add_member(&pool, workspace_id, admin, Role::Admin).await;
     let user = seed_user(&pool, workspace_id, "u@x.com").await;
-    add_member(&pool, workspace_id,user, Role::User).await;
+    add_member(&pool, workspace_id, user, Role::User).await;
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let guard = TenantGuard::new(pool, workspace_id);
     guard.grant_visibility(admin, user, pid).await.unwrap();
@@ -340,11 +342,11 @@ async fn admin_can_grant_visibility() {
 async fn user_cannot_grant_visibility() {
     let (pool, workspace_id) = fresh_pool().await;
     let owner = seed_user(&pool, workspace_id, "o@x.com").await;
-    add_member(&pool, workspace_id,owner, Role::Owner).await;
+    add_member(&pool, workspace_id, owner, Role::Owner).await;
     let user = seed_user(&pool, workspace_id, "u@x.com").await;
-    add_member(&pool, workspace_id,user, Role::User).await;
+    add_member(&pool, workspace_id, user, Role::User).await;
     let other = seed_user(&pool, workspace_id, "ot@x.com").await;
-    add_member(&pool, workspace_id,other, Role::User).await;
+    add_member(&pool, workspace_id, other, Role::User).await;
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let guard = TenantGuard::new(pool, workspace_id);
     let err = guard.grant_visibility(user, other, pid).await.unwrap_err();
@@ -369,9 +371,9 @@ async fn non_member_cannot_grant_visibility() {
 async fn revoke_visibility_round_trip() {
     let (pool, workspace_id) = fresh_pool().await;
     let owner = seed_user(&pool, workspace_id, "o@x.com").await;
-    add_member(&pool, workspace_id,owner, Role::Owner).await;
+    add_member(&pool, workspace_id, owner, Role::Owner).await;
     let user = seed_user(&pool, workspace_id, "u@x.com").await;
-    add_member(&pool, workspace_id,user, Role::User).await;
+    add_member(&pool, workspace_id, user, Role::User).await;
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let guard = TenantGuard::new(pool, workspace_id);
     guard.grant_visibility(owner, user, pid).await.unwrap();
@@ -386,7 +388,7 @@ async fn revoke_visibility_round_trip() {
 async fn assert_can_view_sugar_matches_assert_can_perform_view() {
     let (pool, workspace_id) = fresh_pool().await;
     let user = seed_user(&pool, workspace_id, "u@x.com").await;
-    add_member(&pool, workspace_id,user, Role::Admin).await;
+    add_member(&pool, workspace_id, user, Role::Admin).await;
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let guard = TenantGuard::new(pool, workspace_id);
     guard.assert_can_view_project(user, pid).await.unwrap();

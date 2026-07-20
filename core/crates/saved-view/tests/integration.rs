@@ -109,9 +109,14 @@ async fn create_workspace_view_round_trip() {
     let svc = SavedViewService::new(pool);
     let id = svc
         .create(
-            SavedViewDraft::new(workspace_id,"Prod crashes", Target::Issues, Scope::Workspace)
-                .for_project(pid)
-                .with_payload(json!({"environment": "production"})),
+            SavedViewDraft::new(
+                workspace_id,
+                "Prod crashes",
+                Target::Issues,
+                Scope::Workspace,
+            )
+            .for_project(pid)
+            .with_payload(json!({"environment": "production"})),
         )
         .await
         .unwrap();
@@ -129,7 +134,12 @@ async fn create_personal_view_requires_user() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = SavedViewService::new(pool);
     let err = svc
-        .create(SavedViewDraft::new(workspace_id,"x", Target::Issues, Scope::Personal))
+        .create(SavedViewDraft::new(
+            workspace_id,
+            "x",
+            Target::Issues,
+            Scope::Personal,
+        ))
         .await
         .unwrap_err();
     assert!(matches!(err, SavedViewError::InvalidInput(_)));
@@ -140,7 +150,10 @@ async fn create_workspace_view_must_not_set_user() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = SavedViewService::new(pool);
     let err = svc
-        .create(SavedViewDraft::new(workspace_id,"x", Target::Issues, Scope::Workspace).owned_by(UserId::new()))
+        .create(
+            SavedViewDraft::new(workspace_id, "x", Target::Issues, Scope::Workspace)
+                .owned_by(UserId::new()),
+        )
         .await
         .unwrap_err();
     assert!(matches!(err, SavedViewError::InvalidInput(_)));
@@ -152,7 +165,10 @@ async fn create_personal_view_with_user() {
     let user = seed_user(&pool, workspace_id, "u1@example.com").await;
     let svc = SavedViewService::new(pool);
     let id = svc
-        .create(SavedViewDraft::new(workspace_id,"My view", Target::Events, Scope::Personal).owned_by(user))
+        .create(
+            SavedViewDraft::new(workspace_id, "My view", Target::Events, Scope::Personal)
+                .owned_by(user),
+        )
         .await
         .unwrap();
     let v = svc.find(id).await.unwrap().unwrap();
@@ -166,7 +182,12 @@ async fn create_rejects_empty_name() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = SavedViewService::new(pool);
     let err = svc
-        .create(SavedViewDraft::new(workspace_id,"  ", Target::Issues, Scope::Workspace))
+        .create(SavedViewDraft::new(
+            workspace_id,
+            "  ",
+            Target::Issues,
+            Scope::Workspace,
+        ))
         .await
         .unwrap_err();
     assert!(matches!(err, SavedViewError::InvalidInput(_)));
@@ -178,7 +199,7 @@ async fn create_unknown_project_fk() {
     let svc = SavedViewService::new(pool);
     let err = svc
         .create(
-            SavedViewDraft::new(workspace_id,"x", Target::Issues, Scope::Workspace)
+            SavedViewDraft::new(workspace_id, "x", Target::Issues, Scope::Workspace)
                 .for_project(ProjectId::new()),
         )
         .await
@@ -191,7 +212,10 @@ async fn create_unknown_user_fk() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = SavedViewService::new(pool);
     let err = svc
-        .create(SavedViewDraft::new(workspace_id,"x", Target::Issues, Scope::Personal).owned_by(UserId::new()))
+        .create(
+            SavedViewDraft::new(workspace_id, "x", Target::Issues, Scope::Personal)
+                .owned_by(UserId::new()),
+        )
         .await
         .unwrap_err();
     assert!(matches!(err, SavedViewError::UserNotFound(_)));
@@ -207,7 +231,8 @@ async fn list_visible_to_combines_workspace_and_personal() {
     let svc = SavedViewService::new(pool);
     // Workspace view — visible to anyone.
     let workspace = svc
-        .create(SavedViewDraft::new(workspace_id,
+        .create(SavedViewDraft::new(
+            workspace_id,
             "global",
             Target::Issues,
             Scope::Workspace,
@@ -216,17 +241,24 @@ async fn list_visible_to_combines_workspace_and_personal() {
         .unwrap();
     // Personal view for user A — visible only to A.
     let personal_a = svc
-        .create(SavedViewDraft::new(workspace_id,"A's view", Target::Issues, Scope::Personal).owned_by(user_a))
+        .create(
+            SavedViewDraft::new(workspace_id, "A's view", Target::Issues, Scope::Personal)
+                .owned_by(user_a),
+        )
         .await
         .unwrap();
     // Personal view for user B — invisible to A.
     let personal_b = svc
-        .create(SavedViewDraft::new(workspace_id,"B's view", Target::Issues, Scope::Personal).owned_by(user_b))
+        .create(
+            SavedViewDraft::new(workspace_id, "B's view", Target::Issues, Scope::Personal)
+                .owned_by(user_b),
+        )
         .await
         .unwrap();
     // Different target — should not appear in Issues listing.
     let _other_target = svc
-        .create(SavedViewDraft::new(workspace_id,
+        .create(SavedViewDraft::new(
+            workspace_id,
             "events",
             Target::Events,
             Scope::Workspace,
@@ -254,15 +286,26 @@ async fn list_visible_to_with_project_filter() {
     let svc = SavedViewService::new(pool);
 
     let p1_view = svc
-        .create(SavedViewDraft::new(workspace_id,"p1", Target::Issues, Scope::Workspace).for_project(p1))
+        .create(
+            SavedViewDraft::new(workspace_id, "p1", Target::Issues, Scope::Workspace)
+                .for_project(p1),
+        )
         .await
         .unwrap();
     let _p2_view = svc
-        .create(SavedViewDraft::new(workspace_id,"p2", Target::Issues, Scope::Workspace).for_project(p2))
+        .create(
+            SavedViewDraft::new(workspace_id, "p2", Target::Issues, Scope::Workspace)
+                .for_project(p2),
+        )
         .await
         .unwrap();
     let workspace_wide = svc
-        .create(SavedViewDraft::new(workspace_id,"any", Target::Issues, Scope::Workspace))
+        .create(SavedViewDraft::new(
+            workspace_id,
+            "any",
+            Target::Issues,
+            Scope::Workspace,
+        ))
         .await
         .unwrap();
 
@@ -282,15 +325,24 @@ async fn list_personal_filters_by_user_and_target() {
     let user_a = seed_user(&pool, workspace_id, "a@x.com").await;
     let user_b = seed_user(&pool, workspace_id, "b@x.com").await;
     let svc = SavedViewService::new(pool);
-    svc.create(SavedViewDraft::new(workspace_id,"a-issues", Target::Issues, Scope::Personal).owned_by(user_a))
-        .await
-        .unwrap();
-    svc.create(SavedViewDraft::new(workspace_id,"a-events", Target::Events, Scope::Personal).owned_by(user_a))
-        .await
-        .unwrap();
-    svc.create(SavedViewDraft::new(workspace_id,"b-issues", Target::Issues, Scope::Personal).owned_by(user_b))
-        .await
-        .unwrap();
+    svc.create(
+        SavedViewDraft::new(workspace_id, "a-issues", Target::Issues, Scope::Personal)
+            .owned_by(user_a),
+    )
+    .await
+    .unwrap();
+    svc.create(
+        SavedViewDraft::new(workspace_id, "a-events", Target::Events, Scope::Personal)
+            .owned_by(user_a),
+    )
+    .await
+    .unwrap();
+    svc.create(
+        SavedViewDraft::new(workspace_id, "b-issues", Target::Issues, Scope::Personal)
+            .owned_by(user_b),
+    )
+    .await
+    .unwrap();
     let list = svc.list_personal(user_a, Target::Issues).await.unwrap();
     assert_eq!(list.len(), 1);
     assert_eq!(list[0].name, "a-issues");
@@ -301,12 +353,20 @@ async fn list_workspace_excludes_personal() {
     let (pool, workspace_id) = fresh_pool().await;
     let user = seed_user(&pool, workspace_id, "u@x.com").await;
     let svc = SavedViewService::new(pool);
-    svc.create(SavedViewDraft::new(workspace_id,"ws", Target::Spans, Scope::Workspace))
-        .await
-        .unwrap();
-    svc.create(SavedViewDraft::new(workspace_id,"personal", Target::Spans, Scope::Personal).owned_by(user))
-        .await
-        .unwrap();
+    svc.create(SavedViewDraft::new(
+        workspace_id,
+        "ws",
+        Target::Spans,
+        Scope::Workspace,
+    ))
+    .await
+    .unwrap();
+    svc.create(
+        SavedViewDraft::new(workspace_id, "personal", Target::Spans, Scope::Personal)
+            .owned_by(user),
+    )
+    .await
+    .unwrap();
     let list = svc.list_workspace(Target::Spans).await.unwrap();
     assert_eq!(list.len(), 1);
     assert_eq!(list[0].name, "ws");
@@ -319,7 +379,8 @@ async fn update_patches_name_and_payload() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = SavedViewService::new(pool);
     let id = svc
-        .create(SavedViewDraft::new(workspace_id,
+        .create(SavedViewDraft::new(
+            workspace_id,
             "orig",
             Target::Replays,
             Scope::Workspace,
@@ -346,7 +407,7 @@ async fn update_patch_only_name() {
     let svc = SavedViewService::new(pool);
     let id = svc
         .create(
-            SavedViewDraft::new(workspace_id,"orig", Target::Metrics, Scope::Workspace)
+            SavedViewDraft::new(workspace_id, "orig", Target::Metrics, Scope::Workspace)
                 .with_payload(json!({"preserved": true})),
         )
         .await
@@ -381,7 +442,12 @@ async fn update_rejects_empty_name() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = SavedViewService::new(pool);
     let id = svc
-        .create(SavedViewDraft::new(workspace_id,"ok", Target::Issues, Scope::Workspace))
+        .create(SavedViewDraft::new(
+            workspace_id,
+            "ok",
+            Target::Issues,
+            Scope::Workspace,
+        ))
         .await
         .unwrap();
     let err = svc
@@ -402,7 +468,12 @@ async fn delete_round_trip() {
     let (pool, workspace_id) = fresh_pool().await;
     let svc = SavedViewService::new(pool);
     let id = svc
-        .create(SavedViewDraft::new(workspace_id,"x", Target::Issues, Scope::Workspace))
+        .create(SavedViewDraft::new(
+            workspace_id,
+            "x",
+            Target::Issues,
+            Scope::Workspace,
+        ))
         .await
         .unwrap();
     svc.delete(id).await.unwrap();
@@ -419,7 +490,10 @@ async fn project_cascade_drops_scoped_views() {
     let pid = seed_project(&pool, workspace_id, "doomed").await;
     let svc = SavedViewService::new(pool.clone());
     let id = svc
-        .create(SavedViewDraft::new(workspace_id,"p", Target::Issues, Scope::Workspace).for_project(pid))
+        .create(
+            SavedViewDraft::new(workspace_id, "p", Target::Issues, Scope::Workspace)
+                .for_project(pid),
+        )
         .await
         .unwrap();
     sqlx::query("DELETE FROM projects WHERE id = $1")
@@ -436,7 +510,9 @@ async fn user_cascade_drops_personal_views() {
     let user = seed_user(&pool, workspace_id, "byebye@x.com").await;
     let svc = SavedViewService::new(pool.clone());
     let id = svc
-        .create(SavedViewDraft::new(workspace_id,"p", Target::Issues, Scope::Personal).owned_by(user))
+        .create(
+            SavedViewDraft::new(workspace_id, "p", Target::Issues, Scope::Personal).owned_by(user),
+        )
         .await
         .unwrap();
     sqlx::query("DELETE FROM users WHERE id = $1")

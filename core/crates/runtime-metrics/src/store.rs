@@ -409,10 +409,10 @@ fn validate_point(p: &MetricPoint) -> Result<(), RuntimeMetricsError> {
 }
 
 fn translate_fk(err: sqlx::Error, project_id: ProjectId) -> RuntimeMetricsError {
-    if let sqlx::Error::Database(db_err) = &err {
-        if db_err.code().as_deref() == Some("23503") {
-            return RuntimeMetricsError::ProjectNotFound(project_id.into_uuid());
-        }
+    if let sqlx::Error::Database(db_err) = &err
+        && db_err.code().as_deref() == Some("23503")
+    {
+        return RuntimeMetricsError::ProjectNotFound(project_id.into_uuid());
     }
     RuntimeMetricsError::Db(err)
 }

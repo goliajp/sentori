@@ -319,17 +319,17 @@ impl<B: BlobStore> ReplayStore<B> {
 }
 
 fn translate_fk(err: sqlx::Error, project_id: ProjectId, event_id: Uuid) -> ReplayStoreError {
-    if let sqlx::Error::Database(db_err) = &err {
-        if db_err.code().as_deref() == Some("23503") {
-            // FK 23503 — could be either project or event. The
-            // constraint name disambiguates.
-            let on_event = db_err.constraint().is_some_and(|c| c.contains("event"));
-            return if on_event {
-                ReplayStoreError::EventNotFound(event_id)
-            } else {
-                ReplayStoreError::ProjectNotFound(project_id.into_uuid())
-            };
-        }
+    if let sqlx::Error::Database(db_err) = &err
+        && db_err.code().as_deref() == Some("23503")
+    {
+        // FK 23503 — could be either project or event. The
+        // constraint name disambiguates.
+        let on_event = db_err.constraint().is_some_and(|c| c.contains("event"));
+        return if on_event {
+            ReplayStoreError::EventNotFound(event_id)
+        } else {
+            ReplayStoreError::ProjectNotFound(project_id.into_uuid())
+        };
     }
     ReplayStoreError::Db(err)
 }

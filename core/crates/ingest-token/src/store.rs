@@ -65,10 +65,7 @@ impl TokenStore {
     /// # Errors
     ///
     /// [`TokenError::Db`] on backend failure.
-    pub async fn lookup_by_plaintext(
-        &self,
-        plaintext: &str,
-    ) -> Result<Option<Token>, TokenError> {
+    pub async fn lookup_by_plaintext(&self, plaintext: &str) -> Result<Option<Token>, TokenError> {
         let token_hash = hash_token(plaintext);
         let row = sqlx::query(
             "SELECT id, workspace_id, project_id, kind, label, last4, created_at, revoked_at \
@@ -102,10 +99,7 @@ impl TokenStore {
     /// # Errors
     ///
     /// [`TokenError::Db`] on backend failure.
-    pub async fn list_for_project(
-        &self,
-        project_id: ProjectId,
-    ) -> Result<Vec<Token>, TokenError> {
+    pub async fn list_for_project(&self, project_id: ProjectId) -> Result<Vec<Token>, TokenError> {
         let rows = sqlx::query(
             "SELECT id, workspace_id, project_id, kind, label, last4, created_at, revoked_at \
              FROM tokens WHERE project_id = $1 ORDER BY created_at DESC",

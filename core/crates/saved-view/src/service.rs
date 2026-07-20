@@ -1,6 +1,6 @@
 //! [`SavedViewService`] — CRUD + visibility-aware listing.
 
-use sentori_workspace_identity::{ProjectId, UserId, WorkspaceId};
+use sentori_workspace_identity::{ProjectId, UserId};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -281,23 +281,23 @@ fn translate_fk(
     user_id: Option<UserId>,
     created_by: Option<UserId>,
 ) -> SavedViewError {
-    if let sqlx::Error::Database(db_err) = &err {
-        if db_err.code().as_deref() == Some("23503") {
-            let constraint = db_err.constraint().unwrap_or("");
-            if constraint.contains("project") {
-                if let Some(p) = project_id {
-                    return SavedViewError::ProjectNotFound(p.into_uuid());
-                }
-            }
-            if let Some(u) = user_id {
-                return SavedViewError::UserNotFound(u.into_uuid());
-            }
-            if let Some(u) = created_by {
-                return SavedViewError::UserNotFound(u.into_uuid());
-            }
-            if let Some(p) = project_id {
-                return SavedViewError::ProjectNotFound(p.into_uuid());
-            }
+    if let sqlx::Error::Database(db_err) = &err
+        && db_err.code().as_deref() == Some("23503")
+    {
+        let constraint = db_err.constraint().unwrap_or("");
+        if constraint.contains("project")
+            && let Some(p) = project_id
+        {
+            return SavedViewError::ProjectNotFound(p.into_uuid());
+        }
+        if let Some(u) = user_id {
+            return SavedViewError::UserNotFound(u.into_uuid());
+        }
+        if let Some(u) = created_by {
+            return SavedViewError::UserNotFound(u.into_uuid());
+        }
+        if let Some(p) = project_id {
+            return SavedViewError::ProjectNotFound(p.into_uuid());
         }
     }
     SavedViewError::Db(err)
@@ -307,6 +307,7 @@ fn translate_fk(
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
+    use sentori_workspace_identity::WorkspaceId;
 
     #[test]
     fn validate_rejects_empty_name() {
@@ -328,7 +329,8 @@ mod tests {
 
     #[test]
     fn validate_workspace_rejects_user() {
-        let d = SavedViewDraft::new(WorkspaceId::new(), "x", Target::Issues, Scope::Workspace).owned_by(UserId::new());
+        let d = SavedViewDraft::new(WorkspaceId::new(), "x", Target::Issues, Scope::Workspace)
+            .owned_by(UserId::new());
         assert!(matches!(
             validate_draft(&d),
             Err(SavedViewError::InvalidInput(_))
@@ -337,7 +339,8 @@ mod tests {
 
     #[test]
     fn validate_accepts_personal_with_user() {
-        let d = SavedViewDraft::new(WorkspaceId::new(), "x", Target::Issues, Scope::Personal).owned_by(UserId::new());
+        let d = SavedViewDraft::new(WorkspaceId::new(), "x", Target::Issues, Scope::Personal)
+            .owned_by(UserId::new());
         assert!(validate_draft(&d).is_ok());
     }
 

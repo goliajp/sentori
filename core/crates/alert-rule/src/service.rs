@@ -1,7 +1,7 @@
 //! [`AlertRuleService`] — rule CRUD + on-event fire + atomic
 //! throttle claim.
 
-use sentori_workspace_identity::{ProjectId, UserId, WorkspaceId};
+use sentori_workspace_identity::{ProjectId, UserId};
 use sqlx::PgPool;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -424,20 +424,20 @@ fn translate_fk(
     project_id: Option<ProjectId>,
     created_by: Option<UserId>,
 ) -> AlertRuleError {
-    if let sqlx::Error::Database(db_err) = &err {
-        if db_err.code().as_deref() == Some("23503") {
-            let constraint = db_err.constraint().unwrap_or("");
-            if constraint.contains("user") || constraint.contains("created_by") {
-                if let Some(u) = created_by {
-                    return AlertRuleError::UserNotFound(u.into_uuid());
-                }
-            }
-            if let Some(p) = project_id {
-                return AlertRuleError::ProjectNotFound(p.into_uuid());
-            }
-            if let Some(u) = created_by {
-                return AlertRuleError::UserNotFound(u.into_uuid());
-            }
+    if let sqlx::Error::Database(db_err) = &err
+        && db_err.code().as_deref() == Some("23503")
+    {
+        let constraint = db_err.constraint().unwrap_or("");
+        if (constraint.contains("user") || constraint.contains("created_by"))
+            && let Some(u) = created_by
+        {
+            return AlertRuleError::UserNotFound(u.into_uuid());
+        }
+        if let Some(p) = project_id {
+            return AlertRuleError::ProjectNotFound(p.into_uuid());
+        }
+        if let Some(u) = created_by {
+            return AlertRuleError::UserNotFound(u.into_uuid());
         }
     }
     AlertRuleError::Db(err)
@@ -447,6 +447,7 @@ fn translate_fk(
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
+    use sentori_workspace_identity::WorkspaceId;
 
     fn ctx() -> EventContext {
         EventContext {
@@ -470,7 +471,8 @@ mod tests {
 
     #[test]
     fn validate_draft_rejects_negative_throttle() {
-        let d = AlertRuleDraft::new(WorkspaceId::new(), "x", TriggerKind::NewIssue).with_throttle(-1);
+        let d =
+            AlertRuleDraft::new(WorkspaceId::new(), "x", TriggerKind::NewIssue).with_throttle(-1);
         assert!(matches!(
             validate_draft(&d),
             Err(AlertRuleError::InvalidInput(_))

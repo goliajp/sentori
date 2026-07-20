@@ -478,10 +478,10 @@ impl IssueStore {
         patch: IssuePatch,
         now: OffsetDateTime,
     ) -> Result<PatchOutcome, IssueStoreError> {
-        if let Some(p) = patch.priority.as_deref() {
-            if !ALLOWED_PRIORITIES.contains(&p) {
-                return Err(IssueStoreError::InvalidPriority { got: p.to_string() });
-            }
+        if let Some(p) = patch.priority.as_deref()
+            && !ALLOWED_PRIORITIES.contains(&p)
+        {
+            return Err(IssueStoreError::InvalidPriority { got: p.to_string() });
         }
         if ids.is_empty() {
             return Ok(PatchOutcome::default());
