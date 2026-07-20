@@ -245,7 +245,7 @@ pub async fn bulk_patch(
 
     let outcome = state
         .issues
-        .bulk_patch(&ids, patch, OffsetDateTime::now_utc())
+        .bulk_patch(ctx.workspace_id, &ids, patch, OffsetDateTime::now_utc())
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     if let Some(status_label) = body.status.as_deref() {
