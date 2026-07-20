@@ -109,17 +109,69 @@ async fn push_credentials(
 
 async fn push_sends(
     src: &PgPool,
-    _dst: &PgPool,
-    _dry_run: bool,
+    dst: &PgPool,
+    dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
-    // 0 rows in legacy prod — dispatch history starts fresh on
-    // v0.2. Guarded so a nonzero legacy count can't be silently
-    // dropped.
     if !guard(src, "push_sends", report).await? {
         return Ok(0);
     }
-    anyhow::bail!("push_sends: legacy rows present but migration is not implemented");
+    // dst 0024 mirrors legacy verbatim + workspace_id.
+    let rows = sqlx::query(
+        "SELECT s.id, p.org_id AS workspace_id, s.project_id, s.token_id, s.provider, \
+                s.payload, s.status, s.provider_outcome, s.error, s.retry_count, \
+                s.idempotency_key, s.next_attempt_at, s.created_at, s.sent_at, \
+                s.campaign_id, s.template_id, s.audience_tag, s.acked_at, s.ack_session_id \
+         FROM push_sends s JOIN projects p ON p.id = s.project_id",
+    )
+    .fetch_all(src)
+    .await?;
+    report.note_read("push_sends", rows.len() as u64);
+    let mut written = 0u64;
+    let mut skipped = 0u64;
+    for r in &rows {
+        if dry_run {
+            continue;
+        }
+        let res = sqlx::query(
+            "INSERT INTO push_sends (id, workspace_id, project_id, token_id, provider, \
+                payload, status, provider_outcome, error, retry_count, idempotency_key, \
+                next_attempt_at, created_at, sent_at, campaign_id, template_id, \
+                audience_tag, acked_at, ack_session_id) \
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) \
+             ON CONFLICT (id) DO NOTHING",
+        )
+        .bind(r.get::<uuid::Uuid, _>("id"))
+        .bind(r.get::<uuid::Uuid, _>("workspace_id"))
+        .bind(r.get::<uuid::Uuid, _>("project_id"))
+        .bind(r.get::<uuid::Uuid, _>("token_id"))
+        .bind(r.get::<String, _>("provider"))
+        .bind(r.get::<serde_json::Value, _>("payload"))
+        .bind(r.get::<String, _>("status"))
+        .bind(r.get::<Option<String>, _>("provider_outcome"))
+        .bind(r.get::<Option<String>, _>("error"))
+        .bind(r.get::<i32, _>("retry_count"))
+        .bind(r.get::<Option<String>, _>("idempotency_key"))
+        .bind(r.get::<time::OffsetDateTime, _>("next_attempt_at"))
+        .bind(r.get::<time::OffsetDateTime, _>("created_at"))
+        .bind(r.get::<Option<time::OffsetDateTime>, _>("sent_at"))
+        .bind(r.get::<Option<String>, _>("campaign_id"))
+        .bind(r.get::<Option<String>, _>("template_id"))
+        .bind(r.get::<Option<String>, _>("audience_tag"))
+        .bind(r.get::<Option<time::OffsetDateTime>, _>("acked_at"))
+        .bind(r.get::<Option<String>, _>("ack_session_id"))
+        .execute(dst)
+        .await?;
+        if res.rows_affected() > 0 {
+            written += 1;
+        } else {
+            skipped += 1;
+        }
+    }
+    report.note_written("push_sends", written);
+    report.note_skipped("push_sends", skipped);
+    info!(read = rows.len(), written, skipped, "push_sends");
+    Ok(written)
 }
 
 async fn device_topics(
