@@ -8,17 +8,24 @@
 //! Self-hosted operators will see only their one workspace row
 //! when calling these — that's fine, the row count is just 1.
 //!
-//! RBAC: in v0.2 these are gated only by the same session
-//! middleware as the rest of /admin/api/*. A role-based admin
-//! middleware that further restricts to saasadmin users lands
-//! in a follow-up.
+//! RBAC: gated by `session_middleware` plus `saasadmin_only`
+//! (see `crate::saasadmin_mw`), which restricts the group to the
+//! user ids in `SENTORI_SAASADMIN_USER_IDS`.
+//!
+//! Workspace create / delete / suspend / resume moved here from
+//! the `sentori-saas-control` binary, which had its own account
+//! system and no UI calling it. That binary is now only the
+//! Stripe webhook receiver.
 
 use std::sync::Arc;
 
-use axum::{Json, extract::State};
+use axum::Json;
+use axum::extract::{Path, State};
+use axum::http::StatusCode;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::Row;
-use tracing::warn;
+use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::state::AppState;
@@ -102,4 +109,121 @@ pub async fn workspace_stats(State(state): State<Arc<AppState>>) -> Json<Value> 
         "events_24h": events_24h,
         "tokens_active": tokens_active,
     }))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateBody {
+    pub name: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateResponse {
+    pub id: Uuid,
+    pub name: String,
+    pub status: String,
+}
+
+pub async fn create_workspace(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<CreateBody>,
+) -> Result<(StatusCode, Json<CreateResponse>), (StatusCode, String)> {
+    if body.name.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "name required".into()));
+    }
+    let id = Uuid::now_v7();
+
+    sqlx::query("INSERT INTO workspaces (id, name) VALUES ($1, $2)")
+        .bind(id)
+        .bind(body.name.trim())
+        .execute(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Bootstrap a billing row at "active" / "free" plan. Stripe
+    // wiring lives in the saas-control webhook receiver; this is
+    // the initial seed before any payment event.
+    let billing_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO workspace_billing (id, workspace_id, plan, status) \
+         VALUES ($1, $2, 'free', 'active') ON CONFLICT (workspace_id) DO NOTHING",
+    )
+    .bind(billing_id)
+    .bind(id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    info!(workspace_id = %id, name = %body.name, "saas.workspaces created");
+    Ok((
+        StatusCode::CREATED,
+        Json(CreateResponse {
+            id,
+            name: body.name.trim().to_string(),
+            status: "active".into(),
+        }),
+    ))
+}
+
+pub async fn delete_workspace(
+    State(state): State<Arc<AppState>>,
+    Path(workspace_id): Path<Uuid>,
+) -> StatusCode {
+    // Hard delete cascades via FK (workspaces.id → projects.workspace_id
+    // → events.workspace_id, etc. all ON DELETE CASCADE).
+    let result = sqlx::query("DELETE FROM workspaces WHERE id = $1")
+        .bind(workspace_id)
+        .execute(&state.pool)
+        .await;
+    match result {
+        Ok(_) => {
+            info!(%workspace_id, "saas.workspaces deleted");
+            StatusCode::NO_CONTENT
+        }
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+pub async fn suspend_workspace(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    // Row-level pivot: status lives on workspace_billing now.
+    let res = sqlx::query(
+        "UPDATE workspace_billing SET status = 'past_due', updated_at = now() \
+         WHERE workspace_id = $1 AND status = 'active'",
+    )
+    .bind(id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if res.rows_affected() == 0 {
+        return Err((
+            StatusCode::NOT_FOUND,
+            "workspace billing row not active / missing".into(),
+        ));
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn resume_workspace(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let res = sqlx::query(
+        "UPDATE workspace_billing SET status = 'active', updated_at = now() \
+         WHERE workspace_id = $1 AND status = 'past_due'",
+    )
+    .bind(id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if res.rows_affected() == 0 {
+        return Err((
+            StatusCode::NOT_FOUND,
+            "workspace billing row not past_due / missing".into(),
+        ));
+    }
+    Ok(StatusCode::NO_CONTENT)
 }

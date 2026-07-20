@@ -6,6 +6,19 @@
 
 ---
 
+## v1.5.0(2026-07-21 — SaaS 管理入口统一)
+
+Workspace 管理此前存在两套。`sentori-server` 的 `/admin/api/saas/{workspaces,stats}` 只读,走 dashboard session + saasadmin 角色门,是 **UI 唯一调用的那套**;`sentori-saas-control` 的 `/v1/saas/workspaces` 有完整 CRUD 与 suspend/resume,走**另一套独立账号体系**(`saasadmin_users` / `saasadmin_sessions`),却没有任何界面。一件事,两个接口,两套登录。
+
+- **能力收进 `sentori-server`**,复用 UI 已在使用的鉴权:`POST /admin/api/saas/workspaces`、`DELETE .../{id}`、`POST .../{id}/suspend`、`POST .../{id}/resume`。SQL、绑定顺序、状态码、响应形状逐字迁移
+- **`saas-control` 只保留 `/healthz` 与 Stripe webhook**。webhook 保持独立是有意的:它用 body 的 HMAC 验签,与 session 是不同鉴权模型,且 Stripe 需要稳定的机器端点,不应置于 dashboard 登录之后。其鉴权中间件、saasadmin 登录、tenant handler 一并删除;当日早些时候加入的启动时 schema 等待与操作员播种也随之移除(此处已无任何鉴权消费者),argon2 依赖同去
+- **migration 0031 与其两张表保留**。当天建、当天删,判断有误便无退路;文档注明控制面已不再读取
+- **webapp 同步补齐** create / suspend / resume / delete,删除操作带确认。搬走一个点不到的端点不叫统一
+
+**端到端验证**:create 201(返回 id)→ suspend 204 → resume 204 → delete 204 → workspace 确已从库中消失;鉴权三层实测:未登录 401、已登录非 saasadmin 403、saasadmin 全通;saas-control 旧路由全 404,webhook 对无签名请求 400。
+
+---
+
 ## v1.4.9(2026-07-21 — core 集成测试首次运行,连带修复六类既有缺陷)
 
 `v0.2-core-check` 的 core job 此前只跑 `clippy` 与 `check`,**从不 `cargo test`** —— `crates/*/tests/integration.rs` 下所有断言一直是死代码。这些测试用 testcontainers 自起 Postgres,runner 本就有 docker,补一行即可运行。打开之后连锁暴露出以下缺陷,**均为既有问题,非本次引入**:

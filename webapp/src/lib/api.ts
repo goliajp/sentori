@@ -200,6 +200,12 @@ export interface WorkspaceRow {
   created_at: string;
 }
 
+export interface CreatedWorkspace {
+  id: string;
+  name: string;
+  status: string;
+}
+
 export interface SaasStats {
   workspaces: number;
   active_workspaces: number;
@@ -879,6 +885,18 @@ export class Api {
   saasStats(): Promise<SaasStats> {
     return this.get('/admin/api/saas/stats');
   }
+  createWorkspace(name: string): Promise<CreatedWorkspace> {
+    return this.post('/admin/api/saas/workspaces', { name });
+  }
+  deleteWorkspace(id: string): Promise<void> {
+    return this.send(`/admin/api/saas/workspaces/${id}`, 'DELETE');
+  }
+  suspendWorkspace(id: string): Promise<void> {
+    return this.send(`/admin/api/saas/workspaces/${id}/suspend`, 'POST');
+  }
+  resumeWorkspace(id: string): Promise<void> {
+    return this.send(`/admin/api/saas/workspaces/${id}/resume`, 'POST');
+  }
 
   private authHeaders(): HeadersInit {
     // Cookie is HttpOnly + auto-attached via credentials: include.
@@ -916,9 +934,12 @@ export class Api {
     return (await r.json()) as T;
   }
 
+  // POST is in the union for the 204-returning saas actions
+  // (suspend / resume); `post` above would choke parsing an
+  // empty body as JSON.
   private async send(
     path: string,
-    method: 'PATCH' | 'DELETE',
+    method: 'PATCH' | 'DELETE' | 'POST',
     body?: unknown,
   ): Promise<void> {
     const baseHeaders = this.authHeaders();

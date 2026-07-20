@@ -42,7 +42,6 @@ panic = "warn"
 [dependencies]
 # S5 Stripe webhook verifier (already in core/).
 sentori-stripe-webhook-verify = { path = "../../core/crates/stripe-webhook-verify" }
-sentori-argon2-password       = { path = "../../core/crates/argon2-password" }
 sentori-cookie-session        = { path = "../../core/crates/cookie-session" }
 
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "tower-log", "tracing", "macros"] }

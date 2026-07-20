@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { api, SaasStats, WorkspaceRow } from '../lib/api';
 import {
   Badge,
+  Button,
   Card,
   CardHeader,
   DataTable,
@@ -23,24 +24,89 @@ export default function SaasAdmin() {
   const [stats, setStats] = useState<SaasStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([api.listWorkspaces(), api.saasStats()])
-      .then(([w, s]) => {
-        setRows(w.workspaces);
-        setStats(s);
-      })
-      .catch(e => setError(String(e)))
-      .finally(() => setLoading(false));
+    void refresh().finally(() => setLoading(false));
   }, []);
+
+  async function refresh() {
+    try {
+      const [w, s] = await Promise.all([api.listWorkspaces(), api.saasStats()]);
+      setRows(w.workspaces);
+      setStats(s);
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  async function create() {
+    if (!name.trim()) return;
+    try {
+      await api.createWorkspace(name.trim());
+      setName('');
+      setShowCreate(false);
+      await refresh();
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  // `busy` keys off the workspace id so only the acting row's
+  // buttons disable, not the whole table.
+  async function act(w: WorkspaceRow, fn: (id: string) => Promise<void>) {
+    setBusy(w.id);
+    try {
+      await fn(w.id);
+      await refresh();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function destroy(w: WorkspaceRow) {
+    if (
+      !confirm(
+        `Delete workspace "${w.name}"? All projects / events / issues CASCADE-deleted.`,
+      )
+    )
+      return;
+    await act(w, id => api.deleteWorkspace(id));
+  }
 
   return (
     <div className="space-y-4">
       <PageHeader
         title="SaaS admin"
         subtitle="Cross-workspace operator view. In self-hosted mode shows your single workspace."
+        actions={
+          <Button onClick={() => setShowCreate(true)}>+ New workspace</Button>
+        }
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
+      {showCreate && (
+        <Card>
+          <CardHeader title="Create workspace" />
+          <Section>
+            <input
+              className="w-full rounded border border-zinc-300 px-3 py-2 text-sm"
+              placeholder="Display name (e.g. 'Acme Inc')"
+              value={name}
+              onChange={e => setName(e.target.value)}
+            />
+            <div className="mt-2 flex gap-2">
+              <Button onClick={create}>Create</Button>
+              <Button variant="secondary" onClick={() => setShowCreate(false)}>
+                Cancel
+              </Button>
+            </div>
+          </Section>
+        </Card>
+      )}
 
       {stats && (
         <div className="grid grid-cols-6 gap-3">
@@ -82,6 +148,7 @@ export default function SaasAdmin() {
                 { key: 'projects', label: 'Projects' },
                 { key: 'members', label: 'Members' },
                 { key: 'created', label: 'Created' },
+                { key: 'actions', label: '' },
               ]}
               rows={rows.map(w => ({
                 key: w.id,
@@ -103,6 +170,37 @@ export default function SaasAdmin() {
                 projects: formatNumber(w.project_count),
                 members: formatNumber(w.member_count),
                 created: formatRelative(w.created_at),
+                actions: (
+                  <div className="flex gap-1">
+                    {w.status === 'active' ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy === w.id}
+                        onClick={() => act(w, id => api.suspendWorkspace(id))}
+                      >
+                        Suspend
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy === w.id}
+                        onClick={() => act(w, id => api.resumeWorkspace(id))}
+                      >
+                        Resume
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      disabled={busy === w.id}
+                      onClick={() => destroy(w)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                ),
               }))}
             />
           )}
