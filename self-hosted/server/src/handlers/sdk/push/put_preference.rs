@@ -2,7 +2,11 @@
 
 use std::sync::Arc;
 
-use axum::{Extension, Json, extract::{Path, State}, http::StatusCode};
+use axum::{
+    Extension, Json,
+    extract::{Path, State},
+    http::StatusCode,
+};
 use sentori_ingest_token::IngestContext;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -63,7 +67,9 @@ pub async fn handle(
             );
             (
                 StatusCode::ACCEPTED,
-                Json(json!({ "status": "updated", "category": category, "opted_out": body.opted_out })),
+                Json(
+                    json!({ "status": "updated", "category": category, "opted_out": body.opted_out }),
+                ),
             )
         }
         Err(e) => {

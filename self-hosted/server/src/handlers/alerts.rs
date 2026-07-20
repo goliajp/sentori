@@ -35,7 +35,9 @@ pub struct AlertRuleRow {
 fn to_row(r: sentori_alert_rule::AlertRule) -> AlertRuleRow {
     AlertRuleRow {
         id: r.id,
-        project_id: r.project_id.map(sentori_workspace_identity::ProjectId::into_uuid),
+        project_id: r
+            .project_id
+            .map(sentori_workspace_identity::ProjectId::into_uuid),
         name: r.name,
         enabled: r.enabled,
         muted: r.muted,

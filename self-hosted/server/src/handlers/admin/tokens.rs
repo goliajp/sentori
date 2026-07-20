@@ -109,10 +109,7 @@ pub async fn create(
     }
 }
 
-pub async fn list(
-    State(state): State<Arc<AppState>>,
-    Path(project_id): Path<Uuid>,
-) -> Json<Value> {
+pub async fn list(State(state): State<Arc<AppState>>, Path(project_id): Path<Uuid>) -> Json<Value> {
     let store = TokenStore::new(state.pool.clone());
     match store
         .list_for_project(ProjectId::from_uuid(project_id))

@@ -9,7 +9,10 @@
 
 use std::sync::Arc;
 
-use axum::{Extension, Json, extract::{Query, State}};
+use axum::{
+    Extension, Json,
+    extract::{Query, State},
+};
 use sentori_ingest_token::IngestContext;
 use serde::Deserialize;
 use serde_json::{Value, json};

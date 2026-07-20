@@ -11,10 +11,7 @@ use uuid::Uuid;
 
 use crate::state::AppState;
 
-pub async fn list(
-    State(state): State<Arc<AppState>>,
-    Path(issue_id): Path<Uuid>,
-) -> Json<Value> {
+pub async fn list(State(state): State<Arc<AppState>>, Path(issue_id): Path<Uuid>) -> Json<Value> {
     let rows = sqlx::query(
         "SELECT id, actor_user_id, kind, payload, created_at \
          FROM activity_log WHERE issue_id = $1 ORDER BY created_at DESC LIMIT 200",

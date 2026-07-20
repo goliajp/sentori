@@ -7,7 +7,11 @@
 
 use std::sync::Arc;
 
-use axum::{Extension, Json, extract::{Path, State}, http::StatusCode};
+use axum::{
+    Extension, Json,
+    extract::{Path, State},
+    http::StatusCode,
+};
 use sentori_ingest_token::IngestContext;
 use serde_json::{Value, json};
 use tracing::{info, warn};

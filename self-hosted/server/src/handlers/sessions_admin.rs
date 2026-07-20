@@ -52,13 +52,11 @@ pub async fn revoke(
     Path(id_hash_hex): Path<String>,
     headers: HeaderMap,
 ) -> StatusCode {
-    let res = sqlx::query(
-        "DELETE FROM sessions WHERE user_id = $1 AND id_hash_hex = $2",
-    )
-    .bind(ctx.user_id.into_uuid())
-    .bind(&id_hash_hex)
-    .execute(&state.pool)
-    .await;
+    let res = sqlx::query("DELETE FROM sessions WHERE user_id = $1 AND id_hash_hex = $2")
+        .bind(ctx.user_id.into_uuid())
+        .bind(&id_hash_hex)
+        .execute(&state.pool)
+        .await;
     match res {
         Ok(r) if r.rows_affected() > 0 => {
             let (ip, ua) = crate::notify::extract_request_meta(&headers);

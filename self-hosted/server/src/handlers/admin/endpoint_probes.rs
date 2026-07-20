@@ -44,9 +44,7 @@ pub async fn create(
     }
     let id = Uuid::now_v7();
     let interval = body.interval_sec.unwrap_or(60).max(60);
-    let codes = body
-        .assertion_status_codes
-        .unwrap_or_else(|| vec![200]);
+    let codes = body.assertion_status_codes.unwrap_or_else(|| vec![200]);
     let result = sqlx::query(
         "INSERT INTO endpoint_check (id, workspace_id, project_id, name, target_url, method, \
             interval_sec, assertion_status_codes, assertion_max_latency_ms) \
@@ -84,10 +82,7 @@ pub async fn create(
     }
 }
 
-pub async fn list(
-    State(state): State<Arc<AppState>>,
-    Path(project_id): Path<Uuid>,
-) -> Json<Value> {
+pub async fn list(State(state): State<Arc<AppState>>, Path(project_id): Path<Uuid>) -> Json<Value> {
     let rows = sqlx::query(
         "SELECT id, name, target_url, method, interval_sec, assertion_status_codes, \
                 assertion_max_latency_ms, paused, created_at \
@@ -142,10 +137,7 @@ pub async fn patch(
     StatusCode::NO_CONTENT
 }
 
-pub async fn delete(
-    State(state): State<Arc<AppState>>,
-    Path(check_id): Path<Uuid>,
-) -> StatusCode {
+pub async fn delete(State(state): State<Arc<AppState>>, Path(check_id): Path<Uuid>) -> StatusCode {
     let _ = sqlx::query("DELETE FROM endpoint_check WHERE id = $1")
         .bind(check_id)
         .execute(&state.pool)

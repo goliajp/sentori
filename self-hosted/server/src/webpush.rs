@@ -71,13 +71,8 @@ pub async fn send_with_payload(
     ttl_sec: u32,
     payload: Option<(&[u8], &str, &str)>,
 ) -> Result<u16, WebPushError> {
-    let url = url::Url::parse(sub_endpoint)
-        .map_err(|e| WebPushError::BadUrl(e.to_string()))?;
-    let aud = format!(
-        "{}://{}",
-        url.scheme(),
-        url.host_str().unwrap_or("")
-    );
+    let url = url::Url::parse(sub_endpoint).map_err(|e| WebPushError::BadUrl(e.to_string()))?;
+    let aud = format!("{}://{}", url.scheme(), url.host_str().unwrap_or(""));
 
     // VAPID JWT (ES256). exp = now + 12h (RFC 8292 ≤ 24h)
     let now = SystemTime::now()
@@ -93,10 +88,7 @@ pub async fn send_with_payload(
     let key = EncodingKey::from_ec_pem(cfg.vapid_private_pem.as_bytes())?;
     let jwt = jsonwebtoken::encode(&header, &claims, &key)?;
 
-    let auth_header = format!(
-        "vapid t={jwt}, k={}",
-        cfg.vapid_public_key_b64url,
-    );
+    let auth_header = format!("vapid t={jwt}, k={}", cfg.vapid_public_key_b64url,);
 
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
@@ -107,11 +99,12 @@ pub async fn send_with_payload(
         .header("TTL", ttl_sec.to_string());
 
     if let Some((plain, p256dh, auth_secret)) = payload {
-        let enc = crate::webpush_encrypt::encrypt(plain, p256dh, auth_secret)
-            .map_err(|e| WebPushError::Rejected {
+        let enc = crate::webpush_encrypt::encrypt(plain, p256dh, auth_secret).map_err(|e| {
+            WebPushError::Rejected {
                 status: 0,
                 body: format!("encrypt: {e}"),
-            })?;
+            }
+        })?;
         req = req
             .header("Content-Encoding", enc.content_encoding)
             .header("Content-Length", enc.body.len().to_string())
