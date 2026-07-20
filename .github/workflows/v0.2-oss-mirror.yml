@@ -12,13 +12,17 @@ name: v0.2 OSS — mirror to sentori-selfhosted public repo
 #
 # Triggers:
 #   - master push (continuous mirror)
-#   - tag v0.2.* (release-aligned mirror)
+#   - release tag v<x>.<y>.<z> (release-aligned mirror)
 #   - manual dispatch
 
 on:
   push:
     branches: [master]
-    tags: ['v0.2.*']
+    # Releases are tagged v<major>.<minor>.<patch>. The old 'v0.2.*'
+    # filter matched no real tag, so the "mirror the tag too" branch
+    # below had never once run and the public repo never received a
+    # version tag from CI.
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
   workflow_dispatch:
 
 jobs:
@@ -71,7 +75,7 @@ jobs:
             --exclude='node_modules/' \
             --exclude='.claude/' \
             ./ /tmp/mirror/
-          ls /tmp/mirror/ | head -20
+          find /tmp/mirror/ -maxdepth 1 -printf '%f\n' | sort | head -20
 
       - name: Push to sentori-selfhosted public repo
         env:
@@ -90,7 +94,11 @@ jobs:
           git commit -m "mirror: ${{ github.sha }} from goliajp/sentori@${{ github.ref_name }}"
           git remote add origin "https://x-access-token:${MIRROR_TOKEN}@github.com/${MIRROR_REPO}.git"
           git push -f origin master
-          # Mirror tag too if this run is for a tag
+          # Mirror tag too if this run is for a tag.
+          # shellcheck disable=SC2193  # actionlint substitutes the
+          # expression with a fixed placeholder before shellcheck sees
+          # it, so the glob looks unreachable; at runtime github.ref
+          # really can be refs/tags/<tag>.
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             git tag "${{ github.ref_name }}"
             git push origin "${{ github.ref_name }}"
