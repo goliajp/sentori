@@ -6,28 +6,32 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import { api } from '../lib/api';
 
+const MISSING_TOKEN = 'Missing token — open the link from your email.';
+
 export default function Verify() {
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
-  const [state, setState] = useState<'working' | 'ok' | 'error'>('working');
-  const [err, setErr] = useState<string | null>(null);
+  // A missing token is knowable during render — no effect needed.
+  const [result, setResult] = useState<{
+    state: 'working' | 'ok' | 'error';
+    err: string | null;
+  }>(() =>
+    token
+      ? { state: 'working', err: null }
+      : { state: 'error', err: MISSING_TOKEN },
+  );
+  const { state, err } = result;
   const fired = useRef(false);
 
   useEffect(() => {
-    if (fired.current) return;
+    if (!token || fired.current) return;
     fired.current = true;
-    if (!token) {
-      setErr('Missing token — open the link from your email.');
-      setState('error');
-      return;
-    }
     api
       .authVerify(token)
-      .then(() => setState('ok'))
-      .catch(e => {
-        setErr(String(e));
-        setState('error');
-      });
+      .then(() => setResult({ state: 'ok', err: null }))
+      .catch((e: unknown) =>
+        setResult({ state: 'error', err: String(e) }),
+      );
   }, [token]);
 
   return (

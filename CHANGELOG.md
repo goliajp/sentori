@@ -6,6 +6,14 @@
 
 ---
 
+## v1.4.2(2026-07-20 — astro CVE 修复 + webapp 质量门补齐)
+
+- **安全**:astro 5 → 7 + starlight 0.34 → 0.41,关掉 6 个 dependabot alert(4 high):CVE-2026-54299(prerendered error page 的 host-header SSRF)/ CVE-2026-50146(unescaped slot name 反射 XSS)/ CVE-2026-54298(spread props 属性名 XSS)。5.18.2 是最后的 5.x 且无补丁回移,跨大版本是唯一路径;marketing 2 页 + docs 56 页产物验证无退化(`/docs` base、og:image、pagefind 索引均在)
+- **质量门**:`webapp/`(v0.2 dashboard,即 self-hosted 镜像打包的 SPA)此前在 preflight 与 CI 均无 typecheck/lint —— 96 个类型错误因此潜伏到 docker `tsc -b` 才暴露。现补:tsconfig `noEmit`(此前 `tsc -b` 往源码目录 emit,积了 40 个 stale `.js` 干扰 eslint 与编辑器)、eslint flat config、preflight + build.yml webapp job(gating docker-build)
+- **修复**(lint 查出的真实缺陷):`useKeyHandlers` render 期间写 ref、`Cert` render 期间调 `Date.now()`、6 处空 catch 补上吞错理由
+
+---
+
 ## v1.4.1(2026-07-20 — auth 安全修复 + 注册/重置全链路打通)
 
 - **安全**:`/auth/forgot-password` 曾把 reset token 直接放进 HTTP 响应(任何人 POST 目标邮箱即可接管账号);`/auth/register` 同样回传 verify token。两者改为仅经邮件发送(新 Mailer,`SENTORI_SMTP_*` + `SENTORI_BASE_URL`;无 SMTP 配置时 token 仅落服务器日志)

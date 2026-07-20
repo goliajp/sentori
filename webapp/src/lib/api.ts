@@ -956,7 +956,10 @@ export class Api {
     }
     try {
       sessionStorage.setItem('sentori_return_to', here + window.location.search);
-    } catch {}
+    } catch {
+      // Storage disabled — user lands on the dashboard root after
+      // login instead of the page they were on.
+    }
     window.location.href = '/login';
   }
 }
