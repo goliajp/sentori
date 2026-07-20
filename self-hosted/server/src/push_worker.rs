@@ -60,7 +60,9 @@ async fn drain_once(
          WHERE status = 'queued' AND next_attempt_at <= now() \
          ORDER BY created_at LIMIT $1 FOR UPDATE SKIP LOCKED",
     )
-    .bind(batch as i64)
+    // Batch size is a small operator-set constant; saturating is
+    // unreachable and a clamped LIMIT is harmless regardless.
+    .bind(i64::try_from(batch).unwrap_or(i64::MAX))
     .fetch_all(pool)
     .await?;
     if rows.is_empty() {
@@ -115,7 +117,10 @@ async fn dispatch_one(
             if let Some(t) = token_id {
                 crate::push_quarantine::reset_streak(pool, t).await;
             }
-            log_attempt(pool, send_id, attempt, "ok", code as i32, dur as i32).await?;
+            // Elapsed millis of a single HTTP send; saturates only
+            // after ~24 days, far beyond the client timeout.
+            let dur_ms = i32::try_from(dur).unwrap_or(i32::MAX);
+            log_attempt(pool, send_id, attempt, "ok", i32::from(code), dur_ms).await?;
             mark_sent(pool, send_id, "ok").await?;
         }
         Err(reason) => {
@@ -143,7 +148,7 @@ async fn dispatch_one(
                 } else {
                     "transient_failure"
                 },
-                http_status as i32,
+                i32::from(http_status),
                 0,
             )
             .await?;
@@ -280,20 +285,14 @@ async fn try_hcm(
     };
 
     let start = Instant::now();
-    let token = match cache.get(project_id, "hcm_oauth") {
-        Some(t) => t,
-        None => {
-            let t = crate::hcm::fetch_oauth_token(&cfg)
-                .await
-                .map_err(|e| e.to_string())?;
-            cache.put(
-                project_id,
-                "hcm_oauth",
-                t.clone(),
-                Duration::from_secs(3300),
-            );
-            t
-        }
+    let token = if let Some(t) = cache.get(project_id, "hcm_oauth") {
+        t
+    } else {
+        let t = crate::hcm::fetch_oauth_token(&cfg)
+            .await
+            .map_err(|e| e.to_string())?;
+        cache.put(project_id, "hcm_oauth", t.clone(), Duration::from_mins(55));
+        t
     };
     let status = crate::hcm::send_with_token(&cfg, &token, &device_token, title, body_text)
         .await
@@ -418,7 +417,7 @@ async fn try_apns(
         .to_string();
     let production = config
         .get("production")
-        .and_then(|v| v.as_bool())
+        .and_then(serde_json::Value::as_bool)
         .unwrap_or(true);
 
     let title = payload
@@ -448,7 +447,7 @@ async fn try_apns(
         let (status, jwt) = crate::apns::send_returning_jwt(&cfg, &device_token, title, body_text)
             .await
             .map_err(|e| e.to_string())?;
-        cache.put(project_id, "apns_jwt", jwt, Duration::from_secs(3300));
+        cache.put(project_id, "apns_jwt", jwt, Duration::from_mins(55));
         status
     };
     Ok((status, start.elapsed().as_millis()))
@@ -520,7 +519,7 @@ fn mock_send(provider: &str) -> (&'static str, &'static str) {
 /// strings like "apns rejected: status=410 body=...".
 fn extract_http_status(s: &str) -> Option<u16> {
     let after = s.split("status=").nth(1)?;
-    let digits: String = after.chars().take_while(|c| c.is_ascii_digit()).collect();
+    let digits: String = after.chars().take_while(char::is_ascii_digit).collect();
     digits.parse().ok()
 }
 
@@ -529,7 +528,7 @@ fn env_enabled() -> bool {
         std::env::var("SENTORI_PUSH_WORKER_ENABLED")
             .ok()
             .as_deref()
-            .map(|s| s.to_ascii_lowercase()),
+            .map(str::to_ascii_lowercase),
         Some(s) if s == "1" || s == "true"
     ) || std::env::var("SENTORI_PUSH_WORKER_ENABLED").is_err()
 }

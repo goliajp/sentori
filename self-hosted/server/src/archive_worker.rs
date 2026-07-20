@@ -77,7 +77,7 @@ fn env_enabled() -> bool {
         std::env::var("SENTORI_ARCHIVE_WORKER_ENABLED")
             .ok()
             .as_deref()
-            .map(|s| s.to_ascii_lowercase()),
+            .map(str::to_ascii_lowercase),
         Some(s) if s == "1" || s == "true"
     ) || std::env::var("SENTORI_ARCHIVE_WORKER_ENABLED").is_err()
 }

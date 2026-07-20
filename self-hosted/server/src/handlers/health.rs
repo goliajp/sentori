@@ -34,16 +34,14 @@ pub async fn healthz(State(state): State<Arc<AppState>>) -> (StatusCode, Json<He
     let push_queued: i64 = sqlx::query("SELECT COUNT(*) FROM push_sends WHERE status = 'queued'")
         .fetch_one(&state.pool)
         .await
-        .map(|r| r.get::<i64, _>(0))
-        .unwrap_or(0);
+        .map_or(0, |r| r.get::<i64, _>(0));
     let push_failed_24h: i64 = sqlx::query(
         "SELECT COUNT(*) FROM push_sends WHERE status = 'failed' \
          AND created_at >= now() - interval '24 hours'",
     )
     .fetch_one(&state.pool)
     .await
-    .map(|r| r.get::<i64, _>(0))
-    .unwrap_or(0);
+    .map_or(0, |r| r.get::<i64, _>(0));
     (
         code,
         Json(Health {
@@ -51,7 +49,8 @@ pub async fn healthz(State(state): State<Arc<AppState>>) -> (StatusCode, Json<He
             db,
             version: env!("CARGO_PKG_VERSION"),
             pool_size: state.pool.size(),
-            pool_idle: state.pool.num_idle() as u32,
+            // Bounded by the configured pool size; cannot saturate.
+            pool_idle: u32::try_from(state.pool.num_idle()).unwrap_or(u32::MAX),
             push_queued,
             push_failed_24h,
         }),

@@ -70,8 +70,12 @@ pub async fn list(
             })
             .map(|e| AuditRow {
                 id: e.id,
-                project_id: e.project_id.map(|p| p.into_uuid()),
-                actor_user_id: e.actor_user_id.map(|u| u.into_uuid()),
+                project_id: e
+                    .project_id
+                    .map(sentori_workspace_identity::ProjectId::into_uuid),
+                actor_user_id: e
+                    .actor_user_id
+                    .map(sentori_workspace_identity::UserId::into_uuid),
                 action: e.action,
                 target_type: e.target_type,
                 target_id: e.target_id,

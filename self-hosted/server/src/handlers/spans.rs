@@ -27,7 +27,7 @@ pub async fn list_traces(
 ) -> Result<Json<Value>, (StatusCode, String)> {
     super::tenant::guard_project(&state, ctx.workspace_id, project_id).await?;
 
-    let limit = q.limit.unwrap_or(50).clamp(1, 500) as i64;
+    let limit = i64::from(q.limit.unwrap_or(50).clamp(1, 500));
     let rows = sqlx::query(
         "SELECT trace_id, root_op, root_name, first_seen, last_seen, span_count, \
                 status, duration_ms \

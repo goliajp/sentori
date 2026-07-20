@@ -16,37 +16,41 @@ use sqlx::Row;
 
 use crate::state::AppState;
 
+// Straight-line Prometheus exposition: one block per metric family.
+// Length is inherent to the metric count, not to nesting.
+#[allow(clippy::too_many_lines)]
 pub async fn handle(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let mut out = String::with_capacity(2048);
 
     // ── build info ──────────────────────────────────────────
     out.push_str("# HELP sentori_build_info Server build metadata.\n");
     out.push_str("# TYPE sentori_build_info gauge\n");
-    out.push_str(&format!(
-        "sentori_build_info{{version=\"{}\"}} 1\n",
-        env!("CARGO_PKG_VERSION")
-    ));
+    out.push_str("sentori_build_info{version=\"");
+    out.push_str(env!("CARGO_PKG_VERSION"));
+    out.push_str("\"} 1\n");
 
     // ── pool ────────────────────────────────────────────────
     let pool_size = state.pool.size();
-    let pool_idle = state.pool.num_idle();
+    // Connection counts are bounded by the configured pool size, so
+    // the conversion cannot saturate.
+    let pool_idle = i64::try_from(state.pool.num_idle()).unwrap_or(i64::MAX);
     line(
         &mut out,
         "sentori_db_pool_size",
         "Configured max DB pool size",
-        pool_size as i64,
+        i64::from(pool_size),
     );
     line(
         &mut out,
         "sentori_db_pool_idle",
         "Currently idle DB connections",
-        pool_idle as i64,
+        pool_idle,
     );
     line(
         &mut out,
         "sentori_db_pool_in_use",
         "Active (non-idle) DB connections",
-        (pool_size as i64) - (pool_idle as i64),
+        i64::from(pool_size) - pool_idle,
     );
 
     // ── push queue depth ────────────────────────────────────

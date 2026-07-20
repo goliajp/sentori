@@ -64,29 +64,28 @@ pub async fn send(
     // FCM legacy returns 200 even when token is invalid; parse
     // body.results[0].error for "NotRegistered" / "InvalidRegistration".
     if (200..400).contains(&status) {
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
-            if let Some(err) = json
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body)
+            && let Some(err) = json
                 .get("results")
                 .and_then(|r| r.as_array())
                 .and_then(|a| a.first())
                 .and_then(|r| r.get("error"))
                 .and_then(|e| e.as_str())
-            {
-                let mapped = match err {
-                    // Body says token is permanently invalid → treat as 404
-                    // for the quarantine_token caller.
-                    "NotRegistered" | "InvalidRegistration" | "MismatchSenderId" => {
-                        return Err(FcmError::Rejected {
-                            status: 404,
-                            body: err.to_string(),
-                        });
-                    }
-                    // Transient (server-side congestion / quota); caller's
-                    // retry path bumps streak.
-                    other => other,
-                };
-                let _ = mapped;
-            }
+        {
+            let mapped = match err {
+                // Body says token is permanently invalid → treat as 404
+                // for the quarantine_token caller.
+                "NotRegistered" | "InvalidRegistration" | "MismatchSenderId" => {
+                    return Err(FcmError::Rejected {
+                        status: 404,
+                        body: err.to_string(),
+                    });
+                }
+                // Transient (server-side congestion / quota); caller's
+                // retry path bumps streak.
+                other => other,
+            };
+            let _ = mapped;
         }
         return Ok(status);
     }

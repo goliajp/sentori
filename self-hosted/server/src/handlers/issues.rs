@@ -36,6 +36,23 @@ pub struct IssueRow {
     pub last_environment: String,
 }
 
+/// Positional shape of the `issues` list query: id, fingerprint,
+/// error_type, message_sample, kind, status, event_count,
+/// first_seen, last_seen, last_release, last_environment.
+type IssueListRow = (
+    Uuid,
+    String,
+    String,
+    String,
+    String,
+    String,
+    i64,
+    OffsetDateTime,
+    OffsetDateTime,
+    String,
+    String,
+);
+
 pub async fn list(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<crate::session_mw::SessionContext>,
@@ -50,19 +67,7 @@ pub async fn list(
     // The two branches carry different parameter counts, so each
     // builds its own bind chain rather than sharing one with a
     // placeholder for the absent status filter.
-    let rows: Vec<(
-        Uuid,
-        String,
-        String,
-        String,
-        String,
-        String,
-        i64,
-        OffsetDateTime,
-        OffsetDateTime,
-        String,
-        String,
-    )> = if let Some(status) = q.status.as_deref() {
+    let rows: Vec<IssueListRow> = if let Some(status) = q.status.as_deref() {
         sqlx::query_as(
             "SELECT id, fingerprint, error_type, message_sample, kind, status,
                     event_count, first_seen, last_seen, last_release, last_environment
@@ -283,9 +288,10 @@ pub async fn get(
     Extension(ctx): Extension<crate::session_mw::SessionContext>,
     Path((_project_id, issue_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    use sqlx::Row;
+
     super::tenant::guard_issue(&state, ctx.workspace_id, issue_id).await?;
 
-    use sqlx::Row;
     let row = sqlx::query(
         "SELECT id, project_id, fingerprint, error_type, message_sample, kind, status, \
                 event_count, first_seen, last_seen, last_release, last_environment, \

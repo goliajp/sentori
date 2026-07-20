@@ -18,10 +18,10 @@
 //!   8. AES-128-GCM encrypt(CEK, nonce, payload || 0x02)
 //!      (the 0x02 padding byte marks the last record per RFC 8188)
 //!   9. Body framing (RFC 8188 §2.1):
-//!         salt (16) || rs (4, big-endian, default 4096) ||
-//!         idlen (1) || keyid (idlen) || ciphertext
-//!         keyid = the ephemeral server public key in uncompressed
-//!         SEC1 form (65 bytes for P-256: 0x04 || X(32) || Y(32))
+//!      salt (16) || rs (4, big-endian, default 4096) ||
+//!      idlen (1) || keyid (idlen) || ciphertext
+//!      keyid = the ephemeral server public key in uncompressed
+//!      SEC1 form (65 bytes for P-256: 0x04 || X(32) || Y(32))
 
 #![allow(dead_code)]
 
@@ -32,7 +32,7 @@ use aes_gcm::{
 use base64::Engine;
 use hkdf::Hkdf;
 use p256::{PublicKey, SecretKey, ecdh::diffie_hellman, elliptic_curve::sec1::ToEncodedPoint};
-use rand_core::OsRng;
+use rand_core::{OsRng, RngCore};
 use sha2::Sha256;
 
 pub struct EncryptedPayload {
@@ -52,6 +52,8 @@ pub enum EncryptError {
     HkdfExpand(String),
     #[error("aes-gcm encrypt: {0}")]
     AesEncrypt(String),
+    #[error("server key length out of range for RFC 8188 idlen: {0}")]
+    InvalidServerKeyLen(usize),
 }
 
 /// Encrypt `payload` for a subscription identified by its p256dh
@@ -67,7 +69,7 @@ pub fn encrypt(
     let client_pub = PublicKey::from_sec1_bytes(&p256dh_bytes)
         .map_err(|e| EncryptError::InvalidClientKey(e.to_string()))?;
     let auth_secret =
-        b64url_decode(auth_secret_b64url).map_err(|e| EncryptError::InvalidAuthLen(0))?;
+        b64url_decode(auth_secret_b64url).map_err(|_e| EncryptError::InvalidAuthLen(0))?;
     if auth_secret.len() != 16 {
         return Err(EncryptError::InvalidAuthLen(auth_secret.len()));
     }
@@ -98,7 +100,6 @@ pub fn encrypt(
 
     // 5. salt = 16 random bytes.
     let mut salt = [0u8; 16];
-    use rand_core::RngCore;
     OsRng.fill_bytes(&mut salt);
 
     // 6+7. HKDF-Extract+Expand to derive CEK (16) and nonce (12).
@@ -132,7 +133,11 @@ pub fn encrypt(
 
     // 9. Body framing per RFC 8188 §2.1.
     let rs: u32 = 4096;
-    let key_id_len: u8 = server_pub_bytes.len() as u8; // 65
+    // Always 65 for an uncompressed SEC1 P-256 key; erroring rather
+    // than truncating keeps a bad length from silently corrupting
+    // the RFC 8188 framing.
+    let key_id_len: u8 = u8::try_from(server_pub_bytes.len())
+        .map_err(|_| EncryptError::InvalidServerKeyLen(server_pub_bytes.len()))?;
     let mut body = Vec::with_capacity(16 + 4 + 1 + server_pub_bytes.len() + ciphertext.len());
     body.extend_from_slice(&salt);
     body.extend_from_slice(&rs.to_be_bytes());

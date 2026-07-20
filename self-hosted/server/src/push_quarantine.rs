@@ -40,6 +40,10 @@ pub async fn reset_streak(pool: &PgPool, token_id: Uuid) {
 /// Decide which response code is a permanent token failure that
 /// should quarantine vs a transient failure that should just bump
 /// the streak.
+// Arms are deliberately kept per-provider rather than merged: each
+// carries the vendor-specific reasoning for why that status is
+// treated as permanent, which a combined pattern would lose.
+#[allow(clippy::match_same_arms)]
 #[must_use]
 pub fn is_permanent_token_failure(provider: &str, http_status: u16) -> bool {
     match (provider, http_status) {

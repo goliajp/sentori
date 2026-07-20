@@ -3,6 +3,7 @@
 //! Resolves `handle` as either:
 //! - a UUID (server-side token id, from register_token's response)
 //! - or a native_token string (provider's own opaque id)
+//!
 //! and deletes the matching row from `push_tokens`.
 
 use std::sync::Arc;
@@ -41,7 +42,7 @@ pub async fn handle(
     };
 
     match result {
-        Ok(_) => {
+        Ok(()) => {
             info!(
                 workspace_id = %ctx.workspace_id,
                 project_id = %ctx.project_id,

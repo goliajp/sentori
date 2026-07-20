@@ -32,6 +32,10 @@ pub struct SendBody {
     pub native_tokens: Vec<String>,
     #[serde(default)]
     pub topic: Option<String>,
+    /// Advertised as a targeting mode but not implemented. A send
+    /// that sets only this is refused with a 400 rather than
+    /// resolving zero devices and reporting success — see
+    /// `resolve_targets`.
     #[serde(default)]
     pub app_user_id: Option<String>,
     /// Vendor payload (passed through verbatim to vendor adapter).
@@ -127,6 +131,22 @@ async fn resolve_targets(
     ctx: &IngestContext,
     body: &SendBody,
 ) -> Result<Vec<(Uuid, String)>, String> {
+    // Refuse rather than resolve nothing. `appUserId` is advertised as
+    // a targeting mode but was never implemented, so a caller relying
+    // on it got a 200 and no delivery — the failure mode that looks
+    // like success. An explicit 400 tells them the mode is unavailable
+    // instead of letting the notification vanish.
+    if body.app_user_id.is_some()
+        && body.token_ids.is_empty()
+        && body.native_tokens.is_empty()
+        && body.topic.is_none()
+    {
+        return Err(
+            "appUserId targeting is not implemented; send to tokenIds, nativeTokens or topic"
+                .to_string(),
+        );
+    }
+
     let mut out: Vec<(Uuid, String)> = Vec::new();
 
     // Loop per-id; sqlx-postgres UUID[] array binding is fragile.
@@ -178,7 +198,7 @@ async fn resolve_targets(
     }
 
     // De-duplicate by token_id.
-    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out.sort_by_key(|a| a.0);
     out.dedup_by_key(|t| t.0);
     Ok(out)
 }

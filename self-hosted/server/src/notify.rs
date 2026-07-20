@@ -19,7 +19,7 @@ pub fn extract_request_meta(headers: &axum::http::HeaderMap) -> (Option<String>,
             headers
                 .get("x-real-ip")
                 .and_then(|v| v.to_str().ok())
-                .map(|s| s.to_string())
+                .map(std::string::ToString::to_string)
         })
         .filter(|s| !s.is_empty());
     let ua = headers
@@ -49,6 +49,9 @@ pub fn enrich_payload(mut payload: Value, ip: Option<&str>, user_agent: Option<&
 
 /// Write an audit_log row. Best-effort; failure does not bubble
 /// up — admin endpoint success is decoupled from the audit write.
+// The parameters mirror the audit_log columns one-for-one; bundling
+// them into a struct would add an indirection with no new invariant.
+#[allow(clippy::too_many_arguments)]
 pub async fn audit(
     pool: &PgPool,
     workspace_id: Uuid,

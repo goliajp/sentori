@@ -71,16 +71,19 @@ async fn run_once(pool: &PgPool) -> Result<usize, sqlx::Error> {
 
         let window_min = cfg
             .get("windowMinutes")
-            .and_then(|v| v.as_i64())
+            .and_then(serde_json::Value::as_i64)
             .unwrap_or(60);
         let baseline_min = cfg
             .get("baselineMinutes")
-            .and_then(|v| v.as_i64())
+            .and_then(serde_json::Value::as_i64)
             .unwrap_or(window_min * 24);
-        let drop_pct = cfg.get("dropPct").and_then(|v| v.as_f64()).unwrap_or(5.0);
+        let drop_pct = cfg
+            .get("dropPct")
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(5.0);
         let min_sessions = cfg
             .get("minSessions")
-            .and_then(|v| v.as_i64())
+            .and_then(serde_json::Value::as_i64)
             .unwrap_or(20);
 
         // Compute crash-free rate for current window + baseline window.
@@ -174,6 +177,9 @@ async fn crash_free_rate(
     .await?;
     let total: i64 = row.get("total");
     let non_crashed: i64 = row.get("non_crashed");
+    // Session counts within an alert window never approach 2^53, so
+    // the f64 conversion is exact for every realistic input.
+    #[allow(clippy::cast_precision_loss)]
     let rate = if total > 0 {
         (non_crashed as f64) / (total as f64) * 100.0
     } else {
@@ -187,7 +193,7 @@ fn env_enabled() -> bool {
         std::env::var("SENTORI_PERIODIC_ALERT_WORKER_ENABLED")
             .ok()
             .as_deref()
-            .map(|s| s.to_ascii_lowercase()),
+            .map(str::to_ascii_lowercase),
         Some(s) if s == "1" || s == "true"
     ) || std::env::var("SENTORI_PERIODIC_ALERT_WORKER_ENABLED").is_err()
 }

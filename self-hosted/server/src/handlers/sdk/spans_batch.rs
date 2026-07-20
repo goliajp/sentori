@@ -42,12 +42,9 @@ pub async fn handle(
     let mut accepted = 0u32;
     let mut failed = 0u32;
     for raw in arr {
-        let input: SpanInput = match serde_json::from_value(raw) {
-            Ok(s) => s,
-            Err(_) => {
-                failed += 1;
-                continue;
-            }
+        let Ok(input) = serde_json::from_value::<SpanInput>(raw) else {
+            failed += 1;
+            continue;
         };
         match state.spans.ingest_span(ctx.project_id, input).await {
             Ok(_) => accepted += 1,
