@@ -20,30 +20,30 @@ use crate::saasadmin_mw::saasadmin_only;
 use crate::session_mw::session_middleware;
 use crate::state::AppState;
 
+mod activity_log;
 mod admin;
 mod alerts;
 mod alerts_fire;
+mod api_describe;
 mod audit;
 mod auth;
 mod cert;
 mod events;
 mod events_live;
 mod health;
-mod metrics_prom;
-mod self_test;
-mod activity_log;
-mod api_describe;
 mod ingest;
 mod issue_comments;
 mod issue_watchers;
 mod issues;
-mod projects;
-mod saved_views;
 mod metrics;
+mod metrics_prom;
 mod notifications;
+mod projects;
 mod replays;
-mod search;
+mod saved_views;
 mod sdk;
+mod search;
+mod self_test;
 mod sessions_admin;
 mod spans;
 mod stats;
@@ -70,7 +70,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/v1/deploys", post(sdk::deploys::handle))
         // ── metrics ──
         .route("/v1/metrics:batch", post(sdk::metrics::handle))
-        .route("/v1/runtime-metrics:batch", post(sdk::runtime_metrics::handle))
+        .route(
+            "/v1/runtime-metrics:batch",
+            post(sdk::runtime_metrics::handle),
+        )
         // ── analytics ──
         .route("/v1/track:batch", post(sdk::track::handle))
         // ── security ──
@@ -100,10 +103,7 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/v1/push/receipts/{send_id}",
             get(sdk::push::receipt::handle),
         )
-        .route(
-            "/v1/push/sends/{send_id}/ack",
-            post(sdk::push::ack::handle),
-        )
+        .route("/v1/push/sends/{send_id}/ack", post(sdk::push::ack::handle))
         .route(
             "/v1/push/expo-compat/send",
             post(sdk::push::expo_send::handle),
@@ -145,8 +145,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         )
         .route(
             "/admin/api/projects/{project_id}/push/credentials",
-            get(admin::push_credentials::list)
-                .post(admin::push_credentials::upsert),
+            get(admin::push_credentials::list).post(admin::push_credentials::upsert),
         )
         .route(
             "/admin/api/projects/{project_id}/push/credentials/{kind}",
@@ -221,13 +220,11 @@ pub fn router(state: Arc<AppState>) -> Router {
         // ── admin: endpoint probes (synthetic monitor) ──
         .route(
             "/admin/api/projects/{project_id}/endpoint-probes",
-            get(admin::endpoint_probes::list)
-                .post(admin::endpoint_probes::create),
+            get(admin::endpoint_probes::list).post(admin::endpoint_probes::create),
         )
         .route(
             "/admin/api/endpoint-probes/{probe_id}",
-            patch(admin::endpoint_probes::patch)
-                .delete(admin::endpoint_probes::delete),
+            patch(admin::endpoint_probes::patch).delete(admin::endpoint_probes::delete),
         )
         // ── admin: releases ───────────────────────────────
         .route(
@@ -250,10 +247,7 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/auth/sessions/{id_hash_hex}",
             delete(sessions_admin::revoke),
         )
-        .route(
-            "/auth/notifications",
-            get(notifications::list),
-        )
+        .route("/auth/notifications", get(notifications::list))
         .route(
             "/auth/notifications/_read_all",
             post(notifications::read_all),
@@ -295,18 +289,9 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/v1/projects/{project_id}/issues/{issue_id}",
             get(issues::get).patch(issues::patch),
         )
-        .route(
-            "/v1/issues/{issue_id}/watchers",
-            get(issue_watchers::list),
-        )
-        .route(
-            "/v1/issues/{issue_id}/comments",
-            get(issue_comments::list),
-        )
-        .route(
-            "/v1/issues/{issue_id}/activity",
-            get(activity_log::list),
-        )
+        .route("/v1/issues/{issue_id}/watchers", get(issue_watchers::list))
+        .route("/v1/issues/{issue_id}/comments", get(issue_comments::list))
+        .route("/v1/issues/{issue_id}/activity", get(activity_log::list))
         .route(
             "/v1/projects/{project_id}/issues/_bulk_patch",
             post(issues::bulk_patch),
@@ -317,10 +302,7 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/v1/projects/{project_id}/events/_recent",
             get(events_live::handle),
         )
-        .route(
-            "/v1/projects/{project_id}/traces",
-            get(spans::list_traces),
-        )
+        .route("/v1/projects/{project_id}/traces", get(spans::list_traces))
         .route(
             "/v1/projects/{project_id}/traces/{trace_id}",
             get(spans::get_trace),
@@ -333,23 +315,17 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/v1/projects/{project_id}/metrics/{name}/timeseries",
             get(metrics::timeseries),
         )
-        .route(
-            "/v1/projects/{project_id}/replays",
-            get(replays::list),
-        )
+        .route("/v1/projects/{project_id}/replays", get(replays::list))
         .route(
             "/v1/projects/{project_id}/replays/{replay_id}/ndjson",
             get(replays::ndjson),
         )
+        .route("/v1/projects/{project_id}/stats", get(stats::project_stats))
+        .route("/v1/projects/{project_id}/search", get(search::search))
         .route(
-            "/v1/projects/{project_id}/stats",
-            get(stats::project_stats),
+            "/v1/projects/{project_id}/cert/watches",
+            get(cert::list_watches),
         )
-        .route(
-            "/v1/projects/{project_id}/search",
-            get(search::search),
-        )
-        .route("/v1/projects/{project_id}/cert/watches", get(cert::list_watches))
         .route(
             "/v1/projects/{project_id}/cert/observations",
             get(cert::list_observations),
@@ -360,15 +336,17 @@ pub fn router(state: Arc<AppState>) -> Router {
         )
         .route("/v1/usage", get(usage::current))
         .route("/v1/audit", get(audit::list))
-        .route("/v1/alerts", get(alerts::list_workspace).post(alerts::create))
+        .route(
+            "/v1/alerts",
+            get(alerts::list_workspace).post(alerts::create),
+        )
         .route(
             "/v1/alerts/{id}",
-            get(alerts::get).patch(alerts::update).delete(alerts::delete),
+            get(alerts::get)
+                .patch(alerts::update)
+                .delete(alerts::delete),
         )
-        .route(
-            "/v1/alerts/{id}/_fire_test",
-            post(alerts_fire::fire_test),
-        )
+        .route("/v1/alerts/{id}/_fire_test", post(alerts_fire::fire_test))
         .route(
             "/v1/saved-views",
             get(saved_views::list_workspace).post(saved_views::create),
@@ -380,7 +358,10 @@ pub fn router(state: Arc<AppState>) -> Router {
                 .delete(saved_views::delete),
         )
         // legacy fresh-start ingest stubs (defer to SDK-auth path)
-        .route("/v1/projects/{project_id}/ingest", post(ingest::ingest_event))
+        .route(
+            "/v1/projects/{project_id}/ingest",
+            post(ingest::ingest_event),
+        )
         // ── auth: dashboard user lifecycle (public) ──────
         .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login))
@@ -407,6 +388,18 @@ fn is_api_path(path: &str) -> bool {
     API_PREFIXES.iter().any(|p| path.starts_with(p))
 }
 
+/// Where Vite emits its content-hashed bundles. Nothing under here is
+/// an SPA route, so a miss is a genuinely absent file.
+const ASSET_PREFIX: &str = "/assets/";
+
+/// True when `path` addresses a build artifact rather than an SPA
+/// route. Matched by prefix rather than by file extension on purpose:
+/// an extension heuristic would misfire on route segments that
+/// legitimately contain dots (release names like `app@5.4.2+361`).
+fn is_asset_path(path: &str) -> bool {
+    path.starts_with(ASSET_PREFIX)
+}
+
 /// Fallback for everything the router didn't match.
 ///
 /// Unmatched **API** paths must answer with a JSON 404. Serving the
@@ -414,6 +407,12 @@ fn is_api_path(path: &str) -> bool {
 /// and what production did until 2026-07-20 — hands an SDK
 /// `200 <!doctype html>`: it reads as success, and any JSON parse of
 /// the body fails somewhere far from the cause.
+///
+/// A missing **asset** must 404 too. Returning the shell for
+/// `/assets/index-OLD.js` — which happens to every browser holding a
+/// cached index.html across a redeploy — makes the browser parse HTML
+/// as JavaScript and fail with a syntax error instead of a clean 404
+/// it can recover from.
 ///
 /// Everything else is an SPA deep link (`/projects/x/issues`) and
 /// still resolves to `index.html` with 200 so React Router can take
@@ -434,8 +433,21 @@ async fn spa_or_api_404(req: axum::extract::Request) -> axum::response::Response
             .into_response();
     }
 
-    match tower::ServiceExt::oneshot(webapp_dir(), req).await {
-        Ok(res) => res.into_response(),
+    // Assets serve from a ServeDir with no index fallback, so a miss
+    // stays a 404 instead of becoming the shell. The two ServeDirs
+    // differ in their fallback type parameter, hence the two arms.
+    let served = if is_asset_path(path) {
+        tower::ServiceExt::oneshot(webapp_assets(), req)
+            .await
+            .map(IntoResponse::into_response)
+    } else {
+        tower::ServiceExt::oneshot(webapp_dir(), req)
+            .await
+            .map(IntoResponse::into_response)
+    };
+
+    match served {
+        Ok(res) => res,
         Err(e) => {
             tracing::error!(%e, "webapp static serve failed");
             axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
@@ -450,10 +462,21 @@ async fn spa_or_api_404(req: axum::extract::Request) -> axum::response::Response
 /// Unknown paths resolve to `index.html` with 200 so React Router
 /// can handle SPA deep links. `spa_or_api_404` gates which requests
 /// reach here — API prefixes never do.
+/// Same root as [`webapp_dir`] but with **no** index fallback: a
+/// request for a build artifact that isn't on disk gets ServeDir's
+/// native 404. Used for `/assets/*` — see [`is_asset_path`].
+fn webapp_assets() -> tower_http::services::ServeDir {
+    tower_http::services::ServeDir::new(webapp_root())
+}
+
+/// Root directory holding the compiled SPA.
+fn webapp_root() -> String {
+    std::env::var("SENTORI_WEBAPP_DIST").unwrap_or_else(|_| "/app/webapp".to_string())
+}
+
 fn webapp_dir() -> tower_http::services::ServeDir<tower_http::services::ServeFile> {
     use tower_http::services::{ServeDir, ServeFile};
-    let root = std::env::var("SENTORI_WEBAPP_DIST")
-        .unwrap_or_else(|_| "/app/webapp".to_string());
+    let root = webapp_root();
     let index = format!("{root}/index.html");
     // `fallback` (not `not_found_service`) — the latter wraps the
     // fallback in SetStatus(404), which is for custom 404 pages;
@@ -463,7 +486,7 @@ fn webapp_dir() -> tower_http::services::ServeDir<tower_http::services::ServeFil
 
 #[cfg(test)]
 mod fallback_tests {
-    use super::is_api_path;
+    use super::{is_api_path, is_asset_path};
 
     #[test]
     fn api_prefixes_are_machine_facing() {
@@ -496,6 +519,25 @@ mod fallback_tests {
             "/some/deep/link",
         ] {
             assert!(!is_api_path(p), "{p} must fall through to the SPA");
+        }
+    }
+
+    #[test]
+    fn assets_are_files_not_spa_routes() {
+        // A miss here must stay a 404: a browser holding a cached
+        // index.html across a redeploy asks for the old hashed bundle,
+        // and answering with the shell makes it parse HTML as JS.
+        for p in [
+            "/assets/index-BTIykhei.js",
+            "/assets/index-BwO1nBzl.css",
+            "/assets/index-OLD.js",
+        ] {
+            assert!(is_asset_path(p), "{p} must 404 when absent");
+        }
+        // Route segments may legitimately contain dots (release names
+        // like `app@5.4.2+361`); only the /assets/ prefix decides.
+        for p in ["/", "/login", "/projects/abc/releases", "/releases/1.2.3"] {
+            assert!(!is_asset_path(p), "{p} must fall through to the SPA");
         }
     }
 

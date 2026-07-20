@@ -31,11 +31,7 @@ use aes_gcm::{
 };
 use base64::Engine;
 use hkdf::Hkdf;
-use p256::{
-    PublicKey, SecretKey,
-    ecdh::diffie_hellman,
-    elliptic_curve::sec1::ToEncodedPoint,
-};
+use p256::{PublicKey, SecretKey, ecdh::diffie_hellman, elliptic_curve::sec1::ToEncodedPoint};
 use rand_core::OsRng;
 use sha2::Sha256;
 
@@ -66,12 +62,12 @@ pub fn encrypt(
     auth_secret_b64url: &str,
 ) -> Result<EncryptedPayload, EncryptError> {
     // 1. Decode client's keys.
-    let p256dh_bytes = b64url_decode(p256dh_b64url)
-        .map_err(|e| EncryptError::InvalidClientKey(e.to_string()))?;
+    let p256dh_bytes =
+        b64url_decode(p256dh_b64url).map_err(|e| EncryptError::InvalidClientKey(e.to_string()))?;
     let client_pub = PublicKey::from_sec1_bytes(&p256dh_bytes)
         .map_err(|e| EncryptError::InvalidClientKey(e.to_string()))?;
-    let auth_secret = b64url_decode(auth_secret_b64url)
-        .map_err(|e| EncryptError::InvalidAuthLen(0))?;
+    let auth_secret =
+        b64url_decode(auth_secret_b64url).map_err(|e| EncryptError::InvalidAuthLen(0))?;
     if auth_secret.len() != 16 {
         return Err(EncryptError::InvalidAuthLen(auth_secret.len()));
     }
@@ -83,10 +79,7 @@ pub fn encrypt(
     let server_pub_bytes = ephemeral_pub_sec1.as_bytes(); // 65 bytes: 0x04 || X || Y
 
     // 3. ECDH shared secret (32 bytes).
-    let ecdh = diffie_hellman(
-        ephemeral_priv.to_nonzero_scalar(),
-        client_pub.as_affine(),
-    );
+    let ecdh = diffie_hellman(ephemeral_priv.to_nonzero_scalar(), client_pub.as_affine());
     let ikm_ecdh = ecdh.raw_secret_bytes();
 
     // 4. HKDF-Extract(auth_secret, ikm_ecdh) → IKM
@@ -140,9 +133,7 @@ pub fn encrypt(
     // 9. Body framing per RFC 8188 §2.1.
     let rs: u32 = 4096;
     let key_id_len: u8 = server_pub_bytes.len() as u8; // 65
-    let mut body = Vec::with_capacity(
-        16 + 4 + 1 + server_pub_bytes.len() + ciphertext.len(),
-    );
+    let mut body = Vec::with_capacity(16 + 4 + 1 + server_pub_bytes.len() + ciphertext.len());
     body.extend_from_slice(&salt);
     body.extend_from_slice(&rs.to_be_bytes());
     body.push(key_id_len);

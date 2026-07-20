@@ -44,7 +44,8 @@ pub async fn session_middleware(
     let auth = build_auth(&state);
     match auth.lookup_session(&token).await {
         Ok(Some((user, _session))) => {
-            req.extensions_mut().insert(SessionContext { user_id: user.id });
+            req.extensions_mut()
+                .insert(SessionContext { user_id: user.id });
             next.run(req).await
         }
         Ok(None) => reject("session expired or invalid"),

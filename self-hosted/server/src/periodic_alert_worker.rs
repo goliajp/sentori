@@ -25,7 +25,10 @@ pub fn spawn(pool: PgPool) {
     }
     let interval = env_interval();
     tokio::spawn(async move {
-        info!(interval_sec = interval.as_secs(), "periodic alert worker started");
+        info!(
+            interval_sec = interval.as_secs(),
+            "periodic alert worker started"
+        );
         loop {
             match run_once(&pool).await {
                 Ok(n) => {
@@ -74,10 +77,7 @@ async fn run_once(pool: &PgPool) -> Result<usize, sqlx::Error> {
             .get("baselineMinutes")
             .and_then(|v| v.as_i64())
             .unwrap_or(window_min * 24);
-        let drop_pct = cfg
-            .get("dropPct")
-            .and_then(|v| v.as_f64())
-            .unwrap_or(5.0);
+        let drop_pct = cfg.get("dropPct").and_then(|v| v.as_f64()).unwrap_or(5.0);
         let min_sessions = cfg
             .get("minSessions")
             .and_then(|v| v.as_i64())
@@ -85,8 +85,7 @@ async fn run_once(pool: &PgPool) -> Result<usize, sqlx::Error> {
 
         // Compute crash-free rate for current window + baseline window.
         let current = crash_free_rate(pool, project_id, window_min, 0).await?;
-        let baseline =
-            crash_free_rate(pool, project_id, baseline_min, window_min).await?;
+        let baseline = crash_free_rate(pool, project_id, baseline_min, window_min).await?;
 
         if current.total < min_sessions || baseline.total < min_sessions {
             continue;
@@ -121,12 +120,10 @@ async fn run_once(pool: &PgPool) -> Result<usize, sqlx::Error> {
                 delivered += 1;
             }
         }
-        let _ = sqlx::query(
-            "UPDATE alert_rules SET last_fired_at = now() WHERE id = $1",
-        )
-        .bind(alert_id)
-        .execute(pool)
-        .await;
+        let _ = sqlx::query("UPDATE alert_rules SET last_fired_at = now() WHERE id = $1")
+            .bind(alert_id)
+            .execute(pool)
+            .await;
         crate::notify::audit(
             pool,
             workspace_id,

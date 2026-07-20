@@ -122,7 +122,12 @@ impl Mailer {
         let Some(transport) = self.transport.clone() else {
             // Operator-assist fallback: without SMTP the token
             // only exists here — never in an HTTP response.
-            warn!(email, kind, token = token_wire, "SMTP disabled — auth token logged");
+            warn!(
+                email,
+                kind,
+                token = token_wire,
+                "SMTP disabled — auth token logged"
+            );
             return;
         };
         let n = Notification {

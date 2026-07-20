@@ -35,7 +35,10 @@ pub fn spawn(pool: PgPool, cache: Arc<TokenCache>) {
     let interval = env_interval();
     let batch = env_batch();
     tokio::spawn(async move {
-        info!(interval_sec = interval.as_secs(), batch, "push worker started");
+        info!(
+            interval_sec = interval.as_secs(),
+            batch, "push worker started"
+        );
         loop {
             match drain_once(&pool, &cache, batch).await {
                 Ok(0) => debug!("push worker idle"),
@@ -85,12 +88,10 @@ async fn dispatch_one(
     provider: &str,
 ) -> Result<(), sqlx::Error> {
     use sqlx::Row;
-    let send_meta = sqlx::query(
-        "SELECT token_id, retry_count FROM push_sends WHERE id = $1",
-    )
-    .bind(send_id)
-    .fetch_optional(pool)
-    .await?;
+    let send_meta = sqlx::query("SELECT token_id, retry_count FROM push_sends WHERE id = $1")
+        .bind(send_id)
+        .fetch_optional(pool)
+        .await?;
     let (token_id, retry_count): (Option<Uuid>, i32) = match send_meta {
         Some(r) => (
             r.try_get("token_id").ok(),
@@ -137,7 +138,11 @@ async fn dispatch_one(
                 pool,
                 send_id,
                 attempt,
-                if is_perm { "permanent_failure" } else { "transient_failure" },
+                if is_perm {
+                    "permanent_failure"
+                } else {
+                    "transient_failure"
+                },
                 http_status as i32,
                 0,
             )
@@ -263,7 +268,10 @@ async fn try_hcm(
         .and_then(|v| v.as_str())
         .ok_or_else(|| "appId missing".to_string())?
         .to_string();
-    let title = payload.get("title").and_then(|v| v.as_str()).unwrap_or("Sentori");
+    let title = payload
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Sentori");
     let body_text = payload.get("body").and_then(|v| v.as_str()).unwrap_or("");
     let cfg = crate::hcm::HcmConfig {
         client_id,
@@ -278,7 +286,12 @@ async fn try_hcm(
             let t = crate::hcm::fetch_oauth_token(&cfg)
                 .await
                 .map_err(|e| e.to_string())?;
-            cache.put(project_id, "hcm_oauth", t.clone(), Duration::from_secs(3300));
+            cache.put(
+                project_id,
+                "hcm_oauth",
+                t.clone(),
+                Duration::from_secs(3300),
+            );
             t
         }
     };
@@ -314,9 +327,15 @@ async fn try_mipush(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String>
         .and_then(|v| v.as_str())
         .ok_or_else(|| "packageName missing".to_string())?
         .to_string();
-    let title = payload.get("title").and_then(|v| v.as_str()).unwrap_or("Sentori");
+    let title = payload
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Sentori");
     let body_text = payload.get("body").and_then(|v| v.as_str()).unwrap_or("");
-    let cfg = crate::mipush::MiPushConfig { app_secret, package_name };
+    let cfg = crate::mipush::MiPushConfig {
+        app_secret,
+        package_name,
+    };
     let start = Instant::now();
     let status = crate::mipush::send(&cfg, &device_token, title, body_text)
         .await
@@ -348,10 +367,7 @@ async fn try_fcm(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
         .get("title")
         .and_then(|v| v.as_str())
         .unwrap_or("Sentori");
-    let body_text = payload
-        .get("body")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let body_text = payload.get("body").and_then(|v| v.as_str()).unwrap_or("");
     let cfg = crate::fcm::FcmConfig { server_key };
     let start = Instant::now();
     let status = crate::fcm::send(&cfg, &device_token, title, body_text)
@@ -382,8 +398,8 @@ async fn try_apns(
     let device_token: String = row.get("native_token");
     let payload: serde_json::Value = row.get("payload");
     let config: serde_json::Value = row.get("config");
-    let secret_pem = String::from_utf8(row.get::<Vec<u8>, _>("secret_blob"))
-        .map_err(|e| e.to_string())?;
+    let secret_pem =
+        String::from_utf8(row.get::<Vec<u8>, _>("secret_blob")).map_err(|e| e.to_string())?;
 
     let team_id = config
         .get("teamId")
@@ -409,10 +425,7 @@ async fn try_apns(
         .get("title")
         .and_then(|v| v.as_str())
         .unwrap_or("Sentori");
-    let body_text = payload
-        .get("body")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let body_text = payload.get("body").and_then(|v| v.as_str()).unwrap_or("");
 
     let cfg = crate::apns::ApnsConfig {
         team_id,
@@ -459,8 +472,8 @@ async fn try_webpush(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String
     let metadata: serde_json::Value = row.try_get("metadata").unwrap_or(serde_json::Value::Null);
     let payload: serde_json::Value = row.try_get("payload").unwrap_or(serde_json::Value::Null);
     let config: serde_json::Value = row.get("config");
-    let secret_pem = String::from_utf8(row.get::<Vec<u8>, _>("secret_blob"))
-        .map_err(|e| e.to_string())?;
+    let secret_pem =
+        String::from_utf8(row.get::<Vec<u8>, _>("secret_blob")).map_err(|e| e.to_string())?;
     let subject = config
         .get("subject")
         .and_then(|v| v.as_str())

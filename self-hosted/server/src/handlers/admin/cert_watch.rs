@@ -74,13 +74,11 @@ pub async fn remove(
     Path((project_id, domain)): Path<(Uuid, String)>,
 ) -> StatusCode {
     let normalised = domain.trim().to_ascii_lowercase();
-    match sqlx::query(
-        "DELETE FROM cert_watch_domains WHERE project_id = $1 AND domain = $2",
-    )
-    .bind(project_id)
-    .bind(&normalised)
-    .execute(&state.pool)
-    .await
+    match sqlx::query("DELETE FROM cert_watch_domains WHERE project_id = $1 AND domain = $2")
+        .bind(project_id)
+        .bind(&normalised)
+        .execute(&state.pool)
+        .await
     {
         Ok(_) => {
             info!(%project_id, domain = %normalised, "admin.cert_watch removed");

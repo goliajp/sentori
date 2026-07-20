@@ -19,10 +19,7 @@ use uuid::Uuid;
 use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
-pub async fn list(
-    State(state): State<Arc<AppState>>,
-    Path(issue_id): Path<Uuid>,
-) -> Json<Value> {
+pub async fn list(State(state): State<Arc<AppState>>, Path(issue_id): Path<Uuid>) -> Json<Value> {
     let rows = sqlx::query(
         "SELECT id, author_id, body, created_at \
          FROM issue_comments WHERE issue_id = $1 ORDER BY created_at",
@@ -95,14 +92,14 @@ pub async fn create(
             )
             .await;
             (
-            StatusCode::CREATED,
-            Json(json!({
-                "id": id.to_string(),
-                "issue_id": issue_id.to_string(),
-                "author_user_id": ctx.user_id.into_uuid().to_string(),
-                "body_md": body.body_md.trim(),
-                "created_at": row.get::<time::OffsetDateTime, _>("created_at"),
-            })),
+                StatusCode::CREATED,
+                Json(json!({
+                    "id": id.to_string(),
+                    "issue_id": issue_id.to_string(),
+                    "author_user_id": ctx.user_id.into_uuid().to_string(),
+                    "body_md": body.body_md.trim(),
+                    "created_at": row.get::<time::OffsetDateTime, _>("created_at"),
+                })),
             )
         }
         _ => (
@@ -118,13 +115,11 @@ pub async fn delete(
     Path((_issue_id, comment_id)): Path<(Uuid, Uuid)>,
 ) -> StatusCode {
     // Only the author can delete their own comment.
-    let res = sqlx::query(
-        "DELETE FROM issue_comments WHERE id = $1 AND author_id = $2",
-    )
-    .bind(comment_id)
-    .bind(ctx.user_id.into_uuid())
-    .execute(&state.pool)
-    .await;
+    let res = sqlx::query("DELETE FROM issue_comments WHERE id = $1 AND author_id = $2")
+        .bind(comment_id)
+        .bind(ctx.user_id.into_uuid())
+        .execute(&state.pool)
+        .await;
     match res {
         Ok(r) if r.rows_affected() > 0 => StatusCode::NO_CONTENT,
         Ok(_) => StatusCode::FORBIDDEN,

@@ -24,21 +24,17 @@ pub async fn quarantine_token(pool: &PgPool, token_id: Uuid, reason: &str) {
 }
 
 pub async fn bump_streak(pool: &PgPool, token_id: Uuid) {
-    let _ = sqlx::query(
-        "UPDATE device_tokens SET bad_streak = bad_streak + 1 WHERE id = $1",
-    )
-    .bind(token_id)
-    .execute(pool)
-    .await;
+    let _ = sqlx::query("UPDATE device_tokens SET bad_streak = bad_streak + 1 WHERE id = $1")
+        .bind(token_id)
+        .execute(pool)
+        .await;
 }
 
 pub async fn reset_streak(pool: &PgPool, token_id: Uuid) {
-    let _ = sqlx::query(
-        "UPDATE device_tokens SET bad_streak = 0 WHERE id = $1 AND bad_streak > 0",
-    )
-    .bind(token_id)
-    .execute(pool)
-    .await;
+    let _ = sqlx::query("UPDATE device_tokens SET bad_streak = 0 WHERE id = $1 AND bad_streak > 0")
+        .bind(token_id)
+        .execute(pool)
+        .await;
 }
 
 /// Decide which response code is a permanent token failure that

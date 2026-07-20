@@ -40,8 +40,7 @@ pub async fn deliver<T: Serialize>(
         .header("content-type", "application/json")
         .header("user-agent", "sentori/0.2 webhook");
     if let Some(s) = secret {
-        let mut mac = HmacSha256::new_from_slice(s.as_bytes())
-            .expect("HMAC any length key");
+        let mut mac = HmacSha256::new_from_slice(s.as_bytes()).expect("HMAC any length key");
         mac.update(&body);
         let sig = hex::encode(mac.finalize().into_bytes());
         req = req.header("x-sentori-signature", sig);

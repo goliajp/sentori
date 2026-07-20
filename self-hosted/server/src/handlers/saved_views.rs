@@ -34,8 +34,8 @@ pub async fn list_workspace(
     State(state): State<Arc<AppState>>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<ViewRow>>, (StatusCode, String)> {
-    let target = Target::from_db_str(&q.target)
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    let target =
+        Target::from_db_str(&q.target).map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
     let views = state
         .saved_views
         .list_workspace(target)
@@ -70,8 +70,8 @@ pub async fn create(
     State(state): State<Arc<AppState>>,
     Json(body): Json<CreateBody>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, String)> {
-    let target = Target::from_db_str(&body.target)
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    let target =
+        Target::from_db_str(&body.target).map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
     let mut draft = SavedViewDraft::new(state.workspace_id, &body.name, target, Scope::Workspace);
     if let Some(pid) = body.project_id {
         draft = draft.for_project(sentori_workspace_identity::ProjectId::from_uuid(pid));

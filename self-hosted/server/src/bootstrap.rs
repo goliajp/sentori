@@ -13,9 +13,7 @@
 //! owner already there and skip.
 
 use sentori_billing::BillingService;
-use sentori_workspace_identity::{
-    Identity, Role, WorkspaceId, ensure_workspace,
-};
+use sentori_workspace_identity::{Identity, Role, WorkspaceId, ensure_workspace};
 use sqlx::PgPool;
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -27,8 +25,7 @@ use uuid::Uuid;
 ///
 /// UUIDv4 "00000000-0000-4000-8000-000000000001" — explicitly
 /// versioned so it can never collide with a UUIDv7 mint.
-pub const DEFAULT_WORKSPACE_ID: Uuid =
-    Uuid::from_u128(0x00000000_0000_4000_8000_000000000001);
+pub const DEFAULT_WORKSPACE_ID: Uuid = Uuid::from_u128(0x00000000_0000_4000_8000_000000000001);
 
 /// Return the default workspace id as a typed [`WorkspaceId`].
 #[must_use]
@@ -66,11 +63,15 @@ pub async fn ensure_first_owner(pool: &PgPool) -> anyhow::Result<()> {
     }
 
     let Some(email) = read_env("SENTORI_BOOTSTRAP_OWNER_EMAIL") else {
-        warn!("no SENTORI_BOOTSTRAP_OWNER_EMAIL set; skipping first-owner bootstrap — dashboard /signup must be reachable");
+        warn!(
+            "no SENTORI_BOOTSTRAP_OWNER_EMAIL set; skipping first-owner bootstrap — dashboard /signup must be reachable"
+        );
         return Ok(());
     };
     let Some(password) = read_env("SENTORI_BOOTSTRAP_OWNER_PASSWORD") else {
-        warn!("SENTORI_BOOTSTRAP_OWNER_EMAIL set but SENTORI_BOOTSTRAP_OWNER_PASSWORD missing; skipping");
+        warn!(
+            "SENTORI_BOOTSTRAP_OWNER_EMAIL set but SENTORI_BOOTSTRAP_OWNER_PASSWORD missing; skipping"
+        );
         return Ok(());
     };
 
@@ -90,12 +91,10 @@ pub async fn ensure_first_owner(pool: &PgPool) -> anyhow::Result<()> {
     // The env-bootstrapped owner is trusted (operator who set
     // SENTORI_BOOTSTRAP_OWNER_PASSWORD); skip the verification step
     // that would otherwise require a mailer + click-through.
-    let _ = sqlx::query(
-        "UPDATE users SET email_verified = TRUE WHERE id = $1",
-    )
-    .bind(user.id.into_uuid())
-    .execute(pool)
-    .await;
+    let _ = sqlx::query("UPDATE users SET email_verified = TRUE WHERE id = $1")
+        .bind(user.id.into_uuid())
+        .execute(pool)
+        .await;
     info!(%email, "first owner created (env-bootstrapped + auto-verified)");
     Ok(())
 }

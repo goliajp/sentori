@@ -58,7 +58,11 @@ pub async fn ingest_event(
         .check_and_record(project_id, CounterKind::Events, 1, now)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("billing: {e}")))?;
-    if let Decision::OverLimit { current_count, limit } = decision {
+    if let Decision::OverLimit {
+        current_count,
+        limit,
+    } = decision
+    {
         let _ = state
             .billing
             .record_drop(project_id, CounterKind::Events, 1, now)

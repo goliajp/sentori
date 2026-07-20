@@ -22,12 +22,11 @@ pub struct ProjectRow {
 pub async fn list(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<ProjectRow>>, (StatusCode, String)> {
-    let rows: Vec<(Uuid, String, String)> = sqlx::query_as(
-        "SELECT id, slug, name FROM projects ORDER BY created_at ASC",
-    )
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let rows: Vec<(Uuid, String, String)> =
+        sqlx::query_as("SELECT id, slug, name FROM projects ORDER BY created_at ASC")
+            .fetch_all(&state.pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(
         rows.into_iter()
             .map(|(id, slug, name)| ProjectRow { id, slug, name })

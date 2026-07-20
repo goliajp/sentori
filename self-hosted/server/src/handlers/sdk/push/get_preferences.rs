@@ -2,7 +2,10 @@
 
 use std::sync::Arc;
 
-use axum::{Extension, Json, extract::{Path, State}};
+use axum::{
+    Extension, Json,
+    extract::{Path, State},
+};
 use sentori_ingest_token::IngestContext;
 use serde_json::{Value, json};
 use sqlx::Row;

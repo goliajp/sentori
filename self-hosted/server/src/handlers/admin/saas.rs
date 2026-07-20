@@ -65,13 +65,12 @@ pub async fn workspace_stats(State(state): State<Arc<AppState>>) -> Json<Value> 
             warn!(error = %e, "saas.workspace_stats workspaces query");
             0
         });
-    let active: i64 = sqlx::query(
-        "SELECT COUNT(*) AS n FROM workspace_billing WHERE status = 'active'",
-    )
-    .fetch_one(&state.pool)
-    .await
-    .map(|r| r.get("n"))
-    .unwrap_or(0);
+    let active: i64 =
+        sqlx::query("SELECT COUNT(*) AS n FROM workspace_billing WHERE status = 'active'")
+            .fetch_one(&state.pool)
+            .await
+            .map(|r| r.get("n"))
+            .unwrap_or(0);
     let projects: i64 = sqlx::query("SELECT COUNT(*) AS n FROM projects")
         .fetch_one(&state.pool)
         .await
@@ -89,13 +88,12 @@ pub async fn workspace_stats(State(state): State<Arc<AppState>>) -> Json<Value> 
     .await
     .map(|r| r.get("n"))
     .unwrap_or(0);
-    let tokens_active: i64 = sqlx::query(
-        "SELECT COUNT(*) AS n FROM tokens WHERE revoked_at IS NULL",
-    )
-    .fetch_one(&state.pool)
-    .await
-    .map(|r| r.get("n"))
-    .unwrap_or(0);
+    let tokens_active: i64 =
+        sqlx::query("SELECT COUNT(*) AS n FROM tokens WHERE revoked_at IS NULL")
+            .fetch_one(&state.pool)
+            .await
+            .map(|r| r.get("n"))
+            .unwrap_or(0);
     Json(json!({
         "workspaces": workspaces,
         "active_workspaces": active,

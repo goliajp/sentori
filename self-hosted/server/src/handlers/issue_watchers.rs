@@ -20,10 +20,7 @@ use uuid::Uuid;
 use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
-pub async fn list(
-    State(state): State<Arc<AppState>>,
-    Path(issue_id): Path<Uuid>,
-) -> Json<Value> {
+pub async fn list(State(state): State<Arc<AppState>>, Path(issue_id): Path<Uuid>) -> Json<Value> {
     let rows = sqlx::query(
         "SELECT user_id, since AS started_at FROM watchers WHERE issue_id = $1 ORDER BY since",
     )
@@ -64,12 +61,10 @@ pub async fn leave(
     Extension(ctx): Extension<SessionContext>,
     Path(issue_id): Path<Uuid>,
 ) -> StatusCode {
-    let _ = sqlx::query(
-        "DELETE FROM watchers WHERE issue_id = $1 AND user_id = $2",
-    )
-    .bind(issue_id)
-    .bind(ctx.user_id.into_uuid())
-    .execute(&state.pool)
-    .await;
+    let _ = sqlx::query("DELETE FROM watchers WHERE issue_id = $1 AND user_id = $2")
+        .bind(issue_id)
+        .bind(ctx.user_id.into_uuid())
+        .execute(&state.pool)
+        .await;
     StatusCode::NO_CONTENT
 }

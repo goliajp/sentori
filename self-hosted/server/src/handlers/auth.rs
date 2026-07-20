@@ -27,7 +27,9 @@ fn auth(state: &Arc<AppState>) -> AuthService {
             SecretKey::from_bytes(a)
         }
         _ => {
-            warn!("SENTORI_SESSION_SECRET missing or < 32 bytes; using ephemeral key (sessions reset on restart)");
+            warn!(
+                "SENTORI_SESSION_SECRET missing or < 32 bytes; using ephemeral key (sessions reset on restart)"
+            );
             SecretKey::generate().expect("session key generate")
         }
     };
@@ -106,10 +108,8 @@ pub async fn login(
             // that lookup_session expects. session_token in the body
             // is the signed value too so cli / Bearer clients can use
             // the exact same string they would put in the cookie.
-            let signed = sentori_cookie_session::SignedCookie::seal(
-                auth_svc.cookie_key(),
-                raw.as_bytes(),
-            );
+            let signed =
+                sentori_cookie_session::SignedCookie::seal(auth_svc.cookie_key(), raw.as_bytes());
             let body_json = json!({
                 "user_id": user.id.to_string(),
                 "email": user.email,
@@ -260,9 +260,7 @@ pub async fn logout(
 }
 
 pub async fn me(
-    axum::extract::Extension(ctx): axum::extract::Extension<
-        crate::session_mw::SessionContext,
-    >,
+    axum::extract::Extension(ctx): axum::extract::Extension<crate::session_mw::SessionContext>,
     State(state): State<Arc<AppState>>,
 ) -> Json<Value> {
     match state.identity.users().find_by_id(ctx.user_id).await {
