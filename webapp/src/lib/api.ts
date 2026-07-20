@@ -667,6 +667,12 @@ export class Api {
   }> {
     return this.post('/auth/login', body);
   }
+  /// Which OAuth providers the server has credentials for. The
+  /// login page renders a button per enabled provider; both are
+  /// false on a deployment that configured neither.
+  authOAuthProviders(): Promise<{ github: boolean; google: boolean }> {
+    return this.get('/auth/oauth/providers');
+  }
   authVerify(token: string): Promise<{ user_id: string }> {
     return this.post('/auth/verify', { token });
   }

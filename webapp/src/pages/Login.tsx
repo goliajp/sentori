@@ -86,6 +86,7 @@ export function LoginPage() {
         >
           {loading ? 'Signing in…' : 'Sign in'}
         </button>
+        <OAuthButtons />
         <div className="mt-4 flex justify-between text-xs text-zinc-500">
           <Link to="/register" className="hover:text-zinc-300">
             Create account
@@ -96,6 +97,58 @@ export function LoginPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+const OAUTH_LABELS: Record<string, string> = {
+  github: 'GitHub',
+  google: 'Google',
+};
+
+// Renders nothing at all until the server confirms a provider is
+// configured — a button that 400s on "oauth_not_configured" is worse
+// than no button.
+function OAuthButtons() {
+  const [enabled, setEnabled] = useState<string[]>([]);
+
+  useEffect(() => {
+    api
+      .authOAuthProviders()
+      .then(p =>
+        setEnabled(
+          Object.entries(p)
+            .filter(([, on]) => on)
+            .map(([name]) => name),
+        ),
+      )
+      .catch(() => setEnabled([]));
+  }, []);
+
+  if (enabled.length === 0) return null;
+
+  return (
+    <>
+      <div className="my-4 flex items-center gap-3">
+        <span className="h-px flex-1 bg-zinc-800" />
+        <span className="text-[10px] uppercase tracking-wide text-zinc-600">
+          or
+        </span>
+        <span className="h-px flex-1 bg-zinc-800" />
+      </div>
+      <div className="flex flex-col gap-2">
+        {enabled.map(name => (
+          // A plain link, not fetch: /start answers 302 to the
+          // provider, so the browser must be the one following it.
+          <a
+            key={name}
+            href={`/auth/oauth/${name}/start`}
+            className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-center text-sm font-medium text-zinc-100 transition hover:bg-zinc-800"
+          >
+            Continue with {OAUTH_LABELS[name] ?? name}
+          </a>
+        ))}
+      </div>
+    </>
   );
 }
 
