@@ -1,7 +1,7 @@
 {
   "name": "@goliapkg/sentori-expo",
   "version": "9.0.1",
-  "description": "Expo adapter for Sentori — Config Plugin marker, expo-application auto-config, EAS post-build helper. Built on @goliapkg/sentori-react-native.",
+  "description": "Expo adapter for Sentori \u2014 Config Plugin marker, expo-application auto-config, EAS post-build helper. Built on @goliapkg/sentori-react-native.",
   "license": "Apache-2.0 OR MIT",
   "author": "GOLIA K.K. <takagi@golia.jp> (https://golia.jp)",
   "homepage": "https://sentori.golia.jp",
@@ -47,8 +47,8 @@
   },
   "peerDependencies": {
     "@goliapkg/sentori-react-native": ">=4.0.0",
-    "expo": ">=56.0.0 <57.0.0",
-    "expo-application": ">=56.0.0 <57.0.0",
+    "expo": ">=56.0.0",
+    "expo-application": ">=56.0.0",
     "react-native": ">=0.82.0"
   },
   "peerDependenciesMeta": {
@@ -57,12 +57,12 @@
     }
   },
   "dependencies": {
-    "@expo/config-plugins": "^56.0.9"
+    "@expo/config-plugins": "^57.0.5"
   },
   "devDependencies": {
     "@goliapkg/sentori-react-native": "workspace:*",
     "@types/bun": "latest",
-    "typescript": "^6"
+    "typescript": "^7"
   },
   "publishConfig": {
     "access": "public"

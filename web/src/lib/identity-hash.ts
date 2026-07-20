@@ -13,13 +13,7 @@
  */
 
 export type IdentityKeyType =
-  | 'email'
-  | 'phone'
-  | 'googleSub'
-  | 'appleSub'
-  | 'metaSub'
-  | 'username'
-  | string
+  'email' | 'phone' | 'googleSub' | 'appleSub' | 'metaSub' | 'username' | string
 
 function normalize(keyType: IdentityKeyType, raw: string): string {
   switch (keyType) {

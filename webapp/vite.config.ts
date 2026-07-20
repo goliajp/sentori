@@ -1,5 +1,6 @@
-import { defineConfig } from 'vite';
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
 
 // Sentori webapp Vite config.
 // - Default dev server proxies /v1 + /healthz to the local
@@ -8,7 +9,7 @@ import react from '@vitejs/plugin-react';
 // - Production build emits static assets that any HTTP
 //   server (Caddy, nginx, GitHub Pages) can serve.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [tailwindcss(), react()],
   server: {
     port: 3000,
     // Every prefix the server owns. `/auth` and `/admin/api` were
