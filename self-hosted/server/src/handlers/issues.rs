@@ -162,7 +162,7 @@ pub async fn patch(
     };
     state
         .issues
-        .patch(issue_id, patch, OffsetDateTime::now_utc())
+        .patch(ctx.workspace_id, issue_id, patch, OffsetDateTime::now_utc())
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     if let Some(status_label) = body.status.as_deref() {
