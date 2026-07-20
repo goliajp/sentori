@@ -83,7 +83,7 @@ async fn users(src: &PgPool, dst: &PgPool, dry_run: bool, report: &mut Report) -
     let rows = sqlx::query(
         "SELECT u.id, u.email, u.password_hash, u.email_verified, u.created_at, \
                 COALESCE( \
-                    (SELECT org_id FROM memberships m WHERE m.user_id = u.id ORDER BY added_at ASC LIMIT 1), \
+                    (SELECT org_id FROM memberships m WHERE m.user_id = u.id ORDER BY created_at ASC LIMIT 1), \
                     (SELECT id FROM orgs ORDER BY created_at ASC LIMIT 1) \
                 ) AS workspace_id \
          FROM users u",
@@ -138,8 +138,11 @@ async fn memberships(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    // Legacy memberships carries only (org_id, user_id, role,
+    // created_at) — no added_by/added_at; created_at maps to
+    // dst added_at, added_by stays NULL.
     let rows = sqlx::query(
-        "SELECT user_id, org_id, role, added_by, added_at FROM memberships",
+        "SELECT user_id, org_id, role, created_at FROM memberships",
     )
     .fetch_all(src)
     .await?;
@@ -154,8 +157,8 @@ async fn memberships(
         let workspace_id: uuid::Uuid = r.get("org_id");
         let legacy_role: String = r.get("role");
         let role = map_role(&legacy_role);
-        let added_by: Option<uuid::Uuid> = r.try_get("added_by").ok();
-        let added_at: time::OffsetDateTime = r.get("added_at");
+        let added_by: Option<uuid::Uuid> = None;
+        let added_at: time::OffsetDateTime = r.get("created_at");
 
         let res = sqlx::query(
             "INSERT INTO workspace_members (workspace_id, user_id, role, added_by, added_at) \
@@ -180,6 +183,26 @@ async fn memberships(
     Ok(written)
 }
 
+/// Slug for dst projects.slug (legacy projects has no slug column):
+/// lowercase, runs of non-alphanumerics collapsed to '-'.
+fn slugify(name: &str) -> String {
+    let mut out = String::with_capacity(name.len());
+    let mut prev_dash = true;
+    for c in name.chars() {
+        if c.is_ascii_alphanumeric() {
+            out.push(c.to_ascii_lowercase());
+            prev_dash = false;
+        } else if !prev_dash {
+            out.push('-');
+            prev_dash = true;
+        }
+    }
+    while out.ends_with('-') {
+        out.pop();
+    }
+    if out.is_empty() { "project".to_string() } else { out }
+}
+
 /// 4-level → 3-level role mapping.
 ///
 /// - owner / admin → unchanged
@@ -201,10 +224,20 @@ async fn privacy_salts(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
-    let rows =
-        sqlx::query("SELECT id, org_id, salt_bytes, created_at FROM privacy_salts")
-            .fetch_all(src)
-            .await?;
+    // Legacy has no privacy_salts table — the 32-byte salts live in
+    // identity_scopes (one per org, named '<org slug> (auto)').
+    // Derive workspace_id from that naming convention; fall back to
+    // the oldest org for scopes that don't match it.
+    let rows = sqlx::query(
+        "SELECT s.id, s.salt AS salt_bytes, s.created_at, \
+                COALESCE( \
+                    (SELECT o.id FROM orgs o WHERE s.name = o.slug || ' (auto)'), \
+                    (SELECT id FROM orgs ORDER BY created_at ASC LIMIT 1) \
+                ) AS org_id \
+         FROM identity_scopes s",
+    )
+    .fetch_all(src)
+    .await?;
     report.note_read("privacy_salts", rows.len() as u64);
     let mut written = 0u64;
     let mut skipped = 0u64;
@@ -213,7 +246,11 @@ async fn privacy_salts(
             continue;
         }
         let id: uuid::Uuid = r.get("id");
-        let workspace_id: uuid::Uuid = r.get("org_id");
+        let workspace_id: Option<uuid::Uuid> = r.get("org_id");
+        let Some(workspace_id) = workspace_id else {
+            skipped += 1;
+            continue;
+        };
         let salt_bytes: Vec<u8> = r.get("salt_bytes");
         let created_at: time::OffsetDateTime = r.get("created_at");
         let res = sqlx::query(
@@ -244,8 +281,20 @@ async fn projects(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    // Legacy projects has no slug (synthesized from name below) and
+    // its identity_scope_id is NULL in practice — resolve the salt
+    // via the org's '<slug> (auto)' scope, falling back to the
+    // oldest scope so dst's NOT NULL privacy_salt_id is satisfied.
     let rows = sqlx::query(
-        "SELECT id, org_id, name, slug, privacy_salt_id, created_at FROM projects",
+        "SELECT p.id, p.org_id, p.name, p.created_at, \
+                COALESCE( \
+                    p.identity_scope_id, \
+                    (SELECT s.id FROM identity_scopes s \
+                       JOIN orgs o ON s.name = o.slug || ' (auto)' \
+                      WHERE o.id = p.org_id), \
+                    (SELECT id FROM identity_scopes ORDER BY created_at ASC LIMIT 1) \
+                ) AS privacy_salt_id \
+         FROM projects p",
     )
     .fetch_all(src)
     .await?;
@@ -259,8 +308,14 @@ async fn projects(
         let id: uuid::Uuid = r.get("id");
         let workspace_id: uuid::Uuid = r.get("org_id");
         let name: String = r.get("name");
-        let slug: String = r.get("slug");
-        let privacy_salt_id: uuid::Uuid = r.get("privacy_salt_id");
+        let slug: String = slugify(&name);
+        let privacy_salt_id: Option<uuid::Uuid> = r.get("privacy_salt_id");
+        let Some(privacy_salt_id) = privacy_salt_id else {
+            // No scope exists at all — dst requires a salt; skip
+            // rather than invent crypto material here.
+            skipped += 1;
+            continue;
+        };
         let created_at: time::OffsetDateTime = r.get("created_at");
         let res = sqlx::query(
             "INSERT INTO projects (id, workspace_id, name, slug, privacy_salt_id, created_at) \

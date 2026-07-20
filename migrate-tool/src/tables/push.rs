@@ -1,16 +1,18 @@
-//! Push platform tables: device_tokens, push_credentials, push_sends,
-//! push_delivery_logs, device_topics, push_preferences.
+//! Push platform tables: device_tokens, push_sends, device_topics,
+//! push_preferences (dst 0024 mirrors legacy column names, plus
+//! workspace_id derived via projects join).
 //!
-//! All schema-equivalent to legacy (migration 0024 deliberately
-//! mirrors legacy column names) so this is pure INSERT-透传 with
-//! workspace_id derived via projects FK subquery.
+//! push_credentials is intentionally NOT migrated — see the
+//! function comment (legacy-key-encrypted secrets).
 
 use anyhow::Result;
 use serde_json::Value;
 use sqlx::{PgPool, Row};
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::report::Report;
+
+use super::dashboard::guard;
 
 pub async fn migrate(
     src: &PgPool,
@@ -84,61 +86,40 @@ async fn device_tokens(
 
 async fn push_credentials(
     src: &PgPool,
-    dst: &PgPool,
-    dry_run: bool,
-    report: &mut Report,
-) -> Result<u64> {
-    let rows = sqlx::query(
-        "SELECT pc.id, p.org_id AS workspace_id, pc.project_id, pc.kind, pc.config, \
-                pc.secret_blob, pc.created_at, pc.last_validated_at, pc.last_validate_status \
-         FROM push_credentials pc JOIN projects p ON p.id = pc.project_id",
-    )
-    .fetch_all(src)
-    .await?;
-    report.note_read("push_credentials", rows.len() as u64);
-    let mut written = 0u64;
-    let mut skipped = 0u64;
-    for r in &rows {
-        if dry_run {
-            continue;
-        }
-        let res = sqlx::query(
-            "INSERT INTO push_credentials (id, workspace_id, project_id, kind, config, \
-                secret_blob, last_validated_at, last_validate_status) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING",
-        )
-        .bind(r.get::<uuid::Uuid, _>("id"))
-        .bind(r.get::<uuid::Uuid, _>("workspace_id"))
-        .bind(r.get::<uuid::Uuid, _>("project_id"))
-        .bind(r.get::<String, _>("kind"))
-        .bind(r.get::<Value, _>("config"))
-        .bind(r.get::<Vec<u8>, _>("secret_blob"))
-        .bind(r.try_get::<Option<time::OffsetDateTime>, _>("last_validated_at").ok().flatten())
-        .bind(r.try_get::<Option<String>, _>("last_validate_status").ok().flatten())
-        .execute(dst)
-        .await?;
-        if res.rows_affected() > 0 {
-            written += 1;
-        } else {
-            skipped += 1;
-        }
-    }
-    report.note_written("push_credentials", written);
-    report.note_skipped("push_credentials", skipped);
-    info!(read = rows.len(), written, skipped, "push_credentials");
-    Ok(written)
-}
-
-async fn push_sends(
-    _src: &PgPool,
     _dst: &PgPool,
     _dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
-    // High-volume — leave for incremental ETL phase. Schema-1:1
-    // so when wired, just paginate like events.rs.
-    report.note_read("push_sends", 0);
+    // Deliberately NOT migrated: legacy `secret_blob` is AES-GCM
+    // ciphertext under the LEGACY server's master key — the v0.2
+    // secrets vault cannot decrypt it, so copying the ciphertext
+    // would be data corruption dressed as a migration.
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM push_credentials")
+        .fetch_one(src)
+        .await?;
+    warn!(
+        rows = n,
+        "push_credentials: not migrated — secrets are encrypted under the \
+         legacy master key; re-enter credentials in the dashboard"
+    );
+    report.note_read("push_credentials", n as u64);
+    report.note_skipped("push_credentials", n as u64);
     Ok(0)
+}
+
+async fn push_sends(
+    src: &PgPool,
+    _dst: &PgPool,
+    _dry_run: bool,
+    report: &mut Report,
+) -> Result<u64> {
+    // 0 rows in legacy prod — dispatch history starts fresh on
+    // v0.2. Guarded so a nonzero legacy count can't be silently
+    // dropped.
+    if !guard(src, "push_sends", report).await? {
+        return Ok(0);
+    }
+    anyhow::bail!("push_sends: legacy rows present but migration is not implemented");
 }
 
 async fn device_topics(
@@ -147,6 +128,9 @@ async fn device_topics(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "device_topics", report).await? {
+        return Ok(0);
+    }
     let rows =
         sqlx::query("SELECT device_token_id, topic, created_at FROM device_topics")
             .fetch_all(src)
@@ -185,6 +169,9 @@ async fn push_preferences(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "push_preferences", report).await? {
+        return Ok(0);
+    }
     let rows = sqlx::query(
         "SELECT project_id, user_fingerprint_hex, category, opted_out, updated_at \
          FROM push_preferences",

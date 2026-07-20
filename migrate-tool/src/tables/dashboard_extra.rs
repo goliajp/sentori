@@ -1,6 +1,8 @@
-//! Additional dashboard tables — watchers, notifications,
+//! Issue-dashboard tables — watchers, notifications,
 //! activity_log, issue_comments, issue_integration_links,
-//! issue_user_mutes.
+//! issue_user_mutes. Dst 0025 mirrors legacy verbatim except
+//! issue_integration_links, which lives in 0011 with a
+//! different shape.
 
 use anyhow::Result;
 use serde_json::Value;
@@ -8,6 +10,8 @@ use sqlx::{PgPool, Row};
 use tracing::info;
 
 use crate::report::Report;
+
+use super::dashboard::guard;
 
 pub async fn migrate(
     src: &PgPool,
@@ -31,12 +35,11 @@ async fn watchers(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
-    let rows = sqlx::query(
-        "SELECT issue_id, user_id, started_at FROM issue_watchers",
-    )
-    .fetch_all(src)
-    .await?;
-    report.note_read("issue_watchers", rows.len() as u64);
+    // Legacy + dst 0025: (issue_id, user_id, since), PK (issue_id, user_id).
+    let rows = sqlx::query("SELECT issue_id, user_id, since FROM watchers")
+        .fetch_all(src)
+        .await?;
+    report.note_read("watchers", rows.len() as u64);
     let mut written = 0u64;
     let mut skipped = 0u64;
     for r in &rows {
@@ -44,12 +47,12 @@ async fn watchers(
             continue;
         }
         let res = sqlx::query(
-            "INSERT INTO issue_watchers (issue_id, user_id, started_at) \
+            "INSERT INTO watchers (issue_id, user_id, since) \
              VALUES ($1, $2, $3) ON CONFLICT (issue_id, user_id) DO NOTHING",
         )
         .bind(r.get::<uuid::Uuid, _>("issue_id"))
         .bind(r.get::<uuid::Uuid, _>("user_id"))
-        .bind(r.get::<time::OffsetDateTime, _>("started_at"))
+        .bind(r.get::<time::OffsetDateTime, _>("since"))
         .execute(dst)
         .await?;
         if res.rows_affected() > 0 {
@@ -58,9 +61,9 @@ async fn watchers(
             skipped += 1;
         }
     }
-    report.note_written("issue_watchers", written);
-    report.note_skipped("issue_watchers", skipped);
-    info!(read = rows.len(), written, skipped, "issue_watchers");
+    report.note_written("watchers", written);
+    report.note_skipped("watchers", skipped);
+    info!(read = rows.len(), written, skipped, "watchers");
     Ok(written)
 }
 
@@ -70,8 +73,13 @@ async fn notifications(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "notifications", report).await? {
+        return Ok(0);
+    }
+    // Legacy + dst 0025: id BIGINT, user_id, issue_id, kind,
+    // payload, read_at, created_at.
     let rows = sqlx::query(
-        "SELECT id, user_id, kind, payload, read_at, created_at FROM notifications",
+        "SELECT id, user_id, issue_id, kind, payload, read_at, created_at FROM notifications",
     )
     .fetch_all(src)
     .await?;
@@ -83,14 +91,15 @@ async fn notifications(
             continue;
         }
         let res = sqlx::query(
-            "INSERT INTO notifications (id, user_id, kind, payload, read_at, created_at) \
-             VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING",
+            "INSERT INTO notifications (id, user_id, issue_id, kind, payload, read_at, created_at) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (id) DO NOTHING",
         )
-        .bind(r.get::<uuid::Uuid, _>("id"))
+        .bind(r.get::<i64, _>("id"))
         .bind(r.get::<uuid::Uuid, _>("user_id"))
+        .bind(r.get::<uuid::Uuid, _>("issue_id"))
         .bind(r.get::<String, _>("kind"))
-        .bind(r.try_get::<Value, _>("payload").unwrap_or(Value::Null))
-        .bind(r.try_get::<Option<time::OffsetDateTime>, _>("read_at").ok().flatten())
+        .bind(r.get::<Value, _>("payload"))
+        .bind(r.get::<Option<time::OffsetDateTime>, _>("read_at"))
         .bind(r.get::<time::OffsetDateTime, _>("created_at"))
         .execute(dst)
         .await?;
@@ -112,11 +121,13 @@ async fn activity_log(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
-    let rows = sqlx::query(
-        "SELECT id, issue_id, actor_user_id, kind, payload, created_at FROM activity_log",
-    )
-    .fetch_all(src)
-    .await?;
+    if !guard(src, "activity_log", report).await? {
+        return Ok(0);
+    }
+    // Legacy + dst 0025: id BIGINT, issue_id, actor_id, verb, payload, at.
+    let rows = sqlx::query("SELECT id, issue_id, actor_id, verb, payload, at FROM activity_log")
+        .fetch_all(src)
+        .await?;
     report.note_read("activity_log", rows.len() as u64);
     let mut written = 0u64;
     let mut skipped = 0u64;
@@ -125,15 +136,15 @@ async fn activity_log(
             continue;
         }
         let res = sqlx::query(
-            "INSERT INTO activity_log (id, issue_id, actor_user_id, kind, payload, created_at) \
+            "INSERT INTO activity_log (id, issue_id, actor_id, verb, payload, at) \
              VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING",
         )
-        .bind(r.get::<uuid::Uuid, _>("id"))
+        .bind(r.get::<i64, _>("id"))
         .bind(r.get::<uuid::Uuid, _>("issue_id"))
-        .bind(r.try_get::<Option<uuid::Uuid>, _>("actor_user_id").ok().flatten())
-        .bind(r.get::<String, _>("kind"))
-        .bind(r.try_get::<Value, _>("payload").unwrap_or(Value::Null))
-        .bind(r.get::<time::OffsetDateTime, _>("created_at"))
+        .bind(r.get::<Option<uuid::Uuid>, _>("actor_id"))
+        .bind(r.get::<String, _>("verb"))
+        .bind(r.get::<Value, _>("payload"))
+        .bind(r.get::<time::OffsetDateTime, _>("at"))
         .execute(dst)
         .await?;
         if res.rows_affected() > 0 {
@@ -154,11 +165,13 @@ async fn issue_comments(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
-    let rows = sqlx::query(
-        "SELECT id, issue_id, author_user_id, body_md, created_at, edited_at FROM issue_comments",
-    )
-    .fetch_all(src)
-    .await?;
+    if !guard(src, "issue_comments", report).await? {
+        return Ok(0);
+    }
+    // Legacy + dst 0025: id, issue_id, author_id, body, created_at.
+    let rows = sqlx::query("SELECT id, issue_id, author_id, body, created_at FROM issue_comments")
+        .fetch_all(src)
+        .await?;
     report.note_read("issue_comments", rows.len() as u64);
     let mut written = 0u64;
     let mut skipped = 0u64;
@@ -167,15 +180,14 @@ async fn issue_comments(
             continue;
         }
         let res = sqlx::query(
-            "INSERT INTO issue_comments (id, issue_id, author_user_id, body_md, created_at, edited_at) \
-             VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING",
+            "INSERT INTO issue_comments (id, issue_id, author_id, body, created_at) \
+             VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING",
         )
         .bind(r.get::<uuid::Uuid, _>("id"))
         .bind(r.get::<uuid::Uuid, _>("issue_id"))
-        .bind(r.get::<uuid::Uuid, _>("author_user_id"))
-        .bind(r.get::<String, _>("body_md"))
+        .bind(r.get::<Option<uuid::Uuid>, _>("author_id"))
+        .bind(r.get::<String, _>("body"))
         .bind(r.get::<time::OffsetDateTime, _>("created_at"))
-        .bind(r.try_get::<Option<time::OffsetDateTime>, _>("edited_at").ok().flatten())
         .execute(dst)
         .await?;
         if res.rows_affected() > 0 {
@@ -196,9 +208,23 @@ async fn issue_integration_links(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "issue_integration_links", report).await? {
+        return Ok(0);
+    }
+    // Legacy: issue_id, integration_kind, external_id,
+    // external_url (nullable), created_at, external_title,
+    // external_status, external_updated_at.
+    // Dst is 0011 (NOT 0025): id UUID PK, workspace_id, issue_id,
+    // kind, external_id, external_url NOT NULL, created_at — the
+    // external_title/status/updated_at columns have no dst home
+    // and are dropped; rows with NULL external_url are skipped
+    // (dst declares it NOT NULL). id is minted at migration time.
     let rows = sqlx::query(
-        "SELECT id, issue_id, integration_id, external_kind, external_ref, external_url, \
-                created_at, created_by FROM issue_integration_links",
+        "SELECT gen_random_uuid() AS id, p.org_id AS workspace_id, l.issue_id, \
+                l.integration_kind, l.external_id, l.external_url, l.created_at \
+         FROM issue_integration_links l \
+         JOIN issues i ON i.id = l.issue_id \
+         JOIN projects p ON p.id = i.project_id",
     )
     .fetch_all(src)
     .await?;
@@ -209,19 +235,23 @@ async fn issue_integration_links(
         if dry_run {
             continue;
         }
+        let external_url: Option<String> = r.get("external_url");
+        let Some(external_url) = external_url else {
+            skipped += 1;
+            continue;
+        };
         let res = sqlx::query(
-            "INSERT INTO issue_integration_links (id, issue_id, integration_id, external_kind, \
-                external_ref, external_url, created_at, created_by) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING",
+            "INSERT INTO issue_integration_links (id, workspace_id, issue_id, kind, \
+                external_id, external_url, created_at) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING",
         )
         .bind(r.get::<uuid::Uuid, _>("id"))
+        .bind(r.get::<uuid::Uuid, _>("workspace_id"))
         .bind(r.get::<uuid::Uuid, _>("issue_id"))
-        .bind(r.get::<uuid::Uuid, _>("integration_id"))
-        .bind(r.get::<String, _>("external_kind"))
-        .bind(r.get::<String, _>("external_ref"))
-        .bind(r.try_get::<Option<String>, _>("external_url").ok().flatten())
+        .bind(r.get::<String, _>("integration_kind"))
+        .bind(r.get::<String, _>("external_id"))
+        .bind(external_url)
         .bind(r.get::<time::OffsetDateTime, _>("created_at"))
-        .bind(r.try_get::<Option<uuid::Uuid>, _>("created_by").ok().flatten())
         .execute(dst)
         .await?;
         if res.rows_affected() > 0 {
@@ -242,12 +272,13 @@ async fn issue_user_mutes(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
-    let rows = sqlx::query(
-        "SELECT id, project_id, user_id, until_release, until_at, scope, created_at \
-         FROM issue_user_mutes",
-    )
-    .fetch_all(src)
-    .await?;
+    if !guard(src, "issue_user_mutes", report).await? {
+        return Ok(0);
+    }
+    // Legacy + dst 0025: (user_id, issue_id, since), PK (user_id, issue_id).
+    let rows = sqlx::query("SELECT user_id, issue_id, since FROM issue_user_mutes")
+        .fetch_all(src)
+        .await?;
     report.note_read("issue_user_mutes", rows.len() as u64);
     let mut written = 0u64;
     let mut skipped = 0u64;
@@ -256,16 +287,12 @@ async fn issue_user_mutes(
             continue;
         }
         let res = sqlx::query(
-            "INSERT INTO issue_user_mutes (id, project_id, user_id, until_release, until_at, scope, created_at) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (id) DO NOTHING",
+            "INSERT INTO issue_user_mutes (user_id, issue_id, since) \
+             VALUES ($1, $2, $3) ON CONFLICT (user_id, issue_id) DO NOTHING",
         )
-        .bind(r.get::<uuid::Uuid, _>("id"))
-        .bind(r.get::<uuid::Uuid, _>("project_id"))
         .bind(r.get::<uuid::Uuid, _>("user_id"))
-        .bind(r.try_get::<Option<String>, _>("until_release").ok().flatten())
-        .bind(r.try_get::<Option<time::OffsetDateTime>, _>("until_at").ok().flatten())
-        .bind(r.try_get::<String, _>("scope").unwrap_or_default())
-        .bind(r.get::<time::OffsetDateTime, _>("created_at"))
+        .bind(r.get::<uuid::Uuid, _>("issue_id"))
+        .bind(r.get::<time::OffsetDateTime, _>("since"))
         .execute(dst)
         .await?;
         if res.rows_affected() > 0 {

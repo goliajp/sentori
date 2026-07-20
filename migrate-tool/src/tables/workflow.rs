@@ -9,6 +9,8 @@ use tracing::info;
 
 use crate::report::Report;
 
+use super::dashboard::guard;
+
 pub async fn migrate(
     src: &PgPool,
     dst: &PgPool,
@@ -28,6 +30,9 @@ async fn workflow_rules(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "workflow_rules", report).await? {
+        return Ok(0);
+    }
     let rows = sqlx::query(
         "SELECT wr.id, COALESCE(p.org_id, wr.workspace_id) AS workspace_id, wr.project_id, \
                 wr.name, wr.trigger, wr.steps, wr.enabled, wr.created_at, wr.created_by, wr.updated_at \
@@ -77,6 +82,9 @@ async fn workflow_runs(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "workflow_runs", report).await? {
+        return Ok(0);
+    }
     let rows = sqlx::query(
         "SELECT id, rule_id, trigger_event_id, status, started_at, completed_at, error \
          FROM workflow_runs ORDER BY started_at DESC LIMIT 10000",
@@ -121,6 +129,9 @@ async fn workflow_run_steps(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "workflow_run_steps", report).await? {
+        return Ok(0);
+    }
     let rows = sqlx::query(
         "SELECT id, run_id, step_index, kind, status, output, started_at, completed_at, error \
          FROM workflow_run_steps ORDER BY started_at DESC LIMIT 50000",

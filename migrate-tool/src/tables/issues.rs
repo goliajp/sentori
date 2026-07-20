@@ -20,8 +20,10 @@ pub async fn migrate(
     loop {
         let rows = sqlx::query(
             "SELECT i.id, p.org_id AS workspace_id, i.project_id, i.fingerprint, i.error_type, \
-                    i.message_sample, i.kind, i.status, i.first_seen, i.last_seen, i.event_count, \
-                    i.last_environment, i.last_release, i.regressed_at, i.regressed_in_release, i.resolved_at \
+                    i.message_sample, i.status, i.first_seen, i.last_seen, i.event_count, \
+                    COALESCE(i.last_environment, '') AS last_environment, \
+                    COALESCE(i.last_release, '') AS last_release, \
+                    i.regressed_at, i.regressed_in_release, i.resolved_at \
              FROM issues i JOIN projects p ON p.id = i.project_id \
              ORDER BY i.last_seen LIMIT $1 OFFSET $2",
         )
@@ -50,7 +52,9 @@ pub async fn migrate(
             .bind(r.get::<String, _>("fingerprint"))
             .bind(r.get::<String, _>("error_type"))
             .bind(r.try_get::<String, _>("message_sample").unwrap_or_default())
-            .bind(r.get::<String, _>("kind"))
+            // Legacy has no kind column; every legacy issue is an
+            // error-class issue.
+            .bind("error")
             .bind(r.get::<String, _>("status"))
             .bind(r.get::<time::OffsetDateTime, _>("first_seen"))
             .bind(r.get::<time::OffsetDateTime, _>("last_seen"))

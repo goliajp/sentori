@@ -29,7 +29,9 @@ pub async fn migrate(
         let workspace_id: uuid::Uuid = r.get("org_id");
         let project_id: uuid::Uuid = r.get("project_id");
         let kind: String = r.get("kind");
-        let token_hash: Vec<u8> = r.get("token_hash");
+        // Legacy stores the SHA-256 hex-encoded as TEXT; dst 0016
+        // mirrors that verbatim (TEXT, not BYTEA).
+        let token_hash: String = r.get("token_hash");
         let label: Option<String> = r.try_get("label").ok();
         let last4: Option<String> = r.try_get("last4").ok();
         let created_at: time::OffsetDateTime = r.get("created_at");

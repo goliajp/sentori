@@ -8,6 +8,8 @@ use tracing::info;
 
 use crate::report::Report;
 
+use super::dashboard::guard;
+
 const PAGE: i64 = 2000;
 
 pub async fn migrate(
@@ -96,6 +98,9 @@ async fn security_events(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "security_events", report).await? {
+        return Ok(0);
+    }
     let mut written = 0u64;
     let mut skipped = 0u64;
     let mut offset: i64 = 0;
@@ -166,6 +171,9 @@ async fn federation(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "user_federation_links", report).await? {
+        return Ok(0);
+    }
     let rows = sqlx::query(
         "SELECT ufl.id, p.org_id AS workspace_id, ufl.project_id, ufl.provider, ufl.subject, \
                 ufl.user_id, ufl.install_id, ufl.created_at \
@@ -213,6 +221,9 @@ async fn user_reports(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "user_reports", report).await? {
+        return Ok(0);
+    }
     let rows = sqlx::query(
         "SELECT ur.id, p.org_id AS workspace_id, ur.project_id, ur.event_id, ur.issue_id, \
                 ur.title, ur.body, ur.email, ur.name, ur.received_at \

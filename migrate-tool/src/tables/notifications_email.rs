@@ -1,12 +1,16 @@
 //! Email notification tables — notifications_email_log,
-//! notifications_email_preferences, digest_email_log.
-//! Operational ledger; preserved on cutover.
+//! notification_preferences, digest_runs. Dst 0026 mirrors the
+//! legacy shapes verbatim. All three are empty in legacy prod —
+//! guarded, with real-shape queries so a future nonzero run
+//! works.
 
 use anyhow::Result;
 use sqlx::{PgPool, Row};
 use tracing::info;
 
 use crate::report::Report;
+
+use super::dashboard::guard;
 
 pub async fn migrate(
     src: &PgPool,
@@ -16,8 +20,8 @@ pub async fn migrate(
 ) -> Result<u64> {
     let mut total = 0u64;
     total += email_log(src, dst, dry_run, report).await?;
-    total += email_prefs(src, dst, dry_run, report).await?;
-    total += digest_log(src, dst, dry_run, report).await?;
+    total += notification_preferences(src, dst, dry_run, report).await?;
+    total += digest_runs(src, dst, dry_run, report).await?;
     Ok(total)
 }
 
@@ -27,9 +31,16 @@ async fn email_log(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "notifications_email_log", report).await? {
+        return Ok(0);
+    }
+    // Legacy + dst 0026: id BIGINT, notification_id BIGINT
+    // (nullable), user_id, recipient_email, status, subject,
+    // last_error, created_at, delivered_at.
     let rows = sqlx::query(
-        "SELECT id, user_id, kind, subject, status, error, sent_at, created_at \
-         FROM notifications_email_log ORDER BY created_at DESC LIMIT 50000",
+        "SELECT id, notification_id, user_id, recipient_email, status, subject, \
+                last_error, created_at, delivered_at \
+         FROM notifications_email_log",
     )
     .fetch_all(src)
     .await?;
@@ -41,17 +52,19 @@ async fn email_log(
             continue;
         }
         let res = sqlx::query(
-            "INSERT INTO notifications_email_log (id, user_id, kind, subject, status, error, sent_at, created_at) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING",
+            "INSERT INTO notifications_email_log (id, notification_id, user_id, \
+                recipient_email, status, subject, last_error, created_at, delivered_at) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (id) DO NOTHING",
         )
-        .bind(r.get::<uuid::Uuid, _>("id"))
+        .bind(r.get::<i64, _>("id"))
+        .bind(r.get::<Option<i64>, _>("notification_id"))
         .bind(r.get::<uuid::Uuid, _>("user_id"))
-        .bind(r.get::<String, _>("kind"))
-        .bind(r.try_get::<Option<String>, _>("subject").ok().flatten())
+        .bind(r.get::<String, _>("recipient_email"))
         .bind(r.get::<String, _>("status"))
-        .bind(r.try_get::<Option<String>, _>("error").ok().flatten())
-        .bind(r.try_get::<Option<time::OffsetDateTime>, _>("sent_at").ok().flatten())
+        .bind(r.get::<String, _>("subject"))
+        .bind(r.get::<Option<String>, _>("last_error"))
         .bind(r.get::<time::OffsetDateTime, _>("created_at"))
+        .bind(r.get::<Option<time::OffsetDateTime>, _>("delivered_at"))
         .execute(dst)
         .await?;
         if res.rows_affected() > 0 {
@@ -66,18 +79,24 @@ async fn email_log(
     Ok(written)
 }
 
-async fn email_prefs(
+async fn notification_preferences(
     src: &PgPool,
     dst: &PgPool,
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "notification_preferences", report).await? {
+        return Ok(0);
+    }
+    // Legacy + dst 0026: user_id (PK), muted_kinds TEXT[],
+    // cadence, channels TEXT[], updated_at.
     let rows = sqlx::query(
-        "SELECT user_id, category, opted_out, updated_at FROM notifications_email_preferences",
+        "SELECT user_id, muted_kinds, cadence, channels, updated_at \
+         FROM notification_preferences",
     )
     .fetch_all(src)
     .await?;
-    report.note_read("notifications_email_preferences", rows.len() as u64);
+    report.note_read("notification_preferences", rows.len() as u64);
     let mut written = 0u64;
     let mut skipped = 0u64;
     for r in &rows {
@@ -85,12 +104,13 @@ async fn email_prefs(
             continue;
         }
         let res = sqlx::query(
-            "INSERT INTO notifications_email_preferences (user_id, category, opted_out, updated_at) \
-             VALUES ($1, $2, $3, $4) ON CONFLICT (user_id, category) DO NOTHING",
+            "INSERT INTO notification_preferences (user_id, muted_kinds, cadence, channels, updated_at) \
+             VALUES ($1, $2, $3, $4, $5) ON CONFLICT (user_id) DO NOTHING",
         )
         .bind(r.get::<uuid::Uuid, _>("user_id"))
-        .bind(r.get::<String, _>("category"))
-        .bind(r.get::<bool, _>("opted_out"))
+        .bind(r.get::<Vec<String>, _>("muted_kinds"))
+        .bind(r.get::<String, _>("cadence"))
+        .bind(r.get::<Vec<String>, _>("channels"))
         .bind(r.get::<time::OffsetDateTime, _>("updated_at"))
         .execute(dst)
         .await?;
@@ -100,25 +120,27 @@ async fn email_prefs(
             skipped += 1;
         }
     }
-    report.note_written("notifications_email_preferences", written);
-    report.note_skipped("notifications_email_preferences", skipped);
-    info!(read = rows.len(), written, skipped, "notifications_email_preferences");
+    report.note_written("notification_preferences", written);
+    report.note_skipped("notification_preferences", skipped);
+    info!(read = rows.len(), written, skipped, "notification_preferences");
     Ok(written)
 }
 
-async fn digest_log(
+async fn digest_runs(
     src: &PgPool,
     dst: &PgPool,
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
-    let rows = sqlx::query(
-        "SELECT id, subscription_id, status, error, sent_at, created_at \
-         FROM digest_email_log ORDER BY created_at DESC LIMIT 50000",
-    )
-    .fetch_all(src)
-    .await?;
-    report.note_read("digest_email_log", rows.len() as u64);
+    if !guard(src, "digest_runs", report).await? {
+        return Ok(0);
+    }
+    // Legacy + dst 0026: user_id, cadence, last_sent_at;
+    // PK (user_id, cadence).
+    let rows = sqlx::query("SELECT user_id, cadence, last_sent_at FROM digest_runs")
+        .fetch_all(src)
+        .await?;
+    report.note_read("digest_runs", rows.len() as u64);
     let mut written = 0u64;
     let mut skipped = 0u64;
     for r in &rows {
@@ -126,15 +148,12 @@ async fn digest_log(
             continue;
         }
         let res = sqlx::query(
-            "INSERT INTO digest_email_log (id, subscription_id, status, error, sent_at, created_at) \
-             VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING",
+            "INSERT INTO digest_runs (user_id, cadence, last_sent_at) \
+             VALUES ($1, $2, $3) ON CONFLICT (user_id, cadence) DO NOTHING",
         )
-        .bind(r.get::<uuid::Uuid, _>("id"))
-        .bind(r.get::<uuid::Uuid, _>("subscription_id"))
-        .bind(r.get::<String, _>("status"))
-        .bind(r.try_get::<Option<String>, _>("error").ok().flatten())
-        .bind(r.try_get::<Option<time::OffsetDateTime>, _>("sent_at").ok().flatten())
-        .bind(r.get::<time::OffsetDateTime, _>("created_at"))
+        .bind(r.get::<uuid::Uuid, _>("user_id"))
+        .bind(r.get::<String, _>("cadence"))
+        .bind(r.get::<Option<time::OffsetDateTime>, _>("last_sent_at"))
         .execute(dst)
         .await?;
         if res.rows_affected() > 0 {
@@ -143,8 +162,8 @@ async fn digest_log(
             skipped += 1;
         }
     }
-    report.note_written("digest_email_log", written);
-    report.note_skipped("digest_email_log", skipped);
-    info!(read = rows.len(), written, skipped, "digest_email_log");
+    report.note_written("digest_runs", written);
+    report.note_skipped("digest_runs", skipped);
+    info!(read = rows.len(), written, skipped, "digest_runs");
     Ok(written)
 }

@@ -11,6 +11,8 @@ use tracing::info;
 
 use crate::report::Report;
 
+use super::dashboard::guard;
+
 pub async fn migrate(
     src: &PgPool,
     dst: &PgPool,
@@ -31,6 +33,9 @@ async fn workspace_billing(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "workspace_billing", report).await? {
+        return Ok(0);
+    }
     let rows = sqlx::query(
         "SELECT id, org_id AS workspace_id, plan, status, stripe_customer_id, \
                 stripe_subscription_id, current_period_end, seats, created_at, updated_at \
@@ -81,6 +86,9 @@ async fn billing_subscriptions(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "billing_subscriptions", report).await? {
+        return Ok(0);
+    }
     let rows = sqlx::query(
         "SELECT id, org_id AS workspace_id, stripe_subscription_id, status, plan, \
                 price_cents, current_period_start, current_period_end, cancel_at_period_end, \
@@ -133,6 +141,9 @@ async fn billing_invoices(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "billing_invoices", report).await? {
+        return Ok(0);
+    }
     let rows = sqlx::query(
         "SELECT id, org_id AS workspace_id, stripe_invoice_id, status, amount_cents, \
                 currency, period_start, period_end, paid_at, raw, created_at \
@@ -183,6 +194,9 @@ async fn billing_seat_log(
     dry_run: bool,
     report: &mut Report,
 ) -> Result<u64> {
+    if !guard(src, "billing_seat_log", report).await? {
+        return Ok(0);
+    }
     let rows = sqlx::query(
         "SELECT id, org_id AS workspace_id, delta, reason, actor_user_id, created_at \
          FROM billing_seat_log",
