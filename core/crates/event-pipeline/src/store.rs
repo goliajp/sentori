@@ -80,9 +80,14 @@ pub(super) async fn persist_event(
     .bind(event.timestamp)
     .bind(&event.environment)
     .bind(&event.release)
-    .fetch_one(&mut *tx)
+    .fetch_optional(&mut *tx)
     .await
     .map_err(|e| translate_fk(e, project_id))?;
+
+    // Unknown project → the driving SELECT matches zero rows → nothing is
+    // inserted, the ON CONFLICT branch never runs and no FK violation reaches
+    // `translate_fk`. A missing RETURNING row is the only signal.
+    let row = row.ok_or_else(|| IngestError::ProjectNotFound(project_id.into_uuid()))?;
 
     let issue_id: Uuid = row.get("id");
     let is_new: bool = row.get("is_new");

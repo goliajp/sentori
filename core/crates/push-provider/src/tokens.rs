@@ -70,9 +70,13 @@ impl DeviceTokenStore {
         .bind(native_token)
         .bind(env)
         .bind(app_user_id)
-        .fetch_one(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(|e| translate_fk(e, project_id))?;
+        // Unknown project → the driving SELECT matches zero rows → nothing is
+        // inserted, the ON CONFLICT branch never runs and no FK violation is
+        // raised. Absence of a RETURNING row is the only signal.
+        let row = row.ok_or_else(|| PushError::ProjectNotFound(project_id.into_uuid()))?;
 
         Ok(MintedToken {
             id: row.get("id"),

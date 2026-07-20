@@ -92,7 +92,7 @@ impl IntegrationService {
             return Err(IntegrationError::NoAdapter(kind.to_string()));
         }
         let id = Uuid::now_v7();
-        let row: (Uuid,) = sqlx::query_as(
+        let row: Option<(Uuid,)> = sqlx::query_as(
             r"
             INSERT INTO integrations (id, workspace_id, project_id, kind, config, connected_by, active)
             SELECT $1, p.workspace_id, $2, $3, $4, $5, TRUE
@@ -109,9 +109,13 @@ impl IntegrationService {
         .bind(kind)
         .bind(&config)
         .bind(connected_by.map(UserId::into_uuid))
-        .fetch_one(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(|e| translate_fk(e, project_id))?;
+        // Unknown project → the driving SELECT matches zero rows → nothing is
+        // inserted and no FK violation is raised. Absence of a RETURNING row
+        // is the only signal.
+        let row = row.ok_or_else(|| IntegrationError::ProjectNotFound(project_id.into_uuid()))?;
         Ok(row.0)
     }
 

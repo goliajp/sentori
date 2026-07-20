@@ -331,7 +331,7 @@ impl BillingService {
             return Err(BillingError::InvalidInput("delta must be > 0".into()));
         }
         let period = period_key(now);
-        sqlx::query(
+        let inserted: Option<(uuid::Uuid,)> = sqlx::query_as(
             r"
             INSERT INTO usage_counters
                 (workspace_id, project_id, period_yyyymm, counter_kind, count, dropped_count)
@@ -339,15 +339,23 @@ impl BillingService {
             ON CONFLICT (project_id, period_yyyymm, counter_kind) DO UPDATE SET
                 dropped_count = usage_counters.dropped_count + $4,
                 updated_at = now()
+            RETURNING project_id
             ",
         )
         .bind(project_id.into_uuid())
         .bind(&period)
         .bind(kind.as_db_str())
         .bind(delta)
-        .execute(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(|e| translate_fk(e, project_id))?;
+        // Unknown project → the driving SELECT matches zero rows → nothing is
+        // inserted, the ON CONFLICT branch never runs and no FK violation is
+        // raised. The DO UPDATE branch still RETURNINGs, so a missing row here
+        // means only one thing: the project doesn't exist.
+        if inserted.is_none() {
+            return Err(BillingError::ProjectNotFound(project_id.into_uuid()));
+        }
         Ok(())
     }
 
