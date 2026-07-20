@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { api, ApiError, CertObservation, CertWatch } from '../lib/api';
+import { api, CertObservation, CertWatch } from '../lib/api';
+import { useAsyncData } from '../lib/useAsyncData';
 import {
   Badge,
   Button,
@@ -14,30 +15,24 @@ import {
 
 export function CertPage() {
   const { id: projectId } = useParams<{ id: string }>();
-  const [observations, setObservations] = useState<CertObservation[] | null>(null);
-  const [watches, setWatches] = useState<CertWatch[]>([]);
-  const [err, setErr] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [newDomain, setNewDomain] = useState('');
 
-  async function refresh() {
-    if (!projectId) return;
-    try {
-      const [o, w] = await Promise.all([
-        api.listCertObservations(projectId),
-        api.listCertWatches(projectId).catch(() => [] as CertWatch[]),
-      ]);
-      setObservations(o);
-      setWatches(w);
-    } catch (e) {
-      if (e instanceof ApiError) setErr(`${e.status}: ${e.body}`);
-      else setErr(String(e));
-    }
-  }
-
-  useEffect(() => {
-    refresh();
+  const {
+    data,
+    error: err,
+    reload: refresh,
+    setError: setErr,
+  } = useAsyncData(async () => {
+    if (!projectId) return null;
+    const [o, w] = await Promise.all([
+      api.listCertObservations(projectId),
+      api.listCertWatches(projectId).catch(() => [] as CertWatch[]),
+    ]);
+    return { observations: o, watches: w };
   }, [projectId]);
+  const observations: CertObservation[] | null = data?.observations ?? null;
+  const watches: CertWatch[] = data?.watches ?? [];
 
   async function addDomain() {
     if (!projectId || !newDomain.trim()) return;
@@ -45,7 +40,7 @@ export function CertPage() {
       await api.addCertWatch(projectId, newDomain.trim());
       setNewDomain('');
       setShowAdd(false);
-      await refresh();
+      refresh();
     } catch (e) {
       setErr(String(e));
     }
@@ -56,7 +51,7 @@ export function CertPage() {
     if (!confirm(`Stop watching ${domain}? Existing observations stay.`)) return;
     try {
       await api.removeCertWatch(projectId, domain);
-      await refresh();
+      refresh();
     } catch (e) {
       setErr(String(e));
     }

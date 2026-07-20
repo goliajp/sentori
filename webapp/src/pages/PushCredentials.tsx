@@ -1,10 +1,11 @@
 // Push credentials admin — upsert / list / delete vendor secrets
 // (APNs, FCM, WebPush, HCM, MiPush).
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import { api, PushCredential } from '../lib/api';
+import { useAsyncData } from '../lib/useAsyncData';
 import {
   Badge,
   Button,
@@ -21,30 +22,24 @@ const PROVIDERS = ['apns', 'fcm', 'webpush', 'hcm', 'mipush'] as const;
 
 export default function PushCredentials() {
   const { id: projectId } = useParams<{ id: string }>();
-  const [rows, setRows] = useState<PushCredential[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [provider, setProvider] = useState<(typeof PROVIDERS)[number]>('apns');
   const [config, setConfig] = useState('{}');
   const [secret, setSecret] = useState('');
   const [showUpload, setShowUpload] = useState(false);
 
-  async function refresh() {
-    if (!projectId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await api.listPushCredentials(projectId);
-      setRows(r.credentials);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }
-  useEffect(() => {
-    refresh();
-  }, [projectId]);
+  const {
+    data,
+    loading,
+    error,
+    reload: refresh,
+    setError,
+  } = useAsyncData(
+    async (): Promise<PushCredential[]> =>
+      projectId ? (await api.listPushCredentials(projectId)).credentials : [],
+    [projectId],
+    String,
+  );
+  const rows = data ?? [];
 
   async function upload() {
     if (!projectId) return;
@@ -64,7 +59,7 @@ export default function PushCredentials() {
       setConfig('{}');
       setSecret('');
       setShowUpload(false);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }
@@ -75,7 +70,7 @@ export default function PushCredentials() {
     if (!confirm(`Delete ${kind} credentials? Pending pushes will fail.`)) return;
     try {
       await api.deletePushCredential(projectId, kind);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }

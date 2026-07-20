@@ -1,9 +1,10 @@
 // Projects admin — create / list / rename / delete.
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { api, Project, ProjectStats } from '../lib/api';
+import { useAsyncData } from '../lib/useAsyncData';
 import {
   Button,
   Card,
@@ -16,20 +17,22 @@ import {
 } from '../components/ui';
 
 export default function Projects() {
-  const [rows, setRows] = useState<Project[]>([]);
-  const [stats, setStats] = useState<Record<string, ProjectStats>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
 
-  async function refresh() {
-    setLoading(true);
-    setError(null);
-    try {
+  const {
+    data,
+    loading,
+    error,
+    reload: refresh,
+    setError,
+  } = useAsyncData(
+    async (): Promise<{
+      rows: Project[];
+      stats: Record<string, ProjectStats>;
+    }> => {
       const rows = await api.listProjects();
-      setRows(rows);
       // Parallel per-project stats fetch
       const pairs = await Promise.all(
         rows.map(async p => {
@@ -41,20 +44,18 @@ export default function Projects() {
           }
         }),
       );
-      setStats(
-        Object.fromEntries(
+      return {
+        rows,
+        stats: Object.fromEntries(
           pairs.filter(([, v]) => v !== null) as [string, ProjectStats][],
         ),
-      );
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }
-  useEffect(() => {
-    refresh();
-  }, []);
+      };
+    },
+    [],
+    String,
+  );
+  const rows = data?.rows ?? [];
+  const stats = data?.stats ?? {};
 
   async function create() {
     if (!name || !slug) return;
@@ -63,7 +64,7 @@ export default function Projects() {
       setName('');
       setSlug('');
       setShowCreate(false);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }
@@ -74,7 +75,7 @@ export default function Projects() {
     if (!next || next === p.name) return;
     try {
       await api.renameProject(p.id, next);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }
@@ -85,7 +86,7 @@ export default function Projects() {
       return;
     try {
       await api.deleteProject(p.id);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }

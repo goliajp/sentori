@@ -1,9 +1,10 @@
 // Per-project integrations admin — Slack / Linear / Jira / GitHub / GitLab.
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import { api, IntegrationRow } from '../lib/api';
+import { useAsyncData } from '../lib/useAsyncData';
 import {
   Badge,
   Button,
@@ -21,29 +22,23 @@ const KINDS = ['slack', 'linear', 'jira', 'github', 'gitlab'] as const;
 
 export default function Integrations() {
   const { id: projectId } = useParams<{ id: string }>();
-  const [rows, setRows] = useState<IntegrationRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [kind, setKind] = useState<(typeof KINDS)[number]>('slack');
   const [config, setConfig] = useState('{}');
 
-  async function refresh() {
-    if (!projectId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await api.listIntegrations(projectId);
-      setRows(r.integrations);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }
-  useEffect(() => {
-    refresh();
-  }, [projectId]);
+  const {
+    data,
+    loading,
+    error,
+    reload: refresh,
+    setError,
+  } = useAsyncData(
+    async (): Promise<IntegrationRow[]> =>
+      projectId ? (await api.listIntegrations(projectId)).integrations : [],
+    [projectId],
+    String,
+  );
+  const rows = data ?? [];
 
   async function upsert() {
     if (!projectId) return;
@@ -58,7 +53,7 @@ export default function Integrations() {
       await api.upsertIntegration(projectId, { kind, config: parsed });
       setConfig('{}');
       setShowAdd(false);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }
@@ -68,7 +63,7 @@ export default function Integrations() {
     if (!projectId) return;
     try {
       await api.setIntegrationActive(projectId, it.kind, !it.active);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }
@@ -80,7 +75,7 @@ export default function Integrations() {
       return;
     try {
       await api.deleteIntegration(projectId, it.kind);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }

@@ -1,8 +1,9 @@
 // Workspace members + pending invites in one page.
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { api, InviteRow, MemberRow } from '../lib/api';
+import { useAsyncData } from '../lib/useAsyncData';
 import {
   Badge,
   Button,
@@ -17,10 +18,6 @@ import {
 } from '../components/ui';
 
 export default function Members() {
-  const [members, setMembers] = useState<MemberRow[]>([]);
-  const [invites, setInvites] = useState<InviteRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'admin' | 'user'>('user');
@@ -31,27 +28,27 @@ export default function Members() {
   );
   const [newInviteToken, setNewInviteToken] = useState<string | null>(null);
 
-  async function refresh() {
-    setLoading(true);
-    setError(null);
-    try {
+  const {
+    data,
+    loading,
+    error,
+    reload: refresh,
+    setError,
+  } = useAsyncData(
+    async (): Promise<{ members: MemberRow[]; invites: InviteRow[] }> => {
       const [m, i] = await Promise.all([api.listMembers(), api.listInvites()]);
-      setMembers(m.members);
-      setInvites(i.invites);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }
-  useEffect(() => {
-    refresh();
-  }, []);
+      return { members: m.members, invites: i.invites };
+    },
+    [],
+    String,
+  );
+  const members = data?.members ?? [];
+  const invites = data?.invites ?? [];
 
   async function setRole(uid: string, role: 'admin' | 'user') {
     try {
       await api.updateMemberRole(uid, role);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }
@@ -61,7 +58,7 @@ export default function Members() {
     if (!confirm('Remove this member from the workspace?')) return;
     try {
       await api.removeMember(uid);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }
@@ -78,7 +75,7 @@ export default function Members() {
       setNewInviteToken(r.token);
       setInviteEmail('');
       setShowInvite(false);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }
@@ -88,7 +85,7 @@ export default function Members() {
     if (!confirm('Revoke this invite?')) return;
     try {
       await api.revokeInvite(id);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }
