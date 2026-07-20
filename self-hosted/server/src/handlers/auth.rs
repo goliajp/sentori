@@ -61,11 +61,18 @@ pub async fn register(
     match auth(&state).register(&body.email, &body.password).await {
         Ok((user, minted)) => {
             info!(user_id = %user.id, "auth.register");
+            // The verify token goes out by email ONLY — returning
+            // it here would let any caller self-verify.
+            state.mailer.send_verify(
+                state.workspace_id,
+                &body.email,
+                &minted.plaintext_token.to_wire_string(),
+            );
             (
                 StatusCode::CREATED,
                 Json(json!({
                     "user_id": user.id.to_string(),
-                    "verify_token": minted.plaintext_token.to_wire_string(),
+                    "status": "verification email sent",
                 })),
             )
         }
@@ -165,14 +172,22 @@ pub async fn forgot(
     Json(body): Json<ForgotBody>,
 ) -> (StatusCode, Json<Value>) {
     match auth(&state).forgot_password(&body.email).await {
-        Ok(Some(minted)) => (
-            StatusCode::OK,
-            Json(json!({ "reset_token": minted.plaintext_token.to_wire_string() })),
-        ),
-        Ok(None) => (
-            StatusCode::OK,
-            Json(json!({ "status": "if registered, an email is sent" })),
-        ),
+        // Same response for hit and miss (anti-enumeration), and
+        // the token travels by email ONLY — returning it here
+        // hands account takeover to any caller.
+        Ok(minted) => {
+            if let Some(minted) = minted {
+                state.mailer.send_reset(
+                    state.workspace_id,
+                    &body.email,
+                    &minted.plaintext_token.to_wire_string(),
+                );
+            }
+            (
+                StatusCode::OK,
+                Json(json!({ "status": "if registered, an email is sent" })),
+            )
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),

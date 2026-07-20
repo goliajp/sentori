@@ -44,6 +44,7 @@ mod bootstrap;
 mod fcm;
 mod handlers;
 mod hcm;
+mod mailer;
 mod mipush;
 mod notify;
 mod periodic_alert_worker;

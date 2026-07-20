@@ -649,7 +649,7 @@ export class Api {
   // ── auth: dashboard user lifecycle ─────────────────────
   authRegister(body: { email: string; password: string }): Promise<{
     user_id: string;
-    verify_token: string;
+    status: string;
   }> {
     return this.post('/auth/register', body);
   }
@@ -664,16 +664,17 @@ export class Api {
   authVerify(token: string): Promise<{ user_id: string }> {
     return this.post('/auth/verify', { token });
   }
-  authForgotPassword(email: string): Promise<{ reset_token?: string }> {
+  authForgotPassword(email: string): Promise<{ status: string }> {
     return this.post('/auth/forgot-password', { email });
   }
   authResetPassword(
     token: string,
     newPassword: string,
   ): Promise<{ user_id: string }> {
+    // Server ResetBody is #[serde(rename_all = "camelCase")].
     return this.post('/auth/reset-password', {
       token,
-      new_password: newPassword,
+      newPassword,
     });
   }
 

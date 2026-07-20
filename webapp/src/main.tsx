@@ -20,6 +20,8 @@ import PushCredentials from './pages/PushCredentials';
 import PushSends from './pages/PushSends';
 import Sessions from './pages/Sessions';
 import Register from './pages/Register';
+import ResetPassword from './pages/ResetPassword';
+import Verify from './pages/Verify';
 import Releases from './pages/Releases';
 import SaasAdmin from './pages/SaasAdmin';
 import SavedViews from './pages/SavedViews';
@@ -49,6 +51,8 @@ createRoot(rootEl).render(
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/verify" element={<Verify />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route element={<App />}>
           <Route index element={<OverviewPage />} />
           <Route path="/alerts" element={<AlertsPage />} />
