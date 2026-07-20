@@ -98,6 +98,20 @@ jobs:
       VALKEY_URL: redis://localhost:6379
 
     steps:
+      # The legacy server workspace + its dep tree fills the
+      # ubuntu-latest disk: 2026-07-20 the `cargo test (server)` step
+      # died mid-run with "No space left on device" (the runner
+      # couldn't even write its own diagnostic log). The preinstalled
+      # Android SDK / .NET / GHC / CodeQL bundles are ~25 GB we never
+      # touch.
+      - name: free runner disk
+        run: |
+          df -h / | tail -1
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet \
+                      /opt/ghc /usr/local/.ghcup \
+                      /opt/hostedtoolcache/CodeQL
+          df -h / | tail -1
+
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
