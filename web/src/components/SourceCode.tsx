@@ -27,14 +27,7 @@ import { Fragment, jsx, jsxs } from 'react/jsx-runtime'
  */
 
 export type SourceLanguage =
-  | 'java'
-  | 'javascript'
-  | 'jsx'
-  | 'kotlin'
-  | 'objc'
-  | 'swift'
-  | 'tsx'
-  | 'typescript'
+  'java' | 'javascript' | 'jsx' | 'kotlin' | 'objc' | 'swift' | 'tsx' | 'typescript'
 
 const SCOPE_BY_LANG: Record<SourceLanguage, string> = {
   java: 'source.java',
