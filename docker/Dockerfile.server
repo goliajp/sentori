@@ -17,7 +17,7 @@
 # Attribution required by CC-BY 4.0 lives in NOTICES.md at repo root
 # and in docs/self-hosting.md.
 FROM debian:bookworm-slim AS geoip
-ARG DBIP_VERSION=2026-05
+ARG DBIP_VERSION=2026-07
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
