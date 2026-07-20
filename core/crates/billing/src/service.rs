@@ -278,9 +278,25 @@ impl BillingService {
             });
         }
 
-        // INSERT conflicted → row exists and the prior
-        // UPDATE was blocked by the cap. Read the current
-        // count + return OverLimit.
+        // Nothing inserted. Two very different causes land here:
+        // the row already exists and the cap blocked the UPDATE, or
+        // the project doesn't exist at all — `INSERT … SELECT …
+        // WHERE p.id = $1` quietly inserts zero rows for an unknown
+        // project rather than raising the FK violation the doc
+        // comment promises. Separate them, or a missing project is
+        // reported as `OverLimit { current_count: 0 }`, which is both
+        // wrong and self-contradictory.
+        let project_exists: Option<(uuid::Uuid,)> =
+            sqlx::query_as("SELECT id FROM projects WHERE id = $1")
+                .bind(project_id.into_uuid())
+                .fetch_optional(&self.pool)
+                .await?;
+        if project_exists.is_none() {
+            return Err(BillingError::ProjectNotFound(project_id.into_uuid()));
+        }
+
+        // Row exists and the prior UPDATE was blocked by the cap.
+        // Read the current count + return OverLimit.
         let current = self
             .read_count(project_id, &period, kind)
             .await?
@@ -315,7 +331,7 @@ impl BillingService {
             return Err(BillingError::InvalidInput("delta must be > 0".into()));
         }
         let period = period_key(now);
-        sqlx::query(
+        let inserted: Option<(uuid::Uuid,)> = sqlx::query_as(
             r"
             INSERT INTO usage_counters
                 (workspace_id, project_id, period_yyyymm, counter_kind, count, dropped_count)
@@ -323,15 +339,23 @@ impl BillingService {
             ON CONFLICT (project_id, period_yyyymm, counter_kind) DO UPDATE SET
                 dropped_count = usage_counters.dropped_count + $4,
                 updated_at = now()
+            RETURNING project_id
             ",
         )
         .bind(project_id.into_uuid())
         .bind(&period)
         .bind(kind.as_db_str())
         .bind(delta)
-        .execute(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(|e| translate_fk(e, project_id))?;
+        // Unknown project → the driving SELECT matches zero rows → nothing is
+        // inserted, the ON CONFLICT branch never runs and no FK violation is
+        // raised. The DO UPDATE branch still RETURNINGs, so a missing row here
+        // means only one thing: the project doesn't exist.
+        if inserted.is_none() {
+            return Err(BillingError::ProjectNotFound(project_id.into_uuid()));
+        }
         Ok(())
     }
 

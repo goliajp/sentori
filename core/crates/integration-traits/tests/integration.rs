@@ -105,11 +105,12 @@ async fn seed_issue(pool: &PgPool, project_id: ProjectId) -> Uuid {
     sqlx::query(
         r"
         INSERT INTO issues
-            (id, project_id, fingerprint, error_type, message_sample,
-             kind, status, first_seen, last_seen, event_count,
-             last_environment, last_release)
-        VALUES ($1, $2, $3, $4, $5, 'error', 'active', $6, $6, 1,
-                'production', 'app@1.0.0')
+            (id, workspace_id, project_id, fingerprint, error_type,
+             message_sample, kind, status, first_seen, last_seen,
+             event_count, last_environment, last_release)
+        SELECT $1, p.workspace_id, $2, $3, $4, $5, 'error', 'active',
+               $6, $6, 1, 'production', 'app@1.0.0'
+          FROM projects p WHERE p.id = $2
         ",
     )
     .bind(id)

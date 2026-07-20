@@ -114,7 +114,7 @@ impl CertMonitor {
         // workspace_id is denormalized from projects via subquery
         // so the caller's PgPool can be either superuser (janitor)
         // or workspace-scoped (CRUD) without API change.
-        let row: (Uuid,) = sqlx::query_as(
+        let row: Option<(Uuid,)> = sqlx::query_as(
             "INSERT INTO cert_watch_domains (id, workspace_id, project_id, domain, added_by) \
              SELECT $1, p.workspace_id, $2, $3, $4 FROM projects p WHERE p.id = $2 \
              ON CONFLICT (project_id, domain) DO UPDATE SET added_by = COALESCE(EXCLUDED.added_by, cert_watch_domains.added_by) \
@@ -124,9 +124,14 @@ impl CertMonitor {
         .bind(project_id.into_uuid())
         .bind(&normalised)
         .bind(added_by.map(UserId::into_uuid))
-        .fetch_one(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(|e| translate_fk(e, project_id))?;
+        // An unknown project makes the driving SELECT match zero rows, so the
+        // INSERT writes nothing and Postgres never raises the FK violation
+        // `translate_fk` is waiting for. Absence of a RETURNING row is the
+        // only signal we get.
+        let row = row.ok_or_else(|| CertMonitorError::ProjectNotFound(project_id.into_uuid()))?;
         Ok(row.0)
     }
 
@@ -226,6 +231,8 @@ impl CertMonitor {
     /// - [`CertMonitorError::UpstreamStatus`] on non-2xx.
     /// - [`CertMonitorError::MalformedResponse`] on JSON
     ///   shape failure.
+    /// - [`CertMonitorError::ProjectNotFound`] if the project
+    ///   doesn't exist.
     /// - [`CertMonitorError::Db`] on backend failure.
     pub async fn poll_domain(
         &self,
@@ -252,6 +259,19 @@ impl CertMonitor {
         let body = resp.bytes().await?;
         let parsed: Vec<CrtShCert> = serde_json::from_slice(&body)
             .map_err(|e| CertMonitorError::MalformedResponse(format!("json parse: {e}")))?;
+
+        // The observation INSERT below derives workspace_id from a SELECT over
+        // `projects`, so an unknown project matches zero rows and writes
+        // nothing — indistinguishable from the `ON CONFLICT DO NOTHING` dupe
+        // path, and never an FK violation. Probe once up front instead.
+        let project_exists: Option<(Uuid,)> =
+            sqlx::query_as("SELECT id FROM projects WHERE id = $1")
+                .bind(project_id.into_uuid())
+                .fetch_optional(&self.pool)
+                .await?;
+        if project_exists.is_none() {
+            return Err(CertMonitorError::ProjectNotFound(project_id.into_uuid()));
+        }
 
         let mut new = Vec::with_capacity(parsed.len());
         for c in parsed {

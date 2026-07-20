@@ -92,7 +92,7 @@ impl IntegrationService {
             return Err(IntegrationError::NoAdapter(kind.to_string()));
         }
         let id = Uuid::now_v7();
-        let row: (Uuid,) = sqlx::query_as(
+        let row: Option<(Uuid,)> = sqlx::query_as(
             r"
             INSERT INTO integrations (id, workspace_id, project_id, kind, config, connected_by, active)
             SELECT $1, p.workspace_id, $2, $3, $4, $5, TRUE
@@ -109,9 +109,13 @@ impl IntegrationService {
         .bind(kind)
         .bind(&config)
         .bind(connected_by.map(UserId::into_uuid))
-        .fetch_one(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(|e| translate_fk(e, project_id))?;
+        // Unknown project → the driving SELECT matches zero rows → nothing is
+        // inserted and no FK violation is raised. Absence of a RETURNING row
+        // is the only signal.
+        let row = row.ok_or_else(|| IntegrationError::ProjectNotFound(project_id.into_uuid()))?;
         Ok(row.0)
     }
 
@@ -319,7 +323,7 @@ impl IntegrationService {
         ext: &crate::ExternalRef,
     ) -> Result<Uuid, IntegrationError> {
         let id = Uuid::now_v7();
-        let row: (Uuid,) = sqlx::query_as(
+        let row: Option<(Uuid,)> = sqlx::query_as(
             r"
             INSERT INTO issue_integration_links
                 (id, workspace_id, issue_id, kind, external_id, external_url)
@@ -336,9 +340,14 @@ impl IntegrationService {
         .bind(kind)
         .bind(&ext.external_id)
         .bind(&ext.external_url)
-        .fetch_one(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(|e| translate_issue_fk(e, issue_id))?;
+        // Same shape as the project-driven inserts: an unknown issue
+        // makes the driving SELECT match zero rows, so nothing is
+        // inserted, the ON CONFLICT branch never runs and no FK
+        // violation reaches translate_issue_fk.
+        let row = row.ok_or(IntegrationError::IssueNotFound(issue_id))?;
         Ok(row.0)
     }
 

@@ -272,7 +272,7 @@ impl NotifierService {
     ) -> Result<Vec<DeliveryLog>, NotifierError> {
         let rows = sqlx::query(
             r"
-            SELECT id, project_id, channel, recipient, subject,
+            SELECT id, workspace_id, project_id, channel, recipient, subject,
                    body_preview, metadata, status, retries, error,
                    dedup_key, sent_at, created_at
             FROM delivery_log
@@ -302,7 +302,7 @@ impl NotifierService {
     ) -> Result<Vec<DeliveryLog>, NotifierError> {
         let rows = sqlx::query(
             r"
-            SELECT id, project_id, channel, recipient, subject,
+            SELECT id, workspace_id, project_id, channel, recipient, subject,
                    body_preview, metadata, status, retries, error,
                    dedup_key, sent_at, created_at
             FROM delivery_log
@@ -347,7 +347,7 @@ impl NotifierService {
 // ── helpers ──────────────────────────────────────────────────
 
 const SELECT_COLS: &str = r"
-    SELECT id, project_id, channel, recipient, subject,
+    SELECT id, workspace_id, project_id, channel, recipient, subject,
            body_preview, metadata, status, retries, error,
            dedup_key, sent_at, created_at
     FROM delivery_log
@@ -355,7 +355,7 @@ const SELECT_COLS: &str = r"
 ";
 
 const SELECT_COLS_BY_DEDUP: &str = r"
-    SELECT id, project_id, channel, recipient, subject,
+    SELECT id, workspace_id, project_id, channel, recipient, subject,
            body_preview, metadata, status, retries, error,
            dedup_key, sent_at, created_at
     FROM delivery_log

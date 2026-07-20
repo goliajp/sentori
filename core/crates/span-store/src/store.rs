@@ -104,9 +104,16 @@ impl SpanStore {
         .bind(&input.tags)
         .bind(input.data.as_ref())
         .bind(input.traceparent.as_deref())
-        .fetch_one(&mut *tx)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(|e| translate_fk(e, project_id))?;
+
+        // Unknown project → the driving SELECT matches zero rows → nothing is
+        // inserted and no FK violation reaches `translate_fk`. Absence of a
+        // RETURNING row is the only signal. Bailing here also protects the
+        // trace UPSERT below, which shares the transaction and project_id.
+        let span_row =
+            span_row.ok_or_else(|| SpanStoreError::ProjectNotFound(project_id.into_uuid()))?;
 
         // 2. UPSERT the trace row. Root info populates only
         //    when this span IS the root (`parent_span_id IS NULL`);

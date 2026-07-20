@@ -2,7 +2,7 @@
 //! `issues` + `events` tables with operator read + mutate.
 
 use sentori_event_pipeline::IssueStatus;
-use sentori_workspace_identity::{ProjectId, UserId};
+use sentori_workspace_identity::{ProjectId, UserId, WorkspaceId};
 use sqlx::{PgPool, Row};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -446,6 +446,7 @@ impl IssueStore {
     /// - [`IssueStoreError::Db`] on database failure.
     pub async fn patch(
         &self,
+        workspace_id: WorkspaceId,
         issue_id: Uuid,
         patch: IssuePatch,
         now: OffsetDateTime,
@@ -454,7 +455,9 @@ impl IssueStore {
         // silent zero — operator-facing UX is clearer. Bulk
         // path silently no-ops on missing ids by design; here
         // we surface.
-        let out = self.bulk_patch(&[issue_id], patch, now).await?;
+        let out = self
+            .bulk_patch(workspace_id, &[issue_id], patch, now)
+            .await?;
         if out.updated == 0 {
             Err(IssueStoreError::IssueNotFound(issue_id))
         } else {
@@ -474,6 +477,7 @@ impl IssueStore {
     /// - [`IssueStoreError::Db`] on database failure.
     pub async fn bulk_patch(
         &self,
+        workspace_id: WorkspaceId,
         ids: &[Uuid],
         patch: IssuePatch,
         now: OffsetDateTime,
@@ -491,14 +495,17 @@ impl IssueStore {
         // any_reopened in the same tx so callers can fire
         // notifications without a separate read.
         let mut tx = self.pool.begin().await?;
-        let pre: Vec<(Uuid, String)> =
-            sqlx::query("SELECT id, status FROM issues WHERE id = ANY($1) FOR UPDATE")
-                .bind(ids)
-                .fetch_all(&mut *tx)
-                .await?
-                .into_iter()
-                .map(|r| (r.get::<Uuid, _>("id"), r.get::<String, _>("status")))
-                .collect();
+        let pre: Vec<(Uuid, String)> = sqlx::query(
+            "SELECT id, status FROM issues \
+                 WHERE id = ANY($1) AND workspace_id = $2 FOR UPDATE",
+        )
+        .bind(ids)
+        .bind(workspace_id.into_uuid())
+        .fetch_all(&mut *tx)
+        .await?
+        .into_iter()
+        .map(|r| (r.get::<Uuid, _>("id"), r.get::<String, _>("status")))
+        .collect();
 
         // Build the UPDATE — every field is COALESCE'd off
         // the patch so unset fields preserve the existing
@@ -528,7 +535,7 @@ impl IssueStore {
                     WHEN $2 IS NOT NULL AND $2 <> 'resolved' THEN NULL
                     ELSE resolved_in_release
                 END
-            WHERE id = ANY($1)
+            WHERE id = ANY($1) AND workspace_id = $9
             ",
         )
         .bind(ids)
@@ -539,6 +546,7 @@ impl IssueStore {
         .bind(assignee_value)
         .bind(now)
         .bind(patch.resolved_in_release.as_deref())
+        .bind(workspace_id.into_uuid())
         .execute(&mut *tx)
         .await?;
         tx.commit().await?;

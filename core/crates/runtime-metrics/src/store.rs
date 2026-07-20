@@ -62,6 +62,11 @@ impl MetricsStore {
 
         let mut tx = self.pool.begin().await?;
         let mut written = 0usize;
+        // Project ids whose INSERT wrote nothing. Either the row deduped on
+        // the PK, or the project doesn't exist and the driving SELECT matched
+        // zero rows — the two are indistinguishable at this point and neither
+        // raises an FK violation. Resolved once after the loop.
+        let mut wrote_nothing: Vec<ProjectId> = Vec::new();
         for p in points {
             let tags_hash = p.tags_hash();
             let tags_value = serde_json::Value::Object(p.tags.clone());
@@ -87,8 +92,26 @@ impl MetricsStore {
             .execute(&mut *tx)
             .await
             .map_err(|e| translate_fk(e, p.project_id))?;
-            written += result.rows_affected() as usize;
+            if result.rows_affected() == 0 {
+                if !wrote_nothing.contains(&p.project_id) {
+                    wrote_nothing.push(p.project_id);
+                }
+            } else {
+                written += result.rows_affected() as usize;
+            }
         }
+
+        for pid in wrote_nothing {
+            let exists: Option<(uuid::Uuid,)> =
+                sqlx::query_as("SELECT id FROM projects WHERE id = $1")
+                    .bind(pid.into_uuid())
+                    .fetch_optional(&mut *tx)
+                    .await?;
+            if exists.is_none() {
+                return Err(RuntimeMetricsError::ProjectNotFound(pid.into_uuid()));
+            }
+        }
+
         tx.commit().await?;
         Ok(written)
     }
@@ -305,7 +328,9 @@ impl MetricsStore {
     ///
     /// # Errors
     ///
-    /// [`RuntimeMetricsError::Db`] on backend failure.
+    /// - [`RuntimeMetricsError::ProjectNotFound`] if the
+    ///   project doesn't exist.
+    /// - [`RuntimeMetricsError::Db`] on backend failure.
     pub async fn record_drop(
         &self,
         project_id: ProjectId,
@@ -313,22 +338,30 @@ impl MetricsStore {
         reason: DropReason,
         delta: i64,
     ) -> Result<(), RuntimeMetricsError> {
-        sqlx::query(
+        let written: Option<(uuid::Uuid,)> = sqlx::query_as(
             r"
             INSERT INTO runtime_metrics_dropped (day, workspace_id, project_id, reason, count)
             SELECT $1, p.workspace_id, $2, $3, $4
             FROM projects p WHERE p.id = $2
             ON CONFLICT (project_id, day, reason)
             DO UPDATE SET count = runtime_metrics_dropped.count + EXCLUDED.count
+            RETURNING project_id
             ",
         )
         .bind(day)
         .bind(project_id.into_uuid())
         .bind(reason.as_db_str())
         .bind(delta)
-        .execute(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(|e| translate_fk(e, project_id))?;
+        // Unknown project → the driving SELECT matches zero rows → nothing is
+        // inserted, the ON CONFLICT branch never runs and no FK violation is
+        // raised. The DO UPDATE branch still RETURNINGs, so a missing row here
+        // means only one thing: the project doesn't exist.
+        if written.is_none() {
+            return Err(RuntimeMetricsError::ProjectNotFound(project_id.into_uuid()));
+        }
         Ok(())
     }
 

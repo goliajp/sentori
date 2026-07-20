@@ -169,9 +169,15 @@ impl<B: BlobStore> ReplayStore<B> {
         .bind(report.frame_count)
         .bind(report.redaction_count)
         .bind(byte_count)
-        .fetch_one(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(|e| translate_fk(e, project_id, event_id))?;
+
+        // A missing event_id trips a real FK violation, but a missing project
+        // just makes the driving SELECT match zero rows — nothing is inserted
+        // and `translate_fk` never sees a 23503. Absence of a RETURNING row is
+        // the only signal.
+        let row = row.ok_or_else(|| ReplayStoreError::ProjectNotFound(project_id.into_uuid()))?;
 
         row_to_session(&row)
     }
