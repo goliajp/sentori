@@ -32,7 +32,7 @@ docker run -d --name sentori \
   -e SENTORI_BOOTSTRAP_OWNER_EMAIL='you@example.com' \
   -e SENTORI_BOOTSTRAP_OWNER_PASSWORD='change-me-please' \
   -p 8080:8080 \
-  ghcr.io/goliajp/sentori-selfhosted:latest
+  ghcr.io/goliajp/sentori/sentori-server:latest
 ```
 
 ## HTTPS in production
