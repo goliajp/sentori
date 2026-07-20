@@ -51,6 +51,9 @@ mod stats;
 pub mod tenant;
 mod usage;
 
+// A flat route table: length is inherent to enumerating every route
+// in one place, and splitting it would only hide the routing surface.
+#[allow(clippy::too_many_lines)]
 pub fn router(state: Arc<AppState>) -> Router {
     // SDK ingest routes — Bearer st_pk_ gated.
     let token_store = TokenStore::new(state.pool.clone());

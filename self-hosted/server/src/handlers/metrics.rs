@@ -62,7 +62,7 @@ pub async fn timeseries(
 ) -> Result<Json<Value>, (StatusCode, String)> {
     super::tenant::guard_project(&state, ctx.workspace_id, project_id).await?;
 
-    let hours = q.hours.unwrap_or(24).clamp(1, 720) as i64;
+    let hours = i64::from(q.hours.unwrap_or(24).clamp(1, 720));
     let rows = sqlx::query(
         "SELECT date_trunc('minute', ts) AS bucket, SUM(value)::float8 AS sum, \
                 COUNT(*)::bigint AS count, MIN(value)::float8 AS min, \

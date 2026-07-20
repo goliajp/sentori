@@ -11,7 +11,6 @@ use axum::{
 };
 use serde_json::{Value, json};
 use sqlx::Row;
-use uuid::Uuid;
 
 use crate::session_mw::SessionContext;
 use crate::state::AppState;

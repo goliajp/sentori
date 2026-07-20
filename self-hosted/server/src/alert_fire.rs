@@ -44,6 +44,9 @@ pub fn fire_async(
     });
 }
 
+// Splitting this would mean threading the notification state through
+// new signatures; deferred rather than done inside a lint pass.
+#[allow(clippy::too_many_lines)]
 async fn fire(
     pool: &PgPool,
     workspace_id: Uuid,
@@ -94,14 +97,14 @@ async fn fire(
             let threshold = trigger_config
                 .get("count")
                 .or_else(|| trigger_config.get("threshold"))
-                .and_then(|v| v.as_i64())
+                .and_then(serde_json::Value::as_i64)
                 .unwrap_or(100);
             let cur: Option<(i64,)> =
                 sqlx::query_as("SELECT event_count FROM issues WHERE id = $1")
                     .bind(issue_id)
                     .fetch_optional(pool)
                     .await?;
-            let count = cur.map(|t| t.0).unwrap_or(0);
+            let count = cur.map_or(0, |t| t.0);
             if count < threshold {
                 continue;
             }

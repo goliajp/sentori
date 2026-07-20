@@ -101,7 +101,7 @@ pub async fn list(
     Path(project_id): Path<Uuid>,
     Query(q): Query<ListQuery>,
 ) -> Json<Value> {
-    let limit = q.limit.unwrap_or(100).clamp(1, 1000) as i64;
+    let limit = i64::from(q.limit.unwrap_or(100).clamp(1, 1000));
     let rows = if let Some(status) = q.status.as_deref() {
         sqlx::query(
             "SELECT id, token_id, provider, status, provider_outcome, error, retry_count, \

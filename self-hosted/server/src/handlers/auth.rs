@@ -30,6 +30,11 @@ pub(crate) fn auth(state: &Arc<AppState>) -> AuthService {
             warn!(
                 "SENTORI_SESSION_SECRET missing or < 32 bytes; using ephemeral key (sessions reset on restart)"
             );
+            // Only fails if the OS CSPRNG is unavailable, which no
+            // request could be served through anyway. Threading a
+            // Result out of here would change every caller's
+            // signature, which is out of scope for a lint pass.
+            #[allow(clippy::expect_used)]
             SecretKey::generate().expect("session key generate")
         }
     };
@@ -147,7 +152,7 @@ pub(crate) fn secure_cookies() -> bool {
     // Default ON; flip OFF for local-dev plain HTTP.
     !matches!(
         std::env::var("SENTORI_COOKIE_SECURE").ok().as_deref(),
-        Some("0") | Some("false")
+        Some("0" | "false")
     )
 }
 
@@ -247,14 +252,13 @@ pub async fn logout(
 
     if let Some(token) = extract_session_token(&headers) {
         let svc = auth(&state);
-        if let Ok(Some((_user, session))) = svc.lookup_session(&token).await {
-            if let Ok(hash) = hex::decode(&session.id_hash_hex) {
-                if hash.len() == 32 {
-                    let mut arr = [0u8; 32];
-                    arr.copy_from_slice(&hash);
-                    let _ = svc.logout(&arr).await;
-                }
-            }
+        if let Ok(Some((_user, session))) = svc.lookup_session(&token).await
+            && let Ok(hash) = hex::decode(&session.id_hash_hex)
+            && hash.len() == 32
+        {
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&hash);
+            let _ = svc.logout(&arr).await;
         }
     }
     let mut resp = StatusCode::NO_CONTENT.into_response();
@@ -285,20 +289,19 @@ pub async fn me(
 
 fn extract_session_token(headers: &axum::http::HeaderMap) -> Option<String> {
     use axum::http::header;
-    if let Some(auth) = headers.get(header::AUTHORIZATION) {
-        if let Ok(s) = auth.to_str() {
-            if let Some(rest) = s.strip_prefix("Bearer ") {
-                return Some(rest.trim().to_string());
-            }
-        }
+    if let Some(auth) = headers.get(header::AUTHORIZATION)
+        && let Ok(s) = auth.to_str()
+        && let Some(rest) = s.strip_prefix("Bearer ")
+    {
+        return Some(rest.trim().to_string());
     }
-    if let Some(cookie_hdr) = headers.get(header::COOKIE) {
-        if let Ok(s) = cookie_hdr.to_str() {
-            for part in s.split(';') {
-                let p = part.trim();
-                if let Some(rest) = p.strip_prefix("sentori_session=") {
-                    return Some(rest.trim().to_string());
-                }
+    if let Some(cookie_hdr) = headers.get(header::COOKIE)
+        && let Ok(s) = cookie_hdr.to_str()
+    {
+        for part in s.split(';') {
+            let p = part.trim();
+            if let Some(rest) = p.strip_prefix("sentori_session=") {
+                return Some(rest.trim().to_string());
             }
         }
     }

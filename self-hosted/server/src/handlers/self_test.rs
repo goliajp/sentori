@@ -15,7 +15,6 @@ use std::sync::Arc;
 
 use axum::{Json, extract::State, http::StatusCode};
 use serde_json::{Value, json};
-use sqlx::Row;
 
 use crate::state::AppState;
 
@@ -91,7 +90,7 @@ pub async fn handle(State(state): State<Arc<AppState>>) -> (StatusCode, Json<Val
         .await
         .ok()
         .flatten();
-    let proj_n = proj_count.map(|t| t.0).unwrap_or(0);
+    let proj_n = proj_count.map_or(0, |t| t.0);
     checks.push(json!({
         "name": "has_at_least_one_project",
         "ok": proj_n > 0,
@@ -107,7 +106,7 @@ pub async fn handle(State(state): State<Arc<AppState>>) -> (StatusCode, Json<Val
         .await
         .ok()
         .flatten();
-    let ws_n = ws_count.map(|t| t.0).unwrap_or(0);
+    let ws_n = ws_count.map_or(0, |t| t.0);
     checks.push(json!({
         "name": "has_workspace",
         "ok": ws_n > 0,

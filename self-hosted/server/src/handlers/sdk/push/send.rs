@@ -32,6 +32,12 @@ pub struct SendBody {
     pub native_tokens: Vec<String>,
     #[serde(default)]
     pub topic: Option<String>,
+    /// Accepted and documented above, but `resolve_targets` does not
+    /// yet implement this targeting mode, so a send that only sets
+    /// `appUserId` currently resolves zero devices. Kept (rather than
+    /// deleted) so the advertised field stays visible as a known gap
+    /// instead of silently vanishing from the request shape.
+    #[allow(dead_code)]
     #[serde(default)]
     pub app_user_id: Option<String>,
     /// Vendor payload (passed through verbatim to vendor adapter).
@@ -178,7 +184,7 @@ async fn resolve_targets(
     }
 
     // De-duplicate by token_id.
-    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out.sort_by_key(|a| a.0);
     out.dedup_by_key(|t| t.0);
     Ok(out)
 }

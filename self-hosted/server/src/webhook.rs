@@ -24,6 +24,11 @@ pub enum WebhookError {
     Http(#[from] reqwest::Error),
     #[error("webhook rejected: status={0}")]
     Rejected(u16),
+    /// Unreachable in practice — HMAC-SHA256 accepts a key of any
+    /// length — but modelled as an error so the signing path on a
+    /// request-reachable code path never panics.
+    #[error("invalid webhook signing key: {0}")]
+    InvalidSigningKey(#[from] hmac::digest::InvalidLength),
 }
 
 pub async fn deliver<T: Serialize>(
@@ -40,7 +45,7 @@ pub async fn deliver<T: Serialize>(
         .header("content-type", "application/json")
         .header("user-agent", "sentori/0.2 webhook");
     if let Some(s) = secret {
-        let mut mac = HmacSha256::new_from_slice(s.as_bytes()).expect("HMAC any length key");
+        let mut mac = HmacSha256::new_from_slice(s.as_bytes())?;
         mac.update(&body);
         let sig = hex::encode(mac.finalize().into_bytes());
         req = req.header("x-sentori-signature", sig);

@@ -26,7 +26,7 @@ pub async fn list(
 ) -> Result<Json<Value>, (StatusCode, String)> {
     super::tenant::guard_project(&state, ctx.workspace_id, project_id).await?;
 
-    let limit = q.limit.unwrap_or(50).clamp(1, 500) as i64;
+    let limit = i64::from(q.limit.unwrap_or(50).clamp(1, 500));
     let rows = sqlx::query(
         "SELECT id, event_id, blob_hash, started_at, ended_at, frame_count, created_at \
          FROM replay_sessions \
@@ -51,7 +51,8 @@ pub async fn list(
                 "blob_hash": r.get::<String, _>("blob_hash"),
                 "started_at": started,
                 "ended_at": ended,
-                "duration_ms": (ended - started).whole_milliseconds() as i64,
+                "duration_ms": i64::try_from((ended - started).whole_milliseconds())
+                    .unwrap_or(i64::MAX),
                 "frame_count": r.try_get::<i32, _>("frame_count").unwrap_or(0),
                 "created_at": r.get::<OffsetDateTime, _>("created_at"),
             })

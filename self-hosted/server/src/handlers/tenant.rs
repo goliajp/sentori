@@ -131,6 +131,10 @@ mod scoping_tests {
         "FROM projects",
     ];
 
+    // Test-only helper: a source file that cannot be read means the
+    // tenant-isolation scan cannot run at all, so failing loudly is
+    // the correct outcome.
+    #[allow(clippy::panic)]
     fn source(file: &str) -> String {
         let p = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("src/handlers")

@@ -6,6 +6,9 @@
 use axum::Json;
 use serde_json::{Value, json};
 
+// A single JSON literal describing the API surface; its length is the
+// size of that literal, not of any logic.
+#[allow(clippy::too_many_lines)]
 pub async fn describe() -> Json<Value> {
     Json(json!({
         "version": env!("CARGO_PKG_VERSION"),

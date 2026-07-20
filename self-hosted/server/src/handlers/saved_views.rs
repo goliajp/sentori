@@ -16,7 +16,6 @@ use crate::state::AppState;
 #[derive(Deserialize)]
 pub struct ListQuery {
     pub target: String, // "issues" / "events" / "spans" / "replays" / "metrics"
-    pub project_id: Option<Uuid>,
 }
 
 #[derive(Serialize)]
@@ -46,7 +45,9 @@ pub async fn list_workspace(
             .into_iter()
             .map(|v| ViewRow {
                 id: v.id,
-                project_id: v.project_id.map(|p| p.into_uuid()),
+                project_id: v
+                    .project_id
+                    .map(sentori_workspace_identity::ProjectId::into_uuid),
                 target: v.target.to_string(),
                 scope: v.scope.to_string(),
                 name: v.name,
