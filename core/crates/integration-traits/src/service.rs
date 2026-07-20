@@ -323,7 +323,7 @@ impl IntegrationService {
         ext: &crate::ExternalRef,
     ) -> Result<Uuid, IntegrationError> {
         let id = Uuid::now_v7();
-        let row: (Uuid,) = sqlx::query_as(
+        let row: Option<(Uuid,)> = sqlx::query_as(
             r"
             INSERT INTO issue_integration_links
                 (id, workspace_id, issue_id, kind, external_id, external_url)
@@ -340,9 +340,14 @@ impl IntegrationService {
         .bind(kind)
         .bind(&ext.external_id)
         .bind(&ext.external_url)
-        .fetch_one(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(|e| translate_issue_fk(e, issue_id))?;
+        // Same shape as the project-driven inserts: an unknown issue
+        // makes the driving SELECT match zero rows, so nothing is
+        // inserted, the ON CONFLICT branch never runs and no FK
+        // violation reaches translate_issue_fk.
+        let row = row.ok_or(IntegrationError::IssueNotFound(issue_id))?;
         Ok(row.0)
     }
 
