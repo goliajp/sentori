@@ -203,7 +203,7 @@ export default function PushCredentials() {
           ) : rows.length === 0 ? (
             <EmptyState
               title="No credentials yet"
-              message="Upload at least one provider to start dispatching push."
+              hint="Upload at least one provider to start dispatching push."
             />
           ) : (
             <DataTable
@@ -223,9 +223,9 @@ export default function PushCredentials() {
                 ),
                 status:
                   c.last_validate_status === 'ok' ? (
-                    <Badge variant="ok">ok</Badge>
+                    <Badge tone="ok">ok</Badge>
                   ) : c.last_validate_status ? (
-                    <Badge variant="muted">{c.last_validate_status}</Badge>
+                    <Badge tone="neutral">{c.last_validate_status}</Badge>
                   ) : (
                     <span className="text-xs text-zinc-400">never</span>
                   ),

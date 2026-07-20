@@ -216,7 +216,7 @@ export default function SavedViews() {
                             project {v.project_id.slice(0, 8)}…
                           </span>
                         ) : (
-                          <Badge variant="muted">workspace</Badge>
+                          <Badge tone="neutral">workspace</Badge>
                         )}
                       </div>
                       <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all text-[10px] font-mono text-zinc-500">

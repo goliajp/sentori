@@ -52,7 +52,7 @@ export default function Traces() {
           ) : rows.length === 0 ? (
             <EmptyState
               title="No traces yet"
-              message="SDKs call POST /v1/spans to send tracing data."
+              hint="SDKs call POST /v1/spans to send tracing data."
             />
           ) : (
             <ul className="divide-y divide-zinc-800">
@@ -72,7 +72,7 @@ export default function Traces() {
                             {t.root_name ?? t.trace_id.slice(0, 8) + '…'}
                           </span>
                           <Badge
-                            variant={t.status === 'ok' ? 'ok' : 'muted'}
+                            tone={t.status === 'ok' ? 'ok' : 'neutral'}
                           >
                             {t.status}
                           </Badge>

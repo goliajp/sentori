@@ -217,6 +217,8 @@ function AuditRow({ entry: e }: { entry: AuditEntry }) {
   const hasPayload = payloadObject
     ? Object.keys(payloadObject).length > 0
     : Boolean(e.payload);
+  const payloadIp = payloadObject?._ip;
+  const payloadUa = payloadObject?._ua;
 
   return (
     <li>
@@ -250,14 +252,14 @@ function AuditRow({ entry: e }: { entry: AuditEntry }) {
       </button>
       {open && hasPayload && (
         <div className="bg-zinc-950 px-12 py-3">
-          {payloadObject?._ip && (
+          {payloadIp != null && (
             <div className="font-mono text-[10px] text-zinc-500">
-              IP: <span className="text-zinc-300">{String(payloadObject._ip)}</span>
-              {payloadObject._ua && (
+              IP: <span className="text-zinc-300">{String(payloadIp)}</span>
+              {payloadUa != null && (
                 <>
                   {' · UA: '}
                   <span className="text-zinc-300">
-                    {String(payloadObject._ua).slice(0, 80)}
+                    {String(payloadUa).slice(0, 80)}
                   </span>
                 </>
               )}

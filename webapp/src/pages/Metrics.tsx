@@ -71,7 +71,7 @@ export default function Metrics() {
           ) : rows.length === 0 ? (
             <EmptyState
               title="No metrics yet"
-              message="SDKs call POST /v1/metrics:batch to send rolled-up samples."
+              hint="SDKs call POST /v1/metrics:batch to send rolled-up samples."
             />
           ) : (
             <ul className="divide-y divide-zinc-800">

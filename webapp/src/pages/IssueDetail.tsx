@@ -186,12 +186,12 @@ export default function IssueDetail() {
           <div className="grid grid-cols-4 gap-4">
             <Cell label="Status">
               <Badge
-                variant={
+                tone={
                   issue.status === 'resolved'
                     ? 'ok'
                     : issue.status === 'regressed'
-                      ? 'muted'
-                      : 'default'
+                      ? 'warn'
+                      : 'neutral'
                 }
               >
                 {issue.status}

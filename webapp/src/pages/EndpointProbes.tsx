@@ -155,7 +155,7 @@ export default function EndpointProbes() {
           ) : rows.length === 0 ? (
             <EmptyState
               title="No probes"
-              message="Add a URL to start synthetic monitoring."
+              hint="Add a URL to start synthetic monitoring."
             />
           ) : (
             <ul className="divide-y divide-zinc-800">
@@ -171,9 +171,9 @@ export default function EndpointProbes() {
                         {p.endpoint_url}
                       </span>
                       {p.enabled ? (
-                        <Badge variant="ok">on</Badge>
+                        <Badge tone="ok">on</Badge>
                       ) : (
-                        <Badge variant="muted">off</Badge>
+                        <Badge tone="neutral">off</Badge>
                       )}
                     </div>
                     <div className="mt-1 text-[10px] text-zinc-500">

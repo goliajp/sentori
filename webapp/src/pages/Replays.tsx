@@ -53,7 +53,7 @@ export default function Replays() {
           ) : rows.length === 0 ? (
             <EmptyState
               title="No replays yet"
-              message="SDKs capture replays automatically around captureException calls. Verify your SDK init has replay enabled."
+              hint="SDKs capture replays automatically around captureException calls. Verify your SDK init has replay enabled."
             />
           ) : (
             <ul className="divide-y divide-zinc-800">
@@ -68,7 +68,7 @@ export default function Replays() {
                   >
                     <div className="flex items-center gap-2">
                       <Badge>{(r.duration_ms / 1000).toFixed(1)}s</Badge>
-                      <Badge variant="muted">
+                      <Badge tone="neutral">
                         {formatNumber(r.frame_count)} frames
                       </Badge>
                       <span className="font-mono text-[11px] text-emerald-400">

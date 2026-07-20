@@ -136,9 +136,9 @@ export default function PushSends() {
                     <div className="flex items-center gap-2">
                       <Badge>{r.provider}</Badge>
                       {r.status === 'sent' ? (
-                        <Badge variant="ok">{r.status}</Badge>
+                        <Badge tone="ok">{r.status}</Badge>
                       ) : r.status === 'failed' ? (
-                        <Badge variant="muted">{r.status}</Badge>
+                        <Badge tone="neutral">{r.status}</Badge>
                       ) : (
                         <Badge>{r.status}</Badge>
                       )}

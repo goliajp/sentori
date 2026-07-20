@@ -141,7 +141,7 @@ export default function Integrations() {
           ) : rows.length === 0 ? (
             <EmptyState
               title="No integrations"
-              message="Connect Slack or Linear to forward sentori events into your workflows."
+              hint="Connect Slack or Linear to forward sentori events into your workflows."
             />
           ) : (
             <DataTable
@@ -155,9 +155,9 @@ export default function Integrations() {
                 key: it.id,
                 kind: <Badge>{it.kind}</Badge>,
                 active: it.active ? (
-                  <Badge variant="ok">on</Badge>
+                  <Badge tone="ok">on</Badge>
                 ) : (
-                  <Badge variant="muted">off</Badge>
+                  <Badge tone="neutral">off</Badge>
                 ),
                 connected: formatRelative(it.connected_at),
                 actions: (
