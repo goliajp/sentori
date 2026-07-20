@@ -5,11 +5,13 @@ on:
     branches: [feature/v0.2-**, develop, master]
     paths:
       - 'core/**'
+      - 'self-hosted/server/**'
       - '.github/workflows/v0.2-core-check.yml'
   pull_request:
     branches: [develop, master]
     paths:
       - 'core/**'
+      - 'self-hosted/server/**'
 
 jobs:
   check:
@@ -32,3 +34,28 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: check
         run: cargo check --workspace --all-targets
+
+  # The v0.2 server crate had no CI at all: build.yml tests the legacy
+  # `server/` and this workflow tested `core/`, so nothing ever
+  # compiled or ran the tests for the binary that actually ships in
+  # the self-hosted image.
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: self-hosted/server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: self-hosted/server
+      - name: fmt
+        run: cargo fmt --all -- --check
+      - name: clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: test
+        run: cargo test --all-targets
