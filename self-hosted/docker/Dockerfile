@@ -12,22 +12,16 @@
 
 # ── webapp builder ──────────────────────────────────────────
 # Compiles the React/Vite SPA to /webapp/dist
-FROM node:22-bookworm-slim AS webapp-builder
+FROM oven/bun:1-debian AS webapp-builder
 WORKDIR /webapp
-COPY webapp/package.json webapp/package-lock.json* webapp/bun.lockb* /webapp/
-# Prefer npm — works without bun being installed in the
-# Node image. Vite/Tailwind/etc are dev deps.
-RUN if [ -f package-lock.json ]; then \
-        npm ci --no-audit --no-fund; \
-    else \
-        npm install --no-audit --no-fund; \
-    fi
+COPY webapp/package.json webapp/bun.lock /webapp/
+RUN bun install --frozen-lockfile
 COPY webapp/ /webapp/
-RUN npm run build
+RUN bun run build
 # Expected output: /webapp/dist (Vite default)
 
 # ── rust builder ────────────────────────────────────────────
-FROM rust:1.88-slim-bookworm AS builder
+FROM rust:1.97-slim-bookworm AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         pkg-config libssl-dev \
