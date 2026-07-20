@@ -407,6 +407,18 @@ fn is_api_path(path: &str) -> bool {
     API_PREFIXES.iter().any(|p| path.starts_with(p))
 }
 
+/// Where Vite emits its content-hashed bundles. Nothing under here is
+/// an SPA route, so a miss is a genuinely absent file.
+const ASSET_PREFIX: &str = "/assets/";
+
+/// True when `path` addresses a build artifact rather than an SPA
+/// route. Matched by prefix rather than by file extension on purpose:
+/// an extension heuristic would misfire on route segments that
+/// legitimately contain dots (release names like `app@5.4.2+361`).
+fn is_asset_path(path: &str) -> bool {
+    path.starts_with(ASSET_PREFIX)
+}
+
 /// Fallback for everything the router didn't match.
 ///
 /// Unmatched **API** paths must answer with a JSON 404. Serving the
@@ -414,6 +426,12 @@ fn is_api_path(path: &str) -> bool {
 /// and what production did until 2026-07-20 — hands an SDK
 /// `200 <!doctype html>`: it reads as success, and any JSON parse of
 /// the body fails somewhere far from the cause.
+///
+/// A missing **asset** must 404 too. Returning the shell for
+/// `/assets/index-OLD.js` — which happens to every browser holding a
+/// cached index.html across a redeploy — makes the browser parse HTML
+/// as JavaScript and fail with a syntax error instead of a clean 404
+/// it can recover from.
 ///
 /// Everything else is an SPA deep link (`/projects/x/issues`) and
 /// still resolves to `index.html` with 200 so React Router can take
@@ -434,8 +452,21 @@ async fn spa_or_api_404(req: axum::extract::Request) -> axum::response::Response
             .into_response();
     }
 
-    match tower::ServiceExt::oneshot(webapp_dir(), req).await {
-        Ok(res) => res.into_response(),
+    // Assets serve from a ServeDir with no index fallback, so a miss
+    // stays a 404 instead of becoming the shell. The two ServeDirs
+    // differ in their fallback type parameter, hence the two arms.
+    let served = if is_asset_path(path) {
+        tower::ServiceExt::oneshot(webapp_assets(), req)
+            .await
+            .map(IntoResponse::into_response)
+    } else {
+        tower::ServiceExt::oneshot(webapp_dir(), req)
+            .await
+            .map(IntoResponse::into_response)
+    };
+
+    match served {
+        Ok(res) => res,
         Err(e) => {
             tracing::error!(%e, "webapp static serve failed");
             axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
@@ -450,10 +481,21 @@ async fn spa_or_api_404(req: axum::extract::Request) -> axum::response::Response
 /// Unknown paths resolve to `index.html` with 200 so React Router
 /// can handle SPA deep links. `spa_or_api_404` gates which requests
 /// reach here — API prefixes never do.
+/// Same root as [`webapp_dir`] but with **no** index fallback: a
+/// request for a build artifact that isn't on disk gets ServeDir's
+/// native 404. Used for `/assets/*` — see [`is_asset_path`].
+fn webapp_assets() -> tower_http::services::ServeDir {
+    tower_http::services::ServeDir::new(webapp_root())
+}
+
+/// Root directory holding the compiled SPA.
+fn webapp_root() -> String {
+    std::env::var("SENTORI_WEBAPP_DIST").unwrap_or_else(|_| "/app/webapp".to_string())
+}
+
 fn webapp_dir() -> tower_http::services::ServeDir<tower_http::services::ServeFile> {
     use tower_http::services::{ServeDir, ServeFile};
-    let root = std::env::var("SENTORI_WEBAPP_DIST")
-        .unwrap_or_else(|_| "/app/webapp".to_string());
+    let root = webapp_root();
     let index = format!("{root}/index.html");
     // `fallback` (not `not_found_service`) — the latter wraps the
     // fallback in SetStatus(404), which is for custom 404 pages;
@@ -463,7 +505,7 @@ fn webapp_dir() -> tower_http::services::ServeDir<tower_http::services::ServeFil
 
 #[cfg(test)]
 mod fallback_tests {
-    use super::is_api_path;
+    use super::{is_api_path, is_asset_path};
 
     #[test]
     fn api_prefixes_are_machine_facing() {
@@ -496,6 +538,25 @@ mod fallback_tests {
             "/some/deep/link",
         ] {
             assert!(!is_api_path(p), "{p} must fall through to the SPA");
+        }
+    }
+
+    #[test]
+    fn assets_are_files_not_spa_routes() {
+        // A miss here must stay a 404: a browser holding a cached
+        // index.html across a redeploy asks for the old hashed bundle,
+        // and answering with the shell makes it parse HTML as JS.
+        for p in [
+            "/assets/index-BTIykhei.js",
+            "/assets/index-BwO1nBzl.css",
+            "/assets/index-OLD.js",
+        ] {
+            assert!(is_asset_path(p), "{p} must 404 when absent");
+        }
+        // Route segments may legitimately contain dots (release names
+        // like `app@5.4.2+361`); only the /assets/ prefix decides.
+        for p in ["/", "/login", "/projects/abc/releases", "/releases/1.2.3"] {
+            assert!(!is_asset_path(p), "{p} must fall through to the SPA");
         }
     }
 
