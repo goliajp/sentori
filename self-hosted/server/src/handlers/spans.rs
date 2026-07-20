@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Extension, Path, Query, State};
 use axum::http::StatusCode;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -21,18 +21,22 @@ pub struct ListQuery {
 
 pub async fn list_traces(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<crate::session_mw::SessionContext>,
     Path(project_id): Path<Uuid>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    super::tenant::guard_project(&state, ctx.workspace_id, project_id).await?;
+
     let limit = q.limit.unwrap_or(50).clamp(1, 500) as i64;
     let rows = sqlx::query(
         "SELECT trace_id, root_op, root_name, first_seen, last_seen, span_count, \
                 status, duration_ms \
          FROM traces \
-         WHERE project_id = $1 \
-         ORDER BY last_seen DESC LIMIT $2",
+         WHERE project_id = $1 AND workspace_id = $2 \
+         ORDER BY last_seen DESC LIMIT $3",
     )
     .bind(project_id)
+    .bind(ctx.workspace_id.into_uuid())
     .bind(limit)
     .fetch_all(&state.pool)
     .await
@@ -58,14 +62,18 @@ pub async fn list_traces(
 
 pub async fn get_trace(
     State(state): State<Arc<AppState>>,
-    Path((_project_id, trace_id)): Path<(Uuid, Uuid)>,
+    Extension(ctx): Extension<crate::session_mw::SessionContext>,
+    Path((project_id, trace_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    super::tenant::guard_project(&state, ctx.workspace_id, project_id).await?;
+
     let trace_row = sqlx::query(
         "SELECT trace_id, root_op, root_name, first_seen, last_seen, span_count, \
                 status, duration_ms \
-         FROM traces WHERE trace_id = $1",
+         FROM traces WHERE trace_id = $1 AND workspace_id = $2",
     )
     .bind(trace_id)
+    .bind(ctx.workspace_id.into_uuid())
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
@@ -73,10 +81,11 @@ pub async fn get_trace(
 
     let span_rows = sqlx::query(
         "SELECT id, parent_span_id, op, name, status, started_at, duration_ms, tags \
-         FROM spans WHERE trace_id = $1 \
+         FROM spans WHERE trace_id = $1 AND workspace_id = $2 \
          ORDER BY started_at LIMIT 500",
     )
     .bind(trace_id)
+    .bind(ctx.workspace_id.into_uuid())
     .fetch_all(&state.pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;

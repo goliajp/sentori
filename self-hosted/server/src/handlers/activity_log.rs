@@ -4,14 +4,21 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::{Extension, Path, State};
 use serde_json::{Value, json};
 use sqlx::Row;
 use uuid::Uuid;
 
+use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
-pub async fn list(State(state): State<Arc<AppState>>, Path(issue_id): Path<Uuid>) -> Json<Value> {
+pub async fn list(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    Path(issue_id): Path<Uuid>,
+) -> Result<Json<Value>, super::tenant::ApiErr> {
+    super::tenant::guard_issue(&state, ctx.workspace_id, issue_id).await?;
+
     let rows = sqlx::query(
         "SELECT id, actor_user_id, kind, payload, created_at \
          FROM activity_log WHERE issue_id = $1 ORDER BY created_at DESC LIMIT 200",
@@ -32,5 +39,5 @@ pub async fn list(State(state): State<Arc<AppState>>, Path(issue_id): Path<Uuid>
             })
         })
         .collect();
-    Json(json!({ "activity": out }))
+    Ok(Json(json!({ "activity": out })))
 }

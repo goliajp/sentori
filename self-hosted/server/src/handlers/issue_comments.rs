@@ -19,7 +19,13 @@ use uuid::Uuid;
 use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
-pub async fn list(State(state): State<Arc<AppState>>, Path(issue_id): Path<Uuid>) -> Json<Value> {
+pub async fn list(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    Path(issue_id): Path<Uuid>,
+) -> Result<Json<Value>, super::tenant::ApiErr> {
+    super::tenant::guard_issue(&state, ctx.workspace_id, issue_id).await?;
+
     let rows = sqlx::query(
         "SELECT id, author_id, body, created_at \
          FROM issue_comments WHERE issue_id = $1 ORDER BY created_at",
@@ -44,7 +50,7 @@ pub async fn list(State(state): State<Arc<AppState>>, Path(issue_id): Path<Uuid>
             })
         })
         .collect();
-    Json(json!({ "comments": out }))
+    Ok(Json(json!({ "comments": out })))
 }
 
 #[derive(Deserialize)]
@@ -59,6 +65,12 @@ pub async fn create(
     Path(issue_id): Path<Uuid>,
     Json(body): Json<CreateBody>,
 ) -> (StatusCode, Json<Value>) {
+    // Kept in this handler's `{ "error": ... }` body shape rather
+    // than the guard's plain-text one.
+    if let Err((status, msg)) = super::tenant::guard_issue(&state, ctx.workspace_id, issue_id).await
+    {
+        return (status, Json(json!({ "error": msg })));
+    }
     if body.body_md.trim().is_empty() {
         return (
             StatusCode::BAD_REQUEST,
@@ -112,8 +124,11 @@ pub async fn create(
 pub async fn delete(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
-    Path((_issue_id, comment_id)): Path<(Uuid, Uuid)>,
+    Path((issue_id, comment_id)): Path<(Uuid, Uuid)>,
 ) -> StatusCode {
+    if let Err((status, _)) = super::tenant::guard_issue(&state, ctx.workspace_id, issue_id).await {
+        return status;
+    }
     // Only the author can delete their own comment.
     let res = sqlx::query("DELETE FROM issue_comments WHERE id = $1 AND author_id = $2")
         .bind(comment_id)
