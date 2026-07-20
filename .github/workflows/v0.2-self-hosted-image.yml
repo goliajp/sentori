@@ -2,15 +2,28 @@ name: v0.2 self-hosted — docker image build + push to GHCR
 
 # Builds sentori-server (the unified main binary) into a docker image
 # that anyone can `docker pull` and run. Triggered on master push +
-# tagged v0.2 releases. Multi-arch (amd64 + arm64).
+# tagged releases. Multi-arch (amd64 + arm64).
+#
+# Each architecture builds on its OWN native runner and pushes by
+# digest; a final job stitches the digests into one manifest list.
+# The previous single-job form built arm64 under QEMU emulation and
+# took a consistent ~55 min against a 60 min timeout — five minutes
+# of headroom for a full Rust workspace build, which any cache miss
+# would have blown. Native arm64 runners are free for public repos.
 
 on:
   push:
     branches: [master]
-    tags: ['v0.2.*']
+    # Releases are tagged v<major>.<minor>.<patch> (v1.4.2, ...). The
+    # old 'v0.2.*' filter never matched a real tag, so the semver tag
+    # patterns below never fired and the published image only ever
+    # carried `master` + `sha-<short>` — no version, no `latest`,
+    # while self-hosted/README.md tells users to pull `:latest`.
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
     paths:
       - 'core/**'
       - 'self-hosted/server/**'
+      - 'webapp/**'
       - 'docker/**'
       - '.github/workflows/v0.2-self-hosted-image.yml'
   workflow_dispatch:
@@ -20,14 +33,81 @@ env:
   IMAGE_NAME: ${{ github.repository }}/sentori-server
 
 jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            arch: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build + push by digest
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: self-hosted/docker/Dockerfile
+          platforms: ${{ matrix.platform }}
+          # No tags here — the merge job below owns the tags. Each
+          # arch pushes an untagged blob addressed by digest.
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          # Per-arch cache scope: a shared scope would have the two
+          # runners overwrite each other's layers every run.
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+
+      - name: Export digest
+        shell: bash
+        run: |
+          mkdir -p /tmp/digests
+          # Strip the algorithm prefix in the shell — `${{ }}` is an
+          # Actions expression and has no parameter expansion.
+          digest='${{ steps.build.outputs.digest }}'
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -49,15 +129,16 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha,format=short
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
-      - name: Build + push (multi-arch)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: self-hosted/docker/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Create manifest list + push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+
+      - name: Inspect
+        run: |
+          docker buildx imagetools inspect \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
