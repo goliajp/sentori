@@ -64,8 +64,8 @@ export function CertPage() {
 
   if (!projectId) return <div className="p-8">no project id</div>;
 
-  const now = Date.now();
   function daysUntil(iso: string): number {
+    const now = Date.now();
     return Math.round((new Date(iso).getTime() - now) / (1000 * 60 * 60 * 24));
   }
   function expiryTone(days: number) {

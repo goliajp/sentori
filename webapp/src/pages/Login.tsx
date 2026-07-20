@@ -38,7 +38,9 @@ export function LoginPage() {
           returnTo = stashed;
           sessionStorage.removeItem('sentori_return_to');
         }
-      } catch {}
+      } catch {
+        // Storage disabled — fall through to the default returnTo.
+      }
       navigate(returnTo);
     } catch (e) {
       setErr(String(e));

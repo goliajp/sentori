@@ -53,7 +53,10 @@ export function App() {
           try {
             localStorage.setItem('sentori_user_id', me.user_id);
             localStorage.setItem('sentori_email', me.email);
-          } catch {}
+          } catch {
+            // Storage disabled (private mode / quota) — display
+            // fields just aren't cached; /auth/me stays the source.
+          }
         }
         setVerified(true);
       })
@@ -208,11 +211,16 @@ function UserFooter() {
         method: 'POST',
         credentials: 'include',
       });
-    } catch {}
+    } catch {
+      // Best-effort: the cookie expires server-side anyway, and
+      // local state is cleared below regardless.
+    }
     try {
       localStorage.removeItem('sentori_user_id');
       localStorage.removeItem('sentori_email');
-    } catch {}
+    } catch {
+      // Storage disabled — nothing was cached to clear.
+    }
     navigate('/login');
   }
 
