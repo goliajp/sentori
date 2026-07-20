@@ -6,6 +6,23 @@
 
 ---
 
+## v1.4.9(2026-07-21 — core 集成测试首次运行,连带修复六类既有缺陷)
+
+`v0.2-core-check` 的 core job 此前只跑 `clippy` 与 `check`,**从不 `cargo test`** —— `crates/*/tests/integration.rs` 下所有断言一直是死代码。这些测试用 testcontainers 自起 Postgres,runner 本就有 docker,补一行即可运行。打开之后连锁暴露出以下缺陷,**均为既有问题,非本次引入**:
+
+- **静默 FK:未知 project 写入 0 行却报成功**(9 crate / 14 处)。这些 store 用 `INSERT … SELECT p.workspace_id … FROM projects p WHERE p.id = $n` 从 project 推导 workspace;project 不存在时 SELECT 匹配不到行,写入 0 行,**FK 违例永不触发**,而每个函数的文档与 `translate_fk` 都假设此时得到 `ProjectNotFound`。实际后果:`replay-store::store` 的 blob 已写入对象存储才轮到该行失败,**blob 就此孤儿化**;`runtime-metrics::ingest_batch` 返回少计的 `Ok(n)`,未知 project 的数据点与去重跳过无法区分;`billing::record_drop` 与 `cert-monitor::poll_domain` 静默 `Ok`,写入凭空消失;其余冒成裸 `Db(RowNotFound)`,矛头指向驱动而非缺失的 project
+- **`billing::check_and_record` 返回自相矛盾的 `OverLimit { current_count: 0, limit: 100000 }`** —— 同一根因,未知 project 落入"已达上限"分支
+- **`integration-traits::record_link`** 同族反模式的 issue 驱动版(`FROM issues i WHERE i.id`),按 `projects` 的检索扫不到
+- **`notifier` 四条 SELECT 漏取 `workspace_id`**,而 row-mapper 会读它 —— 所有读路径 panic 于 `ColumnNotFound`。该列自 migration 0010 起就在表上,SELECT 从未跟进
+- **`integration-traits` 测试 seed 早已过期**:写于 `issues.workspace_id` 加 NOT NULL 之前,11 个测试在 setup 阶段即挂
+- **`IssueStore::patch` 调用点遗漏**(v1.4.8 引入 workspace 参数时,server 侧一处未跟改)
+
+修法尽量不动成功路径:多数为 `fetch_one` → `fetch_optional` 加显式映射,不增往返;两处 `ON CONFLICT DO NOTHING` 无法区分"未插入"与"重复",改用探测,其中 `ingest_batch` 仅探测确实 0 行的 project id,全新数据批次零额外开销。两处**有意保留**:`persist_event` 的 events 插入与 `ingest_span` 的 traces upsert 与已会 bail 的语句同事务同 project_id,再加检查即为不可达分支加守卫。
+
+SDK handler 早已为 `ProjectNotFound` 写好分支(映射 401),此前该变体永不产生,那段代码一直是死的。
+
+---
+
 ## v1.4.8(2026-07-20 — 租户隔离 ⚠️ 安全)
 
 v1.4.7 补上了**鉴权**(必须登录),本版补上**授权**(只能看自己的)。此前任一已登录用户可读写全部租户数据。
