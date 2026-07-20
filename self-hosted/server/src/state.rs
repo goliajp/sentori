@@ -73,6 +73,8 @@ pub struct AppState {
     /// Capacity 512 — slow subscribers drop oldest, not the
     /// fast ones.
     pub events_bus: tokio::sync::broadcast::Sender<RecentEventTick>,
+    /// Transactional auth email sender (verify / reset links).
+    pub mailer: crate::mailer::Mailer,
 }
 
 impl AppState {
@@ -107,6 +109,7 @@ impl AppState {
         let tenant = TenantGuard::new(pool.clone(), workspace_id);
         let billing = BillingService::new(pool.clone(), workspace_id);
         let push_tokens = DeviceTokenStore::new(pool.clone());
+        let mailer = crate::mailer::Mailer::from_env();
         Self {
             pool,
             workspace_id,
@@ -126,6 +129,7 @@ impl AppState {
             push_tokens,
             attachments,
             events_bus,
+            mailer,
         }
     }
 }

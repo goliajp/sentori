@@ -1,5 +1,5 @@
-// Forgot password — calls /auth/forgot-password and shows the
-// reset token (dev mode; in prod this would be emailed only).
+// Forgot password — calls /auth/forgot-password; the reset link
+// arrives by email only.
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -9,7 +9,6 @@ import { api } from '../lib/api';
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [err, setErr] = useState<string | null>(null);
-  const [resetToken, setResetToken] = useState<string | null>(null);
   const [silent, setSilent] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -17,15 +16,10 @@ export default function ForgotPassword() {
     e.preventDefault();
     setErr(null);
     setSilent(false);
-    setResetToken(null);
     setLoading(true);
     try {
-      const r = await api.authForgotPassword(email);
-      if (r.reset_token) {
-        setResetToken(r.reset_token);
-      } else {
-        setSilent(true);
-      }
+      await api.authForgotPassword(email);
+      setSilent(true);
     } catch (e) {
       setErr(String(e));
     } finally {
@@ -41,7 +35,7 @@ export default function ForgotPassword() {
       >
         <h1 className="mb-1 text-xl font-semibold">Forgot password</h1>
         <p className="mb-6 text-sm text-zinc-500">
-          We'll send (or print, in dev) a reset token.
+          We'll email you a password reset link.
         </p>
         <label className="mb-3 block text-sm">
           <span className="mb-1 block text-zinc-400">Email</span>
@@ -60,11 +54,6 @@ export default function ForgotPassword() {
           <p className="mb-3 text-xs text-zinc-300">
             If that email is registered, instructions have been sent.
           </p>
-        )}
-        {resetToken && (
-          <pre className="mb-3 overflow-x-auto whitespace-pre-wrap break-all rounded bg-zinc-950 p-3 text-xs font-mono text-emerald-400">
-            {resetToken}
-          </pre>
         )}
         <button
           type="submit"

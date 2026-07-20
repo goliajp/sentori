@@ -88,13 +88,13 @@ impl AuthService {
     /// Sub-handle for `email_verifications`.
     #[must_use]
     pub const fn email_verifications(&self) -> EmailVerifications<'_> {
-        EmailVerifications::new(self.identity.pool())
+        EmailVerifications::new(self.identity.pool(), self.identity.workspace_id())
     }
 
     /// Sub-handle for `password_resets`.
     #[must_use]
     pub const fn password_resets(&self) -> PasswordResets<'_> {
-        PasswordResets::new(self.identity.pool())
+        PasswordResets::new(self.identity.pool(), self.identity.workspace_id())
     }
 
     // ── high-level orchestration ─────────────────────────────────
