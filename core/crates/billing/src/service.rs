@@ -278,9 +278,25 @@ impl BillingService {
             });
         }
 
-        // INSERT conflicted → row exists and the prior
-        // UPDATE was blocked by the cap. Read the current
-        // count + return OverLimit.
+        // Nothing inserted. Two very different causes land here:
+        // the row already exists and the cap blocked the UPDATE, or
+        // the project doesn't exist at all — `INSERT … SELECT …
+        // WHERE p.id = $1` quietly inserts zero rows for an unknown
+        // project rather than raising the FK violation the doc
+        // comment promises. Separate them, or a missing project is
+        // reported as `OverLimit { current_count: 0 }`, which is both
+        // wrong and self-contradictory.
+        let project_exists: Option<(uuid::Uuid,)> =
+            sqlx::query_as("SELECT id FROM projects WHERE id = $1")
+                .bind(project_id.into_uuid())
+                .fetch_optional(&self.pool)
+                .await?;
+        if project_exists.is_none() {
+            return Err(BillingError::ProjectNotFound(project_id.into_uuid()));
+        }
+
+        // Row exists and the prior UPDATE was blocked by the cap.
+        // Read the current count + return OverLimit.
         let current = self
             .read_count(project_id, &period, kind)
             .await?
