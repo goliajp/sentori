@@ -6,6 +6,14 @@
 
 ---
 
+## v1.4.3(2026-07-20 — CI 与发布镜像修复)
+
+- **self-hosted 镜像从来拿不到版本 tag**:workflow 只在 `v0.2.*` tag 触发,而实际发布 tag 是 `v1.4.x` —— 没有一次 tagged run 触发过,metadata-action 的 semver 模式从未生效,发布镜像只有 `master` 和 `sha-<short>`。同时 `self-hosted/README.md` 让用户 pull `ghcr.io/goliajp/sentori-selfhosted:latest`,而 workflow 推的是 `ghcr.io/goliajp/sentori/sentori-server` —— 镜像名与 tag 皆不存在。现改为 `v<x>.<y>.<z>` 触发 + tagged 构建加 `latest`,README 指向真实镜像
+- **镜像构建改原生 arm64 runner**:此前 linux/arm64 在 QEMU 仿真下编译整个 Rust workspace,稳定耗时 ~55 分钟对 60 分钟超时(仅 5 分钟余量)。改为 per-arch matrix(`ubuntu-latest` / `ubuntu-24.04-arm`,公开 repo 免费)按 digest 推送 + merge job 合并 manifest list,两架构并行原生构建;cache scope 按架构隔离
+- **CI runner 磁盘**:master 上 `cargo test (server)` 曾以 "No space left on device" 中途死亡(连诊断日志都写不下,故报 failure 但无失败步骤)。构建前清掉预装的 Android SDK / .NET / GHC / CodeQL(~25 GB),并前后打印 df
+
+---
+
 ## v1.4.2(2026-07-20 — astro CVE 修复 + webapp 质量门补齐)
 
 - **安全**:astro 5 → 7 + starlight 0.34 → 0.41,关掉 6 个 dependabot alert(4 high):CVE-2026-54299(prerendered error page 的 host-header SSRF)/ CVE-2026-50146(unescaped slot name 反射 XSS)/ CVE-2026-54298(spread props 属性名 XSS)。5.18.2 是最后的 5.x 且无补丁回移,跨大版本是唯一路径;marketing 2 页 + docs 56 页产物验证无退化(`/docs` base、og:image、pagefind 索引均在)
