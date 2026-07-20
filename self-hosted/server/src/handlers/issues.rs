@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Extension, Path, Query, State};
 use axum::http::StatusCode;
 use sentori_workspace_identity::ProjectId;
 use serde::{Deserialize, Serialize};
@@ -38,24 +38,18 @@ pub struct IssueRow {
 
 pub async fn list(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<crate::session_mw::SessionContext>,
     Path(project_id): Path<Uuid>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<IssueRow>>, (StatusCode, String)> {
+    super::tenant::guard_project(&state, ctx.workspace_id, project_id).await?;
+
     let _pid = ProjectId::from_uuid(project_id);
     let limit = q.limit.unwrap_or(100).min(500);
 
-    let sql = if q.status.is_some() {
-        "SELECT id, fingerprint, error_type, message_sample, kind, status,
-                event_count, first_seen, last_seen, last_release, last_environment
-         FROM issues WHERE project_id = $1 AND status = $2
-         ORDER BY last_seen DESC LIMIT $3"
-    } else {
-        "SELECT id, fingerprint, error_type, message_sample, kind, status,
-                event_count, first_seen, last_seen, last_release, last_environment
-         FROM issues WHERE project_id = $1
-         ORDER BY last_seen DESC LIMIT $3"
-    };
-
+    // The two branches carry different parameter counts, so each
+    // builds its own bind chain rather than sharing one with a
+    // placeholder for the absent status filter.
     let rows: Vec<(
         Uuid,
         String,
@@ -69,19 +63,32 @@ pub async fn list(
         String,
         String,
     )> = if let Some(status) = q.status.as_deref() {
-        sqlx::query_as(sql)
-            .bind(project_id)
-            .bind(status)
-            .bind(i64::from(limit))
-            .fetch_all(&state.pool)
-            .await
+        sqlx::query_as(
+            "SELECT id, fingerprint, error_type, message_sample, kind, status,
+                    event_count, first_seen, last_seen, last_release, last_environment
+             FROM issues
+             WHERE project_id = $1 AND workspace_id = $2 AND status = $3
+             ORDER BY last_seen DESC LIMIT $4",
+        )
+        .bind(project_id)
+        .bind(ctx.workspace_id.into_uuid())
+        .bind(status)
+        .bind(i64::from(limit))
+        .fetch_all(&state.pool)
+        .await
     } else {
-        sqlx::query_as(sql)
-            .bind(project_id)
-            .bind(Option::<String>::None)
-            .bind(i64::from(limit))
-            .fetch_all(&state.pool)
-            .await
+        sqlx::query_as(
+            "SELECT id, fingerprint, error_type, message_sample, kind, status,
+                    event_count, first_seen, last_seen, last_release, last_environment
+             FROM issues
+             WHERE project_id = $1 AND workspace_id = $2
+             ORDER BY last_seen DESC LIMIT $3",
+        )
+        .bind(project_id)
+        .bind(ctx.workspace_id.into_uuid())
+        .bind(i64::from(limit))
+        .fetch_all(&state.pool)
+        .await
     }
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -124,11 +131,17 @@ pub async fn list(
 ///           resolved_in_release?: string }`
 pub async fn patch(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<crate::session_mw::SessionContext>,
     Path((_project_id, issue_id)): Path<(Uuid, Uuid)>,
     Json(body): Json<PatchBody>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     use sentori_event_pipeline::IssueStatus;
     use sentori_issue_store::IssuePatch;
+
+    // The mutation goes through IssueStore, which takes no
+    // workspace argument, so the guard is the only scoping layer
+    // here — it addresses exactly the id being written.
+    super::tenant::guard_issue(&state, ctx.workspace_id, issue_id).await?;
 
     let status = match body.status.as_deref() {
         None => None,
@@ -166,7 +179,7 @@ pub async fn patch(
         .await;
         crate::notify::audit(
             &state.pool,
-            state.workspace_id.into_uuid(),
+            ctx.workspace_id.into_uuid(),
             None,
             None,
             "issue.status",
@@ -189,11 +202,14 @@ pub struct PatchBody {
 /// Body: { ids: [uuid…], status?: "resolved" | ... }
 pub async fn bulk_patch(
     State(state): State<Arc<AppState>>,
-    Path(_project_id): Path<Uuid>,
+    Extension(ctx): Extension<crate::session_mw::SessionContext>,
+    Path(project_id): Path<Uuid>,
     Json(body): Json<BulkPatchBody>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     use sentori_event_pipeline::IssueStatus;
     use sentori_issue_store::IssuePatch;
+
+    super::tenant::guard_project(&state, ctx.workspace_id, project_id).await?;
 
     let status = match body.status.as_deref() {
         None => None,
@@ -212,15 +228,30 @@ pub async fn bulk_patch(
         labels: None,
         resolved_in_release: body.resolved_in_release,
     };
+    // Unlike the other handlers the ids here come from the body,
+    // not the path, so guarding project_id says nothing about
+    // them. IssueStore::bulk_patch takes no workspace argument, so
+    // narrow the id set to the caller's workspace before handing it
+    // over. Ids outside it drop out and simply don't count toward
+    // `updated` — the same silent no-op the store already applies
+    // to ids that don't exist.
+    let ids: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM issues WHERE id = ANY($1) AND workspace_id = $2")
+            .bind(&body.ids)
+            .bind(ctx.workspace_id.into_uuid())
+            .fetch_all(&state.pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
     let outcome = state
         .issues
-        .bulk_patch(&body.ids, patch, OffsetDateTime::now_utc())
+        .bulk_patch(&ids, patch, OffsetDateTime::now_utc())
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     if let Some(status_label) = body.status.as_deref() {
         crate::notify::audit(
             &state.pool,
-            state.workspace_id.into_uuid(),
+            ctx.workspace_id.into_uuid(),
             None,
             None,
             "issue.bulk_status",
@@ -249,16 +280,20 @@ pub struct BulkPatchBody {
 /// GET /v1/projects/:project_id/issues/:issue_id
 pub async fn get(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<crate::session_mw::SessionContext>,
     Path((_project_id, issue_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    super::tenant::guard_issue(&state, ctx.workspace_id, issue_id).await?;
+
     use sqlx::Row;
     let row = sqlx::query(
         "SELECT id, project_id, fingerprint, error_type, message_sample, kind, status, \
                 event_count, first_seen, last_seen, last_release, last_environment, \
                 regressed_at, regressed_in_release, resolved_at \
-         FROM issues WHERE id = $1",
+         FROM issues WHERE id = $1 AND workspace_id = $2",
     )
     .bind(issue_id)
+    .bind(ctx.workspace_id.into_uuid())
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
