@@ -11,9 +11,18 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
+    // Every prefix the server owns. `/auth` and `/admin/api` were
+    // missing, so against the dev server login returned the SPA shell
+    // instead of a session and the whole admin surface was
+    // unreachable — including the OAuth redirects, which the browser
+    // has to follow to the server rather than to Vite.
     proxy: {
       '/v1': { target: 'http://localhost:8080', changeOrigin: true },
+      '/auth': { target: 'http://localhost:8080', changeOrigin: true },
+      '/admin/api': { target: 'http://localhost:8080', changeOrigin: true },
       '/healthz': { target: 'http://localhost:8080', changeOrigin: true },
+      '/livez': { target: 'http://localhost:8080', changeOrigin: true },
+      '/readyz': { target: 'http://localhost:8080', changeOrigin: true },
     },
   },
   build: {
