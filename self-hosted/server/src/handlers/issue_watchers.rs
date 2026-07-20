@@ -20,7 +20,13 @@ use uuid::Uuid;
 use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
-pub async fn list(State(state): State<Arc<AppState>>, Path(issue_id): Path<Uuid>) -> Json<Value> {
+pub async fn list(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    Path(issue_id): Path<Uuid>,
+) -> Result<Json<Value>, super::tenant::ApiErr> {
+    super::tenant::guard_issue(&state, ctx.workspace_id, issue_id).await?;
+
     let rows = sqlx::query(
         "SELECT user_id, since AS started_at FROM watchers WHERE issue_id = $1 ORDER BY since",
     )
@@ -37,14 +43,16 @@ pub async fn list(State(state): State<Arc<AppState>>, Path(issue_id): Path<Uuid>
             })
         })
         .collect();
-    Json(json!({ "watchers": out }))
+    Ok(Json(json!({ "watchers": out })))
 }
 
 pub async fn join(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
     Path(issue_id): Path<Uuid>,
-) -> StatusCode {
+) -> Result<StatusCode, super::tenant::ApiErr> {
+    super::tenant::guard_issue(&state, ctx.workspace_id, issue_id).await?;
+
     let _ = sqlx::query(
         "INSERT INTO watchers (issue_id, user_id) VALUES ($1, $2) \
          ON CONFLICT (issue_id, user_id) DO NOTHING",
@@ -53,18 +61,20 @@ pub async fn join(
     .bind(ctx.user_id.into_uuid())
     .execute(&state.pool)
     .await;
-    StatusCode::NO_CONTENT
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn leave(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
     Path(issue_id): Path<Uuid>,
-) -> StatusCode {
+) -> Result<StatusCode, super::tenant::ApiErr> {
+    super::tenant::guard_issue(&state, ctx.workspace_id, issue_id).await?;
+
     let _ = sqlx::query("DELETE FROM watchers WHERE issue_id = $1 AND user_id = $2")
         .bind(issue_id)
         .bind(ctx.user_id.into_uuid())
         .execute(&state.pool)
         .await;
-    StatusCode::NO_CONTENT
+    Ok(StatusCode::NO_CONTENT)
 }
