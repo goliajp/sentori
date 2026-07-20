@@ -274,13 +274,15 @@ pub fn router(state: Arc<AppState>) -> Router {
         ))
         .with_state(state.clone());
 
-    // Dashboard / public routes (open in v0.2; can be locked
-    // behind the same session middleware via env-var flip).
-    Router::new()
-        .route("/healthz", get(health::healthz))
-        .route("/livez", get(health::livez))
-        .route("/readyz", get(health::readyz))
-        .route("/metrics", get(metrics_prom::handle))
+    // Dashboard reads — session-gated.
+    //
+    // These were public until 2026-07-20 ("Phase E will gate with
+    // cookie session"), which meant any caller could read a
+    // customer's issues, events, traces, metrics and replays, with
+    // `/v1/projects` handing out the project ids to address them by.
+    // SDK ingest is a separate group above and keeps its own Bearer
+    // st_pk_ gate; ops probes stay open below for k8s and Prometheus.
+    let dashboard_routes = Router::new()
         .route("/v1/_describe", get(api_describe::describe))
         .route("/v1/_self_test", get(self_test::handle))
         .route("/v1/projects", get(projects::list))
@@ -362,6 +364,18 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/v1/projects/{project_id}/ingest",
             post(ingest::ingest_event),
         )
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            session_middleware,
+        ))
+        .with_state(state.clone());
+
+    // Ops probes + the auth endpoints needed to obtain a session.
+    Router::new()
+        .route("/healthz", get(health::healthz))
+        .route("/livez", get(health::livez))
+        .route("/readyz", get(health::readyz))
+        .route("/metrics", get(metrics_prom::handle))
         // ── auth: dashboard user lifecycle (public) ──────
         .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login))
@@ -370,6 +384,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/auth/reset-password", post(auth::reset))
         .route("/auth/change-password", post(auth::change_password))
         .with_state(state)
+        .merge(dashboard_routes)
         .merge(admin_routes)
         .merge(saas_routes)
         .merge(sdk_routes)
