@@ -7,7 +7,8 @@ use std::convert::Infallible;
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Extension, Path, State},
+    http::StatusCode,
     response::sse::{Event as SseEvent, KeepAlive, Sse},
 };
 use futures::stream::{Stream, StreamExt};
@@ -19,8 +20,15 @@ use crate::state::AppState;
 
 pub async fn handle(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<crate::session_mw::SessionContext>,
     Path(project_id): Path<Uuid>,
-) -> Sse<impl Stream<Item = Result<SseEvent, Infallible>>> {
+) -> Result<Sse<impl Stream<Item = Result<SseEvent, Infallible>>>, (StatusCode, String)> {
+    // `RecentEventTick` carries no workspace_id, so the per-tick
+    // filter below can only match on project_id. This guard, run
+    // once before the subscription is handed out, is therefore the
+    // sole tenant boundary on this endpoint.
+    super::tenant::guard_project(&state, ctx.workspace_id, project_id).await?;
+
     let rx = state.events_bus.subscribe();
     let stream = BroadcastStream::new(rx).filter_map(move |result| {
         let pid = project_id;
@@ -47,5 +55,5 @@ pub async fn handle(
             }
         }
     });
-    Sse::new(stream).keep_alive(KeepAlive::default())
+    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }

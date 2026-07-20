@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::{Extension, Path, State};
 use axum::http::StatusCode;
 use sentori_workspace_identity::ProjectId;
 use serde::Serialize;
@@ -34,9 +34,11 @@ pub struct ObservationRow {
 }
 
 pub async fn list_watches(
-    State(_state): State<Arc<AppState>>,
-    Path(_project_id): Path<Uuid>,
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<crate::session_mw::SessionContext>,
+    Path(project_id): Path<Uuid>,
 ) -> Result<Json<Vec<WatchRow>>, (StatusCode, String)> {
+    super::tenant::guard_project(&state, ctx.workspace_id, project_id).await?;
     // K10 CertMonitor not yet plumbed into AppState (it's a
     // standalone service that needs reqwest client init).
     // v0.1 skeleton returns empty list; full wiring is
@@ -46,8 +48,11 @@ pub async fn list_watches(
 
 pub async fn list_observations(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<crate::session_mw::SessionContext>,
     Path(project_id): Path<Uuid>,
 ) -> Result<Json<Vec<ObservationRow>>, (StatusCode, String)> {
+    super::tenant::guard_project(&state, ctx.workspace_id, project_id).await?;
+
     // Direct SQL read — bypass K10 service since we're just
     // reading the persisted observations table.
     let _pid = ProjectId::from_uuid(project_id);
@@ -64,10 +69,11 @@ pub async fn list_observations(
         "SELECT id, project_id, domain, common_name, issuer_name,
                 not_before, not_after, observed_at
          FROM cert_observations
-         WHERE project_id = $1
+         WHERE project_id = $1 AND workspace_id = $2
          ORDER BY observed_at DESC LIMIT 200",
     )
     .bind(project_id)
+    .bind(ctx.workspace_id.into_uuid())
     .fetch_all(&state.pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;

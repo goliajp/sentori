@@ -138,11 +138,21 @@ mod scoping_tests {
         fs::read_to_string(&p).unwrap_or_else(|e| panic!("read {}: {e}", p.display()))
     }
 
+    /// SELECTs in real code, ignoring ones quoted in comments —
+    /// a doc comment describing the old unscoped query is not a
+    /// query.
+    fn count_live_selects(src: &str) -> usize {
+        src.lines()
+            .filter(|l| !l.trim_start().starts_with("//"))
+            .filter(|l| l.contains("SELECT"))
+            .count()
+    }
+
     #[test]
     fn dashboard_queries_constrain_workspace() {
         for file in DASHBOARD_HANDLERS {
             let src = source(file);
-            let selects = src.matches("SELECT").count();
+            let selects = count_live_selects(&src);
             let scoped = src.matches("workspace_id = $").count();
             assert!(
                 scoped > 0,
