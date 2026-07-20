@@ -6,6 +6,19 @@
 
 ---
 
+## v1.4.7(2026-07-20 — 两处未鉴权访问修复 ⚠️ 安全)
+
+**背景**:为让 SaaS 面可用而排查时,发现两处接口在公网无需任何鉴权即可访问。两次访问日志审计均显示**仅有本人验证请求(21 次,同一 IP),无外部访问,数据完整**。发现后立即在 t01 边缘封锁,修复上线后恢复。
+
+- **dashboard 读 API 全部无鉴权**:路由组注释写着 "open in v0.2; can be locked behind the same session middleware via env-var flip",而该 flip 从未执行。任何人可读取任意 workspace 的 issues / events / traces / metrics / replays,且 `GET /v1/projects` 直接返回项目 UUID 供寻址(实测取回某客户 98 个 issue 含崩溃明细)。现拆为三组:dashboard 读进 `session_middleware`;ops 探针(`/healthz` `/livez` `/readyz` `/metrics`)保持免鉴权供 k8s 与 Prometheus 抓取;`/auth/*` 保持公开(否则无法获得 session)。SDK ingest 是独立组,自带 Bearer `st_pk_` 门,未受影响
+- **saas-control 无鉴权中间件**:binary 提供 `login` 会写 `saasadmin_sessions`,但从无中间件读回该表 —— 跨租户列表、`DELETE /v1/saas/workspaces/{id}`、suspend/resume 对任何可达者开放。此前不可利用仅因它没有公网路由(该路由是本日早些时候我为修复"控制面返回 HTML"而添加的)。新增 `auth_mw`:Bearer → sha256 → 查 session,过期与不存在合并为同一 401;破坏性路由额外要求 `super` 角色,`staff` 只读
+- **`saasadmin_users` / `saasadmin_sessions` 表此前不存在**:定义在 `saas/migrations/0001`,但 saas-control 无 `sqlx::migrate!` 调用,其注释又将 schema 归属 sentori-server,而 core/migrations 从未包含它们 —— 因此 login 只可能返回 500,无人能登录。新增 core migration 0031;saas-control 启动时等待其就绪,并按 `SENTORI_SAASADMIN_BOOTSTRAP_EMAIL/_PASSWORD` 幂等播种首个 `super` 操作员
+- **saas-control 的 `init_tracing` 又是空 stub**(与 sentori-server v1.4.1 同一 bug),生产零日志,以致排查暴露只能依赖 Caddy 访问日志。已接真 subscriber
+
+**已知未闭合**:dashboard handler 中 `projects` / `events` / `spans` / `metrics` / `replays` / `search` 六处 SQL 无 workspace 过滤,已登录用户可跨 workspace 读取。当前 dashboard 账号仅 GOLIA 内部人员,故非急性问题;**但在给外部租户(如 Insight)开通 dashboard 账号之前必须先完成租户隔离**。
+
+---
+
 ## v1.4.6(2026-07-20 — 缺失 asset 返回 404 + v0.2 server 首次纳入 CI)
 
 - **缺失的 asset 返回 SPA shell 而非 404**:浏览器跨部署持有缓存的 index.html 时会去请求上一版的哈希 bundle,该请求落进 SPA fallback 拿回 200 + index.html,于是浏览器把 HTML 当 JavaScript 解析、报语法错,而不是一个它能恢复的干净 404。`/assets/*` 改用不带 index fallback 的 ServeDir。按前缀而非扩展名判定 —— 扩展名启发式会误伤合法含点的路由段(如 release 名 `app@5.4.2+361`)
