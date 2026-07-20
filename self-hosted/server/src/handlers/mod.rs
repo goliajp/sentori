@@ -409,7 +409,10 @@ fn webapp_service() -> axum::routing::MethodRouter {
     let root = std::env::var("SENTORI_WEBAPP_DIST")
         .unwrap_or_else(|_| "/app/webapp".to_string());
     let index = format!("{root}/index.html");
+    // `fallback` (not `not_found_service`) — the latter wraps the
+    // fallback in SetStatus(404), which is for custom 404 pages;
+    // SPA deep links must serve index.html with 200.
     axum::routing::get_service(
-        ServeDir::new(&root).not_found_service(ServeFile::new(index)),
+        ServeDir::new(&root).fallback(ServeFile::new(index)),
     )
 }
