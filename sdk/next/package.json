@@ -73,7 +73,7 @@
     "@types/bun": "latest",
     "@types/react": "^19",
     "react": "^19",
-    "typescript": "^6"
+    "typescript": "^7"
   },
   "publishConfig": {
     "access": "public"

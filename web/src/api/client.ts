@@ -2032,8 +2032,7 @@ export type ActivityEntry =
 export type AlertTriggerKind = 'crash_free_drop' | 'event_count' | 'new_issue' | 'regression'
 
 export type AlertChannel =
-  | { secret: string; type: 'webhook'; url: string }
-  | { to: string[]; type: 'email' }
+  { secret: string; type: 'webhook'; url: string } | { to: string[]; type: 'email' }
 
 export type AlertFilter = {
   environment?: string
