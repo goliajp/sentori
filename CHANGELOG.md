@@ -6,6 +6,14 @@
 
 ---
 
+## v1.4.6(2026-07-20 — 缺失 asset 返回 404 + v0.2 server 首次纳入 CI)
+
+- **缺失的 asset 返回 SPA shell 而非 404**:浏览器跨部署持有缓存的 index.html 时会去请求上一版的哈希 bundle,该请求落进 SPA fallback 拿回 200 + index.html,于是浏览器把 HTML 当 JavaScript 解析、报语法错,而不是一个它能恢复的干净 404。`/assets/*` 改用不带 index fallback 的 ServeDir。按前缀而非扩展名判定 —— 扩展名启发式会误伤合法含点的路由段(如 release 名 `app@5.4.2+361`)
+- **`self-hosted/server/` 此前完全不在 CI 内**:`build.yml` 测的是 legacy `server/`,`v0.2-core-check` 测的是 `core/` —— 那个打进 self-hosted 镜像、正在跑生产的二进制,从未被任何 CI 编译、lint 或测试过(本版新增的 4 个 fallback 测试若就这么提交也永远不会运行)。现于 `v0.2-core-check` 增加 server job:fmt + test 强制,clippy 暂为 report-only
+- 该 crate 因从未进过 CI 也从未被格式化:本版含一次 `cargo fmt --all`(48 文件,纯空白)。clippy 的 ~110 条历史 lint 未清 —— `clippy --fix` 会重写约 64 个文件的生产二进制,应作独立改动
+
+---
+
 ## v1.4.5(2026-07-20 — 两处生产静默错误内容修复)
 
 - **未匹配的 API 路径返回 SPA 而非 404**:所有未命中路由都落到 `fallback_service(webapp_service())`,于是 `/v1/does-not-exist`、`/admin/api/nope`、`/auth/nope` 一律回 `200 <!doctype html>`。已发货的 SDK 调到本服务未实现的端点时会把它当成功,随后在离现场很远的地方 JSON 解析失败。legacy 没这问题 —— 那时 SPA 与 API 是 Caddy 后面两个容器,未知 `/api` 路径会吃到 server 的真 404;单体化引入了这个回归。现按路径前缀分流:四个 API 前缀返回 `{"error":"not_found"}` + 404,其余仍解析到 index.html + 200 供 React Router 接管。附 3 个前缀判定回归测试(含 `/v1` `/apidocs` `/authors` 这类相邻路径不得误判)
