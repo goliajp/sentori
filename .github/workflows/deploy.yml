@@ -160,6 +160,11 @@ jobs:
           SENTORI_GITHUB_CLIENT_SECRET: ${{ secrets.SENTORI_GITHUB_CLIENT_SECRET }}
           SENTORI_GOOGLE_CLIENT_ID: ${{ secrets.SENTORI_GOOGLE_CLIENT_ID }}
           SENTORI_GOOGLE_CLIENT_SECRET: ${{ secrets.SENTORI_GOOGLE_CLIENT_SECRET }}
+          # v0.2 stack — saasadmin UUIDs are filled in post-ETL (IDs
+          # copy 1:1 from legacy users); stripe secret optional until
+          # billing goes live on the new stack.
+          SENTORI_SAASADMIN_USER_IDS: ${{ secrets.SENTORI_SAASADMIN_USER_IDS }}
+          SENTORI_STRIPE_WEBHOOK_SECRET: ${{ secrets.SENTORI_STRIPE_WEBHOOK_SECRET }}
           # Use the upstream SHA when we came via workflow_run (matches
           # the checked-out ref). github.sha is the default-branch HEAD
           # at trigger time, which can drift; prefer head_sha when set.
@@ -184,6 +189,8 @@ jobs:
           SENTORI_GOOGLE_CLIENT_ID=${SENTORI_GOOGLE_CLIENT_ID}
           SENTORI_GOOGLE_CLIENT_SECRET=${SENTORI_GOOGLE_CLIENT_SECRET}
           SENTORI_VERSION=${SENTORI_VERSION}
+          SENTORI_SAASADMIN_USER_IDS=${SENTORI_SAASADMIN_USER_IDS}
+          SENTORI_STRIPE_WEBHOOK_SECRET=${SENTORI_STRIPE_WEBHOOK_SECRET}
           RUST_LOG=info,sentori_server=info
           EOF
           chmod 600 "${REMOTE_DIR}/.env"
@@ -191,9 +198,11 @@ jobs:
       - name: Build & up
         working-directory: /apps/sentori
         run: |
-          docker compose --env-file .env -f docker-compose.yml build server web
+          docker compose --env-file .env -f docker-compose.yml build \
+            server web server-v2 saas-control
           docker compose --env-file .env -f docker-compose.yml up -d \
-            postgres valkey server web marketing docs
+            postgres valkey server web marketing docs \
+            postgres-v2 server-v2 saas-control
 
       - name: Wait for /v1/events/_recent
         env:
@@ -240,6 +249,37 @@ jobs:
           status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18802/)
           test "$status" = "200" || fail "docs :18802 expected 200, got $status"
           echo "==> smoke OK"
+
+      - name: Wait + smoke — v0.2 stack
+        run: |
+          set -e
+          fail() { echo "v0.2 smoke FAIL: $1" >&2; exit 1; }
+          # server-v2 runs migrations at boot; give it the same 120s
+          # budget the legacy server gets.
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:18090/healthz >/dev/null; then
+              break
+            fi
+            if [ "$i" = "60" ]; then
+              echo "==> server-v2 health check failed — recent logs:"
+              docker compose -f "${COMPOSE_FILE}" logs --tail 100 server-v2 || true
+              fail "server-v2 /healthz never came up"
+            fi
+            sleep 2
+          done
+          # readiness (DB reachable)
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18090/readyz)
+          test "$status" = "200" || fail "/readyz expected 200, got $status"
+          # session gate engaged (no cookie -> 401)
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18090/auth/me)
+          test "$status" = "401" || fail "/auth/me expected 401, got $status"
+          # SPA fallback serves the dashboard shell
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18090/login)
+          test "$status" = "200" || fail "SPA /login expected 200, got $status"
+          # saas-control is listening
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18091/healthz)
+          case "$status" in 200|404) : ;; *) fail "saas-control :18091 unreachable (got $status)";; esac
+          echo "==> v0.2 smoke OK"
 
       - name: Tag release version
         # Only on the release/* push path — master-line deploys derived

@@ -3,7 +3,7 @@
 # Sentori SaaS control plane — multi-stage rust → distroless cc.
 # Build context = repo root.
 
-FROM rust:1.88-slim-bookworm AS builder
+FROM rust:1.97-slim-bookworm AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         pkg-config libssl-dev \
@@ -15,12 +15,12 @@ COPY core/ /src/core/
 COPY saas/ /src/saas/
 
 WORKDIR /src/saas/server
-RUN cargo build --release --bin sentori-saas
+RUN cargo build --release --bin sentori-saas-control
 
 FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
 
-COPY --from=builder /src/saas/server/target/release/sentori-saas /usr/local/bin/sentori-saas
+COPY --from=builder /src/saas/server/target/release/sentori-saas-control /usr/local/bin/sentori-saas-control
 
 EXPOSE 9090
 USER nonroot
-ENTRYPOINT ["/usr/local/bin/sentori-saas"]
+ENTRYPOINT ["/usr/local/bin/sentori-saas-control"]
