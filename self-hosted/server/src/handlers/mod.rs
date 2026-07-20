@@ -392,19 +392,65 @@ pub fn router(state: Arc<AppState>) -> Router {
         .merge(admin_routes)
         .merge(saas_routes)
         .merge(sdk_routes)
-        .fallback_service(webapp_service())
+        .fallback(spa_or_api_404)
+}
+
+/// Path prefixes that belong to the HTTP API, not to the SPA.
+///
+/// Anything under these is machine-facing: shipped SDKs hit `/v1/*`,
+/// the dashboard hits `/admin/api/*` and `/auth/*`, and `/api/*` is
+/// the legacy prefix Caddy still forwards from old clients.
+const API_PREFIXES: [&str; 4] = ["/v1/", "/admin/api/", "/auth/", "/api/"];
+
+/// True when `path` belongs to the HTTP API rather than the SPA.
+fn is_api_path(path: &str) -> bool {
+    API_PREFIXES.iter().any(|p| path.starts_with(p))
+}
+
+/// Fallback for everything the router didn't match.
+///
+/// Unmatched **API** paths must answer with a JSON 404. Serving the
+/// SPA shell there — which is what a bare `fallback_service` does,
+/// and what production did until 2026-07-20 — hands an SDK
+/// `200 <!doctype html>`: it reads as success, and any JSON parse of
+/// the body fails somewhere far from the cause.
+///
+/// Everything else is an SPA deep link (`/projects/x/issues`) and
+/// still resolves to `index.html` with 200 so React Router can take
+/// over.
+async fn spa_or_api_404(req: axum::extract::Request) -> axum::response::Response {
+    use axum::response::IntoResponse;
+
+    let path = req.uri().path();
+    if is_api_path(path) {
+        let detail = format!("no route for {} {path}", req.method());
+        return (
+            axum::http::StatusCode::NOT_FOUND,
+            axum::Json(serde_json::json!({
+                "error": "not_found",
+                "detail": detail,
+            })),
+        )
+            .into_response();
+    }
+
+    match tower::ServiceExt::oneshot(webapp_dir(), req).await {
+        Ok(res) => res.into_response(),
+        Err(e) => {
+            tracing::error!(%e, "webapp static serve failed");
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
 }
 
 /// Static-file service for the bundled webapp. Resolves to the
 /// path in `SENTORI_WEBAPP_DIST` env-var, defaulting to
 /// `/app/webapp` inside the container.
 ///
-/// Returns 404 on missing files (axum's default ServeDir
-/// behavior) — that's fine because API routes are matched
-/// first; only true SPA paths hit the fallback. SPA-style
-/// path fall-through (`/projects/abc/issues` → `index.html`)
-/// is handled by `not_found_service`.
-fn webapp_service() -> axum::routing::MethodRouter {
+/// Unknown paths resolve to `index.html` with 200 so React Router
+/// can handle SPA deep links. `spa_or_api_404` gates which requests
+/// reach here — API prefixes never do.
+fn webapp_dir() -> tower_http::services::ServeDir<tower_http::services::ServeFile> {
     use tower_http::services::{ServeDir, ServeFile};
     let root = std::env::var("SENTORI_WEBAPP_DIST")
         .unwrap_or_else(|_| "/app/webapp".to_string());
@@ -412,7 +458,54 @@ fn webapp_service() -> axum::routing::MethodRouter {
     // `fallback` (not `not_found_service`) — the latter wraps the
     // fallback in SetStatus(404), which is for custom 404 pages;
     // SPA deep links must serve index.html with 200.
-    axum::routing::get_service(
-        ServeDir::new(&root).fallback(ServeFile::new(index)),
-    )
+    ServeDir::new(&root).fallback(ServeFile::new(index))
+}
+
+#[cfg(test)]
+mod fallback_tests {
+    use super::is_api_path;
+
+    #[test]
+    fn api_prefixes_are_machine_facing() {
+        for p in [
+            "/v1/events",
+            "/v1/does-not-exist",
+            "/v1/projects/abc/issues",
+            "/admin/api/members",
+            "/admin/api/nope",
+            "/auth/me",
+            "/auth/nope",
+            "/api/legacy-thing",
+        ] {
+            assert!(is_api_path(p), "{p} must answer with JSON, not the SPA");
+        }
+    }
+
+    #[test]
+    fn spa_routes_are_not_api() {
+        // Every one of these is a React Router path; sending JSON 404
+        // here would break deep links.
+        for p in [
+            "/",
+            "/login",
+            "/register",
+            "/verify",
+            "/reset-password",
+            "/projects/abc/issues",
+            "/assets/index-abc123.js",
+            "/some/deep/link",
+        ] {
+            assert!(!is_api_path(p), "{p} must fall through to the SPA");
+        }
+    }
+
+    #[test]
+    fn prefix_match_does_not_leak_to_sibling_paths() {
+        // `/v1` and `/apidocs` share a prefix with an API root but are
+        // not under it — the trailing slash in API_PREFIXES is what
+        // keeps them on the SPA side.
+        for p in ["/v1", "/apidocs", "/authors", "/administration"] {
+            assert!(!is_api_path(p), "{p} must not be treated as API");
+        }
+    }
 }

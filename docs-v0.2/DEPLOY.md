@@ -81,25 +81,33 @@ SENTORI_STRIPE_WEBHOOK_SECRET=$WHSEC
 
 Caddy routes traffic to the right binary:
 
+The `/v1/saas/*` handle must come **before** the catch-all: the
+server binary serves the dashboard SPA from its own fallback, so a
+`/v1/saas/*` request that reaches it answers `200 text/html` rather
+than falling through to the control plane.
+
 ```
-ingest.sentori.golia.jp, sentori.golia.jp {
+ingest.sentori.golia.jp {
     encode zstd gzip
     reverse_proxy localhost:8080  # sentori-server
 }
 
-api.sentori.golia.jp {
+sentori.golia.jp {
     encode zstd gzip
-    handle /v1/saas/* {
+
+    handle /v1/saas/* {          # incl. /v1/saas/stripe/*
         reverse_proxy localhost:9090  # sentori-saas-control
     }
-    handle /v1/saas/stripe/* {
-        reverse_proxy localhost:9090
-    }
     handle {
-        reverse_proxy localhost:8080
+        reverse_proxy localhost:8080  # sentori-server (API + SPA)
     }
 }
 ```
+
+On the GOLIA deployment both hosts sit behind one t01 Caddy that
+proxies over Tailscale to lx64 (`:18090` server, `:18091`
+saas-control); `api.sentori.golia.jp` is a 308 redirect kept for
+old clients, not a separate backend.
 
 ## Database
 
