@@ -4,10 +4,11 @@
 // against one of {issues, events, spans, replays, metrics} so the user
 // can re-run it with one click.
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { api, SavedView } from '../lib/api';
+import { useAsyncData } from '../lib/useAsyncData';
 import {
   Badge,
   Button,
@@ -23,30 +24,18 @@ const TARGETS = ['issues', 'events', 'spans', 'replays', 'metrics'] as const;
 export default function SavedViews() {
   const [target, setTarget] =
     useState<(typeof TARGETS)[number]>('issues');
-  const [rows, setRows] = useState<SavedView[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newPayload, setNewPayload] = useState('{}');
 
-  async function refresh() {
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await api.listSavedViews(target);
-      setRows(r);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target]);
+  const {
+    data,
+    loading,
+    error,
+    reload: refresh,
+    setError,
+  } = useAsyncData(() => api.listSavedViews(target), [target], String);
+  const rows = data ?? [];
 
   async function create() {
     if (!newName.trim()) return;
@@ -67,7 +56,7 @@ export default function SavedViews() {
       setNewName('');
       setNewPayload('{}');
       setShowCreate(false);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }
@@ -78,7 +67,7 @@ export default function SavedViews() {
     if (!next || next === v.name) return;
     try {
       await api.patchSavedView(v.id, { name: next });
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }
@@ -88,7 +77,7 @@ export default function SavedViews() {
     if (!confirm(`Delete view "${v.name}"?`)) return;
     try {
       await api.deleteSavedView(v.id);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }

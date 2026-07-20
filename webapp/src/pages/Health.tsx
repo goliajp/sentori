@@ -1,9 +1,10 @@
 // Ops dashboard. Vitals + worker status + reference links.
 // Polls /healthz every 10s.
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-import { api, HealthResponse } from '../lib/api';
+import { api } from '../lib/api';
+import { useAsyncData } from '../lib/useAsyncData';
 import {
   Badge,
   Card,
@@ -14,23 +15,22 @@ import {
 } from '../components/ui';
 
 export function HealthPage() {
-  const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [stamp, setStamp] = useState(new Date().toLocaleTimeString());
+  const { data: health, error, reload } = useAsyncData(
+    () => api.health(),
+    [],
+    String,
+  );
 
-  function refresh() {
+  const refresh = useCallback(() => {
     setStamp(new Date().toLocaleTimeString());
-    api
-      .health()
-      .then(setHealth)
-      .catch((e: unknown) => setError(String(e)));
-  }
+    reload();
+  }, [reload]);
 
   useEffect(() => {
-    refresh();
     const id = setInterval(refresh, 10_000);
     return () => clearInterval(id);
-  }, []);
+  }, [refresh]);
 
   const poolPct =
     health?.pool_size && health.pool_idle != null

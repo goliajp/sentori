@@ -51,12 +51,20 @@ export default function Search() {
       .catch(e => setError(String(e)));
   }, []);
 
-  useEffect(() => {
-    if (!projectId || q.trim().length < 3) {
+  // Clear results the moment the query stops qualifying, adjusted during
+  // render rather than in an effect so it lands in the same commit.
+  const searchable = Boolean(projectId) && q.trim().length >= 3;
+  const [wasSearchable, setWasSearchable] = useState(searchable);
+  if (searchable !== wasSearchable) {
+    setWasSearchable(searchable);
+    if (!searchable) {
       setIssues([]);
       setEvents([]);
-      return;
     }
+  }
+
+  useEffect(() => {
+    if (!searchable) return;
     const id = setTimeout(async () => {
       setLoading(true);
       try {
@@ -70,6 +78,7 @@ export default function Search() {
       }
     }, 250);
     return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, q]);
 
   return (

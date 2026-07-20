@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { api, ApiError, AuditEntry } from '../lib/api';
+import { useState } from 'react';
+import { api, AuditEntry } from '../lib/api';
+import { useAsyncData } from '../lib/useAsyncData';
 import {
   Button,
   Card,
@@ -10,35 +11,23 @@ import {
 } from '../components/ui';
 
 export function AuditPage() {
-  const [entries, setEntries] = useState<AuditEntry[] | null>(null);
-  const [err, setErr] = useState<string | null>(null);
   const [projectId, setProjectId] = useState('');
   const [actor, setActor] = useState('');
   const [action, setAction] = useState('');
   const [ipFilter, setIpFilter] = useState('');
   const [limit, setLimit] = useState(200);
 
-  async function load() {
-    try {
-      const r = await api.listAudit({
+  const { data: entries, error: err, reload: load } = useAsyncData<AuditEntry[]>(
+    () =>
+      api.listAudit({
         project_id: projectId.trim() || undefined,
         actor_user_id: actor.trim() || undefined,
         action: action.trim() || undefined,
         ip: ipFilter.trim() || undefined,
         limit,
-      });
-      setEntries(r);
-      setErr(null);
-    } catch (e) {
-      if (e instanceof ApiError) setErr(`${e.status}: ${e.body}`);
-      else setErr(String(e));
-    }
-  }
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      }),
+    [],
+  );
 
   function clear() {
     setProjectId('');
