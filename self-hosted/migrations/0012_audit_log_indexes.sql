@@ -1,1 +1,0 @@
-../../core/migrations/0012_audit_log_indexes.sql

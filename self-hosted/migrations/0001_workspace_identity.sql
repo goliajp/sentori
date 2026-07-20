@@ -1,1 +1,0 @@
-../../core/migrations/0001_workspace_identity.sql
