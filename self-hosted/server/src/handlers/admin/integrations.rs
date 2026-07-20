@@ -86,10 +86,7 @@ pub async fn upsert(
     }
 }
 
-pub async fn list(
-    State(state): State<Arc<AppState>>,
-    Path(project_id): Path<Uuid>,
-) -> Json<Value> {
+pub async fn list(State(state): State<Arc<AppState>>, Path(project_id): Path<Uuid>) -> Json<Value> {
     let rows = sqlx::query(
         "SELECT id, kind, config, connected_by, connected_at, active \
          FROM integrations WHERE project_id = $1 ORDER BY kind",
@@ -119,13 +116,11 @@ pub async fn delete(
     State(state): State<Arc<AppState>>,
     Path((project_id, kind)): Path<(Uuid, String)>,
 ) -> StatusCode {
-    match sqlx::query(
-        "DELETE FROM integrations WHERE project_id = $1 AND kind = $2",
-    )
-    .bind(project_id)
-    .bind(&kind)
-    .execute(&state.pool)
-    .await
+    match sqlx::query("DELETE FROM integrations WHERE project_id = $1 AND kind = $2")
+        .bind(project_id)
+        .bind(&kind)
+        .execute(&state.pool)
+        .await
     {
         Ok(_) => StatusCode::NO_CONTENT,
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -143,14 +138,12 @@ pub async fn set_active(
     Path((project_id, kind)): Path<(Uuid, String)>,
     Json(body): Json<ActiveBody>,
 ) -> StatusCode {
-    match sqlx::query(
-        "UPDATE integrations SET active = $1 WHERE project_id = $2 AND kind = $3",
-    )
-    .bind(body.active)
-    .bind(project_id)
-    .bind(&kind)
-    .execute(&state.pool)
-    .await
+    match sqlx::query("UPDATE integrations SET active = $1 WHERE project_id = $2 AND kind = $3")
+        .bind(body.active)
+        .bind(project_id)
+        .bind(&kind)
+        .execute(&state.pool)
+        .await
     {
         Ok(_) => StatusCode::NO_CONTENT,
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,

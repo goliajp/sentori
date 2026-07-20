@@ -137,10 +137,7 @@ pub async fn patch(
         Some("regressed") => Some(IssueStatus::Regressed),
         Some("ignored") => Some(IssueStatus::Ignored),
         Some(other) => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                format!("invalid status: {other}"),
-            ));
+            return Err((StatusCode::BAD_REQUEST, format!("invalid status: {other}")));
         }
     };
     let patch = IssuePatch {
@@ -205,10 +202,7 @@ pub async fn bulk_patch(
         Some("regressed") => Some(IssueStatus::Regressed),
         Some("ignored") => Some(IssueStatus::Ignored),
         Some(other) => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                format!("invalid status: {other}"),
-            ));
+            return Err((StatusCode::BAD_REQUEST, format!("invalid status: {other}")));
         }
     };
     let patch = IssuePatch {

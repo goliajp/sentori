@@ -67,7 +67,12 @@ pub async fn handle(State(state): State<Arc<AppState>>) -> impl IntoResponse {
          WHERE status = 'sent' AND created_at >= now() - INTERVAL '24 hours'",
     )
     .await;
-    line(&mut out, "sentori_push_queued", "Push sends currently queued", push_queued);
+    line(
+        &mut out,
+        "sentori_push_queued",
+        "Push sends currently queued",
+        push_queued,
+    );
     line(
         &mut out,
         "sentori_push_failed_24h",

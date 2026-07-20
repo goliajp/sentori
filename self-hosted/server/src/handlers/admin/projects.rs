@@ -159,7 +159,10 @@ pub async fn update(
         Ok(Some(row)) => {
             let id: Uuid = row.get("id");
             info!(%id, "admin.projects renamed");
-            (StatusCode::OK, Json(json!({ "id": id.to_string(), "name": name })))
+            (
+                StatusCode::OK,
+                Json(json!({ "id": id.to_string(), "name": name })),
+            )
         }
         Ok(None) => (
             StatusCode::NOT_FOUND,

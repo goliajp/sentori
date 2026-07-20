@@ -2,7 +2,11 @@
 
 use std::sync::Arc;
 
-use axum::{Extension, Json, extract::{Path, State}, http::StatusCode};
+use axum::{
+    Extension, Json,
+    extract::{Path, State},
+    http::StatusCode,
+};
 use sentori_ingest_token::IngestContext;
 use serde_json::{Value, json};
 use tracing::{info, warn};
@@ -32,13 +36,11 @@ pub async fn handle(
         }
     };
 
-    let result = sqlx::query(
-        "DELETE FROM device_topics WHERE device_token_id = $1 AND topic = $2",
-    )
-    .bind(device_token_id)
-    .bind(&topic)
-    .execute(&state.pool)
-    .await;
+    let result = sqlx::query("DELETE FROM device_topics WHERE device_token_id = $1 AND topic = $2")
+        .bind(device_token_id)
+        .bind(&topic)
+        .execute(&state.pool)
+        .await;
 
     match result {
         Ok(_) => {

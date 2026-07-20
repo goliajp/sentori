@@ -21,7 +21,10 @@ pub fn spawn(pool: PgPool) {
     let interval = env_interval();
     let batch = env_batch();
     tokio::spawn(async move {
-        info!(interval_sec = interval.as_secs(), batch, "probe worker started");
+        info!(
+            interval_sec = interval.as_secs(),
+            batch, "probe worker started"
+        );
         loop {
             match run_due(&pool, batch).await {
                 Ok(0) => debug!("probe worker idle"),
@@ -94,11 +97,7 @@ async fn run_due(pool: &PgPool, batch: usize) -> Result<usize, sqlx::Error> {
     Ok(ran)
 }
 
-async fn probe_one(
-    url: &str,
-    method: &str,
-    timeout_ms: u64,
-) -> Result<(u16, i32), String> {
+async fn probe_one(url: &str, method: &str, timeout_ms: u64) -> Result<(u16, i32), String> {
     use std::time::Instant;
     let client = reqwest::Client::builder()
         .timeout(Duration::from_millis(timeout_ms))

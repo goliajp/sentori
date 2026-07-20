@@ -31,13 +31,11 @@ pub async fn healthz(State(state): State<Arc<AppState>>) -> (StatusCode, Json<He
     } else {
         StatusCode::SERVICE_UNAVAILABLE
     };
-    let push_queued: i64 = sqlx::query(
-        "SELECT COUNT(*) FROM push_sends WHERE status = 'queued'",
-    )
-    .fetch_one(&state.pool)
-    .await
-    .map(|r| r.get::<i64, _>(0))
-    .unwrap_or(0);
+    let push_queued: i64 = sqlx::query("SELECT COUNT(*) FROM push_sends WHERE status = 'queued'")
+        .fetch_one(&state.pool)
+        .await
+        .map(|r| r.get::<i64, _>(0))
+        .unwrap_or(0);
     let push_failed_24h: i64 = sqlx::query(
         "SELECT COUNT(*) FROM push_sends WHERE status = 'failed' \
          AND created_at >= now() - interval '24 hours'",

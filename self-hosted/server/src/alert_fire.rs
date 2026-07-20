@@ -96,12 +96,11 @@ async fn fire(
                 .or_else(|| trigger_config.get("threshold"))
                 .and_then(|v| v.as_i64())
                 .unwrap_or(100);
-            let cur: Option<(i64,)> = sqlx::query_as(
-                "SELECT event_count FROM issues WHERE id = $1",
-            )
-            .bind(issue_id)
-            .fetch_optional(pool)
-            .await?;
+            let cur: Option<(i64,)> =
+                sqlx::query_as("SELECT event_count FROM issues WHERE id = $1")
+                    .bind(issue_id)
+                    .fetch_optional(pool)
+                    .await?;
             let count = cur.map(|t| t.0).unwrap_or(0);
             if count < threshold {
                 continue;
@@ -154,12 +153,10 @@ async fn fire(
                 }
             }
         }
-        let _ = sqlx::query(
-            "UPDATE alert_rules SET last_fired_at = now() WHERE id = $1",
-        )
-        .bind(alert_id)
-        .execute(pool)
-        .await;
+        let _ = sqlx::query("UPDATE alert_rules SET last_fired_at = now() WHERE id = $1")
+            .bind(alert_id)
+            .execute(pool)
+            .await;
         crate::notify::audit(
             pool,
             workspace_id,

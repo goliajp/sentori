@@ -128,10 +128,7 @@ pub async fn list(State(state): State<Arc<AppState>>) -> Json<Value> {
     }
 }
 
-pub async fn revoke(
-    State(state): State<Arc<AppState>>,
-    Path(invite_id): Path<Uuid>,
-) -> StatusCode {
+pub async fn revoke(State(state): State<Arc<AppState>>, Path(invite_id): Path<Uuid>) -> StatusCode {
     match state.identity.invites().revoke(invite_id).await {
         Ok(()) => StatusCode::NO_CONTENT,
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,

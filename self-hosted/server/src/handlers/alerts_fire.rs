@@ -25,17 +25,12 @@ pub async fn fire_test(
     State(state): State<Arc<AppState>>,
     Path(alert_id): Path<Uuid>,
 ) -> (StatusCode, Json<Value>) {
-    let row = sqlx::query(
-        "SELECT name, channels FROM alert_rules WHERE id = $1",
-    )
-    .bind(alert_id)
-    .fetch_optional(&state.pool)
-    .await;
+    let row = sqlx::query("SELECT name, channels FROM alert_rules WHERE id = $1")
+        .bind(alert_id)
+        .fetch_optional(&state.pool)
+        .await;
     let (name, channels) = match row {
-        Ok(Some(r)) => (
-            r.get::<String, _>("name"),
-            r.get::<Value, _>("channels"),
-        ),
+        Ok(Some(r)) => (r.get::<String, _>("name"), r.get::<Value, _>("channels")),
         Ok(None) => {
             return (
                 StatusCode::NOT_FOUND,

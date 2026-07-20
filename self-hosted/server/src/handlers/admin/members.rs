@@ -78,7 +78,10 @@ pub async fn update_role(
     match state.identity.members().set_role(uid, role).await {
         Ok(()) => {
             info!(%user_id, ?role, "admin.members role_changed");
-            (StatusCode::OK, Json(json!({ "user_id": user_id.to_string(), "role": body.role })))
+            (
+                StatusCode::OK,
+                Json(json!({ "user_id": user_id.to_string(), "role": body.role })),
+            )
         }
         Err(e) => {
             warn!(error = %e, "admin.members update_failed");
@@ -90,10 +93,7 @@ pub async fn update_role(
     }
 }
 
-pub async fn remove(
-    State(state): State<Arc<AppState>>,
-    Path(user_id): Path<Uuid>,
-) -> StatusCode {
+pub async fn remove(State(state): State<Arc<AppState>>, Path(user_id): Path<Uuid>) -> StatusCode {
     let uid = UserId::from_uuid(user_id);
     match state.identity.members().remove(uid).await {
         Ok(()) => {

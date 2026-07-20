@@ -23,10 +23,7 @@ use uuid::Uuid;
 
 use crate::state::AppState;
 
-pub async fn list(
-    State(state): State<Arc<AppState>>,
-    Path(project_id): Path<Uuid>,
-) -> Json<Value> {
+pub async fn list(State(state): State<Arc<AppState>>, Path(project_id): Path<Uuid>) -> Json<Value> {
     let rows = sqlx::query(
         "SELECT id, name, created_at, deploy_at FROM releases \
          WHERE project_id = $1 ORDER BY created_at DESC LIMIT 200",

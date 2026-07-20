@@ -41,13 +41,7 @@ impl TokenCache {
         }
     }
 
-    pub fn put(
-        &self,
-        project_id: Uuid,
-        kind: &str,
-        token: String,
-        ttl: Duration,
-    ) {
+    pub fn put(&self, project_id: Uuid, kind: &str, token: String, ttl: Duration) {
         if let Ok(mut guard) = self.inner.lock() {
             guard.insert(
                 (project_id, kind.to_string()),

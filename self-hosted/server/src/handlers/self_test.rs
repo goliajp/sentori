@@ -86,12 +86,11 @@ pub async fn handle(State(state): State<Arc<AppState>>) -> (StatusCode, Json<Val
     }
 
     // 6. At least one project (deploy provisioned correctly).
-    let proj_count: Option<(i64,)> =
-        sqlx::query_as("SELECT COUNT(*)::bigint FROM projects")
-            .fetch_optional(&state.pool)
-            .await
-            .ok()
-            .flatten();
+    let proj_count: Option<(i64,)> = sqlx::query_as("SELECT COUNT(*)::bigint FROM projects")
+        .fetch_optional(&state.pool)
+        .await
+        .ok()
+        .flatten();
     let proj_n = proj_count.map(|t| t.0).unwrap_or(0);
     checks.push(json!({
         "name": "has_at_least_one_project",
@@ -103,12 +102,11 @@ pub async fn handle(State(state): State<Arc<AppState>>) -> (StatusCode, Json<Val
     }
 
     // 7. Workspace count.
-    let ws_count: Option<(i64,)> =
-        sqlx::query_as("SELECT COUNT(*)::bigint FROM workspaces")
-            .fetch_optional(&state.pool)
-            .await
-            .ok()
-            .flatten();
+    let ws_count: Option<(i64,)> = sqlx::query_as("SELECT COUNT(*)::bigint FROM workspaces")
+        .fetch_optional(&state.pool)
+        .await
+        .ok()
+        .flatten();
     let ws_n = ws_count.map(|t| t.0).unwrap_or(0);
     checks.push(json!({
         "name": "has_workspace",

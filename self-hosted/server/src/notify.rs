@@ -9,9 +9,7 @@ use uuid::Uuid;
 /// Extract requester IP + user-agent from request headers.
 /// IP is honored from `X-Forwarded-For` (first hop) if present,
 /// then `X-Real-IP`. UA from `User-Agent`. Both optional.
-pub fn extract_request_meta(
-    headers: &axum::http::HeaderMap,
-) -> (Option<String>, Option<String>) {
+pub fn extract_request_meta(headers: &axum::http::HeaderMap) -> (Option<String>, Option<String>) {
     let ip = headers
         .get("x-forwarded-for")
         .and_then(|v| v.to_str().ok())
@@ -34,11 +32,7 @@ pub fn extract_request_meta(
 
 /// Inject IP + user-agent into the audit payload before writing.
 /// Pass `(None, None)` from background workers / non-request paths.
-pub fn enrich_payload(
-    mut payload: Value,
-    ip: Option<&str>,
-    user_agent: Option<&str>,
-) -> Value {
+pub fn enrich_payload(mut payload: Value, ip: Option<&str>, user_agent: Option<&str>) -> Value {
     if ip.is_none() && user_agent.is_none() {
         return payload;
     }

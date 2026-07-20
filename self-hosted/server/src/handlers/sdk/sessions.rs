@@ -36,7 +36,10 @@ pub async fn handle(
     State(state): State<Arc<AppState>>,
     Json(body): Json<SessionBody>,
 ) -> (StatusCode, Json<Value>) {
-    if !matches!(body.status.as_str(), "ok" | "errored" | "crashed" | "exited") {
+    if !matches!(
+        body.status.as_str(),
+        "ok" | "errored" | "crashed" | "exited"
+    ) {
         return (
             StatusCode::BAD_REQUEST,
             Json(json!({ "error": "invalid_status", "got": body.status })),
@@ -68,7 +71,10 @@ pub async fn handle(
                 status = %body.status,
                 "sdk.sessions recorded",
             );
-            (StatusCode::ACCEPTED, Json(json!({ "session_id": id.to_string() })))
+            (
+                StatusCode::ACCEPTED,
+                Json(json!({ "session_id": id.to_string() })),
+            )
         }
         Err(e) => {
             warn!(workspace_id = %ctx.workspace_id, error = %e, "sdk.sessions db_error");
