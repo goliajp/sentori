@@ -20,14 +20,6 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
-      // Every remaining hit is `useEffect(() => { asyncLoader() }, deps)`
-      // where the setState runs after an `await` — two renders total,
-      // not the cascade this rule targets, and the rule can't see
-      // through the async boundary. Downgraded rather than papered
-      // over with per-site disables; clearing it for real means
-      // replacing fetch-in-effect with a shared data-loading hook
-      // across the 17 list pages, which is its own change.
-      'react-hooks/set-state-in-effect': 'warn',
     },
   },
 )

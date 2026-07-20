@@ -102,7 +102,7 @@ pub async fn trend(
 ) -> Result<Json<Vec<TrendRow>>, (StatusCode, String)> {
     super::tenant::guard_project(&state, ctx.workspace_id, project_id).await?;
 
-    let days = q.days.unwrap_or(7).clamp(1, 90) as i64;
+    let days = i64::from(q.days.unwrap_or(7).clamp(1, 90));
     let rows: Vec<(time::Date, i64)> = sqlx::query_as(
         "SELECT (received_at AT TIME ZONE 'UTC')::date AS day, COUNT(*)::bigint \
          FROM events \

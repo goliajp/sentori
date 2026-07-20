@@ -67,40 +67,37 @@ pub async fn workspace_stats(State(state): State<Arc<AppState>>) -> Json<Value> 
     let workspaces: i64 = sqlx::query("SELECT COUNT(*) AS n FROM workspaces")
         .fetch_one(&state.pool)
         .await
-        .map(|r| r.get("n"))
-        .unwrap_or_else(|e| {
-            warn!(error = %e, "saas.workspace_stats workspaces query");
-            0
-        });
+        .map_or_else(
+            |e| {
+                warn!(error = %e, "saas.workspace_stats workspaces query");
+                0
+            },
+            |r| r.get("n"),
+        );
     let active: i64 =
         sqlx::query("SELECT COUNT(*) AS n FROM workspace_billing WHERE status = 'active'")
             .fetch_one(&state.pool)
             .await
-            .map(|r| r.get("n"))
-            .unwrap_or(0);
+            .map_or(0, |r| r.get("n"));
     let projects: i64 = sqlx::query("SELECT COUNT(*) AS n FROM projects")
         .fetch_one(&state.pool)
         .await
-        .map(|r| r.get("n"))
-        .unwrap_or(0);
+        .map_or(0, |r| r.get("n"));
     let users: i64 = sqlx::query("SELECT COUNT(*) AS n FROM users")
         .fetch_one(&state.pool)
         .await
-        .map(|r| r.get("n"))
-        .unwrap_or(0);
+        .map_or(0, |r| r.get("n"));
     let events_24h: i64 = sqlx::query(
         "SELECT COUNT(*) AS n FROM events WHERE received_at >= now() - interval '24 hours'",
     )
     .fetch_one(&state.pool)
     .await
-    .map(|r| r.get("n"))
-    .unwrap_or(0);
+    .map_or(0, |r| r.get("n"));
     let tokens_active: i64 =
         sqlx::query("SELECT COUNT(*) AS n FROM tokens WHERE revoked_at IS NULL")
             .fetch_one(&state.pool)
             .await
-            .map(|r| r.get("n"))
-            .unwrap_or(0);
+            .map_or(0, |r| r.get("n"));
     Json(json!({
         "workspaces": workspaces,
         "active_workspaces": active,

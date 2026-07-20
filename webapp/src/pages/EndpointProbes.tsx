@@ -3,10 +3,11 @@
 // Probes are polled by a background worker (legacy ingest service
 // — to be re-wired for v0.2 step K, not blocking ship).
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import { api } from '../lib/api';
+import { useAsyncData } from '../lib/useAsyncData';
 import {
   Badge,
   Button,
@@ -32,30 +33,25 @@ interface Probe {
 
 export default function EndpointProbes() {
   const { id: projectId } = useParams<{ id: string }>();
-  const [rows, setRows] = useState<Probe[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [url, setUrl] = useState('');
   const [method, setMethod] = useState('GET');
   const [interval, setInterval] = useState(60);
 
-  async function refresh() {
-    if (!projectId) return;
-    setLoading(true);
-    try {
-      const r = await api.listEndpointProbes(projectId);
-      setRows(r.probes);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    refresh();
-  }, [projectId]);
+  const {
+    data,
+    loading,
+    error,
+    reload: refresh,
+    setData,
+    setError,
+  } = useAsyncData(
+    async (): Promise<Probe[]> =>
+      projectId ? (await api.listEndpointProbes(projectId)).probes : [],
+    [projectId],
+    String,
+  );
+  const rows = data ?? [];
 
   async function add() {
     if (!projectId || !url.trim()) return;
@@ -68,7 +64,7 @@ export default function EndpointProbes() {
       });
       setUrl('');
       setShowAdd(false);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }
@@ -77,8 +73,9 @@ export default function EndpointProbes() {
   async function toggle(p: Probe) {
     try {
       await api.setEndpointProbeEnabled(p.id, !p.enabled);
-      setRows(rs =>
-        rs.map(r => (r.id === p.id ? { ...r, enabled: !r.enabled } : r)),
+      setData(rs =>
+        rs?.map(r => (r.id === p.id ? { ...r, enabled: !r.enabled } : r)) ??
+        null,
       );
     } catch (e) {
       setError(String(e));
@@ -89,7 +86,7 @@ export default function EndpointProbes() {
     if (!confirm(`Delete probe for ${p.endpoint_url}?`)) return;
     try {
       await api.deleteEndpointProbe(p.id);
-      setRows(rs => rs.filter(r => r.id !== p.id));
+      setData(rs => rs?.filter(r => r.id !== p.id) ?? null);
     } catch (e) {
       setError(String(e));
     }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { api, UsageResponse } from '../lib/api';
+import { useAsyncData } from '../lib/useAsyncData';
 import { Card, PageHeader, Section, Badge } from '../components/ui';
 
 export function SettingsPage() {
@@ -179,7 +180,7 @@ function Cell({
 }
 
 function SessionsCard() {
-  const [rows, setRows] = useState<
+  const { data, loading, reload: refresh } = useAsyncData<
     {
       id_hash_hex: string;
       created_at: string;
@@ -188,29 +189,13 @@ function SessionsCard() {
       ip: string | null;
       user_agent: string | null;
     }[]
-  >([]);
-  const [loading, setLoading] = useState(true);
-
-  async function refresh() {
-    setLoading(true);
-    try {
-      const r = await api.listSessions();
-      setRows(r.sessions);
-    } catch {
-      // noop
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    refresh();
-  }, []);
+  >(async () => (await api.listSessions()).sessions, []);
+  const rows = data ?? [];
 
   async function revoke(id: string) {
     if (!confirm('Revoke this session?')) return;
     await api.revokeSession(id);
-    await refresh();
+    refresh();
   }
 
   return (

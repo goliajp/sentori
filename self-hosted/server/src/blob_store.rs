@@ -44,20 +44,6 @@ impl AttachmentStore {
             Self::Fs(s) => s.put(bytes).await,
         }
     }
-
-    pub async fn get(&self, hash: &BlobHash) -> BlobResult<Vec<u8>> {
-        match self {
-            Self::Memory(s) => s.get(hash).await,
-            Self::Fs(s) => s.get(hash).await,
-        }
-    }
-
-    pub async fn delete(&self, hash: &BlobHash) -> BlobResult<()> {
-        match self {
-            Self::Memory(s) => s.delete(hash).await,
-            Self::Fs(s) => s.delete(hash).await,
-        }
-    }
 }
 
 // Suppress unused-warning when only one variant is reached at runtime.

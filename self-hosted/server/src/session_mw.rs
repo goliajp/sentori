@@ -46,9 +46,8 @@ pub async fn session_middleware(
     mut req: Request<Body>,
     next: Next,
 ) -> Response {
-    let token = match extract_token(&headers) {
-        Some(t) => t,
-        None => return reject("session token missing"),
+    let Some(token) = extract_token(&headers) else {
+        return reject("session token missing");
     };
 
     let auth = build_auth(&state);
@@ -84,20 +83,19 @@ pub async fn session_middleware(
 }
 
 fn extract_token(headers: &HeaderMap) -> Option<String> {
-    if let Some(auth) = headers.get(header::AUTHORIZATION) {
-        if let Ok(s) = auth.to_str() {
-            if let Some(rest) = s.strip_prefix("Bearer ") {
-                return Some(rest.trim().to_string());
-            }
-        }
+    if let Some(auth) = headers.get(header::AUTHORIZATION)
+        && let Ok(s) = auth.to_str()
+        && let Some(rest) = s.strip_prefix("Bearer ")
+    {
+        return Some(rest.trim().to_string());
     }
-    if let Some(cookie_hdr) = headers.get(header::COOKIE) {
-        if let Ok(s) = cookie_hdr.to_str() {
-            for part in s.split(';') {
-                let p = part.trim();
-                if let Some(rest) = p.strip_prefix("sentori_session=") {
-                    return Some(rest.trim().to_string());
-                }
+    if let Some(cookie_hdr) = headers.get(header::COOKIE)
+        && let Ok(s) = cookie_hdr.to_str()
+    {
+        for part in s.split(';') {
+            let p = part.trim();
+            if let Some(rest) = p.strip_prefix("sentori_session=") {
+                return Some(rest.trim().to_string());
             }
         }
     }
@@ -112,6 +110,9 @@ fn build_auth(state: &Arc<AppState>) -> AuthService {
             a.copy_from_slice(&s.as_bytes()[..32]);
             SecretKey::from_bytes(a)
         }
+        // Only fails if the OS CSPRNG is unavailable, which no request
+        // could be served through anyway.
+        #[allow(clippy::expect_used)]
         _ => SecretKey::generate().expect("ephemeral session key"),
     };
     AuthService::new(state.identity.clone(), key, AuthOptions::default())

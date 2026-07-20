@@ -38,7 +38,7 @@ pub async fn search(
     if needle.is_empty() {
         return Ok(Json(json!({ "issues": [], "events": [] })));
     }
-    let limit = q.limit.clamp(1, 100) as i64;
+    let limit = i64::from(q.limit.clamp(1, 100));
     let pattern = format!("%{needle}%");
 
     let issues = sqlx::query(

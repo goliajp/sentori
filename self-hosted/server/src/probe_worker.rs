@@ -49,7 +49,9 @@ async fn run_due(pool: &PgPool, batch: usize) -> Result<usize, sqlx::Error> {
            AND (last.last_ts IS NULL OR last.last_ts + (ec.interval_sec || ' seconds')::interval <= now()) \
          ORDER BY last.last_ts NULLS FIRST LIMIT $1",
     )
-    .bind(batch as i64)
+    // Batch size is a small operator-set constant; saturating is
+    // unreachable and a clamped LIMIT is harmless regardless.
+    .bind(i64::try_from(batch).unwrap_or(i64::MAX))
     .fetch_all(pool)
     .await?;
     if rows.is_empty() {
@@ -71,12 +73,12 @@ async fn run_due(pool: &PgPool, batch: usize) -> Result<usize, sqlx::Error> {
         let outcome = probe_one(&target_url, &method, 5000).await;
         let (status_code, latency_ms, ok, error_kind) = match outcome {
             Ok((code, dur)) => {
-                let code_ok = allowed_codes.contains(&(code as i32));
+                let code_ok = allowed_codes.contains(&i32::from(code));
                 let latency_ok = match max_latency {
                     Some(max) => dur <= max,
                     None => true,
                 };
-                (code as i32, dur, code_ok && latency_ok, None::<String>)
+                (i32::from(code), dur, code_ok && latency_ok, None::<String>)
             }
             Err(e) => (0, 0, false, Some(e)),
         };
@@ -110,7 +112,9 @@ async fn probe_one(url: &str, method: &str, timeout_ms: u64) -> Result<(u16, i32
     };
     let start = Instant::now();
     let resp = req.send().await.map_err(|e| e.to_string())?;
-    let dur = start.elapsed().as_millis() as i32;
+    // Elapsed millis of a single probe; saturates only after ~24
+    // days, far beyond the client timeout.
+    let dur = i32::try_from(start.elapsed().as_millis()).unwrap_or(i32::MAX);
     Ok((resp.status().as_u16(), dur))
 }
 
@@ -119,7 +123,7 @@ fn env_enabled() -> bool {
         std::env::var("SENTORI_PROBE_WORKER_ENABLED")
             .ok()
             .as_deref()
-            .map(|s| s.to_ascii_lowercase()),
+            .map(str::to_ascii_lowercase),
         Some(s) if s == "1" || s == "true"
     ) || std::env::var("SENTORI_PROBE_WORKER_ENABLED").is_err()
 }

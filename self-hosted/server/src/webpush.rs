@@ -16,6 +16,10 @@ use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+// The `vapid_` prefix is part of the VAPID spec vocabulary; dropping
+// it would make these fields ambiguous against the other key material
+// in this module.
+#[allow(clippy::struct_field_names)]
 pub struct WebPushConfig {
     pub vapid_subject: String,
     pub vapid_public_key_b64url: String,
@@ -88,7 +92,7 @@ pub async fn send_with_payload(
     let key = EncodingKey::from_ec_pem(cfg.vapid_private_pem.as_bytes())?;
     let jwt = jsonwebtoken::encode(&header, &claims, &key)?;
 
-    let auth_header = format!("vapid t={jwt}, k={}", cfg.vapid_public_key_b64url,);
+    let auth_header = format!("vapid t={jwt}, k={}", cfg.vapid_public_key_b64url);
 
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))

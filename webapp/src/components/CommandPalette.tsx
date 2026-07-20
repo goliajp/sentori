@@ -46,11 +46,28 @@ export function CommandPalette({ open, onClose }: Props) {
   const [projects, setProjects] = useState<PaletteItem[]>([]);
   const [searchHits, setSearchHits] = useState<PaletteItem[]>([]);
 
-  // Reset + autofocus on open + load projects.
+  // Reset on open, and reset the cursor whenever the query changes. Both are
+  // adjusted during render rather than in an effect: they derive from a value
+  // we already have, so an effect would only add a second render pass.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) {
+      setQuery('');
+      setSelected(0);
+    }
+  }
+
+  const [prevQuery, setPrevQuery] = useState(query);
+  if (query !== prevQuery) {
+    setPrevQuery(query);
+    setSelected(0);
+    if (query.trim().length < 3) setSearchHits([]);
+  }
+
+  // Autofocus on open + load projects.
   useEffect(() => {
     if (!open) return;
-    setQuery('');
-    setSelected(0);
     setTimeout(() => inputRef.current?.focus(), 10);
     api
       .listProjects()
@@ -111,10 +128,7 @@ export function CommandPalette({ open, onClose }: Props) {
   // scope selector).
   useEffect(() => {
     const q = query.trim();
-    if (q.length < 3) {
-      setSearchHits([]);
-      return;
-    }
+    if (q.length < 3) return;
     const timer = setTimeout(async () => {
       try {
         const ps = await api.listProjects();
@@ -141,10 +155,6 @@ export function CommandPalette({ open, onClose }: Props) {
       }
     }, 200);
     return () => clearTimeout(timer);
-  }, [query]);
-
-  useEffect(() => {
-    setSelected(0);
   }, [query]);
 
   if (!open) return null;

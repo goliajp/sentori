@@ -1,9 +1,10 @@
 // DLQ + recent push triage. Status filter + per-row retry.
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import { api } from '../lib/api';
+import { useAsyncData } from '../lib/useAsyncData';
 import {
   Badge,
   Button,
@@ -29,35 +30,35 @@ interface Row {
 
 export default function PushSends() {
   const { id: projectId } = useParams<{ id: string }>();
-  const [rows, setRows] = useState<Row[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'' | 'queued' | 'sent' | 'failed'>(
     '',
   );
 
-  async function refresh() {
-    if (!projectId) return;
-    try {
-      const r = await api.listPushSends(projectId, {
-        status: filter || undefined,
-        limit: 100,
-      });
-      setRows(r.sends);
-    } catch (e) {
-      setError(String(e));
-    }
-  }
-
-  useEffect(() => {
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, filter]);
+  const {
+    data,
+    error,
+    reload: refresh,
+    setError,
+  } = useAsyncData(
+    async (): Promise<Row[]> =>
+      projectId
+        ? (
+            await api.listPushSends(projectId, {
+              status: filter || undefined,
+              limit: 100,
+            })
+          ).sends
+        : [],
+    [projectId, filter],
+    String,
+  );
+  const rows = data ?? [];
 
   async function retry(id: string) {
     if (!projectId) return;
     try {
       await api.retryPushSend(projectId, id);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }
@@ -68,7 +69,7 @@ export default function PushSends() {
     if (!confirm(`Re-queue all ${counts.failed} failed sends?`)) return;
     try {
       await api.retryAllFailedPushSends(projectId);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }

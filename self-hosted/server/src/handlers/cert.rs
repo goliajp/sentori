@@ -33,6 +33,20 @@ pub struct ObservationRow {
     pub observed_at: OffsetDateTime,
 }
 
+/// Positional shape of the `cert_observations` query: id,
+/// project_id, domain, common_name, issuer_name, not_before,
+/// not_after, observed_at.
+type CertObservationRow = (
+    Uuid,
+    Uuid,
+    String,
+    Option<String>,
+    String,
+    OffsetDateTime,
+    OffsetDateTime,
+    OffsetDateTime,
+);
+
 pub async fn list_watches(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<crate::session_mw::SessionContext>,
@@ -56,16 +70,7 @@ pub async fn list_observations(
     // Direct SQL read — bypass K10 service since we're just
     // reading the persisted observations table.
     let _pid = ProjectId::from_uuid(project_id);
-    let rows: Vec<(
-        Uuid,
-        Uuid,
-        String,
-        Option<String>,
-        String,
-        OffsetDateTime,
-        OffsetDateTime,
-        OffsetDateTime,
-    )> = sqlx::query_as(
+    let rows: Vec<CertObservationRow> = sqlx::query_as(
         "SELECT id, project_id, domain, common_name, issuer_name,
                 not_before, not_after, observed_at
          FROM cert_observations

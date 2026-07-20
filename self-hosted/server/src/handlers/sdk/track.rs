@@ -68,12 +68,9 @@ pub async fn handle(
     let mut accepted = 0u32;
     let mut failed = 0u32;
     for raw in arr {
-        let ev: TrackEvent = match serde_json::from_value(raw) {
-            Ok(e) => e,
-            Err(_) => {
-                failed += 1;
-                continue;
-            }
+        let Ok(ev) = serde_json::from_value::<TrackEvent>(raw) else {
+            failed += 1;
+            continue;
         };
         let id = Uuid::now_v7();
         let result = sqlx::query(

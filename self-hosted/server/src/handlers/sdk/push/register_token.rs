@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use sentori_ingest_token::IngestContext;
-use sentori_push_provider::{ProviderKind, PushError};
+use sentori_push_provider::ProviderKind;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use tracing::{info, warn};
@@ -35,14 +35,11 @@ pub async fn handle(
     State(state): State<Arc<AppState>>,
     Json(body): Json<RegisterBody>,
 ) -> (StatusCode, Json<Value>) {
-    let kind = match parse_kind(&body.kind) {
-        Some(k) => k,
-        None => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(json!({ "error": "invalid_kind", "got": body.kind })),
-            );
-        }
+    let Some(kind) = parse_kind(&body.kind) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid_kind", "got": body.kind })),
+        );
     };
 
     // v0.2 canonical store is `device_tokens` (push.send /

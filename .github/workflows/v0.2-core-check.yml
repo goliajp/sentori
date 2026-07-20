@@ -62,12 +62,8 @@ jobs:
           workspaces: self-hosted/server
       - name: fmt
         run: cargo fmt --all -- --check
-      # Not `-D warnings` yet: this crate carries ~110 pre-existing
-      # lints from never having been linted, and clearing them means
-      # touching ~64 files of a binary that is currently serving
-      # production. Surfaced here so the count can only go down;
-      # promoting to -D warnings is its own change.
-      - name: clippy (report-only)
-        run: cargo clippy --all-targets
+      # The crate is clippy-clean, so warnings are hard failures here.
+      - name: clippy
+        run: cargo clippy --all-targets -- -D warnings
       - name: test
         run: cargo test --all-targets

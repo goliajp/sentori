@@ -3,10 +3,11 @@
 // This is the new-customer onboarding step that produces the
 // `st_pk_<26 base32>` string they paste into SDK init().
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 
-import { api, TokenSummary } from '../lib/api';
+import { api } from '../lib/api';
+import { useAsyncData } from '../lib/useAsyncData';
 import {
   Badge,
   Button,
@@ -22,30 +23,22 @@ import {
 
 export default function Tokens() {
   const { id: projectId } = useParams<{ id: string }>();
-  const [rows, setRows] = useState<TokenSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [label, setLabel] = useState('');
   const [newToken, setNewToken] = useState<string | null>(null);
 
-  async function refresh() {
-    if (!projectId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await api.listTokens(projectId);
-      setRows(r.tokens);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    refresh();
-  }, [projectId]);
+  const {
+    data,
+    loading,
+    error,
+    reload: refresh,
+    setError,
+  } = useAsyncData(
+    async () => (projectId ? (await api.listTokens(projectId)).tokens : []),
+    [projectId],
+    String,
+  );
+  const rows = data ?? [];
 
   async function mint() {
     if (!projectId) return;
@@ -57,7 +50,7 @@ export default function Tokens() {
       setNewToken(r.token);
       setLabel('');
       setShowCreate(false);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }
@@ -68,7 +61,7 @@ export default function Tokens() {
       return;
     try {
       await api.revokeToken(id);
-      await refresh();
+      refresh();
     } catch (e) {
       setError(String(e));
     }

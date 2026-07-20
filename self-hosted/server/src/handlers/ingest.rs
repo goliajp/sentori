@@ -100,23 +100,6 @@ pub async fn ingest_event(
     ))
 }
 
-/// Legacy-compat ingest path — POST /v1/events with the
-/// project derived from the `Authorization: Bearer
-/// <token>` header. v0.1 self-hosted accepts both
-/// shapes so SDK ports can happen one at a time.
-///
-/// v0.1 skeleton returns 501 until K7/K2 token
-/// middleware lands — SDK should POST to
-/// `/v1/events/{project_id}` (the v0.1 native path)
-/// until then. Documented in
-/// `docs-v0.1/reference/api-compat.md`.
-pub async fn ingest_event_legacy() -> Result<StatusCode, (StatusCode, String)> {
-    Err((
-        StatusCode::NOT_IMPLEMENTED,
-        "legacy /v1/events stub — pending token middleware. Use POST /v1/events/{project_id} for v0.1.".into(),
-    ))
-}
-
 fn parse_platform(s: &str) -> Platform {
     match s.trim().to_ascii_lowercase().as_str() {
         "android" => Platform::Android,

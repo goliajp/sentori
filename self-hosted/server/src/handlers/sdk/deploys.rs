@@ -2,8 +2,8 @@
 //!
 //! UPSERTs a row in `releases` table (idempotent on
 //! `(project_id, name)`). SDK calls this once per release roll-
-//! out so the dashboard "Releases" page can list deploy markers
-//! + downstream events can JOIN against `release.id` (via the
+//! out so the dashboard "Releases" page can list deploy markers,
+//! and downstream events can JOIN against `release.id` (via the
 //! release name).
 
 use std::sync::Arc;

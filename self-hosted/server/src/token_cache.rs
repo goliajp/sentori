@@ -34,7 +34,7 @@ impl TokenCache {
         let guard = self.inner.lock().ok()?;
         let entry = guard.get(&(project_id, kind.to_string()))?;
         let now = Instant::now();
-        if entry.expires_at.checked_duration_since(now)? > Duration::from_secs(300) {
+        if entry.expires_at.checked_duration_since(now)? > Duration::from_mins(5) {
             Some(entry.token.clone())
         } else {
             None

@@ -6,6 +6,26 @@
 
 ---
 
+## v1.6.1(2026-07-21 — 两道质量门提到阻塞级,连带两个真 bug)
+
+两项技术债清完,门从"报告"提到"阻塞" —— 目标不是把 warning 数字降下去,是让它今后涨不回来。
+
+**`self-hosted/server` clippy(111 → 0,门改为 `-D warnings`)**
+- `usize`→`i64` 转换用 `try_from` + 饱和兜底并逐处注明为何不可达,而非整体 allow;两处改为真错误路径:`webpush_encrypt` 的 RFC 8188 `idlen` 字节截断会静默破坏帧结构,现返回 `InvalidServerKeyLen`
+- `webhook::deliver` 可从两个请求处理器到达,其 HMAC `expect` 改为真错误;其余三处保留并写明不变量(启动接线、两处 `SecretKey::generate` 仅在 OS CSPRNG 不可用时失败)
+- 删除确实无人使用的:`AppState` 三个启动时构建却从不读取的字段、`AttachmentStore::{get,delete}`、一个未挂路由的 501 桩、一个残留查询字段
+- **`state.rs` 的 `#[allow(dead_code)]` 与其目标之间隔了空行**,实际在给 `RecentEventTick`(事件总线载荷,完全活跃)无差别放行,而四十行外三个真死字段反而不报。移除它才使其浮现
+
+**webapp `set-state-in-effect`(17 → 0,门回到 error 级)**
+- 新增 `useAsyncData`,取代 13 个页面各自长出的 `useState` 三件套 + `useEffect`
+- **修掉被复制了 17 份的竞态**:快速切换项目时较慢的首个请求会后到并覆盖较新数据。每次运行取单调 ticket,仅最新者可写状态;卸载后不再写状态
+- 五个页面此前在后续成功加载时从不清除错误,过期报错横幅会永远挂着
+- 错误文案**刻意不统一**:仅两页用 `${status}: ${body}`,其余十一页用裸 `String(e)`,统一会改变用户实际看到的文字
+
+**`fix(push)`:`appUserId` 定向静默不发** —— 该字段在文档注释里被宣传为定向方式,但 `resolve_targets` 仅处理 `tokenIds` / `nativeTokens` / `topic`。只设 `appUserId` 的推送会解析到零设备、什么都不发、返回 200,调用方以为已送达。现返回 400 并告知可用的定向方式。该模式仍未实现,只是不再假装实现了。
+
+---
+
 ## v1.6.0(2026-07-21 — OAuth 登录移植 ⚠️ 含 legacy 账号劫持修复)
 
 将 GitHub / Google 登录移植到 v0.2。**存储模型是重建的而非照搬**:legacy 把身份存在 `users.oauth_provider` / `oauth_subject`,v0.2 无此二列;`user_federation_links` 虽名字相近但不可替代 —— 它是项目级、`user_id` 为 TEXT 而非指向 `users` 的外键、且带 `install_id`,模型的是 SDK 侧最终用户联合。新增 migration 0032 建 `user_oauth_identities`,独立表以支持单账号同时绑定两个 provider(两个列做不到)。

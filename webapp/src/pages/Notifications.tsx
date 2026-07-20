@@ -1,8 +1,7 @@
 // Per-user notification inbox.
 
-import { useEffect, useState } from 'react';
-
 import { api } from '../lib/api';
+import { useAsyncData } from '../lib/useAsyncData';
 import {
   Badge,
   Button,
@@ -23,41 +22,28 @@ interface Row {
 }
 
 export default function Notifications() {
-  const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  async function refresh() {
-    setLoading(true);
-    try {
-      const r = await api.listNotifications();
-      setRows(r.notifications);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    refresh();
-  }, []);
+  const { data, loading, error, setData } = useAsyncData(
+    async (): Promise<Row[]> => (await api.listNotifications()).notifications,
+    [],
+    String,
+  );
+  const rows = data ?? [];
 
   async function readOne(id: string) {
     await api.markNotificationRead(id);
-    setRows(rs =>
-      rs.map(r =>
+    setData(rs =>
+      rs?.map(r =>
         r.id === id && !r.read_at
           ? { ...r, read_at: new Date().toISOString() }
           : r,
-      ),
+      ) ?? null,
     );
   }
 
   async function readAll() {
     await api.markAllNotificationsRead();
     const now = new Date().toISOString();
-    setRows(rs => rs.map(r => (r.read_at ? r : { ...r, read_at: now })));
+    setData(rs => rs?.map(r => (r.read_at ? r : { ...r, read_at: now })) ?? null);
   }
 
   const unread = rows.filter(r => !r.read_at).length;

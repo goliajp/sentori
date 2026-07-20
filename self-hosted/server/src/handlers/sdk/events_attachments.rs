@@ -24,7 +24,6 @@ use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode, header},
 };
-use sentori_attachment_store::BlobStore;
 use sentori_ingest_token::IngestContext;
 use serde_json::{Value, json};
 use tracing::{info, warn};
@@ -72,7 +71,9 @@ pub async fn handle(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("application/octet-stream")
         .to_string();
-    let size_bytes = body.len() as i64;
+    // Body length is already bounded by the request body limit, so
+    // this cannot saturate in practice.
+    let size_bytes = i64::try_from(body.len()).unwrap_or(i64::MAX);
 
     // Store the blob. Phase D step 2 uses AppState's shared
     // MemoryBlobStore; Phase E swaps to LocalFsBlobStore (S3

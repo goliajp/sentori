@@ -62,8 +62,8 @@ pub async fn handle(
             if let Some(send_ids) = resp.get("send_ids").and_then(|v| v.as_array()) {
                 all_send_ids.extend(send_ids.clone());
             }
-            if let Some(queued) = resp.get("queued").and_then(|v| v.as_u64()) {
-                all_queued += queued as u32;
+            if let Some(queued) = resp.get("queued").and_then(serde_json::Value::as_u64) {
+                all_queued += u32::try_from(queued).unwrap_or(u32::MAX);
             }
         }
     }
