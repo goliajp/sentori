@@ -60,6 +60,8 @@ anyhow = "1"
 tracing = "0.1"
 http = "1"
 sha2 = "0.10"
+hex = "0.4"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 [profile.release]
 opt-level = 3
