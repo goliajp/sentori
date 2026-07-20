@@ -6,6 +6,24 @@
 
 ---
 
+## v1.6.0(2026-07-21 — OAuth 登录移植 ⚠️ 含 legacy 账号劫持修复)
+
+将 GitHub / Google 登录移植到 v0.2。**存储模型是重建的而非照搬**:legacy 把身份存在 `users.oauth_provider` / `oauth_subject`,v0.2 无此二列;`user_federation_links` 虽名字相近但不可替代 —— 它是项目级、`user_id` 为 TEXT 而非指向 `users` 的外键、且带 `install_id`,模型的是 SDK 侧最终用户联合。新增 migration 0032 建 `user_oauth_identities`,独立表以支持单账号同时绑定两个 provider(两个列做不到)。
+
+**legacy 实现存在可实施的账号劫持,已刻意不移植**:`extract_github` 读取 `v["email"]` 且**无任何验证检查** —— 那是 GitHub 的公开资料邮箱,GitHub 从不验证、任何人可填任意地址 —— 随后 `upsert_oauth_user` 执行 `SELECT id FROM users WHERE email = $1` 并 `UPDATE … oauth_provider = …, email_verified = TRUE`。将 GitHub 资料邮箱改为受害者地址,点一次 "Continue with GitHub" 即接管其 Sentori 账号,并顺带标记该账号邮箱已验证。新实现只从 `/user/emails` 取地址,要求 `verified` 与 `primary` 同时为真,provider 不背书则拒绝关联。
+
+其余边界:
+- state cookie 与回调 `state` 比对,缺失或为空即拒绝
+- 已有身份记录时**仅按 provider 的 subject 匹配**;邮箱只用于首次关联
+- 新建用户写入哨兵密码哈希(argon2 无法解析),`/auth/login` 永不可能对其成功
+- `exchange_code` 只记 provider 与状态码,绝不记 code / token / secret;非 2xx 分支丢弃响应体(部分 provider 会在错误里回显提交的 client_secret)
+
+session 签发与密码登录**共用同一实现**(`session_cookie_header`),两条路径无法漂移。
+
+13 个单元测试覆盖无需网络的部分:provider 解析、authorize URL 构造、两个 provider 的提取器(含未验证邮箱的拒绝)、state 比对的六种拒绝形态。
+
+---
+
 ## v1.5.0(2026-07-21 — SaaS 管理入口统一)
 
 Workspace 管理此前存在两套。`sentori-server` 的 `/admin/api/saas/{workspaces,stats}` 只读,走 dashboard session + saasadmin 角色门,是 **UI 唯一调用的那套**;`sentori-saas-control` 的 `/v1/saas/workspaces` 有完整 CRUD 与 suspend/resume,走**另一套独立账号体系**(`saasadmin_users` / `saasadmin_sessions`),却没有任何界面。一件事,两个接口,两套登录。
