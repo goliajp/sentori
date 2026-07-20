@@ -462,6 +462,7 @@ async fn patch_status_and_priority_round_trip() {
 
     let outcome = store
         .patch(
+            workspace_id,
             out.issue_id,
             IssuePatch {
                 status: Some(IssueStatus::Resolved),
@@ -499,6 +500,7 @@ async fn patch_assignee_tri_state() {
     // Assign.
     store
         .patch(
+            workspace_id,
             out.issue_id,
             IssuePatch {
                 assignee_user_id: Some(Some(assignee)),
@@ -514,6 +516,7 @@ async fn patch_assignee_tri_state() {
     // Clear.
     store
         .patch(
+            workspace_id,
             out.issue_id,
             IssuePatch {
                 assignee_user_id: Some(None),
@@ -539,6 +542,7 @@ async fn patch_invalid_priority_rejected() {
     let store = IssueStore::new(pool);
     let err = store
         .patch(
+            workspace_id,
             out.issue_id,
             IssuePatch {
                 priority: Some("p99".into()),
@@ -553,10 +557,11 @@ async fn patch_invalid_priority_rejected() {
 
 #[tokio::test]
 async fn patch_missing_id_errors() {
-    let (pool, _workspace_id) = fresh_pool().await;
+    let (pool, workspace_id) = fresh_pool().await;
     let store = IssueStore::new(pool);
     let err = store
         .patch(
+            workspace_id,
             Uuid::now_v7(),
             IssuePatch {
                 priority: Some("p1".into()),
@@ -582,6 +587,7 @@ async fn bulk_patch_silent_on_missing_ids() {
     let store = IssueStore::new(pool);
     let outcome = store
         .bulk_patch(
+            workspace_id,
             &[real.issue_id, phantom],
             IssuePatch {
                 priority: Some("p0".into()),
@@ -606,6 +612,7 @@ async fn patch_reopen_flag_fires() {
     let store = IssueStore::new(pool);
     store
         .patch(
+            workspace_id,
             out.issue_id,
             IssuePatch {
                 status: Some(IssueStatus::Resolved),
@@ -617,6 +624,7 @@ async fn patch_reopen_flag_fires() {
         .unwrap();
     let outcome = store
         .patch(
+            workspace_id,
             out.issue_id,
             IssuePatch {
                 status: Some(IssueStatus::Active),
@@ -728,6 +736,7 @@ async fn label_and_priority_filter_match() {
     let store = IssueStore::new(pool);
     store
         .patch(
+            workspace_id,
             a.issue_id,
             IssuePatch {
                 priority: Some("p0".into()),
@@ -740,6 +749,7 @@ async fn label_and_priority_filter_match() {
         .unwrap();
     store
         .patch(
+            workspace_id,
             b.issue_id,
             IssuePatch {
                 priority: Some("p2".into()),
@@ -778,4 +788,95 @@ async fn label_and_priority_filter_match() {
         .unwrap();
     assert_eq!(crash_only.items.len(), 1);
     assert_eq!(crash_only.items[0].error_type, "A");
+}
+
+// ── tenant isolation ──────────────────────────────────────────
+
+#[tokio::test]
+async fn patch_refuses_an_issue_from_another_workspace() {
+    // The handler layer narrows ids before calling the store, but
+    // that narrowing is one line in one caller. This asserts the
+    // store itself won't write across the boundary, so a future
+    // caller that forgets can't reach another tenant's rows.
+    let (pool, workspace_a) = fresh_pool().await;
+    let workspace_b = bootstrap_workspace(&pool, "other")
+        .await
+        .expect("second workspace");
+
+    let project_a = seed_project(&pool, workspace_a, "a").await;
+    let svc = IngestService::new(pool.clone(), IngestOptions::default()).expect("svc");
+    let seeded = svc
+        .ingest(project_a, exception("app@1.0.0", "A", "boom", 1000))
+        .await
+        .unwrap();
+    let store = IssueStore::new(pool.clone());
+
+    // B tries to resolve an issue that belongs to A.
+    let outcome = store
+        .bulk_patch(
+            workspace_b,
+            &[seeded.issue_id],
+            IssuePatch {
+                status: Some(IssueStatus::Resolved),
+                ..Default::default()
+            },
+            OffsetDateTime::now_utc(),
+        )
+        .await
+        .expect("bulk_patch should succeed with zero rows, not error");
+    assert_eq!(outcome.updated, 0, "wrote across the workspace boundary");
+
+    // And the row is untouched.
+    let status: String = sqlx::query_scalar("SELECT status FROM issues WHERE id = $1")
+        .bind(seeded.issue_id)
+        .fetch_one(&pool)
+        .await
+        .expect("read back");
+    assert_eq!(status, "active");
+
+    // The owner can still patch it — the constraint isn't just
+    // breaking the write path for everyone.
+    let ok = store
+        .bulk_patch(
+            workspace_a,
+            &[seeded.issue_id],
+            IssuePatch {
+                status: Some(IssueStatus::Resolved),
+                ..Default::default()
+            },
+            OffsetDateTime::now_utc(),
+        )
+        .await
+        .expect("owner patch");
+    assert_eq!(ok.updated, 1);
+}
+
+#[tokio::test]
+async fn single_patch_reports_not_found_across_workspaces() {
+    // `patch` surfaces a 404 where `bulk_patch` silently no-ops;
+    // a foreign issue must look identical to an absent one.
+    let (pool, workspace_a) = fresh_pool().await;
+    let workspace_b = bootstrap_workspace(&pool, "other")
+        .await
+        .expect("second workspace");
+    let project_a = seed_project(&pool, workspace_a, "a").await;
+    let svc = IngestService::new(pool.clone(), IngestOptions::default()).expect("svc");
+    let seeded = svc
+        .ingest(project_a, exception("app@1.0.0", "A", "boom", 1000))
+        .await
+        .unwrap();
+
+    let err = IssueStore::new(pool)
+        .patch(
+            workspace_b,
+            seeded.issue_id,
+            IssuePatch {
+                status: Some(IssueStatus::Ignored),
+                ..Default::default()
+            },
+            OffsetDateTime::now_utc(),
+        )
+        .await
+        .expect_err("must not patch another workspace's issue");
+    assert!(matches!(err, IssueStoreError::IssueNotFound(_)));
 }

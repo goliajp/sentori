@@ -34,6 +34,13 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: check
         run: cargo check --workspace --all-targets
+      # The core crates' integration tests spin up their own Postgres
+      # via testcontainers, so they need nothing but a docker daemon —
+      # which the runner has. They were never run in CI: this job did
+      # clippy and check only, so every assertion in
+      # crates/*/tests/integration.rs was dead weight.
+      - name: test
+        run: cargo test --workspace --all-targets
 
   # The v0.2 server crate had no CI at all: build.yml tests the legacy
   # `server/` and this workflow tested `core/`, so nothing ever
