@@ -10,7 +10,6 @@ import {
   DataTable,
   ErrorBanner,
   PageHeader,
-  Section,
   formatRelative,
 } from '../components/ui';
 

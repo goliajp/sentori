@@ -104,7 +104,7 @@ export default function TraceDetail() {
         <Section>
           <div className="grid grid-cols-4 gap-4">
             <Cell label="Status">
-              <Badge variant={trace.status === 'ok' ? 'ok' : 'muted'}>
+              <Badge tone={trace.status === 'ok' ? 'ok' : 'neutral'}>
                 {trace.status}
               </Badge>
             </Cell>
@@ -202,7 +202,7 @@ function SpanRowItem({
           <span className="font-mono text-[11px] text-zinc-200 truncate">
             {s.name}
           </span>
-          <Badge variant={s.status === 'ok' ? 'ok' : 'muted'}>
+          <Badge tone={s.status === 'ok' ? 'ok' : 'neutral'}>
             {s.status}
           </Badge>
         </div>

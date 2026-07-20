@@ -144,7 +144,7 @@ export default function Projects() {
           ) : rows.length === 0 ? (
             <EmptyState
               title="No projects yet"
-              message="Create one to start ingesting events."
+              hint="Create one to start ingesting events."
             />
           ) : (
             <DataTable

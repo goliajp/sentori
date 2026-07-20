@@ -151,7 +151,7 @@ export default function Tokens() {
           ) : rows.length === 0 ? (
             <EmptyState
               title="No tokens yet"
-              message="Mint one to get your SDK ingesting events."
+              hint="Mint one to get your SDK ingesting events."
             />
           ) : (
             <DataTable
@@ -170,9 +170,9 @@ export default function Tokens() {
                 last4: t.last4 ? `…${t.last4}` : '—',
                 created: formatRelative(t.created_at),
                 status: t.revoked_at ? (
-                  <Badge variant="muted">revoked</Badge>
+                  <Badge tone="neutral">revoked</Badge>
                 ) : (
-                  <Badge variant="ok">active</Badge>
+                  <Badge tone="ok">active</Badge>
                 ),
                 actions: !t.revoked_at && (
                   <Button

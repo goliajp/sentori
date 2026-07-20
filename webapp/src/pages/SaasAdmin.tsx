@@ -71,7 +71,7 @@ export default function SaasAdmin() {
           ) : rows.length === 0 ? (
             <EmptyState
               title="No workspaces"
-              message="No workspaces have been provisioned yet."
+              hint="No workspaces have been provisioned yet."
             />
           ) : (
             <DataTable
@@ -96,9 +96,9 @@ export default function SaasAdmin() {
                 plan: <Badge>{w.plan}</Badge>,
                 status:
                   w.status === 'active' ? (
-                    <Badge variant="ok">{w.status}</Badge>
+                    <Badge tone="ok">{w.status}</Badge>
                   ) : (
-                    <Badge variant="muted">{w.status}</Badge>
+                    <Badge tone="neutral">{w.status}</Badge>
                   ),
                 projects: formatNumber(w.project_count),
                 members: formatNumber(w.member_count),

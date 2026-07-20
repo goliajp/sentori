@@ -119,7 +119,7 @@ export function DataTable<T>({
   columns: { key: keyof T | string; label: string; render?: (row: T) => ReactNode; width?: string }[];
   rows: T[];
   empty?: string;
-  rowKey: (row: T) => string;
+  rowKey?: (row: T) => string;
 }) {
   if (rows.length === 0) {
     return (
@@ -143,8 +143,8 @@ export function DataTable<T>({
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-800">
-          {rows.map((r) => (
-            <tr key={rowKey(r)} className="hover:bg-zinc-900/50">
+          {rows.map((r, i) => (
+            <tr key={rowKey ? rowKey(r) : String(i)} className="hover:bg-zinc-900/50">
               {columns.map((c) => (
                 <td key={String(c.key)} className="px-3 py-2.5 text-zinc-300">
                   {c.render
@@ -223,18 +223,20 @@ export function Section({
   children,
   action,
 }: {
-  title: string;
+  title?: string;
   children: ReactNode;
   action?: ReactNode;
 }) {
   return (
     <section className="mb-8">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-medium uppercase tracking-wide text-zinc-400">
-          {title}
-        </h3>
-        {action}
-      </div>
+      {(title || action) && (
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-medium uppercase tracking-wide text-zinc-400">
+            {title}
+          </h3>
+          {action}
+        </div>
+      )}
       {children}
     </section>
   );

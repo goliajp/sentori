@@ -110,9 +110,9 @@ export default function Members() {
             <pre className="overflow-x-auto whitespace-pre-wrap break-all bg-zinc-50 p-3 text-xs font-mono">
               {newInviteToken}
             </pre>
-            <Button onClick={() => setNewInviteToken(null)} className="mt-2">
-              Done
-            </Button>
+            <div className="mt-2">
+              <Button onClick={() => setNewInviteToken(null)}>Done</Button>
+            </div>
           </Section>
         </Card>
       )}
@@ -159,7 +159,7 @@ export default function Members() {
               Loading…
             </div>
           ) : members.length === 0 ? (
-            <EmptyState title="No members" message="Invite teammates to start." />
+            <EmptyState title="No members" hint="Invite teammates to start." />
           ) : (
             <DataTable
               columns={[
@@ -174,7 +174,7 @@ export default function Members() {
                   <span className="font-mono text-xs">{m.user_id}</span>
                 ),
                 role: (
-                  <Badge variant={m.role === 'owner' ? 'ok' : 'default'}>
+                  <Badge tone={m.role === 'owner' ? 'ok' : 'neutral'}>
                     {m.role}
                   </Badge>
                 ),
@@ -212,7 +212,7 @@ export default function Members() {
           {invites.length === 0 ? (
             <EmptyState
               title="No invites"
-              message="Pending and historical invites land here."
+              hint="Pending and historical invites land here."
             />
           ) : (
             <DataTable
@@ -229,11 +229,11 @@ export default function Members() {
                 role: <Badge>{i.role}</Badge>,
                 created: formatRelative(i.created_at),
                 status: i.accepted_at ? (
-                  <Badge variant="ok">accepted</Badge>
+                  <Badge tone="ok">accepted</Badge>
                 ) : new Date(i.expires_at) < new Date() ? (
-                  <Badge variant="muted">expired</Badge>
+                  <Badge tone="neutral">expired</Badge>
                 ) : (
-                  <Badge variant="default">pending</Badge>
+                  <Badge tone="neutral">pending</Badge>
                 ),
                 actions:
                   !i.accepted_at && new Date(i.expires_at) > new Date() ? (

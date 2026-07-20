@@ -148,7 +148,7 @@ export default function Releases() {
           ) : rows.length === 0 ? (
             <EmptyState
               title="No releases"
-              message="SDK calls /v1/deploys when a release ships — it'll appear here."
+              hint="SDK calls /v1/deploys when a release ships — it'll appear here."
             />
           ) : (
             <div className="space-y-2">
@@ -166,7 +166,7 @@ export default function Releases() {
                         {expanded === r.id ? '▼' : '▶'} {r.name}
                       </button>
                       {r.deploy_at && (
-                        <Badge variant="ok">deployed</Badge>
+                        <Badge tone="ok">deployed</Badge>
                       )}
                     </div>
                     <div className="flex items-center gap-3">

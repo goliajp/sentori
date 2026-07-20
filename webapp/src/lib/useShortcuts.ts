@@ -1,13 +1,16 @@
 // Linear-style two-key nav shortcuts: press `g` then a letter
 // within 1.5s to navigate. Skips when focus is in an input.
 
-import { useCallback, useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 /// Page-level single-key handler. Caller passes a map of
 /// { key: handler }; we skip when focus is in an editable.
+/// The listener registers once; the ref always sees the latest map
+/// (callers pass a fresh object literal every render).
 export function useKeyHandlers(map: Record<string, () => void>) {
-  const stable = useCallback(map, [map]);
+  const stable = useRef(map);
+  stable.current = map;
   useEffect(() => {
     function inEditable(): boolean {
       const a = document.activeElement;
@@ -20,7 +23,7 @@ export function useKeyHandlers(map: Record<string, () => void>) {
     function onKey(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (inEditable()) return;
-      const fn = stable[e.key];
+      const fn = stable.current[e.key];
       if (fn) {
         e.preventDefault();
         fn();
@@ -28,7 +31,7 @@ export function useKeyHandlers(map: Record<string, () => void>) {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [stable]);
+  }, []);
 }
 
 const SHORTCUTS: Record<string, string> = {
