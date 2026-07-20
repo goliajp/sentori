@@ -6,6 +6,27 @@
 
 ---
 
+## v1.6.2(2026-07-21 — 依赖全面升级到最新 stable)
+
+覆盖所有 workspace 与前端包,目标是消除 dependabot 的过期告警并把每个包带到它能到的最新。
+
+**Rust**(1.97.1 已是 latest stable,各 workspace `rust-version` 一致)
+- 六个 workspace 108 个包更新到最新兼容(补丁/小版本);除下述 wasmtime 外无 crate 落后大版本
+- `generic-array` 弃用 `GenericArray::as_slice`,`webpush_encrypt` 的 HKDF 推导改用 deref borrow —— 一小时前刚提到阻塞级的 clippy 门抓住的,位置在 WebPush 加密路径
+- **wasmtime 39 → 47**(legacy `server/` 的 dev 依赖)。它支撑 `tests/wasm_score.rs` 的信任分数 kernel 回归测试(5 断言,加载前端也在跑的 `sentori_score.wasm`);用的都是稳定核心 API,升级仅动 lockfile,5 断言在 47 上全过
+
+**JS**
+- webapp(vite 6→8、plugin-react 4→6、react 19.2)、web(react-router 7→8、jest-dom 6→7)、marketing/docs-site(sharp、sentori-javascript 0.1→1.3)、10 个 SDK(TypeScript 6→7)全部到各自能到的最新
+- webapp 强制改动一处:tsconfig 加 `"types": ["vite/client"]`(TS 严格化后 side-effect CSS import 需要,与 web/ 已有约定一致)
+
+**Tailwind webapp v3 → v4** —— 零视觉变化。theme 从 `tailwind.config.js` 迁入 CSS `@theme`,自定义 token(brand/字体)与约 30 个用到的默认色阶逐个 pin 回 v3 精确 hex,边框/placeholder 默认在 `@layer base` 复原。证据:编译产物零 `oklch`、32 个 token diff 无差异
+
+**Expo SDK 声明为 latest** —— `@expo/config-plugins` 56→57,peer 开放到 `expo >=56.0.0`(去掉 `<57` 上界,不排除 56 用户)。`app.plugin.js` 用的 7 个 config-plugins API 在 57 全在(实测对 57 加载),SDK 源码不 import config-plugins,纯声明升级
+
+**上游阻塞,如实保留**:TypeScript 7 在 webapp/web(typescript-eslint 硬拒 TS 7.0,实测确认)与 marketing/docs-site(astro check 依赖 TS 7 移除的 API);Tailwind 4 已在 web;rn-example 的 Expo 55→57 是需真机验证的 app 工程,独立处理。
+
+---
+
 ## v1.6.1(2026-07-21 — 两道质量门提到阻塞级,连带两个真 bug)
 
 两项技术债清完,门从"报告"提到"阻塞" —— 目标不是把 warning 数字降下去,是让它今后涨不回来。
