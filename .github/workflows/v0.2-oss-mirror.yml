@@ -50,6 +50,13 @@ jobs:
             --exclude='docs-v0.1/' \
             --exclude='docs-v0.2/' \
             --exclude='ROADMAP.md' \
+            --exclude='ROADMAP-PHASE-50.md' \
+            --exclude='ops/secrets.md' \
+            --exclude='.github/workflows/build.yml' \
+            --exclude='.github/workflows/deploy.yml' \
+            --exclude='.github/workflows/mobile-e2e.yml' \
+            --exclude='.github/workflows/release-cli.yml' \
+            --exclude='.github/workflows/sdk-perf.yml' \
             --exclude='CHANGELOG.md' \
             --exclude='CONTRIBUTING.md' \
             --exclude='CODE_OF_CONDUCT.md' \
