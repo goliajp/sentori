@@ -22,18 +22,21 @@ pub async fn ingest_webhook(
     secret: &str,
     now_unix: i64,
 ) -> anyhow::Result<bool> {
-    let _verified = verify(secret.as_bytes(), sig_header, body, now_unix, Tolerance::default())
-        .map_err(|e| anyhow::anyhow!("stripe sig verify: {e}"))?;
+    let _verified = verify(
+        secret.as_bytes(),
+        sig_header,
+        body,
+        now_unix,
+        Tolerance::default(),
+    )
+    .map_err(|e| anyhow::anyhow!("stripe sig verify: {e}"))?;
     let payload: serde_json::Value = serde_json::from_slice(body)
         .map_err(|e| anyhow::anyhow!("malformed Stripe payload JSON: {e}"))?;
     let stripe_event_id = payload
         .get("id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow::anyhow!("Stripe event payload missing `id`"))?;
-    let event_type = payload
-        .get("type")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let event_type = payload.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
     let inserted: Option<(Uuid,)> = sqlx::query_as(
         r"

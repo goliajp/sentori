@@ -266,7 +266,22 @@ pub fn router(state: Arc<AppState>) -> Router {
     // SaaS cross-workspace endpoints — session-gated AND
     // saasadmin-role-gated (env-driven allowlist).
     let saas_routes = Router::new()
-        .route("/admin/api/saas/workspaces", get(admin::saas::workspaces))
+        .route(
+            "/admin/api/saas/workspaces",
+            get(admin::saas::workspaces).post(admin::saas::create_workspace),
+        )
+        .route(
+            "/admin/api/saas/workspaces/{id}",
+            delete(admin::saas::delete_workspace),
+        )
+        .route(
+            "/admin/api/saas/workspaces/{id}/suspend",
+            post(admin::saas::suspend_workspace),
+        )
+        .route(
+            "/admin/api/saas/workspaces/{id}/resume",
+            post(admin::saas::resume_workspace),
+        )
         .route("/admin/api/saas/stats", get(admin::saas::workspace_stats))
         .layer(axum_middleware::from_fn(saasadmin_only))
         .layer(axum_middleware::from_fn_with_state(
