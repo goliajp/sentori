@@ -134,4 +134,4 @@ proptest = "1"
 # kernel at `wasm/score/`. The 433-byte artifact in `web/public/wasm/`
 # is committed; this dep lets us load it from a server test and
 # assert the math stays correct across Rust toolchain bumps.
-wasmtime = "39"
+wasmtime = "47"
