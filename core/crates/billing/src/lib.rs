@@ -93,7 +93,7 @@ mod service;
 pub use error::BillingError;
 pub use model::{
     CounterKind, CounterKindParseError, Decision, Limits, Plan, PlanParseError, PlanStatus,
-    PlanStatusParseError, UsageRow, WorkspaceBilling,
+    PlanStatusParseError, UsageRow, WorkspaceBilling, effective_plan,
 };
 pub use period::{next_period_start, period_key};
 pub use service::BillingService;

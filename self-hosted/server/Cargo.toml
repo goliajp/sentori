@@ -58,6 +58,7 @@ sentori-cookie-session     = { path = "../../core/crates/cookie-session" }
 sentori-ingest-token       = { path = "../../core/crates/ingest-token" }
 sentori-push-provider      = { path = "../../core/crates/push-provider" }
 sentori-cert-monitor       = { path = "../../core/crates/cert-monitor" }
+sentori-stripe-webhook-verify = { path = "../../core/crates/stripe-webhook-verify" }
 
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio", "tower-log", "tracing", "macros"] }
 axum-extra = { version = "0.10", default-features = false, features = ["cookie"] }

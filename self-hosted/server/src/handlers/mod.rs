@@ -27,6 +27,7 @@ mod alerts_fire;
 mod api_describe;
 mod audit;
 mod auth;
+mod billing;
 mod cert;
 mod events;
 mod events_live;
@@ -48,6 +49,7 @@ mod self_test;
 mod sessions_admin;
 mod spans;
 mod stats;
+mod stripe_webhook;
 pub mod tenant;
 mod usage;
 mod workspaces;
@@ -186,6 +188,10 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/webhooks/test",
             post(admin::test_webhook::handle),
         )
+        // ── self-serve billing (caller's own workspace) ──────
+        .route("/admin/api/billing", get(billing::get))
+        .route("/admin/api/billing/checkout", post(billing::checkout))
+        .route("/admin/api/billing/portal", post(billing::portal))
         .route("/admin/api/members", get(admin::members::list))
         .route(
             "/admin/api/members/{user_id}",
@@ -291,6 +297,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(
             "/admin/api/saas/workspaces/{id}",
             delete(admin::saas::delete_workspace),
+        )
+        .route(
+            "/admin/api/saas/workspaces/{id}/plan",
+            post(admin::saas::set_plan),
         )
         .route(
             "/admin/api/saas/workspaces/{id}/suspend",
@@ -410,6 +420,8 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/livez", get(health::livez))
         .route("/readyz", get(health::readyz))
         .route("/metrics", get(metrics_prom::handle))
+        // ── stripe webhook (public; HMAC-signature authed) ──
+        .route("/webhooks/stripe", post(stripe_webhook::ingest))
         // ── auth: dashboard user lifecycle (public) ──────
         .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login))

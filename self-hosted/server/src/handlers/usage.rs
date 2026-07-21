@@ -3,12 +3,13 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::State;
+use axum::extract::{Extension, State};
 use axum::http::StatusCode;
-use sentori_billing::{Plan, period_key};
+use sentori_billing::{BillingError, Plan, PlanStatus, effective_plan, period_key};
 use serde::Serialize;
 use time::OffsetDateTime;
 
+use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
 #[derive(Serialize)]
@@ -30,18 +31,25 @@ pub struct CounterTotal {
 
 pub async fn current(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
 ) -> Result<Json<UsageResponse>, (StatusCode, String)> {
-    let billing = state
-        .billing
-        .get()
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    let limits = billing.plan.limits();
+    // Scope to the caller's active workspace, not the boot-time
+    // default — otherwise every SaaS tenant sees the default
+    // workspace's plan and the deployment-wide usage totals.
+    let billing = state.billing_for(ctx.workspace_id);
+    let (plan, status) = match billing.get().await {
+        Ok(b) => (b.plan, b.status),
+        // No billing row yet == an un-subscribed workspace: Free.
+        Err(BillingError::NotInitialised) => (Plan::Free, PlanStatus::Active),
+        Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+    };
+    // Enforced limits follow the effective plan (a canceled Pro
+    // meters against Free), so the panel shows what actually bites.
+    let limits = effective_plan(plan, status).limits();
     let now = OffsetDateTime::now_utc();
     let period = period_key(now);
 
-    let rows = state
-        .billing
+    let rows = billing
         .workspace_usage(&period)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -70,8 +78,8 @@ pub async fn current(
     }
 
     Ok(Json(UsageResponse {
-        plan: plan_str(billing.plan).into(),
-        status: billing.status.to_string(),
+        plan: plan_str(plan).into(),
+        status: status.to_string(),
         period_yyyymm: period,
         events: CounterTotal {
             count: events,

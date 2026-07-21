@@ -39,6 +39,7 @@ use tracing::info;
 mod alert_fire;
 mod apns;
 mod archive_worker;
+mod billing_worker;
 mod blob_store;
 mod bootstrap;
 mod fcm;
@@ -54,6 +55,7 @@ mod push_worker;
 mod saasadmin_mw;
 mod session_mw;
 mod state;
+mod stripe;
 mod token_cache;
 mod webhook;
 mod webpush;
@@ -94,6 +96,9 @@ async fn main() -> anyhow::Result<()> {
     push_worker::spawn(pool.clone(), token_cache);
     probe_worker::spawn(pool.clone());
     periodic_alert_worker::spawn(pool.clone());
+    // Stripe billing worker: drains verified webhook events →
+    // workspace_billing. No-op when Stripe isn't configured.
+    billing_worker::spawn(pool.clone(), state.stripe.clone());
     archive_worker::spawn(pool);
 
     let app = handlers::router(state);

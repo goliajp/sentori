@@ -3,11 +3,14 @@
 use std::sync::Arc;
 
 use axum::{Extension, Json, extract::State, http::StatusCode};
+use sentori_billing::CounterKind;
 use sentori_ingest_token::IngestContext;
 use sentori_span_store::SpanInput;
 use serde_json::{Value, json};
+use time::OffsetDateTime;
 use tracing::{info, warn};
 
+use crate::handlers::sdk::quota;
 use crate::state::AppState;
 
 const MAX_BATCH_SIZE: usize = 100;
@@ -37,6 +40,14 @@ pub async fn handle(
                 "got": arr.len(),
             })),
         );
+    }
+
+    // K17 quota: meter the whole batch atomically (delta = batch
+    // size, not 1). Over-limit rejects the entire batch with 429.
+    let now = OffsetDateTime::now_utc();
+    let delta = i64::try_from(arr.len()).unwrap_or(i64::MAX);
+    if let Err(body) = quota::meter(&state, ctx.project_id, CounterKind::Spans, delta, now).await {
+        return (StatusCode::TOO_MANY_REQUESTS, Json(body));
     }
 
     let mut accepted = 0u32;

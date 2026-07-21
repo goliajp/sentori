@@ -64,6 +64,10 @@ pub struct AppState {
     pub events_bus: tokio::sync::broadcast::Sender<RecentEventTick>,
     /// Transactional auth email sender (verify / reset links).
     pub mailer: crate::mailer::Mailer,
+    /// Env-driven Stripe config (keys + price ids + public URL).
+    /// Absent keys disable the corresponding self-serve billing
+    /// path rather than erroring at boot.
+    pub stripe: crate::stripe::StripeConfig,
 }
 
 impl AppState {
@@ -100,6 +104,7 @@ impl AppState {
         let billing = BillingService::new(pool.clone(), workspace_id);
         let push_tokens = DeviceTokenStore::new(pool.clone());
         let mailer = crate::mailer::Mailer::from_env();
+        let stripe = crate::stripe::StripeConfig::from_env();
         Self {
             pool,
             workspace_id,
@@ -117,6 +122,7 @@ impl AppState {
             attachments,
             events_bus,
             mailer,
+            stripe,
         }
     }
 
