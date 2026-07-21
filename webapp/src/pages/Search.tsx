@@ -11,6 +11,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  EmptyState,
   ErrorBanner,
   PageHeader,
   formatRelative,
@@ -118,6 +119,14 @@ export default function Search() {
           </div>
         </CardBody>
       </Card>
+
+      {/* An empty screen is an invitation to act, not a blank. Before
+          this, typing fewer than three characters left the page with a
+          search box and nothing under it, which reads as broken rather
+          than as waiting. */}
+      {q.trim().length < 3 && issues.length === 0 && events.length === 0 && (
+        <EmptyState title={t('search.empty')} hint={t('search.emptyHint')} />
+      )}
 
       {issues.length > 0 && (
         <Card>

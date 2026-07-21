@@ -2,66 +2,71 @@
 // /shortcuts URL.
 
 import { useT } from '../i18n';
+import type { MessageKey } from '../i18n/en';
 import { PageHeader, Card, CardBody, CardHeader } from '../components/ui';
 
-const GROUPS: { title: string; items: { kbd: string; label: string }[] }[] =
-  [
-    {
-      title: 'Global navigation',
-      items: [
-        { kbd: 'g i', label: 'Overview' },
-        { kbd: 'g p', label: 'Projects' },
-        { kbd: 'g m', label: 'Members' },
-        { kbd: 'g a', label: 'Alerts' },
-        { kbd: 'g v', label: 'Saved views' },
-        { kbd: 'g u', label: 'Audit log' },
-        { kbd: 'g n', label: 'Notifications' },
-        { kbd: 'g s', label: 'Settings' },
-        { kbd: 'g h', label: 'Health' },
-        { kbd: 'g o', label: 'SaaS admin' },
-      ],
-    },
-    {
-      title: 'Command palette',
-      items: [
-        { kbd: '⌘K / Ctrl-K', label: 'Open fuzzy nav + backend search' },
-        { kbd: '↑ ↓', label: 'Navigate palette items' },
-        { kbd: '↵', label: 'Open selected' },
-        { kbd: 'esc', label: 'Close' },
-      ],
-    },
-    {
-      title: 'Issue list',
-      items: [
-        { kbd: 'j / k', label: 'Move cursor down / up' },
-        { kbd: 'x', label: 'Toggle select cursor row' },
-        { kbd: 'e', label: 'Resolve cursor row' },
-        { kbd: 'i', label: 'Ignore cursor row' },
-      ],
-    },
-    {
-      title: 'Issue detail',
-      items: [
-        { kbd: 'e', label: 'Resolve' },
-        { kbd: 'i', label: 'Ignore' },
-        { kbd: 'r', label: 'Reopen' },
-        { kbd: 'w', label: 'Toggle Watch' },
-      ],
-    },
-    {
-      title: 'Trace / replay detail',
-      items: [
-        { kbd: 'esc', label: 'Back to list' },
-        { kbd: '← →', label: 'Scrub replay frames' },
-      ],
-    },
-    {
-      title: 'Misc',
-      items: [
-        { kbd: '?', label: 'Open this cheatsheet' },
-      ],
-    },
-  ];
+/**
+ * The cheatsheet, carrying message keys.
+ *
+ * The navigation half lists the same destinations as the sidebar, so
+ * it shares their `nav.*` entries — a cheatsheet that said "Overview"
+ * beside a sidebar reading 概览 would be teaching the wrong word.
+ */
+const GROUPS: { title: MessageKey; items: { kbd: string; label: MessageKey }[] }[] = [
+  {
+    title: 'shortcuts.navigation',
+    items: [
+      { kbd: 'g i', label: 'nav.overview' },
+      { kbd: 'g p', label: 'nav.projects' },
+      { kbd: 'g m', label: 'nav.members' },
+      { kbd: 'g a', label: 'nav.alerts' },
+      { kbd: 'g v', label: 'nav.savedViews' },
+      { kbd: 'g u', label: 'nav.audit' },
+      { kbd: 'g n', label: 'notifications.title' },
+      { kbd: 'g s', label: 'nav.settings' },
+      { kbd: 'g h', label: 'nav.health' },
+      { kbd: 'g o', label: 'nav.saasAdmin' },
+    ],
+  },
+  {
+    title: 'shortcuts.palette',
+    items: [
+      { kbd: '⌘K / Ctrl-K', label: 'shortcuts.openPalette' },
+      { kbd: '↑ ↓', label: 'shortcuts.movePalette' },
+      { kbd: '↵', label: 'shortcuts.openSelected' },
+      { kbd: 'esc', label: 'shortcuts.close' },
+    ],
+  },
+  {
+    title: 'shortcuts.issueList',
+    items: [
+      { kbd: 'j / k', label: 'shortcuts.moveCursor' },
+      { kbd: 'x', label: 'shortcuts.toggleSelect' },
+      { kbd: 'e', label: 'shortcuts.resolveRow' },
+      { kbd: 'i', label: 'shortcuts.ignoreRow' },
+    ],
+  },
+  {
+    title: 'shortcuts.issueDetail',
+    items: [
+      { kbd: 'e', label: 'issues.resolve' },
+      { kbd: 'i', label: 'issues.ignore' },
+      { kbd: 'r', label: 'issues.reopen' },
+      { kbd: 'w', label: 'shortcuts.toggleWatch' },
+    ],
+  },
+  {
+    title: 'shortcuts.playback',
+    items: [
+      { kbd: 'esc', label: 'shortcuts.backToList' },
+      { kbd: '← →', label: 'shortcuts.scrub' },
+    ],
+  },
+  {
+    title: 'shortcuts.misc',
+    items: [{ kbd: '?', label: 'shortcuts.openSheet' }],
+  },
+];
 
 export default function Shortcuts() {
   const t = useT();
@@ -73,8 +78,8 @@ export default function Shortcuts() {
       />
       <div className="grid grid-cols-2 gap-4">
         {GROUPS.map(g => (
-          <Card key={g.title}>
-            <CardHeader title={g.title} />
+          <Card key={t(g.title)}>
+            <CardHeader title={t(g.title)} />
             <CardBody>
               <ul className="space-y-1 text-xs">
                 {g.items.map(it => (
@@ -82,7 +87,7 @@ export default function Shortcuts() {
                     key={it.kbd}
                     className="flex items-center justify-between"
                   >
-                    <span className="text-fg-muted">{it.label}</span>
+                    <span className="text-fg-muted">{t(it.label)}</span>
                     <kbd className="rounded bg-raised px-1.5 py-0.5 font-mono text-xs text-fg">
                       {it.kbd}
                     </kbd>

@@ -1,6 +1,7 @@
 // Per-user notification inbox.
 
 import { useT } from '../i18n';
+import type { MessageKey } from '../i18n/en';
 import { api } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 import {
@@ -20,6 +21,39 @@ interface Row {
   payload: unknown;
   read_at: string | null;
   created_at: string;
+}
+
+/**
+ * The one line a notification is about.
+ *
+ * The payload was being printed as raw JSON —
+ * `{"title":"TypeError in CheckoutScreen"}` — which is the shape it is
+ * stored in, not a sentence. Every kind carries a `title`; anything
+ * that does not is a kind this function has not been taught, and
+ * showing its keys is more honest than showing nothing.
+ */
+function summarise(payload: unknown): string {
+  if (payload && typeof payload === 'object') {
+    const p = payload as Record<string, unknown>;
+    for (const k of ['title', 'message', 'name', 'summary']) {
+      const v = p[k];
+      if (typeof v === 'string') return v;
+    }
+    return Object.keys(p).join(', ');
+  }
+  return String(payload ?? '');
+}
+
+/** Notification kinds we have a word for; anything else shows raw. */
+const KIND_KEYS: Record<string, MessageKey> = {
+  issue_new: 'notifications.kindIssueNew',
+  regression: 'notifications.kindRegression',
+  quota: 'notifications.kindQuota',
+};
+
+function kindLabel(kind: string, t: (k: MessageKey) => string): string {
+  const key = KIND_KEYS[kind];
+  return key ? t(key) : kind;
 }
 
 export default function Notifications() {
@@ -56,8 +90,8 @@ export default function Notifications() {
         title={t('notifications.title')}
         subtitle={
           unread > 0
-            ? `${unread} unread`
-            : 'No unread notifications.'
+            ? t('notifications.unread').replace('{n}', String(unread))
+            : t('notifications.allRead')
         }
         actions={
           unread > 0 ? (
@@ -72,11 +106,11 @@ export default function Notifications() {
         <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
-              Loading…
+              {t('common.loading')}
             </div>
           ) : rows.length === 0 ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
-              No notifications.
+              {t('notifications.empty')}
             </div>
           ) : (
             <ul className="divide-y divide-border">
@@ -90,14 +124,14 @@ export default function Notifications() {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <Badge>{n.kind}</Badge>
-                      {!n.read_at && (
-                        <span className="text-accent">●</span>
-                      )}
+                      <Badge tone={n.read_at ? 'neutral' : 'info'}>
+                        {kindLabel(n.kind, t)}
+                      </Badge>
+                      {!n.read_at && <span className="text-accent">●</span>}
                     </div>
-                    <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all text-xs font-mono text-fg-subtle">
-                      {JSON.stringify(n.payload)}
-                    </pre>
+                    <p className="mt-1 truncate text-sm text-fg">
+                      {summarise(n.payload)}
+                    </p>
                   </div>
                   <span className="text-xs text-fg-subtle w-24 text-right">
                     {formatRelative(n.created_at)}

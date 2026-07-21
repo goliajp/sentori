@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",
-    "check": "tsc -b --noEmit && eslint ."
+    "check": "tsc -b --noEmit && eslint .",
+    "mock": "node devtools/mock-api.mjs",
+    "sweep": "node devtools/sweep.mjs"
   },
   "dependencies": {
     "@goliapkg/gds": "^2.2.0",
