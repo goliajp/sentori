@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api, ReleaseArtifact, ReleaseRow } from '../lib/api';
 import {
   Badge,
@@ -20,6 +21,7 @@ import {
 } from '../components/ui';
 
 export default function Releases() {
+  const t = useT();
   const { id: projectId } = useParams<{ id: string }>();
   const [rows, setRows] = useState<ReleaseRow[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -100,7 +102,7 @@ export default function Releases() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Releases"
+        title={t('releases.title')}
         subtitle="Deploy markers + uploaded symbolicator blobs (sourcemap / dsym / proguard)."
         actions={
           <Button onClick={() => setShowCreate(!showCreate)} size="sm">
@@ -111,7 +113,7 @@ export default function Releases() {
 
       {showCreate && (
         <Card>
-          <CardHeader title="Mark deploy" />
+          <CardHeader title={t('releases.mark')} />
           <CardBody>
             <p className="text-xs text-fg-subtle mb-2">
               Mints a release row via the public /v1/deploys endpoint.
@@ -119,14 +121,14 @@ export default function Releases() {
             </p>
             <input
               className="w-full rounded border border-border-strong bg-surface px-3 py-2 text-sm"
-              placeholder="Release name (e.g. myapp@1.2.3+456)"
+              placeholder={t('releases.namePlaceholder')}
               value={newName}
               onChange={e => setNewName(e.target.value)}
             />
             <input
               type="password"
               className="mt-2 w-full rounded border border-border-strong bg-surface px-3 py-2 text-sm font-mono"
-              placeholder="Project SDK token (st_pk_...)"
+              placeholder={t('releases.tokenPlaceholder')}
               value={sdkToken}
               onChange={e => setSdkToken(e.target.value)}
             />
@@ -147,8 +149,8 @@ export default function Releases() {
             <div className="py-8 text-center text-sm text-fg-subtle">Loading…</div>
           ) : rows.length === 0 ? (
             <EmptyState
-              title="No releases"
-              hint="SDK calls /v1/deploys when a release ships — it'll appear here."
+              title={t('releases.empty')}
+              hint={t('releases.emptyHint')}
             />
           ) : (
             <div className="space-y-2">

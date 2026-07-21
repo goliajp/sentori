@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api, IntegrationRow } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 import {
@@ -21,6 +22,7 @@ import {
 const KINDS = ['slack', 'linear', 'jira', 'github', 'gitlab'] as const;
 
 export default function Integrations() {
+  const t = useT();
   const { id: projectId } = useParams<{ id: string }>();
   const [showAdd, setShowAdd] = useState(false);
   const [kind, setKind] = useState<(typeof KINDS)[number]>('slack');
@@ -88,7 +90,7 @@ export default function Integrations() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Integrations"
+        title={t('integrations.title')}
         subtitle="External services that receive sentori events: Slack notifications, Linear issue creation, GitHub mentions, etc."
         actions={<Button onClick={() => setShowAdd(true)}>+ Connect</Button>}
       />
@@ -96,7 +98,7 @@ export default function Integrations() {
 
       {showAdd && (
         <Card>
-          <CardHeader title="Connect integration" />
+          <CardHeader title={t('integrations.connect')} />
           <CardBody>
             <label className="block text-xs text-fg-subtle mb-1">Provider</label>
             <select
@@ -135,8 +137,8 @@ export default function Integrations() {
             <div className="py-8 text-center text-sm text-fg-subtle">Loading…</div>
           ) : rows.length === 0 ? (
             <EmptyState
-              title="No integrations"
-              hint="Connect Slack or Linear to forward sentori events into your workflows."
+              title={t('integrations.empty')}
+              hint={t('integrations.emptyHint')}
             />
           ) : (
             <DataTable

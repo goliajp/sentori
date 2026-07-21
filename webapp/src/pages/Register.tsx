@@ -4,9 +4,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api } from '../lib/api';
 
 export default function Register() {
+  const t = useT();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -37,7 +39,7 @@ export default function Register() {
         onSubmit={submit}
         className="w-96 rounded-lg border border-border bg-surface p-6"
       >
-        <h1 className="mb-1 text-xl font-semibold">Create account</h1>
+        <h1 className="mb-1 text-xl font-semibold">{t('auth.createAccount')}</h1>
         <p className="mb-6 text-sm text-fg-subtle">Sentori v0.2</p>
         {done ? (
           <div className="space-y-3">
@@ -58,7 +60,7 @@ export default function Register() {
         ) : (
           <>
             <label className="mb-3 block text-sm">
-              <span className="mb-1 block text-fg-muted">Email</span>
+              <span className="mb-1 block text-fg-muted">{t('auth.email')}</span>
               <input
                 type="email"
                 autoFocus
@@ -86,7 +88,7 @@ export default function Register() {
               disabled={loading}
               className="w-full rounded bg-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
-              {loading ? 'Creating…' : 'Create account'}
+              {loading ? t('auth.creating') : t('auth.createAccount')}
             </button>
             <div className="mt-4 text-center text-xs text-fg-subtle">
               <Link to="/login" className="hover:text-fg-muted">

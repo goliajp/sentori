@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api, SavedView } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 import {
@@ -22,6 +23,7 @@ import {
 const TARGETS = ['issues', 'events', 'spans', 'replays', 'metrics'] as const;
 
 export default function SavedViews() {
+  const t = useT();
   const [target, setTarget] =
     useState<(typeof TARGETS)[number]>('issues');
   const [showCreate, setShowCreate] = useState(false);
@@ -119,8 +121,8 @@ export default function SavedViews() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Saved views"
-        subtitle="Stored query filters for issues / events / spans / replays / metrics."
+        title={t('savedViews.title')}
+        subtitle={t('savedViews.subtitle')}
         actions={
           <Button onClick={() => setShowCreate(true)}>+ Save view</Button>
         }
@@ -128,7 +130,7 @@ export default function SavedViews() {
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       <Card>
-        <CardHeader title="Target" />
+        <CardHeader title={t('savedViews.target')} />
         <div className="flex gap-1 p-2">
           {TARGETS.map(t => (
             <button

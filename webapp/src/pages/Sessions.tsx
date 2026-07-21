@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { useT } from '../i18n';
 import { api } from '../lib/api';
 import {
   Button,
@@ -24,6 +25,7 @@ interface Row {
 }
 
 export default function Sessions() {
+  const t = useT();
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
@@ -48,7 +50,7 @@ export default function Sessions() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Active sessions"
+        title={t('sessions.title')}
         subtitle="Where your account is currently signed in. Revoke any you don't recognize."
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}

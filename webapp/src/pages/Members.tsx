@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { useT } from '../i18n';
 import { api, InviteRow, MemberRow } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 import {
@@ -18,6 +19,7 @@ import {
 } from '../components/ui';
 
 export default function Members() {
+  const t = useT();
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'admin' | 'user'>('user');
@@ -94,15 +96,15 @@ export default function Members() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Members"
-        subtitle="Workspace owner / admin / user roles + pending invites."
+        title={t('members.title')}
+        subtitle={t('members.subtitle')}
         actions={<Button onClick={() => setShowInvite(true)}>+ Invite</Button>}
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       {newInviteToken && (
         <Card>
-          <CardHeader title="Invite link (copy now — shown once)" />
+          <CardHeader title={t('members.inviteLink')} />
           <CardBody>
             <pre className="overflow-x-auto whitespace-pre-wrap break-all bg-raised p-3 text-xs font-mono">
               {newInviteToken}
@@ -116,7 +118,7 @@ export default function Members() {
 
       {showInvite && (
         <Card>
-          <CardHeader title="Invite member" />
+          <CardHeader title={t('members.invite')} />
           <CardBody>
             <input
               className="h-8 w-full rounded border border-border px-2.5 text-sm"
@@ -156,7 +158,7 @@ export default function Members() {
               Loading…
             </div>
           ) : members.length === 0 ? (
-            <EmptyState title="No members" hint="Invite teammates to start." />
+            <EmptyState title={t('members.empty')} hint={t('members.emptyHint')} />
           ) : (
             <DataTable
               columns={[
@@ -208,8 +210,8 @@ export default function Members() {
         <CardBody>
           {invites.length === 0 ? (
             <EmptyState
-              title="No invites"
-              hint="Pending and historical invites land here."
+              title={t('members.noInvites')}
+              hint={t('members.invitesHint')}
             />
           ) : (
             <DataTable

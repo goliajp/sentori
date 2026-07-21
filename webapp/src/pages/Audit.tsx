@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useT } from '../i18n';
 import { api, AuditEntry } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 import {
@@ -11,6 +12,7 @@ import {
 } from '../components/ui';
 
 export function AuditPage() {
+  const t = useT();
   const [projectId, setProjectId] = useState('');
   const [actor, setActor] = useState('');
   const [action, setAction] = useState('');
@@ -79,8 +81,8 @@ export function AuditPage() {
   return (
     <div>
       <PageHeader
-        title="Audit log"
-        subtitle="Workspace-wide admin actions, append-only."
+        title={t('audit.title')}
+        subtitle={t('audit.subtitle')}
         action={
           entries && entries.length > 0 ? (
             <Button variant="secondary" size="sm" onClick={exportCsv}>
@@ -92,34 +94,34 @@ export function AuditPage() {
       {err && <ErrorBanner>{err}</ErrorBanner>}
 
       <Card className="mb-4">
-        <CardHeader title="Filter" />
+        <CardHeader title={t('common.filter')} />
         <div className="grid grid-cols-4 gap-2 px-5 py-4">
           <Field
-            label="Project ID"
+            label={t('tokens.projectId')}
             value={projectId}
             onChange={setProjectId}
-            placeholder="UUID (optional)"
+            placeholder={t('common.optional')}
           />
           <Field
-            label="Actor user ID"
+            label={t('audit.actor')}
             value={actor}
             onChange={setActor}
-            placeholder="UUID (optional)"
+            placeholder={t('common.optional')}
           />
           <Field
-            label="Action"
+            label={t('audit.action')}
             value={action}
             onChange={setAction}
             placeholder="e.g. project.create"
           />
           <Field
-            label="Limit"
+            label={t('audit.limit')}
             value={String(limit)}
             onChange={v => setLimit(parseInt(v, 10) || 200)}
             placeholder="200"
           />
           <Field
-            label="IP (substring match)"
+            label={t('audit.ip')}
             value={ipFilter}
             onChange={setIpFilter}
             placeholder="e.g. 198.51.100"

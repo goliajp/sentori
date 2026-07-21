@@ -1,5 +1,6 @@
 // Per-user notification inbox.
 
+import { useT } from '../i18n';
 import { api } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 import {
@@ -22,6 +23,7 @@ interface Row {
 }
 
 export default function Notifications() {
+  const t = useT();
   const { data, loading, error, setData } = useAsyncData(
     async (): Promise<Row[]> => (await api.listNotifications()).notifications,
     [],
@@ -51,7 +53,7 @@ export default function Notifications() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Notifications"
+        title={t('notifications.title')}
         subtitle={
           unread > 0
             ? `${unread} unread`

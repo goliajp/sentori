@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useT } from '../i18n';
 import { api, AlertRule, ApiError } from '../lib/api';
 import {
   Badge,
@@ -11,6 +12,7 @@ import {
 } from '../components/ui';
 
 export function AlertsPage() {
+  const t = useT();
   const [alerts, setAlerts] = useState<AlertRule[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [refreshTok, setRefreshTok] = useState(0);
@@ -96,7 +98,7 @@ export function AlertsPage() {
   return (
     <div>
       <PageHeader
-        title="Alert rules"
+        title={t('alerts.title')}
         subtitle="Workspace-wide rules. Trigger kinds: issue_new / regression / event_count / crash_free_drop."
         action={
           <Button
@@ -130,7 +132,7 @@ export function AlertsPage() {
               onChange={e =>
                 setThrottle(parseInt(e.target.value, 10) || 10)
               }
-              title="Throttle (minutes)"
+              title={t('alerts.throttle')}
             />
             <Button onClick={create} size="sm">
               Create
@@ -142,7 +144,7 @@ export function AlertsPage() {
       <Card>
         <DataTable
           rowKey={(r) => r.id}
-          empty="No alert rules. Create one to start receiving notifications."
+          empty={t('alerts.empty')}
           rows={alerts ?? []}
           columns={[
             {

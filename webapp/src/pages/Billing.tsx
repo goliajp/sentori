@@ -9,6 +9,7 @@
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api, BillingInfo, PlanName, UsageCounter } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 import {
@@ -33,6 +34,7 @@ const PLAN_LABEL: Record<PlanName, string> = {
 };
 
 export default function Billing() {
+  const t = useT();
   const {
     data,
     loading,
@@ -77,8 +79,8 @@ export default function Billing() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Billing"
-        subtitle="Plan, usage, and subscription for this workspace."
+        title={t('billing.title')}
+        subtitle={t('billing.subtitle')}
       />
 
       {checkout === 'success' && (
@@ -109,7 +111,7 @@ export default function Billing() {
             />
           ) : (
             <Card>
-              <CardHeader title="Self-serve billing unavailable" />
+              <CardHeader title={t('billing.unavailable')} />
               <CardBody>
                 <p className="text-sm text-fg-subtle">
                   This deployment has no Stripe keys configured, so plan
@@ -134,11 +136,12 @@ function PlanCard({
   onManage: () => void;
   busy: boolean;
 }) {
+  const t = useT();
   const downgraded = info.effective_plan !== info.plan;
   return (
     <Card>
       <CardHeader
-        title="Current plan"
+        title={t('billing.current')}
         action={
           info.has_customer ? (
             <Button variant="secondary" onClick={onManage} disabled={busy}>
@@ -149,16 +152,16 @@ function PlanCard({
       />
       <CardBody>
         <div className="flex flex-wrap items-center gap-6">
-          <Field label="Plan">
+          <Field label={t('settings.plan')}>
             <Badge tone={info.plan === 'free' ? 'neutral' : 'info'}>
               {PLAN_LABEL[info.plan]}
             </Badge>
           </Field>
-          <Field label="Status">
+          <Field label={t('crash.status')}>
             <Badge tone={statusTone(info.status)}>{info.status}</Badge>
           </Field>
           {info.current_period_end && (
-            <Field label="Renews / ends">
+            <Field label={t('billing.renews')}>
               <span className="font-mono text-sm text-fg-muted">
                 {new Date(info.current_period_end).toLocaleDateString()}
               </span>
@@ -181,14 +184,15 @@ function PlanCard({
 }
 
 function UsageCard({ info }: { info: BillingInfo }) {
+  const t = useT();
   return (
     <Card>
       <CardHeader title={`Usage · ${info.period_yyyymm}`} />
       <CardBody>
         <div className="space-y-4">
-          <UsageBar label="Events" counter={info.usage.events} />
-          <UsageBar label="Spans" counter={info.usage.spans} />
-          <UsageBar label="Replays" counter={info.usage.replays} />
+          <UsageBar label={t('events.title')} counter={info.usage.events} />
+          <UsageBar label={t('overview.spans')} counter={info.usage.spans} />
+          <UsageBar label={t('replays.title')} counter={info.usage.replays} />
         </div>
       </CardBody>
     </Card>
@@ -236,6 +240,7 @@ function UpgradeCard({
   onRefresh: () => void;
   busy: boolean;
 }) {
+  const t = useT();
   const options: { plan: 'pro' | 'enterprise'; show: boolean }[] = [
     { plan: 'pro', show: info.upgradeable.pro },
     { plan: 'enterprise', show: info.upgradeable.enterprise },
@@ -244,7 +249,7 @@ function UpgradeCard({
   return (
     <Card>
       <CardHeader
-        title="Change plan"
+        title={t('billing.change')}
         action={
           <Button variant="ghost" size="sm" onClick={onRefresh} disabled={busy}>
             Refresh

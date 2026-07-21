@@ -4,11 +4,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api } from '../lib/api';
 
 const MISSING_TOKEN = 'Missing token — open the link from your email.';
 
 export default function Verify() {
+  const t = useT();
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
   // A missing token is knowable during render — no effect needed.
@@ -37,10 +39,10 @@ export default function Verify() {
   return (
     <div className="flex h-screen items-center justify-center bg-bg">
       <div className="w-96 rounded-lg border border-border bg-surface p-6">
-        <h1 className="mb-1 text-xl font-semibold">Verify email</h1>
+        <h1 className="mb-1 text-xl font-semibold">{t('auth.verifyEmail')}</h1>
         <p className="mb-6 text-sm text-fg-subtle">Sentori</p>
         {state === 'working' && (
-          <p className="text-sm text-fg-muted">Verifying…</p>
+          <p className="text-sm text-fg-muted">{t('auth.verifying')}</p>
         )}
         {state === 'ok' && (
           <div className="space-y-3">
@@ -51,7 +53,7 @@ export default function Verify() {
               to="/login"
               className="block rounded bg-accent px-3 py-2 text-center text-sm font-medium text-white hover:opacity-90"
             >
-              Sign in
+              {t('auth.signIn')}
             </Link>
           </div>
         )}
