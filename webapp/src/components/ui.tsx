@@ -434,8 +434,20 @@ export function Tabs({
  * renderers where threading a locale down would mean touching every
  * column definition to fix a suffix.
  */
-export function formatRelative(iso: string, now: number = Date.now()): string {
-  const sec = Math.abs(now - new Date(iso).getTime()) / 1000;
+export function formatRelative(
+  iso: string | null | undefined,
+  now: number = Date.now(),
+): string {
+  // A formatter handed no timestamp has nothing to format. Several
+  // columns are genuinely nullable — `resolved_at` on an unresolved
+  // issue, `next_attempt_at` on a send that will not be retried — and
+  // `new Date(null).getTime()` is NaN. `Intl.RelativeTimeFormat`
+  // *throws* on a non-finite number rather than printing one, so the
+  // NaN that the old hand-rolled version rendered as a cosmetic
+  // "NaNs ago" now takes the whole page down with it.
+  const ms = iso == null ? NaN : new Date(iso).getTime();
+  if (!Number.isFinite(ms)) return '—';
+  const sec = Math.abs(now - ms) / 1000;
   const [value, unit]: [number, Intl.RelativeTimeFormatUnit] =
     sec < 60
       ? [Math.max(1, Math.round(sec)), 'second']
