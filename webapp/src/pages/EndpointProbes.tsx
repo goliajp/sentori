@@ -108,7 +108,7 @@ export default function EndpointProbes() {
           <CardHeader title="New probe" />
           <Section>
             <input
-              className="w-full rounded border border-border px-3 py-2 text-sm"
+              className="h-8 w-full rounded border border-border px-2.5 text-sm"
               placeholder="https://api.example.com/health"
               value={url}
               onChange={e => setUrl(e.target.value)}

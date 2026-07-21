@@ -119,7 +119,7 @@ export default function Members() {
           <CardHeader title="Invite member" />
           <Section>
             <input
-              className="w-full rounded border border-border px-3 py-2 text-sm"
+              className="h-8 w-full rounded border border-border px-2.5 text-sm"
               placeholder="Email"
               value={inviteEmail}
               onChange={e => setInviteEmail(e.target.value)}

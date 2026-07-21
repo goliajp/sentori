@@ -45,7 +45,7 @@ export function HealthPage() {
         actions={
           <button
             onClick={refresh}
-            className="rounded border border-border-strong px-3 py-1.5 text-sm hover:bg-raised"
+            className="inline-flex h-8 items-center rounded border border-border-strong px-3 text-sm hover:bg-raised"
           >
             Refresh
           </button>

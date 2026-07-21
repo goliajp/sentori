@@ -93,7 +93,7 @@ export default function SaasAdmin() {
           <CardHeader title="Create workspace" />
           <Section>
             <input
-              className="w-full rounded border border-border px-3 py-2 text-sm"
+              className="h-8 w-full rounded border border-border px-2.5 text-sm"
               placeholder="Display name (e.g. 'Acme Inc')"
               value={name}
               onChange={e => setName(e.target.value)}

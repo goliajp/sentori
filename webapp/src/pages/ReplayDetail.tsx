@@ -121,7 +121,7 @@ export default function ReplayDetail() {
             </Button>
             <Link
               to={`/projects/${projectId}/replays`}
-              className="rounded border border-border px-3 py-1.5 text-sm text-fg-subtle hover:bg-raised"
+              className="inline-flex h-8 items-center rounded border border-border px-3 text-sm text-fg-subtle hover:bg-raised"
             >
               ← All replays
             </Link>

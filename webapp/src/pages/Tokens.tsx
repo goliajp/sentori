@@ -117,7 +117,7 @@ export default function Tokens() {
           <CardHeader title="Mint new token" />
           <Section>
             <input
-              className="w-full rounded border border-border px-3 py-2 text-sm"
+              className="h-8 w-full rounded border border-border px-2.5 text-sm"
               placeholder="Label (e.g. 'production iOS')"
               value={label}
               onChange={e => setLabel(e.target.value)}
