@@ -17,10 +17,13 @@ pub struct PasswordReset {
     /// References [`sentori_workspace_identity::User::id`].
     pub user_id: UserId,
     /// Token expiration.
+    #[serde(with = "time::serde::rfc3339")]
     pub expires_at: OffsetDateTime,
     /// Set on accept. `None` for pending.
+    #[serde(with = "time::serde::rfc3339::option")]
     pub used_at: Option<OffsetDateTime>,
     /// Creation timestamp.
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
 }
 

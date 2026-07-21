@@ -88,10 +88,10 @@ export function EventsPage() {
     }
   }
 
-  if (!projectId) return <div className="p-8">no project id</div>;
+  if (!projectId) return <div>no project id</div>;
 
   return (
-    <div className="p-8">
+    <div>
       <PageHeader
         title="Events"
         subtitle="Recent event tail (newest first, up to 100)."

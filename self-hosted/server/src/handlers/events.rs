@@ -24,6 +24,7 @@ pub struct EventRow {
     pub id: Uuid,
     pub issue_id: Uuid,
     pub kind: String,
+    #[serde(with = "time::serde::rfc3339")]
     pub timestamp: OffsetDateTime,
     pub release: String,
     pub environment: String,

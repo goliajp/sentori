@@ -79,8 +79,15 @@ export function App() {
   return (
     <div className="flex h-screen">
       <Sidebar me={me} />
+      {/* The shell owns page padding and the measure. Pages used to
+          each decide for themselves, and half of them forgot — issue
+          detail, members, projects, metrics and others rendered flush
+          against the viewport edge, clipping their own header actions
+          on a wide display. One container here, none in the pages. */}
       <main className="flex-1 overflow-y-auto">
-        <Outlet />
+        <div className="mx-auto w-full max-w-[1600px] px-8 py-8">
+          <Outlet />
+        </div>
       </main>
       <CommandPalette
         open={paletteOpen}

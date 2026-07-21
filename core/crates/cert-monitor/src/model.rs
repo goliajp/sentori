@@ -19,8 +19,10 @@ pub struct WatchedDomain {
     /// migration with no actor).
     pub added_by: Option<UserId>,
     /// When the watch was added.
+    #[serde(with = "time::serde::rfc3339")]
     pub added_at: OffsetDateTime,
     /// Last successful crt.sh poll. NULL until first poll.
+    #[serde(with = "time::serde::rfc3339::option")]
     pub last_polled_at: Option<OffsetDateTime>,
 }
 
@@ -43,10 +45,13 @@ pub struct CertObservation {
     /// Cert's issuer string.
     pub issuer_name: String,
     /// Cert validity start.
+    #[serde(with = "time::serde::rfc3339")]
     pub not_before: OffsetDateTime,
     /// Cert validity end.
+    #[serde(with = "time::serde::rfc3339")]
     pub not_after: OffsetDateTime,
     /// When K10 first observed this cert.
+    #[serde(with = "time::serde::rfc3339")]
     pub observed_at: OffsetDateTime,
 }
 

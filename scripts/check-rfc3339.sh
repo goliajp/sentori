@@ -13,6 +13,13 @@
 # The bash wrapper exists so CI can call `bash scripts/check-rfc3339.sh`
 # directly; the actual logic is python3 because tracking brace depth
 # + derive-line context across files is awkward in awk.
+#
+# 2026-07-21: the scan only ever covered `server/src` (the legacy v0.1
+# binary), so the v0.2 stack — `self-hosted/server/src` plus the `core/`
+# crates whose models it serializes straight to the dashboard — was
+# never checked. 62 fields had drifted, which is exactly why every date
+# in the v0.2 dashboard rendered as "NaNy ago". All three roots are in
+# scope now.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -28,8 +35,16 @@ ATTR_LINE        = re.compile(r'^\s*#\[')
 BLANK_LINE       = re.compile(r'^\s*$')
 DOC_COMMENT      = re.compile(r'^\s*///?')
 
+ROOTS = ('server/src', 'self-hosted/server/src', 'core/crates')
+
 violations = []
-for path in sorted(Path('server/src').rglob('*.rs')):
+sources = [
+    p
+    for root in ROOTS
+    for p in sorted(Path(root).rglob('*.rs'))
+    if '/target/' not in str(p)
+]
+for path in sources:
     in_block = False
     depth = 0
     serde_aware = False

@@ -486,8 +486,10 @@ pub struct Issue {
     /// Lifecycle status.
     pub status: IssueStatus,
     /// First-event timestamp.
+    #[serde(with = "time::serde::rfc3339")]
     pub first_seen: OffsetDateTime,
     /// Last-event timestamp.
+    #[serde(with = "time::serde::rfc3339")]
     pub last_seen: OffsetDateTime,
     /// Number of events that landed in this group.
     pub event_count: i64,
@@ -496,10 +498,12 @@ pub struct Issue {
     /// Release of the most recent event.
     pub last_release: String,
     /// When the issue was flipped back to regressed (if ever).
+    #[serde(with = "time::serde::rfc3339::option")]
     pub regressed_at: Option<OffsetDateTime>,
     /// Release in which the regression was observed.
     pub regressed_in_release: Option<String>,
     /// When the issue was last marked resolved.
+    #[serde(with = "time::serde::rfc3339::option")]
     pub resolved_at: Option<OffsetDateTime>,
 }
 
@@ -513,6 +517,7 @@ pub struct StoredEvent {
     /// Issue this event joined.
     pub issue_id: Uuid,
     /// Capture timestamp.
+    #[serde(with = "time::serde::rfc3339")]
     pub timestamp: OffsetDateTime,
     /// Event kind.
     pub kind: EventKind,
@@ -525,5 +530,6 @@ pub struct StoredEvent {
     /// JSONB payload (`device` / `app` / `breadcrumbs` / …).
     pub payload: Value,
     /// When the server received the event.
+    #[serde(with = "time::serde::rfc3339")]
     pub received_at: OffsetDateTime,
 }

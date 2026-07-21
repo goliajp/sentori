@@ -34,7 +34,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="p-8">
+    <div>
       <PageHeader
         title="Settings"
         subtitle="Workspace + plan + integrations + members."

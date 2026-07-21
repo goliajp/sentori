@@ -57,7 +57,7 @@ export function CertPage() {
     }
   }
 
-  if (!projectId) return <div className="p-8">no project id</div>;
+  if (!projectId) return <div>no project id</div>;
 
   function daysUntil(iso: string): number {
     const now = Date.now();
@@ -71,7 +71,7 @@ export function CertPage() {
   }
 
   return (
-    <div className="p-8">
+    <div>
       <PageHeader
         title="Certificate monitor"
         subtitle="CT log observations for watched domains."

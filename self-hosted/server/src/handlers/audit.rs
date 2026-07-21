@@ -34,6 +34,7 @@ pub struct AuditRow {
     pub target_type: Option<String>,
     pub target_id: Option<String>,
     pub payload: Value,
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
 }
 

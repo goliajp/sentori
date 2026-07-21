@@ -32,6 +32,7 @@ pub struct AuditEntry {
     /// …}`).
     pub payload: Value,
     /// Insertion ts (UTC).
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
 }
 
