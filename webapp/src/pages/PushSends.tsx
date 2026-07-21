@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 import {
@@ -29,6 +30,7 @@ interface Row {
 }
 
 export default function PushSends() {
+  const t = useT();
   const { id: projectId } = useParams<{ id: string }>();
   const [filter, setFilter] = useState<'' | 'queued' | 'sent' | 'failed'>(
     '',
@@ -86,8 +88,8 @@ export default function PushSends() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Push sends"
-        subtitle="Last 100 push attempts + retry-now for the DLQ."
+        title={t('push.sends')}
+        subtitle={t('push.sendsSubtitle')}
         actions={
           counts.failed > 0 && (
             <Button size="sm" onClick={retryAllFailed}>

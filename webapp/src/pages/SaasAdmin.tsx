@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { useT } from '../i18n';
 import { api, SaasStats, WorkspaceRow } from '../lib/api';
 import {
   Badge,
@@ -20,6 +21,7 @@ import {
 } from '../components/ui';
 
 export default function SaasAdmin() {
+  const t = useT();
   const [rows, setRows] = useState<WorkspaceRow[]>([]);
   const [stats, setStats] = useState<SaasStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,7 +83,7 @@ export default function SaasAdmin() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="SaaS admin"
+        title={t('saas.title')}
         subtitle="Cross-workspace operator view. In self-hosted mode shows your single workspace."
         actions={
           <Button onClick={() => setShowCreate(true)}>+ New workspace</Button>
@@ -90,11 +92,11 @@ export default function SaasAdmin() {
       {error && <ErrorBanner>{error}</ErrorBanner>}
       {showCreate && (
         <Card>
-          <CardHeader title="Create workspace" />
+          <CardHeader title={t('saas.create')} />
           <CardBody>
             <input
               className="h-8 w-full rounded border border-border px-2.5 text-sm"
-              placeholder="Display name (e.g. 'Acme Inc')"
+              placeholder={t('saas.namePlaceholder')}
               value={name}
               onChange={e => setName(e.target.value)}
             />
@@ -110,20 +112,20 @@ export default function SaasAdmin() {
 
       {stats && (
         <div className="grid grid-cols-6 gap-3">
-          <StatCard label="Workspaces" value={stats.workspaces} />
+          <StatCard label={t('saas.workspaces')} value={stats.workspaces} />
           <StatCard
-            label="Active"
+            label={t('saas.active')}
             value={stats.active_workspaces}
             tone="ok"
           />
-          <StatCard label="Projects" value={stats.projects} />
-          <StatCard label="Users" value={stats.users} />
+          <StatCard label={t('overview.projects')} value={stats.projects} />
+          <StatCard label={t('saas.users')} value={stats.users} />
           <StatCard
-            label="Events 24h"
+            label={t('saas.events24h')}
             value={stats.events_24h ?? 0}
           />
           <StatCard
-            label="Tokens"
+            label={t('saas.tokens')}
             value={stats.tokens_active ?? 0}
           />
         </div>
@@ -136,8 +138,8 @@ export default function SaasAdmin() {
             <div className="py-8 text-center text-sm text-fg-subtle">Loading…</div>
           ) : rows.length === 0 ? (
             <EmptyState
-              title="No workspaces"
-              hint="No workspaces have been provisioned yet."
+              title={t('saas.empty')}
+              hint={t('saas.emptyHint')}
             />
           ) : (
             <DataTable

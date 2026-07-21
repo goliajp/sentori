@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useT } from '../i18n';
 import { api, CertObservation, CertWatch } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 import {
@@ -14,6 +15,7 @@ import {
 } from '../components/ui';
 
 export function CertPage() {
+  const t = useT();
   const { id: projectId } = useParams<{ id: string }>();
   const [showAdd, setShowAdd] = useState(false);
   const [newDomain, setNewDomain] = useState('');
@@ -73,8 +75,8 @@ export function CertPage() {
   return (
     <div>
       <PageHeader
-        title="Certificate monitor"
-        subtitle="CT log observations for watched domains."
+        title={t('cert.title')}
+        subtitle={t('cert.subtitle')}
         actions={
           <Button onClick={() => setShowAdd(true)}>+ Watch domain</Button>
         }
@@ -83,7 +85,7 @@ export function CertPage() {
 
       {showAdd && (
         <Card className="mb-4">
-          <CardHeader title="Watch new domain" />
+          <CardHeader title={t('cert.watch')} />
           <div className="px-5 py-4 space-y-2">
             <input
               className="w-full rounded border border-border-strong bg-surface px-3 py-2 text-sm font-mono"
@@ -129,7 +131,7 @@ export function CertPage() {
       <Card>
         <DataTable
           rowKey={(r) => r.id}
-          empty="No cert observations yet. Add a watched domain to start polling crt.sh."
+          empty={t('cert.empty')}
           rows={observations ?? []}
           columns={[
             {

@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 import {
@@ -32,6 +33,7 @@ interface Probe {
 }
 
 export default function EndpointProbes() {
+  const t = useT();
   const { id: projectId } = useParams<{ id: string }>();
   const [showAdd, setShowAdd] = useState(false);
   const [url, setUrl] = useState('');
@@ -97,15 +99,15 @@ export default function EndpointProbes() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Endpoint probes"
-        subtitle="Synthetic HTTP monitor — periodic GET/POST against configured URLs."
+        title={t('probes.title')}
+        subtitle={t('probes.subtitle')}
         actions={<Button onClick={() => setShowAdd(true)}>+ Add probe</Button>}
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       {showAdd && (
         <Card>
-          <CardHeader title="New probe" />
+          <CardHeader title={t('probes.new')} />
           <CardBody>
             <input
               className="h-8 w-full rounded border border-border px-2.5 text-sm"
@@ -128,7 +130,7 @@ export default function EndpointProbes() {
                 className="rounded border border-border px-3 py-2 text-sm w-24"
                 value={interval}
                 onChange={e => setInterval(parseInt(e.target.value, 10) || 60)}
-                title="Interval (seconds)"
+                title={t('probes.interval')}
               />
               <span className="self-center text-xs text-fg-subtle">sec</span>
             </div>
@@ -151,8 +153,8 @@ export default function EndpointProbes() {
             </div>
           ) : rows.length === 0 ? (
             <EmptyState
-              title="No probes"
-              hint="Add a URL to start synthetic monitoring."
+              title={t('probes.empty')}
+              hint={t('probes.emptyHint')}
             />
           ) : (
             <ul className="divide-y divide-border">
