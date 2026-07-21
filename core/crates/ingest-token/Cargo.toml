@@ -14,7 +14,7 @@ axum = "0.8"
 tower = "0.5"
 http = "1"
 uuid = { version = "1", features = ["v7"] }
-time = { version = "0.3", features = ["serde"] }
+time = { version = "0.3", features = ["serde-well-known"] }
 sha2 = "0.10"
 hex = "0.4"
 data-encoding = "2"

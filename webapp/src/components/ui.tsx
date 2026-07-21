@@ -16,7 +16,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded border border-zinc-800 bg-zinc-900 ${className}`}
+      className={`rounded border border-border bg-surface ${className}`}
     >
       {children}
     </div>
@@ -33,11 +33,11 @@ export function CardHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between border-b border-zinc-800 px-5 py-4">
+    <div className="flex items-start justify-between border-b border-border px-5 py-4">
       <div>
-        <h3 className="text-sm font-medium text-zinc-100">{title}</h3>
+        <h3 className="text-sm font-medium text-fg">{title}</h3>
         {subtitle && (
-          <p className="mt-0.5 text-xs text-zinc-500">{subtitle}</p>
+          <p className="mt-0.5 text-xs text-fg-subtle">{subtitle}</p>
         )}
       </div>
       {action}
@@ -66,9 +66,9 @@ export function Button({
     'inline-flex items-center justify-center rounded font-medium transition disabled:opacity-50 disabled:cursor-not-allowed';
   const sizes = { sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
   const variants = {
-    primary: 'bg-brand-500 text-white hover:bg-brand-600',
-    secondary: 'border border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800',
-    ghost: 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100',
+    primary: 'bg-accent text-white hover:bg-accent',
+    secondary: 'border border-border-strong bg-surface text-fg hover:bg-raised',
+    ghost: 'text-fg-muted hover:bg-raised hover:text-fg',
     danger: 'border border-red-900 bg-red-950/50 text-red-300 hover:bg-red-950',
   };
   return (
@@ -93,7 +93,7 @@ export function Badge({
   tone?: 'neutral' | 'ok' | 'warn' | 'danger' | 'info';
 }) {
   const tones = {
-    neutral: 'bg-zinc-800 text-zinc-300',
+    neutral: 'bg-raised text-fg-muted',
     ok: 'bg-green-950 text-green-300',
     warn: 'bg-amber-950 text-amber-300',
     danger: 'bg-red-950 text-red-300',
@@ -123,18 +123,18 @@ export function DataTable<T>({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="p-8 text-center text-sm text-zinc-500">{empty}</div>
+      <div className="p-8 text-center text-sm text-fg-subtle">{empty}</div>
     );
   }
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <thead className="border-b border-zinc-800 bg-zinc-950/50">
+        <thead className="border-b border-border bg-bg/50">
           <tr>
             {columns.map((c) => (
               <th
                 key={String(c.key)}
-                className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wide text-zinc-500"
+                className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wide text-fg-subtle"
                 style={c.width ? { width: c.width } : undefined}
               >
                 {c.label}
@@ -142,11 +142,11 @@ export function DataTable<T>({
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-zinc-800">
+        <tbody className="divide-y divide-border">
           {rows.map((r, i) => (
-            <tr key={rowKey ? rowKey(r) : String(i)} className="hover:bg-zinc-900/50">
+            <tr key={rowKey ? rowKey(r) : String(i)} className="hover:bg-surface/50">
               {columns.map((c) => (
-                <td key={String(c.key)} className="px-3 py-2.5 text-zinc-300">
+                <td key={String(c.key)} className="px-3 py-2.5 text-fg-muted">
                   {c.render
                     ? c.render(r)
                     : String((r as Record<string, unknown>)[c.key as string] ?? '—')}
@@ -178,7 +178,7 @@ export function PageHeader({
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
         {subtitle && (
-          <p className="mt-1 text-sm text-zinc-500">{subtitle}</p>
+          <p className="mt-1 text-sm text-fg-subtle">{subtitle}</p>
         )}
       </div>
       {action ?? actions}
@@ -198,9 +198,9 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded border border-zinc-800 bg-zinc-900 p-12 text-center">
-      <p className="text-zinc-300">{title}</p>
-      {hint && <p className="mt-2 text-sm text-zinc-500">{hint}</p>}
+    <div className="rounded border border-border bg-surface p-12 text-center">
+      <p className="text-fg-muted">{title}</p>
+      {hint && <p className="mt-2 text-sm text-fg-subtle">{hint}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );
@@ -231,7 +231,7 @@ export function Section({
     <section className="mb-8">
       {(title || action) && (
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-medium uppercase tracking-wide text-zinc-400">
+          <h3 className="text-sm font-medium uppercase tracking-wide text-fg-muted">
             {title}
           </h3>
           {action}
@@ -254,15 +254,15 @@ export function Tabs({
   options: { value: string; label: string }[];
 }) {
   return (
-    <div className="flex gap-1 border-b border-zinc-800">
+    <div className="flex gap-1 border-b border-border">
       {options.map((o) => (
         <button
           key={o.value}
           onClick={() => onChange(o.value)}
           className={`border-b-2 px-3 py-2 text-sm transition ${
             value === o.value
-              ? 'border-brand-500 text-zinc-100'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              ? 'border-brand-500 text-fg'
+              : 'border-transparent text-fg-muted hover:text-fg'
           }`}
         >
           {o.label}

@@ -1,0 +1,53 @@
+// 简体中文。类型是 `Messages` —— en.ts 里加了 key 而这里没补,
+// 就是编译错误,不会悄悄漏成英文。
+
+import type { Messages } from './en';
+
+export const zh: Messages = {
+  'action.cancel': '取消',
+  'action.copy': '复制',
+  'action.create': '创建',
+  'action.delete': '删除',
+  'action.dismiss': '关闭',
+  'action.refresh': '刷新',
+  'action.retry': '重试',
+  'action.save': '保存',
+  'action.signOut': '退出登录',
+
+  'common.error': '出错了',
+  'common.loading': '加载中…',
+  'common.none': '无',
+  'common.search': '搜索',
+
+  'nav.alerts': '告警',
+  'nav.audit': '审计日志',
+  'nav.billing': '账单',
+  'nav.cert': '证书监控',
+  'nav.events': '事件',
+  'nav.health': '健康状态',
+  'nav.inbox': '通知',
+  'nav.integrations': '集成',
+  'nav.issues': '问题',
+  'nav.members': '成员',
+  'nav.metrics': '指标',
+  'nav.overview': '概览',
+  'nav.probes': '端点探针',
+  'nav.projects': '项目',
+  'nav.push': '推送',
+  'nav.releases': '版本',
+  'nav.replays': '录屏回放',
+  'nav.saasAdmin': 'SaaS 运营',
+  'nav.savedViews': '保存的视图',
+  'nav.search': '搜索',
+  'nav.sectionProject': '项目',
+  'nav.sectionWorkspace': '工作区',
+  'nav.settings': '设置',
+  'nav.tokens': '接入令牌',
+  'nav.traces': '链路追踪',
+
+  'prefs.language': '语言',
+  'prefs.theme': '主题',
+  'prefs.themeDark': '深色',
+  'prefs.themeLight': '浅色',
+  'prefs.themeSystem': '跟随系统',
+};

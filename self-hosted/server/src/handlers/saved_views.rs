@@ -28,6 +28,7 @@ pub struct ViewRow {
     pub scope: String,
     pub name: String,
     pub payload: Value,
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
 }
 

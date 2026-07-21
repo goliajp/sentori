@@ -17,7 +17,9 @@ pub struct WatchRow {
     pub id: Uuid,
     pub project_id: Uuid,
     pub domain: String,
+    #[serde(with = "time::serde::rfc3339")]
     pub added_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339::option")]
     pub last_polled_at: Option<OffsetDateTime>,
 }
 
@@ -28,8 +30,11 @@ pub struct ObservationRow {
     pub domain: String,
     pub common_name: Option<String>,
     pub issuer_name: String,
+    #[serde(with = "time::serde::rfc3339")]
     pub not_before: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
     pub not_after: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
     pub observed_at: OffsetDateTime,
 }
 

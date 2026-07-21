@@ -94,7 +94,7 @@ export function AlertsPage() {
   }
 
   return (
-    <div className="p-8">
+    <div>
       <PageHeader
         title="Alert rules"
         subtitle="Workspace-wide rules. Trigger kinds: issue_new / regression / event_count / crash_free_drop."

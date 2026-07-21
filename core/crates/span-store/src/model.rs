@@ -144,8 +144,10 @@ pub struct Span {
     /// Parent span (None for root).
     pub parent_span_id: Option<Uuid>,
     /// Server-side ingest timestamp (partition key).
+    #[serde(with = "time::serde::rfc3339")]
     pub received_at: OffsetDateTime,
     /// SDK-supplied start.
+    #[serde(with = "time::serde::rfc3339")]
     pub started_at: OffsetDateTime,
     /// Duration in ms.
     pub duration_ms: i32,
@@ -176,8 +178,10 @@ pub struct Trace {
     /// Root span's `name`.
     pub root_name: Option<String>,
     /// First child span received.
+    #[serde(with = "time::serde::rfc3339")]
     pub first_seen: OffsetDateTime,
     /// Most recent child span received.
+    #[serde(with = "time::serde::rfc3339")]
     pub last_seen: OffsetDateTime,
     /// How many spans have landed under this trace.
     pub span_count: i32,

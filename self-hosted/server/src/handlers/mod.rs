@@ -25,6 +25,7 @@ mod admin;
 mod alerts;
 mod alerts_fire;
 mod api_describe;
+mod attachments;
 mod audit;
 mod auth;
 mod billing;
@@ -342,6 +343,15 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/v1/projects/{project_id}/events/_recent",
             get(events_live::handle),
         )
+        // Registered after the two literal siblings above. The router
+        // prefers a static segment over a capture regardless of order,
+        // but `{event_id}` parses as a Uuid — if it ever did win,
+        // `/events/trend` would 400 instead of 404, so keep the
+        // precedence visible in the source too.
+        .route(
+            "/v1/projects/{project_id}/events/{event_id}",
+            get(events::get),
+        )
         .route("/v1/projects/{project_id}/traces", get(spans::list_traces))
         .route(
             "/v1/projects/{project_id}/traces/{trace_id}",
@@ -354,6 +364,15 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(
             "/v1/projects/{project_id}/metrics/{name}/timeseries",
             get(metrics::timeseries),
+        )
+        // Crash evidence: what the SDK captured alongside the event.
+        .route(
+            "/v1/projects/{project_id}/events/{event_id}/attachments",
+            get(attachments::list),
+        )
+        .route(
+            "/v1/projects/{project_id}/attachments/{ref_id}",
+            get(attachments::get),
         )
         .route("/v1/projects/{project_id}/replays", get(replays::list))
         .route(

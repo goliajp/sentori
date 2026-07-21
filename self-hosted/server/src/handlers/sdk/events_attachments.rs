@@ -1,28 +1,45 @@
-//! POST `/v1/events/:event_id/attachments/:kind` — upload a blob
-//! attached to an event (replay / screenshot / sourcemap / dsym
-//! / proguard).
+//! POST `/v1/events/:event_id/attachments/:kind` — the evidence an
+//! SDK captures alongside a crash.
 //!
-//! Path params:
-//! - `event_id` — UUID of the originating event (does not have to
-//!   exist yet; the FK is `ON DELETE SET NULL` for late binding)
-//! - `kind` — one of `replay` / `screenshot` / `sourcemap` /
-//!   `dsym` / `proguard` / `mapping`
+//! Six kinds, all defined by the `event_attachments` CHECK in
+//! migration 0022: `screenshot`, `viewTree`, `stateSnapshot`,
+//! `logTail`, `sessionTrail`, `replay`. The replay payload is the
+//! wireframe NDJSON recording (keyframe + delta lines) the RN SDK
+//! keeps in a rolling 60-second ring.
 //!
-//! Body: raw bytes (not multipart in v0.2 — SDK uploads single-
-//! file blob in body for simplicity). Content-Type passes through
-//! to the stored row.
+//! ## Ordering contract
 //!
-//! Stores the blob in `state.replays` (the MemoryBlobStore which
-//! is also used for general attachments) and INSERTs metadata
-//! row in `event_attachments` (migration 0022).
+//! The SDK uploads attachments **before** POSTing the event, then
+//! echoes the returned `refId` into `event.attachments[]`. So this
+//! handler must not assume the event row exists — and indeed
+//! `event_attachments.event_id` deliberately carries no foreign key.
+//!
+//! ## Wire format
+//!
+//! `multipart/form-data` with a `file` part (the bytes, carrying the
+//! media type) and a `source` field (`js` / `ios` / `android`). Both
+//! the React Native and browser SDKs post this shape.
+//!
+//! Response is `{ refId, sizeBytes, mediaType, kind }`; the SDK drops
+//! the attachment if `refId` is absent.
+//!
+//! This handler was rewritten 2026-07-21. Every upload had been
+//! failing in production — the table was empty on a deployment with
+//! 2211 events — for four independent reasons: it read the body as
+//! raw bytes while both SDKs send multipart; its `kind` allowlist
+//! admitted build artefacts (`sourcemap`, `dsym`, `proguard`) that
+//! violate the CHECK while rejecting four kinds the SDK actually
+//! sends; its INSERT named three columns that do not exist (`id`,
+//! `content_type`, `blob_hash`) and omitted two that are NOT NULL
+//! (`captured_at`, `source`); and its response used field names the
+//! SDK does not read.
 
 use std::sync::Arc;
 
 use axum::{
     Extension, Json,
-    body::Bytes,
-    extract::{Path, State},
-    http::{HeaderMap, StatusCode, header},
+    extract::{Multipart, Path, State},
+    http::StatusCode,
 };
 use sentori_billing::CounterKind;
 use sentori_ingest_token::IngestContext;
@@ -36,63 +53,50 @@ use crate::state::AppState;
 
 const MAX_BODY_BYTES: usize = 50 * 1024 * 1024; // 50 MiB hard cap
 
+/// The kinds migration 0022's CHECK constraint accepts. Anything else
+/// would be rejected by the database, so reject it here with a usable
+/// message instead.
+const KINDS: [&str; 6] = [
+    "logTail",
+    "replay",
+    "screenshot",
+    "sessionTrail",
+    "stateSnapshot",
+    "viewTree",
+];
+
+/// `source` is CHECK-constrained too.
+const SOURCES: [&str; 3] = ["android", "ios", "js"];
+
 pub async fn handle(
     Extension(ctx): Extension<IngestContext>,
     State(state): State<Arc<AppState>>,
     Path((event_id, kind)): Path<(Uuid, String)>,
-    headers: HeaderMap,
-    body: Bytes,
+    multipart: Multipart,
 ) -> (StatusCode, Json<Value>) {
-    if !matches!(
-        kind.as_str(),
-        "replay" | "screenshot" | "sourcemap" | "dsym" | "proguard" | "mapping" | "trail"
-    ) {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "invalid_kind", "got": kind })),
-        );
-    }
-    if body.len() > MAX_BODY_BYTES {
-        return (
-            StatusCode::PAYLOAD_TOO_LARGE,
-            Json(json!({
-                "error": "too_large",
-                "max": MAX_BODY_BYTES,
-                "got": body.len(),
-            })),
-        );
-    }
-    if body.is_empty() {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "empty_body" })),
-        );
-    }
-
-    // K17 quota: only replay blobs meter (as one Replays unit).
-    // Screenshots / sourcemaps / dsym / proguard / mapping / trail
-    // are symbolication + debug artifacts, not a billed counter.
-    if kind == "replay" {
-        let now = OffsetDateTime::now_utc();
-        if let Err(body) = quota::meter(&state, ctx.project_id, CounterKind::Replays, 1, now).await
-        {
-            return (StatusCode::PAYMENT_REQUIRED, Json(body));
+    let Parsed {
+        bytes,
+        media_type,
+        source,
+    } = match accept(&kind, multipart).await {
+        Ok(p) => p,
+        Err((status, body)) => {
+            warn!(workspace_id = %ctx.workspace_id, %kind, ?body, "sdk.attachments rejected");
+            return (status, Json(body));
         }
+    };
+
+    // K17 quota: only replay recordings meter (as one Replays unit).
+    // The other five kinds are debug artefacts attached to an event
+    // that was already metered, not a separately billed counter.
+    let now = OffsetDateTime::now_utc();
+    if kind == "replay"
+        && let Err(body) = quota::meter(&state, ctx.project_id, CounterKind::Replays, 1, now).await
+    {
+        return (StatusCode::PAYMENT_REQUIRED, Json(body));
     }
 
-    let content_type = headers
-        .get(header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("application/octet-stream")
-        .to_string();
-    // Body length is already bounded by the request body limit, so
-    // this cannot saturate in practice.
-    let size_bytes = i64::try_from(body.len()).unwrap_or(i64::MAX);
-
-    // Store the blob. Phase D step 2 uses AppState's shared
-    // MemoryBlobStore; Phase E swaps to LocalFsBlobStore (S3
-    // adapter still future work).
-    let hash = match state.attachments.put(&body).await {
+    let hash = match state.attachments.put(&bytes).await {
         Ok(h) => h,
         Err(e) => {
             warn!(workspace_id = %ctx.workspace_id, error = %e, "sdk.attachments blob_store_error");
@@ -102,23 +106,26 @@ pub async fn handle(
             );
         }
     };
-    let blob_hash_hex = hash.to_hex();
 
-    // INSERT metadata row.
-    let id = Uuid::now_v7();
+    // Body length is bounded above, so this cannot saturate.
+    let size_bytes = i32::try_from(bytes.len()).unwrap_or(i32::MAX);
+    let reference = Uuid::now_v7();
     let result = sqlx::query(
         "INSERT INTO event_attachments \
-         (id, workspace_id, project_id, event_id, kind, content_type, size_bytes, blob_hash) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+         (ref, workspace_id, project_id, event_id, kind, media_type, \
+          size_bytes, captured_at, source, blob_hash) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
     )
-    .bind(id)
+    .bind(reference)
     .bind(ctx.workspace_id.into_uuid())
     .bind(ctx.project_id.into_uuid())
     .bind(event_id)
     .bind(&kind)
-    .bind(&content_type)
+    .bind(&media_type)
     .bind(size_bytes)
-    .bind(&blob_hash_hex)
+    .bind(now)
+    .bind(&source)
+    .bind(hash.to_hex())
     .execute(&state.pool)
     .await;
 
@@ -129,15 +136,17 @@ pub async fn handle(
                 project_id = %ctx.project_id,
                 %event_id,
                 %kind,
+                %source,
                 size_bytes,
                 "sdk.attachments stored",
             );
             (
                 StatusCode::ACCEPTED,
                 Json(json!({
-                    "attachment_id": id.to_string(),
-                    "blob_hash": blob_hash_hex,
-                    "size_bytes": size_bytes,
+                    "refId": reference.to_string(),
+                    "sizeBytes": size_bytes,
+                    "mediaType": media_type,
+                    "kind": kind,
                 })),
             )
         }
@@ -149,4 +158,93 @@ pub async fn handle(
             )
         }
     }
+}
+
+struct Parsed {
+    bytes: Vec<u8>,
+    media_type: String,
+    source: String,
+}
+
+/// Validate the path `kind`, parse the multipart body, and check the
+/// resulting bytes and `source` against the column constraints. Every
+/// rejection here is a 4xx the SDK can act on.
+async fn accept(kind: &str, multipart: Multipart) -> Result<Parsed, (StatusCode, Value)> {
+    if !KINDS.contains(&kind) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            json!({ "error": "invalid_kind", "got": kind, "expected": KINDS }),
+        ));
+    }
+    let parsed = read_multipart(multipart).await.map_err(|detail| {
+        (
+            StatusCode::BAD_REQUEST,
+            json!({ "error": "invalid_multipart", "detail": detail }),
+        )
+    })?;
+    if parsed.bytes.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, json!({ "error": "empty_file" })));
+    }
+    if parsed.bytes.len() > MAX_BODY_BYTES {
+        return Err((
+            StatusCode::PAYLOAD_TOO_LARGE,
+            json!({ "error": "too_large", "max": MAX_BODY_BYTES, "got": parsed.bytes.len() }),
+        ));
+    }
+    if !SOURCES.contains(&parsed.source.as_str()) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            json!({ "error": "invalid_source", "got": parsed.source, "expected": SOURCES }),
+        ));
+    }
+    Ok(parsed)
+}
+
+/// Pull the `file` part and the `source` field out of the multipart
+/// body. Unknown parts are skipped so the SDKs can add fields without
+/// a server release.
+async fn read_multipart(mut multipart: Multipart) -> Result<Parsed, String> {
+    let mut bytes: Option<Vec<u8>> = None;
+    let mut media_type = String::from("application/octet-stream");
+    let mut source = String::from("js");
+
+    loop {
+        let field = match multipart.next_field().await {
+            Ok(Some(f)) => f,
+            Ok(None) => break,
+            Err(e) => return Err(format!("reading field: {e}")),
+        };
+        match field.name() {
+            Some("file") => {
+                if let Some(ct) = field.content_type() {
+                    media_type = ct.to_string();
+                }
+                let data = field
+                    .bytes()
+                    .await
+                    .map_err(|e| format!("reading file part: {e}"))?;
+                bytes = Some(data.to_vec());
+            }
+            Some("source") => {
+                source = field
+                    .text()
+                    .await
+                    .map_err(|e| format!("reading source part: {e}"))?
+                    .trim()
+                    .to_string();
+            }
+            _ => {
+                // Drain so the stream stays in sync.
+                let _ = field.bytes().await;
+            }
+        }
+    }
+
+    bytes
+        .map(|bytes| Parsed {
+            bytes,
+            media_type,
+            source,
+        })
+        .ok_or_else(|| "missing `file` part".to_string())
 }

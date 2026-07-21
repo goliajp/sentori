@@ -94,6 +94,7 @@ pub struct IntegrationConfig {
     /// migration / boot script).
     pub connected_by: Option<UserId>,
     /// When connected.
+    #[serde(with = "time::serde::rfc3339")]
     pub connected_at: OffsetDateTime,
     /// Active flag — operator deactivates without losing
     /// the OAuth token.
@@ -115,6 +116,7 @@ pub struct IssueIntegrationLink {
     /// Upstream URL.
     pub external_url: String,
     /// When the link was created.
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
 }
 

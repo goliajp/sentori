@@ -24,8 +24,10 @@ pub struct ReplaySession {
     /// Hex SHA-256 of the gzipped scrubbed bytes in K3.
     pub blob_hash: String,
     /// Wall-clock start of the replay window (SDK-supplied).
+    #[serde(with = "time::serde::rfc3339")]
     pub started_at: OffsetDateTime,
     /// Wall-clock end of the replay window.
+    #[serde(with = "time::serde::rfc3339")]
     pub ended_at: OffsetDateTime,
     /// NDJSON line count (keyframes + deltas).
     pub frame_count: i32,
@@ -37,6 +39,7 @@ pub struct ReplaySession {
     /// storage-estimation badges.
     pub byte_count: i32,
     /// Insert timestamp.
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
 }
 

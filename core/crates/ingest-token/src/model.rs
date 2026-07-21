@@ -16,7 +16,9 @@ pub struct Token {
     /// Last 4 chars of the original token for UI display
     /// (`ad4f` etc.) — non-secret.
     pub last4: Option<String>,
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339::option")]
     pub revoked_at: Option<OffsetDateTime>,
 }
 

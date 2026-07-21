@@ -274,12 +274,15 @@ pub struct DeviceToken {
     /// "every device for user X".
     pub app_user_id: Option<String>,
     /// Creation timestamp.
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
     /// Last activity (used by retention to drop ancient
     /// tokens).
+    #[serde(with = "time::serde::rfc3339")]
     pub last_seen_at: OffsetDateTime,
     /// Quarantine stamp; non-None means dispatcher skips this
     /// row.
+    #[serde(with = "time::serde::rfc3339::option")]
     pub quarantined_at: Option<OffsetDateTime>,
     /// Why it was quarantined (e.g.
     /// `"PermanentlyInvalidToken: vendor said device dead"`).

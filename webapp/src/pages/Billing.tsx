@@ -75,7 +75,7 @@ export default function Billing() {
   }
 
   return (
-    <div className="space-y-4 p-8">
+    <div className="space-y-4">
       <PageHeader
         title="Billing"
         subtitle="Plan, usage, and subscription for this workspace."
