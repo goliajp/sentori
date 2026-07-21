@@ -107,7 +107,7 @@ export default function Projects() {
           <CardHeader title="Create project" />
           <Section>
             <input
-              className="w-full rounded border border-border px-3 py-2 text-sm"
+              className="h-8 w-full rounded border border-border px-2.5 text-sm"
               placeholder="Display name (e.g. 'MyApp iOS')"
               value={name}
               onChange={e => {

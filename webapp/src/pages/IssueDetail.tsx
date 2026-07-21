@@ -200,7 +200,7 @@ export default function IssueDetail() {
             </Button>
             <Link
               to={`/projects/${projectId}/issues`}
-              className="rounded border border-border px-3 py-1.5 text-sm text-fg-subtle hover:bg-raised"
+              className="inline-flex h-8 items-center rounded border border-border px-3 text-sm text-fg-subtle hover:bg-raised"
             >
               ← All
             </Link>
@@ -470,7 +470,7 @@ function EventPicker({
             type="button"
             onClick={() => onSelect(e.id)}
             aria-current={active}
-            className={`rounded border px-2 py-1 font-mono text-[11px] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+            className={`inline-flex h-7 items-center rounded border px-2 font-mono text-[11px] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
               active
                 ? 'border-accent text-fg'
                 : 'border-border text-fg-subtle hover:text-fg-muted'

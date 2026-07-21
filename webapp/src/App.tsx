@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
 
 import { CommandPalette } from './components/CommandPalette';
+import { QuickPrefs } from './components/QuickPrefs';
 import { WorkspaceSwitcher } from './components/WorkspaceSwitcher';
 import { useT } from './i18n';
 import { api, MeResponse } from './lib/api';
@@ -243,9 +244,13 @@ function UserFooter() {
     navigate('/login');
   }
 
-  if (!email) return null;
   return (
-    <div className="mt-4 border-t border-border pt-3 text-[11px]">
+    <div className="mt-4 space-y-2 border-t border-border pt-3 text-[11px]">
+      {/* Theme + language sit above the account row: they are used far
+          more often than sign-out, and burying them in Settings meant
+          nobody found them. */}
+      <QuickPrefs />
+      {email && (
       <div className="flex items-center justify-between gap-1">
         <span
           className="truncate font-mono text-fg-muted"
@@ -256,11 +261,12 @@ function UserFooter() {
         <button
           onClick={signOut}
           title="Sign out"
-          className="rounded px-1.5 py-0.5 text-fg-subtle hover:bg-raised hover:text-fg"
+          className="inline-flex h-7 w-7 items-center justify-center rounded text-fg-subtle transition hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         >
           ⎋
         </button>
       </div>
+      )}
     </div>
   );
 }

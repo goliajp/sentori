@@ -99,7 +99,7 @@ export function SettingsPage() {
             </p>
             <button
               onClick={() => navigate('/settings/billing')}
-              className="rounded border border-border-strong px-3 py-1.5 text-sm hover:bg-raised"
+              className="inline-flex h-8 items-center rounded border border-border-strong px-3 text-sm hover:bg-raised"
             >
               Manage billing →
             </button>
@@ -149,7 +149,7 @@ export function SettingsPage() {
             </p>
             <button
               onClick={() => navigate('/sessions')}
-              className="rounded border border-border-strong px-3 py-1.5 text-sm hover:bg-raised"
+              className="inline-flex h-8 items-center rounded border border-border-strong px-3 text-sm hover:bg-raised"
             >
               Open Sessions →
             </button>
