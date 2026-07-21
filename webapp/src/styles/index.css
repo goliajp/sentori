@@ -33,6 +33,18 @@
  * and keeps `fg-subtle` for the faintest.
  */
 @theme inline {
+  /*
+   * The page canvas — what a card sits *on*.
+   *
+   * Elevation runs in opposite directions in the two modes: in dark a
+   * card lifts by getting lighter than the page, in light it lifts by
+   * staying white while the page steps back to grey. GDS gives both
+   * values but has no single name for "the thing behind the cards",
+   * so one is defined here and flipped by mode below. Without it,
+   * light mode put white cards on a white page and nothing lifted at
+   * all — the borders were doing the entire job.
+   */
+  --color-canvas: var(--gds-canvas);
   --color-raised: var(--gds-bg-tertiary);
   --color-fg-muted: var(--gds-fg-secondary);
   --color-fg-subtle: var(--gds-fg-muted);
@@ -57,11 +69,17 @@
   --s-border-strong: var(--gds-border-strong);
   --s-fg-muted: var(--gds-fg-secondary);
 
+  --gds-canvas: var(--gds-bg);
+
   /* GDS's compact density sets body text to 13px. Raise its own
      token rather than overriding the rule it feeds — otherwise the
      two declarations sit in the cascade waiting for one of them to
      move. See the note on the body rule below for why 14. */
   --gds-text-body: 14px;
+}
+
+:root[data-theme='light'] {
+  --gds-canvas: var(--gds-bg-secondary);
 }
 
 html,
@@ -83,7 +101,7 @@ body,
  */
 body {
   margin: 0;
-  background-color: var(--gds-bg);
+  background-color: var(--gds-canvas);
   color: var(--gds-fg);
   font-family: var(--font-sans);
   font-size: 14px;
