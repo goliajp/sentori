@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { useT } from '../i18n';
 import { api } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 import {
@@ -15,6 +16,7 @@ import {
 } from '../components/ui';
 
 export function HealthPage() {
+  const t = useT();
   const [stamp, setStamp] = useState(new Date().toLocaleTimeString());
   const { data: health, error, reload } = useAsyncData(
     () => api.health(),
@@ -40,7 +42,7 @@ export function HealthPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Health"
+        title={t('health.title')}
         subtitle={`Live server vitals. Last refresh: ${stamp}.`}
         actions={
           <button
@@ -58,7 +60,7 @@ export function HealthPage() {
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatCard
-              label="Status"
+              label={t('crash.status')}
               value={
                 <Badge tone={health.status === 'ok' ? 'ok' : 'neutral'}>
                   {health.status}
@@ -67,7 +69,7 @@ export function HealthPage() {
               sub={`v${health.version}`}
             />
             <StatCard
-              label="Database"
+              label={t('health.database')}
               value={
                 <Badge tone={health.db === 'ok' ? 'ok' : 'neutral'}>
                   {health.db}
@@ -80,7 +82,7 @@ export function HealthPage() {
               }
             />
             <StatCard
-              label="Push queued"
+              label={t('health.pushQueued')}
               value={
                 <span className="font-mono text-xl text-fg">
                   {health.push_queued ?? 0}
@@ -89,7 +91,7 @@ export function HealthPage() {
               sub="drained every 5s"
             />
             <StatCard
-              label="Push failed 24h"
+              label={t('health.pushFailed')}
               value={
                 <span
                   className={`font-mono text-xl ${
@@ -106,7 +108,7 @@ export function HealthPage() {
           </div>
 
           <Card>
-            <CardHeader title="Scrape endpoints" />
+            <CardHeader title={t('health.scrape')} />
             <CardBody>
               <ul className="space-y-1 text-xs font-mono text-fg-muted">
                 <li>
@@ -134,7 +136,7 @@ export function HealthPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Background workers" />
+            <CardHeader title={t('health.workers')} />
             <CardBody>
               <ul className="space-y-1 text-xs font-mono text-fg-muted">
                 <li>
@@ -167,7 +169,7 @@ export function HealthPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Vendor adapters (push)" />
+            <CardHeader title={t('health.vendors')} />
             <CardBody>
               <ul className="space-y-1 text-xs font-mono text-fg-muted">
                 <li>
@@ -195,7 +197,7 @@ export function HealthPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Raw" />
+            <CardHeader title={t('health.raw')} />
             <CardBody>
               <pre className="overflow-auto rounded border border-border bg-bg p-3 text-xs font-mono text-fg-muted">
                 {JSON.stringify(health, null, 2)}

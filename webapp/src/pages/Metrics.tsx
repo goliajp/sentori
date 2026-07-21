@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api, MetricPoint, MetricSummary } from '../lib/api';
 import { Sparkline } from '../components/Sparkline';
 import {
@@ -18,6 +19,7 @@ import {
 } from '../components/ui';
 
 export default function Metrics() {
+  const t = useT();
   const { id: projectId } = useParams<{ id: string }>();
   const [rows, setRows] = useState<MetricSummary[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -56,7 +58,7 @@ export default function Metrics() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Metrics"
+        title={t('metrics.title')}
         subtitle="Custom counters / gauges / distributions emitted via SDK metrics:batch. Last 24h shown by default."
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
@@ -70,8 +72,8 @@ export default function Metrics() {
             </div>
           ) : rows.length === 0 ? (
             <EmptyState
-              title="No metrics yet"
-              hint="SDKs call POST /v1/metrics:batch to send rolled-up samples."
+              title={t('metrics.empty')}
+              hint={t('metrics.emptyHint')}
             />
           ) : (
             <ul className="divide-y divide-border">
