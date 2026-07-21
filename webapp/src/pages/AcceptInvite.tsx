@@ -70,7 +70,7 @@ export default function AcceptInvite() {
               <span className="font-medium text-emerald-400">{state.role}</span>.
             </p>
             <Link
-              to="/"
+              to="/main"
               onClick={() => {
                 // Land in the freshly-joined workspace's dashboard.
               }}

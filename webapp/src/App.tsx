@@ -112,7 +112,7 @@ function Sidebar({ me }: { me: MeResponse | null }) {
 
       <nav className="mt-4 flex flex-1 flex-col gap-1 text-sm">
         <SectionLabel>Workspace</SectionLabel>
-        <NavItem to="/" label="Overview" />
+        <NavItem to="/main" label="Overview" />
         <NavItem to="/search" label="Search" />
         <NavItem to="/projects" label="Projects" />
         <NavItem to="/members" label="Members" />
