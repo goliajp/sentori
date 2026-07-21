@@ -51,7 +51,7 @@ export default function Sessions() {
     <div className="space-y-4">
       <PageHeader
         title={t('sessions.title')}
-        subtitle="Where your account is currently signed in. Revoke any you don't recognize."
+        subtitle={t('sessions.subtitle')}
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
       <Card>
@@ -73,13 +73,24 @@ export default function Sessions() {
                       {s.id_hash_hex.slice(0, 16)}…
                     </div>
                     <div className="mt-1 text-xs text-fg-subtle">
-                      {s.ip ?? 'IP unknown'} ·{' '}
-                      {(s.user_agent ?? 'UA unknown').slice(0, 90)}
+                      {s.ip ?? t('sessions.ipUnknown')} ·{' '}
+                      {(s.user_agent ?? t('sessions.deviceUnknown')).slice(0, 90)}
                     </div>
                     <div className="mt-1 text-xs text-fg-subtle">
-                      created {formatRelative(s.created_at)} · last seen{' '}
-                      {s.last_used_at ? formatRelative(s.last_used_at) : 'never'}{' '}
-                      · expires {formatRelative(s.expires_at)}
+                      {t('sessions.created').replace(
+                        '{when}',
+                        formatRelative(s.created_at),
+                      )}{' · '}
+                      {t('sessions.lastSeen').replace(
+                        '{when}',
+                        s.last_used_at
+                          ? formatRelative(s.last_used_at)
+                          : t('sessions.never'),
+                      )}{' · '}
+                      {t('sessions.expires').replace(
+                        '{when}',
+                        formatRelative(s.expires_at),
+                      )}
                     </div>
                   </div>
                   <Button
