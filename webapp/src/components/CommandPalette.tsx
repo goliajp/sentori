@@ -205,7 +205,7 @@ export function CommandPalette({ open, onClose }: Props) {
           value={query}
           onChange={e => setQuery(e.target.value)}
           onKeyDown={onKey}
-          placeholder="Jump to…  (try project name, or 'issues')"
+          placeholder={t('palette.placeholder')}
           className="w-full border-b border-border bg-transparent px-4 py-3 text-sm text-fg placeholder:text-fg-subtle focus:outline-none"
         />
         <ul className="max-h-80 overflow-y-auto py-1">

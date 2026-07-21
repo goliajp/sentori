@@ -48,7 +48,7 @@ export function SettingsPage() {
           <Card>
             <div className="flex items-center justify-between px-5 py-4">
               <div>
-                <p className="text-xs text-fg-subtle">Signed in as</p>
+                <p className="text-xs text-fg-subtle">{t('settings.signedInAs')}</p>
                 <p className="font-mono text-sm">{email}</p>
               </div>
               <button
@@ -97,13 +97,13 @@ export function SettingsPage() {
           </div>
           <div className="flex items-center justify-between border-t border-border px-5 py-4">
             <p className="text-sm text-fg-subtle">
-              Usage, upgrades, invoices, and cancellation.
+              {t('settings.billingHint')}
             </p>
             <button
               onClick={() => navigate('/settings/billing')}
               className="inline-flex h-8 items-center rounded border border-border-strong px-3 text-sm hover:bg-raised"
             >
-              Manage billing →
+              {t('settings.manageBilling')} →
             </button>
           </div>
         </Card>
@@ -111,13 +111,19 @@ export function SettingsPage() {
 
       <Section title={t('members.title')}>
         <Card>
-          <div className="p-6 text-sm text-fg-subtle">
-            Member management UI lands in v0.1.x. Backend ready (K1
-            workspace_members + K16 tenant-scoping ACL gate). Use the
-            <code className="mx-1 rounded bg-raised px-1 py-0.5 text-xs">
-              sentorictl
-            </code>
-            CLI for now.
+          {/* This used to say member management was unbuilt and to use
+              the CLI. Both the members page and the tokens page have
+              existed for releases; a settings screen advertising a
+              workaround for a shipped feature sends people the long way
+              round. */}
+          <div className="flex items-center justify-between px-5 py-4">
+            <p className="text-sm text-fg-muted">{t('settings.membersHint')}</p>
+            <button
+              onClick={() => navigate('/members')}
+              className="inline-flex h-8 shrink-0 items-center rounded border border-border-strong px-3 text-sm hover:bg-raised"
+            >
+              {t('settings.openMembers')} →
+            </button>
           </div>
         </Card>
       </Section>
@@ -125,9 +131,7 @@ export function SettingsPage() {
       <Section title={t('settings.integrations')}>
         <Card>
           <div className="p-6 text-sm text-fg-subtle">
-            K12 IntegrationAdapter trait shipped with Slack reference impl.
-            UI for connect/disconnect lands as K12.1-K12.4 vendor adapters
-            roll out (Linear / Jira / GitHub / GitLab).
+            {t('settings.integrationsHint')}
           </div>
         </Card>
       </Section>
@@ -135,10 +139,7 @@ export function SettingsPage() {
       <Section title={t('settings.notifiers')}>
         <Card>
           <div className="p-6 text-sm text-fg-subtle">
-            K11 NotifierService is operator-configured via env at boot
-            (SMTP host / port / auth). Webhook + Mock transports always
-            available. delivery_log persistence visible via the audit
-            log when admin actions trigger fan-out.
+            {t('settings.notifiersHint')}
           </div>
         </Card>
       </Section>
@@ -147,13 +148,13 @@ export function SettingsPage() {
         <Card>
           <div className="px-5 py-4 flex items-center justify-between">
             <p className="text-sm text-fg-muted">
-              Detailed list, IP+UA per session, revoke individual entries.
+              {t('settings.sessionsHint')}
             </p>
             <button
               onClick={() => navigate('/sessions')}
               className="inline-flex h-8 items-center rounded border border-border-strong px-3 text-sm hover:bg-raised"
             >
-              Open Sessions →
+              {t('settings.openSessions')} →
             </button>
           </div>
         </Card>
@@ -164,16 +165,12 @@ export function SettingsPage() {
         <Card>
           <div className="p-6 text-sm text-fg-muted">
             <p className="mb-2">
-              Send events to:{' '}
               <code className="rounded bg-raised px-1 py-0.5 text-xs">
                 POST /v1/events/&lt;project_id&gt;
               </code>
             </p>
             <p className="text-sm text-fg-subtle">
-              Per-project token auth lands with K2 token middleware in
-              v0.1.x. Until then, restrict access to the ingest port at the
-              network layer (firewall / k8s NetworkPolicy / Caddy
-              allowlist).
+              {t('settings.ingestHint')}
             </p>
           </div>
         </Card>

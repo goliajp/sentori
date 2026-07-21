@@ -139,7 +139,7 @@ export function AlertsPage() {
           <div className="flex gap-2">
             <input
               className="flex-1 rounded border border-border-strong bg-surface px-3 py-2 text-sm"
-              placeholder='Name (e.g. "production new issues")'
+              placeholder={t('alerts.namePlaceholder')}
               value={name}
               onChange={e => setName(e.target.value)}
             />

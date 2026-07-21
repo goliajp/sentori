@@ -111,7 +111,7 @@ export default function EndpointProbes() {
           <CardBody>
             <input
               className="h-8 w-full rounded border border-border px-2.5 text-sm"
-              placeholder="https://api.example.com/health"
+              placeholder={t('probes.urlPlaceholder')}
               value={url}
               onChange={e => setUrl(e.target.value)}
             />
@@ -185,7 +185,7 @@ export default function EndpointProbes() {
                       variant="secondary"
                       onClick={() => toggle(p)}
                     >
-                      {p.enabled ? 'Disable' : 'Enable'}
+                      {p.enabled ? t('action.disable') : t('action.enable')}
                     </Button>
                     <Button
                       size="sm"

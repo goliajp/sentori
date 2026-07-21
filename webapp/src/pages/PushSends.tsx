@@ -93,7 +93,7 @@ export default function PushSends() {
         actions={
           counts.failed > 0 && (
             <Button size="sm" onClick={retryAllFailed}>
-              Retry all {counts.failed} failed
+              {t('push.retryAllFailed').replace('{n}', String(counts.failed))}
             </Button>
           )
         }

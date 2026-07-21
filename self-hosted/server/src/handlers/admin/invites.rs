@@ -14,7 +14,7 @@ use axum::{
     extract::{Extension, Path, State},
     http::StatusCode,
 };
-use sentori_workspace_identity::{InviteRole, UserId};
+use sentori_workspace_identity::InviteRole;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use tracing::{info, warn};
@@ -23,13 +23,17 @@ use uuid::Uuid;
 use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
+/// The inviter is not in this body.
+///
+/// It used to be, which meant the form asked an admin to type their own
+/// uuid — and meant the field was whatever the client said it was, so
+/// the invite audit trail recorded a claim rather than a fact. The
+/// session already knows who is calling.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateBody {
     pub email: String,
     pub role: String,
-    /// Who's sending the invite (subject's user_id).
-    pub invited_by: Uuid,
     /// Days until expiry (server-clamped to MAX_EXPIRES_IN_DAYS).
     #[serde(default = "default_expires")]
     pub expires_in_days: i64,
@@ -64,12 +68,7 @@ pub async fn create(
     match state
         .identity_for(ctx.workspace_id)
         .invites()
-        .create(
-            &body.email,
-            role,
-            UserId::from_uuid(body.invited_by),
-            body.expires_in_days,
-        )
+        .create(&body.email, role, ctx.user_id, body.expires_in_days)
         .await
     {
         Ok(minted) => {
@@ -83,7 +82,7 @@ pub async fn create(
                 &state.pool,
                 ctx.workspace_id.into_uuid(),
                 None,
-                Some(body.invited_by),
+                Some(ctx.user_id.into_uuid()),
                 "invite.mint",
                 Some("invite"),
                 Some(&minted.invite.id.to_string()),

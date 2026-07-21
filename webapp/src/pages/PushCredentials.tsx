@@ -86,7 +86,7 @@ export default function PushCredentials() {
     <div className="space-y-4">
       <PageHeader
         title={t('push.credentials')}
-        subtitle="Vendor secrets used by /v1/push/send. APNs p8, FCM service-account, WebPush VAPID, HCM/MiPush client secrets."
+        subtitle={t('push.credSubtitle')}
         actions={
           <div className="flex gap-2">
             <Button

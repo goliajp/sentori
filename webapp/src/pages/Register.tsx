@@ -90,7 +90,7 @@ export default function Register() {
             </button>
             <div className="mt-4 text-center text-xs text-fg-subtle">
               <Link to="/login" className="hover:text-fg-muted">
-                Already have an account? Sign in
+                {t('auth.haveAccount')} {t('auth.signIn')}
               </Link>
             </div>
           </>

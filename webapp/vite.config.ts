@@ -26,6 +26,18 @@ export default defineConfig({
       '/readyz': { target: 'http://localhost:8080', changeOrigin: true },
     },
   },
+  // `bun run sweep` points at the built bundle rather than the dev
+  // server: a sweep against HMR catches whatever half-saved state the
+  // editor is in, which twice reported an error that was already fixed.
+  preview: {
+    port: 5599,
+    proxy: {
+      '/v1': { target: 'http://localhost:8080', changeOrigin: true },
+      '/auth': { target: 'http://localhost:8080', changeOrigin: true },
+      '/admin/api': { target: 'http://localhost:8080', changeOrigin: true },
+      '/healthz': { target: 'http://localhost:8080', changeOrigin: true },
+    },
+  },
   build: {
     target: 'es2022',
     sourcemap: true,
