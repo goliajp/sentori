@@ -27,16 +27,34 @@ const GLYPH: Record<BreadcrumbType, string> = {
 export function BreadcrumbTimeline({
   breadcrumbs,
   crashedAt,
+  playheadTs,
 }: {
   breadcrumbs: Breadcrumb[];
   crashedAt: string;
+  /** When the replay is scrubbing, the crumb nearest the playhead is
+   *  marked — the recording and the log read as one timeline rather
+   *  than two things that happen to be on the same page. */
+  playheadTs?: number;
 }) {
   const end = new Date(crashedAt).getTime();
+  const activeIndex =
+    playheadTs === undefined
+      ? -1
+      : breadcrumbs.reduce(
+          (best, b, i) =>
+            new Date(b.timestamp).getTime() <= playheadTs ? i : best,
+          -1,
+        );
 
   return (
     <ol className="relative space-y-0">
       {breadcrumbs.map((b, i) => (
-        <Row key={i} crumb={b} offsetMs={new Date(b.timestamp).getTime() - end} />
+        <Row
+          key={i}
+          crumb={b}
+          offsetMs={new Date(b.timestamp).getTime() - end}
+          active={i === activeIndex}
+        />
       ))}
       <li className="flex items-baseline gap-3 border-l-2 border-l-danger py-1.5 pl-3">
         <span className="w-14 shrink-0 text-right font-mono text-[11px] text-danger">
@@ -51,9 +69,23 @@ export function BreadcrumbTimeline({
   );
 }
 
-function Row({ crumb, offsetMs }: { crumb: Breadcrumb; offsetMs: number }) {
+function Row({
+  crumb,
+  offsetMs,
+  active,
+}: {
+  crumb: Breadcrumb;
+  offsetMs: number;
+  active?: boolean;
+}) {
   return (
-    <li className="flex items-baseline gap-3 border-l-2 border-l-border py-1.5 pl-3 transition hover:border-l-border-strong">
+    <li
+      className={`flex items-baseline gap-3 border-l-2 py-1.5 pl-3 transition ${
+        active
+          ? 'border-l-accent bg-raised/40'
+          : 'border-l-border hover:border-l-border-strong'
+      }`}
+    >
       <span className="w-14 shrink-0 text-right font-mono text-[11px] tabular-nums text-fg-subtle">
         {formatOffset(offsetMs)}
       </span>

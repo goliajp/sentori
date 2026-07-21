@@ -9,7 +9,10 @@
 // that collected no breadcrumbs should not leave a "Breadcrumbs (0)"
 // box implying something is broken.
 
+import { useState } from 'react';
+
 import { api, type EventAttachment, type EventDetail } from '../../lib/api';
+import { ReplayPlayer } from './ReplayPlayer';
 import { BreadcrumbTimeline } from './BreadcrumbTimeline';
 import { StackTrace } from './StackTrace';
 
@@ -22,6 +25,10 @@ export function EventEvidence({
 }) {
   const p = event.payload ?? {};
   const breadcrumbs = p.breadcrumbs ?? [];
+  const replay = event.attachments.find(a => a.kind === 'replay');
+  // Shared between the recording and the log so scrubbing one moves
+  // the other.
+  const [playheadTs, setPlayheadTs] = useState<number | undefined>();
 
   return (
     <div className="space-y-8">
@@ -37,15 +44,31 @@ export function EventEvidence({
         )
       )}
 
-      {breadcrumbs.length > 0 && (
+      {(replay || breadcrumbs.length > 0) && (
         <Panel
           title="Before the crash"
-          note={`${breadcrumbs.length} step${breadcrumbs.length === 1 ? '' : 's'}`}
+          note={
+            replay
+              ? 'recording and log share a playhead'
+              : `${breadcrumbs.length} step${breadcrumbs.length === 1 ? '' : 's'}`
+          }
         >
-          <BreadcrumbTimeline
-            breadcrumbs={breadcrumbs}
-            crashedAt={event.timestamp}
-          />
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+            {replay && (
+              <ReplayPlayer
+                projectId={projectId}
+                attachmentRef={replay.ref}
+                onSeek={setPlayheadTs}
+              />
+            )}
+            {breadcrumbs.length > 0 && (
+              <BreadcrumbTimeline
+                breadcrumbs={breadcrumbs}
+                crashedAt={event.timestamp}
+                playheadTs={playheadTs}
+              />
+            )}
+          </div>
         </Panel>
       )}
 
@@ -53,9 +76,12 @@ export function EventEvidence({
         <ContextGrid event={event} />
       </Panel>
 
-      {event.attachments.length > 0 && (
+      {event.attachments.filter(a => a.kind !== 'replay').length > 0 && (
         <Panel title="Captured artefacts">
-          <Attachments items={event.attachments} projectId={projectId} />
+          <Attachments
+            items={event.attachments.filter(a => a.kind !== 'replay')}
+            projectId={projectId}
+          />
         </Panel>
       )}
     </div>
