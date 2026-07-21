@@ -6,6 +6,22 @@
 
 ---
 
+## v1.7.3(2026-07-21 — 崩溃证据链修复:日期、附件/录屏、事件详情接口,以及主题与三语言地基)
+
+为「围绕 crash 组织的详情视图」清障。查下来 dashboard「几乎不能用」不是观感问题,是几处硬伤叠加。
+
+**每个日期都渲染成 `NaNy ago`** —— `self-hosted/server` 与它序列化的 `core` crate 里有 **62 个 `OffsetDateTime` 字段缺 `#[serde(with = "time::serde::rfc3339")]`**。缺了这个注解,`time` 输出的是 9 元素数组,`new Date(...)` 得到 Invalid Date,`formatRelative` 一路 fall through 到最后一支返回 `NaN` + `y ago`。issues / events / alerts / audit / cert / tokens / sessions / replays / members 全中。仓库本来就有 `scripts/check-rfc3339.sh` 专防这个,但它**只扫 legacy `server/src`**,整个 v0.2 栈从没被检查过 —— 现已扩到 `self-hosted/server/src` 与 `core/crates`,并实测「拆掉一个注解门会红」。
+
+**附件与录屏从未落库** —— 有 2211 条事件的生产库里 `event_attachments` 是 **0 行**。同一个 handler 四处独立错误:按 raw bytes 读而两个 SDK 都发 multipart;`kind` 白名单放行会违反 CHECK 的构建产物(`sourcemap`/`dsym`/`proguard`),却拒绝 SDK 真正发的 `viewTree`/`stateSnapshot`/`logTail`/`sessionTrail`;INSERT 写了三个不存在的列又漏了两个 NOT NULL 列;返回体字段名 SDK 不认。更深一层:0022 schema 根本没有指向字节的列,blob 包装层也只有 `put` 没有 `get` —— 就算写成功也永远读不回来。migration 0035 补上 `blob_hash`(handler 一直在写这列),`AttachmentStore::get` 补全读取,并新增两个读接口。
+
+**`GET /v1/projects/{pid}/events/{event_id}`** —— ingest 一直把 SDK 的整个 JSON 原样存在 `events.payload`(堆栈帧含 pre/post 源码上下文与递归 `cause` 链、breadcrumb 时间线、device / app / bundle / user / tags / flags),但没有任何接口 SELECT 过它,连单事件路由都不存在。现在一个接口全部返回,附件清单以 `event_attachments` 为准而非 payload 里的回声。
+
+**布局** —— `<main>` 不给内边距、各页自行决定,一半页面(IssueDetail / Members / Projects / Metrics / Integrations / Notifications / PushSends)什么都没加,内容顶到视口边缘、自己的头部按钮被切掉。内边距与最大宽度收归外壳一处。
+
+**主题与语言地基** —— 新增语义角色层(`bg`/`surface`/`raised`/`border`/`fg`/`fg-muted`/`fg-subtle`/`accent` + 三个严重度),`@theme inline` 使其运行时可切换;暗色仍为默认,浅色是独立设计的一组值(accent 加深到 `#0284c7`,因 `#38bdf8` 在白底上文字对比度不合格),主题在挂载前解析以消除首屏闪烁,并尊重 `prefers-reduced-motion`。三语言(en / 简体中文 / 日本語)用类型化目录实现 —— 少一个 key 即编译错误,不会悄悄漏成英文;语言按「存储 → `navigator.languages` → 英文」协商并同步 `<html lang>`。两个切换器在 Settings。
+
+---
+
 ## v1.7.2(2026-07-21 — dashboard 首页移到 `/main`,修 OAuth 登录落到 marketing 页)
 
 Google/GitHub 登录认证本身是好的(链账号 + 建 session 都正常),但登完把人丢到了 marketing 首页。根因:OAuth 回调结尾是**服务端 302**,而 SaaS 部署上 Caddy 把 `/` 交给 Astro marketing 构建、其余路径才路由到本 server 的 SPA —— 所以整页加载 `/` 永远到不了 dashboard。密码登录一直没暴露这个问题纯属侥幸:它在已加载的 SPA 内做**客户端**跳转,压根不经过 Caddy;只有全新的浏览器导航(OAuth 回调、刷新、书签)才会撞上 marketing。
