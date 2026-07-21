@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api, Project } from '../lib/api';
 import {
   Badge,
@@ -33,6 +34,7 @@ interface EventHit {
 }
 
 export default function Search() {
+  const t = useT();
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState('');
   const [q, setQ] = useState('');
@@ -84,8 +86,8 @@ export default function Search() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Search"
-        subtitle="LIKE search across issues + events for the selected project."
+        title={t('search.title')}
+        subtitle={t('search.subtitle')}
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
@@ -107,7 +109,7 @@ export default function Search() {
               autoFocus
               value={q}
               onChange={e => setQ(e.target.value)}
-              placeholder="Type to search (≥3 chars)…"
+              placeholder={t('search.placeholder')}
               className="flex-1 rounded border border-border-strong bg-surface px-3 py-2 text-sm"
             />
             {loading && (
@@ -119,7 +121,7 @@ export default function Search() {
 
       {issues.length > 0 && (
         <Card>
-          <CardHeader title={`Issues (${issues.length})`} />
+          <CardHeader title={`${t('issues.title')} (${issues.length})`} />
           <CardBody>
             <ul className="divide-y divide-border">
               {issues.map(i => (
@@ -150,7 +152,7 @@ export default function Search() {
 
       {events.length > 0 && (
         <Card>
-          <CardHeader title={`Events (${events.length})`} />
+          <CardHeader title={`${t('events.title')} (${events.length})`} />
           <CardBody>
             <ul className="space-y-1">
               {events.map(e => (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api, ApiError, EventRow } from '../lib/api';
 import {
   Badge,
@@ -14,6 +15,7 @@ import {
 } from '../components/ui';
 
 export function EventsPage() {
+  const t = useT();
   const { id: projectId } = useParams<{ id: string }>();
   const [search, setSearch] = useSearchParams();
   const issueFilter = search.get('issue_id') ?? '';
@@ -93,8 +95,8 @@ export function EventsPage() {
   return (
     <div>
       <PageHeader
-        title="Events"
-        subtitle="Recent event tail (newest first, up to 100)."
+        title={t('events.title')}
+        subtitle={t('events.subtitle')}
         action={
           <div className="flex items-center gap-2">
             {saveMsg && (
@@ -121,7 +123,7 @@ export function EventsPage() {
 
       {issueFilter && (
         <Card className="mb-4">
-          <CardHeader title="Filter" />
+          <CardHeader title={t('events.filter')} />
           <div className="flex items-center justify-between p-3">
             <span className="font-mono text-xs">
               issue_id ={' '}
@@ -144,7 +146,7 @@ export function EventsPage() {
       <Card>
         <DataTable
           rowKey={(r) => r.id}
-          empty="No events yet."
+          empty={t('events.empty')}
           rows={events ?? []}
           columns={[
             {
@@ -212,7 +214,7 @@ export function EventsPage() {
                     search.set('issue_id', r.issue_id);
                     setSearch(search, { replace: true });
                   }}
-                  title="Narrow to this issue"
+                  title={t('events.narrowToIssue')}
                   className="rounded bg-raised px-2 py-0.5 text-xs text-fg-muted hover:bg-raised"
                 >
                   Narrow

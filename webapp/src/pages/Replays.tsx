@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api, ReplayRow } from '../lib/api';
 import {
   Badge,
@@ -19,6 +20,7 @@ import {
 } from '../components/ui';
 
 export default function Replays() {
+  const t = useT();
   const { id: projectId } = useParams<{ id: string }>();
   const [rows, setRows] = useState<ReplayRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,13 +40,13 @@ export default function Replays() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Replays"
+        title={t('replays.title')}
         subtitle="Session replays captured around error events. Last 100 by recency."
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       <Card>
-        <CardHeader title={`Replays (${rows.length})`} />
+        <CardHeader title={`${t('replays.title')} (${rows.length})`} />
         <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
@@ -52,7 +54,7 @@ export default function Replays() {
             </div>
           ) : rows.length === 0 ? (
             <EmptyState
-              title="No replays yet"
+              title={t('replays.empty')}
               hint="SDKs capture replays automatically around captureException calls. Verify your SDK init has replay enabled."
             />
           ) : (
