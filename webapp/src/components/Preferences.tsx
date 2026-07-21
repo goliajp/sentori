@@ -4,25 +4,17 @@
 // each, all worth showing at once, and a segmented control states the
 // current value without being opened.
 
-import { useEffect, useState } from 'react';
+import { useSetThemeMode, useTheme } from '@goliapkg/gds/systems';
 
 import { LOCALES, LOCALE_LABELS, useI18n } from '../i18n';
-import {
-  applyPreference,
-  readPreference,
-  watchSystemTheme,
-  type ThemePreference,
-} from '../lib/theme';
+import type { ThemeMode } from '../lib/theme';
 
 export function Preferences() {
   const { locale, setLocale, t } = useI18n();
-  const [theme, setTheme] = useState<ThemePreference>(() => readPreference());
+  const theme = useTheme().mode;
+  const setThemeMode = useSetThemeMode();
 
-  // While the preference is "system", follow the OS live — someone on
-  // a sunset schedule should not have to reload.
-  useEffect(() => watchSystemTheme(() => setTheme(readPreference())), []);
-
-  const themeOptions: { value: ThemePreference; label: string }[] = [
+  const themeOptions: { value: ThemeMode; label: string }[] = [
     { value: 'system', label: t('prefs.themeSystem') },
     { value: 'light', label: t('prefs.themeLight') },
     { value: 'dark', label: t('prefs.themeDark') },
@@ -34,10 +26,7 @@ export function Preferences() {
         <Segmented
           options={themeOptions}
           value={theme}
-          onChange={next => {
-            applyPreference(next);
-            setTheme(next);
-          }}
+          onChange={setThemeMode}
         />
       </Field>
       <Field label={t('prefs.language')}>
@@ -60,7 +49,7 @@ function Field({
 }) {
   return (
     <div>
-      <p className="mb-2 text-[11px] uppercase tracking-wide text-fg-subtle">
+      <p className="mb-2 text-xs uppercase tracking-wide text-fg-subtle">
         {label}
       </p>
       {children}

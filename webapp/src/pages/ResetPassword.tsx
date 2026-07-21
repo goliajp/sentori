@@ -47,12 +47,12 @@ export default function ResetPassword() {
         <p className="mb-6 text-sm text-fg-subtle">Sentori</p>
         {done ? (
           <div className="space-y-3">
-            <p className="text-sm text-emerald-400">
+            <p className="text-sm text-accent">
               Password updated — sign in with your new password.
             </p>
             <Link
               to="/login"
-              className="block rounded bg-emerald-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-emerald-500"
+              className="block rounded bg-accent px-3 py-2 text-center text-sm font-medium text-white hover:opacity-90"
             >
               Sign in
             </Link>
@@ -60,7 +60,7 @@ export default function ResetPassword() {
         ) : (
           <>
             {!token && (
-              <p className="mb-3 text-xs text-red-400">
+              <p className="mb-3 text-xs text-danger">
                 Missing token — open the link from your email.
               </p>
             )}
@@ -86,12 +86,12 @@ export default function ResetPassword() {
               />
             </label>
             {err && (
-              <p className="mb-3 break-all text-xs text-red-400">{err}</p>
+              <p className="mb-3 break-all text-xs text-danger">{err}</p>
             )}
             <button
               type="submit"
               disabled={loading || !token}
-              className="w-full rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+              className="w-full rounded bg-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               {loading ? 'Saving…' : 'Set new password'}
             </button>

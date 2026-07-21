@@ -12,10 +12,10 @@ import { useKeyHandlers } from '../lib/useShortcuts';
 import {
   Badge,
   Card,
+  CardBody,
   CardHeader,
   ErrorBanner,
   PageHeader,
-  Section,
   formatNumber,
   formatRelative,
 } from '../components/ui';
@@ -101,7 +101,7 @@ export default function TraceDetail() {
 
       <Card>
         <CardHeader title="Meta" />
-        <Section>
+        <CardBody>
           <div className="grid grid-cols-4 gap-4">
             <Cell label="Status">
               <Badge tone={trace.status === 'ok' ? 'ok' : 'neutral'}>
@@ -118,12 +118,12 @@ export default function TraceDetail() {
             <Cell label="First seen">{formatRelative(trace.first_seen)}</Cell>
             <Cell label="Last seen">{formatRelative(trace.last_seen)}</Cell>
           </div>
-        </Section>
+        </CardBody>
       </Card>
 
       <Card>
         <CardHeader title={`Spans (${spans.length})`} />
-        <Section>
+        <CardBody>
           {spans.length === 0 ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
               No spans recorded.
@@ -141,7 +141,7 @@ export default function TraceDetail() {
               ))}
             </ul>
           )}
-        </Section>
+        </CardBody>
       </Card>
     </div>
   );
@@ -156,7 +156,7 @@ function Cell({
 }) {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-wide text-fg-subtle">
+      <p className="text-xs uppercase tracking-wide text-fg-subtle">
         {label}
       </p>
       <div className="mt-1 text-sm">{children}</div>
@@ -194,12 +194,12 @@ function SpanRowItem({
       >
         <div className="flex items-center gap-2 min-w-0">
           {hasTags && (
-            <span className="font-mono text-[10px] text-fg-subtle w-3">
+            <span className="font-mono text-xs text-fg-subtle w-3">
               {open ? '▼' : '▶'}
             </span>
           )}
           <Badge>{s.op}</Badge>
-          <span className="font-mono text-[11px] text-fg truncate">
+          <span className="font-mono text-xs text-fg truncate">
             {s.name}
           </span>
           <Badge tone={s.status === 'ok' ? 'ok' : 'neutral'}>
@@ -212,7 +212,7 @@ function SpanRowItem({
       </button>
       <div className="mt-1 h-1.5 w-full rounded bg-raised relative overflow-hidden">
         <div
-          className="absolute top-0 h-full rounded bg-emerald-500/70"
+          className="absolute top-0 h-full rounded bg-accent/70"
           style={{
             left: `${offsetPct.toFixed(2)}%`,
             width: `${widthPct.toFixed(2)}%`,
@@ -220,7 +220,7 @@ function SpanRowItem({
         />
       </div>
       {open && hasTags && (
-        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all bg-bg p-2 text-[10px] font-mono text-fg-muted">
+        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all bg-bg p-2 text-xs font-mono text-fg-muted">
           {JSON.stringify(s.tags, null, 2)}
         </pre>
       )}

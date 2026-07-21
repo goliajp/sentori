@@ -139,7 +139,7 @@ export function CertPage() {
                 <div>
                   <div className="font-mono text-sm text-fg">{r.domain}</div>
                   {r.common_name && (
-                    <div className="text-[11px] text-fg-subtle">
+                    <div className="text-xs text-fg-subtle">
                       CN: {r.common_name}
                     </div>
                   )}

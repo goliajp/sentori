@@ -9,11 +9,11 @@ import { api, ReplayRow } from '../lib/api';
 import {
   Badge,
   Card,
+  CardBody,
   CardHeader,
   EmptyState,
   ErrorBanner,
   PageHeader,
-  Section,
   formatNumber,
   formatRelative,
 } from '../components/ui';
@@ -45,7 +45,7 @@ export default function Replays() {
 
       <Card>
         <CardHeader title={`Replays (${rows.length})`} />
-        <Section>
+        <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
@@ -71,11 +71,11 @@ export default function Replays() {
                       <Badge tone="neutral">
                         {formatNumber(r.frame_count)} frames
                       </Badge>
-                      <span className="font-mono text-[11px] text-emerald-400">
+                      <span className="font-mono text-xs text-accent">
                         event {r.event_id.slice(0, 8)}…
                       </span>
                     </div>
-                    <div className="font-mono text-[10px] text-fg-subtle mt-1">
+                    <div className="font-mono text-xs text-fg-subtle mt-1">
                       blob {r.blob_hash.slice(0, 16)}… ·{' '}
                       {formatRelative(r.created_at)}
                     </div>
@@ -84,10 +84,10 @@ export default function Replays() {
               ))}
             </ul>
           )}
-        </Section>
+        </CardBody>
       </Card>
 
-      <p className="text-center text-[11px] text-fg-subtle">
+      <p className="text-center text-xs text-fg-subtle">
         Replay viewer (scrubber + frame playback) coming in v0.3.
       </p>
     </div>

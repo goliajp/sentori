@@ -11,10 +11,10 @@ import {
   Badge,
   Button,
   Card,
+  CardBody,
   CardHeader,
   ErrorBanner,
   PageHeader,
-  Section,
   formatNumber,
 } from '../components/ui';
 
@@ -131,7 +131,7 @@ export default function ReplayDetail() {
 
       <Card>
         <CardHeader title="Scrubber" />
-        <Section>
+        <CardBody>
           <div className="space-y-3">
             <input
               type="range"
@@ -152,27 +152,27 @@ export default function ReplayDetail() {
             <div className="flex items-center gap-2">
               <Badge>{cur.kind ?? 'unknown'}</Badge>
               {cur.ts !== undefined && (
-                <span className="font-mono text-[10px] text-fg-subtle">
+                <span className="font-mono text-xs text-fg-subtle">
                   ts {cur.ts}
                 </span>
               )}
             </div>
           </div>
-        </Section>
+        </CardBody>
       </Card>
 
       <Card>
         <CardHeader title="Frame payload" />
-        <Section>
-          <pre className="overflow-x-auto whitespace-pre-wrap break-all bg-bg p-3 text-[11px] font-mono text-fg-muted">
+        <CardBody>
+          <pre className="overflow-x-auto whitespace-pre-wrap break-all bg-bg p-3 text-xs font-mono text-fg-muted">
             {cur.parsed
               ? JSON.stringify(cur.parsed, null, 2)
               : cur.raw}
           </pre>
-        </Section>
+        </CardBody>
       </Card>
 
-      <p className="text-center text-[11px] text-fg-subtle">
+      <p className="text-center text-xs text-fg-subtle">
         Canvas / DOM replay player coming in v0.3. Today: scrub
         through raw frames + payload inspection.
       </p>

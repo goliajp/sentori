@@ -1,189 +1,67 @@
+/*
+ * Sentori dashboard — the local CSS layer.
+ *
+ * Colour, elevation, radius and both modes come from
+ * @goliapkg/gds: the same design system golia.jp and the legacy
+ * dashboard run on, so the three surfaces are one product rather
+ * than three houses with similar paint. The blue accent, the
+ * greys, the light-mode derivation — all of it arrives with the
+ * tokens; nothing here re-invents a palette.
+ *
+ * What this file owns: the type scale, the spacing rhythm, and the
+ * few role names Sentori uses that GDS spells differently.
+ */
+@import '@goliapkg/gds/tokens.css';
+@import '@goliapkg/gds/theme.css';
+@import '@goliapkg/gds/fonts.css';
 @import 'tailwindcss';
 
-/*
- * Tailwind v4 theme (migrated from the old `tailwind.config.js`).
- *
- * v4 moved theme config out of JS and into this CSS `@theme` block.
- * Two things live here:
- *
- *   1. The project's custom tokens — the GDS-aligned `brand` accent
- *      scale and the sans/mono font stacks. These are ported verbatim
- *      from the v3 config so the exact same utility classes resolve to
- *      the exact same values (`bg-brand-500` is still #0ea5e9, etc.).
- *
- *   2. Explicit pins of the default-palette shades this app actually
- *      uses. Tailwind v4 replaced the v3 sRGB/hex color palette with a
- *      new OKLCH palette, so `zinc-900`, `emerald-400`, … would shift
- *      by a few pixel values under a naive upgrade. This migration is a
- *      pure build-system change with a zero-visual-change bar, so every
- *      shade in use is pinned back to its exact v3 hex. `gray-200`
- *      (#e5e7eb) and `gray-400` (#9ca3af) are pinned too because v3
- *      Preflight used them as the default border color and the default
- *      `::placeholder` color respectively — both are restored in the
- *      `@layer base` block below.
- */
-@theme {
-  /* ── project custom tokens (from tailwind.config.js) ──────────── */
-  --color-brand-50: #f0f9ff;
-  --color-brand-400: #38bdf8;
-  --color-brand-500: #0ea5e9;
-  --color-brand-600: #0284c7;
-
-  --font-sans: 'Inter var', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SFMono-Regular', monospace;
-
-  /* ── v3 default-palette pins (used shades only) ───────────────── */
-  --color-zinc-50: #fafafa;
-  --color-zinc-100: #f4f4f5;
-  --color-zinc-200: #e4e4e7;
-  --color-zinc-300: #d4d4d8;
-  --color-zinc-400: #a1a1aa;
-  --color-zinc-500: #71717a;
-  --color-zinc-600: #52525b;
-  --color-zinc-700: #3f3f46;
-  --color-zinc-800: #27272a;
-  --color-zinc-900: #18181b;
-  --color-zinc-950: #09090b;
-
-  --color-emerald-300: #6ee7b7;
-  --color-emerald-400: #34d399;
-  --color-emerald-500: #10b981;
-  --color-emerald-600: #059669;
-  --color-emerald-700: #047857;
-  --color-emerald-900: #064e3b;
-
-  --color-red-300: #fca5a5;
-  --color-red-400: #f87171;
-  --color-red-500: #ef4444;
-  --color-red-700: #b91c1c;
-  --color-red-900: #7f1d1d;
-  --color-red-950: #450a0a;
-
-  --color-amber-300: #fcd34d;
-  --color-amber-400: #fbbf24;
-  --color-amber-950: #451a03;
-
-  --color-orange-300: #fdba74;
-  --color-orange-700: #c2410c;
-  --color-orange-900: #7c2d12;
-
-  --color-sky-300: #7dd3fc;
-  --color-sky-950: #082f49;
-
-  --color-green-300: #86efac;
-  --color-green-950: #052e16;
-
-  /* Preflight defaults (border + placeholder) — see @layer base. */
-  --color-gray-200: #e5e7eb;
-  --color-gray-400: #9ca3af;
-}
+/* Tailwind v4 only scans src/ by default, so utility classes that
+ * exist solely inside GDS's compiled components never reach the
+ * bundle and those components render as unstyled skeletons. */
+@source '../../node_modules/@goliapkg/gds/dist/**/*.js';
 
 /*
- * Restore the two v3 Preflight defaults that v4 changed:
+ * Role names Sentori uses that GDS spells differently, plus the two
+ * severities it names in full. Declared after the GDS import so
+ * these win.
  *
- *   - Default border/divide color. v3 set every element's border color
- *     to gray-200; v4 defaults to `currentColor`. This app uses bare
- *     `border` and `divide-x`/`divide-y` without an explicit color in
- *     several places, so without this pin those hairlines would take on
- *     the element's text color instead of the expected light gray.
- *   - Default `::placeholder` color. v3 set it to gray-400; v4 defaults
- *     to 50% of the current text color.
- */
-@layer base {
-  *,
-  ::after,
-  ::before,
-  ::backdrop,
-  ::file-selector-button {
-    border-color: var(--color-gray-200, currentColor);
-  }
-
-  input::placeholder,
-  textarea::placeholder {
-    color: var(--color-gray-400);
-  }
-}
-
-/*
- * ── Semantic surface tokens ──────────────────────────────────────
- *
- * Everything above this point is a raw palette: `zinc-900`,
- * `emerald-400`. Raw palette cannot carry a theme — a page written in
- * `bg-zinc-950 text-zinc-100` is dark, permanently, and the only way
- * to get a light mode out of it is to double every class with a
- * `dark:` variant and keep the two in sync by hand forever.
- *
- * These tokens are the theme boundary instead. Components name a
- * *role* — surface, border, muted text — and the role resolves to a
- * different value per theme with no change at the call site.
- *
- * `@theme inline` matters: it makes Tailwind emit `var(--s-bg)` into
- * the utility rather than resolving the value at build time, which is
- * what lets `[data-theme]` re-point it live.
- *
- * Names and the dark values are shared with the marketing build
- * (`marketing/src/styles/global.css`) so the two halves of the product
- * look like one product.
+ * The `fg` ramp is three steps on purpose — primary, secondary,
+ * faint — because a crash page leans on exactly that: the frame you
+ * wrote, the file it lives in, and the line number beside it. GDS
+ * calls the middle step `fg-secondary`; Sentori calls it `fg-muted`
+ * and keeps `fg-subtle` for the faintest.
  */
 @theme inline {
-  --color-bg: var(--s-bg);
-  --color-surface: var(--s-surface);
-  --color-raised: var(--s-raised);
-  --color-border: var(--s-border);
-  --color-border-strong: var(--s-border-strong);
-  --color-fg: var(--s-fg);
-  --color-fg-muted: var(--s-fg-muted);
-  --color-fg-subtle: var(--s-fg-subtle);
-  --color-accent: var(--s-accent);
-  --color-accent-fg: var(--s-accent-fg);
-  --color-danger: var(--s-danger);
-  --color-warn: var(--s-warn);
-  --color-ok: var(--s-ok);
+  --color-raised: var(--gds-bg-tertiary);
+  --color-fg-muted: var(--gds-fg-secondary);
+  --color-fg-subtle: var(--gds-fg-muted);
+  --color-warn: var(--gds-warning);
+  --color-ok: var(--gds-success);
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  /* Reserved for the wordmark. A display face earns its place on a
+     name, not on every section heading — in a tool read at speed,
+     hierarchy is the job of size, weight and colour. */
+  --font-display: 'Roboto Flex', 'Inter', sans-serif;
 }
 
 /*
- * Dark is the default: this is a tool people keep open beside an
- * editor, and the editor is dark. Light exists because daylight and
- * projectors exist, not as an afterthought — every token below has a
- * deliberate light value, not an inversion.
+ * The canvas replay player cannot read Tailwind utilities, so it
+ * samples these directly off the document.
  */
-:root,
-:root[data-theme='dark'] {
-  color-scheme: dark;
+:root {
+  --s-bg: var(--gds-bg);
+  --s-surface: var(--gds-surface);
+  --s-border-strong: var(--gds-border-strong);
+  --s-fg-muted: var(--gds-fg-secondary);
 
-  --s-bg: #09090b;
-  --s-surface: #18181b;
-  --s-raised: #27272a;
-  --s-border: #27272a;
-  --s-border-strong: #3f3f46;
-  --s-fg: #f4f4f5;
-  --s-fg-muted: #a1a1aa;
-  --s-fg-subtle: #71717a;
-  --s-accent: #38bdf8;
-  --s-accent-fg: #09090b;
-  --s-danger: #f87171;
-  --s-warn: #fbbf24;
-  --s-ok: #34d399;
-}
-
-:root[data-theme='light'] {
-  color-scheme: light;
-
-  --s-bg: #ffffff;
-  --s-surface: #fafafa;
-  --s-raised: #f4f4f5;
-  --s-border: #e4e4e7;
-  --s-border-strong: #d4d4d8;
-  --s-fg: #18181b;
-  --s-fg-muted: #52525b;
-  --s-fg-subtle: #71717a;
-  /* Darker than the dark-mode accent: #38bdf8 on white fails
-     contrast at text sizes. */
-  --s-accent: #0284c7;
-  --s-accent-fg: #ffffff;
-  --s-danger: #dc2626;
-  --s-warn: #b45309;
-  --s-ok: #059669;
+  /* GDS's compact density sets body text to 13px. Raise its own
+     token rather than overriding the rule it feeds — otherwise the
+     two declarations sit in the cascade waiting for one of them to
+     move. See the note on the body rule below for why 14. */
+  --gds-text-body: 14px;
 }
 
 html,
@@ -192,13 +70,34 @@ body,
   height: 100%;
 }
 
+/*
+ * 14px base, not 13.
+ *
+ * The dashboard had drifted to a 10–13px world: `text-[10px]`
+ * timestamps, 11px labels, 12px body. It read as cramped rather
+ * than dense — dense is an information-per-screen property, and you
+ * get it from tight spacing and short rows, not from shrinking type
+ * past comfortable reading. 14px body with a 12px floor keeps the
+ * same row heights while making the thing legible at arm's length,
+ * which is where a dashboard on a second monitor actually lives.
+ */
 body {
   margin: 0;
-  background-color: var(--s-bg);
-  color: var(--s-fg);
+  background-color: var(--gds-bg);
+  color: var(--gds-fg);
   font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Numerals in tables, timestamps and counters must not reflow as
+   they tick. */
+.tabular-nums,
+table,
+time {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Anyone who asked their OS to stop animating things means it. */

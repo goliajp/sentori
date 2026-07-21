@@ -8,12 +8,12 @@ import { useAsyncData } from '../lib/useAsyncData';
 import {
   Button,
   Card,
+  CardBody,
   CardHeader,
   DataTable,
   EmptyState,
   ErrorBanner,
   PageHeader,
-  Section,
 } from '../components/ui';
 
 export default function Projects() {
@@ -105,7 +105,7 @@ export default function Projects() {
       {showCreate && (
         <Card>
           <CardHeader title="Create project" />
-          <Section>
+          <CardBody>
             <input
               className="h-8 w-full rounded border border-border px-2.5 text-sm"
               placeholder="Display name (e.g. 'MyApp iOS')"
@@ -132,12 +132,12 @@ export default function Projects() {
                 Cancel
               </Button>
             </div>
-          </Section>
+          </CardBody>
         </Card>
       )}
       <Card>
         <CardHeader title={`Projects (${rows.length})`} />
-        <Section>
+        <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
@@ -161,7 +161,7 @@ export default function Projects() {
                 name: (
                   <Link
                     to={`/projects/${p.id}/issues`}
-                    className="text-emerald-600 hover:underline"
+                    className="text-accent hover:underline"
                   >
                     {p.name}
                   </Link>
@@ -192,7 +192,7 @@ export default function Projects() {
               }))}
             />
           )}
-        </Section>
+        </CardBody>
       </Card>
     </div>
   );

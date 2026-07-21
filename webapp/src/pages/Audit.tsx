@@ -131,7 +131,7 @@ export function AuditPage() {
                 setAction('token.mint');
                 setTimeout(load, 0);
               }}
-              className="text-emerald-400 hover:underline"
+              className="text-accent hover:underline"
             >
               token mints
             </button>
@@ -140,7 +140,7 @@ export function AuditPage() {
                 setAction('project.create');
                 setTimeout(load, 0);
               }}
-              className="text-emerald-400 hover:underline"
+              className="text-accent hover:underline"
             >
               project creates
             </button>
@@ -149,7 +149,7 @@ export function AuditPage() {
                 setAction('issue.status');
                 setTimeout(load, 0);
               }}
-              className="text-emerald-400 hover:underline"
+              className="text-accent hover:underline"
             >
               issue status
             </button>
@@ -158,7 +158,7 @@ export function AuditPage() {
                 setAction('push_credentials.upsert');
                 setTimeout(load, 0);
               }}
-              className="text-emerald-400 hover:underline"
+              className="text-accent hover:underline"
             >
               push creds
             </button>
@@ -180,7 +180,7 @@ export function AuditPage() {
         ) : (
           <>
             {ipFilter && (
-              <div className="border-b border-border px-4 py-2 text-[10px] text-fg-subtle">
+              <div className="border-b border-border px-4 py-2 text-xs text-fg-subtle">
                 Showing {visibleEntries?.length ?? 0} of {entries?.length ?? 0}
                 {' '}entries matching IP "{ipFilter}".
               </div>
@@ -221,7 +221,7 @@ function AuditRow({ entry: e }: { entry: AuditEntry }) {
         <div className="flex-1 min-w-0">
           <div className="font-mono text-sm text-fg">{e.action}</div>
           {(e.target_type || e.target_id) && (
-            <div className="font-mono text-[11px] text-fg-subtle">
+            <div className="font-mono text-xs text-fg-subtle">
               {e.target_type ?? ''}{' '}
               {e.target_id ? `${e.target_id.slice(0, 16)}…` : ''}
             </div>
@@ -242,7 +242,7 @@ function AuditRow({ entry: e }: { entry: AuditEntry }) {
       {open && hasPayload && (
         <div className="bg-bg px-12 py-3">
           {payloadIp != null && (
-            <div className="font-mono text-[10px] text-fg-subtle">
+            <div className="font-mono text-xs text-fg-subtle">
               IP: <span className="text-fg-muted">{String(payloadIp)}</span>
               {payloadUa != null && (
                 <>
@@ -254,7 +254,7 @@ function AuditRow({ entry: e }: { entry: AuditEntry }) {
               )}
             </div>
           )}
-          <pre className="overflow-x-auto whitespace-pre-wrap break-all text-[11px] font-mono text-fg-muted">
+          <pre className="overflow-x-auto whitespace-pre-wrap break-all text-xs font-mono text-fg-muted">
             {JSON.stringify(e.payload, null, 2)}
           </pre>
         </div>
@@ -276,7 +276,7 @@ function Field({
 }) {
   return (
     <div>
-      <p className="mb-1 text-[10px] uppercase tracking-wide text-fg-subtle">
+      <p className="mb-1 text-xs uppercase tracking-wide text-fg-subtle">
         {label}
       </p>
       <input

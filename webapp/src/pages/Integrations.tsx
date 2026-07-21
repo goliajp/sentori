@@ -9,12 +9,12 @@ import {
   Badge,
   Button,
   Card,
+  CardBody,
   CardHeader,
   DataTable,
   EmptyState,
   ErrorBanner,
   PageHeader,
-  Section,
   formatRelative,
 } from '../components/ui';
 
@@ -97,7 +97,7 @@ export default function Integrations() {
       {showAdd && (
         <Card>
           <CardHeader title="Connect integration" />
-          <Section>
+          <CardBody>
             <label className="block text-xs text-fg-subtle mb-1">Provider</label>
             <select
               className="h-8 w-full rounded border border-border px-2.5 text-sm"
@@ -124,13 +124,13 @@ export default function Integrations() {
                 Cancel
               </Button>
             </div>
-          </Section>
+          </CardBody>
         </Card>
       )}
 
       <Card>
         <CardHeader title={`Configured (${rows.length})`} />
-        <Section>
+        <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">Loading…</div>
           ) : rows.length === 0 ? (
@@ -172,7 +172,7 @@ export default function Integrations() {
               }))}
             />
           )}
-        </Section>
+        </CardBody>
       </Card>
     </div>
   );

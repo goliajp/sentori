@@ -22,7 +22,7 @@ export function Sparkline({
   if (values.length < 2) {
     return (
       <div
-        className={`flex items-center justify-center text-[10px] text-fg-subtle ${className ?? ''}`}
+        className={`flex items-center justify-center text-xs text-fg-subtle ${className ?? ''}`}
         style={{ width, height }}
       >
         not enough data

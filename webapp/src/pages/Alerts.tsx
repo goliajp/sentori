@@ -161,7 +161,7 @@ export function AlertsPage() {
               render: (r) => (
                 <div>
                   <div className="font-medium text-fg">{r.name}</div>
-                  <div className="font-mono text-[11px] text-fg-subtle">
+                  <div className="font-mono text-xs text-fg-subtle">
                     {r.trigger_kind} · throttle {r.throttle_minutes}m
                     {r.project_id ? ` · project ${r.project_id.slice(0, 8)}` : ' · workspace-wide'}
                   </div>

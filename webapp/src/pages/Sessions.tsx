@@ -7,10 +7,10 @@ import { api } from '../lib/api';
 import {
   Button,
   Card,
+  CardBody,
   CardHeader,
   ErrorBanner,
   PageHeader,
-  Section,
   formatRelative,
 } from '../components/ui';
 
@@ -54,7 +54,7 @@ export default function Sessions() {
       {error && <ErrorBanner>{error}</ErrorBanner>}
       <Card>
         <CardHeader title={`Sessions (${rows.length})`} />
-        <Section>
+        <CardBody>
           {rows.length === 0 ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
               No active sessions found.
@@ -70,11 +70,11 @@ export default function Sessions() {
                     <div className="font-mono text-xs text-fg-muted">
                       {s.id_hash_hex.slice(0, 16)}…
                     </div>
-                    <div className="mt-1 text-[10px] text-fg-subtle">
+                    <div className="mt-1 text-xs text-fg-subtle">
                       {s.ip ?? 'IP unknown'} ·{' '}
                       {(s.user_agent ?? 'UA unknown').slice(0, 90)}
                     </div>
-                    <div className="mt-1 text-[10px] text-fg-subtle">
+                    <div className="mt-1 text-xs text-fg-subtle">
                       created {formatRelative(s.created_at)} · last seen{' '}
                       {s.last_used_at ? formatRelative(s.last_used_at) : 'never'}{' '}
                       · expires {formatRelative(s.expires_at)}
@@ -91,7 +91,7 @@ export default function Sessions() {
               ))}
             </ul>
           )}
-        </Section>
+        </CardBody>
       </Card>
     </div>
   );

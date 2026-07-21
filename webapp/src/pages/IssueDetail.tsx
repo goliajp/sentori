@@ -1,7 +1,7 @@
 // Single issue detail — meta + matching events tail.
 
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 
 import { api, EventDetail, EventRow, IssueDetail as Issue } from '../lib/api';
 import { EventEvidence } from '../components/crash/EventEvidence';
@@ -11,10 +11,11 @@ import {
   Badge,
   Button,
   Card,
+  CardBody,
   CardHeader,
   ErrorBanner,
+  LinkButton,
   PageHeader,
-  Section,
   formatNumber,
   formatRelative,
 } from '../components/ui';
@@ -198,19 +199,20 @@ export default function IssueDetail() {
             >
               Copy link
             </Button>
-            <Link
+            <LinkButton
               to={`/projects/${projectId}/issues`}
-              className="inline-flex h-8 items-center rounded border border-border px-3 text-sm text-fg-subtle hover:bg-raised"
+              size="sm"
+              variant="ghost"
             >
               ← All
-            </Link>
+            </LinkButton>
           </div>
         }
       />
 
       <Card>
         <CardHeader title="Meta" />
-        <Section>
+        <CardBody>
           <div className="grid grid-cols-4 gap-4">
             <Cell label="Status">
               <Badge
@@ -240,7 +242,7 @@ export default function IssueDetail() {
               <span className="font-mono text-xs">{issue.last_environment || '—'}</span>
             </Cell>
             <Cell label="Fingerprint">
-              <span className="font-mono text-[10px] break-all">
+              <span className="font-mono text-xs break-all">
                 {issue.fingerprint.slice(0, 16)}…
               </span>
             </Cell>
@@ -253,14 +255,14 @@ export default function IssueDetail() {
               <Cell label="Regressed at">
                 {formatRelative(issue.regressed_at)}
                 {issue.regressed_in_release && (
-                  <span className="font-mono text-[10px] text-fg-subtle ml-1">
+                  <span className="font-mono text-xs text-fg-subtle ml-1">
                     in {issue.regressed_in_release}
                   </span>
                 )}
               </Cell>
             )}
           </div>
-        </Section>
+        </CardBody>
       </Card>
 
       <Comments issueId={issueId} myUserId={myUserId} />
@@ -295,7 +297,7 @@ function Cell({
 }) {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-wide text-fg-subtle">
+      <p className="text-xs uppercase tracking-wide text-fg-subtle">
         {label}
       </p>
       <div className="mt-1 text-sm">{children}</div>
@@ -355,7 +357,7 @@ function Comments({
   return (
     <Card>
       <CardHeader title={`Comments (${rows.length})`} />
-      <Section>
+      <CardBody>
         <div className="space-y-2">
           {rows.map(c => (
             <div
@@ -363,14 +365,14 @@ function Comments({
               className="rounded border border-border p-2 text-xs"
             >
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] text-fg-subtle">
+                <span className="font-mono text-xs text-fg-subtle">
                   {c.author_user_id.slice(0, 8)}… ·{' '}
                   {formatRelative(c.created_at)}
                 </span>
                 {myUserId === c.author_user_id && (
                   <button
                     onClick={() => del(c.id)}
-                    className="text-[10px] text-fg-subtle hover:text-red-400"
+                    className="text-xs text-fg-subtle hover:text-danger"
                   >
                     delete
                   </button>
@@ -399,7 +401,7 @@ function Comments({
             </div>
           )}
         </div>
-      </Section>
+      </CardBody>
     </Card>
   );
 }
@@ -424,7 +426,7 @@ function Activity({ issueId }: { issueId: string }) {
   return (
     <Card>
       <CardHeader title={`Activity (${rows.length})`} />
-      <Section>
+      <CardBody>
         <ul className="space-y-1 text-xs">
           {rows.map(a => (
             <li
@@ -437,13 +439,13 @@ function Activity({ issueId }: { issueId: string }) {
                   ? a.actor_user_id.slice(0, 8) + '…'
                   : 'system'}
               </span>
-              <span className="font-mono text-[10px]">
+              <span className="font-mono text-xs">
                 {formatRelative(a.created_at)}
               </span>
             </li>
           ))}
         </ul>
-      </Section>
+      </CardBody>
     </Card>
   );
 }
@@ -470,7 +472,7 @@ function EventPicker({
             type="button"
             onClick={() => onSelect(e.id)}
             aria-current={active}
-            className={`inline-flex h-7 items-center rounded border px-2 font-mono text-[11px] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+            className={`inline-flex h-7 items-center rounded border px-2 font-mono text-xs transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
               active
                 ? 'border-accent text-fg'
                 : 'border-border text-fg-subtle hover:text-fg-muted'

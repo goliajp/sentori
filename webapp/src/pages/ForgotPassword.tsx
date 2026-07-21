@@ -48,7 +48,7 @@ export default function ForgotPassword() {
           />
         </label>
         {err && (
-          <p className="mb-3 text-xs text-red-400 break-all">{err}</p>
+          <p className="mb-3 text-xs text-danger break-all">{err}</p>
         )}
         {silent && (
           <p className="mb-3 text-xs text-fg-muted">
@@ -58,7 +58,7 @@ export default function ForgotPassword() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+          className="w-full rounded bg-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
           {loading ? 'Sending…' : 'Send reset link'}
         </button>

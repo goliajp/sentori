@@ -215,7 +215,7 @@ export function CommandPalette({ open, onClose }: Props) {
               >
                 <span>{item.label}</span>
                 {item.hint && (
-                  <span className="font-mono text-[10px] text-fg-subtle">
+                  <span className="font-mono text-xs text-fg-subtle">
                     {item.hint}
                   </span>
                 )}
@@ -223,7 +223,7 @@ export function CommandPalette({ open, onClose }: Props) {
             ))
           )}
         </ul>
-        <div className="border-t border-border px-4 py-2 text-[10px] text-fg-subtle">
+        <div className="border-t border-border px-4 py-2 text-xs text-fg-subtle">
           ↑↓ navigate · ↵ open · esc close
         </div>
       </div>

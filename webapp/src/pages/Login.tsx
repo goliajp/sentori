@@ -80,12 +80,12 @@ export function LoginPage() {
           />
         </label>
         {err && (
-          <p className="mb-3 text-xs text-red-400 break-all">{err}</p>
+          <p className="mb-3 text-xs text-danger break-all">{err}</p>
         )}
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+          className="w-full rounded bg-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
           {loading ? 'Signing in…' : 'Sign in'}
         </button>
@@ -133,7 +133,7 @@ function OAuthButtons() {
     <>
       <div className="my-4 flex items-center gap-3">
         <span className="h-px flex-1 bg-raised" />
-        <span className="text-[10px] uppercase tracking-wide text-fg-subtle">
+        <span className="text-xs uppercase tracking-wide text-fg-subtle">
           or
         </span>
         <span className="h-px flex-1 bg-raised" />

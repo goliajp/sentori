@@ -15,10 +15,10 @@ import {
   Badge,
   Button,
   Card,
+  CardBody,
   CardHeader,
   ErrorBanner,
   PageHeader,
-  Section,
   formatNumber,
 } from '../components/ui';
 
@@ -110,13 +110,13 @@ export default function Billing() {
           ) : (
             <Card>
               <CardHeader title="Self-serve billing unavailable" />
-              <Section>
+              <CardBody>
                 <p className="text-sm text-fg-subtle">
                   This deployment has no Stripe keys configured, so plan
                   changes are managed by the operator. Contact your admin
                   to change tiers.
                 </p>
-              </Section>
+              </CardBody>
             </Card>
           )}
         </>
@@ -147,7 +147,7 @@ function PlanCard({
           ) : undefined
         }
       />
-      <Section>
+      <CardBody>
         <div className="flex flex-wrap items-center gap-6">
           <Field label="Plan">
             <Badge tone={info.plan === 'free' ? 'neutral' : 'info'}>
@@ -166,7 +166,7 @@ function PlanCard({
           )}
         </div>
         {downgraded && (
-          <p className="mt-3 text-xs text-amber-500">
+          <p className="mt-3 text-xs text-warn">
             Subscription is <span className="font-medium">{info.status}</span>{' '}
             — quotas are enforced at the{' '}
             <span className="font-medium">
@@ -175,7 +175,7 @@ function PlanCard({
             tier until it is reactivated.
           </p>
         )}
-      </Section>
+      </CardBody>
     </Card>
   );
 }
@@ -184,13 +184,13 @@ function UsageCard({ info }: { info: BillingInfo }) {
   return (
     <Card>
       <CardHeader title={`Usage · ${info.period_yyyymm}`} />
-      <Section>
+      <CardBody>
         <div className="space-y-4">
           <UsageBar label="Events" counter={info.usage.events} />
           <UsageBar label="Spans" counter={info.usage.spans} />
           <UsageBar label="Replays" counter={info.usage.replays} />
         </div>
-      </Section>
+      </CardBody>
     </Card>
   );
 }
@@ -209,7 +209,7 @@ function UsageBar({ label, counter }: { label: string; counter: UsageCounter }) 
           {formatNumber(counter.count)}
           {unlimited ? ' / ∞' : ` / ${formatNumber(counter.limit)}`}
           {counter.dropped > 0 && (
-            <span className="ml-2 text-red-400">
+            <span className="ml-2 text-danger">
               {formatNumber(counter.dropped)} dropped
             </span>
           )}
@@ -217,7 +217,7 @@ function UsageBar({ label, counter }: { label: string; counter: UsageCounter }) 
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded bg-raised">
         <div
-          className={`h-full rounded ${near ? 'bg-red-500' : 'bg-emerald-500'}`}
+          className={`h-full rounded ${near ? 'bg-danger/10' : 'bg-accent'}`}
           style={{ width: unlimited ? '4%' : `${pct}%` }}
         />
       </div>
@@ -251,7 +251,7 @@ function UpgradeCard({
           </Button>
         }
       />
-      <Section>
+      <CardBody>
         {anyUpgrade ? (
           <div className="flex flex-wrap gap-3">
             {options
@@ -275,7 +275,7 @@ function UpgradeCard({
               : 'You are on the highest configured plan.'}
           </p>
         )}
-      </Section>
+      </CardBody>
     </Card>
   );
 }
@@ -289,7 +289,7 @@ function Field({
 }) {
   return (
     <div>
-      <p className="mb-1 text-[11px] uppercase tracking-wide text-fg-subtle">
+      <p className="mb-1 text-xs uppercase tracking-wide text-fg-subtle">
         {label}
       </p>
       <div>{children}</div>
@@ -308,8 +308,8 @@ function Banner({
 }) {
   const cls =
     tone === 'ok'
-      ? 'border-emerald-700 bg-emerald-950/40 text-emerald-300'
-      : 'border-amber-700 bg-amber-950/40 text-amber-300';
+      ? 'border-accent/40 bg-accent/40 text-accent'
+      : 'border-warn/40 bg-warn/40 text-warn';
   return (
     <div
       className={`flex items-start justify-between gap-4 rounded border px-4 py-3 text-sm ${cls}`}

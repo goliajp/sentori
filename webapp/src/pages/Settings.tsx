@@ -51,7 +51,7 @@ export function SettingsPage() {
               </div>
               <button
                 onClick={logout}
-                className="rounded border border-red-500 px-3 py-1.5 text-sm text-red-400 hover:bg-red-500 hover:text-white"
+                className="rounded border border-danger/40 px-3 py-1.5 text-sm text-danger hover:bg-danger/20 hover:text-white"
               >
                 Sign out
               </button>
@@ -189,7 +189,7 @@ function Cell({
 }) {
   return (
     <div className="p-4">
-      <p className="mb-1 text-[11px] uppercase tracking-wide text-fg-subtle">
+      <p className="mb-1 text-xs uppercase tracking-wide text-fg-subtle">
         {label}
       </p>
       <div>{children}</div>
@@ -231,19 +231,19 @@ function SessionsCard() {
                 className="flex items-center justify-between py-2"
               >
                 <div>
-                  <p className="font-mono text-[10px] text-fg-muted">
+                  <p className="font-mono text-xs text-fg-muted">
                     {s.id_hash_hex.slice(0, 12)}…
                   </p>
-                  <p className="text-[10px] text-fg-subtle">
+                  <p className="text-xs text-fg-subtle">
                     {s.ip ?? '?'} · {s.user_agent?.slice(0, 40) ?? '?'}
                   </p>
-                  <p className="text-[10px] text-fg-subtle">
+                  <p className="text-xs text-fg-subtle">
                     expires {s.expires_at}
                   </p>
                 </div>
                 <button
                   onClick={() => revoke(s.id_hash_hex)}
-                  className="rounded border border-red-700 px-2 py-1 text-[10px] text-red-300 hover:bg-red-700/30"
+                  className="rounded border border-danger/40 px-2 py-1 text-xs text-danger hover:bg-danger/20"
                 >
                   Revoke
                 </button>

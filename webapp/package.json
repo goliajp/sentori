@@ -13,6 +13,7 @@
     "check": "tsc -b --noEmit && eslint ."
   },
   "dependencies": {
+    "@goliapkg/gds": "^2.2.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1"

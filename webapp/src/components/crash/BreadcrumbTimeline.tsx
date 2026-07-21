@@ -59,7 +59,7 @@ export function BreadcrumbTimeline({
         />
       ))}
       <li className="flex items-baseline gap-3 border-l-2 border-l-danger py-1.5 pl-3">
-        <span className="w-14 shrink-0 text-right font-mono text-[11px] text-danger">
+        <span className="w-14 shrink-0 text-right font-mono text-xs text-danger">
           0.0s
         </span>
         <span className="w-4 shrink-0 text-center font-mono text-xs text-danger">
@@ -88,7 +88,7 @@ function Row({
           : 'border-l-border hover:border-l-border-strong'
       }`}
     >
-      <span className="w-14 shrink-0 text-right font-mono text-[11px] tabular-nums text-fg-subtle">
+      <span className="w-14 shrink-0 text-right font-mono text-xs tabular-nums text-fg-subtle">
         {formatOffset(offsetMs)}
       </span>
       <span

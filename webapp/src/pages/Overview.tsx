@@ -97,13 +97,13 @@ export function OverviewPage() {
                   >
                     {p.name}
                   </Link>
-                  <p className="font-mono text-[11px] text-fg-subtle">
+                  <p className="font-mono text-xs text-fg-subtle">
                     {p.slug}
                   </p>
                 </div>
                 <div className="flex items-center gap-4">
                   {stats[p.id] && (
-                    <div className="flex gap-2 text-[10px]">
+                    <div className="flex gap-2 text-xs">
                       <LensPill
                         label="events"
                         value={stats[p.id].events_24h}
@@ -196,7 +196,7 @@ function OnboardingGuide() {
         <div className="mt-6">
           <Link
             to="/projects"
-            className="inline-flex rounded bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent"
+            className="inline-flex rounded bg-accent px-4 py-2 text-sm font-medium text-accent-fg hover:bg-accent"
           >
             Create your first project →
           </Link>
@@ -223,13 +223,13 @@ function UsageCard({
   const isUnlimited = limit >= Number.MAX_SAFE_INTEGER || limit > 1e15;
   return (
     <div className="rounded border border-border bg-surface p-4">
-      <p className="text-[11px] uppercase tracking-wide text-fg-subtle">{title}</p>
+      <p className="text-xs uppercase tracking-wide text-fg-subtle">{title}</p>
       <p className="mt-1 font-mono text-2xl text-fg">{formatNumber(count)}</p>
       <p className="text-xs text-fg-subtle">
         {isUnlimited ? 'unlimited' : `of ${formatNumber(limit)} / month (${pct}%)`}
       </p>
       {dropped > 0 && (
-        <p className="mt-1 text-xs text-red-400">
+        <p className="mt-1 text-xs text-danger">
           dropped: {formatNumber(dropped)}
         </p>
       )}

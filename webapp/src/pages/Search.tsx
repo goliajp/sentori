@@ -8,10 +8,10 @@ import { api, Project } from '../lib/api';
 import {
   Badge,
   Card,
+  CardBody,
   CardHeader,
   ErrorBanner,
   PageHeader,
-  Section,
   formatRelative,
 } from '../components/ui';
 
@@ -90,7 +90,7 @@ export default function Search() {
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       <Card>
-        <Section>
+        <CardBody>
           <div className="flex gap-2">
             <select
               value={projectId}
@@ -114,13 +114,13 @@ export default function Search() {
               <span className="self-center text-xs text-fg-subtle">…</span>
             )}
           </div>
-        </Section>
+        </CardBody>
       </Card>
 
       {issues.length > 0 && (
         <Card>
           <CardHeader title={`Issues (${issues.length})`} />
-          <Section>
+          <CardBody>
             <ul className="divide-y divide-border">
               {issues.map(i => (
                 <li key={i.id} className="px-2 py-2">
@@ -133,25 +133,25 @@ export default function Search() {
                       <span className="font-medium text-fg">
                         {i.error_type}
                       </span>
-                      <span className="font-mono text-[10px] text-fg-subtle">
+                      <span className="font-mono text-xs text-fg-subtle">
                         {formatRelative(i.last_seen)}
                       </span>
                     </div>
-                    <p className="font-mono text-[11px] text-fg-subtle mt-1">
+                    <p className="font-mono text-xs text-fg-subtle mt-1">
                       {i.message_sample.slice(0, 120)}
                     </p>
                   </Link>
                 </li>
               ))}
             </ul>
-          </Section>
+          </CardBody>
         </Card>
       )}
 
       {events.length > 0 && (
         <Card>
           <CardHeader title={`Events (${events.length})`} />
-          <Section>
+          <CardBody>
             <ul className="space-y-1">
               {events.map(e => (
                 <li
@@ -160,7 +160,7 @@ export default function Search() {
                 >
                   <Link
                     to={`/projects/${projectId}/issues/${e.issue_id}`}
-                    className="font-mono text-emerald-400 hover:underline"
+                    className="font-mono text-accent hover:underline"
                   >
                     {e.kind}
                   </Link>
@@ -174,17 +174,17 @@ export default function Search() {
                 </li>
               ))}
             </ul>
-          </Section>
+          </CardBody>
         </Card>
       )}
 
       {q.trim().length >= 3 && !loading && !issues.length && !events.length && (
         <Card>
-          <Section>
+          <CardBody>
             <p className="py-8 text-center text-sm text-fg-subtle">
               No matches.
             </p>
-          </Section>
+          </CardBody>
         </Card>
       )}
     </div>
