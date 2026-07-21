@@ -133,7 +133,7 @@ export default function IssueDetail() {
     return <ErrorBanner>{error}</ErrorBanner>;
   }
   if (!issue) {
-    return <ErrorBanner>Issue not found</ErrorBanner>;
+    return <ErrorBanner>{t('crash.notFound')}</ErrorBanner>;
   }
 
   return (
@@ -149,7 +149,7 @@ export default function IssueDetail() {
                 onClick={() => act('resolved')}
                 disabled={busy}
               >
-                Resolve
+                {t('issues.resolve')}
               </Button>
             )}
             {issue.status !== 'ignored' && (
@@ -159,7 +159,7 @@ export default function IssueDetail() {
                 onClick={() => act('ignored')}
                 disabled={busy}
               >
-                Ignore
+                {t('issues.ignore')}
               </Button>
             )}
             {issue.status !== 'active' && (
@@ -169,7 +169,7 @@ export default function IssueDetail() {
                 onClick={() => act('active')}
                 disabled={busy}
               >
-                Reopen
+                {t('issues.reopen')}
               </Button>
             )}
             {myUserId && (
@@ -178,7 +178,7 @@ export default function IssueDetail() {
                 variant={watching ? 'primary' : 'secondary'}
                 onClick={toggleWatch}
               >
-                {watching ? `★ Watching (${watchers.length})` : `☆ Watch (${watchers.length})`}
+                {watching ? `★ ${t('crash.watching')} (${watchers.length})` : `☆ ${t('crash.watch')} (${watchers.length})`}
               </Button>
             )}
             <Button
@@ -188,7 +188,7 @@ export default function IssueDetail() {
                 navigator.clipboard?.writeText(issueId);
               }}
             >
-              Copy ID
+              {t('crash.copyId')}
             </Button>
             <Button
               size="sm"
@@ -197,24 +197,24 @@ export default function IssueDetail() {
                 navigator.clipboard?.writeText(window.location.href);
               }}
             >
-              Copy link
+              {t('crash.copyLink')}
             </Button>
             <LinkButton
               to={`/projects/${projectId}/issues`}
               size="sm"
               variant="ghost"
             >
-              ← All
+              {t('crash.backToAll')}
             </LinkButton>
           </div>
         }
       />
 
       <Card>
-        <CardHeader title="Meta" />
+        <CardHeader title={t('crash.meta')} />
         <CardBody>
           <div className="grid grid-cols-4 gap-4">
-            <Cell label="Status">
+            <Cell label={t('crash.status')}>
               <Badge
                 tone={
                   issue.status === 'resolved'
@@ -224,35 +224,35 @@ export default function IssueDetail() {
                       : 'neutral'
                 }
               >
-                {issue.status}
+                {t(`status.${issue.status}`)}
               </Badge>
             </Cell>
-            <Cell label="Kind">
+            <Cell label={t('crash.kind')}>
               <span className="font-mono text-xs">{issue.kind}</span>
             </Cell>
-            <Cell label="Events">{formatNumber(issue.event_count)}</Cell>
-            <Cell label="Last release">
+            <Cell label={t('issues.colEvents')}>{formatNumber(issue.event_count)}</Cell>
+            <Cell label={t('crash.lastRelease')}>
               <span className="font-mono text-xs">
                 {issue.last_release || '—'}
               </span>
             </Cell>
-            <Cell label="First seen">{formatRelative(issue.first_seen)}</Cell>
-            <Cell label="Last seen">{formatRelative(issue.last_seen)}</Cell>
-            <Cell label="Environment">
+            <Cell label={t('crash.firstSeen')}>{formatRelative(issue.first_seen)}</Cell>
+            <Cell label={t('crash.lastSeen')}>{formatRelative(issue.last_seen)}</Cell>
+            <Cell label={t('crash.environment')}>
               <span className="font-mono text-xs">{issue.last_environment || '—'}</span>
             </Cell>
-            <Cell label="Fingerprint">
+            <Cell label={t('crash.fingerprint')}>
               <span className="font-mono text-xs break-all">
                 {issue.fingerprint.slice(0, 16)}…
               </span>
             </Cell>
             {issue.resolved_at && (
-              <Cell label="Resolved at">
+              <Cell label={t('crash.resolvedAt')}>
                 {formatRelative(issue.resolved_at)}
               </Cell>
             )}
             {issue.regressed_at && (
-              <Cell label="Regressed at">
+              <Cell label={t('crash.regressedAt')}>
                 {formatRelative(issue.regressed_at)}
                 {issue.regressed_in_release && (
                   <span className="font-mono text-xs text-fg-subtle ml-1">
@@ -321,6 +321,7 @@ function Comments({
     }[]
   >([]);
   const [text, setText] = useState('');
+  const t = useT();
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -345,7 +346,7 @@ function Comments({
   }
 
   async function del(id: string) {
-    if (!confirm('Delete comment?')) return;
+    if (!confirm(t('crash.deleteComment'))) return;
     try {
       await api.deleteComment(issueId, id);
       setRows(rs => rs.filter(r => r.id !== id));
@@ -356,7 +357,7 @@ function Comments({
 
   return (
     <Card>
-      <CardHeader title={`Comments (${rows.length})`} />
+      <CardHeader title={`${t('crash.comments')} (${rows.length})`} />
       <CardBody>
         <div className="space-y-2">
           {rows.map(c => (
@@ -388,7 +389,7 @@ function Comments({
               <textarea
                 value={text}
                 onChange={e => setText(e.target.value)}
-                placeholder="Add a comment (Markdown)…"
+                placeholder={t('crash.addComment')}
                 className="w-full h-20 rounded border border-border p-2 text-xs"
               />
               <Button

@@ -209,9 +209,15 @@ export function Badge({
     danger: 'bg-danger/12 text-danger',
     info: 'bg-accent/12 text-accent',
   };
+  // `whitespace-nowrap` is not cosmetic here. CJK has no word
+  // boundaries, so a wrapped badge breaks between any two characters:
+  // 未対応 became three stacked glyphs and pushed the table row to
+  // three lines. `tracking-wide` is scoped to the Latin case for the
+  // same reason — letter-spacing between kanji reads as broken, not
+  // deliberate.
   return (
     <span
-      className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide ${tones[tone]}`}
+      className={`inline-flex items-center whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium uppercase ${tones[tone]}`}
     >
       {children}
     </span>
@@ -244,7 +250,7 @@ export function DataTable<T>({
             {columns.map((c) => (
               <th
                 key={String(c.key)}
-                className="px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-fg-subtle"
+                className="whitespace-nowrap px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-fg-subtle"
                 style={c.width ? { width: c.width } : undefined}
               >
                 {c.label}
@@ -405,15 +411,38 @@ export function Tabs({
 
 // ── Format helpers ─────────────────────────────────────────
 
+/**
+ * "8 minutes ago", in the reader's language.
+ *
+ * This used to append the English suffix by hand — `${n}m ago` — so a
+ * Japanese dashboard still said "15m ago" beside 最終発生. Every
+ * platform ships the plural rules and the word order for this;
+ * `Intl.RelativeTimeFormat` is the whole answer, and the `narrow`
+ * style keeps the string short enough for a table cell.
+ *
+ * The locale comes from the document rather than a prop because this
+ * is called from ten files, most of them deep inside table cell
+ * renderers where threading a locale down would mean touching every
+ * column definition to fix a suffix.
+ */
 export function formatRelative(iso: string, now: number = Date.now()): string {
-  const ms = Math.abs(now - new Date(iso).getTime());
-  const sec = ms / 1000;
-  if (sec < 60) return `${Math.max(1, Math.round(sec))}s ago`;
-  if (sec < 3600) return `${Math.round(sec / 60)}m ago`;
-  if (sec < 86_400) return `${Math.round(sec / 3600)}h ago`;
-  if (sec < 86_400 * 30) return `${Math.round(sec / 86_400)}d ago`;
-  if (sec < 86_400 * 365) return `${Math.round(sec / 86_400 / 30)}mo ago`;
-  return `${Math.round(sec / 86_400 / 365)}y ago`;
+  const sec = Math.abs(now - new Date(iso).getTime()) / 1000;
+  const [value, unit]: [number, Intl.RelativeTimeFormatUnit] =
+    sec < 60
+      ? [Math.max(1, Math.round(sec)), 'second']
+      : sec < 3600
+        ? [Math.round(sec / 60), 'minute']
+        : sec < 86_400
+          ? [Math.round(sec / 3600), 'hour']
+          : sec < 86_400 * 30
+            ? [Math.round(sec / 86_400), 'day']
+            : sec < 86_400 * 365
+              ? [Math.round(sec / 86_400 / 30), 'month']
+              : [Math.round(sec / 86_400 / 365), 'year'];
+  const locale =
+    typeof document === 'undefined' ? 'en' : document.documentElement.lang || 'en';
+  return new Intl.RelativeTimeFormat(locale, { numeric: 'always', style: 'narrow' })
+    .format(-value, unit);
 }
 
 export function formatNumber(n: number): string {
