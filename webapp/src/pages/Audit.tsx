@@ -125,7 +125,7 @@ export function AuditPage() {
             placeholder="e.g. 198.51.100"
           />
           <div className="col-span-4 flex gap-2 text-xs">
-            <span className="text-fg-subtle">Quick:</span>
+            <span className="text-fg-subtle">{t('audit.quick')}:</span>
             <button
               onClick={() => {
                 setAction('token.mint');
@@ -133,7 +133,7 @@ export function AuditPage() {
               }}
               className="text-accent hover:underline"
             >
-              token mints
+              {t('audit.quickTokens')}
             </button>
             <button
               onClick={() => {
@@ -142,7 +142,7 @@ export function AuditPage() {
               }}
               className="text-accent hover:underline"
             >
-              project creates
+              {t('audit.quickProjects')}
             </button>
             <button
               onClick={() => {
@@ -151,7 +151,7 @@ export function AuditPage() {
               }}
               className="text-accent hover:underline"
             >
-              issue status
+              {t('audit.quickIssues')}
             </button>
             <button
               onClick={() => {
@@ -160,7 +160,7 @@ export function AuditPage() {
               }}
               className="text-accent hover:underline"
             >
-              push creds
+              {t('audit.quickPush')}
             </button>
           </div>
           <div className="col-span-4 flex gap-2">
@@ -196,6 +196,7 @@ export function AuditPage() {
 }
 
 function AuditRow({ entry: e }: { entry: AuditEntry }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const payloadObject =
     e.payload && typeof e.payload === 'object'
@@ -225,13 +226,27 @@ function AuditRow({ entry: e }: { entry: AuditEntry }) {
             </div>
           )}
         </div>
-        <span className="font-mono text-xs text-fg-muted w-24 text-right">
-          {e.actor_user_id
-            ? e.actor_user_id.slice(0, 8) + '…'
-            : 'system'}
+        {/* Two bare uuid prefixes side by side told you nothing about
+            which was which. The label costs a word and answers it. */}
+        <span className="w-40 text-right text-xs text-fg-subtle">
+          {t('audit.by')}{' '}
+          <span className="font-mono text-fg-muted">
+            {e.actor_user_id
+              ? `${e.actor_user_id.slice(0, 8)}…`
+              : t('audit.system')}
+          </span>
         </span>
-        <span className="font-mono text-xs text-fg-muted w-20 text-right">
-          {e.project_id ? e.project_id.slice(0, 8) + '…' : 'workspace'}
+        <span className="w-40 text-right text-xs text-fg-subtle">
+          {e.project_id ? (
+            <>
+              {t('audit.scope')}{' '}
+              <span className="font-mono text-fg-muted">
+                {`${e.project_id.slice(0, 8)}…`}
+              </span>
+            </>
+          ) : (
+            t('audit.workspaceScope')
+          )}
         </span>
         <span className="text-xs text-fg-subtle w-24 text-right">
           {formatRelative(e.created_at)}
