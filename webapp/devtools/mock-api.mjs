@@ -191,7 +191,9 @@ const SUFFIX = [
 
 createServer((req, res) => {
   const p = new URL(req.url, 'http://x').pathname;
-  if (p.includes('/attachments/')) {
+  // The replay page fetches by replay id; the crash view fetches the
+  // same bytes by attachment ref. Both are NDJSON, not JSON.
+  if (p.includes('/attachments/') || p.endsWith('/ndjson')) {
     res.setHeader('content-type', 'application/x-ndjson');
     res.end(replayNdjson());
     return;

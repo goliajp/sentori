@@ -1,12 +1,17 @@
-// Replay scrubber — basic version. Loads NDJSON, decodes frame
-// types, lets the user step through them with a slider. Full
-// canvas/DOM replay player is K7-replay work (v0.3).
+// A recording on its own page: the same canvas player the crash view
+// embeds, plus the decoded frame under the playhead for anyone who
+// needs to see what the SDK actually sent.
+//
+// This used to be a slider over raw JSON with a footnote saying a real
+// player was coming in v0.3. The player shipped with the crash
+// evidence view; this page just hadn't been told.
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { useT } from '../i18n';
 import { api } from '../lib/api';
+import { ReplayPlayer } from '../components/crash/ReplayPlayer';
 import { useKeyHandlers } from '../lib/useShortcuts';
 import {
   Badge,
@@ -109,7 +114,7 @@ export default function ReplayDetail() {
     <div className="space-y-4">
       <PageHeader
         title={t('replays.detail')}
-        subtitle={`${formatNumber(frames.length)} frames · ${replayId.slice(0, 16)}…`}
+        subtitle={t('replays.frames').replace('{n}', formatNumber(frames.length))}
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -119,17 +124,27 @@ export default function ReplayDetail() {
                 navigator.clipboard?.writeText(window.location.href);
               }}
             >
-              Copy link
+              {t('crash.copyLink')}
             </Button>
             <Link
               to={`/projects/${projectId}/replays`}
               className="inline-flex h-8 items-center rounded border border-border px-3 text-sm text-fg-subtle hover:bg-raised"
             >
-              ← All replays
+              {t('replays.allReplays')}
             </Link>
           </div>
         }
       />
+
+      {/* The player owns playback; the scrubber below it stays because
+          a frame-by-frame view is what you want when the question is
+          "what did the SDK send", not "what did the user see". */}
+      <Card>
+        <CardHeader title={t('replays.detail')} />
+        <CardBody>
+          <ReplayPlayer ndjson={text ?? undefined} />
+        </CardBody>
+      </Card>
 
       <Card>
         <CardHeader title={t('replays.scrubber')} />
@@ -174,10 +189,6 @@ export default function ReplayDetail() {
         </CardBody>
       </Card>
 
-      <p className="text-center text-xs text-fg-subtle">
-        Canvas / DOM replay player coming in v0.3. Today: scrub
-        through raw frames + payload inspection.
-      </p>
     </div>
   );
 }

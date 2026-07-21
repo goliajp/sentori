@@ -454,6 +454,9 @@ export const en = {
   'cert.domainPlaceholder': "example.com",
   'probes.urlPlaceholder': "https://api.example.com/health",
 
+  'replays.frames': "{n} frames",
+  'replays.allReplays': "← All replays",
+
   'nav.issues': 'Issues',
   'nav.members': 'Members',
   'nav.metrics': 'Metrics',

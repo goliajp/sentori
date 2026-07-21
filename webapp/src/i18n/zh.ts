@@ -447,6 +447,9 @@ export const zh: Messages = {
   'cert.domainPlaceholder': "example.com",
   'probes.urlPlaceholder': "https://api.example.com/health",
 
+  'replays.frames': "{n} 帧",
+  'replays.allReplays': "← 返回回放列表",
+
   'nav.issues': '问题',
   'nav.members': '成员',
   'nav.metrics': '指标',
