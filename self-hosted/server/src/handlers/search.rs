@@ -80,7 +80,7 @@ pub async fn search(
                 "error_type": r.get::<String, _>("error_type"),
                 "message_sample": r.try_get::<String, _>("message_sample").unwrap_or_default(),
                 "status": r.get::<String, _>("status"),
-                "last_seen": r.get::<time::OffsetDateTime, _>("last_seen"),
+                "last_seen": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("last_seen")),
             })
         })
         .collect();
@@ -93,7 +93,7 @@ pub async fn search(
                 "kind": r.get::<String, _>("kind"),
                 "release": r.get::<String, _>("release"),
                 "environment": r.get::<String, _>("environment"),
-                "timestamp": r.get::<time::OffsetDateTime, _>("timestamp"),
+                "timestamp": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("timestamp")),
             })
         })
         .collect();

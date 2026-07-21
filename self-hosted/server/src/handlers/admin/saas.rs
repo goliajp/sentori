@@ -53,7 +53,7 @@ pub async fn workspaces(State(state): State<Arc<AppState>>) -> Json<Value> {
             json!({
                 "id": r.get::<Uuid, _>("id").to_string(),
                 "name": r.get::<String, _>("name"),
-                "created_at": r.get::<time::OffsetDateTime, _>("created_at"),
+                "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
                 "plan": r.get::<String, _>("plan"),
                 "status": r.get::<String, _>("status"),
                 "project_count": r.get::<i64, _>("project_count"),

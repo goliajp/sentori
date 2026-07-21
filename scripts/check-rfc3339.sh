@@ -20,6 +20,15 @@
 # never checked. 62 fields had drifted, which is exactly why every date
 # in the v0.2 dashboard rendered as "NaNy ago". All three roots are in
 # scope now.
+#
+# 2026-07-22: a *field* attribute cannot reach a value interpolated into
+# `serde_json::json!`, so 26 handlers that build responses with the
+# macro were emitting the array shape while passing this check. By then
+# the dashboard had moved to Intl.RelativeTimeFormat, which throws on a
+# non-finite number rather than printing NaN, so the same drift took
+# whole pages down instead of merely looking wrong. Bare OffsetDateTime
+# in a json! body is now a violation too; wrap it in
+# `crate::wire_time::rfc3339` / `rfc3339_opt`.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -28,6 +37,13 @@ import re, sys
 from pathlib import Path
 
 FIELD            = re.compile(r'^(\s+)((?:pub\s+)?\w+):\s*(Option<)?(time::)?OffsetDateTime')
+# A row column read straight into a json! body. `.is_none()` and friends
+# consume the value rather than serialise it, so only reads that end the
+# expression count.
+RAW_JSON_TS      = re.compile(
+    r'\.(?:try_)?get::<(?:Option<\s*)?time::OffsetDateTime\s*>?\s*, _>\("[^"]+"\)'
+)
+WRAPPED          = re.compile(r'wire_time::rfc3339')
 SERDE_OK         = re.compile(r'serde\s*\([^)]*with\s*=')
 STRUCT_OR_ENUM   = re.compile(r'^\s*(?:pub\s+)?(?:struct|enum)\s+\w+.*\{')
 DERIVE_LINE      = re.compile(r'^\s*#\[derive\(')
@@ -44,6 +60,19 @@ sources = [
     for p in sorted(Path(root).rglob('*.rs'))
     if '/target/' not in str(p)
 ]
+# Pass 2 first: bare OffsetDateTime reads in a json! response body.
+for path in sources:
+    lines = path.read_text().split('\n')
+    for i, line in enumerate(lines):
+        if not RAW_JSON_TS.search(line) or WRAPPED.search(line):
+            continue
+        # Consumed rather than serialised (counting unread, comparing) —
+        # the shape on the wire is not involved.
+        tail = ' '.join(lines[i : i + 4])
+        if re.search(r'\.(is_none|is_some|map|unwrap|matches)\b', tail):
+            continue
+        violations.append((path, i + 1, line.rstrip()))
+
 for path in sources:
     in_block = False
     depth = 0
@@ -83,6 +112,10 @@ if violations:
     print('For Option<OffsetDateTime>:')
     print('    #[serde(default, with = "time::serde::rfc3339::option")]')
     print('    pub revoked_at: Option<OffsetDateTime>,')
+    print()
+    print('Inside serde_json::json!, where there is no field to annotate:')
+    print('    "created_at": crate::wire_time::rfc3339(r.get(...)),')
+    print('    "sent_at": crate::wire_time::rfc3339_opt(r.try_get(...).ok().flatten()),')
     sys.exit(1)
 
 print('✓ all OffsetDateTime fields in serde-derived structs carry the rfc3339 annotation')

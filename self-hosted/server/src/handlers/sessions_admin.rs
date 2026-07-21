@@ -34,9 +34,9 @@ pub async fn list(
         .map(|r| {
             json!({
                 "id_hash_hex": r.get::<String, _>("id_hash_hex"),
-                "created_at": r.get::<time::OffsetDateTime, _>("created_at"),
-                "last_used_at": r.try_get::<Option<time::OffsetDateTime>, _>("last_used_at").ok().flatten(),
-                "expires_at": r.get::<time::OffsetDateTime, _>("expires_at"),
+                "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
+                "last_used_at": crate::wire_time::rfc3339_opt(r.try_get::<Option<time::OffsetDateTime>, _>("last_used_at").ok().flatten()),
+                "expires_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("expires_at")),
                 "ip": r.try_get::<Option<String>, _>("ip").ok().flatten(),
                 "user_agent": r.try_get::<Option<String>, _>("user_agent").ok().flatten(),
             })

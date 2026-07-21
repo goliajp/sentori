@@ -164,9 +164,9 @@ pub async fn list(
                 "provider_outcome": r.try_get::<Option<String>, _>("provider_outcome").ok().flatten(),
                 "error": r.try_get::<Option<String>, _>("error").ok().flatten(),
                 "retry_count": r.try_get::<i32, _>("retry_count").unwrap_or(0),
-                "created_at": r.get::<time::OffsetDateTime, _>("created_at"),
-                "sent_at": r.try_get::<Option<time::OffsetDateTime>, _>("sent_at").ok().flatten(),
-                "next_attempt_at": r.try_get::<Option<time::OffsetDateTime>, _>("next_attempt_at").ok().flatten(),
+                "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
+                "sent_at": crate::wire_time::rfc3339_opt(r.try_get::<Option<time::OffsetDateTime>, _>("sent_at").ok().flatten()),
+                "next_attempt_at": crate::wire_time::rfc3339_opt(r.try_get::<Option<time::OffsetDateTime>, _>("next_attempt_at").ok().flatten()),
             })
         })
         .collect();

@@ -109,7 +109,7 @@ pub async fn list(State(state): State<Arc<AppState>>, Path(project_id): Path<Uui
                 "interval_sec": r.get::<i32, _>("interval_sec"),
                 "timeout_ms": r.try_get::<Option<i32>, _>("assertion_max_latency_ms").ok().flatten().unwrap_or(5000),
                 "enabled": !r.get::<bool, _>("paused"),
-                "created_at": r.get::<time::OffsetDateTime, _>("created_at"),
+                "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
             })
         })
         .collect();
