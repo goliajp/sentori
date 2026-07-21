@@ -244,6 +244,10 @@ export const ja: Messages = {
   'shortcuts.title': "キーボードショートカット",
   'shortcuts.subtitle': "入力欄にフォーカスがあるときは無効です。",
 
+  'traces.duration': "所要時間",
+  'traces.rootOp': "ルート操作",
+  'workspace.label': "ワークスペース",
+
   'nav.issues': 'イシュー',
   'nav.members': 'メンバー',
   'nav.metrics': 'メトリクス',

@@ -7,6 +7,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { useT } from '../i18n';
+import type { MessageKey } from '../i18n/en';
+
 import { api } from '../lib/api';
 
 interface PaletteItem {
@@ -16,21 +19,25 @@ interface PaletteItem {
   route: string;
 }
 
-const WORKSPACE_ROUTES: PaletteItem[] = [
-  { id: 'wo', label: 'Overview', hint: 'g i', route: '/main' },
-  { id: 'wp', label: 'Projects', hint: 'g p', route: '/projects' },
-  { id: 'wm', label: 'Members', hint: 'g m', route: '/members' },
-  { id: 'wa', label: 'Alerts', hint: 'g a', route: '/alerts' },
-  {
-    id: 'wv',
-    label: 'Saved views',
-    hint: 'g v',
-    route: '/saved-views',
-  },
-  { id: 'wu', label: 'Audit log', hint: 'g u', route: '/audit' },
-  { id: 'ws', label: 'Settings', hint: 'g s', route: '/settings' },
-  { id: 'wh', label: 'Health', hint: 'g h', route: '/health' },
-  { id: 'wsa', label: 'SaaS admin', hint: 'g o', route: '/saas' },
+/**
+ * The fixed destinations, carrying a message key rather than a label.
+ *
+ * These are the same nine places the sidebar lists, so they share its
+ * `nav.*` entries — a palette that said "Overview" beside a sidebar
+ * reading 概要 would look like two different products. The key is
+ * resolved at render, not here, because this array is module-level
+ * and the locale can change without it being rebuilt.
+ */
+const WORKSPACE_ROUTES: { id: string; key: MessageKey; hint: string; route: string }[] = [
+  { id: 'wo', key: 'nav.overview', hint: 'g i', route: '/main' },
+  { id: 'wp', key: 'nav.projects', hint: 'g p', route: '/projects' },
+  { id: 'wm', key: 'nav.members', hint: 'g m', route: '/members' },
+  { id: 'wa', key: 'nav.alerts', hint: 'g a', route: '/alerts' },
+  { id: 'wv', key: 'nav.savedViews', hint: 'g v', route: '/saved-views' },
+  { id: 'wu', key: 'nav.audit', hint: 'g u', route: '/audit' },
+  { id: 'ws', key: 'nav.settings', hint: 'g s', route: '/settings' },
+  { id: 'wh', key: 'nav.health', hint: 'g h', route: '/health' },
+  { id: 'wsa', key: 'nav.saasAdmin', hint: 'g o', route: '/saas' },
 ];
 
 interface Props {
@@ -39,6 +46,7 @@ interface Props {
 }
 
 export function CommandPalette({ open, onClose }: Props) {
+  const t = useT();
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
@@ -110,7 +118,11 @@ export function CommandPalette({ open, onClose }: Props) {
   }, [open]);
 
   const items = useMemo(() => {
-    const all = [...WORKSPACE_ROUTES, ...projects, ...searchHits];
+    const all = [
+      ...WORKSPACE_ROUTES.map(r => ({ ...r, label: t(r.key) })),
+      ...projects,
+      ...searchHits,
+    ];
     const q = query.trim().toLowerCase();
     if (!q) return all.slice(0, 50);
     return all

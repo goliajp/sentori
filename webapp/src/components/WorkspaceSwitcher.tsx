@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { useT } from '../i18n';
 import { api, MeResponse, MyWorkspaceRow } from '../lib/api';
 
 /// Active-workspace pill + dropdown switcher, shown at the top of
@@ -7,6 +8,7 @@ import { api, MeResponse, MyWorkspaceRow } from '../lib/api';
 /// workspaces; picking one repoints the session server-side and
 /// reloads so every query re-scopes to the new active workspace.
 export function WorkspaceSwitcher({ me }: { me: MeResponse }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<MyWorkspaceRow[] | null>(null);
   const [switching, setSwitching] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export function WorkspaceSwitcher({ me }: { me: MeResponse }) {
     }
   }
 
-  const name = me.workspace_name ?? 'Workspace';
+  const name = me.workspace_name ?? t('workspace.label');
   return (
     <div ref={ref} className="relative">
       <button
@@ -67,7 +69,7 @@ export function WorkspaceSwitcher({ me }: { me: MeResponse }) {
       {open && (
         <div className="absolute left-0 right-0 z-20 mt-1 max-h-72 overflow-y-auto rounded border border-border bg-surface py-1 shadow-xl">
           {rows === null ? (
-            <div className="px-3 py-2 text-xs text-fg-subtle">Loading…</div>
+            <div className="px-3 py-2 text-xs text-fg-subtle">{t('common.loading')}</div>
           ) : rows.length === 0 ? (
             <div className="px-3 py-2 text-xs text-fg-subtle">
               No workspaces.

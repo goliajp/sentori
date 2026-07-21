@@ -244,6 +244,10 @@ export const zh: Messages = {
   'shortcuts.title': "键盘快捷键",
   'shortcuts.subtitle': "光标在输入框里时不生效。",
 
+  'traces.duration': "耗时",
+  'traces.rootOp': "根操作",
+  'workspace.label': "工作区",
+
   'nav.issues': '问题',
   'nav.members': '成员',
   'nav.metrics': '指标',
