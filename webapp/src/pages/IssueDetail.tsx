@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
-import { api, EventRow, IssueDetail as Issue } from '../lib/api';
+import { api, EventDetail, EventRow, IssueDetail as Issue } from '../lib/api';
+import { EventEvidence } from '../components/crash/EventEvidence';
 import { useKeyHandlers } from '../lib/useShortcuts';
 import {
   Badge,
@@ -28,6 +29,10 @@ export default function IssueDetail() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [watchers, setWatchers] = useState<string[]>([]);
+  // The latest matching event, loaded in full. This is the crash the
+  // page is actually about — the issue row is just its aggregate.
+  const [latest, setLatest] = useState<EventDetail | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const myUserId =
     typeof localStorage !== 'undefined'
       ? localStorage.getItem('sentori_user_id')
@@ -92,12 +97,33 @@ export default function IssueDetail() {
       .finally(() => setLoading(false));
   }, [projectId, issueId]);
 
+  // Load the selected event — or the newest one — in full. The list
+  // rows carry only identifiers; the payload with the stack,
+  // breadcrumbs and context comes from the single-event endpoint.
+  useEffect(() => {
+    if (!projectId) return;
+    const target = selectedEventId ?? events[0]?.id;
+    if (!target) return;
+    let cancelled = false;
+    api
+      .getEvent(projectId, target)
+      .then(d => {
+        if (!cancelled) setLatest(d);
+      })
+      .catch(e => {
+        if (!cancelled) setError(String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, events, selectedEventId]);
+
   if (!projectId || !issueId) {
     return <ErrorBanner>Missing project/issue id</ErrorBanner>;
   }
   if (loading) {
     return (
-      <div className="py-16 text-center text-sm text-zinc-500">Loading…</div>
+      <div className="py-16 text-center text-sm text-fg-subtle">Loading…</div>
     );
   }
   if (error) {
@@ -172,7 +198,7 @@ export default function IssueDetail() {
             </Button>
             <Link
               to={`/projects/${projectId}/issues`}
-              className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50"
+              className="rounded border border-border px-3 py-1.5 text-sm text-fg-subtle hover:bg-raised"
             >
               ← All
             </Link>
@@ -225,7 +251,7 @@ export default function IssueDetail() {
               <Cell label="Regressed at">
                 {formatRelative(issue.regressed_at)}
                 {issue.regressed_in_release && (
-                  <span className="font-mono text-[10px] text-zinc-500 ml-1">
+                  <span className="font-mono text-[10px] text-fg-subtle ml-1">
                     in {issue.regressed_in_release}
                   </span>
                 )}
@@ -238,41 +264,22 @@ export default function IssueDetail() {
       <Comments issueId={issueId} myUserId={myUserId} />
       <Activity issueId={issueId} />
 
-      <Card>
-        <CardHeader title={`Recent events (${events.length})`} />
-        <Section>
-          {events.length === 0 ? (
-            <div className="py-8 text-center text-sm text-zinc-500">
-              No matching events.
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {events.map(e => (
-                <div
-                  key={e.id}
-                  className="flex items-center justify-between rounded border border-zinc-200 p-2 text-xs"
-                >
-                  <div className="flex items-center gap-2">
-                    <Badge>{e.kind}</Badge>
-                    <span className="font-mono text-[10px] text-zinc-500">
-                      {e.platform}
-                    </span>
-                    <span className="text-zinc-400">/</span>
-                    <span className="font-mono text-[10px]">{e.release}</span>
-                    <span className="text-zinc-400">/</span>
-                    <span className="font-mono text-[10px]">
-                      {e.environment}
-                    </span>
-                  </div>
-                  <span className="font-mono text-[10px] text-zinc-500">
-                    {formatRelative(e.timestamp)}
-                  </span>
-                </div>
-              ))}
-            </div>
+      {latest ? (
+        <div className="space-y-8">
+          {events.length > 1 && (
+            <EventPicker
+              events={events}
+              selected={latest.id}
+              onSelect={setSelectedEventId}
+            />
           )}
-        </Section>
-      </Card>
+          <EventEvidence event={latest} projectId={projectId} />
+        </div>
+      ) : (
+        <p className="py-8 text-center text-sm text-fg-subtle">
+          No event has been collected for this issue yet.
+        </p>
+      )}
     </div>
   );
 }
@@ -286,7 +293,7 @@ function Cell({
 }) {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-wide text-zinc-500">
+      <p className="text-[10px] uppercase tracking-wide text-fg-subtle">
         {label}
       </p>
       <div className="mt-1 text-sm">{children}</div>
@@ -351,23 +358,23 @@ function Comments({
           {rows.map(c => (
             <div
               key={c.id}
-              className="rounded border border-zinc-200 p-2 text-xs"
+              className="rounded border border-border p-2 text-xs"
             >
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] text-zinc-500">
+                <span className="font-mono text-[10px] text-fg-subtle">
                   {c.author_user_id.slice(0, 8)}… ·{' '}
                   {formatRelative(c.created_at)}
                 </span>
                 {myUserId === c.author_user_id && (
                   <button
                     onClick={() => del(c.id)}
-                    className="text-[10px] text-zinc-500 hover:text-red-400"
+                    className="text-[10px] text-fg-subtle hover:text-red-400"
                   >
                     delete
                   </button>
                 )}
               </div>
-              <p className="mt-1 whitespace-pre-wrap text-zinc-200">
+              <p className="mt-1 whitespace-pre-wrap text-fg">
                 {c.body_md}
               </p>
             </div>
@@ -378,7 +385,7 @@ function Comments({
                 value={text}
                 onChange={e => setText(e.target.value)}
                 placeholder="Add a comment (Markdown)…"
-                className="w-full h-20 rounded border border-zinc-300 p-2 text-xs"
+                className="w-full h-20 rounded border border-border p-2 text-xs"
               />
               <Button
                 size="sm"
@@ -420,7 +427,7 @@ function Activity({ issueId }: { issueId: string }) {
           {rows.map(a => (
             <li
               key={a.id}
-              className="flex items-center justify-between text-zinc-400"
+              className="flex items-center justify-between text-fg-muted"
             >
               <span>
                 <Badge>{a.kind}</Badge>{' '}
@@ -436,5 +443,42 @@ function Activity({ issueId }: { issueId: string }) {
         </ul>
       </Section>
     </Card>
+  );
+}
+
+/** Which occurrence of this issue you are looking at. Same crash,
+ *  different device / build / moment — and those differences are
+ *  often the whole diagnosis. */
+function EventPicker({
+  events,
+  selected,
+  onSelect,
+}: {
+  events: EventRow[];
+  selected: string;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {events.slice(0, 12).map(e => {
+        const active = e.id === selected;
+        return (
+          <button
+            key={e.id}
+            type="button"
+            onClick={() => onSelect(e.id)}
+            aria-current={active}
+            className={`rounded border px-2 py-1 font-mono text-[11px] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+              active
+                ? 'border-accent text-fg'
+                : 'border-border text-fg-subtle hover:text-fg-muted'
+            }`}
+          >
+            {formatRelative(e.timestamp)}
+            <span className="ml-1.5 text-fg-subtle">{e.platform}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
