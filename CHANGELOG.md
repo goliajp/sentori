@@ -6,6 +6,17 @@
 
 ---
 
+## v1.7.2(2026-07-21 — dashboard 首页移到 `/main`,修 OAuth 登录落到 marketing 页)
+
+Google/GitHub 登录认证本身是好的(链账号 + 建 session 都正常),但登完把人丢到了 marketing 首页。根因:OAuth 回调结尾是**服务端 302**,而 SaaS 部署上 Caddy 把 `/` 交给 Astro marketing 构建、其余路径才路由到本 server 的 SPA —— 所以整页加载 `/` 永远到不了 dashboard。密码登录一直没暴露这个问题纯属侥幸:它在已加载的 SPA 内做**客户端**跳转,压根不经过 Caddy;只有全新的浏览器导航(OAuth 回调、刷新、书签)才会撞上 marketing。
+
+把 **`/main` 定为 dashboard 首页** —— SaaS 与 self-hosted 都把它路由到 SPA,因此能扛整页加载 / 刷新 / 书签:
+
+- server:OAuth 回调 `DASHBOARD_ROOT` 由 `/` 改为 `/main`。
+- webapp:`/main` 渲染 Overview,`/` 重定向到它;侧栏 Overview 链接、`g i` 快捷键、命令面板条目、登录后默认 `returnTo`、邀请接受页的 CTA 全部指向 `/main` —— 应用内不再有任何路径能把已登录用户甩到 marketing。
+
+---
+
 ## v1.7.1(2026-07-21 — 配额超限返回 402 而非 429,避免 RN SDK 重试 churn)
 
 紧跟 v1.7.0 的行为修正。月度配额用尽本不该是 429:RN SDK 把每个 429 当"稍后重试" —— 读响应体 `retryAfterMs`(v1.7.0 的 server 从不发 → 默认 5s),退避重试 `MAX_RETRY` 次,再把批次 persist 到 AsyncStorage 离线队列、下次 session 继续发。对一个整月都不会恢复的配额,这就是对注定失败的批次反复重试 = 白耗 host app 电量/网络,正好踩"Sentori 不能给 host app 造成抖动"的铁律。
