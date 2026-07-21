@@ -127,7 +127,7 @@ pub async fn login(
                 "user_id": user.id.to_string(),
                 "email": user.email,
                 "session_token": signed,
-                "expires_at": minted.session.expires_at,
+                "expires_at": crate::wire_time::rfc3339(minted.session.expires_at),
             });
             let mut resp = (StatusCode::OK, Json(body_json)).into_response();
             let cookie = session_cookie_header(&signed);
@@ -300,7 +300,7 @@ pub async fn me(
                 "user_id": u.id.to_string(),
                 "email": u.email,
                 "email_verified": u.email_verified,
-                "created_at": u.created_at,
+                "created_at": crate::wire_time::rfc3339(u.created_at),
                 // Active-workspace context for the header + switcher.
                 "workspace_id": ctx.workspace_id.into_uuid().to_string(),
                 "workspace_name": ws_name,

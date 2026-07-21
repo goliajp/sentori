@@ -301,6 +301,28 @@ pub struct Member {
     pub added_at: OffsetDateTime,
 }
 
+/// A member together with the identity an operator recognises them by.
+///
+/// [`Member`] is the membership record and holds only the foreign key,
+/// which is the right shape for authorisation. It is the wrong shape
+/// for the members screen: an admin deciding whether to remove someone
+/// knows them as an email address, not as
+/// `019e3589-9d7f-7013-9952-e3f287104954`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemberIdentity {
+    /// The membership itself.
+    #[serde(flatten)]
+    pub member: Member,
+    /// Sign-in address. `None` only if the user row vanished under a
+    /// membership that outlived it.
+    pub email: Option<String>,
+    /// Whether that address has been confirmed — an admin looking at a
+    /// stale invite wants to see the difference.
+    pub email_verified: bool,
+    /// Email of whoever added them, resolved from [`Member::added_by`].
+    pub added_by_email: Option<String>,
+}
+
 /// `projects` row.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Project {

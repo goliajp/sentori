@@ -279,8 +279,12 @@ export interface PushCredential {
 
 export interface MemberRow {
   user_id: string;
+  /** Sign-in address — how an operator recognises this person. */
+  email: string | null;
+  email_verified: boolean;
   role: 'owner' | 'admin' | 'user';
   added_by: string | null;
+  added_by_email: string | null;
   added_at: string;
 }
 

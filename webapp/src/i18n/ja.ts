@@ -335,6 +335,13 @@ export const ja: Messages = {
   'billing.usage': "使用量",
   'health.subtitle': "サーバーの稼働状況 · {stamp} 更新",
 
+  'members.user': "メンバー",
+  'members.role': "ロール",
+  'members.added': "追加日",
+  'members.unverified': "未確認",
+  'members.addedBy': "{who} が追加",
+  'members.unknownUser': "不明なユーザー",
+
   'nav.issues': 'イシュー',
   'nav.members': 'メンバー',
   'nav.metrics': 'メトリクス',

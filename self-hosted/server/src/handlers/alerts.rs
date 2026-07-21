@@ -204,10 +204,10 @@ pub async fn get(
         "filter_config": rule.filter_config,
         "channels": rule.channels,
         "throttle_minutes": rule.throttle_minutes,
-        "last_fired_at": rule.last_fired_at,
+        "last_fired_at": crate::wire_time::rfc3339_opt(rule.last_fired_at),
         "muted": rule.muted,
         "snoozed_until": rule.snoozed_until,
-        "created_at": rule.created_at,
-        "updated_at": rule.updated_at,
+        "created_at": crate::wire_time::rfc3339(rule.created_at),
+        "updated_at": crate::wire_time::rfc3339(rule.updated_at),
     })))
 }

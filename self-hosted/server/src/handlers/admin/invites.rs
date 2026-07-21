@@ -95,7 +95,7 @@ pub async fn create(
                 Json(json!({
                     "invite_id": minted.invite.id.to_string(),
                     "token": minted.plaintext_token.to_wire_string(),
-                    "expires_at": minted.invite.expires_at,
+                    "expires_at": crate::wire_time::rfc3339(minted.invite.expires_at),
                 })),
             )
         }
@@ -130,9 +130,9 @@ pub async fn list(
                             InviteRole::Admin => "admin",
                             InviteRole::User => "user",
                         },
-                        "expires_at": i.expires_at,
-                        "accepted_at": i.accepted_at,
-                        "created_at": i.created_at,
+                        "expires_at": crate::wire_time::rfc3339(i.expires_at),
+                        "accepted_at": crate::wire_time::rfc3339_opt(i.accepted_at),
+                        "created_at": crate::wire_time::rfc3339(i.created_at),
                     })
                 })
                 .collect();

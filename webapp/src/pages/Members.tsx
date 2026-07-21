@@ -160,15 +160,32 @@ export default function Members() {
           ) : (
             <DataTable
               columns={[
-                { key: 'uid', label: 'User' },
-                { key: 'role', label: 'Role' },
-                { key: 'added', label: 'Added' },
+                { key: 'uid', label: t('members.user') },
+                { key: 'role', label: t('members.role') },
+                { key: 'added', label: t('members.added') },
                 { key: 'actions', label: '' },
               ]}
               rows={members.map(m => ({
                 key: m.user_id,
+                // The email, with who added them underneath. The uuid is
+                // the join key, not a name — it belongs in the row's
+                // React key and in copy-to-clipboard, not on screen.
                 uid: (
-                  <span className="font-mono text-xs">{m.user_id}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-fg">
+                        {m.email ?? t('members.unknownUser')}
+                      </span>
+                      {m.email && !m.email_verified && (
+                        <Badge tone="warn">{t('members.unverified')}</Badge>
+                      )}
+                    </div>
+                    {m.added_by_email && (
+                      <div className="mt-0.5 text-xs text-fg-subtle">
+                        {t('members.addedBy').replace('{who}', m.added_by_email)}
+                      </div>
+                    )}
+                  </div>
                 ),
                 role: (
                   <Badge tone={m.role === 'owner' ? 'ok' : 'neutral'}>
