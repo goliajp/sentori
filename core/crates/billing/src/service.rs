@@ -97,6 +97,38 @@ impl BillingService {
         row_to_billing(&row)
     }
 
+    /// Read the plan of the workspace that owns `project_id`,
+    /// regardless of which workspace this service is bound to.
+    ///
+    /// The ingest quota path is driven by the token's project,
+    /// whose workspace can differ from the service's bound one (in
+    /// SaaS the ingest service is bound to the boot-time default
+    /// workspace). Metering against `self.workspace_id`'s plan would
+    /// limit every tenant by the wrong plan; this resolves the
+    /// project's real workspace instead. Returns `None` if the
+    /// project has no billing row yet (caller falls back to Free).
+    ///
+    /// # Errors
+    ///
+    /// [`BillingError::Db`] on backend failure.
+    pub async fn plan_for_project(
+        &self,
+        project_id: ProjectId,
+    ) -> Result<Option<Plan>, BillingError> {
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT wb.plan FROM workspace_billing wb \
+             JOIN projects p ON p.workspace_id = wb.workspace_id \
+             WHERE p.id = $1",
+        )
+        .bind(project_id.into_uuid())
+        .fetch_optional(&self.pool)
+        .await?;
+        match row {
+            Some((plan,)) => Ok(Some(Plan::from_db_str(&plan)?)),
+            None => Ok(None),
+        }
+    }
+
     /// Set the plan + optional Stripe customer ref +
     /// period_end for this workspace.
     ///
@@ -190,8 +222,15 @@ impl BillingService {
         if delta <= 0 {
             return Err(BillingError::InvalidInput("delta must be > 0".into()));
         }
-        let billing = self.get().await?;
-        let limit = billing.plan.limits().for_kind(kind);
+        // Limit is driven by the PROJECT's workspace plan, not this
+        // service's bound workspace (which is the boot-time default
+        // in SaaS). A project whose workspace has no billing row yet
+        // falls back to Free rather than failing the ingest.
+        let plan = self
+            .plan_for_project(project_id)
+            .await?
+            .unwrap_or(Plan::Free);
+        let limit = plan.limits().for_kind(kind);
         let period = period_key(now);
 
         // Atomic compare-and-increment via single statement.
