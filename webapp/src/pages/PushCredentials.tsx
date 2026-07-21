@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api, PushCredential } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 import {
@@ -21,6 +22,7 @@ import {
 const PROVIDERS = ['apns', 'fcm', 'webpush', 'hcm', 'mipush'] as const;
 
 export default function PushCredentials() {
+  const t = useT();
   const { id: projectId } = useParams<{ id: string }>();
   const [provider, setProvider] = useState<(typeof PROVIDERS)[number]>('apns');
   const [config, setConfig] = useState('{}');
@@ -83,7 +85,7 @@ export default function PushCredentials() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Push credentials"
+        title={t('push.credentials')}
         subtitle="Vendor secrets used by /v1/push/send. APNs p8, FCM service-account, WebPush VAPID, HCM/MiPush client secrets."
         actions={
           <div className="flex gap-2">
@@ -101,7 +103,7 @@ export default function PushCredentials() {
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
       <Card className="mb-2">
-        <CardHeader title="Test push" />
+        <CardHeader title={t('push.test')} />
         <CardBody>
           <p className="text-xs text-fg-subtle mb-2">
             Send a real test notification to a known device token to
@@ -113,7 +115,7 @@ export default function PushCredentials() {
 
       {showUpload && (
         <Card>
-          <CardHeader title="Upload credentials" />
+          <CardHeader title={t('push.upload')} />
           <CardBody>
             <label className="block text-xs text-fg-subtle mb-1">Provider</label>
             <select
@@ -197,8 +199,8 @@ export default function PushCredentials() {
             </div>
           ) : rows.length === 0 ? (
             <EmptyState
-              title="No credentials yet"
-              hint="Upload at least one provider to start dispatching push."
+              title={t('push.empty')}
+              hint={t('push.emptyHint')}
             />
           ) : (
             <DataTable
@@ -278,6 +280,7 @@ function bytesToB64url(bytes: Uint8Array): string {
 }
 
 function TestPushForm({ projectId }: { projectId: string }) {
+  const t = useT();
   const [tokenId, setTokenId] = useState('');
   const [title, setTitle] = useState('Sentori test');
   const [bodyText, setBodyText] = useState('hello from dashboard');
@@ -309,13 +312,13 @@ function TestPushForm({ projectId }: { projectId: string }) {
       <div className="grid grid-cols-2 gap-2">
         <input
           className="rounded border border-border-strong bg-surface px-3 py-2 text-sm"
-          placeholder="Title"
+          placeholder={t('push.notifTitle')}
           value={title}
           onChange={e => setTitle(e.target.value)}
         />
         <input
           className="rounded border border-border-strong bg-surface px-3 py-2 text-sm"
-          placeholder="Body"
+          placeholder={t('push.notifBody')}
           value={bodyText}
           onChange={e => setBodyText(e.target.value)}
         />
