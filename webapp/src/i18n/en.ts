@@ -57,6 +57,10 @@ export const en = {
   'nav.health': 'Health',
   'nav.inbox': 'Inbox',
   'nav.integrations': 'Integrations',
+  'issues.resolve': 'Resolve',
+  'issues.ignore': 'Ignore',
+  'issues.reopen': 'Reopen',
+
   'nav.issues': 'Issues',
   'nav.members': 'Members',
   'nav.metrics': 'Metrics',

@@ -105,7 +105,7 @@ export default function AcceptInvite() {
         )}
 
         {state.kind === 'error' && (
-          <p className="mt-4 text-sm text-rose-400">{state.message}</p>
+          <p className="mt-4 text-sm text-danger">{state.message}</p>
         )}
       </div>
     </div>

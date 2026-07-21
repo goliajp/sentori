@@ -265,7 +265,7 @@ function LensPill({
     <span
       className={`rounded px-1.5 py-0.5 font-mono ${
         tone === 'warn'
-          ? 'bg-orange-900/40 text-orange-300'
+          ? 'bg-warn/40 text-warn'
           : 'bg-raised text-fg-muted'
       }`}
     >

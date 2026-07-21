@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api, ApiError, IngestRequest, Issue } from '../lib/api';
+import { useI18n } from '../i18n';
 import { useKeyHandlers } from '../lib/useShortcuts';
+import { useProjectName } from '../lib/useProjectName';
 import {
   Badge,
   Button,
@@ -23,6 +25,8 @@ const STATUS_TONE: Record<Issue['status'], 'ok' | 'warn' | 'danger' | 'neutral'>
 
 export function IssuesPage() {
   const { id: projectId } = useParams<{ id: string }>();
+  const projectName = useProjectName(projectId);
+  const { t } = useI18n();
   const [search, setSearch] = useSearchParams();
   const statusFilter = search.get('status') ?? '';
   const [issues, setIssues] = useState<Issue[] | null>(null);
@@ -130,7 +134,7 @@ export function IssuesPage() {
     <div>
       <PageHeader
         title="Issues"
-        subtitle={`Project ${projectId.slice(0, 8)}…`}
+        subtitle={projectName}
         action={
           <div className="flex gap-2">
             <SaveViewButton
@@ -295,36 +299,41 @@ export function IssuesPage() {
               label: '',
               width: '14%',
               render: (r) => (
-                <div className="flex gap-1">
+                <div className="flex justify-end gap-1">
                   {r.status !== 'resolved' && (
-                    <button
+                    <Button
+                      size="sm"
+                      variant="primary"
                       onClick={() => quickAction(r.id, 'resolved')}
                       disabled={busy.has(r.id)}
-                      title="Resolve"
-                      className="rounded bg-accent/30 px-2 py-0.5 text-xs text-accent hover:opacity-90/60 disabled:opacity-50"
+                      title={t('issues.resolve')}
                     >
-                      ✓ Resolve
-                    </button>
+                      {t('issues.resolve')}
+                    </Button>
                   )}
                   {r.status !== 'ignored' && (
-                    <button
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon
                       onClick={() => quickAction(r.id, 'ignored')}
                       disabled={busy.has(r.id)}
-                      title="Ignore"
-                      className="rounded bg-raised/40 px-2 py-0.5 text-xs text-fg-muted hover:bg-raised disabled:opacity-50"
+                      title={t('issues.ignore')}
                     >
                       ⊘
-                    </button>
+                    </Button>
                   )}
                   {r.status !== 'active' && (
-                    <button
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon
                       onClick={() => quickAction(r.id, 'active')}
                       disabled={busy.has(r.id)}
-                      title="Reopen"
-                      className="rounded bg-orange-700/30 px-2 py-0.5 text-xs text-orange-300 hover:bg-orange-700/60 disabled:opacity-50"
+                      title={t('issues.reopen')}
                     >
                       ↺
-                    </button>
+                    </Button>
                   )}
                 </div>
               ),

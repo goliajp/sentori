@@ -51,6 +51,10 @@ export const ja: Messages = {
   'nav.health': 'ヘルス',
   'nav.inbox': '受信箱',
   'nav.integrations': '連携',
+  'issues.resolve': '解決済みにする',
+  'issues.ignore': '無視',
+  'issues.reopen': '再オープン',
+
   'nav.issues': 'イシュー',
   'nav.members': 'メンバー',
   'nav.metrics': 'メトリクス',
