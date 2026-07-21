@@ -6,6 +6,18 @@
 
 ---
 
+## v1.7.15(2026-07-22 — 热修:相对时间遇空值把整页搞崩)
+
+**多个页面打不开**,报 `RangeError: number argument must be finite`。
+
+v1.7.9 改用 `Intl.RelativeTimeFormat` 时,**改变了「时间戳缺失」的失败方式**:手写版本只是拼字符串,`NaN` 出来是难看的 `NaNs ago`;而 `Intl.RelativeTimeFormat.format()` 遇非有限数**直接抛**,这些组件上方又没有 error boundary,于是整页白屏。**一个显示瑕疵被我升级成了故障。**
+
+有几列本来就可空 —— 没人解决过的 issue 的 `resolved_at`、不会重试的 `next_attempt_at`、从未触发的规则的 `last_fired_at` —— 而 33 个调用点直接把它们传了进来。函数签名现在接受 `null | undefined`(调用方本来就在这么传),不是真实时刻的值渲染成「—」。
+
+**顺带修掉一个更安静的错答案**:`new Date(null).getTime()` 是 `0` 不是 `NaN`,所以未解决的 issue 一直在报告「56 年前已解决」。
+
+---
+
 ## v1.7.14(2026-07-22 — 三语覆盖 41/41)
 
 en/zh/ja 各 **282 键**,**所有**页面与组件都读目录。
