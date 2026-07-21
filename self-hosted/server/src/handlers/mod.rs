@@ -343,6 +343,15 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/v1/projects/{project_id}/events/_recent",
             get(events_live::handle),
         )
+        // Registered after the two literal siblings above. The router
+        // prefers a static segment over a capture regardless of order,
+        // but `{event_id}` parses as a Uuid — if it ever did win,
+        // `/events/trend` would 400 instead of 404, so keep the
+        // precedence visible in the source too.
+        .route(
+            "/v1/projects/{project_id}/events/{event_id}",
+            get(events::get),
+        )
         .route("/v1/projects/{project_id}/traces", get(spans::list_traces))
         .route(
             "/v1/projects/{project_id}/traces/{trace_id}",
