@@ -91,7 +91,7 @@ export default function Integrations() {
     <div className="space-y-4">
       <PageHeader
         title={t('integrations.title')}
-        subtitle="External services that receive sentori events: Slack notifications, Linear issue creation, GitHub mentions, etc."
+        subtitle={t('integrations.subtitle')}
         actions={<Button onClick={() => setShowAdd(true)}>{'+ ' + t('integrations.connectShort')}</Button>}
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
@@ -162,7 +162,7 @@ export default function Integrations() {
                       variant="secondary"
                       onClick={() => toggle(it)}
                     >
-                      {it.active ? 'Pause' : 'Resume'}
+                      {it.active ? t('action.pause') : t('saas.resume')}
                     </Button>
                     <Button size="sm" variant="danger" onClick={() => destroy(it)}>{t('action.disconnect')}</Button>
                   </div>

@@ -215,7 +215,7 @@ export function EventsPage() {
                   title={t('events.narrowToIssue')}
                   className="rounded bg-raised px-2 py-0.5 text-xs text-fg-muted hover:bg-raised"
                 >
-                  Narrow
+                  {t('events.narrowShort')}
                 </button>
               ),
             },

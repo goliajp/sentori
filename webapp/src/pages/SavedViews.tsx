@@ -154,7 +154,7 @@ export default function SavedViews() {
           <CardBody>
             <input
               className="w-full rounded border border-border-strong bg-surface px-3 py-2 text-sm"
-              placeholder='Name (e.g. "active iOS prod")'
+              placeholder={t('savedViews.namePlaceholder')}
               value={newName}
               onChange={e => setNewName(e.target.value)}
             />

@@ -59,7 +59,7 @@ export default function Metrics() {
     <div className="space-y-4">
       <PageHeader
         title={t('metrics.title')}
-        subtitle="Custom counters / gauges / distributions emitted via SDK metrics:batch. Last 24h shown by default."
+        subtitle={t('metrics.subtitle')}
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
 

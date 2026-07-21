@@ -103,7 +103,7 @@ export default function Releases() {
     <div className="space-y-4">
       <PageHeader
         title={t('releases.title')}
-        subtitle="Deploy markers + uploaded symbolicator blobs (sourcemap / dsym / proguard)."
+        subtitle={t('releases.subtitle')}
         actions={
           <Button onClick={() => setShowCreate(!showCreate)} size="sm">
             {showCreate ? 'Cancel' : '+ Deploy marker'}

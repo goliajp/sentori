@@ -988,10 +988,10 @@ export class Api {
   listInvites(): Promise<{ invites: InviteRow[] }> {
     return this.get('/admin/api/invites');
   }
+  /** The inviter comes from the session, not from here. */
   mintInvite(body: {
     email: string;
     role: 'admin' | 'user';
-    invited_by: string;
     expires_in_days?: number;
   }): Promise<{ invite_id: string; token: string; expires_at: string }> {
     return this.post('/admin/api/invites', body);

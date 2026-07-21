@@ -110,7 +110,7 @@ export function AuditPage() {
             label={t('audit.action')}
             value={action}
             onChange={setAction}
-            placeholder="e.g. project.create"
+            placeholder={t('audit.actionPlaceholder')}
           />
           <Field
             label={t('audit.limit')}
@@ -122,7 +122,7 @@ export function AuditPage() {
             label={t('audit.ip')}
             value={ipFilter}
             onChange={setIpFilter}
-            placeholder="e.g. 198.51.100"
+            placeholder={t('audit.ipPlaceholder')}
           />
           <div className="col-span-4 flex gap-2 text-xs">
             <span className="text-fg-subtle">{t('audit.quick')}:</span>

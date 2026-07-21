@@ -23,11 +23,6 @@ export default function Members() {
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'admin' | 'user'>('user');
-  const [invitedBy, setInvitedBy] = useState(
-    typeof localStorage !== 'undefined'
-      ? localStorage.getItem('sentori_user_id') ?? ''
-      : '',
-  );
   const [newInviteToken, setNewInviteToken] = useState<string | null>(null);
 
   const {
@@ -67,12 +62,11 @@ export default function Members() {
   }
 
   async function mintInvite() {
-    if (!inviteEmail || !invitedBy) return;
+    if (!inviteEmail) return;
     try {
       const r = await api.mintInvite({
         email: inviteEmail,
         role: inviteRole,
-        invited_by: invitedBy,
       });
       setNewInviteToken(r.token);
       setInviteEmail('');
@@ -122,7 +116,7 @@ export default function Members() {
           <CardBody>
             <input
               className="h-8 w-full rounded border border-border px-2.5 text-sm"
-              placeholder="Email"
+              placeholder={t('auth.email')}
               value={inviteEmail}
               onChange={e => setInviteEmail(e.target.value)}
             />
@@ -134,12 +128,6 @@ export default function Members() {
               <option value="user">user</option>
               <option value="admin">admin</option>
             </select>
-            <input
-              className="mt-2 w-full rounded border border-border px-3 py-2 text-sm font-mono"
-              placeholder="Inviter user_id (UUID — yours)"
-              value={invitedBy}
-              onChange={e => setInvitedBy(e.target.value)}
-            />
             <div className="mt-2 flex gap-2">
               <Button onClick={mintInvite}>{t('members.sendInvite')}</Button>
               <Button variant="secondary" onClick={() => setShowInvite(false)}>{t('action.cancel')}</Button>

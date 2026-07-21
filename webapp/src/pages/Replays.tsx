@@ -90,7 +90,7 @@ export default function Replays() {
       </Card>
 
       <p className="text-center text-xs text-fg-subtle">
-        Replay viewer (scrubber + frame playback) coming in v0.3.
+        {t('replays.comingSoon')}
       </p>
     </div>
   );
