@@ -43,11 +43,12 @@ pub async fn handle(
     }
 
     // K17 quota: meter the whole batch atomically (delta = batch
-    // size, not 1). Over-limit rejects the entire batch with 429.
+    // size, not 1). Over-limit rejects the entire batch with 402
+    // (monthly quota — SDKs drop it rather than retry; see quota.rs).
     let now = OffsetDateTime::now_utc();
     let delta = i64::try_from(arr.len()).unwrap_or(i64::MAX);
     if let Err(body) = quota::meter(&state, ctx.project_id, CounterKind::Spans, delta, now).await {
-        return (StatusCode::TOO_MANY_REQUESTS, Json(body));
+        return (StatusCode::PAYMENT_REQUIRED, Json(body));
     }
 
     let mut accepted = 0u32;

@@ -8,6 +8,15 @@
 //! `usage_counters` table hiccuped — we under-count that one
 //! request and log it instead.
 //!
+//! Over-quota rejects with `402 Payment Required`, deliberately
+//! **not** `429`: the quota is a *monthly* budget, not a short-term
+//! rate limit, so it will not recover for days/weeks. Every SDK
+//! drops a non-429 4xx silently; the RN SDK by contrast treats 429
+//! as retry-after-a-moment and would re-send (with an offline
+//! queue) a batch that cannot succeed until the period resets,
+//! burning the host app's battery and network. 402 makes deployed
+//! clients drop cleanly with no retry churn, no SDK update needed.
+//!
 //! The limit is driven by the *project's* real workspace plan
 //! (see [`sentori_billing::BillingService::check_and_record`]), so
 //! passing the shared boot-time-bound `state.billing` handle is
@@ -27,7 +36,9 @@ use crate::state::AppState;
 ///   we chose to ride through (fail-open). The caller proceeds
 ///   with the ingest.
 /// - `Err(body)` — over quota. The drop is already recorded; the
-///   caller should return `429 Too Many Requests` with `body`.
+///   caller should return `402 Payment Required` with `body` (a
+///   monthly quota is a plan limit, not a retryable rate limit —
+///   see the module docs on why not 429).
 pub async fn meter(
     state: &AppState,
     project_id: ProjectId,
