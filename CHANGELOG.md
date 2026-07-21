@@ -6,6 +6,24 @@
 
 ---
 
+## v1.7.16(2026-07-22 — 页面崩溃的**真**根因:`json!` 里的时间戳不是 RFC 3339)
+
+v1.7.15 只是止血。真因在服务端。
+
+`#[serde(with = "time::serde::rfc3339")]` 是**字段**属性,而 **26 个 handler 用 `serde_json::json!` 拼响应**,那里根本没有字段可以挂它。于是这些时间戳按 `time` 的默认形状发出去:
+
+```json
+"created_at": [1970,1,0,0,0,0,0,0,0]
+```
+
+`new Date()` 把它读成 Invalid Date。v1.7.9 之前前端把由此产生的 `NaN` 渲染成难看的 `NaNy ago`;改用 `Intl.RelativeTimeFormat` 之后,同样的偏差**直接抛异常、整页白屏**。受影响的有:会话、通知、评论、关注者、搜索、活动流、版本、集成、端点探针、推送凭证、推送记录、SaaS 管理。
+
+新增 `crate::wire_time::rfc3339` / `rfc3339_opt` 在调用点格式化;`scripts/check-rfc3339.sh` 现在也会对 `json!` 体内裸露的 `OffsetDateTime` 报错 —— **正是这个盲区让 26 处一边积累、一边让检查报绿**。已实测:退回一处则门变红,还原则恢复绿。
+
+v1.7.15 在 `formatRelative` 里的守卫保留 —— 它是「坏时间戳不能再搞崩页面」的兜底,并且顺带修掉 `new Date(null)` 让未解决的 issue 报告「56 年前已解决」。
+
+---
+
 ## v1.7.15(2026-07-22 — 热修:相对时间遇空值把整页搞崩)
 
 **多个页面打不开**,报 `RangeError: number argument must be finite`。
