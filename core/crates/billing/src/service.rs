@@ -238,11 +238,13 @@ impl BillingService {
     /// In v0.1, we do INSERT/UPDATE conditionally based on
     /// a pre-read + compare. Race losers retry.
     ///
+    /// A workspace with no billing row yet is metered at Free rather
+    /// than erroring, so a fresh tenant's first ingest is never
+    /// rejected for lack of an `ensure_default` call.
+    ///
     /// # Errors
     ///
     /// - [`BillingError::InvalidInput`] for `delta <= 0`.
-    /// - [`BillingError::NotInitialised`] if `ensure_default`
-    ///   hasn't been called.
     /// - [`BillingError::ProjectNotFound`] on FK violation.
     /// - [`BillingError::Db`] on backend failure.
     pub async fn check_and_record(
