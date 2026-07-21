@@ -133,7 +133,7 @@ export function IssuesPage() {
   return (
     <div>
       <PageHeader
-        title="Issues"
+        title={t('issues.title')}
         subtitle={projectName}
         action={
           <div className="flex gap-2">
@@ -147,11 +147,11 @@ export function IssuesPage() {
       />
 
       <p className="mb-3 text-xs text-fg-subtle">
-        Shortcuts: <kbd className="rounded bg-raised px-1">j</kbd>/
-        <kbd className="rounded bg-raised px-1">k</kbd> navigate ·{' '}
-        <kbd className="rounded bg-raised px-1">x</kbd> select ·{' '}
-        <kbd className="rounded bg-raised px-1">e</kbd> resolve ·{' '}
-        <kbd className="rounded bg-raised px-1">i</kbd> ignore
+        {t('issues.shortcuts')}: <kbd className="rounded bg-raised px-1">j</kbd>/
+        <kbd className="rounded bg-raised px-1">k</kbd> {t('issues.kbdNavigate')} ·{' '}
+        <kbd className="rounded bg-raised px-1">x</kbd> {t('issues.kbdSelect')} ·{' '}
+        <kbd className="rounded bg-raised px-1">e</kbd> {t('issues.resolve')} ·{' '}
+        <kbd className="rounded bg-raised px-1">i</kbd> {t('issues.kbdIgnore')}
       </p>
 
       {selected.size > 0 && (
@@ -191,11 +191,11 @@ export function IssuesPage() {
             setSearch(search, { replace: true });
           }}
           options={[
-            { value: 'all', label: 'All' },
-            { value: 'active', label: 'Active' },
-            { value: 'regressed', label: 'Regressed' },
-            { value: 'resolved', label: 'Resolved' },
-            { value: 'ignored', label: 'Ignored' },
+            { value: 'all', label: t('issues.tabAll') },
+            { value: 'active', label: t('issues.tabActive') },
+            { value: 'regressed', label: t('issues.tabRegressed') },
+            { value: 'resolved', label: t('issues.tabResolved') },
+            { value: 'ignored', label: t('issues.tabIgnored') },
           ]}
         />
       </div>
@@ -241,11 +241,13 @@ export function IssuesPage() {
               key: 'status',
               label: '',
               width: '5%',
-              render: (r) => <Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge>,
+              render: (r) => (
+                <Badge tone={STATUS_TONE[r.status]}>{t(`status.${r.status}`)}</Badge>
+              ),
             },
             {
               key: 'error_type',
-              label: 'Issue',
+              label: t('issues.colIssue'),
               render: (r) => (
                 <Link
                   to={`/projects/${projectId}/issues/${r.id}`}
@@ -260,7 +262,7 @@ export function IssuesPage() {
             },
             {
               key: 'event_count',
-              label: 'Events',
+              label: t('issues.colEvents'),
               width: '10%',
               render: (r) => (
                 <span className="font-mono tabular-nums">
@@ -270,7 +272,7 @@ export function IssuesPage() {
             },
             {
               key: 'last_release',
-              label: 'Release',
+              label: t('issues.colRelease'),
               width: '15%',
               render: (r) => (
                 <span className="font-mono text-xs text-fg-muted">
@@ -280,13 +282,13 @@ export function IssuesPage() {
             },
             {
               key: 'last_environment',
-              label: 'Env',
+              label: t('issues.colEnv'),
               width: '10%',
               render: (r) => <Badge>{r.last_environment}</Badge>,
             },
             {
               key: 'last_seen',
-              label: 'Last seen',
+              label: t('issues.colLastSeen'),
               width: '12%',
               render: (r) => (
                 <span className="text-xs text-fg-subtle">
@@ -348,6 +350,7 @@ export function IssuesPage() {
 function TestIngestButton({ projectId }: { projectId: string }) {
   const [sending, setSending] = useState(false);
   const [out, setOut] = useState<string | null>(null);
+  const { t } = useI18n();
 
   async function send() {
     setSending(true);
@@ -376,7 +379,7 @@ function TestIngestButton({ projectId }: { projectId: string }) {
         <span className="font-mono text-xs text-fg-subtle">{out}</span>
       )}
       <Button onClick={send} disabled={sending} variant="primary" size="sm">
-        {sending ? 'Sending…' : 'Test ingest'}
+        {sending ? t('common.sending') : t('issues.testIngest')}
       </Button>
     </div>
   );
@@ -391,10 +394,11 @@ function SaveViewButton({
 }) {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const { t } = useI18n();
 
   async function save() {
     const name = prompt(
-      'Saved view name',
+      t('issues.savedViewName'),
       `Issues ${statusFilter || 'all'} – ${new Date().toLocaleDateString()}`,
     );
     if (!name) return;
@@ -423,7 +427,7 @@ function SaveViewButton({
         <span className="font-mono text-xs text-fg-subtle">{msg}</span>
       )}
       <Button onClick={save} disabled={saving} variant="secondary" size="sm">
-        {saving ? 'Saving…' : 'Save filter'}
+        {saving ? t('common.saving') : t('issues.saveFilter')}
       </Button>
     </div>
   );
