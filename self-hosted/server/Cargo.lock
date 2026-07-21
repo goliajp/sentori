@@ -2552,7 +2552,7 @@ dependencies = [
 
 [[package]]
 name = "sentori-server"
-version = "1.6.2"
+version = "1.7.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -2586,6 +2586,7 @@ dependencies = [
  "sentori-runtime-metrics",
  "sentori-saved-view",
  "sentori-span-store",
+ "sentori-stripe-webhook-verify",
  "sentori-tenant-scoping",
  "sentori-workspace-identity",
  "serde",
@@ -2617,6 +2618,17 @@ dependencies = [
  "time",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "sentori-stripe-webhook-verify"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "hmac",
+ "sha2",
+ "subtle",
+ "thiserror 2.0.19",
 ]
 
 [[package]]

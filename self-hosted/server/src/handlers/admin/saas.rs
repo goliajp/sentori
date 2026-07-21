@@ -22,6 +22,8 @@ use std::sync::Arc;
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
+use sentori_billing::{Plan, PlanStatus};
+use sentori_workspace_identity::WorkspaceId;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::Row;
@@ -186,10 +188,16 @@ pub async fn suspend_workspace(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    // Row-level pivot: status lives on workspace_billing now.
+    // Operator kill-switch: set `canceled`, which the quota path
+    // reads as Free-tier limits (see `sentori_billing::effective_plan`).
+    // We deliberately do NOT use `past_due` here — that is Stripe's
+    // dunning grace state, where quotas still apply, so a manual
+    // suspend written as past_due would enforce nothing. `canceled`
+    // is the state that actually bites; a later resume restores
+    // `active` and the untouched `plan` column takes effect again.
     let res = sqlx::query(
-        "UPDATE workspace_billing SET status = 'past_due', updated_at = now() \
-         WHERE workspace_id = $1 AND status = 'active'",
+        "UPDATE workspace_billing SET status = 'canceled', updated_at = now() \
+         WHERE workspace_id = $1 AND status <> 'canceled'",
     )
     .bind(id)
     .execute(&state.pool)
@@ -198,9 +206,42 @@ pub async fn suspend_workspace(
     if res.rows_affected() == 0 {
         return Err((
             StatusCode::NOT_FOUND,
-            "workspace billing row not active / missing".into(),
+            "workspace billing row already suspended / missing".into(),
         ));
     }
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Deserialize)]
+pub struct SetPlanBody {
+    pub plan: String,
+}
+
+/// Operator override: force a workspace onto a plan (comped
+/// enterprise, manual downgrade, …). Self-serve upgrades go
+/// through Stripe Checkout + the webhook, not this — Stripe stays
+/// the source of truth there. This is the out-of-band lever.
+///
+/// Also resets status to `active`: granting a plan implies it
+/// should take effect, even if the workspace was previously
+/// suspended / canceled.
+pub async fn set_plan(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+    Json(body): Json<SetPlanBody>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let plan = Plan::from_db_str(body.plan.trim())
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    let billing = state.billing_for(WorkspaceId::from_uuid(id));
+    billing
+        .set_plan(plan, None, None)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    billing
+        .set_status(PlanStatus::Active)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    info!(workspace_id = %id, %plan, "saas.set_plan operator override");
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -210,7 +251,7 @@ pub async fn resume_workspace(
 ) -> Result<StatusCode, (StatusCode, String)> {
     let res = sqlx::query(
         "UPDATE workspace_billing SET status = 'active', updated_at = now() \
-         WHERE workspace_id = $1 AND status = 'past_due'",
+         WHERE workspace_id = $1 AND status <> 'active'",
     )
     .bind(id)
     .execute(&state.pool)
@@ -219,7 +260,7 @@ pub async fn resume_workspace(
     if res.rows_affected() == 0 {
         return Err((
             StatusCode::NOT_FOUND,
-            "workspace billing row not past_due / missing".into(),
+            "workspace billing row already active / missing".into(),
         ));
     }
     Ok(StatusCode::NO_CONTENT)

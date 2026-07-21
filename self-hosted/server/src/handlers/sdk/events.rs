@@ -8,6 +8,7 @@
 use std::sync::Arc;
 
 use axum::{Extension, Json, extract::State, http::StatusCode};
+use sentori_billing::CounterKind;
 use sentori_event_pipeline::{Event, EventKind, IngestError, MessageLevel, Platform};
 use sentori_ingest_token::IngestContext;
 use serde_json::{Value, json};
@@ -32,6 +33,17 @@ pub async fn handle(
             );
         }
     };
+
+    // K17 quota: meter one event against the project's plan
+    // before persisting. Malformed payloads (rejected above) do
+    // not consume quota.
+    let now = OffsetDateTime::now_utc();
+    if let Err(body) =
+        crate::handlers::sdk::quota::meter(&state, ctx.project_id, CounterKind::Events, 1, now)
+            .await
+    {
+        return (StatusCode::TOO_MANY_REQUESTS, Json(body));
+    }
 
     let event_tick_snapshot = (
         event.kind.as_db_str().to_string(),

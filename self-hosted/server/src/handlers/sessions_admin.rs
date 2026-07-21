@@ -61,7 +61,7 @@ pub async fn revoke(
             let (ip, ua) = crate::notify::extract_request_meta(&headers);
             crate::notify::audit(
                 &state.pool,
-                state.workspace_id.into_uuid(),
+                ctx.workspace_id.into_uuid(),
                 None,
                 Some(ctx.user_id.into_uuid()),
                 "session.revoke",

@@ -50,7 +50,7 @@ pub async fn create(
     // identity's projects.create accepts arbitrary bytes.
     let salt = [0xa5u8; 32];
     match state
-        .identity
+        .identity_for(ctx.workspace_id)
         .projects()
         .create(&body.name, &body.slug, &salt)
         .await
@@ -64,7 +64,7 @@ pub async fn create(
             let (ip, ua) = crate::notify::extract_request_meta(&headers);
             crate::notify::audit(
                 &state.pool,
-                state.workspace_id.into_uuid(),
+                ctx.workspace_id.into_uuid(),
                 Some(p.id.into_uuid()),
                 Some(ctx.user_id.into_uuid()),
                 "project.create",
@@ -99,10 +99,11 @@ pub async fn create(
 
 pub async fn get(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
 ) -> (StatusCode, Json<Value>) {
     match state
-        .identity
+        .identity_for(ctx.workspace_id)
         .projects()
         .find(ProjectId::from_uuid(project_id))
         .await
@@ -138,6 +139,7 @@ pub struct UpdateBody {
 
 pub async fn update(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
     Json(body): Json<UpdateBody>,
 ) -> (StatusCode, Json<Value>) {
@@ -150,11 +152,17 @@ pub async fn update(
             Json(json!({ "error": "name must not be empty" })),
         );
     }
-    let result = sqlx::query("UPDATE projects SET name = $1 WHERE id = $2 RETURNING id")
-        .bind(&name)
-        .bind(project_id)
-        .fetch_optional(&state.pool)
-        .await;
+    // `AND workspace_id` is the tenant guard: a rename aimed at
+    // another workspace's project matches no row → 404, not a
+    // cross-tenant write.
+    let result = sqlx::query(
+        "UPDATE projects SET name = $1 WHERE id = $2 AND workspace_id = $3 RETURNING id",
+    )
+    .bind(&name)
+    .bind(project_id)
+    .bind(ctx.workspace_id.into_uuid())
+    .fetch_optional(&state.pool)
+    .await;
     match result {
         Ok(Some(row)) => {
             let id: Uuid = row.get("id");
@@ -185,7 +193,7 @@ pub async fn delete(
     headers: HeaderMap,
 ) -> StatusCode {
     match state
-        .identity
+        .identity_for(ctx.workspace_id)
         .projects()
         .delete(ProjectId::from_uuid(project_id))
         .await
@@ -195,7 +203,7 @@ pub async fn delete(
             let (ip, ua) = crate::notify::extract_request_meta(&headers);
             crate::notify::audit(
                 &state.pool,
-                state.workspace_id.into_uuid(),
+                ctx.workspace_id.into_uuid(),
                 Some(project_id),
                 Some(ctx.user_id.into_uuid()),
                 "project.delete",

@@ -19,6 +19,7 @@ import Projects from './pages/Projects';
 import PushCredentials from './pages/PushCredentials';
 import PushSends from './pages/PushSends';
 import Sessions from './pages/Sessions';
+import AcceptInvite from './pages/AcceptInvite';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
 import Verify from './pages/Verify';
@@ -35,6 +36,7 @@ import ReplayDetail from './pages/ReplayDetail';
 import Traces from './pages/Traces';
 import TraceDetail from './pages/TraceDetail';
 import { SettingsPage } from './pages/Settings';
+import Billing from './pages/Billing';
 import Tokens from './pages/Tokens';
 
 import './styles/index.css';
@@ -50,6 +52,7 @@ createRoot(rootEl).render(
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/invite" element={<AcceptInvite />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/verify" element={<Verify />} />
         <Route path="/reset-password" element={<ResetPassword />} />
@@ -58,6 +61,7 @@ createRoot(rootEl).render(
           <Route path="/alerts" element={<AlertsPage />} />
           <Route path="/audit" element={<AuditPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings/billing" element={<Billing />} />
           <Route path="/health" element={<HealthPage />} />
           <Route path="/projects/:id/issues" element={<IssuesPage />} />
           <Route

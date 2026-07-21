@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Extension, Path, State},
     http::StatusCode,
 };
 use sentori_workspace_identity::{InviteRole, UserId};
@@ -20,6 +20,7 @@ use serde_json::{Value, json};
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
 #[derive(Deserialize)]
@@ -40,8 +41,16 @@ const fn default_expires() -> i64 {
 
 pub async fn create(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Json(body): Json<CreateBody>,
 ) -> (StatusCode, Json<Value>) {
+    // RBAC: inviting members is owner/admin only.
+    if !ctx.role.can_manage_users() {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "insufficient_role" })),
+        );
+    }
     let role = match body.role.as_str() {
         "admin" => InviteRole::Admin,
         "user" => InviteRole::User,
@@ -53,7 +62,7 @@ pub async fn create(
         }
     };
     match state
-        .identity
+        .identity_for(ctx.workspace_id)
         .invites()
         .create(
             &body.email,
@@ -72,7 +81,7 @@ pub async fn create(
             );
             crate::notify::audit(
                 &state.pool,
-                state.workspace_id.into_uuid(),
+                ctx.workspace_id.into_uuid(),
                 None,
                 Some(body.invited_by),
                 "invite.mint",
@@ -100,8 +109,16 @@ pub async fn create(
     }
 }
 
-pub async fn list(State(state): State<Arc<AppState>>) -> Json<Value> {
-    match state.identity.invites().list_all().await {
+pub async fn list(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+) -> Json<Value> {
+    match state
+        .identity_for(ctx.workspace_id)
+        .invites()
+        .list_all()
+        .await
+    {
         Ok(rows) => {
             let out: Vec<Value> = rows
                 .iter()
@@ -128,8 +145,86 @@ pub async fn list(State(state): State<Arc<AppState>>) -> Json<Value> {
     }
 }
 
-pub async fn revoke(State(state): State<Arc<AppState>>, Path(invite_id): Path<Uuid>) -> StatusCode {
-    match state.identity.invites().revoke(invite_id).await {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AcceptBody {
+    pub token: String,
+}
+
+/// POST /admin/api/invites/accept — the logged-in caller joins the
+/// workspace an invite token belongs to.
+///
+/// This is how the Team (1:N) model grows: an invited person signs
+/// up (getting their own personal workspace), logs in, then accepts
+/// — gaining a `workspace_members` row in the inviter's workspace,
+/// reachable via the switcher. The token (from the emailed link) is
+/// the authorization; it resolves the workspace, so the acceptor
+/// never names it.
+pub async fn accept(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    Json(body): Json<AcceptBody>,
+) -> (StatusCode, Json<Value>) {
+    let ws = match sentori_workspace_identity::resolve_invite_workspace(&state.pool, &body.token)
+        .await
+    {
+        Ok(Some(ws)) => ws,
+        // Unknown / expired / already-accepted all collapse to 404.
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "invite invalid or expired" })),
+            );
+        }
+        Err(e) => {
+            warn!(error = %e, "admin.invites accept resolve_failed");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "internal" })),
+            );
+        }
+    };
+    match state
+        .identity_for(ws)
+        .invites()
+        .accept(&body.token, ctx.user_id)
+        .await
+    {
+        Ok(member) => {
+            info!(user_id = %ctx.user_id, workspace_id = %ws, "admin.invites accepted");
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "workspace_id": ws.into_uuid().to_string(),
+                    "role": member.role.as_db_str(),
+                })),
+            )
+        }
+        Err(e) => {
+            warn!(error = %e, "admin.invites accept_failed");
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": e.to_string() })),
+            )
+        }
+    }
+}
+
+pub async fn revoke(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    Path(invite_id): Path<Uuid>,
+) -> StatusCode {
+    // RBAC: revoking invites is owner/admin only.
+    if !ctx.role.can_manage_users() {
+        return StatusCode::FORBIDDEN;
+    }
+    match state
+        .identity_for(ctx.workspace_id)
+        .invites()
+        .revoke(invite_id)
+        .await
+    {
         Ok(()) => StatusCode::NO_CONTENT,
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }

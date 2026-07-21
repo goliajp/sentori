@@ -19,25 +19,39 @@ use axum::{
 };
 use sentori_auth_session::{AuthOptions, AuthService};
 use sentori_cookie_session::SecretKey;
-use sentori_workspace_identity::UserId;
+use sentori_workspace_identity::{Members, Role, UserId};
 use serde_json::json;
 use tracing::warn;
 
 use crate::state::AppState;
 
-/// Who the caller is, and which workspace their reads are confined
-/// to.
+/// Who the caller is, which workspace their request is acting in,
+/// and the role they hold there.
 ///
-/// `workspace_id` is resolved here rather than left to each handler:
-/// dashboard queries used to select across the whole table, so any
-/// authenticated user saw every tenant's projects, events, spans,
-/// metrics and replays. Carrying the scope on the request makes the
-/// filter something a handler has to actively drop rather than
-/// something it has to remember to add.
+/// `workspace_id` is the session's *active* workspace (a user can
+/// belong to many; the switcher UPDATEs which one is active). It is
+/// resolved + membership-validated here rather than left to each
+/// handler: dashboard queries used to select across the whole
+/// table, so any authenticated user saw every tenant's projects,
+/// events, spans, metrics and replays. Carrying the scope on the
+/// request makes the filter something a handler has to actively
+/// drop rather than something it has to remember to add.
+///
+/// `role` is the caller's RBAC role in the active workspace — the
+/// membership check that authorizes the request already fetched it,
+/// so handlers can gate mutations (e.g. `role.can_manage_workspace()`)
+/// without a second query.
 #[derive(Clone, Copy, Debug)]
 pub struct SessionContext {
     pub user_id: UserId,
     pub workspace_id: sentori_workspace_identity::WorkspaceId,
+    pub role: Role,
+    /// SHA-256 of the current session id. The workspace switcher
+    /// needs it to UPDATE this exact session's active workspace;
+    /// carrying it here avoids re-parsing the cookie in the
+    /// handler. Zero-filled only if the hex failed to decode,
+    /// which cannot happen for a session that just looked up.
+    pub session_id_hash: [u8; 32],
 }
 
 pub async fn session_middleware(
@@ -52,27 +66,29 @@ pub async fn session_middleware(
 
     let auth = build_auth(&state);
     match auth.lookup_session(&token).await {
-        Ok(Some((user, _session))) => {
-            // users.workspace_id is NOT NULL, so a live session always
-            // resolves to exactly one workspace.
-            let ws: Result<Option<(uuid::Uuid,)>, _> =
-                sqlx::query_as("SELECT workspace_id FROM users WHERE id = $1")
-                    .bind(user.id.into_uuid())
-                    .fetch_optional(&state.pool)
-                    .await;
-            let workspace_id = match ws {
-                Ok(Some((id,))) => sentori_workspace_identity::WorkspaceId::from_uuid(id),
-                Ok(None) => return reject("session user no longer exists"),
-                Err(e) => {
-                    warn!(error = %e, "workspace lookup failed");
-                    return reject("internal");
+        Ok(Some((user, session))) => {
+            // The session carries its *active* workspace. Validate
+            // the user still belongs to it: a revoked membership (or
+            // any stale active workspace) must be rejected, not
+            // trusted — otherwise removing someone from a workspace
+            // would leave their live sessions with access.
+            let workspace_id = session.workspace_id;
+            match Members::new(&state.pool, workspace_id).find(user.id).await {
+                Ok(Some(member)) => {
+                    req.extensions_mut().insert(SessionContext {
+                        user_id: user.id,
+                        workspace_id,
+                        role: member.role,
+                        session_id_hash: decode_hash(&session.id_hash_hex),
+                    });
+                    next.run(req).await
                 }
-            };
-            req.extensions_mut().insert(SessionContext {
-                user_id: user.id,
-                workspace_id,
-            });
-            next.run(req).await
+                Ok(None) => reject("workspace access revoked"),
+                Err(e) => {
+                    warn!(error = %e, "membership check failed");
+                    reject("internal")
+                }
+            }
         }
         Ok(None) => reject("session expired or invalid"),
         Err(e) => {
@@ -80,6 +96,28 @@ pub async fn session_middleware(
             reject("internal")
         }
     }
+}
+
+/// Decode a 64-char hex session-id hash back into 32 bytes. The
+/// value comes straight from `Session::id_hash_hex`, which we
+/// produced from a real 32-byte hash, so a malformed string is not
+/// reachable in practice; we return zeroes rather than panic so a
+/// freak decode failure downgrades to "switcher can't target this
+/// session" instead of a 500 on every request.
+fn decode_hash(hex: &str) -> [u8; 32] {
+    let mut out = [0u8; 32];
+    if hex.len() == 64 {
+        for (i, chunk) in hex.as_bytes().chunks_exact(2).enumerate() {
+            let hi = (chunk[0] as char).to_digit(16);
+            let lo = (chunk[1] as char).to_digit(16);
+            if let (Some(hi), Some(lo)) = (hi, lo) {
+                // hi, lo are single hex nibbles (0..=15), so the
+                // assembled byte always fits u8; unwrap_or is dead.
+                out[i] = u8::try_from((hi << 4) | lo).unwrap_or(0);
+            }
+        }
+    }
+    out
 }
 
 fn extract_token(headers: &HeaderMap) -> Option<String> {

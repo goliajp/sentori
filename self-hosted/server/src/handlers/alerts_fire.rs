@@ -12,23 +12,30 @@ use std::sync::Arc;
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Extension, Path, State},
     http::StatusCode,
 };
 use serde_json::{Value, json};
 use sqlx::Row;
 use uuid::Uuid;
 
+use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
 pub async fn fire_test(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(alert_id): Path<Uuid>,
 ) -> (StatusCode, Json<Value>) {
-    let row = sqlx::query("SELECT name, channels FROM alert_rules WHERE id = $1")
-        .bind(alert_id)
-        .fetch_optional(&state.pool)
-        .await;
+    // `AND workspace_id` is the tenant guard: fire-testing another
+    // workspace's alert (and thus hitting its webhook/Slack) must be
+    // a 404, not a cross-tenant trigger.
+    let row =
+        sqlx::query("SELECT name, channels FROM alert_rules WHERE id = $1 AND workspace_id = $2")
+            .bind(alert_id)
+            .bind(ctx.workspace_id.into_uuid())
+            .fetch_optional(&state.pool)
+            .await;
     let (name, channels) = match row {
         Ok(Some(r)) => (r.get::<String, _>("name"), r.get::<Value, _>("channels")),
         Ok(None) => {
@@ -72,7 +79,7 @@ pub async fn fire_test(
 
     crate::notify::audit(
         &state.pool,
-        state.workspace_id.into_uuid(),
+        ctx.workspace_id.into_uuid(),
         None,
         None,
         "alert.fire_test",

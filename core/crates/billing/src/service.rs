@@ -7,8 +7,8 @@ use uuid::Uuid;
 
 use crate::error::BillingError;
 use crate::model::{
-    CounterKind, Decision, Plan, PlanStatus, UsageRow, WorkspaceBilling, row_to_billing,
-    row_to_usage,
+    CounterKind, Decision, Plan, PlanStatus, UsageRow, WorkspaceBilling, effective_plan,
+    row_to_billing, row_to_usage,
 };
 use crate::period::period_key;
 
@@ -97,6 +97,71 @@ impl BillingService {
         row_to_billing(&row)
     }
 
+    /// Read the plan of the workspace that owns `project_id`,
+    /// regardless of which workspace this service is bound to.
+    ///
+    /// The ingest quota path is driven by the token's project,
+    /// whose workspace can differ from the service's bound one (in
+    /// SaaS the ingest service is bound to the boot-time default
+    /// workspace). Metering against `self.workspace_id`'s plan would
+    /// limit every tenant by the wrong plan; this resolves the
+    /// project's real workspace instead. Returns `None` if the
+    /// project has no billing row yet (caller falls back to Free).
+    ///
+    /// # Errors
+    ///
+    /// [`BillingError::Db`] on backend failure.
+    pub async fn plan_for_project(
+        &self,
+        project_id: ProjectId,
+    ) -> Result<Option<Plan>, BillingError> {
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT wb.plan FROM workspace_billing wb \
+             JOIN projects p ON p.workspace_id = wb.workspace_id \
+             WHERE p.id = $1",
+        )
+        .bind(project_id.into_uuid())
+        .fetch_optional(&self.pool)
+        .await?;
+        match row {
+            Some((plan,)) => Ok(Some(Plan::from_db_str(&plan)?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Read both the plan **and** subscription status of the
+    /// workspace that owns `project_id`.
+    ///
+    /// The quota path needs the status too: a `canceled` / `unpaid`
+    /// subscription meters against Free limits even though the
+    /// `plan` column still says `pro` (see [`effective_plan`]).
+    /// Returns `None` if the project has no billing row yet (caller
+    /// falls back to Free / Active).
+    ///
+    /// # Errors
+    ///
+    /// [`BillingError::Db`] on backend failure.
+    pub async fn plan_and_status_for_project(
+        &self,
+        project_id: ProjectId,
+    ) -> Result<Option<(Plan, PlanStatus)>, BillingError> {
+        let row: Option<(String, String)> = sqlx::query_as(
+            "SELECT wb.plan, wb.status FROM workspace_billing wb \
+             JOIN projects p ON p.workspace_id = wb.workspace_id \
+             WHERE p.id = $1",
+        )
+        .bind(project_id.into_uuid())
+        .fetch_optional(&self.pool)
+        .await?;
+        match row {
+            Some((plan, status)) => Ok(Some((
+                Plan::from_db_str(&plan)?,
+                PlanStatus::from_db_str(&status)?,
+            ))),
+            None => Ok(None),
+        }
+    }
+
     /// Set the plan + optional Stripe customer ref +
     /// period_end for this workspace.
     ///
@@ -173,11 +238,13 @@ impl BillingService {
     /// In v0.1, we do INSERT/UPDATE conditionally based on
     /// a pre-read + compare. Race losers retry.
     ///
+    /// A workspace with no billing row yet is metered at Free rather
+    /// than erroring, so a fresh tenant's first ingest is never
+    /// rejected for lack of an `ensure_default` call.
+    ///
     /// # Errors
     ///
     /// - [`BillingError::InvalidInput`] for `delta <= 0`.
-    /// - [`BillingError::NotInitialised`] if `ensure_default`
-    ///   hasn't been called.
     /// - [`BillingError::ProjectNotFound`] on FK violation.
     /// - [`BillingError::Db`] on backend failure.
     pub async fn check_and_record(
@@ -190,8 +257,18 @@ impl BillingService {
         if delta <= 0 {
             return Err(BillingError::InvalidInput("delta must be > 0".into()));
         }
-        let billing = self.get().await?;
-        let limit = billing.plan.limits().for_kind(kind);
+        // Limit is driven by the PROJECT's workspace plan, not this
+        // service's bound workspace (which is the boot-time default
+        // in SaaS). A project whose workspace has no billing row yet
+        // falls back to Free rather than failing the ingest. The
+        // subscription status folds in too: a canceled / unpaid
+        // subscription meters against Free limits even while the
+        // plan column still reads `pro` (grace ends at cancel).
+        let (plan, status) = self
+            .plan_and_status_for_project(project_id)
+            .await?
+            .unwrap_or((Plan::Free, PlanStatus::Active));
+        let limit = effective_plan(plan, status).limits().for_kind(kind);
         let period = period_key(now);
 
         // Atomic compare-and-increment via single statement.
@@ -384,8 +461,14 @@ impl BillingService {
         rows.iter().map(row_to_usage).collect()
     }
 
-    /// Sum of all counters across every project for one
-    /// period — dashboard "this month workspace-wide" panel.
+    /// Sum of all counters across every project in **this
+    /// workspace** for one period — dashboard "this month" panel.
+    ///
+    /// Scoped to `self.workspace_id`: without the filter this summed
+    /// every tenant's usage in a shared-DB SaaS deployment, so the
+    /// panel showed one workspace another's numbers. Call via
+    /// `AppState::billing_for(ctx.workspace_id)`, never the
+    /// boot-default-bound handle.
     ///
     /// # Errors
     ///
@@ -396,10 +479,11 @@ impl BillingService {
     ) -> Result<Vec<(CounterKind, i64, i64)>, BillingError> {
         let rows: Vec<(String, i64, i64)> = sqlx::query_as(
             "SELECT counter_kind, SUM(count)::bigint, SUM(dropped_count)::bigint \
-             FROM usage_counters WHERE period_yyyymm = $1 \
+             FROM usage_counters WHERE period_yyyymm = $1 AND workspace_id = $2 \
              GROUP BY counter_kind ORDER BY counter_kind ASC",
         )
         .bind(period_yyyymm)
+        .bind(self.workspace_id.into_uuid())
         .fetch_all(&self.pool)
         .await?;
         rows.into_iter()

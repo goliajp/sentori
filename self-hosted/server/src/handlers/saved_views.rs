@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Extension, Path, Query, State};
 use axum::http::StatusCode;
 use sentori_saved_view::{SavedViewDraft, Scope, Target};
 use serde::{Deserialize, Serialize};
@@ -11,6 +11,8 @@ use serde_json::Value;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+use crate::handlers::tenant::{guard_project, guard_saved_view};
+use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
 #[derive(Deserialize)]
@@ -31,13 +33,14 @@ pub struct ViewRow {
 
 pub async fn list_workspace(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<ViewRow>>, (StatusCode, String)> {
     let target =
         Target::from_db_str(&q.target).map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
     let views = state
         .saved_views
-        .list_workspace(target)
+        .list_workspace(ctx.workspace_id, target)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(
@@ -69,12 +72,14 @@ pub struct CreateBody {
 
 pub async fn create(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Json(body): Json<CreateBody>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, String)> {
     let target =
         Target::from_db_str(&body.target).map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
-    let mut draft = SavedViewDraft::new(state.workspace_id, &body.name, target, Scope::Workspace);
+    let mut draft = SavedViewDraft::new(ctx.workspace_id, &body.name, target, Scope::Workspace);
     if let Some(pid) = body.project_id {
+        guard_project(&state, ctx.workspace_id, pid).await?;
         draft = draft.for_project(sentori_workspace_identity::ProjectId::from_uuid(pid));
     }
     if let Some(p) = body.payload {
@@ -90,8 +95,10 @@ pub async fn create(
 
 pub async fn get(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    guard_saved_view(&state, ctx.workspace_id, id).await?;
     let view = state
         .saved_views
         .find(id)
@@ -120,10 +127,12 @@ pub struct PatchBody {
 
 pub async fn patch(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(id): Path<Uuid>,
     Json(body): Json<PatchBody>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     use sentori_saved_view::SavedViewPatch;
+    guard_saved_view(&state, ctx.workspace_id, id).await?;
     let p = SavedViewPatch {
         name: body.name,
         payload: body.payload,
@@ -138,8 +147,10 @@ pub async fn patch(
 
 pub async fn delete(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    guard_saved_view(&state, ctx.workspace_id, id).await?;
     state
         .saved_views
         .delete(id)

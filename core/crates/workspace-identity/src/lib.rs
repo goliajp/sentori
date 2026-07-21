@@ -111,11 +111,11 @@ mod scoped_pool;
 mod store;
 
 pub use error::IdentityError;
-pub use identity::{Identity, bootstrap_workspace, ensure_workspace};
+pub use identity::{Identity, bootstrap_workspace, ensure_workspace, resolve_invite_workspace};
 pub use invite_token::{INVITE_TOKEN_BYTES, InviteToken, MintedInvite, TokenHash};
 pub use model::{
     InviteRole, InviteRoleParseError, Member, Project, ProjectId, Role, RoleParseError, User,
     UserId, WorkspaceId, WorkspaceInvite,
 };
 pub use scoped_pool::WorkspaceScopedPool;
-pub use store::{Invites, Members, Projects, Users, Visibility};
+pub use store::{Invites, Members, Projects, UserWorkspace, Users, Visibility};

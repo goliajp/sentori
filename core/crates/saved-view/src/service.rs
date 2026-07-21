@@ -167,13 +167,18 @@ impl SavedViewService {
     /// # Errors
     ///
     /// [`SavedViewError::Db`] on backend failure.
-    pub async fn list_workspace(&self, target: Target) -> Result<Vec<SavedView>, SavedViewError> {
+    pub async fn list_workspace(
+        &self,
+        workspace_id: sentori_workspace_identity::WorkspaceId,
+        target: Target,
+    ) -> Result<Vec<SavedView>, SavedViewError> {
         let sql = format!(
             "SELECT {SELECT_COLS} FROM saved_views \
-             WHERE scope = 'workspace' AND target = $1 \
+             WHERE scope = 'workspace' AND workspace_id = $1 AND target = $2 \
              ORDER BY created_at ASC"
         );
         let rows = sqlx::query(&sql)
+            .bind(workspace_id.into_uuid())
             .bind(target.as_db_str())
             .fetch_all(&self.pool)
             .await?;

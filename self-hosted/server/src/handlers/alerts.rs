@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::{Extension, Path, State};
 use axum::http::StatusCode;
 use sentori_alert_rule::{AlertRuleDraft, AlertRulePatch, TriggerKind};
 use sentori_workspace_identity::ProjectId;
@@ -12,6 +12,8 @@ use serde_json::Value;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+use crate::handlers::tenant::{guard_alert, guard_project};
+use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
 #[derive(Serialize)]
@@ -55,10 +57,11 @@ fn to_row(r: sentori_alert_rule::AlertRule) -> AlertRuleRow {
 
 pub async fn list_workspace(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
 ) -> Result<Json<Vec<AlertRuleRow>>, (StatusCode, String)> {
     let rules = state
         .alerts
-        .list_workspace_wide()
+        .list_workspace_wide(ctx.workspace_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(rules.into_iter().map(to_row).collect()))
@@ -66,8 +69,10 @@ pub async fn list_workspace(
 
 pub async fn list_for_project(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
 ) -> Result<Json<Vec<AlertRuleRow>>, (StatusCode, String)> {
+    guard_project(&state, ctx.workspace_id, project_id).await?;
     let rules = state
         .alerts
         .list_for_project(ProjectId::from_uuid(project_id))
@@ -97,13 +102,16 @@ fn default_throttle() -> i32 {
 
 pub async fn create(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Json(body): Json<CreateBody>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, String)> {
     let kind = TriggerKind::from_db_str(&body.trigger_kind)
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
-    let mut draft = AlertRuleDraft::new(state.workspace_id, &body.name, kind)
+    let mut draft = AlertRuleDraft::new(ctx.workspace_id, &body.name, kind)
         .with_throttle(body.throttle_minutes);
     if let Some(pid) = body.project_id {
+        // A project-scoped rule must target a project the caller owns.
+        guard_project(&state, ctx.workspace_id, pid).await?;
         draft = draft.for_project(ProjectId::from_uuid(pid));
     }
     if let Some(c) = body.trigger_config {
@@ -134,9 +142,11 @@ pub struct PatchBody {
 
 pub async fn update(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(id): Path<Uuid>,
     Json(body): Json<PatchBody>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    guard_alert(&state, ctx.workspace_id, id).await?;
     state
         .alerts
         .update(
@@ -156,8 +166,10 @@ pub async fn update(
 
 pub async fn delete(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    guard_alert(&state, ctx.workspace_id, id).await?;
     state
         .alerts
         .delete(id)
@@ -168,8 +180,10 @@ pub async fn delete(
 
 pub async fn get(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    guard_alert(&state, ctx.workspace_id, id).await?;
     let rule = state
         .alerts
         .find(id)

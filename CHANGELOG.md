@@ -6,6 +6,31 @@
 
 ---
 
+## v1.7.0(2026-07-21 — SaaS 接入与管理:真多租户 + 计费执行 + Stripe 自助 + onboarding)
+
+把 SaaS 化从"地基"推到"能收钱、能管理、能自助接入"的完整闭环。
+
+**多租户地基**
+- register 事务内建 personal workspace + owner membership;session 携带 active workspace,每请求校验 membership;`AppState::identity_for/billing_for` 按请求 workspace 取 handle;一批 handler 从默认 workspace 切到 `ctx.workspace_id` + guard;工作区切换器(API + 侧栏);invite accept(`/admin/api/invites/accept` + `/invite` 页);RBAC 门 + saasadmin 默认拒绝;migration 0033 backfill membership。
+
+**计费执行**
+- 真实 SDK ingest 三类事件(events / spans / replays)接入配额计量(此前只有 legacy stub 计量):新 `sdk::quota::meter` helper,batch 按批量条数原子检,replay 附件才计 Replays;计量后端故障 fail-open,不因 usage 表抖动丢客户遥测。
+- 配额 status-aware:新纯函数 `effective_plan(plan, status)` —— canceled / unpaid 降级到 Free 限额,past_due 保留(Stripe dunning 宽限);运营 suspend 改写 `canceled`(真正生效),不再是无执行力的 past_due。
+- 修多租户读侧串数据:`workspace_usage` / `/v1/usage` 原按 boot 默认 workspace 读并汇总全体租户,改为按调用者 active workspace scope。
+
+**Stripe 自助控制面**
+- migration 0034 加 `stripe_events`(webhook 去重 + worker 台账)。
+- `POST /webhooks/stripe`(HMAC 验签)+ 后台 billing worker 消费:checkout.session.completed 绑定 customer;subscription.created/updated 设 plan + status + period;deleted → canceled;invoice.payment_failed → past_due。
+- 自助端点 `GET/POST /admin/api/billing{,/checkout,/portal}`(Owner/Admin 门)+ 运营 override `POST /admin/api/saas/workspaces/{id}/plan`。商业参数(price id / key / URL)全走 env,不硬编码。
+
+**接入 onboarding**
+- Billing dashboard 页(plan / status / usage bars / Checkout 升级 / Portal 管理 / 回调 banner;无 Stripe key 时降级为运营提示)。
+- Overview 空态 → 4 步 first-run 引导;Tokens 页 Quickstart 卡显式展示 ingest URL(SDK 默认值)+ `sentori.init()` 片段(prefill 刚 mint 的 token);SaasAdmin 每行 plan 选择器。
+
+**待配**:Stripe 运行时端到端需部署侧配 `SENTORI_STRIPE_SECRET_KEY` / `SENTORI_STRIPE_PRICE_*` / `SENTORI_STRIPE_WEBHOOK_SECRET` / `SENTORI_PUBLIC_URL` 后验证。
+
+---
+
 ## v1.6.2(2026-07-21 — 依赖全面升级到最新 stable)
 
 覆盖所有 workspace 与前端包,目标是消除 dependabot 的过期告警并把每个包带到它能到的最新。

@@ -296,15 +296,20 @@ async fn check_and_record_unknown_project_fk() {
 }
 
 #[tokio::test]
-async fn check_and_record_before_init_errors() {
+async fn check_and_record_before_init_falls_back_to_free() {
+    // A workspace with no `workspace_billing` row yet meters against
+    // Free limits instead of erroring — a fresh tenant's very first
+    // ingest must not 500 just because `ensure_default` hasn't run.
+    // The limit is driven by the project's workspace plan, which
+    // falls back to Free when the workspace has no billing row.
     let (pool, workspace_id) = fresh_pool().await;
     let pid = seed_project(&pool, workspace_id, "p1").await;
     let svc = BillingService::new(pool, workspace_id);
-    let err = svc
+    let decision = svc
         .check_and_record(pid, CounterKind::Events, 1, now())
         .await
-        .unwrap_err();
-    assert!(matches!(err, BillingError::NotInitialised));
+        .unwrap();
+    assert!(matches!(decision, Decision::Allow { new_count: 1, .. }));
 }
 
 #[tokio::test]
