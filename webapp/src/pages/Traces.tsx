@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api, TraceRow } from '../lib/api';
 import {
   Badge,
@@ -19,6 +20,7 @@ import {
 } from '../components/ui';
 
 export default function Traces() {
+  const t = useT();
   const { id: projectId } = useParams<{ id: string }>();
   const [rows, setRows] = useState<TraceRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,12 +40,12 @@ export default function Traces() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Traces"
-        subtitle="Distributed tracing — last 100 traces by recency."
+        title={t('traces.title')}
+        subtitle={t('traces.subtitle')}
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
       <Card>
-        <CardHeader title={`Traces (${rows.length})`} />
+        <CardHeader title={`${t('traces.title')} (${rows.length})`} />
         <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
@@ -51,8 +53,8 @@ export default function Traces() {
             </div>
           ) : rows.length === 0 ? (
             <EmptyState
-              title="No traces yet"
-              hint="SDKs call POST /v1/spans to send tracing data."
+              title={t('traces.empty')}
+              hint={t('traces.emptyHint')}
             />
           ) : (
             <ul className="divide-y divide-border">

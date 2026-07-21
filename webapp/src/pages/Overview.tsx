@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useT } from '../i18n';
 import { api, ApiError, Project, ProjectStats, UsageResponse } from '../lib/api';
 import { Sparkline } from '../components/Sparkline';
 import {
@@ -11,6 +12,7 @@ import {
 } from '../components/ui';
 
 export function OverviewPage() {
+  const t = useT();
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -61,24 +63,28 @@ export function OverviewPage() {
   return (
     <div>
       <PageHeader
-        title="Overview"
-        subtitle="Workspace-wide health + this-period usage."
+        title={t('overview.title')}
+        subtitle={t('overview.subtitle')}
       />
       {err && <ErrorBanner>{err}</ErrorBanner>}
 
       {usage && (
         <div className="mb-6 grid grid-cols-3 gap-4">
-          <UsageCard title="Events" {...usage.events} />
-          <UsageCard title="Spans" {...usage.spans} />
-          <UsageCard title="Replays" {...usage.replays} />
+          <UsageCard title={t('events.title')} {...usage.events} />
+          <UsageCard title={t('overview.spans')} {...usage.spans} />
+          <UsageCard title={t('replays.title')} {...usage.replays} />
         </div>
       )}
 
       <Card>
         <CardHeader
-          title="Projects"
+          title={t('overview.projects')}
           subtitle={
-            projects ? `${projects.length} project${projects.length === 1 ? '' : 's'}` : 'Loading…'
+            projects
+              ? projects.length === 1
+                ? t('overview.projectCountOne')
+                : t('overview.projectCount').replace('{n}', String(projects.length))
+              : t('common.loading')
           }
         />
         {projects?.length === 0 ? (
@@ -105,24 +111,24 @@ export function OverviewPage() {
                   {stats[p.id] && (
                     <div className="flex gap-2 text-xs">
                       <LensPill
-                        label="events"
+                        label={t('events.title')}
                         value={stats[p.id].events_24h}
                       />
                       <LensPill
-                        label="active"
+                        label={t('overview.activeIssues')}
                         value={stats[p.id].issues_active}
                         tone="warn"
                       />
                       <LensPill
-                        label="spans"
+                        label={t('overview.spans')}
                         value={stats[p.id].spans_24h}
                       />
                       <LensPill
-                        label="metrics"
+                        label={t('overview.metrics')}
                         value={stats[p.id].metrics_buckets_24h}
                       />
                       <LensPill
-                        label="replays"
+                        label={t('replays.title')}
                         value={stats[p.id].replays_24h}
                       />
                     </div>
@@ -136,7 +142,7 @@ export function OverviewPage() {
                     to={`/projects/${p.id}/issues`}
                     className="rounded bg-raised px-3 py-1 text-xs text-fg-muted hover:bg-raised"
                   >
-                    Issues →
+                    {t('overview.viewIssues')}
                   </Link>
                 </div>
               </li>
@@ -217,6 +223,7 @@ function UsageCard({
   dropped: number;
   limit: number;
 }) {
+  const t = useT();
   const pct = limit > 0 && limit < Number.MAX_SAFE_INTEGER
     ? Math.min(100, Math.round((count / limit) * 100))
     : 0;
@@ -226,7 +233,11 @@ function UsageCard({
       <p className="text-xs uppercase tracking-wide text-fg-subtle">{title}</p>
       <p className="mt-1 font-mono text-2xl text-fg">{formatNumber(count)}</p>
       <p className="text-xs text-fg-subtle">
-        {isUnlimited ? 'unlimited' : `of ${formatNumber(limit)} / month (${pct}%)`}
+        {isUnlimited
+          ? t('overview.unlimited')
+          : t('overview.ofPerMonth')
+              .replace('{limit}', formatNumber(limit))
+              .replace('{pct}', String(pct))}
       </p>
       {dropped > 0 && (
         <p className="mt-1 text-xs text-danger">

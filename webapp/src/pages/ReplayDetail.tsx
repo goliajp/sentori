@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api } from '../lib/api';
 import { useKeyHandlers } from '../lib/useShortcuts';
 import {
@@ -26,6 +27,7 @@ interface Frame {
 }
 
 export default function ReplayDetail() {
+  const t = useT();
   const { id: projectId, replayId } = useParams<{
     id: string;
     replayId: string;
@@ -92,7 +94,7 @@ export default function ReplayDetail() {
   if (!frames.length) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Replay" subtitle={replayId} />
+        <PageHeader title={t('replays.detail')} subtitle={replayId} />
         <ErrorBanner>Empty NDJSON blob</ErrorBanner>
       </div>
     );
@@ -106,7 +108,7 @@ export default function ReplayDetail() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Replay"
+        title={t('replays.detail')}
         subtitle={`${formatNumber(frames.length)} frames · ${replayId.slice(0, 16)}…`}
         actions={
           <div className="flex items-center gap-2">
@@ -130,7 +132,7 @@ export default function ReplayDetail() {
       />
 
       <Card>
-        <CardHeader title="Scrubber" />
+        <CardHeader title={t('replays.scrubber')} />
         <CardBody>
           <div className="space-y-3">
             <input
@@ -162,7 +164,7 @@ export default function ReplayDetail() {
       </Card>
 
       <Card>
-        <CardHeader title="Frame payload" />
+        <CardHeader title={t('replays.framePayload')} />
         <CardBody>
           <pre className="overflow-x-auto whitespace-pre-wrap break-all bg-bg p-3 text-xs font-mono text-fg-muted">
             {cur.parsed

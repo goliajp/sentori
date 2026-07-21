@@ -2,6 +2,8 @@
 // Takes a flat array of numbers and renders a polyline scaled
 // to the parent's width × height.
 
+import { useT } from '../i18n';
+
 interface Props {
   values: number[];
   width?: number;
@@ -16,16 +18,22 @@ export function Sparkline({
   width = 200,
   height = 40,
   className,
-  stroke = '#10b981',
-  fill = 'rgba(16, 185, 129, 0.15)',
+  // Defaults read the live accent off the document rather than naming
+  // a hex. These were `#10b981` — emerald — which is why sparklines
+  // stayed green after the palette moved to blue, and why they would
+  // not have followed a theme change either. SVG cannot take a
+  // Tailwind class, so the custom property is the seam.
+  stroke = 'var(--gds-accent)',
+  fill = 'color-mix(in oklab, var(--gds-accent) 15%, transparent)',
 }: Props) {
+  const t = useT();
   if (values.length < 2) {
     return (
       <div
         className={`flex items-center justify-center text-xs text-fg-subtle ${className ?? ''}`}
         style={{ width, height }}
       >
-        not enough data
+        {t('overview.notEnoughData')}
       </div>
     );
   }
