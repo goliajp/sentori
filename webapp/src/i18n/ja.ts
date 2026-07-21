@@ -410,6 +410,11 @@ export const ja: Messages = {
   'audit.by': "実行者",
   'audit.scope': "範囲",
 
+  'billing.manage': "サブスクリプションを管理",
+  'billing.upgradeTo': "{plan} にアップグレード",
+  'billing.switchTo': "{plan} に変更",
+  'billing.dropped': "{n} 件を破棄",
+
   'nav.issues': 'イシュー',
   'nav.members': 'メンバー',
   'nav.metrics': 'メトリクス',

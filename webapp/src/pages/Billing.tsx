@@ -145,7 +145,7 @@ function PlanCard({
         action={
           info.has_customer ? (
             <Button variant="secondary" onClick={onManage} disabled={busy}>
-              Manage subscription →
+              {t('billing.manage')} →
             </Button>
           ) : undefined
         }
@@ -200,6 +200,7 @@ function UsageCard({ info }: { info: BillingInfo }) {
 }
 
 function UsageBar({ label, counter }: { label: string; counter: UsageCounter }) {
+  const t = useT();
   const unlimited = counter.limit >= UNLIMITED;
   const pct = unlimited
     ? 0
@@ -214,7 +215,7 @@ function UsageBar({ label, counter }: { label: string; counter: UsageCounter }) 
           {unlimited ? ' / ∞' : ` / ${formatNumber(counter.limit)}`}
           {counter.dropped > 0 && (
             <span className="ml-2 text-danger">
-              {formatNumber(counter.dropped)} dropped
+              {t('billing.dropped').replace('{n}', formatNumber(counter.dropped))}
             </span>
           )}
         </span>
@@ -266,8 +267,11 @@ function UpgradeCard({
                   onClick={() => onUpgrade(o.plan)}
                   disabled={busy}
                 >
-                  {info.plan === 'free' ? 'Upgrade to' : 'Switch to'}{' '}
-                  {PLAN_LABEL[o.plan]} →
+                  {(info.plan === 'free'
+                    ? t('billing.upgradeTo')
+                    : t('billing.switchTo')
+                  ).replace('{plan}', PLAN_LABEL[o.plan])}{' '}
+                  →
                 </Button>
               ))}
           </div>

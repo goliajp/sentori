@@ -410,6 +410,11 @@ export const zh: Messages = {
   'audit.by': "操作人",
   'audit.scope': "范围",
 
+  'billing.manage': "管理订阅",
+  'billing.upgradeTo': "升级到 {plan}",
+  'billing.switchTo': "切换到 {plan}",
+  'billing.dropped': "已丢弃 {n}",
+
   'nav.issues': '问题',
   'nav.members': '成员',
   'nav.metrics': '指标',

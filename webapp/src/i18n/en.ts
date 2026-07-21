@@ -417,6 +417,11 @@ export const en = {
   'audit.by': "by",
   'audit.scope': "Scope",
 
+  'billing.manage': "Manage subscription",
+  'billing.upgradeTo': "Upgrade to {plan}",
+  'billing.switchTo': "Switch to {plan}",
+  'billing.dropped': "{n} dropped",
+
   'nav.issues': 'Issues',
   'nav.members': 'Members',
   'nav.metrics': 'Metrics',
