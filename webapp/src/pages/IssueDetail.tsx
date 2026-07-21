@@ -265,9 +265,11 @@ export default function IssueDetail() {
         </CardBody>
       </Card>
 
-      <Comments issueId={issueId} myUserId={myUserId} />
-      <Activity issueId={issueId} />
-
+      {/* Evidence before discussion. The stack, the breadcrumbs and the
+          replay are what the page is for — someone opening a crash is
+          reading the error, not the thread about it. An empty comment
+          box sitting between the summary and the stack trace pushed
+          the first useful thing below the fold. */}
       {latest ? (
         <div className="space-y-8">
           {events.length > 1 && (
@@ -284,6 +286,9 @@ export default function IssueDetail() {
           {t('crash.noEvent')}
         </p>
       )}
+
+      <Comments issueId={issueId} myUserId={myUserId} />
+      <Activity issueId={issueId} />
     </div>
   );
 }
