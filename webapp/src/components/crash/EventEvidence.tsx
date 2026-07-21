@@ -11,6 +11,8 @@
 
 import { useState } from 'react';
 
+import { useT } from '../../i18n';
+
 import { api, type EventAttachment, type EventDetail } from '../../lib/api';
 import { ReplayPlayer } from './ReplayPlayer';
 import { BreadcrumbTimeline } from './BreadcrumbTimeline';
@@ -23,6 +25,7 @@ export function EventEvidence({
   event: EventDetail;
   projectId: string;
 }) {
+  const t = useT();
   const p = event.payload ?? {};
   const breadcrumbs = p.breadcrumbs ?? [];
   const replay = event.attachments.find(a => a.kind === 'replay');
@@ -33,12 +36,12 @@ export function EventEvidence({
   return (
     <div className="space-y-8">
       {p.error ? (
-        <Panel title="Stack">
+        <Panel title={t('crash.stack')}>
           <StackTrace error={p.error} />
         </Panel>
       ) : (
         p.message && (
-          <Panel title="Message">
+          <Panel title={t('crash.message')}>
             <p className="font-mono text-sm text-fg">{p.message}</p>
           </Panel>
         )
@@ -46,11 +49,11 @@ export function EventEvidence({
 
       {(replay || breadcrumbs.length > 0) && (
         <Panel
-          title="Before the crash"
+          title={t('crash.timeline')}
           note={
             replay
-              ? 'recording and log share a playhead'
-              : `${breadcrumbs.length} step${breadcrumbs.length === 1 ? '' : 's'}`
+              ? t('crash.sharedPlayhead')
+              : `${breadcrumbs.length} ${t(breadcrumbs.length === 1 ? 'crash.step' : 'crash.steps')}`
           }
         >
           <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
@@ -72,12 +75,12 @@ export function EventEvidence({
         </Panel>
       )}
 
-      <Panel title="Context">
+      <Panel title={t('crash.context')}>
         <ContextGrid event={event} />
       </Panel>
 
       {event.attachments.filter(a => a.kind !== 'replay').length > 0 && (
-        <Panel title="Captured artefacts">
+        <Panel title={t('crash.artefacts')}>
           <Attachments
             items={event.attachments.filter(a => a.kind !== 'replay')}
             projectId={projectId}
@@ -111,6 +114,7 @@ function Panel({
 }
 
 function ContextGrid({ event }: { event: EventDetail }) {
+  const t = useT();
   const p = event.payload ?? {};
   const groups: { label: string; rows: [string, string][] }[] = [];
 
@@ -119,20 +123,20 @@ function ContextGrid({ event }: { event: EventDetail }) {
     if (kept.length) groups.push({ label, rows: kept });
   };
 
-  push('Release', [
+  push(t('crash.release'), [
     ['version', event.release],
     ['environment', event.environment],
     ['platform', event.platform],
     ['app build', p.app?.build],
     ['framework', p.app?.framework?.name && `${p.app.framework.name} ${p.app.framework.version ?? ''}`.trim()],
   ]);
-  push('Device', [
+  push(t('crash.device'), [
     ['os', [p.device?.os, p.device?.osVersion].filter(Boolean).join(' ')],
     ['model', p.device?.model],
     ['locale', p.device?.locale],
     ['network', p.device?.networkType],
   ]);
-  push('User', [
+  push(t('crash.user'), [
     ['id', p.user?.id],
     ['name', p.user?.name],
     ['anonymous', p.user?.anonymous ? 'yes' : undefined],
@@ -146,14 +150,14 @@ function ContextGrid({ event }: { event: EventDetail }) {
     ],
   ]);
   push(
-    'Tags',
+    t('crash.tags'),
     Object.entries(p.tags ?? {}).map(([k, v]) => [k, v] as [string, string]),
   );
 
   if (!groups.length) {
     return (
       <p className="text-sm text-fg-subtle">
-        This SDK sent no device or release context.
+        {t('crash.noContext')}
       </p>
     );
   }

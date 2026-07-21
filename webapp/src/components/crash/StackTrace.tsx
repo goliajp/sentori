@@ -15,6 +15,8 @@
 
 import { useState } from 'react';
 
+import { useT } from '../../i18n';
+
 import type { CapturedError, StackFrame } from '../../lib/api';
 
 export function StackTrace({ error }: { error: CapturedError }) {
@@ -37,6 +39,7 @@ export function StackTrace({ error }: { error: CapturedError }) {
 }
 
 function ErrorLink({ error, depth }: { error: CapturedError; depth: number }) {
+  const t = useT();
   const frames = [...(error.stack ?? [])].reverse();
   const appFrames = frames.filter(f => f.inApp).length;
 
@@ -44,7 +47,7 @@ function ErrorLink({ error, depth }: { error: CapturedError; depth: number }) {
     <section>
       {depth > 0 && (
         <p className="mb-2 font-mono text-[11px] uppercase tracking-wider text-fg-subtle">
-          caused by
+          {t('crash.causedBy')}
         </p>
       )}
       <h3 className="font-mono text-sm text-fg">
@@ -95,6 +98,7 @@ function FrameList({
 }
 
 function SystemRun({ frames }: { frames: StackFrame[] }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <li className="bg-surface">
@@ -104,8 +108,7 @@ function SystemRun({ frames }: { frames: StackFrame[] }) {
         aria-expanded={open}
         className="w-full px-3 py-1.5 text-left font-mono text-[11px] text-fg-subtle transition hover:text-fg-muted focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
       >
-        {open ? '−' : '+'} {frames.length} frame
-        {frames.length === 1 ? '' : 's'} outside your code
+        {open ? '−' : '+'} {frames.length} {t('crash.framesHidden')}
       </button>
       {open && (
         <ul className="divide-y divide-border border-t border-border">
