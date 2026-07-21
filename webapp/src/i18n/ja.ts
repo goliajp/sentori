@@ -447,6 +447,9 @@ export const ja: Messages = {
   'cert.domainPlaceholder': "example.com",
   'probes.urlPlaceholder': "https://api.example.com/health",
 
+  'replays.frames': "{n} フレーム",
+  'replays.allReplays': "← リプレイ一覧へ",
+
   'nav.issues': 'イシュー',
   'nav.members': 'メンバー',
   'nav.metrics': 'メトリクス',

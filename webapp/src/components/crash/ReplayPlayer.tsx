@@ -48,10 +48,16 @@ const fp = (n: Pick<Node, 'x' | 'y' | 'w' | 'h'>) =>
 export function ReplayPlayer({
   projectId,
   attachmentRef,
+  ndjson,
   onSeek,
 }: {
-  projectId: string;
-  attachmentRef: string;
+  projectId?: string;
+  attachmentRef?: string;
+  /** The recording, already fetched. The replay page loads it by
+   *  replay id rather than by attachment ref, and rebuilding the
+   *  canvas a second time over there would be two players to keep in
+   *  step with each other. */
+  ndjson?: string;
   /** Playhead position, as a wall-clock ms, so the surrounding page
    *  can follow along — the breadcrumb timeline highlights in step. */
   onSeek?: (ts: number) => void;
@@ -65,6 +71,27 @@ export function ReplayPlayer({
 
   useEffect(() => {
     let cancelled = false;
+    // One malformed line should not cost the whole recording; the
+    // format is append-only and a truncated tail is the expected
+    // failure.
+    const decode = (text: string) => {
+      const parsed: Frame[] = [];
+      for (const line of text.split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          parsed.push(JSON.parse(line) as Frame);
+        } catch {
+          /* skip */
+        }
+      }
+      return parsed;
+    };
+
+    if (ndjson !== undefined) {
+      setFrames(decode(ndjson));
+      return;
+    }
+    if (!projectId || !attachmentRef) return;
     fetch(api.attachmentUrl(projectId, attachmentRef), {
       credentials: 'include',
     })
@@ -72,26 +99,12 @@ export function ReplayPlayer({
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.text();
       })
-      .then(text => {
-        if (cancelled) return;
-        const parsed: Frame[] = [];
-        for (const line of text.split('\n')) {
-          if (!line.trim()) continue;
-          try {
-            parsed.push(JSON.parse(line) as Frame);
-          } catch {
-            // One malformed line should not cost the whole recording;
-            // the format is append-only and a truncated tail is the
-            // expected failure.
-          }
-        }
-        setFrames(parsed);
-      })
+      .then(text => !cancelled && setFrames(decode(text)))
       .catch(e => !cancelled && setError(String(e)));
     return () => {
       cancelled = true;
     };
-  }, [projectId, attachmentRef]);
+  }, [projectId, attachmentRef, ndjson]);
 
   /** Screen size comes from the most recent keyframe at or before the
    *  playhead — a rotation mid-recording changes it. */
