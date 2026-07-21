@@ -215,6 +215,7 @@ Documentation **must not** use the term "DSN". Always say "token + ingest URL".
 | `202 Accepted` | Event(s) accepted (not necessarily persisted yet) | `{}` |
 | `400 Bad Request` | Schema validation failed | see below |
 | `401 Unauthorized` | Missing, malformed, or unknown token | `{ "error": "unauthorized", "hint": "<what's likely wrong>" }` — the `hint` distinguishes "no `Authorization: Bearer` header", "token has the wrong prefix (not `st_pk_`/`sk_`)", and "right shape but unrecognized (revoked / wrong project)" |
+| `402 Payment Required` | Monthly plan quota exhausted for this counter (events / spans / replays) | `{ "error": "quota_exceeded", "counter": "events", "current": 100000, "limit": 100000 }` — the SDK MUST drop the payload (do **not** retry; the quota is monthly and will not recover until the period resets). Distinct from `429`, which is a short-term rate limit the SDK retries after `retryAfterMs`. |
 | `413 Payload Too Large` | Event > 1 MB or batch > 1 MB | `{ "error": "payloadTooLarge" }` |
 | `429 Too Many Requests` | Rate limit hit | see below; `Retry-After` header set |
 | `500 Internal Server Error` | Server fault; SDK should retry with backoff | `{ "error": "internal" }` |
