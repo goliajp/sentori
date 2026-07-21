@@ -51,7 +51,7 @@ export default function TraceDetail() {
   }
   if (loading) {
     return (
-      <div className="py-16 text-center text-sm text-zinc-500">Loading…</div>
+      <div className="py-16 text-center text-sm text-fg-subtle">Loading…</div>
     );
   }
   if (error) return <ErrorBanner>{error}</ErrorBanner>;
@@ -92,7 +92,7 @@ export default function TraceDetail() {
         actions={
           <Link
             to={`/projects/${projectId}/traces`}
-            className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50"
+            className="rounded border border-border px-3 py-1.5 text-sm text-fg-subtle hover:bg-raised"
           >
             ← All traces
           </Link>
@@ -125,7 +125,7 @@ export default function TraceDetail() {
         <CardHeader title={`Spans (${spans.length})`} />
         <Section>
           {spans.length === 0 ? (
-            <div className="py-8 text-center text-sm text-zinc-500">
+            <div className="py-8 text-center text-sm text-fg-subtle">
               No spans recorded.
             </div>
           ) : (
@@ -156,7 +156,7 @@ function Cell({
 }) {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-wide text-zinc-500">
+      <p className="text-[10px] uppercase tracking-wide text-fg-subtle">
         {label}
       </p>
       <div className="mt-1 text-sm">{children}</div>
@@ -185,7 +185,7 @@ function SpanRowItem({
 
   return (
     <li
-      className="rounded border border-zinc-200 p-2 text-xs"
+      className="rounded border border-border p-2 text-xs"
       style={{ marginLeft: `${depth * 16}px` }}
     >
       <button
@@ -194,23 +194,23 @@ function SpanRowItem({
       >
         <div className="flex items-center gap-2 min-w-0">
           {hasTags && (
-            <span className="font-mono text-[10px] text-zinc-500 w-3">
+            <span className="font-mono text-[10px] text-fg-subtle w-3">
               {open ? '▼' : '▶'}
             </span>
           )}
           <Badge>{s.op}</Badge>
-          <span className="font-mono text-[11px] text-zinc-200 truncate">
+          <span className="font-mono text-[11px] text-fg truncate">
             {s.name}
           </span>
           <Badge tone={s.status === 'ok' ? 'ok' : 'neutral'}>
             {s.status}
           </Badge>
         </div>
-        <span className="font-mono tabular-nums text-zinc-300">
+        <span className="font-mono tabular-nums text-fg-muted">
           {s.duration_ms}ms
         </span>
       </button>
-      <div className="mt-1 h-1.5 w-full rounded bg-zinc-100 relative overflow-hidden">
+      <div className="mt-1 h-1.5 w-full rounded bg-raised relative overflow-hidden">
         <div
           className="absolute top-0 h-full rounded bg-emerald-500/70"
           style={{
@@ -220,7 +220,7 @@ function SpanRowItem({
         />
       </div>
       {open && hasTags && (
-        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all bg-zinc-950 p-2 text-[10px] font-mono text-zinc-300">
+        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all bg-bg p-2 text-[10px] font-mono text-fg-muted">
           {JSON.stringify(s.tags, null, 2)}
         </pre>
       )}

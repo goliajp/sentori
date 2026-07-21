@@ -85,7 +85,7 @@ export default function ReplayDetail() {
   }
   if (loading) {
     return (
-      <div className="py-16 text-center text-sm text-zinc-500">Loading…</div>
+      <div className="py-16 text-center text-sm text-fg-subtle">Loading…</div>
     );
   }
   if (error) return <ErrorBanner>{error}</ErrorBanner>;
@@ -121,7 +121,7 @@ export default function ReplayDetail() {
             </Button>
             <Link
               to={`/projects/${projectId}/replays`}
-              className="rounded border border-zinc-300 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50"
+              className="rounded border border-border px-3 py-1.5 text-sm text-fg-subtle hover:bg-raised"
             >
               ← All replays
             </Link>
@@ -141,7 +141,7 @@ export default function ReplayDetail() {
               onChange={e => setIdx(parseInt(e.target.value, 10))}
               className="w-full"
             />
-            <div className="flex items-center justify-between text-xs text-zinc-500">
+            <div className="flex items-center justify-between text-xs text-fg-subtle">
               <span>
                 frame {idx + 1} / {frames.length}
               </span>
@@ -152,7 +152,7 @@ export default function ReplayDetail() {
             <div className="flex items-center gap-2">
               <Badge>{cur.kind ?? 'unknown'}</Badge>
               {cur.ts !== undefined && (
-                <span className="font-mono text-[10px] text-zinc-500">
+                <span className="font-mono text-[10px] text-fg-subtle">
                   ts {cur.ts}
                 </span>
               )}
@@ -164,7 +164,7 @@ export default function ReplayDetail() {
       <Card>
         <CardHeader title="Frame payload" />
         <Section>
-          <pre className="overflow-x-auto whitespace-pre-wrap break-all bg-zinc-950 p-3 text-[11px] font-mono text-zinc-300">
+          <pre className="overflow-x-auto whitespace-pre-wrap break-all bg-bg p-3 text-[11px] font-mono text-fg-muted">
             {cur.parsed
               ? JSON.stringify(cur.parsed, null, 2)
               : cur.raw}
@@ -172,7 +172,7 @@ export default function ReplayDetail() {
         </Section>
       </Card>
 
-      <p className="text-center text-[11px] text-zinc-500">
+      <p className="text-center text-[11px] text-fg-subtle">
         Canvas / DOM replay player coming in v0.3. Today: scrub
         through raw frames + payload inspection.
       </p>

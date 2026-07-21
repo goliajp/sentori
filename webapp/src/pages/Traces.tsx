@@ -46,7 +46,7 @@ export default function Traces() {
         <CardHeader title={`Traces (${rows.length})`} />
         <Section>
           {loading ? (
-            <div className="py-8 text-center text-sm text-zinc-500">
+            <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
             </div>
           ) : rows.length === 0 ? (
@@ -55,12 +55,12 @@ export default function Traces() {
               hint="SDKs call POST /v1/spans to send tracing data."
             />
           ) : (
-            <ul className="divide-y divide-zinc-800">
+            <ul className="divide-y divide-border">
               {rows.map(t => (
                 <li key={t.trace_id} className="px-2 py-3">
                   <Link
                     to={`/projects/${projectId}/traces/${t.trace_id}`}
-                    className="block hover:bg-zinc-900/40 -m-2 p-2 rounded"
+                    className="block hover:bg-surface/40 -m-2 p-2 rounded"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0 flex-1">
@@ -68,7 +68,7 @@ export default function Traces() {
                           <span className="font-mono text-xs text-emerald-400">
                             {t.root_op ?? '—'}
                           </span>
-                          <span className="font-mono text-sm text-zinc-100">
+                          <span className="font-mono text-sm text-fg">
                             {t.root_name ?? t.trace_id.slice(0, 8) + '…'}
                           </span>
                           <Badge
@@ -77,15 +77,15 @@ export default function Traces() {
                             {t.status}
                           </Badge>
                         </div>
-                        <div className="font-mono text-[10px] text-zinc-500 mt-1">
+                        <div className="font-mono text-[10px] text-fg-subtle mt-1">
                           {t.trace_id}
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-mono text-sm text-zinc-200 tabular-nums">
+                        <div className="font-mono text-sm text-fg tabular-nums">
                           {formatNumber(t.duration_ms)}ms
                         </div>
-                        <div className="font-mono text-[10px] text-zinc-500">
+                        <div className="font-mono text-[10px] text-fg-subtle">
                           {t.span_count} span{t.span_count === 1 ? '' : 's'} ·{' '}
                           {formatRelative(t.last_seen)}
                         </div>

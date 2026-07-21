@@ -53,30 +53,30 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-zinc-950">
+    <div className="flex h-screen items-center justify-center bg-bg">
       <form
         onSubmit={handleSubmit}
-        className="w-80 rounded-lg border border-zinc-800 bg-zinc-900 p-6"
+        className="w-80 rounded-lg border border-border bg-surface p-6"
       >
         <h1 className="mb-1 text-xl font-semibold">Sign in to Sentori</h1>
         <ServerVersion />
         <label className="mb-3 block text-sm">
-          <span className="mb-1 block text-zinc-400">Email</span>
+          <span className="mb-1 block text-fg-muted">Email</span>
           <input
             type="email"
             autoFocus
             value={email}
             onChange={e => setEmail(e.target.value)}
-            className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+            className="w-full rounded border border-border-strong bg-bg px-3 py-2 text-sm focus:border-accent focus:outline-none"
           />
         </label>
         <label className="mb-4 block text-sm">
-          <span className="mb-1 block text-zinc-400">Password</span>
+          <span className="mb-1 block text-fg-muted">Password</span>
           <input
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+            className="w-full rounded border border-border-strong bg-bg px-3 py-2 text-sm focus:border-accent focus:outline-none"
           />
         </label>
         {err && (
@@ -90,11 +90,11 @@ export function LoginPage() {
           {loading ? 'Signing in…' : 'Sign in'}
         </button>
         <OAuthButtons />
-        <div className="mt-4 flex justify-between text-xs text-zinc-500">
-          <Link to="/register" className="hover:text-zinc-300">
+        <div className="mt-4 flex justify-between text-xs text-fg-subtle">
+          <Link to="/register" className="hover:text-fg-muted">
             Create account
           </Link>
-          <Link to="/forgot-password" className="hover:text-zinc-300">
+          <Link to="/forgot-password" className="hover:text-fg-muted">
             Forgot password?
           </Link>
         </div>
@@ -132,11 +132,11 @@ function OAuthButtons() {
   return (
     <>
       <div className="my-4 flex items-center gap-3">
-        <span className="h-px flex-1 bg-zinc-800" />
-        <span className="text-[10px] uppercase tracking-wide text-zinc-600">
+        <span className="h-px flex-1 bg-raised" />
+        <span className="text-[10px] uppercase tracking-wide text-fg-subtle">
           or
         </span>
-        <span className="h-px flex-1 bg-zinc-800" />
+        <span className="h-px flex-1 bg-raised" />
       </div>
       <div className="flex flex-col gap-2">
         {enabled.map(name => (
@@ -145,7 +145,7 @@ function OAuthButtons() {
           <a
             key={name}
             href={`/auth/oauth/${name}/start`}
-            className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-center text-sm font-medium text-zinc-100 transition hover:bg-zinc-800"
+            className="w-full rounded border border-border-strong bg-surface px-3 py-2 text-center text-sm font-medium text-fg transition hover:bg-raised"
           >
             Continue with {OAUTH_LABELS[name] ?? name}
           </a>
@@ -163,5 +163,5 @@ function ServerVersion() {
       .then(j => setV(`v${j.version ?? '?'}`))
       .catch(() => setV('v?'));
   }, []);
-  return <p className="mb-6 font-mono text-xs text-zinc-500">{v}</p>;
+  return <p className="mb-6 font-mono text-xs text-fg-subtle">{v}</p>;
 }

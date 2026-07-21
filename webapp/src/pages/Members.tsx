@@ -104,7 +104,7 @@ export default function Members() {
         <Card>
           <CardHeader title="Invite link (copy now — shown once)" />
           <Section>
-            <pre className="overflow-x-auto whitespace-pre-wrap break-all bg-zinc-50 p-3 text-xs font-mono">
+            <pre className="overflow-x-auto whitespace-pre-wrap break-all bg-raised p-3 text-xs font-mono">
               {newInviteToken}
             </pre>
             <div className="mt-2">
@@ -119,13 +119,13 @@ export default function Members() {
           <CardHeader title="Invite member" />
           <Section>
             <input
-              className="w-full rounded border border-zinc-300 px-3 py-2 text-sm"
+              className="w-full rounded border border-border px-3 py-2 text-sm"
               placeholder="Email"
               value={inviteEmail}
               onChange={e => setInviteEmail(e.target.value)}
             />
             <select
-              className="mt-2 w-full rounded border border-zinc-300 px-3 py-2 text-sm"
+              className="mt-2 w-full rounded border border-border px-3 py-2 text-sm"
               value={inviteRole}
               onChange={e => setInviteRole(e.target.value as 'admin' | 'user')}
             >
@@ -133,7 +133,7 @@ export default function Members() {
               <option value="admin">admin</option>
             </select>
             <input
-              className="mt-2 w-full rounded border border-zinc-300 px-3 py-2 text-sm font-mono"
+              className="mt-2 w-full rounded border border-border px-3 py-2 text-sm font-mono"
               placeholder="Inviter user_id (UUID — yours)"
               value={invitedBy}
               onChange={e => setInvitedBy(e.target.value)}
@@ -152,7 +152,7 @@ export default function Members() {
         <CardHeader title={`Active members (${members.length})`} />
         <Section>
           {loading ? (
-            <div className="py-8 text-center text-sm text-zinc-500">
+            <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
             </div>
           ) : members.length === 0 ? (

@@ -47,7 +47,7 @@ export default function Replays() {
         <CardHeader title={`Replays (${rows.length})`} />
         <Section>
           {loading ? (
-            <div className="py-8 text-center text-sm text-zinc-500">
+            <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
             </div>
           ) : rows.length === 0 ? (
@@ -56,7 +56,7 @@ export default function Replays() {
               hint="SDKs capture replays automatically around captureException calls. Verify your SDK init has replay enabled."
             />
           ) : (
-            <ul className="divide-y divide-zinc-800">
+            <ul className="divide-y divide-border">
               {rows.map(r => (
                 <li
                   key={r.id}
@@ -64,7 +64,7 @@ export default function Replays() {
                 >
                   <Link
                     to={`/projects/${projectId}/replays/${r.id}`}
-                    className="min-w-0 flex-1 block hover:bg-zinc-900/40 -m-2 p-2 rounded"
+                    className="min-w-0 flex-1 block hover:bg-surface/40 -m-2 p-2 rounded"
                   >
                     <div className="flex items-center gap-2">
                       <Badge>{(r.duration_ms / 1000).toFixed(1)}s</Badge>
@@ -75,7 +75,7 @@ export default function Replays() {
                         event {r.event_id.slice(0, 8)}…
                       </span>
                     </div>
-                    <div className="font-mono text-[10px] text-zinc-500 mt-1">
+                    <div className="font-mono text-[10px] text-fg-subtle mt-1">
                       blob {r.blob_hash.slice(0, 16)}… ·{' '}
                       {formatRelative(r.created_at)}
                     </div>
@@ -87,7 +87,7 @@ export default function Replays() {
         </Section>
       </Card>
 
-      <p className="text-center text-[11px] text-zinc-500">
+      <p className="text-center text-[11px] text-fg-subtle">
         Replay viewer (scrubber + frame playback) coming in v0.3.
       </p>
     </div>

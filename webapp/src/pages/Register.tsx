@@ -32,19 +32,19 @@ export default function Register() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-zinc-950">
+    <div className="flex h-screen items-center justify-center bg-bg">
       <form
         onSubmit={submit}
-        className="w-96 rounded-lg border border-zinc-800 bg-zinc-900 p-6"
+        className="w-96 rounded-lg border border-border bg-surface p-6"
       >
         <h1 className="mb-1 text-xl font-semibold">Create account</h1>
-        <p className="mb-6 text-sm text-zinc-500">Sentori v0.2</p>
+        <p className="mb-6 text-sm text-fg-subtle">Sentori v0.2</p>
         {done ? (
           <div className="space-y-3">
-            <p className="text-sm text-zinc-300">
+            <p className="text-sm text-fg-muted">
               Account created — check your inbox.
             </p>
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-fg-subtle">
               We emailed you a verification link. Open it to activate
               your account, then sign in.
             </p>
@@ -58,24 +58,24 @@ export default function Register() {
         ) : (
           <>
             <label className="mb-3 block text-sm">
-              <span className="mb-1 block text-zinc-400">Email</span>
+              <span className="mb-1 block text-fg-muted">Email</span>
               <input
                 type="email"
                 autoFocus
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                className="w-full rounded border border-border-strong bg-bg px-3 py-2 text-sm focus:border-accent focus:outline-none"
               />
             </label>
             <label className="mb-4 block text-sm">
-              <span className="mb-1 block text-zinc-400">
+              <span className="mb-1 block text-fg-muted">
                 Password (≥12 chars)
               </span>
               <input
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                className="w-full rounded border border-border-strong bg-bg px-3 py-2 text-sm focus:border-accent focus:outline-none"
               />
             </label>
             {err && (
@@ -88,8 +88,8 @@ export default function Register() {
             >
               {loading ? 'Creating…' : 'Create account'}
             </button>
-            <div className="mt-4 text-center text-xs text-zinc-500">
-              <Link to="/login" className="hover:text-zinc-300">
+            <div className="mt-4 text-center text-xs text-fg-subtle">
+              <Link to="/login" className="hover:text-fg-muted">
                 Already have an account? Sign in
               </Link>
             </div>

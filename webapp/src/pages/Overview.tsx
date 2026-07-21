@@ -84,7 +84,7 @@ export function OverviewPage() {
         {projects?.length === 0 ? (
           <OnboardingGuide />
         ) : (
-          <ul className="divide-y divide-zinc-800">
+          <ul className="divide-y divide-border">
             {projects?.map((p) => (
               <li
                 key={p.id}
@@ -93,11 +93,11 @@ export function OverviewPage() {
                 <div className="min-w-0 flex-1">
                   <Link
                     to={`/projects/${p.id}/issues`}
-                    className="text-sm font-medium text-zinc-100 hover:text-brand-400"
+                    className="text-sm font-medium text-fg hover:text-accent"
                   >
                     {p.name}
                   </Link>
-                  <p className="font-mono text-[11px] text-zinc-500">
+                  <p className="font-mono text-[11px] text-fg-subtle">
                     {p.slug}
                   </p>
                 </div>
@@ -134,7 +134,7 @@ export function OverviewPage() {
                   />
                   <Link
                     to={`/projects/${p.id}/issues`}
-                    className="rounded bg-zinc-800 px-3 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
+                    className="rounded bg-raised px-3 py-1 text-xs text-fg-muted hover:bg-raised"
                   >
                     Issues →
                   </Link>
@@ -174,21 +174,21 @@ function OnboardingGuide() {
   return (
     <div>
       <div className="mx-auto max-w-2xl">
-        <h3 className="text-base font-medium text-zinc-100">
+        <h3 className="text-base font-medium text-fg">
           Welcome to Sentori
         </h3>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-fg-subtle">
           Four steps to your first event. Start by creating a project.
         </p>
         <ol className="mt-6 space-y-4">
           {steps.map(s => (
             <li key={s.n} className="flex gap-3">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs font-medium text-zinc-300">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-raised text-xs font-medium text-fg-muted">
                 {s.n}
               </span>
               <div>
-                <p className="text-sm font-medium text-zinc-200">{s.title}</p>
-                <p className="text-xs text-zinc-500">{s.body}</p>
+                <p className="text-sm font-medium text-fg">{s.title}</p>
+                <p className="text-xs text-fg-subtle">{s.body}</p>
               </div>
             </li>
           ))}
@@ -196,7 +196,7 @@ function OnboardingGuide() {
         <div className="mt-6">
           <Link
             to="/projects"
-            className="inline-flex rounded bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
+            className="inline-flex rounded bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent"
           >
             Create your first project →
           </Link>
@@ -222,10 +222,10 @@ function UsageCard({
     : 0;
   const isUnlimited = limit >= Number.MAX_SAFE_INTEGER || limit > 1e15;
   return (
-    <div className="rounded border border-zinc-800 bg-zinc-900 p-4">
-      <p className="text-[11px] uppercase tracking-wide text-zinc-500">{title}</p>
-      <p className="mt-1 font-mono text-2xl text-zinc-100">{formatNumber(count)}</p>
-      <p className="text-xs text-zinc-500">
+    <div className="rounded border border-border bg-surface p-4">
+      <p className="text-[11px] uppercase tracking-wide text-fg-subtle">{title}</p>
+      <p className="mt-1 font-mono text-2xl text-fg">{formatNumber(count)}</p>
+      <p className="text-xs text-fg-subtle">
         {isUnlimited ? 'unlimited' : `of ${formatNumber(limit)} / month (${pct}%)`}
       </p>
       {dropped > 0 && (
@@ -234,9 +234,9 @@ function UsageCard({
         </p>
       )}
       {!isUnlimited && (
-        <div className="mt-2 h-1 overflow-hidden rounded bg-zinc-800">
+        <div className="mt-2 h-1 overflow-hidden rounded bg-raised">
           <div
-            className="h-full bg-brand-500 transition-all"
+            className="h-full bg-accent transition-all"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -256,7 +256,7 @@ function LensPill({
 }) {
   if (value === 0) {
     return (
-      <span className="rounded bg-zinc-900 px-1.5 py-0.5 font-mono text-zinc-600">
+      <span className="rounded bg-surface px-1.5 py-0.5 font-mono text-fg-subtle">
         {label} 0
       </span>
     );
@@ -266,7 +266,7 @@ function LensPill({
       className={`rounded px-1.5 py-0.5 font-mono ${
         tone === 'warn'
           ? 'bg-orange-900/40 text-orange-300'
-          : 'bg-zinc-800 text-zinc-300'
+          : 'bg-raised text-fg-muted'
       }`}
     >
       {label} {formatNumber(value)}
