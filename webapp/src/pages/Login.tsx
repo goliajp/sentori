@@ -5,9 +5,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api } from '../lib/api';
 
 export function LoginPage() {
+  const t = useT();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -58,10 +60,10 @@ export function LoginPage() {
         onSubmit={handleSubmit}
         className="w-80 rounded-lg border border-border bg-surface p-6"
       >
-        <h1 className="mb-1 text-xl font-semibold">Sign in to Sentori</h1>
+        <h1 className="mb-1 text-xl font-semibold">{t('auth.signInTitle')}</h1>
         <ServerVersion />
         <label className="mb-3 block text-sm">
-          <span className="mb-1 block text-fg-muted">Email</span>
+          <span className="mb-1 block text-fg-muted">{t('auth.email')}</span>
           <input
             type="email"
             autoFocus
@@ -71,7 +73,7 @@ export function LoginPage() {
           />
         </label>
         <label className="mb-4 block text-sm">
-          <span className="mb-1 block text-fg-muted">Password</span>
+          <span className="mb-1 block text-fg-muted">{t('auth.password')}</span>
           <input
             type="password"
             value={password}
@@ -87,15 +89,15 @@ export function LoginPage() {
           disabled={loading}
           className="w-full rounded bg-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
-          {loading ? 'Signing in…' : 'Sign in'}
+          {loading ? t('auth.signingIn') : t('auth.signIn')}
         </button>
         <OAuthButtons />
         <div className="mt-4 flex justify-between text-xs text-fg-subtle">
           <Link to="/register" className="hover:text-fg-muted">
-            Create account
+            {t('auth.createAccount')}
           </Link>
           <Link to="/forgot-password" className="hover:text-fg-muted">
-            Forgot password?
+            {t('auth.forgot')}
           </Link>
         </div>
       </form>
@@ -112,6 +114,7 @@ const OAUTH_LABELS: Record<string, string> = {
 // configured — a button that 400s on "oauth_not_configured" is worse
 // than no button.
 function OAuthButtons() {
+  const t = useT();
   const [enabled, setEnabled] = useState<string[]>([]);
 
   useEffect(() => {
@@ -134,7 +137,7 @@ function OAuthButtons() {
       <div className="my-4 flex items-center gap-3">
         <span className="h-px flex-1 bg-raised" />
         <span className="text-xs uppercase tracking-wide text-fg-subtle">
-          or
+          {t('auth.or')}
         </span>
         <span className="h-px flex-1 bg-raised" />
       </div>
@@ -147,7 +150,7 @@ function OAuthButtons() {
             href={`/auth/oauth/${name}/start`}
             className="w-full rounded border border-border-strong bg-surface px-3 py-2 text-center text-sm font-medium text-fg transition hover:bg-raised"
           >
-            Continue with {OAUTH_LABELS[name] ?? name}
+            {t('auth.continueWith').replace('{provider}', OAUTH_LABELS[name] ?? name)}
           </a>
         ))}
       </div>

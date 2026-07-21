@@ -4,9 +4,11 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api } from '../lib/api';
 
 export default function ResetPassword() {
+  const t = useT();
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
   const [password, setPassword] = useState('');
@@ -23,7 +25,7 @@ export default function ResetPassword() {
       return;
     }
     if (password !== confirm) {
-      setErr('Passwords do not match.');
+      setErr(t('auth.passwordsDiffer'));
       return;
     }
     setLoading(true);
@@ -43,7 +45,7 @@ export default function ResetPassword() {
         onSubmit={submit}
         className="w-96 rounded-lg border border-border bg-surface p-6"
       >
-        <h1 className="mb-1 text-xl font-semibold">Reset password</h1>
+        <h1 className="mb-1 text-xl font-semibold">{t('auth.resetPassword')}</h1>
         <p className="mb-6 text-sm text-fg-subtle">Sentori</p>
         {done ? (
           <div className="space-y-3">
@@ -54,7 +56,7 @@ export default function ResetPassword() {
               to="/login"
               className="block rounded bg-accent px-3 py-2 text-center text-sm font-medium text-white hover:opacity-90"
             >
-              Sign in
+              {t('auth.signIn')}
             </Link>
           </div>
         ) : (
@@ -77,7 +79,7 @@ export default function ResetPassword() {
               />
             </label>
             <label className="mb-4 block text-sm">
-              <span className="mb-1 block text-fg-muted">Confirm</span>
+              <span className="mb-1 block text-fg-muted">{t('auth.confirm')}</span>
               <input
                 type="password"
                 value={confirm}
@@ -93,7 +95,7 @@ export default function ResetPassword() {
               disabled={loading || !token}
               className="w-full rounded bg-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
-              {loading ? 'Saving…' : 'Set new password'}
+              {loading ? t('auth.saving') : t('auth.setNewPassword')}
             </button>
             <p className="mt-4 text-center text-xs text-fg-subtle">
               <Link to="/login" className="hover:text-fg-muted">

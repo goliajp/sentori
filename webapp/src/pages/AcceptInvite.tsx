@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api } from '../lib/api';
 
 /// Landing page for an invite link (`/invite?token=…`). The logged-in
@@ -14,12 +15,13 @@ type State =
   | { kind: 'error'; message: string };
 
 export default function AcceptInvite() {
+  const t = useT();
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
   // Derive the no-token error state at init rather than via a
   // synchronous setState in the effect (which cascades renders).
   const [state, setState] = useState<State>(() =>
-    token ? { kind: 'working' } : { kind: 'error', message: 'Missing invite token.' },
+    token ? { kind: 'working' } : { kind: 'error', message: t('auth.missingInviteToken') },
   );
 
   useEffect(() => {
@@ -57,10 +59,10 @@ export default function AcceptInvite() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 text-center">
-        <h1 className="text-lg font-semibold text-fg">Workspace invite</h1>
+        <h1 className="text-lg font-semibold text-fg">{t('auth.workspaceInvite')}</h1>
 
         {state.kind === 'working' && (
-          <p className="mt-4 text-sm text-fg-muted">Accepting invite…</p>
+          <p className="mt-4 text-sm text-fg-muted">{t('auth.acceptingInvite')}</p>
         )}
 
         {state.kind === 'joined' && (

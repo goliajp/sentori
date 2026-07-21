@@ -1,6 +1,7 @@
 // Keyboard shortcut cheatsheet. Reachable via `?` or
 // /shortcuts URL.
 
+import { useT } from '../i18n';
 import { PageHeader, Card, CardBody, CardHeader } from '../components/ui';
 
 const GROUPS: { title: string; items: { kbd: string; label: string }[] }[] =
@@ -63,11 +64,12 @@ const GROUPS: { title: string; items: { kbd: string; label: string }[] }[] =
   ];
 
 export default function Shortcuts() {
+  const t = useT();
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Keyboard shortcuts"
-        subtitle="Linear-style navigation. Disabled while focus is in an input."
+        title={t('shortcuts.title')}
+        subtitle={t('shortcuts.subtitle')}
       />
       <div className="grid grid-cols-2 gap-4">
         {GROUPS.map(g => (
