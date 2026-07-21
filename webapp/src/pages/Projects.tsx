@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api, Project, ProjectStats } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 import {
@@ -17,6 +18,7 @@ import {
 } from '../components/ui';
 
 export default function Projects() {
+  const t = useT();
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -95,8 +97,8 @@ export default function Projects() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Projects"
-        subtitle="One per app. Each project owns its own SDK tokens + push credentials."
+        title={t('projects.title')}
+        subtitle={t('projects.subtitle')}
         actions={
           <Button onClick={() => setShowCreate(true)}>+ New project</Button>
         }
@@ -104,11 +106,11 @@ export default function Projects() {
       {error && <ErrorBanner>{error}</ErrorBanner>}
       {showCreate && (
         <Card>
-          <CardHeader title="Create project" />
+          <CardHeader title={t('projects.create')} />
           <CardBody>
             <input
               className="h-8 w-full rounded border border-border px-2.5 text-sm"
-              placeholder="Display name (e.g. 'MyApp iOS')"
+              placeholder={t('projects.nameHint')}
               value={name}
               onChange={e => {
                 const v = e.target.value;
@@ -122,7 +124,7 @@ export default function Projects() {
             />
             <input
               className="mt-2 w-full rounded border border-border px-3 py-2 text-sm font-mono"
-              placeholder="Slug (e.g. 'myapp-ios')"
+              placeholder={t('projects.slugHint')}
               value={slug}
               onChange={e => setSlug(e.target.value)}
             />
@@ -144,8 +146,8 @@ export default function Projects() {
             </div>
           ) : rows.length === 0 ? (
             <EmptyState
-              title="No projects yet"
-              hint="Create one to start ingesting events."
+              title={t('projects.empty')}
+              hint={t('projects.emptyHint')}
             />
           ) : (
             <DataTable

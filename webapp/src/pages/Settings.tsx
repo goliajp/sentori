@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api, UsageResponse } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 import { Preferences } from '../components/Preferences';
 import { Card, PageHeader, Section, Badge } from '../components/ui';
 
 export function SettingsPage() {
+  const t = useT();
   const [usage, setUsage] = useState<UsageResponse | null>(null);
   const navigate = useNavigate();
   const email =
@@ -37,12 +39,12 @@ export function SettingsPage() {
   return (
     <div>
       <PageHeader
-        title="Settings"
-        subtitle="Workspace + plan + integrations + members."
+        title={t('settings.title')}
+        subtitle={t('settings.subtitle')}
       />
 
       {email && (
-        <Section title="Account">
+        <Section title={t('settings.account')}>
           <Card>
             <div className="flex items-center justify-between px-5 py-4">
               <div>
@@ -60,16 +62,16 @@ export function SettingsPage() {
         </Section>
       )}
 
-      <Section title="Preferences">
+      <Section title={t('settings.preferences')}>
         <Card>
           <Preferences />
         </Card>
       </Section>
 
-      <Section title="Plan">
+      <Section title={t('settings.plan')}>
         <Card>
           <div className="grid grid-cols-3 divide-x divide-border">
-            <Cell label="Tier">
+            <Cell label={t('settings.tier')}>
               {usage ? (
                 <Badge tone={usage.plan === 'free' ? 'neutral' : 'info'}>
                   {usage.plan}
@@ -78,7 +80,7 @@ export function SettingsPage() {
                 '—'
               )}
             </Cell>
-            <Cell label="Status">
+            <Cell label={t('crash.status')}>
               {usage ? (
                 <Badge tone={usage.status === 'active' ? 'ok' : 'warn'}>
                   {usage.status}
@@ -87,7 +89,7 @@ export function SettingsPage() {
                 '—'
               )}
             </Cell>
-            <Cell label="Period">
+            <Cell label={t('settings.period')}>
               <span className="font-mono text-sm">
                 {usage?.period_yyyymm ?? '—'}
               </span>
@@ -107,7 +109,7 @@ export function SettingsPage() {
         </Card>
       </Section>
 
-      <Section title="Members">
+      <Section title={t('members.title')}>
         <Card>
           <div className="p-6 text-sm text-fg-subtle">
             Member management UI lands in v0.1.x. Backend ready (K1
@@ -120,7 +122,7 @@ export function SettingsPage() {
         </Card>
       </Section>
 
-      <Section title="Integrations">
+      <Section title={t('settings.integrations')}>
         <Card>
           <div className="p-6 text-sm text-fg-subtle">
             K12 IntegrationAdapter trait shipped with Slack reference impl.
@@ -130,7 +132,7 @@ export function SettingsPage() {
         </Card>
       </Section>
 
-      <Section title="Notifier transports">
+      <Section title={t('settings.notifiers')}>
         <Card>
           <div className="p-6 text-sm text-fg-subtle">
             K11 NotifierService is operator-configured via env at boot
@@ -141,7 +143,7 @@ export function SettingsPage() {
         </Card>
       </Section>
 
-      <Section title="Active sessions">
+      <Section title={t('settings.sessions')}>
         <Card>
           <div className="px-5 py-4 flex items-center justify-between">
             <p className="text-sm text-fg-muted">
@@ -158,7 +160,7 @@ export function SettingsPage() {
         <SessionsCard />
       </Section>
 
-      <Section title="API ingest">
+      <Section title={t('settings.apiIngest')}>
         <Card>
           <div className="p-6 text-sm text-fg-muted">
             <p className="mb-2">

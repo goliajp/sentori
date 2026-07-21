@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 import {
@@ -22,6 +23,7 @@ import {
 } from '../components/ui';
 
 export default function Tokens() {
+  const t = useT();
   const { id: projectId } = useParams<{ id: string }>();
   const [showCreate, setShowCreate] = useState(false);
   const [label, setLabel] = useState('');
@@ -74,8 +76,8 @@ export default function Tokens() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Tokens"
-        subtitle="SDK ingest credentials. Paste into init({ token })."
+        title={t('tokens.title')}
+        subtitle={t('tokens.subtitle')}
         actions={
           <Button onClick={() => setShowCreate(true)}>
             + Mint token
@@ -85,7 +87,7 @@ export default function Tokens() {
       {error && <ErrorBanner>{error}</ErrorBanner>}
       {newToken && (
         <Card>
-          <CardHeader title="New token (shown once)" />
+          <CardHeader title={t('tokens.new')} />
           <CardBody>
             <pre className="overflow-x-auto whitespace-pre-wrap break-all bg-raised p-3 text-xs font-mono">
               {newToken}
@@ -114,11 +116,11 @@ export default function Tokens() {
       )}
       {showCreate && (
         <Card>
-          <CardHeader title="Mint new token" />
+          <CardHeader title={t('tokens.mint')} />
           <CardBody>
             <input
               className="h-8 w-full rounded border border-border px-2.5 text-sm"
-              placeholder="Label (e.g. 'production iOS')"
+              placeholder={t('tokens.labelHint')}
               value={label}
               onChange={e => setLabel(e.target.value)}
             />
@@ -144,8 +146,8 @@ export default function Tokens() {
             </div>
           ) : rows.length === 0 ? (
             <EmptyState
-              title="No tokens yet"
-              hint="Mint one to get your SDK ingesting events."
+              title={t('tokens.empty')}
+              hint={t('tokens.emptyHint')}
             />
           ) : (
             <DataTable
@@ -197,6 +199,7 @@ function Quickstart({
   projectId: string;
   token: string | null;
 }) {
+  const t = useT();
   const tk = token ?? 'st_pk_<your project token>';
   const snippet = `import { sentori } from '@goliapkg/sentori-react-native';
 
@@ -208,13 +211,13 @@ sentori.init({
   return (
     <Card>
       <CardHeader
-        title="Quickstart"
-        subtitle="Drop this into your app's entry point to start ingesting."
+        title={t('tokens.quickstart')}
+        subtitle={t('tokens.quickstartHint')}
       />
       <CardBody>
         <div className="mb-3 grid gap-3 sm:grid-cols-2">
-          <Field label="Ingest URL" value={DEFAULT_INGEST_URL} />
-          <Field label="Project ID" value={projectId} mono />
+          <Field label={t('tokens.ingestUrl')} value={DEFAULT_INGEST_URL} />
+          <Field label={t('tokens.projectId')} value={projectId} mono />
         </div>
         <div className="relative">
           <pre className="overflow-x-auto rounded bg-bg p-3 text-xs font-mono text-fg">
