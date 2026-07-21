@@ -113,7 +113,12 @@ pub async fn list(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
 ) -> Json<Value> {
-    match state.identity_for(ctx.workspace_id).invites().list_all().await {
+    match state
+        .identity_for(ctx.workspace_id)
+        .invites()
+        .list_all()
+        .await
+    {
         Ok(rows) => {
             let out: Vec<Value> = rows
                 .iter()

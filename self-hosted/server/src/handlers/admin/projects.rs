@@ -155,13 +155,14 @@ pub async fn update(
     // `AND workspace_id` is the tenant guard: a rename aimed at
     // another workspace's project matches no row → 404, not a
     // cross-tenant write.
-    let result =
-        sqlx::query("UPDATE projects SET name = $1 WHERE id = $2 AND workspace_id = $3 RETURNING id")
-            .bind(&name)
-            .bind(project_id)
-            .bind(ctx.workspace_id.into_uuid())
-            .fetch_optional(&state.pool)
-            .await;
+    let result = sqlx::query(
+        "UPDATE projects SET name = $1 WHERE id = $2 AND workspace_id = $3 RETURNING id",
+    )
+    .bind(&name)
+    .bind(project_id)
+    .bind(ctx.workspace_id.into_uuid())
+    .fetch_optional(&state.pool)
+    .await;
     match result {
         Ok(Some(row)) => {
             let id: Uuid = row.get("id");

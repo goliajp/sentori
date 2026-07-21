@@ -117,9 +117,10 @@ impl AuthService {
     ///   if the email is already on file.
     /// - [`AuthError::Password`] on hashing failure.
     /// - [`AuthError::Db`] on DB failure.
+    ///
     /// Returns the new user, the minted email-verify token, and
     /// the [`WorkspaceId`] of the freshly-provisioned personal
-    /// workspace the user now owns. SaaS self-signup lands every
+    /// workspace the user now owns. `SaaS` self-signup lands every
     /// registrant in their own isolated tenant (not the shared
     /// default workspace); the caller seeds that workspace's
     /// billing row and emails the verify link.
@@ -145,10 +146,9 @@ impl AuthService {
         let expires_at = OffsetDateTime::now_utc() + self.opts.email_verify_ttl;
         // Verification token scoped to the NEW workspace, not the
         // AuthService's bound (default) one.
-        let minted =
-            crate::store::EmailVerifications::new(self.identity.pool(), workspace_id)
-                .create(user.id, expires_at)
-                .await?;
+        let minted = crate::store::EmailVerifications::new(self.identity.pool(), workspace_id)
+            .create(user.id, expires_at)
+            .await?;
         Ok((user, minted, workspace_id))
     }
 

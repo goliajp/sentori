@@ -30,11 +30,12 @@ pub async fn fire_test(
     // `AND workspace_id` is the tenant guard: fire-testing another
     // workspace's alert (and thus hitting its webhook/Slack) must be
     // a 404, not a cross-tenant trigger.
-    let row = sqlx::query("SELECT name, channels FROM alert_rules WHERE id = $1 AND workspace_id = $2")
-        .bind(alert_id)
-        .bind(ctx.workspace_id.into_uuid())
-        .fetch_optional(&state.pool)
-        .await;
+    let row =
+        sqlx::query("SELECT name, channels FROM alert_rules WHERE id = $1 AND workspace_id = $2")
+            .bind(alert_id)
+            .bind(ctx.workspace_id.into_uuid())
+            .fetch_optional(&state.pool)
+            .await;
     let (name, channels) = match row {
         Ok(Some(r)) => (r.get::<String, _>("name"), r.get::<Value, _>("channels")),
         Ok(None) => {

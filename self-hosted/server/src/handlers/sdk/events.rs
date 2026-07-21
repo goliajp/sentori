@@ -39,7 +39,8 @@ pub async fn handle(
     // not consume quota.
     let now = OffsetDateTime::now_utc();
     if let Err(body) =
-        crate::handlers::sdk::quota::meter(&state, ctx.project_id, CounterKind::Events, 1, now).await
+        crate::handlers::sdk::quota::meter(&state, ctx.project_id, CounterKind::Events, 1, now)
+            .await
     {
         return (StatusCode::TOO_MANY_REQUESTS, Json(body));
     }

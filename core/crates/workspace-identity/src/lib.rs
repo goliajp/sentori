@@ -118,4 +118,4 @@ pub use model::{
     UserId, WorkspaceId, WorkspaceInvite,
 };
 pub use scoped_pool::WorkspaceScopedPool;
-pub use store::{Invites, Members, Projects, Users, UserWorkspace, Visibility};
+pub use store::{Invites, Members, Projects, UserWorkspace, Users, Visibility};

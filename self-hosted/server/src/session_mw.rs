@@ -73,10 +73,7 @@ pub async fn session_middleware(
             // trusted — otherwise removing someone from a workspace
             // would leave their live sessions with access.
             let workspace_id = session.workspace_id;
-            match Members::new(&state.pool, workspace_id)
-                .find(user.id)
-                .await
-            {
+            match Members::new(&state.pool, workspace_id).find(user.id).await {
                 Ok(Some(member)) => {
                     req.extensions_mut().insert(SessionContext {
                         user_id: user.id,
@@ -114,7 +111,9 @@ fn decode_hash(hex: &str) -> [u8; 32] {
             let hi = (chunk[0] as char).to_digit(16);
             let lo = (chunk[1] as char).to_digit(16);
             if let (Some(hi), Some(lo)) = (hi, lo) {
-                out[i] = ((hi << 4) | lo) as u8;
+                // hi, lo are single hex nibbles (0..=15), so the
+                // assembled byte always fits u8; unwrap_or is dead.
+                out[i] = u8::try_from((hi << 4) | lo).unwrap_or(0);
             }
         }
     }

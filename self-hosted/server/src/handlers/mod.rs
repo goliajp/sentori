@@ -139,10 +139,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         // Workspace switcher (multi-workspace 1:N): list the caller's
         // memberships + repoint the current session.
         .route("/admin/api/workspaces", get(workspaces::list))
-        .route(
-            "/admin/api/workspaces/switch",
-            post(workspaces::switch),
-        )
+        .route("/admin/api/workspaces/switch", post(workspaces::switch))
         .route(
             "/admin/api/projects/{project_id}/tokens",
             get(admin::tokens::list).post(admin::tokens::create),
@@ -203,10 +200,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         )
         // Accept lives before `{id}` conceptually but is a distinct
         // path; the logged-in caller joins the token's workspace.
-        .route(
-            "/admin/api/invites/accept",
-            post(admin::invites::accept),
-        )
+        .route("/admin/api/invites/accept", post(admin::invites::accept))
         .route("/admin/api/invites/{id}", delete(admin::invites::revoke))
         .route(
             "/admin/api/projects/{project_id}/cert/watches",

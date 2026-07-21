@@ -7,13 +7,13 @@
 //! first and apply each to the owning workspace's billing row.
 //!
 //! Event → action mapping (see `apply_event`):
-//! - `checkout.session.completed`      → link the Stripe customer id
-//!                                        to the workspace.
-//! - `customer.subscription.created`   → set plan + status +
-//!   `.updated`                          customer + period end.
-//! - `customer.subscription.deleted`   → status = canceled
-//!                                        (effective Free).
-//! - `invoice.payment_failed`          → status = past_due (grace).
+//! - `checkout.session.completed` → link the Stripe customer id to the
+//!   workspace.
+//! - `customer.subscription.created` / `.updated` → set plan + status
+//!   + customer + period end.
+//! - `customer.subscription.deleted` → status = canceled (effective
+//!   Free).
+//! - `invoice.payment_failed` → status = past_due (grace).
 //!
 //! Rows that hit a permanent mapping error (unknown price, no
 //! resolvable workspace) flip to `failed` with a `process_error`
@@ -102,12 +102,7 @@ async fn drain(pool: &PgPool, cfg: &StripeConfig, batch: usize) -> Result<usize,
     Ok(done)
 }
 
-async fn mark(
-    pool: &PgPool,
-    id: Uuid,
-    state: &str,
-    err: Option<&str>,
-) -> Result<(), sqlx::Error> {
+async fn mark(pool: &PgPool, id: Uuid, state: &str, err: Option<&str>) -> Result<(), sqlx::Error> {
     sqlx::query(
         "UPDATE stripe_events \
          SET processed_state = $2, process_error = $3, processed_at = now() \
@@ -142,7 +137,10 @@ async fn apply_event(
         // Anything we don't model is intentionally a no-op success:
         // Stripe sends many event types we never subscribed logic to.
         other => {
-            debug!(event_type = other, "billing worker ignoring unmodelled event");
+            debug!(
+                event_type = other,
+                "billing worker ignoring unmodelled event"
+            );
             Outcome::Processed
         }
     }
@@ -184,11 +182,7 @@ async fn apply_checkout_completed(pool: &PgPool, session: &serde_json::Value) ->
 /// `customer.subscription.created|updated` — the authoritative
 /// plan-setting event. Carries the price (→ plan), status, customer,
 /// and current period end.
-async fn apply_subscription(
-    pool: &PgPool,
-    cfg: &StripeConfig,
-    sub: &serde_json::Value,
-) -> Outcome {
+async fn apply_subscription(pool: &PgPool, cfg: &StripeConfig, sub: &serde_json::Value) -> Outcome {
     let Some(workspace_id) = resolve_workspace(pool, sub).await else {
         return Outcome::Failed("subscription: cannot resolve workspace".into());
     };

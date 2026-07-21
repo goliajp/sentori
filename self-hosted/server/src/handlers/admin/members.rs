@@ -127,7 +127,12 @@ pub async fn remove(
         return StatusCode::FORBIDDEN;
     }
     let uid = UserId::from_uuid(user_id);
-    match state.identity_for(ctx.workspace_id).members().remove(uid).await {
+    match state
+        .identity_for(ctx.workspace_id)
+        .members()
+        .remove(uid)
+        .await
+    {
         Ok(()) => {
             info!(%user_id, "admin.members removed");
             crate::notify::audit(

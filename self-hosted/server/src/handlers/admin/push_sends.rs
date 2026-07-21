@@ -83,7 +83,10 @@ pub async fn retry_all_failed(
     Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
 ) -> Json<Value> {
-    if guard_project(&state, ctx.workspace_id, project_id).await.is_err() {
+    if guard_project(&state, ctx.workspace_id, project_id)
+        .await
+        .is_err()
+    {
         return Json(json!({ "requeued": 0, "error": "not found" }));
     }
     let res = sqlx::query(
@@ -116,7 +119,10 @@ pub async fn list(
     Path(project_id): Path<Uuid>,
     Query(q): Query<ListQuery>,
 ) -> Json<Value> {
-    if guard_project(&state, ctx.workspace_id, project_id).await.is_err() {
+    if guard_project(&state, ctx.workspace_id, project_id)
+        .await
+        .is_err()
+    {
         return Json(json!({ "sends": [] }));
     }
     let limit = i64::from(q.limit.unwrap_or(100).clamp(1, 1000));

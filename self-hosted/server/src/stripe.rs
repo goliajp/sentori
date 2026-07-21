@@ -10,15 +10,15 @@
 //! All commercial parameters come from the environment — this file
 //! hard-codes no price ids, amounts, or product names.
 //!
-//! - `SENTORI_STRIPE_SECRET_KEY`      — `sk_…`, used as Bearer for
-//!                                      the REST API.
-//! - `SENTORI_STRIPE_WEBHOOK_SECRET`  — `whsec_…`, HMAC key for
-//!                                      inbound webhook verification.
-//! - `SENTORI_STRIPE_PRICE_PRO`       — `price_…` for the Pro plan.
-//! - `SENTORI_STRIPE_PRICE_ENTERPRISE`— `price_…` for Enterprise
-//!                                      (optional; usually sales-led).
-//! - `SENTORI_PUBLIC_URL`             — dashboard origin for the
-//!                                      Checkout/Portal return URLs.
+//! - `SENTORI_STRIPE_SECRET_KEY` — `sk_…`, used as Bearer for the
+//!   REST API.
+//! - `SENTORI_STRIPE_WEBHOOK_SECRET` — `whsec_…`, HMAC key for inbound
+//!   webhook verification.
+//! - `SENTORI_STRIPE_PRICE_PRO` — `price_…` for the Pro plan.
+//! - `SENTORI_STRIPE_PRICE_ENTERPRISE` — `price_…` for Enterprise
+//!   (optional; usually sales-led).
+//! - `SENTORI_PUBLIC_URL` — dashboard origin for the Checkout / Portal
+//!   return URLs.
 
 use sentori_billing::Plan;
 use sentori_stripe_webhook_verify::{Tolerance, verify};

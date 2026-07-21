@@ -1,11 +1,11 @@
 //! Self-serve billing — the caller's own workspace subscription.
 //!
-//! - `GET  /admin/api/billing`          — plan, status, usage, and
-//!                                         which upgrade paths exist.
-//! - `POST /admin/api/billing/checkout` — start a Stripe Checkout
-//!                                         for a plan (Owner/Admin).
-//! - `POST /admin/api/billing/portal`   — open the Stripe Billing
-//!                                         Portal (Owner/Admin).
+//! - `GET /admin/api/billing` — plan, status, usage, and which
+//!   upgrade paths exist.
+//! - `POST /admin/api/billing/checkout` — start a Stripe Checkout for
+//!   a plan (Owner/Admin).
+//! - `POST /admin/api/billing/portal` — open the Stripe Billing Portal
+//!   (Owner/Admin).
 //!
 //! Session-gated (mounted under `admin_routes`). Mutating routes
 //! additionally require `can_manage_workspace` (Owner/Admin) — a
@@ -42,9 +42,7 @@ pub async fn get(
     };
     let plan = row.as_ref().map_or(Plan::Free, |b| b.plan);
     let status = row.as_ref().map_or(PlanStatus::Active, |b| b.status);
-    let has_customer = row
-        .as_ref()
-        .is_some_and(|b| b.stripe_customer_id.is_some());
+    let has_customer = row.as_ref().is_some_and(|b| b.stripe_customer_id.is_some());
     let period_end = row.as_ref().and_then(|b| b.current_period_end);
 
     let limits = effective_plan(plan, status).limits();
@@ -120,12 +118,11 @@ pub async fn checkout(
         Err(BillingError::NotInitialised) => None,
         Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
     };
-    let email: Option<String> =
-        sqlx::query_scalar("SELECT email FROM users WHERE id = $1")
-            .bind(ctx.user_id.into_uuid())
-            .fetch_optional(&state.pool)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let email: Option<String> = sqlx::query_scalar("SELECT email FROM users WHERE id = $1")
+        .bind(ctx.user_id.into_uuid())
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let url = crate::stripe::create_checkout_session(
         cfg,

@@ -74,8 +74,7 @@ pub async fn handle(
     // are symbolication + debug artifacts, not a billed counter.
     if kind == "replay" {
         let now = OffsetDateTime::now_utc();
-        if let Err(body) =
-            quota::meter(&state, ctx.project_id, CounterKind::Replays, 1, now).await
+        if let Err(body) = quota::meter(&state, ctx.project_id, CounterKind::Replays, 1, now).await
         {
             return (StatusCode::TOO_MANY_REQUESTS, Json(body));
         }

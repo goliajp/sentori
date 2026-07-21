@@ -93,7 +93,7 @@ impl Identity {
     /// `workspaces` row, the first `users` row inside it, and an
     /// `owner` `workspace_members` row — all in one transaction.
     ///
-    /// This is the SaaS self-signup primitive. It deliberately
+    /// This is the `SaaS` self-signup primitive. It deliberately
     /// does NOT use `self.workspace_id` (which scopes the CRUD
     /// sub-handles); it mints a new workspace so each self-signup
     /// lands in its own isolated tenant rather than the shared

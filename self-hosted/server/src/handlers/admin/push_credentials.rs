@@ -138,7 +138,10 @@ pub async fn list(
     Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
 ) -> Json<Value> {
-    if guard_project(&state, ctx.workspace_id, project_id).await.is_err() {
+    if guard_project(&state, ctx.workspace_id, project_id)
+        .await
+        .is_err()
+    {
         return Json(json!({ "credentials": [] }));
     }
     let rows = sqlx::query(
