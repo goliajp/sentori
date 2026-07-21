@@ -74,6 +74,112 @@ export interface UsageResponse {
   replays: UsageCounter;
 }
 
+// ── One crash, as collected ────────────────────────────────────
+//
+// Mirrors what the SDK puts on the wire (sdk/core/src/types.ts) and
+// the server now returns verbatim from `events.payload`. Every field
+// is optional except the ones ingest itself guarantees: an SDK may be
+// older than the dashboard, and a browser SDK collects less than the
+// React Native one.
+
+/** One stack frame. `inApp` is the distinction that matters — the
+ *  reader's own code versus framework and runtime noise. */
+export interface StackFrame {
+  file: string;
+  line: number;
+  column?: number;
+  function?: string;
+  inApp: boolean;
+  absolutePath?: string;
+  /** Source lines immediately before/after `line`, when the frame was
+   *  symbolicated against an uploaded source map. */
+  preContext?: string[];
+  postContext?: string[];
+}
+
+/** The error, plus however deep its `cause` chain goes. */
+export interface CapturedError {
+  type: string;
+  message: string;
+  stack?: StackFrame[];
+  cause?: CapturedError | null;
+}
+
+export type BreadcrumbType =
+  | 'custom'
+  | 'log'
+  | 'nav'
+  | 'net'
+  | 'push'
+  | 'track'
+  | 'user';
+
+export interface Breadcrumb {
+  type: BreadcrumbType;
+  timestamp: string;
+  data: Record<string, unknown>;
+}
+
+export interface EventPayload {
+  error?: CapturedError;
+  level?: string;
+  message?: string;
+  breadcrumbs?: Breadcrumb[];
+  device?: {
+    os?: string;
+    osVersion?: string;
+    model?: string;
+    locale?: string;
+    networkType?: string;
+    installId?: string;
+  };
+  app?: {
+    version?: string;
+    build?: string;
+    framework?: { name?: string; version?: string };
+  };
+  bundle?: Record<string, unknown>;
+  user?: {
+    id?: string;
+    name?: string;
+    anonymous?: boolean;
+    linkHashes?: Record<string, string>;
+  };
+  tags?: Record<string, string>;
+  flags?: Record<string, unknown>;
+  fingerprint?: string[];
+  traceId?: string;
+  spanId?: string;
+}
+
+export interface EventAttachment {
+  ref: string;
+  kind:
+    | 'logTail'
+    | 'replay'
+    | 'screenshot'
+    | 'sessionTrail'
+    | 'stateSnapshot'
+    | 'viewTree';
+  media_type: string;
+  size_bytes: number;
+  captured_at: string;
+  source: 'android' | 'ios' | 'js';
+}
+
+export interface EventDetail {
+  id: string;
+  issue_id: string;
+  kind: string;
+  timestamp: string;
+  received_at: string;
+  release: string;
+  environment: string;
+  platform: string;
+  payload: EventPayload;
+  attachments: EventAttachment[];
+}
+
 export type PlanName = 'free' | 'pro' | 'enterprise';
 
 export interface BillingInfo {
@@ -372,6 +478,15 @@ export class Api {
     days = 7,
   ): Promise<{ day: string; count: number }[]> {
     return this.get(`/v1/projects/${projectId}/events/trend?days=${days}`);
+  }
+  /** One event with everything the SDK captured for it. */
+  getEvent(projectId: string, eventId: string): Promise<EventDetail> {
+    return this.get(`/v1/projects/${projectId}/events/${eventId}`);
+  }
+  /** Direct URL for an attachment's bytes — used as an `<img src>` or
+   *  fetched for the replay NDJSON. Session cookie authorises it. */
+  attachmentUrl(projectId: string, ref: string): string {
+    return `${this.baseUrl}/v1/projects/${projectId}/attachments/${ref}`;
   }
   getIssue(projectId: string, issueId: string): Promise<IssueDetail> {
     return this.get(`/v1/projects/${projectId}/issues/${issueId}`);
