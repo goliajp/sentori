@@ -84,7 +84,7 @@ export function CertPage() {
       {showAdd && (
         <Card className="mb-4">
           <CardHeader title="Watch new domain" />
-          <div className="p-4 space-y-2">
+          <div className="px-5 py-4 space-y-2">
             <input
               className="w-full rounded border border-border-strong bg-surface px-3 py-2 text-sm font-mono"
               placeholder="example.com"
@@ -104,7 +104,7 @@ export function CertPage() {
       {watches.length > 0 && (
         <Card className="mb-4">
           <CardHeader title={`Watched (${watches.length})`} />
-          <div className="p-4 space-y-1">
+          <div className="px-5 py-4 space-y-1">
             {watches.map(w => (
               <div
                 key={w.id}

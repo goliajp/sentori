@@ -114,7 +114,7 @@ function Sidebar({ me }: { me: MeResponse | null }) {
   const projectScoped = params.id;
 
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-bg p-4">
+    <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-bg px-5 py-4">
       <div className="mb-4">
         <h1 className="text-base font-semibold tracking-tight text-fg">
           Sentori

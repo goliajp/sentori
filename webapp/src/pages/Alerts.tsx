@@ -111,7 +111,7 @@ export function AlertsPage() {
       {err && <ErrorBanner>{err}</ErrorBanner>}
 
       {showCreate && (
-        <Card className="mb-4 p-4">
+        <Card className="mb-4 px-5 py-4">
           <p className="mb-2 text-xs text-fg-subtle">
             Minimal create — trigger_kind defaults to "issue_new" + filter
             / channels empty. Tune via PATCH /v1/alerts/:id afterward.

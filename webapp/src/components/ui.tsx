@@ -44,7 +44,7 @@ export function CardHeader({
   return (
     <div className="flex items-start justify-between border-b border-border px-5 py-4">
       <div>
-        <h3 className="text-sm font-medium text-fg">{title}</h3>
+        <h3 className="text-[15px] font-semibold tracking-tight text-fg">{title}</h3>
         {subtitle && (
           <p className="mt-0.5 text-xs text-fg-subtle">{subtitle}</p>
         )}
@@ -350,7 +350,7 @@ export function Section({
     <section className="mb-8">
       {(title || action) && (
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-medium uppercase tracking-wide text-fg-muted">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
             {title}
           </h3>
           {action}

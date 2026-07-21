@@ -222,7 +222,7 @@ function UsageCard({
     : 0;
   const isUnlimited = limit >= Number.MAX_SAFE_INTEGER || limit > 1e15;
   return (
-    <div className="rounded border border-border bg-surface p-4">
+    <div className="rounded border border-border bg-surface px-5 py-4">
       <p className="text-xs uppercase tracking-wide text-fg-subtle">{title}</p>
       <p className="mt-1 font-mono text-2xl text-fg">{formatNumber(count)}</p>
       <p className="text-xs text-fg-subtle">
