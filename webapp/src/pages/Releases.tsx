@@ -113,19 +113,19 @@ export default function Releases() {
         <Card>
           <CardHeader title="Mark deploy" />
           <Section>
-            <p className="text-xs text-zinc-500 mb-2">
+            <p className="text-xs text-fg-subtle mb-2">
               Mints a release row via the public /v1/deploys endpoint.
               Requires a project SDK token (st_pk_...).
             </p>
             <input
-              className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+              className="w-full rounded border border-border-strong bg-surface px-3 py-2 text-sm"
               placeholder="Release name (e.g. myapp@1.2.3+456)"
               value={newName}
               onChange={e => setNewName(e.target.value)}
             />
             <input
               type="password"
-              className="mt-2 w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-mono"
+              className="mt-2 w-full rounded border border-border-strong bg-surface px-3 py-2 text-sm font-mono"
               placeholder="Project SDK token (st_pk_...)"
               value={sdkToken}
               onChange={e => setSdkToken(e.target.value)}
@@ -144,7 +144,7 @@ export default function Releases() {
         <CardHeader title={`Releases (${rows.length})`} />
         <Section>
           {loading ? (
-            <div className="py-8 text-center text-sm text-zinc-500">Loading…</div>
+            <div className="py-8 text-center text-sm text-fg-subtle">Loading…</div>
           ) : rows.length === 0 ? (
             <EmptyState
               title="No releases"
@@ -155,7 +155,7 @@ export default function Releases() {
               {rows.map(r => (
                 <div
                   key={r.id}
-                  className="rounded border border-zinc-200 bg-white"
+                  className="rounded border border-border bg-white"
                 >
                   <div className="flex items-center justify-between p-3">
                     <div className="flex items-center gap-3">
@@ -170,7 +170,7 @@ export default function Releases() {
                       )}
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-xs text-zinc-500">
+                      <span className="text-xs text-fg-subtle">
                         {formatRelative(r.created_at)}
                       </span>
                       <Button
@@ -183,10 +183,10 @@ export default function Releases() {
                     </div>
                   </div>
                   {expanded === r.id && (
-                    <div className="border-t border-zinc-100 p-3">
+                    <div className="border-t border-border p-3">
                       {artifacts[r.id] ? (
                         artifacts[r.id].length === 0 ? (
-                          <p className="text-xs text-zinc-500">
+                          <p className="text-xs text-fg-subtle">
                             No artifacts uploaded.
                           </p>
                         ) : (
@@ -213,7 +213,7 @@ export default function Releases() {
                           />
                         )
                       ) : (
-                        <p className="text-xs text-zinc-500">Loading…</p>
+                        <p className="text-xs text-fg-subtle">Loading…</p>
                       )}
                     </div>
                   )}

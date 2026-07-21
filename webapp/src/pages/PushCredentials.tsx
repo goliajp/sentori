@@ -103,7 +103,7 @@ export default function PushCredentials() {
       <Card className="mb-2">
         <CardHeader title="Test push" />
         <Section>
-          <p className="text-xs text-zinc-500 mb-2">
+          <p className="text-xs text-fg-subtle mb-2">
             Send a real test notification to a known device token to
             verify credentials + vendor adapter end-to-end.
           </p>
@@ -115,9 +115,9 @@ export default function PushCredentials() {
         <Card>
           <CardHeader title="Upload credentials" />
           <Section>
-            <label className="block text-xs text-zinc-500 mb-1">Provider</label>
+            <label className="block text-xs text-fg-subtle mb-1">Provider</label>
             <select
-              className="w-full rounded border border-zinc-300 px-3 py-2 text-sm"
+              className="w-full rounded border border-border px-3 py-2 text-sm"
               value={provider}
               onChange={e =>
                 setProvider(e.target.value as (typeof PROVIDERS)[number])
@@ -130,20 +130,20 @@ export default function PushCredentials() {
               ))}
             </select>
 
-            <label className="mt-3 block text-xs text-zinc-500 mb-1">
+            <label className="mt-3 block text-xs text-fg-subtle mb-1">
               Config (JSON — key id, team id, project id, vapid public key, …)
             </label>
             <textarea
-              className="w-full h-32 rounded border border-zinc-300 px-3 py-2 text-xs font-mono"
+              className="w-full h-32 rounded border border-border px-3 py-2 text-xs font-mono"
               value={config}
               onChange={e => setConfig(e.target.value)}
             />
 
-            <label className="mt-3 block text-xs text-zinc-500 mb-1">
+            <label className="mt-3 block text-xs text-fg-subtle mb-1">
               Secret (APNs p8 / FCM service-account json / VAPID private key)
             </label>
             <textarea
-              className="w-full h-32 rounded border border-zinc-300 px-3 py-2 text-xs font-mono"
+              className="w-full h-32 rounded border border-border px-3 py-2 text-xs font-mono"
               value={secret}
               onChange={e => setSecret(e.target.value)}
               placeholder="-----BEGIN PRIVATE KEY-----\n..."
@@ -171,7 +171,7 @@ export default function PushCredentials() {
                 >
                   Generate VAPID keypair
                 </Button>
-                <p className="mt-1 text-[10px] text-zinc-500">
+                <p className="mt-1 text-[10px] text-fg-subtle">
                   Browser-side WebCrypto. Public key goes into config
                   (for SDK), private PEM goes into secret. Never leaves
                   this browser → sent to server only on Save.
@@ -192,7 +192,7 @@ export default function PushCredentials() {
         <CardHeader title={`Configured (${rows.length})`} />
         <Section>
           {loading ? (
-            <div className="py-8 text-center text-sm text-zinc-500">
+            <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
             </div>
           ) : rows.length === 0 ? (
@@ -212,7 +212,7 @@ export default function PushCredentials() {
                 key: c.id,
                 kind: <Badge>{c.kind}</Badge>,
                 config: (
-                  <code className="text-[10px] font-mono text-zinc-500">
+                  <code className="text-[10px] font-mono text-fg-subtle">
                     {JSON.stringify(c.config).slice(0, 80)}
                   </code>
                 ),
@@ -222,7 +222,7 @@ export default function PushCredentials() {
                   ) : c.last_validate_status ? (
                     <Badge tone="neutral">{c.last_validate_status}</Badge>
                   ) : (
-                    <span className="text-xs text-zinc-400">never</span>
+                    <span className="text-xs text-fg-muted">never</span>
                   ),
                 actions: (
                   <Button
@@ -301,20 +301,20 @@ function TestPushForm({ projectId }: { projectId: string }) {
   return (
     <div className="space-y-2">
       <input
-        className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-mono"
+        className="w-full rounded border border-border-strong bg-surface px-3 py-2 text-sm font-mono"
         placeholder="device_token_id (UUID)"
         value={tokenId}
         onChange={e => setTokenId(e.target.value)}
       />
       <div className="grid grid-cols-2 gap-2">
         <input
-          className="rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+          className="rounded border border-border-strong bg-surface px-3 py-2 text-sm"
           placeholder="Title"
           value={title}
           onChange={e => setTitle(e.target.value)}
         />
         <input
-          className="rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+          className="rounded border border-border-strong bg-surface px-3 py-2 text-sm"
           placeholder="Body"
           value={bodyText}
           onChange={e => setBodyText(e.target.value)}
@@ -325,7 +325,7 @@ function TestPushForm({ projectId }: { projectId: string }) {
           Send test
         </Button>
         {msg && (
-          <span className="font-mono text-[10px] text-zinc-500">{msg}</span>
+          <span className="font-mono text-[10px] text-fg-subtle">{msg}</span>
         )}
       </div>
     </div>

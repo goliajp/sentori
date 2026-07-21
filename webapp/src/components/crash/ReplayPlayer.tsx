@@ -19,6 +19,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useT } from '../../i18n';
 import { api } from '../../lib/api';
 
 type Node = {
@@ -55,6 +56,7 @@ export function ReplayPlayer({
    *  can follow along — the breadcrumb timeline highlights in step. */
   onSeek?: (ts: number) => void;
 }) {
+  const t = useT();
   const [frames, setFrames] = useState<Frame[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
@@ -188,15 +190,15 @@ export function ReplayPlayer({
   if (error) {
     return (
       <p className="text-sm text-fg-subtle">
-        This recording could not be loaded ({error}).
+        {t('crash.loadFailed')} ({error}).
       </p>
     );
   }
   if (!frames) {
-    return <p className="text-sm text-fg-subtle">Loading recording…</p>;
+    return <p className="text-sm text-fg-subtle">{t('crash.loadingRecording')}</p>;
   }
   if (!frames.length) {
-    return <p className="text-sm text-fg-subtle">The recording is empty.</p>;
+    return <p className="text-sm text-fg-subtle">{t('crash.emptyRecording')}</p>;
   }
 
   const last = frames.length - 1;
@@ -222,14 +224,14 @@ export function ReplayPlayer({
           }}
           className="w-16 shrink-0 rounded border border-border px-2 py-1 text-xs text-fg-muted transition hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
-          {playing ? 'Pause' : 'Play'}
+          {playing ? t('crash.pause') : t('crash.play')}
         </button>
         <input
           type="range"
           min={0}
           max={last}
           value={index}
-          aria-label="Recording position"
+          aria-label={t('crash.recordingPosition')}
           onChange={e => {
             setPlaying(false);
             setIndex(Number(e.target.value));

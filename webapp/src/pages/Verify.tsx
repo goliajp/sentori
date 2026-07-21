@@ -35,12 +35,12 @@ export default function Verify() {
   }, [token]);
 
   return (
-    <div className="flex h-screen items-center justify-center bg-zinc-950">
-      <div className="w-96 rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+    <div className="flex h-screen items-center justify-center bg-bg">
+      <div className="w-96 rounded-lg border border-border bg-surface p-6">
         <h1 className="mb-1 text-xl font-semibold">Verify email</h1>
-        <p className="mb-6 text-sm text-zinc-500">Sentori</p>
+        <p className="mb-6 text-sm text-fg-subtle">Sentori</p>
         {state === 'working' && (
-          <p className="text-sm text-zinc-300">Verifying…</p>
+          <p className="text-sm text-fg-muted">Verifying…</p>
         )}
         {state === 'ok' && (
           <div className="space-y-3">
@@ -58,13 +58,13 @@ export default function Verify() {
         {state === 'error' && (
           <div className="space-y-3">
             <p className="break-all text-xs text-red-400">{err}</p>
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-fg-subtle">
               The link may have expired. Sign up again or request a
               new verification email.
             </p>
             <Link
               to="/login"
-              className="block rounded border border-zinc-700 px-3 py-2 text-center text-sm text-zinc-300 hover:bg-zinc-800"
+              className="block rounded border border-border-strong px-3 py-2 text-center text-sm text-fg-muted hover:bg-raised"
             >
               Back to sign in
             </Link>

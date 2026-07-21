@@ -71,21 +71,21 @@ export default function Notifications() {
         <CardHeader title={`Inbox (${rows.length})`} />
         <Section>
           {loading ? (
-            <div className="py-8 text-center text-sm text-zinc-500">
+            <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
             </div>
           ) : rows.length === 0 ? (
-            <div className="py-8 text-center text-sm text-zinc-500">
+            <div className="py-8 text-center text-sm text-fg-subtle">
               No notifications.
             </div>
           ) : (
-            <ul className="divide-y divide-zinc-800">
+            <ul className="divide-y divide-border">
               {rows.map(n => (
                 <li
                   key={n.id}
                   onClick={() => !n.read_at && readOne(n.id)}
                   className={`flex items-center justify-between gap-3 px-2 py-3 cursor-pointer ${
-                    n.read_at ? 'opacity-60' : 'hover:bg-zinc-900/40'
+                    n.read_at ? 'opacity-60' : 'hover:bg-surface/40'
                   }`}
                 >
                   <div className="min-w-0 flex-1">
@@ -95,11 +95,11 @@ export default function Notifications() {
                         <span className="text-emerald-400">●</span>
                       )}
                     </div>
-                    <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all text-[10px] font-mono text-zinc-500">
+                    <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all text-[10px] font-mono text-fg-subtle">
                       {JSON.stringify(n.payload)}
                     </pre>
                   </div>
-                  <span className="text-xs text-zinc-500 w-24 text-right">
+                  <span className="text-xs text-fg-subtle w-24 text-right">
                     {formatRelative(n.created_at)}
                   </span>
                 </li>

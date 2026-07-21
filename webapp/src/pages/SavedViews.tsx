@@ -137,7 +137,7 @@ export default function SavedViews() {
               className={`rounded px-3 py-1 text-xs font-mono ${
                 target === t
                   ? 'bg-emerald-600 text-white'
-                  : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                  : 'bg-raised text-fg-muted hover:bg-raised'
               }`}
             >
               {t}
@@ -151,16 +151,16 @@ export default function SavedViews() {
           <CardHeader title={`Save new ${target} view`} />
           <Section>
             <input
-              className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+              className="w-full rounded border border-border-strong bg-surface px-3 py-2 text-sm"
               placeholder='Name (e.g. "active iOS prod")'
               value={newName}
               onChange={e => setNewName(e.target.value)}
             />
-            <label className="mt-2 block text-xs text-zinc-500">
+            <label className="mt-2 block text-xs text-fg-subtle">
               Payload (JSON — filter shape; depends on target)
             </label>
             <textarea
-              className="w-full h-32 rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs font-mono"
+              className="w-full h-32 rounded border border-border-strong bg-surface px-3 py-2 text-xs font-mono"
               value={newPayload}
               onChange={e => setNewPayload(e.target.value)}
             />
@@ -178,15 +178,15 @@ export default function SavedViews() {
         <CardHeader title={`Views (${rows.length})`} />
         <Section>
           {loading ? (
-            <div className="py-8 text-center text-sm text-zinc-500">
+            <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
             </div>
           ) : rows.length === 0 ? (
-            <div className="py-8 text-center text-sm text-zinc-500">
+            <div className="py-8 text-center text-sm text-fg-subtle">
               No saved {target} views.
             </div>
           ) : (
-            <ul className="divide-y divide-zinc-800">
+            <ul className="divide-y divide-border">
               {rows.map(v => {
                 const route = targetRoute(v);
                 return (
@@ -196,19 +196,19 @@ export default function SavedViews() {
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-zinc-100">
+                        <span className="text-sm font-medium text-fg">
                           {v.name}
                         </span>
                         <Badge>{v.scope}</Badge>
                         {v.project_id ? (
-                          <span className="font-mono text-[10px] text-zinc-500">
+                          <span className="font-mono text-[10px] text-fg-subtle">
                             project {v.project_id.slice(0, 8)}…
                           </span>
                         ) : (
                           <Badge tone="neutral">workspace</Badge>
                         )}
                       </div>
-                      <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all text-[10px] font-mono text-zinc-500">
+                      <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all text-[10px] font-mono text-fg-subtle">
                         {JSON.stringify(v.payload)}
                       </pre>
                     </div>
@@ -216,7 +216,7 @@ export default function SavedViews() {
                       {route !== '#' && (
                         <Link
                           to={route}
-                          className="rounded bg-zinc-800 px-3 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
+                          className="rounded bg-raised px-3 py-1 text-xs text-fg-muted hover:bg-raised"
                         >
                           Open →
                         </Link>

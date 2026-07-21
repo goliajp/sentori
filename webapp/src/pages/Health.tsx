@@ -45,7 +45,7 @@ export function HealthPage() {
         actions={
           <button
             onClick={refresh}
-            className="rounded border border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-800"
+            className="rounded border border-border-strong px-3 py-1.5 text-sm hover:bg-raised"
           >
             Refresh
           </button>
@@ -82,7 +82,7 @@ export function HealthPage() {
             <StatCard
               label="Push queued"
               value={
-                <span className="font-mono text-xl text-zinc-100">
+                <span className="font-mono text-xl text-fg">
                   {health.push_queued ?? 0}
                 </span>
               }
@@ -95,7 +95,7 @@ export function HealthPage() {
                   className={`font-mono text-xl ${
                     (health.push_failed_24h ?? 0) > 0
                       ? 'text-amber-400'
-                      : 'text-zinc-100'
+                      : 'text-fg'
                   }`}
                 >
                   {health.push_failed_24h ?? 0}
@@ -108,7 +108,7 @@ export function HealthPage() {
           <Card>
             <CardHeader title="Scrape endpoints" />
             <Section>
-              <ul className="space-y-1 text-xs font-mono text-zinc-400">
+              <ul className="space-y-1 text-xs font-mono text-fg-muted">
                 <li>
                   GET <code>/healthz</code> — JSON snapshot (this page
                   uses it)
@@ -136,7 +136,7 @@ export function HealthPage() {
           <Card>
             <CardHeader title="Background workers" />
             <Section>
-              <ul className="space-y-1 text-xs font-mono text-zinc-400">
+              <ul className="space-y-1 text-xs font-mono text-fg-muted">
                 <li>
                   <span className="text-emerald-400">●</span>{' '}
                   push_worker — drains push_sends every{' '}
@@ -169,7 +169,7 @@ export function HealthPage() {
           <Card>
             <CardHeader title="Vendor adapters (push)" />
             <Section>
-              <ul className="space-y-1 text-xs font-mono text-zinc-400">
+              <ul className="space-y-1 text-xs font-mono text-fg-muted">
                 <li>
                   <span className="text-emerald-400">●</span> webpush —
                   VAPID ES256 wake push
@@ -197,7 +197,7 @@ export function HealthPage() {
           <Card>
             <CardHeader title="Raw" />
             <Section>
-              <pre className="overflow-auto rounded border border-zinc-800 bg-zinc-950 p-3 text-[10px] font-mono text-zinc-400">
+              <pre className="overflow-auto rounded border border-border bg-bg p-3 text-[10px] font-mono text-fg-muted">
                 {JSON.stringify(health, null, 2)}
               </pre>
             </Section>
@@ -220,12 +220,12 @@ function StatCard({
   return (
     <Card>
       <Section>
-        <div className="text-xs uppercase tracking-wide text-zinc-500">
+        <div className="text-xs uppercase tracking-wide text-fg-subtle">
           {label}
         </div>
         <div className="mt-1">{value}</div>
         {sub && (
-          <div className="mt-1 text-[10px] font-mono text-zinc-500">
+          <div className="mt-1 text-[10px] font-mono text-fg-subtle">
             {sub}
           </div>
         )}

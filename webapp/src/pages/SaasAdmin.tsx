@@ -93,7 +93,7 @@ export default function SaasAdmin() {
           <CardHeader title="Create workspace" />
           <Section>
             <input
-              className="w-full rounded border border-zinc-300 px-3 py-2 text-sm"
+              className="w-full rounded border border-border px-3 py-2 text-sm"
               placeholder="Display name (e.g. 'Acme Inc')"
               value={name}
               onChange={e => setName(e.target.value)}
@@ -133,7 +133,7 @@ export default function SaasAdmin() {
         <CardHeader title={`Workspaces (${rows.length})`} />
         <Section>
           {loading ? (
-            <div className="py-8 text-center text-sm text-zinc-500">Loading…</div>
+            <div className="py-8 text-center text-sm text-fg-subtle">Loading…</div>
           ) : rows.length === 0 ? (
             <EmptyState
               title="No workspaces"
@@ -155,7 +155,7 @@ export default function SaasAdmin() {
                 name: (
                   <div>
                     <div className="font-medium">{w.name}</div>
-                    <div className="font-mono text-[10px] text-zinc-400">
+                    <div className="font-mono text-[10px] text-fg-muted">
                       {w.id}
                     </div>
                   </div>
@@ -173,7 +173,7 @@ export default function SaasAdmin() {
                 actions: (
                   <div className="flex items-center gap-1">
                     <select
-                      className="rounded border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-xs text-zinc-200"
+                      className="rounded border border-border-strong bg-surface px-1.5 py-1 text-xs text-fg"
                       value={w.plan}
                       disabled={busy === w.id}
                       onChange={e =>
@@ -239,11 +239,11 @@ function StatCard({
   return (
     <Card>
       <div className="p-4">
-        <p className="text-[11px] uppercase tracking-wide text-zinc-500">
+        <p className="text-[11px] uppercase tracking-wide text-fg-subtle">
           {label}
         </p>
         <p
-          className={`mt-1 text-2xl font-semibold ${tone === 'ok' ? 'text-emerald-600' : 'text-zinc-800'}`}
+          className={`mt-1 text-2xl font-semibold ${tone === 'ok' ? 'text-ok' : 'text-fg'}`}
         >
           {formatNumber(value)}
         </p>

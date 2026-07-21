@@ -125,7 +125,7 @@ export function AuditPage() {
             placeholder="e.g. 198.51.100"
           />
           <div className="col-span-4 flex gap-2 text-xs">
-            <span className="text-zinc-500">Quick:</span>
+            <span className="text-fg-subtle">Quick:</span>
             <button
               onClick={() => {
                 setAction('token.mint');
@@ -174,18 +174,18 @@ export function AuditPage() {
 
       <Card>
         {visibleEntries?.length === 0 ? (
-          <div className="p-8 text-center text-sm text-zinc-500">
+          <div className="p-8 text-center text-sm text-fg-subtle">
             {ipFilter ? `No entries match IP "${ipFilter}".` : 'No audit entries yet.'}
           </div>
         ) : (
           <>
             {ipFilter && (
-              <div className="border-b border-zinc-800 px-4 py-2 text-[10px] text-zinc-500">
+              <div className="border-b border-border px-4 py-2 text-[10px] text-fg-subtle">
                 Showing {visibleEntries?.length ?? 0} of {entries?.length ?? 0}
                 {' '}entries matching IP "{ipFilter}".
               </div>
             )}
-            <ul className="divide-y divide-zinc-800">
+            <ul className="divide-y divide-border">
               {visibleEntries?.map(e => (
                 <AuditRow key={e.id} entry={e} />
               ))}
@@ -213,48 +213,48 @@ function AuditRow({ entry: e }: { entry: AuditEntry }) {
     <li>
       <button
         onClick={() => hasPayload && setOpen(!open)}
-        className={`flex w-full items-center gap-4 px-5 py-3 text-left ${hasPayload ? 'hover:bg-zinc-900/40' : 'cursor-default'}`}
+        className={`flex w-full items-center gap-4 px-5 py-3 text-left ${hasPayload ? 'hover:bg-surface/40' : 'cursor-default'}`}
       >
-        <span className="font-mono text-xs text-zinc-500 w-4">
+        <span className="font-mono text-xs text-fg-subtle w-4">
           {hasPayload ? (open ? '▼' : '▶') : ''}
         </span>
         <div className="flex-1 min-w-0">
-          <div className="font-mono text-sm text-zinc-100">{e.action}</div>
+          <div className="font-mono text-sm text-fg">{e.action}</div>
           {(e.target_type || e.target_id) && (
-            <div className="font-mono text-[11px] text-zinc-500">
+            <div className="font-mono text-[11px] text-fg-subtle">
               {e.target_type ?? ''}{' '}
               {e.target_id ? `${e.target_id.slice(0, 16)}…` : ''}
             </div>
           )}
         </div>
-        <span className="font-mono text-xs text-zinc-400 w-24 text-right">
+        <span className="font-mono text-xs text-fg-muted w-24 text-right">
           {e.actor_user_id
             ? e.actor_user_id.slice(0, 8) + '…'
             : 'system'}
         </span>
-        <span className="font-mono text-xs text-zinc-400 w-20 text-right">
+        <span className="font-mono text-xs text-fg-muted w-20 text-right">
           {e.project_id ? e.project_id.slice(0, 8) + '…' : 'workspace'}
         </span>
-        <span className="text-xs text-zinc-500 w-24 text-right">
+        <span className="text-xs text-fg-subtle w-24 text-right">
           {formatRelative(e.created_at)}
         </span>
       </button>
       {open && hasPayload && (
-        <div className="bg-zinc-950 px-12 py-3">
+        <div className="bg-bg px-12 py-3">
           {payloadIp != null && (
-            <div className="font-mono text-[10px] text-zinc-500">
-              IP: <span className="text-zinc-300">{String(payloadIp)}</span>
+            <div className="font-mono text-[10px] text-fg-subtle">
+              IP: <span className="text-fg-muted">{String(payloadIp)}</span>
               {payloadUa != null && (
                 <>
                   {' · UA: '}
-                  <span className="text-zinc-300">
+                  <span className="text-fg-muted">
                     {String(payloadUa).slice(0, 80)}
                   </span>
                 </>
               )}
             </div>
           )}
-          <pre className="overflow-x-auto whitespace-pre-wrap break-all text-[11px] font-mono text-zinc-300">
+          <pre className="overflow-x-auto whitespace-pre-wrap break-all text-[11px] font-mono text-fg-muted">
             {JSON.stringify(e.payload, null, 2)}
           </pre>
         </div>
@@ -276,7 +276,7 @@ function Field({
 }) {
   return (
     <div>
-      <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500">
+      <p className="mb-1 text-[10px] uppercase tracking-wide text-fg-subtle">
         {label}
       </p>
       <input
@@ -284,7 +284,7 @@ function Field({
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm font-mono focus:border-brand-500 focus:outline-none"
+        className="w-full rounded border border-border-strong bg-surface px-3 py-1.5 text-sm font-mono focus:border-accent focus:outline-none"
       />
     </div>
   );

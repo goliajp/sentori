@@ -142,17 +142,17 @@ export function IssuesPage() {
         }
       />
 
-      <p className="mb-3 text-[10px] text-zinc-500">
-        Shortcuts: <kbd className="rounded bg-zinc-800 px-1">j</kbd>/
-        <kbd className="rounded bg-zinc-800 px-1">k</kbd> navigate ·{' '}
-        <kbd className="rounded bg-zinc-800 px-1">x</kbd> select ·{' '}
-        <kbd className="rounded bg-zinc-800 px-1">e</kbd> resolve ·{' '}
-        <kbd className="rounded bg-zinc-800 px-1">i</kbd> ignore
+      <p className="mb-3 text-[10px] text-fg-subtle">
+        Shortcuts: <kbd className="rounded bg-raised px-1">j</kbd>/
+        <kbd className="rounded bg-raised px-1">k</kbd> navigate ·{' '}
+        <kbd className="rounded bg-raised px-1">x</kbd> select ·{' '}
+        <kbd className="rounded bg-raised px-1">e</kbd> resolve ·{' '}
+        <kbd className="rounded bg-raised px-1">i</kbd> ignore
       </p>
 
       {selected.size > 0 && (
         <div className="mb-4 flex items-center gap-2 rounded border border-emerald-700/40 bg-emerald-900/20 px-3 py-2 text-xs">
-          <span className="text-zinc-300">
+          <span className="text-fg-muted">
             {selected.size} selected
           </span>
           <Button size="sm" onClick={() => bulkApply('resolved')}>
@@ -245,10 +245,10 @@ export function IssuesPage() {
               render: (r) => (
                 <Link
                   to={`/projects/${projectId}/issues/${r.id}`}
-                  className="block hover:bg-zinc-900/40 -m-2 p-2 rounded"
+                  className="block hover:bg-surface/40 -m-2 p-2 rounded"
                 >
-                  <div className="font-medium text-zinc-100">{r.error_type}</div>
-                  <div className="font-mono text-[11px] text-zinc-500">
+                  <div className="font-medium text-fg">{r.error_type}</div>
+                  <div className="font-mono text-[11px] text-fg-subtle">
                     {r.message_sample.slice(0, 80)}
                   </div>
                 </Link>
@@ -269,7 +269,7 @@ export function IssuesPage() {
               label: 'Release',
               width: '15%',
               render: (r) => (
-                <span className="font-mono text-xs text-zinc-400">
+                <span className="font-mono text-xs text-fg-muted">
                   {r.last_release}
                 </span>
               ),
@@ -285,7 +285,7 @@ export function IssuesPage() {
               label: 'Last seen',
               width: '12%',
               render: (r) => (
-                <span className="text-xs text-zinc-500">
+                <span className="text-xs text-fg-subtle">
                   {formatRelative(r.last_seen)}
                 </span>
               ),
@@ -311,7 +311,7 @@ export function IssuesPage() {
                       onClick={() => quickAction(r.id, 'ignored')}
                       disabled={busy.has(r.id)}
                       title="Ignore"
-                      className="rounded bg-zinc-700/40 px-2 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-600 disabled:opacity-50"
+                      className="rounded bg-raised/40 px-2 py-0.5 text-[11px] text-fg-muted hover:bg-raised disabled:opacity-50"
                     >
                       ⊘
                     </button>
@@ -364,7 +364,7 @@ function TestIngestButton({ projectId }: { projectId: string }) {
   return (
     <div className="flex items-center gap-2">
       {out && (
-        <span className="font-mono text-xs text-zinc-500">{out}</span>
+        <span className="font-mono text-xs text-fg-subtle">{out}</span>
       )}
       <Button onClick={send} disabled={sending} variant="primary" size="sm">
         {sending ? 'Sending…' : 'Test ingest'}
@@ -411,7 +411,7 @@ function SaveViewButton({
   return (
     <div className="flex items-center gap-2">
       {msg && (
-        <span className="font-mono text-xs text-zinc-500">{msg}</span>
+        <span className="font-mono text-xs text-fg-subtle">{msg}</span>
       )}
       <Button onClick={save} disabled={saving} variant="secondary" size="sm">
         {saving ? 'Saving…' : 'Save filter'}

@@ -56,25 +56,25 @@ export default function Sessions() {
         <CardHeader title={`Sessions (${rows.length})`} />
         <Section>
           {rows.length === 0 ? (
-            <div className="py-8 text-center text-sm text-zinc-500">
+            <div className="py-8 text-center text-sm text-fg-subtle">
               No active sessions found.
             </div>
           ) : (
-            <ul className="divide-y divide-zinc-800">
+            <ul className="divide-y divide-border">
               {rows.map(s => (
                 <li
                   key={s.id_hash_hex}
                   className="flex items-start justify-between gap-3 py-3"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="font-mono text-xs text-zinc-300">
+                    <div className="font-mono text-xs text-fg-muted">
                       {s.id_hash_hex.slice(0, 16)}…
                     </div>
-                    <div className="mt-1 text-[10px] text-zinc-500">
+                    <div className="mt-1 text-[10px] text-fg-subtle">
                       {s.ip ?? 'IP unknown'} ·{' '}
                       {(s.user_agent ?? 'UA unknown').slice(0, 90)}
                     </div>
-                    <div className="mt-1 text-[10px] text-zinc-500">
+                    <div className="mt-1 text-[10px] text-fg-subtle">
                       created {formatRelative(s.created_at)} · last seen{' '}
                       {s.last_used_at ? formatRelative(s.last_used_at) : 'never'}{' '}
                       · expires {formatRelative(s.expires_at)}

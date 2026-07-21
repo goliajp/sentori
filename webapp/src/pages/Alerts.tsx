@@ -112,20 +112,20 @@ export function AlertsPage() {
 
       {showCreate && (
         <Card className="mb-4 p-4">
-          <p className="mb-2 text-xs text-zinc-500">
+          <p className="mb-2 text-xs text-fg-subtle">
             Minimal create — trigger_kind defaults to "issue_new" + filter
             / channels empty. Tune via PATCH /v1/alerts/:id afterward.
           </p>
           <div className="flex gap-2">
             <input
-              className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+              className="flex-1 rounded border border-border-strong bg-surface px-3 py-2 text-sm"
               placeholder='Name (e.g. "production new issues")'
               value={name}
               onChange={e => setName(e.target.value)}
             />
             <input
               type="number"
-              className="w-24 rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+              className="w-24 rounded border border-border-strong bg-surface px-3 py-2 text-sm"
               value={throttle}
               onChange={e =>
                 setThrottle(parseInt(e.target.value, 10) || 10)
@@ -160,8 +160,8 @@ export function AlertsPage() {
               label: 'Name',
               render: (r) => (
                 <div>
-                  <div className="font-medium text-zinc-100">{r.name}</div>
-                  <div className="font-mono text-[11px] text-zinc-500">
+                  <div className="font-medium text-fg">{r.name}</div>
+                  <div className="font-mono text-[11px] text-fg-subtle">
                     {r.trigger_kind} · throttle {r.throttle_minutes}m
                     {r.project_id ? ` · project ${r.project_id.slice(0, 8)}` : ' · workspace-wide'}
                   </div>
@@ -174,11 +174,11 @@ export function AlertsPage() {
               width: '15%',
               render: (r) =>
                 r.last_fired_at ? (
-                  <span className="text-xs text-zinc-500">
+                  <span className="text-xs text-fg-subtle">
                     {formatRelative(r.last_fired_at)}
                   </span>
                 ) : (
-                  <span className="text-xs text-zinc-600">never</span>
+                  <span className="text-xs text-fg-subtle">never</span>
                 ),
             },
             {

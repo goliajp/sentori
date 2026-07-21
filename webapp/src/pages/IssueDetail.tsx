@@ -5,6 +5,7 @@ import { Link, useParams } from 'react-router-dom';
 
 import { api, EventDetail, EventRow, IssueDetail as Issue } from '../lib/api';
 import { EventEvidence } from '../components/crash/EventEvidence';
+import { useT } from '../i18n';
 import { useKeyHandlers } from '../lib/useShortcuts';
 import {
   Badge,
@@ -28,6 +29,7 @@ export default function IssueDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const t = useT();
   const [watchers, setWatchers] = useState<string[]>([]);
   // The latest matching event, loaded in full. This is the crash the
   // page is actually about — the issue row is just its aggregate.
@@ -277,7 +279,7 @@ export default function IssueDetail() {
         </div>
       ) : (
         <p className="py-8 text-center text-sm text-fg-subtle">
-          No event has been collected for this issue yet.
+          {t('crash.noEvent')}
         </p>
       )}
     </div>

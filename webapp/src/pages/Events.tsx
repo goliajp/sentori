@@ -98,7 +98,7 @@ export function EventsPage() {
         action={
           <div className="flex items-center gap-2">
             {saveMsg && (
-              <span className="font-mono text-xs text-zinc-500">
+              <span className="font-mono text-xs text-fg-subtle">
                 {saveMsg}
               </span>
             )}
@@ -132,7 +132,7 @@ export function EventsPage() {
                 search.delete('issue_id');
                 setSearch(search, { replace: true });
               }}
-              className="rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
+              className="rounded bg-raised px-2 py-1 text-xs text-fg-muted hover:bg-raised"
             >
               Clear ×
             </button>
@@ -158,7 +158,7 @@ export function EventsPage() {
               label: 'Plat',
               width: '10%',
               render: (r) => (
-                <span className="font-mono text-xs text-zinc-400">
+                <span className="font-mono text-xs text-fg-muted">
                   {r.platform}
                 </span>
               ),
@@ -168,7 +168,7 @@ export function EventsPage() {
               label: 'Release',
               width: '20%',
               render: (r) => (
-                <span className="font-mono text-xs text-zinc-400">
+                <span className="font-mono text-xs text-fg-muted">
                   {r.release}
                 </span>
               ),
@@ -197,7 +197,7 @@ export function EventsPage() {
               label: 'When',
               width: '12%',
               render: (r) => (
-                <span className="text-xs text-zinc-500">
+                <span className="text-xs text-fg-subtle">
                   {formatRelative(r.timestamp)}
                 </span>
               ),
@@ -213,7 +213,7 @@ export function EventsPage() {
                     setSearch(search, { replace: true });
                   }}
                   title="Narrow to this issue"
-                  className="rounded bg-zinc-800 px-2 py-0.5 text-[11px] text-zinc-300 hover:bg-zinc-700"
+                  className="rounded bg-raised px-2 py-0.5 text-[11px] text-fg-muted hover:bg-raised"
                 >
                   Narrow
                 </button>

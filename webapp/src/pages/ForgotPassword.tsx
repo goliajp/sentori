@@ -28,30 +28,30 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-zinc-950">
+    <div className="flex h-screen items-center justify-center bg-bg">
       <form
         onSubmit={submit}
-        className="w-96 rounded-lg border border-zinc-800 bg-zinc-900 p-6"
+        className="w-96 rounded-lg border border-border bg-surface p-6"
       >
         <h1 className="mb-1 text-xl font-semibold">Forgot password</h1>
-        <p className="mb-6 text-sm text-zinc-500">
+        <p className="mb-6 text-sm text-fg-subtle">
           We'll email you a password reset link.
         </p>
         <label className="mb-3 block text-sm">
-          <span className="mb-1 block text-zinc-400">Email</span>
+          <span className="mb-1 block text-fg-muted">Email</span>
           <input
             type="email"
             autoFocus
             value={email}
             onChange={e => setEmail(e.target.value)}
-            className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+            className="w-full rounded border border-border-strong bg-bg px-3 py-2 text-sm focus:border-accent focus:outline-none"
           />
         </label>
         {err && (
           <p className="mb-3 text-xs text-red-400 break-all">{err}</p>
         )}
         {silent && (
-          <p className="mb-3 text-xs text-zinc-300">
+          <p className="mb-3 text-xs text-fg-muted">
             If that email is registered, instructions have been sent.
           </p>
         )}
@@ -62,8 +62,8 @@ export default function ForgotPassword() {
         >
           {loading ? 'Sending…' : 'Send reset link'}
         </button>
-        <div className="mt-4 text-center text-xs text-zinc-500">
-          <Link to="/login" className="hover:text-zinc-300">
+        <div className="mt-4 text-center text-xs text-fg-subtle">
+          <Link to="/login" className="hover:text-fg-muted">
             Back to sign in
           </Link>
         </div>

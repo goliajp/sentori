@@ -107,7 +107,7 @@ export default function Projects() {
           <CardHeader title="Create project" />
           <Section>
             <input
-              className="w-full rounded border border-zinc-300 px-3 py-2 text-sm"
+              className="w-full rounded border border-border px-3 py-2 text-sm"
               placeholder="Display name (e.g. 'MyApp iOS')"
               value={name}
               onChange={e => {
@@ -121,7 +121,7 @@ export default function Projects() {
               }}
             />
             <input
-              className="mt-2 w-full rounded border border-zinc-300 px-3 py-2 text-sm font-mono"
+              className="mt-2 w-full rounded border border-border px-3 py-2 text-sm font-mono"
               placeholder="Slug (e.g. 'myapp-ios')"
               value={slug}
               onChange={e => setSlug(e.target.value)}
@@ -139,7 +139,7 @@ export default function Projects() {
         <CardHeader title={`Projects (${rows.length})`} />
         <Section>
           {loading ? (
-            <div className="py-8 text-center text-sm text-zinc-500">
+            <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
             </div>
           ) : rows.length === 0 ? (
@@ -168,7 +168,7 @@ export default function Projects() {
                 ),
                 slug: <span className="font-mono text-xs">{p.slug}</span>,
                 events: (
-                  <span className="font-mono tabular-nums text-zinc-300">
+                  <span className="font-mono tabular-nums text-fg-muted">
                     {stats[p.id]
                       ? stats[p.id].events_24h.toLocaleString()
                       : '—'}

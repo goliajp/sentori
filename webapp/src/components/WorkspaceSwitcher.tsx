@@ -54,22 +54,22 @@ export function WorkspaceSwitcher({ me }: { me: MeResponse }) {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex w-full items-center justify-between rounded border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-left hover:border-zinc-700"
+        className="flex w-full items-center justify-between rounded border border-border bg-surface px-2.5 py-2 text-left hover:border-border-strong"
       >
         <span className="min-w-0">
-          <span className="block truncate text-xs font-medium text-zinc-100">
+          <span className="block truncate text-xs font-medium text-fg">
             {name}
           </span>
-          <span className="block text-[10px] text-zinc-500">{me.role}</span>
+          <span className="block text-[10px] text-fg-subtle">{me.role}</span>
         </span>
-        <span className="ml-2 shrink-0 text-zinc-500">▾</span>
+        <span className="ml-2 shrink-0 text-fg-subtle">▾</span>
       </button>
       {open && (
-        <div className="absolute left-0 right-0 z-20 mt-1 max-h-72 overflow-y-auto rounded border border-zinc-800 bg-zinc-900 py-1 shadow-xl">
+        <div className="absolute left-0 right-0 z-20 mt-1 max-h-72 overflow-y-auto rounded border border-border bg-surface py-1 shadow-xl">
           {rows === null ? (
-            <div className="px-3 py-2 text-[11px] text-zinc-500">Loading…</div>
+            <div className="px-3 py-2 text-[11px] text-fg-subtle">Loading…</div>
           ) : rows.length === 0 ? (
-            <div className="px-3 py-2 text-[11px] text-zinc-500">
+            <div className="px-3 py-2 text-[11px] text-fg-subtle">
               No workspaces.
             </div>
           ) : (
@@ -78,12 +78,12 @@ export function WorkspaceSwitcher({ me }: { me: MeResponse }) {
                 key={w.workspace_id}
                 onClick={() => pick(w)}
                 disabled={switching !== null}
-                className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-zinc-800 ${
-                  w.active ? 'text-emerald-400' : 'text-zinc-200'
+                className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-raised ${
+                  w.active ? 'text-emerald-400' : 'text-fg'
                 }`}
               >
                 <span className="min-w-0 truncate">{w.name}</span>
-                <span className="ml-2 shrink-0 text-[10px] text-zinc-500">
+                <span className="ml-2 shrink-0 text-[10px] text-fg-subtle">
                   {switching === w.workspace_id
                     ? '…'
                     : w.active

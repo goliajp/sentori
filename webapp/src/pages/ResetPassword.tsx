@@ -38,13 +38,13 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-zinc-950">
+    <div className="flex h-screen items-center justify-center bg-bg">
       <form
         onSubmit={submit}
-        className="w-96 rounded-lg border border-zinc-800 bg-zinc-900 p-6"
+        className="w-96 rounded-lg border border-border bg-surface p-6"
       >
         <h1 className="mb-1 text-xl font-semibold">Reset password</h1>
-        <p className="mb-6 text-sm text-zinc-500">Sentori</p>
+        <p className="mb-6 text-sm text-fg-subtle">Sentori</p>
         {done ? (
           <div className="space-y-3">
             <p className="text-sm text-emerald-400">
@@ -65,7 +65,7 @@ export default function ResetPassword() {
               </p>
             )}
             <label className="mb-3 block text-sm">
-              <span className="mb-1 block text-zinc-400">
+              <span className="mb-1 block text-fg-muted">
                 New password (≥12 chars)
               </span>
               <input
@@ -73,16 +73,16 @@ export default function ResetPassword() {
                 autoFocus
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                className="w-full rounded border border-border-strong bg-bg px-3 py-2 text-sm focus:border-accent focus:outline-none"
               />
             </label>
             <label className="mb-4 block text-sm">
-              <span className="mb-1 block text-zinc-400">Confirm</span>
+              <span className="mb-1 block text-fg-muted">Confirm</span>
               <input
                 type="password"
                 value={confirm}
                 onChange={e => setConfirm(e.target.value)}
-                className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                className="w-full rounded border border-border-strong bg-bg px-3 py-2 text-sm focus:border-accent focus:outline-none"
               />
             </label>
             {err && (
@@ -95,8 +95,8 @@ export default function ResetPassword() {
             >
               {loading ? 'Saving…' : 'Set new password'}
             </button>
-            <p className="mt-4 text-center text-xs text-zinc-500">
-              <Link to="/login" className="hover:text-zinc-300">
+            <p className="mt-4 text-center text-xs text-fg-subtle">
+              <Link to="/login" className="hover:text-fg-muted">
                 Back to sign in
               </Link>
             </p>
