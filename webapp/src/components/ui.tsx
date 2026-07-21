@@ -45,6 +45,41 @@ export function CardHeader({
   );
 }
 
+// ── Controls ───────────────────────────────────────────────
+
+/**
+ * The two control heights in the product. Everything that can sit in
+ * a row with a button — buttons, inputs, selects — uses one of these
+ * so the row has a single baseline. Before this the app had ten
+ * different padding pairs standing in for a height, and no two
+ * adjacent controls agreed.
+ */
+export const CONTROL_H = { sm: 'h-7', md: 'h-8' } as const;
+
+/** Text input at the shared control height. */
+export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  const { className = '', ...rest } = props;
+  return (
+    <input
+      {...rest}
+      className={`${CONTROL_H.md} w-full rounded border border-border bg-surface px-2.5 text-sm text-fg placeholder:text-fg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-accent ${className}`}
+    />
+  );
+}
+
+/** Select at the shared control height. */
+export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  const { className = '', children, ...rest } = props;
+  return (
+    <select
+      {...rest}
+      className={`${CONTROL_H.md} rounded border border-border bg-surface px-2 text-sm text-fg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-accent ${className}`}
+    >
+      {children}
+    </select>
+  );
+}
+
 // ── Button ─────────────────────────────────────────────────
 
 export function Button({
@@ -63,13 +98,19 @@ export function Button({
   type?: 'button' | 'submit';
 }) {
   const base =
-    'inline-flex items-center justify-center rounded font-medium transition disabled:opacity-50 disabled:cursor-not-allowed';
-  const sizes = { sm: 'px-2 py-1 text-xs', md: 'px-3 py-1.5 text-sm' };
+    'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50';
+  // Height is fixed, not inferred from padding. Deriving it from
+  // padding plus line-height means a button with an icon, a badge or
+  // a longer label ends up a pixel or two taller than the one beside
+  // it, and a toolbar of six buttons never lines up. Padding controls
+  // width only; CONTROL_H is shared with the inputs and selects that
+  // sit in the same rows.
+  const sizes = { sm: `${CONTROL_H.sm} px-2 text-xs`, md: `${CONTROL_H.md} px-3 text-sm` };
   const variants = {
-    primary: 'bg-accent text-white hover:bg-accent',
+    primary: 'bg-accent text-accent-fg hover:opacity-90',
     secondary: 'border border-border-strong bg-surface text-fg hover:bg-raised',
     ghost: 'text-fg-muted hover:bg-raised hover:text-fg',
-    danger: 'border border-red-900 bg-red-950/50 text-red-300 hover:bg-red-950',
+    danger: 'border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20',
   };
   return (
     <button

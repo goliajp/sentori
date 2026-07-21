@@ -100,7 +100,7 @@ export default function Integrations() {
           <Section>
             <label className="block text-xs text-fg-subtle mb-1">Provider</label>
             <select
-              className="w-full rounded border border-border px-3 py-2 text-sm"
+              className="h-8 w-full rounded border border-border px-2.5 text-sm"
               value={kind}
               onChange={e => setKind(e.target.value as (typeof KINDS)[number])}
             >
