@@ -12,12 +12,12 @@ import {
   Badge,
   Button,
   Card,
+  CardBody,
   CardHeader,
   DataTable,
   EmptyState,
   ErrorBanner,
   PageHeader,
-  Section,
   formatRelative,
 } from '../components/ui';
 
@@ -86,7 +86,7 @@ export default function Tokens() {
       {newToken && (
         <Card>
           <CardHeader title="New token (shown once)" />
-          <Section>
+          <CardBody>
             <pre className="overflow-x-auto whitespace-pre-wrap break-all bg-raised p-3 text-xs font-mono">
               {newToken}
             </pre>
@@ -109,13 +109,13 @@ export default function Tokens() {
                 Done
               </Button>
             </div>
-          </Section>
+          </CardBody>
         </Card>
       )}
       {showCreate && (
         <Card>
           <CardHeader title="Mint new token" />
-          <Section>
+          <CardBody>
             <input
               className="h-8 w-full rounded border border-border px-2.5 text-sm"
               placeholder="Label (e.g. 'production iOS')"
@@ -131,13 +131,13 @@ export default function Tokens() {
                 Cancel
               </Button>
             </div>
-          </Section>
+          </CardBody>
         </Card>
       )}
       <Quickstart projectId={projectId} token={newToken} />
       <Card>
         <CardHeader title={`Tokens (${rows.length})`} />
-        <Section>
+        <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
@@ -180,7 +180,7 @@ export default function Tokens() {
               }))}
             />
           )}
-        </Section>
+        </CardBody>
       </Card>
     </div>
   );
@@ -211,7 +211,7 @@ sentori.init({
         title="Quickstart"
         subtitle="Drop this into your app's entry point to start ingesting."
       />
-      <Section>
+      <CardBody>
         <div className="mb-3 grid gap-3 sm:grid-cols-2">
           <Field label="Ingest URL" value={DEFAULT_INGEST_URL} />
           <Field label="Project ID" value={projectId} mono />
@@ -235,7 +235,7 @@ sentori.init({
             ? 'Token above is the one you just minted.'
             : 'Mint a token above and it fills in here automatically. Other frameworks: swap the import (@goliapkg/sentori-react, -vue, -svelte, …); the init shape is identical.'}
         </p>
-      </Section>
+      </CardBody>
     </Card>
   );
 }
@@ -251,7 +251,7 @@ function Field({
 }) {
   return (
     <div className="rounded border border-border bg-surface px-3 py-2">
-      <p className="text-[10px] uppercase tracking-wide text-fg-subtle">
+      <p className="text-xs uppercase tracking-wide text-fg-subtle">
         {label}
       </p>
       <div className="flex items-center justify-between gap-2">
@@ -262,7 +262,7 @@ function Field({
         </span>
         <button
           onClick={() => navigator.clipboard?.writeText(value)}
-          className="shrink-0 text-[10px] text-fg-subtle hover:text-fg-muted"
+          className="shrink-0 text-xs text-fg-subtle hover:text-fg-muted"
         >
           copy
         </button>

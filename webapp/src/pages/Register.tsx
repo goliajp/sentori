@@ -50,7 +50,7 @@ export default function Register() {
             </p>
             <Link
               to="/login"
-              className="block rounded bg-emerald-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-emerald-500"
+              className="block rounded bg-accent px-3 py-2 text-center text-sm font-medium text-white hover:opacity-90"
             >
               Continue to sign in
             </Link>
@@ -79,12 +79,12 @@ export default function Register() {
               />
             </label>
             {err && (
-              <p className="mb-3 text-xs text-red-400 break-all">{err}</p>
+              <p className="mb-3 text-xs text-danger break-all">{err}</p>
             )}
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+              className="w-full rounded bg-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               {loading ? 'Creating…' : 'Create account'}
             </button>

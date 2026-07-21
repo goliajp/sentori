@@ -103,10 +103,10 @@ function Panel({
   return (
     <section>
       <div className="mb-3 flex items-baseline gap-3">
-        <h2 className="text-[11px] font-medium uppercase tracking-wider text-fg-subtle">
+        <h2 className="text-xs font-medium uppercase tracking-wider text-fg-subtle">
           {title}
         </h2>
-        {note && <span className="text-[11px] text-fg-subtle">{note}</span>}
+        {note && <span className="text-xs text-fg-subtle">{note}</span>}
       </div>
       {children}
     </section>
@@ -166,7 +166,7 @@ function ContextGrid({ event }: { event: EventDetail }) {
     <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
       {groups.map(g => (
         <div key={g.label}>
-          <p className="mb-2 text-[11px] uppercase tracking-wide text-fg-subtle">
+          <p className="mb-2 text-xs uppercase tracking-wide text-fg-subtle">
             {g.label}
           </p>
           <dl className="space-y-1">
@@ -217,7 +217,7 @@ function Attachments({
                 href={href}
                 target="_blank"
                 rel="noreferrer"
-                className="text-[11px] text-accent hover:underline"
+                className="text-xs text-accent hover:underline"
               >
                 {formatBytes(a.size_bytes)}
               </a>

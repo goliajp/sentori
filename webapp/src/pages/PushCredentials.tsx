@@ -10,12 +10,12 @@ import {
   Badge,
   Button,
   Card,
+  CardBody,
   CardHeader,
   DataTable,
   EmptyState,
   ErrorBanner,
   PageHeader,
-  Section,
 } from '../components/ui';
 
 const PROVIDERS = ['apns', 'fcm', 'webpush', 'hcm', 'mipush'] as const;
@@ -102,19 +102,19 @@ export default function PushCredentials() {
       {error && <ErrorBanner>{error}</ErrorBanner>}
       <Card className="mb-2">
         <CardHeader title="Test push" />
-        <Section>
+        <CardBody>
           <p className="text-xs text-fg-subtle mb-2">
             Send a real test notification to a known device token to
             verify credentials + vendor adapter end-to-end.
           </p>
           <TestPushForm projectId={projectId} />
-        </Section>
+        </CardBody>
       </Card>
 
       {showUpload && (
         <Card>
           <CardHeader title="Upload credentials" />
-          <Section>
+          <CardBody>
             <label className="block text-xs text-fg-subtle mb-1">Provider</label>
             <select
               className="h-8 w-full rounded border border-border px-2.5 text-sm"
@@ -171,7 +171,7 @@ export default function PushCredentials() {
                 >
                   Generate VAPID keypair
                 </Button>
-                <p className="mt-1 text-[10px] text-fg-subtle">
+                <p className="mt-1 text-xs text-fg-subtle">
                   Browser-side WebCrypto. Public key goes into config
                   (for SDK), private PEM goes into secret. Never leaves
                   this browser → sent to server only on Save.
@@ -185,12 +185,12 @@ export default function PushCredentials() {
                 Cancel
               </Button>
             </div>
-          </Section>
+          </CardBody>
         </Card>
       )}
       <Card>
         <CardHeader title={`Configured (${rows.length})`} />
-        <Section>
+        <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
@@ -212,7 +212,7 @@ export default function PushCredentials() {
                 key: c.id,
                 kind: <Badge>{c.kind}</Badge>,
                 config: (
-                  <code className="text-[10px] font-mono text-fg-subtle">
+                  <code className="text-xs font-mono text-fg-subtle">
                     {JSON.stringify(c.config).slice(0, 80)}
                   </code>
                 ),
@@ -236,7 +236,7 @@ export default function PushCredentials() {
               }))}
             />
           )}
-        </Section>
+        </CardBody>
       </Card>
     </div>
   );
@@ -325,7 +325,7 @@ function TestPushForm({ projectId }: { projectId: string }) {
           Send test
         </Button>
         {msg && (
-          <span className="font-mono text-[10px] text-fg-subtle">{msg}</span>
+          <span className="font-mono text-xs text-fg-subtle">{msg}</span>
         )}
       </div>
     </div>

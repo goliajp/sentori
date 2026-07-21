@@ -238,7 +238,7 @@ export function ReplayPlayer({
           }}
           className="h-1 flex-1 accent-accent"
         />
-        <span className="w-24 shrink-0 text-right font-mono text-[11px] tabular-nums text-fg-subtle">
+        <span className="w-24 shrink-0 text-right font-mono text-xs tabular-nums text-fg-subtle">
           {elapsed}s / {total}s
         </span>
       </div>

@@ -6,10 +6,10 @@ import {
   Badge,
   Button,
   Card,
+  CardBody,
   CardHeader,
   ErrorBanner,
   PageHeader,
-  Section,
   formatRelative,
 } from '../components/ui';
 
@@ -69,7 +69,7 @@ export default function Notifications() {
 
       <Card>
         <CardHeader title={`Inbox (${rows.length})`} />
-        <Section>
+        <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
@@ -92,10 +92,10 @@ export default function Notifications() {
                     <div className="flex items-center gap-2">
                       <Badge>{n.kind}</Badge>
                       {!n.read_at && (
-                        <span className="text-emerald-400">●</span>
+                        <span className="text-accent">●</span>
                       )}
                     </div>
-                    <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all text-[10px] font-mono text-fg-subtle">
+                    <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all text-xs font-mono text-fg-subtle">
                       {JSON.stringify(n.payload)}
                     </pre>
                   </div>
@@ -106,7 +106,7 @@ export default function Notifications() {
               ))}
             </ul>
           )}
-        </Section>
+        </CardBody>
       </Card>
     </div>
   );

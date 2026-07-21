@@ -44,12 +44,12 @@ export default function Verify() {
         )}
         {state === 'ok' && (
           <div className="space-y-3">
-            <p className="text-sm text-emerald-400">
+            <p className="text-sm text-accent">
               Email verified — your account is active.
             </p>
             <Link
               to="/login"
-              className="block rounded bg-emerald-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-emerald-500"
+              className="block rounded bg-accent px-3 py-2 text-center text-sm font-medium text-white hover:opacity-90"
             >
               Sign in
             </Link>
@@ -57,7 +57,7 @@ export default function Verify() {
         )}
         {state === 'error' && (
           <div className="space-y-3">
-            <p className="break-all text-xs text-red-400">{err}</p>
+            <p className="break-all text-xs text-danger">{err}</p>
             <p className="text-xs text-fg-subtle">
               The link may have expired. Sign up again or request a
               new verification email.

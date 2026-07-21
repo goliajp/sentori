@@ -67,14 +67,14 @@ export default function AcceptInvite() {
           <>
             <p className="mt-4 text-sm text-fg-muted">
               You've joined the workspace as{' '}
-              <span className="font-medium text-emerald-400">{state.role}</span>.
+              <span className="font-medium text-accent">{state.role}</span>.
             </p>
             <Link
               to="/main"
               onClick={() => {
                 // Land in the freshly-joined workspace's dashboard.
               }}
-              className="mt-5 inline-block rounded bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+              className="mt-5 inline-block rounded bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
             >
               Go to dashboard
             </Link>

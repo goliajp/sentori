@@ -13,10 +13,10 @@ import {
   Badge,
   Button,
   Card,
+  CardBody,
   CardHeader,
   ErrorBanner,
   PageHeader,
-  Section,
 } from '../components/ui';
 
 const TARGETS = ['issues', 'events', 'spans', 'replays', 'metrics'] as const;
@@ -136,7 +136,7 @@ export default function SavedViews() {
               onClick={() => setTarget(t)}
               className={`rounded px-3 py-1 text-xs font-mono ${
                 target === t
-                  ? 'bg-emerald-600 text-white'
+                  ? 'bg-accent text-white'
                   : 'bg-raised text-fg-muted hover:bg-raised'
               }`}
             >
@@ -149,7 +149,7 @@ export default function SavedViews() {
       {showCreate && (
         <Card>
           <CardHeader title={`Save new ${target} view`} />
-          <Section>
+          <CardBody>
             <input
               className="w-full rounded border border-border-strong bg-surface px-3 py-2 text-sm"
               placeholder='Name (e.g. "active iOS prod")'
@@ -170,13 +170,13 @@ export default function SavedViews() {
                 Cancel
               </Button>
             </div>
-          </Section>
+          </CardBody>
         </Card>
       )}
 
       <Card>
         <CardHeader title={`Views (${rows.length})`} />
-        <Section>
+        <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
@@ -201,14 +201,14 @@ export default function SavedViews() {
                         </span>
                         <Badge>{v.scope}</Badge>
                         {v.project_id ? (
-                          <span className="font-mono text-[10px] text-fg-subtle">
+                          <span className="font-mono text-xs text-fg-subtle">
                             project {v.project_id.slice(0, 8)}…
                           </span>
                         ) : (
                           <Badge tone="neutral">workspace</Badge>
                         )}
                       </div>
-                      <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all text-[10px] font-mono text-fg-subtle">
+                      <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all text-xs font-mono text-fg-subtle">
                         {JSON.stringify(v.payload)}
                       </pre>
                     </div>
@@ -241,7 +241,7 @@ export default function SavedViews() {
               })}
             </ul>
           )}
-        </Section>
+        </CardBody>
       </Card>
     </div>
   );

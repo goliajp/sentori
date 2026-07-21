@@ -8,11 +8,11 @@ import { api, MetricPoint, MetricSummary } from '../lib/api';
 import { Sparkline } from '../components/Sparkline';
 import {
   Card,
+  CardBody,
   CardHeader,
   EmptyState,
   ErrorBanner,
   PageHeader,
-  Section,
   formatNumber,
   formatRelative,
 } from '../components/ui';
@@ -63,7 +63,7 @@ export default function Metrics() {
 
       <Card>
         <CardHeader title={`Active metrics (${rows.length})`} />
-        <Section>
+        <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
@@ -154,7 +154,7 @@ export default function Metrics() {
               })}
             </ul>
           )}
-        </Section>
+        </CardBody>
       </Card>
     </div>
   );

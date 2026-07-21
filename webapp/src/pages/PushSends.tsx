@@ -9,10 +9,10 @@ import {
   Badge,
   Button,
   Card,
+  CardBody,
   CardHeader,
   ErrorBanner,
   PageHeader,
-  Section,
   formatRelative,
 } from '../components/ui';
 
@@ -105,7 +105,7 @@ export default function PushSends() {
             onClick={() => setFilter(s)}
             className={`rounded px-3 py-1 ${
               filter === s
-                ? 'bg-emerald-600 text-white'
+                ? 'bg-accent text-white'
                 : 'bg-raised text-fg-muted hover:bg-raised'
             }`}
           >
@@ -121,7 +121,7 @@ export default function PushSends() {
 
       <Card>
         <CardHeader title={`Sends (${rows.length})`} />
-        <Section>
+        <CardBody>
           {rows.length === 0 ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
               No push sends yet.
@@ -144,18 +144,18 @@ export default function PushSends() {
                         <Badge>{r.status}</Badge>
                       )}
                       {r.retry_count > 0 && (
-                        <span className="font-mono text-[10px] text-fg-subtle">
+                        <span className="font-mono text-xs text-fg-subtle">
                           retry {r.retry_count}
                         </span>
                       )}
                     </div>
-                    <div className="mt-1 text-[10px] text-fg-subtle">
+                    <div className="mt-1 text-xs text-fg-subtle">
                       {r.error ||
                         r.provider_outcome ||
                         formatRelative(r.created_at)}
                     </div>
                     {r.next_attempt_at && r.status === 'queued' && (
-                      <div className="text-[10px] text-fg-subtle">
+                      <div className="text-xs text-fg-subtle">
                         next attempt {formatRelative(r.next_attempt_at)}
                       </div>
                     )}
@@ -173,7 +173,7 @@ export default function PushSends() {
               ))}
             </ul>
           )}
-        </Section>
+        </CardBody>
       </Card>
     </div>
   );

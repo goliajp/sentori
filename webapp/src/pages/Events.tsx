@@ -125,7 +125,7 @@ export function EventsPage() {
           <div className="flex items-center justify-between p-3">
             <span className="font-mono text-xs">
               issue_id ={' '}
-              <span className="text-emerald-400">{issueFilter}</span>
+              <span className="text-accent">{issueFilter}</span>
             </span>
             <button
               onClick={() => {
@@ -186,7 +186,7 @@ export function EventsPage() {
               render: (r) => (
                 <Link
                   to={`/projects/${projectId}/issues/${r.issue_id}`}
-                  className="font-mono text-xs text-emerald-400 hover:underline"
+                  className="font-mono text-xs text-accent hover:underline"
                 >
                   {r.issue_id.slice(0, 8)}…
                 </Link>
@@ -213,7 +213,7 @@ export function EventsPage() {
                     setSearch(search, { replace: true });
                   }}
                   title="Narrow to this issue"
-                  className="rounded bg-raised px-2 py-0.5 text-[11px] text-fg-muted hover:bg-raised"
+                  className="rounded bg-raised px-2 py-0.5 text-xs text-fg-muted hover:bg-raised"
                 >
                   Narrow
                 </button>

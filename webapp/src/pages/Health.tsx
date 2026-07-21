@@ -8,10 +8,10 @@ import { useAsyncData } from '../lib/useAsyncData';
 import {
   Badge,
   Card,
+  CardBody,
   CardHeader,
   ErrorBanner,
   PageHeader,
-  Section,
 } from '../components/ui';
 
 export function HealthPage() {
@@ -94,7 +94,7 @@ export function HealthPage() {
                 <span
                   className={`font-mono text-xl ${
                     (health.push_failed_24h ?? 0) > 0
-                      ? 'text-amber-400'
+                      ? 'text-warn'
                       : 'text-fg'
                   }`}
                 >
@@ -107,7 +107,7 @@ export function HealthPage() {
 
           <Card>
             <CardHeader title="Scrape endpoints" />
-            <Section>
+            <CardBody>
               <ul className="space-y-1 text-xs font-mono text-fg-muted">
                 <li>
                   GET <code>/healthz</code> — JSON snapshot (this page
@@ -130,77 +130,77 @@ export function HealthPage() {
                   GET <code>/v1/_describe</code> — endpoint catalog
                 </li>
               </ul>
-            </Section>
+            </CardBody>
           </Card>
 
           <Card>
             <CardHeader title="Background workers" />
-            <Section>
+            <CardBody>
               <ul className="space-y-1 text-xs font-mono text-fg-muted">
                 <li>
-                  <span className="text-emerald-400">●</span>{' '}
+                  <span className="text-ok">●</span>{' '}
                   push_worker — drains push_sends every{' '}
                   <code>SENTORI_PUSH_WORKER_INTERVAL_SEC</code> (5s)
                 </li>
                 <li>
-                  <span className="text-emerald-400">●</span>{' '}
+                  <span className="text-ok">●</span>{' '}
                   probe_worker — polls endpoint_check every{' '}
                   <code>SENTORI_PROBE_POLL_INTERVAL_SEC</code> (10s)
                 </li>
                 <li>
-                  <span className="text-emerald-400">●</span>{' '}
+                  <span className="text-ok">●</span>{' '}
                   archive_worker — DELETEs sent &gt;30d / failed &gt;90d
                   every <code>SENTORI_ARCHIVE_INTERVAL_SEC</code> (24h)
                 </li>
                 <li>
-                  <span className="text-emerald-400">●</span>{' '}
+                  <span className="text-ok">●</span>{' '}
                   periodic_alert_worker — evaluates crash_free_drop
                   rules every <code>SENTORI_PERIODIC_ALERT_INTERVAL_SEC</code>{' '}
                   (5min)
                 </li>
                 <li>
-                  <span className="text-emerald-400">●</span> session
+                  <span className="text-ok">●</span> session
                   middleware — HttpOnly cookie + Bearer dual auth
                 </li>
               </ul>
-            </Section>
+            </CardBody>
           </Card>
 
           <Card>
             <CardHeader title="Vendor adapters (push)" />
-            <Section>
+            <CardBody>
               <ul className="space-y-1 text-xs font-mono text-fg-muted">
                 <li>
-                  <span className="text-emerald-400">●</span> webpush —
+                  <span className="text-ok">●</span> webpush —
                   VAPID ES256 wake push
                 </li>
                 <li>
-                  <span className="text-emerald-400">●</span> apns —
+                  <span className="text-ok">●</span> apns —
                   token-based ES256 / HTTP/2 (cached JWT 55min)
                 </li>
                 <li>
-                  <span className="text-emerald-400">●</span> fcm — legacy
+                  <span className="text-ok">●</span> fcm — legacy
                   HTTP API + body NotRegistered parsing
                 </li>
                 <li>
-                  <span className="text-emerald-400">●</span> hcm — OAuth2
+                  <span className="text-ok">●</span> hcm — OAuth2
                   + HTTP push (cached bearer 55min)
                 </li>
                 <li>
-                  <span className="text-emerald-400">●</span> mipush —
+                  <span className="text-ok">●</span> mipush —
                   app-secret + form-encoded POST
                 </li>
               </ul>
-            </Section>
+            </CardBody>
           </Card>
 
           <Card>
             <CardHeader title="Raw" />
-            <Section>
-              <pre className="overflow-auto rounded border border-border bg-bg p-3 text-[10px] font-mono text-fg-muted">
+            <CardBody>
+              <pre className="overflow-auto rounded border border-border bg-bg p-3 text-xs font-mono text-fg-muted">
                 {JSON.stringify(health, null, 2)}
               </pre>
-            </Section>
+            </CardBody>
           </Card>
         </>
       )}
@@ -219,17 +219,17 @@ function StatCard({
 }) {
   return (
     <Card>
-      <Section>
+      <CardBody>
         <div className="text-xs uppercase tracking-wide text-fg-subtle">
           {label}
         </div>
         <div className="mt-1">{value}</div>
         {sub && (
-          <div className="mt-1 text-[10px] font-mono text-fg-subtle">
+          <div className="mt-1 text-xs font-mono text-fg-subtle">
             {sub}
           </div>
         )}
-      </Section>
+      </CardBody>
     </Card>
   );
 }

@@ -8,12 +8,12 @@ import {
   Badge,
   Button,
   Card,
+  CardBody,
   CardHeader,
   DataTable,
   EmptyState,
   ErrorBanner,
   PageHeader,
-  Section,
   formatRelative,
 } from '../components/ui';
 
@@ -103,21 +103,21 @@ export default function Members() {
       {newInviteToken && (
         <Card>
           <CardHeader title="Invite link (copy now — shown once)" />
-          <Section>
+          <CardBody>
             <pre className="overflow-x-auto whitespace-pre-wrap break-all bg-raised p-3 text-xs font-mono">
               {newInviteToken}
             </pre>
             <div className="mt-2">
               <Button onClick={() => setNewInviteToken(null)}>Done</Button>
             </div>
-          </Section>
+          </CardBody>
         </Card>
       )}
 
       {showInvite && (
         <Card>
           <CardHeader title="Invite member" />
-          <Section>
+          <CardBody>
             <input
               className="h-8 w-full rounded border border-border px-2.5 text-sm"
               placeholder="Email"
@@ -144,13 +144,13 @@ export default function Members() {
                 Cancel
               </Button>
             </div>
-          </Section>
+          </CardBody>
         </Card>
       )}
 
       <Card>
         <CardHeader title={`Active members (${members.length})`} />
-        <Section>
+        <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
@@ -200,12 +200,12 @@ export default function Members() {
               }))}
             />
           )}
-        </Section>
+        </CardBody>
       </Card>
 
       <Card>
         <CardHeader title={`Invites (${invites.length})`} />
-        <Section>
+        <CardBody>
           {invites.length === 0 ? (
             <EmptyState
               title="No invites"
@@ -245,7 +245,7 @@ export default function Members() {
               }))}
             />
           )}
-        </Section>
+        </CardBody>
       </Card>
     </div>
   );

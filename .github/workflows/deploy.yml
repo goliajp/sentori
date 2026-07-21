@@ -110,6 +110,24 @@ jobs:
           install -d -m 0755 "${REMOTE_DIR}/docs-dist"
           rsync -a --delete docs-site/dist/ "${REMOTE_DIR}/docs-dist/"
 
+      - name: Build webapp (dashboard SPA)
+        working-directory: webapp
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
+      # Production serves the SPA from this directory rather than from
+      # the copy baked into the server image, so a dashboard change can
+      # ship without rebuilding the image. Owned by the container's
+      # runtime uid (distroless `nonroot`) so the read-only mount
+      # resolves.
+      - name: Rsync webapp/dist → /apps/sentori/webapp-dist
+        run: |
+          install -d -m 0755 "${REMOTE_DIR}/webapp-dist"
+          rsync -a --delete webapp/dist/ "${REMOTE_DIR}/webapp-dist/"
+          chown -R 65532:65532 "${REMOTE_DIR}/webapp-dist" || \
+            sudo chown -R 65532:65532 "${REMOTE_DIR}/webapp-dist"
+
       - name: Rsync source into /apps/sentori/src
         run: |
           mkdir -p "${REMOTE_DIR}/src"

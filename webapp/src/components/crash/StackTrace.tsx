@@ -46,7 +46,7 @@ function ErrorLink({ error, depth }: { error: CapturedError; depth: number }) {
   return (
     <section>
       {depth > 0 && (
-        <p className="mb-2 font-mono text-[11px] uppercase tracking-wider text-fg-subtle">
+        <p className="mb-2 font-mono text-xs uppercase tracking-wider text-fg-subtle">
           {t('crash.causedBy')}
         </p>
       )}
@@ -106,7 +106,7 @@ function SystemRun({ frames }: { frames: StackFrame[] }) {
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
-        className="w-full px-3 py-1.5 text-left font-mono text-[11px] text-fg-subtle transition hover:text-fg-muted focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        className="w-full px-3 py-1.5 text-left font-mono text-xs text-fg-subtle transition hover:text-fg-muted focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
       >
         {open ? '−' : '+'} {frames.length} {t('crash.framesHidden')}
       </button>
@@ -158,7 +158,7 @@ function SourceContext({ frame }: { frame: StackFrame }) {
   const firstLine = frame.line - pre.length;
 
   return (
-    <pre className="overflow-x-auto border-t border-border bg-bg px-3 py-2 font-mono text-[11px] leading-relaxed">
+    <pre className="overflow-x-auto border-t border-border bg-bg px-3 py-2 font-mono text-xs leading-relaxed">
       {pre.map((l, i) => (
         <Line key={`p${i}`} n={firstLine + i} text={l} />
       ))}

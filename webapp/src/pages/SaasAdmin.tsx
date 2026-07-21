@@ -9,12 +9,12 @@ import {
   Badge,
   Button,
   Card,
+  CardBody,
   CardHeader,
   DataTable,
   EmptyState,
   ErrorBanner,
   PageHeader,
-  Section,
   formatNumber,
   formatRelative,
 } from '../components/ui';
@@ -91,7 +91,7 @@ export default function SaasAdmin() {
       {showCreate && (
         <Card>
           <CardHeader title="Create workspace" />
-          <Section>
+          <CardBody>
             <input
               className="h-8 w-full rounded border border-border px-2.5 text-sm"
               placeholder="Display name (e.g. 'Acme Inc')"
@@ -104,7 +104,7 @@ export default function SaasAdmin() {
                 Cancel
               </Button>
             </div>
-          </Section>
+          </CardBody>
         </Card>
       )}
 
@@ -131,7 +131,7 @@ export default function SaasAdmin() {
 
       <Card>
         <CardHeader title={`Workspaces (${rows.length})`} />
-        <Section>
+        <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">Loading…</div>
           ) : rows.length === 0 ? (
@@ -155,7 +155,7 @@ export default function SaasAdmin() {
                 name: (
                   <div>
                     <div className="font-medium">{w.name}</div>
-                    <div className="font-mono text-[10px] text-fg-muted">
+                    <div className="font-mono text-xs text-fg-muted">
                       {w.id}
                     </div>
                   </div>
@@ -221,7 +221,7 @@ export default function SaasAdmin() {
               }))}
             />
           )}
-        </Section>
+        </CardBody>
       </Card>
     </div>
   );
@@ -239,7 +239,7 @@ function StatCard({
   return (
     <Card>
       <div className="p-4">
-        <p className="text-[11px] uppercase tracking-wide text-fg-subtle">
+        <p className="text-xs uppercase tracking-wide text-fg-subtle">
           {label}
         </p>
         <p

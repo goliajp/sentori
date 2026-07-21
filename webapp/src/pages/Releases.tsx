@@ -9,12 +9,12 @@ import {
   Badge,
   Button,
   Card,
+  CardBody,
   CardHeader,
   DataTable,
   EmptyState,
   ErrorBanner,
   PageHeader,
-  Section,
   formatNumber,
   formatRelative,
 } from '../components/ui';
@@ -112,7 +112,7 @@ export default function Releases() {
       {showCreate && (
         <Card>
           <CardHeader title="Mark deploy" />
-          <Section>
+          <CardBody>
             <p className="text-xs text-fg-subtle mb-2">
               Mints a release row via the public /v1/deploys endpoint.
               Requires a project SDK token (st_pk_...).
@@ -135,14 +135,14 @@ export default function Releases() {
                 Mark deployed
               </Button>
             </div>
-          </Section>
+          </CardBody>
         </Card>
       )}
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       <Card>
         <CardHeader title={`Releases (${rows.length})`} />
-        <Section>
+        <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">Loading…</div>
           ) : rows.length === 0 ? (
@@ -161,7 +161,7 @@ export default function Releases() {
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => expand(r.id)}
-                        className="font-mono text-sm text-emerald-600 hover:underline"
+                        className="font-mono text-sm text-accent hover:underline"
                       >
                         {expanded === r.id ? '▼' : '▶'} {r.name}
                       </button>
@@ -221,7 +221,7 @@ export default function Releases() {
               ))}
             </div>
           )}
-        </Section>
+        </CardBody>
       </Card>
     </div>
   );

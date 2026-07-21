@@ -1,75 +1,57 @@
-// Theme selection: dark, light, or follow the OS.
+// Theme selection, delegated to GDS.
 //
-// The choice lives on `<html data-theme>`, which is what the token
-// definitions in styles/index.css key off. Everything else in the app
-// names roles (`bg-surface`, `text-fg-muted`) and never learns which
-// theme is active.
+// The colour values live in @goliapkg/gds — the same system golia.jp
+// and the legacy dashboard run on, so the three surfaces read as one
+// product rather than three houses with similar paint. GDS keeps the
+// theme in an atom, persists it, and `useThemeEffect()` paints the
+// resolved `--gds-*` custom properties onto <html> reactively.
+//
+// This module adds only what Sentori needs on top: the first-run
+// posture, and one synchronous paint before React mounts.
+//
+// Dark stays the default. GDS is dark-native (light is a derived
+// adaptation), golia.jp and the marketing site default dark, and half
+// an hour of reading stack traces in light mode is measurably more
+// tiring.
 
-export type ThemePreference = 'dark' | 'light' | 'system';
-export type ResolvedTheme = 'dark' | 'light';
+import {
+  DEFAULT_THEME,
+  loadPersistedTheme,
+  resolveThemeCssVars,
+  type ThemeMode,
+} from '@goliapkg/gds/systems';
 
-const STORAGE_KEY = 'sentori_theme';
+export type { ThemeMode };
 
-/** What the OS currently asks for. */
-export function systemTheme(): ResolvedTheme {
+/** Compact density: this is a triage tool, not a marketing page. */
+const SENTORI_DEFAULT = {
+  ...DEFAULT_THEME,
+  mode: 'dark' as ThemeMode,
+  density: 'compact' as const,
+};
+
+export function systemMode(): 'dark' | 'light' {
   if (typeof window === 'undefined' || !window.matchMedia) return 'dark';
   return window.matchMedia('(prefers-color-scheme: light)').matches
     ? 'light'
     : 'dark';
 }
 
-export function readPreference(): ThemePreference {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw === 'dark' || raw === 'light' || raw === 'system') return raw;
-  } catch {
-    // Storage disabled — fall through to the default.
-  }
-  return 'system';
-}
-
-export function resolve(pref: ThemePreference): ResolvedTheme {
-  return pref === 'system' ? systemTheme() : pref;
-}
-
-/** Write the resolved theme to `<html>` and remember the preference. */
-export function applyPreference(pref: ThemePreference): ResolvedTheme {
-  const resolved = resolve(pref);
+/**
+ * Paint the persisted theme before React mounts.
+ *
+ * Resolving inside an effect means a light-mode user watches the app
+ * flash dark on every single load, so the entry module calls this
+ * synchronously. `useThemeEffect()` takes over for changes afterwards.
+ */
+export function initTheme(): 'dark' | 'light' {
+  const saved = loadPersistedTheme() ?? SENTORI_DEFAULT;
+  const resolved = saved.mode === 'system' ? systemMode() : saved.mode;
   if (typeof document !== 'undefined') {
-    document.documentElement.dataset.theme = resolved;
-  }
-  try {
-    localStorage.setItem(STORAGE_KEY, pref);
-  } catch {
-    // Preference just won't survive the reload.
+    const vars = resolveThemeCssVars(saved, resolved);
+    const root = document.documentElement;
+    for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
+    root.dataset.theme = resolved;
   }
   return resolved;
-}
-
-/**
- * Apply the stored preference as early as possible.
- *
- * Called from the entry module before React mounts so the first paint
- * is already the right theme — otherwise a light-mode user gets a
- * dark flash on every load.
- */
-export function initTheme(): ResolvedTheme {
-  return applyPreference(readPreference());
-}
-
-/**
- * Re-resolve when the OS flips, but only while the preference is
- * `system` — an explicit choice outranks the OS.
- */
-export function watchSystemTheme(onChange: (t: ResolvedTheme) => void): () => void {
-  if (typeof window === 'undefined' || !window.matchMedia) return () => {};
-  const mq = window.matchMedia('(prefers-color-scheme: light)');
-  const handler = () => {
-    if (readPreference() !== 'system') return;
-    const resolved = systemTheme();
-    document.documentElement.dataset.theme = resolved;
-    onChange(resolved);
-  };
-  mq.addEventListener('change', handler);
-  return () => mq.removeEventListener('change', handler);
 }

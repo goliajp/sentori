@@ -142,7 +142,7 @@ export function IssuesPage() {
         }
       />
 
-      <p className="mb-3 text-[10px] text-fg-subtle">
+      <p className="mb-3 text-xs text-fg-subtle">
         Shortcuts: <kbd className="rounded bg-raised px-1">j</kbd>/
         <kbd className="rounded bg-raised px-1">k</kbd> navigate ·{' '}
         <kbd className="rounded bg-raised px-1">x</kbd> select ·{' '}
@@ -151,7 +151,7 @@ export function IssuesPage() {
       </p>
 
       {selected.size > 0 && (
-        <div className="mb-4 flex items-center gap-2 rounded border border-emerald-700/40 bg-emerald-900/20 px-3 py-2 text-xs">
+        <div className="mb-4 flex items-center gap-2 rounded border border-accent/40 bg-accent/20 px-3 py-2 text-xs">
           <span className="text-fg-muted">
             {selected.size} selected
           </span>
@@ -214,7 +214,7 @@ export function IssuesPage() {
                 return (
                   <div className="flex items-center gap-1">
                     {isCursor && (
-                      <span className="text-emerald-500 text-xs">▸</span>
+                      <span className="text-accent text-xs">▸</span>
                     )}
                     <input
                       type="checkbox"
@@ -248,7 +248,7 @@ export function IssuesPage() {
                   className="block hover:bg-surface/40 -m-2 p-2 rounded"
                 >
                   <div className="font-medium text-fg">{r.error_type}</div>
-                  <div className="font-mono text-[11px] text-fg-subtle">
+                  <div className="font-mono text-xs text-fg-subtle">
                     {r.message_sample.slice(0, 80)}
                   </div>
                 </Link>
@@ -301,7 +301,7 @@ export function IssuesPage() {
                       onClick={() => quickAction(r.id, 'resolved')}
                       disabled={busy.has(r.id)}
                       title="Resolve"
-                      className="rounded bg-emerald-700/30 px-2 py-0.5 text-[11px] text-emerald-300 hover:bg-emerald-700/60 disabled:opacity-50"
+                      className="rounded bg-accent/30 px-2 py-0.5 text-xs text-accent hover:opacity-90/60 disabled:opacity-50"
                     >
                       ✓ Resolve
                     </button>
@@ -311,7 +311,7 @@ export function IssuesPage() {
                       onClick={() => quickAction(r.id, 'ignored')}
                       disabled={busy.has(r.id)}
                       title="Ignore"
-                      className="rounded bg-raised/40 px-2 py-0.5 text-[11px] text-fg-muted hover:bg-raised disabled:opacity-50"
+                      className="rounded bg-raised/40 px-2 py-0.5 text-xs text-fg-muted hover:bg-raised disabled:opacity-50"
                     >
                       ⊘
                     </button>
@@ -321,7 +321,7 @@ export function IssuesPage() {
                       onClick={() => quickAction(r.id, 'active')}
                       disabled={busy.has(r.id)}
                       title="Reopen"
-                      className="rounded bg-orange-700/30 px-2 py-0.5 text-[11px] text-orange-300 hover:bg-orange-700/60 disabled:opacity-50"
+                      className="rounded bg-orange-700/30 px-2 py-0.5 text-xs text-orange-300 hover:bg-orange-700/60 disabled:opacity-50"
                     >
                       ↺
                     </button>

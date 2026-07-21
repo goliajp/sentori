@@ -9,11 +9,11 @@ import { api, TraceRow } from '../lib/api';
 import {
   Badge,
   Card,
+  CardBody,
   CardHeader,
   EmptyState,
   ErrorBanner,
   PageHeader,
-  Section,
   formatNumber,
   formatRelative,
 } from '../components/ui';
@@ -44,7 +44,7 @@ export default function Traces() {
       {error && <ErrorBanner>{error}</ErrorBanner>}
       <Card>
         <CardHeader title={`Traces (${rows.length})`} />
-        <Section>
+        <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
@@ -65,7 +65,7 @@ export default function Traces() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs text-emerald-400">
+                          <span className="font-mono text-xs text-accent">
                             {t.root_op ?? '—'}
                           </span>
                           <span className="font-mono text-sm text-fg">
@@ -77,7 +77,7 @@ export default function Traces() {
                             {t.status}
                           </Badge>
                         </div>
-                        <div className="font-mono text-[10px] text-fg-subtle mt-1">
+                        <div className="font-mono text-xs text-fg-subtle mt-1">
                           {t.trace_id}
                         </div>
                       </div>
@@ -85,7 +85,7 @@ export default function Traces() {
                         <div className="font-mono text-sm text-fg tabular-nums">
                           {formatNumber(t.duration_ms)}ms
                         </div>
-                        <div className="font-mono text-[10px] text-fg-subtle">
+                        <div className="font-mono text-xs text-fg-subtle">
                           {t.span_count} span{t.span_count === 1 ? '' : 's'} ·{' '}
                           {formatRelative(t.last_seen)}
                         </div>
@@ -96,7 +96,7 @@ export default function Traces() {
               ))}
             </ul>
           )}
-        </Section>
+        </CardBody>
       </Card>
     </div>
   );

@@ -1,3 +1,4 @@
+import { useThemeEffect } from '@goliapkg/gds/systems';
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
 
@@ -14,6 +15,10 @@ export function App() {
   const [verified, setVerified] = useState(false);
   const [me, setMe] = useState<MeResponse | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // GDS repaints the --gds-* custom properties whenever the theme
+  // atom changes; without this the toggle updates state and nothing
+  // on screen moves.
+  useThemeEffect();
   useNavShortcuts();
 
   // Global Cmd-K / Ctrl-K to toggle the command palette.
@@ -114,7 +119,7 @@ function Sidebar({ me }: { me: MeResponse | null }) {
         <h1 className="text-base font-semibold tracking-tight text-fg">
           Sentori
         </h1>
-        <p className="font-mono text-[10px] text-fg-subtle">v0.2</p>
+        <p className="font-mono text-xs text-fg-subtle">v0.2</p>
       </div>
 
       {/* Active workspace + switcher. Hidden until whoami resolves. */}
@@ -210,7 +215,7 @@ function NotificationsNavItem() {
     >
       <span>{t('nav.inbox')}</span>
       {unread > 0 && (
-        <span className="rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-mono text-white">
+        <span className="rounded bg-ok/15 px-1.5 py-0.5 text-xs font-mono text-ok">
           {unread}
         </span>
       )}
@@ -245,7 +250,7 @@ function UserFooter() {
   }
 
   return (
-    <div className="mt-4 space-y-2 border-t border-border pt-3 text-[11px]">
+    <div className="mt-4 space-y-2 border-t border-border pt-3 text-xs">
       {/* Theme + language sit above the account row: they are used far
           more often than sign-out, and burying them in Settings meant
           nobody found them. */}
@@ -298,7 +303,7 @@ function SectionLabel({
 }) {
   return (
     <p
-      className={`mb-1 px-2.5 text-[10px] font-medium uppercase tracking-wider text-fg-subtle ${className}`}
+      className={`mb-1 px-2.5 text-xs font-medium uppercase tracking-wider text-fg-subtle ${className}`}
     >
       {children}
     </p>

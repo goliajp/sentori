@@ -1,9 +1,18 @@
-// Minimal local design primitives. Dark-native, editorial,
-// emulating the legacy GDS aesthetic without depending on
-// @goliapkg/gds. Each component is intentionally small +
-// self-contained.
+// The dashboard's layout and data primitives.
+//
+// Colour, elevation, radius and both modes come from @goliapkg/gds —
+// the same system golia.jp runs on. Nothing here names a palette
+// value; everything reaches for a role (`accent`, `ok`, `danger`,
+// `fg-muted`) so one definition serves light and dark alike.
+//
+// Two invariants this file exists to hold:
+//   · a control's height is written once (`CONTROL_H`), never
+//     inferred from padding;
+//   · a card's contents sit at one inset (`px-5`), header and body
+//     and table cells alike, so the left edge is a single line.
 
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 
 // ── Card ───────────────────────────────────────────────────
 
@@ -82,6 +91,38 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
 
 // ── Button ─────────────────────────────────────────────────
 
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+export type ButtonSize = 'sm' | 'md';
+
+/**
+ * The single source of a button's appearance, shared by `<Button>`
+ * and `<LinkButton>`.
+ *
+ * Height is fixed, never inferred from padding: derive it from
+ * padding plus line-height and a button carrying an icon or a count
+ * ends up a pixel taller than the plain one beside it, and a toolbar
+ * of six never lines up. Padding sets width only.
+ */
+export function buttonClass(
+  variant: ButtonVariant = 'secondary',
+  size: ButtonSize = 'md',
+): string {
+  const base =
+    'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50';
+  const sizes = {
+    sm: `${CONTROL_H.sm} px-2.5 text-sm`,
+    md: `${CONTROL_H.md} px-3 text-sm`,
+  };
+  const variants = {
+    primary: 'bg-accent text-accent-fg hover:opacity-90',
+    secondary: 'border border-border-strong bg-surface text-fg hover:bg-raised',
+    ghost: 'text-fg-muted hover:bg-raised hover:text-fg',
+    danger:
+      'border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20',
+  };
+  return `${base} ${sizes[size]} ${variants[variant]}`;
+}
+
 export function Button({
   children,
   variant = 'secondary',
@@ -97,30 +138,41 @@ export function Button({
   disabled?: boolean;
   type?: 'button' | 'submit';
 }) {
-  const base =
-    'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50';
-  // Height is fixed, not inferred from padding. Deriving it from
-  // padding plus line-height means a button with an icon, a badge or
-  // a longer label ends up a pixel or two taller than the one beside
-  // it, and a toolbar of six buttons never lines up. Padding controls
-  // width only; CONTROL_H is shared with the inputs and selects that
-  // sit in the same rows.
-  const sizes = { sm: `${CONTROL_H.sm} px-2 text-xs`, md: `${CONTROL_H.md} px-3 text-sm` };
-  const variants = {
-    primary: 'bg-accent text-accent-fg hover:opacity-90',
-    secondary: 'border border-border-strong bg-surface text-fg hover:bg-raised',
-    ghost: 'text-fg-muted hover:bg-raised hover:text-fg',
-    danger: 'border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20',
-  };
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`${base} ${sizes[size]} ${variants[variant]}`}
+      className={buttonClass(variant, size)}
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * A link that is a button.
+ *
+ * `← All` was a hand-styled `<Link>` sitting in a row of `<Button>`s
+ * and it stood 4px taller than every one of them, because the height
+ * had been written twice and the two copies drifted. Anything that
+ * looks like a button now derives its class from the same place.
+ */
+export function LinkButton({
+  to,
+  children,
+  variant = 'secondary',
+  size = 'md',
+}: {
+  to: string;
+  children: ReactNode;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+}) {
+  return (
+    <Link to={to} className={buttonClass(variant, size)}>
+      {children}
+    </Link>
   );
 }
 
@@ -133,16 +185,21 @@ export function Badge({
   children: ReactNode;
   tone?: 'neutral' | 'ok' | 'warn' | 'danger' | 'info';
 }) {
+  // Tinted from the semantic colour itself rather than picked off the
+  // raw palette: `bg-green-950` is a near-black green, which reads as
+  // a badge only while the card behind it is dark. Deriving the fill
+  // from the same token as the text means one definition serves both
+  // modes, and a status colour can never drift from its own tint.
   const tones = {
     neutral: 'bg-raised text-fg-muted',
-    ok: 'bg-green-950 text-green-300',
-    warn: 'bg-amber-950 text-amber-300',
-    danger: 'bg-red-950 text-red-300',
-    info: 'bg-sky-950 text-sky-300',
+    ok: 'bg-ok/12 text-ok',
+    warn: 'bg-warn/12 text-warn',
+    danger: 'bg-danger/12 text-danger',
+    info: 'bg-accent/12 text-accent',
   };
   return (
     <span
-      className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${tones[tone]}`}
+      className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide ${tones[tone]}`}
     >
       {children}
     </span>
@@ -175,7 +232,7 @@ export function DataTable<T>({
             {columns.map((c) => (
               <th
                 key={String(c.key)}
-                className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wide text-fg-subtle"
+                className="px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-fg-subtle"
                 style={c.width ? { width: c.width } : undefined}
               >
                 {c.label}
@@ -187,7 +244,7 @@ export function DataTable<T>({
           {rows.map((r, i) => (
             <tr key={rowKey ? rowKey(r) : String(i)} className="hover:bg-surface/50">
               {columns.map((c) => (
-                <td key={String(c.key)} className="px-3 py-2.5 text-fg-muted">
+                <td key={String(c.key)} className="px-5 py-3 text-fg-muted">
                   {c.render
                     ? c.render(r)
                     : String((r as Record<string, unknown>)[c.key as string] ?? '—')}
@@ -251,7 +308,7 @@ export function EmptyState({
 
 export function ErrorBanner({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded border border-red-900 bg-red-950/50 p-3 text-sm text-red-300">
+    <div className="rounded border border-danger/40 bg-danger/50 p-3 text-sm text-danger">
       {children}
     </div>
   );
@@ -259,6 +316,27 @@ export function ErrorBanner({ children }: { children: ReactNode }) {
 
 // ── Section ────────────────────────────────────────────────
 
+/**
+ * A card's content, at the same inset as its header.
+ *
+ * This used to be `<Section>` doing double duty — page-level
+ * grouping *and* card body — which is why card content sat flush
+ * against the border with a stray 32px gap under it: the grouping
+ * component's `mb-8` was landing inside the card. One element, one
+ * job.
+ */
+export function CardBody({
+  children,
+  className = '',
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={`px-5 py-4 ${className}`}>{children}</div>;
+}
+
+/** A titled group of cards on a page. Not a card's interior — that
+ *  is `CardBody`. */
 export function Section({
   title,
   children,

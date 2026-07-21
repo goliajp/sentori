@@ -1,7 +1,7 @@
 // Keyboard shortcut cheatsheet. Reachable via `?` or
 // /shortcuts URL.
 
-import { PageHeader, Card, Section, CardHeader } from '../components/ui';
+import { PageHeader, Card, CardBody, CardHeader } from '../components/ui';
 
 const GROUPS: { title: string; items: { kbd: string; label: string }[] }[] =
   [
@@ -73,7 +73,7 @@ export default function Shortcuts() {
         {GROUPS.map(g => (
           <Card key={g.title}>
             <CardHeader title={g.title} />
-            <Section>
+            <CardBody>
               <ul className="space-y-1 text-xs">
                 {g.items.map(it => (
                   <li
@@ -81,13 +81,13 @@ export default function Shortcuts() {
                     className="flex items-center justify-between"
                   >
                     <span className="text-fg-muted">{it.label}</span>
-                    <kbd className="rounded bg-raised px-1.5 py-0.5 font-mono text-[10px] text-fg">
+                    <kbd className="rounded bg-raised px-1.5 py-0.5 font-mono text-xs text-fg">
                       {it.kbd}
                     </kbd>
                   </li>
                 ))}
               </ul>
-            </Section>
+            </CardBody>
           </Card>
         ))}
       </div>

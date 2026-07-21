@@ -9,21 +9,16 @@
 // Two icon-width controls rather than two labelled selects: the
 // sidebar is 224px wide and already carries the account row.
 
-import { useEffect, useState } from 'react';
+import { useSetThemeMode, useTheme } from '@goliapkg/gds/systems';
 
 import { LOCALES, LOCALE_LABELS, useI18n } from '../i18n';
-import {
-  applyPreference,
-  readPreference,
-  watchSystemTheme,
-  type ThemePreference,
-} from '../lib/theme';
+import type { ThemeMode } from '../lib/theme';
 
 /** Cycles system → light → dark. The glyph shows what is in force,
  *  the tooltip names what a click will do — a control that only
  *  showed its current state would leave you clicking to find out. */
-const THEME_ORDER: ThemePreference[] = ['system', 'light', 'dark'];
-const THEME_GLYPH: Record<ThemePreference, string> = {
+const THEME_ORDER: ThemeMode[] = ['system', 'light', 'dark'];
+const THEME_GLYPH: Record<ThemeMode, string> = {
   system: '◐',
   light: '☀',
   dark: '☾',
@@ -31,11 +26,12 @@ const THEME_GLYPH: Record<ThemePreference, string> = {
 
 export function QuickPrefs() {
   const { locale, setLocale, t } = useI18n();
-  const [theme, setTheme] = useState<ThemePreference>(() => readPreference());
+  // GDS owns the theme atom, its persistence, and the repaint; this
+  // control only names the next value in the cycle.
+  const theme = useTheme().mode;
+  const setThemeMode = useSetThemeMode();
 
-  useEffect(() => watchSystemTheme(() => setTheme(readPreference())), []);
-
-  const themeLabel: Record<ThemePreference, string> = {
+  const themeLabel: Record<ThemeMode, string> = {
     system: t('prefs.themeSystem'),
     light: t('prefs.themeLight'),
     dark: t('prefs.themeDark'),
@@ -46,10 +42,7 @@ export function QuickPrefs() {
     <div className="flex items-center gap-1">
       <button
         type="button"
-        onClick={() => {
-          applyPreference(next);
-          setTheme(next);
-        }}
+        onClick={() => setThemeMode(next)}
         title={`${t('prefs.theme')}: ${themeLabel[theme]} → ${themeLabel[next]}`}
         aria-label={`${t('prefs.theme')}: ${themeLabel[theme]}`}
         className="inline-flex h-7 w-7 items-center justify-center rounded text-fg-subtle transition hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
@@ -65,7 +58,7 @@ export function QuickPrefs() {
         value={locale}
         onChange={e => setLocale(e.target.value as (typeof LOCALES)[number])}
         title={t('prefs.language')}
-        className="h-7 rounded border border-transparent bg-transparent px-1 text-[11px] text-fg-subtle transition hover:border-border hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        className="h-7 rounded border border-transparent bg-transparent px-1 text-xs text-fg-subtle transition hover:border-border hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
       >
         {LOCALES.map(l => (
           <option key={l} value={l}>

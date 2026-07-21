@@ -12,11 +12,11 @@ import {
   Badge,
   Button,
   Card,
+  CardBody,
   CardHeader,
   EmptyState,
   ErrorBanner,
   PageHeader,
-  Section,
   formatRelative,
 } from '../components/ui';
 
@@ -106,7 +106,7 @@ export default function EndpointProbes() {
       {showAdd && (
         <Card>
           <CardHeader title="New probe" />
-          <Section>
+          <CardBody>
             <input
               className="h-8 w-full rounded border border-border px-2.5 text-sm"
               placeholder="https://api.example.com/health"
@@ -138,13 +138,13 @@ export default function EndpointProbes() {
                 Cancel
               </Button>
             </div>
-          </Section>
+          </CardBody>
         </Card>
       )}
 
       <Card>
         <CardHeader title={`Probes (${rows.length})`} />
-        <Section>
+        <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
@@ -173,7 +173,7 @@ export default function EndpointProbes() {
                         <Badge tone="neutral">off</Badge>
                       )}
                     </div>
-                    <div className="mt-1 text-[10px] text-fg-subtle">
+                    <div className="mt-1 text-xs text-fg-subtle">
                       expect {p.expected_status} · every {p.interval_sec}s ·
                       timeout {p.timeout_ms}ms · added{' '}
                       {formatRelative(p.created_at)}
@@ -199,7 +199,7 @@ export default function EndpointProbes() {
               ))}
             </ul>
           )}
-        </Section>
+        </CardBody>
       </Card>
     </div>
   );
