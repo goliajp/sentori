@@ -104,8 +104,86 @@
   }
 }
 
-:root {
+/*
+ * ── Semantic surface tokens ──────────────────────────────────────
+ *
+ * Everything above this point is a raw palette: `zinc-900`,
+ * `emerald-400`. Raw palette cannot carry a theme — a page written in
+ * `bg-zinc-950 text-zinc-100` is dark, permanently, and the only way
+ * to get a light mode out of it is to double every class with a
+ * `dark:` variant and keep the two in sync by hand forever.
+ *
+ * These tokens are the theme boundary instead. Components name a
+ * *role* — surface, border, muted text — and the role resolves to a
+ * different value per theme with no change at the call site.
+ *
+ * `@theme inline` matters: it makes Tailwind emit `var(--s-bg)` into
+ * the utility rather than resolving the value at build time, which is
+ * what lets `[data-theme]` re-point it live.
+ *
+ * Names and the dark values are shared with the marketing build
+ * (`marketing/src/styles/global.css`) so the two halves of the product
+ * look like one product.
+ */
+@theme inline {
+  --color-bg: var(--s-bg);
+  --color-surface: var(--s-surface);
+  --color-raised: var(--s-raised);
+  --color-border: var(--s-border);
+  --color-border-strong: var(--s-border-strong);
+  --color-fg: var(--s-fg);
+  --color-fg-muted: var(--s-fg-muted);
+  --color-fg-subtle: var(--s-fg-subtle);
+  --color-accent: var(--s-accent);
+  --color-accent-fg: var(--s-accent-fg);
+  --color-danger: var(--s-danger);
+  --color-warn: var(--s-warn);
+  --color-ok: var(--s-ok);
+}
+
+/*
+ * Dark is the default: this is a tool people keep open beside an
+ * editor, and the editor is dark. Light exists because daylight and
+ * projectors exist, not as an afterthought — every token below has a
+ * deliberate light value, not an inversion.
+ */
+:root,
+:root[data-theme='dark'] {
   color-scheme: dark;
+
+  --s-bg: #09090b;
+  --s-surface: #18181b;
+  --s-raised: #27272a;
+  --s-border: #27272a;
+  --s-border-strong: #3f3f46;
+  --s-fg: #f4f4f5;
+  --s-fg-muted: #a1a1aa;
+  --s-fg-subtle: #71717a;
+  --s-accent: #38bdf8;
+  --s-accent-fg: #09090b;
+  --s-danger: #f87171;
+  --s-warn: #fbbf24;
+  --s-ok: #34d399;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --s-bg: #ffffff;
+  --s-surface: #fafafa;
+  --s-raised: #f4f4f5;
+  --s-border: #e4e4e7;
+  --s-border-strong: #d4d4d8;
+  --s-fg: #18181b;
+  --s-fg-muted: #52525b;
+  --s-fg-subtle: #71717a;
+  /* Darker than the dark-mode accent: #38bdf8 on white fails
+     contrast at text sizes. */
+  --s-accent: #0284c7;
+  --s-accent-fg: #ffffff;
+  --s-danger: #dc2626;
+  --s-warn: #b45309;
+  --s-ok: #059669;
 }
 
 html,
@@ -116,7 +194,21 @@ body,
 
 body {
   margin: 0;
+  background-color: var(--s-bg);
+  color: var(--s-fg);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Anyone who asked their OS to stop animating things means it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

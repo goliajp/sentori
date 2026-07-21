@@ -212,8 +212,10 @@ pub struct DeliveryLog {
     /// Caller's dedup token.
     pub dedup_key: Option<String>,
     /// Filled when transport ack'd.
+    #[serde(with = "time::serde::rfc3339::option")]
     pub sent_at: Option<OffsetDateTime>,
     /// Row insertion ts.
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
 }
 

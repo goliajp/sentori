@@ -161,6 +161,7 @@ impl RollupTier {
 #[serde(rename_all = "camelCase")]
 pub struct RollupRow {
     /// Bucket start (truncated to the tier's grain).
+    #[serde(with = "time::serde::rfc3339")]
     pub bucket_ts: OffsetDateTime,
     /// Owning project.
     pub project_id: ProjectId,

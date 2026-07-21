@@ -59,7 +59,7 @@ export function OverviewPage() {
   }, []);
 
   return (
-    <div className="p-8">
+    <div>
       <PageHeader
         title="Overview"
         subtitle="Workspace-wide health + this-period usage."
@@ -172,7 +172,7 @@ function OnboardingGuide() {
     },
   ];
   return (
-    <div className="p-8">
+    <div>
       <div className="mx-auto max-w-2xl">
         <h3 className="text-base font-medium text-zinc-100">
           Welcome to Sentori

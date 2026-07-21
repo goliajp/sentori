@@ -282,6 +282,7 @@ pub struct User {
     /// True once the user verified email ownership.
     pub email_verified: bool,
     /// Account creation timestamp.
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
 }
 
@@ -296,6 +297,7 @@ pub struct Member {
     /// migration-imported rows).
     pub added_by: Option<UserId>,
     /// When this member was added.
+    #[serde(with = "time::serde::rfc3339")]
     pub added_at: OffsetDateTime,
 }
 
@@ -312,6 +314,7 @@ pub struct Project {
     /// via FK to `privacy_salts`.
     pub privacy_salt_id: Uuid,
     /// Creation timestamp.
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
 }
 
@@ -329,10 +332,13 @@ pub struct WorkspaceInvite {
     pub invited_by: UserId,
     /// Token expiration. Past-expiration invites cannot be
     /// accepted (collapsed into [`crate::IdentityError::InviteInvalid`]).
+    #[serde(with = "time::serde::rfc3339")]
     pub expires_at: OffsetDateTime,
     /// When the invite was accepted. `None` for pending.
+    #[serde(with = "time::serde::rfc3339::option")]
     pub accepted_at: Option<OffsetDateTime>,
     /// Creation timestamp.
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
 }
 

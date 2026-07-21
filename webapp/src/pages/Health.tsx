@@ -38,7 +38,7 @@ export function HealthPage() {
       : null;
 
   return (
-    <div className="space-y-4 p-6">
+    <div className="space-y-4">
       <PageHeader
         title="Health"
         subtitle={`Live server vitals. Last refresh: ${stamp}.`}

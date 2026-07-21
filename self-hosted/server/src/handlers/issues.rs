@@ -30,7 +30,9 @@ pub struct IssueRow {
     pub kind: String,
     pub status: String,
     pub event_count: i64,
+    #[serde(with = "time::serde::rfc3339")]
     pub first_seen: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
     pub last_seen: OffsetDateTime,
     pub last_release: String,
     pub last_environment: String,

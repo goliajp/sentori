@@ -124,10 +124,10 @@ export function IssuesPage() {
     }
   }
 
-  if (!projectId) return <div className="p-8">no project id</div>;
+  if (!projectId) return <div>no project id</div>;
 
   return (
-    <div className="p-8">
+    <div>
       <PageHeader
         title="Issues"
         subtitle={`Project ${projectId.slice(0, 8)}…`}

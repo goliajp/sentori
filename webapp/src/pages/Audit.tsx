@@ -77,7 +77,7 @@ export function AuditPage() {
   }
 
   return (
-    <div className="p-8">
+    <div>
       <PageHeader
         title="Audit log"
         subtitle="Workspace-wide admin actions, append-only."

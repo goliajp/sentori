@@ -13,7 +13,7 @@
 
 [package]
 name = "sentori-server"
-version = "1.7.2"
+version = "1.7.3"
 edition = "2024"
 authors = ["GOLIA K.K. <takagi@golia.jp>"]
 license = "Apache-2.0 OR MIT"
@@ -60,7 +60,7 @@ sentori-push-provider      = { path = "../../core/crates/push-provider" }
 sentori-cert-monitor       = { path = "../../core/crates/cert-monitor" }
 sentori-stripe-webhook-verify = { path = "../../core/crates/stripe-webhook-verify" }
 
-axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio", "tower-log", "tracing", "macros"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "multipart", "query", "tokio", "tower-log", "tracing", "macros"] }
 axum-extra = { version = "0.10", default-features = false, features = ["cookie"] }
 tokio = { version = "1", features = ["full"] }
 tower = { version = "0.5", default-features = false }

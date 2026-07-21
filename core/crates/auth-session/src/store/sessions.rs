@@ -111,12 +111,15 @@ pub struct Session {
     /// rejected rather than trusted.
     pub workspace_id: WorkspaceId,
     /// When the session was minted (login or refresh).
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
     /// Last time a request touched this session (updated on
     /// every authenticated request).
+    #[serde(with = "time::serde::rfc3339")]
     pub last_seen_at: OffsetDateTime,
     /// Hard expiry — past this, the session is gone whether or
     /// not it's been used recently.
+    #[serde(with = "time::serde::rfc3339")]
     pub expires_at: OffsetDateTime,
     /// Originating client IP, if the caller could determine one.
     pub ip: Option<String>,

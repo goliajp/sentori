@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { api, UsageResponse } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
+import { Preferences } from '../components/Preferences';
 import { Card, PageHeader, Section, Badge } from '../components/ui';
 
 export function SettingsPage() {
@@ -34,7 +35,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="p-8">
+    <div>
       <PageHeader
         title="Settings"
         subtitle="Workspace + plan + integrations + members."
@@ -58,6 +59,12 @@ export function SettingsPage() {
           </Card>
         </Section>
       )}
+
+      <Section title="Preferences">
+        <Card>
+          <Preferences />
+        </Card>
+      </Section>
 
       <Section title="Plan">
         <Card>

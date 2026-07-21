@@ -117,8 +117,10 @@ pub struct IssueSummary {
     /// Operator assignment (or `None` if unassigned).
     pub assignee_user_id: Option<UserId>,
     /// First event timestamp.
+    #[serde(with = "time::serde::rfc3339")]
     pub first_seen: OffsetDateTime,
     /// Last event timestamp (the cursor sort key).
+    #[serde(with = "time::serde::rfc3339")]
     pub last_seen: OffsetDateTime,
     /// Cumulative event count for this issue.
     pub event_count: i64,
@@ -127,10 +129,12 @@ pub struct IssueSummary {
     /// Release of the most recent event.
     pub last_release: String,
     /// Set when the issue regressed.
+    #[serde(with = "time::serde::rfc3339::option")]
     pub regressed_at: Option<OffsetDateTime>,
     /// Release that triggered the regression.
     pub regressed_in_release: Option<String>,
     /// Set when the operator marked the issue resolved.
+    #[serde(with = "time::serde::rfc3339::option")]
     pub resolved_at: Option<OffsetDateTime>,
     /// Release the resolution was filed against.
     pub resolved_in_release: Option<String>,

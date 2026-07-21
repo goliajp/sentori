@@ -28,9 +28,13 @@ pub struct AlertRuleRow {
     pub filter_config: Value,
     pub channels: Value,
     pub throttle_minutes: i32,
+    #[serde(with = "time::serde::rfc3339::option")]
     pub last_fired_at: Option<OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339::option")]
     pub snoozed_until: Option<OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
     pub updated_at: OffsetDateTime,
 }
 
