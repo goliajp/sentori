@@ -14,6 +14,8 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
+import { useT } from '../i18n';
+
 // ── Card ───────────────────────────────────────────────────
 
 export function Card({
@@ -229,7 +231,7 @@ export function Badge({
 export function DataTable<T>({
   columns,
   rows,
-  empty = 'No data',
+  empty,
   rowKey,
 }: {
   columns: { key: keyof T | string; label: string; render?: (row: T) => ReactNode; width?: string }[];
@@ -237,9 +239,16 @@ export function DataTable<T>({
   empty?: string;
   rowKey?: (row: T) => string;
 }) {
+  // Resolved here rather than as a default parameter: a default is
+  // evaluated where the signature is written, which has no hook and
+  // so no locale, and every caller that omitted `empty` was getting
+  // the English string regardless of language.
+  const t = useT();
   if (rows.length === 0) {
     return (
-      <div className="p-8 text-center text-sm text-fg-subtle">{empty}</div>
+      <div className="p-8 text-center text-sm text-fg-subtle">
+        {empty ?? t('table.empty')}
+      </div>
     );
   }
   return (

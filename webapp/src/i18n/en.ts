@@ -250,6 +250,10 @@ export const en = {
   'shortcuts.title': "Keyboard shortcuts",
   'shortcuts.subtitle': "Disabled while your cursor is in a text field.",
 
+  'traces.duration': "Duration",
+  'traces.rootOp': "Root operation",
+  'workspace.label': "Workspace",
+
   'nav.issues': 'Issues',
   'nav.members': 'Members',
   'nav.metrics': 'Metrics',

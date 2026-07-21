@@ -7,6 +7,7 @@ import { Link, useParams } from 'react-router-dom';
 
 import { useNavigate } from 'react-router-dom';
 
+import { useT } from '../i18n';
 import { api, SpanRow, TraceRow } from '../lib/api';
 import { useKeyHandlers } from '../lib/useShortcuts';
 import {
@@ -21,6 +22,7 @@ import {
 } from '../components/ui';
 
 export default function TraceDetail() {
+  const t = useT();
   const { id: projectId, traceId } = useParams<{
     id: string;
     traceId: string;
@@ -100,23 +102,23 @@ export default function TraceDetail() {
       />
 
       <Card>
-        <CardHeader title="Meta" />
+        <CardHeader title={t('crash.meta')} />
         <CardBody>
           <div className="grid grid-cols-4 gap-4">
-            <Cell label="Status">
+            <Cell label={t('crash.status')}>
               <Badge tone={trace.status === 'ok' ? 'ok' : 'neutral'}>
                 {trace.status}
               </Badge>
             </Cell>
-            <Cell label="Root op">
+            <Cell label={t('traces.rootOp')}>
               <span className="font-mono text-xs">{trace.root_op ?? '—'}</span>
             </Cell>
-            <Cell label="Spans">{formatNumber(trace.span_count)}</Cell>
-            <Cell label="Duration">
+            <Cell label={t('overview.spans')}>{formatNumber(trace.span_count)}</Cell>
+            <Cell label={t('traces.duration')}>
               {formatNumber(trace.duration_ms)} ms
             </Cell>
-            <Cell label="First seen">{formatRelative(trace.first_seen)}</Cell>
-            <Cell label="Last seen">{formatRelative(trace.last_seen)}</Cell>
+            <Cell label={t('crash.firstSeen')}>{formatRelative(trace.first_seen)}</Cell>
+            <Cell label={t('crash.lastSeen')}>{formatRelative(trace.last_seen)}</Cell>
           </div>
         </CardBody>
       </Card>
