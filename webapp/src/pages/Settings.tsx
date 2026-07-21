@@ -44,7 +44,7 @@ export function SettingsPage() {
       {email && (
         <Section title="Account">
           <Card>
-            <div className="flex items-center justify-between p-4">
+            <div className="flex items-center justify-between px-5 py-4">
               <div>
                 <p className="text-xs text-fg-subtle">Signed in as</p>
                 <p className="font-mono text-sm">{email}</p>
@@ -93,7 +93,7 @@ export function SettingsPage() {
               </span>
             </Cell>
           </div>
-          <div className="flex items-center justify-between border-t border-border p-4">
+          <div className="flex items-center justify-between border-t border-border px-5 py-4">
             <p className="text-sm text-fg-subtle">
               Usage, upgrades, invoices, and cancellation.
             </p>
@@ -143,7 +143,7 @@ export function SettingsPage() {
 
       <Section title="Active sessions">
         <Card>
-          <div className="p-4 flex items-center justify-between">
+          <div className="px-5 py-4 flex items-center justify-between">
             <p className="text-sm text-fg-muted">
               Detailed list, IP+UA per session, revoke individual entries.
             </p>
@@ -188,7 +188,7 @@ function Cell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="p-4">
+    <div className="px-5 py-4">
       <p className="mb-1 text-xs uppercase tracking-wide text-fg-subtle">
         {label}
       </p>
@@ -218,7 +218,7 @@ function SessionsCard() {
 
   return (
     <Card>
-      <div className="p-4 text-sm">
+      <div className="px-5 py-4 text-sm">
         {loading ? (
           <p className="text-fg-subtle text-xs">Loading…</p>
         ) : rows.length === 0 ? (

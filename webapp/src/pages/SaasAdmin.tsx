@@ -238,7 +238,7 @@ function StatCard({
 }) {
   return (
     <Card>
-      <div className="p-4">
+      <div className="px-5 py-4">
         <p className="text-xs uppercase tracking-wide text-fg-subtle">
           {label}
         </p>

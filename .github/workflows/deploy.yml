@@ -118,15 +118,18 @@ jobs:
 
       # Production serves the SPA from this directory rather than from
       # the copy baked into the server image, so a dashboard change can
-      # ship without rebuilding the image. Owned by the container's
-      # runtime uid (distroless `nonroot`) so the read-only mount
-      # resolves.
+      # ship without rebuilding the image.
+      #
+      # Stays owned by the runner. The mount is `:ro`, so the container's
+      # uid (distroless `nonroot`, 65532) only needs the world-read bit
+      # that 0755/0644 already grants — chowning it to 65532 instead
+      # locks the runner out of its own directory and every later deploy
+      # fails on `mkstemp … Permission denied`.
       - name: Rsync webapp/dist → /apps/sentori/webapp-dist
         run: |
           install -d -m 0755 "${REMOTE_DIR}/webapp-dist"
-          rsync -a --delete webapp/dist/ "${REMOTE_DIR}/webapp-dist/"
-          chown -R 65532:65532 "${REMOTE_DIR}/webapp-dist" || \
-            sudo chown -R 65532:65532 "${REMOTE_DIR}/webapp-dist"
+          rsync -a --delete --chmod=D755,F644 \
+            webapp/dist/ "${REMOTE_DIR}/webapp-dist/"
 
       - name: Rsync source into /apps/sentori/src
         run: |

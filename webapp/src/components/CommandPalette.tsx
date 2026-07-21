@@ -181,7 +181,7 @@ export function CommandPalette({ open, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-24"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 px-5 py-4 pt-24"
       onClick={onClose}
     >
       <div

@@ -44,7 +44,7 @@ export function CardHeader({
   return (
     <div className="flex items-start justify-between border-b border-border px-5 py-4">
       <div>
-        <h3 className="text-sm font-medium text-fg">{title}</h3>
+        <h3 className="text-[15px] font-semibold tracking-tight text-fg">{title}</h3>
         {subtitle && (
           <p className="mt-0.5 text-xs text-fg-subtle">{subtitle}</p>
         )}
@@ -106,13 +106,16 @@ export type ButtonSize = 'sm' | 'md';
 export function buttonClass(
   variant: ButtonVariant = 'secondary',
   size: ButtonSize = 'md',
+  icon = false,
 ): string {
   const base =
     'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50';
-  const sizes = {
-    sm: `${CONTROL_H.sm} px-2.5 text-sm`,
-    md: `${CONTROL_H.md} px-3 text-sm`,
-  };
+  // An icon-only button is square. Left to padding it would be
+  // narrower than its lettered neighbours and by a different amount
+  // for every glyph — `⊘` and `↺` do not share a width.
+  const sizes = icon
+    ? { sm: `${CONTROL_H.sm} w-7 text-sm`, md: `${CONTROL_H.md} w-8 text-sm` }
+    : { sm: `${CONTROL_H.sm} px-2.5 text-sm`, md: `${CONTROL_H.md} px-3 text-sm` };
   const variants = {
     primary: 'bg-accent text-accent-fg hover:opacity-90',
     secondary: 'border border-border-strong bg-surface text-fg hover:bg-raised',
@@ -130,20 +133,29 @@ export function Button({
   onClick,
   disabled,
   type = 'button',
+  title,
+  icon = false,
 }: {
   children: ReactNode;
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
-  size?: 'sm' | 'md';
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   onClick?: () => void;
   disabled?: boolean;
   type?: 'button' | 'submit';
+  /** Also the accessible name — an icon-only button has no text to
+   *  read out, so this is the only thing a screen reader can announce. */
+  title?: string;
+  /** Square, for a lone glyph. */
+  icon?: boolean;
 }) {
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={buttonClass(variant, size)}
+      title={title}
+      aria-label={title}
+      className={buttonClass(variant, size, icon)}
     >
       {children}
     </button>
@@ -350,7 +362,7 @@ export function Section({
     <section className="mb-8">
       {(title || action) && (
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-medium uppercase tracking-wide text-fg-muted">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
             {title}
           </h3>
           {action}

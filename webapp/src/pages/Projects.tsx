@@ -175,7 +175,7 @@ export default function Projects() {
                   </span>
                 ),
                 active: (
-                  <span className="font-mono tabular-nums text-orange-300">
+                  <span className="font-mono tabular-nums text-warn">
                     {stats[p.id] ? stats[p.id].issues_active : '—'}
                   </span>
                 ),

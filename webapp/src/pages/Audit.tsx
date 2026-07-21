@@ -93,7 +93,7 @@ export function AuditPage() {
 
       <Card className="mb-4">
         <CardHeader title="Filter" />
-        <div className="grid grid-cols-4 gap-2 p-4">
+        <div className="grid grid-cols-4 gap-2 px-5 py-4">
           <Field
             label="Project ID"
             value={projectId}

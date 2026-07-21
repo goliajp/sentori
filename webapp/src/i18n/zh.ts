@@ -51,6 +51,10 @@ export const zh: Messages = {
   'nav.health': '健康状态',
   'nav.inbox': '通知',
   'nav.integrations': '集成',
+  'issues.resolve': '标记已解决',
+  'issues.ignore': '忽略',
+  'issues.reopen': '重新打开',
+
   'nav.issues': '问题',
   'nav.members': '成员',
   'nav.metrics': '指标',

@@ -21,7 +21,7 @@ export function Preferences() {
   ];
 
   return (
-    <div className="grid gap-6 p-4 sm:grid-cols-2">
+    <div className="grid gap-6 px-5 py-4 sm:grid-cols-2">
       <Field label={t('prefs.theme')}>
         <Segmented
           options={themeOptions}
