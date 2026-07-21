@@ -62,9 +62,19 @@ use crate::state::AppState;
 const STATE_COOKIE: &str = "sentori_oauth_state";
 const STATE_TTL_MINUTES: i64 = 10;
 
-/// Where a successful login lands. The SPA's root route resolves the
-/// signed-in user via `/auth/me`, so no state travels in the URL.
-const DASHBOARD_ROOT: &str = "/";
+/// Where a successful login lands. The SPA resolves the signed-in user
+/// via `/auth/me`, so no state travels in the URL.
+///
+/// `/main`, deliberately not `/`: this is a **server-side** 302, i.e. a
+/// full page load. On the SaaS deployment Caddy serves the marketing
+/// site at `/` and routes every other path to this server's SPA, so a
+/// redirect to `/` handed freshly-authenticated users the marketing
+/// homepage instead of the dashboard. (Password login dodged it by
+/// navigating client-side inside the already-loaded SPA — only the
+/// OAuth callback, being a fresh browser navigation, hit Caddy.)
+/// `/main` reaches the SPA on both SaaS and self-hosted and survives a
+/// refresh or bookmark, so it is the canonical dashboard home.
+const DASHBOARD_ROOT: &str = "/main";
 
 struct ProviderConfig {
     name: &'static str,

@@ -17,7 +17,7 @@ interface PaletteItem {
 }
 
 const WORKSPACE_ROUTES: PaletteItem[] = [
-  { id: 'wo', label: 'Overview', hint: 'g i', route: '/' },
+  { id: 'wo', label: 'Overview', hint: 'g i', route: '/main' },
   { id: 'wp', label: 'Projects', hint: 'g p', route: '/projects' },
   { id: 'wm', label: 'Members', hint: 'g m', route: '/members' },
   { id: 'wa', label: 'Alerts', hint: 'g a', route: '/alerts' },

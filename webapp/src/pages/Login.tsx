@@ -31,7 +31,10 @@ export function LoginPage() {
       localStorage.setItem('sentori_email', r.email);
       // If the user was bounced here by the 401 redirect, bring
       // them back to where they were.
-      let returnTo = '/';
+      // Default to the dashboard home path, not `/` — on SaaS `/` is
+      // the marketing site and only resolves to this SPA via a
+      // client-side navigation, so it breaks on refresh / bookmark.
+      let returnTo = '/main';
       try {
         const stashed = sessionStorage.getItem('sentori_return_to');
         if (stashed) {

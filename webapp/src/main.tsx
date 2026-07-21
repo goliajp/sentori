@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import { App } from './App';
 import { AlertsPage } from './pages/Alerts';
@@ -57,7 +57,17 @@ createRoot(rootEl).render(
         <Route path="/verify" element={<Verify />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route element={<App />}>
-          <Route index element={<OverviewPage />} />
+          {/* The dashboard home lives at /main, not /. On the SaaS
+              deployment `/` is the marketing site (Caddy routes it to
+              the Astro build), so a *full page load* of `/` never
+              reaches this SPA — which broke every server-side redirect
+              that targeted it (notably the OAuth callback, which
+              landed users on the marketing page after a successful
+              login). `/main` is served to the SPA on both SaaS and
+              self-hosted, so it is the one home path that survives a
+              full load, a refresh, and a bookmark. */}
+          <Route index element={<Navigate to="/main" replace />} />
+          <Route path="/main" element={<OverviewPage />} />
           <Route path="/alerts" element={<AlertsPage />} />
           <Route path="/audit" element={<AuditPage />} />
           <Route path="/settings" element={<SettingsPage />} />
