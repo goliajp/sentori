@@ -84,7 +84,7 @@ export default function SaasAdmin() {
     <div className="space-y-4">
       <PageHeader
         title={t('saas.title')}
-        subtitle="Cross-workspace operator view. In self-hosted mode shows your single workspace."
+        subtitle={t('saas.subtitle')}
         actions={
           <Button onClick={() => setShowCreate(true)}>{'+ ' + t('saas.newWorkspace')}</Button>
         }
@@ -142,12 +142,12 @@ export default function SaasAdmin() {
           ) : (
             <DataTable
               columns={[
-                { key: 'name', label: 'Name' },
-                { key: 'plan', label: 'Plan' },
-                { key: 'status', label: 'Status' },
-                { key: 'projects', label: 'Projects' },
-                { key: 'members', label: 'Members' },
-                { key: 'created', label: 'Created' },
+                { key: 'name', label: t('saas.name') },
+                { key: 'plan', label: t('saas.plan') },
+                { key: 'status', label: t('crash.status') },
+                { key: 'projects', label: t('saas.projects') },
+                { key: 'members', label: t('saas.members') },
+                { key: 'created', label: t('saas.created') },
                 { key: 'actions', label: '' },
               ]}
               rows={rows.map(w => ({
@@ -195,14 +195,14 @@ export default function SaasAdmin() {
                         variant="secondary"
                         disabled={busy === w.id}
                         onClick={() => act(w, id => api.suspendWorkspace(id))}
-                      >{t('action.delete')}</Button>
+                      >{t('saas.suspend')}</Button>
                     ) : (
                       <Button
                         size="sm"
                         variant="secondary"
                         disabled={busy === w.id}
                         onClick={() => act(w, id => api.resumeWorkspace(id))}
-                      >{t('action.retryNow')}</Button>
+                      >{t('saas.resume')}</Button>
                     )}
                     <Button
                       size="sm"

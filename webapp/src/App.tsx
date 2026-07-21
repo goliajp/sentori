@@ -114,7 +114,7 @@ function Sidebar({ me }: { me: MeResponse | null }) {
   const projectScoped = params.id;
 
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-bg px-5 py-4">
+    <aside className="flex h-full w-56 shrink-0 flex-col overflow-hidden border-r border-border bg-bg px-5 py-4">
       <div className="mb-4">
         <h1 className="text-base font-semibold tracking-tight text-fg">
           Sentori
@@ -125,7 +125,11 @@ function Sidebar({ me }: { me: MeResponse | null }) {
       {/* Active workspace + switcher. Hidden until whoami resolves. */}
       {me && <WorkspaceSwitcher me={me} />}
 
-      <nav className="mt-4 flex flex-1 flex-col gap-1 text-sm">
+      {/* The nav scrolls, the account row below it does not. Without
+          this the list simply overflowed the aside on a short window:
+          its background and right border stopped at the fold while the
+          last few destinations carried on past them, unreachable. */}
+      <nav className="mt-4 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto text-sm">
         <SectionLabel>{t('nav.sectionWorkspace')}</SectionLabel>
         <NavItem to="/main" label={t('nav.overview')} />
         <NavItem to="/search" label={t('nav.search')} />

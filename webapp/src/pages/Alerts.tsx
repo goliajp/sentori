@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useT } from '../i18n';
+import type { MessageKey } from '../i18n/en';
 import { api, AlertRule, ApiError } from '../lib/api';
 import {
   Badge,
@@ -10,6 +11,23 @@ import {
   PageHeader,
   formatRelative,
 } from '../components/ui';
+
+/**
+ * What a rule watches for, said as a condition rather than as the enum
+ * the column stores. `crash_free_drop` is the value; "Crash-free rate
+ * drops" is the thing the person setting it up has in mind.
+ */
+const TRIGGER_KEYS: Record<string, MessageKey> = {
+  new_issue: 'alerts.kindNewIssue',
+  regression: 'alerts.kindRegression',
+  event_count: 'alerts.kindEventCount',
+  crash_free_drop: 'alerts.kindCrashFreeDrop',
+};
+
+function triggerLabel(kind: string, t: (k: MessageKey) => string): string {
+  const key = TRIGGER_KEYS[kind];
+  return key ? t(key) : kind;
+}
 
 export function AlertsPage() {
   const t = useT();
@@ -99,7 +117,7 @@ export function AlertsPage() {
     <div>
       <PageHeader
         title={t('alerts.title')}
-        subtitle="Workspace-wide rules. Trigger kinds: issue_new / regression / event_count / crash_free_drop."
+        subtitle={t('alerts.subtitle')}
         action={
           <Button
             variant="primary"
@@ -147,7 +165,7 @@ export function AlertsPage() {
           columns={[
             {
               key: 'enabled',
-              label: 'On',
+              label: t('alerts.on'),
               width: '5%',
               render: (r) => (
                 <Badge tone={r.enabled && !r.muted ? 'ok' : 'neutral'}>
@@ -157,20 +175,26 @@ export function AlertsPage() {
             },
             {
               key: 'name',
-              label: 'Name',
+              label: t('alerts.name'),
               render: (r) => (
                 <div>
                   <div className="font-medium text-fg">{r.name}</div>
                   <div className="font-mono text-xs text-fg-subtle">
-                    {r.trigger_kind} · throttle {r.throttle_minutes}m
-                    {r.project_id ? ` · project ${r.project_id.slice(0, 8)}` : ' · workspace-wide'}
+                    {triggerLabel(r.trigger_kind, t)} ·{' '}
+                    {t('alerts.throttleEvery').replace(
+                      '{n}',
+                      String(r.throttle_minutes),
+                    )}{' · '}
+                    {r.project_id
+                      ? t('alerts.scopeProject')
+                      : t('alerts.scopeWorkspace')}
                   </div>
                 </div>
               ),
             },
             {
               key: 'last_fired_at',
-              label: 'Last fired',
+              label: t('alerts.lastFired'),
               width: '15%',
               render: (r) =>
                 r.last_fired_at ? (
@@ -178,7 +202,7 @@ export function AlertsPage() {
                     {formatRelative(r.last_fired_at)}
                   </span>
                 ) : (
-                  <span className="text-xs text-fg-subtle">never</span>
+                  <span className="text-xs text-fg-subtle">{t('alerts.never')}</span>
                 ),
             },
             {
