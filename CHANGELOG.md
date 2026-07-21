@@ -6,6 +6,16 @@
 
 ---
 
+## v1.7.1(2026-07-21 — 配额超限返回 402 而非 429,避免 RN SDK 重试 churn)
+
+紧跟 v1.7.0 的行为修正。月度配额用尽本不该是 429:RN SDK 把每个 429 当"稍后重试" —— 读响应体 `retryAfterMs`(v1.7.0 的 server 从不发 → 默认 5s),退避重试 `MAX_RETRY` 次,再把批次 persist 到 AsyncStorage 离线队列、下次 session 继续发。对一个整月都不会恢复的配额,这就是对注定失败的批次反复重试 = 白耗 host app 电量/网络,正好踩"Sentori 不能给 host app 造成抖动"的铁律。
+
+改为返回 **402 Payment Required**:所有 SDK 对非-429 的 4xx 都静默 drop(JS `status >= 400` → drop;RN 落在 429/5xx 两个分支之外 → 不重试、不 persist),已部署客户端零改动即止 churn,**无需更新任何 SDK**。402 语义也更准("到 plan 上限了,升级继续")。429 留给短期 per-token 速率限制(带 `retryAfterMs`,正是 RN 那段重试逻辑的本意)。
+
+5 条真实 ingest 路径(events / spans + 各自 batch + replay 附件)全部切到 402;`docs/protocol.md` 补 402 响应码说明。
+
+---
+
 ## v1.7.0(2026-07-21 — SaaS 接入与管理:真多租户 + 计费执行 + Stripe 自助 + onboarding)
 
 把 SaaS 化从"地基"推到"能收钱、能管理、能自助接入"的完整闭环。

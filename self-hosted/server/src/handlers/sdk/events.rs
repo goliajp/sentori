@@ -42,7 +42,7 @@ pub async fn handle(
         crate::handlers::sdk::quota::meter(&state, ctx.project_id, CounterKind::Events, 1, now)
             .await
     {
-        return (StatusCode::TOO_MANY_REQUESTS, Json(body));
+        return (StatusCode::PAYMENT_REQUIRED, Json(body));
     }
 
     let event_tick_snapshot = (

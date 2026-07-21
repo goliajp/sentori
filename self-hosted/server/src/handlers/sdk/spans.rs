@@ -21,7 +21,7 @@ pub async fn handle(
     // K17 quota: meter one span against the project's plan.
     let now = OffsetDateTime::now_utc();
     if let Err(body) = quota::meter(&state, ctx.project_id, CounterKind::Spans, 1, now).await {
-        return (StatusCode::TOO_MANY_REQUESTS, Json(body));
+        return (StatusCode::PAYMENT_REQUIRED, Json(body));
     }
 
     match state.spans.ingest_span(ctx.project_id, input).await {
