@@ -35,7 +35,7 @@ pub async fn list(
                 "actor_user_id": r.try_get::<Option<Uuid>, _>("actor_user_id").ok().flatten().map(|u| u.to_string()),
                 "kind": r.get::<String, _>("kind"),
                 "payload": r.try_get::<Value, _>("payload").unwrap_or(Value::Null),
-                "created_at": r.get::<time::OffsetDateTime, _>("created_at"),
+                "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
             })
         })
         .collect();

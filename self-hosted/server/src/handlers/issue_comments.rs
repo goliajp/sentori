@@ -45,7 +45,7 @@ pub async fn list(
                     .flatten()
                     .map(|u| u.to_string()),
                 "body_md": r.get::<String, _>("body"),
-                "created_at": r.get::<time::OffsetDateTime, _>("created_at"),
+                "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
                 "edited_at": Option::<time::OffsetDateTime>::None,
             })
         })
@@ -110,7 +110,7 @@ pub async fn create(
                     "issue_id": issue_id.to_string(),
                     "author_user_id": ctx.user_id.into_uuid().to_string(),
                     "body_md": body.body_md.trim(),
-                    "created_at": row.get::<time::OffsetDateTime, _>("created_at"),
+                    "created_at": crate::wire_time::rfc3339(row.get::<time::OffsetDateTime, _>("created_at")),
                 })),
             )
         }

@@ -46,7 +46,7 @@ pub async fn handle(
             json!({
                 "category": r.get::<String, _>("category"),
                 "opted_out": r.get::<bool, _>("opted_out"),
-                "updated_at": r.get::<time::OffsetDateTime, _>("updated_at"),
+                "updated_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("updated_at")),
             })
         })
         .collect();

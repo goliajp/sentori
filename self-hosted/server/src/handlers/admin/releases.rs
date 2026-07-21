@@ -39,8 +39,8 @@ pub async fn list(State(state): State<Arc<AppState>>, Path(project_id): Path<Uui
             json!({
                 "id": r.get::<Uuid, _>("id").to_string(),
                 "name": r.get::<String, _>("name"),
-                "created_at": r.get::<time::OffsetDateTime, _>("created_at"),
-                "deploy_at": r.try_get::<Option<time::OffsetDateTime>, _>("deploy_at").ok().flatten(),
+                "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
+                "deploy_at": crate::wire_time::rfc3339_opt(r.try_get::<Option<time::OffsetDateTime>, _>("deploy_at").ok().flatten()),
             })
         })
         .collect();
@@ -69,7 +69,7 @@ pub async fn list_artifacts(
                 "name": r.get::<String, _>("name"),
                 "content_hash": r.get::<String, _>("content_hash"),
                 "size_bytes": r.try_get::<i64, _>("size_bytes").unwrap_or(0),
-                "created_at": r.get::<time::OffsetDateTime, _>("created_at"),
+                "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
             })
         })
         .collect();

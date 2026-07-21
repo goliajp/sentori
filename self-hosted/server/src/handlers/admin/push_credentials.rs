@@ -160,8 +160,8 @@ pub async fn list(
                 "id": r.get::<Uuid, _>("id").to_string(),
                 "kind": r.get::<String, _>("kind"),
                 "config": r.get::<Value, _>("config"),
-                "created_at": r.get::<time::OffsetDateTime, _>("created_at"),
-                "last_validated_at": r.get::<Option<time::OffsetDateTime>, _>("last_validated_at"),
+                "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
+                "last_validated_at": crate::wire_time::rfc3339_opt(r.get::<Option<time::OffsetDateTime>, _>("last_validated_at")),
                 "last_validate_status": r.get::<Option<String>, _>("last_validate_status"),
             })
         })

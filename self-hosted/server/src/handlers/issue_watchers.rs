@@ -39,7 +39,7 @@ pub async fn list(
         .map(|r| {
             json!({
                 "user_id": r.get::<Uuid, _>("user_id").to_string(),
-                "started_at": r.get::<time::OffsetDateTime, _>("started_at"),
+                "started_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("started_at")),
             })
         })
         .collect();

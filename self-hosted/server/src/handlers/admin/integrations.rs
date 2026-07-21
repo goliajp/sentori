@@ -104,7 +104,7 @@ pub async fn list(State(state): State<Arc<AppState>>, Path(project_id): Path<Uui
                 "kind": r.get::<String, _>("kind"),
                 "config": r.get::<Value, _>("config"),
                 "connected_by": r.try_get::<Option<Uuid>, _>("connected_by").ok().flatten().map(|u| u.to_string()),
-                "connected_at": r.get::<time::OffsetDateTime, _>("connected_at"),
+                "connected_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("connected_at")),
                 "active": r.get::<bool, _>("active"),
             })
         })

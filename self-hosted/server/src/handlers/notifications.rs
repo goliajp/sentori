@@ -34,8 +34,8 @@ pub async fn list(
                 "id": r.get::<i64, _>("id").to_string(),
                 "kind": r.get::<String, _>("kind"),
                 "payload": r.try_get::<Value, _>("payload").unwrap_or(Value::Null),
-                "read_at": r.try_get::<Option<time::OffsetDateTime>, _>("read_at").ok().flatten(),
-                "created_at": r.get::<time::OffsetDateTime, _>("created_at"),
+                "read_at": crate::wire_time::rfc3339_opt(r.try_get::<Option<time::OffsetDateTime>, _>("read_at").ok().flatten()),
+                "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
             })
         })
         .collect();
