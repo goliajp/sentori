@@ -77,9 +77,7 @@ export default function AcceptInvite() {
                 // Land in the freshly-joined workspace's dashboard.
               }}
               className="mt-5 inline-block rounded bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-            >
-              Go to dashboard
-            </Link>
+            >{t('auth.goToDashboard')}</Link>
           </>
         )}
 
@@ -93,15 +91,11 @@ export default function AcceptInvite() {
               <Link
                 to="/login"
                 className="rounded bg-raised px-4 py-2 text-sm font-medium text-fg hover:bg-white"
-              >
-                Log in
-              </Link>
+              >{t('auth.logIn')}</Link>
               <Link
                 to="/register"
                 className="rounded border border-border-strong px-4 py-2 text-sm font-medium text-fg hover:border-border-strong"
-              >
-                Sign up
-              </Link>
+              >{t('auth.signUp')}</Link>
             </div>
           </>
         )}

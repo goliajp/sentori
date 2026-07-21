@@ -96,7 +96,7 @@ export default function Releases() {
   }
 
   if (!projectId) {
-    return <ErrorBanner>Project id missing</ErrorBanner>;
+    return <ErrorBanner>{t('common.missingProjectId')}</ErrorBanner>;
   }
 
   return (
@@ -143,7 +143,7 @@ export default function Releases() {
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       <Card>
-        <CardHeader title={`Releases (${rows.length})`} />
+        <CardHeader title={`${t('releases.title')} (${rows.length})`} />
         <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">Loading…</div>
@@ -179,9 +179,7 @@ export default function Releases() {
                         size="sm"
                         variant="danger"
                         onClick={() => destroy(r)}
-                      >
-                        Delete
-                      </Button>
+                      >{t('action.delete')}</Button>
                     </div>
                   </div>
                   {expanded === r.id && (

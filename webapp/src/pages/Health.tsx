@@ -43,14 +43,12 @@ export function HealthPage() {
     <div className="space-y-4">
       <PageHeader
         title={t('health.title')}
-        subtitle={`Live server vitals. Last refresh: ${stamp}.`}
+        subtitle={t('health.subtitle').replace('{stamp}', stamp)}
         actions={
           <button
             onClick={refresh}
             className="inline-flex h-8 items-center rounded border border-border-strong px-3 text-sm hover:bg-raised"
-          >
-            Refresh
-          </button>
+          >{t('action.refresh')}</button>
         }
       />
 

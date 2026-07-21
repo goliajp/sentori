@@ -187,7 +187,7 @@ function UsageCard({ info }: { info: BillingInfo }) {
   const t = useT();
   return (
     <Card>
-      <CardHeader title={`Usage · ${info.period_yyyymm}`} />
+      <CardHeader title={`${t('billing.usage')} · ${info.period_yyyymm}`} />
       <CardBody>
         <div className="space-y-4">
           <UsageBar label={t('events.title')} counter={info.usage.events} />
@@ -251,9 +251,7 @@ function UpgradeCard({
       <CardHeader
         title={t('billing.change')}
         action={
-          <Button variant="ghost" size="sm" onClick={onRefresh} disabled={busy}>
-            Refresh
-          </Button>
+          <Button variant="ghost" size="sm" onClick={onRefresh} disabled={busy}>{t('action.refresh')}</Button>
         }
       />
       <CardBody>
@@ -311,6 +309,7 @@ function Banner({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const t = useT();
   const cls =
     tone === 'ok'
       ? 'border-accent/40 bg-accent/40 text-accent'
@@ -323,9 +322,7 @@ function Banner({
       <button
         onClick={onClose}
         className="shrink-0 text-xs opacity-70 hover:opacity-100"
-      >
-        Dismiss
-      </button>
+      >{t('action.dismiss')}</button>
     </div>
   );
 }

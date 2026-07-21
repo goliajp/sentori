@@ -11,7 +11,7 @@
 //   · a card's contents sit at one inset (`px-5`), header and body
 //     and table cells alike, so the left edge is a single line.
 
-import type { ReactNode } from 'react';
+import { isValidElement, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
 import { useT } from '../i18n';
@@ -228,6 +228,27 @@ export function Badge({
 
 // ── DataTable ──────────────────────────────────────────────
 
+/**
+ * A cell's value, rendered as what it is.
+ *
+ * This used to be `String(value ?? '—')`, which turns anything that is
+ * not a primitive into the literal text `[object Object]` — including
+ * a React element, which is exactly what seven pages put in their rows
+ * instead of writing a `render` callback for every column. The whole
+ * projects table read `[object Object]` five times across.
+ *
+ * `String()` is the wrong tool because it never fails: it converts
+ * everything, so a type mismatch shows up as plausible-looking text
+ * rather than as an error anyone would notice.
+ */
+function cell(row: unknown, key: PropertyKey): ReactNode {
+  const v = (row as Record<PropertyKey, unknown>)[key];
+  if (v === null || v === undefined || v === '') return '—';
+  if (isValidElement(v)) return v;
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
 export function DataTable<T>({
   columns,
   rows,
@@ -272,9 +293,7 @@ export function DataTable<T>({
             <tr key={rowKey ? rowKey(r) : String(i)} className="hover:bg-surface/50">
               {columns.map((c) => (
                 <td key={String(c.key)} className="px-5 py-3 text-fg-muted">
-                  {c.render
-                    ? c.render(r)
-                    : String((r as Record<string, unknown>)[c.key as string] ?? '—')}
+                  {c.render ? c.render(r) : cell(r, c.key)}
                 </td>
               ))}
             </tr>

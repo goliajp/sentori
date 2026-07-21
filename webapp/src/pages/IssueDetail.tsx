@@ -122,7 +122,7 @@ export default function IssueDetail() {
   }, [projectId, events, selectedEventId]);
 
   if (!projectId || !issueId) {
-    return <ErrorBanner>Missing project/issue id</ErrorBanner>;
+    return <ErrorBanner>{t('common.missingIds')}</ErrorBanner>;
   }
   if (loading) {
     return (
@@ -401,9 +401,7 @@ function Comments({
                 size="sm"
                 onClick={post}
                 disabled={busy || !text.trim()}
-              >
-                Post
-              </Button>
+              >{t('action.post')}</Button>
             </div>
           )}
         </div>
@@ -413,6 +411,7 @@ function Comments({
 }
 
 function Activity({ issueId }: { issueId: string }) {
+  const t = useT();
   const [rows, setRows] = useState<
     {
       id: string;
@@ -431,7 +430,7 @@ function Activity({ issueId }: { issueId: string }) {
   if (rows.length === 0) return null;
   return (
     <Card>
-      <CardHeader title={`Activity (${rows.length})`} />
+      <CardHeader title={`${t('crash.activity')} (${rows.length})`} />
       <CardBody>
         <ul className="space-y-1 text-xs">
           {rows.map(a => (

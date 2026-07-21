@@ -90,7 +90,7 @@ export default function TraceDetail() {
     <div className="space-y-4">
       <PageHeader
         title={trace.root_name ?? trace.trace_id.slice(0, 16) + '…'}
-        subtitle={`Trace ${trace.trace_id}`}
+        subtitle={`${t('traces.trace')} ${trace.trace_id}`}
         actions={
           <Link
             to={`/projects/${projectId}/traces`}
@@ -124,7 +124,7 @@ export default function TraceDetail() {
       </Card>
 
       <Card>
-        <CardHeader title={`Spans (${spans.length})`} />
+        <CardHeader title={`${t('traces.spans')} (${spans.length})`} />
         <CardBody>
           {spans.length === 0 ? (
             <div className="py-8 text-center text-sm text-fg-subtle">

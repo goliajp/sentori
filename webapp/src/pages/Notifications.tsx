@@ -61,16 +61,14 @@ export default function Notifications() {
         }
         actions={
           unread > 0 ? (
-            <Button onClick={readAll} variant="secondary" size="sm">
-              Mark all read
-            </Button>
+            <Button onClick={readAll} variant="secondary" size="sm">{t('action.markAllRead')}</Button>
           ) : null
         }
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       <Card>
-        <CardHeader title={`Inbox (${rows.length})`} />
+        <CardHeader title={`${t('notifications.inbox')} (${rows.length})`} />
         <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">

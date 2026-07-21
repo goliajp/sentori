@@ -134,9 +134,7 @@ export function AlertsPage() {
               }
               title={t('alerts.throttle')}
             />
-            <Button onClick={create} size="sm">
-              Create
-            </Button>
+            <Button onClick={create} size="sm">{t('action.create')}</Button>
           </div>
         </Card>
       )}
@@ -192,9 +190,7 @@ export function AlertsPage() {
                   variant="secondary"
                   size="sm"
                   onClick={() => editChannels(r)}
-                >
-                  Channels
-                </Button>
+                >{t('alerts.channels')}</Button>
               ),
             },
             {
@@ -206,9 +202,7 @@ export function AlertsPage() {
                   variant="secondary"
                   size="sm"
                   onClick={() => fireTest(r.id)}
-                >
-                  Fire test
-                </Button>
+                >{t('alerts.fireTest')}</Button>
               ),
             },
             {
@@ -220,9 +214,7 @@ export function AlertsPage() {
                   variant="danger"
                   size="sm"
                   onClick={() => deleteAlert(r.id)}
-                >
-                  Delete
-                </Button>
+                >{t('action.delete')}</Button>
               ),
             },
           ]}

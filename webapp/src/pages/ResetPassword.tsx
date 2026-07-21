@@ -98,9 +98,7 @@ export default function ResetPassword() {
               {loading ? t('auth.saving') : t('auth.setNewPassword')}
             </button>
             <p className="mt-4 text-center text-xs text-fg-subtle">
-              <Link to="/login" className="hover:text-fg-muted">
-                Back to sign in
-              </Link>
+              <Link to="/login" className="hover:text-fg-muted">{t('auth.backToSignIn')}</Link>
             </p>
           </>
         )}

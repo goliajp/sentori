@@ -94,14 +94,14 @@ export default function EndpointProbes() {
     }
   }
 
-  if (!projectId) return <ErrorBanner>Project id missing</ErrorBanner>;
+  if (!projectId) return <ErrorBanner>{t('common.missingProjectId')}</ErrorBanner>;
 
   return (
     <div className="space-y-4">
       <PageHeader
         title={t('probes.title')}
         subtitle={t('probes.subtitle')}
-        actions={<Button onClick={() => setShowAdd(true)}>+ Add probe</Button>}
+        actions={<Button onClick={() => setShowAdd(true)}>{'+ ' + t('probes.addProbe')}</Button>}
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
@@ -135,17 +135,15 @@ export default function EndpointProbes() {
               <span className="self-center text-xs text-fg-subtle">sec</span>
             </div>
             <div className="mt-2 flex gap-2">
-              <Button onClick={add}>Add</Button>
-              <Button variant="secondary" onClick={() => setShowAdd(false)}>
-                Cancel
-              </Button>
+              <Button onClick={add}>{t('action.add')}</Button>
+              <Button variant="secondary" onClick={() => setShowAdd(false)}>{t('action.cancel')}</Button>
             </div>
           </CardBody>
         </Card>
       )}
 
       <Card>
-        <CardHeader title={`Probes (${rows.length})`} />
+        <CardHeader title={`${t('probes.probes')} (${rows.length})`} />
         <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
@@ -193,9 +191,7 @@ export default function EndpointProbes() {
                       size="sm"
                       variant="danger"
                       onClick={() => destroy(p)}
-                    >
-                      Delete
-                    </Button>
+                    >{t('action.delete')}</Button>
                   </div>
                 </li>
               ))}

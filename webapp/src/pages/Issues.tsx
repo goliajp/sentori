@@ -159,23 +159,17 @@ export function IssuesPage() {
           <span className="text-fg-muted">
             {selected.size} selected
           </span>
-          <Button size="sm" onClick={() => bulkApply('resolved')}>
-            Resolve all
-          </Button>
+          <Button size="sm" onClick={() => bulkApply('resolved')}>{t('issues.resolveAll')}</Button>
           <Button
             size="sm"
             variant="secondary"
             onClick={() => bulkApply('ignored')}
-          >
-            Ignore all
-          </Button>
+          >{t('issues.ignoreAll')}</Button>
           <Button
             size="sm"
             variant="secondary"
             onClick={() => setSelected(new Set())}
-          >
-            Clear
-          </Button>
+          >{t('action.clear')}</Button>
         </div>
       )}
 

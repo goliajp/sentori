@@ -65,9 +65,7 @@ export default function ForgotPassword() {
           {loading ? t('auth.sending') : t('auth.sendReset')}
         </button>
         <div className="mt-4 text-center text-xs text-fg-subtle">
-          <Link to="/login" className="hover:text-fg-muted">
-            Back to sign in
-          </Link>
+          <Link to="/login" className="hover:text-fg-muted">{t('auth.backToSignIn')}</Link>
         </div>
       </form>
     </div>

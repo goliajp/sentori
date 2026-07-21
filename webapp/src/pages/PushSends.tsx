@@ -77,7 +77,7 @@ export default function PushSends() {
     }
   }
 
-  if (!projectId) return <ErrorBanner>Project id missing</ErrorBanner>;
+  if (!projectId) return <ErrorBanner>{t('common.missingProjectId')}</ErrorBanner>;
 
   const counts = {
     queued: rows.filter(r => r.status === 'queued').length,
@@ -122,7 +122,7 @@ export default function PushSends() {
       </div>
 
       <Card>
-        <CardHeader title={`Sends (${rows.length})`} />
+        <CardHeader title={`${t('push.sendsShort')} (${rows.length})`} />
         <CardBody>
           {rows.length === 0 ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
@@ -167,9 +167,7 @@ export default function PushSends() {
                       size="sm"
                       variant="secondary"
                       onClick={() => retry(r.id)}
-                    >
-                      Retry now
-                    </Button>
+                    >{t('action.retryNow')}</Button>
                   )}
                 </li>
               ))}
