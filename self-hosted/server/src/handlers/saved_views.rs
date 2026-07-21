@@ -114,8 +114,8 @@ pub async fn get(
         "scope": format!("{:?}", view.scope),
         "user_id": view.user_id.map(|u| u.to_string()),
         "payload": view.payload,
-        "created_at": view.created_at,
-        "updated_at": view.updated_at,
+        "created_at": crate::wire_time::rfc3339(view.created_at),
+        "updated_at": crate::wire_time::rfc3339(view.updated_at),
     })))
 }
 

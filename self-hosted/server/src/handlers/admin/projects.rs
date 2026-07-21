@@ -83,7 +83,7 @@ pub async fn create(
                     "id": p.id.to_string(),
                     "name": p.name,
                     "slug": p.slug,
-                    "created_at": p.created_at,
+                    "created_at": crate::wire_time::rfc3339(p.created_at),
                 })),
             )
         }
@@ -114,7 +114,7 @@ pub async fn get(
                 "id": p.id.to_string(),
                 "name": p.name,
                 "slug": p.slug,
-                "created_at": p.created_at,
+                "created_at": crate::wire_time::rfc3339(p.created_at),
             })),
         ),
         Ok(None) => (

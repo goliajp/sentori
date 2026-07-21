@@ -38,7 +38,7 @@ pub async fn handle(
                         "platform": tick.platform,
                         "release": tick.release,
                         "environment": tick.environment,
-                        "timestamp": tick.timestamp,
+                        "timestamp": crate::wire_time::rfc3339(tick.timestamp),
                     });
                     Some(Ok::<_, Infallible>(
                         SseEvent::default()

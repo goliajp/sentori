@@ -335,6 +335,13 @@ export const zh: Messages = {
   'billing.usage': "用量",
   'health.subtitle': "服务端实时状态 · 刷新于 {stamp}",
 
+  'members.user': "成员",
+  'members.role': "角色",
+  'members.added': "加入时间",
+  'members.unverified': "未验证",
+  'members.addedBy': "由 {who} 添加",
+  'members.unknownUser': "未知用户",
+
   'nav.issues': '问题',
   'nav.members': '成员',
   'nav.metrics': '指标',

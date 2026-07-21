@@ -142,8 +142,8 @@ pub async fn list(
                         "kind": t.kind.as_db_str(),
                         "label": t.label,
                         "last4": t.last4,
-                        "created_at": t.created_at,
-                        "revoked_at": t.revoked_at,
+                        "created_at": crate::wire_time::rfc3339(t.created_at),
+                        "revoked_at": crate::wire_time::rfc3339_opt(t.revoked_at),
                     })
                 })
                 .collect();

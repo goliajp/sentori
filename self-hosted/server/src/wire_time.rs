@@ -68,3 +68,35 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod field_attr_scope {
+    use serde::Serialize;
+    #[derive(Serialize)]
+    struct M {
+        #[serde(with = "time::serde::rfc3339")]
+        added_at: time::OffsetDateTime,
+    }
+    /// The attribute applies when the *struct* is serialised…
+    // A struct of one timestamp that will not serialise means serde
+    // itself is broken; there is nothing for the test to report but that.
+    #[allow(clippy::panic)]
+    #[test]
+    fn annotated_struct_is_rfc3339() {
+        let m = M {
+            added_at: time::OffsetDateTime::UNIX_EPOCH,
+        };
+        let Ok(v) = serde_json::to_value(&m) else {
+            panic!("a struct of one timestamp must serialise")
+        };
+        assert!(v["added_at"].is_string());
+    }
+    /// …and not when the field's value is lifted into json! on its own.
+    #[test]
+    fn same_field_via_json_macro_is_an_array() {
+        let m = M {
+            added_at: time::OffsetDateTime::UNIX_EPOCH,
+        };
+        assert!(serde_json::json!({ "added_at": m.added_at })["added_at"].is_array());
+    }
+}

@@ -5,7 +5,7 @@ use time::OffsetDateTime;
 
 use crate::WorkspaceId;
 use crate::error::IdentityError;
-use crate::model::{Member, Role, UserId};
+use crate::model::{Member, MemberIdentity, Role, UserId};
 
 /// One row of a user's workspace list — which workspace, its
 /// display name, and the role the user holds there. Returned by
@@ -130,6 +130,42 @@ impl<'a> Members<'a> {
         .await?;
 
         rows.iter().map(row_to_member).collect()
+    }
+
+    /// Members with the email each one signs in as.
+    ///
+    /// Separate from [`list`](Self::list) rather than replacing it:
+    /// authorisation checks want the membership row and nothing else,
+    /// and joining `users` on every permission lookup would be paying
+    /// for a display concern on the hot path.
+    ///
+    /// # Errors
+    ///
+    /// [`IdentityError::Db`] for underlying database errors.
+    pub async fn list_with_identity(&self) -> Result<Vec<MemberIdentity>, IdentityError> {
+        let rows = sqlx::query(
+            "SELECT m.user_id, m.role, m.added_by, m.added_at, \
+                    u.email, u.email_verified, \
+                    a.email AS added_by_email \
+             FROM workspace_members m \
+             JOIN users u ON u.id = m.user_id \
+             LEFT JOIN users a ON a.id = m.added_by \
+             WHERE m.workspace_id = $1 ORDER BY m.added_at ASC",
+        )
+        .bind(self.workspace_id.into_uuid())
+        .fetch_all(self.pool)
+        .await?;
+
+        rows.iter()
+            .map(|r| {
+                Ok(MemberIdentity {
+                    member: row_to_member(r)?,
+                    email: r.get::<Option<String>, _>("email"),
+                    email_verified: r.get::<bool, _>("email_verified"),
+                    added_by_email: r.get::<Option<String>, _>("added_by_email"),
+                })
+            })
+            .collect()
     }
 
     /// Change a member's role within this workspace.

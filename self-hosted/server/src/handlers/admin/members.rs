@@ -28,16 +28,24 @@ pub async fn list(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
 ) -> Json<Value> {
-    match state.identity_for(ctx.workspace_id).members().list().await {
+    match state
+        .identity_for(ctx.workspace_id)
+        .members()
+        .list_with_identity()
+        .await
+    {
         Ok(members) => {
             let out: Vec<Value> = members
                 .iter()
                 .map(|m| {
                     json!({
-                        "user_id": m.user_id.to_string(),
-                        "role": role_str(m.role),
-                        "added_by": m.added_by.map(|u| u.to_string()),
-                        "added_at": m.added_at,
+                        "user_id": m.member.user_id.to_string(),
+                        "email": m.email,
+                        "email_verified": m.email_verified,
+                        "role": role_str(m.member.role),
+                        "added_by": m.member.added_by.map(|u| u.to_string()),
+                        "added_by_email": m.added_by_email,
+                        "added_at": crate::wire_time::rfc3339(m.member.added_at),
                     })
                 })
                 .collect();

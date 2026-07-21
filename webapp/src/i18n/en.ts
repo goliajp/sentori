@@ -342,6 +342,13 @@ export const en = {
   'billing.usage': "Usage",
   'health.subtitle': "Live server vitals · refreshed {stamp}",
 
+  'members.user': "Member",
+  'members.role': "Role",
+  'members.added': "Added",
+  'members.unverified': "Unverified",
+  'members.addedBy': "added by {who}",
+  'members.unknownUser': "Unknown user",
+
   'nav.issues': 'Issues',
   'nav.members': 'Members',
   'nav.metrics': 'Metrics',

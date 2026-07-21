@@ -43,6 +43,14 @@ FIELD            = re.compile(r'^(\s+)((?:pub\s+)?\w+):\s*(Option<)?(time::)?Off
 RAW_JSON_TS      = re.compile(
     r'\.(?:try_)?get::<(?:Option<\s*)?time::OffsetDateTime\s*>?\s*, _>\("[^"]+"\)'
 )
+# `"created_at": model.created_at` — a timestamp-looking field lifted
+# out of a struct. Matched by name because the type is not written at
+# the call site; the suffix list is the naming convention this codebase
+# actually uses for instants.
+STRUCT_FIELD_TS  = re.compile(
+    r'"\w*(?:_at|_seen|_bucket|timestamp)"\s*:\s*[a-z_][\w.]*\.\w*'
+    r'(?:_at|_seen|_bucket|timestamp)\s*,?\s*$'
+)
 WRAPPED          = re.compile(r'wire_time::rfc3339')
 SERDE_OK         = re.compile(r'serde\s*\([^)]*with\s*=')
 STRUCT_OR_ENUM   = re.compile(r'^\s*(?:pub\s+)?(?:struct|enum)\s+\w+.*\{')
@@ -64,7 +72,9 @@ sources = [
 for path in sources:
     lines = path.read_text().split('\n')
     for i, line in enumerate(lines):
-        if not RAW_JSON_TS.search(line) or WRAPPED.search(line):
+        if WRAPPED.search(line):
+            continue
+        if not (RAW_JSON_TS.search(line) or STRUCT_FIELD_TS.search(line)):
             continue
         # Consumed rather than serialised (counting unread, comparing) —
         # the shape on the wire is not involved.
