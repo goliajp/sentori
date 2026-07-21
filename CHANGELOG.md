@@ -6,6 +6,20 @@
 
 ---
 
+## v1.7.8(2026-07-22 — 修 deploy 红:webapp-dist 不该 chown 给容器 uid)
+
+**deploy 挂了** —— v1.7.7 的 deploy job 红在 `mkstemp … Permission denied`。根因是我先前手工快速部署时把 `/apps/sentori/webapp-dist` chown 成了 65532(容器 uid),CI 的 runner 从此写不进自己的目录;workflow 里那句 chown 排在 rsync 之后,永远救不了。
+
+**两个坑方向相反**:`/data/blobs` 是读写挂载、容器要**写**,必须 65532;`webapp-dist` 是 `:ro`、容器只**读**,0644 的 world-read 位就够,属主必须留给 runner。已移除 chown,改用 `--chmod=D755,F644` 直接保证读位。
+
+**顺带**(这一轮改自「看渲染结果」而非「读源码」):
+
+- issue 行内的三个操作按钮各有各的底色、高度由 padding 撑出,`⊘` 还比 `↺` 窄(字形自带宽度)。现在统一走 `Button`,并给它加了 `icon` 方形模式,一排图标按钮才能对齐。
+- issue 列表副标题写的是 `Project 019e358a…` —— 那是这行数据的存储方式,不是任何人对自己 app 的称呼。`useProjectName` 换成他们自己起的名字。
+- `orange` / `rose` 漏在上一轮语义化之外,已归 `warn` / `danger`。全站不再有任何调色板字面量。
+
+---
+
 ## v1.7.7(2026-07-22 — 接入 @goliapkg/gds:配色归位、控件统一、卡片内缩修正)
 
 **配色** —— `emerald` 才是这个 dashboard 事实上的强调色,硬写在约 **60 处**;GDS 的蓝只在少数写了 `text-accent` 的地方生效,所以看起来跟 golia.jp 不是一家。本版整体接入 **@goliapkg/gds**(golia.jp 与旧 dashboard 同一套系统),并把所有字面色按语义归位:可交互的走 `accent`,状态走 `ok` / `warn` / `danger`。除 `index.css` 外全站不再出现任何具体色值 —— 这同时也是 light mode 能成立的前提:`bg-green-950` 是接近黑的绿,只有在深色卡片上才像个 badge。accent 实值 `#3b82f6`,与 golia.jp 同色。
