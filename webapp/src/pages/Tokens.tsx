@@ -134,6 +134,7 @@ export default function Tokens() {
           </Section>
         </Card>
       )}
+      <Quickstart projectId={projectId} token={newToken} />
       <Card>
         <CardHeader title={`Tokens (${rows.length})`} />
         <Section>
@@ -181,6 +182,91 @@ export default function Tokens() {
           )}
         </Section>
       </Card>
+    </div>
+  );
+}
+
+// The SaaS ingest host is the SDK's built-in default `ingestUrl`;
+// it never appears in the dashboard otherwise, so surface it here.
+const DEFAULT_INGEST_URL = 'https://ingest.sentori.golia.jp';
+
+function Quickstart({
+  projectId,
+  token,
+}: {
+  projectId: string;
+  token: string | null;
+}) {
+  const tk = token ?? 'st_pk_<your project token>';
+  const snippet = `import { sentori } from '@goliapkg/sentori-react-native';
+
+sentori.init({
+  token: '${tk}',
+  release: 'myapp@1.0.0+1',
+  ingestUrl: '${DEFAULT_INGEST_URL}', // optional — this is the default
+});`;
+  return (
+    <Card>
+      <CardHeader
+        title="Quickstart"
+        subtitle="Drop this into your app's entry point to start ingesting."
+      />
+      <Section>
+        <div className="mb-3 grid gap-3 sm:grid-cols-2">
+          <Field label="Ingest URL" value={DEFAULT_INGEST_URL} />
+          <Field label="Project ID" value={projectId} mono />
+        </div>
+        <div className="relative">
+          <pre className="overflow-x-auto rounded bg-zinc-950 p-3 text-xs font-mono text-zinc-200">
+            {snippet}
+          </pre>
+          <div className="absolute right-2 top-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => navigator.clipboard?.writeText(snippet)}
+            >
+              Copy
+            </Button>
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-zinc-500">
+          {token
+            ? 'Token above is the one you just minted.'
+            : 'Mint a token above and it fills in here automatically. Other frameworks: swap the import (@goliapkg/sentori-react, -vue, -svelte, …); the init shape is identical.'}
+        </p>
+      </Section>
+    </Card>
+  );
+}
+
+function Field({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="rounded border border-zinc-800 bg-zinc-900 px-3 py-2">
+      <p className="text-[10px] uppercase tracking-wide text-zinc-500">
+        {label}
+      </p>
+      <div className="flex items-center justify-between gap-2">
+        <span
+          className={`truncate text-xs text-zinc-200 ${mono ? 'font-mono' : ''}`}
+        >
+          {value}
+        </span>
+        <button
+          onClick={() => navigator.clipboard?.writeText(value)}
+          className="shrink-0 text-[10px] text-zinc-500 hover:text-zinc-300"
+        >
+          copy
+        </button>
+      </div>
     </div>
   );
 }

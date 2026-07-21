@@ -82,9 +82,7 @@ export function OverviewPage() {
           }
         />
         {projects?.length === 0 ? (
-          <div className="p-8 text-center text-sm text-zinc-500">
-            No projects yet. Create your first project to start ingesting events.
-          </div>
+          <OnboardingGuide />
         ) : (
           <ul className="divide-y divide-zinc-800">
             {projects?.map((p) => (
@@ -146,6 +144,64 @@ export function OverviewPage() {
           </ul>
         )}
       </Card>
+    </div>
+  );
+}
+
+function OnboardingGuide() {
+  const steps = [
+    {
+      n: 1,
+      title: 'Create a project',
+      body: 'One project per app / service. It scopes issues, traces, and tokens.',
+    },
+    {
+      n: 2,
+      title: 'Mint an ingest token',
+      body: 'On the project’s Tokens page — an st_pk_… string your SDK sends.',
+    },
+    {
+      n: 3,
+      title: 'Drop the SDK into your app',
+      body: 'Copy the init snippet (token + ingest URL) from the Tokens page.',
+    },
+    {
+      n: 4,
+      title: 'Watch the first event land',
+      body: 'Trigger an error; it shows up here and under the project’s Issues.',
+    },
+  ];
+  return (
+    <div className="p-8">
+      <div className="mx-auto max-w-2xl">
+        <h3 className="text-base font-medium text-zinc-100">
+          Welcome to Sentori
+        </h3>
+        <p className="mt-1 text-sm text-zinc-500">
+          Four steps to your first event. Start by creating a project.
+        </p>
+        <ol className="mt-6 space-y-4">
+          {steps.map(s => (
+            <li key={s.n} className="flex gap-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs font-medium text-zinc-300">
+                {s.n}
+              </span>
+              <div>
+                <p className="text-sm font-medium text-zinc-200">{s.title}</p>
+                <p className="text-xs text-zinc-500">{s.body}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <div className="mt-6">
+          <Link
+            to="/projects"
+            className="inline-flex rounded bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
+          >
+            Create your first project →
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

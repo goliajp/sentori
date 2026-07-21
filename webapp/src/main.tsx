@@ -36,6 +36,7 @@ import ReplayDetail from './pages/ReplayDetail';
 import Traces from './pages/Traces';
 import TraceDetail from './pages/TraceDetail';
 import { SettingsPage } from './pages/Settings';
+import Billing from './pages/Billing';
 import Tokens from './pages/Tokens';
 
 import './styles/index.css';
@@ -60,6 +61,7 @@ createRoot(rootEl).render(
           <Route path="/alerts" element={<AlertsPage />} />
           <Route path="/audit" element={<AuditPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings/billing" element={<Billing />} />
           <Route path="/health" element={<HealthPage />} />
           <Route path="/projects/:id/issues" element={<IssuesPage />} />
           <Route

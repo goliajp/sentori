@@ -74,6 +74,28 @@ export interface UsageResponse {
   replays: UsageCounter;
 }
 
+export type PlanName = 'free' | 'pro' | 'enterprise';
+
+export interface BillingInfo {
+  plan: PlanName;
+  status: string;
+  /** Plan whose limits actually apply (a canceled Pro → free). */
+  effective_plan: PlanName;
+  current_period_end: string | null;
+  period_yyyymm: string;
+  /** A Stripe secret key is configured — self-serve is available. */
+  stripe_enabled: boolean;
+  /** The workspace already has a Stripe customer (Portal works). */
+  has_customer: boolean;
+  /** Which paid plans this deployment sells (a price id is set). */
+  upgradeable: { pro: boolean; enterprise: boolean };
+  usage: {
+    events: UsageCounter;
+    spans: UsageCounter;
+    replays: UsageCounter;
+  };
+}
+
 export interface AlertRule {
   id: string;
   project_id: string | null;
@@ -563,6 +585,16 @@ export class Api {
   usage(): Promise<UsageResponse> {
     return this.get('/v1/usage');
   }
+  // ── self-serve billing (caller's own workspace) ────────
+  billing(): Promise<BillingInfo> {
+    return this.get('/admin/api/billing');
+  }
+  billingCheckout(plan: 'pro' | 'enterprise'): Promise<{ url: string }> {
+    return this.post('/admin/api/billing/checkout', { plan });
+  }
+  billingPortal(): Promise<{ url: string }> {
+    return this.post('/admin/api/billing/portal', {});
+  }
   listAlerts(): Promise<AlertRule[]> {
     return this.get('/v1/alerts');
   }
@@ -932,6 +964,9 @@ export class Api {
   }
   resumeWorkspace(id: string): Promise<void> {
     return this.send(`/admin/api/saas/workspaces/${id}/resume`, 'POST');
+  }
+  saasSetPlan(id: string, plan: 'free' | 'pro' | 'enterprise'): Promise<void> {
+    return this.send(`/admin/api/saas/workspaces/${id}/plan`, 'POST', { plan });
   }
 
   private authHeaders(): HeadersInit {

@@ -86,6 +86,17 @@ export function SettingsPage() {
               </span>
             </Cell>
           </div>
+          <div className="flex items-center justify-between border-t border-zinc-800 p-4">
+            <p className="text-sm text-zinc-500">
+              Usage, upgrades, invoices, and cancellation.
+            </p>
+            <button
+              onClick={() => navigate('/settings/billing')}
+              className="rounded border border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-800"
+            >
+              Manage billing →
+            </button>
+          </div>
         </Card>
       </Section>
 

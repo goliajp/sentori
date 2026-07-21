@@ -120,6 +120,7 @@ function Sidebar({ me }: { me: MeResponse | null }) {
         <NavItem to="/saved-views" label="Saved views" />
         <NotificationsNavItem />
         <NavItem to="/audit" label="Audit" />
+        <NavItem to="/settings/billing" label="Billing" />
         <NavItem to="/settings" label="Settings" />
         <NavItem to="/health" label="Health" />
         {/* Cross-workspace operator surface — only for saasadmins.
