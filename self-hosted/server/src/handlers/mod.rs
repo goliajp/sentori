@@ -25,6 +25,7 @@ mod admin;
 mod alerts;
 mod alerts_fire;
 mod api_describe;
+mod attachments;
 mod audit;
 mod auth;
 mod billing;
@@ -354,6 +355,15 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(
             "/v1/projects/{project_id}/metrics/{name}/timeseries",
             get(metrics::timeseries),
+        )
+        // Crash evidence: what the SDK captured alongside the event.
+        .route(
+            "/v1/projects/{project_id}/events/{event_id}/attachments",
+            get(attachments::list),
+        )
+        .route(
+            "/v1/projects/{project_id}/attachments/{ref_id}",
+            get(attachments::get),
         )
         .route("/v1/projects/{project_id}/replays", get(replays::list))
         .route(

@@ -44,6 +44,20 @@ impl AttachmentStore {
             Self::Fs(s) => s.put(bytes).await,
         }
     }
+
+    /// Read a blob back by its content hash.
+    ///
+    /// The wrapper exposed only `put` until now, which meant every
+    /// attachment the SDK uploaded — screenshots, view trees, state
+    /// snapshots, log tails, session trails, replay recordings — was
+    /// write-only: stored, then unreachable. The crash detail view is
+    /// built on reading these back.
+    pub async fn get(&self, hash: &BlobHash) -> BlobResult<Vec<u8>> {
+        match self {
+            Self::Memory(s) => s.get(hash).await,
+            Self::Fs(s) => s.get(hash).await,
+        }
+    }
 }
 
 // Suppress unused-warning when only one variant is reached at runtime.
