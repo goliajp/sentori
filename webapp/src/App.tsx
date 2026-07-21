@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
 
 import { CommandPalette } from './components/CommandPalette';
 import { WorkspaceSwitcher } from './components/WorkspaceSwitcher';
+import { useT } from './i18n';
 import { api, MeResponse } from './lib/api';
 import { useNavShortcuts } from './lib/useShortcuts';
 
@@ -71,7 +72,7 @@ export function App() {
 
   if (!verified) {
     return (
-      <div className="flex h-screen items-center justify-center bg-zinc-950 text-sm text-zinc-500">
+      <div className="flex h-screen items-center justify-center bg-bg text-sm text-fg-subtle">
         Loading…
       </div>
     );
@@ -102,69 +103,70 @@ function Sidebar({ me }: { me: MeResponse | null }) {
   // `web/src/modules/registry.tsx`: workspace-wide pages
   // up top, per-project pages picked when a project is
   // selected.
+  const t = useT();
   const params = useParams<{ id?: string }>();
   const projectScoped = params.id;
 
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-zinc-800 bg-zinc-950 p-4">
+    <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-bg p-4">
       <div className="mb-4">
-        <h1 className="text-base font-semibold tracking-tight text-zinc-100">
+        <h1 className="text-base font-semibold tracking-tight text-fg">
           Sentori
         </h1>
-        <p className="font-mono text-[10px] text-zinc-600">v0.2</p>
+        <p className="font-mono text-[10px] text-fg-subtle">v0.2</p>
       </div>
 
       {/* Active workspace + switcher. Hidden until whoami resolves. */}
       {me && <WorkspaceSwitcher me={me} />}
 
       <nav className="mt-4 flex flex-1 flex-col gap-1 text-sm">
-        <SectionLabel>Workspace</SectionLabel>
-        <NavItem to="/main" label="Overview" />
-        <NavItem to="/search" label="Search" />
-        <NavItem to="/projects" label="Projects" />
-        <NavItem to="/members" label="Members" />
-        <NavItem to="/alerts" label="Alerts" />
-        <NavItem to="/saved-views" label="Saved views" />
+        <SectionLabel>{t('nav.sectionWorkspace')}</SectionLabel>
+        <NavItem to="/main" label={t('nav.overview')} />
+        <NavItem to="/search" label={t('nav.search')} />
+        <NavItem to="/projects" label={t('nav.projects')} />
+        <NavItem to="/members" label={t('nav.members')} />
+        <NavItem to="/alerts" label={t('nav.alerts')} />
+        <NavItem to="/saved-views" label={t('nav.savedViews')} />
         <NotificationsNavItem />
-        <NavItem to="/audit" label="Audit" />
-        <NavItem to="/settings/billing" label="Billing" />
-        <NavItem to="/settings" label="Settings" />
-        <NavItem to="/health" label="Health" />
+        <NavItem to="/audit" label={t('nav.audit')} />
+        <NavItem to="/settings/billing" label={t('nav.billing')} />
+        <NavItem to="/settings" label={t('nav.settings')} />
+        <NavItem to="/health" label={t('nav.health')} />
         {/* Cross-workspace operator surface — only for saasadmins.
             The route is server-gated too; this hides the entry. */}
-        {me?.is_saasadmin && <NavItem to="/saas" label="SaaS admin" />}
+        {me?.is_saasadmin && <NavItem to="/saas" label={t('nav.saasAdmin')} />}
 
         {projectScoped && (
           <>
-            <SectionLabel className="mt-6">Project</SectionLabel>
-            <NavItem to={`/projects/${projectScoped}/issues`} label="Issues" />
-            <NavItem to={`/projects/${projectScoped}/events`} label="Events" />
-            <NavItem to={`/projects/${projectScoped}/traces`} label="Traces" />
+            <SectionLabel className="mt-6">{t('nav.sectionProject')}</SectionLabel>
+            <NavItem to={`/projects/${projectScoped}/issues`} label={t('nav.issues')} />
+            <NavItem to={`/projects/${projectScoped}/events`} label={t('nav.events')} />
+            <NavItem to={`/projects/${projectScoped}/traces`} label={t('nav.traces')} />
             <NavItem
               to={`/projects/${projectScoped}/metrics`}
-              label="Metrics"
+              label={t('nav.metrics')}
             />
             <NavItem
               to={`/projects/${projectScoped}/replays`}
-              label="Replays"
+              label={t('nav.replays')}
             />
             <NavItem
               to={`/projects/${projectScoped}/cert`}
-              label="Cert monitor"
+              label={t('nav.cert')}
             />
             <NavItem
               to={`/projects/${projectScoped}/probes`}
-              label="Endpoint probes"
+              label={t('nav.probes')}
             />
-            <NavItem to={`/projects/${projectScoped}/tokens`} label="Tokens" />
-            <NavItem to={`/projects/${projectScoped}/push`} label="Push" />
+            <NavItem to={`/projects/${projectScoped}/tokens`} label={t('nav.tokens')} />
+            <NavItem to={`/projects/${projectScoped}/push`} label={t('nav.push')} />
             <NavItem
               to={`/projects/${projectScoped}/integrations`}
-              label="Integrations"
+              label={t('nav.integrations')}
             />
             <NavItem
               to={`/projects/${projectScoped}/releases`}
-              label="Releases"
+              label={t('nav.releases')}
             />
           </>
         )}
@@ -176,6 +178,7 @@ function Sidebar({ me }: { me: MeResponse | null }) {
 }
 
 function NotificationsNavItem() {
+  const t = useT();
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
@@ -199,12 +202,12 @@ function NotificationsNavItem() {
       className={({ isActive }) =>
         `flex items-center justify-between rounded px-2.5 py-1.5 transition ${
           isActive
-            ? 'bg-zinc-800 text-zinc-100'
-            : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'
+            ? 'bg-raised text-fg'
+            : 'text-fg-muted hover:bg-surface hover:text-fg'
         }`
       }
     >
-      <span>Inbox</span>
+      <span>{t('nav.inbox')}</span>
       {unread > 0 && (
         <span className="rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-mono text-white">
           {unread}
@@ -242,10 +245,10 @@ function UserFooter() {
 
   if (!email) return null;
   return (
-    <div className="mt-4 border-t border-zinc-800 pt-3 text-[11px]">
+    <div className="mt-4 border-t border-border pt-3 text-[11px]">
       <div className="flex items-center justify-between gap-1">
         <span
-          className="truncate font-mono text-zinc-400"
+          className="truncate font-mono text-fg-muted"
           title={email}
         >
           {email}
@@ -253,7 +256,7 @@ function UserFooter() {
         <button
           onClick={signOut}
           title="Sign out"
-          className="rounded px-1.5 py-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+          className="rounded px-1.5 py-0.5 text-fg-subtle hover:bg-raised hover:text-fg"
         >
           ⎋
         </button>
@@ -270,8 +273,8 @@ function NavItem({ to, label }: { to: string; label: string }) {
       className={({ isActive }) =>
         `rounded px-2.5 py-1.5 transition ${
           isActive
-            ? 'bg-zinc-800 text-zinc-100'
-            : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'
+            ? 'bg-raised text-fg'
+            : 'text-fg-muted hover:bg-surface hover:text-fg'
         }`
       }
     >
@@ -289,7 +292,7 @@ function SectionLabel({
 }) {
   return (
     <p
-      className={`mb-1 px-2.5 text-[10px] font-medium uppercase tracking-wider text-zinc-600 ${className}`}
+      className={`mb-1 px-2.5 text-[10px] font-medium uppercase tracking-wider text-fg-subtle ${className}`}
     >
       {children}
     </p>

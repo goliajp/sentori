@@ -39,6 +39,9 @@ import { SettingsPage } from './pages/Settings';
 import Billing from './pages/Billing';
 import Tokens from './pages/Tokens';
 
+import { I18nProvider } from './i18n/provider';
+import { initTheme } from './lib/theme';
+
 import './styles/index.css';
 
 const rootEl = document.getElementById('root');
@@ -46,8 +49,14 @@ if (!rootEl) {
   throw new Error('#root not found');
 }
 
+// Before the first paint, not inside an effect: resolving the theme
+// after mount means a light-mode user watches the app flash dark on
+// every single load.
+initTheme();
+
 createRoot(rootEl).render(
   <StrictMode>
+    <I18nProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -108,5 +117,6 @@ createRoot(rootEl).render(
         </Route>
       </Routes>
     </BrowserRouter>
+    </I18nProvider>
   </StrictMode>
 );
