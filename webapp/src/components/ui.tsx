@@ -261,7 +261,7 @@ export function Tabs({
           onClick={() => onChange(o.value)}
           className={`border-b-2 px-3 py-2 text-sm transition ${
             value === o.value
-              ? 'border-brand-500 text-fg'
+              ? 'border-accent text-fg'
               : 'border-transparent text-fg-muted hover:text-fg'
           }`}
         >

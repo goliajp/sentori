@@ -55,17 +55,17 @@ export default function AcceptInvite() {
   }, [token]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-4">
-      <div className="w-full max-w-sm rounded-lg border border-zinc-800 bg-zinc-900 p-6 text-center">
-        <h1 className="text-lg font-semibold text-zinc-100">Workspace invite</h1>
+    <div className="flex min-h-screen items-center justify-center bg-bg px-4">
+      <div className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 text-center">
+        <h1 className="text-lg font-semibold text-fg">Workspace invite</h1>
 
         {state.kind === 'working' && (
-          <p className="mt-4 text-sm text-zinc-400">Accepting invite…</p>
+          <p className="mt-4 text-sm text-fg-muted">Accepting invite…</p>
         )}
 
         {state.kind === 'joined' && (
           <>
-            <p className="mt-4 text-sm text-zinc-300">
+            <p className="mt-4 text-sm text-fg-muted">
               You've joined the workspace as{' '}
               <span className="font-medium text-emerald-400">{state.role}</span>.
             </p>
@@ -83,20 +83,20 @@ export default function AcceptInvite() {
 
         {state.kind === 'need_auth' && (
           <>
-            <p className="mt-4 text-sm text-zinc-400">
+            <p className="mt-4 text-sm text-fg-muted">
               Log in or create an account first, then reopen this invite
               link to join.
             </p>
             <div className="mt-5 flex justify-center gap-2">
               <Link
                 to="/login"
-                className="rounded bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white"
+                className="rounded bg-raised px-4 py-2 text-sm font-medium text-fg hover:bg-white"
               >
                 Log in
               </Link>
               <Link
                 to="/register"
-                className="rounded border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-600"
+                className="rounded border border-border-strong px-4 py-2 text-sm font-medium text-fg hover:border-border-strong"
               >
                 Sign up
               </Link>

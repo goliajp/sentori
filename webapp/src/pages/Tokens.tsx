@@ -87,10 +87,10 @@ export default function Tokens() {
         <Card>
           <CardHeader title="New token (shown once)" />
           <Section>
-            <pre className="overflow-x-auto whitespace-pre-wrap break-all bg-zinc-50 p-3 text-xs font-mono">
+            <pre className="overflow-x-auto whitespace-pre-wrap break-all bg-raised p-3 text-xs font-mono">
               {newToken}
             </pre>
-            <div className="text-xs text-zinc-500 mt-2">
+            <div className="text-xs text-fg-subtle mt-2">
               Copy this now — it won't be shown again. Plaintext lives only in
               your dashboard session.
             </div>
@@ -117,7 +117,7 @@ export default function Tokens() {
           <CardHeader title="Mint new token" />
           <Section>
             <input
-              className="w-full rounded border border-zinc-300 px-3 py-2 text-sm"
+              className="w-full rounded border border-border px-3 py-2 text-sm"
               placeholder="Label (e.g. 'production iOS')"
               value={label}
               onChange={e => setLabel(e.target.value)}
@@ -139,7 +139,7 @@ export default function Tokens() {
         <CardHeader title={`Tokens (${rows.length})`} />
         <Section>
           {loading ? (
-            <div className="py-8 text-center text-sm text-zinc-500">
+            <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
             </div>
           ) : rows.length === 0 ? (
@@ -217,7 +217,7 @@ sentori.init({
           <Field label="Project ID" value={projectId} mono />
         </div>
         <div className="relative">
-          <pre className="overflow-x-auto rounded bg-zinc-950 p-3 text-xs font-mono text-zinc-200">
+          <pre className="overflow-x-auto rounded bg-bg p-3 text-xs font-mono text-fg">
             {snippet}
           </pre>
           <div className="absolute right-2 top-2">
@@ -230,7 +230,7 @@ sentori.init({
             </Button>
           </div>
         </div>
-        <p className="mt-2 text-xs text-zinc-500">
+        <p className="mt-2 text-xs text-fg-subtle">
           {token
             ? 'Token above is the one you just minted.'
             : 'Mint a token above and it fills in here automatically. Other frameworks: swap the import (@goliapkg/sentori-react, -vue, -svelte, …); the init shape is identical.'}
@@ -250,19 +250,19 @@ function Field({
   mono?: boolean;
 }) {
   return (
-    <div className="rounded border border-zinc-800 bg-zinc-900 px-3 py-2">
-      <p className="text-[10px] uppercase tracking-wide text-zinc-500">
+    <div className="rounded border border-border bg-surface px-3 py-2">
+      <p className="text-[10px] uppercase tracking-wide text-fg-subtle">
         {label}
       </p>
       <div className="flex items-center justify-between gap-2">
         <span
-          className={`truncate text-xs text-zinc-200 ${mono ? 'font-mono' : ''}`}
+          className={`truncate text-xs text-fg ${mono ? 'font-mono' : ''}`}
         >
           {value}
         </span>
         <button
           onClick={() => navigator.clipboard?.writeText(value)}
-          className="shrink-0 text-[10px] text-zinc-500 hover:text-zinc-300"
+          className="shrink-0 text-[10px] text-fg-subtle hover:text-fg-muted"
         >
           copy
         </button>

@@ -80,8 +80,8 @@ export default function Shortcuts() {
                     key={it.kbd}
                     className="flex items-center justify-between"
                   >
-                    <span className="text-zinc-300">{it.label}</span>
-                    <kbd className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] text-zinc-200">
+                    <span className="text-fg-muted">{it.label}</span>
+                    <kbd className="rounded bg-raised px-1.5 py-0.5 font-mono text-[10px] text-fg">
                       {it.kbd}
                     </kbd>
                   </li>

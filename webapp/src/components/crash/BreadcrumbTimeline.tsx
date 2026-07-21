@@ -9,6 +9,7 @@
 // clock. Nobody debugging asks what time it was; they ask how long
 // before the end it happened.
 
+import { useT } from '../../i18n';
 import type { Breadcrumb, BreadcrumbType } from '../../lib/api';
 
 /** One glyph per source, so a run of network calls is scannable
@@ -36,6 +37,7 @@ export function BreadcrumbTimeline({
    *  than two things that happen to be on the same page. */
   playheadTs?: number;
 }) {
+  const t = useT();
   const end = new Date(crashedAt).getTime();
   const activeIndex =
     playheadTs === undefined
@@ -63,7 +65,7 @@ export function BreadcrumbTimeline({
         <span className="w-4 shrink-0 text-center font-mono text-xs text-danger">
           ✕
         </span>
-        <span className="text-xs font-medium text-danger">crash</span>
+        <span className="text-xs font-medium text-danger">{t('crash.crash')}</span>
       </li>
     </ol>
   );

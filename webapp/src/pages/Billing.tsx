@@ -95,7 +95,7 @@ export default function Billing() {
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       {loading && !data ? (
-        <div className="py-12 text-center text-sm text-zinc-500">Loading…</div>
+        <div className="py-12 text-center text-sm text-fg-subtle">Loading…</div>
       ) : data ? (
         <>
           <PlanCard info={data} onManage={openPortal} busy={busy} />
@@ -111,7 +111,7 @@ export default function Billing() {
             <Card>
               <CardHeader title="Self-serve billing unavailable" />
               <Section>
-                <p className="text-sm text-zinc-500">
+                <p className="text-sm text-fg-subtle">
                   This deployment has no Stripe keys configured, so plan
                   changes are managed by the operator. Contact your admin
                   to change tiers.
@@ -159,7 +159,7 @@ function PlanCard({
           </Field>
           {info.current_period_end && (
             <Field label="Renews / ends">
-              <span className="font-mono text-sm text-zinc-300">
+              <span className="font-mono text-sm text-fg-muted">
                 {new Date(info.current_period_end).toLocaleDateString()}
               </span>
             </Field>
@@ -204,8 +204,8 @@ function UsageBar({ label, counter }: { label: string; counter: UsageCounter }) 
   return (
     <div>
       <div className="mb-1 flex items-baseline justify-between text-sm">
-        <span className="text-zinc-300">{label}</span>
-        <span className="font-mono text-xs text-zinc-500">
+        <span className="text-fg-muted">{label}</span>
+        <span className="font-mono text-xs text-fg-subtle">
           {formatNumber(counter.count)}
           {unlimited ? ' / ∞' : ` / ${formatNumber(counter.limit)}`}
           {counter.dropped > 0 && (
@@ -215,7 +215,7 @@ function UsageBar({ label, counter }: { label: string; counter: UsageCounter }) 
           )}
         </span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded bg-zinc-800">
+      <div className="h-1.5 w-full overflow-hidden rounded bg-raised">
         <div
           className={`h-full rounded ${near ? 'bg-red-500' : 'bg-emerald-500'}`}
           style={{ width: unlimited ? '4%' : `${pct}%` }}
@@ -269,7 +269,7 @@ function UpgradeCard({
               ))}
           </div>
         ) : (
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-fg-subtle">
             {info.has_customer
               ? 'Use “Manage subscription” to change or cancel your plan.'
               : 'You are on the highest configured plan.'}
@@ -289,7 +289,7 @@ function Field({
 }) {
   return (
     <div>
-      <p className="mb-1 text-[11px] uppercase tracking-wide text-zinc-500">
+      <p className="mb-1 text-[11px] uppercase tracking-wide text-fg-subtle">
         {label}
       </p>
       <div>{children}</div>

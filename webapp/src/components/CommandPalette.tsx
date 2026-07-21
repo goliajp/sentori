@@ -185,7 +185,7 @@ export function CommandPalette({ open, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl"
+        className="w-full max-w-xl rounded-lg border border-border-strong bg-surface shadow-xl"
         onClick={e => e.stopPropagation()}
       >
         <input
@@ -194,11 +194,11 @@ export function CommandPalette({ open, onClose }: Props) {
           onChange={e => setQuery(e.target.value)}
           onKeyDown={onKey}
           placeholder="Jump to…  (try project name, or 'issues')"
-          className="w-full border-b border-zinc-800 bg-transparent px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none"
+          className="w-full border-b border-border bg-transparent px-4 py-3 text-sm text-fg placeholder:text-fg-subtle focus:outline-none"
         />
         <ul className="max-h-80 overflow-y-auto py-1">
           {items.length === 0 ? (
-            <li className="px-4 py-3 text-xs text-zinc-500">
+            <li className="px-4 py-3 text-xs text-fg-subtle">
               No matches
             </li>
           ) : (
@@ -209,13 +209,13 @@ export function CommandPalette({ open, onClose }: Props) {
                 onClick={() => fire(item)}
                 className={`flex cursor-pointer items-center justify-between px-4 py-2 text-sm ${
                   i === selected
-                    ? 'bg-zinc-800 text-zinc-100'
-                    : 'text-zinc-300'
+                    ? 'bg-raised text-fg'
+                    : 'text-fg-muted'
                 }`}
               >
                 <span>{item.label}</span>
                 {item.hint && (
-                  <span className="font-mono text-[10px] text-zinc-500">
+                  <span className="font-mono text-[10px] text-fg-subtle">
                     {item.hint}
                   </span>
                 )}
@@ -223,7 +223,7 @@ export function CommandPalette({ open, onClose }: Props) {
             ))
           )}
         </ul>
-        <div className="border-t border-zinc-800 px-4 py-2 text-[10px] text-zinc-600">
+        <div className="border-t border-border px-4 py-2 text-[10px] text-fg-subtle">
           ↑↓ navigate · ↵ open · esc close
         </div>
       </div>

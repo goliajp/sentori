@@ -98,9 +98,9 @@ export default function Integrations() {
         <Card>
           <CardHeader title="Connect integration" />
           <Section>
-            <label className="block text-xs text-zinc-500 mb-1">Provider</label>
+            <label className="block text-xs text-fg-subtle mb-1">Provider</label>
             <select
-              className="w-full rounded border border-zinc-300 px-3 py-2 text-sm"
+              className="w-full rounded border border-border px-3 py-2 text-sm"
               value={kind}
               onChange={e => setKind(e.target.value as (typeof KINDS)[number])}
             >
@@ -110,11 +110,11 @@ export default function Integrations() {
                 </option>
               ))}
             </select>
-            <label className="mt-2 block text-xs text-zinc-500 mb-1">
+            <label className="mt-2 block text-xs text-fg-subtle mb-1">
               Config (JSON — webhook URL, OAuth tokens, team id, etc.)
             </label>
             <textarea
-              className="w-full h-40 rounded border border-zinc-300 px-3 py-2 text-xs font-mono"
+              className="w-full h-40 rounded border border-border px-3 py-2 text-xs font-mono"
               value={config}
               onChange={e => setConfig(e.target.value)}
             />
@@ -132,7 +132,7 @@ export default function Integrations() {
         <CardHeader title={`Configured (${rows.length})`} />
         <Section>
           {loading ? (
-            <div className="py-8 text-center text-sm text-zinc-500">Loading…</div>
+            <div className="py-8 text-center text-sm text-fg-subtle">Loading…</div>
           ) : rows.length === 0 ? (
             <EmptyState
               title="No integrations"

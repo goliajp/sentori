@@ -106,12 +106,12 @@ export default function PushSends() {
             className={`rounded px-3 py-1 ${
               filter === s
                 ? 'bg-emerald-600 text-white'
-                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                : 'bg-raised text-fg-muted hover:bg-raised'
             }`}
           >
             {s === '' ? 'All' : s}
             {s && (
-              <span className="ml-1 font-mono text-zinc-400">
+              <span className="ml-1 font-mono text-fg-muted">
                 ({counts[s as keyof typeof counts]})
               </span>
             )}
@@ -123,11 +123,11 @@ export default function PushSends() {
         <CardHeader title={`Sends (${rows.length})`} />
         <Section>
           {rows.length === 0 ? (
-            <div className="py-8 text-center text-sm text-zinc-500">
+            <div className="py-8 text-center text-sm text-fg-subtle">
               No push sends yet.
             </div>
           ) : (
-            <ul className="divide-y divide-zinc-800">
+            <ul className="divide-y divide-border">
               {rows.map(r => (
                 <li
                   key={r.id}
@@ -144,18 +144,18 @@ export default function PushSends() {
                         <Badge>{r.status}</Badge>
                       )}
                       {r.retry_count > 0 && (
-                        <span className="font-mono text-[10px] text-zinc-500">
+                        <span className="font-mono text-[10px] text-fg-subtle">
                           retry {r.retry_count}
                         </span>
                       )}
                     </div>
-                    <div className="mt-1 text-[10px] text-zinc-500">
+                    <div className="mt-1 text-[10px] text-fg-subtle">
                       {r.error ||
                         r.provider_outcome ||
                         formatRelative(r.created_at)}
                     </div>
                     {r.next_attempt_at && r.status === 'queued' && (
-                      <div className="text-[10px] text-zinc-500">
+                      <div className="text-[10px] text-fg-subtle">
                         next attempt {formatRelative(r.next_attempt_at)}
                       </div>
                     )}

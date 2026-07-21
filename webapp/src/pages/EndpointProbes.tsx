@@ -108,14 +108,14 @@ export default function EndpointProbes() {
           <CardHeader title="New probe" />
           <Section>
             <input
-              className="w-full rounded border border-zinc-300 px-3 py-2 text-sm"
+              className="w-full rounded border border-border px-3 py-2 text-sm"
               placeholder="https://api.example.com/health"
               value={url}
               onChange={e => setUrl(e.target.value)}
             />
             <div className="mt-2 flex gap-2">
               <select
-                className="rounded border border-zinc-300 px-3 py-2 text-sm"
+                className="rounded border border-border px-3 py-2 text-sm"
                 value={method}
                 onChange={e => setMethod(e.target.value)}
               >
@@ -125,12 +125,12 @@ export default function EndpointProbes() {
               </select>
               <input
                 type="number"
-                className="rounded border border-zinc-300 px-3 py-2 text-sm w-24"
+                className="rounded border border-border px-3 py-2 text-sm w-24"
                 value={interval}
                 onChange={e => setInterval(parseInt(e.target.value, 10) || 60)}
                 title="Interval (seconds)"
               />
-              <span className="self-center text-xs text-zinc-500">sec</span>
+              <span className="self-center text-xs text-fg-subtle">sec</span>
             </div>
             <div className="mt-2 flex gap-2">
               <Button onClick={add}>Add</Button>
@@ -146,7 +146,7 @@ export default function EndpointProbes() {
         <CardHeader title={`Probes (${rows.length})`} />
         <Section>
           {loading ? (
-            <div className="py-8 text-center text-sm text-zinc-500">
+            <div className="py-8 text-center text-sm text-fg-subtle">
               Loading…
             </div>
           ) : rows.length === 0 ? (
@@ -155,7 +155,7 @@ export default function EndpointProbes() {
               hint="Add a URL to start synthetic monitoring."
             />
           ) : (
-            <ul className="divide-y divide-zinc-800">
+            <ul className="divide-y divide-border">
               {rows.map(p => (
                 <li
                   key={p.id}
@@ -164,7 +164,7 @@ export default function EndpointProbes() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <Badge>{p.method}</Badge>
-                      <span className="font-mono text-xs text-zinc-200 truncate">
+                      <span className="font-mono text-xs text-fg truncate">
                         {p.endpoint_url}
                       </span>
                       {p.enabled ? (
@@ -173,7 +173,7 @@ export default function EndpointProbes() {
                         <Badge tone="neutral">off</Badge>
                       )}
                     </div>
-                    <div className="mt-1 text-[10px] text-zinc-500">
+                    <div className="mt-1 text-[10px] text-fg-subtle">
                       expect {p.expected_status} · every {p.interval_sec}s ·
                       timeout {p.timeout_ms}ms · added{' '}
                       {formatRelative(p.created_at)}

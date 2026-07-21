@@ -86,7 +86,7 @@ export function CertPage() {
           <CardHeader title="Watch new domain" />
           <div className="p-4 space-y-2">
             <input
-              className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-mono"
+              className="w-full rounded border border-border-strong bg-surface px-3 py-2 text-sm font-mono"
               placeholder="example.com"
               value={newDomain}
               onChange={e => setNewDomain(e.target.value)}
@@ -108,9 +108,9 @@ export function CertPage() {
             {watches.map(w => (
               <div
                 key={w.id}
-                className="flex items-center justify-between rounded border border-zinc-800 px-3 py-1.5"
+                className="flex items-center justify-between rounded border border-border px-3 py-1.5"
               >
-                <span className="font-mono text-sm text-zinc-200">
+                <span className="font-mono text-sm text-fg">
                   {w.domain}
                 </span>
                 <Button
@@ -137,9 +137,9 @@ export function CertPage() {
               label: 'Domain',
               render: (r) => (
                 <div>
-                  <div className="font-mono text-sm text-zinc-100">{r.domain}</div>
+                  <div className="font-mono text-sm text-fg">{r.domain}</div>
                   {r.common_name && (
-                    <div className="text-[11px] text-zinc-500">
+                    <div className="text-[11px] text-fg-subtle">
                       CN: {r.common_name}
                     </div>
                   )}
@@ -151,7 +151,7 @@ export function CertPage() {
               label: 'Issuer',
               width: '25%',
               render: (r) => (
-                <span className="text-xs text-zinc-400">
+                <span className="text-xs text-fg-muted">
                   {r.issuer_name.slice(0, 50)}
                 </span>
               ),
@@ -174,7 +174,7 @@ export function CertPage() {
               label: 'Observed',
               width: '15%',
               render: (r) => (
-                <span className="text-xs text-zinc-500">
+                <span className="text-xs text-fg-subtle">
                   {formatRelative(r.observed_at)}
                 </span>
               ),
