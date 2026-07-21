@@ -120,7 +120,7 @@ async fn register_and_verify_round_trip() {
     let (pool, ws) = fresh_pool().await;
     let auth = service(pool, ws);
 
-    let (user, minted) = auth
+    let (user, minted, _ws) = auth
         .register("Alice@example.com", "verysecret")
         .await
         .expect("register");
@@ -194,7 +194,7 @@ async fn verify_email_rejects_bad_tokens() {
 async fn double_verify_fails_after_first() {
     let (pool, ws) = fresh_pool().await;
     let auth = service(pool, ws);
-    let (_user, minted) = auth
+    let (_user, minted, _ws) = auth
         .register("once@example.com", "verysecret")
         .await
         .expect("register");
@@ -215,7 +215,7 @@ async fn resend_email_verification_is_silent_when_unknown_or_verified() {
         .expect("ok");
     assert!(resent.is_none());
 
-    let (_user, minted) = auth
+    let (_user, minted, _ws) = auth
         .register("bob@example.com", "verysecret")
         .await
         .expect("register");
@@ -236,7 +236,7 @@ async fn login_happy_path_and_cookie_lookup() {
     let (pool, ws) = fresh_pool().await;
     let auth = service(pool, ws);
 
-    let (user, minted_verify) = auth
+    let (user, minted_verify, _ws) = auth
         .register("login@example.com", "verysecret")
         .await
         .expect("register");
@@ -278,7 +278,7 @@ async fn login_rejects_unknown_or_wrong_password_uniformly() {
         .unwrap_err();
     assert!(matches!(err, AuthError::InvalidCredentials));
 
-    let (_u, minted) = auth
+    let (_u, minted, _ws) = auth
         .register("user@example.com", "rightsecret")
         .await
         .expect("register");
@@ -327,7 +327,7 @@ async fn logout_invalidates_session() {
     let (pool, ws) = fresh_pool().await;
     let auth = service(pool, ws);
 
-    let (user, mv) = auth
+    let (user, mv, _ws) = auth
         .register("out@example.com", "verysecret")
         .await
         .expect("reg");
@@ -362,7 +362,7 @@ async fn sign_out_everywhere_keeps_one() {
     let (pool, ws) = fresh_pool().await;
     let auth = service(pool, ws);
 
-    let (user, mv) = auth
+    let (user, mv, _ws) = auth
         .register("multi@example.com", "verysecret")
         .await
         .expect("reg");
@@ -402,7 +402,7 @@ async fn prune_expired_collects_only_past() {
     let (pool, ws) = fresh_pool().await;
     let auth = service(pool, ws);
 
-    let (user, mv) = auth
+    let (user, mv, _ws) = auth
         .register("prune@example.com", "verysecret")
         .await
         .expect("reg");
@@ -441,7 +441,7 @@ async fn reset_password_flow_rotates_hash_and_drops_sessions() {
     let (pool, ws) = fresh_pool().await;
     let auth = service(pool, ws);
 
-    let (user, mv) = auth
+    let (user, mv, _ws) = auth
         .register("reset@example.com", "oldsecret")
         .await
         .expect("reg");
@@ -485,7 +485,7 @@ async fn reset_password_flow_rotates_hash_and_drops_sessions() {
 async fn reset_password_rejects_short_or_bad_token() {
     let (pool, ws) = fresh_pool().await;
     let auth = service(pool, ws);
-    let (_u, mv) = auth
+    let (_u, mv, _ws) = auth
         .register("badreset@example.com", "oldsecret")
         .await
         .expect("reg");
@@ -517,7 +517,7 @@ async fn reset_password_rejects_short_or_bad_token() {
 async fn change_password_keeps_current_session_drops_others() {
     let (pool, ws) = fresh_pool().await;
     let auth = service(pool, ws);
-    let (user, mv) = auth
+    let (user, mv, _ws) = auth
         .register("change@example.com", "oldsecret")
         .await
         .expect("reg");
@@ -561,7 +561,7 @@ async fn change_password_keeps_current_session_drops_others() {
 async fn change_password_rejects_wrong_current_pwd() {
     let (pool, ws) = fresh_pool().await;
     let auth = service(pool, ws);
-    let (user, mv) = auth
+    let (user, mv, _ws) = auth
         .register("changewrong@example.com", "oldsecret")
         .await
         .expect("reg");

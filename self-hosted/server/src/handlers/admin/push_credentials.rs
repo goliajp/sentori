@@ -17,6 +17,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
 };
 
+use crate::handlers::tenant::guard_project;
 use crate::session_mw::SessionContext;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -57,6 +58,14 @@ pub async fn upsert(
         );
     }
 
+    // Tenant guard: the project must belong to the caller's
+    // workspace. The INSERT derives workspace_id from the project
+    // row, so without this a caller could plant credentials on
+    // another tenant's project.
+    if let Err((code, msg)) = guard_project(&state, ctx.workspace_id, project_id).await {
+        return (code, Json(json!({ "error": msg })));
+    }
+
     // Use device_tokens-side push_credentials table from migration 0024.
     // workspace_id derived via projects FK subquery (matches pattern in
     // migrations 0016+).
@@ -92,7 +101,7 @@ pub async fn upsert(
             let (ip, ua) = crate::notify::extract_request_meta(&headers);
             crate::notify::audit(
                 &state.pool,
-                state.workspace_id.into_uuid(),
+                ctx.workspace_id.into_uuid(),
                 Some(project_id),
                 Some(ctx.user_id.into_uuid()),
                 "push_credentials.upsert",
@@ -124,7 +133,14 @@ pub async fn upsert(
     }
 }
 
-pub async fn list(State(state): State<Arc<AppState>>, Path(project_id): Path<Uuid>) -> Json<Value> {
+pub async fn list(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    Path(project_id): Path<Uuid>,
+) -> Json<Value> {
+    if guard_project(&state, ctx.workspace_id, project_id).await.is_err() {
+        return Json(json!({ "credentials": [] }));
+    }
     let rows = sqlx::query(
         "SELECT id, kind, config, created_at, last_validated_at, last_validate_status \
          FROM push_credentials WHERE project_id = $1 ORDER BY kind",
@@ -152,8 +168,12 @@ pub async fn list(State(state): State<Arc<AppState>>, Path(project_id): Path<Uui
 
 pub async fn delete(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path((project_id, kind)): Path<(Uuid, String)>,
 ) -> StatusCode {
+    if let Err((code, _)) = guard_project(&state, ctx.workspace_id, project_id).await {
+        return code;
+    }
     let result = sqlx::query("DELETE FROM push_credentials WHERE project_id = $1 AND kind = $2")
         .bind(project_id)
         .bind(&kind)

@@ -222,7 +222,7 @@ async fn list_workspace_wide_excludes_scoped() {
     ))
     .await
     .unwrap();
-    let list = svc.list_workspace_wide().await.unwrap();
+    let list = svc.list_workspace_wide(workspace_id).await.unwrap();
     assert_eq!(list.len(), 1);
     assert!(list[0].project_id.is_none());
 }

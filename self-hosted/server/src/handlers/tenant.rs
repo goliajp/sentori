@@ -79,6 +79,61 @@ pub async fn guard_issue(
     Ok(())
 }
 
+/// Confirm a row identified by its own id belongs to `workspace_id`,
+/// for handlers that address a resource directly (alert rule id,
+/// saved view id, …) where the backing service method keys on the
+/// id alone. `table` is a trusted static string from the caller, not
+/// user input — never interpolate a request value here.
+///
+/// # Errors
+///
+/// - `404` when the row is absent or owned by another workspace.
+/// - `500` on a database failure.
+async fn guard_row(
+    state: &Arc<AppState>,
+    workspace_id: WorkspaceId,
+    table: &'static str,
+    id: Uuid,
+) -> Result<(), ApiErr> {
+    let sql = format!("SELECT id FROM {table} WHERE id = $1 AND workspace_id = $2");
+    let row: Option<(Uuid,)> = sqlx::query_as(&sql)
+        .bind(id)
+        .bind(workspace_id.into_uuid())
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if row.is_none() {
+        return Err((StatusCode::NOT_FOUND, "not found".into()));
+    }
+    Ok(())
+}
+
+/// Confirm an alert rule belongs to the caller's workspace.
+///
+/// # Errors
+///
+/// As [`guard_project`] (404 absent/foreign, 500 on db error).
+pub async fn guard_alert(
+    state: &Arc<AppState>,
+    workspace_id: WorkspaceId,
+    alert_id: Uuid,
+) -> Result<(), ApiErr> {
+    guard_row(state, workspace_id, "alert_rules", alert_id).await
+}
+
+/// Confirm a saved view belongs to the caller's workspace.
+///
+/// # Errors
+///
+/// As [`guard_project`] (404 absent/foreign, 500 on db error).
+pub async fn guard_saved_view(
+    state: &Arc<AppState>,
+    workspace_id: WorkspaceId,
+    view_id: Uuid,
+) -> Result<(), ApiErr> {
+    guard_row(state, workspace_id, "saved_views", view_id).await
+}
+
 #[cfg(test)]
 mod tests {
     //! The guards need a live database, so the coverage here is on
@@ -198,5 +253,56 @@ mod scoping_tests {
             hits >= 5,
             "expected the dashboard handlers to read most tenant tables, matched {hits}"
         );
+    }
+
+    /// Admin + mutation handlers that must act in the caller's
+    /// *active* workspace (`ctx.workspace_id`), never the boot-time
+    /// default (`state.workspace_id`) or the default-bound
+    /// `state.identity`. Before 2026-07-21 every one of these wrote
+    /// to / read from `DEFAULT_WORKSPACE_ID`, so in a multi-tenant
+    /// deployment they touched the wrong tenant.
+    const CTX_SCOPED_HANDLERS: [&str; 11] = [
+        "admin/tokens.rs",
+        "admin/projects.rs",
+        "admin/members.rs",
+        "admin/invites.rs",
+        "admin/push_sends.rs",
+        "admin/push_credentials.rs",
+        "admin/test_push.rs",
+        "alerts.rs",
+        "alerts_fire.rs",
+        "saved_views.rs",
+        "sessions_admin.rs",
+    ];
+
+    /// A live (non-comment) line that binds workspace scope from the
+    /// process default rather than the session. The whole point of
+    /// the multi-workspace cutover is that these disappear from
+    /// request handlers.
+    fn live_uses(src: &str, needle: &str) -> bool {
+        src.lines()
+            .filter(|l| !l.trim_start().starts_with("//"))
+            .any(|l| l.contains(needle))
+    }
+
+    #[test]
+    fn admin_handlers_scope_to_session_not_default_workspace() {
+        for file in CTX_SCOPED_HANDLERS {
+            let src = source(file);
+            assert!(
+                !live_uses(&src, "state.workspace_id"),
+                "{file} still binds the default workspace via `state.workspace_id` — \
+                 use `ctx.workspace_id` so the write lands in the caller's tenant"
+            );
+            // `state.identity.` (trailing dot = a method call on the
+            // default-bound handle) is the leak; `state.identity_for(`
+            // is the correct request-scoped constructor and must not
+            // trip the check.
+            assert!(
+                !live_uses(&src, "state.identity."),
+                "{file} still uses the default-bound `state.identity` — \
+                 use `state.identity_for(ctx.workspace_id)`"
+            );
+        }
     }
 }

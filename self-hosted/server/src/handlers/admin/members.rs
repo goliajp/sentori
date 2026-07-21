@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Extension, Path, State},
     http::StatusCode,
 };
 use sentori_workspace_identity::{Role, UserId};
@@ -21,10 +21,14 @@ use serde_json::{Value, json};
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
-pub async fn list(State(state): State<Arc<AppState>>) -> Json<Value> {
-    match state.identity.members().list().await {
+pub async fn list(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+) -> Json<Value> {
+    match state.identity_for(ctx.workspace_id).members().list().await {
         Ok(members) => {
             let out: Vec<Value> = members
                 .iter()
@@ -54,6 +58,7 @@ pub struct UpdateBody {
 
 pub async fn update_role(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(user_id): Path<Uuid>,
     Json(body): Json<UpdateBody>,
 ) -> (StatusCode, Json<Value>) {
@@ -74,8 +79,27 @@ pub async fn update_role(
         }
     };
 
+    // RBAC: promoting to admin is owner-only (per the capability
+    // matrix); setting the `user` role needs manage-users (owner or
+    // admin). A plain user cannot change anyone's role.
+    let permitted = match role {
+        Role::Admin => ctx.role.can_grant_admin(),
+        _ => ctx.role.can_manage_users(),
+    };
+    if !permitted {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "insufficient_role" })),
+        );
+    }
+
     let uid = UserId::from_uuid(user_id);
-    match state.identity.members().set_role(uid, role).await {
+    match state
+        .identity_for(ctx.workspace_id)
+        .members()
+        .set_role(uid, role)
+        .await
+    {
         Ok(()) => {
             info!(%user_id, ?role, "admin.members role_changed");
             (
@@ -93,14 +117,22 @@ pub async fn update_role(
     }
 }
 
-pub async fn remove(State(state): State<Arc<AppState>>, Path(user_id): Path<Uuid>) -> StatusCode {
+pub async fn remove(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    Path(user_id): Path<Uuid>,
+) -> StatusCode {
+    // RBAC: removing members is owner/admin only.
+    if !ctx.role.can_manage_users() {
+        return StatusCode::FORBIDDEN;
+    }
     let uid = UserId::from_uuid(user_id);
-    match state.identity.members().remove(uid).await {
+    match state.identity_for(ctx.workspace_id).members().remove(uid).await {
         Ok(()) => {
             info!(%user_id, "admin.members removed");
             crate::notify::audit(
                 &state.pool,
-                state.workspace_id.into_uuid(),
+                ctx.workspace_id.into_uuid(),
                 None,
                 None,
                 "member.remove",

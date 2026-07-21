@@ -2,13 +2,15 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
 
 import { CommandPalette } from './components/CommandPalette';
-import { api } from './lib/api';
+import { WorkspaceSwitcher } from './components/WorkspaceSwitcher';
+import { api, MeResponse } from './lib/api';
 import { useNavShortcuts } from './lib/useShortcuts';
 
 /// Main app shell — sidebar + content outlet. Wraps every
 /// authenticated page.
 export function App() {
   const [verified, setVerified] = useState(false);
+  const [me, setMe] = useState<MeResponse | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   useNavShortcuts();
 
@@ -48,6 +50,7 @@ export function App() {
       .authMe()
       .then(me => {
         if (me?.user_id) {
+          setMe(me);
           // Stash UI display fields so the rest of the app can
           // show them without hitting /auth/me on every render.
           try {
@@ -75,7 +78,7 @@ export function App() {
   }
   return (
     <div className="flex h-screen">
-      <Sidebar />
+      <Sidebar me={me} />
       <main className="flex-1 overflow-y-auto">
         <Outlet />
       </main>
@@ -87,7 +90,7 @@ export function App() {
   );
 }
 
-function Sidebar() {
+function Sidebar({ me }: { me: MeResponse | null }) {
   // Sidebar layout mirrors the lens grouping from legacy
   // `web/src/modules/registry.tsx`: workspace-wide pages
   // up top, per-project pages picked when a project is
@@ -97,14 +100,17 @@ function Sidebar() {
 
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-zinc-800 bg-zinc-950 p-4">
-      <div className="mb-6">
+      <div className="mb-4">
         <h1 className="text-base font-semibold tracking-tight text-zinc-100">
           Sentori
         </h1>
         <p className="font-mono text-[10px] text-zinc-600">v0.2</p>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1 text-sm">
+      {/* Active workspace + switcher. Hidden until whoami resolves. */}
+      {me && <WorkspaceSwitcher me={me} />}
+
+      <nav className="mt-4 flex flex-1 flex-col gap-1 text-sm">
         <SectionLabel>Workspace</SectionLabel>
         <NavItem to="/" label="Overview" />
         <NavItem to="/search" label="Search" />
@@ -116,7 +122,9 @@ function Sidebar() {
         <NavItem to="/audit" label="Audit" />
         <NavItem to="/settings" label="Settings" />
         <NavItem to="/health" label="Health" />
-        <NavItem to="/saas" label="SaaS admin" />
+        {/* Cross-workspace operator surface — only for saasadmins.
+            The route is server-gated too; this hides the entry. */}
+        {me?.is_saasadmin && <NavItem to="/saas" label="SaaS admin" />}
 
         {projectScoped && (
           <>

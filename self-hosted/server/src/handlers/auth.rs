@@ -66,12 +66,20 @@ pub async fn register(
         );
     }
     match auth(&state).register(&body.email, &body.password).await {
-        Ok((user, minted)) => {
-            info!(user_id = %user.id, "auth.register");
+        Ok((user, minted, workspace_id)) => {
+            info!(user_id = %user.id, %workspace_id, "auth.register");
+            // Seed the new tenant's billing row (Free plan) so
+            // quota checks + the usage page have a row to read.
+            // Best-effort: a missing billing row degrades to
+            // "no plan yet", not a failed signup.
+            if let Err(e) = state.billing_for(workspace_id).ensure_default().await {
+                warn!(error = %e, %workspace_id, "billing seed on signup failed");
+            }
             // The verify token goes out by email ONLY — returning
-            // it here would let any caller self-verify.
+            // it here would let any caller self-verify. Scoped to
+            // the caller's freshly-minted workspace.
             state.mailer.send_verify(
-                state.workspace_id,
+                workspace_id,
                 &body.email,
                 &minted.plaintext_token.to_wire_string(),
             );
@@ -277,12 +285,32 @@ pub async fn me(
     State(state): State<Arc<AppState>>,
 ) -> Json<Value> {
     match state.identity.users().find_by_id(ctx.user_id).await {
-        Ok(Some(u)) => Json(json!({
-            "user_id": u.id.to_string(),
-            "email": u.email,
-            "email_verified": u.email_verified,
-            "created_at": u.created_at,
-        })),
+        Ok(Some(u)) => {
+            // Active workspace name for the dashboard header. Best-
+            // effort: a missing name just omits it, it does not fail
+            // the whoami.
+            let ws_name: Option<String> =
+                sqlx::query_scalar("SELECT name FROM workspaces WHERE id = $1")
+                    .bind(ctx.workspace_id.into_uuid())
+                    .fetch_optional(&state.pool)
+                    .await
+                    .ok()
+                    .flatten();
+            Json(json!({
+                "user_id": u.id.to_string(),
+                "email": u.email,
+                "email_verified": u.email_verified,
+                "created_at": u.created_at,
+                // Active-workspace context for the header + switcher.
+                "workspace_id": ctx.workspace_id.into_uuid().to_string(),
+                "workspace_name": ws_name,
+                "role": ctx.role.as_db_str(),
+                // Whether to show the cross-workspace SaaS operator
+                // surface (`/saas`). The route is server-gated too;
+                // this just hides the nav entry for non-operators.
+                "is_saasadmin": crate::saasadmin_mw::is_saasadmin(ctx.user_id.into_uuid(), ctx.role),
+            }))
+        }
         _ => Json(json!({ "error": "user_not_found" })),
     }
 }

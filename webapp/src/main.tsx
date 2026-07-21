@@ -19,6 +19,7 @@ import Projects from './pages/Projects';
 import PushCredentials from './pages/PushCredentials';
 import PushSends from './pages/PushSends';
 import Sessions from './pages/Sessions';
+import AcceptInvite from './pages/AcceptInvite';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
 import Verify from './pages/Verify';
@@ -50,6 +51,7 @@ createRoot(rootEl).render(
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/invite" element={<AcceptInvite />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/verify" element={<Verify />} />
         <Route path="/reset-password" element={<ResetPassword />} />

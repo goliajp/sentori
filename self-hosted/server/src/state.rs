@@ -119,4 +119,27 @@ impl AppState {
             mailer,
         }
     }
+
+    /// An [`Identity`] handle scoped to a specific workspace —
+    /// typically `ctx.workspace_id` from the session middleware.
+    ///
+    /// `self.identity` is bound to the boot-time default workspace
+    /// and must NOT be used for request-scoped work: in a
+    /// multi-tenant (SaaS) deployment every authenticated request
+    /// acts in its caller's active workspace, not the default one.
+    /// `Identity::new` is a cheap pool clone + a copied id, so
+    /// building one per request is fine.
+    #[must_use]
+    pub fn identity_for(&self, workspace_id: WorkspaceId) -> Identity {
+        Identity::new(self.pool.clone(), workspace_id)
+    }
+
+    /// A [`BillingService`] scoped to a specific workspace. Same
+    /// rationale as [`Self::identity_for`]: `self.billing` is bound
+    /// to the default workspace and is wrong for request-scoped
+    /// quota / plan lookups.
+    #[must_use]
+    pub fn billing_for(&self, workspace_id: WorkspaceId) -> BillingService {
+        BillingService::new(self.pool.clone(), workspace_id)
+    }
 }

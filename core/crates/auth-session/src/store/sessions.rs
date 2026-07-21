@@ -3,7 +3,7 @@
 use std::fmt;
 
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use sentori_workspace_identity::UserId;
+use sentori_workspace_identity::{UserId, WorkspaceId};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Row};
@@ -103,6 +103,13 @@ pub struct Session {
     pub id_hash_hex: String,
     /// Owning user.
     pub user_id: UserId,
+    /// The workspace this session is currently acting in. NOT a
+    /// fixed property of the user (a user can belong to many
+    /// workspaces); switching workspace UPDATEs this column. The
+    /// session middleware validates it against `workspace_members`
+    /// on every request, so a stale value (membership revoked) is
+    /// rejected rather than trusted.
+    pub workspace_id: WorkspaceId,
     /// When the session was minted (login or refresh).
     pub created_at: OffsetDateTime,
     /// Last time a request touched this session (updated on
@@ -185,7 +192,7 @@ impl<'a> Sessions<'a> {
              (id_hash, workspace_id, user_id, expires_at, ip, user_agent) \
              SELECT $1, u.workspace_id, $2, $3, $4, $5 \
              FROM users u WHERE u.id = $2 \
-             RETURNING id_hash, user_id, created_at, last_seen_at, expires_at, ip, user_agent",
+             RETURNING id_hash, workspace_id, user_id, created_at, last_seen_at, expires_at, ip, user_agent",
         )
         .bind(id_hash.as_slice())
         .bind(user_id.into_uuid())
@@ -219,7 +226,7 @@ impl<'a> Sessions<'a> {
         let row = sqlx::query(
             "UPDATE auth_sessions SET last_seen_at = now() \
              WHERE id_hash = $1 AND expires_at > now() \
-             RETURNING id_hash, user_id, created_at, last_seen_at, expires_at, ip, user_agent",
+             RETURNING id_hash, workspace_id, user_id, created_at, last_seen_at, expires_at, ip, user_agent",
         )
         .bind(id_hash.as_slice())
         .fetch_optional(self.pool)
@@ -237,7 +244,7 @@ impl<'a> Sessions<'a> {
     /// [`AuthError::Db`] on DB failure.
     pub async fn lookup(&self, id_hash: &[u8; 32]) -> Result<Option<Session>, AuthError> {
         let row = sqlx::query(
-            "SELECT id_hash, user_id, created_at, last_seen_at, expires_at, ip, user_agent \
+            "SELECT id_hash, workspace_id, user_id, created_at, last_seen_at, expires_at, ip, user_agent \
              FROM auth_sessions \
              WHERE id_hash = $1 AND expires_at > now()",
         )
@@ -257,7 +264,7 @@ impl<'a> Sessions<'a> {
     /// [`AuthError::Db`] on DB failure.
     pub async fn list_for_user(&self, user_id: UserId) -> Result<Vec<Session>, AuthError> {
         let rows = sqlx::query(
-            "SELECT id_hash, user_id, created_at, last_seen_at, expires_at, ip, user_agent \
+            "SELECT id_hash, workspace_id, user_id, created_at, last_seen_at, expires_at, ip, user_agent \
              FROM auth_sessions WHERE user_id = $1 \
              ORDER BY last_seen_at DESC",
         )
@@ -266,6 +273,34 @@ impl<'a> Sessions<'a> {
         .await?;
 
         Ok(rows.iter().map(row_to_session).collect())
+    }
+
+    /// Point this session at a different active workspace. Powers
+    /// the dashboard workspace switcher.
+    ///
+    /// The caller MUST have already verified the session's user is
+    /// a member of `workspace_id` — this store method only writes
+    /// the column; it does not authorize the move. Returns whether
+    /// a live session row matched (`false` = expired / unknown
+    /// session, treat as 401).
+    ///
+    /// # Errors
+    ///
+    /// [`AuthError::Db`] on DB failure.
+    pub async fn set_active_workspace(
+        &self,
+        id_hash: &[u8; 32],
+        workspace_id: WorkspaceId,
+    ) -> Result<bool, AuthError> {
+        let result = sqlx::query(
+            "UPDATE auth_sessions SET workspace_id = $2 \
+             WHERE id_hash = $1 AND expires_at > now()",
+        )
+        .bind(id_hash.as_slice())
+        .bind(workspace_id.into_uuid())
+        .execute(self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
     }
 
     /// Delete a single session by its id hash. Idempotent.
@@ -331,6 +366,7 @@ fn row_to_session(row: &sqlx::postgres::PgRow) -> Session {
     Session {
         id_hash_hex: bytes_to_hex(&id_hash),
         user_id: UserId::from_uuid(row.get("user_id")),
+        workspace_id: WorkspaceId::from_uuid(row.get("workspace_id")),
         created_at: row.get::<OffsetDateTime, _>("created_at"),
         last_seen_at: row.get::<OffsetDateTime, _>("last_seen_at"),
         expires_at: row.get::<OffsetDateTime, _>("expires_at"),

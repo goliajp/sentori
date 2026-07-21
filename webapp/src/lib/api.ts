@@ -200,6 +200,28 @@ export interface WorkspaceRow {
   created_at: string;
 }
 
+/// Whoami — the active-workspace context the dashboard header +
+/// switcher + SaaS-nav gate read.
+export interface MeResponse {
+  user_id: string;
+  email: string;
+  email_verified: boolean;
+  created_at: string;
+  workspace_id: string;
+  workspace_name: string | null;
+  role: 'owner' | 'admin' | 'user';
+  is_saasadmin: boolean;
+}
+
+/// One row of the caller's own workspace list (the switcher), as
+/// opposed to `WorkspaceRow` which is the cross-tenant operator view.
+export interface MyWorkspaceRow {
+  workspace_id: string;
+  name: string;
+  role: 'owner' | 'admin' | 'user';
+  active: boolean;
+}
+
 export interface CreatedWorkspace {
   id: string;
   name: string;
@@ -643,13 +665,21 @@ export class Api {
       {},
     ) as Promise<void>;
   }
-  authMe(): Promise<{
-    user_id: string;
-    email: string;
-    email_verified: boolean;
-    created_at: string;
-  }> {
+  authMe(): Promise<MeResponse> {
     return this.get('/auth/me');
+  }
+
+  // ── multi-workspace: switcher ──────────────────────────
+  listMyWorkspaces(): Promise<{ workspaces: MyWorkspaceRow[] }> {
+    return this.get('/admin/api/workspaces');
+  }
+  switchWorkspace(workspaceId: string): Promise<{ workspace_id: string }> {
+    return this.post('/admin/api/workspaces/switch', {
+      workspaceId,
+    });
+  }
+  acceptInvite(token: string): Promise<{ workspace_id: string; role: string }> {
+    return this.post('/admin/api/invites/accept', { token });
   }
 
   // ── auth: dashboard user lifecycle ─────────────────────

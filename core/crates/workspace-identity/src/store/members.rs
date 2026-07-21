@@ -7,6 +7,19 @@ use crate::WorkspaceId;
 use crate::error::IdentityError;
 use crate::model::{Member, Role, UserId};
 
+/// One row of a user's workspace list — which workspace, its
+/// display name, and the role the user holds there. Returned by
+/// [`Members::list_for_user`] for the dashboard switcher.
+#[derive(Debug, Clone)]
+pub struct UserWorkspace {
+    /// The workspace the user can act in.
+    pub workspace_id: WorkspaceId,
+    /// Human-readable workspace name (from `workspaces.name`).
+    pub name: String,
+    /// The user's role in this workspace.
+    pub role: Role,
+}
+
 /// Store sub-handle for `workspace_members`. Workspace-scoped.
 #[derive(Debug, Clone, Copy)]
 pub struct Members<'a> {
@@ -239,6 +252,44 @@ impl<'a> Members<'a> {
 
         tx.commit().await?;
         Ok(())
+    }
+
+    /// List every workspace `user_id` belongs to, with the role
+    /// they hold in each and the workspace's display name. Powers
+    /// the dashboard workspace switcher.
+    ///
+    /// Cross-workspace by design: unlike the other methods it does
+    /// NOT filter on `self.workspace_id` — it answers "where can
+    /// this user go", which is the reverse lookup. Ordered by
+    /// workspace name for a stable switcher list.
+    ///
+    /// # Errors
+    ///
+    /// [`IdentityError::Db`] on database failure.
+    pub async fn list_for_user(
+        &self,
+        user_id: UserId,
+    ) -> Result<Vec<UserWorkspace>, IdentityError> {
+        let rows = sqlx::query(
+            "SELECT m.workspace_id, w.name, m.role \
+             FROM workspace_members m \
+             JOIN workspaces w ON w.id = m.workspace_id \
+             WHERE m.user_id = $1 \
+             ORDER BY w.name ASC",
+        )
+        .bind(user_id.into_uuid())
+        .fetch_all(self.pool)
+        .await?;
+
+        rows.iter()
+            .map(|r| {
+                Ok(UserWorkspace {
+                    workspace_id: WorkspaceId::from_uuid(r.get::<uuid::Uuid, _>("workspace_id")),
+                    name: r.get::<String, _>("name"),
+                    role: Role::from_db_str(r.get::<&str, _>("role"))?,
+                })
+            })
+            .collect()
     }
 
     /// Find the owner of this workspace.

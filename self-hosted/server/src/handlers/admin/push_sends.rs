@@ -7,13 +7,15 @@ use std::sync::Arc;
 
 use axum::{
     Json,
-    extract::{Path, Query, State},
+    extract::{Extension, Path, Query, State},
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlx::Row;
 use uuid::Uuid;
 
+use crate::handlers::tenant::guard_project;
+use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
 #[derive(Deserialize, Default)]
@@ -24,22 +26,30 @@ pub struct ListQuery {
 
 pub async fn retry(
     State(state): State<Arc<AppState>>,
-    Path((_project_id, send_id)): Path<(Uuid, Uuid)>,
+    Extension(ctx): Extension<SessionContext>,
+    Path((project_id, send_id)): Path<(Uuid, Uuid)>,
 ) -> (axum::http::StatusCode, Json<Value>) {
     use axum::http::StatusCode;
+    if let Err((code, msg)) = guard_project(&state, ctx.workspace_id, project_id).await {
+        return (code, Json(json!({ "error": msg })));
+    }
+    // `AND project_id` ties the send to the guarded project so a
+    // send_id from another project (even in this workspace) can't be
+    // retried through the wrong project's URL.
     let res = sqlx::query(
         "UPDATE push_sends SET status = 'queued', next_attempt_at = now(), \
             retry_count = 0, error = NULL \
-         WHERE id = $1 AND status = 'failed' RETURNING id",
+         WHERE id = $1 AND project_id = $2 AND status = 'failed' RETURNING id",
     )
     .bind(send_id)
+    .bind(project_id)
     .fetch_optional(&state.pool)
     .await;
     match res {
         Ok(Some(_)) => {
             crate::notify::audit(
                 &state.pool,
-                state.workspace_id.into_uuid(),
+                ctx.workspace_id.into_uuid(),
                 None,
                 None,
                 "push.retry",
@@ -70,8 +80,12 @@ pub async fn retry(
 /// wrong get one more chance.
 pub async fn retry_all_failed(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
 ) -> Json<Value> {
+    if guard_project(&state, ctx.workspace_id, project_id).await.is_err() {
+        return Json(json!({ "requeued": 0, "error": "not found" }));
+    }
     let res = sqlx::query(
         "UPDATE push_sends SET status = 'queued', next_attempt_at = now(), \
             retry_count = 0, error = NULL \
@@ -84,7 +98,7 @@ pub async fn retry_all_failed(
     let count = res.len();
     crate::notify::audit(
         &state.pool,
-        state.workspace_id.into_uuid(),
+        ctx.workspace_id.into_uuid(),
         Some(project_id),
         None,
         "push.retry_all_failed",
@@ -98,9 +112,13 @@ pub async fn retry_all_failed(
 
 pub async fn list(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
     Query(q): Query<ListQuery>,
 ) -> Json<Value> {
+    if guard_project(&state, ctx.workspace_id, project_id).await.is_err() {
+        return Json(json!({ "sends": [] }));
+    }
     let limit = i64::from(q.limit.unwrap_or(100).clamp(1, 1000));
     let rows = if let Some(status) = q.status.as_deref() {
         sqlx::query(

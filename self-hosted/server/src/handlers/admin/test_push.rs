@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Extension, Path, State},
     http::StatusCode,
 };
 use serde::Deserialize;
@@ -17,6 +17,8 @@ use sqlx::Row;
 use tracing::warn;
 use uuid::Uuid;
 
+use crate::handlers::tenant::guard_project;
+use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
 #[derive(Deserialize)]
@@ -38,9 +40,15 @@ fn default_body() -> String {
 
 pub async fn handle(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
     Json(body): Json<TestPushBody>,
 ) -> (StatusCode, Json<Value>) {
+    // Tenant guard: the project must belong to the caller's
+    // workspace before we touch its device tokens / queue a send.
+    if let Err((code, msg)) = guard_project(&state, ctx.workspace_id, project_id).await {
+        return (code, Json(json!({ "error": msg })));
+    }
     // Verify the device_token belongs to this project.
     let owns = sqlx::query(
         "SELECT provider FROM device_tokens WHERE id = $1 AND project_id = $2 AND revoked_at IS NULL",
@@ -72,7 +80,7 @@ pub async fn handle(
          VALUES ($1, $2, $3, $4, $5, $6, 'queued') RETURNING id",
     )
     .bind(send_id)
-    .bind(state.workspace_id.into_uuid())
+    .bind(ctx.workspace_id.into_uuid())
     .bind(project_id)
     .bind(body.device_token_id)
     .bind(&provider)

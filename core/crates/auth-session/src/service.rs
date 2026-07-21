@@ -2,7 +2,7 @@
 
 use sentori_argon2_password::PasswordHash as Argon2;
 use sentori_cookie_session::SecretKey;
-use sentori_workspace_identity::{Identity, User, UserId};
+use sentori_workspace_identity::{Identity, User, UserId, WorkspaceId};
 use sqlx::PgPool;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -117,24 +117,39 @@ impl AuthService {
     ///   if the email is already on file.
     /// - [`AuthError::Password`] on hashing failure.
     /// - [`AuthError::Db`] on DB failure.
+    /// Returns the new user, the minted email-verify token, and
+    /// the [`WorkspaceId`] of the freshly-provisioned personal
+    /// workspace the user now owns. SaaS self-signup lands every
+    /// registrant in their own isolated tenant (not the shared
+    /// default workspace); the caller seeds that workspace's
+    /// billing row and emails the verify link.
     pub async fn register(
         &self,
         email: &str,
         password: &str,
-    ) -> Result<(User, MintedEmailVerify), AuthError> {
+    ) -> Result<(User, MintedEmailVerify, WorkspaceId), AuthError> {
         validate_email(email)?;
         validate_password(password, self.opts.password_min_chars)?;
 
         let email_norm = email.trim().to_ascii_lowercase();
         let hash = Argon2::hash(password)?;
-        let user = self.identity.users().create(&email_norm, &hash).await?;
+        let ws_name = default_workspace_name(&email_norm);
+        // One transaction: workspace + owner user + owner
+        // membership. Rolls back cleanly on a taken email so no
+        // orphan workspace is left behind.
+        let (user, workspace_id) = self
+            .identity
+            .register_tenant_tx(&email_norm, &hash, &ws_name)
+            .await?;
 
         let expires_at = OffsetDateTime::now_utc() + self.opts.email_verify_ttl;
-        let minted = self
-            .email_verifications()
-            .create(user.id, expires_at)
-            .await?;
-        Ok((user, minted))
+        // Verification token scoped to the NEW workspace, not the
+        // AuthService's bound (default) one.
+        let minted =
+            crate::store::EmailVerifications::new(self.identity.pool(), workspace_id)
+                .create(user.id, expires_at)
+                .await?;
+        Ok((user, minted, workspace_id))
     }
 
     /// Re-send a verification token for an unverified user.
@@ -425,6 +440,15 @@ impl AuthService {
     pub const fn raw_pool(&self) -> &PgPool {
         self.pool()
     }
+}
+
+/// Friendly default name for a self-signup's personal workspace,
+/// derived from the email local-part (e.g. `jane@acme.io` →
+/// `jane's workspace`). The owner can rename it later.
+fn default_workspace_name(email_norm: &str) -> String {
+    let local = email_norm.split('@').next().unwrap_or(email_norm);
+    let local = if local.is_empty() { "my" } else { local };
+    format!("{local}'s workspace")
 }
 
 fn validate_email(email: &str) -> Result<(), AuthError> {
