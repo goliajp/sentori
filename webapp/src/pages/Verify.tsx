@@ -67,9 +67,7 @@ export default function Verify() {
             <Link
               to="/login"
               className="block rounded border border-border-strong px-3 py-2 text-center text-sm text-fg-muted hover:bg-raised"
-            >
-              Back to sign in
-            </Link>
+            >{t('auth.backToSignIn')}</Link>
           </div>
         )}
       </div>

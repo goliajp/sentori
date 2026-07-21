@@ -124,7 +124,7 @@ export default function SavedViews() {
         title={t('savedViews.title')}
         subtitle={t('savedViews.subtitle')}
         actions={
-          <Button onClick={() => setShowCreate(true)}>+ Save view</Button>
+          <Button onClick={() => setShowCreate(true)}>{'+ ' + t('savedViews.title')}</Button>
         }
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
@@ -150,7 +150,7 @@ export default function SavedViews() {
 
       {showCreate && (
         <Card>
-          <CardHeader title={`Save new ${target} view`} />
+          <CardHeader title={t('savedViews.saveNew')} />
           <CardBody>
             <input
               className="w-full rounded border border-border-strong bg-surface px-3 py-2 text-sm"
@@ -167,17 +167,15 @@ export default function SavedViews() {
               onChange={e => setNewPayload(e.target.value)}
             />
             <div className="mt-2 flex gap-2">
-              <Button onClick={create}>Save</Button>
-              <Button variant="secondary" onClick={() => setShowCreate(false)}>
-                Cancel
-              </Button>
+              <Button onClick={create}>{t('action.save')}</Button>
+              <Button variant="secondary" onClick={() => setShowCreate(false)}>{t('action.cancel')}</Button>
             </div>
           </CardBody>
         </Card>
       )}
 
       <Card>
-        <CardHeader title={`Views (${rows.length})`} />
+        <CardHeader title={`${t('savedViews.views')} (${rows.length})`} />
         <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
@@ -227,16 +225,12 @@ export default function SavedViews() {
                         size="sm"
                         variant="secondary"
                         onClick={() => rename(v)}
-                      >
-                        Rename
-                      </Button>
+                      >{t('action.rename')}</Button>
                       <Button
                         size="sm"
                         variant="danger"
                         onClick={() => destroy(v)}
-                      >
-                        Delete
-                      </Button>
+                      >{t('action.delete')}</Button>
                     </div>
                   </li>
                 );

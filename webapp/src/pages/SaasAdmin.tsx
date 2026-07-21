@@ -86,7 +86,7 @@ export default function SaasAdmin() {
         title={t('saas.title')}
         subtitle="Cross-workspace operator view. In self-hosted mode shows your single workspace."
         actions={
-          <Button onClick={() => setShowCreate(true)}>+ New workspace</Button>
+          <Button onClick={() => setShowCreate(true)}>{'+ ' + t('saas.newWorkspace')}</Button>
         }
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
@@ -101,10 +101,8 @@ export default function SaasAdmin() {
               onChange={e => setName(e.target.value)}
             />
             <div className="mt-2 flex gap-2">
-              <Button onClick={create}>Create</Button>
-              <Button variant="secondary" onClick={() => setShowCreate(false)}>
-                Cancel
-              </Button>
+              <Button onClick={create}>{t('action.create')}</Button>
+              <Button variant="secondary" onClick={() => setShowCreate(false)}>{t('action.cancel')}</Button>
             </div>
           </CardBody>
         </Card>
@@ -132,7 +130,7 @@ export default function SaasAdmin() {
       )}
 
       <Card>
-        <CardHeader title={`Workspaces (${rows.length})`} />
+        <CardHeader title={`${t('saas.workspaces')} (${rows.length})`} />
         <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">Loading…</div>
@@ -197,27 +195,21 @@ export default function SaasAdmin() {
                         variant="secondary"
                         disabled={busy === w.id}
                         onClick={() => act(w, id => api.suspendWorkspace(id))}
-                      >
-                        Suspend
-                      </Button>
+                      >{t('action.delete')}</Button>
                     ) : (
                       <Button
                         size="sm"
                         variant="secondary"
                         disabled={busy === w.id}
                         onClick={() => act(w, id => api.resumeWorkspace(id))}
-                      >
-                        Resume
-                      </Button>
+                      >{t('action.retryNow')}</Button>
                     )}
                     <Button
                       size="sm"
                       variant="danger"
                       disabled={busy === w.id}
                       onClick={() => destroy(w)}
-                    >
-                      Delete
-                    </Button>
+                    >{t('action.delete')}</Button>
                   </div>
                 ),
               }))}

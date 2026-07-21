@@ -210,9 +210,7 @@ export function CommandPalette({ open, onClose }: Props) {
         />
         <ul className="max-h-80 overflow-y-auto py-1">
           {items.length === 0 ? (
-            <li className="px-4 py-3 text-xs text-fg-subtle">
-              No matches
-            </li>
+            <li className="px-4 py-3 text-xs text-fg-subtle">{t('common.noMatches')}</li>
           ) : (
             items.map((item, i) => (
               <li

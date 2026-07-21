@@ -53,7 +53,7 @@ export default function Metrics() {
     }
   }
 
-  if (!projectId) return <ErrorBanner>Project id missing</ErrorBanner>;
+  if (!projectId) return <ErrorBanner>{t('common.missingProjectId')}</ErrorBanner>;
 
   return (
     <div className="space-y-4">
@@ -64,7 +64,7 @@ export default function Metrics() {
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       <Card>
-        <CardHeader title={`Active metrics (${rows.length})`} />
+        <CardHeader title={`${t('metrics.active')} (${rows.length})`} />
         <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">

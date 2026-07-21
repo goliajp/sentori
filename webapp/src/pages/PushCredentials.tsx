@@ -79,7 +79,7 @@ export default function PushCredentials() {
   }
 
   if (!projectId) {
-    return <ErrorBanner>Project id missing</ErrorBanner>;
+    return <ErrorBanner>{t('common.missingProjectId')}</ErrorBanner>;
   }
 
   return (
@@ -94,10 +94,8 @@ export default function PushCredentials() {
               onClick={() =>
                 (window.location.href = `/projects/${projectId}/push-sends`)
               }
-            >
-              View sends
-            </Button>
-            <Button onClick={() => setShowUpload(true)}>+ Upload</Button>
+            >{t('push.viewSends')}</Button>
+            <Button onClick={() => setShowUpload(true)}>{'+ ' + t('push.upload')}</Button>
           </div>
         }
       />
@@ -170,9 +168,7 @@ export default function PushCredentials() {
                     );
                     setSecret(out.privatePem);
                   }}
-                >
-                  Generate VAPID keypair
-                </Button>
+                >{t('push.generateVapid')}</Button>
                 <p className="mt-1 text-xs text-fg-subtle">
                   Browser-side WebCrypto. Public key goes into config
                   (for SDK), private PEM goes into secret. Never leaves
@@ -182,16 +178,14 @@ export default function PushCredentials() {
             )}
 
             <div className="mt-3 flex gap-2">
-              <Button onClick={upload}>Save</Button>
-              <Button variant="secondary" onClick={() => setShowUpload(false)}>
-                Cancel
-              </Button>
+              <Button onClick={upload}>{t('action.save')}</Button>
+              <Button variant="secondary" onClick={() => setShowUpload(false)}>{t('action.cancel')}</Button>
             </div>
           </CardBody>
         </Card>
       )}
       <Card>
-        <CardHeader title={`Configured (${rows.length})`} />
+        <CardHeader title={`${t('common.configured')} (${rows.length})`} />
         <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
@@ -231,9 +225,7 @@ export default function PushCredentials() {
                     size="sm"
                     variant="danger"
                     onClick={() => destroy(c.kind)}
-                  >
-                    Delete
-                  </Button>
+                  >{t('action.delete')}</Button>
                 ),
               }))}
             />
@@ -324,9 +316,7 @@ function TestPushForm({ projectId }: { projectId: string }) {
         />
       </div>
       <div className="flex items-center gap-2">
-        <Button onClick={send} size="sm">
-          Send test
-        </Button>
+        <Button onClick={send} size="sm">{t('push.sendTest')}</Button>
         {msg && (
           <span className="font-mono text-xs text-fg-subtle">{msg}</span>
         )}

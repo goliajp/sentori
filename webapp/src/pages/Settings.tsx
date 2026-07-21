@@ -200,6 +200,7 @@ function Cell({
 }
 
 function SessionsCard() {
+  const t = useT();
   const { data, loading, reload: refresh } = useAsyncData<
     {
       id_hash_hex: string;
@@ -246,9 +247,7 @@ function SessionsCard() {
                 <button
                   onClick={() => revoke(s.id_hash_hex)}
                   className="rounded border border-danger/40 px-2 py-1 text-xs text-danger hover:bg-danger/20"
-                >
-                  Revoke
-                </button>
+                >{t('action.revoke')}</button>
               </li>
             ))}
           </ul>

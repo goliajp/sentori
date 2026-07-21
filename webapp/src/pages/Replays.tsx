@@ -35,7 +35,7 @@ export default function Replays() {
       .finally(() => setLoading(false));
   }, [projectId]);
 
-  if (!projectId) return <ErrorBanner>Project id missing</ErrorBanner>;
+  if (!projectId) return <ErrorBanner>{t('common.missingProjectId')}</ErrorBanner>;
 
   return (
     <div className="space-y-4">

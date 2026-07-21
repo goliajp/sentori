@@ -84,7 +84,7 @@ export default function Integrations() {
   }
 
   if (!projectId) {
-    return <ErrorBanner>Project id missing</ErrorBanner>;
+    return <ErrorBanner>{t('common.missingProjectId')}</ErrorBanner>;
   }
 
   return (
@@ -92,7 +92,7 @@ export default function Integrations() {
       <PageHeader
         title={t('integrations.title')}
         subtitle="External services that receive sentori events: Slack notifications, Linear issue creation, GitHub mentions, etc."
-        actions={<Button onClick={() => setShowAdd(true)}>+ Connect</Button>}
+        actions={<Button onClick={() => setShowAdd(true)}>{'+ ' + t('integrations.connectShort')}</Button>}
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
@@ -121,17 +121,15 @@ export default function Integrations() {
               onChange={e => setConfig(e.target.value)}
             />
             <div className="mt-2 flex gap-2">
-              <Button onClick={upsert}>Save</Button>
-              <Button variant="secondary" onClick={() => setShowAdd(false)}>
-                Cancel
-              </Button>
+              <Button onClick={upsert}>{t('action.save')}</Button>
+              <Button variant="secondary" onClick={() => setShowAdd(false)}>{t('action.cancel')}</Button>
             </div>
           </CardBody>
         </Card>
       )}
 
       <Card>
-        <CardHeader title={`Configured (${rows.length})`} />
+        <CardHeader title={`${t('common.configured')} (${rows.length})`} />
         <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">Loading…</div>
@@ -166,9 +164,7 @@ export default function Integrations() {
                     >
                       {it.active ? 'Pause' : 'Resume'}
                     </Button>
-                    <Button size="sm" variant="danger" onClick={() => destroy(it)}>
-                      Disconnect
-                    </Button>
+                    <Button size="sm" variant="danger" onClick={() => destroy(it)}>{t('action.disconnect')}</Button>
                   </div>
                 ),
               }))}

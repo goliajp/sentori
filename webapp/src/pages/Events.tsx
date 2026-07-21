@@ -114,9 +114,7 @@ export function EventsPage() {
             >
               {live ? `● Live (${liveCount})` : 'Live ○'}
             </Button>
-            <Button onClick={saveView} variant="secondary" size="sm">
-              Save filter
-            </Button>
+            <Button onClick={saveView} variant="secondary" size="sm">{t('issues.saveFilter')}</Button>
           </div>
         }
       />

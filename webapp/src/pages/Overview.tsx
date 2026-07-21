@@ -155,6 +155,7 @@ export function OverviewPage() {
 }
 
 function OnboardingGuide() {
+  const t = useT();
   const steps = [
     {
       n: 1,
@@ -180,9 +181,7 @@ function OnboardingGuide() {
   return (
     <div>
       <div className="mx-auto max-w-2xl">
-        <h3 className="text-base font-medium text-fg">
-          Welcome to Sentori
-        </h3>
+        <h3 className="text-base font-medium text-fg">{t('auth.welcome')}</h3>
         <p className="mt-1 text-sm text-fg-subtle">
           Four steps to your first event. Start by creating a project.
         </p>

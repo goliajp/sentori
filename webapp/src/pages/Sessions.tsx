@@ -55,7 +55,7 @@ export default function Sessions() {
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
       <Card>
-        <CardHeader title={`Sessions (${rows.length})`} />
+        <CardHeader title={`${t('sessions.title')} (${rows.length})`} />
         <CardBody>
           {rows.length === 0 ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
@@ -86,9 +86,7 @@ export default function Sessions() {
                     variant="danger"
                     size="sm"
                     onClick={() => revoke(s.id_hash_hex)}
-                  >
-                    Revoke
-                  </Button>
+                  >{t('action.revoke')}</Button>
                 </li>
               ))}
             </ul>

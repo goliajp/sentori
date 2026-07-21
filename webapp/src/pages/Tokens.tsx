@@ -70,7 +70,7 @@ export default function Tokens() {
   }
 
   if (!projectId) {
-    return <ErrorBanner>Project id missing</ErrorBanner>;
+    return <ErrorBanner>{t('common.missingProjectId')}</ErrorBanner>;
   }
 
   return (
@@ -79,9 +79,7 @@ export default function Tokens() {
         title={t('tokens.title')}
         subtitle={t('tokens.subtitle')}
         actions={
-          <Button onClick={() => setShowCreate(true)}>
-            + Mint token
-          </Button>
+          <Button onClick={() => setShowCreate(true)}>{'+ ' + t('tokens.mintShort')}</Button>
         }
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
@@ -101,15 +99,11 @@ export default function Tokens() {
                 onClick={() => {
                   navigator.clipboard?.writeText(newToken);
                 }}
-              >
-                Copy
-              </Button>
+              >{t('action.copy')}</Button>
               <Button
                 variant="secondary"
                 onClick={() => setNewToken(null)}
-              >
-                Done
-              </Button>
+              >{t('action.done')}</Button>
             </div>
           </CardBody>
         </Card>
@@ -125,20 +119,18 @@ export default function Tokens() {
               onChange={e => setLabel(e.target.value)}
             />
             <div className="mt-2 flex gap-2">
-              <Button onClick={mint}>Create</Button>
+              <Button onClick={mint}>{t('action.create')}</Button>
               <Button
                 variant="secondary"
                 onClick={() => setShowCreate(false)}
-              >
-                Cancel
-              </Button>
+              >{t('action.cancel')}</Button>
             </div>
           </CardBody>
         </Card>
       )}
       <Quickstart projectId={projectId} token={newToken} />
       <Card>
-        <CardHeader title={`Tokens (${rows.length})`} />
+        <CardHeader title={`${t('tokens.title')} (${rows.length})`} />
         <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
@@ -159,25 +151,23 @@ export default function Tokens() {
                 { key: 'status', label: 'Status' },
                 { key: 'actions', label: '' },
               ]}
-              rows={rows.map(t => ({
-                key: t.id,
-                label: t.label || '(unlabelled)',
-                kind: <Badge>{t.kind}</Badge>,
-                last4: t.last4 ? `…${t.last4}` : '—',
-                created: formatRelative(t.created_at),
-                status: t.revoked_at ? (
+              rows={rows.map(tok => ({
+                key: tok.id,
+                label: tok.label || '(unlabelled)',
+                kind: <Badge>{tok.kind}</Badge>,
+                last4: tok.last4 ? `…${tok.last4}` : '—',
+                created: formatRelative(tok.created_at),
+                status: tok.revoked_at ? (
                   <Badge tone="neutral">revoked</Badge>
                 ) : (
                   <Badge tone="ok">active</Badge>
                 ),
-                actions: !t.revoked_at && (
+                actions: !tok.revoked_at && (
                   <Button
                     variant="danger"
                     size="sm"
-                    onClick={() => revoke(t.id)}
-                  >
-                    Revoke
-                  </Button>
+                    onClick={() => revoke(tok.id)}
+                  >{t('action.revoke')}</Button>
                 ),
               }))}
             />
@@ -228,9 +218,7 @@ sentori.init({
               size="sm"
               variant="secondary"
               onClick={() => navigator.clipboard?.writeText(snippet)}
-            >
-              Copy
-            </Button>
+            >{t('action.copy')}</Button>
           </div>
         </div>
         <p className="mt-2 text-xs text-fg-subtle">

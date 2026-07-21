@@ -98,7 +98,7 @@ export default function Members() {
       <PageHeader
         title={t('members.title')}
         subtitle={t('members.subtitle')}
-        actions={<Button onClick={() => setShowInvite(true)}>+ Invite</Button>}
+        actions={<Button onClick={() => setShowInvite(true)}>{'+ ' + t('members.invite')}</Button>}
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
@@ -110,7 +110,7 @@ export default function Members() {
               {newInviteToken}
             </pre>
             <div className="mt-2">
-              <Button onClick={() => setNewInviteToken(null)}>Done</Button>
+              <Button onClick={() => setNewInviteToken(null)}>{t('action.done')}</Button>
             </div>
           </CardBody>
         </Card>
@@ -141,17 +141,15 @@ export default function Members() {
               onChange={e => setInvitedBy(e.target.value)}
             />
             <div className="mt-2 flex gap-2">
-              <Button onClick={mintInvite}>Send invite</Button>
-              <Button variant="secondary" onClick={() => setShowInvite(false)}>
-                Cancel
-              </Button>
+              <Button onClick={mintInvite}>{t('members.sendInvite')}</Button>
+              <Button variant="secondary" onClick={() => setShowInvite(false)}>{t('action.cancel')}</Button>
             </div>
           </CardBody>
         </Card>
       )}
 
       <Card>
-        <CardHeader title={`Active members (${members.length})`} />
+        <CardHeader title={`${t('members.activeMembers')} (${members.length})`} />
         <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
@@ -194,9 +192,7 @@ export default function Members() {
                         size="sm"
                         variant="danger"
                         onClick={() => removeMember(m.user_id)}
-                      >
-                        Remove
-                      </Button>
+                      >{t('action.remove')}</Button>
                     </div>
                   ) : null,
               }))}
@@ -206,7 +202,7 @@ export default function Members() {
       </Card>
 
       <Card>
-        <CardHeader title={`Invites (${invites.length})`} />
+        <CardHeader title={`${t('members.invites')} (${invites.length})`} />
         <CardBody>
           {invites.length === 0 ? (
             <EmptyState
@@ -240,9 +236,7 @@ export default function Members() {
                       size="sm"
                       variant="danger"
                       onClick={() => revokeInvite(i.id)}
-                    >
-                      Revoke
-                    </Button>
+                    >{t('action.revoke')}</Button>
                   ) : null,
               }))}
             />

@@ -53,9 +53,7 @@ export default function Register() {
             <Link
               to="/login"
               className="block rounded bg-accent px-3 py-2 text-center text-sm font-medium text-white hover:opacity-90"
-            >
-              Continue to sign in
-            </Link>
+            >{t('auth.continueToSignIn')}</Link>
           </div>
         ) : (
           <>

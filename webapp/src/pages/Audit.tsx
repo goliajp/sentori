@@ -85,9 +85,7 @@ export function AuditPage() {
         subtitle={t('audit.subtitle')}
         action={
           entries && entries.length > 0 ? (
-            <Button variant="secondary" size="sm" onClick={exportCsv}>
-              Export CSV
-            </Button>
+            <Button variant="secondary" size="sm" onClick={exportCsv}>{t('action.exportCsv')}</Button>
           ) : null
         }
       />
@@ -166,10 +164,8 @@ export function AuditPage() {
             </button>
           </div>
           <div className="col-span-4 flex gap-2">
-            <Button onClick={load}>Apply</Button>
-            <Button variant="secondary" onClick={clear}>
-              Clear
-            </Button>
+            <Button onClick={load}>{t('action.apply')}</Button>
+            <Button variant="secondary" onClick={clear}>{t('action.clear')}</Button>
           </div>
         </div>
       </Card>

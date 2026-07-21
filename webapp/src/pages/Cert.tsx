@@ -78,7 +78,7 @@ export function CertPage() {
         title={t('cert.title')}
         subtitle={t('cert.subtitle')}
         actions={
-          <Button onClick={() => setShowAdd(true)}>+ Watch domain</Button>
+          <Button onClick={() => setShowAdd(true)}>{'+ ' + t('cert.watchDomain')}</Button>
         }
       />
       {err && <ErrorBanner>{err}</ErrorBanner>}
@@ -94,10 +94,8 @@ export function CertPage() {
               onChange={e => setNewDomain(e.target.value)}
             />
             <div className="flex gap-2">
-              <Button onClick={addDomain}>Add</Button>
-              <Button variant="secondary" onClick={() => setShowAdd(false)}>
-                Cancel
-              </Button>
+              <Button onClick={addDomain}>{t('action.add')}</Button>
+              <Button variant="secondary" onClick={() => setShowAdd(false)}>{t('action.cancel')}</Button>
             </div>
           </div>
         </Card>
@@ -105,7 +103,7 @@ export function CertPage() {
 
       {watches.length > 0 && (
         <Card className="mb-4">
-          <CardHeader title={`Watched (${watches.length})`} />
+          <CardHeader title={`${t('cert.watched')} (${watches.length})`} />
           <div className="px-5 py-4 space-y-1">
             {watches.map(w => (
               <div
@@ -119,9 +117,7 @@ export function CertPage() {
                   size="sm"
                   variant="danger"
                   onClick={() => removeDomain(w.domain)}
-                >
-                  Remove
-                </Button>
+                >{t('action.remove')}</Button>
               </div>
             ))}
           </div>

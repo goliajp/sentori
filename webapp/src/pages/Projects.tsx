@@ -73,7 +73,7 @@ export default function Projects() {
   }
 
   async function rename(p: Project) {
-    const next = prompt('New project name', p.name);
+    const next = prompt(t('projects.newName'), p.name);
     if (!next || next === p.name) return;
     try {
       await api.renameProject(p.id, next);
@@ -84,7 +84,7 @@ export default function Projects() {
   }
 
   async function destroy(p: Project) {
-    if (!confirm(`Delete project "${p.name}"? All events / issues / spans CASCADE-deleted.`))
+    if (!confirm(t('projects.confirmDelete').replace('{name}', p.name)))
       return;
     try {
       await api.deleteProject(p.id);
@@ -100,7 +100,7 @@ export default function Projects() {
         title={t('projects.title')}
         subtitle={t('projects.subtitle')}
         actions={
-          <Button onClick={() => setShowCreate(true)}>+ New project</Button>
+          <Button onClick={() => setShowCreate(true)}>+ {t('projects.create')}</Button>
         }
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
@@ -129,16 +129,14 @@ export default function Projects() {
               onChange={e => setSlug(e.target.value)}
             />
             <div className="mt-2 flex gap-2">
-              <Button onClick={create}>Create</Button>
-              <Button variant="secondary" onClick={() => setShowCreate(false)}>
-                Cancel
-              </Button>
+              <Button onClick={create}>{t('action.create')}</Button>
+              <Button variant="secondary" onClick={() => setShowCreate(false)}>{t('action.cancel')}</Button>
             </div>
           </CardBody>
         </Card>
       )}
       <Card>
-        <CardHeader title={`Projects (${rows.length})`} />
+        <CardHeader title={`${t('projects.title')} (${rows.length})`} />
         <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
@@ -152,10 +150,10 @@ export default function Projects() {
           ) : (
             <DataTable
               columns={[
-                { key: 'name', label: 'Name' },
-                { key: 'slug', label: 'Slug' },
-                { key: 'events', label: '24h events' },
-                { key: 'active', label: 'Active' },
+                { key: 'name', label: t('projects.name') },
+                { key: 'slug', label: t('projects.slug') },
+                { key: 'events', label: t('projects.events24h') },
+                { key: 'active', label: t('overview.activeIssues') },
                 { key: 'actions', label: '' },
               ]}
               rows={rows.map(p => ({
@@ -184,10 +182,10 @@ export default function Projects() {
                 actions: (
                   <div className="flex gap-1">
                     <Button size="sm" variant="secondary" onClick={() => rename(p)}>
-                      Rename
+                      {t('action.rename')}
                     </Button>
                     <Button size="sm" variant="danger" onClick={() => destroy(p)}>
-                      Delete
+                      {t('action.delete')}
                     </Button>
                   </div>
                 ),
