@@ -37,7 +37,8 @@ export function useKeyHandlers(map: Record<string, () => void>) {
 }
 
 const SHORTCUTS: Record<string, string> = {
-  i: '/',
+  // Dashboard home is /main, not / — see main.tsx's route comment.
+  i: '/main',
   p: '/projects',
   m: '/members',
   a: '/alerts',
