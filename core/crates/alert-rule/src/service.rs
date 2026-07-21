@@ -228,13 +228,19 @@ impl AlertRuleService {
     /// # Errors
     ///
     /// [`AlertRuleError::Db`] on backend failure.
-    pub async fn list_workspace_wide(&self) -> Result<Vec<AlertRule>, AlertRuleError> {
+    pub async fn list_workspace_wide(
+        &self,
+        workspace_id: sentori_workspace_identity::WorkspaceId,
+    ) -> Result<Vec<AlertRule>, AlertRuleError> {
         let sql = format!(
             "SELECT {SELECT_COLS} FROM alert_rules \
-             WHERE project_id IS NULL \
+             WHERE project_id IS NULL AND workspace_id = $1 \
              ORDER BY created_at ASC"
         );
-        let rows = sqlx::query(&sql).fetch_all(&self.pool).await?;
+        let rows = sqlx::query(&sql)
+            .bind(workspace_id.into_uuid())
+            .fetch_all(&self.pool)
+            .await?;
         rows.iter().map(row_to_rule).collect()
     }
 

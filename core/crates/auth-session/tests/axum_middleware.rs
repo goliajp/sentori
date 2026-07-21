@@ -184,7 +184,7 @@ async fn protected_route_401s_with_garbage_cookie() {
 async fn protected_route_returns_user_with_valid_cookie() {
     let auth = opts_with_insecure_cookie().await;
     // Provision + login flow.
-    let (_user, mv) = auth
+    let (_user, mv, _ws) = auth
         .register("axum@example.com", "verysecret")
         .await
         .expect("reg");
@@ -221,7 +221,7 @@ async fn protected_route_returns_user_with_valid_cookie() {
 #[tokio::test]
 async fn protected_route_401s_after_logout() {
     let auth = opts_with_insecure_cookie().await;
-    let (_user, mv) = auth
+    let (_user, mv, _ws) = auth
         .register("logout@example.com", "verysecret")
         .await
         .expect("reg");

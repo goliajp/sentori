@@ -171,7 +171,24 @@ export default function SaasAdmin() {
                 members: formatNumber(w.member_count),
                 created: formatRelative(w.created_at),
                 actions: (
-                  <div className="flex gap-1">
+                  <div className="flex items-center gap-1">
+                    <select
+                      className="rounded border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-xs text-zinc-200"
+                      value={w.plan}
+                      disabled={busy === w.id}
+                      onChange={e =>
+                        act(w, id =>
+                          api.saasSetPlan(
+                            id,
+                            e.target.value as 'free' | 'pro' | 'enterprise',
+                          ),
+                        )
+                      }
+                    >
+                      <option value="free">free</option>
+                      <option value="pro">pro</option>
+                      <option value="enterprise">enterprise</option>
+                    </select>
                     {w.status === 'active' ? (
                       <Button
                         size="sm"

@@ -64,6 +64,10 @@ pub struct AppState {
     pub events_bus: tokio::sync::broadcast::Sender<RecentEventTick>,
     /// Transactional auth email sender (verify / reset links).
     pub mailer: crate::mailer::Mailer,
+    /// Env-driven Stripe config (keys + price ids + public URL).
+    /// Absent keys disable the corresponding self-serve billing
+    /// path rather than erroring at boot.
+    pub stripe: crate::stripe::StripeConfig,
 }
 
 impl AppState {
@@ -100,6 +104,7 @@ impl AppState {
         let billing = BillingService::new(pool.clone(), workspace_id);
         let push_tokens = DeviceTokenStore::new(pool.clone());
         let mailer = crate::mailer::Mailer::from_env();
+        let stripe = crate::stripe::StripeConfig::from_env();
         Self {
             pool,
             workspace_id,
@@ -117,6 +122,30 @@ impl AppState {
             attachments,
             events_bus,
             mailer,
+            stripe,
         }
+    }
+
+    /// An [`Identity`] handle scoped to a specific workspace —
+    /// typically `ctx.workspace_id` from the session middleware.
+    ///
+    /// `self.identity` is bound to the boot-time default workspace
+    /// and must NOT be used for request-scoped work: in a
+    /// multi-tenant (SaaS) deployment every authenticated request
+    /// acts in its caller's active workspace, not the default one.
+    /// `Identity::new` is a cheap pool clone + a copied id, so
+    /// building one per request is fine.
+    #[must_use]
+    pub fn identity_for(&self, workspace_id: WorkspaceId) -> Identity {
+        Identity::new(self.pool.clone(), workspace_id)
+    }
+
+    /// A [`BillingService`] scoped to a specific workspace. Same
+    /// rationale as [`Self::identity_for`]: `self.billing` is bound
+    /// to the default workspace and is wrong for request-scoped
+    /// quota / plan lookups.
+    #[must_use]
+    pub fn billing_for(&self, workspace_id: WorkspaceId) -> BillingService {
+        BillingService::new(self.pool.clone(), workspace_id)
     }
 }

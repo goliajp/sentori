@@ -85,6 +85,32 @@ impl fmt::Display for Plan {
     }
 }
 
+/// The plan whose limits actually apply, given a subscription
+/// [`PlanStatus`].
+///
+/// - `Canceled` / `Unpaid` → [`Plan::Free`]. The subscription has
+///   ended (or lapsed past dunning); the workspace drops to the
+///   free-tier quota rather than being hard-blocked, so a lapsed
+///   customer keeps a working (if smaller) install. This is the
+///   enforcement bite behind an operator suspend or a Stripe
+///   `customer.subscription.deleted`.
+/// - `PastDue` → the plan is **kept** (grace period). Stripe's
+///   dunning retries a failed payment for days before giving up;
+///   yanking quota on the first failure would punish transient
+///   card declines.
+/// - `Active` / `Trialing` → the plan as-is.
+///
+/// Keeping the plan column intact (rather than rewriting it to
+/// `free` on cancel) means a re-activation restores the prior tier
+/// without needing to re-derive it.
+#[must_use]
+pub const fn effective_plan(plan: Plan, status: PlanStatus) -> Plan {
+    match status {
+        PlanStatus::Canceled | PlanStatus::Unpaid => Plan::Free,
+        PlanStatus::Active | PlanStatus::Trialing | PlanStatus::PastDue => plan,
+    }
+}
+
 /// Error from [`Plan::from_db_str`].
 #[derive(Debug, Error, PartialEq, Eq)]
 #[error("unknown plan: {0:?}")]
@@ -397,6 +423,42 @@ mod tests {
             PlanStatus::Unpaid,
         ] {
             assert_eq!(PlanStatus::from_db_str(s.as_db_str()).unwrap(), s);
+        }
+    }
+
+    #[test]
+    fn effective_plan_downgrades_only_on_canceled_or_unpaid() {
+        // Grace + healthy states keep the paid plan.
+        for status in [
+            PlanStatus::Active,
+            PlanStatus::Trialing,
+            PlanStatus::PastDue,
+        ] {
+            assert_eq!(effective_plan(Plan::Pro, status), Plan::Pro, "{status}");
+            assert_eq!(
+                effective_plan(Plan::Enterprise, status),
+                Plan::Enterprise,
+                "{status}"
+            );
+        }
+        // Ended states drop to Free limits regardless of prior plan.
+        for status in [PlanStatus::Canceled, PlanStatus::Unpaid] {
+            assert_eq!(effective_plan(Plan::Pro, status), Plan::Free, "{status}");
+            assert_eq!(
+                effective_plan(Plan::Enterprise, status),
+                Plan::Free,
+                "{status}"
+            );
+        }
+        // Free stays Free everywhere.
+        for status in [
+            PlanStatus::Active,
+            PlanStatus::Trialing,
+            PlanStatus::PastDue,
+            PlanStatus::Canceled,
+            PlanStatus::Unpaid,
+        ] {
+            assert_eq!(effective_plan(Plan::Free, status), Plan::Free, "{status}");
         }
     }
 

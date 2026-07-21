@@ -27,6 +27,7 @@ mod alerts_fire;
 mod api_describe;
 mod audit;
 mod auth;
+mod billing;
 mod cert;
 mod events;
 mod events_live;
@@ -48,8 +49,10 @@ mod self_test;
 mod sessions_admin;
 mod spans;
 mod stats;
+mod stripe_webhook;
 pub mod tenant;
 mod usage;
+mod workspaces;
 
 // A flat route table: length is inherent to enumerating every route
 // in one place, and splitting it would only hide the routing surface.
@@ -133,6 +136,13 @@ pub fn router(state: Arc<AppState>) -> Router {
 
     // Admin routes — session-gated (cookie or Bearer session_token).
     let admin_routes = Router::new()
+        // Workspace switcher (multi-workspace 1:N): list the caller's
+        // memberships + repoint the current session.
+        .route("/admin/api/workspaces", get(workspaces::list))
+        .route(
+            "/admin/api/workspaces/switch",
+            post(workspaces::switch),
+        )
         .route(
             "/admin/api/projects/{project_id}/tokens",
             get(admin::tokens::list).post(admin::tokens::create),
@@ -178,6 +188,10 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/webhooks/test",
             post(admin::test_webhook::handle),
         )
+        // ── self-serve billing (caller's own workspace) ──────
+        .route("/admin/api/billing", get(billing::get))
+        .route("/admin/api/billing/checkout", post(billing::checkout))
+        .route("/admin/api/billing/portal", post(billing::portal))
         .route("/admin/api/members", get(admin::members::list))
         .route(
             "/admin/api/members/{user_id}",
@@ -186,6 +200,12 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(
             "/admin/api/invites",
             get(admin::invites::list).post(admin::invites::create),
+        )
+        // Accept lives before `{id}` conceptually but is a distinct
+        // path; the logged-in caller joins the token's workspace.
+        .route(
+            "/admin/api/invites/accept",
+            post(admin::invites::accept),
         )
         .route("/admin/api/invites/{id}", delete(admin::invites::revoke))
         .route(
@@ -277,6 +297,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(
             "/admin/api/saas/workspaces/{id}",
             delete(admin::saas::delete_workspace),
+        )
+        .route(
+            "/admin/api/saas/workspaces/{id}/plan",
+            post(admin::saas::set_plan),
         )
         .route(
             "/admin/api/saas/workspaces/{id}/suspend",
@@ -396,6 +420,8 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/livez", get(health::livez))
         .route("/readyz", get(health::readyz))
         .route("/metrics", get(metrics_prom::handle))
+        // ── stripe webhook (public; HMAC-signature authed) ──
+        .route("/webhooks/stripe", post(stripe_webhook::ingest))
         // ── auth: dashboard user lifecycle (public) ──────
         .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login))

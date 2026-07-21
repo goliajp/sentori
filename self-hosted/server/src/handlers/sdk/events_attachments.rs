@@ -24,11 +24,14 @@ use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode, header},
 };
+use sentori_billing::CounterKind;
 use sentori_ingest_token::IngestContext;
 use serde_json::{Value, json};
+use time::OffsetDateTime;
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use crate::handlers::sdk::quota;
 use crate::state::AppState;
 
 const MAX_BODY_BYTES: usize = 50 * 1024 * 1024; // 50 MiB hard cap
@@ -64,6 +67,18 @@ pub async fn handle(
             StatusCode::BAD_REQUEST,
             Json(json!({ "error": "empty_body" })),
         );
+    }
+
+    // K17 quota: only replay blobs meter (as one Replays unit).
+    // Screenshots / sourcemaps / dsym / proguard / mapping / trail
+    // are symbolication + debug artifacts, not a billed counter.
+    if kind == "replay" {
+        let now = OffsetDateTime::now_utc();
+        if let Err(body) =
+            quota::meter(&state, ctx.project_id, CounterKind::Replays, 1, now).await
+        {
+            return (StatusCode::TOO_MANY_REQUESTS, Json(body));
+        }
     }
 
     let content_type = headers

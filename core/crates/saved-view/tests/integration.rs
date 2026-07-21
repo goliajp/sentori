@@ -367,7 +367,7 @@ async fn list_workspace_excludes_personal() {
     )
     .await
     .unwrap();
-    let list = svc.list_workspace(Target::Spans).await.unwrap();
+    let list = svc.list_workspace(workspace_id, Target::Spans).await.unwrap();
     assert_eq!(list.len(), 1);
     assert_eq!(list[0].name, "ws");
 }

@@ -1,0 +1,100 @@
+import { useEffect, useRef, useState } from 'react';
+
+import { api, MeResponse, MyWorkspaceRow } from '../lib/api';
+
+/// Active-workspace pill + dropdown switcher, shown at the top of
+/// the sidebar. Multi-workspace (1:N): a user can belong to several
+/// workspaces; picking one repoints the session server-side and
+/// reloads so every query re-scopes to the new active workspace.
+export function WorkspaceSwitcher({ me }: { me: MeResponse }) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<MyWorkspaceRow[] | null>(null);
+  const [switching, setSwitching] = useState<string | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click.
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  // Lazy-load the membership list the first time the menu opens.
+  useEffect(() => {
+    if (!open || rows) return;
+    api
+      .listMyWorkspaces()
+      .then(r => setRows(r.workspaces))
+      .catch(() => setRows([]));
+  }, [open, rows]);
+
+  async function pick(w: MyWorkspaceRow) {
+    if (w.active) {
+      setOpen(false);
+      return;
+    }
+    setSwitching(w.workspace_id);
+    try {
+      await api.switchWorkspace(w.workspace_id);
+      // Re-scope the whole app: every query keys off the session's
+      // active workspace, so a full reload is the clean reset.
+      window.location.assign('/');
+    } catch {
+      setSwitching(null);
+    }
+  }
+
+  const name = me.workspace_name ?? 'Workspace';
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex w-full items-center justify-between rounded border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-left hover:border-zinc-700"
+      >
+        <span className="min-w-0">
+          <span className="block truncate text-xs font-medium text-zinc-100">
+            {name}
+          </span>
+          <span className="block text-[10px] text-zinc-500">{me.role}</span>
+        </span>
+        <span className="ml-2 shrink-0 text-zinc-500">▾</span>
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 z-20 mt-1 max-h-72 overflow-y-auto rounded border border-zinc-800 bg-zinc-900 py-1 shadow-xl">
+          {rows === null ? (
+            <div className="px-3 py-2 text-[11px] text-zinc-500">Loading…</div>
+          ) : rows.length === 0 ? (
+            <div className="px-3 py-2 text-[11px] text-zinc-500">
+              No workspaces.
+            </div>
+          ) : (
+            rows.map(w => (
+              <button
+                key={w.workspace_id}
+                onClick={() => pick(w)}
+                disabled={switching !== null}
+                className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-zinc-800 ${
+                  w.active ? 'text-emerald-400' : 'text-zinc-200'
+                }`}
+              >
+                <span className="min-w-0 truncate">{w.name}</span>
+                <span className="ml-2 shrink-0 text-[10px] text-zinc-500">
+                  {switching === w.workspace_id
+                    ? '…'
+                    : w.active
+                      ? '✓'
+                      : w.role}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

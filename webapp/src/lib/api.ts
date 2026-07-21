@@ -74,6 +74,28 @@ export interface UsageResponse {
   replays: UsageCounter;
 }
 
+export type PlanName = 'free' | 'pro' | 'enterprise';
+
+export interface BillingInfo {
+  plan: PlanName;
+  status: string;
+  /** Plan whose limits actually apply (a canceled Pro → free). */
+  effective_plan: PlanName;
+  current_period_end: string | null;
+  period_yyyymm: string;
+  /** A Stripe secret key is configured — self-serve is available. */
+  stripe_enabled: boolean;
+  /** The workspace already has a Stripe customer (Portal works). */
+  has_customer: boolean;
+  /** Which paid plans this deployment sells (a price id is set). */
+  upgradeable: { pro: boolean; enterprise: boolean };
+  usage: {
+    events: UsageCounter;
+    spans: UsageCounter;
+    replays: UsageCounter;
+  };
+}
+
 export interface AlertRule {
   id: string;
   project_id: string | null;
@@ -198,6 +220,28 @@ export interface WorkspaceRow {
   project_count: number;
   member_count: number;
   created_at: string;
+}
+
+/// Whoami — the active-workspace context the dashboard header +
+/// switcher + SaaS-nav gate read.
+export interface MeResponse {
+  user_id: string;
+  email: string;
+  email_verified: boolean;
+  created_at: string;
+  workspace_id: string;
+  workspace_name: string | null;
+  role: 'owner' | 'admin' | 'user';
+  is_saasadmin: boolean;
+}
+
+/// One row of the caller's own workspace list (the switcher), as
+/// opposed to `WorkspaceRow` which is the cross-tenant operator view.
+export interface MyWorkspaceRow {
+  workspace_id: string;
+  name: string;
+  role: 'owner' | 'admin' | 'user';
+  active: boolean;
 }
 
 export interface CreatedWorkspace {
@@ -541,6 +585,16 @@ export class Api {
   usage(): Promise<UsageResponse> {
     return this.get('/v1/usage');
   }
+  // ── self-serve billing (caller's own workspace) ────────
+  billing(): Promise<BillingInfo> {
+    return this.get('/admin/api/billing');
+  }
+  billingCheckout(plan: 'pro' | 'enterprise'): Promise<{ url: string }> {
+    return this.post('/admin/api/billing/checkout', { plan });
+  }
+  billingPortal(): Promise<{ url: string }> {
+    return this.post('/admin/api/billing/portal', {});
+  }
   listAlerts(): Promise<AlertRule[]> {
     return this.get('/v1/alerts');
   }
@@ -643,13 +697,21 @@ export class Api {
       {},
     ) as Promise<void>;
   }
-  authMe(): Promise<{
-    user_id: string;
-    email: string;
-    email_verified: boolean;
-    created_at: string;
-  }> {
+  authMe(): Promise<MeResponse> {
     return this.get('/auth/me');
+  }
+
+  // ── multi-workspace: switcher ──────────────────────────
+  listMyWorkspaces(): Promise<{ workspaces: MyWorkspaceRow[] }> {
+    return this.get('/admin/api/workspaces');
+  }
+  switchWorkspace(workspaceId: string): Promise<{ workspace_id: string }> {
+    return this.post('/admin/api/workspaces/switch', {
+      workspaceId,
+    });
+  }
+  acceptInvite(token: string): Promise<{ workspace_id: string; role: string }> {
+    return this.post('/admin/api/invites/accept', { token });
   }
 
   // ── auth: dashboard user lifecycle ─────────────────────
@@ -902,6 +964,9 @@ export class Api {
   }
   resumeWorkspace(id: string): Promise<void> {
     return this.send(`/admin/api/saas/workspaces/${id}/resume`, 'POST');
+  }
+  saasSetPlan(id: string, plan: 'free' | 'pro' | 'enterprise'): Promise<void> {
+    return this.send(`/admin/api/saas/workspaces/${id}/plan`, 'POST', { plan });
   }
 
   private authHeaders(): HeadersInit {
