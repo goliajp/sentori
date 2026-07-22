@@ -199,7 +199,7 @@ export function IssuesPage() {
       <Card>
         <DataTable
           rowKey={(r) => r.id}
-          empty="No issues. Send some events with the SDK to populate."
+          empty={t('issues.empty')}
           rows={issues ?? []}
           columns={[
             {

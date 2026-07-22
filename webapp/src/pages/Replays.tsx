@@ -71,14 +71,17 @@ export default function Replays() {
                     <div className="flex items-center gap-2">
                       <Badge>{(r.duration_ms / 1000).toFixed(1)}s</Badge>
                       <Badge tone="neutral">
-                        {formatNumber(r.frame_count)} frames
+                        {t('replays.frames').replace(
+                          '{n}',
+                          formatNumber(r.frame_count),
+                        )}
                       </Badge>
                       <span className="font-mono text-xs text-accent">
-                        event {r.event_id.slice(0, 8)}…
+                        {t('replays.event')} {r.event_id.slice(0, 8)}…
                       </span>
                     </div>
                     <div className="font-mono text-xs text-fg-subtle mt-1">
-                      blob {r.blob_hash.slice(0, 16)}… ·{' '}
+                      {t('replays.blob')} {r.blob_hash.slice(0, 16)}… ·{' '}
                       {formatRelative(r.created_at)}
                     </div>
                   </Link>
@@ -89,9 +92,6 @@ export default function Replays() {
         </CardBody>
       </Card>
 
-      <p className="text-center text-xs text-fg-subtle">
-        {t('replays.comingSoon')}
-      </p>
     </div>
   );
 }

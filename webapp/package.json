@@ -10,9 +10,10 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",
-    "check": "tsc -b --noEmit && eslint .",
+    "check": "tsc -b --noEmit && eslint . && node devtools/check-i18n.mjs",
     "mock": "node devtools/mock-api.mjs",
-    "sweep": "node devtools/sweep.mjs"
+    "sweep": "node devtools/sweep.mjs",
+    "check:i18n": "node devtools/check-i18n.mjs"
   },
   "dependencies": {
     "@goliapkg/gds": "^2.2.0",

@@ -16,14 +16,10 @@ export const en = {
   'action.delete': 'Delete',
   'action.dismiss': 'Dismiss',
   'action.refresh': 'Refresh',
-  'action.retry': 'Retry',
   'action.save': 'Save',
   'action.signOut': 'Sign out',
 
-  'common.error': 'Something went wrong',
   'common.loading': 'Loading…',
-  'common.none': 'None',
-  'common.search': 'Search',
 
   'crash.artefacts': 'Captured artefacts',
   'crash.causedBy': 'caused by',
@@ -43,7 +39,6 @@ export const en = {
   'crash.release': 'Release',
   'crash.sharedPlayhead': 'recording and log share a playhead',
   'crash.stack': 'Stack',
-  'crash.step': 'step',
   'crash.steps': 'steps',
   'crash.tags': 'Tags',
   'crash.timeline': 'Before the crash',
@@ -77,7 +72,6 @@ export const en = {
   'issues.testIngest': 'Test ingest',
   'issues.resolveAll': 'Resolve all',
   'issues.empty': 'No issues yet',
-  'issues.emptyHint': 'Errors your app reports will land here.',
   'crash.meta': 'Meta',
   'crash.status': 'Status',
   'crash.kind': 'Kind',
@@ -110,7 +104,6 @@ export const en = {
 
   'crash.comments': 'Comments',
   'crash.deleteComment': 'Delete this comment?',
-  'crash.post': 'Post',
 
   'events.title': 'Events',
   'events.subtitle': 'The last 100 events, newest first.',
@@ -291,7 +284,6 @@ export const en = {
   'projects.confirmDelete':
     'Delete “{name}”? Its events, issues and spans go with it.',
   'action.rename': "Rename",
-  'action.new': "New",
 
   'action.add': "Add",
   'action.remove': "Remove",
@@ -405,7 +397,6 @@ export const en = {
   'alerts.kindRegression': "A resolved issue comes back",
   'alerts.kindEventCount': "Events cross a threshold",
   'alerts.kindCrashFreeDrop': "Crash-free rate drops",
-  'alerts.muted': "Muted",
 
   'audit.quick': "Common filters",
   'audit.quickTokens': "Token mints",
@@ -430,7 +421,6 @@ export const en = {
   'push.credSubtitle': "Provider secrets used to deliver push: APNs, FCM, WebPush, HCM, MiPush.",
   'push.retryAllFailed': "Retry all {n} failed",
   'releases.subtitle': "Deploys, and the symbol files uploaded for them.",
-  'replays.comingSoon': "Frame-by-frame playback lands in v0.3.",
   'auth.haveAccount': "Already have an account?",
   'events.narrowShort': "Only this",
   'settings.manageBilling': "Manage billing",
@@ -442,7 +432,6 @@ export const en = {
   'settings.sessionsHint': "Every session with its address and device, revocable one by one.",
   'settings.openSessions': "Open sessions",
   'settings.ingestHint': "Your SDK sends here. The token that authorises it is on the project tokens page.",
-  'settings.openTokens': "Open tokens",
 
   'settings.integrationsHint': "Connect Slack or Linear on a project to forward its events.",
   'settings.notifiersHint': "Email is configured by whoever runs this deployment. Webhooks work out of the box.",
@@ -456,6 +445,11 @@ export const en = {
 
   'replays.frames': "{n} frames",
   'replays.allReplays': "← All replays",
+
+  'replays.event': "event",
+  'replays.blob': "recording",
+
+  'crash.step': "step",
 
   'nav.issues': 'Issues',
   'nav.members': 'Members',

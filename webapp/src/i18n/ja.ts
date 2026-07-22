@@ -10,14 +10,10 @@ export const ja: Messages = {
   'action.delete': '削除',
   'action.dismiss': '閉じる',
   'action.refresh': '更新',
-  'action.retry': '再試行',
   'action.save': '保存',
   'action.signOut': 'サインアウト',
 
-  'common.error': 'エラーが発生しました',
   'common.loading': '読み込み中…',
-  'common.none': 'なし',
-  'common.search': '検索',
 
   'crash.artefacts': '取得したファイル',
   'crash.causedBy': '原因',
@@ -37,7 +33,6 @@ export const ja: Messages = {
   'crash.release': 'リリース',
   'crash.sharedPlayhead': '記録とログは再生位置を共有',
   'crash.stack': 'スタック',
-  'crash.step': 'ステップ',
   'crash.steps': 'ステップ',
   'crash.tags': 'タグ',
   'crash.timeline': 'クラッシュ直前',
@@ -71,7 +66,6 @@ export const ja: Messages = {
   'issues.testIngest': 'テスト送信',
   'issues.resolveAll': 'すべて解決済みに',
   'issues.empty': '問題はまだありません',
-  'issues.emptyHint': 'アプリが報告したエラーがここに表示されます。',
   'crash.meta': '概要',
   'crash.status': 'ステータス',
   'crash.kind': '種別',
@@ -104,7 +98,6 @@ export const ja: Messages = {
 
   'crash.comments': 'コメント',
   'crash.deleteComment': 'このコメントを削除しますか?',
-  'crash.post': '投稿',
 
   'events.title': 'イベント',
   'events.subtitle': '直近 100 件のイベント(新しい順)。',
@@ -284,7 +277,6 @@ export const ja: Messages = {
   'projects.newName': "新しいプロジェクト名",
   'projects.confirmDelete': "「{name}」を削除しますか?イベント・問題・スパンも一緒に削除されます。",
   'action.rename': "名前を変更",
-  'action.new': "新規",
 
   'action.add': "追加",
   'action.remove': "削除",
@@ -398,7 +390,6 @@ export const ja: Messages = {
   'alerts.kindRegression': "解決済みの問題が再発",
   'alerts.kindEventCount': "イベント数がしきい値を超過",
   'alerts.kindCrashFreeDrop': "クラッシュフリー率が低下",
-  'alerts.muted': "ミュート中",
 
   'audit.quick': "よく使うフィルタ",
   'audit.quickTokens': "トークン発行",
@@ -423,7 +414,6 @@ export const ja: Messages = {
   'push.credSubtitle': "プッシュ配信に使う各社の認証情報:APNs・FCM・WebPush・HCM・MiPush。",
   'push.retryAllFailed': "失敗した {n} 件を再試行",
   'releases.subtitle': "デプロイ記録と、そのためにアップロードされたシンボルファイル。",
-  'replays.comingSoon': "フレーム単位の再生は v0.3 で提供予定です。",
   'auth.haveAccount': "すでにアカウントをお持ちですか?",
   'events.narrowShort': "これだけ",
   'settings.manageBilling': "請求を管理",
@@ -435,7 +425,6 @@ export const ja: Messages = {
   'settings.sessionsHint': "各セッションのアドレスとデバイス。個別に失効できます。",
   'settings.openSessions': "セッションページへ",
   'settings.ingestHint': "SDK はここに送信します。認可に使うトークンはプロジェクトのトークンページにあります。",
-  'settings.openTokens': "トークンページへ",
 
   'settings.integrationsHint': "プロジェクトに Slack や Linear を接続して、イベントを転送します。",
   'settings.notifiersHint': "メールはこのデプロイの運用者が設定します。Webhook は既定で利用できます。",
@@ -449,6 +438,11 @@ export const ja: Messages = {
 
   'replays.frames': "{n} フレーム",
   'replays.allReplays': "← リプレイ一覧へ",
+
+  'replays.event': "イベント",
+  'replays.blob': "録画",
+
+  'crash.step': "ステップ",
 
   'nav.issues': 'イシュー',
   'nav.members': 'メンバー',

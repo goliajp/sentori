@@ -10,14 +10,10 @@ export const zh: Messages = {
   'action.delete': '删除',
   'action.dismiss': '关闭',
   'action.refresh': '刷新',
-  'action.retry': '重试',
   'action.save': '保存',
   'action.signOut': '退出登录',
 
-  'common.error': '出错了',
   'common.loading': '加载中…',
-  'common.none': '无',
-  'common.search': '搜索',
 
   'crash.artefacts': '采集到的附件',
   'crash.causedBy': '起因于',
@@ -37,7 +33,6 @@ export const zh: Messages = {
   'crash.release': '版本',
   'crash.sharedPlayhead': '录屏与日志共用播放头',
   'crash.stack': '堆栈',
-  'crash.step': '步',
   'crash.steps': '步',
   'crash.tags': '标签',
   'crash.timeline': '崩溃之前',
@@ -71,7 +66,6 @@ export const zh: Messages = {
   'issues.testIngest': '发送测试事件',
   'issues.resolveAll': '全部标记已解决',
   'issues.empty': '还没有问题',
-  'issues.emptyHint': '你的 app 上报的错误会出现在这里。',
   'crash.meta': '概要',
   'crash.status': '状态',
   'crash.kind': '类型',
@@ -104,7 +98,6 @@ export const zh: Messages = {
 
   'crash.comments': '评论',
   'crash.deleteComment': '删除这条评论?',
-  'crash.post': '发表',
 
   'events.title': '事件',
   'events.subtitle': '最近 100 条事件,新的在前。',
@@ -284,7 +277,6 @@ export const zh: Messages = {
   'projects.newName': "新的项目名称",
   'projects.confirmDelete': "删除「{name}」?它的事件、问题和链路数据会一并删除。",
   'action.rename': "重命名",
-  'action.new': "新建",
 
   'action.add': "添加",
   'action.remove': "移除",
@@ -398,7 +390,6 @@ export const zh: Messages = {
   'alerts.kindRegression': "已解决的问题回归",
   'alerts.kindEventCount': "事件量越过阈值",
   'alerts.kindCrashFreeDrop': "无崩溃率下降",
-  'alerts.muted': "已静音",
 
   'audit.quick': "常用筛选",
   'audit.quickTokens': "令牌铸造",
@@ -423,7 +414,6 @@ export const zh: Messages = {
   'push.credSubtitle': "投递推送用的服务商密钥:APNs、FCM、WebPush、HCM、MiPush。",
   'push.retryAllFailed': "重试全部 {n} 条失败",
   'releases.subtitle': "发布记录,以及为它们上传的符号文件。",
-  'replays.comingSoon': "逐帧回放将在 v0.3 提供。",
   'auth.haveAccount': "已经有账号了?",
   'events.narrowShort': "只看这条",
   'settings.manageBilling': "管理账单",
@@ -435,7 +425,6 @@ export const zh: Messages = {
   'settings.sessionsHint': "每个会话的来源地址与设备,可逐个吊销。",
   'settings.openSessions': "打开会话页",
   'settings.ingestHint': "SDK 往这里上报。授权用的令牌在项目的接入令牌页。",
-  'settings.openTokens': "打开令牌页",
 
   'settings.integrationsHint': "在某个项目上接入 Slack 或 Linear,把它的事件转出去。",
   'settings.notifiersHint': "邮件由部署这套系统的人配置。Webhook 开箱可用。",
@@ -449,6 +438,11 @@ export const zh: Messages = {
 
   'replays.frames': "{n} 帧",
   'replays.allReplays': "← 返回回放列表",
+
+  'replays.event': "事件",
+  'replays.blob': "录制",
+
+  'crash.step': "步",
 
   'nav.issues': '问题',
   'nav.members': '成员',
