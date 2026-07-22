@@ -139,6 +139,12 @@ jobs:
       - name: check rfc3339 serde annotations (phase 29 sub-C)
         run: bash scripts/check-rfc3339.sh
 
+      # A file no `mod` reaches is never compiled, so nothing else in
+      # this job would notice it. That is how the rate limiter sat
+      # written-but-dead while ingest ran unlimited.
+      - name: check for orphan modules
+        run: bash scripts/check-orphan-modules.sh
+
       - name: check cargo features (v2.20 P2 — anti-feature-drift)
         run: bash scripts/check-cargo-features.sh
 
