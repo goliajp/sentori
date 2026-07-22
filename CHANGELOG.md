@@ -6,6 +6,29 @@
 
 ---
 
+## v1.9.0(2026-07-22 — 符号化打通;删掉从来跑不起来的 CI)
+
+**符号化的每块零件都在,缺的只是连接。** 三个 resolver crate 在 v0.2 cutover 之前就有测试和 benchmark,`release_artifacts` 有表,crash 视图会渲染源码上下文 —— 而 ingest 写着 `frame: None` 加一句 TODO,**因为根本没有办法把文件传进来**。
+
+现在:`POST …/releases/:id/artifacts` 收 map,ingest 在**存储前**改写栈帧,并**保留原始坐标**。改在读时做意味着每次打开 dashboard 都重算一遍,而且永远修不了已经写下的事件;保留压缩前坐标则是**唯一**能让人察觉「map 过期」的手段 —— 否则它产出的是自信的胡说。
+
+**顺带修好两条 ingest 路径的漂移**:批量路径**没有实时推送、没有 event_count 告警**,也没有身份归属。单条能触发的告警规则,批量进来就静默。三者现在共用 `after_ingest`。
+
+## CI 那一半
+
+**`mobile-e2e` 四个 job 全部指向不存在的东西** —— 一个没有工程文件的 Xcode scheme、一个不在仓库里的 Gradle wrapper、以及两次 legacy `server/`。它在 v0.4 被改成手动触发并留言「修好就恢复」,然后**从 2026-05-11 起红着没人看**。**没人能跑的门不是门;红着没人读的门更糟,因为红色从此不再有含义。**
+
+替换它的东西是真能跑的:
+
+- **android-unit** 通过 `apps/rn-example` 驱动 SDK 的 Robolectric 测试 —— 那是它们唯一能构建的地方(Expo 模块必须有宿主)。**这补上了「改 .kt 文件能通过所有门直接发到 npm」那个洞。** Gradle 模块路径是运行时发现而非硬编码:猜错名字会「通过」但什么都没测。
+- **sourcemap-e2e** 对 v0.2 服务端跑完整往返。用 Bun 的打包器而非 Metro:裸 `bunx metro` 既没有 Babel preset 也没有 haste 配置,为了产出八行 JavaScript 要背上一整个 React Native 工程的配置。
+
+**本地对真实 Postgres 端到端验证过**:压缩后的 `app.js:1` 解析回 `app.js:10`,正是 fixture 抛异常那一行。**然后验证了门会红** —— 传一个空 map 退出码 1,还原后 0。断言专门拒绝「解析到第 1 行」,因为 bundle 只有一行,不匹配的 map 会把一切都解析回去。
+
+**删除**:`scripts/test-phase13/14/15.sh` 与 `test-mailcatcher.sh`,没有任何 workflow 引用它们,而且全都在调 `/admin/api/orgs/…` —— **v0.2 没有 orgs 这个概念**。旧的 `sourcemap-e2e/run.sh` 一并删除。部署 runbook 的 pre-flight 列着这三个脚本、一个 `pages` workflow 和 `server/migrations`,现在列的是 CI 真正跑的命令。
+
+---
+
 ## v1.8.3(2026-07-22 — 恢复 PII-safe 跨项目用户查找:v0.2 cutover 以来它一直是断的)
 
 **这个功能从 v0.2 上线起就死了,而且没人发现** —— 因为它的失败方式天生是静默的。
