@@ -223,8 +223,8 @@ sentori.init({
         </div>
         <p className="mt-2 text-xs text-fg-subtle">
           {token
-            ? 'Token above is the one you just minted.'
-            : 'Mint a token above and it fills in here automatically. Other frameworks: swap the import (@goliapkg/sentori-react, -vue, -svelte, …); the init shape is identical.'}
+            ? t('tokens.justMinted')
+            : t('tokens.otherFrameworks')}
         </p>
       </CardBody>
     </Card>

@@ -82,6 +82,22 @@ for (const r of ROUTES) {
   report.push({ route: r, name, errors: [...logs], text: text?.result?.value ?? '' });
   process.stdout.write(`${logs.length ? '✗' : '·'} ${r}\n`);
 }
-writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 1));
+// Stamp which bundle this describes. A report that cannot name its
+// build is a report you have to take on trust — and one sweep here ran
+// while dist/ was being rebuilt underneath it, so its clean result
+// described a state that never existed on disk at any single moment.
+const bundle = await cmd('Runtime.evaluate', {
+  expression:
+    "[...document.querySelectorAll('script[src]')].map(s => s.src.split('/').pop()).join(' ')",
+  returnByValue: true,
+});
+writeFileSync(
+  `${out}/report.json`,
+  JSON.stringify(
+    { bundle: bundle?.result?.value ?? 'unknown', lang, theme, routes: report },
+    null,
+    1,
+  ),
+);
 chrome.kill();
 process.exit(0);

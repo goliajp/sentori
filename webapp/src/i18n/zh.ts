@@ -444,6 +444,10 @@ export const zh: Messages = {
 
   'crash.step': "步",
 
+  'auth.passwordMin': "密码(至少 12 位)",
+  'tokens.justMinted': "这就是你刚铸的令牌。",
+  'tokens.otherFrameworks': "在上面铸一个令牌,这里就会填好。其它框架换掉 import 即可,init 的写法完全一样。",
+
   'nav.issues': '问题',
   'nav.members': '成员',
   'nav.metrics': '指标',

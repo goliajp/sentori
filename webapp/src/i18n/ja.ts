@@ -444,6 +444,10 @@ export const ja: Messages = {
 
   'crash.step': "ステップ",
 
+  'auth.passwordMin': "パスワード(12 文字以上)",
+  'tokens.justMinted': "今発行したトークンです。",
+  'tokens.otherFrameworks': "上でトークンを発行するとここに入ります。他のフレームワークは import を差し替えるだけで、init の書き方は同じです。",
+
   'nav.issues': 'イシュー',
   'nav.members': 'メンバー',
   'nav.metrics': 'メトリクス',
