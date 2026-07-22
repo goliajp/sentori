@@ -198,7 +198,7 @@ pub async fn get(
             "kind": a.get::<String, _>("kind"),
             "media_type": a.get::<String, _>("media_type"),
             "size_bytes": a.get::<i32, _>("size_bytes"),
-            "captured_at": a.get::<OffsetDateTime, _>("captured_at"),
+            "captured_at": crate::wire_time::rfc3339(a.get::<OffsetDateTime, _>("captured_at")),
             "source": a.get::<String, _>("source"),
         })
     })
@@ -208,8 +208,8 @@ pub async fn get(
         "id": row.get::<Uuid, _>("id").to_string(),
         "issue_id": row.get::<Uuid, _>("issue_id").to_string(),
         "kind": row.get::<String, _>("kind"),
-        "timestamp": row.get::<OffsetDateTime, _>("timestamp"),
-        "received_at": row.get::<OffsetDateTime, _>("received_at"),
+        "timestamp": crate::wire_time::rfc3339(row.get::<OffsetDateTime, _>("timestamp")),
+        "received_at": crate::wire_time::rfc3339(row.get::<OffsetDateTime, _>("received_at")),
         "release": row.get::<String, _>("release"),
         "environment": row.get::<String, _>("environment"),
         "platform": row.get::<String, _>("platform"),

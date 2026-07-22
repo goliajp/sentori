@@ -40,8 +40,11 @@ FIELD            = re.compile(r'^(\s+)((?:pub\s+)?\w+):\s*(Option<)?(time::)?Off
 # A row column read straight into a json! body. `.is_none()` and friends
 # consume the value rather than serialise it, so only reads that end the
 # expression count.
+# `time::OffsetDateTime` and a bare `OffsetDateTime` brought in by a
+# `use` are the same type; the check has to spell both, and missing the
+# second one hid seventeen call sites across seven handlers.
 RAW_JSON_TS      = re.compile(
-    r'\.(?:try_)?get::<(?:Option<\s*)?time::OffsetDateTime\s*>?\s*, _>\("[^"]+"\)'
+    r'\.(?:try_)?get::<(?:Option<\s*)?(?:time::)?OffsetDateTime\s*>?\s*, _>\("[^"]+"\)'
 )
 # `"created_at": model.created_at` — a timestamp-looking field lifted
 # out of a struct. Matched by name because the type is not written at
@@ -75,6 +78,11 @@ for path in sources:
         if WRAPPED.search(line):
             continue
         if not (RAW_JSON_TS.search(line) or STRUCT_FIELD_TS.search(line)):
+            continue
+        # `created_at: row.get(...)` builds a struct whose field carries
+        # the annotation; only `"created_at": row.get(...)` goes out on
+        # the wire unmediated. The quotes are the whole difference.
+        if not re.search(r'"\w+"\s*:', line):
             continue
         # Consumed rather than serialised (counting unread, comparing) —
         # the shape on the wire is not involved.

@@ -99,7 +99,7 @@ mod store;
 pub use error::IngestError;
 pub use model::{
     EnqueuedEvent, Event, EventKind, EventKindParseError, FrameSite, IngestOutcome, Issue,
-    IssueStatus, IssueStatusParseError, MessageLevel, MessageLevelParseError, Platform,
-    PlatformParseError, StoredEvent,
+    IssuePriority, IssuePriorityParseError, IssueStatus, IssueStatusParseError, MessageLevel,
+    MessageLevelParseError, Platform, PlatformParseError, StoredEvent,
 };
 pub use pipeline::{IngestOptions, IngestService};

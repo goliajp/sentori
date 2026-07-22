@@ -160,11 +160,22 @@ pub async fn patch(
             return Err((StatusCode::BAD_REQUEST, format!("invalid status: {other}")));
         }
     };
+    // Reject an out-of-range priority here rather than letting the
+    // CHECK constraint turn it into a 500. The set is closed and the
+    // caller is a UI that knows it.
+    if let Some(p) = body.priority.as_deref()
+        && sentori_event_pipeline::IssuePriority::from_db_str(p).is_err()
+    {
+        return Err((StatusCode::BAD_REQUEST, format!("invalid priority: {p}")));
+    }
     let patch = IssuePatch {
         status,
-        assignee_user_id: None,
-        priority: None,
-        labels: None,
+        assignee_user_id: body
+            .assignee_user_id
+            .into_patch()
+            .map(|o| o.map(sentori_workspace_identity::UserId::from_uuid)),
+        priority: body.priority.clone(),
+        labels: body.labels.clone(),
         resolved_in_release: body.resolved_in_release,
     };
     state
@@ -203,6 +214,55 @@ pub async fn patch(
 pub struct PatchBody {
     pub status: Option<String>,
     pub resolved_in_release: Option<String>,
+    /// `p0`–`p3`.
+    pub priority: Option<String>,
+    /// Replaces the set — the caller sends the labels it wants the
+    /// issue to end up with, not a delta.
+    pub labels: Option<Vec<String>>,
+    /// Absent leaves the assignee alone, `null` clears it, a uuid
+    /// assigns.
+    #[serde(default)]
+    pub assignee_user_id: FieldPatch<Uuid>,
+}
+
+/// What a PATCH says about a nullable field.
+///
+/// Three states, because "leave it alone" and "set it to nobody" are
+/// different requests and a plain `Option` can only carry two. Absent
+/// from the body is [`Self::Leave`]; `null` is [`Self::Clear`].
+#[derive(Debug, Clone, Copy, Default)]
+pub enum FieldPatch<T> {
+    /// The key was absent.
+    #[default]
+    Leave,
+    /// The key was present. `None` means the caller sent `null`.
+    Set(Option<T>),
+}
+
+// Deserialized by hand rather than `#[serde(untagged)]`: untagged tries
+// each variant in order and a unit variant accepts `null`, so `null`
+// landed on `Leave` and "unassign" silently became "leave as is". Here
+// the field's presence is decided by `#[serde(default)]` on the struct
+// field, and anything that reaches this impl was present.
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for FieldPatch<T> {
+    fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        Option::<T>::deserialize(de).map(Self::Set)
+    }
+}
+
+impl<T> FieldPatch<T> {
+    /// Collapse to the shape `IssuePatch` takes.
+    ///
+    /// The nested option is that type's existing contract, so this is
+    /// the one place it has to be spelled — the lint is right that it
+    /// is unreadable, which is why `FieldPatch` exists everywhere else.
+    #[allow(clippy::option_option)]
+    fn into_patch(self) -> Option<Option<T>> {
+        match self {
+            Self::Leave => None,
+            Self::Set(v) => Some(v),
+        }
+    }
 }
 
 /// POST /v1/projects/:project_id/issues/_bulk_patch
@@ -228,11 +288,22 @@ pub async fn bulk_patch(
             return Err((StatusCode::BAD_REQUEST, format!("invalid status: {other}")));
         }
     };
+    // Reject an out-of-range priority here rather than letting the
+    // CHECK constraint turn it into a 500. The set is closed and the
+    // caller is a UI that knows it.
+    if let Some(p) = body.priority.as_deref()
+        && sentori_event_pipeline::IssuePriority::from_db_str(p).is_err()
+    {
+        return Err((StatusCode::BAD_REQUEST, format!("invalid priority: {p}")));
+    }
     let patch = IssuePatch {
         status,
-        assignee_user_id: None,
-        priority: None,
-        labels: None,
+        assignee_user_id: body
+            .assignee_user_id
+            .into_patch()
+            .map(|o| o.map(sentori_workspace_identity::UserId::from_uuid)),
+        priority: body.priority.clone(),
+        labels: body.labels.clone(),
         resolved_in_release: body.resolved_in_release,
     };
     // Unlike the other handlers the ids here come from the body,
@@ -282,6 +353,14 @@ pub struct BulkPatchBody {
     pub ids: Vec<Uuid>,
     pub status: Option<String>,
     pub resolved_in_release: Option<String>,
+    /// `p0`–`p3`. Triaging a morning's worth of new issues to the same
+    /// priority is the reason this endpoint takes a list at all.
+    pub priority: Option<String>,
+    /// Replaces the set on every id.
+    pub labels: Option<Vec<String>>,
+    /// Absent leaves alone, `null` unassigns, a uuid assigns.
+    #[serde(default)]
+    pub assignee_user_id: FieldPatch<Uuid>,
 }
 
 /// GET /v1/projects/:project_id/issues/:issue_id
@@ -316,12 +395,66 @@ pub async fn get(
         "kind": row.get::<String, _>("kind"),
         "status": row.get::<String, _>("status"),
         "event_count": row.get::<i64, _>("event_count"),
-        "first_seen": row.get::<OffsetDateTime, _>("first_seen"),
-        "last_seen": row.get::<OffsetDateTime, _>("last_seen"),
+        "first_seen": crate::wire_time::rfc3339(row.get::<OffsetDateTime, _>("first_seen")),
+        "last_seen": crate::wire_time::rfc3339(row.get::<OffsetDateTime, _>("last_seen")),
         "last_release": row.get::<String, _>("last_release"),
         "last_environment": row.get::<String, _>("last_environment"),
-        "regressed_at": row.try_get::<Option<OffsetDateTime>, _>("regressed_at").ok().flatten(),
+        "regressed_at": crate::wire_time::rfc3339_opt(row.try_get::<Option<OffsetDateTime>, _>("regressed_at").ok().flatten()),
         "regressed_in_release": row.try_get::<Option<String>, _>("regressed_in_release").ok().flatten(),
-        "resolved_at": row.try_get::<Option<OffsetDateTime>, _>("resolved_at").ok().flatten(),
+        "resolved_at": crate::wire_time::rfc3339_opt(row.try_get::<Option<OffsetDateTime>, _>("resolved_at").ok().flatten()),
     })))
+}
+
+#[cfg(test)]
+// A fixture that will not parse is a broken test, not a runtime path;
+// failing loudly is the whole point here.
+#[allow(clippy::expect_used)]
+mod patch_wire_tests {
+    use super::*;
+
+    fn body(json: &str) -> PatchBody {
+        serde_json::from_str(json).expect("valid PatchBody")
+    }
+
+    /// Absent, null and a value are three different requests. Losing
+    /// this distinction means "unassign" silently becomes "leave as is",
+    /// which looks like the button not working.
+    #[test]
+    fn assignee_absent_leaves_it_alone() {
+        assert!(body(r"{}").assignee_user_id.into_patch().is_none());
+    }
+
+    #[test]
+    fn assignee_null_clears_it() {
+        let p = body(r#"{"assignee_user_id":null}"#)
+            .assignee_user_id
+            .into_patch();
+        assert_eq!(p, Some(None));
+    }
+
+    #[test]
+    fn assignee_uuid_assigns_it() {
+        let id = "019e3589-9d7f-7013-9952-e3f287104954";
+        let p = body(&format!(r#"{{"assignee_user_id":"{id}"}}"#))
+            .assignee_user_id
+            .into_patch();
+        assert_eq!(p, Some(Some(id.parse().expect("uuid"))));
+    }
+
+    /// Labels replace rather than merge — the caller sends the set it
+    /// wants, so an empty array must reach the store as an empty set
+    /// and not be mistaken for "unspecified".
+    #[test]
+    fn empty_label_array_is_a_request_to_clear() {
+        assert_eq!(body(r#"{"labels":[]}"#).labels, Some(vec![]));
+        assert_eq!(body(r"{}").labels, None);
+    }
+
+    #[test]
+    fn priority_round_trips_through_the_db_form() {
+        for p in sentori_event_pipeline::IssuePriority::ALL {
+            let parsed = sentori_event_pipeline::IssuePriority::from_db_str(p.as_db_str());
+            assert_eq!(parsed.ok(), Some(p));
+        }
+    }
 }
