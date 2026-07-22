@@ -19,6 +19,16 @@ pub struct Health {
     pool_idle: u32,
     push_queued: i64,
     push_failed_24h: i64,
+    /// Billing events the worker could not apply. A non-zero value
+    /// means someone's subscription changed at Stripe and their plan
+    /// here did not — money moved, service did not follow — which is
+    /// the worst thing a billing system can do quietly. Until this
+    /// existed, such a row was invisible: nothing reads the table.
+    billing_failed_24h: i64,
+    /// Billing events waiting to be applied. Normally zero, since the
+    /// worker drains every 15s; a number that stays up means the queue
+    /// is stuck rather than busy.
+    billing_pending: i64,
 }
 
 pub async fn healthz(State(state): State<Arc<AppState>>) -> (StatusCode, Json<Health>) {
@@ -42,6 +52,18 @@ pub async fn healthz(State(state): State<Arc<AppState>>) -> (StatusCode, Json<He
     .fetch_one(&state.pool)
     .await
     .map_or(0, |r| r.get::<i64, _>(0));
+    let billing_failed_24h: i64 = sqlx::query(
+        "SELECT COUNT(*) FROM stripe_events WHERE processed_state = 'failed' \
+         AND received_at >= now() - interval '24 hours'",
+    )
+    .fetch_one(&state.pool)
+    .await
+    .map_or(0, |r| r.get::<i64, _>(0));
+    let billing_pending: i64 =
+        sqlx::query("SELECT COUNT(*) FROM stripe_events WHERE processed_state = 'pending'")
+            .fetch_one(&state.pool)
+            .await
+            .map_or(0, |r| r.get::<i64, _>(0));
     (
         code,
         Json(Health {
@@ -53,6 +75,8 @@ pub async fn healthz(State(state): State<Arc<AppState>>) -> (StatusCode, Json<He
             pool_idle: u32::try_from(state.pool.num_idle()).unwrap_or(u32::MAX),
             push_queued,
             push_failed_24h,
+            billing_failed_24h,
+            billing_pending,
         }),
     )
 }
