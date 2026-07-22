@@ -957,10 +957,7 @@ async fn main() -> Result<()> {
             token,
             api_url,
             json,
-        } => {
-            admin::audit_list(project_id, actor, action, limit, token, api_url, json)
-                .await
-        }
+        } => admin::audit_list(project_id, actor, action, limit, token, api_url, json).await,
         Command::Member { kind } => match kind {
             MemberKind::List {
                 token,
@@ -986,17 +983,7 @@ async fn main() -> Result<()> {
                 expires_in_days,
                 token,
                 api_url,
-            } => {
-                admin::invite_mint(
-                    email,
-                    role,
-                    invited_by,
-                    expires_in_days,
-                    token,
-                    api_url,
-                )
-                .await
-            }
+            } => admin::invite_mint(email, role, invited_by, expires_in_days, token, api_url).await,
         },
         Command::Alert { kind } => match kind {
             AlertKind::List {
@@ -1143,9 +1130,7 @@ async fn main() -> Result<()> {
             secret,
             token,
             api_url,
-        } => {
-            admin::alert_channel_add(alert_id, kind, url, secret, token, api_url).await
-        }
+        } => admin::alert_channel_add(alert_id, kind, url, secret, token, api_url).await,
         Command::AlertFire {
             alert_id,
             token,
@@ -1158,17 +1143,7 @@ async fn main() -> Result<()> {
             throttle_minutes,
             token,
             api_url,
-        } => {
-            admin::alert_patch(
-                alert_id,
-                enabled,
-                muted,
-                throttle_minutes,
-                token,
-                api_url,
-            )
-            .await
-        }
+        } => admin::alert_patch(alert_id, enabled, muted, throttle_minutes, token, api_url).await,
         Command::WebhookTest {
             url,
             secret,
@@ -1194,9 +1169,7 @@ async fn main() -> Result<()> {
             token,
             api_url,
             json,
-        } => {
-            admin::push_sends_list(project_id, status, limit, token, api_url, json).await
-        }
+        } => admin::push_sends_list(project_id, status, limit, token, api_url, json).await,
         Command::PushTest {
             project_id,
             device_token_id,
@@ -1222,17 +1195,7 @@ async fn main() -> Result<()> {
             environment,
             token,
             api_url,
-        } => {
-            admin::ingest_test(
-                error_type,
-                message,
-                release,
-                environment,
-                token,
-                api_url,
-            )
-            .await
-        }
+        } => admin::ingest_test(error_type, message, release, environment, token, api_url).await,
         Command::Probe {
             project_id,
             token,
@@ -1246,7 +1209,9 @@ async fn main() -> Result<()> {
             interval_sec,
             token,
             api_url,
-        } => admin::probe_create(project_id, target_url, method, interval_sec, token, api_url).await,
+        } => {
+            admin::probe_create(project_id, target_url, method, interval_sec, token, api_url).await
+        }
         Command::Init { api_url } => admin::init_wizard(api_url).await,
         Command::Login {
             email,
@@ -1268,15 +1233,7 @@ async fn main() -> Result<()> {
             token,
             api_url,
         } => {
-            admin::push_cred_upsert(
-                project_id,
-                provider,
-                config,
-                secret_path,
-                token,
-                api_url,
-            )
-            .await
+            admin::push_cred_upsert(project_id, provider, config, secret_path, token, api_url).await
         }
         Command::PushCredDelete {
             project_id,
@@ -1456,10 +1413,7 @@ async fn upload_dsym(
             );
             continue;
         }
-        println!(
-            "  ✓ {} {} ({} bytes)",
-            s.debug_id, s.arch, s.size_bytes
-        );
+        println!("  ✓ {} {} ({} bytes)", s.debug_id, s.arch, s.size_bytes);
         ok += 1;
     }
     println!("Done. {ok}/{total} ok.");
@@ -1516,13 +1470,12 @@ async fn upload_sourcemap(
     );
 
     let url = format!(
-        "{}/admin/api/releases/{}/sourcemaps",
+        "{}/v1/releases/{}/artifacts",
         base.trim_end_matches('/'),
         urlencoding(&release)
     );
 
     let client = reqwest::Client::new();
-    let mut form = reqwest::multipart::Form::new();
     for path in &collected {
         let data = tokio::fs::read(path)
             .await
@@ -1532,24 +1485,40 @@ async fn upload_sourcemap(
             .and_then(|n| n.to_str())
             .unwrap_or("file")
             .to_string();
-        let part = reqwest::multipart::Part::bytes(data).file_name(name.clone());
-        form = form.part(name, part);
+
+        // The server stores `kind` and the symbolicator selects on it,
+        // so sending everything under one kind would file the bundle as
+        // a map and leave the resolver parsing JavaScript as JSON.
+        let kind = if name.ends_with(".map") {
+            "sourcemap"
+        } else {
+            "bundle"
+        };
+
+        // One request per file. Artifacts are keyed on
+        // (release, filename), so a batch that half-failed would leave
+        // no way to tell which halves landed.
+        let form = reqwest::multipart::Form::new().text("kind", kind).part(
+            "file",
+            reqwest::multipart::Part::bytes(data).file_name(name.clone()),
+        );
+
+        let resp = client
+            .post(&url)
+            .bearer_auth(&token)
+            .multipart(form)
+            .send()
+            .await?;
+
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        if !status.is_success() {
+            anyhow::bail!("upload of {name} failed: {status} {body}");
+        }
+        println!("  {name} ({kind})");
     }
 
-    let resp = client
-        .post(&url)
-        .bearer_auth(&token)
-        .multipart(form)
-        .send()
-        .await?;
-
-    let status = resp.status();
-    let body = resp.text().await.unwrap_or_default();
-    if !status.is_success() {
-        anyhow::bail!("upload failed: {status} {body}");
-    }
-
-    println!("OK ({status}): {body}");
+    println!("Uploaded {} file(s) to release {release}.", collected.len());
     Ok(())
 }
 
