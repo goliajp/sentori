@@ -1,135 +1,110 @@
 name: mobile-e2e
 
-# Phase 16 sub-E: native crash + source-map e2e jobs.
+# Native + symbolication checks that need more than the Linux unit-test
+# runner.
 #
-# These run on every PR + push to master but use a macOS runner (for
-# iOS) and an Ubuntu runner with the Android emulator action (for
-# Android). They're slower than the Linux unit-test job, so the
-# regular CI workflow keeps running on Ubuntu and we let mobile fan
-# out only when relevant trees change.
+# 2026-07-22 rewrite. The previous version had four jobs and all four
+# were pointing at things that do not exist:
+#
+#   · ios-xctest         `-scheme SentoriTests`, but `sdk/react-native/ios`
+#                        holds loose .swift files and no Xcode project.
+#   · android-robolectric `./gradlew` in a directory with no wrapper, on a
+#                        module that depends on `:expo-modules-core` and
+#                        cannot build standalone.
+#   · mailcatcher        legacy `server/` + `server/migrations`.
+#   · sourcemap-e2e      same legacy server.
+#
+# It had been switched to `workflow_dispatch` in v0.4 with a note to
+# restore the triggers "once those two are fixed", and then sat failing
+# and unlooked-at from 2026-05-11. A gate nobody can run is not a gate;
+# a red one nobody looks at is worse, because the red stops meaning
+# anything.
+#
+# What is left runs, and runs on the code that ships.
 
-# v0.4 CI sweep: `push` / `pull_request` triggers temporarily disabled.
-# Two unrelated infra gaps were generating fail-mail noise on every
-# commit:
-#   1. android-robolectric: no `gradlew` wrapper in the repo (the RN
-#      example uses Expo, no Gradle-native project to drive).
-#   2. mailcatcher: port 1025 collides with another job's container
-#      on the same runner; needs docker network isolation.
-# Restore the previous triggers once those two are fixed. Manual
-# dispatch still works for one-off runs.
 on:
+  push:
+    branches: [develop, master]
+    paths:
+      - 'sdk/react-native/android/**'
+      - 'apps/rn-example/**'
+      - '.github/workflows/mobile-e2e.yml'
+  pull_request:
+    branches: [develop, master]
+    paths:
+      - 'sdk/react-native/android/**'
+      - 'apps/rn-example/**'
   workflow_dispatch:
 
-# v2.1 — opt into Node.js 24 ahead of GitHub Actions' 2026-06-02
-# forced cutover. See `build.yml` for the rationale.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  ios-xctest:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-      - name: List simulators (sanity)
-        run: xcrun simctl list devices available | head -20
-      - name: Run XCTest
-        working-directory: sdk/react-native/ios
-        run: |
-          xcodebuild test \
-            -scheme SentoriTests \
-            -destination 'platform=iOS Simulator,name=iPhone 15' \
-            -resultBundlePath /tmp/sentori-ios.xcresult \
-            CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ios-xcresult
-          path: /tmp/sentori-ios.xcresult
-
-  android-robolectric:
+  # The SDK's Android module has two Robolectric tests and has never
+  # been able to run them: it is an Expo module, so it only builds
+  # inside a host app's Gradle project. `apps/rn-example` is that host,
+  # and expo-autolinking pulls the SDK in — the same path used to verify
+  # on a real device.
+  #
+  # This closes the hole recorded in the project notes: changing a .kt
+  # file passed every gate and shipped to npm unchecked, which is how
+  # the v3.0.0 K2 bug got out.
+  android-unit:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.13"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
-      - uses: gradle/gradle-build-action@v3
-      - name: Run Robolectric
-        working-directory: sdk/react-native/android
-        run: ./gradlew test --console=plain
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: install example app deps
+        working-directory: apps/rn-example
+        run: bun install --frozen-lockfile
+
+      # The module's Gradle path is decided by expo-autolinking at
+      # configure time, so it is discovered rather than hardcoded — a
+      # guessed name would silently pass by testing nothing.
+      - name: Robolectric (SDK module, via host project)
+        working-directory: apps/rn-example/android
+        run: |
+          MODULE=$(./gradlew projects --console=plain -q \
+            | grep -oE "Project ':[a-z0-9-]*sentori[a-z0-9-]*'" \
+            | head -1 | sed "s/Project '//;s/'//")
+          if [ -z "$MODULE" ]; then
+            echo "::error::the Sentori module is not in the host Gradle project;"
+            echo "::error::expo-autolinking did not pick it up, so its tests cannot run"
+            ./gradlew projects --console=plain -q | head -40
+            exit 1
+          fi
+          echo "testing $MODULE"
+          ./gradlew "$MODULE:testDebugUnitTest" --console=plain
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: android-test-reports
-          path: sdk/react-native/android/build/reports/tests/
+          path: apps/rn-example/android/**/build/reports/tests/
 
-  mailcatcher:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: dev
-          POSTGRES_DB: sentori
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
-      valkey:
-        image: valkey/valkey:8-alpine
-        ports: ['6379:6379']
-      mailpit:
-        image: axllent/mailpit:latest
-        ports: ['1025:1025', '1080:8025']
-    env:
-      DATABASE_URL: postgres://postgres:dev@localhost:5432/sentori
-      VALKEY_URL: redis://localhost:6379
-      SENTORI_DEV_TOKEN: devtoken
-      SENTORI_ADMIN_PASSWORD: ci-admin
-      SENTORI_SESSION_SECRET: ci-secret-deadbeefdeadbeefdeadbeefdeadbeef
-      SENTORI_BASE_URL: http://localhost:8080
-      SENTORI_SMTP_HOST: localhost
-      SENTORI_SMTP_PORT: '1025'
-      SENTORI_SMTP_TLS: plain
-      SENTORI_SMTP_FROM: sentori@local
-      PG_CONTAINER: ''  # short-circuit docker exec — script falls back to localhost psql
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: server
-      - name: Install psql client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
-      - name: Apply migrations
-        run: |
-          for f in server/migrations/*.sql; do
-            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
-          done
-      - name: Build + start server
-        working-directory: server
-        run: |
-          cargo build
-          target/debug/sentori-server &
-          for _ in $(seq 1 30); do
-            curl -sf http://localhost:8080/v1/events/_recent \
-              -H "Authorization: Bearer $SENTORI_DEV_TOKEN" && break
-            sleep 1
-          done
-      - name: Run mailcatcher smoke
-        run: bash scripts/test-mailcatcher.sh
-
+  # Round-trip symbolication against the v0.2 server: bundle a fixture,
+  # upload its map, send a stack from the minified bundle, assert the
+  # frames come back pointing at the original source.
+  #
+  # The unit tests in `self-hosted/server/src/symbolicate.rs` pin the
+  # resolver's arithmetic against a hand-built map. This pins the part
+  # they cannot: that a real Metro map, uploaded over HTTP, matched to a
+  # release by name, produces the right answer.
   sourcemap-e2e:
-    needs: mailcatcher
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:18-alpine
@@ -144,34 +119,43 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: self-hosted/server
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.13"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Build CLI
-        run: cargo build --release --manifest-path cli/Cargo.toml
-      - name: Apply migrations + start server
+
+      - name: build + start server
         env:
-          DATABASE_URL: postgres://postgres:dev@localhost:5432/sentori
-          SENTORI_DEV_TOKEN: devtoken
-          SENTORI_ADMIN_PASSWORD: ci-admin
+          SENTORI_DATABASE_URL: postgres://postgres:dev@localhost:5432/sentori
           SENTORI_SESSION_SECRET: ci-secret-deadbeefdeadbeefdeadbeefdeadbeef
+          SENTORI_BOOTSTRAP_OWNER_EMAIL: ci@example.com
+          SENTORI_BOOTSTRAP_OWNER_PASSWORD: ci-password-long-enough
           SENTORI_BASE_URL: http://localhost:8080
+          # `fs:` rather than the default in-memory store: the
+          # symbolicator reads the map back out, and an in-memory blob
+          # store would work here by accident while hiding a real path.
+          SENTORI_ATTACHMENT_STORE: fs:/tmp/sentori-blobs
+        working-directory: self-hosted/server
         run: |
-          sudo apt-get update && sudo apt-get install -y postgresql-client
-          for f in server/migrations/*.sql; do
-            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
-          done
-          cargo build --manifest-path server/Cargo.toml
-          server/target/debug/sentori-server &
-          for _ in $(seq 1 30); do
-            curl -sf http://localhost:8080/v1/events/_recent \
-              -H "Authorization: Bearer $SENTORI_DEV_TOKEN" && break
+          mkdir -p /tmp/sentori-blobs
+          cargo build
+          # Migrations run at boot, so starting the binary is the whole
+          # setup step.
+          ./target/debug/sentori-server &
+          for _ in $(seq 1 60); do
+            curl -sf http://localhost:8080/healthz && break
             sleep 1
           done
-      - name: Run sourcemap e2e
+          curl -sf http://localhost:8080/healthz
+
+      - name: symbolication round trip
         env:
           SENTORI_BASE: http://localhost:8080
-          SENTORI_DEV_TOKEN: devtoken
-          SENTORI_PROJECT_ID: 019508a0-0000-7000-8000-000000000000
-        run: bash scripts/sourcemap-e2e/run.sh
+          SENTORI_OWNER_EMAIL: ci@example.com
+          SENTORI_OWNER_PASSWORD: ci-password-long-enough
+        run: bash scripts/sourcemap-e2e/run-v02.sh

@@ -58,12 +58,14 @@ pub async fn handle(
         return (StatusCode::PAYMENT_REQUIRED, Json(body));
     }
 
+    let mut symbolicated_total = 0usize;
+
     let mut accepted = 0u32;
     let mut failed = 0u32;
     let mut results: Vec<Value> = Vec::with_capacity(events.len());
 
     for raw in events {
-        let event = match map_payload_pub(raw) {
+        let mut event = match map_payload_pub(raw) {
             Ok(e) => e,
             Err(msg) => {
                 failed += 1;
@@ -74,31 +76,37 @@ pub async fn handle(
 
         // Same reason as the single-event path: cloned before the
         // event moves, and only the branch identity needs.
-        let payload_for_identity = crate::identity_link::payload_slice(&event.payload);
+        let event_tick_snapshot = (
+            event.kind.as_db_str().to_string(),
+            event.release.clone(),
+            event.environment.clone(),
+            event.platform.as_db_str().to_string(),
+            event.timestamp,
+        );
+        let (symbolicated, payload_for_identity) = crate::symbolicate::prepare(
+            &state,
+            ctx.project_id.into_uuid(),
+            &event.release,
+            &mut event.payload,
+        )
+        .await;
 
         match state.ingest.ingest(ctx.project_id, event).await {
             Ok(outcome) => {
                 accepted += 1;
-                let ws = ctx.workspace_id.into_uuid();
-                crate::identity_link::record(&state, ws, outcome.event_id, &payload_for_identity)
-                    .await;
-                if outcome.is_new_issue {
-                    crate::alert_fire::fire_async(
-                        state.pool.clone(),
-                        ctx.workspace_id.into_uuid(),
-                        ctx.project_id.into_uuid(),
-                        outcome.issue_id,
-                        crate::alert_fire::TriggerKind::IssueNew,
-                    );
-                } else if outcome.regressed {
-                    crate::alert_fire::fire_async(
-                        state.pool.clone(),
-                        ctx.workspace_id.into_uuid(),
-                        ctx.project_id.into_uuid(),
-                        outcome.issue_id,
-                        crate::alert_fire::TriggerKind::Regression,
-                    );
-                }
+                symbolicated_total += symbolicated;
+                // Same after-ingest work as the single path. It used to
+                // be a partial copy here: no live-tail broadcast and no
+                // event_count trigger, so a rule that fired on a single
+                // event stayed silent for a batched one.
+                super::events::after_ingest(
+                    &state,
+                    &ctx,
+                    &outcome,
+                    &payload_for_identity,
+                    event_tick_snapshot,
+                )
+                .await;
                 results.push(json!({
                     "ok": true,
                     "event_id": outcome.event_id.to_string(),
@@ -120,6 +128,7 @@ pub async fn handle(
         project_id = %ctx.project_id,
         accepted,
         failed,
+        symbolicated = symbolicated_total,
         "sdk.events_batch processed",
     );
 
