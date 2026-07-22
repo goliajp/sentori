@@ -3464,6 +3464,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "sentori-identity-fingerprint"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "sha2",
+]
+
+[[package]]
 name = "sentori-ingest-token"
 version = "0.2.0"
 dependencies = [

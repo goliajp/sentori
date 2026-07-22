@@ -72,9 +72,16 @@ pub async fn handle(
             }
         };
 
+        // Same reason as the single-event path: cloned before the
+        // event moves, and only the branch identity needs.
+        let payload_for_identity = crate::identity_link::payload_slice(&event.payload);
+
         match state.ingest.ingest(ctx.project_id, event).await {
             Ok(outcome) => {
                 accepted += 1;
+                let ws = ctx.workspace_id.into_uuid();
+                crate::identity_link::record(&state, ws, outcome.event_id, &payload_for_identity)
+                    .await;
                 if outcome.is_new_issue {
                     crate::alert_fire::fire_async(
                         state.pool.clone(),

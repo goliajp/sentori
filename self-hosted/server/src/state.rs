@@ -49,6 +49,10 @@ pub struct AppState {
     pub spans: SpanStore,
     pub replays: ReplayStore<MemoryBlobStore>,
     pub metrics: MetricsStore,
+    /// Identity scope salts, keyed by workspace. Salts never change —
+    /// rotating one would orphan every fingerprint written under it —
+    /// so this grows to one small entry per workspace and stays there.
+    pub identity_scopes: crate::identity_link::SharedScopeCache,
     pub audit: AuditService,
     pub alerts: AlertRuleService,
     pub saved_views: SavedViewService,
@@ -114,6 +118,7 @@ impl AppState {
             spans,
             replays,
             metrics,
+            identity_scopes: std::sync::Arc::default(),
             audit,
             alerts,
             saved_views,

@@ -2404,6 +2404,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sentori-identity-fingerprint"
+version = "0.1.0"
+dependencies = [
+ "sha2",
+]
+
+[[package]]
 name = "sentori-ingest-token"
 version = "0.2.0"
 dependencies = [
@@ -2570,7 +2577,7 @@ dependencies = [
 
 [[package]]
 name = "sentori-server"
-version = "1.8.0"
+version = "1.8.2"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -2595,6 +2602,7 @@ dependencies = [
  "sentori-cert-monitor",
  "sentori-cookie-session",
  "sentori-event-pipeline",
+ "sentori-identity-fingerprint",
  "sentori-ingest-token",
  "sentori-integration-traits",
  "sentori-issue-store",

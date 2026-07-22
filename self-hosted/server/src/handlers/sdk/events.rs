@@ -45,6 +45,11 @@ pub async fn handle(
         return (StatusCode::PAYMENT_REQUIRED, Json(body));
     }
 
+    // Cloned before the event moves into ingest, like the tick
+    // snapshot below. Only the `user` branch is needed, so the rest of
+    // the payload is not copied.
+    let payload_for_identity = crate::identity_link::payload_slice(&event.payload);
+
     let event_tick_snapshot = (
         event.kind.as_db_str().to_string(),
         event.release.clone(),
@@ -62,6 +67,12 @@ pub async fn handle(
                 regressed = outcome.regressed,
                 "sdk.events ingested",
             );
+            // File the event under whoever it belongs to. Best effort:
+            // an event we cannot attribute is still an event worth
+            // keeping, and the SDK already did the hashing.
+            let ws = ctx.workspace_id.into_uuid();
+            crate::identity_link::record(&state, ws, outcome.event_id, &payload_for_identity).await;
+
             // Best-effort broadcast to live SSE subscribers.
             let (kind, release, environment, platform, ts) = event_tick_snapshot;
             let _ = state.events_bus.send(crate::state::RecentEventTick {
