@@ -480,6 +480,14 @@ export const zh: Messages = {
   'track.empty': "还没有产品事件",
   'track.emptyHint': "在 app 里调用 sentori.track(name, props),事件就会出现在这里。",
 
+  'metrics.runtime': "SDK 性能",
+  'metrics.runtimeHint': "SDK 对你的 app 测到的:冷启动、帧率、内存、页面跳转。",
+  'metrics.p95': "p95",
+  'metrics.samples': "{n} 个采样",
+
+  'crash.userReports': "用户怎么说",
+  'crash.userReportsHint': "遇到这个问题的人自己写的描述。",
+
   'nav.issues': '问题',
   'nav.members': '成员',
   'nav.metrics': '指标',

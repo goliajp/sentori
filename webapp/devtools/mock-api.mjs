@@ -172,6 +172,19 @@ const SUFFIX = [
   [/\/metrics$/, () => ({ metrics: [{ name: 'checkout.duration', last_bucket: iso(600_000), total_count: 8_412, avg_value: 218.4 }, { name: 'cart.size', last_bucket: null, total_count: 0, avg_value: 0 }] })],
   [/\/replays\/[^/]+$/, () => ({ replay: { id: 'r1', event_id: EVENT, blob_hash: 'deadbeef', started_at: iso(t0 + 46_000), ended_at: iso(t0), duration_ms: 44_200, frame_count: 35, created_at: iso(t0) } })],
   [/\/replays/, () => ({ replays: [{ id: 'r1', event_id: EVENT, blob_hash: 'deadbeef', started_at: iso(t0 + 46_000), ended_at: iso(t0), duration_ms: 44_200, frame_count: 35, created_at: iso(t0) }] })],
+  [/\/runtime-metrics\/series/, () => ({ name: 'runtime.fps.p95', hours: 24, points:
+    Array.from({ length: 24 }, (_, i) => ({ bucket_ts: iso(3_600_000 * (23 - i)), release: 'myapp@1.2.3', environment: 'production', count: 60, avg: 58, p50: 60, p95: 59 - (i % 4), p99: 51 })) })],
+  [/\/runtime-metrics/, () => ({ hours: 24, metrics: [
+    { name: 'runtime.cold_start_ms', bucket_ts: iso(3_600_000), release: 'myapp@1.2.3', environment: 'production', count: 1, avg: 2539, p50: 2539, p95: 2539, p99: 2539 },
+    { name: 'runtime.fps.p95', bucket_ts: iso(3_600_000), release: 'myapp@1.2.3', environment: 'production', count: 66, avg: 58.4, p50: 60, p95: 59, p99: 51 },
+    { name: 'runtime.heap.used_bytes', bucket_ts: iso(3_600_000), release: 'myapp@1.2.3', environment: 'production', count: 12, avg: 2.0e8, p50: 2.0e8, p95: 203098264, p99: 2.1e8 },
+    { name: 'runtime.route_nav_ms', bucket_ts: iso(7_200_000), release: 'myapp@1.2.3', environment: 'production', count: 9, avg: 180, p50: 160, p95: 410, p99: 480 },
+  ] })],
+  [/\/user-reports/, () => ({ reports: [
+    { id: 'ur1', event_id: EVENT, issue_id: ISSUE, title: 'Payment button did nothing',
+      body: 'Tapped Pay now three times, the spinner ran and then it went back to the cart. Card was never charged.',
+      email: 'customer@example.com', name: 'Aiko', received_at: iso(600_000) },
+  ] })],
   [/\/track\/names/, () => ({ days: 7, names: [
     { name: '$pageview', total: 18_751, users: 45, last_seen: iso(3_600_000) },
     { name: 'bio.login.attempt', total: 177, users: 0, last_seen: iso(7_200_000) },

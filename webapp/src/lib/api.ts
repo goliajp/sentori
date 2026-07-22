@@ -421,6 +421,33 @@ export interface TrackEventRow {
   occurred_at: string;
 }
 
+/** One bucket of an auto-instrumented measurement. */
+export interface RuntimePoint {
+  name?: string;
+  bucket_ts: string;
+  release: string | null;
+  environment: string | null;
+  count: number;
+  avg: number | null;
+  /** Percentiles matter more than the mean here — a mean frame time
+   *  hides exactly the stutter this data exists to catch. */
+  p50: number | null;
+  p95: number | null;
+  p99: number | null;
+}
+
+/** A person's own description of what went wrong. */
+export interface UserReport {
+  id: string;
+  event_id: string | null;
+  issue_id: string | null;
+  title: string | null;
+  body: string | null;
+  email: string | null;
+  name: string | null;
+  received_at: string;
+}
+
 export interface MetricSummary {
   name: string;
   last_bucket: string | null;
@@ -570,6 +597,31 @@ export class Api {
     const qs = buildQS({ name: opts.name, user: opts.user, limit: opts.limit });
     return this.get(`/v1/projects/${projectId}/track/recent${qs}`);
   }
+  /** The SDK's own perf rollups — cold start, FPS, heap, nav timing. */
+  runtimeMetrics(
+    projectId: string,
+    hours = 24,
+  ): Promise<{ hours: number; metrics: RuntimePoint[] }> {
+    return this.get(
+      `/v1/projects/${projectId}/runtime-metrics?hours=${hours}`,
+    );
+  }
+  runtimeSeries(
+    projectId: string,
+    name: string,
+    opts: { hours?: number; release?: string } = {},
+  ): Promise<{ name: string; hours: number; points: RuntimePoint[] }> {
+    const qs = buildQS({ name, hours: opts.hours, release: opts.release });
+    return this.get(`/v1/projects/${projectId}/runtime-metrics/series${qs}`);
+  }
+  /** What people typed when the app asked them what happened. */
+  listUserReports(
+    projectId: string,
+    opts: { issue_id?: string; limit?: number } = {},
+  ): Promise<{ reports: UserReport[] }> {
+    const qs = buildQS({ issue_id: opts.issue_id, limit: opts.limit });
+    return this.get(`/v1/projects/${projectId}/user-reports${qs}`);
+  }
   listMetrics(projectId: string): Promise<{ metrics: MetricSummary[] }> {
     return this.get(`/v1/projects/${projectId}/metrics`);
   }
@@ -672,6 +724,8 @@ export class Api {
     comments: {
       id: string;
       author_user_id: string;
+      /** Who wrote it, as an operator recognises them. */
+      author_email: string | null;
       body_md: string;
       created_at: string;
       edited_at: string | null;
@@ -685,8 +739,10 @@ export class Api {
   ): Promise<{
     id: string;
     author_user_id: string;
+    author_email: string | null;
     body_md: string;
     created_at: string;
+    edited_at: string | null;
   }> {
     return this.post(`/admin/api/issues/${issueId}/comments`, { body_md });
   }

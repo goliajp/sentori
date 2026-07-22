@@ -43,6 +43,7 @@ mod notifications;
 mod oauth;
 mod projects;
 mod replays;
+mod runtime_metrics_query;
 mod saved_views;
 mod sdk;
 mod search;
@@ -54,6 +55,7 @@ mod stripe_webhook;
 pub mod tenant;
 mod track_query;
 mod usage;
+mod user_reports_query;
 mod workspaces;
 
 // A flat route table: length is inherent to enumerating every route
@@ -375,6 +377,21 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(
             "/v1/projects/{project_id}/track/recent",
             get(track_query::recent),
+        )
+        // The SDK's own perf rollups — the numbers behind the promise
+        // that Sentori does not make the host app stutter.
+        .route(
+            "/v1/projects/{project_id}/runtime-metrics",
+            get(runtime_metrics_query::names),
+        )
+        .route(
+            "/v1/projects/{project_id}/runtime-metrics/series",
+            get(runtime_metrics_query::series),
+        )
+        // What a user typed when the app asked them what happened.
+        .route(
+            "/v1/projects/{project_id}/user-reports",
+            get(user_reports_query::list),
         )
         .route(
             "/v1/projects/{project_id}/metrics/{name}/timeseries",

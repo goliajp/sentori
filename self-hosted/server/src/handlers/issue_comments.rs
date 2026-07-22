@@ -27,8 +27,13 @@ pub async fn list(
     super::tenant::guard_issue(&state, ctx.workspace_id, issue_id).await?;
 
     let rows = sqlx::query(
-        "SELECT id, author_id, body, created_at \
-         FROM issue_comments WHERE issue_id = $1 ORDER BY created_at",
+        // Join `users` for the same reason the members list does: a
+        // comment is attributed to a person, and nobody recognises a
+        // uuid as one.
+        "SELECT c.id, c.author_id, c.body, c.created_at, u.email AS author_email \
+         FROM issue_comments c \
+         LEFT JOIN users u ON u.id = c.author_id \
+         WHERE c.issue_id = $1 ORDER BY c.created_at",
     )
     .bind(issue_id)
     .fetch_all(&state.pool)
@@ -44,6 +49,7 @@ pub async fn list(
                     .ok()
                     .flatten()
                     .map(|u| u.to_string()),
+                "author_email": r.try_get::<Option<String>, _>("author_email").ok().flatten(),
                 "body_md": r.get::<String, _>("body"),
                 "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
                 "edited_at": Option::<time::OffsetDateTime>::None,
@@ -109,8 +115,23 @@ pub async fn create(
                     "id": id.to_string(),
                     "issue_id": issue_id.to_string(),
                     "author_user_id": ctx.user_id.into_uuid().to_string(),
+                    // Same shape as the list response. Without it a
+                    // freshly posted comment would show a uuid while
+                    // every other comment showed an email, until reload.
+                    "author_email": sqlx::query_scalar::<_, String>(
+                        "SELECT email FROM users WHERE id = $1",
+                    )
+                    .bind(ctx.user_id.into_uuid())
+                    .fetch_optional(&state.pool)
+                    .await
+                    .ok()
+                    .flatten(),
                     "body_md": body.body_md.trim(),
                     "created_at": crate::wire_time::rfc3339(row.get::<time::OffsetDateTime, _>("created_at")),
+                    // The list sends this; a create response that omits
+                    // it is a second shape for the same object, and the
+                    // client ends up describing both.
+                    "edited_at": Value::Null,
                 })),
             )
         }

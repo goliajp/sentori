@@ -480,6 +480,14 @@ export const ja: Messages = {
   'track.empty': "プロダクトイベントがありません",
   'track.emptyHint': "アプリで sentori.track(name, props) を呼ぶとここに表示されます。",
 
+  'metrics.runtime': "SDK パフォーマンス",
+  'metrics.runtimeHint': "SDK がアプリについて計測した値:コールドスタート・フレームレート・メモリ・画面遷移。",
+  'metrics.p95': "p95",
+  'metrics.samples': "{n} サンプル",
+
+  'crash.userReports': "ユーザーの声",
+  'crash.userReportsHint': "この問題に遭遇した人が書いた説明。",
+
   'nav.issues': 'イシュー',
   'nav.members': 'メンバー',
   'nav.metrics': 'メトリクス',
