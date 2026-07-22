@@ -69,7 +69,7 @@ export default function Register() {
             </label>
             <label className="mb-4 block text-sm">
               <span className="mb-1 block text-fg-muted">
-                Password (≥12 chars)
+                {t('auth.passwordMin')}
               </span>
               <input
                 type="password"

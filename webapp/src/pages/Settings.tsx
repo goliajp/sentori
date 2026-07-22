@@ -55,7 +55,7 @@ export function SettingsPage() {
                 onClick={logout}
                 className="rounded border border-danger/40 px-3 py-1.5 text-sm text-danger hover:bg-danger/20 hover:text-white"
               >
-                Sign out
+                {t('action.signOut')}
               </button>
             </div>
           </Card>

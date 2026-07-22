@@ -451,6 +451,10 @@ export const en = {
 
   'crash.step': "step",
 
+  'auth.passwordMin': "Password (at least 12 characters)",
+  'tokens.justMinted': "This is the token you just minted.",
+  'tokens.otherFrameworks': "Mint a token above and it appears here. Other frameworks swap the import — the init call is identical.",
+
   'nav.issues': 'Issues',
   'nav.members': 'Members',
   'nav.metrics': 'Metrics',
