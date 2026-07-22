@@ -84,7 +84,10 @@ pub async fn project_delete(
     token: Option<String>,
     api_url: Option<String>,
 ) -> Result<()> {
-    let url = format!("{}/admin/api/projects/{project_id}", resolve_api_url(api_url));
+    let url = format!(
+        "{}/admin/api/projects/{project_id}",
+        resolve_api_url(api_url)
+    );
     let c = client(&token_value(token)?)?;
     c.delete(&url).send().await?.error_for_status()?;
     println!("deleted project {project_id}");
@@ -219,11 +222,7 @@ pub async fn audit_list(
 
 // ── member ─────────────────────────────────────────────────
 
-pub async fn member_list(
-    token: Option<String>,
-    api_url: Option<String>,
-    json: bool,
-) -> Result<()> {
+pub async fn member_list(token: Option<String>, api_url: Option<String>, json: bool) -> Result<()> {
     let url = format!("{}/admin/api/members", resolve_api_url(api_url));
     let c = client(&token_value(token)?)?;
     let resp = c.get(&url).send().await?.error_for_status()?;
@@ -297,11 +296,7 @@ pub async fn invite_mint(
 
 // ── alert ──────────────────────────────────────────────────
 
-pub async fn alert_list(
-    token: Option<String>,
-    api_url: Option<String>,
-    json: bool,
-) -> Result<()> {
+pub async fn alert_list(token: Option<String>, api_url: Option<String>, json: bool) -> Result<()> {
     let url = format!("{}/v1/alerts", resolve_api_url(api_url));
     let c = client(&token_value(token)?)?;
     let resp = c.get(&url).send().await?.error_for_status()?;
@@ -419,10 +414,7 @@ pub async fn cert_list(
         println!("{}", serde_json::to_string_pretty(&body)?);
         return Ok(());
     }
-    println!(
-        "{:<40}  {:<25}  expires",
-        "domain", "issuer"
-    );
+    println!("{:<40}  {:<25}  expires", "domain", "issuer");
     for o in &body {
         println!(
             "{:<40}  {:<25}  {}",
@@ -475,11 +467,7 @@ pub async fn cert_unwatch(
 
 // ── usage ──────────────────────────────────────────────────
 
-pub async fn usage_show(
-    token: Option<String>,
-    api_url: Option<String>,
-    json: bool,
-) -> Result<()> {
+pub async fn usage_show(token: Option<String>, api_url: Option<String>, json: bool) -> Result<()> {
     let url = format!("{}/v1/usage", resolve_api_url(api_url));
     let c = client(&token_value(token)?)?;
     let resp = c.get(&url).send().await?.error_for_status()?;
@@ -564,10 +552,7 @@ pub async fn replay_list(
         return Ok(());
     }
     let rows = body["replays"].as_array().cloned().unwrap_or_default();
-    println!(
-        "{:<38}  {:>7}  {:>7}  event",
-        "id", "ms", "frames"
-    );
+    println!("{:<38}  {:>7}  {:>7}  event", "id", "ms", "frames");
     for r in &rows {
         println!(
             "{:<38}  {:>7}  {:>7}  {}",
@@ -601,10 +586,7 @@ pub async fn metric_list(
         return Ok(());
     }
     let rows = body["metrics"].as_array().cloned().unwrap_or_default();
-    println!(
-        "{:<40}  {:>10}  {:>10}  last",
-        "name", "24h count", "avg"
-    );
+    println!("{:<40}  {:>10}  {:>10}  last", "name", "24h count", "avg");
     for m in &rows {
         println!(
             "{:<40}  {:>10}  {:>10.2}  {}",
@@ -649,10 +631,7 @@ pub async fn comment_list(
     api_url: Option<String>,
     json: bool,
 ) -> Result<()> {
-    let url = format!(
-        "{}/v1/issues/{issue_id}/comments",
-        resolve_api_url(api_url)
-    );
+    let url = format!("{}/v1/issues/{issue_id}/comments", resolve_api_url(api_url));
     let c = client(&token_value(token)?)?;
     let resp = c.get(&url).send().await?.error_for_status()?;
     let body: Value = resp.json().await?;
@@ -674,11 +653,7 @@ pub async fn comment_list(
     Ok(())
 }
 
-pub async fn alerts_list(
-    token: Option<String>,
-    api_url: Option<String>,
-    json: bool,
-) -> Result<()> {
+pub async fn alerts_list(token: Option<String>, api_url: Option<String>, json: bool) -> Result<()> {
     let url = format!("{}/v1/alerts", resolve_api_url(api_url));
     let c = client(&token_value(token)?)?;
     let resp = c.get(&url).send().await?.error_for_status()?;
@@ -696,9 +671,7 @@ pub async fn alerts_list(
                 .as_str()
                 .map(|x| &x[..x.len().min(8)])
                 .unwrap_or("?"),
-            if a["enabled"].as_bool().unwrap_or(false)
-                && !a["muted"].as_bool().unwrap_or(false)
-            {
+            if a["enabled"].as_bool().unwrap_or(false) && !a["muted"].as_bool().unwrap_or(false) {
                 "on"
             } else {
                 "off"
@@ -728,10 +701,7 @@ pub async fn alert_channel_add(
         .error_for_status()?
         .json()
         .await?;
-    let mut channels = cur["channels"]
-        .as_array()
-        .cloned()
-        .unwrap_or_default();
+    let mut channels = cur["channels"].as_array().cloned().unwrap_or_default();
     let mut new_ch = serde_json::Map::new();
     new_ch.insert("kind".to_string(), Value::String(kind));
     new_ch.insert("url".to_string(), Value::String(url));
@@ -753,7 +723,10 @@ pub async fn alert_fire_test(
     token: Option<String>,
     api_url: Option<String>,
 ) -> Result<()> {
-    let url = format!("{}/v1/alerts/{alert_id}/_fire_test", resolve_api_url(api_url));
+    let url = format!(
+        "{}/v1/alerts/{alert_id}/_fire_test",
+        resolve_api_url(api_url)
+    );
     let c = client(&token_value(token)?)?;
     let resp = c.post(&url).send().await?.error_for_status()?;
     let body: Value = resp.json().await?;
@@ -790,11 +763,7 @@ pub async fn alert_patch(
     if let Some(t) = throttle_minutes {
         body.insert("throttle_minutes".to_string(), serde_json::json!(t));
     }
-    c.patch(&url)
-        .json(&body)
-        .send()
-        .await?
-        .error_for_status()?;
+    c.patch(&url).json(&body).send().await?.error_for_status()?;
     println!("patched {alert_id}");
     Ok(())
 }
@@ -819,7 +788,10 @@ pub async fn webhook_test(
         .await?;
     let body: Value = resp.json().await?;
     if body["delivered"].as_bool().unwrap_or(false) {
-        println!("✓ delivered, status={}", body["status"].as_i64().unwrap_or(0));
+        println!(
+            "✓ delivered, status={}",
+            body["status"].as_i64().unwrap_or(0)
+        );
     } else {
         println!("✗ {}", body["error"].as_str().unwrap_or("unknown"));
     }
@@ -854,7 +826,10 @@ pub async fn push_retry_all_failed(
     let c = client(&token_value(token)?)?;
     let resp = c.post(&url).send().await?.error_for_status()?;
     let body: Value = resp.json().await?;
-    println!("requeued {} failed sends", body["requeued"].as_i64().unwrap_or(0));
+    println!(
+        "requeued {} failed sends",
+        body["requeued"].as_i64().unwrap_or(0)
+    );
     Ok(())
 }
 
@@ -1125,11 +1100,7 @@ pub async fn init_wizard(api_url: Option<String>) -> Result<()> {
     Ok(())
 }
 
-pub async fn auth_login(
-    email: String,
-    password: String,
-    api_url: Option<String>,
-) -> Result<()> {
+pub async fn auth_login(email: String, password: String, api_url: Option<String>) -> Result<()> {
     let url = format!("{}/auth/login", resolve_api_url(api_url));
     let c = reqwest::Client::new();
     let resp = c
@@ -1154,10 +1125,7 @@ pub async fn auth_login(
     Ok(())
 }
 
-pub async fn auth_logout(
-    token: Option<String>,
-    api_url: Option<String>,
-) -> Result<()> {
+pub async fn auth_logout(token: Option<String>, api_url: Option<String>) -> Result<()> {
     let url = format!("{}/auth/logout", resolve_api_url(api_url));
     let c = client(&token_value(token)?)?;
     c.post(&url)
@@ -1208,8 +1176,7 @@ pub async fn push_cred_upsert(
     api_url: Option<String>,
 ) -> Result<()> {
     use std::fs;
-    let config: Value =
-        serde_json::from_str(&config_json).context("config json invalid")?;
+    let config: Value = serde_json::from_str(&config_json).context("config json invalid")?;
     let secret = if let Some(p) = secret_path {
         Some(fs::read_to_string(&p).context("read secret file")?)
     } else {
@@ -1289,10 +1256,7 @@ pub async fn session_revoke(
     token: Option<String>,
     api_url: Option<String>,
 ) -> Result<()> {
-    let url = format!(
-        "{}/auth/sessions/{id_hash_hex}",
-        resolve_api_url(api_url)
-    );
+    let url = format!("{}/auth/sessions/{id_hash_hex}", resolve_api_url(api_url));
     let c = client(&token_value(token)?)?;
     c.delete(&url).send().await?.error_for_status()?;
     println!("revoked session {id_hash_hex}");
@@ -1305,10 +1269,7 @@ pub async fn watcher_list(
     api_url: Option<String>,
     json: bool,
 ) -> Result<()> {
-    let url = format!(
-        "{}/v1/issues/{issue_id}/watchers",
-        resolve_api_url(api_url)
-    );
+    let url = format!("{}/v1/issues/{issue_id}/watchers", resolve_api_url(api_url));
     let c = client(&token_value(token)?)?;
     let resp = c.get(&url).send().await?.error_for_status()?;
     let body: Value = resp.json().await?;
@@ -1378,11 +1339,11 @@ pub async fn notification_list(
         println!("{}", serde_json::to_string_pretty(&body)?);
         return Ok(());
     }
-    println!(
-        "unread: {}",
-        body["unread"].as_i64().unwrap_or(0)
-    );
-    let rows = body["notifications"].as_array().cloned().unwrap_or_default();
+    println!("unread: {}", body["unread"].as_i64().unwrap_or(0));
+    let rows = body["notifications"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
     for n in &rows {
         let read = n["read_at"].is_string();
         println!(
@@ -1395,14 +1356,8 @@ pub async fn notification_list(
     Ok(())
 }
 
-pub async fn notification_read_all(
-    token: Option<String>,
-    api_url: Option<String>,
-) -> Result<()> {
-    let url = format!(
-        "{}/auth/notifications/_read_all",
-        resolve_api_url(api_url)
-    );
+pub async fn notification_read_all(token: Option<String>, api_url: Option<String>) -> Result<()> {
+    let url = format!("{}/auth/notifications/_read_all", resolve_api_url(api_url));
     let c = client(&token_value(token)?)?;
     c.post(&url)
         .json(&serde_json::json!({}))
@@ -1423,8 +1378,14 @@ pub async fn describe(api_url: Option<String>, json: bool) -> Result<()> {
         return Ok(());
     }
     println!("server: {}", body["version"].as_str().unwrap_or("?"));
-    println!("token prefix: {}", body["sdk_token_prefix"].as_str().unwrap_or("?"));
-    println!("session cookie: {}", body["session_cookie"].as_str().unwrap_or("?"));
+    println!(
+        "token prefix: {}",
+        body["sdk_token_prefix"].as_str().unwrap_or("?")
+    );
+    println!(
+        "session cookie: {}",
+        body["session_cookie"].as_str().unwrap_or("?")
+    );
     if let Some(groups) = body["endpoints"].as_object() {
         for (group, list) in groups {
             let n = list.as_array().map(|a| a.len()).unwrap_or(0);
@@ -1509,7 +1470,11 @@ pub async fn self_test(api_url: Option<String>) -> Result<()> {
     let overall = body["ok"].as_bool().unwrap_or(false);
     println!(
         "{} v{}  (HTTP {})",
-        if overall { "✓ all checks pass" } else { "✗ some checks failed" },
+        if overall {
+            "✓ all checks pass"
+        } else {
+            "✗ some checks failed"
+        },
         body["version"].as_str().unwrap_or("?"),
         status,
     );
@@ -1519,7 +1484,10 @@ pub async fn self_test(api_url: Option<String>) -> Result<()> {
             "  {}  {}{}",
             if ok { "✓" } else { "✗" },
             c["name"].as_str().unwrap_or("?"),
-            c["detail"].as_str().map(|d| format!("  ({d})")).unwrap_or_default(),
+            c["detail"]
+                .as_str()
+                .map(|d| format!("  ({d})"))
+                .unwrap_or_default(),
         );
     }
     if !overall {
@@ -1536,10 +1504,7 @@ pub async fn metrics_raw(api_url: Option<String>) -> Result<()> {
     Ok(())
 }
 
-pub async fn me_show(
-    token: Option<String>,
-    api_url: Option<String>,
-) -> Result<()> {
+pub async fn me_show(token: Option<String>, api_url: Option<String>) -> Result<()> {
     let url = format!("{}/auth/me", resolve_api_url(api_url));
     let c = client(&token_value(token)?)?;
     let resp = c.get(&url).send().await?.error_for_status()?;
@@ -1554,10 +1519,7 @@ pub async fn me_show(
     Ok(())
 }
 
-pub async fn live_tail(
-    token: Option<String>,
-    api_url: Option<String>,
-) -> Result<()> {
+pub async fn live_tail(token: Option<String>, api_url: Option<String>) -> Result<()> {
     use anyhow::anyhow;
     use std::io::{self, Write};
     let url = format!("{}/v1/events/_recent", resolve_api_url(api_url));
@@ -1579,8 +1541,8 @@ pub async fn live_tail(
             buf.drain(..idx + 2);
             for line in frame.lines() {
                 if let Some(data) = line.strip_prefix("data:") {
-                    let json: serde_json::Value = serde_json::from_str(data.trim())
-                        .unwrap_or(serde_json::Value::Null);
+                    let json: serde_json::Value =
+                        serde_json::from_str(data.trim()).unwrap_or(serde_json::Value::Null);
                     println!(
                         "{}  {}  {}  {}  issue={}",
                         json["timestamp"].as_str().unwrap_or("?"),
@@ -1703,7 +1665,13 @@ pub async fn replay_download(
         resolve_api_url(api_url)
     );
     let c = client(&token_value(token)?)?;
-    let bytes = c.get(&url).send().await?.error_for_status()?.bytes().await?;
+    let bytes = c
+        .get(&url)
+        .send()
+        .await?
+        .error_for_status()?
+        .bytes()
+        .await?;
     // Print raw NDJSON to stdout — pipe to file: > replay.ndjson
     use std::io::Write;
     std::io::stdout().write_all(&bytes)?;
@@ -1723,9 +1691,7 @@ pub async fn search_project(
     let encoded = query
         .chars()
         .map(|c| match c {
-            'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => {
-                c.to_string()
-            }
+            'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
             ' ' => "+".to_string(),
             _ => format!("%{:02X}", c as u32),
         })
@@ -1813,11 +1779,7 @@ pub async fn stats_show(
     Ok(())
 }
 
-pub async fn invite_list(
-    token: Option<String>,
-    api_url: Option<String>,
-    json: bool,
-) -> Result<()> {
+pub async fn invite_list(token: Option<String>, api_url: Option<String>, json: bool) -> Result<()> {
     let url = format!("{}/admin/api/invites", resolve_api_url(api_url));
     let c = client(&token_value(token)?)?;
     let resp = c.get(&url).send().await?.error_for_status()?;
