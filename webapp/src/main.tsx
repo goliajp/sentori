@@ -22,6 +22,7 @@ import Sessions from './pages/Sessions';
 import AcceptInvite from './pages/AcceptInvite';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
+import Legal from './pages/Legal';
 import Verify from './pages/Verify';
 import Releases from './pages/Releases';
 import SaasAdmin from './pages/SaasAdmin';
@@ -66,6 +67,10 @@ createRoot(rootEl).render(
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/verify" element={<Verify />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        {/* Public and outside <App>: a visitor reading the terms
+            before signing up must not be bounced to the login page. */}
+        <Route path="/legal" element={<Navigate to="/legal/terms" replace />} />
+        <Route path="/legal/:slug" element={<Legal />} />
         <Route element={<App />}>
           {/* The dashboard home lives at /main, not /. On the SaaS
               deployment `/` is the marketing site (Caddy routes it to
