@@ -107,6 +107,7 @@
 #![allow(deprecated)]
 
 mod csrf;
+mod ct_eq;
 mod encrypted;
 mod error;
 mod key;
@@ -114,6 +115,7 @@ mod password;
 mod signed;
 
 pub use csrf::{CsrfToken, TOKEN_LEN as CSRF_TOKEN_LEN};
+pub use ct_eq::constant_time_eq;
 pub use encrypted::{EncryptedCookie, NONCE_LEN, TAG_LEN as ENCRYPTED_TAG_LEN};
 pub use error::{
     CsrfError, CsrfResult, EncryptedCookieError, EncryptedCookieResult, PasswordError,

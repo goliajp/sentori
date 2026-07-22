@@ -254,8 +254,15 @@ fn authorize_url(cfg: &ProviderConfig, client_id: &str, redirect_uri: &str, stat
 /// nothing tying the callback to a login this browser began, which is
 /// the entire point of the parameter.
 fn state_matches(cookie: Option<&str>, returned: &str) -> bool {
+    // Constant-time. The state is a 64-char hex string, short-lived and
+    // single-use, so a timing attack is impractical — but the `==`
+    // check that used to sit here still reintroduced a byte-level
+    // timing leak that the rest of this codebase takes care to
+    // prevent. The zero-cost fix belongs where the cost is measured.
     match cookie {
-        Some(c) if !c.is_empty() => c == returned,
+        Some(c) if !c.is_empty() => {
+            sentori_cookie_session::constant_time_eq(c.as_bytes(), returned.as_bytes())
+        }
         _ => false,
     }
 }
