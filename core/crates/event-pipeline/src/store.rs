@@ -35,6 +35,35 @@ pub(super) async fn persist_event(
 ) -> Result<IngestOutcome, IngestError> {
     let mut tx = pool.begin().await?;
 
+    // A retry of a request whose response was lost carries the same
+    // event id. Without this it collides with the primary key, the
+    // handler answers 500, and the SDK — which retries 5xx three times
+    // and then writes the batch to disk — re-sends it on every launch
+    // for the life of the install. One dropped response becomes a
+    // permanent drain on the host app's battery and network.
+    //
+    // Checked before the issue upsert, not after the event insert:
+    // the upsert increments `event_count` and moves `last_seen`, so
+    // absorbing the collision one statement later would still count
+    // the same event twice.
+    if let Some(issue_id) =
+        sqlx::query_scalar::<_, Uuid>("SELECT issue_id FROM events WHERE id = $1")
+            .bind(event.id)
+            .fetch_optional(&mut *tx)
+            .await?
+    {
+        tx.rollback().await?;
+        return Ok(IngestOutcome {
+            event_id: event.id,
+            issue_id,
+            // The first delivery already reported both. Repeating them
+            // would re-broadcast the live feed and re-fire alert rules
+            // for an event the customer has seen.
+            is_new_issue: false,
+            regressed: false,
+        });
+    }
+
     let new_id = Uuid::now_v7();
     let issue_error_type: &str = event.error_type.as_deref().unwrap_or("Message");
     let issue_message_sample: String = event.message.clone().unwrap_or_default();
