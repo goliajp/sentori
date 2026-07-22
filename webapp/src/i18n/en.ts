@@ -185,6 +185,7 @@ export const en = {
   'common.jsonInvalid': 'Must be valid JSON.',
   'alerts.channelsInvalid': 'Channels JSON did not parse.',
   'alerts.confirmDelete': 'Delete this alert rule?',
+  'verify.missingToken': 'Missing token — open the link from your email.',
   'audit.empty': 'No audit entries yet.',
   'events.savedViewName': 'Saved view name',
   'members.confirmRemove': 'Remove this member from the workspace?',

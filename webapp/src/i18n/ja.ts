@@ -179,6 +179,7 @@ export const ja: Messages = {
   'common.jsonInvalid': '有効な JSON である必要があります。',
   'alerts.channelsInvalid': 'チャンネルの JSON を解析できませんでした。',
   'alerts.confirmDelete': 'このアラートルールを削除しますか？',
+  'verify.missingToken': 'トークンがありません。メール内のリンクからお開きください。',
   'audit.empty': '監査ログはまだありません。',
   'events.savedViewName': 'ビュー名',
   'members.confirmRemove': 'このメンバーをワークスペースから外しますか？',

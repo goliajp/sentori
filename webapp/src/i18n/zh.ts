@@ -179,6 +179,7 @@ export const zh: Messages = {
   'common.jsonInvalid': '必须是合法的 JSON。',
   'alerts.channelsInvalid': '通道 JSON 解析失败。',
   'alerts.confirmDelete': '删除这条告警规则?',
+  'verify.missingToken': '缺少令牌 —— 请从邮件里的链接打开。',
   'audit.empty': '还没有审计记录。',
   'events.savedViewName': '视图名称',
   'members.confirmRemove': '把这位成员移出工作区?',
