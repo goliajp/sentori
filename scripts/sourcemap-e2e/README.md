@@ -1,40 +1,55 @@
-# Source-map e2e (Phase 16 sub-E, 回填 Phase 8)
+# Source-map e2e
 
-Round-trip test: minified RN bundle → upload via `sentori-cli upload
-sourcemap` → trigger a deliberately-thrown error in a fixture → fetch
-the issue from the dashboard API → assert the stack frame names + line
-numbers map back to the original source positions.
+Proves that a real bundler's source map, uploaded over HTTP and matched
+to a release by name, turns a minified stack frame back into a line of
+source.
 
-## What's here
+The unit tests in `self-hosted/server/src/symbolicate.rs` pin the
+resolver's arithmetic against a hand-built map. They cannot tell you
+that the upload endpoint, the blob store, the release lookup and the
+ingest hook all line up — that is what this does.
 
-- `app.tsx` — fixture component with a `throw` deep enough to produce
-  a real-looking stack.
-- `metro.fixture.config.js` — Metro bundler config that emits both
-  `bundle.js` (minified) and `bundle.js.map` to `dist/`.
-- `run.sh` — orchestrator: bundle → upload → trigger → poll → assert.
-
-## Prereqs
-
-- Server running with PG + Valkey, dev token in `SENTORI_DEV_TOKEN`.
-- `sentori-cli` built: `cargo build --release --manifest-path cli/Cargo.toml`.
-- bun (for Metro / RN bundling).
-
-## Run
+## Run it
 
 ```sh
-SENTORI_BASE=http://localhost:8080 \
-SENTORI_DEV_TOKEN=devtoken \
-SENTORI_PROJECT_ID=019508a0-0000-7000-8000-000000000000 \
-./run.sh
+# a server with its own database, blobs on disk
+docker run -d --rm --name sme2e-pg -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=sentori -p 55432:5432 postgres:18-alpine
+
+cd self-hosted/server
+SENTORI_DATABASE_URL=postgres://postgres:dev@localhost:55432/sentori \
+SENTORI_SESSION_SECRET=$(openssl rand -hex 32) \
+SENTORI_BOOTSTRAP_OWNER_EMAIL=ci@example.com \
+SENTORI_BOOTSTRAP_OWNER_PASSWORD=ci-password-long-enough \
+SENTORI_BIND=127.0.0.1:8099 \
+SENTORI_ATTACHMENT_STORE=fs:/tmp/sme2e-blobs \
+  cargo run &
+
+SENTORI_BASE=http://localhost:8099 \
+SENTORI_OWNER_EMAIL=ci@example.com \
+SENTORI_OWNER_PASSWORD=ci-password-long-enough \
+  bash scripts/sourcemap-e2e/run-v02.sh
 ```
 
-The script exits non-zero if any frame in the symbolicated stack still
-points at `bundle.js` (i.e. symbolication didn't kick in) or if the
-top frame's function name doesn't match the source.
+`SENTORI_ATTACHMENT_STORE` has to be `fs:` — the default in-memory
+store would make this pass without ever writing a blob to disk, hiding
+the path a real deployment takes.
 
-## What can't be automated yet
+## What it asserts
 
-- Running the bundle inside an actual JS engine (Hermes / V8) is left
-  to the simulator e2e job (`mobile-e2e.yml`). This script uses Node
-  to evaluate the bundle so we get a stack with real minified line
-  numbers without bringing up an emulator.
+- Something was symbolicated at all (`symbolicated: true` on a frame).
+- The resolved line is **not** line 1. The bundle is a single line, so a
+  mismatched map resolves everything back to it, and a test that only
+  checked "a file name changed" would pass.
+- The pre-symbolication coordinates survive. A stale map produces
+  confident nonsense, and the original position is the only way anyone
+  can tell.
+
+## Files
+
+- `app.js` — the fixture. Three nested calls so the stack has depth;
+  plain JS so bundling needs no Babel preset.
+- `throw-and-format.js` — runs the bundle via `vm.runInThisContext` with
+  the bundle's filename, so the stack really points inside it, and
+  shapes the result into a Sentori event.
+- `run-v02.sh` — the driver.

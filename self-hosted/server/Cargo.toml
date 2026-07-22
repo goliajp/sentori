@@ -43,6 +43,7 @@ sentori-auth-session       = { path = "../../core/crates/auth-session" }
 sentori-attachment-store   = { path = "../../core/crates/attachment-store" }
 sentori-event-pipeline     = { path = "../../core/crates/event-pipeline" }
 sentori-identity-fingerprint = { path = "../../core/crates/identity-fingerprint" }
+sentori-sourcemap-resolver = { path = "../../core/crates/sourcemap-resolver" }
 sentori-issue-store        = { path = "../../core/crates/issue-store" }
 sentori-span-store         = { path = "../../core/crates/span-store" }
 sentori-replay-store       = { path = "../../core/crates/replay-store" }

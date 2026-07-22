@@ -53,6 +53,9 @@ pub struct AppState {
     /// rotating one would orphan every fingerprint written under it —
     /// so this grows to one small entry per workspace and stays there.
     pub identity_scopes: crate::identity_link::SharedScopeCache,
+    /// Parsed source maps, keyed by content hash. Shared so one parse
+    /// serves every event of a crashing release.
+    pub source_maps: std::sync::Arc<crate::symbolicate::MapCache>,
     pub audit: AuditService,
     pub alerts: AlertRuleService,
     pub saved_views: SavedViewService,
@@ -119,6 +122,7 @@ impl AppState {
             replays,
             metrics,
             identity_scopes: std::sync::Arc::default(),
+            source_maps: std::sync::Arc::new(crate::symbolicate::new_cache()),
             audit,
             alerts,
             saved_views,

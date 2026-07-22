@@ -8,6 +8,7 @@
 
 const fs = require('node:fs')
 const path = require('node:path')
+const vm = require('node:vm')
 
 const [, , bundlePath, release] = process.argv
 if (!bundlePath || !release) {
@@ -20,8 +21,12 @@ let stack = ''
 let message = ''
 let type = 'Error'
 try {
-  // eslint-disable-next-line no-new-func
-  new Function(code)()
+  // `vm.runInThisContext` with an explicit filename, not `new Function`:
+  // the latter attributes every frame to *this* file, so the stack came
+  // back naming throw-and-format.js and there was nothing for a source
+  // map to resolve. The point of the fixture is a stack that really
+  // points into the bundle.
+  vm.runInThisContext(code, { filename: bundlePath })
 } catch (e) {
   stack = e.stack || ''
   message = e.message || 'unknown'
@@ -36,12 +41,15 @@ const frames = stack
   .slice(1)
   .map((line) => line.match(/at\s+(?:(\S+)\s+)?\(?([^:)]+):(\d+):(\d+)\)?/))
   .filter(Boolean)
+  // Only frames from inside the bundle; the Node frames that ran it are
+  // not part of what the app would have reported.
+  .filter(([, , file]) => file.endsWith(path.basename(bundlePath)))
   .map(([, fn, file, line, col]) => ({
     file: path.basename(file),
     line: Number(line),
     column: Number(col),
     function: fn || undefined,
-    inApp: file.endsWith('bundle.js'),
+    inApp: file.endsWith(path.basename(bundlePath)),
   }))
 
 const id = crypto.randomUUID()

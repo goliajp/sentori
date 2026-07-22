@@ -25,6 +25,7 @@ mod admin;
 mod alerts;
 mod alerts_fire;
 mod api_describe;
+mod artifacts_upload;
 mod attachments;
 mod audit;
 mod auth;
@@ -256,7 +257,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         )
         .route(
             "/admin/api/projects/{project_id}/releases/{release_id}/artifacts",
-            get(admin::releases::list_artifacts),
+            get(admin::releases::list_artifacts).post(artifacts_upload::upload),
         )
         .route(
             "/admin/api/releases/{release_id}",

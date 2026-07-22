@@ -6,13 +6,19 @@ We deploy by tagging a release on `main`, pulling the GHCR image on the app VM, 
 
 Before you cut a tag:
 
-1. CI on `main` is green. Specifically: `build`, `mobile-e2e` (XCTest, Robolectric, mailcatcher, sourcemap), and `pages`. If any of these are red, fix them first; do not deploy a "known broken" tag.
-2. The migration count matches what's in `server/migrations/`. If you added a migration, confirm it's idempotent and tested locally with `cargo test --test db_test`.
-3. Run all three smoke scripts against your local server one more time:
+1. CI on `master` is green — `build`, `v0.2 core`, and `mobile-e2e` if
+   it ran. A red gate is fixed before a tag, never deployed around.
+2. Migrations live in `core/migrations/` and run at boot, so a new one
+   ships the moment the image does. Confirm it is idempotent: it will
+   be re-applied on every restart of every self-hosted install.
+3. Run the local gates the CI runs, using the same commands — `cargo
+   test` without `--all-targets` skips every integration test and still
+   exits 0:
    ```sh
-   scripts/test-phase13.sh
-   scripts/test-phase14.sh
-   scripts/test-phase15.sh
+   cd core              && cargo test --workspace --all-targets
+   cd self-hosted/server && cargo test --all-targets
+   cd webapp            && bun run check
+   bash scripts/check-rfc3339.sh
    ```
 4. Note the previous version in case you need to roll back. `docker exec sentori-server-blue env | grep SENTORI_VERSION` on the app VM, or read `compose/.env`.
 

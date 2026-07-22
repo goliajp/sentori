@@ -57,6 +57,7 @@ mod saasadmin_mw;
 mod session_mw;
 mod state;
 mod stripe;
+mod symbolicate;
 mod token_cache;
 mod webhook;
 mod webpush;

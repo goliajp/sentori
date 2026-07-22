@@ -23,7 +23,7 @@ pub async fn handle(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<Value>,
 ) -> (StatusCode, Json<Value>) {
-    let event = match map_payload(payload) {
+    let mut event = match map_payload(payload) {
         Ok(e) => e,
         Err(msg) => {
             warn!(workspace_id = %ctx.workspace_id, error = %msg, "sdk.events bad_payload");
@@ -48,7 +48,13 @@ pub async fn handle(
     // Cloned before the event moves into ingest, like the tick
     // snapshot below. Only the `user` branch is needed, so the rest of
     // the payload is not copied.
-    let payload_for_identity = crate::identity_link::payload_slice(&event.payload);
+    let (symbolicated, payload_for_identity) = crate::symbolicate::prepare(
+        &state,
+        ctx.project_id.into_uuid(),
+        &event.release,
+        &mut event.payload,
+    )
+    .await;
 
     let event_tick_snapshot = (
         event.kind.as_db_str().to_string(),
@@ -65,53 +71,17 @@ pub async fn handle(
                 issue_id = %outcome.issue_id,
                 is_new = outcome.is_new_issue,
                 regressed = outcome.regressed,
+                symbolicated,
                 "sdk.events ingested",
             );
-            // File the event under whoever it belongs to. Best effort:
-            // an event we cannot attribute is still an event worth
-            // keeping, and the SDK already did the hashing.
-            let ws = ctx.workspace_id.into_uuid();
-            crate::identity_link::record(&state, ws, outcome.event_id, &payload_for_identity).await;
-
-            // Best-effort broadcast to live SSE subscribers.
-            let (kind, release, environment, platform, ts) = event_tick_snapshot;
-            let _ = state.events_bus.send(crate::state::RecentEventTick {
-                project_id: ctx.project_id.into_uuid(),
-                issue_id: outcome.issue_id,
-                event_id: outcome.event_id,
-                kind,
-                release,
-                environment,
-                platform,
-                timestamp: ts,
-            });
-            // Best-effort alert dispatch on new-issue / regression.
-            if outcome.is_new_issue {
-                crate::alert_fire::fire_async(
-                    state.pool.clone(),
-                    ctx.workspace_id.into_uuid(),
-                    ctx.project_id.into_uuid(),
-                    outcome.issue_id,
-                    crate::alert_fire::TriggerKind::IssueNew,
-                );
-            } else if outcome.regressed {
-                crate::alert_fire::fire_async(
-                    state.pool.clone(),
-                    ctx.workspace_id.into_uuid(),
-                    ctx.project_id.into_uuid(),
-                    outcome.issue_id,
-                    crate::alert_fire::TriggerKind::Regression,
-                );
-            }
-            // event_count rules can fire on any event (rule itself
-            // checks the threshold against issues.event_count).
-            crate::alert_fire::fire_async(
-                state.pool.clone(),
-                ctx.workspace_id.into_uuid(),
-                ctx.project_id.into_uuid(),
-                outcome.issue_id,
-                crate::alert_fire::TriggerKind::EventCount,
-            );
+            after_ingest(
+                &state,
+                &ctx,
+                &outcome,
+                &payload_for_identity,
+                event_tick_snapshot,
+            )
+            .await;
             (
                 StatusCode::ACCEPTED,
                 Json(json!({
@@ -250,4 +220,53 @@ fn map_payload(mut p: Value) -> Result<Event, String> {
         fingerprint_override,
         payload: Value::Object(obj.clone()),
     })
+}
+
+/// Everything that happens after an event lands: attribute it, tell the
+/// live tail, and let the alert rules look at it.
+///
+/// Shared by the single and batch paths, which were carrying the same
+/// forty lines twice — and drifting, since the batch path had never
+/// gained identity attribution.
+pub(super) async fn after_ingest(
+    state: &Arc<AppState>,
+    ctx: &IngestContext,
+    outcome: &sentori_event_pipeline::IngestOutcome,
+    identity_slice: &serde_json::Value,
+    tick: (String, String, String, String, time::OffsetDateTime),
+) {
+    let ws = ctx.workspace_id.into_uuid();
+    // Best effort: an event we cannot attribute is still worth keeping,
+    // and the SDK already did the hashing.
+    crate::identity_link::record(state, ws, outcome.event_id, identity_slice).await;
+
+    let (kind, release, environment, platform, timestamp) = tick;
+    let _ = state.events_bus.send(crate::state::RecentEventTick {
+        project_id: ctx.project_id.into_uuid(),
+        issue_id: outcome.issue_id,
+        event_id: outcome.event_id,
+        kind,
+        release,
+        environment,
+        platform,
+        timestamp,
+    });
+
+    let fire = |trigger| {
+        crate::alert_fire::fire_async(
+            state.pool.clone(),
+            ws,
+            ctx.project_id.into_uuid(),
+            outcome.issue_id,
+            trigger,
+        );
+    };
+    if outcome.is_new_issue {
+        fire(crate::alert_fire::TriggerKind::IssueNew);
+    } else if outcome.regressed {
+        fire(crate::alert_fire::TriggerKind::Regression);
+    }
+    // event_count rules can fire on any event; the rule itself checks
+    // the threshold against issues.event_count.
+    fire(crate::alert_fire::TriggerKind::EventCount);
 }
