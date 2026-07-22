@@ -1,6 +1,7 @@
 package com.sentori
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import android.os.Build
 import android.util.Base64
 import org.json.JSONArray
@@ -51,6 +52,34 @@ object SentoriCrashHandler {
             // wireframe view-tree walks.
             SentoriReplayCapture.register(it)
         }
+    }
+
+    /**
+     * Bind a context without taking over the process's uncaught-exception
+     * handler.
+     *
+     * `register` installs a global handler and hooks the Activity
+     * lifecycle, neither of which a unit test wants — and Robolectric
+     * would carry the handler across test classes. This binds only the
+     * context that [write] needs.
+     */
+    @VisibleForTesting
+    @JvmStatic
+    fun installForTesting(context: Context) {
+        appCtx = context.applicationContext
+    }
+
+    /**
+     * Run the persist path on a throwable, as if it had crashed the app.
+     *
+     * Exposes [write] rather than duplicating it: a test that reimplemented
+     * the JSON shape would pass while the real one drifted, which is the
+     * opposite of what it is for.
+     */
+    @VisibleForTesting
+    @JvmStatic
+    fun persistForTesting(throwable: Throwable) {
+        write(throwable)
     }
 
     @JvmStatic
