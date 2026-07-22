@@ -63,3 +63,10 @@ data/
 tmp/
 .claude/
 .npmrc
+
+# Credentials kept next to the project for convenience. Untracked is
+# not enough on its own: this repo is mirrored to a public one, and a
+# single `git add -A` would push live keys there irreversibly.
+.keys
+.keys.*
+*.pem
