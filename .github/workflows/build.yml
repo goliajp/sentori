@@ -36,7 +36,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       server: ${{ steps.filter.outputs.server }}
-      web: ${{ steps.filter.outputs.web }}
       webapp: ${{ steps.filter.outputs.webapp }}
       sdk: ${{ steps.filter.outputs.sdk }}
       infra: ${{ steps.filter.outputs.infra }}
@@ -57,13 +56,16 @@ jobs:
               - 'Cargo.lock'
               - 'docker/**'
               - 'scripts/**'
+            # Drives the `server-test` job, which after the v0.1
+            # decommission runs the cli gates and the repo-wide checks
+            # (rfc3339, orphan modules, cargo features) rather than
+            # anything under server/.
             server:
-              - 'server/**'
               - 'cli/**'
+              - 'core/**'
+              - 'self-hosted/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
-            web:
-              - 'web/**'
             webapp:
               - 'webapp/**'
             sdk:
@@ -147,58 +149,11 @@ jobs:
 
       - name: check cargo features (v2.20 P2 — anti-feature-drift)
         run: bash scripts/check-cargo-features.sh
-
-      - name: cargo test (server)
-        run: cargo test --manifest-path server/Cargo.toml --all-targets
-
-      # v1.1 P2 — clippy report. Runs on every server-touching push
-      # so reviewers can see what new lints landed in their diff. Not
-      # `-D warnings` yet (~98 pre-existing across the crate); the
-      # roadmap is to fix in P2.x batches and tighten this to `-D`
-      # once we're at zero. `continue-on-error` keeps green CI today
-      # so any lint regression shows in the logs without blocking
-      # unrelated merges.
-      - name: cargo clippy (server) — report
-        continue-on-error: true
-        run: cargo clippy --manifest-path server/Cargo.toml --all-targets
-
-      # `cli/` publishes binaries from release-cli.yml and had only ever
-      # been type-checked, so three clippy errors and a drifted format
-      # lived in it unremarked. A surface that ships needs the same gate
-      # as the surfaces it ships alongside.
       - name: cargo fmt (cli)
         run: cargo fmt --manifest-path cli/Cargo.toml --check
 
       - name: cargo clippy (cli)
         run: cargo clippy --manifest-path cli/Cargo.toml --all-targets -- -D warnings
-
-  web:
-    needs: changes
-    if: needs.changes.outputs.web == 'true' || needs.changes.outputs.infra == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          # Pinned (matches local). `latest` on bun has been known to
-          # change peerDependency resolution behaviour between patch
-          # releases — pin to avoid CI drift from local development.
-          bun-version: "1.3.13"
-
-      - name: web — install + check + test + build
-        working-directory: web
-        run: |
-          bun install --frozen-lockfile
-          bun run check
-          bun run test
-          bun run build
-
-  # v0.2 dashboard. This is the SPA the self-hosted docker image
-  # bundles, so a type error here breaks the image build — it went
-  # unguarded until 2026-07-20 (96 type errors surfaced only when
-  # docker ran `tsc -b` during the v0.2 cutover).
   webapp:
     needs: changes
     if: needs.changes.outputs.webapp == 'true' || needs.changes.outputs.infra == 'true'
@@ -217,66 +172,6 @@ jobs:
           bun install --frozen-lockfile
           bun run check
           bun run build
-
-  web-e2e:
-    # Playwright browser drive of the account flows + teams flow against
-    # a freshly built sentori-server. Gated to the same trigger surface
-    # as web — a server change can still break the dashboard's UI
-    # contracts, and a web change can still break the e2e expectations,
-    # so we run on either.
-    needs: changes
-    if: |
-      needs.changes.outputs.web == 'true'
-      || needs.changes.outputs.server == 'true'
-      || needs.changes.outputs.infra == 'true'
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: dev
-          POSTGRES_DB: sentori
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d sentori"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
-
-    env:
-      DATABASE_URL: postgres://postgres:dev@localhost:5432/sentori
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: server -> target
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.13"
-
-      - name: install web deps
-        working-directory: web
-        run: bun install --frozen-lockfile
-
-      - name: install playwright browsers
-        working-directory: web
-        run: bunx playwright install --with-deps chromium
-
-      - name: build server (pre-warm before playwright launches it)
-        run: cargo build --manifest-path server/Cargo.toml --bin sentori-server
-
-      - name: playwright — e2e
-        working-directory: web
-        run: bun run test:e2e
-
   sdk:
     needs: changes
     if: needs.changes.outputs.sdk == 'true' || needs.changes.outputs.infra == 'true'
@@ -323,60 +218,9 @@ jobs:
           bun test
           bun run build
 
-  docker-build:
-    # Wait for the upstreams that actually ran. Skipped jobs report
-    # `result == skipped` which `!failure() && !cancelled()` accepts —
-    # so when web is the only thing that changed, server-test and sdk
-    # are skipped but this job still proceeds.
-    needs: [changes, workflows, server-test, web, webapp, web-e2e, sdk]
-    if: |
-      always()
-      && !failure()
-      && !cancelled()
-      && github.event_name == 'push'
-      && github.ref == 'refs/heads/master'
-      && (needs.changes.outputs.server == 'true'
-          || needs.changes.outputs.web == 'true'
-          || needs.changes.outputs.infra == 'true')
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: build & push sentori-server
-        if: needs.changes.outputs.server == 'true' || needs.changes.outputs.infra == 'true'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: docker/Dockerfile.server
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/sentori-server:latest
-            ghcr.io/${{ github.repository_owner }}/sentori-server:${{ github.sha }}
-          cache-from: type=gha,scope=sentori-server
-          cache-to: type=gha,mode=max,scope=sentori-server
-
-      - name: build & push sentori-web
-        if: needs.changes.outputs.web == 'true' || needs.changes.outputs.infra == 'true'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: docker/Dockerfile.web
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/sentori-web:latest
-            ghcr.io/${{ github.repository_owner }}/sentori-web:${{ github.sha }}
-          cache-from: type=gha,scope=sentori-web
-          cache-to: type=gha,mode=max,scope=sentori-web
+  # `docker-build` lived here and pushed ghcr.io/goliajp/sentori-server
+  # and ...-web from docker/Dockerfile.{server,web}. Both were the v0.1
+  # build, decommissioned 2026-07-23. The v0.2 image is published by
+  # `v0.2 self-hosted — docker image build + push to GHCR`, on master
+  # and on release tags, under a different name
+  # (goliajp/sentori/sentori-server), so nothing was sharing a tag.
