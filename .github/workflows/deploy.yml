@@ -185,7 +185,14 @@ jobs:
           # copy 1:1 from legacy users); stripe secret optional until
           # billing goes live on the new stack.
           SENTORI_SAASADMIN_USER_IDS: ${{ secrets.SENTORI_SAASADMIN_USER_IDS }}
+          # All four are needed together. With only the webhook secret
+          # the worker starts and drains events, but nothing can create
+          # a subscription to send them — checkout has no API key and no
+          # price to sell.
+          SENTORI_STRIPE_SECRET_KEY: ${{ secrets.SENTORI_STRIPE_SECRET_KEY }}
           SENTORI_STRIPE_WEBHOOK_SECRET: ${{ secrets.SENTORI_STRIPE_WEBHOOK_SECRET }}
+          SENTORI_STRIPE_PRICE_PRO: ${{ secrets.SENTORI_STRIPE_PRICE_PRO }}
+          SENTORI_STRIPE_PRICE_ENTERPRISE: ${{ secrets.SENTORI_STRIPE_PRICE_ENTERPRISE }}
           # First `super` operator for sentori-saas-control. Seeding is
           # idempotent, so redeploying can't reset the password.
           SENTORI_SAASADMIN_BOOTSTRAP_EMAIL: ${{ secrets.SENTORI_SAASADMIN_BOOTSTRAP_EMAIL }}
@@ -216,7 +223,10 @@ jobs:
           SENTORI_GOOGLE_CLIENT_SECRET=${SENTORI_GOOGLE_CLIENT_SECRET}
           SENTORI_VERSION=${SENTORI_VERSION}
           SENTORI_SAASADMIN_USER_IDS=${SENTORI_SAASADMIN_USER_IDS}
+          SENTORI_STRIPE_SECRET_KEY=${SENTORI_STRIPE_SECRET_KEY}
           SENTORI_STRIPE_WEBHOOK_SECRET=${SENTORI_STRIPE_WEBHOOK_SECRET}
+          SENTORI_STRIPE_PRICE_PRO=${SENTORI_STRIPE_PRICE_PRO}
+          SENTORI_STRIPE_PRICE_ENTERPRISE=${SENTORI_STRIPE_PRICE_ENTERPRISE}
           SENTORI_SAASADMIN_BOOTSTRAP_EMAIL=${SENTORI_SAASADMIN_BOOTSTRAP_EMAIL}
           SENTORI_SAASADMIN_BOOTSTRAP_PASSWORD=${SENTORI_SAASADMIN_BOOTSTRAP_PASSWORD}
           SENTORI_SAASADMIN_BOOTSTRAP_NAME=${SENTORI_SAASADMIN_BOOTSTRAP_NAME}
