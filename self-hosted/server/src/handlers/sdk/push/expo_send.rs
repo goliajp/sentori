@@ -18,6 +18,13 @@ pub async fn handle(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<Value>,
 ) -> (StatusCode, Json<Value>) {
+    // Same capability as /v1/push/send, reached through the Expo
+    // compatibility door. Gating one and not the other would gate
+    // nothing.
+    if let Err((code, body)) = crate::handlers::sdk::require_admin_token(&ctx) {
+        return (code, body);
+    }
+
     let items: Vec<Value> = if let Some(arr) = payload.as_array() {
         arr.clone()
     } else {

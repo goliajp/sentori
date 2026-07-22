@@ -89,6 +89,13 @@ pub async fn upload_by_release_name(
     Path(release): Path<String>,
     multipart: Multipart,
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
+    // A public token ships inside the customer's app. Anyone who has
+    // the app could otherwise replace the source map for a release,
+    // and every stack in it would then symbolicate to whatever they
+    // chose — silently, since a wrong map looks exactly like a right
+    // one until someone reads a frame.
+    super::sdk::require_admin_token(&ctx)?;
+
     if release.trim().is_empty() {
         return Err((
             StatusCode::BAD_REQUEST,
