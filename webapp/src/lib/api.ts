@@ -1156,6 +1156,25 @@ export class Api {
   listReleases(projectId: string): Promise<{ releases: ReleaseRow[] }> {
     return this.get(`/admin/api/projects/${projectId}/releases`);
   }
+  /** Upload a symbolication artifact for a release. */
+  async uploadArtifact(
+    projectId: string,
+    releaseId: string,
+    kind: 'sourcemap' | 'dsym' | 'proguard' | 'bundle',
+    file: File,
+  ): Promise<ReleaseArtifact> {
+    const form = new FormData();
+    form.append('kind', kind);
+    form.append('file', file);
+    // No Content-Type header: the browser has to set it so the
+    // multipart boundary matches the body it generated.
+    const r = await fetch(
+      `${this.baseUrl}/admin/api/projects/${projectId}/releases/${releaseId}/artifacts`,
+      { method: 'POST', credentials: 'include', body: form },
+    );
+    if (!r.ok) throw new ApiError(r.status, await r.text());
+    return r.json() as Promise<ReleaseArtifact>;
+  }
   listArtifacts(
     projectId: string,
     releaseId: string,

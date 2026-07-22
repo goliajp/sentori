@@ -495,6 +495,18 @@ export const en = {
   'crash.userReports': "What people said",
   'crash.userReportsHint': "Descriptions typed by people who hit this.",
 
+  'artifacts.kind': "Kind",
+  'artifacts.name': "File",
+  'artifacts.size': "Size",
+  'artifacts.hash': "Hash",
+  'artifacts.uploaded': "Uploaded",
+  'artifacts.none': "No symbol files for this release",
+  'artifacts.noneHint': "Without them a crash from this build shows minified frames.",
+  'artifacts.upload': "Upload symbols",
+  'artifacts.uploading': "Uploading…",
+
+  'releases.confirmDelete': 'Delete "{name}"? Its symbol files go with it.',
+
   'nav.issues': 'Issues',
   'nav.members': 'Members',
   'nav.metrics': 'Metrics',

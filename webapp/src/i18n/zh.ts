@@ -488,6 +488,18 @@ export const zh: Messages = {
   'crash.userReports': "用户怎么说",
   'crash.userReportsHint': "遇到这个问题的人自己写的描述。",
 
+  'artifacts.kind': "类型",
+  'artifacts.name': "文件",
+  'artifacts.size': "大小",
+  'artifacts.hash': "哈希",
+  'artifacts.uploaded': "上传时间",
+  'artifacts.none': "这个版本还没有符号文件",
+  'artifacts.noneHint': "没有它们,这个构建的崩溃只能看到压缩后的调用栈。",
+  'artifacts.upload': "上传符号文件",
+  'artifacts.uploading': "上传中…",
+
+  'releases.confirmDelete': '删除「{name}」?它的符号文件会一并删除。',
+
   'nav.issues': '问题',
   'nav.members': '成员',
   'nav.metrics': '指标',

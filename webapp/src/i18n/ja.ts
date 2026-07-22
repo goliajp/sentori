@@ -488,6 +488,18 @@ export const ja: Messages = {
   'crash.userReports': "ユーザーの声",
   'crash.userReportsHint': "この問題に遭遇した人が書いた説明。",
 
+  'artifacts.kind': "種別",
+  'artifacts.name': "ファイル",
+  'artifacts.size': "サイズ",
+  'artifacts.hash': "ハッシュ",
+  'artifacts.uploaded': "アップロード日時",
+  'artifacts.none': "このリリースにはシンボルファイルがありません",
+  'artifacts.noneHint': "これがないと、このビルドのクラッシュは圧縮された状態でしか見えません。",
+  'artifacts.upload': "シンボルをアップロード",
+  'artifacts.uploading': "アップロード中…",
+
+  'releases.confirmDelete': '「{name}」を削除しますか?シンボルファイルも一緒に削除されます。',
+
   'nav.issues': 'イシュー',
   'nav.members': 'メンバー',
   'nav.metrics': 'メトリクス',
