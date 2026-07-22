@@ -7,8 +7,6 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useT } from '../i18n';
 import { api } from '../lib/api';
 
-const MISSING_TOKEN = 'Missing token — open the link from your email.';
-
 export default function Verify() {
   const t = useT();
   const [params] = useSearchParams();
@@ -20,7 +18,7 @@ export default function Verify() {
   }>(() =>
     token
       ? { state: 'working', err: null }
-      : { state: 'error', err: MISSING_TOKEN },
+      : { state: 'error', err: t('verify.missingToken') },
   );
   const { state, err } = result;
   const fired = useRef(false);

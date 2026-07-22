@@ -22,8 +22,26 @@ const ROOTS = ['src/pages', 'src/components'];
 const CODE_PROPS =
   /(?:className|class|href|src|to|id|key|type|role|name|htmlFor|rel|target|charSet|viewBox|d|fill|stroke|xmlns|data-[\w-]+|aria-controls|aria-labelledby)\s*=\s*$/;
 
-/** A sentence: three-plus words, letters and ordinary punctuation. */
-const PROSE = /^[A-Z][\w'’-]*(?: [\w'’“”"(),.:;!?/&%+-]+){2,}$/;
+/** Looks like a sentence rather than an identifier or a class list.
+ *
+ *  Counts words instead of allow-listing punctuation. The first
+ *  version listed the characters a sentence may contain, and anything
+ *  outside the list escaped — an em dash or an ellipsis was enough.
+ *  That is how `On the project's Tokens page — an st_pk_… string your
+ *  SDK sends.` sat in the onboarding guide, untranslated, while the
+ *  check reported the file clean. */
+function isProse(text) {
+  if (!/^[A-Z]/.test(text)) return false;
+  if (!text.includes(' ')) return false;
+  // Three or more runs of two-plus letters. `flex items-center gap-6`
+  // has none longer than a token, and `px-5` has none at all.
+  const words = text.match(/[A-Za-z]{2,}/g) ?? [];
+  if (words.length < 3) return false;
+  // Class lists and paths are mostly separators; prose is mostly
+  // letters and spaces.
+  const letters = (text.match(/[A-Za-z ]/g) ?? []).length;
+  return letters / text.length > 0.75;
+}
 
 function walk(dir, out = []) {
   for (const e of readdirSync(dir)) {
@@ -48,7 +66,7 @@ for (const root of ROOTS) {
     let m;
     while ((m = re.exec(src)) !== null) {
       const text = m[2].replace(/\\(.)/g, '$1').trim();
-      if (!PROSE.test(text)) continue;
+      if (!isProse(text)) continue;
 
       const before = src.slice(0, m.index);
       const line = before.split('\n').length;
