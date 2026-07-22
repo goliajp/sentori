@@ -228,6 +228,7 @@ function NotificationsNavItem() {
 }
 
 function UserFooter() {
+  const t = useT();
   const navigate = useNavigate();
   const email =
     typeof localStorage !== 'undefined'
@@ -269,7 +270,7 @@ function UserFooter() {
         </span>
         <button
           onClick={signOut}
-          title="Sign out"
+          title={t('action.signOut')}
           className="inline-flex h-7 w-7 items-center justify-center rounded text-fg-subtle transition hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         >
           ⎋

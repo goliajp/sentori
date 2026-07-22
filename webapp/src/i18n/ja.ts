@@ -284,7 +284,6 @@ export const ja: Messages = {
   'projects.newName': "新しいプロジェクト名",
   'projects.confirmDelete': "「{name}」を削除しますか?イベント・問題・スパンも一緒に削除されます。",
   'action.rename': "名前を変更",
-  'action.new': "新規",
 
   'action.add': "追加",
   'action.remove': "削除",
@@ -398,7 +397,6 @@ export const ja: Messages = {
   'alerts.kindRegression': "解決済みの問題が再発",
   'alerts.kindEventCount': "イベント数がしきい値を超過",
   'alerts.kindCrashFreeDrop': "クラッシュフリー率が低下",
-  'alerts.muted': "ミュート中",
 
   'audit.quick': "よく使うフィルタ",
   'audit.quickTokens': "トークン発行",
@@ -423,7 +421,6 @@ export const ja: Messages = {
   'push.credSubtitle': "プッシュ配信に使う各社の認証情報:APNs・FCM・WebPush・HCM・MiPush。",
   'push.retryAllFailed': "失敗した {n} 件を再試行",
   'releases.subtitle': "デプロイ記録と、そのためにアップロードされたシンボルファイル。",
-  'replays.comingSoon': "フレーム単位の再生は v0.3 で提供予定です。",
   'auth.haveAccount': "すでにアカウントをお持ちですか?",
   'events.narrowShort': "これだけ",
   'settings.manageBilling': "請求を管理",
@@ -435,7 +432,6 @@ export const ja: Messages = {
   'settings.sessionsHint': "各セッションのアドレスとデバイス。個別に失効できます。",
   'settings.openSessions': "セッションページへ",
   'settings.ingestHint': "SDK はここに送信します。認可に使うトークンはプロジェクトのトークンページにあります。",
-  'settings.openTokens': "トークンページへ",
 
   'settings.integrationsHint': "プロジェクトに Slack や Linear を接続して、イベントを転送します。",
   'settings.notifiersHint': "メールはこのデプロイの運用者が設定します。Webhook は既定で利用できます。",
@@ -449,6 +445,9 @@ export const ja: Messages = {
 
   'replays.frames': "{n} フレーム",
   'replays.allReplays': "← リプレイ一覧へ",
+
+  'replays.event': "イベント",
+  'replays.blob': "録画",
 
   'nav.issues': 'イシュー',
   'nav.members': 'メンバー',

@@ -291,7 +291,6 @@ export const en = {
   'projects.confirmDelete':
     'Delete “{name}”? Its events, issues and spans go with it.',
   'action.rename': "Rename",
-  'action.new': "New",
 
   'action.add': "Add",
   'action.remove': "Remove",
@@ -405,7 +404,6 @@ export const en = {
   'alerts.kindRegression': "A resolved issue comes back",
   'alerts.kindEventCount': "Events cross a threshold",
   'alerts.kindCrashFreeDrop': "Crash-free rate drops",
-  'alerts.muted': "Muted",
 
   'audit.quick': "Common filters",
   'audit.quickTokens': "Token mints",
@@ -430,7 +428,6 @@ export const en = {
   'push.credSubtitle': "Provider secrets used to deliver push: APNs, FCM, WebPush, HCM, MiPush.",
   'push.retryAllFailed': "Retry all {n} failed",
   'releases.subtitle': "Deploys, and the symbol files uploaded for them.",
-  'replays.comingSoon': "Frame-by-frame playback lands in v0.3.",
   'auth.haveAccount': "Already have an account?",
   'events.narrowShort': "Only this",
   'settings.manageBilling': "Manage billing",
@@ -442,7 +439,6 @@ export const en = {
   'settings.sessionsHint': "Every session with its address and device, revocable one by one.",
   'settings.openSessions': "Open sessions",
   'settings.ingestHint': "Your SDK sends here. The token that authorises it is on the project tokens page.",
-  'settings.openTokens': "Open tokens",
 
   'settings.integrationsHint': "Connect Slack or Linear on a project to forward its events.",
   'settings.notifiersHint': "Email is configured by whoever runs this deployment. Webhooks work out of the box.",
@@ -456,6 +452,9 @@ export const en = {
 
   'replays.frames': "{n} frames",
   'replays.allReplays': "← All replays",
+
+  'replays.event': "event",
+  'replays.blob': "recording",
 
   'nav.issues': 'Issues',
   'nav.members': 'Members',

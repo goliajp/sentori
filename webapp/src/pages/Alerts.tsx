@@ -124,7 +124,7 @@ export function AlertsPage() {
             size="sm"
             onClick={() => setShowCreate(!showCreate)}
           >
-            {showCreate ? 'Cancel' : '+ New rule'}
+            {showCreate ? t('action.cancel') : `+ ${t('alerts.newRule')}`}
           </Button>
         }
       />
