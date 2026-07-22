@@ -19,6 +19,11 @@ use crate::store::TokenStore;
 /// Handler extractors pull this from `Extension<IngestContext>`.
 #[derive(Debug, Clone, Copy)]
 pub struct IngestContext {
+    /// The `tokens` row this request authenticated with. Carried so a
+    /// caller can attribute or limit per credential rather than per
+    /// project — two apps under one project hold separate tokens and
+    /// should not share an allowance.
+    pub token_id: uuid::Uuid,
     pub workspace_id: sentori_workspace_identity::WorkspaceId,
     pub project_id: sentori_workspace_identity::ProjectId,
     pub token_kind: TokenKind,
@@ -71,6 +76,7 @@ async fn resolve_token(
     }
 
     Ok(IngestContext {
+        token_id: token.id,
         workspace_id: token.workspace_id,
         project_id: token.project_id,
         token_kind: token.kind,

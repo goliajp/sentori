@@ -53,6 +53,7 @@ mod periodic_alert_worker;
 mod probe_worker;
 mod push_quarantine;
 mod push_worker;
+mod rate_limit;
 mod saasadmin_mw;
 mod session_mw;
 mod state;
