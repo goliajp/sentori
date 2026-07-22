@@ -99,9 +99,19 @@ jobs:
           MIRROR_REPO: ${{ vars.SENTORI_SELFHOSTED_MIRROR_REPO }}
           MIRROR_TOKEN: ${{ secrets.SENTORI_SELFHOSTED_MIRROR_TOKEN }}
         run: |
+          # Fail rather than skip. This exited 0 without a token, so
+          # every run reported success while pushing nothing, and the
+          # public repository — the artifact self-hosted users actually
+          # consume — sat three days and thirty commits behind without
+          # anything going red. A mirror that cannot mirror is broken,
+          # not fine.
           if [ -z "$MIRROR_TOKEN" ]; then
-            echo "SENTORI_SELFHOSTED_MIRROR_TOKEN not set, skipping push"
-            exit 0
+            echo "::error::SENTORI_SELFHOSTED_MIRROR_TOKEN is not set."
+            echo "::error::The public mirror has not been updated since"
+            echo "::error::this token went missing. Set it, or disable"
+            echo "::error::this workflow — but do not leave it green and"
+            echo "::error::silent."
+            exit 1
           fi
           cd /tmp/mirror
           git init -b master
