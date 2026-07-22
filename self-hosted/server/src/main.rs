@@ -42,6 +42,7 @@ mod archive_worker;
 mod billing_worker;
 mod blob_store;
 mod bootstrap;
+mod client_ip;
 mod fcm;
 mod handlers;
 mod hcm;
