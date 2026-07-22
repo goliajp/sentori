@@ -53,6 +53,15 @@ jobs:
           # `target/` and `node_modules/` stay unanchored on purpose:
           # those should go at every depth.
           #
+          # Every workflow is private by default. The mirror does not
+          # need to ship CI configs — a user building their own image
+          # writes their own. Excluding by name meant new workflows
+          # opted in by accident: `prod-drift.yml` was published on the
+          # first successful push and rejected because the PAT lacked
+          # `workflow` scope. If we ever want to publish a workflow,
+          # whitelist it explicitly with `--include` before the wildcard
+          # exclude — today, none.
+          #
           # `/.git/` is the private repo's checkout, not source. Without
           # this exclude, rsync copies the private git dir into
           # /tmp/mirror. `git init` becomes a no-op, `git remote add
@@ -82,11 +91,6 @@ jobs:
             --exclude='ROADMAP.md' \
             --exclude='ROADMAP-PHASE-50.md' \
             --exclude='ops/secrets.md' \
-            --exclude='.github/workflows/build.yml' \
-            --exclude='.github/workflows/deploy.yml' \
-            --exclude='.github/workflows/mobile-e2e.yml' \
-            --exclude='.github/workflows/release-cli.yml' \
-            --exclude='.github/workflows/sdk-perf.yml' \
             --exclude='CHANGELOG.md' \
             --exclude='CONTRIBUTING.md' \
             --exclude='CODE_OF_CONDUCT.md' \
@@ -95,10 +99,9 @@ jobs:
             --exclude='.github/PULL_REQUEST_TEMPLATE.md' \
             --exclude='.github/CONTRIBUTING.md' \
             --exclude='.github/SECURITY.md' \
-            --exclude='.github/workflows/v0.2-oss-mirror.yml' \
-            --exclude='.github/workflows/v0.2-core-check.yml' \
             --exclude='target/' \
             --exclude='node_modules/' \
+            --exclude='.github/workflows/**' \
             --exclude='.claude/' \
             --exclude='/.git/' \
             ./ /tmp/mirror/
