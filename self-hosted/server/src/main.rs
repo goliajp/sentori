@@ -56,6 +56,7 @@ mod push_quarantine;
 mod push_worker;
 mod rate_limit;
 mod saasadmin_mw;
+mod security_headers;
 mod session_mw;
 mod state;
 mod stripe;
@@ -106,7 +107,13 @@ async fn main() -> anyhow::Result<()> {
     billing_worker::spawn(pool.clone(), state.stripe.clone());
     archive_worker::spawn(pool);
 
-    let app = handlers::router(state);
+    // Baseline HSTS / X-Content-Type-Options / X-Frame-Options /
+    // Referrer-Policy on every response. Wrapping at the outermost
+    // point catches every route, including the ones added by nested
+    // Routers inside `handlers::router`.
+    let app = handlers::router(state).layer(axum::middleware::from_fn(
+        security_headers::add_baseline_headers,
+    ));
 
     let listener = TcpListener::bind(&bind).await.context("bind")?;
     info!(%bind, "ready");
