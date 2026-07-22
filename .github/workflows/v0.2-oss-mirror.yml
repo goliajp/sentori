@@ -44,15 +44,32 @@ jobs:
           # Everything else (docs, contributing templates, internal
           # planning, saas-control, marketing, sdk pkg matrix) stays
           # private — the public mirror is consumption-only.
+          #
+          # Every directory exclusion is anchored with a leading `/`.
+          # rsync matches an unanchored `server/` at any depth, so the
+          # rule meant to drop the v0.1 crate was also dropping
+          # `self-hosted/server/` — the v0.2 server source, in the
+          # repository whose entire purpose is letting people run it.
+          # `target/` and `node_modules/` stay unanchored on purpose:
+          # those should go at every depth.
+          #
+          # `docker/` is excluded because it is the v0.1 build.
+          # Dockerfile.server COPYs `server/`, which this mirror does
+          # not ship, and production-compose.yml pulls
+          # ghcr.io/goliajp/sentori-server, which stopped being built
+          # when v0.1 was decommissioned on 2026-07-23. A reader
+          # following it hit a 404 on the first COPY. The v0.2
+          # equivalents are in `self-hosted/docker/` and are mirrored.
           rsync -a --delete \
-            --exclude='saas/' \
-            --exclude='server/' \
-            --exclude='web/' \
-            --exclude='marketing/' \
-            --exclude='docs/' \
-            --exclude='docs-site/' \
-            --exclude='docs-v0.1/' \
-            --exclude='docs-v0.2/' \
+            --exclude='/saas/' \
+            --exclude='/server/' \
+            --exclude='/web/' \
+            --exclude='/docker/' \
+            --exclude='/marketing/' \
+            --exclude='/docs/' \
+            --exclude='/docs-site/' \
+            --exclude='/docs-v0.1/' \
+            --exclude='/docs-v0.2/' \
             --exclude='ROADMAP.md' \
             --exclude='ROADMAP-PHASE-50.md' \
             --exclude='ops/secrets.md' \
