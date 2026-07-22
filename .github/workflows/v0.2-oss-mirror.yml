@@ -53,6 +53,15 @@ jobs:
           # `target/` and `node_modules/` stay unanchored on purpose:
           # those should go at every depth.
           #
+          # `/.git/` is the private repo's checkout, not source. Without
+          # this exclude, rsync copies the private git dir into
+          # /tmp/mirror. `git init` becomes a no-op, `git remote add
+          # origin` fails with "already exists", and — before that
+          # error — a mirror that succeeded would have been publishing
+          # every private commit and branch ever made. Anchored so it
+          # matches only the top level, not `.git` inside submodules or
+          # checked-in fixtures.
+          #
           # `docker/` is excluded because it is the v0.1 build.
           # Dockerfile.server COPYs `server/`, which this mirror does
           # not ship, and production-compose.yml pulls
@@ -91,6 +100,7 @@ jobs:
             --exclude='target/' \
             --exclude='node_modules/' \
             --exclude='.claude/' \
+            --exclude='/.git/' \
             ./ /tmp/mirror/
           find /tmp/mirror/ -maxdepth 1 -printf '%f\n' | sort | head -20
 
