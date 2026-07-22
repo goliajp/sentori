@@ -23,7 +23,15 @@ use crate::state::AppState;
 pub async fn handle(
     Extension(ctx): Extension<IngestContext>,
     State(state): State<Arc<AppState>>,
-) -> Sse<impl Stream<Item = Result<SseEvent, Infallible>>> {
+) -> Result<
+    Sse<impl Stream<Item = Result<SseEvent, Infallible>>>,
+    (axum::http::StatusCode, axum::Json<serde_json::Value>),
+> {
+    // Nothing in any SDK subscribes to this. It is an operator feed,
+    // and a public token would hand a project's live error rate and
+    // release names to anyone holding the app.
+    super::require_admin_token(&ctx)?;
+
     let project_id = ctx.project_id.into_uuid();
     let rx = state.events_bus.subscribe();
     let stream = BroadcastStream::new(rx).filter_map(move |result| {
@@ -51,5 +59,5 @@ pub async fn handle(
             }
         }
     });
-    Sse::new(stream).keep_alive(KeepAlive::default())
+    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }

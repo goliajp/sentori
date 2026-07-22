@@ -54,6 +54,13 @@ pub async fn handle(
     State(state): State<Arc<AppState>>,
     Json(body): Json<SendBody>,
 ) -> (StatusCode, Json<Value>) {
+    // A public token is in the customer's shipped app. Whoever pulls
+    // it out could otherwise push arbitrary notifications to that
+    // customer's users, from a channel those users trust.
+    if let Err((code, body)) = crate::handlers::sdk::require_admin_token(&ctx) {
+        return (code, body);
+    }
+
     // Resolve target → list of (device_token_id, provider).
     let targets = match resolve_targets(&state, &ctx, &body).await {
         Ok(t) => t,

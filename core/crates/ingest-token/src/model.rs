@@ -43,6 +43,28 @@ pub enum TokenKind {
 }
 
 impl TokenKind {
+    /// Whether this token may perform server-side operations.
+    ///
+    /// The two kinds share a wire prefix, so the middleware cannot
+    /// tell them apart and does not try — it authenticates the token
+    /// and hands the kind to the handler. That arrangement only works
+    /// if handlers actually look, and for a long time none did: the
+    /// kind rode along in `IngestContext` and every endpoint behind
+    /// the middleware accepted both.
+    ///
+    /// The distinction is not about trust levels in the abstract. A
+    /// public token is *compiled into a shipped application* — anyone
+    /// who has the app has the token. So the question each endpoint
+    /// must answer is concrete: would it be acceptable for a stranger
+    /// with a copy of the customer's app to do this? Reporting a crash,
+    /// yes. Uploading a source map that rewrites how every stack in a
+    /// release is read, or sending a push notification to the
+    /// customer's users, no.
+    #[must_use]
+    pub const fn is_admin(self) -> bool {
+        matches!(self, Self::Admin)
+    }
+
     #[must_use]
     pub const fn as_db_str(self) -> &'static str {
         match self {
@@ -58,5 +80,27 @@ impl TokenKind {
             "admin" => Some(Self::Admin),
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod kind_tests {
+    use super::*;
+
+    #[test]
+    fn only_admin_is_admin() {
+        assert!(TokenKind::Admin.is_admin());
+        assert!(!TokenKind::Public.is_admin());
+    }
+
+    /// The db strings are the stored representation; renaming one
+    /// silently reclassifies every existing token.
+    #[test]
+    fn db_strings_round_trip() {
+        for k in [TokenKind::Public, TokenKind::Admin] {
+            assert_eq!(TokenKind::from_db_str(k.as_db_str()), Some(k));
+        }
+        assert_eq!(TokenKind::from_db_str("Admin"), None);
+        assert_eq!(TokenKind::from_db_str(""), None);
     }
 }
