@@ -6,6 +6,19 @@
 
 ---
 
+## v1.8.1(2026-07-22 — 打开 analytics 表;修 v1.8.0 弄红的 master)
+
+**`track_events` 从 migration 0019 起就有写入路由,生产里躺着 19,134 行** —— 18,751 条 `$pageview` 加上客户真实的 `bio.login.*` 业务事件。**一个读接口都没有。** 现在有三个,各对应表上已有的一个索引:窗口内的事件名聚合、单个事件名的日序列、按名字或用户过滤的明细尾巴。每个查询都有时间窗和行数上限 —— 一个能按请求全表扫 analytics 的端点,等于给了从 dashboard 打垮数据库的办法。
+
+页面回答的是**紧挨着 crash 的那个问题**(这个用户、这个版本,当时在做什么),而不是要长成一个 analytics 产品。「0 个用户」渲染成空白而不是「0 人」:匿名上报的 SDK 根本没有可计数的 handle,而 18k 事件旁边写个 0 读起来像 bug。
+
+**两处修复,针对正红着的 master**:
+
+- **`core-check` 5 个集成测试挂在 `column "priority" does not exist`**。event-pipeline 的 fixture 用 migration 0001 + 0003 建 schema,而三个 triage 列在 0004。**生产早就有这些列,只有测试 schema 落后。** 我本地没发现是因为 `cargo test` 不编译 `tests/` 目录,CI 用的是 `--all-targets`。以后照抄 CI 的命令。
+- **`build` 挂在 i18n 门上,而它是对的**:我加了 `crash.labels` / `crash.noLabels` 两个键却没做标签编辑器。现在做了 —— 标签按集合替换,删一个就是把剩下的发上去。
+
+---
+
 ## v1.8.0(2026-07-22 — issue 的优先级 / 标签 / 负责人:从表接到屏幕)
 
 **缺口是一层厚的**。`issues.priority` / `labels` / `assignee_user_id` 从建表起就在,生产 109 个 issue **全都带着 priority 值**。但 `Issue` 模型没有这三个字段,PATCH handler 给 `IssuePatch` 传的是三个字面量 `None` —— 而 `IssueStore::patch` 一直是支持它们的。缺的只有 HTTP 这一层。
