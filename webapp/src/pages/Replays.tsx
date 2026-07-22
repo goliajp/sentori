@@ -55,7 +55,7 @@ export default function Replays() {
           ) : rows.length === 0 ? (
             <EmptyState
               title={t('replays.empty')}
-              hint="SDKs capture replays automatically around captureException calls. Verify your SDK init has replay enabled."
+              hint={t('replays.emptyHint')}
             />
           ) : (
             <ul className="divide-y divide-border">

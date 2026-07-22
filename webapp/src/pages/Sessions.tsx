@@ -38,7 +38,7 @@ export default function Sessions() {
   }, [tick]);
 
   async function revoke(hash: string) {
-    if (!confirm('Revoke this session?')) return;
+    if (!confirm(t('sessions.confirmRevoke'))) return;
     try {
       await api.revokeSession(hash);
       setTick(t => t + 1);

@@ -179,16 +179,17 @@ function PlanCard({
               </span>
             </Field>
           )}
+          {downgraded && (
+            <Field label={t('billing.enforced')}>
+              <Badge tone="warn">{PLAN_LABEL[info.effective_plan]}</Badge>
+            </Field>
+          )}
         </div>
         {downgraded && (
-          <p className="mt-3 text-xs text-warn">
-            Subscription is <span className="font-medium">{info.status}</span>{' '}
-            — quotas are enforced at the{' '}
-            <span className="font-medium">
-              {PLAN_LABEL[info.effective_plan]}
-            </span>{' '}
-            tier until it is reactivated.
-          </p>
+          <p className="mt-3 text-xs text-warn">{t('billing.downgradedNote')}</p>
+        )}
+        {info.has_customer && (
+          <p className="mt-3 text-xs text-fg-subtle">{t('billing.manageHint')}</p>
         )}
       </CardBody>
     </Card>
@@ -290,8 +291,8 @@ function UpgradeCard({
         ) : (
           <p className="text-sm text-fg-subtle">
             {info.has_customer
-              ? 'Use “Manage subscription” to change or cancel your plan.'
-              : 'You are on the highest configured plan.'}
+              ? t('billing.changeViaPortal')
+              : t('billing.highestPlan')}
           </p>
         )}
       </CardBody>

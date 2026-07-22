@@ -211,7 +211,7 @@ function SessionsCard() {
   const rows = data ?? [];
 
   async function revoke(id: string) {
-    if (!confirm('Revoke this session?')) return;
+    if (!confirm(t('sessions.confirmRevoke'))) return;
     await api.revokeSession(id);
     refresh();
   }

@@ -21,7 +21,7 @@ export default function ResetPassword() {
     e.preventDefault();
     setErr(null);
     if (password.length < 12) {
-      setErr('Password must be at least 12 characters.');
+      setErr(t('auth.passwordTooShort'));
       return;
     }
     if (password !== confirm) {

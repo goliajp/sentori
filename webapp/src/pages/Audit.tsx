@@ -173,7 +173,7 @@ export function AuditPage() {
       <Card>
         {visibleEntries?.length === 0 ? (
           <div className="p-8 text-center text-sm text-fg-subtle">
-            {ipFilter ? `No entries match IP "${ipFilter}".` : 'No audit entries yet.'}
+            {ipFilter ? `No entries match IP "${ipFilter}".` : t('audit.empty')}
           </div>
         ) : (
           <>
