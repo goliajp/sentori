@@ -42,8 +42,8 @@ pub fn slices_from_bundle(bundle: &Path) -> Result<Vec<Slice>> {
         ));
     }
     let mut slices = Vec::new();
-    for entry in fs::read_dir(&dwarf_dir)
-        .with_context(|| format!("reading {}", dwarf_dir.display()))?
+    for entry in
+        fs::read_dir(&dwarf_dir).with_context(|| format!("reading {}", dwarf_dir.display()))?
     {
         let entry = entry?;
         let path = entry.path();
@@ -55,8 +55,7 @@ pub fn slices_from_bundle(bundle: &Path) -> Result<Vec<Slice>> {
             .and_then(|n| n.to_str())
             .unwrap_or("")
             .to_string();
-        let bytes = fs::read(&path)
-            .with_context(|| format!("reading {}", path.display()))?;
+        let bytes = fs::read(&path).with_context(|| format!("reading {}", path.display()))?;
         let mut found = parse_macho(&bytes, &object_name)?;
         slices.append(&mut found);
     }

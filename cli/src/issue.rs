@@ -22,9 +22,7 @@ pub(crate) fn resolve_token_with(
 ) -> Result<String> {
     cli.or_else(|| env_lookup("SENTORI_ADMIN_TOKEN"))
         .or_else(|| env_lookup("SENTORI_TOKEN"))
-        .context(
-            "token: pass --token or set SENTORI_ADMIN_TOKEN / SENTORI_TOKEN",
-        )
+        .context("token: pass --token or set SENTORI_ADMIN_TOKEN / SENTORI_TOKEN")
 }
 
 pub(crate) fn resolve_token(cli: Option<String>) -> Result<String> {
@@ -101,8 +99,7 @@ pub async fn list(
     if json_out {
         println!("{body}");
     } else {
-        let issues: Vec<Value> = serde_json::from_str(&body)
-            .context("parsing issue list body")?;
+        let issues: Vec<Value> = serde_json::from_str(&body).context("parsing issue list body")?;
         print!("{}", format_issues_table(&issues));
     }
     Ok(())
@@ -303,8 +300,8 @@ mod tests {
         );
 
         // Explicit token wins; env miss is irrelevant.
-        let tok = resolve_token_with(Some("explicit".into()), |_| None)
-            .expect("explicit token wins");
+        let tok =
+            resolve_token_with(Some("explicit".into()), |_| None).expect("explicit token wins");
         assert_eq!(tok, "explicit");
 
         // Env fallback works when CLI flag is absent.
