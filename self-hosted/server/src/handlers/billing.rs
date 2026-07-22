@@ -70,6 +70,12 @@ pub async fn get(
         "current_period_end": period_end,
         "period_yyyymm": period,
         "stripe_enabled": stripe_enabled,
+        // Reported separately because the half-configured state is the
+        // dangerous one: with a key and a price but no webhook secret,
+        // checkout completes and takes the customer's money, and the
+        // worker that turns the subscription into a plan change is not
+        // running. The plan never moves and nothing says why.
+        "webhook_configured": cfg.webhook_secret.is_some(),
         "has_customer": has_customer,
         // Which paid plans this deployment actually sells (a price
         // id is configured). Drives which upgrade buttons render.

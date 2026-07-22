@@ -172,6 +172,8 @@ export const zh: Messages = {
   'billing.subtitle': "这个工作区的套餐、用量与订阅。",
   'billing.current': "当前套餐",
   'billing.change': "更换套餐",
+  'billing.webhookMissing': '可以付款,但套餐不会变。',
+  'billing.webhookMissingHint': '未设置 SENTORI_STRIPE_WEBHOOK_SECRET,把订阅结果写回套餐的 worker 没有启动。设置它,并在 Stripe 后台把 webhook 指向 /webhooks/stripe。',
   'billing.unavailable': "暂不支持自助付费",
   'billing.renews': "续费 / 到期",
   'audit.title': "审计日志",

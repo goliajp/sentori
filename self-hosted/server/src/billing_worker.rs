@@ -134,6 +134,13 @@ async fn apply_event(
             apply_status_change(pool, object, PlanStatus::Canceled).await
         }
         "invoice.payment_failed" => apply_status_change(pool, object, PlanStatus::PastDue).await,
+        // The recovery half of `invoice.payment_failed`. Without it a
+        // workspace that goes past_due and then pays stays past_due
+        // until its next subscription.updated — Stripe does send one,
+        // but "eventually, via a different event" is not a recovery
+        // path, it is a gap that happens to close on its own most of
+        // the time.
+        "invoice.paid" => apply_status_change(pool, object, PlanStatus::Active).await,
         // Anything we don't model is intentionally a no-op success:
         // Stripe sends many event types we never subscribed logic to.
         other => {

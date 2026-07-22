@@ -178,6 +178,8 @@ export const en = {
   'billing.subtitle': "Plan, usage and subscription for this workspace.",
   'billing.current': "Current plan",
   'billing.change': "Change plan",
+  'billing.webhookMissing': 'Checkout works, but plan changes will not arrive.',
+  'billing.webhookMissingHint': 'SENTORI_STRIPE_WEBHOOK_SECRET is not set, so the worker that turns a completed subscription into a plan change is not running. Set it and point the Stripe webhook at /webhooks/stripe.',
   'billing.unavailable': "Self-serve billing unavailable",
   'billing.renews': "Renews / ends",
   'audit.title': "Audit log",
