@@ -70,6 +70,14 @@ jobs:
         working-directory: apps/rn-example
         run: bun install --frozen-lockfile
 
+      # `apps/rn-example/android` is a prebuild output and is
+      # gitignored, so the runner has to generate it. Locally it is
+      # already there, which is exactly why the first version of this
+      # job passed review and then failed on a clean checkout.
+      - name: expo prebuild (generates the host Gradle project)
+        working-directory: apps/rn-example
+        run: bunx expo prebuild --platform android --no-install
+
       # The module's Gradle path is decided by expo-autolinking at
       # configure time, so it is discovered rather than hardcoded — a
       # guessed name would silently pass by testing nothing.
