@@ -53,10 +53,18 @@ that release isn't loaded. Two reasons:
   ```bash
   sentori-cli upload sourcemap \
     --release "myapp@1.2.3+456" \
-    --token "$SENTORI_TOKEN" \
+    --token "$SENTORI_ADMIN_TOKEN" \
     --ingest-url "$SENTORI_INGEST_URL" \
     dist/assets/
   ```
+
+  The token here must be of kind `admin`, not the `public` token your
+  SDK ships with. Mint one under **Project → Tokens** and keep it in
+  your CI secrets. Uploading a source map rewrites how every stack in
+  a release is read, so it is not something the token inside your
+  published app is allowed to do — that one is readable by anyone who
+  downloads the app. A `public` token here returns
+  `403 admin_token_required`.
 
 - **Release name mismatch** — the upload's `--release` and the
   event's `release` field must match byte-for-byte (case-sensitive,

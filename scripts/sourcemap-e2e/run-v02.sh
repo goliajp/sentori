@@ -42,6 +42,15 @@ PROJECT_ID=$(curl -sS -b "$COOKIE" -X POST "$SENTORI_BASE/admin/api/projects" \
   -H 'Content-Type: application/json' \
   -d "{\"name\":\"sourcemap e2e\",\"slug\":\"$SLUG\"}" | jqp "['id']")
 
+# Two tokens, because the two halves of this test need different
+# rights. Uploading a map is a build-time action and needs `admin`;
+# sending an event is what a shipped app does and needs `public`. Using
+# one token for both would pass while proving neither.
+ADMIN_TOKEN=$(curl -sS -b "$COOKIE" -X POST \
+  "$SENTORI_BASE/admin/api/projects/$PROJECT_ID/tokens" \
+  -H 'Content-Type: application/json' \
+  -d '{"kind":"admin","label":"sourcemap-e2e-admin"}' | jqp "['token']")
+
 TOKEN=$(curl -sS -b "$COOKIE" -X POST \
   "$SENTORI_BASE/admin/api/projects/$PROJECT_ID/tokens" \
   -H 'Content-Type: application/json' \
@@ -70,7 +79,7 @@ curl -sS -o /dev/null -w '      upload=%{http_code}\n' -X POST \
   "$SENTORI_BASE/v1/releases/$(python3 -c "
 import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1], safe=''))
 " "$RELEASE")/artifacts" \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
   -F 'kind=sourcemap' \
   -F "file=@$DIST/app.js.map"
 
@@ -102,6 +111,21 @@ if not any(a['kind'] == 'sourcemap' for a in arts):
     sys.exit('FAIL: token upload is not visible on the admin route: %r' % arts)
 print('      admin sees %d artifact(s)' % len(arts))
 "
+
+# The public token is the one inside a shipped app. If it could upload
+# a map, anyone with the app could rewrite how a release symbolicates.
+echo "      checking a public token is refused"
+REFUSED=$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
+  "$SENTORI_BASE/v1/releases/$(python3 -c "
+import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1], safe=''))
+" "$RELEASE")/artifacts" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F 'kind=sourcemap' -F "file=@$DIST/app.js.map")
+if [ "$REFUSED" != "403" ]; then
+  echo "FAIL: a public token uploaded an artifact (got $REFUSED, want 403)" >&2
+  exit 1
+fi
+echo "      public upload refused: $REFUSED"
 
 echo "[5/6] throwing inside the minified bundle, sending the stack"
 EVENT_JSON=$(node "$HERE/throw-and-format.js" "$DIST/app.js" "$RELEASE")
