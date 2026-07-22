@@ -170,6 +170,47 @@ async fn ingest_creates_issue_then_bumps_count() {
 }
 
 #[tokio::test]
+async fn redelivering_the_same_event_id_is_a_no_op() {
+    // A mobile SDK that loses the response to a successful send retries
+    // the identical payload — same event id. This used to hit the
+    // primary key and answer 500, which the SDK treats as retryable, so
+    // it retried three times and then persisted the batch to disk and
+    // re-sent it on every launch. One dropped response became a
+    // permanent battery and network cost on that device.
+    let (pool, workspace_id) = fresh_pool().await;
+    let pid = seed_project(&pool, workspace_id, "p1").await;
+    let svc = IngestService::new(pool.clone(), IngestOptions::default()).expect("svc");
+
+    let event = exception_event("app@1.0.0", "TypeError", "boom");
+
+    let first = svc.ingest(pid, event.clone()).await.expect("first");
+    assert!(first.is_new_issue);
+
+    let again = svc
+        .ingest(pid, event)
+        .await
+        .expect("redelivery must succeed");
+    assert_eq!(again.event_id, first.event_id);
+    assert_eq!(again.issue_id, first.issue_id);
+    // The issue was reported the first time. Saying so again would
+    // re-broadcast the live feed and re-fire alert rules.
+    assert!(!again.is_new_issue);
+    assert!(!again.regressed);
+
+    // The counter is the part that would break quietly. Absorbing the
+    // collision at the event insert instead of before the issue upsert
+    // would leave this at 2 — right answer, wrong count, and nothing
+    // would have surfaced it.
+    let issue = svc
+        .find_issue(first.issue_id)
+        .await
+        .expect("ok")
+        .expect("present");
+    assert_eq!(issue.event_count, 1, "a redelivery must not count twice");
+    assert_eq!(svc.count_events_for_issue(first.issue_id).await.unwrap(), 1);
+}
+
+#[tokio::test]
 async fn ingest_different_release_creates_separate_issues() {
     let (pool, workspace_id) = fresh_pool().await;
     let pid = seed_project(&pool, workspace_id, "p1").await;
