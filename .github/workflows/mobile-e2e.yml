@@ -100,12 +100,14 @@ jobs:
         if: always()
         with:
           name: android-test-reports
-          # The module builds under node_modules, not under the host
+          # The module builds in its own source tree, not under the host
           # project — the first version pointed at the host and uploaded
-          # nothing, so a failing run had no report to read.
+          # nothing, so a failing run had no report to read. Keyed on the
+          # directory, which is stable; the Gradle project name is
+          # assigned by autolinking and is not the directory name.
           path: |
-            **/sentori-react-native/build/reports/tests/
-            **/sentori-react-native/build/test-results/
+            sdk/react-native/android/build/reports/tests/
+            sdk/react-native/android/build/test-results/
           if-no-files-found: warn
 
   # Round-trip symbolication against the v0.2 server: bundle a fixture,

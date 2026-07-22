@@ -54,7 +54,12 @@ class SentoriCrashHandlerTest {
         assertNotNull(payload.getString("id"))
         assertNotNull(payload.getString("timestamp"))
         val error = payload.getJSONObject("error")
-        assertEquals("RuntimeException", error.getString("type"))
+        // Fully qualified, not the simple name: on Android the package
+        // is real signal — two `FooException` classes from different
+        // libraries are different bugs — and it is what every shipped
+        // Android event already carries, so shortening it here would
+        // split existing issue groups in two.
+        assertEquals("java.lang.RuntimeException", error.getString("type"))
         assertTrue(error.getString("message").contains("boom"))
     }
 }
