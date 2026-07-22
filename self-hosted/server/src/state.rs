@@ -56,6 +56,10 @@ pub struct AppState {
     /// Parsed source maps, keyed by content hash. Shared so one parse
     /// serves every event of a crashing release.
     pub source_maps: std::sync::Arc<crate::symbolicate::MapCache>,
+    /// Per-token request limiter for the ingest surface. In-memory and
+    /// per-process, which is right for a single instance and would
+    /// need a shared store before running more than one.
+    pub rate_limit: std::sync::Arc<crate::rate_limit::RateLimiter>,
     pub audit: AuditService,
     pub alerts: AlertRuleService,
     pub saved_views: SavedViewService,
@@ -123,6 +127,7 @@ impl AppState {
             metrics,
             identity_scopes: std::sync::Arc::default(),
             source_maps: std::sync::Arc::new(crate::symbolicate::new_cache()),
+            rate_limit: std::sync::Arc::new(crate::rate_limit::RateLimiter::from_env()),
             audit,
             alerts,
             saved_views,

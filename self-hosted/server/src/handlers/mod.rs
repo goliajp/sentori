@@ -11,10 +11,15 @@
 
 use std::sync::Arc;
 
+use axum::Json;
 use axum::Router;
+use axum::extract::State;
+use axum::http::StatusCode;
 use axum::middleware as axum_middleware;
+use axum::response::IntoResponse;
 use axum::routing::{delete, get, patch, post};
 use sentori_ingest_token::{TokenStore, bearer_middleware};
+use serde_json::json;
 
 use crate::saasadmin_mw::saasadmin_only;
 use crate::session_mw::session_middleware;
@@ -58,6 +63,41 @@ mod track_query;
 mod usage;
 mod user_reports_query;
 mod workspaces;
+
+/// Refuse a token that is flooding the ingest surface.
+///
+/// A public token is compiled into the customer's app, so the rate a
+/// single credential can drive is not bounded by anything the customer
+/// controls. Without this, someone holding a copy of the app can spend
+/// that workspace's monthly quota in minutes and leave the customer's
+/// monitoring blind — the outage they bought Sentori to see.
+///
+/// 429 with `retryAfterMs`, which is what the SDKs already back off
+/// on. Deliberately not 402: that means the month's quota is spent and
+/// the SDKs drop the batch, which is the wrong answer for a burst that
+/// will be fine a second from now.
+async fn rate_limit_mw(
+    State(state): State<Arc<AppState>>,
+    req: axum::extract::Request,
+    next: axum_middleware::Next,
+) -> axum::response::Response {
+    let admitted = req
+        .extensions()
+        .get::<sentori_ingest_token::IngestContext>()
+        .is_none_or(|ctx| state.rate_limit.admit(ctx.token_id));
+
+    if admitted {
+        return next.run(req).await;
+    }
+    (
+        StatusCode::TOO_MANY_REQUESTS,
+        Json(json!({
+            "error": "rate_limited",
+            "retryAfterMs": 1000,
+        })),
+    )
+        .into_response()
+}
 
 // A flat route table: length is inherent to enumerating every route
 // in one place, and splitting it would only hide the routing surface.
@@ -137,6 +177,13 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/v1/push/users/{fp_hex}/preferences/{category}",
             axum::routing::put(sdk::push::put_preference::handle),
         )
+        // Order matters: the limiter runs *after* the bearer check, so
+        // it has a token to key on and an unauthenticated flood is
+        // rejected earlier and more cheaply.
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            rate_limit_mw,
+        ))
         .layer(axum_middleware::from_fn_with_state(
             token_store,
             bearer_middleware,

@@ -19,6 +19,12 @@ use std::time::{Duration, Instant};
 
 use uuid::Uuid;
 
+/// Requests per window, per token. Far above any legitimate SDK: the
+/// clients batch precisely to avoid rates like this, so a token
+/// sustaining it is either misconfigured or not the customer's.
+const DEFAULT_CAPACITY: usize = 100;
+const DEFAULT_WINDOW_SEC: u64 = 1;
+
 pub struct RateLimiter {
     buckets: Mutex<HashMap<Uuid, VecDeque<Instant>>>,
     capacity: usize,
@@ -33,17 +39,17 @@ impl RateLimiter {
             std::env::var("SENTORI_RATELIMIT_DISABLED")
                 .ok()
                 .as_deref()
-                .map(|s| s.to_ascii_lowercase()),
+                .map(str::to_ascii_lowercase),
             Some(s) if s == "1" || s == "true"
         );
         let capacity = std::env::var("SENTORI_RATELIMIT_PER_TOKEN_RPS")
             .ok()
             .and_then(|s| s.parse::<usize>().ok())
-            .unwrap_or(100);
+            .unwrap_or(DEFAULT_CAPACITY);
         let window = std::env::var("SENTORI_RATELIMIT_WINDOW_SEC")
             .ok()
             .and_then(|s| s.parse::<u64>().ok())
-            .unwrap_or(1);
+            .unwrap_or(DEFAULT_WINDOW_SEC);
         Self {
             buckets: Mutex::new(HashMap::new()),
             capacity,
@@ -76,5 +82,92 @@ impl RateLimiter {
         }
         buf.push_back(now);
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn limiter(capacity: usize, window_ms: u64) -> RateLimiter {
+        RateLimiter {
+            buckets: Mutex::new(HashMap::new()),
+            capacity,
+            window: Duration::from_millis(window_ms),
+            disabled: false,
+        }
+    }
+
+    fn limiter_secs(capacity: usize, window_secs: u64) -> RateLimiter {
+        RateLimiter {
+            buckets: Mutex::new(HashMap::new()),
+            capacity,
+            window: Duration::from_secs(window_secs),
+            disabled: false,
+        }
+    }
+
+    #[test]
+    fn admits_up_to_capacity_then_refuses() {
+        let rl = limiter_secs(3, 10);
+        let t = Uuid::now_v7();
+        assert!(rl.admit(t));
+        assert!(rl.admit(t));
+        assert!(rl.admit(t));
+        assert!(!rl.admit(t), "the fourth in the window must be refused");
+    }
+
+    /// The bucket is keyed by token. One noisy app must not throttle a
+    /// different customer's — which is the failure that would be
+    /// hardest to notice, since the victim sees dropped telemetry and
+    /// has nothing in their own traffic to explain it.
+    #[test]
+    fn buckets_are_per_token() {
+        let rl = limiter_secs(1, 10);
+        let a = Uuid::now_v7();
+        let b = Uuid::now_v7();
+        assert!(rl.admit(a));
+        assert!(!rl.admit(a));
+        assert!(rl.admit(b), "a second token has its own allowance");
+    }
+
+    #[test]
+    fn the_window_slides() {
+        let rl = limiter(2, 50);
+        let t = Uuid::now_v7();
+        assert!(rl.admit(t));
+        assert!(rl.admit(t));
+        assert!(!rl.admit(t));
+        std::thread::sleep(Duration::from_millis(80));
+        assert!(rl.admit(t), "slots must come back once the window passes");
+    }
+
+    /// The kill switch has to be absolute. It exists for the moment
+    /// someone discovers the limiter is dropping real traffic, and at
+    /// that moment nobody wants to reason about edge cases.
+    #[test]
+    fn disabled_admits_everything() {
+        let rl = RateLimiter {
+            buckets: Mutex::new(HashMap::new()),
+            capacity: 1,
+            // Long enough that nothing in this test can age out of it;
+            // the point is the switch, not the window.
+            window: Duration::from_hours(1),
+            disabled: true,
+        };
+        let t = Uuid::now_v7();
+        for _ in 0..50 {
+            assert!(rl.admit(t));
+        }
+    }
+
+    /// The constants the module documents as defaults. Read from the
+    /// struct rather than through `from_env`, which would need to
+    /// mutate process-global environment and race every other test in
+    /// the binary.
+    #[test]
+    fn documented_defaults() {
+        assert_eq!(DEFAULT_CAPACITY, 100);
+        assert_eq!(DEFAULT_WINDOW_SEC, 1);
     }
 }
