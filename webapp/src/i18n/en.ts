@@ -487,6 +487,14 @@ export const en = {
   'track.empty': "No product events yet",
   'track.emptyHint': "Call sentori.track(name, props) in your app and they appear here.",
 
+  'metrics.runtime': "SDK performance",
+  'metrics.runtimeHint': "What the SDK measures about your app: cold start, frame rate, memory, navigation.",
+  'metrics.p95': "p95",
+  'metrics.samples': "{n} samples",
+
+  'crash.userReports': "What people said",
+  'crash.userReportsHint': "Descriptions typed by people who hit this.",
+
   'nav.issues': 'Issues',
   'nav.members': 'Members',
   'nav.metrics': 'Metrics',

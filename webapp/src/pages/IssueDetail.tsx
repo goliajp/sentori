@@ -9,6 +9,7 @@ import {
   EventRow,
   IssueDetail as Issue,
   MemberRow,
+  UserReport,
 } from '../lib/api';
 import { EventEvidence } from '../components/crash/EventEvidence';
 import { useT } from '../i18n';
@@ -53,6 +54,15 @@ export default function IssueDetail() {
   // picker with just "Nobody" rather than breaking the page — you can
   // still read the crash.
   const [members, setMembers] = useState<MemberRow[]>([]);
+  const [reports, setReports] = useState<UserReport[]>([]);
+  useEffect(() => {
+    if (!projectId || !issueId) return;
+    api
+      .listUserReports(projectId, { issue_id: issueId })
+      .then(r => setReports(r.reports))
+      .catch(() => setReports([]));
+  }, [projectId, issueId]);
+
   useEffect(() => {
     api
       .listMembers()
@@ -398,6 +408,43 @@ export default function IssueDetail() {
         </p>
       )}
 
+      {/* A stack trace says where; this says what they were trying to
+          do. It is the only signal in the product that is not machine
+          generated, so it sits with the evidence rather than with the
+          team's own discussion below. */}
+      {reports.length > 0 && (
+        <Card>
+          <CardHeader
+            title={t('crash.userReports')}
+            subtitle={t('crash.userReportsHint')}
+          />
+          <CardBody>
+            <ul className="divide-y divide-border">
+              {reports.map(r => (
+                <li key={r.id} className="py-3">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm font-medium text-fg">
+                      {r.name || r.email || '—'}
+                    </span>
+                    <span className="text-xs text-fg-subtle">
+                      {formatRelative(r.received_at)}
+                    </span>
+                  </div>
+                  {r.title && (
+                    <p className="mt-1 text-sm text-fg">{r.title}</p>
+                  )}
+                  {r.body && (
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-fg-muted">
+                      {r.body}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      )}
+
       <Comments issueId={issueId} myUserId={myUserId} />
       <Activity issueId={issueId} />
     </div>
@@ -428,14 +475,11 @@ function Comments({
   issueId: string;
   myUserId: string | null;
 }) {
-  const [rows, setRows] = useState<
-    {
-      id: string;
-      author_user_id: string;
-      body_md: string;
-      created_at: string;
-    }[]
-  >([]);
+  // Derived from the client rather than restated here. This was a
+  // hand-copy of the response shape and it fell behind the moment the
+  // server started sending the author's email.
+  type Comment = Awaited<ReturnType<typeof api.listComments>>['comments'][number];
+  const [rows, setRows] = useState<Comment[]>([]);
   const [text, setText] = useState('');
   const t = useT();
   const [busy, setBusy] = useState(false);
@@ -483,7 +527,7 @@ function Comments({
             >
               <div className="flex items-center justify-between">
                 <span className="font-mono text-xs text-fg-subtle">
-                  {c.author_user_id.slice(0, 8)}… ·{' '}
+                  {c.author_email ?? `${c.author_user_id.slice(0, 8)}…`} ·{' '}
                   {formatRelative(c.created_at)}
                 </span>
                 {myUserId === c.author_user_id && (
@@ -491,7 +535,7 @@ function Comments({
                     onClick={() => del(c.id)}
                     className="text-xs text-fg-subtle hover:text-danger"
                   >
-                    delete
+                    {t('action.delete')}
                   </button>
                 )}
               </div>

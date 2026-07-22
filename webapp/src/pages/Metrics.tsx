@@ -5,7 +5,12 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import { useT } from '../i18n';
-import { api, MetricPoint, MetricSummary } from '../lib/api';
+import {
+  api,
+  MetricPoint,
+  MetricSummary,
+  RuntimePoint,
+} from '../lib/api';
 import { Sparkline } from '../components/Sparkline';
 import {
   Card,
@@ -26,6 +31,7 @@ export default function Metrics() {
   const [series, setSeries] = useState<Record<string, MetricPoint[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [runtime, setRuntime] = useState<RuntimePoint[]>([]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -34,6 +40,17 @@ export default function Metrics() {
       .then(r => setRows(r.metrics))
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false));
+  }, [projectId]);
+
+  // Perf rollups load separately: a project with no runtime data is
+  // normal (older SDK, or the feature off), and it must not stop the
+  // custom metrics below from rendering.
+  useEffect(() => {
+    if (!projectId) return;
+    api
+      .runtimeMetrics(projectId)
+      .then(r => setRuntime(r.metrics))
+      .catch(() => setRuntime([]));
   }, [projectId]);
 
   async function expand(name: string) {
@@ -63,12 +80,50 @@ export default function Metrics() {
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
+      {/* SDK performance first. Custom counters are what a team chose
+          to measure; this is whether the tool measuring them is costing
+          the app anything, which is the promise the product rests on. */}
+      {runtime.length > 0 && (
+        <Card>
+          <CardHeader
+            title={t('metrics.runtime')}
+            subtitle={t('metrics.runtimeHint')}
+          />
+          <CardBody>
+            <ul className="divide-y divide-border">
+              {runtime.map(m => (
+                <li
+                  key={m.name}
+                  className="flex items-baseline justify-between gap-4 py-2"
+                >
+                  <span className="min-w-0 flex-1 truncate font-mono text-sm text-fg">
+                    {m.name}
+                  </span>
+                  <span className="tabular-nums text-sm text-fg">
+                    {m.p95 !== null ? Math.round(m.p95).toLocaleString() : '—'}
+                    <span className="ml-1 text-xs text-fg-subtle">
+                      {t('metrics.p95')}
+                    </span>
+                  </span>
+                  <span className="w-28 text-right text-xs text-fg-subtle">
+                    {t('metrics.samples').replace('{n}', String(m.count))}
+                  </span>
+                  <span className="w-24 text-right text-xs text-fg-subtle">
+                    {formatRelative(m.bucket_ts)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      )}
+
       <Card>
         <CardHeader title={`${t('metrics.active')} (${rows.length})`} />
         <CardBody>
           {loading ? (
             <div className="py-8 text-center text-sm text-fg-subtle">
-              Loading…
+              {t('common.loading')}
             </div>
           ) : rows.length === 0 ? (
             <EmptyState
