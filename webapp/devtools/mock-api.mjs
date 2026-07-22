@@ -128,9 +128,14 @@ const EXACT = {
     events: { count: 41_233, dropped: 0, limit: 1_000_000 },
     spans: { count: 12_004, dropped: 0, limit: 500_000 },
     replays: { count: 318, dropped: 2, limit: 5_000 } },
-  '/admin/api/billing': { plan: 'enterprise', status: 'active', effective_plan: 'enterprise',
+  // Deliberately a lapsed subscription: the downgrade banner and the
+  // gap between the plan bought and the plan enforced only render in
+  // this state, and a mock that always shows a healthy account never
+  // exercises them.
+  '/admin/api/billing': { plan: 'pro', status: 'canceled', effective_plan: 'free',
     current_period_end: iso(-86_400_000 * 12), period_yyyymm: '2026-07',
-    stripe_enabled: true, has_customer: true, upgradeable: { pro: true, enterprise: true },
+    stripe_enabled: true, webhook_configured: true,
+    has_customer: true, upgradeable: { pro: true, enterprise: false },
     usage: { events: { count: 41_233, dropped: 0, limit: 1_000_000 },
              spans: { count: 12_004, dropped: 0, limit: 500_000 },
              replays: { count: 318, dropped: 2, limit: 5_000 } } },

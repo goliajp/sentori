@@ -52,7 +52,7 @@ export default function Members() {
   }
 
   async function removeMember(uid: string) {
-    if (!confirm('Remove this member from the workspace?')) return;
+    if (!confirm(t('members.confirmRemove'))) return;
     try {
       await api.removeMember(uid);
       refresh();
@@ -78,7 +78,7 @@ export default function Members() {
   }
 
   async function revokeInvite(id: string) {
-    if (!confirm('Revoke this invite?')) return;
+    if (!confirm(t('members.confirmRevokeInvite'))) return;
     try {
       await api.revokeInvite(id);
       refresh();

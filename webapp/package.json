@@ -10,10 +10,11 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",
-    "check": "tsc -b --noEmit && eslint . && node devtools/check-i18n.mjs",
+    "check": "tsc -b --noEmit && eslint . && node devtools/check-i18n.mjs && node devtools/check-hardcoded-text.mjs",
     "mock": "node devtools/mock-api.mjs",
     "sweep": "node devtools/sweep.mjs",
-    "check:i18n": "node devtools/check-i18n.mjs"
+    "check:i18n": "node devtools/check-i18n.mjs",
+    "check:text": "node devtools/check-hardcoded-text.mjs"
   },
   "dependencies": {
     "@goliapkg/gds": "^2.2.0",

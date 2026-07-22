@@ -159,23 +159,23 @@ function OnboardingGuide() {
   const steps = [
     {
       n: 1,
-      title: 'Create a project',
-      body: 'One project per app / service. It scopes issues, traces, and tokens.',
+      title: t('overview.step1Title'),
+      body: t('overview.step1Body'),
     },
     {
       n: 2,
-      title: 'Mint an ingest token',
-      body: 'On the project’s Tokens page — an st_pk_… string your SDK sends.',
+      title: t('overview.step2Title'),
+      body: t('overview.step2Body'),
     },
     {
       n: 3,
-      title: 'Drop the SDK into your app',
-      body: 'Copy the init snippet (token + ingest URL) from the Tokens page.',
+      title: t('overview.step3Title'),
+      body: t('overview.step3Body'),
     },
     {
       n: 4,
-      title: 'Watch the first event land',
-      body: 'Trigger an error; it shows up here and under the project’s Issues.',
+      title: t('overview.step4Title'),
+      body: t('overview.step4Body'),
     },
   ];
   return (

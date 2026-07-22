@@ -71,7 +71,7 @@ export function EventsPage() {
   async function saveView() {
     if (!projectId) return;
     const name = prompt(
-      'Saved view name',
+      t('events.savedViewName'),
       `Events ${issueFilter ? 'for issue ' + issueFilter.slice(0, 8) : 'recent'} — ${new Date().toLocaleDateString()}`,
     );
     if (!name) return;

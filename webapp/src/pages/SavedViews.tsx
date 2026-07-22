@@ -45,7 +45,7 @@ export default function SavedViews() {
     try {
       parsed = JSON.parse(newPayload);
     } catch {
-      setError('Payload must be valid JSON');
+      setError(t('common.jsonInvalid'));
       return;
     }
     try {

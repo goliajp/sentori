@@ -49,7 +49,7 @@ export default function PushCredentials() {
     try {
       parsed = JSON.parse(config);
     } catch {
-      setError('Config must be valid JSON');
+      setError(t('common.jsonInvalid'));
       return;
     }
     try {

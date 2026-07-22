@@ -79,7 +79,7 @@ export function AlertsPage() {
     try {
       parsed = JSON.parse(next);
     } catch {
-      setErr('Channels JSON did not parse');
+      setErr(t('alerts.channelsInvalid'));
       return;
     }
     try {
@@ -104,7 +104,7 @@ export function AlertsPage() {
   }
 
   async function deleteAlert(id: string) {
-    if (!confirm('Delete this alert rule?')) return;
+    if (!confirm(t('alerts.confirmDelete'))) return;
     try {
       await api.deleteAlert(id);
       setRefreshTok((t) => t + 1);

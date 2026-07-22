@@ -59,7 +59,7 @@ export default function Tokens() {
   }
 
   async function revoke(id: string) {
-    if (!confirm('Revoke this token? SDKs using it will start returning 401.'))
+    if (!confirm(t('tokens.confirmRevoke')))
       return;
     try {
       await api.revokeToken(id);
