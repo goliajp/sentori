@@ -40,7 +40,7 @@ pub async fn list_names(
         .map(|r| {
             json!({
                 "name": r.get::<String, _>("name"),
-                "last_bucket": r.try_get::<Option<OffsetDateTime>, _>("last_bucket").ok().flatten(),
+                "last_bucket": crate::wire_time::rfc3339_opt(r.try_get::<Option<OffsetDateTime>, _>("last_bucket").ok().flatten()),
                 "total_count": r.try_get::<i64, _>("total_count").unwrap_or(0),
                 "avg_value": r.try_get::<f64, _>("avg_value").unwrap_or(0.0),
             })
@@ -83,7 +83,7 @@ pub async fn timeseries(
         .iter()
         .map(|r| {
             json!({
-                "bucket": r.get::<OffsetDateTime, _>("bucket"),
+                "bucket": crate::wire_time::rfc3339(r.get::<OffsetDateTime, _>("bucket")),
                 "sum": r.try_get::<f64, _>("sum").unwrap_or(0.0),
                 "count": r.try_get::<i64, _>("count").unwrap_or(0),
                 "min": r.try_get::<Option<f64>, _>("min").ok().flatten(),

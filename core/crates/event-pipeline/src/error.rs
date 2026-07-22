@@ -4,7 +4,8 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::model::{
-    EventKindParseError, IssueStatusParseError, MessageLevelParseError, PlatformParseError,
+    EventKindParseError, IssuePriorityParseError, IssueStatusParseError, MessageLevelParseError,
+    PlatformParseError,
 };
 
 /// Failure modes for the ingest pipeline.
@@ -35,6 +36,12 @@ pub enum IngestError {
     /// operation; surface loudly if it happens.
     #[error("invalid issue status in database: {0}")]
     InvalidIssueStatusInDb(#[from] IssueStatusParseError),
+
+    /// Stored issue row had a corrupt `priority` string (outside the
+    /// CHECK constraint set). Same shape as the status case: unreachable
+    /// unless something wrote around the constraint.
+    #[error("invalid issue priority in database: {0}")]
+    InvalidIssuePriorityInDb(#[from] IssuePriorityParseError),
 
     /// Stored event row had a corrupt `kind` string.
     #[error("invalid event kind in database: {0}")]

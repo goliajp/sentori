@@ -15,7 +15,9 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::error::IngestError;
-use crate::model::{Event, EventKind, IngestOutcome, Issue, IssueStatus, Platform, StoredEvent};
+use crate::model::{
+    Event, EventKind, IngestOutcome, Issue, IssuePriority, IssueStatus, Platform, StoredEvent,
+};
 
 /// Full ingest write — issue UPSERT + event INSERT in one
 /// transaction. Both writes succeed or neither; downstream
@@ -141,7 +143,8 @@ pub(super) async fn find_issue_by_fingerprint(
         SELECT id, project_id, fingerprint, error_type, message_sample, kind,
                status, first_seen, last_seen, event_count,
                last_environment, last_release,
-               regressed_at, regressed_in_release, resolved_at
+               regressed_at, regressed_in_release, resolved_at,
+               priority, labels, assignee_user_id
         FROM issues
         WHERE project_id = $1 AND fingerprint = $2
         ",
@@ -167,7 +170,8 @@ pub(super) async fn find_issue(
         SELECT id, project_id, fingerprint, error_type, message_sample, kind,
                status, first_seen, last_seen, event_count,
                last_environment, last_release,
-               regressed_at, regressed_in_release, resolved_at
+               regressed_at, regressed_in_release, resolved_at,
+               priority, labels, assignee_user_id
         FROM issues
         WHERE id = $1
         ",
@@ -251,6 +255,7 @@ pub(super) async fn set_issue_status(
 fn row_to_issue(row: &sqlx::postgres::PgRow) -> Result<Issue, IngestError> {
     let kind_str: &str = row.get("kind");
     let status_str: &str = row.get("status");
+    let priority_str: &str = row.get("priority");
     Ok(Issue {
         id: row.get("id"),
         project_id: ProjectId::from_uuid(row.get("project_id")),
@@ -267,6 +272,9 @@ fn row_to_issue(row: &sqlx::postgres::PgRow) -> Result<Issue, IngestError> {
         regressed_at: row.get("regressed_at"),
         regressed_in_release: row.get("regressed_in_release"),
         resolved_at: row.get("resolved_at"),
+        priority: IssuePriority::from_db_str(priority_str)?,
+        labels: row.get("labels"),
+        assignee_user_id: row.get("assignee_user_id"),
     })
 }
 

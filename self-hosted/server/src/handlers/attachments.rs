@@ -60,9 +60,9 @@ pub async fn list(
                 "kind": r.get::<String, _>("kind"),
                 "media_type": r.get::<String, _>("media_type"),
                 "size_bytes": r.get::<i32, _>("size_bytes"),
-                "captured_at": r.get::<OffsetDateTime, _>("captured_at"),
+                "captured_at": crate::wire_time::rfc3339(r.get::<OffsetDateTime, _>("captured_at")),
                 "source": r.get::<String, _>("source"),
-                "received_at": r.get::<OffsetDateTime, _>("received_at"),
+                "received_at": crate::wire_time::rfc3339(r.get::<OffsetDateTime, _>("received_at")),
             })
         })
         .collect();

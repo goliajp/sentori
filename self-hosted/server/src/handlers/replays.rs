@@ -54,7 +54,7 @@ pub async fn list(
                 "duration_ms": i64::try_from((ended - started).whole_milliseconds())
                     .unwrap_or(i64::MAX),
                 "frame_count": r.try_get::<i32, _>("frame_count").unwrap_or(0),
-                "created_at": r.get::<OffsetDateTime, _>("created_at"),
+                "created_at": crate::wire_time::rfc3339(r.get::<OffsetDateTime, _>("created_at")),
             })
         })
         .collect();

@@ -456,6 +456,18 @@ export const ja: Messages = {
   'events.live': "ライブ",
   'releases.markShort': "デプロイマーカー",
 
+  'crash.priority': "優先度",
+  'crash.assignee': "担当者",
+  'crash.unassigned': "未割り当て",
+  'crash.labels': "ラベル",
+  'crash.noLabels': "なし",
+  'priority.p0': "P0 · 最優先",
+  'priority.p1': "P1 · 今スプリント",
+  'priority.p2': "P2 · バックログ",
+  'priority.p3': "P3 · 未分類",
+
+  'issues.colPriority': "優先度",
+
   'nav.issues': 'イシュー',
   'nav.members': 'メンバー',
   'nav.metrics': 'メトリクス',

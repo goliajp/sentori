@@ -463,6 +463,18 @@ export const en = {
   'events.live': "Live",
   'releases.markShort': "Deploy marker",
 
+  'crash.priority': "Priority",
+  'crash.assignee': "Assignee",
+  'crash.unassigned': "Nobody",
+  'crash.labels': "Labels",
+  'crash.noLabels': "None",
+  'priority.p0': "P0 · drop everything",
+  'priority.p1': "P1 · this sprint",
+  'priority.p2': "P2 · backlog",
+  'priority.p3': "P3 · untriaged",
+
+  'issues.colPriority': "Priority",
+
   'nav.issues': 'Issues',
   'nav.members': 'Members',
   'nav.metrics': 'Metrics',

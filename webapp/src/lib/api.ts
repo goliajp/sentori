@@ -32,6 +32,11 @@ export interface Issue {
   last_seen: string;
   last_release: string;
   last_environment: string;
+  /** Triage priority, most urgent first. `p3` is the untriaged default. */
+  priority: 'p0' | 'p1' | 'p2' | 'p3';
+  /** Workspace-scoped label names. */
+  labels: string[];
+  assignee_user_id: string | null;
 }
 
 export interface EventRow {
@@ -441,6 +446,11 @@ export interface IssueDetail {
   regressed_at: string | null;
   regressed_in_release: string | null;
   resolved_at: string | null;
+  /** Triage priority, most urgent first. `p3` is the untriaged default. */
+  priority: 'p0' | 'p1' | 'p2' | 'p3';
+  /** Workspace-scoped label names. */
+  labels: string[];
+  assignee_user_id: string | null;
 }
 
 const DEFAULT_BASE = '';
@@ -576,6 +586,11 @@ export class Api {
     body: {
       status?: 'active' | 'resolved' | 'regressed' | 'ignored';
       resolved_in_release?: string;
+      priority?: 'p0' | 'p1' | 'p2' | 'p3';
+      /** Replaces the set — send what the issue should end up with. */
+      labels?: string[];
+      /** Omit to leave alone; `null` unassigns; a uuid assigns. */
+      assignee_user_id?: string | null;
     },
   ): Promise<void> {
     return this.send(

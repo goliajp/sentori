@@ -198,6 +198,68 @@ impl fmt::Display for MessageLevel {
     }
 }
 
+/// Triage priority. Matches the `issues.priority` CHECK.
+///
+/// Ordered most urgent first, which is also the sort order an operator
+/// means by "priority" — `p0` is a page-someone incident, `p3` the
+/// default a new issue arrives at.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum IssuePriority {
+    /// Drop everything.
+    P0,
+    /// This sprint.
+    P1,
+    /// Backlog, but real.
+    P2,
+    /// Default on arrival; nobody has triaged it yet.
+    P3,
+}
+
+impl IssuePriority {
+    /// All four, most urgent first.
+    pub const ALL: [Self; 4] = [Self::P0, Self::P1, Self::P2, Self::P3];
+
+    /// SQL wire form.
+    #[must_use]
+    pub const fn as_db_str(self) -> &'static str {
+        match self {
+            Self::P0 => "p0",
+            Self::P1 => "p1",
+            Self::P2 => "p2",
+            Self::P3 => "p3",
+        }
+    }
+
+    /// Parse from the SQL wire form.
+    ///
+    /// # Errors
+    ///
+    /// [`IssuePriorityParseError`] for any unknown string.
+    pub fn from_db_str(s: &str) -> Result<Self, IssuePriorityParseError> {
+        match s {
+            "p0" => Ok(Self::P0),
+            "p1" => Ok(Self::P1),
+            "p2" => Ok(Self::P2),
+            "p3" => Ok(Self::P3),
+            other => Err(IssuePriorityParseError(other.to_string())),
+        }
+    }
+}
+
+impl Default for IssuePriority {
+    /// `p3` — the column default, and what an untriaged issue is.
+    fn default() -> Self {
+        Self::P3
+    }
+}
+
+impl fmt::Display for IssuePriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_db_str())
+    }
+}
+
 /// Issue lifecycle status. Matches the `issues.status` CHECK.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -258,6 +320,11 @@ impl fmt::Display for IssueStatus {
 #[derive(Debug, Error, PartialEq, Eq)]
 #[error("unrecognised event kind: {0:?}")]
 pub struct EventKindParseError(pub String);
+
+/// Error from [`IssuePriority::from_db_str`].
+#[derive(Debug, Error, PartialEq, Eq)]
+#[error("unrecognised issue priority: {0:?}")]
+pub struct IssuePriorityParseError(pub String);
 
 /// Error from [`Platform::from_db_str`].
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -505,6 +572,15 @@ pub struct Issue {
     /// When the issue was last marked resolved.
     #[serde(with = "time::serde::rfc3339::option")]
     pub resolved_at: Option<OffsetDateTime>,
+    /// Triage priority. The column has always existed and always had a
+    /// value; nothing read it until now, so every issue in the wild
+    /// sits at the `p3` default.
+    pub priority: IssuePriority,
+    /// Free-form labels. Names are workspace-scoped — see
+    /// `workspace_labels` for the registry that gives them a colour.
+    pub labels: Vec<String>,
+    /// Who owns triaging this, if anyone.
+    pub assignee_user_id: Option<Uuid>,
 }
 
 /// `events` row pulled from the DB.

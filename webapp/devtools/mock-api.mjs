@@ -33,11 +33,12 @@ const issue = {
   // time's default Serialize — the exact shape that broke v1.7.15.
   regressed_at: [1970, 1, 0, 0, 0, 0, 0, 0, 0],
   regressed_in_release: null, resolved_at: null,
+  priority: 'p1', labels: ['checkout', 'regression'], assignee_user_id: U1,
 };
 const issues = [
   issue,
-  { ...issue, id: 'b'.repeat(8), error_type: 'NetworkError', message_sample: 'Request timed out after 30000ms', culprit: 'api.fetchCart', event_count: 88, user_count: 41, last_seen: iso(900_000), regressed_at: null },
-  { ...issue, id: 'c'.repeat(8), error_type: 'RangeError', message_sample: 'Maximum call stack size exceeded', culprit: 'renderTree', event_count: 9, user_count: 3, status: 'resolved', last_seen: iso(7_200_000), resolved_at: iso(3_600_000), regressed_at: null },
+  { ...issue, id: 'b'.repeat(8), error_type: 'NetworkError', message_sample: 'Request timed out after 30000ms', culprit: 'api.fetchCart', event_count: 88, user_count: 41, last_seen: iso(900_000), regressed_at: null, priority: 'p0', assignee_user_id: null },
+  { ...issue, id: 'c'.repeat(8), error_type: 'RangeError', message_sample: 'Maximum call stack size exceeded', culprit: 'renderTree', event_count: 9, user_count: 3, status: 'resolved', last_seen: iso(7_200_000), resolved_at: iso(3_600_000), regressed_at: null, priority: 'p3', labels: [], assignee_user_id: null },
 ];
 
 const t0 = 240_000;

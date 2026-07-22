@@ -456,6 +456,18 @@ export const zh: Messages = {
   'events.live': "实时",
   'releases.markShort': "发布标记",
 
+  'crash.priority': "优先级",
+  'crash.assignee': "负责人",
+  'crash.unassigned': "未指派",
+  'crash.labels': "标签",
+  'crash.noLabels': "无",
+  'priority.p0': "P0 · 立刻处理",
+  'priority.p1': "P1 · 本迭代",
+  'priority.p2': "P2 · 待办",
+  'priority.p3': "P3 · 未分级",
+
+  'issues.colPriority': "优先级",
+
   'nav.issues': '问题',
   'nav.members': '成员',
   'nav.metrics': '指标',
