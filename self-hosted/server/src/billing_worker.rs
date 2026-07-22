@@ -218,12 +218,27 @@ async fn apply_subscription(pool: &PgPool, cfg: &StripeConfig, sub: &serde_json:
         .set_plan(plan, customer.as_deref(), period_end)
         .await
     {
-        return Outcome::Retry(format!("set_plan: {e}"));
+        return classify(&e, "set_plan");
     }
     if let Err(e) = billing.set_status(status).await {
-        return Outcome::Retry(format!("set_status: {e}"));
+        return classify(&e, "set_status");
     }
     Outcome::Processed
+}
+
+/// Route a billing failure to the outcome that ends.
+///
+/// Everything used to be `Retry`, which meant a foreign-key violation —
+/// a subscription pointing at a workspace that no longer exists — was
+/// deferred every 15 seconds for as long as the process lived. Not a
+/// slow retry: an unending one, on a row that could never succeed,
+/// logged at WARN so it read like a passing blip.
+fn classify(e: &sentori_billing::BillingError, what: &str) -> Outcome {
+    if e.is_permanent() {
+        Outcome::Failed(format!("{what}: {e}"))
+    } else {
+        Outcome::Retry(format!("{what}: {e}"))
+    }
 }
 
 /// `customer.subscription.deleted` / `invoice.payment_failed` —
@@ -239,12 +254,7 @@ async fn apply_status_change(
     let billing = BillingService::new(pool.clone(), WorkspaceId::from_uuid(workspace_id));
     match billing.set_status(status).await {
         Ok(()) => Outcome::Processed,
-        // NotInitialised = no billing row for this workspace yet.
-        // That is a genuine mapping gap, not a transient fault.
-        Err(sentori_billing::BillingError::NotInitialised) => {
-            Outcome::Failed("no billing row for resolved workspace".into())
-        }
-        Err(e) => Outcome::Retry(format!("set_status: {e}")),
+        Err(e) => classify(&e, "set_status"),
     }
 }
 
