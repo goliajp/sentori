@@ -22,6 +22,15 @@ android {
         }
     }
 
+    testOptions {
+        unitTests {
+            // Robolectric needs the real android.jar rather than the
+            // stub that throws on every call.
+            includeAndroidResources = true
+            returnDefaultValues = true
+        }
+    }
+
     kotlinOptions {
         jvmTarget = '17'
     }
@@ -47,4 +56,16 @@ dependencies {
     // androidx.core for ContextCompat.checkSelfPermission +
     // ActivityCompat.requestPermissions (Android 13+ POST_NOTIFICATIONS).
     implementation 'androidx.core:core:1.13.1'
+
+    // The two Robolectric suites under src/test have been in the repo
+    // since Phase 29 and could never compile: the module declared no
+    // test dependencies at all, so every `org.junit` import was an
+    // unresolved reference. Nothing noticed because nothing ran them —
+    // the CI job that was supposed to had been failing for months on a
+    // missing Gradle wrapper.
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.13'
+    testImplementation 'androidx.test:core:1.6.1'
+    // The suites mix kotlin.test.assert* with JUnit's runner.
+    testImplementation "org.jetbrains.kotlin:kotlin-test:${rootProject.ext.kotlinVersion ?: '2.0.21'}"
 }
