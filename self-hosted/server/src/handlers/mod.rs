@@ -306,6 +306,18 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/projects/{project_id}/releases",
             get(admin::releases::list),
         )
+        // Per-project access for the `user` role. The store behind
+        // these has existed since the identity crate was written with
+        // no way to reach it, which is why `user` members saw every
+        // project.
+        .route(
+            "/admin/api/projects/{project_id}/visibility",
+            get(admin::visibility::list),
+        )
+        .route(
+            "/admin/api/projects/{project_id}/visibility/{user_id}",
+            axum::routing::put(admin::visibility::grant).delete(admin::visibility::revoke),
+        )
         .route(
             "/admin/api/projects/{project_id}/releases/{release_id}/artifacts",
             get(admin::releases::list_artifacts).post(artifacts_upload::upload),

@@ -18,3 +18,4 @@ pub mod saas;
 pub mod test_push;
 pub mod test_webhook;
 pub mod tokens;
+pub mod visibility;

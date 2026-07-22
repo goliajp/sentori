@@ -39,6 +39,19 @@ pub async fn create(
     headers: HeaderMap,
     Json(body): Json<CreateBody>,
 ) -> (StatusCode, Json<Value>) {
+    // `Role::can_create_project` has existed since the role model was
+    // written and had no caller. Any member — including the `user`
+    // role, whose whole point is that it sees only what it is granted
+    // — could create a project here.
+    if !ctx.role.can_create_project() {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(
+                json!({ "error": "forbidden", "hint": "creating a project needs the owner or admin role" }),
+            ),
+        );
+    }
+
     if body.name.is_empty() || body.slug.is_empty() {
         return (
             StatusCode::BAD_REQUEST,
