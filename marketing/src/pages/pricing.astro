@@ -9,20 +9,20 @@ import '../styles/global.css'
     <meta name="viewport" content="width=device-width" />
     <meta
       name="description"
-      content="Sentori pricing. Self-hosted is free forever. SaaS free tier 100k events/month, sign up at sentori.golia.jp."
+      content="Sentori pricing. Self-hosted is free forever. Hosted: free tier at 100k events/month, Pro at ¥4,900/month for 5M events and 90-day retention."
     />
     <link rel="canonical" href="https://sentori.golia.jp/pricing/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Sentori" />
     <meta property="og:title" content="Pricing — Sentori" />
-    <meta property="og:description" content="Self-hosted is free forever. SaaS free tier 100k events/month, open registration." />
+    <meta property="og:description" content="Self-hosted is free forever. Hosted free tier at 100k events/month; Pro at ¥4,900/month." />
     <meta property="og:url" content="https://sentori.golia.jp/pricing/" />
     <meta property="og:image" content="https://sentori.golia.jp/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Pricing — Sentori" />
-    <meta name="twitter:description" content="Self-hosted is free forever. SaaS free tier 100k events/month." />
+    <meta name="twitter:description" content="Self-hosted is free forever. Hosted free tier at 100k events/month; Pro at ¥4,900/month." />
     <meta name="twitter:image" content="https://sentori.golia.jp/og.png" />
     <title>Pricing — Sentori</title>
   </head>
@@ -46,11 +46,12 @@ import '../styles/global.css'
     <main class="mx-auto max-w-5xl px-6 pt-16 pb-24">
       <h1 class="text-fg text-4xl font-semibold tracking-tight">Pricing</h1>
       <p class="text-fg-muted mt-4 max-w-2xl leading-relaxed">
-        Two ways to use Sentori. Pick the one that matches your team's
-        comfort with running infra.
+        Run it yourself for nothing, or let us run it. The hosted tiers
+        differ only in how much they hold and for how long — same
+        dashboard, same SDKs, same alerts.
       </p>
 
-      <div class="mt-16 grid grid-cols-1 gap-6 md:grid-cols-2">
+      <div class="mt-16 grid grid-cols-1 gap-6 md:grid-cols-3">
         <div class="border-border bg-bg-tertiary/30 rounded-lg border p-8">
           <div class="text-fg-muted text-xs tracking-wider uppercase">
             Self-hosted
@@ -63,7 +64,7 @@ import '../styles/global.css'
           </p>
           <ul class="text-fg-muted mt-6 space-y-2 text-sm">
             <li>• Unlimited events</li>
-            <li>• Unlimited team members (Phase 13+)</li>
+            <li>• Unlimited team members</li>
             <li>• Source maps + symbolication</li>
             <li>• Email alerts</li>
             <li>• Run on a $5/mo VM</li>
@@ -76,37 +77,77 @@ import '../styles/global.css'
           </a>
         </div>
 
-        <div class="border-accent/40 bg-accent/5 rounded-lg border p-8">
+        <div class="border-border bg-bg-tertiary/30 rounded-lg border p-8">
           <div class="text-fg-muted text-xs tracking-wider uppercase">
-            SaaS — Free
+            Hosted — Free
           </div>
-          <div class="text-fg mt-2 text-3xl font-semibold">$0</div>
+          <div class="text-fg mt-2 text-3xl font-semibold">Free</div>
           <p class="text-fg-muted mt-4 text-sm leading-relaxed">
             Hosted at <span class="text-fg font-mono">sentori.golia.jp</span>.
-            100k events / month, 30-day retention, multi-org. No card
-            required. Pro / enterprise pricing lands after we've stayed
-            up reliably for a while.
+            Enough to instrument a real app and see whether it earns a
+            place in your stack. No card required.
           </p>
           <ul class="text-fg-muted mt-6 space-y-2 text-sm">
-            <li>• 100k events / month</li>
+            <li>• 100,000 events / month</li>
+            <li>• 1,000,000 spans / month</li>
+            <li>• 1,000 session replays / month</li>
             <li>• 30-day retention</li>
-            <li>• Multi-org, role-based</li>
-            <li>• Same dashboard, zero ops</li>
             <li>• Email alerts on new issues + quota</li>
+          </ul>
+          <a
+            href="/register"
+            class="border-border text-fg hover:bg-bg-tertiary mt-8 inline-block rounded-md border px-4 py-2 text-sm transition-colors"
+          >
+            Sign up — free →
+          </a>
+        </div>
+
+        <div class="border-accent/40 bg-accent/5 rounded-lg border p-8">
+          <div class="text-fg-muted text-xs tracking-wider uppercase">
+            Hosted — Pro
+          </div>
+          <div class="text-fg mt-2 text-3xl font-semibold">
+            ¥4,900<span class="text-fg-muted text-base font-normal"> / month</span>
+          </div>
+          <p class="text-fg-muted mt-4 text-sm leading-relaxed">
+            Fifty times the volume and three times the history. Billed in
+            JPY; if you are elsewhere your bank converts at the rate on
+            the day, and checkout shows you an estimate first.
+          </p>
+          <ul class="text-fg-muted mt-6 space-y-2 text-sm">
+            <li>• 5,000,000 events / month</li>
+            <li>• 50,000,000 spans / month</li>
+            <li>• 50,000 session replays / month</li>
+            <li>• 90-day retention</li>
+            <li>• Everything in Free</li>
           </ul>
           <a
             href="/register"
             class="bg-accent text-bg mt-8 inline-block rounded-md px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90"
           >
-            Sign up — free →
+            Start free, upgrade later →
           </a>
         </div>
       </div>
 
-      <p class="text-fg-muted mt-16 max-w-2xl text-xs leading-relaxed">
-        Self-hosted will always be free. The hosted plan exists so we can
+      <div class="border-border mt-12 rounded-lg border p-6">
+        <div class="text-fg-muted text-xs tracking-wider uppercase">
+          Enterprise
+        </div>
+        <p class="text-fg-muted mt-3 max-w-2xl text-sm leading-relaxed">
+          Unmetered volume and 365-day retention, on a contract rather
+          than a card. If you need a signed agreement, an invoice, or
+          limits nobody has written down yet,
+          mail <a class="text-fg hover:text-accent font-mono" href="mailto:takagi@golia.jp">takagi@golia.jp</a>.
+        </p>
+      </div>
+
+      <p class="text-fg-muted mt-12 max-w-2xl text-xs leading-relaxed">
+        Self-hosted will always be free. The hosted tiers exist so we can
         offer a zero-ops option; revenue from Pro funds development that
-        also benefits the open-source build.
+        also benefits the open-source build. Upgrading and cancelling are
+        both self-serve — a cancelled workspace falls back to Free limits
+        and keeps its data for the Free retention window.
       </p>
     </main>
 
