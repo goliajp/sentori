@@ -468,6 +468,18 @@ export const ja: Messages = {
 
   'issues.colPriority': "優先度",
 
+  'crash.addLabel': "ラベルを追加…",
+
+  'nav.track': "プロダクトイベント",
+  'track.title': "プロダクトイベント",
+  'track.names': "このアプリが送っているもの",
+  'track.recent': "最近",
+  'track.recentHint': "新しい順・すべてのイベント名。",
+  'track.users': "{n} 人",
+  'track.lastDays': "直近 {n} 日",
+  'track.empty': "プロダクトイベントがありません",
+  'track.emptyHint': "アプリで sentori.track(name, props) を呼ぶとここに表示されます。",
+
   'nav.issues': 'イシュー',
   'nav.members': 'メンバー',
   'nav.metrics': 'メトリクス',

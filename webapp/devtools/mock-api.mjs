@@ -172,6 +172,19 @@ const SUFFIX = [
   [/\/metrics$/, () => ({ metrics: [{ name: 'checkout.duration', last_bucket: iso(600_000), total_count: 8_412, avg_value: 218.4 }, { name: 'cart.size', last_bucket: null, total_count: 0, avg_value: 0 }] })],
   [/\/replays\/[^/]+$/, () => ({ replay: { id: 'r1', event_id: EVENT, blob_hash: 'deadbeef', started_at: iso(t0 + 46_000), ended_at: iso(t0), duration_ms: 44_200, frame_count: 35, created_at: iso(t0) } })],
   [/\/replays/, () => ({ replays: [{ id: 'r1', event_id: EVENT, blob_hash: 'deadbeef', started_at: iso(t0 + 46_000), ended_at: iso(t0), duration_ms: 44_200, frame_count: 35, created_at: iso(t0) }] })],
+  [/\/track\/names/, () => ({ days: 7, names: [
+    { name: '$pageview', total: 18_751, users: 45, last_seen: iso(3_600_000) },
+    { name: 'bio.login.attempt', total: 177, users: 0, last_seen: iso(7_200_000) },
+    { name: 'bio.login.failure', total: 148, users: 0, last_seen: iso(9_000_000) },
+    { name: 'checkout.started', total: 62, users: 31, last_seen: iso(600_000) },
+  ] })],
+  [/\/track\/series/, () => ({ name: '$pageview', days: 30, points:
+    Array.from({ length: 30 }, (_, i) => ({ day: iso(86_400_000 * (29 - i)), total: 400 + ((i * 37) % 300), users: 3 + (i % 9) })) })],
+  [/\/track\/recent/, () => ({ events: [
+    { id: 't1', name: '$pageview', user_id: 'a91f3c02deadbeef', session_id: null, route: '/checkout', release: 'myapp@1.2.3', environment: 'production', props: { referrer: '/cart' }, occurred_at: iso(120_000) },
+    { id: 't2', name: 'checkout.started', user_id: 'a91f3c02deadbeef', session_id: null, route: '/checkout', release: 'myapp@1.2.3', environment: 'production', props: { items: 3 }, occurred_at: iso(180_000) },
+    { id: 't3', name: 'bio.login.failure', user_id: null, session_id: null, route: '/login', release: 'myapp@1.2.3', environment: 'production', props: {}, occurred_at: iso(900_000) },
+  ] })],
   [/\/stats$/, () => ({ events_24h: 1382, issues_active: 2, spans_24h: 940, metrics_buckets_24h: 288, replays_24h: 6 })],
   [/\/search/, () => ({ q: '', issues: [{ id: ISSUE, error_type: 'TypeError', message_sample: "Cannot read property 'id' of undefined", last_seen: iso(240_000) }], events: [{ id: EVENT, issue_id: ISSUE, kind: 'error', timestamp: iso(240_000), release: 'myapp@1.2.3' }] })],
   [/\/endpoint-probes$/, () => ({ probes: [{ id: 'p1', endpoint_url: 'https://api.example.com/health', method: 'GET', interval_seconds: 60, enabled: true, last_status: 200, last_checked_at: iso(45_000), created_at: iso(86_400_000 * 4) }] })],

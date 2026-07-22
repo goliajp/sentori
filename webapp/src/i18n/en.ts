@@ -475,6 +475,18 @@ export const en = {
 
   'issues.colPriority': "Priority",
 
+  'crash.addLabel': "Add a label…",
+
+  'nav.track': "Product events",
+  'track.title': "Product events",
+  'track.names': "What this app sends",
+  'track.recent': "Latest",
+  'track.recentHint': "Newest first, across all event names.",
+  'track.users': "{n} people",
+  'track.lastDays': "Last {n} days",
+  'track.empty': "No product events yet",
+  'track.emptyHint': "Call sentori.track(name, props) in your app and they appear here.",
+
   'nav.issues': 'Issues',
   'nav.members': 'Members',
   'nav.metrics': 'Metrics',

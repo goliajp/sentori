@@ -153,6 +153,10 @@ function Sidebar({ me }: { me: MeResponse | null }) {
             <NavItem to={`/projects/${projectScoped}/events`} label={t('nav.events')} />
             <NavItem to={`/projects/${projectScoped}/traces`} label={t('nav.traces')} />
             <NavItem
+              to={`/projects/${projectScoped}/track`}
+              label={t('nav.track')}
+            />
+            <NavItem
               to={`/projects/${projectScoped}/metrics`}
               label={t('nav.metrics')}
             />
