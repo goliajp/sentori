@@ -33,10 +33,16 @@ const ALLOWED = new RegExp(
     'healthz|livez|readyz|metrics|describe',
     'English|简体中文|日本語',
     'Mozilla|Macintosh|Windows|Android|Chrome|Safari|Firefox',
+    // The health page lists workers, env vars and auth schemes by their
+    // real names on purpose — an operator greps for `Bearer`, not for
+    // its translation.
+    'Bearer|HttpOnly|Cookie|ES256|RS256|JWT|TLS|HTTP|TCP|Postgres|Valkey',
     // fixture values from devtools/mock-api.mjs
     'insight|myapp|TypeError|NetworkError|RangeError|Cannot read|Request timed',
     'Maximum call|production|staging|Checkout|Cart|Home|Pay now|Unresolved',
     'Crash|Events at|checkout|payments',
+    "Let's Encrypt|Encrypt|BadDeviceToken|Send",  // CA and provider strings from fixtures
+    'Ctrl|Cmd|Shift|Enter|Esc|Tab',               // key names, printed as typed
   ].join('|'),
 );
 
