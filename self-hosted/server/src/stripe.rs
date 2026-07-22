@@ -27,6 +27,22 @@ use uuid::Uuid;
 
 const STRIPE_API_BASE: &str = "https://api.stripe.com";
 
+/// Pinned rather than floating on the account's default. Stripe rolls
+/// the account default forward, and a version bump can reshape response
+/// bodies — an unpinned integration finds out in production, on
+/// someone's upgrade click. Move this deliberately, with the changelog
+/// open.
+const STRIPE_API_VERSION: &str = "2026-06-24.dahlia";
+
+/// Attempts for one logical Stripe write, including the first.
+///
+/// A customer is waiting on the other end of these calls, so the
+/// budget is small: three tries with the backoff below adds at most
+/// ~900 ms before giving up. Stripe's own guidance is to retry 5xx,
+/// 429 and transport failures; 4xx are our bug or the customer's and
+/// retrying them just repeats the same rejection.
+const STRIPE_MAX_ATTEMPTS: u32 = 3;
+
 /// Env-driven Stripe configuration. Cloned into every handler that
 /// needs it (all fields are small owned strings).
 #[derive(Clone, Debug, Default)]
@@ -188,13 +204,14 @@ pub async fn create_checkout_session(
         form.push(("customer_email", email));
     }
 
-    let resp = reqwest::Client::new()
-        .post(format!("{STRIPE_API_BASE}/v1/checkout/sessions"))
-        .bearer_auth(secret)
-        .form(&form)
-        .send()
-        .await?;
-    let json = parse_stripe_response(resp, "checkout session").await?;
+    let json = stripe_post(
+        secret,
+        "/v1/checkout/sessions",
+        &form,
+        &Uuid::now_v7().to_string(),
+        "checkout session",
+    )
+    .await?;
     json.get("url")
         .and_then(|v| v.as_str())
         .map(String::from)
@@ -219,17 +236,87 @@ pub async fn create_portal_session(
     let return_url = format!("{}/settings/billing", cfg.public_url);
     let form: Vec<(&str, &str)> = vec![("customer", customer_id), ("return_url", &return_url)];
 
-    let resp = reqwest::Client::new()
-        .post(format!("{STRIPE_API_BASE}/v1/billing_portal/sessions"))
-        .bearer_auth(secret)
-        .form(&form)
-        .send()
-        .await?;
-    let json = parse_stripe_response(resp, "billing portal session").await?;
+    let json = stripe_post(
+        secret,
+        "/v1/billing_portal/sessions",
+        &form,
+        &Uuid::now_v7().to_string(),
+        "billing portal session",
+    )
+    .await?;
     json.get("url")
         .and_then(|v| v.as_str())
         .map(String::from)
         .ok_or_else(|| anyhow::anyhow!("Stripe portal session response missing `url`"))
+}
+
+/// Whether a Stripe HTTP status is worth sending again.
+///
+/// 4xx other than 429 are our bug or the customer's — a declined card,
+/// a price that does not exist, a malformed request. Retrying them
+/// repeats the same rejection three times and triples the time the
+/// customer spends looking at a spinner before the same failure.
+fn is_retryable(status: reqwest::StatusCode) -> bool {
+    status.is_server_error() || matches!(status.as_u16(), 429)
+}
+
+/// POST a form to Stripe, retrying only what is worth retrying.
+///
+/// `idempotency_key` is generated once by the caller and held across
+/// every attempt — that is the whole point. Without it a retry after a
+/// timeout can create a second Checkout Session for one click, and we
+/// would never know, because the response that would have told us is
+/// the one that got lost.
+async fn stripe_post(
+    secret: &str,
+    path: &str,
+    form: &[(&str, &str)],
+    idempotency_key: &str,
+    what: &str,
+) -> anyhow::Result<serde_json::Value> {
+    let client = reqwest::Client::new();
+    let mut last: anyhow::Error = anyhow::anyhow!("Stripe {what}: no attempt was made");
+
+    for attempt in 0..STRIPE_MAX_ATTEMPTS {
+        if attempt > 0 {
+            // 150ms, 300ms. No jitter: these retries are per-request
+            // and user-initiated, so they do not arrive in a
+            // synchronised herd the way a cron's would.
+            let backoff = std::time::Duration::from_millis(150u64 << (attempt - 1));
+            tokio::time::sleep(backoff).await;
+        }
+
+        let sent = client
+            .post(format!("{STRIPE_API_BASE}{path}"))
+            .bearer_auth(secret)
+            .header("Stripe-Version", STRIPE_API_VERSION)
+            .header("Idempotency-Key", idempotency_key)
+            .form(form)
+            .send()
+            .await;
+
+        match sent {
+            Ok(resp) => {
+                let status = resp.status();
+                if is_retryable(status) {
+                    last = parse_stripe_response(resp, what)
+                        .await
+                        .err()
+                        .unwrap_or_else(|| anyhow::anyhow!("Stripe {what} failed ({status})"));
+                    continue;
+                }
+                return parse_stripe_response(resp, what).await;
+            }
+            // Transport failure: the request may or may not have
+            // reached Stripe, which is exactly the case the
+            // idempotency key exists for.
+            Err(e) => last = anyhow::Error::new(e).context(format!("Stripe {what} request failed")),
+        }
+    }
+
+    Err(last.context(format!(
+        "Stripe {what} failed after {STRIPE_MAX_ATTEMPTS} attempts"
+    )))
 }
 
 /// Turn a Stripe HTTP response into JSON, surfacing a non-2xx as a
@@ -250,4 +337,51 @@ async fn parse_stripe_response(
         anyhow::bail!("Stripe {what} failed ({status}): {msg}");
     }
     Ok(body)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use reqwest::StatusCode;
+
+    /// The classification is the whole retry policy. Getting it wrong
+    /// in the permissive direction turns one declined card into three,
+    /// and in the strict direction gives up on the outages retrying
+    /// exists for.
+    #[test]
+    fn only_transient_statuses_are_retried() {
+        for s in [
+            StatusCode::INTERNAL_SERVER_ERROR,
+            StatusCode::BAD_GATEWAY,
+            StatusCode::SERVICE_UNAVAILABLE,
+            StatusCode::GATEWAY_TIMEOUT,
+            StatusCode::TOO_MANY_REQUESTS,
+        ] {
+            assert!(is_retryable(s), "{s} should be retried");
+        }
+
+        for s in [
+            StatusCode::OK,
+            StatusCode::BAD_REQUEST,
+            StatusCode::UNAUTHORIZED,
+            StatusCode::FORBIDDEN,
+            StatusCode::NOT_FOUND,
+            StatusCode::CONFLICT,
+            // Stripe returns 402 for a declined card. Retrying it just
+            // declines the same card again.
+            StatusCode::PAYMENT_REQUIRED,
+        ] {
+            assert!(!is_retryable(s), "{s} should not be retried");
+        }
+    }
+
+    /// Three attempts at 150ms + 300ms. The comment on
+    /// `STRIPE_MAX_ATTEMPTS` promises a customer waits under a second
+    /// extra; this is what holds that promise honest.
+    #[test]
+    fn retry_budget_stays_under_a_second() {
+        let total: u64 = (1..STRIPE_MAX_ATTEMPTS).map(|a| 150u64 << (a - 1)).sum();
+        assert_eq!(total, 450);
+        assert!(total < 1000);
+    }
 }
