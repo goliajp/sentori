@@ -41,7 +41,7 @@ export default function Replays() {
     <div className="space-y-4">
       <PageHeader
         title={t('replays.title')}
-        subtitle="Session replays captured around error events. Last 100 by recency."
+        subtitle={t('replays.subtitle')}
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
 

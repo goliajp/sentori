@@ -112,7 +112,7 @@ export function EventsPage() {
               variant={live ? 'primary' : 'secondary'}
               size="sm"
             >
-              {live ? `● Live (${liveCount})` : 'Live ○'}
+              {live ? `● ${t('events.live')} (${liveCount})` : `${t('events.live')} ○`}
             </Button>
             <Button onClick={saveView} variant="secondary" size="sm">{t('issues.saveFilter')}</Button>
           </div>

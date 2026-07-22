@@ -199,9 +199,9 @@ export default function PushCredentials() {
           ) : (
             <DataTable
               columns={[
-                { key: 'kind', label: 'Provider' },
-                { key: 'config', label: 'Config (no secret)' },
-                { key: 'status', label: 'Last validate' },
+                { key: 'kind', label: t('push.provider') },
+                { key: 'config', label: t('push.config') },
+                { key: 'status', label: t('push.lastValidate') },
                 { key: 'actions', label: '' },
               ]}
               rows={rows.map(c => ({

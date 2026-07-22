@@ -106,7 +106,7 @@ export default function Releases() {
         subtitle={t('releases.subtitle')}
         actions={
           <Button onClick={() => setShowCreate(!showCreate)} size="sm">
-            {showCreate ? 'Cancel' : '+ Deploy marker'}
+            {showCreate ? t('action.cancel') : `+ ${t('releases.markShort')}`}
           </Button>
         }
       />

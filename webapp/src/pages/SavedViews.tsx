@@ -218,7 +218,7 @@ export default function SavedViews() {
                           to={route}
                           className="rounded bg-raised px-3 py-1 text-xs text-fg-muted hover:bg-raised"
                         >
-                          Open →
+                          {t('savedViews.open')} →
                         </Link>
                       )}
                       <Button
