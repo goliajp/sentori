@@ -100,7 +100,13 @@ jobs:
         if: always()
         with:
           name: android-test-reports
-          path: apps/rn-example/android/**/build/reports/tests/
+          # The module builds under node_modules, not under the host
+          # project — the first version pointed at the host and uploaded
+          # nothing, so a failing run had no report to read.
+          path: |
+            **/sentori-react-native/build/reports/tests/
+            **/sentori-react-native/build/test-results/
+          if-no-files-found: warn
 
   # Round-trip symbolication against the v0.2 server: bundle a fixture,
   # upload its map, send a stack from the minified bundle, assert the
