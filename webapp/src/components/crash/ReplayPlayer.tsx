@@ -42,6 +42,26 @@ type Frame =
       removed: Pick<Node, 'x' | 'y' | 'w' | 'h'>[];
     };
 
+/**
+ * NDJSON to frames.
+ *
+ * One malformed line should not cost the whole recording: the format is
+ * append-only, so a truncated tail is the expected failure rather than
+ * a corrupt file.
+ */
+function decodeFrames(text: string): Frame[] {
+  const out: Frame[] = [];
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      out.push(JSON.parse(line) as Frame);
+    } catch {
+      /* a partial last line is normal */
+    }
+  }
+  return out;
+}
+
 const fp = (n: Pick<Node, 'x' | 'y' | 'w' | 'h'>) =>
   `${n.x | 0},${n.y | 0},${n.w | 0},${n.h | 0}`;
 
@@ -63,35 +83,26 @@ export function ReplayPlayer({
   onSeek?: (ts: number) => void;
 }) {
   const t = useT();
-  const [frames, setFrames] = useState<Frame[] | null>(null);
+  const [fetched, setFetched] = useState<Frame[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    // One malformed line should not cost the whole recording; the
-    // format is append-only and a truncated tail is the expected
-    // failure.
-    const decode = (text: string) => {
-      const parsed: Frame[] = [];
-      for (const line of text.split('\n')) {
-        if (!line.trim()) continue;
-        try {
-          parsed.push(JSON.parse(line) as Frame);
-        } catch {
-          /* skip */
-        }
-      }
-      return parsed;
-    };
+  // Text that was handed to us needs no effect — it is already here, so
+  // deriving is both simpler and correct. Setting state inside an
+  // effect for a value available at render costs a second render pass
+  // and is what `react-hooks/set-state-in-effect` is pointing at.
+  const provided = useMemo(
+    () => (ndjson === undefined ? null : decodeFrames(ndjson)),
+    [ndjson],
+  );
+  const frames = provided ?? fetched;
 
-    if (ndjson !== undefined) {
-      setFrames(decode(ndjson));
-      return;
-    }
+  useEffect(() => {
+    if (ndjson !== undefined) return;
     if (!projectId || !attachmentRef) return;
+    let cancelled = false;
     fetch(api.attachmentUrl(projectId, attachmentRef), {
       credentials: 'include',
     })
@@ -99,7 +110,7 @@ export function ReplayPlayer({
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.text();
       })
-      .then(text => !cancelled && setFrames(decode(text)))
+      .then(text => !cancelled && setFetched(decodeFrames(text)))
       .catch(e => !cancelled && setError(String(e)));
     return () => {
       cancelled = true;

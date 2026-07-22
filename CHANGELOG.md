@@ -6,6 +6,16 @@
 
 ---
 
+## v1.7.23(2026-07-22 — hotfix:v1.7.22 让 master 的 build 变红)
+
+v1.7.22 的 `ReplayPlayer` 在 effect 体里直接 `setState`,`react-hooks/set-state-in-effect` 判 error,`master` 的 build 挂掉、deploy 被跳过 —— **v1.7.22 从未部署**。
+
+已经拿到手的文本不需要 effect:它在 render 时就在,派生即可。在 effect 里为一个渲染期已知的值设 state,多付一趟渲染,正是那条规则指的东西。解码函数提到组件外(它不依赖任何 prop),`ndjson` 走 `useMemo` 派生,fetch 分支保持 effect。
+
+**为什么本地没拦住**:我一直用 `grep -c "error TS"` 判断 `bun run check` 的结果 —— **那只数 TypeScript 错误,eslint 的 error 完全漏掉**。改用退出码。
+
+---
+
 ## v1.7.22(2026-07-22 — 回放页接上早就存在的播放器)
 
 回放详情页显示的是一个拖原始 JSON 的滑块,底下还有一行「canvas 播放器将在 v0.3 提供」。**播放器随 crash 证据视图一起上线很久了** —— 只是这个页面没被告知,于是唯一一个专门用来看录屏的页面,成了唯一一个放不了录屏的页面。
