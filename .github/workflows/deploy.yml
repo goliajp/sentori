@@ -308,7 +308,18 @@ jobs:
           # saas-control is listening
           status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18091/healthz)
           case "$status" in 200|404) : ;; *) fail "saas-control :18091 unreachable (got $status)";; esac
-          echo "==> v0.2 smoke OK"
+          # The version actually answering has to be the version we just
+          # checked out. Everything above this line passes just as well
+          # when the image was never rebuilt and the old binary is still
+          # serving — which is how v1.9.1 reported five green deploys
+          # while production stayed on 1.9.0. "Healthy" is not "new".
+          want=$(grep -m1 '^version' self-hosted/server/Cargo.toml \
+            | sed 's/.*"\(.*\)".*/\1/')
+          got=$(curl -fsS http://127.0.0.1:18090/healthz \
+            | sed 's/.*"version":"\([^"]*\)".*/\1/')
+          test "$want" = "$got" \
+            || fail "deployed $got but this commit is $want — the image did not rebuild"
+          echo "==> v0.2 smoke OK (serving $got)"
 
       - name: Tag release version
         # Only on the release/* push path — master-line deploys derived
