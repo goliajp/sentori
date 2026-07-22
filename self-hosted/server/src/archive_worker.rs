@@ -1,8 +1,19 @@
 //! Background archive worker.
 //!
-//! Periodically (default daily) DELETEs old `sent` push_sends + their
-//! delivery_logs to keep the table small. Keeps `failed` indefinitely
-//! by default (operator may want to investigate later) — controllable.
+//! Periodically (default daily) DELETEs three kinds of no-longer-
+//! useful rows:
+//!
+//! - `sent` and old `failed` push_sends plus their delivery_logs.
+//! - Rows with `expires_at < now()` in the four short-lived auth
+//!   tables — sessions, email verifications, password resets, invites.
+//!   The auth code already filters expired rows out of every lookup,
+//!   so leaving them in the table is a correctness no-op but a slow
+//!   size-forever leak that would eventually make those lookups
+//!   scan through years of dead credentials.
+//!
+//! The `prune_expired` and `purge_*` store methods that do these
+//! DELETEs have existed since the auth crate was written with no
+//! caller. This is the caller.
 //!
 //! Tunables:
 //! - `SENTORI_ARCHIVE_WORKER_ENABLED` default on
@@ -33,6 +44,12 @@ pub fn spawn(pool: PgPool) {
             match run_once(&pool, sent_days, failed_days).await {
                 Ok((sends, logs)) => info!(sends, logs, "archive worker pass"),
                 Err(e) => warn!(error = %e, "archive worker pass failed"),
+            }
+            match prune_expired_auth(&pool).await {
+                Ok((sessions, email, resets, invites)) => {
+                    info!(sessions, email, resets, invites, "auth prune pass");
+                }
+                Err(e) => warn!(error = %e, "auth prune pass failed"),
             }
             sleep(interval).await;
         }
@@ -70,6 +87,37 @@ async fn run_once(
     .rows_affected();
 
     Ok((sends, logs))
+}
+
+/// DELETE anything whose `expires_at` has already passed in the four
+/// tables the auth flow relies on. Returns the row counts so the log
+/// line names them; a run with zero everywhere is a healthy default.
+async fn prune_expired_auth(pool: &PgPool) -> Result<(u64, u64, u64, u64), sqlx::Error> {
+    // Four small DELETEs on `expires_at < now()`. Each table is
+    // separately indexed on expires_at at scales that matter, and a
+    // single UNION would have to name them anyway.
+    let sessions = sqlx::query("DELETE FROM auth_sessions WHERE expires_at < now()")
+        .execute(pool)
+        .await?
+        .rows_affected();
+    let email = sqlx::query("DELETE FROM email_verifications WHERE expires_at < now()")
+        .execute(pool)
+        .await?
+        .rows_affected();
+    let resets = sqlx::query("DELETE FROM password_resets WHERE expires_at < now()")
+        .execute(pool)
+        .await?
+        .rows_affected();
+    // Accepted invites carry `accepted_at` and are kept for audit; a
+    // row with `expires_at < now()` AND no `accepted_at` is a bare
+    // never-consumed invite and safe to drop.
+    let invites = sqlx::query(
+        "DELETE FROM workspace_invites WHERE expires_at < now() AND accepted_at IS NULL",
+    )
+    .execute(pool)
+    .await?
+    .rows_affected();
+    Ok((sessions, email, resets, invites))
 }
 
 fn env_enabled() -> bool {
