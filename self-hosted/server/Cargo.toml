@@ -13,7 +13,7 @@
 
 [package]
 name = "sentori-server"
-version = "1.8.2"
+version = "1.8.3"
 edition = "2024"
 authors = ["GOLIA K.K. <takagi@golia.jp>"]
 license = "Apache-2.0 OR MIT"
@@ -42,6 +42,7 @@ sentori-workspace-identity = { path = "../../core/crates/workspace-identity" }
 sentori-auth-session       = { path = "../../core/crates/auth-session" }
 sentori-attachment-store   = { path = "../../core/crates/attachment-store" }
 sentori-event-pipeline     = { path = "../../core/crates/event-pipeline" }
+sentori-identity-fingerprint = { path = "../../core/crates/identity-fingerprint" }
 sentori-issue-store        = { path = "../../core/crates/issue-store" }
 sentori-span-store         = { path = "../../core/crates/span-store" }
 sentori-replay-store       = { path = "../../core/crates/replay-store" }
