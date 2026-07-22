@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 import { useT } from '../i18n';
-import { api, InviteRow, MemberRow } from '../lib/api';
+import { api, InviteRow, MemberRow, Project } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 import {
   Badge,
@@ -24,6 +24,11 @@ export default function Members() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'admin' | 'user'>('user');
   const [newInviteToken, setNewInviteToken] = useState<string | null>(null);
+  // Which member's project access is open, and what it currently is.
+  // Only the `user` role has any: owners and admins see every project,
+  // and the server refuses a grant for them rather than pretending.
+  const [accessFor, setAccessFor] = useState<MemberRow | null>(null);
+  const [accessIds, setAccessIds] = useState<Set<string> | null>(null);
 
   const {
     data,
@@ -32,15 +37,63 @@ export default function Members() {
     reload: refresh,
     setError,
   } = useAsyncData(
-    async (): Promise<{ members: MemberRow[]; invites: InviteRow[] }> => {
-      const [m, i] = await Promise.all([api.listMembers(), api.listInvites()]);
-      return { members: m.members, invites: i.invites };
+    async (): Promise<{
+      members: MemberRow[];
+      invites: InviteRow[];
+      projects: Project[];
+    }> => {
+      const [m, i, p] = await Promise.all([
+        api.listMembers(),
+        api.listInvites(),
+        api.listProjects(),
+      ]);
+      return { members: m.members, invites: i.invites, projects: p };
     },
     [],
     String,
   );
   const members = data?.members ?? [];
   const invites = data?.invites ?? [];
+  const projects = data?.projects ?? [];
+
+  // Access is stored per project, so reading one member's set means
+  // asking every project who can see it. Fine at this scale, and it
+  // keeps the server's shape honest rather than adding a per-user
+  // endpoint that exists only for this screen.
+  async function openAccess(m: MemberRow) {
+    setAccessFor(m);
+    setAccessIds(null);
+    try {
+      const lists = await Promise.all(
+        projects.map(async p => ({
+          id: p.id,
+          users: (await api.listProjectAccess(p.id)).user_ids,
+        })),
+      );
+      setAccessIds(
+        new Set(lists.filter(l => l.users.includes(m.user_id)).map(l => l.id)),
+      );
+    } catch (e) {
+      setError(String(e));
+      setAccessFor(null);
+    }
+  }
+
+  async function toggleAccess(projectId: string, on: boolean) {
+    if (!accessFor) return;
+    try {
+      if (on) await api.grantProjectAccess(projectId, accessFor.user_id);
+      else await api.revokeProjectAccess(projectId, accessFor.user_id);
+      setAccessIds(prev => {
+        const next = new Set(prev ?? []);
+        if (on) next.add(projectId);
+        else next.delete(projectId);
+        return next;
+      });
+    } catch (e) {
+      setError(String(e));
+    }
+  }
 
   async function setRole(uid: string, role: 'admin' | 'user') {
     try {
@@ -136,6 +189,52 @@ export default function Members() {
         </Card>
       )}
 
+      {accessFor && (
+        <Card>
+          <CardHeader
+            title={t('members.accessFor').replace(
+              '{who}',
+              accessFor.email ?? t('members.unknownUser'),
+            )}
+            action={
+              <Button variant="secondary" onClick={() => setAccessFor(null)}>
+                {t('action.done')}
+              </Button>
+            }
+          />
+          <CardBody>
+            {accessIds === null ? (
+              <div className="py-4 text-sm text-fg-subtle">{t('common.loading')}</div>
+            ) : projects.length === 0 ? (
+              <EmptyState
+                title={t('members.noProjectsToGrant')}
+                hint={t('members.noProjectsToGrantHint')}
+              />
+            ) : (
+              <div className="space-y-2">
+                {projects.map(p => (
+                  <label
+                    key={p.id}
+                    className="flex cursor-pointer items-center gap-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={accessIds.has(p.id)}
+                      onChange={e => toggleAccess(p.id, e.target.checked)}
+                    />
+                    <span className="text-fg">{p.name}</span>
+                    <span className="font-mono text-xs text-fg-subtle">{p.slug}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            <p className="mt-3 text-xs text-fg-subtle">
+              {t('members.accessHint')}
+            </p>
+          </CardBody>
+        </Card>
+      )}
+
       <Card>
         <CardHeader title={`${t('members.activeMembers')} (${members.length})`} />
         <CardBody>
@@ -150,6 +249,7 @@ export default function Members() {
               columns={[
                 { key: 'uid', label: t('members.user') },
                 { key: 'role', label: t('members.role') },
+                { key: 'access', label: t('members.projectAccess') },
                 { key: 'added', label: t('members.added') },
                 { key: 'actions', label: '' },
               ]}
@@ -180,6 +280,24 @@ export default function Members() {
                     {m.role}
                   </Badge>
                 ),
+                // Only the `user` role has a set to manage. For owners
+                // and admins the honest answer is not an empty list but
+                // "all of them", which no control should invite you to
+                // edit.
+                access:
+                  m.role === 'user' ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => openAccess(m)}
+                    >
+                      {t('members.manageAccess')}
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-fg-subtle">
+                      {t('members.allProjects')}
+                    </span>
+                  ),
                 added: formatRelative(m.added_at),
                 actions:
                   m.role !== 'owner' ? (
