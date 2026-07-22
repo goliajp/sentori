@@ -16,6 +16,8 @@ import {
   EmptyState,
   ErrorBanner,
   PageHeader,
+  Select,
+  buttonClass,
   formatNumber,
   formatRelative,
 } from '../components/ui';
@@ -74,18 +76,21 @@ export default function Releases() {
       return;
     }
     setExpanded(id);
-    if (!artifacts[id]) {
-      try {
-        const r = await api.listArtifacts(projectId, id);
-        setArtifacts(a => ({ ...a, [id]: r.artifacts }));
-      } catch (e) {
-        setError(String(e));
-      }
+    if (!artifacts[id]) await loadArtifacts(id);
+  }
+
+  async function loadArtifacts(id: string) {
+    if (!projectId) return;
+    try {
+      const r = await api.listArtifacts(projectId, id);
+      setArtifacts(a => ({ ...a, [id]: r.artifacts }));
+    } catch (e) {
+      setError(String(e));
     }
   }
 
   async function destroy(r: ReleaseRow) {
-    if (!confirm(`Delete release "${r.name}"? Sourcemaps / dsyms CASCADE-removed.`))
+    if (!confirm(t('releases.confirmDelete').replace('{name}', r.name)))
       return;
     try {
       await api.deleteRelease(r.id);
@@ -184,19 +189,40 @@ export default function Releases() {
                   </div>
                   {expanded === r.id && (
                     <div className="border-t border-border p-3">
+                      {/* The build that produced a release is the only
+                          thing that has its symbols, so uploading is
+                          attached to the release rather than living on
+                          a settings page somewhere. */}
+                      <ArtifactUpload
+                        projectId={projectId}
+                        releaseId={r.id}
+                        onDone={() => {
+                          setArtifacts(a => {
+                            const next = { ...a };
+                            delete next[r.id];
+                            return next;
+                          });
+                          void loadArtifacts(r.id);
+                        }}
+                      />
                       {artifacts[r.id] ? (
                         artifacts[r.id].length === 0 ? (
-                          <p className="text-xs text-fg-subtle">
-                            No artifacts uploaded.
-                          </p>
+                          <div className="py-2 text-center">
+                            <p className="text-sm text-fg-muted">
+                              {t('artifacts.none')}
+                            </p>
+                            <p className="mt-1 text-xs text-fg-subtle">
+                              {t('artifacts.noneHint')}
+                            </p>
+                          </div>
                         ) : (
                           <DataTable
                             columns={[
-                              { key: 'kind', label: 'Kind' },
-                              { key: 'name', label: 'Name' },
-                              { key: 'size', label: 'Size' },
-                              { key: 'hash', label: 'Hash' },
-                              { key: 'when', label: 'Uploaded' },
+                              { key: 'kind', label: t('artifacts.kind') },
+                              { key: 'name', label: t('artifacts.name') },
+                              { key: 'size', label: t('artifacts.size') },
+                              { key: 'hash', label: t('artifacts.hash') },
+                              { key: 'when', label: t('artifacts.uploaded') },
                             ]}
                             rows={artifacts[r.id].map(a => ({
                               key: a.id,
@@ -213,7 +239,9 @@ export default function Releases() {
                           />
                         )
                       ) : (
-                        <p className="text-xs text-fg-subtle">Loading…</p>
+                        <p className="text-xs text-fg-subtle">
+                          {t('common.loading')}
+                        </p>
                       )}
                     </div>
                   )}
@@ -223,6 +251,67 @@ export default function Releases() {
           )}
         </CardBody>
       </Card>
+    </div>
+  );
+}
+
+/**
+ * Attach symbol files to a release.
+ *
+ * Kind is chosen rather than inferred from the extension: a `.map` is a
+ * sourcemap and a `.txt` could be a proguard mapping or anything else,
+ * and guessing wrong stores an artifact that silently never matches.
+ */
+function ArtifactUpload({
+  projectId,
+  releaseId,
+  onDone,
+}: {
+  projectId: string;
+  releaseId: string;
+  onDone: () => void;
+}) {
+  const t = useT();
+  const [kind, setKind] = useState<
+    'sourcemap' | 'dsym' | 'proguard' | 'bundle'
+  >('sourcemap');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function pick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Clear immediately so re-picking the same file fires again.
+    e.target.value = '';
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.uploadArtifact(projectId, releaseId, kind, file);
+      onDone();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mb-3 flex items-center gap-2">
+      <Select
+        value={kind}
+        disabled={busy}
+        onChange={e => setKind(e.target.value as typeof kind)}
+      >
+        <option value="sourcemap">sourcemap</option>
+        <option value="dsym">dSYM</option>
+        <option value="proguard">proguard</option>
+        <option value="bundle">bundle</option>
+      </Select>
+      <label className={buttonClass('secondary', 'md')}>
+        {busy ? t('artifacts.uploading') : t('artifacts.upload')}
+        <input type="file" className="hidden" disabled={busy} onChange={pick} />
+      </label>
+      {error && <span className="text-xs text-danger">{error}</span>}
     </div>
   );
 }
