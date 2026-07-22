@@ -6,6 +6,43 @@
 
 ---
 
+## v1.9.2(2026-07-22 — 符号化的入口原来是个 404)
+
+v1.9.0 说「符号化打通了」。能用它的只有坐在浏览器前的人。
+
+文档(`troubleshooting.md` / `sdk-react-native.md`)教用户跑
+`sentori-cli upload sourcemap`,**那条命令 POST 到一条 v0.2 服务端从来没有的路由**
+(`/admin/api/releases/{name}/sourcemaps`)。生产实测 404,与随手编的路径同码。
+而 dashboard 那条路 CI 也走不了:它要浏览器 session 和项目 UUID,流水线手上只有
+token 和 release 名字。
+
+新增 `POST /v1/releases/{release}/artifacts`,令牌认证,按名字找 release、没有就建 ——
+**map 是构建时产的,通常在 app 第一次跑起来之前**,要求 deploy marker 先到会把顺序做成
+陷阱。两条路共用同一个存储函数,不让它们漂成「谁传的、符号化器读法就不同」。
+
+**然后新加的 e2e 断言当场抓出第二个。** 列出 release 的 artifact 时查询 select 的是
+`size_bytes`,而表里那列叫 `uncompressed_size_bytes`,**一直都叫这个**。查询每次都失败,
+`unwrap_or_default()` 把失败变成空列表 —— 于是 release 页对着表里躺着的文件说
+「没有符号文件」。改列名 + 删掉兜底:**空列表现在只能是真的空。**
+
+**e2e 改走文档教的那条路。** 原来它驱动的是 admin 路由,于是在一个 404 之上绿了一个月。
+本地对真实 Postgres 端到端验过:upload 201 → admin 看见 1 条 → `app.js:1` 解回
+`../app.js:10` 且保留压缩前坐标。**修列名之前那条断言实测是红的。** 真实 CLI 命令也跑过:
+两个文件按 sourcemap / bundle 分类进库,字节数与打包输出一致。
+
+## 部署侧
+
+**deploy 绿过、生产却没换版本。** `workflow_run` 对 v1.9.1 那次 build 静默漏触发,最后一次
+deploy 检出的是前一个提交。没有任何东西发现 —— 因为 smoke 测试问的是「服务器健康吗」,
+而**旧二进制答得和新版一模一样**:`/healthz` 200、`/readyz` 200、`/auth/me` 401、
+SPA fallback 200,四条断言全过,却什么都没发。
+
+现在 smoke 末尾比对 `/healthz` 的 version 与本次检出的 `Cargo.toml`。**提交前拿真实坏状态
+实测过红**(want=1.9.1 got=1.9.0),上线后在 CI 实测过绿(`serving 1.9.1`)。这不修漏触发
+本身(在 GitHub 侧,无可靠复现),它让下一次漏触发**吵起来而不是隐身**。
+
+---
+
 ## v1.9.1(2026-07-22 — 让新开的门真的能跑)
 
 v1.9.0 把 `mobile-e2e` 从「四个指向不存在东西的 job」换成两个真 job。`sourcemap-e2e` 第一次就绿;`android-unit` 失败了四次,**每一次都是一个真问题**:
