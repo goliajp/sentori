@@ -238,56 +238,22 @@ jobs:
         working-directory: /apps/sentori
         run: |
           docker compose --env-file .env -f docker-compose.yml build \
-            server web server-v2 saas-control
+            server-v2 saas-control
           docker compose --env-file .env -f docker-compose.yml up -d \
-            postgres valkey server web marketing docs \
-            postgres-v2 server-v2 saas-control
+            marketing docs postgres-v2 server-v2 saas-control
 
-      - name: Wait for /v1/events/_recent
-        env:
-          SENTORI_DEV_TOKEN: ${{ secrets.SENTORI_DEV_TOKEN }}
-        run: |
-          for _ in $(seq 1 60); do
-            if curl -fsS -H "Authorization: Bearer $SENTORI_DEV_TOKEN" \
-               http://127.0.0.1:18080/v1/events/_recent >/dev/null; then
-              echo "==> healthy"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "==> health check failed — recent logs:"
-          docker compose -f "${COMPOSE_FILE}" logs --tail 100 server || true
-          exit 1
-
-      - name: Smoke test — public surface
-        env:
-          SENTORI_DEV_TOKEN: ${{ secrets.SENTORI_DEV_TOKEN }}
+      - name: Smoke test — static sites
         run: |
           set -e
           fail() { echo "smoke FAIL: $1" >&2; exit 1; }
-          # /v1/events/_recent: dev token authenticates and the endpoint
-          # returns a JSON array. We don't assert the array is empty —
-          # real dogfood traffic (Insight) keeps live events in there,
-          # so the original `= "[]"` check was a stale assumption.
-          recent=$(curl -fsS -H "Authorization: Bearer $SENTORI_DEV_TOKEN" \
-            http://127.0.0.1:18080/v1/events/_recent)
-          [ "${recent:0:1}" = "[" ] || fail "_recent expected JSON array, got $recent"
-          # /metrics: prometheus exporter live
-          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/metrics)
-          test "$status" = "200" || fail "/metrics expected 200, got $status"
-          # /api/auth/me without cookie -> 401 (auth gate engaged)
-          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/api/auth/me)
-          test "$status" = "401" || fail "/api/auth/me expected 401, got $status"
-          # web container responds
-          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18800/)
-          test "$status" = "200" || fail "web :18800 expected 200, got $status"
-          # marketing static
+          # The v0.1 checks that used to live here drove :18080 and
+          # :18800. Both were decommissioned on 2026-07-23; a check
+          # against a port with nothing behind it is not a check.
           status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18801/)
           test "$status" = "200" || fail "marketing :18801 expected 200, got $status"
-          # docs static
           status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18802/)
           test "$status" = "200" || fail "docs :18802 expected 200, got $status"
-          echo "==> smoke OK"
+          echo "==> static smoke OK"
 
       - name: Wait + smoke — v0.2 stack
         run: |
