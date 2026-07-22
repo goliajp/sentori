@@ -285,9 +285,9 @@ const PRIVACY_JA: LegalDoc = {
       heading: '第三者提供および委託',
       body: [
         '法令に基づく場合を除き、ご本人の同意なく第三者に提供することはありません。',
-        '本サービスの運営に必要な範囲で、以下に取り扱いを委託しています：決済代行事業者である Stripe、およびアマゾン ウェブ サービス（東京リージョン）をはじめとする、当社が利用するサーバー設備。',
+        '本サービスの運営に必要な範囲で、以下に取り扱いを委託しています：サーバー設備としてアマゾン ウェブ サービス（日本リージョン）、決済代行として Stripe。',
         'お客様データ（エラー情報、トレース、セッション記録等）の保存および処理は、日本国内のサーバー設備において行います。',
-        '決済に関する情報は Stripe が処理します。同社は日本国外に所在するため、この範囲において個人データの国外への移転が生じます。',
+        '決済に関する情報は Stripe が処理します。同社の処理体制により、当該情報が日本国外で取り扱われる場合があります。',
       ],
     },
     {
@@ -341,9 +341,9 @@ const PRIVACY_EN: LegalDoc = {
       heading: 'Who else sees it',
       body: [
         'Nobody, except where the law requires it or you have agreed.',
-        'We rely on Stripe for payment processing, and on server infrastructure in Japan — including Amazon Web Services, Tokyo region.',
+        'Server infrastructure: Amazon Web Services, Japan region. Payment processing: Stripe.',
         'Your telemetry — errors, traces, session recordings — is stored and processed on infrastructure located in Japan.',
-        'Payment information is handled by Stripe, which is based outside Japan. To that extent, personal data is transferred abroad.',
+        'Payment information is handled by Stripe, and may be processed outside Japan depending on their arrangements.',
       ],
     },
     {
