@@ -13,14 +13,33 @@ null" only exist after the thing is composed.
 ## Use
 
 ```bash
-node devtools/mock-api.mjs &        # :8080, what vite proxies to
-bun run dev --port 5599 &
-node devtools/sweep.mjs out zh-CN dark
+bun run mock &                      # :8080, what vite proxies to
+bun run build                       # sweep reads dist/, not source
+bun run preview &                   # :5599, serves dist/ with the proxy
+bun run sweep out zh-CN dark        # <outdir> <lang> <theme>
 ```
 
 `sweep.mjs` walks all 30 routes in one Chrome over CDP, writes a PNG per
 route into `out/`, and writes `out/report.json` with each route's console
-errors and rendered text. Read the PNGs; grep the report.
+errors and rendered text, under a `bundle` field naming the script it
+actually loaded. Read the PNGs; grep the report.
+
+```bash
+python3 -c "
+import json, sys
+d = json.load(open(sys.argv[1]))
+bad = [r for r in d['routes'] if r['errors']]
+print(d['bundle'], d['lang'], d['theme'], '—', len(d['routes']), 'routes,', len(bad), 'with errors')
+for r in bad: print(' ', r['route'], r['errors'][0][:80])
+" out/report.json
+```
+
+**Preview, not dev, and no editing while it runs.** Two sweeps against
+`bun run dev` reported an error that was already fixed, having caught
+the editor mid-save; a third ran while `dist/` was being rebuilt
+underneath it, so its clean result described a state that never
+existed. A sweep is a measurement — rebuild first, then leave the tree
+alone until it finishes.
 
 A blank page is nearly always a mock-shape mismatch rather than a bug in
 the page — check the route's return type in `src/lib/api.ts` first. The
