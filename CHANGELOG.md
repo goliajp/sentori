@@ -6,6 +6,23 @@
 
 ---
 
+## v1.9.1(2026-07-22 — 让新开的门真的能跑)
+
+v1.9.0 把 `mobile-e2e` 从「四个指向不存在东西的 job」换成两个真 job。`sourcemap-e2e` 第一次就绿;`android-unit` 失败了四次,**每一次都是一个真问题**:
+
+1. **`apps/rn-example/android` 是 prebuild 产物,在 .gitignore 里。** 本地一直存在,所以我只确认了目录在,没确认它被 git 跟踪 —— 正是我在删旧 workflow 时批评它犯的那个错。加了 `expo prebuild` 步骤,在全新 clone 上验证过。
+2. **模块没有声明任何测试依赖。** `junit` / `robolectric` / `kotlin.test` 全部无法解析 —— 两个 Robolectric 测试自 Phase 29 写下起**从未编译过**。
+3. **测试调用的 `installForTesting` / `persistForTesting` 不存在。** 测试是照着一个没人实现的 API 写的。
+4. **Robolectric 4.13 没有 compileSdk 35/36 的运行时。** 它默认按模块 `targetSdk` 挑,而宿主工程给的是 Expo 模板的值。`robolectric.properties` 锁到 34 —— 这两个测试断言的是 JSON 形状和文件写入,与 API level 无关,让测试台跟着 app 的 target 漂只会让它没人维护。
+
+**这四层能同时潜伏,是因为本该跑它们的 job 从 2026-05 起挂在缺 gradle wrapper 上,连编译都走不到。一道死门把它后面所有的门都挡住了。**
+
+修完之后测试第一次真正执行,出现第一个**断言**失败:测试期望 `RuntimeException`,实现写 `throwable.javaClass.name` 即 `java.lang.RuntimeException`。**改的是测试。** 生产里 1,487 条 Android 事件全是全限定名,改实现会把每个已有 issue 分组劈成两半;而且包名在 Android 上是真信号 —— 两个不同库的 `FooException` 是两个不同的 bug。**一个从未执行过的断言不构成对实现的约束。**
+
+同时:webapp 的 release 页能直接上传符号文件,不必再用 curl。
+
+---
+
 ## v1.9.0(2026-07-22 — 符号化打通;删掉从来跑不起来的 CI)
 
 **符号化的每块零件都在,缺的只是连接。** 三个 resolver crate 在 v0.2 cutover 之前就有测试和 benchmark,`release_artifacts` 有表,crash 视图会渲染源码上下文 —— 而 ingest 写着 `frame: None` 加一句 TODO,**因为根本没有办法把文件传进来**。
