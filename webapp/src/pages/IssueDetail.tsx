@@ -3,7 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
-import { api, EventDetail, EventRow, IssueDetail as Issue } from '../lib/api';
+import {
+  api,
+  EventDetail,
+  EventRow,
+  IssueDetail as Issue,
+  MemberRow,
+} from '../lib/api';
 import { EventEvidence } from '../components/crash/EventEvidence';
 import { useT } from '../i18n';
 import { useKeyHandlers } from '../lib/useShortcuts';
@@ -16,6 +22,7 @@ import {
   ErrorBanner,
   LinkButton,
   PageHeader,
+  Select,
   formatNumber,
   formatRelative,
 } from '../components/ui';
@@ -41,6 +48,17 @@ export default function IssueDetail() {
       ? localStorage.getItem('sentori_user_id')
       : null;
   const watching = myUserId ? watchers.includes(myUserId) : false;
+
+  // Members, for the assignee picker. Failing to load them leaves the
+  // picker with just "Nobody" rather than breaking the page — you can
+  // still read the crash.
+  const [members, setMembers] = useState<MemberRow[]>([]);
+  useEffect(() => {
+    api
+      .listMembers()
+      .then(r => setMembers(r.members))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!issueId) return;
@@ -71,6 +89,25 @@ export default function IssueDetail() {
     r: () => act('active'),
     w: () => toggleWatch(),
   });
+
+  /** Any subset of the triage fields, then re-read so the page shows
+   *  what the server stored rather than what we hoped it would. */
+  async function setField(patch: {
+    priority?: Issue['priority'];
+    labels?: string[];
+    assignee_user_id?: string | null;
+  }) {
+    if (!projectId || !issueId) return;
+    setBusy(true);
+    try {
+      await api.patchIssue(projectId, issueId, patch);
+      setIssue(await api.getIssue(projectId, issueId));
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function act(status: 'active' | 'resolved' | 'ignored') {
     if (!projectId || !issueId) return;
@@ -226,6 +263,41 @@ export default function IssueDetail() {
               >
                 {t(`status.${issue.status}`)}
               </Badge>
+            </Cell>
+            {/* Priority and assignee are editable in place. They are
+                the two fields an operator changes while reading the
+                crash, and a round trip to a separate form to set one
+                dropdown is the reason nobody triages. */}
+            <Cell label={t('crash.priority')}>
+              <Select
+                value={issue.priority}
+                disabled={busy}
+                onChange={e => setField({ priority: e.target.value as Issue['priority'] })}
+                className="w-full"
+              >
+                {(['p0', 'p1', 'p2', 'p3'] as const).map(p => (
+                  <option key={p} value={p}>
+                    {t(`priority.${p}`)}
+                  </option>
+                ))}
+              </Select>
+            </Cell>
+            <Cell label={t('crash.assignee')}>
+              <Select
+                value={issue.assignee_user_id ?? ''}
+                disabled={busy}
+                onChange={e =>
+                  setField({ assignee_user_id: e.target.value || null })
+                }
+                className="w-full"
+              >
+                <option value="">{t('crash.unassigned')}</option>
+                {members.map(m => (
+                  <option key={m.user_id} value={m.user_id}>
+                    {m.email ?? m.user_id.slice(0, 8)}
+                  </option>
+                ))}
+              </Select>
             </Cell>
             <Cell label={t('crash.kind')}>
               <span className="font-mono text-xs">{issue.kind}</span>

@@ -256,6 +256,19 @@ export function IssuesPage() {
             },
             {
               key: 'event_count',
+              label: t('issues.colPriority'),
+              width: '8%',
+              // Sorting a list by urgency is the point of storing a
+              // priority; showing it is the minimum that makes the
+              // column worth setting.
+              render: (r) => (
+                <Badge tone={r.priority === 'p0' ? 'danger' : r.priority === 'p1' ? 'warn' : 'neutral'}>
+                  {r.priority.toUpperCase()}
+                </Badge>
+              ),
+            },
+            {
+              key: 'events',
               label: t('issues.colEvents'),
               width: '10%',
               render: (r) => (
