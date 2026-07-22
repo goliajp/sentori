@@ -1,0 +1,64 @@
+name: prod-drift
+
+# Does production serve what master says it should?
+#
+# Every other gate here answers a question about a run that happened.
+# This one answers a question about a run that did not: on 2026-07-22
+# `workflow_run` silently failed to fire for the v1.9.1 build, master
+# sat two versions ahead of production, and nothing went red — because
+# the last deploy that *did* run deployed its own commit correctly.
+#
+# The version assertion inside deploy.yml catches a deploy that rebuilt
+# nothing. It cannot catch a deploy that never started; there is no run
+# to fail. So this asks from outside, on a clock, with no dependency on
+# anything having been triggered.
+
+on:
+  schedule:
+    # Every 30 minutes. A deploy takes about six, so a real gap is
+    # visible within one tick and a normal one never is.
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: master vs production
+        run: |
+          set -euo pipefail
+
+          want=$(grep -m1 '^version' self-hosted/server/Cargo.toml \
+            | sed 's/.*"\(.*\)".*/\1/')
+          got=$(curl -fsS --max-time 20 https://sentori.golia.jp/healthz \
+            | sed 's/.*"version":"\([^"]*\)".*/\1/')
+
+          echo "master:     $want"
+          echo "production: $got"
+
+          if [ "$want" = "$got" ]; then
+            echo "==> in sync"
+            exit 0
+          fi
+
+          # A deploy in flight is not drift. Only complain once master
+          # has been ahead long enough that no deploy could still be
+          # running — otherwise this is red for six minutes after every
+          # merge and stops meaning anything.
+          pushed=$(git log -1 --format=%ct master)
+          age=$(( $(date +%s) - pushed ))
+          if [ "$age" -lt 1800 ]; then
+            echo "==> master moved ${age}s ago; a deploy may still be running"
+            exit 0
+          fi
+
+          echo "::error::production serves $got but master is $want," \
+               "and master has been ahead for $(( age / 60 )) minutes."
+          echo "::error::A deploy was missed or failed. Re-run it with:"
+          echo "::error::  gh workflow run deploy.yml --ref master"
+          exit 1
