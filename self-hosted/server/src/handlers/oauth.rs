@@ -593,11 +593,7 @@ async fn issue_session(
 ) -> Response {
     let auth_svc = crate::handlers::auth::auth(app);
     let meta = RequestMeta {
-        ip: headers
-            .get("x-forwarded-for")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|s| s.split(',').next())
-            .map(|s| s.trim().to_string()),
+        ip: crate::client_ip::client_ip(headers),
         user_agent: headers
             .get("user-agent")
             .and_then(|v| v.to_str().ok())

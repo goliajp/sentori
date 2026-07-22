@@ -64,6 +64,40 @@ mod usage;
 mod user_reports_query;
 mod workspaces;
 
+/// Refuse an IP that is hammering a credentialed auth endpoint.
+///
+/// A password login has no bearer token to key on, so the bucket is
+/// keyed on the client's address instead. `X-Forwarded-For` is
+/// trusted here because Caddy rewrites it — a deployment that puts
+/// the server on the open internet has to change that.
+///
+/// Absent an IP the request is admitted rather than refused. A limiter
+/// silently DOS-ing traffic from callers whose IP header did not
+/// arrive is worse than the brute-force window it exists to close.
+async fn auth_rate_limit_mw(
+    State(state): State<Arc<AppState>>,
+    req: axum::extract::Request,
+    next: axum_middleware::Next,
+) -> axum::response::Response {
+    let admitted = crate::client_ip::client_ip(req.headers()).is_none_or(|ip| {
+        state
+            .auth_rate_limit
+            .admit(crate::rate_limit::ip_to_key(&ip))
+    });
+
+    if admitted {
+        return next.run(req).await;
+    }
+    (
+        StatusCode::TOO_MANY_REQUESTS,
+        Json(json!({
+            "error": "rate_limited",
+            "hint": "too many attempts from this address; wait and try again",
+        })),
+    )
+        .into_response()
+}
+
 /// Refuse a token that is flooding the ingest surface.
 ///
 /// A public token is compiled into the customer's app, so the rate a
@@ -523,6 +557,22 @@ pub fn router(state: Arc<AppState>) -> Router {
         ))
         .with_state(state.clone());
 
+    // Login-shaped endpoints share a per-IP limiter. They have no
+    // bearer token to key on, and repeated calls with different bodies
+    // is exactly what a brute force looks like. The default budget is
+    // ten attempts per five minutes per IP — an operator loosens it
+    // via SENTORI_AUTH_RATELIMIT_PER_IP / _WINDOW_SEC without touching
+    // the ingest tunables.
+    let auth_bruteforce_routes = Router::new()
+        .route("/auth/register", post(auth::register))
+        .route("/auth/login", post(auth::login))
+        .route("/auth/forgot-password", post(auth::forgot))
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            auth_rate_limit_mw,
+        ))
+        .with_state(state.clone());
+
     // Ops probes + the auth endpoints needed to obtain a session.
     Router::new()
         .route("/healthz", get(health::healthz))
@@ -532,10 +582,14 @@ pub fn router(state: Arc<AppState>) -> Router {
         // ── stripe webhook (public; HMAC-signature authed) ──
         .route("/webhooks/stripe", post(stripe_webhook::ingest))
         // ── auth: dashboard user lifecycle (public) ──────
-        .route("/auth/register", post(auth::register))
-        .route("/auth/login", post(auth::login))
+        //
+        // register / login / forgot-password are merged in below as
+        // `auth_bruteforce_routes` with their own low-cap per-IP
+        // limiter. verify / reset / change-password are shaped
+        // differently: verify and reset only work with a fresh
+        // single-use token from an email we send, and change-password
+        // sits behind the session so it is bounded by that.
         .route("/auth/verify", post(auth::verify))
-        .route("/auth/forgot-password", post(auth::forgot))
         .route("/auth/reset-password", post(auth::reset))
         .route("/auth/change-password", post(auth::change_password))
         // ── auth: dashboard OAuth (public) ──────────────
@@ -549,6 +603,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .merge(dashboard_routes)
         .merge(admin_routes)
         .merge(saas_routes)
+        .merge(auth_bruteforce_routes)
         .merge(sdk_routes)
         .fallback(spa_or_api_404)
 }

@@ -60,6 +60,11 @@ pub struct AppState {
     /// per-process, which is right for a single instance and would
     /// need a shared store before running more than one.
     pub rate_limit: std::sync::Arc<crate::rate_limit::RateLimiter>,
+    /// Per-IP limiter for the auth surface. Separate from the ingest
+    /// limiter so tuning one does not affect the other, and so a
+    /// brute-force response can be loud (block for minutes) without
+    /// throttling legitimate SDK bursts.
+    pub auth_rate_limit: std::sync::Arc<crate::rate_limit::RateLimiter>,
     pub audit: AuditService,
     pub alerts: AlertRuleService,
     pub saved_views: SavedViewService,
@@ -128,6 +133,7 @@ impl AppState {
             identity_scopes: std::sync::Arc::default(),
             source_maps: std::sync::Arc::new(crate::symbolicate::new_cache()),
             rate_limit: std::sync::Arc::new(crate::rate_limit::RateLimiter::from_env()),
+            auth_rate_limit: std::sync::Arc::new(crate::rate_limit::RateLimiter::auth_from_env()),
             audit,
             alerts,
             saved_views,

@@ -10,18 +10,7 @@ use uuid::Uuid;
 /// IP is honored from `X-Forwarded-For` (first hop) if present,
 /// then `X-Real-IP`. UA from `User-Agent`. Both optional.
 pub fn extract_request_meta(headers: &axum::http::HeaderMap) -> (Option<String>, Option<String>) {
-    let ip = headers
-        .get("x-forwarded-for")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.split(',').next())
-        .map(|s| s.trim().to_string())
-        .or_else(|| {
-            headers
-                .get("x-real-ip")
-                .and_then(|v| v.to_str().ok())
-                .map(std::string::ToString::to_string)
-        })
-        .filter(|s| !s.is_empty());
+    let ip = crate::client_ip::client_ip(headers);
     let ua = headers
         .get("user-agent")
         .and_then(|v| v.to_str().ok())
