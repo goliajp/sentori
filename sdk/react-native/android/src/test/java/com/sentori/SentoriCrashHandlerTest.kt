@@ -42,7 +42,7 @@ class SentoriCrashHandlerTest {
     @Test
     fun writePendingProducesValidEventJson() {
         val ex = RuntimeException("boom from robolectric")
-        SentoriCrashHandler.persistForTesting(ex, "android-test-thread")
+        SentoriCrashHandler.persistForTesting(ex)
 
         val files = pendingDir.listFiles { f -> f.name.endsWith(".json") }
         assertNotNull(files, "no listing in $pendingDir")
