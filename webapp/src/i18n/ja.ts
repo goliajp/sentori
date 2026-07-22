@@ -448,6 +448,14 @@ export const ja: Messages = {
   'tokens.justMinted': "今発行したトークンです。",
   'tokens.otherFrameworks': "上でトークンを発行するとここに入ります。他のフレームワークは import を差し替えるだけで、init の書き方は同じです。",
 
+  'replays.subtitle': "エラー前後の録画。直近 100 件。",
+  'push.provider': "事業者",
+  'push.config': "設定(シークレットは非表示)",
+  'push.lastValidate': "最終検証",
+  'savedViews.open': "開く",
+  'events.live': "ライブ",
+  'releases.markShort': "デプロイマーカー",
+
   'nav.issues': 'イシュー',
   'nav.members': 'メンバー',
   'nav.metrics': 'メトリクス',

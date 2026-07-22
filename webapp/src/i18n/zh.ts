@@ -448,6 +448,14 @@ export const zh: Messages = {
   'tokens.justMinted': "这就是你刚铸的令牌。",
   'tokens.otherFrameworks': "在上面铸一个令牌,这里就会填好。其它框架换掉 import 即可,init 的写法完全一样。",
 
+  'replays.subtitle': "在错误前后录下的片段。最近 100 条。",
+  'push.provider': "服务商",
+  'push.config': "配置(密钥已隐藏)",
+  'push.lastValidate': "最近校验",
+  'savedViews.open': "打开",
+  'events.live': "实时",
+  'releases.markShort': "发布标记",
+
   'nav.issues': '问题',
   'nav.members': '成员',
   'nav.metrics': '指标',
