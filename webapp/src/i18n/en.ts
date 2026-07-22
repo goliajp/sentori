@@ -16,14 +16,10 @@ export const en = {
   'action.delete': 'Delete',
   'action.dismiss': 'Dismiss',
   'action.refresh': 'Refresh',
-  'action.retry': 'Retry',
   'action.save': 'Save',
   'action.signOut': 'Sign out',
 
-  'common.error': 'Something went wrong',
   'common.loading': 'Loading…',
-  'common.none': 'None',
-  'common.search': 'Search',
 
   'crash.artefacts': 'Captured artefacts',
   'crash.causedBy': 'caused by',
@@ -43,7 +39,6 @@ export const en = {
   'crash.release': 'Release',
   'crash.sharedPlayhead': 'recording and log share a playhead',
   'crash.stack': 'Stack',
-  'crash.step': 'step',
   'crash.steps': 'steps',
   'crash.tags': 'Tags',
   'crash.timeline': 'Before the crash',
@@ -77,7 +72,6 @@ export const en = {
   'issues.testIngest': 'Test ingest',
   'issues.resolveAll': 'Resolve all',
   'issues.empty': 'No issues yet',
-  'issues.emptyHint': 'Errors your app reports will land here.',
   'crash.meta': 'Meta',
   'crash.status': 'Status',
   'crash.kind': 'Kind',
@@ -110,7 +104,6 @@ export const en = {
 
   'crash.comments': 'Comments',
   'crash.deleteComment': 'Delete this comment?',
-  'crash.post': 'Post',
 
   'events.title': 'Events',
   'events.subtitle': 'The last 100 events, newest first.',
@@ -455,6 +448,8 @@ export const en = {
 
   'replays.event': "event",
   'replays.blob': "recording",
+
+  'crash.step': "step",
 
   'nav.issues': 'Issues',
   'nav.members': 'Members',

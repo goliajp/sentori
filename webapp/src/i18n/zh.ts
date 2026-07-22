@@ -10,14 +10,10 @@ export const zh: Messages = {
   'action.delete': '删除',
   'action.dismiss': '关闭',
   'action.refresh': '刷新',
-  'action.retry': '重试',
   'action.save': '保存',
   'action.signOut': '退出登录',
 
-  'common.error': '出错了',
   'common.loading': '加载中…',
-  'common.none': '无',
-  'common.search': '搜索',
 
   'crash.artefacts': '采集到的附件',
   'crash.causedBy': '起因于',
@@ -37,7 +33,6 @@ export const zh: Messages = {
   'crash.release': '版本',
   'crash.sharedPlayhead': '录屏与日志共用播放头',
   'crash.stack': '堆栈',
-  'crash.step': '步',
   'crash.steps': '步',
   'crash.tags': '标签',
   'crash.timeline': '崩溃之前',
@@ -71,7 +66,6 @@ export const zh: Messages = {
   'issues.testIngest': '发送测试事件',
   'issues.resolveAll': '全部标记已解决',
   'issues.empty': '还没有问题',
-  'issues.emptyHint': '你的 app 上报的错误会出现在这里。',
   'crash.meta': '概要',
   'crash.status': '状态',
   'crash.kind': '类型',
@@ -104,7 +98,6 @@ export const zh: Messages = {
 
   'crash.comments': '评论',
   'crash.deleteComment': '删除这条评论?',
-  'crash.post': '发表',
 
   'events.title': '事件',
   'events.subtitle': '最近 100 条事件,新的在前。',
@@ -448,6 +441,8 @@ export const zh: Messages = {
 
   'replays.event': "事件",
   'replays.blob': "录制",
+
+  'crash.step': "步",
 
   'nav.issues': '问题',
   'nav.members': '成员',

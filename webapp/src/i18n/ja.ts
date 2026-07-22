@@ -10,14 +10,10 @@ export const ja: Messages = {
   'action.delete': '削除',
   'action.dismiss': '閉じる',
   'action.refresh': '更新',
-  'action.retry': '再試行',
   'action.save': '保存',
   'action.signOut': 'サインアウト',
 
-  'common.error': 'エラーが発生しました',
   'common.loading': '読み込み中…',
-  'common.none': 'なし',
-  'common.search': '検索',
 
   'crash.artefacts': '取得したファイル',
   'crash.causedBy': '原因',
@@ -37,7 +33,6 @@ export const ja: Messages = {
   'crash.release': 'リリース',
   'crash.sharedPlayhead': '記録とログは再生位置を共有',
   'crash.stack': 'スタック',
-  'crash.step': 'ステップ',
   'crash.steps': 'ステップ',
   'crash.tags': 'タグ',
   'crash.timeline': 'クラッシュ直前',
@@ -71,7 +66,6 @@ export const ja: Messages = {
   'issues.testIngest': 'テスト送信',
   'issues.resolveAll': 'すべて解決済みに',
   'issues.empty': '問題はまだありません',
-  'issues.emptyHint': 'アプリが報告したエラーがここに表示されます。',
   'crash.meta': '概要',
   'crash.status': 'ステータス',
   'crash.kind': '種別',
@@ -104,7 +98,6 @@ export const ja: Messages = {
 
   'crash.comments': 'コメント',
   'crash.deleteComment': 'このコメントを削除しますか?',
-  'crash.post': '投稿',
 
   'events.title': 'イベント',
   'events.subtitle': '直近 100 件のイベント(新しい順)。',
@@ -448,6 +441,8 @@ export const ja: Messages = {
 
   'replays.event': "イベント",
   'replays.blob': "録画",
+
+  'crash.step': "ステップ",
 
   'nav.issues': 'イシュー',
   'nav.members': 'メンバー',
