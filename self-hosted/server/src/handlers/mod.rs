@@ -52,6 +52,7 @@ mod spans;
 mod stats;
 mod stripe_webhook;
 pub mod tenant;
+mod track_query;
 mod usage;
 mod workspaces;
 
@@ -360,6 +361,20 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(
             "/v1/projects/{project_id}/metrics",
             get(metrics::list_names),
+        )
+        // `track_events` had an ingest route and no way back out; these
+        // three read it along the three indexes it already carries.
+        .route(
+            "/v1/projects/{project_id}/track/names",
+            get(track_query::names),
+        )
+        .route(
+            "/v1/projects/{project_id}/track/series",
+            get(track_query::series),
+        )
+        .route(
+            "/v1/projects/{project_id}/track/recent",
+            get(track_query::recent),
         )
         .route(
             "/v1/projects/{project_id}/metrics/{name}/timeseries",

@@ -79,6 +79,13 @@ async fn fresh_pool() -> (PgPool, WorkspaceId) {
     pool.execute(include_str!("../../../migrations/0003_event_pipeline.sql"))
         .await
         .expect("0003");
+    // 0004 adds the triage columns. `Issue` reads them, so a fixture
+    // stopping at 0003 builds a table the code cannot query — which is
+    // exactly how this broke: the columns had existed in production for
+    // ages and only the test schema was behind.
+    pool.execute(include_str!("../../../migrations/0004_issue_triage.sql"))
+        .await
+        .expect("0004");
     let workspace_id = bootstrap_workspace(&pool, "test")
         .await
         .expect("bootstrap workspace");

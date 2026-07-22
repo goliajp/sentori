@@ -28,6 +28,7 @@ import SaasAdmin from './pages/SaasAdmin';
 import SavedViews from './pages/SavedViews';
 import EndpointProbes from './pages/EndpointProbes';
 import Metrics from './pages/Metrics';
+import Track from './pages/Track';
 import Notifications from './pages/Notifications';
 import Search from './pages/Search';
 import Shortcuts from './pages/Shortcuts';
@@ -108,6 +109,7 @@ createRoot(rootEl).render(
             element={<TraceDetail />}
           />
           <Route path="/projects/:id/metrics" element={<Metrics />} />
+          <Route path="/projects/:id/track" element={<Track />} />
           <Route path="/projects/:id/replays" element={<Replays />} />
           <Route path="/projects/:id/probes" element={<EndpointProbes />} />
           <Route

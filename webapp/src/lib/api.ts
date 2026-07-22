@@ -393,6 +393,34 @@ export interface ReplayRow {
   created_at: string;
 }
 
+/** One analytics event name, aggregated over the window. */
+export interface TrackName {
+  name: string;
+  total: number;
+  /** Distinct users who sent it. Zero when the SDK sends anonymously. */
+  users: number;
+  last_seen: string | null;
+}
+
+export interface TrackPoint {
+  day: string;
+  total: number;
+  users: number;
+}
+
+export interface TrackEventRow {
+  id: string;
+  name: string;
+  /** Hashed handle as stored — never an email. */
+  user_id: string | null;
+  session_id: string | null;
+  route: string | null;
+  release: string | null;
+  environment: string | null;
+  props: unknown;
+  occurred_at: string;
+}
+
 export interface MetricSummary {
   name: string;
   last_bucket: string | null;
@@ -516,6 +544,31 @@ export class Api {
     traceId: string,
   ): Promise<{ trace: TraceRow; spans: SpanRow[] }> {
     return this.get(`/v1/projects/${projectId}/traces/${traceId}`);
+  }
+  /** What analytics events this project sends, most frequent first. */
+  trackNames(
+    projectId: string,
+    days = 7,
+  ): Promise<{ days: number; names: TrackName[] }> {
+    return this.get(`/v1/projects/${projectId}/track/names?days=${days}`);
+  }
+  /** One event's daily volume. Gaps come back as zeroes, not holes. */
+  trackSeries(
+    projectId: string,
+    name: string,
+    days = 30,
+  ): Promise<{ name: string; days: number; points: TrackPoint[] }> {
+    return this.get(
+      `/v1/projects/${projectId}/track/series?name=${encodeURIComponent(name)}&days=${days}`,
+    );
+  }
+  /** The tail, newest first. */
+  trackRecent(
+    projectId: string,
+    opts: { name?: string; user?: string; limit?: number } = {},
+  ): Promise<{ events: TrackEventRow[] }> {
+    const qs = buildQS({ name: opts.name, user: opts.user, limit: opts.limit });
+    return this.get(`/v1/projects/${projectId}/track/recent${qs}`);
   }
   listMetrics(projectId: string): Promise<{ metrics: MetricSummary[] }> {
     return this.get(`/v1/projects/${projectId}/metrics`);

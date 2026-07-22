@@ -302,6 +302,45 @@ export default function IssueDetail() {
             <Cell label={t('crash.kind')}>
               <span className="font-mono text-xs">{issue.kind}</span>
             </Cell>
+            {/* Labels replace as a set, so removing one means sending
+                the rest — the server takes what the issue should end up
+                with rather than a delta. */}
+            <Cell label={t('crash.labels')}>
+              <div className="flex flex-wrap items-center gap-1">
+                {issue.labels.length === 0 && (
+                  <span className="text-xs text-fg-subtle">
+                    {t('crash.noLabels')}
+                  </span>
+                )}
+                {issue.labels.map(l => (
+                  <button
+                    key={l}
+                    type="button"
+                    disabled={busy}
+                    title={t('action.remove')}
+                    onClick={() =>
+                      setField({ labels: issue.labels.filter(x => x !== l) })
+                    }
+                    className="inline-flex items-center gap-1 rounded bg-raised px-1.5 py-0.5 text-xs text-fg-muted hover:text-fg disabled:opacity-50"
+                  >
+                    {l} <span aria-hidden>×</span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    const next = prompt(t('crash.addLabel'))?.trim();
+                    if (next && !issue.labels.includes(next)) {
+                      void setField({ labels: [...issue.labels, next] });
+                    }
+                  }}
+                  className="rounded border border-dashed border-border-strong px-1.5 py-0.5 text-xs text-fg-subtle hover:text-fg disabled:opacity-50"
+                >
+                  +
+                </button>
+              </div>
+            </Cell>
             <Cell label={t('issues.colEvents')}>{formatNumber(issue.event_count)}</Cell>
             <Cell label={t('crash.lastRelease')}>
               <span className="font-mono text-xs">

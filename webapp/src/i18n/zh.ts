@@ -468,6 +468,18 @@ export const zh: Messages = {
 
   'issues.colPriority': "优先级",
 
+  'crash.addLabel': "添加标签…",
+
+  'nav.track': "产品事件",
+  'track.title': "产品事件",
+  'track.names': "这个 app 上报了什么",
+  'track.recent': "最近",
+  'track.recentHint': "最新在前,涵盖全部事件名。",
+  'track.users': "{n} 人",
+  'track.lastDays': "最近 {n} 天",
+  'track.empty': "还没有产品事件",
+  'track.emptyHint': "在 app 里调用 sentori.track(name, props),事件就会出现在这里。",
+
   'nav.issues': '问题',
   'nav.members': '成员',
   'nav.metrics': '指标',
