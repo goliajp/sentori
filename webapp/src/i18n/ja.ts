@@ -172,6 +172,8 @@ export const ja: Messages = {
   'billing.subtitle': "このワークスペースのプラン・使用量・サブスクリプション。",
   'billing.current': "現在のプラン",
   'billing.change': "プランを変更",
+  'billing.webhookMissing': '決済はできますが、プランは変わりません。',
+  'billing.webhookMissingHint': 'SENTORI_STRIPE_WEBHOOK_SECRET が未設定のため、サブスクリプションの結果をプランに反映する worker が動いていません。設定のうえ、Stripe の webhook を /webhooks/stripe に向けてください。',
   'billing.unavailable': "セルフサービス決済は利用できません",
   'billing.renews': "更新 / 終了",
   'audit.title': "監査ログ",

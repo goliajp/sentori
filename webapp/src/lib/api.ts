@@ -196,6 +196,7 @@ export interface BillingInfo {
   period_yyyymm: string;
   /** A Stripe secret key is configured — self-serve is available. */
   stripe_enabled: boolean;
+  webhook_configured: boolean;
   /** The workspace already has a Stripe customer (Portal works). */
   has_customer: boolean;
   /** Which paid plans this deployment sells (a price id is set). */

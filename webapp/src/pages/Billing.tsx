@@ -102,6 +102,18 @@ export default function Billing() {
         <>
           <PlanCard info={data} onManage={openPortal} busy={busy} />
           <UsageCard info={data} />
+          {data.stripe_enabled && !data.webhook_configured && (
+            <Card>
+              <CardBody>
+                <p className="text-sm text-warn">
+                  {t('billing.webhookMissing')}
+                </p>
+                <p className="mt-1 text-xs text-fg-subtle">
+                  {t('billing.webhookMissingHint')}
+                </p>
+              </CardBody>
+            </Card>
+          )}
           {data.stripe_enabled ? (
             <UpgradeCard
               info={data}
