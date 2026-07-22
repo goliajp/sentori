@@ -882,8 +882,8 @@ pub async fn push_sends_list(
     }
     let rows = body["sends"].as_array().cloned().unwrap_or_default();
     println!(
-        "{:<10}  {:<8}  {:<10}  {:>4}  {}",
-        "id", "provider", "status", "rty", "outcome / error"
+        "{:<10}  {:<8}  {:<10}  {:>4}  outcome / error",
+        "id", "provider", "status", "rty"
     );
     for s in &rows {
         println!(
@@ -1481,20 +1481,19 @@ pub async fn ops_report(api_url: Option<String>) -> Result<()> {
         .get(format!("{base}/metrics"))
         .send()
         .await
-        .and_then(|r| Ok(r.error_for_status()?))
+        .and_then(reqwest::Response::error_for_status)
+        && let Ok(s) = text.text().await
     {
-        if let Ok(s) = text.text().await {
-            for line in s.lines() {
-                if line.starts_with("sentori_db_pool_")
-                    || line.starts_with("sentori_push_")
-                    || line.starts_with("sentori_events_")
-                    || line.starts_with("sentori_issues_")
-                    || line.starts_with("sentori_alerts_active")
-                    || line.starts_with("sentori_user_sessions_active")
-                    || line.starts_with("sentori_build_info")
-                {
-                    println!("  {line}");
-                }
+        for line in s.lines() {
+            if line.starts_with("sentori_db_pool_")
+                || line.starts_with("sentori_push_")
+                || line.starts_with("sentori_events_")
+                || line.starts_with("sentori_issues_")
+                || line.starts_with("sentori_alerts_active")
+                || line.starts_with("sentori_user_sessions_active")
+                || line.starts_with("sentori_build_info")
+            {
+                println!("  {line}");
             }
         }
     }
