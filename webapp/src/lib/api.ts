@@ -1109,6 +1109,20 @@ export class Api {
     return this.send(`/admin/api/members/${userId}`, 'DELETE');
   }
 
+  // ── admin: per-project access for the `user` role ──────
+  // Owners and admins see every project and need no grant; the server
+  // answers 409 if you try, rather than writing a row that claims to
+  // grant what they already have.
+  listProjectAccess(projectId: string): Promise<{ user_ids: string[] }> {
+    return this.get(`/admin/api/projects/${projectId}/visibility`);
+  }
+  grantProjectAccess(projectId: string, userId: string): Promise<void> {
+    return this.send(`/admin/api/projects/${projectId}/visibility/${userId}`, 'PUT');
+  }
+  revokeProjectAccess(projectId: string, userId: string): Promise<void> {
+    return this.send(`/admin/api/projects/${projectId}/visibility/${userId}`, 'DELETE');
+  }
+
   // ── admin: invites ─────────────────────────────────────
   listInvites(): Promise<{ invites: InviteRow[] }> {
     return this.get('/admin/api/invites');
@@ -1273,7 +1287,7 @@ export class Api {
   // empty body as JSON.
   private async send(
     path: string,
-    method: 'PATCH' | 'DELETE' | 'POST',
+    method: 'PATCH' | 'DELETE' | 'POST' | 'PUT',
     body?: unknown,
   ): Promise<void> {
     const baseHeaders = this.authHeaders();

@@ -19,6 +19,7 @@ const PROJ = '019e358a-adac-7881-9f7e-fc92646fae4e';
 const ISSUE = '019f85ee-ae41-77f1-bbf9-97d310663c9a';
 const EVENT = '019f8600-0000-7000-8000-000000000001';
 const U1 = '019e3589-9d7f-7013-9952-e3f287104954';
+const U3 = '019e3589-0000-7000-8000-0000000000c3';
 const U2 = '019f802f-c10f-7572-9cfa-f9c143d6534c';
 
 // ── crash thread ──────────────────────────────────────────
@@ -139,10 +140,15 @@ const EXACT = {
     usage: { events: { count: 41_233, dropped: 0, limit: 1_000_000 },
              spans: { count: 12_004, dropped: 0, limit: 500_000 },
              replays: { count: 318, dropped: 2, limit: 5_000 } } },
+  '/admin/api/projects/019e358a-adac-7881-9f7e-fc92646fae4e/visibility': { user_ids: [U3] },
   '/admin/api/workspaces': { workspaces: [{ workspace_id: 'w1', name: 'GOLIA K.K.', role: 'owner', active: true }] },
   '/admin/api/members': { members: [
     { user_id: U1, email: 'takagi@golia.jp', email_verified: true, role: 'owner', added_by: null, added_by_email: null, added_at: iso(86_400_000 * 40) },
     { user_id: U2, email: 'lihao@golia.jp', email_verified: false, role: 'admin', added_by: U1, added_by_email: 'takagi@golia.jp', added_at: iso(86_400_000 * 3) },
+    // A `user`-role member, so the per-project access control renders.
+    // Without one the column shows only the "all projects" case and the
+    // panel is unreachable.
+    { user_id: U3, email: 'contractor@example.com', email_verified: true, role: 'user', added_by: U1, added_by_email: 'takagi@golia.jp', added_at: iso(86_400_000) },
   ] },
   '/admin/api/invites': { invites: [
     { id: 'i1', email: 'newhire@golia.jp', role: 'user', expires_at: iso(-86_400_000 * 6), accepted_at: null, created_at: iso(86_400_000) },
