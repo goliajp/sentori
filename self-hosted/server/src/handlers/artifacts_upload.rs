@@ -28,6 +28,8 @@ use serde_json::{Value, json};
 use sqlx::Row;
 use uuid::Uuid;
 
+use sentori_ingest_token::IngestContext;
+
 use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
@@ -57,7 +59,90 @@ pub async fn upload(
         .await
         .map_err(|m| (StatusCode::BAD_REQUEST, Json(json!({ "error": m }))))?;
 
-    let hash = state.attachments.put(&bytes).await.map_err(|e| {
+    store(
+        &state,
+        ctx.workspace_id.into_uuid(),
+        release_id,
+        kind,
+        name,
+        &bytes,
+    )
+    .await
+}
+
+/// `POST /v1/releases/{release}/artifacts`
+///
+/// Same upload, reached with an ingest token instead of a session.
+/// A build pipeline has a token and a release name; it does not have a
+/// browser session or the project's UUID, which is what the admin route
+/// above requires — so without this there was no way for CI to upload a
+/// map at all, and the documented `sentori-cli upload sourcemap` posted
+/// to a route that did not exist.
+///
+/// The release is created if it is not there yet. Maps are produced at
+/// build time, usually before the app has ever run and announced its
+/// deploy, so requiring the row to exist first would make the ordering
+/// a trap.
+pub async fn upload_by_release_name(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<IngestContext>,
+    Path(release): Path<String>,
+    multipart: Multipart,
+) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
+    if release.trim().is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "release required" })),
+        ));
+    }
+
+    let (kind, name, bytes) = read_upload(multipart)
+        .await
+        .map_err(|m| (StatusCode::BAD_REQUEST, Json(json!({ "error": m }))))?;
+
+    // Same UPSERT `/v1/deploys` uses, so an upload before the deploy
+    // marker and a deploy marker before an upload land on one row.
+    let release_id: Uuid = sqlx::query_scalar(
+        "INSERT INTO releases (id, workspace_id, project_id, name, deploy_at) \
+         VALUES (gen_random_uuid(), $1, $2, $3, now()) \
+         ON CONFLICT (project_id, name) DO UPDATE SET name = EXCLUDED.name \
+         RETURNING id",
+    )
+    .bind(ctx.workspace_id)
+    .bind(ctx.project_id)
+    .bind(&release)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    store(
+        &state,
+        ctx.workspace_id.into_uuid(),
+        release_id,
+        kind,
+        name,
+        &bytes,
+    )
+    .await
+}
+
+/// Blob + row. Shared so the two routes cannot drift into storing
+/// artifacts the symbolicator reads differently depending on who
+/// uploaded them.
+async fn store(
+    state: &AppState,
+    workspace_id: Uuid,
+    release_id: Uuid,
+    kind: String,
+    name: String,
+    bytes: &[u8],
+) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
+    let hash = state.attachments.put(bytes).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -80,7 +165,7 @@ pub async fn upload(
                created_at = now() \
          RETURNING id",
     )
-    .bind(ctx.workspace_id.into_uuid())
+    .bind(workspace_id)
     .bind(release_id)
     .bind(&kind)
     .bind(&name)

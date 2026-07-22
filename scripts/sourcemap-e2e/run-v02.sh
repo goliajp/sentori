@@ -57,14 +57,33 @@ rm -rf "$DIST"
 (cd "$HERE" && bun build app.js --outdir "$DIST" --minify --sourcemap=external)
 
 echo "[4/6] uploading the map against release $RELEASE"
-# Releases are created by the SDK announcing a deploy, not by an admin
-# call — there is no POST on the admin route, and inventing one for the
-# test would test a path no build uses.
+# Uploaded with the ingest token, against the release *name* — the path
+# `sentori-cli upload sourcemap` takes and the only one a build pipeline
+# can take, since CI has no browser session and does not know the
+# project's UUID.
+#
+# This used to drive the admin route instead. That passed for a month
+# while the documented CLI posted to `/admin/api/releases/{name}/
+# sourcemaps`, which the v0.2 server never had — a green symbolication
+# gate over a 404. Test the path the docs hand people.
+curl -sS -o /dev/null -w '      upload=%{http_code}\n' -X POST \
+  "$SENTORI_BASE/v1/releases/$(python3 -c "
+import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1], safe=''))
+" "$RELEASE")/artifacts" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F 'kind=sourcemap' \
+  -F "file=@$DIST/app.js.map"
+
+# The upload creates the release if the deploy marker has not arrived,
+# which is the normal order for a build. Announce it too, so the admin
+# listing below has the deploy time it renders.
 curl -sS -o /dev/null -X POST "$SENTORI_BASE/v1/deploys" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d "{\"release\":\"$RELEASE\"}"
 
+# Both routes write one table; assert the admin side sees what the
+# token side stored, so the two cannot drift apart unnoticed.
 RELEASE_ID=$(curl -sS -b "$COOKIE" \
   "$SENTORI_BASE/admin/api/projects/$PROJECT_ID/releases" \
   | python3 -c "
@@ -74,10 +93,15 @@ hit = next(r for r in rs if r['name'] == '$RELEASE')
 print(hit['id'])
 ")
 
-curl -sS -b "$COOKIE" -X POST \
+curl -sS -b "$COOKIE" \
   "$SENTORI_BASE/admin/api/projects/$PROJECT_ID/releases/$RELEASE_ID/artifacts" \
-  -F 'kind=sourcemap' \
-  -F "file=@$DIST/app.js.map" >/dev/null
+  | python3 -c "
+import sys, json
+arts = json.load(sys.stdin)['artifacts']
+if not any(a['kind'] == 'sourcemap' for a in arts):
+    sys.exit('FAIL: token upload is not visible on the admin route: %r' % arts)
+print('      admin sees %d artifact(s)' % len(arts))
+"
 
 echo "[5/6] throwing inside the minified bundle, sending the stack"
 EVENT_JSON=$(node "$HERE/throw-and-format.js" "$DIST/app.js" "$RELEASE")

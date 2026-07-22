@@ -81,6 +81,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/v1/heartbeat", post(sdk::heartbeat::handle))
         .route("/v1/sessions", post(sdk::sessions::handle))
         .route("/v1/deploys", post(sdk::deploys::handle))
+        .route(
+            "/v1/releases/{release}/artifacts",
+            post(artifacts_upload::upload_by_release_name),
+        )
         // ── metrics ──
         .route("/v1/metrics:batch", post(sdk::metrics::handle))
         .route(
