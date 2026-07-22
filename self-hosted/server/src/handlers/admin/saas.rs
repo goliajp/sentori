@@ -20,7 +20,8 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::{Extension, Path, State};
+use axum::http::HeaderMap;
 use axum::http::StatusCode;
 use sentori_billing::{Plan, PlanStatus};
 use sentori_workspace_identity::WorkspaceId;
@@ -30,7 +31,47 @@ use sqlx::Row;
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use crate::session_mw::SessionContext;
 use crate::state::AppState;
+
+/// Cross-tenant actions are the highest-consequence surface — an
+/// operator touches a workspace that isn't theirs, and until this
+/// existed there was no record beyond a tracing INFO line that gets
+/// lost with rotation. Every mutating handler in this module now
+/// calls it before it returns Ok.
+///
+/// The audit row goes into the *target* workspace's log rather than
+/// the operator's. A tenant querying their own audit history sees who
+/// suspended or reslotted them; without that the record is on the
+/// wrong side of the transaction to be reachable.
+///
+/// `delete_workspace` audits *before* the DELETE, so the row exists at
+/// insert time. `workspaces.id → audit_logs.workspace_id` is
+/// `ON DELETE CASCADE`, so the row is destroyed with the workspace —
+/// a saasadmin covering their tracks with delete leaves only the
+/// tracing log line, which sits outside the DB. Changing the FK to
+/// SET NULL is a separate schema decision.
+async fn audit_saas(
+    state: &Arc<AppState>,
+    headers: &HeaderMap,
+    ctx: &SessionContext,
+    target_workspace_id: Uuid,
+    action: &str,
+    payload: Value,
+) {
+    let (ip, ua) = crate::notify::extract_request_meta(headers);
+    crate::notify::audit(
+        &state.pool,
+        target_workspace_id,
+        None,
+        Some(ctx.user_id.into_uuid()),
+        action,
+        Some("workspace"),
+        Some(&target_workspace_id.to_string()),
+        crate::notify::enrich_payload(payload, ip.as_deref(), ua.as_deref()),
+    )
+    .await;
+}
 
 pub async fn workspaces(State(state): State<Arc<AppState>>) -> Json<Value> {
     let rows = sqlx::query(
@@ -126,6 +167,8 @@ pub struct CreateResponse {
 
 pub async fn create_workspace(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    headers: HeaderMap,
     Json(body): Json<CreateBody>,
 ) -> Result<(StatusCode, Json<CreateResponse>), (StatusCode, String)> {
     if body.name.trim().is_empty() {
@@ -155,6 +198,15 @@ pub async fn create_workspace(
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     info!(workspace_id = %id, name = %body.name, "saas.workspaces created");
+    audit_saas(
+        &state,
+        &headers,
+        &ctx,
+        id,
+        "saas.workspace.create",
+        json!({ "name": body.name.trim() }),
+    )
+    .await;
     Ok((
         StatusCode::CREATED,
         Json(CreateResponse {
@@ -167,8 +219,25 @@ pub async fn create_workspace(
 
 pub async fn delete_workspace(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    headers: HeaderMap,
     Path(workspace_id): Path<Uuid>,
 ) -> StatusCode {
+    // The audit row goes in before the DELETE. It will be cascaded
+    // away when the workspace is dropped, but writing it first at
+    // least means the intent hit the WAL and the tracing INFO line
+    // has a matching id to correlate against externally-collected
+    // logs. See `audit_saas` for the trade-off.
+    audit_saas(
+        &state,
+        &headers,
+        &ctx,
+        workspace_id,
+        "saas.workspace.delete",
+        json!({}),
+    )
+    .await;
+
     // Hard delete cascades via FK (workspaces.id → projects.workspace_id
     // → events.workspace_id, etc. all ON DELETE CASCADE).
     let result = sqlx::query("DELETE FROM workspaces WHERE id = $1")
@@ -186,6 +255,8 @@ pub async fn delete_workspace(
 
 pub async fn suspend_workspace(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Operator kill-switch: set `canceled`, which the quota path
@@ -209,6 +280,15 @@ pub async fn suspend_workspace(
             "workspace billing row already suspended / missing".into(),
         ));
     }
+    audit_saas(
+        &state,
+        &headers,
+        &ctx,
+        id,
+        "saas.workspace.suspend",
+        json!({}),
+    )
+    .await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -227,6 +307,8 @@ pub struct SetPlanBody {
 /// suspended / canceled.
 pub async fn set_plan(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    headers: HeaderMap,
     Path(id): Path<Uuid>,
     Json(body): Json<SetPlanBody>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -242,11 +324,22 @@ pub async fn set_plan(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     info!(workspace_id = %id, %plan, "saas.set_plan operator override");
+    audit_saas(
+        &state,
+        &headers,
+        &ctx,
+        id,
+        "saas.workspace.set_plan",
+        json!({ "plan": plan.as_db_str() }),
+    )
+    .await;
     Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn resume_workspace(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     let res = sqlx::query(
@@ -263,5 +356,14 @@ pub async fn resume_workspace(
             "workspace billing row already active / missing".into(),
         ));
     }
+    audit_saas(
+        &state,
+        &headers,
+        &ctx,
+        id,
+        "saas.workspace.resume",
+        json!({}),
+    )
+    .await;
     Ok(StatusCode::NO_CONTENT)
 }
