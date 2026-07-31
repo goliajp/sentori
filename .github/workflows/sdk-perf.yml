@@ -17,7 +17,6 @@ on:
     paths:
       - 'sdk/core/**'
       - 'sdk/react-native/**'
-      - 'sdk/javascript/**'
       - '.github/workflows/sdk-perf.yml'
 
 env:

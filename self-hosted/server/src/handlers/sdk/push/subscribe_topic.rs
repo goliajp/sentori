@@ -64,7 +64,6 @@ pub async fn handle(
     match result {
         Ok(_) => {
             info!(
-                workspace_id = %ctx.workspace_id,
                 project_id = %ctx.project_id,
                 topic = %body.topic,
                 "push.subscribe_topic subscribed",
@@ -92,7 +91,7 @@ pub(crate) async fn resolve_device_token(
     if let Ok(id) = Uuid::parse_str(handle) {
         let row = sqlx::query("SELECT id FROM device_tokens WHERE id = $1 AND project_id = $2")
             .bind(id)
-            .bind(ctx.project_id.into_uuid())
+            .bind(ctx.project_id)
             .fetch_optional(&state.pool)
             .await?;
         Ok(row.map(|r| r.get::<Uuid, _>("id")))
@@ -101,7 +100,7 @@ pub(crate) async fn resolve_device_token(
             "SELECT id FROM device_tokens \
              WHERE project_id = $1 AND native_token = $2",
         )
-        .bind(ctx.project_id.into_uuid())
+        .bind(ctx.project_id)
         .bind(handle)
         .fetch_optional(&state.pool)
         .await?;

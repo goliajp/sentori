@@ -1,4 +1,4 @@
-//! Transactional auth email sender (verify / password-reset).
+//! Transactional auth email sender (password-reset).
 //!
 //! Wraps the K11 notifier [`EmailTransport`] behind env config:
 //!
@@ -18,7 +18,6 @@
 
 use sentori_notifier::{Channel, Notification};
 use sentori_notifier::{EmailConfig, EmailTransport, SmtpTls};
-use sentori_workspace_identity::WorkspaceId;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
@@ -26,6 +25,10 @@ use tracing::{error, info, warn};
 pub struct Mailer {
     transport: Option<Arc<EmailTransport>>,
     base_url: String,
+    /// (host, from) when configured — surfaced on the admin SMTP
+    /// status endpoint so the operator can see what the server
+    /// actually loaded.
+    smtp_info: Option<(String, String)>,
 }
 
 impl Mailer {
@@ -40,6 +43,7 @@ impl Mailer {
             return Self {
                 transport: None,
                 base_url,
+                smtp_info: None,
             };
         };
         if host.is_empty() {
@@ -47,6 +51,7 @@ impl Mailer {
             return Self {
                 transport: None,
                 base_url,
+                smtp_info: None,
             };
         }
         let cfg = EmailConfig {
@@ -58,48 +63,55 @@ impl Mailer {
             smtp_user: std::env::var("SENTORI_SMTP_USER")
                 .ok()
                 .filter(|s| !s.is_empty()),
-            smtp_pass: std::env::var("SENTORI_SMTP_PASS")
-                .ok()
-                .filter(|s| !s.is_empty()),
+            smtp_pass: crate::env_config::env_or_file("SENTORI_SMTP_PASS"),
             from: std::env::var("SENTORI_SMTP_FROM")
                 .unwrap_or_else(|_| "sentori@golia.jp".to_string()),
             tls: SmtpTls::from_env_str(
                 &std::env::var("SENTORI_SMTP_TLS").unwrap_or_else(|_| "starttls".to_string()),
             ),
         };
+        let info = (cfg.smtp_host.clone(), cfg.from.clone());
         match EmailTransport::new(cfg) {
             Ok(t) => Self {
                 transport: Some(Arc::new(t)),
                 base_url,
+                smtp_info: Some(info),
             },
             Err(e) => {
                 error!(%e, "SMTP transport init failed — auth emails disabled, tokens logged");
                 Self {
                     transport: None,
                     base_url,
+                    smtp_info: None,
                 }
             }
         }
     }
 
-    pub fn send_verify(&self, workspace_id: WorkspaceId, email: &str, token_wire: &str) {
-        let link = format!("{}/verify?token={token_wire}", self.base_url);
-        self.dispatch(
-            workspace_id,
-            email,
-            "Verify your Sentori account",
-            format!(
-                "Welcome to Sentori!\n\nConfirm your email address by opening:\n\n{link}\n\nThe link expires in 24 hours. If you didn't sign up, ignore this email."
-            ),
-            "email_verify",
-            token_wire,
-        );
+    /// (host, from) when configured.
+    #[must_use]
+    pub fn smtp_info(&self) -> Option<(&str, &str)> {
+        self.smtp_info
+            .as_ref()
+            .map(|(h, f)| (h.as_str(), f.as_str()))
     }
 
-    pub fn send_reset(&self, workspace_id: WorkspaceId, email: &str, token_wire: &str) {
+    /// Public dashboard origin for links in email bodies.
+    #[must_use]
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
+    /// Borrow the shared transport (issue notifications reuse the
+    /// same SMTP connection config as auth mail).
+    #[must_use]
+    pub fn transport(&self) -> Option<Arc<EmailTransport>> {
+        self.transport.clone()
+    }
+
+    pub fn send_reset(&self, email: &str, token_wire: &str) {
         let link = format!("{}/reset-password?token={token_wire}", self.base_url);
         self.dispatch(
-            workspace_id,
             email,
             "Reset your Sentori password",
             format!(
@@ -112,7 +124,6 @@ impl Mailer {
 
     fn dispatch(
         &self,
-        workspace_id: WorkspaceId,
         email: &str,
         subject: &str,
         body: String,
@@ -131,7 +142,6 @@ impl Mailer {
             return;
         };
         let n = Notification {
-            workspace_id,
             project_id: None,
             channel: Channel::Email,
             recipient: email.to_string(),
@@ -156,6 +166,7 @@ impl std::fmt::Debug for Mailer {
         f.debug_struct("Mailer")
             .field("enabled", &self.transport.is_some())
             .field("base_url", &self.base_url)
+            .field("smtp_info", &self.smtp_info)
             .finish()
     }
 }

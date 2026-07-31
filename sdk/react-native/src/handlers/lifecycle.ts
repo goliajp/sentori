@@ -12,7 +12,7 @@
  * twice". Sentry historically did the opposite (treat inactive as
  * still alive), but that lets a swiped-away session never end.
  */
-import { endSession, startSession } from '../session-tracker';
+import { pushSignal } from '@goliapkg/sentori-core';
 
 let _installed = false;
 let _subscription: { remove: () => void } | null = null;
@@ -40,9 +40,9 @@ export const installLifecycleHandler = (): void => {
 
   _subscription = AppState.addEventListener('change', (state) => {
     if (state === 'active') {
-      startSession();
+      pushSignal('lifecycle', { state: 'active' });
     } else if (state === 'background' || state === 'inactive') {
-      endSession();
+      pushSignal('lifecycle', { state: 'background' });
     }
   });
 };

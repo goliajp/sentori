@@ -14,7 +14,6 @@ use serde_json::{Value, json};
 use sqlx::Row;
 use uuid::Uuid;
 
-use crate::handlers::tenant::guard_project;
 use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
@@ -30,8 +29,8 @@ pub async fn retry(
     Path((project_id, send_id)): Path<(Uuid, Uuid)>,
 ) -> (axum::http::StatusCode, Json<Value>) {
     use axum::http::StatusCode;
-    if let Err((code, msg)) = guard_project(&state, ctx.workspace_id, project_id).await {
-        return (code, Json(json!({ "error": msg })));
+    if let Err(e) = super::tokens::ensure_project_access(&state, &ctx, project_id).await {
+        return e;
     }
     // `AND project_id` ties the send to the guarded project so a
     // send_id from another project (even in this workspace) can't be
@@ -47,14 +46,13 @@ pub async fn retry(
     .await;
     match res {
         Ok(Some(_)) => {
-            crate::notify::audit(
+            crate::audit::record(
                 &state.pool,
-                ctx.workspace_id.into_uuid(),
                 None,
-                None,
+                ctx.user_id,
                 "push.retry",
-                Some("push_send"),
-                Some(&send_id.to_string()),
+                "push_send",
+                &send_id.to_string(),
                 json!({}),
             )
             .await;
@@ -83,7 +81,7 @@ pub async fn retry_all_failed(
     Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
 ) -> Json<Value> {
-    if guard_project(&state, ctx.workspace_id, project_id)
+    if super::tokens::ensure_project_access(&state, &ctx, project_id)
         .await
         .is_err()
     {
@@ -99,14 +97,13 @@ pub async fn retry_all_failed(
     .await
     .unwrap_or_default();
     let count = res.len();
-    crate::notify::audit(
+    crate::audit::record(
         &state.pool,
-        ctx.workspace_id.into_uuid(),
         Some(project_id),
-        None,
+        ctx.user_id,
         "push.retry_all_failed",
-        Some("push_send"),
-        None,
+        "push_send",
+        "",
         json!({ "count": count }),
     )
     .await;
@@ -119,7 +116,7 @@ pub async fn list(
     Path(project_id): Path<Uuid>,
     Query(q): Query<ListQuery>,
 ) -> Json<Value> {
-    if guard_project(&state, ctx.workspace_id, project_id)
+    if super::tokens::ensure_project_access(&state, &ctx, project_id)
         .await
         .is_err()
     {

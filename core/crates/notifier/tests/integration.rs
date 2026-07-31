@@ -27,7 +27,6 @@ use sentori_notifier::{
     Channel, DeliveryStatus, DispatchOutcome, MockInbox, MockTransport, Notification,
     NotifierError, NotifierService, WebhookTransport,
 };
-use sentori_workspace_identity::{Identity, ProjectId, WorkspaceId, bootstrap_workspace};
 use sqlx::{Executor, PgPool};
 use testcontainers_modules::{
     postgres::Postgres,
@@ -68,7 +67,7 @@ async fn ensure_rig() -> String {
     guard.as_ref().expect("rig").base_url.clone()
 }
 
-async fn fresh_pool() -> (PgPool, WorkspaceId) {
+async fn fresh_pool() -> PgPool {
     let base = ensure_rig().await;
     let admin = PgPool::connect(&format!("{base}/postgres"))
         .await
@@ -83,24 +82,24 @@ async fn fresh_pool() -> (PgPool, WorkspaceId) {
         .await
         .expect("connect");
     for sql in [
-        include_str!("../../../migrations/0001_workspace_identity.sql"),
-        include_str!("../../../migrations/0010_delivery_log.sql"),
+        include_str!("../../../migrations/0001_identity.sql"),
+        include_str!("../../../migrations/0002_projects.sql"),
+        include_str!("../../../migrations/0006_notifications.sql"),
     ] {
         pool.execute(sql).await.expect("migration");
     }
-    let workspace_id = bootstrap_workspace(&pool, "test")
-        .await
-        .expect("bootstrap workspace");
-    (pool, workspace_id)
+    pool
 }
 
-async fn seed_project(pool: &PgPool, workspace_id: WorkspaceId, slug: &str) -> ProjectId {
-    Identity::new(pool.clone(), workspace_id)
-        .projects()
-        .create(slug, slug, &[0xa5u8; 32])
+async fn seed_project(pool: &PgPool, slug: &str) -> Uuid {
+    let id = Uuid::now_v7();
+    sqlx::query("INSERT INTO projects (id, name) VALUES ($1, $2)")
+        .bind(id)
+        .bind(slug)
+        .execute(pool)
         .await
-        .expect("project")
-        .id
+        .expect("project");
+    id
 }
 
 fn build_service_with_mock(pool: PgPool) -> (NotifierService, MockInbox) {
@@ -171,10 +170,10 @@ impl MockHttp {
 
 #[tokio::test]
 async fn dispatch_writes_delivery_log_and_routes_to_transport() {
-    let (pool, workspace_id) = fresh_pool().await;
-    let pid = seed_project(&pool, workspace_id, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let (svc, inbox) = build_service_with_mock(pool);
-    let n = Notification::new(workspace_id, Channel::Mock, "ops", "subj", "body").with_project(pid);
+    let n = Notification::new(Channel::Mock, "ops", "subj", "body").with_project(pid);
     let outcome = svc.dispatch(&n).await.unwrap();
     assert!(outcome.is_delivered());
     assert_eq!(inbox.len(), 1);
@@ -190,14 +189,14 @@ async fn dispatch_writes_delivery_log_and_routes_to_transport() {
 
 #[tokio::test]
 async fn dispatch_failed_transport_records_error() {
-    let (pool, workspace_id) = fresh_pool().await;
-    let pid = seed_project(&pool, workspace_id, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let inbox = MockInbox::new();
     let transport = MockTransport::with_inbox(inbox.clone()).failing_for("bad");
     let mut svc = NotifierService::new(pool);
     svc.register(Arc::new(transport));
 
-    let n = Notification::new(workspace_id, Channel::Mock, "bad", "subj", "body").with_project(pid);
+    let n = Notification::new(Channel::Mock, "bad", "subj", "body").with_project(pid);
     let outcome = svc.dispatch(&n).await.unwrap();
     match outcome {
         DispatchOutcome::Failed { log_id, error } => {
@@ -212,18 +211,18 @@ async fn dispatch_failed_transport_records_error() {
 
 #[tokio::test]
 async fn dispatch_no_transport_for_channel() {
-    let (pool, workspace_id) = fresh_pool().await;
+    let pool = fresh_pool().await;
     let svc = NotifierService::new(pool); // no transports registered
-    let n = Notification::new(workspace_id, Channel::Email, "a@b.com", "s", "b");
+    let n = Notification::new(Channel::Email, "a@b.com", "s", "b");
     let err = svc.dispatch(&n).await.unwrap_err();
     assert!(matches!(err, NotifierError::Transport(_)));
 }
 
 #[tokio::test]
 async fn dispatch_rejects_empty_subject() {
-    let (pool, workspace_id) = fresh_pool().await;
+    let pool = fresh_pool().await;
     let (svc, _) = build_service_with_mock(pool);
-    let n = Notification::new(workspace_id, Channel::Mock, "ops", "", "body");
+    let n = Notification::new(Channel::Mock, "ops", "", "body");
     assert!(matches!(
         svc.dispatch(&n).await.unwrap_err(),
         NotifierError::InvalidInput(_)
@@ -232,9 +231,9 @@ async fn dispatch_rejects_empty_subject() {
 
 #[tokio::test]
 async fn dispatch_rejects_empty_recipient() {
-    let (pool, workspace_id) = fresh_pool().await;
+    let pool = fresh_pool().await;
     let (svc, _) = build_service_with_mock(pool);
-    let n = Notification::new(workspace_id, Channel::Mock, "", "s", "b");
+    let n = Notification::new(Channel::Mock, "", "s", "b");
     assert!(matches!(
         svc.dispatch(&n).await.unwrap_err(),
         NotifierError::InvalidInput(_)
@@ -243,10 +242,10 @@ async fn dispatch_rejects_empty_recipient() {
 
 #[tokio::test]
 async fn dispatch_unknown_project_fk() {
-    let (pool, workspace_id) = fresh_pool().await;
+    let pool = fresh_pool().await;
     let (svc, _) = build_service_with_mock(pool);
-    let phantom = ProjectId::new();
-    let n = Notification::new(workspace_id, Channel::Mock, "ops", "s", "b").with_project(phantom);
+    let phantom = Uuid::now_v7();
+    let n = Notification::new(Channel::Mock, "ops", "s", "b").with_project(phantom);
     let err = svc.dispatch(&n).await.unwrap_err();
     assert!(matches!(err, NotifierError::ProjectNotFound(_)));
 }
@@ -255,14 +254,14 @@ async fn dispatch_unknown_project_fk() {
 
 #[tokio::test]
 async fn dedup_short_circuits_second_dispatch() {
-    let (pool, workspace_id) = fresh_pool().await;
-    let pid = seed_project(&pool, workspace_id, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let (svc, inbox) = build_service_with_mock(pool);
 
-    let n1 = Notification::new(workspace_id, Channel::Mock, "ops", "s", "b")
+    let n1 = Notification::new(Channel::Mock, "ops", "s", "b")
         .with_project(pid)
         .with_dedup_key("k1");
-    let n2 = Notification::new(workspace_id, Channel::Mock, "ops", "s2", "b2")
+    let n2 = Notification::new(Channel::Mock, "ops", "s2", "b2")
         .with_project(pid)
         .with_dedup_key("k1"); // same key
 
@@ -280,11 +279,11 @@ async fn dedup_short_circuits_second_dispatch() {
 
 #[tokio::test]
 async fn dedup_distinct_keys_dont_block() {
-    let (pool, workspace_id) = fresh_pool().await;
-    let pid = seed_project(&pool, workspace_id, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let (svc, inbox) = build_service_with_mock(pool);
     for i in 0..3 {
-        let n = Notification::new(workspace_id, Channel::Mock, "ops", "s", "b")
+        let n = Notification::new(Channel::Mock, "ops", "s", "b")
             .with_project(pid)
             .with_dedup_key(format!("k{i}"));
         svc.dispatch(&n).await.unwrap();
@@ -294,10 +293,10 @@ async fn dedup_distinct_keys_dont_block() {
 
 #[tokio::test]
 async fn no_dedup_key_allows_repeats() {
-    let (pool, workspace_id) = fresh_pool().await;
-    let pid = seed_project(&pool, workspace_id, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let (svc, inbox) = build_service_with_mock(pool);
-    let n = Notification::new(workspace_id, Channel::Mock, "ops", "s", "b").with_project(pid);
+    let n = Notification::new(Channel::Mock, "ops", "s", "b").with_project(pid);
     svc.dispatch(&n).await.unwrap();
     svc.dispatch(&n).await.unwrap();
     svc.dispatch(&n).await.unwrap();
@@ -308,8 +307,8 @@ async fn no_dedup_key_allows_repeats() {
 
 #[tokio::test]
 async fn retry_one_recovers_failed_dispatch() {
-    let (pool, workspace_id) = fresh_pool().await;
-    let pid = seed_project(&pool, workspace_id, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
 
     // First service: failing transport. Second: succeeding
     // transport. Tests that the retry path actually
@@ -319,7 +318,7 @@ async fn retry_one_recovers_failed_dispatch() {
     let mut svc_fail = NotifierService::new(pool.clone());
     svc_fail.register(failing);
 
-    let n = Notification::new(workspace_id, Channel::Mock, "ops", "s", "b").with_project(pid);
+    let n = Notification::new(Channel::Mock, "ops", "s", "b").with_project(pid);
     let r1 = svc_fail.dispatch(&n).await.unwrap();
     let log_id = r1.log_id();
     assert!(matches!(r1, DispatchOutcome::Failed { .. }));
@@ -342,10 +341,10 @@ async fn retry_one_recovers_failed_dispatch() {
 
 #[tokio::test]
 async fn retry_one_delivered_is_noop() {
-    let (pool, workspace_id) = fresh_pool().await;
-    let pid = seed_project(&pool, workspace_id, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let (svc, inbox) = build_service_with_mock(pool);
-    let n = Notification::new(workspace_id, Channel::Mock, "ops", "s", "b").with_project(pid);
+    let n = Notification::new(Channel::Mock, "ops", "s", "b").with_project(pid);
     let r1 = svc.dispatch(&n).await.unwrap();
     let r2 = svc.retry_one(r1.log_id()).await.unwrap();
     assert!(r2.is_delivered());
@@ -356,7 +355,7 @@ async fn retry_one_delivered_is_noop() {
 
 #[tokio::test]
 async fn retry_one_missing_log_errors() {
-    let (pool, _workspace_id) = fresh_pool().await;
+    let pool = fresh_pool().await;
     let (svc, _) = build_service_with_mock(pool);
     let err = svc.retry_one(Uuid::now_v7()).await.unwrap_err();
     assert!(matches!(err, NotifierError::LogNotFound(_)));
@@ -366,12 +365,11 @@ async fn retry_one_missing_log_errors() {
 
 #[tokio::test]
 async fn list_recent_returns_ordered() {
-    let (pool, workspace_id) = fresh_pool().await;
-    let pid = seed_project(&pool, workspace_id, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let (svc, _) = build_service_with_mock(pool);
     for i in 0..5 {
-        let n = Notification::new(workspace_id, Channel::Mock, "ops", format!("s{i}"), "b")
-            .with_project(pid);
+        let n = Notification::new(Channel::Mock, "ops", format!("s{i}"), "b").with_project(pid);
         svc.dispatch(&n).await.unwrap();
     }
     let recent = svc
@@ -387,10 +385,10 @@ async fn list_recent_returns_ordered() {
 
 #[tokio::test]
 async fn list_recent_respects_since() {
-    let (pool, workspace_id) = fresh_pool().await;
-    let pid = seed_project(&pool, workspace_id, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let (svc, _) = build_service_with_mock(pool);
-    let n = Notification::new(workspace_id, Channel::Mock, "ops", "s", "b").with_project(pid);
+    let n = Notification::new(Channel::Mock, "ops", "s", "b").with_project(pid);
     svc.dispatch(&n).await.unwrap();
     let future = time::OffsetDateTime::now_utc() + time::Duration::hours(1);
     let recent = svc.list_recent(pid, future, 10).await.unwrap();
@@ -401,13 +399,12 @@ async fn list_recent_respects_since() {
 
 #[tokio::test]
 async fn webhook_transport_sends_payload() {
-    let (pool, workspace_id) = fresh_pool().await;
-    let pid = seed_project(&pool, workspace_id, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let server = MockHttp::start().await;
     let mut svc = NotifierService::new(pool);
     svc.register(Arc::new(WebhookTransport::new()));
     let n = Notification::new(
-        workspace_id,
         Channel::Webhook,
         format!("{}/hook", server.base_url),
         "alert",
@@ -421,14 +418,13 @@ async fn webhook_transport_sends_payload() {
 
 #[tokio::test]
 async fn webhook_transport_records_502() {
-    let (pool, workspace_id) = fresh_pool().await;
-    let pid = seed_project(&pool, workspace_id, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let server = MockHttp::start().await;
     server.fail_with(502);
     let mut svc = NotifierService::new(pool);
     svc.register(Arc::new(WebhookTransport::new()));
     let n = Notification::new(
-        workspace_id,
         Channel::Webhook,
         format!("{}/hook", server.base_url),
         "alert",

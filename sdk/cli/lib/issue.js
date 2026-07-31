@@ -1,9 +1,7 @@
-// `sentori-cli issue list / resolve / silence` — CI triage helpers.
-function url(c, path) {
-    return `${c.apiUrl.replace(/\/+$/, '')}/admin/api/projects/${c.projectId}${path}`;
-}
-async function adminFetch(c, path, init) {
-    const resp = await fetch(url(c, path), {
+// `sentori-cli issue list / resolve` — CI triage over the AI
+// surface (`/api/*`, api-scope token; the same loop an agent runs).
+async function apiFetch(c, path, init) {
+    const resp = await fetch(`${c.apiUrl.replace(/\/+$/, '')}${path}`, {
         ...init,
         headers: {
             Authorization: `Bearer ${c.token}`,
@@ -12,42 +10,41 @@ async function adminFetch(c, path, init) {
         },
     });
     if (!resp.ok) {
-        let detail = '';
-        try {
-            detail = await resp.text();
-        }
-        catch {
-            // ignore
-        }
+        const detail = await resp.text().catch(() => '');
         throw new Error(`${resp.status} ${resp.statusText}${detail ? ` — ${detail.slice(0, 300)}` : ''}`);
     }
-    // PATCH /issues/<id> returns the row; some endpoints might return no
-    // content — handle both.
-    const txt = await resp.text();
-    return (txt ? JSON.parse(txt) : null);
+    return (await resp.json());
 }
-export async function issueList(opts) {
+export async function listIssues(c, opts = {}) {
     const q = new URLSearchParams();
     if (opts.status)
         q.set('status', opts.status);
-    if (opts.limit)
-        q.set('limit', String(opts.limit));
-    if (opts.errorType)
-        q.set('errorType', opts.errorType);
+    if (opts.kind)
+        q.set('kind', opts.kind);
     const qs = q.toString();
-    return adminFetch(opts.config, `/issues${qs ? '?' + qs : ''}`);
+    const body = await apiFetch(c, `/api/issues${qs ? `?${qs}` : ''}`);
+    return body.issues;
 }
-export async function issuePatch(config, issueId, body) {
-    return adminFetch(config, `/issues/${encodeURIComponent(issueId)}`, {
-        body: JSON.stringify(body),
-        method: 'PATCH',
+export async function resolveIssue(c, issueId, release) {
+    await apiFetch(c, `/api/issues/${encodeURIComponent(issueId)}/resolve`, {
+        method: 'POST',
+        body: JSON.stringify(release ? { release } : {}),
     });
 }
-/** Format one issue for terminal output — short, one line, scannable. */
+export async function noteIssue(c, issueId, body) {
+    await apiFetch(c, `/api/issues/${encodeURIComponent(issueId)}/notes`, {
+        method: 'POST',
+        body: JSON.stringify({ body }),
+    });
+}
+export async function fetchBundle(c, issueId) {
+    const resp = await fetch(`${c.apiUrl.replace(/\/+$/, '')}/api/issues/${encodeURIComponent(issueId)}/bundle`, { headers: { Authorization: `Bearer ${c.token}` } });
+    if (!resp.ok)
+        throw new Error(`${resp.status} ${resp.statusText}`);
+    return resp.text();
+}
 export function formatIssueLine(i) {
-    const status = i.status.padEnd(9);
-    const title = `${i.errorType}${i.messageSample ? `: ${i.messageSample}` : ''}`;
-    const events = `${i.eventCount}×`;
-    return `${i.id}  ${status}  ${title.slice(0, 80).padEnd(80)}  ${events}`;
+    const flag = i.regressed ? ' REGRESSED' : '';
+    return `${i.id}  [${i.kind}] ${i.title}  ${i.usersCount}u×${i.maxPerUser}  ${i.eventCount}ev${flag}`;
 }
 //# sourceMappingURL=issue.js.map

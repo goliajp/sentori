@@ -1,648 +1,487 @@
-// Single issue detail — meta + matching events tail.
+// Issue detail — the interactive rendering of the bundle
+// (design.md §11): one vertical narrative, no tabs. Summary →
+// stack with in-app frames highlighted → the signal timeline ("what
+// the user was doing") → environment → occurrences (collapsed) →
+// activity. A sticky action rail on the right carries triage +
+// Copy-for-AI + the guard-status card. The narrative order IS the
+// design signature.
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 
+import { useShell } from '../App';
+import { KindBadge, RegressedBadge } from '../components/kind';
+import { EmptyState, ErrorBanner, formatRelative } from '../components/ui';
+import { useT } from '../i18n';
 import {
   api,
-  EventDetail,
-  EventRow,
-  IssueDetail as Issue,
-  MemberRow,
-  UserReport,
+  type EventDetail,
+  type IssueDetail as IssueDetailT,
+  type OccurrenceRow,
 } from '../lib/api';
-import { EventEvidence } from '../components/crash/EventEvidence';
-import { useT } from '../i18n';
-import { useKeyHandlers } from '../lib/useShortcuts';
-import {
-  Badge,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  ErrorBanner,
-  LinkButton,
-  PageHeader,
-  Select,
-  formatNumber,
-  formatRelative,
-} from '../components/ui';
+import { useAsyncData } from '../lib/useAsyncData';
+
+type Frame = {
+  file?: string;
+  function?: string;
+  line?: number;
+  inApp?: boolean;
+};
+
+type Signal = { t: number; kind: string; data?: Record<string, unknown> };
 
 export default function IssueDetail() {
-  const { id: projectId, issueId } = useParams<{
-    id: string;
-    issueId: string;
-  }>();
-  const [issue, setIssue] = useState<Issue | null>(null);
-  const [events, setEvents] = useState<EventRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const t = useT();
-  const [watchers, setWatchers] = useState<string[]>([]);
-  // The latest matching event, loaded in full. This is the crash the
-  // page is actually about — the issue row is just its aggregate.
-  const [latest, setLatest] = useState<EventDetail | null>(null);
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const myUserId =
-    typeof localStorage !== 'undefined'
-      ? localStorage.getItem('sentori_user_id')
-      : null;
-  const watching = myUserId ? watchers.includes(myUserId) : false;
+  const { issueId } = useParams<{ issueId: string }>();
+  const navigate = useNavigate();
+  const { me, projects } = useShell();
 
-  // Members, for the assignee picker. Failing to load them leaves the
-  // picker with just "Nobody" rather than breaking the page — you can
-  // still read the crash.
-  const [members, setMembers] = useState<MemberRow[]>([]);
-  const [reports, setReports] = useState<UserReport[]>([]);
-  useEffect(() => {
-    if (!projectId || !issueId) return;
-    api
-      .listUserReports(projectId, { issue_id: issueId })
-      .then(r => setReports(r.reports))
-      .catch(() => setReports([]));
-  }, [projectId, issueId]);
+  const { data: issue, error, loading, reload } = useAsyncData(
+    () => api.getIssue(issueId ?? ''),
+    [issueId],
+  );
+  const { data: occ } = useAsyncData(() => api.listOccurrences(issueId ?? ''), [issueId]);
+  const latestId = occ?.events[0]?.id;
+  const { data: latest } = useAsyncData<EventDetail | null>(
+    () => (latestId ? api.getEvent(latestId) : Promise.resolve(null)),
+    [latestId],
+  );
 
-  useEffect(() => {
-    api
-      .listMembers()
-      .then(r => setMembers(r.members))
-      .catch(() => {});
-  }, []);
+  const [note, setNote] = useState('');
+  const [resolveRelease, setResolveRelease] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (!issueId) return;
-    api
-      .listWatchers(issueId)
-      .then(r => setWatchers(r.watchers.map(w => w.user_id)))
-      .catch(() => {});
-  }, [issueId]);
-
-  async function toggleWatch() {
-    if (!issueId || !myUserId) return;
-    try {
-      if (watching) {
-        await api.unwatchIssue(issueId);
-        setWatchers(ws => ws.filter(w => w !== myUserId));
-      } else {
-        await api.watchIssue(issueId);
-        setWatchers(ws => [...ws, myUserId]);
-      }
-    } catch (e) {
-      setError(String(e));
-    }
-  }
-
-  useKeyHandlers({
-    e: () => act('resolved'),
-    i: () => act('ignored'),
-    r: () => act('active'),
-    w: () => toggleWatch(),
-  });
-
-  /** Any subset of the triage fields, then re-read so the page shows
-   *  what the server stored rather than what we hoped it would. */
-  async function setField(patch: {
-    priority?: Issue['priority'];
-    labels?: string[];
-    assignee_user_id?: string | null;
-  }) {
-    if (!projectId || !issueId) return;
+  const act = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     try {
-      await api.patchIssue(projectId, issueId, patch);
-      setIssue(await api.getIssue(projectId, issueId));
-    } catch (e) {
-      setError(String(e));
+      await fn();
+      reload();
     } finally {
       setBusy(false);
     }
-  }
+  };
 
-  async function act(status: 'active' | 'resolved' | 'ignored') {
-    if (!projectId || !issueId) return;
-    setBusy(true);
-    try {
-      await api.patchIssue(projectId, issueId, { status });
-      const next = await api.getIssue(projectId, issueId);
-      setIssue(next);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const payload = latest?.payload as
+    | { error?: { type?: string; message?: string; stack?: Frame[] }; signals?: Signal[]; device?: Record<string, unknown> }
+    | undefined;
 
-  useEffect(() => {
-    if (!projectId || !issueId) return;
-    Promise.all([
-      api.getIssue(projectId, issueId),
-      api.listEvents(projectId, { issue_id: issueId, limit: 50 }),
-    ])
-      .then(([i, e]) => {
-        setIssue(i);
-        setEvents(e);
-      })
-      .catch(e => setError(String(e)))
-      .finally(() => setLoading(false));
-  }, [projectId, issueId]);
+  const copyForAi = async () => {
+    if (!issue) return;
+    // The AI-ready shape without an api token: assemble from what
+    // the page already loaded. (The /api bundle needs a bearer; the
+    // dashboard's copy carries the same evidence.)
+    const md = buildMarkdown(issue, payload, occ?.events ?? []);
+    await navigator.clipboard.writeText(md);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
-  // Load the selected event — or the newest one — in full. The list
-  // rows carry only identifiers; the payload with the stack,
-  // breadcrumbs and context comes from the single-event endpoint.
-  useEffect(() => {
-    if (!projectId) return;
-    const target = selectedEventId ?? events[0]?.id;
-    if (!target) return;
-    let cancelled = false;
-    api
-      .getEvent(projectId, target)
-      .then(d => {
-        if (!cancelled) setLatest(d);
-      })
-      .catch(e => {
-        if (!cancelled) setError(String(e));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, events, selectedEventId]);
-
-  if (!projectId || !issueId) {
-    return <ErrorBanner>{t('common.missingIds')}</ErrorBanner>;
-  }
-  if (loading) {
+  if (error) {
     return (
-      <div className="py-16 text-center text-sm text-fg-subtle">Loading…</div>
+      <div className="mx-auto max-w-3xl px-6 py-8">
+        <ErrorBanner>
+          {t('issue.loadFailed')}{' '}
+          <button type="button" className="underline" onClick={reload}>
+            {t('common.retry')}
+          </button>
+        </ErrorBanner>
+      </div>
     );
   }
-  if (error) {
-    return <ErrorBanner>{error}</ErrorBanner>;
+  if (loading || !issue) {
+    return <div className="py-16 text-center text-sm opacity-50">…</div>;
   }
-  if (!issue) {
-    return <ErrorBanner>{t('crash.notFound')}</ErrorBanner>;
-  }
+
+  const project = projects.find((p) => p.id === issue.projectId);
+  const surface = issue.surface as { screen?: string; element?: string };
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title={issue.error_type}
-        subtitle={issue.message_sample}
-        actions={
-          <div className="flex items-center gap-2">
-            {issue.status !== 'resolved' && (
-              <Button
-                size="sm"
-                onClick={() => act('resolved')}
-                disabled={busy}
-              >
-                {t('issues.resolve')}
-              </Button>
-            )}
-            {issue.status !== 'ignored' && (
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => act('ignored')}
-                disabled={busy}
-              >
-                {t('issues.ignore')}
-              </Button>
-            )}
-            {issue.status !== 'active' && (
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => act('active')}
-                disabled={busy}
-              >
-                {t('issues.reopen')}
-              </Button>
-            )}
-            {myUserId && (
-              <Button
-                size="sm"
-                variant={watching ? 'primary' : 'secondary'}
-                onClick={toggleWatch}
-              >
-                {watching ? `★ ${t('crash.watching')} (${watchers.length})` : `☆ ${t('crash.watch')} (${watchers.length})`}
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                navigator.clipboard?.writeText(issueId);
-              }}
-            >
-              {t('crash.copyId')}
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                navigator.clipboard?.writeText(window.location.href);
-              }}
-            >
-              {t('crash.copyLink')}
-            </Button>
-            <LinkButton
-              to={`/projects/${projectId}/issues`}
-              size="sm"
-              variant="ghost"
-            >
-              {t('crash.backToAll')}
-            </LinkButton>
-          </div>
-        }
-      />
+    <div className="mx-auto flex max-w-6xl gap-6 px-6 py-5">
+      {/* ── the narrative ── */}
+      <div className="min-w-0 flex-1">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="mb-3 text-xs opacity-50 hover:opacity-100"
+        >
+          ← {t('issue.back')}
+        </button>
 
-      <Card>
-        <CardHeader title={t('crash.meta')} />
-        <CardBody>
-          <div className="grid grid-cols-4 gap-4">
-            <Cell label={t('crash.status')}>
-              <Badge
-                tone={
-                  issue.status === 'resolved'
-                    ? 'ok'
-                    : issue.status === 'regressed'
-                      ? 'warn'
-                      : 'neutral'
-                }
-              >
-                {t(`status.${issue.status}`)}
-              </Badge>
-            </Cell>
-            {/* Priority and assignee are editable in place. They are
-                the two fields an operator changes while reading the
-                crash, and a round trip to a separate form to set one
-                dropdown is the reason nobody triages. */}
-            <Cell label={t('crash.priority')}>
-              <Select
-                value={issue.priority}
-                disabled={busy}
-                onChange={e => setField({ priority: e.target.value as Issue['priority'] })}
-                className="w-full"
-              >
-                {(['p0', 'p1', 'p2', 'p3'] as const).map(p => (
-                  <option key={p} value={p}>
-                    {t(`priority.${p}`)}
-                  </option>
-                ))}
-              </Select>
-            </Cell>
-            <Cell label={t('crash.assignee')}>
-              <Select
-                value={issue.assignee_user_id ?? ''}
-                disabled={busy}
-                onChange={e =>
-                  setField({ assignee_user_id: e.target.value || null })
-                }
-                className="w-full"
-              >
-                <option value="">{t('crash.unassigned')}</option>
-                {members.map(m => (
-                  <option key={m.user_id} value={m.user_id}>
-                    {m.email ?? m.user_id.slice(0, 8)}
-                  </option>
-                ))}
-              </Select>
-            </Cell>
-            <Cell label={t('crash.kind')}>
-              <span className="font-mono text-xs">{issue.kind}</span>
-            </Cell>
-            {/* Labels replace as a set, so removing one means sending
-                the rest — the server takes what the issue should end up
-                with rather than a delta. */}
-            <Cell label={t('crash.labels')}>
-              <div className="flex flex-wrap items-center gap-1">
-                {issue.labels.length === 0 && (
-                  <span className="text-xs text-fg-subtle">
-                    {t('crash.noLabels')}
-                  </span>
-                )}
-                {issue.labels.map(l => (
-                  <button
-                    key={l}
-                    type="button"
-                    disabled={busy}
-                    title={t('action.remove')}
-                    onClick={() =>
-                      setField({ labels: issue.labels.filter(x => x !== l) })
-                    }
-                    className="inline-flex items-center gap-1 rounded bg-raised px-1.5 py-0.5 text-xs text-fg-muted hover:text-fg disabled:opacity-50"
-                  >
-                    {l} <span aria-hidden>×</span>
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => {
-                    const next = prompt(t('crash.addLabel'))?.trim();
-                    if (next && !issue.labels.includes(next)) {
-                      void setField({ labels: [...issue.labels, next] });
-                    }
-                  }}
-                  className="rounded border border-dashed border-border-strong px-1.5 py-0.5 text-xs text-fg-subtle hover:text-fg disabled:opacity-50"
-                >
-                  +
-                </button>
-              </div>
-            </Cell>
-            <Cell label={t('issues.colEvents')}>{formatNumber(issue.event_count)}</Cell>
-            <Cell label={t('crash.lastRelease')}>
-              <span className="font-mono text-xs">
-                {issue.last_release || '—'}
-              </span>
-            </Cell>
-            <Cell label={t('crash.firstSeen')}>{formatRelative(issue.first_seen)}</Cell>
-            <Cell label={t('crash.lastSeen')}>{formatRelative(issue.last_seen)}</Cell>
-            <Cell label={t('crash.environment')}>
-              <span className="font-mono text-xs">{issue.last_environment || '—'}</span>
-            </Cell>
-            <Cell label={t('crash.fingerprint')}>
-              <span className="font-mono text-xs break-all">
-                {issue.fingerprint.slice(0, 16)}…
-              </span>
-            </Cell>
-            {issue.resolved_at && (
-              <Cell label={t('crash.resolvedAt')}>
-                {formatRelative(issue.resolved_at)}
-              </Cell>
-            )}
-            {issue.regressed_at && (
-              <Cell label={t('crash.regressedAt')}>
-                {formatRelative(issue.regressed_at)}
-                {issue.regressed_in_release && (
-                  <span className="font-mono text-xs text-fg-subtle ml-1">
-                    in {issue.regressed_in_release}
-                  </span>
-                )}
-              </Cell>
-            )}
+        <header className="mb-5">
+          <div className="mb-1 flex items-center gap-2">
+            <KindBadge kind={issue.kind} />
+            {issue.regressedAt && issue.status === 'open' && <RegressedBadge />}
+            <span className="text-xs opacity-40">{project?.name}</span>
           </div>
-        </CardBody>
-      </Card>
-
-      {/* Evidence before discussion. The stack, the breadcrumbs and the
-          replay are what the page is for — someone opening a crash is
-          reading the error, not the thread about it. An empty comment
-          box sitting between the summary and the stack trace pushed
-          the first useful thing below the fold. */}
-      {latest ? (
-        <div className="space-y-8">
-          {events.length > 1 && (
-            <EventPicker
-              events={events}
-              selected={latest.id}
-              onSelect={setSelectedEventId}
-            />
+          <h1 className="text-lg font-semibold">{issue.title}</h1>
+          {issue.messageSample && (
+            <p className="mt-0.5 text-sm opacity-60">{issue.messageSample}</p>
           )}
-          <EventEvidence event={latest} projectId={projectId} />
-        </div>
-      ) : (
-        <p className="py-8 text-center text-sm text-fg-subtle">
-          {t('crash.noEvent')}
-        </p>
-      )}
+          <div className="mt-2 font-mono text-xs opacity-60">
+            {issue.usersCount}u × {issue.maxPerUser} · {issue.eventCount}ev ·{' '}
+            {t('issue.firstSeen')} {formatRelative(issue.firstSeen)} · {t('issue.lastSeen')}{' '}
+            {formatRelative(issue.lastSeen)}
+            {issue.lastRelease && <> · {issue.lastRelease}</>}
+          </div>
+          {surface.screen && (
+            <div className="mt-1 font-mono text-xs opacity-40">
+              {surface.screen}
+              {surface.element ? ` · ${surface.element}` : ''}
+            </div>
+          )}
+        </header>
 
-      {/* A stack trace says where; this says what they were trying to
-          do. It is the only signal in the product that is not machine
-          generated, so it sits with the evidence rather than with the
-          team's own discussion below. */}
-      {reports.length > 0 && (
-        <Card>
-          <CardHeader
-            title={t('crash.userReports')}
-            subtitle={t('crash.userReportsHint')}
-          />
-          <CardBody>
-            <ul className="divide-y divide-border">
-              {reports.map(r => (
-                <li key={r.id} className="py-3">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-sm font-medium text-fg">
-                      {r.name || r.email || '—'}
-                    </span>
-                    <span className="text-xs text-fg-subtle">
-                      {formatRelative(r.received_at)}
-                    </span>
-                  </div>
-                  {r.title && (
-                    <p className="mt-1 text-sm text-fg">{r.title}</p>
-                  )}
-                  {r.body && (
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-fg-muted">
-                      {r.body}
-                    </p>
-                  )}
-                </li>
+        {payload?.error?.stack && payload.error.stack.length > 0 && (
+          <Section title={t('issue.stack')}>
+            <div className="overflow-x-auto rounded-md bg-[var(--gds-surface-sunken,#121216)] p-3 font-mono text-xs leading-5">
+              {payload.error.stack.slice(0, 40).map((f, i) => (
+                <div
+                  key={i}
+                  className={
+                    f.inApp
+                      ? 'border-l-2 border-[#ff5d5d] pl-2 text-[var(--gds-text,#e5e5ea)]'
+                      : 'pl-2.5 opacity-45'
+                  }
+                >
+                  {f.function ?? '?'}{' '}
+                  <span className="opacity-60">
+                    ({f.file ?? '?'}
+                    {f.line ? `:${f.line}` : ''})
+                  </span>
+                </div>
               ))}
-            </ul>
-          </CardBody>
-        </Card>
-      )}
+            </div>
+          </Section>
+        )}
 
-      <Comments issueId={issueId} myUserId={myUserId} />
-      <Activity issueId={issueId} />
+        {payload?.signals && payload.signals.length > 0 && (
+          <Section title={t('issue.timeline')}>
+            <Timeline signals={payload.signals} />
+          </Section>
+        )}
+
+        {payload?.device && (
+          <Section title={t('issue.environment')}>
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-3">
+              {Object.entries(payload.device)
+                .filter(([, v]) => typeof v !== 'object')
+                .map(([k, v]) => (
+                  <div key={k} className="flex justify-between gap-2 font-mono">
+                    <dt className="opacity-50">{k}</dt>
+                    <dd>{String(v)}</dd>
+                  </div>
+                ))}
+            </dl>
+          </Section>
+        )}
+
+        {occ && occ.events.length > 0 && (
+          <Section title={`${t('issue.occurrences')} (${occ.events.length})`} collapsed>
+            <div className="divide-y divide-[var(--gds-border,#2a2a30)]">
+              {occ.events.map((e) => (
+                <OccRow key={e.id} row={e} active={e.id === latestId} />
+              ))}
+            </div>
+          </Section>
+        )}
+
+        <Section title={t('issue.activity')}>
+          {issue.activity.length === 0 && (
+            <EmptyState title={t('issue.noActivity')} hint="" />
+          )}
+          <ul className="space-y-1.5">
+            {issue.activity.map((a) => (
+              <li key={a.id} className="flex items-baseline gap-2 text-xs">
+                <span className="w-16 shrink-0 font-mono opacity-40">
+                  {formatRelative(a.at)}
+                </span>
+                <span className="rounded bg-[var(--gds-surface-raised,#26262c)] px-1 font-mono text-[10px]">
+                  {a.kind}
+                </span>
+                <span className="opacity-80">
+                  {a.actorEmail ?? t('issue.system')} · {summarizeActivity(a.body)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      </div>
+
+      {/* ── action rail ── */}
+      <aside className="w-60 shrink-0">
+        <div className="sticky top-5 space-y-3">
+          <button
+            type="button"
+            onClick={copyForAi}
+            className="w-full rounded-md bg-[var(--gds-accent,#4c8dff)] px-3 py-1.5 text-sm font-medium text-black"
+          >
+            {copied ? t('issue.copied') : t('issue.copyForAi')}
+          </button>
+
+          {issue.status === 'open' && (
+            <div className="rounded-md border border-[var(--gds-border,#2a2a30)] p-3">
+              <label className="mb-1 block text-[11px] opacity-60">
+                {t('issue.resolveInRelease')}
+              </label>
+              <input
+                value={resolveRelease}
+                onChange={(e) => setResolveRelease(e.target.value)}
+                placeholder={issue.lastRelease || 'app@x.y.z'}
+                className="mb-2 w-full rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 font-mono text-xs"
+              />
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  act(() => api.resolveIssue(issue.id, resolveRelease || undefined))
+                }
+                className="w-full rounded-md bg-[#4cd97b] px-3 py-1.5 text-sm font-medium text-black disabled:opacity-40"
+              >
+                {t('issue.resolve')}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => act(() => api.ignoreIssue(issue.id))}
+                className="mt-1.5 w-full rounded-md border border-[var(--gds-border,#2a2a30)] px-3 py-1.5 text-sm opacity-70 hover:opacity-100 disabled:opacity-40"
+              >
+                {t('issue.ignore')}
+              </button>
+            </div>
+          )}
+          {issue.status !== 'open' && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => act(() => api.reopenIssue(issue.id))}
+              className="w-full rounded-md border border-[var(--gds-border,#2a2a30)] px-3 py-1.5 text-sm"
+            >
+              {t('issue.reopen')}
+            </button>
+          )}
+
+          {/* guard status — "fixed" and "verified fixed" are two
+              different states, and this card is where that shows */}
+          {issue.status === 'resolved' && (
+            <div className="rounded-md border border-[#4cd97b40] p-3 text-xs">
+              <div className="mb-1 font-semibold text-[#4cd97b]">
+                {t('issue.guardTitle')}
+              </div>
+              <p className="opacity-70">
+                {issue.resolvedInRelease
+                  ? t('issue.guardAnchored', { release: issue.resolvedInRelease })
+                  : t('issue.guardUnanchored')}
+              </p>
+              <p className="mt-1 opacity-70">{t('issue.guardProbeHint')}</p>
+            </div>
+          )}
+
+          <div className="rounded-md border border-[var(--gds-border,#2a2a30)] p-3">
+            <label className="mb-1 block text-[11px] opacity-60">{t('issue.note')}</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              className="mb-2 w-full rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 text-xs"
+            />
+            <button
+              type="button"
+              disabled={busy || note.trim().length === 0}
+              onClick={() =>
+                act(async () => {
+                  await api.addNote(issue.id, note.trim());
+                  setNote('');
+                })
+              }
+              className="w-full rounded-md border border-[var(--gds-border,#2a2a30)] px-3 py-1 text-xs disabled:opacity-40"
+            >
+              {t('issue.addNote')}
+            </button>
+          </div>
+
+          {me.role === 'superadmin' && (
+            <AssignBox issue={issue} onDone={reload} />
+          )}
+        </div>
+      </aside>
     </div>
   );
 }
 
-function Cell({
-  label,
+function Section({
+  title,
+  collapsed,
   children,
 }: {
-  label: string;
+  title: string;
+  collapsed?: boolean;
   children: React.ReactNode;
 }) {
+  const [open, setOpen] = useState(!collapsed);
   return (
-    <div>
-      <p className="text-xs uppercase tracking-wide text-fg-subtle">
-        {label}
-      </p>
-      <div className="mt-1 text-sm">{children}</div>
+    <section className="mb-5">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider opacity-50 hover:opacity-80"
+      >
+        {open ? '▾' : '▸'} {title}
+      </button>
+      {open && children}
+    </section>
+  );
+}
+
+/// The signal timeline — a vertical, readable rendering of the last
+/// 30 seconds. This is the page's centerpiece; replay frames join it
+/// when the wireframe player lands.
+function Timeline({ signals }: { signals: Signal[] }) {
+  const rows = useMemo(() => [...signals].sort((a, b) => a.t - b.t), [signals]);
+  return (
+    <ol className="border-l border-[var(--gds-border,#2a2a30)] pl-4">
+      {rows.map((s, i) => (
+        <li key={i} className="relative mb-1.5 text-xs">
+          <span
+            className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full"
+            style={{ backgroundColor: signalColor(s.kind) }}
+          />
+          <span className="mr-2 inline-block w-12 text-right font-mono opacity-40">
+            {s.t.toFixed(1)}s
+          </span>
+          <span className="mr-2 font-mono text-[10px] uppercase opacity-60">{s.kind}</span>
+          <span className="font-mono opacity-80">{summarizeSignal(s)}</span>
+        </li>
+      ))}
+      <li className="relative text-xs font-semibold text-[#ff5d5d]">
+        <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-[#ff5d5d]" />
+        <span className="mr-2 inline-block w-12 text-right font-mono">0.0s</span>
+        <span>●</span>
+      </li>
+    </ol>
+  );
+}
+
+function signalColor(kind: string): string {
+  switch (kind) {
+    case 'nav':
+      return '#7fa7c9';
+    case 'tap':
+      return '#ffb340';
+    case 'http':
+      return '#b18cff';
+    case 'trace':
+      return '#4cd97b';
+    case 'freeze':
+      return '#ff5d5d';
+    default:
+      return '#8e8e93';
+  }
+}
+
+function summarizeSignal(s: Signal): string {
+  const d = s.data ?? {};
+  const parts = Object.entries(d)
+    .filter(([, v]) => v !== undefined && v !== null)
+    .slice(0, 4)
+    .map(([k, v]) => `${k}=${String(v)}`);
+  return parts.join(' ');
+}
+
+function summarizeActivity(body: Record<string, unknown>): string {
+  if (typeof body.text === 'string') return body.text;
+  if (typeof body.to === 'string') {
+    return body.inRelease ? `→ ${body.to} (${String(body.inRelease)})` : `→ ${body.to}`;
+  }
+  if (typeof body.in_release === 'string') return `↩ ${String(body.in_release)}`;
+  return JSON.stringify(body);
+}
+
+function OccRow({ row, active }: { row: OccurrenceRow; active: boolean }) {
+  return (
+    <div
+      className={`flex items-center gap-3 px-2 py-1.5 font-mono text-xs ${
+        active ? 'bg-[var(--gds-surface-raised,#1c1c22)]' : ''
+      }`}
+    >
+      <span className="opacity-40">{formatRelative(row.receivedAt)}</span>
+      <span>{row.platform}</span>
+      <span className="opacity-60">{row.release}</span>
+      <span className="opacity-40">{row.environment}</span>
+      {row.userKey && <span className="opacity-30">{row.userKey.slice(0, 8)}</span>}
     </div>
   );
 }
 
-function Comments({
-  issueId,
-  myUserId,
-}: {
-  issueId: string;
-  myUserId: string | null;
-}) {
-  // Derived from the client rather than restated here. This was a
-  // hand-copy of the response shape and it fell behind the moment the
-  // server started sending the author's email.
-  type Comment = Awaited<ReturnType<typeof api.listComments>>['comments'][number];
-  const [rows, setRows] = useState<Comment[]>([]);
-  const [text, setText] = useState('');
+function AssignBox({ issue, onDone }: { issue: IssueDetailT; onDone: () => void }) {
   const t = useT();
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    api
-      .listComments(issueId)
-      .then(r => setRows(r.comments))
-      .catch(() => {});
-  }, [issueId]);
-
-  async function post() {
-    if (!text.trim()) return;
-    setBusy(true);
-    try {
-      const c = await api.createComment(issueId, text.trim());
-      setRows(rs => [...rs, c]);
-      setText('');
-    } catch {
-      /* noop */
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function del(id: string) {
-    if (!confirm(t('crash.deleteComment'))) return;
-    try {
-      await api.deleteComment(issueId, id);
-      setRows(rs => rs.filter(r => r.id !== id));
-    } catch {
-      /* noop */
-    }
-  }
-
+  const { data } = useAsyncData(() => api.listUsers(), []);
   return (
-    <Card>
-      <CardHeader title={`${t('crash.comments')} (${rows.length})`} />
-      <CardBody>
-        <div className="space-y-2">
-          {rows.map(c => (
-            <div
-              key={c.id}
-              className="rounded border border-border p-2 text-xs"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs text-fg-subtle">
-                  {c.author_email ?? `${c.author_user_id.slice(0, 8)}…`} ·{' '}
-                  {formatRelative(c.created_at)}
-                </span>
-                {myUserId === c.author_user_id && (
-                  <button
-                    onClick={() => del(c.id)}
-                    className="text-xs text-fg-subtle hover:text-danger"
-                  >
-                    {t('action.delete')}
-                  </button>
-                )}
-              </div>
-              <p className="mt-1 whitespace-pre-wrap text-fg">
-                {c.body_md}
-              </p>
-            </div>
-          ))}
-          {myUserId && (
-            <div className="space-y-2 pt-2">
-              <textarea
-                value={text}
-                onChange={e => setText(e.target.value)}
-                placeholder={t('crash.addComment')}
-                className="w-full h-20 rounded border border-border p-2 text-xs"
-              />
-              <Button
-                size="sm"
-                onClick={post}
-                disabled={busy || !text.trim()}
-              >{t('action.post')}</Button>
-            </div>
-          )}
-        </div>
-      </CardBody>
-    </Card>
-  );
-}
-
-function Activity({ issueId }: { issueId: string }) {
-  const t = useT();
-  const [rows, setRows] = useState<
-    {
-      id: string;
-      actor_user_id: string | null;
-      kind: string;
-      created_at: string;
-    }[]
-  >([]);
-  useEffect(() => {
-    api
-      .listActivity(issueId)
-      .then(r => setRows(r.activity))
-      .catch(() => {});
-  }, [issueId]);
-
-  if (rows.length === 0) return null;
-  return (
-    <Card>
-      <CardHeader title={`${t('crash.activity')} (${rows.length})`} />
-      <CardBody>
-        <ul className="space-y-1 text-xs">
-          {rows.map(a => (
-            <li
-              key={a.id}
-              className="flex items-center justify-between text-fg-muted"
-            >
-              <span>
-                <Badge>{a.kind}</Badge>{' '}
-                {a.actor_user_id
-                  ? a.actor_user_id.slice(0, 8) + '…'
-                  : 'system'}
-              </span>
-              <span className="font-mono text-xs">
-                {formatRelative(a.created_at)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </CardBody>
-    </Card>
-  );
-}
-
-/** Which occurrence of this issue you are looking at. Same crash,
- *  different device / build / moment — and those differences are
- *  often the whole diagnosis. */
-function EventPicker({
-  events,
-  selected,
-  onSelect,
-}: {
-  events: EventRow[];
-  selected: string;
-  onSelect: (id: string) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {events.slice(0, 12).map(e => {
-        const active = e.id === selected;
-        return (
-          <button
-            key={e.id}
-            type="button"
-            onClick={() => onSelect(e.id)}
-            aria-current={active}
-            className={`inline-flex h-7 items-center rounded border px-2 font-mono text-xs transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-              active
-                ? 'border-accent text-fg'
-                : 'border-border text-fg-subtle hover:text-fg-muted'
-            }`}
-          >
-            {formatRelative(e.timestamp)}
-            <span className="ml-1.5 text-fg-subtle">{e.platform}</span>
-          </button>
-        );
-      })}
+    <div className="rounded-md border border-[var(--gds-border,#2a2a30)] p-3">
+      <label className="mb-1 block text-[11px] opacity-60">{t('issue.assignee')}</label>
+      <select
+        value={issue.assigneeUserId ?? ''}
+        onChange={(e) => {
+          void api
+            .assignIssue(issue.id, e.target.value === '' ? null : e.target.value)
+            .then(onDone);
+        }}
+        className="w-full rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 text-xs"
+      >
+        <option value="">{t('issue.unassigned')}</option>
+        {(data?.users ?? []).map((u) => (
+          <option key={u.id} value={u.id}>
+            {u.email}
+          </option>
+        ))}
+      </select>
     </div>
   );
+}
+
+function buildMarkdown(
+  issue: IssueDetailT,
+  payload:
+    | { error?: { type?: string; message?: string; stack?: Frame[] }; signals?: Signal[]; device?: Record<string, unknown> }
+    | undefined,
+  occ: OccurrenceRow[],
+): string {
+  const lines: string[] = [];
+  lines.push(`# ${issue.kind}: ${issue.title}`);
+  if (issue.messageSample) lines.push(`> ${issue.messageSample}`);
+  lines.push('');
+  lines.push(
+    `- Status: ${issue.status}${issue.regressedInRelease ? ` (REGRESSED in ${issue.regressedInRelease})` : ''}`,
+  );
+  lines.push(
+    `- Impact: ${issue.usersCount} users × up to ${issue.maxPerUser} · ${issue.eventCount} events`,
+  );
+  lines.push(`- Last release: ${issue.lastRelease || 'unknown'}`);
+  if (payload?.error?.stack) {
+    lines.push('', '## Stack trace', '```');
+    for (const f of payload.error.stack.slice(0, 40)) {
+      lines.push(
+        `${f.inApp ? '→' : ' '} ${f.function ?? '?'}  (${f.file ?? '?'}${f.line ? `:${f.line}` : ''})`,
+      );
+    }
+    lines.push('```');
+  }
+  if (payload?.signals?.length) {
+    lines.push('', '## What the user was doing');
+    for (const s of payload.signals) {
+      lines.push(`- ${s.t.toFixed(1)}s [${s.kind}] ${summarizeSignal(s)}`);
+    }
+  }
+  if (occ.length) {
+    lines.push('', `## Occurrences (${occ.length} recent)`);
+    for (const e of occ.slice(0, 10)) {
+      lines.push(`- ${e.receivedAt} ${e.platform} ${e.release}`);
+    }
+  }
+  lines.push(
+    '',
+    '---',
+    `When fixed: plant sentori.probe('<ref>') in the broken branch, note it here, and resolve anchored on the fixing release.`,
+  );
+  return lines.join('\n');
 }

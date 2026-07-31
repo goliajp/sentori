@@ -34,6 +34,11 @@ COPY self-hosted/ /src/self-hosted/
 
 WORKDIR /src/self-hosted/server
 RUN cargo build --release --bin sentori-server
+# Skeleton for the /data volume: distroless has no shell, so the
+# ownership must be baked in — a named volume adopts the image
+# path's owner on first creation, and root-owned /data would make
+# the nonroot server fail its blob-store init.
+RUN mkdir -p /data-skel/blobs
 
 # ── runtime: distroless cc (libc + libgcc only) ─────────────
 FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
@@ -42,6 +47,7 @@ COPY --from=builder /src/self-hosted/server/target/release/sentori-server /usr/l
 # Bundle the SPA. The server's fallback handler serves this
 # directory; SENTORI_WEBAPP_DIST env-var can override.
 COPY --from=webapp-builder /webapp/dist /app/webapp
+COPY --from=builder --chown=nonroot:nonroot /data-skel /data
 
 EXPOSE 8080
 USER nonroot

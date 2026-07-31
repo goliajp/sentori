@@ -24,7 +24,7 @@ pub async fn handle(
          FROM push_sends WHERE id = $1 AND project_id = $2",
     )
     .bind(send_id)
-    .bind(ctx.project_id.into_uuid())
+    .bind(ctx.project_id)
     .fetch_optional(&state.pool)
     .await;
 

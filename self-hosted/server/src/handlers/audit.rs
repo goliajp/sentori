@@ -1,88 +1,72 @@
-//! GET /v1/audit — K13 audit log query.
+//! GET /admin/api/audit — audit log query (superadmin only).
 
 use std::sync::Arc;
 
-use axum::Json;
-use axum::extract::{Query, State};
-use axum::http::StatusCode;
-use sentori_audit_event::AuditQuery;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use time::OffsetDateTime;
-use uuid::Uuid;
+use axum::{Extension, Json, extract::Query, extract::State, http::StatusCode};
+use serde::Deserialize;
+use serde_json::{Value, json};
+use sqlx::Row;
 
+use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
-#[derive(Deserialize, Default)]
-pub struct ListQuery {
-    pub project_id: Option<Uuid>,
-    pub actor_user_id: Option<Uuid>,
-    pub action: Option<String>,
-    pub limit: Option<u32>,
-    /// Server-side substring match on payload._ip. Lets ops grep
-    /// "show me everything from 198.51.100.*" without client filter
-    /// missing rows past the query LIMIT.
-    pub ip: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct AuditRow {
-    pub id: Uuid,
-    pub project_id: Option<Uuid>,
-    pub actor_user_id: Option<Uuid>,
-    pub action: String,
-    pub target_type: Option<String>,
-    pub target_id: Option<String>,
-    pub payload: Value,
-    #[serde(with = "time::serde::rfc3339")]
-    pub created_at: OffsetDateTime,
+#[derive(Deserialize)]
+pub struct AuditQuery {
+    #[serde(default)]
+    pub limit: Option<i64>,
+    #[serde(default)]
+    pub project_id: Option<uuid::Uuid>,
 }
 
 pub async fn list(
     State(state): State<Arc<AppState>>,
-    Query(q): Query<ListQuery>,
-) -> Result<Json<Vec<AuditRow>>, (StatusCode, String)> {
-    let mut aq = AuditQuery::default().with_limit(q.limit.unwrap_or(100));
-    if let Some(pid) = q.project_id {
-        aq = aq.with_project(sentori_workspace_identity::ProjectId::from_uuid(pid));
+    Extension(ctx): Extension<SessionContext>,
+    Query(q): Query<AuditQuery>,
+) -> (StatusCode, Json<Value>) {
+    if !ctx.role.is_superadmin() {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "superadmin_only" })),
+        );
     }
-    if let Some(uid) = q.actor_user_id {
-        aq = aq.with_actor(sentori_workspace_identity::UserId::from_uuid(uid));
+    let limit = q.limit.unwrap_or(100).clamp(1, 500);
+    let rows = sqlx::query(
+        "SELECT a.id, a.project_id, a.actor_user_id, u.email AS actor_email, \
+                a.action, a.target_type, a.target_id, a.payload, a.created_at \
+         FROM audit_logs a LEFT JOIN users u ON u.id = a.actor_user_id \
+         WHERE ($2::uuid IS NULL OR a.project_id = $2) \
+         ORDER BY a.created_at DESC LIMIT $1",
+    )
+    .bind(limit)
+    .bind(q.project_id)
+    .fetch_all(&state.pool)
+    .await;
+    match rows {
+        Ok(rows) => {
+            let out: Vec<Value> = rows
+                .iter()
+                .map(|r| {
+                    json!({
+                        "id": r.get::<uuid::Uuid, _>("id"),
+                        "projectId": r.get::<Option<uuid::Uuid>, _>("project_id"),
+                        "actorUserId": r.get::<Option<uuid::Uuid>, _>("actor_user_id"),
+                        "actorEmail": r.get::<Option<String>, _>("actor_email"),
+                        "action": r.get::<String, _>("action"),
+                        "targetType": r.get::<Option<String>, _>("target_type"),
+                        "targetId": r.get::<Option<String>, _>("target_id"),
+                        "payload": r.get::<Value, _>("payload"),
+                        "createdAt": crate::wire_time::rfc3339(r.get("created_at")),
+                    })
+                })
+                .collect();
+            (StatusCode::OK, Json(json!({ "entries": out })))
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "audit query failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "internal" })),
+            )
+        }
     }
-    if let Some(action) = q.action {
-        aq = aq.with_action(action);
-    }
-    let entries = state
-        .audit
-        .query(aq)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    let ip_filter = q.ip.as_deref().filter(|s| !s.is_empty());
-    Ok(Json(
-        entries
-            .into_iter()
-            .filter(|e| match ip_filter {
-                None => true,
-                Some(needle) => e
-                    .payload
-                    .get("_ip")
-                    .and_then(|v| v.as_str())
-                    .is_some_and(|ip| ip.contains(needle)),
-            })
-            .map(|e| AuditRow {
-                id: e.id,
-                project_id: e
-                    .project_id
-                    .map(sentori_workspace_identity::ProjectId::into_uuid),
-                actor_user_id: e
-                    .actor_user_id
-                    .map(sentori_workspace_identity::UserId::into_uuid),
-                action: e.action,
-                target_type: e.target_type,
-                target_id: e.target_id,
-                payload: e.payload,
-                created_at: e.created_at,
-            })
-            .collect(),
-    ))
 }

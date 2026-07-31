@@ -85,32 +85,6 @@ pub async fn symbolicate_payload(
     rewritten
 }
 
-/// Everything that has to happen to a payload before it is stored.
-///
-/// Two steps that look unrelated but share a reason to be here rather
-/// than at read time: symbolication because a later upload cannot fix
-/// an event already written, and the identity slice because it has to
-/// be taken before the event moves into ingest.
-///
-/// Returns `(frames_symbolicated, identity_slice)`.
-pub async fn prepare(
-    state: &crate::state::AppState,
-    project_id: Uuid,
-    release: &str,
-    payload: &mut Value,
-) -> (usize, Value) {
-    let n = symbolicate_payload(
-        &state.pool,
-        &state.attachments,
-        &state.source_maps,
-        project_id,
-        release,
-        payload,
-    )
-    .await;
-    (n, crate::identity_link::payload_slice(payload))
-}
-
 /// Symbolicate an error and every link in its `cause` chain.
 ///
 /// Recursive rather than iterative because a chain is a tree walk and

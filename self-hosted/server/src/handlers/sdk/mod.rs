@@ -11,25 +11,11 @@
 //! step 3+ replaces each stub body with the actual service-crate
 //! integration (event-pipeline / span-store / etc).
 
-pub mod control;
 pub mod deploys;
 pub mod events;
 pub mod events_attachments;
 pub mod events_batch;
-pub mod events_recent;
-pub mod heartbeat;
-pub mod metrics;
 pub mod push;
-pub mod quota;
-pub mod runtime_metrics;
-pub mod security_link;
-pub mod security_report;
-pub mod security_score;
-pub mod sessions;
-pub mod spans;
-pub mod spans_batch;
-pub mod track;
-pub mod user_reports;
 
 /// Reject a public token on an endpoint a shipped application has no
 /// business calling.
@@ -45,7 +31,7 @@ pub mod user_reports;
 pub(crate) fn require_admin_token(
     ctx: &sentori_ingest_token::IngestContext,
 ) -> Result<(), (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
-    if ctx.token_kind.is_admin() {
+    if ctx.scope == sentori_ingest_token::Scope::Api {
         return Ok(());
     }
     Err((

@@ -1,317 +1,138 @@
-// Per-project releases — list deploys + per-release sourcemap /
-// dsym / proguard artifact inventory.
+// Releases — "did this version ship healthy?" (design.md §11).
+// One row per release: the three symbolication lights (sourcemap /
+// dsym / proguard), backed by upload commands when a light is off.
+// Artifact gaps are most visible here, on purpose.
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useState } from 'react';
 
+import { useShell } from '../App';
+import { EmptyState, ErrorBanner, formatRelative } from '../components/ui';
 import { useT } from '../i18n';
-import { api, ReleaseArtifact, ReleaseRow } from '../lib/api';
-import {
-  Badge,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  DataTable,
-  EmptyState,
-  ErrorBanner,
-  PageHeader,
-  Select,
-  buttonClass,
-  formatNumber,
-  formatRelative,
-} from '../components/ui';
+import { api, type ArtifactRow, type ReleaseRow } from '../lib/api';
+import { useAsyncData } from '../lib/useAsyncData';
 
-export default function Releases() {
+export default function ReleasesPage() {
   const t = useT();
-  const { id: projectId } = useParams<{ id: string }>();
-  const [rows, setRows] = useState<ReleaseRow[]>([]);
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [artifacts, setArtifacts] = useState<Record<string, ReleaseArtifact[]>>(
-    {},
+  const { projects } = useShell();
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const active = projectId ?? projects[0]?.id ?? null;
+
+  const { data, error, loading, reload } = useAsyncData(
+    () => (active ? api.listReleases(active) : Promise.resolve({ releases: [] })),
+    [active],
   );
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [sdkToken, setSdkToken] = useState('');
-
-  async function create() {
-    if (!newName.trim() || !sdkToken.trim()) return;
-    try {
-      await api.createDeploy(
-        { name: newName.trim(), deploy_at: new Date().toISOString() },
-        sdkToken.trim(),
-      );
-      setNewName('');
-      setSdkToken('');
-      setShowCreate(false);
-      await refresh();
-    } catch (e) {
-      setError(String(e));
-    }
-  }
-
-  async function refresh() {
-    if (!projectId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await api.listReleases(projectId);
-      setRows(r.releases);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }
-  useEffect(() => {
-    refresh();
-  }, [projectId]);
-
-  async function expand(id: string) {
-    if (!projectId) return;
-    if (expanded === id) {
-      setExpanded(null);
-      return;
-    }
-    setExpanded(id);
-    if (!artifacts[id]) await loadArtifacts(id);
-  }
-
-  async function loadArtifacts(id: string) {
-    if (!projectId) return;
-    try {
-      const r = await api.listArtifacts(projectId, id);
-      setArtifacts(a => ({ ...a, [id]: r.artifacts }));
-    } catch (e) {
-      setError(String(e));
-    }
-  }
-
-  async function destroy(r: ReleaseRow) {
-    if (!confirm(t('releases.confirmDelete').replace('{name}', r.name)))
-      return;
-    try {
-      await api.deleteRelease(r.id);
-      await refresh();
-    } catch (e) {
-      setError(String(e));
-    }
-  }
-
-  if (!projectId) {
-    return <ErrorBanner>{t('common.missingProjectId')}</ErrorBanner>;
-  }
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title={t('releases.title')}
-        subtitle={t('releases.subtitle')}
-        actions={
-          <Button onClick={() => setShowCreate(!showCreate)} size="sm">
-            {showCreate ? t('action.cancel') : `+ ${t('releases.markShort')}`}
-          </Button>
-        }
-      />
+    <div className="mx-auto max-w-5xl px-6 py-5">
+      <div className="mb-4 flex items-center gap-3">
+        <h1 className="text-base font-semibold">{t('nav.releases')}</h1>
+        {projects.length > 1 && (
+          <select
+            value={active ?? ''}
+            onChange={(e) => setProjectId(e.target.value)}
+            className="rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 text-xs"
+          >
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
 
-      {showCreate && (
-        <Card>
-          <CardHeader title={t('releases.mark')} />
-          <CardBody>
-            <p className="text-xs text-fg-subtle mb-2">
-              Mints a release row via the public /v1/deploys endpoint.
-              Requires a project SDK token (st_pk_...).
-            </p>
-            <input
-              className="w-full rounded border border-border-strong bg-surface px-3 py-2 text-sm"
-              placeholder={t('releases.namePlaceholder')}
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
-            />
-            <input
-              type="password"
-              className="mt-2 w-full rounded border border-border-strong bg-surface px-3 py-2 text-sm font-mono"
-              placeholder={t('releases.tokenPlaceholder')}
-              value={sdkToken}
-              onChange={e => setSdkToken(e.target.value)}
-            />
-            <div className="mt-2 flex gap-2">
-              <Button onClick={create} size="sm">
-                Mark deployed
-              </Button>
-            </div>
-          </CardBody>
-        </Card>
+      {error && (
+        <ErrorBanner>
+          {t('releases.loadFailed')}{' '}
+          <button type="button" className="underline" onClick={reload}>
+            {t('common.retry')}
+          </button>
+        </ErrorBanner>
       )}
-      {error && <ErrorBanner>{error}</ErrorBanner>}
+      {loading && !data && <div className="py-16 text-center text-sm opacity-50">…</div>}
+      {data && data.releases.length === 0 && (
+        <EmptyState title={t('releases.emptyTitle')} hint={t('releases.emptyHint')} />
+      )}
 
-      <Card>
-        <CardHeader title={`${t('releases.title')} (${rows.length})`} />
-        <CardBody>
-          {loading ? (
-            <div className="py-8 text-center text-sm text-fg-subtle">Loading…</div>
-          ) : rows.length === 0 ? (
-            <EmptyState
-              title={t('releases.empty')}
-              hint={t('releases.emptyHint')}
-            />
+      <div className="space-y-1.5">
+        {(data?.releases ?? []).map((r) => (
+          <ReleaseRowView key={r.id} release={r} projectId={active ?? ''} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReleaseRowView({ release, projectId }: { release: ReleaseRow; projectId: string }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const { data } = useAsyncData(
+    () =>
+      open
+        ? api.listArtifacts(projectId, release.id)
+        : Promise.resolve({ artifacts: [] as ArtifactRow[] }),
+    [open, release.id],
+  );
+  const artifacts = data?.artifacts ?? [];
+  const kinds = new Set(artifacts.map((a) => a.kind));
+  const created = release.createdAt ?? release.created_at;
+
+  return (
+    <div className="rounded-lg border border-[var(--gds-border,#2a2a30)]">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-3 px-3 py-2 text-left"
+      >
+        <span className="min-w-0 flex-1 truncate font-mono text-sm">{release.name}</span>
+        <Light on={open ? kinds.has('sourcemap') : undefined} label="js" />
+        <Light on={open ? kinds.has('dsym') : undefined} label="ios" />
+        <Light on={open ? kinds.has('proguard') : undefined} label="android" />
+        {created && (
+          <span className="w-16 text-right font-mono text-[11px] opacity-40">
+            {formatRelative(created)}
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className="border-t border-[var(--gds-border,#2a2a30)] px-3 py-2">
+          {artifacts.length === 0 ? (
+            <div className="text-xs opacity-60">
+              <p>{t('releases.noArtifacts')}</p>
+              <code className="mt-1 block rounded bg-[var(--gds-surface-sunken,#121216)] p-2 font-mono text-[11px]">
+                sentori-cli upload sourcemap --release &quot;{release.name}&quot; --token
+                &lt;api-token&gt; &lt;map&gt;
+              </code>
+            </div>
           ) : (
-            <div className="space-y-2">
-              {rows.map(r => (
-                <div
-                  key={r.id}
-                  className="rounded border border-border bg-white"
-                >
-                  <div className="flex items-center justify-between p-3">
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => expand(r.id)}
-                        className="font-mono text-sm text-accent hover:underline"
-                      >
-                        {expanded === r.id ? '▼' : '▶'} {r.name}
-                      </button>
-                      {r.deploy_at && (
-                        <Badge tone="ok">deployed</Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-fg-subtle">
-                        {formatRelative(r.created_at)}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => destroy(r)}
-                      >{t('action.delete')}</Button>
-                    </div>
-                  </div>
-                  {expanded === r.id && (
-                    <div className="border-t border-border p-3">
-                      {/* The build that produced a release is the only
-                          thing that has its symbols, so uploading is
-                          attached to the release rather than living on
-                          a settings page somewhere. */}
-                      <ArtifactUpload
-                        projectId={projectId}
-                        releaseId={r.id}
-                        onDone={() => {
-                          setArtifacts(a => {
-                            const next = { ...a };
-                            delete next[r.id];
-                            return next;
-                          });
-                          void loadArtifacts(r.id);
-                        }}
-                      />
-                      {artifacts[r.id] ? (
-                        artifacts[r.id].length === 0 ? (
-                          <div className="py-2 text-center">
-                            <p className="text-sm text-fg-muted">
-                              {t('artifacts.none')}
-                            </p>
-                            <p className="mt-1 text-xs text-fg-subtle">
-                              {t('artifacts.noneHint')}
-                            </p>
-                          </div>
-                        ) : (
-                          <DataTable
-                            columns={[
-                              { key: 'kind', label: t('artifacts.kind') },
-                              { key: 'name', label: t('artifacts.name') },
-                              { key: 'size', label: t('artifacts.size') },
-                              { key: 'hash', label: t('artifacts.hash') },
-                              { key: 'when', label: t('artifacts.uploaded') },
-                            ]}
-                            rows={artifacts[r.id].map(a => ({
-                              key: a.id,
-                              kind: <Badge>{a.kind}</Badge>,
-                              name: a.name,
-                              size: formatNumber(a.size_bytes),
-                              hash: (
-                                <span className="font-mono text-xs">
-                                  {a.content_hash.slice(0, 12)}…
-                                </span>
-                              ),
-                              when: formatRelative(a.created_at),
-                            }))}
-                          />
-                        )
-                      ) : (
-                        <p className="text-xs text-fg-subtle">
-                          {t('common.loading')}
-                        </p>
-                      )}
-                    </div>
+            <div className="space-y-0.5">
+              {artifacts.map((a) => (
+                <div key={a.id} className="flex gap-3 font-mono text-xs">
+                  <span className="w-20 opacity-60">{a.kind}</span>
+                  <span className="min-w-0 flex-1 truncate">{a.name}</span>
+                  {a.size_bytes !== undefined && (
+                    <span className="opacity-40">{Math.round(a.size_bytes / 1024)} KB</span>
                   )}
                 </div>
               ))}
             </div>
           )}
-        </CardBody>
-      </Card>
+        </div>
+      )}
     </div>
   );
 }
 
-/**
- * Attach symbol files to a release.
- *
- * Kind is chosen rather than inferred from the extension: a `.map` is a
- * sourcemap and a `.txt` could be a proguard mapping or anything else,
- * and guessing wrong stores an artifact that silently never matches.
- */
-function ArtifactUpload({
-  projectId,
-  releaseId,
-  onDone,
-}: {
-  projectId: string;
-  releaseId: string;
-  onDone: () => void;
-}) {
-  const t = useT();
-  const [kind, setKind] = useState<
-    'sourcemap' | 'dsym' | 'proguard' | 'bundle'
-  >('sourcemap');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function pick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    // Clear immediately so re-picking the same file fires again.
-    e.target.value = '';
-    if (!file) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await api.uploadArtifact(projectId, releaseId, kind, file);
-      onDone();
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
+function Light({ on, label }: { on: boolean | undefined; label: string }) {
   return (
-    <div className="mb-3 flex items-center gap-2">
-      <Select
-        value={kind}
-        disabled={busy}
-        onChange={e => setKind(e.target.value as typeof kind)}
-      >
-        <option value="sourcemap">sourcemap</option>
-        <option value="dsym">dSYM</option>
-        <option value="proguard">proguard</option>
-        <option value="bundle">bundle</option>
-      </Select>
-      <label className={buttonClass('secondary', 'md')}>
-        {busy ? t('artifacts.uploading') : t('artifacts.upload')}
-        <input type="file" className="hidden" disabled={busy} onChange={pick} />
-      </label>
-      {error && <span className="text-xs text-danger">{error}</span>}
-    </div>
+    <span className="flex items-center gap-1 font-mono text-[10px] opacity-70">
+      <span
+        className="h-2 w-2 rounded-full"
+        style={{
+          backgroundColor: on === undefined ? '#8e8e9340' : on ? '#4cd97b' : '#ff5d5d',
+        }}
+      />
+      {label}
+    </span>
   );
 }

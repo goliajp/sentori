@@ -7,7 +7,7 @@
 // Best-effort and dev-only: any failure (Metro not running, timeout,
 // bad response) leaves the stack untouched. Never throws.
 
-import type { Frame, SentoriError } from '../types';
+import type { Frame, SentoriError } from '@goliapkg/sentori-core';
 
 const TIMEOUT_MS = 2000;
 
@@ -132,6 +132,7 @@ export async function symbolicateErrorViaMetro(
   err: SentoriError,
   opts: { url?: string } = {},
 ): Promise<void> {
+  if (!err.stack) return;
   const sym = await symbolicateStackViaMetro(err.stack, opts);
   if (sym) err.stack = sym;
   if (err.cause) await symbolicateErrorViaMetro(err.cause, opts);

@@ -1,4 +1,3 @@
-import type { AdminUpload } from './native-artifacts.js';
 type ToolHandler = (args: Record<string, unknown>, ctx: McpCtx) => Promise<unknown>;
 type ToolDef = {
     name: string;
@@ -6,7 +5,10 @@ type ToolDef = {
     inputSchema: Record<string, unknown>;
     handler: ToolHandler;
 };
-type McpCtx = AdminUpload;
+type McpCtx = {
+    apiUrl: string;
+    token: string;
+};
 /** Run the MCP server over stdio. Returns when stdin closes. */
 export declare function runMcpServer(ctx: McpCtx): Promise<void>;
 export declare function buildTools(): ToolDef[];

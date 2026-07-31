@@ -35,7 +35,7 @@ use crate::state::AppState;
 
 /// What a symbolicator can consume. Anything else is a typo, and
 /// storing it would mean an artifact that silently never matches.
-const KINDS: [&str; 4] = ["sourcemap", "dsym", "proguard", "bundle"];
+const KINDS: [&str; 3] = ["sourcemap", "dsym", "proguard"];
 
 /// 200 MB. A dSYM for a large app is tens of megabytes; a sourcemap is
 /// single-digit. The cap exists so a mistaken upload cannot fill the
@@ -51,23 +51,13 @@ pub async fn upload(
     Path((project_id, release_id)): Path<(Uuid, Uuid)>,
     multipart: Multipart,
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
-    super::tenant::guard_project(&state, ctx.workspace_id, project_id)
-        .await
-        .map_err(|(s, m)| (s, Json(json!({ "error": m }))))?;
+    super::admin::tokens::ensure_project_access(&state, &ctx, project_id).await?;
 
     let (kind, name, bytes) = read_upload(multipart)
         .await
         .map_err(|m| (StatusCode::BAD_REQUEST, Json(json!({ "error": m }))))?;
 
-    store(
-        &state,
-        ctx.workspace_id.into_uuid(),
-        release_id,
-        kind,
-        name,
-        &bytes,
-    )
-    .await
+    store(&state, release_id, kind, name, &bytes).await
 }
 
 /// `POST /v1/releases/{release}/artifacts`
@@ -110,12 +100,11 @@ pub async fn upload_by_release_name(
     // Same UPSERT `/v1/deploys` uses, so an upload before the deploy
     // marker and a deploy marker before an upload land on one row.
     let release_id: Uuid = sqlx::query_scalar(
-        "INSERT INTO releases (id, workspace_id, project_id, name, deploy_at) \
-         VALUES (gen_random_uuid(), $1, $2, $3, now()) \
+        "INSERT INTO releases (id, project_id, name) \
+         VALUES (gen_random_uuid(), $1, $2) \
          ON CONFLICT (project_id, name) DO UPDATE SET name = EXCLUDED.name \
          RETURNING id",
     )
-    .bind(ctx.workspace_id)
     .bind(ctx.project_id)
     .bind(&release)
     .fetch_one(&state.pool)
@@ -127,15 +116,7 @@ pub async fn upload_by_release_name(
         )
     })?;
 
-    store(
-        &state,
-        ctx.workspace_id.into_uuid(),
-        release_id,
-        kind,
-        name,
-        &bytes,
-    )
-    .await
+    store(&state, release_id, kind, name, &bytes).await
 }
 
 /// Blob + row. Shared so the two routes cannot drift into storing
@@ -143,7 +124,6 @@ pub async fn upload_by_release_name(
 /// uploaded them.
 async fn store(
     state: &AppState,
-    workspace_id: Uuid,
     release_id: Uuid,
     kind: String,
     name: String,
@@ -156,23 +136,19 @@ async fn store(
         )
     })?;
 
-    // The table's unique key is (release_id, name), so a re-upload
-    // after a failed ship replaces rather than accumulating
+    // The table's unique key is (release_id, kind, name), so a
+    // re-upload after a failed ship replaces rather than accumulating
     // near-duplicates a symbolicator would have to choose between.
     let row = sqlx::query(
         "INSERT INTO release_artifacts \
-           (id, workspace_id, release_id, kind, name, content_hash, blob_path, \
-            uncompressed_size_bytes, created_at) \
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $5, $6, now()) \
-         ON CONFLICT (release_id, name) DO UPDATE \
-           SET kind = EXCLUDED.kind, \
-               content_hash = EXCLUDED.content_hash, \
-               blob_path = EXCLUDED.blob_path, \
-               uncompressed_size_bytes = EXCLUDED.uncompressed_size_bytes, \
+           (id, release_id, kind, name, content_hash, size_bytes) \
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5) \
+         ON CONFLICT (release_id, kind, name) DO UPDATE \
+           SET content_hash = EXCLUDED.content_hash, \
+               size_bytes = EXCLUDED.size_bytes, \
                created_at = now() \
          RETURNING id",
     )
-    .bind(workspace_id)
     .bind(release_id)
     .bind(&kind)
     .bind(&name)

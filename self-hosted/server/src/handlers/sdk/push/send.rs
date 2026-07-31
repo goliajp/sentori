@@ -91,13 +91,12 @@ pub async fn handle(
         // should add the unique index out-of-band.
         let result = sqlx::query(
             "INSERT INTO push_sends \
-             (id, workspace_id, project_id, token_id, provider, payload, status, idempotency_key, campaign_id, template_id) \
+             (id, project_id, token_id, provider, payload, status, idempotency_key, campaign_id, template_id) \
              VALUES ($1, $2, $3, $4, $5, $6, 'queued', $7, $8, $9) \
              RETURNING id",
         )
         .bind(id)
-        .bind(ctx.workspace_id.into_uuid())
-        .bind(ctx.project_id.into_uuid())
+        .bind(ctx.project_id)
         .bind(token_id)
         .bind(&provider)
         .bind(&body.payload)
@@ -122,7 +121,6 @@ pub async fn handle(
     }
 
     info!(
-        workspace_id = %ctx.workspace_id,
         project_id = %ctx.project_id,
         queued,
         "push.send queued",
@@ -163,7 +161,7 @@ async fn resolve_targets(
             "SELECT id, provider FROM device_tokens \
              WHERE project_id = $1 AND revoked_at IS NULL AND id = $2",
         )
-        .bind(ctx.project_id.into_uuid())
+        .bind(ctx.project_id)
         .bind(tid)
         .fetch_optional(&state.pool)
         .await
@@ -178,7 +176,7 @@ async fn resolve_targets(
             "SELECT id, provider FROM device_tokens \
              WHERE project_id = $1 AND revoked_at IS NULL AND native_token = $2",
         )
-        .bind(ctx.project_id.into_uuid())
+        .bind(ctx.project_id)
         .bind(nt)
         .fetch_optional(&state.pool)
         .await
@@ -194,7 +192,7 @@ async fn resolve_targets(
              JOIN device_topics tt ON tt.device_token_id = dt.id \
              WHERE dt.project_id = $1 AND dt.revoked_at IS NULL AND tt.topic = $2",
         )
-        .bind(ctx.project_id.into_uuid())
+        .bind(ctx.project_id)
         .bind(topic)
         .fetch_all(&state.pool)
         .await

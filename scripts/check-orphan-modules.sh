@@ -30,10 +30,8 @@ import sys
 # works.
 ROOTS = [
     "self-hosted/server/src",
-    "server/src",
     "cli/src",
     "saas/server/src",
-    "migrate-tool/src",
     "wasm/score/src",
 ]
 

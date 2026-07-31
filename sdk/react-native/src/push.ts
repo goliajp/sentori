@@ -21,9 +21,8 @@
 //      buffered events while the app is foreground. Pauses on
 //      background, resumes on active, per the perf iron rule.
 
-import { addBreadcrumb, logger } from '@goliapkg/sentori-core'
+import { logger, pushSignal } from '@goliapkg/sentori-core'
 
-import { track } from './track.js'
 // AppState is RN-only; we treat it dynamically so the SDK keeps
 // importing cleanly under Bun / web.
 type AppStateModule = {
@@ -318,13 +317,11 @@ function autoCorrelate(
   // Breadcrumb buffer: O(1) in-memory push. Tag both event types
   // ('received' vs 'opened') so a later captureException shows
   // whether the user actually saw the push.
-  addBreadcrumb('push', { body, msgId, opened: eventType === 'opened', provider, title })
+  pushSignal('push', { body: undefined, msgId, opened: eventType === 'opened', provider, title })
 
   // Track event: reuses the existing SDK event pipeline. Two
   // distinct names so dashboards can separate delivery from open.
   const trackName = eventType === 'opened' ? 'sentori.push.opened' : 'sentori.push.received'
-  track(trackName, { msgId, provider })
-
   // Enqueue ack — batched, see drainAckQueue.
   enqueueAck(msgId)
 }

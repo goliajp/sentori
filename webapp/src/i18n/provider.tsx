@@ -35,7 +35,15 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     () => ({
       locale,
       setLocale,
-      t: (key: MessageKey) => CATALOGUES[locale][key],
+      t: (key: MessageKey, params?: Record<string, string>) => {
+        let out: string = CATALOGUES[locale][key];
+        if (params) {
+          for (const [k, v] of Object.entries(params)) {
+            out = out.replaceAll(`{${k}}`, v);
+          }
+        }
+        return out;
+      },
     }),
     [locale, setLocale],
   );

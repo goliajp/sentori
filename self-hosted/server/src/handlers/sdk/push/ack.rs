@@ -36,7 +36,7 @@ pub async fn handle(
     )
     .bind(body.ack_session_id.as_deref())
     .bind(send_id)
-    .bind(ctx.project_id.into_uuid())
+    .bind(ctx.project_id)
     .execute(&state.pool)
     .await;
 

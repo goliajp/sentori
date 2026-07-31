@@ -33,7 +33,7 @@ pub async fn handle(
             "DELETE FROM push_tokens \
              WHERE project_id = $1 AND native_token = $2",
         )
-        .bind(ctx.project_id.into_uuid())
+        .bind(ctx.project_id)
         .bind(&handle)
         .execute(&state.pool)
         .await
@@ -44,7 +44,6 @@ pub async fn handle(
     match result {
         Ok(()) => {
             info!(
-                workspace_id = %ctx.workspace_id,
                 project_id = %ctx.project_id,
                 %handle,
                 "push.revoke_token deleted",
@@ -52,7 +51,7 @@ pub async fn handle(
             (StatusCode::ACCEPTED, Json(json!({ "status": "revoked" })))
         }
         Err(e) => {
-            warn!(workspace_id = %ctx.workspace_id, error = %e, "push.revoke_token db_error");
+            warn!(error = %e, "push.revoke_token db_error");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({ "error": "internal" })),

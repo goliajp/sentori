@@ -46,8 +46,8 @@ pub fn spawn(pool: PgPool) {
                 Err(e) => warn!(error = %e, "archive worker pass failed"),
             }
             match prune_expired_auth(&pool).await {
-                Ok((sessions, email, resets, invites)) => {
-                    info!(sessions, email, resets, invites, "auth prune pass");
+                Ok((sessions, resets)) => {
+                    info!(sessions, resets, "auth prune pass");
                 }
                 Err(e) => warn!(error = %e, "auth prune pass failed"),
             }
@@ -89,18 +89,11 @@ async fn run_once(
     Ok((sends, logs))
 }
 
-/// DELETE anything whose `expires_at` has already passed in the four
+/// DELETE anything whose `expires_at` has already passed in the two
 /// tables the auth flow relies on. Returns the row counts so the log
 /// line names them; a run with zero everywhere is a healthy default.
-async fn prune_expired_auth(pool: &PgPool) -> Result<(u64, u64, u64, u64), sqlx::Error> {
-    // Four small DELETEs on `expires_at < now()`. Each table is
-    // separately indexed on expires_at at scales that matter, and a
-    // single UNION would have to name them anyway.
+async fn prune_expired_auth(pool: &PgPool) -> Result<(u64, u64), sqlx::Error> {
     let sessions = sqlx::query("DELETE FROM auth_sessions WHERE expires_at < now()")
-        .execute(pool)
-        .await?
-        .rows_affected();
-    let email = sqlx::query("DELETE FROM email_verifications WHERE expires_at < now()")
         .execute(pool)
         .await?
         .rows_affected();
@@ -108,16 +101,7 @@ async fn prune_expired_auth(pool: &PgPool) -> Result<(u64, u64, u64, u64), sqlx:
         .execute(pool)
         .await?
         .rows_affected();
-    // Accepted invites carry `accepted_at` and are kept for audit; a
-    // row with `expires_at < now()` AND no `accepted_at` is a bare
-    // never-consumed invite and safe to drop.
-    let invites = sqlx::query(
-        "DELETE FROM workspace_invites WHERE expires_at < now() AND accepted_at IS NULL",
-    )
-    .execute(pool)
-    .await?
-    .rows_affected();
-    Ok((sessions, email, resets, invites))
+    Ok((sessions, resets))
 }
 
 fn env_enabled() -> bool {

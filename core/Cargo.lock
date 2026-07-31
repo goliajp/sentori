@@ -208,7 +208,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00bdb5da18dac48ca2cc7cd4a98e533e8635a58e2361d13a1a4ee3888e0d72f1"
 dependencies = [
  "aws-lc-sys",
- "untrusted 0.7.1",
  "zeroize",
 ]
 
@@ -232,7 +231,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "31b698c5f9a010f6573133b09e0de5408834d0c82f8d7475a89fc1867a71cd90"
 dependencies = [
  "axum-core",
- "axum-macros",
  "bytes",
  "form_urlencoded",
  "futures-util",
@@ -276,40 +274,6 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "tracing",
-]
-
-[[package]]
-name = "axum-extra"
-version = "0.10.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9963ff19f40c6102c76756ef0a46004c0d58957d87259fc9208ff8441c12ab96"
-dependencies = [
- "axum",
- "axum-core",
- "bytes",
- "cookie",
- "futures-util",
- "headers",
- "http",
- "http-body",
- "http-body-util",
- "mime",
- "pin-project-lite",
- "rustversion",
- "serde_core",
- "tower-layer",
- "tower-service",
-]
-
-[[package]]
-name = "axum-macros"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7aa268c23bfbbd2c4363b9cd302a4f504fb2a9dfe7e3451d66f35dd392e20aca"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -694,17 +658,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
 
 [[package]]
-name = "cookie"
-version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ddef33a339a91ea89fb53151bd0a4689cfce27055c291dfa69945475d22c747"
-dependencies = [
- "percent-encoding",
- "time",
- "version_check",
-]
-
-[[package]]
 name = "core-foundation"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -877,33 +830,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "curve25519-dalek"
-version = "4.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97fb8b7c4503de7d6ae7b42ab72a5a59857b4c937ec27a3d4539dba95b5ab2be"
-dependencies = [
- "cfg-if",
- "cpufeatures 0.2.17",
- "curve25519-dalek-derive",
- "digest",
- "fiat-crypto",
- "rustc_version",
- "subtle",
- "zeroize",
-]
-
-[[package]]
-name = "curve25519-dalek-derive"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f46882e17999c6cc590af592290432be3bce0428cb0d5f8b6715e4dc7b383eb3"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
 name = "darling"
 version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1026,31 +952,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
-name = "ed25519"
-version = "2.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "115531babc129696a58c64a4fef0a8bf9e9698629fb97e9e40767d235cfbcd53"
-dependencies = [
- "pkcs8",
- "signature",
-]
-
-[[package]]
-name = "ed25519-dalek"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70e796c081cee67dc755e1a36a0a172b897fab85fc3f6bc48307991f64e4eca9"
-dependencies = [
- "curve25519-dalek",
- "ed25519",
- "rand_core 0.6.4",
- "serde",
- "sha2",
- "subtle",
- "zeroize",
-]
-
-[[package]]
 name = "either"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1154,12 +1055,6 @@ dependencies = [
  "rand 0.10.2",
  "web-time",
 ]
-
-[[package]]
-name = "fiat-crypto"
-version = "0.2.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 
 [[package]]
 name = "find-msvc-tools"
@@ -1468,30 +1363,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7382cf6263419f2d8df38c55d7da83da5c18aef87fc7a7fc1fb1e344edfe14c1"
 dependencies = [
  "hashbrown 0.15.5",
-]
-
-[[package]]
-name = "headers"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3314d5adb5d94bcdf56771f2e50dbbc80bb4bdf88967526706205ac9eff24eb"
-dependencies = [
- "base64",
- "bytes",
- "headers-core",
- "http",
- "httpdate",
- "mime",
- "sha1",
-]
-
-[[package]]
-name = "headers-core"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54b4a22553d4242c49fddb9ba998a99962b5cc6f22cb5a3482bec22522403ce4"
-dependencies = [
- "http",
 ]
 
 [[package]]
@@ -1994,24 +1865,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jsonwebtoken"
-version = "10.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eba32bfb4ffdeaca3e34431072faf01745c9b26d25504aa7a6cf5684334fc4fc"
-dependencies = [
- "aws-lc-rs",
- "base64",
- "getrandom 0.2.17",
- "js-sys",
- "pem",
- "serde",
- "serde_json",
- "signature",
- "simple_asn1",
- "zeroize",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2445,16 +2298,6 @@ dependencies = [
  "base64ct",
  "rand_core 0.6.4",
  "subtle",
-]
-
-[[package]]
-name = "pem"
-version = "3.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d30c53c26bc5b31a98cd02d20f25a7c8567146caf63ed593a9d87b2775291be"
-dependencies = [
- "base64",
- "serde_core",
 ]
 
 [[package]]
@@ -3015,7 +2858,7 @@ dependencies = [
  "cfg-if",
  "getrandom 0.2.17",
  "libc",
- "untrusted 0.9.0",
+ "untrusted",
  "windows-sys 0.52.0",
 ]
 
@@ -3050,15 +2893,6 @@ name = "rustc-hash"
 version = "2.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b1e7f9a428571be2dc5bc0505c13fb6bf936822b894ec87abf8a08a4e51742d"
-
-[[package]]
-name = "rustc_version"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfcb3a22ef46e85b45de6ee7e79d063319ebb6594faafcf1c225ea92ab6e9b92"
-dependencies = [
- "semver",
-]
 
 [[package]]
 name = "rustix"
@@ -3147,7 +2981,7 @@ dependencies = [
  "aws-lc-rs",
  "ring",
  "rustls-pki-types",
- "untrusted 0.9.0",
+ "untrusted",
 ]
 
 [[package]]
@@ -3255,30 +3089,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "semver"
-version = "1.0.28"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
-
-[[package]]
-name = "sentori-alert-rule"
-version = "0.1.0"
-dependencies = [
- "proptest",
- "sentori-workspace-identity",
- "serde",
- "serde_json",
- "sqlx",
- "testcontainers",
- "testcontainers-modules",
- "thiserror 2.0.19",
- "time",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "sentori-argon2-password"
 version = "0.1.0"
 dependencies = [
@@ -3302,91 +3112,6 @@ dependencies = [
  "thiserror 2.0.19",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "sentori-audit-event"
-version = "0.1.0"
-dependencies = [
- "proptest",
- "sentori-workspace-identity",
- "serde",
- "serde_json",
- "sqlx",
- "testcontainers",
- "testcontainers-modules",
- "thiserror 2.0.19",
- "time",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "sentori-auth-session"
-version = "0.1.0"
-dependencies = [
- "axum",
- "axum-extra",
- "base64",
- "getrandom 0.2.17",
- "http",
- "http-body-util",
- "proptest",
- "sentori-argon2-password",
- "sentori-cookie-session",
- "sentori-workspace-identity",
- "serde",
- "serde_json",
- "sha2",
- "sqlx",
- "subtle",
- "testcontainers",
- "testcontainers-modules",
- "thiserror 2.0.19",
- "time",
- "tokio",
- "tower",
- "tracing",
- "uuid",
- "zeroize",
-]
-
-[[package]]
-name = "sentori-billing"
-version = "0.1.0"
-dependencies = [
- "proptest",
- "sentori-workspace-identity",
- "serde",
- "sqlx",
- "testcontainers",
- "testcontainers-modules",
- "thiserror 2.0.19",
- "time",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "sentori-cert-monitor"
-version = "0.1.0"
-dependencies = [
- "proptest",
- "reqwest",
- "sentori-workspace-identity",
- "serde",
- "serde_json",
- "sqlx",
- "testcontainers",
- "testcontainers-modules",
- "thiserror 2.0.19",
- "time",
- "tokio",
- "tracing",
- "urlencoding",
- "uuid",
 ]
 
 [[package]]
@@ -3418,26 +3143,6 @@ dependencies = [
  "ouroboros",
  "proptest",
  "thiserror 2.0.19",
-]
-
-[[package]]
-name = "sentori-event-pipeline"
-version = "0.1.0"
-dependencies = [
- "proptest",
- "sentori-event-ringbuffer",
- "sentori-issue-fingerprint",
- "sentori-workspace-identity",
- "serde",
- "serde_json",
- "sqlx",
- "testcontainers",
- "testcontainers-modules",
- "thiserror 2.0.19",
- "time",
- "tokio",
- "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -3480,33 +3185,12 @@ dependencies = [
  "hex",
  "http",
  "rand 0.8.7",
- "sentori-workspace-identity",
  "serde",
  "sha2",
  "sqlx",
  "thiserror 2.0.19",
  "time",
  "tower",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "sentori-integration-traits"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "proptest",
- "reqwest",
- "sentori-workspace-identity",
- "serde",
- "serde_json",
- "sqlx",
- "testcontainers",
- "testcontainers-modules",
- "thiserror 2.0.19",
- "time",
- "tokio",
  "tracing",
  "uuid",
 ]
@@ -3523,43 +3207,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sentori-issue-store"
-version = "0.1.0"
-dependencies = [
- "base64",
- "proptest",
- "sentori-event-pipeline",
- "sentori-workspace-identity",
- "serde",
- "serde_json",
- "sqlx",
- "testcontainers",
- "testcontainers-modules",
- "thiserror 2.0.19",
- "time",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "sentori-license-jwt"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "ed25519-dalek",
- "hex",
- "jsonwebtoken",
- "proptest",
- "rand 0.8.7",
- "serde",
- "serde_json",
- "thiserror 2.0.19",
- "time",
- "uuid",
-]
-
-[[package]]
 name = "sentori-notifier"
 version = "0.1.0"
 dependencies = [
@@ -3567,7 +3214,6 @@ dependencies = [
  "lettre",
  "proptest",
  "reqwest",
- "sentori-workspace-identity",
  "serde",
  "serde_json",
  "sqlx",
@@ -3617,7 +3263,6 @@ dependencies = [
  "proptest",
  "sentori-rate-limiter",
  "sentori-secrets-vault",
- "sentori-workspace-identity",
  "serde",
  "serde_json",
  "sqlx",
@@ -3637,67 +3282,6 @@ dependencies = [
  "criterion",
  "proptest",
  "thiserror 2.0.19",
-]
-
-[[package]]
-name = "sentori-replay-store"
-version = "0.1.0"
-dependencies = [
- "flate2",
- "proptest",
- "regex",
- "sentori-attachment-store",
- "sentori-event-pipeline",
- "sentori-issue-store",
- "sentori-workspace-identity",
- "serde",
- "serde_json",
- "sqlx",
- "tempfile",
- "testcontainers",
- "testcontainers-modules",
- "thiserror 2.0.19",
- "time",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "sentori-runtime-metrics"
-version = "0.1.0"
-dependencies = [
- "proptest",
- "sentori-workspace-identity",
- "serde",
- "serde_json",
- "sha2",
- "sqlx",
- "testcontainers",
- "testcontainers-modules",
- "thiserror 2.0.19",
- "time",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "sentori-saved-view"
-version = "0.1.0"
-dependencies = [
- "proptest",
- "sentori-workspace-identity",
- "serde",
- "serde_json",
- "sqlx",
- "testcontainers",
- "testcontainers-modules",
- "thiserror 2.0.19",
- "time",
- "tokio",
- "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -3725,77 +3309,6 @@ dependencies = [
  "proptest",
  "sourcemap",
  "thiserror 2.0.19",
-]
-
-[[package]]
-name = "sentori-span-store"
-version = "0.1.0"
-dependencies = [
- "proptest",
- "sentori-issue-store",
- "sentori-workspace-identity",
- "serde",
- "serde_json",
- "sqlx",
- "testcontainers",
- "testcontainers-modules",
- "thiserror 2.0.19",
- "time",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "sentori-stripe-webhook-verify"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "hex",
- "hmac",
- "proptest",
- "sha2",
- "subtle",
- "thiserror 2.0.19",
-]
-
-[[package]]
-name = "sentori-tenant-scoping"
-version = "0.1.0"
-dependencies = [
- "proptest",
- "sentori-workspace-identity",
- "serde",
- "serde_json",
- "sqlx",
- "testcontainers",
- "testcontainers-modules",
- "thiserror 2.0.19",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "sentori-workspace-identity"
-version = "0.1.0"
-dependencies = [
- "base64",
- "getrandom 0.2.17",
- "proptest",
- "serde",
- "serde_json",
- "sha2",
- "sqlx",
- "subtle",
- "testcontainers",
- "testcontainers-modules",
- "thiserror 2.0.19",
- "time",
- "tokio",
- "tracing",
- "uuid",
- "zeroize",
 ]
 
 [[package]]
@@ -3966,18 +3479,6 @@ name = "simd-adler32"
 version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a219298ac11a56ea9a6d2120044824d6f01aeb034955e7af7bc16858527deea"
-
-[[package]]
-name = "simple_asn1"
-version = "0.6.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d585997b0ac10be3c5ee635f1bab02d512760d14b7c468801ac8a01d9ae5f1d"
-dependencies = [
- "num-bigint",
- "num-traits",
- "thiserror 2.0.19",
- "time",
-]
 
 [[package]]
 name = "slab"
@@ -4764,12 +4265,6 @@ dependencies = [
 
 [[package]]
 name = "untrusted"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
-
-[[package]]
-name = "untrusted"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
@@ -4813,12 +4308,6 @@ dependencies = [
  "serde",
  "serde_derive",
 ]
-
-[[package]]
-name = "urlencoding"
-version = "2.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "daf8dba3b7eb870caf1ddeed7bc9d2a049f3cfdfae7cb521b087cc33ae4c49da"
 
 [[package]]
 name = "utf8-zero"

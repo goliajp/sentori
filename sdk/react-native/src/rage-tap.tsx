@@ -1,22 +1,24 @@
-// v0.9.0 #12 — rage-tap / multi-click detection.
+// rage_tap — the first detected warn scenario (design.md §3,
+// category A: 「我按了没反应/反复按」).
 //
-// Wrap your app root (typically next to ErrorBoundary) with
-// `<sentori.RageTapCapture>{children}</sentori.RageTapCapture>`.
-// We listen to bubble-phase `onTouchEnd` and emit a `ui.multiClick`
-// breadcrumb when the same native target receives ≥ 3 taps within
-// 800 ms. Pure observation — no event capture, no gesture
-// interference; existing Touchables / Pressables / GestureHandler
-// continue to fire normally.
+// Wrap the app root (next to ErrorBoundary) with
+// `<RageTapCapture>{children}</RageTapCapture>`. Bubble-phase
+// `onTouchEnd` only — pure observation, no gesture interference.
+//
+// Mini-spec: ≥3 taps on the same native target within 800 ms ⇒ one
+// `warn` event, scenario `rage_tap`, surface = current screen +
+// target id, plus a signal-ring entry. Per-target cooldown resets
+// after firing so a frustrated 10-tap burst is one event, not four.
 
 import React, { useCallback, useRef } from 'react';
 import { View, type GestureResponderEvent, type ViewProps } from 'react-native';
 
-import { addBreadcrumb } from './breadcrumbs';
-import {
-  RAGE_THRESHOLD,
-  RAGE_WINDOW_MS,
-  recordTap,
-} from './rage-tap-detector';
+import { pushSignal } from '@goliapkg/sentori-core';
+
+import { getConfig } from './config';
+import { currentScreen } from './navigation';
+import { RAGE_THRESHOLD, RAGE_WINDOW_MS, recordTap } from './rage-tap-detector';
+import { warnDetected } from './verbs';
 
 export function RageTapCapture({
   children,
@@ -25,18 +27,19 @@ export function RageTapCapture({
   const recent = useRef<Map<number, number[]>>(new Map());
 
   const onTouchEnd = useCallback((e: GestureResponderEvent) => {
-    const target = e.nativeEvent?.target;
-    if (typeof target !== 'number') return;
-    if (recordTap(recent.current, target, Date.now())) {
-      addBreadcrumb({
-        type: 'user',
-        data: {
-          kind: 'ui.multiClick',
-          target: String(target),
-          taps: RAGE_THRESHOLD,
-          windowMs: RAGE_WINDOW_MS,
-        },
-      });
+    try {
+      const target = e.nativeEvent?.target;
+      if (typeof target !== 'number') return;
+      pushSignal('tap', { target });
+      if (!recordTap(recent.current, target, Date.now())) return;
+      if (getConfig()?.detect.rageTap === false) return;
+      warnDetected(
+        'rage_tap',
+        { screen: currentScreen(), element: String(target) },
+        { taps: RAGE_THRESHOLD, windowMs: RAGE_WINDOW_MS },
+      );
+    } catch {
+      // A detector bug must never reach the host's touch pipeline.
     }
   }, []);
 

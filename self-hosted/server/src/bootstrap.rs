@@ -1,102 +1,93 @@
-//! Env-driven first-owner + default-workspace bootstrap.
+//! Env-declared owner bootstrap.
 //!
-//! On first boot:
-//! 1. Ensure the default `workspaces` row exists (self-hosted is
-//!    single-workspace; the row is identified by a constant
-//!    `DEFAULT_WORKSPACE_ID` UUID so re-runs are idempotent).
-//! 2. Initialise the workspace's billing row at Free plan.
-//! 3. If no owner exists yet, read
-//!    `SENTORI_BOOTSTRAP_OWNER_EMAIL` + `SENTORI_BOOTSTRAP_OWNER_PASSWORD`
-//!    and create the initial Owner.
+//! The owner (superadmin) is configuration, not registration
+//! (design.md §9-10): every boot reconciles the `users` table
+//! against `SENTORI_OWNER_EMAIL` / `SENTORI_OWNER_PASSWORD`.
 //!
-//! Idempotent — second-and-later boots see the workspace +
-//! owner already there and skip.
+//! Reconciliation rules:
+//! - No superadmin exists → create one from env. If the password
+//!   env is absent, generate a random one and print it to the log
+//!   once (the Grafana move) — `docker compose up` stays one-shot.
+//! - A superadmin exists with a different email → update the email
+//!   in place. Declarative: the env var is the source of truth.
+//! - The password env NEVER overwrites an existing hash. Otherwise
+//!   every restart would silently reset the owner's password to
+//!   whatever stale value sits in the compose file.
+//!
+//! There is no self-signup in this product; admins are created by
+//! the owner through the dashboard. This file is the only account
+//! creation path that exists outside it.
 
-use sentori_billing::BillingService;
-use sentori_workspace_identity::{Identity, Role, WorkspaceId, ensure_workspace};
 use sqlx::PgPool;
 use tracing::{info, warn};
 use uuid::Uuid;
 
-/// The constant workspace_id used by every self-hosted
-/// deployment. SaaS deployments mint per-tenant workspace ids;
-/// self-hosted always uses this one so dump/restore between
-/// self-hosted instances round-trips trivially.
-///
-/// UUIDv4 "00000000-0000-4000-8000-000000000001" — explicitly
-/// versioned so it can never collide with a UUIDv7 mint.
-pub const DEFAULT_WORKSPACE_ID: Uuid = Uuid::from_u128(0x00000000_0000_4000_8000_000000000001);
+pub async fn ensure_owner(pool: &PgPool) -> anyhow::Result<()> {
+    let email = read_env("SENTORI_OWNER_EMAIL");
 
-/// Return the default workspace id as a typed [`WorkspaceId`].
-#[must_use]
-pub const fn default_workspace_id() -> WorkspaceId {
-    WorkspaceId::from_uuid(DEFAULT_WORKSPACE_ID)
+    let existing: Option<(Uuid, String)> =
+        sqlx::query_as("SELECT id, email FROM users WHERE role = 'superadmin' LIMIT 1")
+            .fetch_optional(pool)
+            .await?;
+
+    match (existing, email) {
+        (Some((id, current)), Some(wanted)) => {
+            if !current.eq_ignore_ascii_case(&wanted) {
+                sqlx::query("UPDATE users SET email = $1 WHERE id = $2")
+                    .bind(&wanted)
+                    .bind(id)
+                    .execute(pool)
+                    .await?;
+                info!(from = %current, to = %wanted, "owner email reconciled from env");
+            }
+            Ok(())
+        }
+        (Some(_), None) => Ok(()),
+        (None, None) => {
+            warn!(
+                "no superadmin exists and SENTORI_OWNER_EMAIL is unset; \
+                 the dashboard has no account until it is provided"
+            );
+            Ok(())
+        }
+        (None, Some(wanted)) => {
+            let password = crate::env_config::env_or_file("SENTORI_OWNER_PASSWORD").unwrap_or_else(|| {
+                let generated = random_password();
+                // Printed exactly once, at first boot, to the
+                // container log — the operator copies it and can
+                // change it in the dashboard.
+                info!(email = %wanted, password = %generated, "owner created with generated password (change it after first login)");
+                generated
+            });
+            let phc = sentori_argon2_password::PasswordHash::hash(&password)
+                .map_err(|e| anyhow::anyhow!("argon2 hash failed: {e}"))?;
+            sqlx::query(
+                "INSERT INTO users (id, email, password_hash, role, display_name) \
+                 VALUES ($1, $2, $3, 'superadmin', 'Owner')",
+            )
+            .bind(Uuid::now_v7())
+            .bind(&wanted)
+            .bind(&phc)
+            .execute(pool)
+            .await?;
+            info!(email = %wanted, "owner created from env");
+            Ok(())
+        }
+    }
 }
 
-/// Run once at boot. Ensures workspace + billing + first owner
-/// exist; safe to call on every boot.
-pub async fn ensure_first_owner(pool: &PgPool) -> anyhow::Result<()> {
-    let workspace_id = default_workspace_id();
-
-    // 1. Ensure the workspaces row exists (idempotent).
-    ensure_workspace(pool, workspace_id, "default")
-        .await
-        .map_err(|e| anyhow::anyhow!("ensure workspaces row: {e}"))?;
-
-    // 2. Ensure billing row exists.
-    let billing = BillingService::new(pool.clone(), workspace_id);
-    if billing.ensure_default().await? {
-        info!("billing row initialised (Free plan) for default workspace");
-    }
-
-    // 3. Owner bootstrap.
-    let identity = Identity::new(pool.clone(), workspace_id);
-    let owner_exists: Option<(uuid::Uuid,)> = sqlx::query_as(
-        "SELECT user_id FROM workspace_members \
-         WHERE workspace_id = $1 AND role = 'owner' LIMIT 1",
-    )
-    .bind(workspace_id.into_uuid())
-    .fetch_optional(pool)
-    .await?;
-    if owner_exists.is_some() {
-        return Ok(());
-    }
-
-    let Some(email) = read_env("SENTORI_BOOTSTRAP_OWNER_EMAIL") else {
-        warn!(
-            "no SENTORI_BOOTSTRAP_OWNER_EMAIL set; skipping first-owner bootstrap — dashboard /signup must be reachable"
-        );
-        return Ok(());
-    };
-    let Some(password) = read_env("SENTORI_BOOTSTRAP_OWNER_PASSWORD") else {
-        warn!(
-            "SENTORI_BOOTSTRAP_OWNER_EMAIL set but SENTORI_BOOTSTRAP_OWNER_PASSWORD missing; skipping"
-        );
-        return Ok(());
-    };
-
-    let phc = sentori_argon2_password::PasswordHash::hash(&password)
-        .map_err(|e| anyhow::anyhow!("argon2 hash failed: {e}"))?;
-
-    let user = identity
-        .users()
-        .create(&email, &phc)
-        .await
-        .map_err(|e| anyhow::anyhow!("create owner user: {e}"))?;
-    identity
-        .members()
-        .add(user.id, Role::Owner, None)
-        .await
-        .map_err(|e| anyhow::anyhow!("add owner member: {e}"))?;
-    // The env-bootstrapped owner is trusted (operator who set
-    // SENTORI_BOOTSTRAP_OWNER_PASSWORD); skip the verification step
-    // that would otherwise require a mailer + click-through.
-    let _ = sqlx::query("UPDATE users SET email_verified = TRUE WHERE id = $1")
-        .bind(user.id.into_uuid())
-        .execute(pool)
-        .await;
-    info!(%email, "first owner created (env-bootstrapped + auto-verified)");
-    Ok(())
+/// 24 random alphanumerics from the OS RNG — long enough that
+/// printing it to a private container log is the weakest link.
+fn random_password() -> String {
+    use rand::Rng;
+    const CHARS: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+    let mut rng = rand::rng();
+    (0..24)
+        .map(|_| {
+            let i = rng.random_range(0..CHARS.len());
+            CHARS[i] as char
+        })
+        .collect()
 }
 
 fn read_env(key: &str) -> Option<String> {
@@ -104,4 +95,54 @@ fn read_env(key: &str) -> Option<String> {
         .ok()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
+}
+
+/// `sentori-server reset-password <email>` — set a fresh random
+/// password for an existing account and print it to stdout. The
+/// SMTP-free recovery path for a locked-out operator.
+pub async fn reset_password(pool: &PgPool, email: &str) -> anyhow::Result<()> {
+    let user: Option<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE email = $1")
+        .bind(email)
+        .fetch_optional(pool)
+        .await?;
+    let Some(id) = user else {
+        anyhow::bail!("no account with email {email}");
+    };
+    let password = random_password();
+    let phc = sentori_argon2_password::PasswordHash::hash(&password)
+        .map_err(|e| anyhow::anyhow!("argon2 hash failed: {e}"))?;
+    sqlx::query("UPDATE users SET password_hash = $1 WHERE id = $2")
+        .bind(&phc)
+        .bind(id)
+        .execute(pool)
+        .await?;
+    // Invalidate every live session for the account — a reset that
+    // leaves stolen sessions alive isn't a reset.
+    sqlx::query("DELETE FROM auth_sessions WHERE user_id = $1")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    println!("password reset for {email}\nnew password: {password}\nchange it after signing in");
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generated_passwords_are_long_and_unambiguous() {
+        let p = random_password();
+        assert_eq!(p.len(), 24);
+        // The alphabet excludes 0/O/1/l/I/o on purpose — an operator
+        // reads this out of a terminal log.
+        for banned in ['0', 'O', '1', 'l', 'I', 'o'] {
+            assert!(!p.contains(banned), "ambiguous char {banned} in {p}");
+        }
+    }
+
+    #[test]
+    fn two_generated_passwords_differ() {
+        assert_ne!(random_password(), random_password());
+    }
 }

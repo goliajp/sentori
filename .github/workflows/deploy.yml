@@ -1,21 +1,19 @@
 name: deploy
 
-# Phase 16 production deploy via the goliajp/devops infra.
-# Mirrors the goliajp/portal pattern: lands on the self-hosted lx64
-# runner, rsync the source into /apps/sentori/src, install services
-# /sentori/docker-compose.yml from a fresh devops checkout, write
-# .env from repo secrets, then `docker compose up -d`.
+# v1 production deploy — the goliajp instance of the self-hosted
+# stack (design.md: the first self-host customer is us).
 #
-# Trigger surface (Phase 48 sub-H — every dashboard change must be
-# visible on sentori.golia.jp/main without a manual branch push):
+# Lands on the self-hosted lx64 runner: build the webapp, rsync it
+# to the bind-mounted dist dir, rsync source, install the compose
+# file from a fresh devops checkout, write .env from repo secrets,
+# build + up the v1 services, then smoke against the version field
+# (a 200 from an old binary answers "healthy?" exactly like a new
+# one — only the version proves the deploy shipped).
 #
-#   - push to master → deploy automatically AFTER the `build` workflow
-#     completes green for the same SHA. We gate on the build run
-#     because deploying a SHA that fails CI would leave prod in a
-#     known-broken state.
-#   - push to release/* → deploy directly (existing release-branch
-#     dance for explicit-version deploys still works).
-#   - workflow_dispatch → manual trigger from the Actions UI.
+# Trigger surface:
+#   - push to master → after `build` completes green for the SHA.
+#   - push to release/* → deploy directly.
+#   - workflow_dispatch → manual.
 
 on:
   push:
@@ -31,8 +29,6 @@ concurrency:
   group: deploy-lx64-sentori
   cancel-in-progress: false
 
-# v2.1 — opt into Node.js 24 ahead of GitHub Actions' 2026-06-02
-# forced cutover. See `build.yml` for the rationale.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -40,9 +36,6 @@ jobs:
   deploy:
     runs-on: [self-hosted, lx64]
     timeout-minutes: 45
-    # Gate on the upstream `build` workflow when we got here via
-    # `workflow_run`. Pushes to release/* and manual dispatches don't
-    # have an upstream run and pass through unconditionally.
     if: >-
       github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion == 'success'
@@ -54,26 +47,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # `workflow_run` defaults to checking out the *default* branch's
-          # HEAD, not the SHA that triggered the upstream build. Pin to
-          # the upstream SHA so we deploy exactly the commit that just
-          # went green.
+          # `workflow_run` defaults to the default branch's HEAD, not
+          # the SHA that triggered the upstream build. Pin to the
+          # upstream SHA so we deploy exactly what went green.
           fetch-depth: 0
           ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - name: Extract release version
         id: ver
         run: |
-          # Branch-based releases (release/vX.Y.Z) carry the version in
-          # the branch name. Master-line deploys (workflow_run trigger)
-          # don't — we derive a short SHA so we still tag the prod box
-          # with something machine-readable.
+          # release/vX.Y.Z branches carry the version; master-line
+          # deploys assert against Cargo.toml instead (which is what
+          # prod-drift compares against, too).
           branch="${GITHUB_REF_NAME:-master}"
           if [[ "$branch" == release/* ]]; then
             version="${branch#release/}"
             version="${version#v}"
           else
-            version="$(git rev-parse --short=7 HEAD)"
+            version=$(grep -m1 '^version' self-hosted/server/Cargo.toml \
+              | sed 's/.*"\(.*\)".*/\1/')
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "==> deploying version $version"
@@ -82,49 +74,16 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Build marketing (Astro static)
-        working-directory: marketing
-        env:
-          PUBLIC_SENTORI_TOKEN: ${{ secrets.SENTORI_DOGFOOD_MARKETING_TOKEN }}
-          PUBLIC_GIT_SHA: ${{ github.sha }}
-        run: |
-          bun install --frozen-lockfile
-          bun run build
-
-      - name: Build docs-site (Astro Starlight)
-        working-directory: docs-site
-        env:
-          PUBLIC_SENTORI_TOKEN: ${{ secrets.SENTORI_DOGFOOD_DOCS_TOKEN }}
-          PUBLIC_GIT_SHA: ${{ github.sha }}
-        run: |
-          bun install --frozen-lockfile
-          bun run build
-
-      - name: Rsync marketing/dist → /apps/sentori/marketing-dist
-        run: |
-          install -d -m 0755 "${REMOTE_DIR}/marketing-dist"
-          rsync -a --delete marketing/dist/ "${REMOTE_DIR}/marketing-dist/"
-
-      - name: Rsync docs-site/dist → /apps/sentori/docs-dist
-        run: |
-          install -d -m 0755 "${REMOTE_DIR}/docs-dist"
-          rsync -a --delete docs-site/dist/ "${REMOTE_DIR}/docs-dist/"
-
       - name: Build webapp (dashboard SPA)
         working-directory: webapp
         run: |
           bun install --frozen-lockfile
           bun run build
 
-      # Production serves the SPA from this directory rather than from
-      # the copy baked into the server image, so a dashboard change can
-      # ship without rebuilding the image.
-      #
-      # Stays owned by the runner. The mount is `:ro`, so the container's
-      # uid (distroless `nonroot`, 65532) only needs the world-read bit
-      # that 0755/0644 already grants — chowning it to 65532 instead
-      # locks the runner out of its own directory and every later deploy
-      # fails on `mkstemp … Permission denied`.
+      # Production serves the SPA from this directory rather than the
+      # copy baked into the image, so a dashboard-only change ships
+      # without an image rebuild. Stays owned by the runner: the mount
+      # is :ro and distroless nonroot only needs the world-read bit.
       - name: Rsync webapp/dist → /apps/sentori/webapp-dist
         run: |
           install -d -m 0755 "${REMOTE_DIR}/webapp-dist"
@@ -136,15 +95,10 @@ jobs:
           mkdir -p "${REMOTE_DIR}/src"
           rsync -a --delete \
             --exclude .git \
-            --exclude server/target \
-            --exclude cli/target \
-            --exclude web/node_modules \
-            --exclude web/dist \
-            --exclude marketing/node_modules \
-            --exclude marketing/dist \
-            --exclude docs-site/node_modules \
-            --exclude docs-site/dist \
-            --exclude sdk/react-native/node_modules \
+            --exclude node_modules \
+            --exclude 'self-hosted/server/target' \
+            --exclude 'core/target' \
+            --exclude 'webapp/dist' \
             ./ "${REMOTE_DIR}/src/"
 
       - name: Install compose file from devops/services/sentori
@@ -162,144 +116,72 @@ jobs:
       - name: Write .env
         env:
           SENTORI_PG_PASSWORD: ${{ secrets.SENTORI_PG_PASSWORD }}
-          SENTORI_DEV_TOKEN: ${{ secrets.SENTORI_DEV_TOKEN }}
-          SENTORI_ADMIN_PASSWORD: ${{ secrets.SENTORI_ADMIN_PASSWORD }}
-          SENTORI_SESSION_SECRET: ${{ secrets.SENTORI_SESSION_SECRET }}
           SENTORI_SMTP_HOST: ${{ secrets.SENTORI_SMTP_HOST }}
           SENTORI_SMTP_PORT: ${{ secrets.SENTORI_SMTP_PORT }}
           SENTORI_SMTP_USER: ${{ secrets.SENTORI_SMTP_USER }}
           SENTORI_SMTP_PASS: ${{ secrets.SENTORI_SMTP_PASS }}
           SENTORI_SMTP_FROM: ${{ secrets.SENTORI_SMTP_FROM }}
           SENTORI_SMTP_TLS: ${{ secrets.SENTORI_SMTP_TLS }}
-          SENTORI_DOGFOOD_DASHBOARD_TOKEN: ${{ secrets.SENTORI_DOGFOOD_DASHBOARD_TOKEN }}
-          # v1.0 — OAuth provider credentials. Registered manually at
-          # github.com/settings/developers + console.cloud.google.com,
-          # then pasted into the corresponding repo secret. Empty when
-          # the operator hasn't registered yet; the server gracefully
-          # hides the "Continue with …" buttons in that case.
-          SENTORI_GITHUB_CLIENT_ID: ${{ secrets.SENTORI_GITHUB_CLIENT_ID }}
-          SENTORI_GITHUB_CLIENT_SECRET: ${{ secrets.SENTORI_GITHUB_CLIENT_SECRET }}
-          SENTORI_GOOGLE_CLIENT_ID: ${{ secrets.SENTORI_GOOGLE_CLIENT_ID }}
-          SENTORI_GOOGLE_CLIENT_SECRET: ${{ secrets.SENTORI_GOOGLE_CLIENT_SECRET }}
-          # v0.2 stack — saasadmin UUIDs are filled in post-ETL (IDs
-          # copy 1:1 from legacy users); stripe secret optional until
-          # billing goes live on the new stack.
-          SENTORI_SAASADMIN_USER_IDS: ${{ secrets.SENTORI_SAASADMIN_USER_IDS }}
-          # All four are needed together. With only the webhook secret
-          # the worker starts and drains events, but nothing can create
-          # a subscription to send them — checkout has no API key and no
-          # price to sell.
-          SENTORI_STRIPE_SECRET_KEY: ${{ secrets.SENTORI_STRIPE_SECRET_KEY }}
-          SENTORI_STRIPE_WEBHOOK_SECRET: ${{ secrets.SENTORI_STRIPE_WEBHOOK_SECRET }}
-          SENTORI_STRIPE_PRICE_PRO: ${{ secrets.SENTORI_STRIPE_PRICE_PRO }}
-          SENTORI_STRIPE_PRICE_ENTERPRISE: ${{ secrets.SENTORI_STRIPE_PRICE_ENTERPRISE }}
-          # First `super` operator for sentori-saas-control. Seeding is
-          # idempotent, so redeploying can't reset the password.
-          SENTORI_SAASADMIN_BOOTSTRAP_EMAIL: ${{ secrets.SENTORI_SAASADMIN_BOOTSTRAP_EMAIL }}
-          SENTORI_SAASADMIN_BOOTSTRAP_PASSWORD: ${{ secrets.SENTORI_SAASADMIN_BOOTSTRAP_PASSWORD }}
-          SENTORI_SAASADMIN_BOOTSTRAP_NAME: ${{ secrets.SENTORI_SAASADMIN_BOOTSTRAP_NAME }}
-          # Use the upstream SHA when we came via workflow_run (matches
-          # the checked-out ref). github.sha is the default-branch HEAD
-          # at trigger time, which can drift; prefer head_sha when set.
-          SENTORI_VERSION: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # Still read by the v0.2 rollback services defined in the
+          # same compose file; drops with them in S9.
+          SENTORI_SESSION_SECRET: ${{ secrets.SENTORI_SESSION_SECRET }}
         run: |
           umask 077
           cat > "${REMOTE_DIR}/.env" <<EOF
           SENTORI_PG_PASSWORD=${SENTORI_PG_PASSWORD}
-          SENTORI_DEV_TOKEN=${SENTORI_DEV_TOKEN}
-          SENTORI_ADMIN_PASSWORD=${SENTORI_ADMIN_PASSWORD}
-          SENTORI_SESSION_SECRET=${SENTORI_SESSION_SECRET}
           SENTORI_SMTP_HOST=${SENTORI_SMTP_HOST}
           SENTORI_SMTP_PORT=${SENTORI_SMTP_PORT:-587}
           SENTORI_SMTP_USER=${SENTORI_SMTP_USER}
           SENTORI_SMTP_PASS=${SENTORI_SMTP_PASS}
           SENTORI_SMTP_FROM=${SENTORI_SMTP_FROM:-sentori@golia.jp}
           SENTORI_SMTP_TLS=${SENTORI_SMTP_TLS:-starttls}
-          # Phase 17 sub-F dogfood — read by docker-compose web build args
-          SENTORI_DOGFOOD_DASHBOARD_TOKEN=${SENTORI_DOGFOOD_DASHBOARD_TOKEN}
-          SENTORI_GITHUB_CLIENT_ID=${SENTORI_GITHUB_CLIENT_ID}
-          SENTORI_GITHUB_CLIENT_SECRET=${SENTORI_GITHUB_CLIENT_SECRET}
-          SENTORI_GOOGLE_CLIENT_ID=${SENTORI_GOOGLE_CLIENT_ID}
-          SENTORI_GOOGLE_CLIENT_SECRET=${SENTORI_GOOGLE_CLIENT_SECRET}
-          SENTORI_VERSION=${SENTORI_VERSION}
-          SENTORI_SAASADMIN_USER_IDS=${SENTORI_SAASADMIN_USER_IDS}
-          SENTORI_STRIPE_SECRET_KEY=${SENTORI_STRIPE_SECRET_KEY}
-          SENTORI_STRIPE_WEBHOOK_SECRET=${SENTORI_STRIPE_WEBHOOK_SECRET}
-          SENTORI_STRIPE_PRICE_PRO=${SENTORI_STRIPE_PRICE_PRO}
-          SENTORI_STRIPE_PRICE_ENTERPRISE=${SENTORI_STRIPE_PRICE_ENTERPRISE}
-          SENTORI_SAASADMIN_BOOTSTRAP_EMAIL=${SENTORI_SAASADMIN_BOOTSTRAP_EMAIL}
-          SENTORI_SAASADMIN_BOOTSTRAP_PASSWORD=${SENTORI_SAASADMIN_BOOTSTRAP_PASSWORD}
-          SENTORI_SAASADMIN_BOOTSTRAP_NAME=${SENTORI_SAASADMIN_BOOTSTRAP_NAME}
+          SENTORI_SESSION_SECRET=${SENTORI_SESSION_SECRET}
           RUST_LOG=info,sentori_server=info
           EOF
           chmod 600 "${REMOTE_DIR}/.env"
 
-      - name: Build & up
+      - name: Build & up (v1 stack)
         working-directory: /apps/sentori
         run: |
-          docker compose --env-file .env -f docker-compose.yml build \
-            server-v2 saas-control
+          docker compose --env-file .env -f docker-compose.yml build server-v1
           docker compose --env-file .env -f docker-compose.yml up -d \
-            marketing docs postgres-v2 server-v2 saas-control
+            postgres-v1 server-v1
 
-      - name: Smoke test — static sites
+      - name: Smoke — v1 healthz + version
         run: |
           set -e
           fail() { echo "smoke FAIL: $1" >&2; exit 1; }
-          # The v0.1 checks that used to live here drove :18080 and
-          # :18800. Both were decommissioned on 2026-07-23; a check
-          # against a port with nothing behind it is not a check.
-          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18801/)
-          test "$status" = "200" || fail "marketing :18801 expected 200, got $status"
-          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18802/)
-          test "$status" = "200" || fail "docs :18802 expected 200, got $status"
-          echo "==> static smoke OK"
-
-      - name: Wait + smoke — v0.2 stack
-        run: |
-          set -e
-          fail() { echo "v0.2 smoke FAIL: $1" >&2; exit 1; }
-          # server-v2 runs migrations at boot; give it the same 120s
-          # budget the legacy server gets.
+          # migrations run at boot — allow a startup window
+          body=''
           for i in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:18090/healthz >/dev/null; then
-              break
-            fi
+            body=$(curl -s --max-time 5 http://127.0.0.1:18092/healthz || true)
+            case "$body" in *'"status":"ok"'*) break;; esac
             if [ "$i" = "60" ]; then
-              echo "==> server-v2 health check failed — recent logs:"
-              docker compose -f "${COMPOSE_FILE}" logs --tail 100 server-v2 || true
-              fail "server-v2 /healthz never came up"
+              echo "==> server-v1 never went healthy — recent logs:"
+              docker compose -f "${COMPOSE_FILE}" logs --tail 100 server-v1 || true
+              fail "healthz: $body"
             fi
             sleep 2
           done
-          # readiness (DB reachable)
-          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18090/readyz)
-          test "$status" = "200" || fail "/readyz expected 200, got $status"
-          # session gate engaged (no cookie -> 401)
-          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18090/auth/me)
+          # session gate engaged (no cookie → 401)
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18092/auth/me)
           test "$status" = "401" || fail "/auth/me expected 401, got $status"
           # SPA fallback serves the dashboard shell
-          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18090/login)
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18092/login)
           test "$status" = "200" || fail "SPA /login expected 200, got $status"
-          # saas-control is listening
-          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18091/healthz)
-          case "$status" in 200|404) : ;; *) fail "saas-control :18091 unreachable (got $status)";; esac
-          # The version actually answering has to be the version we just
-          # checked out. Everything above this line passes just as well
-          # when the image was never rebuilt and the old binary is still
-          # serving — which is how v1.9.1 reported five green deploys
-          # while production stayed on 1.9.0. "Healthy" is not "new".
-          want=$(grep -m1 '^version' self-hosted/server/Cargo.toml \
-            | sed 's/.*"\(.*\)".*/\1/')
-          got=$(curl -fsS http://127.0.0.1:18090/healthz \
-            | sed 's/.*"version":"\([^"]*\)".*/\1/')
+          # The version actually answering has to be the version we
+          # just checked out. Everything above passes just as well when
+          # the image never rebuilt and an old binary is still serving.
+          want='${{ steps.ver.outputs.version }}'
+          got="${body##*\"version\":\"}"
+          got="${got%%\"*}"
           test "$want" = "$got" \
             || fail "deployed $got but this commit is $want — the image did not rebuild"
-          echo "==> v0.2 smoke OK (serving $got)"
+          echo "==> v1 smoke OK (serving $got)"
 
       - name: Tag release version
-        # Only on the release/* push path — master-line deploys derived
-        # version from the short SHA, which we don't want to tag.
+        # Only on the release/* push path — master-line deploys don't
+        # re-tag.
         if: startsWith(github.ref, 'refs/heads/release/')
         run: |
           git tag "v${{ steps.ver.outputs.version }}" || true

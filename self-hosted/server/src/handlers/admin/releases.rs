@@ -25,7 +25,7 @@ use crate::state::AppState;
 
 pub async fn list(State(state): State<Arc<AppState>>, Path(project_id): Path<Uuid>) -> Json<Value> {
     let rows = sqlx::query(
-        "SELECT id, name, created_at, deploy_at FROM releases \
+        "SELECT id, name, created_at FROM releases \
          WHERE project_id = $1 ORDER BY created_at DESC LIMIT 200",
     )
     .bind(project_id)
@@ -40,7 +40,6 @@ pub async fn list(State(state): State<Arc<AppState>>, Path(project_id): Path<Uui
                 "id": r.get::<Uuid, _>("id").to_string(),
                 "name": r.get::<String, _>("name"),
                 "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
-                "deploy_at": crate::wire_time::rfc3339_opt(r.try_get::<Option<time::OffsetDateTime>, _>("deploy_at").ok().flatten()),
             })
         })
         .collect();
@@ -51,14 +50,13 @@ pub async fn list_artifacts(
     State(state): State<Arc<AppState>>,
     Path((_project_id, release_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    // `uncompressed_size_bytes`, not `size_bytes`: the column has never
     // been called that. The query failed on every call, and
     // `unwrap_or_default()` turned the failure into an empty list — so
     // the releases page reported "no symbol files" for artifacts that
     // were sitting in the table. Errors now surface as errors; an
     // empty list has to mean empty.
     let rows = sqlx::query(
-        "SELECT id, kind, name, content_hash, uncompressed_size_bytes, created_at \
+        "SELECT id, kind, name, content_hash, size_bytes, created_at \
          FROM release_artifacts WHERE release_id = $1 ORDER BY created_at DESC",
     )
     .bind(release_id)
@@ -79,7 +77,7 @@ pub async fn list_artifacts(
                 "kind": r.get::<String, _>("kind"),
                 "name": r.get::<String, _>("name"),
                 "content_hash": r.get::<String, _>("content_hash"),
-                "size_bytes": r.try_get::<i64, _>("uncompressed_size_bytes").unwrap_or(0),
+                "size_bytes": r.try_get::<i64, _>("size_bytes").unwrap_or(0),
                 "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
             })
         })

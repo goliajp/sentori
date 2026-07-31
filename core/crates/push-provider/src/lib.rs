@@ -2,7 +2,7 @@
 //!
 //! Steel-tier (钢筋) crate #7. Composes:
 //!
-//! - K1 [`sentori_workspace_identity`] for `ProjectId`.
+//! - K1 [`sentori_workspace_identity`] for `Uuid`.
 //! - S10 [`sentori_rate_limiter`] for per-(project, provider)
 //!   send-rate enforcement.
 //! - S12 [`sentori_secrets_vault`] for at-rest encryption of
@@ -55,10 +55,10 @@
 //!     ProviderRegistry, PushDispatcher, RateLimits, SendOutcome,
 //! };
 //! use sentori_secrets_vault::{MasterKey, Vault, KeyId};
-//! use sentori_workspace_identity::ProjectId;
+//! use uuid::Uuid;
 //! use sqlx::PgPool;
 //!
-//! # async fn demo(pool: PgPool, project_id: ProjectId) -> Result<(), Box<dyn std::error::Error>> {
+//! # async fn demo(pool: PgPool, project_id: Uuid) -> Result<(), Box<dyn std::error::Error>> {
 //! let mut registry = ProviderRegistry::new();
 //! registry.register(ProviderKind::Apns, Arc::new(MockProvider::always(SendOutcome::Sent)));
 //!

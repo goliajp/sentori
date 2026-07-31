@@ -4,7 +4,6 @@
 
 use proptest::prelude::*;
 use sentori_notifier::{Channel, Notification};
-use sentori_workspace_identity::WorkspaceId;
 
 proptest! {
     #[test]
@@ -14,7 +13,7 @@ proptest! {
         body in "[a-zA-Z \\n]{1,200}",
         dedup in "[a-z0-9_]{4,32}",
     ) {
-        let n = Notification::new(WorkspaceId::new(), Channel::Email, &recipient, &subject, &body)
+        let n = Notification::new(Channel::Email, &recipient, &subject, &body)
             .with_dedup_key(&dedup);
         prop_assert_eq!(n.recipient, recipient);
         prop_assert_eq!(n.subject, subject);
@@ -30,7 +29,7 @@ proptest! {
             Just(Channel::Mock),
         ],
     ) {
-        let n = Notification::new(WorkspaceId::new(), chan, "x@y", "s", "b");
+        let n = Notification::new(chan, "x@y", "s", "b");
         prop_assert_eq!(n.channel, chan);
     }
 }

@@ -132,7 +132,13 @@ impl EmailTransport {
                 .parse()
                 .map_err(|e| TransportError::Email(format!("to parse: {e}")))?)
             .subject(&n.subject)
-            .body(n.body.clone())
+            // Explicit charset: without it some readers fall back to
+            // latin-1 and UTF-8 punctuation renders mojibake.
+            .singlepart(
+                lettre::message::SinglePart::builder()
+                    .header(lettre::message::header::ContentType::TEXT_PLAIN)
+                    .body(n.body.clone()),
+            )
             .map_err(|e| TransportError::Email(format!("body build: {e}")))
     }
 }
@@ -157,7 +163,6 @@ impl Notifier for EmailTransport {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
-    use sentori_workspace_identity::WorkspaceId;
 
     fn cfg() -> EmailConfig {
         EmailConfig {
@@ -182,13 +187,7 @@ mod tests {
     #[test]
     fn build_message_constructs_envelope() {
         let t = EmailTransport::new(cfg()).unwrap();
-        let n = Notification::new(
-            WorkspaceId::new(),
-            Channel::Email,
-            "alice@example.com",
-            "hello",
-            "world body",
-        );
+        let n = Notification::new(Channel::Email, "alice@example.com", "hello", "world body");
         let msg = t.build_message(&n).unwrap();
         let raw = String::from_utf8_lossy(&msg.formatted()).to_string();
         assert!(raw.contains("From: sentori@example.com"));
@@ -200,7 +199,7 @@ mod tests {
     #[test]
     fn build_message_rejects_bad_recipient() {
         let t = EmailTransport::new(cfg()).unwrap();
-        let n = Notification::new(WorkspaceId::new(), Channel::Email, "not-an-email", "x", "y");
+        let n = Notification::new(Channel::Email, "not-an-email", "x", "y");
         assert!(matches!(t.build_message(&n), Err(TransportError::Email(_))));
     }
 

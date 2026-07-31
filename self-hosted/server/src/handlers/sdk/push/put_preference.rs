@@ -49,7 +49,7 @@ pub async fn handle(
             opted_out = EXCLUDED.opted_out, \
             updated_at = now()",
     )
-    .bind(ctx.project_id.into_uuid())
+    .bind(ctx.project_id)
     .bind(&fp_bytes)
     .bind(&category)
     .bind(body.opted_out)
@@ -59,7 +59,6 @@ pub async fn handle(
     match result {
         Ok(_) => {
             info!(
-                workspace_id = %ctx.workspace_id,
                 project_id = %ctx.project_id,
                 %category,
                 opted_out = body.opted_out,
