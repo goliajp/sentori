@@ -151,6 +151,8 @@ export type InitConfig = {
     };
     /** B-type replay rolling buffer, seconds. 0 disables. */
     replaySeconds?: number;
+    /** Console gate: default `warn` — silent unless genuinely broken. */
+    logLevel?: 'debug' | 'error' | 'info' | 'silent' | 'warn';
     /** Last-resort event filter; exceptions fall back to the event. */
     beforeSend?: (event: WireEvent) => WireEvent | null;
 };

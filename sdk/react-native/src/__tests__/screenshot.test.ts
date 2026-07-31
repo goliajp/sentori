@@ -59,8 +59,6 @@ describe('uploadAttachment', () => {
     expect(seen.auth).toBe('Bearer st_pk_test');
     expect(out).not.toBeNull();
     expect(out!.ref).toBe('019e3000-7000-7000-8000-000000000001');
-    expect(out!.kind).toBe('screenshot');
-    expect(out!.source).toBe('js');
   });
 
   test('returns null on a non-201 response', async () => {

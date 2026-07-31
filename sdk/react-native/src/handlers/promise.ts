@@ -1,6 +1,6 @@
 import { coerceError } from '@goliapkg/sentori-core';
 
-import { captureError } from '../capture';
+import { error as captureError } from '../verbs';
 
 type RejectionTracker = (opts: {
   allRejections: boolean;

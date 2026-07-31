@@ -15,9 +15,8 @@
 //
 // Wire schema: docs/replay-encoding-v2.md.
 
-import { logger, startSpan } from '@goliapkg/sentori-core';
+import { logger } from '@goliapkg/sentori-core';
 
-import { getRegisteredMaskQuery } from './mask';
 import { describeWireframeNative } from './native';
 
 declare const __DEV__: boolean | undefined;
@@ -153,18 +152,11 @@ function captureTick(): void {
     logger.debug('replay', 'tick: first invocation');
     _firstTickLogged = true;
   }
-  let tickSpan: ReturnType<typeof startSpan> | null = null;
-  try {
-    tickSpan = startSpan('sentori.replay.tick', { name: 'tick' });
-  } catch {
-    // never fatal
-  }
   try {
     const maskIds = readMaskIds();
     const snapshotJson = _nativeMod?.captureWireframe?.(maskIds);
     if (typeof snapshotJson !== 'string' || snapshotJson.length === 0) {
       handleEmptyTick(snapshotJson);
-      tickSpan?.finish({ status: 'ok' });
       return;
     }
 
@@ -173,7 +165,6 @@ function captureTick(): void {
       snapshot = JSON.parse(snapshotJson) as NativeFrame;
     } catch (e) {
       logger.warn('replay', 'tick: native JSON parse failed', e);
-      tickSpan?.finish({ status: 'error' });
       return;
     }
 
@@ -185,10 +176,7 @@ function captureTick(): void {
     if (typeof __DEV__ !== 'undefined' && __DEV__) {
       diagnosticForTick(snapshot, snapshotJson.length);
     }
-    tickSpan?.finish({ status: 'ok' });
   } catch (e) {
-    if (e instanceof Error) tickSpan?.setTag('error.message', e.message);
-    tickSpan?.finish({ status: 'error' });
     logger.warn('replay', 'tick threw', e);
   }
 }
@@ -326,13 +314,8 @@ function diagnosticForTick(snapshot: NativeFrame, snapshotBytes: number): void {
 }
 
 function readMaskIds(): string[] {
-  const q = getRegisteredMaskQuery();
-  if (!q) return [];
-  try {
-    return q();
-  } catch {
-    return [];
-  }
+  // Masking returns with a v1 privacy pass; nothing masks today.
+  return [];
 }
 
 type ReplayNativeModule = {

@@ -1,232 +1,93 @@
+// @goliapkg/sentori-react-native — the 8-verb surface (design.md §4).
+//
+//   sentori.init(config)   sentori.user(u)      sentori.context(patch)
+//   sentori.error(err)     sentori.warn(name)   sentori.trace(name)
+//   sentori.assert(n, ok)  sentori.probe(ref)
+//
+// Everything is synchronous, returns immediately, and can never
+// throw into the host app. Learn eight words and you know the whole
+// product. The only additions beyond the verbs: ErrorBoundary (React
+// idiom for the error verb) and the push namespace (carried).
+
 import { init } from './init';
-import { addBreadcrumb } from './breadcrumbs';
-import {
-  captureError,
-  captureException,
-  captureMessage,
-  captureStep,
-  getUser,
-  sendUserFeedback,
-  setTag,
-  setTags,
-  setUser,
-} from './capture';
-import { ErrorBoundary } from './error-boundary';
-import { FeedbackButton, type FeedbackButtonHandle, type FeedbackButtonProps } from './feedback-widget';
-import {
-  clearAllFeatureFlags,
-  clearFeatureFlag,
-  getFeatureFlags,
-  setFeatureFlag,
-} from './feature-flags';
-import { clearMaskQuery, registerMaskQuery } from './mask';
-import { measureFn } from './measure';
-import {
-  getColdStartMs,
-  markTimeToFullDisplay,
-  type TimeToFullDisplayHandle,
-} from './mobile-vitals';
-import { bindState, recordState, unbindState } from './state-snapshots';
-import {
-  startMoment,
-  startSpan,
-  startTrace,
-  withScopedSpan,
+import { patchContext, setUser } from './scope';
+import { verbs } from './verbs';
+
+import type {
+  EventData,
+  InitConfig,
+  TraceOptions,
+  User,
 } from '@goliapkg/sentori-core';
-import { getInstallId } from './install-id';
-import { flushMetrics, recordMetric } from './metrics';
-import { close, flush } from './lifecycle';
-import { linkFederatedIdentity, reportPinMismatch, reportSecurity } from './report-security';
-import { flushTrack, track } from './track';
-import { queryTrustScore } from './trust-score';
-import { RageTapCapture } from './rage-tap';
-import {
-  endSession,
-  markSessionCrashed,
-  startSession,
-} from './session-tracker';
 
 export const sentori = {
-  init,
-  addBreadcrumb,
-  setUser,
-  getUser,
-  setTag,
-  setTags,
-  captureError,
-  captureException,
-  captureMessage,
-  captureStep,
-  sendUserFeedback,
-  recordMetric,
-  flushMetrics,
-  track,
-  flushTrack,
-  getInstallId,
-  reportSecurity,
-  reportPinMismatch,
-  queryTrustScore,
-  linkFederatedIdentity,
-  measureFn,
-  startMoment,
-  startSpan,
-  startTrace,
-  withScopedSpan,
-  bindState,
-  recordState,
-  unbindState,
-  markTimeToFullDisplay,
-  getColdStartMs,
-  setFeatureFlag,
-  clearFeatureFlag,
-  clearAllFeatureFlags,
-  getFeatureFlags,
-  ErrorBoundary,
-  FeedbackButton,
-  RageTapCapture,
-  registerMaskQuery,
-  clearMaskQuery,
-  startSession,
-  endSession,
-  markSessionCrashed,
-  flush,
-  close,
+  /** Configure and start the SDK. One call, at app start. */
+  init: (config: InitConfig): void => {
+    init(config);
+  },
+  /** Set (or clear, with null) the current user. Drives the
+   *  breadth × depth importance stats via a salted hash — raw
+   *  identity never leaves the device. */
+  user: (u: User | null): void => {
+    setUser(u);
+  },
+  /** Merge ambient context (feature flags, AB variants, tags)
+   *  attached to every subsequent event. */
+  context: (patch: Record<string, unknown>): void => {
+    patchContext(patch);
+  },
+
+  /** 出了什么事 — report a caught-but-fatal-worthy error. Unhandled
+   *  errors are captured automatically; this is the manual lane. */
+  error: (err: unknown, data?: EventData): string => verbs.error(err, data),
+  /** 用户哪里不舒服 — a hand-written sub-health report. */
+  warn: (name: string, data?: EventData): string => verbs.warn(name, data),
+  /** 这里发生了什么 — a neutral observation point. Also lands in the
+   *  signal ring; `{ quiet: true }` keeps it ring-only. */
+  trace: (name: string, data?: EventData, opts?: TraceOptions): string =>
+    verbs.trace(name, data, opts),
+  /** 这里应该成立吗 — a production assertion. Failure reports and
+   *  NEVER halts the program (unlike a language-level assert);
+   *  passes aggregate into a liveness ledger. */
+  assert: (name: string, ok: boolean, data?: EventData): string =>
+    verbs.assert(name, ok, data),
+  /** 那个 bug 回来了吗 — a regression tripwire. Reaching this call is
+   *  the signal; it never changes control flow. Plant it in the
+   *  branch that used to break. */
+  probe: (ref: string, data?: EventData): string => verbs.probe(ref, data),
 };
 
 export default sentori;
 
-export { init, init as initSentori } from './init';
-export { addBreadcrumb } from './breadcrumbs';
-export {
-  captureError,
-  captureException,
-  captureMessage,
-  captureStep,
-  getUser,
-  sendUserFeedback,
-  setTag,
-  setTags,
-  setUser,
-} from './capture';
-export {
-  startMoment,
-  startSpan,
-  startTrace,
-  withScopedSpan,
-  type SpanContextLike,
-  type StartSpanOptions,
-} from '@goliapkg/sentori-core';
-export { close, flush } from './lifecycle';
+export { init } from './init';
+export { ErrorBoundary } from './error-boundary';
+
+// Wire + config types for typed hosts.
 export type {
-  CaptureMessageOptions,
-  MessageLevel,
+  AssertStat,
+  Device,
+  EventData,
+  EventKind,
+  Frame,
+  InitConfig,
+  SentoriApi,
+  SentoriError,
+  Signal,
+  Surface,
+  TraceOptions,
+  User,
+  WireEvent,
+  WirePayload,
 } from '@goliapkg/sentori-core';
-/** v2.3 — logger surface re-exported from core so hosts can
- *  `import { setLogLevel } from '@goliapkg/sentori-react-native'`
- *  per design §3 ("Production override"). `setLogTransport` lets
- *  hosts route Sentori-internal lines into their own log
- *  aggregator (Datadog, etc.). */
+
+// Logger gate, for hosts debugging Sentori itself.
 export {
   getLogLevel,
   type LogLevel,
-  logger,
-  type LogTransport,
   setLogLevel,
+  type LogTransport,
   setLogTransport,
 } from '@goliapkg/sentori-core';
-export type { ReadyInfo } from './config';
-export { ErrorBoundary } from './error-boundary';
-export { FeedbackButton, type FeedbackButtonHandle, type FeedbackButtonProps } from './feedback-widget';
-export {
-  clearAllFeatureFlags,
-  clearFeatureFlag,
-  getFeatureFlags,
-  setFeatureFlag,
-} from './feature-flags';
-export { clearMaskQuery, registerMaskQuery } from './mask';
-export { flushMetrics, recordMetric } from './metrics';
-export { flushTrack, track, type TrackEvent, type TrackProps } from './track';
-export { getInstallId, peekInstallId } from './install-id';
-export {
-  linkFederatedIdentity,
-  reportPinMismatch,
-  reportSecurity,
-  type SecurityReportData,
-} from './report-security';
-export {
-  queryTrustScore,
-  type TrustScore,
-  type TrustSignal,
-} from './trust-score';
-export { measureFn } from './measure';
-export {
-  getColdStartMs,
-  markTimeToFullDisplay,
-  type TimeToFullDisplayHandle,
-} from './mobile-vitals';
-export { MomentHandle, type MomentProperties } from '@goliapkg/sentori-core';
-export {
-  bindState,
-  recordState,
-  type StateSnapshot,
-  unbindState,
-} from './state-snapshots';
-export { RageTapCapture } from './rage-tap';
-export {
-  probeNativeScreenshot,
-  probeNativeWireframe,
-  startAnrWatchdog,
-  stopAnrWatchdog,
-  triggerNativeCrash,
-} from './native';
-export { drainReplay, startReplay, stopReplay } from './replay';
-export {
-  endSession,
-  markSessionCrashed,
-  startSession,
-} from './session-tracker';
-export { type NavigationRefLike, useTraceNavigation } from './navigation';
 
-// v2.9 — Push notifications (iOS this release; v2.10 lights Android).
-// Surfaced as a `sentori.push` sub-namespace from the default barrel.
-// Opt-in: `sentori.push.register({...})` triggers the OS permission
-// prompt. Sentori never prompts on its own.
-import * as _push from './push';
-export const push = {
-  register: _push.register,
-  unregister: _push.unregister,
-  getCachedIpt: _push.getCachedIpt,
-  getStatus: _push.getStatus,
-  requestPermission: _push.requestPermission,
-  // v2.26 — let the host stamp the current session id on outgoing
-  // ack POSTs so v2.27 push-correlation BI can JOIN on session_id.
-  setSessionContext: _push.setSessionContext,
-};
-export type {
-  PushRegisterOptions,
-  PushRegisterResult,
-  PushNotificationPayload,
-} from './push';
-export type {
-  PushMessage,
-  PushOptions,
-  PushPriority,
-  PushReceipt,
-  PushTicket,
-  PushTicketStatus,
-} from '@goliapkg/sentori-core';
-
-export type {
-  Event,
-  SentoriError,
-  Frame,
-  Breadcrumb,
-  BreadcrumbType,
-  Device,
-  DeviceOS,
-  App,
-  User,
-  Tags,
-  EventKind,
-  Platform,
-} from './types';
+// Push namespace — carried as-is; outside the v1 acceptance surface.
+export * as push from './push';
