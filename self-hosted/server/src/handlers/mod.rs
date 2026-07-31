@@ -124,7 +124,12 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/v1/deploys", post(sdk::deploys::handle))
         .route(
             "/v1/releases/{release}/artifacts",
-            post(artifacts_upload::upload_by_release_name),
+            // Sourcemaps/dSYMs run tens of MB; axum's 2 MB default
+            // body limit truncated the multipart stream and every
+            // real-app upload died as "Error parsing multipart".
+            // The handler enforces its own 200 MB cap per file.
+            post(artifacts_upload::upload_by_release_name)
+                .layer(axum::extract::DefaultBodyLimit::max(210 * 1024 * 1024)),
         )
         // ── push family (carried; outside v1 acceptance) ──
         .route("/v1/push/tokens", post(sdk::push::register_token::handle))
@@ -237,7 +242,9 @@ pub fn router(state: Arc<AppState>) -> Router {
         )
         .route(
             "/admin/api/projects/{project_id}/releases/{release_id}/artifacts",
-            get(admin::releases::list_artifacts).post(artifacts_upload::upload),
+            get(admin::releases::list_artifacts)
+                .post(artifacts_upload::upload)
+                .layer(axum::extract::DefaultBodyLimit::max(210 * 1024 * 1024)),
         )
         .route(
             "/admin/api/releases/{release_id}",
