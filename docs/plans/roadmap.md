@@ -187,9 +187,15 @@ gate 记录:2026-08-01。镜像本地构建 69.6MB(<100MB 目标内,distroless +
 
 ## S8 Dogfood cutover(生产)
 
-- [ ] lx64 新栈部署(devops compose 更新;caddy 走 edit-live → devops import 铁律)
-- [ ] sentori.golia.jp 切新栈;deploy.yml 重写(marketing/docs 去留在此决定);prod-drift 对齐
-- [ ] insight-mobile 接新 SDK,上传 sourcemap/mapping,种一颗真 probe
+细步骤(2026-08-01 到段展开)。cutover 决策(照 v0.2 cutover 剧本):v1 栈全新容器 + 全新卷(数据全扔已定);v0.2 栈(postgres-v2/server-v2/saas-control)容器保留为 rollback,caddy 摘除引用;marketing/docs 容器与 dist 保留但 caddy 不再路由 —— 旧内容是 SaaS 卖点文案,与 v1 self-host 定位相悖,挂着比摘掉更误导;最终去留 S9 三栏交账给用户拍板。webapp 接管 sentori.golia.jp 根路径。
+
+- [ ] 8a 版本 bump 2.0.0(server Cargo.toml / webapp / VERSION);本地 preflight 全绿
+- [ ] 8b repo 侧 CI:deploy.yml 重写(build server-v1 镜像 + webapp rsync + compose up + :18092 smoke/version 核对;去 marketing/docs/saas 构建);prod-drift 对齐新容器名
+- [ ] 8c devops compose 加 v1 栈段(postgres-v1 新卷 :15434 / server-v1 :18092,9-env 面,owner=takagi@golia.jp 密码走生成路径);push devops develop
+- [ ] 8d release/2.0.0 分支 push → deploy.yml 起新栈 → lx64 :18092 healthz version=2.0.0
+- [ ] 8e caddy 切换(⛔ 铁律:ssh t01 edit live → reload → `devops caddy import t01 --accept-live --apply` → repo diff sync):sentori.golia.jp / → server-v1;摘 marketing/docs/saas 块;ingest.sentori.golia.jp → server-v1
+- [ ] 8f git-flow 收束:release → master merge + tag v2.0.0 + back-merge develop;`gh run list` 全绿;生产 /healthz version 核对(memory:绿的 deploy 可能什么都没发)
+- [ ] 8g insight-mobile(qualcomm repo)接新 SDK(tarball 本地依赖,npm 发包留 S9 问包名):init + 8 动词接入 + sourcemap 上传 + 种一颗真 probe;模拟器跑真 crash + warn
 - [ ] **gate**:生产真实 crash + warn 各 ≥1 例走完闭环(事件→issue→bundle→email);gh run list 全绿;/healthz version 核对
 
 gate 记录:(待)
