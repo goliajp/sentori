@@ -36,9 +36,6 @@ members = [
 # sweep; excluding them keeps cargo from claiming they belong to this
 # workspace.
 exclude = [
-    "crates/license-jwt",
-    "crates/stripe-webhook-verify",
-    "crates/workspace-identity",
     "crates/auth-session",
     "crates/event-pipeline",
     "crates/issue-store",
@@ -50,8 +47,6 @@ exclude = [
     "crates/audit-event",
     "crates/alert-rule",
     "crates/saved-view",
-    "crates/tenant-scoping",
-    "crates/billing",
     "crates/analytics-store",
     "crates/security-engine",
     "crates/session-store",
@@ -116,7 +111,6 @@ zeroize = { version = "1", features = ["derive"] }
 subtle = "2"
 
 # Stripe (per sprint-0 S5)
-async-stripe = { version = "0.41", default-features = false, features = ["runtime-tokio-hyper-rustls", "billing", "webhook-events", "checkout", "customer-portal"] }
 
 # JS sourcemap parsing + LRU cache (stone S6 sourcemap-resolver).
 # `sourcemap` is the same upstream crate Sentry, Datadog, and the

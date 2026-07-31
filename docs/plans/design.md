@@ -324,3 +324,15 @@ services:
 5. Self-host 打包:单镜像 + compose + env
 
 顺序可调,每步开工前按惯例先过一轮设计确认。
+
+## 14. 实施回填(2026-08-01,S0-S9 完结)
+
+本设计已按 `roadmap.md` S0-S9 全线落地;2.0.2 在 sentori.golia.jp 生产运行,insight-mobile dogfood 闭环真实跑通(crash + 检测器自动 warn + regression + email + probe + 22MB sourcemap)。逐段 gate 记录见 roadmap.md。设计条目的实施校正:
+
+- §10「cookie 密钥自动生成存卷」:被 DB-backed session token 方案自然消解 —— 无密钥可管理,条目不再适用。
+- 8 动词实际形态:`sentori.{init,user,context,error,warn,trace,assert,probe}` + RN 侧附加 ErrorBoundary / RageTapCapture / useTraceNavigation / push namespace(carried)。
+- 检测器首版:rage_tap / long_freeze / slow_cold_start 默认开,slow_api opt-in;dead_button / sluggish_button 未实现(留 backlog)。
+- 屏幕 masking(privacy pass)未实现:registerMaskQuery 已从 API 面移除,截图当前不打码 —— backlog。
+- error 指纹三层:in-app frames → 全帧 function 名(dev bundle)→ type + digit-collapsed message(生产 dogfood 翻出的修正)。
+- 工作假设中的存量处置全部执行:SaaS 面/OAuth/self-signup/web SDK 已删;Stripe 代码已摘(账号与配置冻结保留);生产数据全扔已执行(v0.2 栈容器保留为 rollback,未删)。
+- marketing / docs-site:caddy 已摘除路由(旧内容与 self-host 定位相悖),repo 目录与生产容器保留,去留待用户拍板。
