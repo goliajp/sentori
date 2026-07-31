@@ -29,13 +29,17 @@ import { deriveRelease } from './release.js';
 export function initSentoriExpo(options) {
     const release = options.release ?? deriveRelease(options.application);
     if (!release) {
-        throw new Error('[sentori-expo] could not derive release. ' +
-            'Either pass `release` explicitly, or pass `application: Application` ' +
+        // Iron rule: a Sentori misconfiguration degrades to a no-op with
+        // one warn — it never throws into the host's startup path.
+        // eslint-disable-next-line no-console
+        console.warn('[sentori-expo] could not derive release — SDK not started. ' +
+            'Pass `release` explicitly, or pass `application: Application` ' +
             'from `import * as Application from "expo-application"`.');
+        return;
     }
     initSentoriRN({
         environment: options.environment ?? (isDev() ? 'dev' : 'prod'),
-        ingestUrl: options.ingestUrl ?? 'https://ingest.sentori.golia.jp',
+        ingestUrl: options.ingestUrl ?? 'https://sentori.golia.jp',
         release,
         token: options.token,
     });

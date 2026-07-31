@@ -54,7 +54,7 @@ export function detectLocale(): Locale {
 export type I18nCtx = {
   locale: Locale;
   setLocale: (l: Locale) => void;
-  t: (key: MessageKey) => string;
+  t: (key: MessageKey, params?: Record<string, string>) => string;
 };
 
 export const LocaleContext = createContext<I18nCtx | null>(null);
@@ -68,6 +68,14 @@ export function useI18n(): I18nCtx {
 }
 
 /** Shorthand for the common case. */
-export function useT(): (key: MessageKey) => string {
+export function useT(): (key: MessageKey, params?: Record<string, string>) => string {
   return useI18n().t;
+}
+
+export function useLocale(): Locale {
+  return useI18n().locale;
+}
+
+export function useSetLocale(): (l: Locale) => void {
+  return useI18n().setLocale;
 }

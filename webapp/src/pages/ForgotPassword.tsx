@@ -20,7 +20,7 @@ export default function ForgotPassword() {
     setSilent(false);
     setLoading(true);
     try {
-      await api.authForgotPassword(email);
+      await api.forgotPassword(email);
       setSilent(true);
     } catch (e) {
       setErr(String(e));
@@ -37,7 +37,7 @@ export default function ForgotPassword() {
       >
         <h1 className="mb-1 text-xl font-semibold">{t('auth.forgot')}</h1>
         <p className="mb-6 text-sm text-fg-subtle">
-          We'll email you a password reset link.
+          {t('auth.forgotHint')}
         </p>
         <label className="mb-3 block text-sm">
           <span className="mb-1 block text-fg-muted">{t('auth.email')}</span>
@@ -53,9 +53,7 @@ export default function ForgotPassword() {
           <p className="mb-3 text-xs text-danger break-all">{err}</p>
         )}
         {silent && (
-          <p className="mb-3 text-xs text-fg-muted">
-            If that email is registered, instructions have been sent.
-          </p>
+          <p className="mb-3 text-xs text-fg-muted">{t('auth.resetSent')}</p>
         )}
         <button
           type="submit"
