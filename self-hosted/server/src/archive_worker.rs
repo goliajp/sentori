@@ -34,6 +34,11 @@
 //! - `SENTORI_ARCHIVE_FAILED_DAYS`  default 90
 //! - `SENTORI_ARTIFACT_KEEP_RELEASES` default 20 (0 disables both
 //!   the retention pass and the blob GC)
+//! - `SENTORI_EVENT_RETENTION_DAYS` default 90 (0 disables) —
+//!   events + their attachment rows past the window go; the issue
+//!   rows they aggregated into stay (counters, first/last seen and
+//!   the regression anchor are denormalized there). Attachment
+//!   blobs become orphans and the GC pass reaps them.
 
 use std::collections::HashSet;
 use std::time::Duration;
@@ -54,10 +59,11 @@ pub fn spawn(pool: PgPool, attachments: AttachmentStore) {
     let sent_days = env_sent_days();
     let failed_days = env_failed_days();
     let keep_releases = env_keep_releases();
+    let event_days = env_event_retention_days();
     tokio::spawn(async move {
         info!(
             interval_sec = interval.as_secs(),
-            sent_days, failed_days, keep_releases, "archive worker started"
+            sent_days, failed_days, keep_releases, event_days, "archive worker started"
         );
         loop {
             match run_once(&pool, sent_days, failed_days).await {
@@ -75,6 +81,21 @@ pub fn spawn(pool: PgPool, attachments: AttachmentStore) {
                     Ok(rows) => info!(rows, keep_releases, "artifact retention pass"),
                     Err(e) => warn!(error = %e, "artifact retention pass failed"),
                 }
+            }
+            if event_days > 0 {
+                match prune_old_events(&pool, event_days).await {
+                    Ok((events, atts)) => {
+                        info!(
+                            events,
+                            attachments = atts,
+                            event_days,
+                            "event retention pass"
+                        );
+                    }
+                    Err(e) => warn!(error = %e, "event retention pass failed"),
+                }
+            }
+            if keep_releases > 0 || event_days > 0 {
                 match gc_orphan_blobs(&pool, &attachments).await {
                     Ok((deleted, kept)) => info!(deleted, kept, "orphan blob gc pass"),
                     Err(e) => warn!(error = %e, "orphan blob gc pass failed"),
@@ -144,6 +165,48 @@ async fn gc_orphan_blobs(
         }
     }
     Ok((deleted, kept))
+}
+
+/// Events (and their attachment rows) older than the window, in
+/// batches so the first pass over a long backlog cannot hold a
+/// giant delete transaction. `event_attachments.event_id` carries
+/// no FK, so the rows go explicitly, attachments before events.
+/// Issue aggregates are denormalized and survive; the attachment
+/// blobs become orphans for [`gc_orphan_blobs`] on the same pass.
+async fn prune_old_events(pool: &PgPool, days: i64) -> Result<(u64, u64), sqlx::Error> {
+    const BATCH: i64 = 5_000;
+    let mut events_total = 0u64;
+    let mut atts_total = 0u64;
+    loop {
+        let ids: Vec<uuid::Uuid> = sqlx::query_scalar(
+            "SELECT id FROM events              WHERE received_at < now() - ($1 || ' days')::interval              LIMIT $2",
+        )
+        .bind(days)
+        .bind(BATCH)
+        .fetch_all(pool)
+        .await?;
+        if ids.is_empty() {
+            break;
+        }
+        atts_total += sqlx::query("DELETE FROM event_attachments WHERE event_id = ANY($1)")
+            .bind(&ids)
+            .execute(pool)
+            .await?
+            .rows_affected();
+        events_total += sqlx::query("DELETE FROM events WHERE id = ANY($1)")
+            .bind(&ids)
+            .execute(pool)
+            .await?
+            .rows_affected();
+    }
+    Ok((events_total, atts_total))
+}
+
+fn env_event_retention_days() -> i64 {
+    std::env::var("SENTORI_EVENT_RETENTION_DAYS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(90)
 }
 
 fn env_keep_releases() -> i64 {
