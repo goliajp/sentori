@@ -162,11 +162,15 @@ gate 记录:2026-07-31。`bun run check` 绿(0 errors;i18n 112 keys × 3 locales
 
 ## S6 渠道(email)
 
-- [ ] 新 issue / regression → 邮件(notifier + mailer 复用,正文 = bundle 精简版 + 回链)
-- [ ] Settings 个人通知偏好;SMTP 状态区 + 测试邮件按钮
-- [ ] **gate**:mailpit 端到端收信;未配 SMTP 降级路径走查
+细步骤(2026-07-31 到段展开):
 
-gate 记录:(待)
+- [x] 6a mailer.rs 暴露 transport/状态;state 组 NotifierService(EmailTransport 注册,delivery_log + dedup 复用 0006)
+- [x] 6b notify.rs:spawn_issue_notification(fire-and-forget;收件人 = owner + project assignees − prefs opt-out;dedup_key 按 issue+user+事由;正文 = bundle 精简版 + `SENTORI_BASE_URL` 回链);events.rs + events_batch.rs 接线
+- [x] 6c admin API:GET /admin/api/smtp(状态)、POST /admin/api/smtp/test(发给当前用户)、GET/PUT /admin/api/notification-prefs(per-project 两开关,无行 = 全开)
+- [x] 6d webapp Settings 加「通知」tab:per-project 开关 + SMTP 状态卡 + 测试邮件按钮;i18n ×3
+- [x] **gate**:mailpit 端到端(新 issue 一封、regression 一封、test 按钮一封,校验正文回链);未配 SMTP 全降级走查(ingest 不受影响、UI 状态区提示)
+
+gate 记录:2026-08-01。mailpit(:51025/:58025)+ postgres + SMTP-配置 server 端到端:新 error → `[sentori/mailtest] New: error — Error` 一封(正文含 impact/seen-in/回链);resolve 锚定 mt@1.0.0 后同 fingerprint 在 mt@1.1.0 再现 → Regression 一封(正文含 "was resolved in mt@1.0.0 — this recurrence reopened it");POST /admin/api/smtp/test → 第三封。PUT prefs onNewIssue=false 后新 fingerprint ingest → 邮件数不变(opt-out 生效,且 UI 通知 tab 截图勾选状态与之一致)。途中修 notifier crate 邮件 charset(lettre 无显式 ContentType 时 UTF-8 标点 mojibake → singlepart + TEXT_PLAIN;crate 16+2+1 tests 绿)。未配 SMTP 栈:GET smtp configured:false、POST test 409、ingest 正常、prefs API 正常、boot 仅 WARN。正文组装重构后重跑一封端到端核对一致。server fmt/clippy -D warnings/32 tests 绿;webapp check 124 keys 绿。
 
 ## S7 Self-host 打包
 

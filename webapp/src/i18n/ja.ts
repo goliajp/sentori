@@ -93,6 +93,19 @@ export const ja: Messages = {
   'nav.instruments': 'インストゥルメント',
   'nav.releases': 'リリース',
   'nav.settings': '設定',
+
+  'notify.loadFailed': '通知設定を読み込めませんでした。',
+  'notify.onNewIssue': '新規 issue',
+  'notify.onRegression': 'リグレッション',
+  'notify.prefsHint': '自分宛て通知のプロジェクト別スイッチ。デフォルトは両方オン。',
+  'notify.prefsTitle': 'メールを受け取る条件',
+  'notify.smtpTitle': 'SMTP',
+  'notify.smtpUnconfigured':
+    'SMTP が未設定です — SENTORI_SMTP_HOST を設定するとメール通知が有効になります。',
+  'notify.testButton': 'テストメールを送信',
+  'notify.testFailed': 'テストメールに失敗しました — SMTP 設定とサーバーログを確認してください。',
+  'notify.testSending': '送信中…',
+  'notify.testSent': 'テストメールを送信しました — 受信箱を確認してください。',
   'palette.placeholder': 'ページへ移動、または issue を検索…',
 
   'releases.emptyHint':
@@ -125,6 +138,7 @@ export const ja: Messages = {
   'settings.saved': '保存しました',
   'settings.tab.account': 'アカウント',
   'settings.tab.audit': '監査',
+  'settings.tab.notifications': '通知',
   'settings.tab.projects': 'プロジェクト',
   'settings.tab.tokens': 'トークン',
   'settings.tab.users': '管理者',

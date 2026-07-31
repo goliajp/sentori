@@ -38,6 +38,7 @@ mod handlers;
 mod hcm;
 mod mailer;
 mod mipush;
+mod notify;
 mod pipeline;
 mod push_quarantine;
 mod push_worker;

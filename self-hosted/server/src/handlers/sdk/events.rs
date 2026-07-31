@@ -131,6 +131,13 @@ pub async fn handle(
                 issue_id: outcome.issue_id,
                 ..tick
             });
+            crate::notify::spawn_issue_notification(
+                &state,
+                ctx.project_id,
+                outcome.issue_id,
+                outcome.is_new_issue,
+                outcome.regressed,
+            );
             (
                 StatusCode::ACCEPTED,
                 Json(json!({

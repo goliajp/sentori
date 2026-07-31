@@ -8,18 +8,24 @@ import { useState } from 'react';
 import { useShell } from '../App';
 import { ErrorBanner, formatRelative } from '../components/ui';
 import { useLocale, useSetLocale, useT } from '../i18n';
-import { api, type Project, type TokenRow, type UserRow } from '../lib/api';
+import {
+  api,
+  type NotificationPref,
+  type Project,
+  type TokenRow,
+  type UserRow,
+} from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 
-type Tab = 'account' | 'audit' | 'projects' | 'tokens' | 'users';
+type Tab = 'account' | 'audit' | 'notifications' | 'projects' | 'tokens' | 'users';
 
 export default function SettingsPage() {
   const t = useT();
   const { me } = useShell();
   const owner = me.role === 'superadmin';
   const tabs: Tab[] = owner
-    ? ['projects', 'tokens', 'users', 'audit', 'account']
-    : ['tokens', 'account'];
+    ? ['projects', 'tokens', 'users', 'notifications', 'audit', 'account']
+    : ['tokens', 'notifications', 'account'];
   const [tab, setTab] = useState<Tab>(tabs[0] ?? 'account');
 
   return (
@@ -44,6 +50,7 @@ export default function SettingsPage() {
       {tab === 'projects' && <ProjectsTab />}
       {tab === 'tokens' && <TokensTab />}
       {tab === 'users' && <UsersTab />}
+      {tab === 'notifications' && <NotificationsTab />}
       {tab === 'audit' && <AuditTab />}
       {tab === 'account' && <AccountTab />}
     </div>
@@ -366,6 +373,111 @@ function AccountTab() {
           {saved ? t('settings.saved') : t('settings.save')}
         </button>
       </div>
+    </div>
+  );
+}
+
+function NotificationsTab() {
+  const t = useT();
+  const [testState, setTestState] = useState<'error' | 'idle' | 'sending' | 'sent'>(
+    'idle',
+  );
+  const smtp = useAsyncData(() => api.smtpStatus(), []);
+  const prefs = useAsyncData(() => api.listNotificationPrefs(), []);
+  const [local, setLocal] = useState<Record<string, NotificationPref>>({});
+
+  const rows = (prefs.data?.prefs ?? []).map((p) => local[p.projectId] ?? p);
+
+  const flip = (p: NotificationPref, field: 'onNewIssue' | 'onRegression') => {
+    const next = { ...p, [field]: !p[field] };
+    setLocal((m) => ({ ...m, [p.projectId]: next }));
+    void api
+      .putNotificationPref({
+        projectId: next.projectId,
+        onNewIssue: next.onNewIssue,
+        onRegression: next.onRegression,
+      })
+      .catch(() => {
+        // roll back on failure so the UI never lies about state
+        setLocal((m) => ({ ...m, [p.projectId]: p }));
+      });
+  };
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <section>
+        <h2 className="mb-2 text-sm font-medium">{t('notify.smtpTitle')}</h2>
+        {smtp.data && smtp.data.configured && (
+          <div className="flex items-center gap-3 rounded-md border border-[var(--gds-border,#2a2a30)] px-3 py-2 text-sm">
+            <span className="h-2 w-2 rounded-full bg-[#4cd97b]" />
+            <span className="font-mono text-xs opacity-70">
+              {smtp.data.host} · {smtp.data.from}
+            </span>
+            <button
+              type="button"
+              disabled={testState === 'sending'}
+              onClick={() => {
+                setTestState('sending');
+                api.smtpTest().then(
+                  () => setTestState('sent'),
+                  () => setTestState('error'),
+                );
+              }}
+              className="ml-auto rounded border border-[var(--gds-border,#2a2a30)] px-2 py-0.5 text-xs hover:bg-[var(--gds-surface-raised,#1c1c22)] disabled:opacity-40"
+            >
+              {testState === 'sending' ? t('notify.testSending') : t('notify.testButton')}
+            </button>
+          </div>
+        )}
+        {smtp.data && !smtp.data.configured && (
+          <div className="flex items-center gap-3 rounded-md border border-[var(--gds-border,#2a2a30)] px-3 py-2 text-sm opacity-70">
+            <span className="h-2 w-2 rounded-full bg-[var(--gds-border,#3a3a42)]" />
+            {t('notify.smtpUnconfigured')}
+          </div>
+        )}
+        {testState === 'sent' && (
+          <p className="mt-2 text-xs text-[#4cd97b]">{t('notify.testSent')}</p>
+        )}
+        {testState === 'error' && (
+          <p className="mt-2 text-xs text-[#ff5d5d]">{t('notify.testFailed')}</p>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-sm font-medium">{t('notify.prefsTitle')}</h2>
+        <p className="mb-3 text-xs opacity-60">{t('notify.prefsHint')}</p>
+        {prefs.error && <ErrorBanner>{t('notify.loadFailed')}</ErrorBanner>}
+        {rows.length === 0 && !prefs.loading && (
+          <p className="text-sm opacity-50">{t('table.empty')}</p>
+        )}
+        {rows.length > 0 && (
+          <div className="divide-y divide-[var(--gds-border,#2a2a30)] rounded-lg border border-[var(--gds-border,#2a2a30)]">
+            {rows.map((p) => (
+              <div key={p.projectId} className="flex items-center gap-4 px-3 py-2 text-sm">
+                <span className="min-w-0 flex-1 truncate font-medium">{p.projectName}</span>
+                <label className="flex items-center gap-1.5 text-xs opacity-80">
+                  <input
+                    type="checkbox"
+                    checked={p.onNewIssue}
+                    onChange={() => flip(p, 'onNewIssue')}
+                    className="h-3.5 w-3.5 accent-[var(--gds-accent,#4c8dff)]"
+                  />
+                  {t('notify.onNewIssue')}
+                </label>
+                <label className="flex items-center gap-1.5 text-xs opacity-80">
+                  <input
+                    type="checkbox"
+                    checked={p.onRegression}
+                    onChange={() => flip(p, 'onRegression')}
+                    className="h-3.5 w-3.5 accent-[var(--gds-accent,#4c8dff)]"
+                  />
+                  {t('notify.onRegression')}
+                </label>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
