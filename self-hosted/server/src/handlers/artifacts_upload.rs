@@ -37,10 +37,12 @@ use crate::state::AppState;
 /// storing it would mean an artifact that silently never matches.
 const KINDS: [&str; 3] = ["sourcemap", "dsym", "proguard"];
 
-/// 200 MB. A dSYM for a large app is tens of megabytes; a sourcemap is
-/// single-digit. The cap exists so a mistaken upload cannot fill the
-/// blob volume, not because any real artifact approaches it.
-const MAX_BYTES: usize = 200 * 1024 * 1024;
+/// Decompressed cap, 512 MB. The main dSYM of an RN + Expo app runs
+/// hundreds of MB raw (insight-mobile's is 291 MB) — this bounds what
+/// a mistaken upload can put on the blob volume, not what a real
+/// artifact needs. The transport-side cap is smaller (the route's
+/// DefaultBodyLimit): anything bigger must arrive gzipped.
+const MAX_BYTES: usize = 512 * 1024 * 1024;
 
 /// `POST /admin/api/projects/:project_id/releases/:release_id/artifacts`
 ///
@@ -198,7 +200,11 @@ async fn read_upload(mut multipart: Multipart) -> Result<(String, String, Vec<u8
                 if data.len() > MAX_BYTES {
                     return Err(format!("file exceeds {MAX_BYTES} bytes"));
                 }
-                bytes = Some(data.to_vec());
+                // Gzip-transparent: symbolicators read raw DWARF /
+                // proguard / sourcemap bytes, so compressed uploads
+                // are inflated HERE — storing the .gz would mean a
+                // 201 on data symbolication can never use.
+                bytes = Some(maybe_gunzip(&data)?);
             }
             _ => {}
         }
@@ -213,12 +219,67 @@ async fn read_upload(mut multipart: Multipart) -> Result<(String, String, Vec<u8
         return Err("file is empty".into());
     }
     let name = name.unwrap_or_else(|| format!("{kind}.bin"));
+    // A gzipped upload usually arrives named `foo.map.gz`; the
+    // stored artifact is the inflated file, so the suffix comes off
+    // (dSYM/proguard matching is by filename).
+    let name = name.strip_suffix(".gz").map_or(name.clone(), str::to_owned);
     Ok((kind, name, bytes))
+}
+
+/// Inflate if the payload is gzip (magic `1f 8b`), else pass through.
+/// The decompressed size is capped by [`MAX_BYTES`] — a zip bomb hits
+/// the limit and errors instead of exhausting memory.
+fn maybe_gunzip(data: &[u8]) -> Result<Vec<u8>, String> {
+    use std::io::Read;
+    if data.len() < 2 || data[0] != 0x1f || data[1] != 0x8b {
+        return Ok(data.to_vec());
+    }
+    let mut out = Vec::new();
+    let decoder = flate2::read::GzDecoder::new(data);
+    // +1 so an at-limit stream is distinguishable from an over-limit one.
+    let mut limited = decoder.take(MAX_BYTES as u64 + 1);
+    limited
+        .read_to_end(&mut out)
+        .map_err(|e| format!("gzip decode failed: {e}"))?;
+    if out.len() > MAX_BYTES {
+        return Err(format!("decompressed file exceeds {MAX_BYTES} bytes"));
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn gz(data: &[u8]) -> std::io::Result<Vec<u8>> {
+        use std::io::Write;
+        let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        enc.write_all(data)?;
+        enc.finish()
+    }
+
+    #[test]
+    fn plain_bytes_pass_through() -> Result<(), String> {
+        let data = b"DWARF is not gzip".to_vec();
+        assert_eq!(maybe_gunzip(&data)?, data);
+        Ok(())
+    }
+
+    #[test]
+    fn gzip_round_trips() -> Result<(), Box<dyn std::error::Error>> {
+        let original = vec![7u8; 128 * 1024];
+        let inflated = maybe_gunzip(&gz(&original)?)?;
+        assert_eq!(inflated, original);
+        Ok(())
+    }
+
+    #[test]
+    fn truncated_gzip_is_an_error_not_a_panic() -> std::io::Result<()> {
+        let mut z = gz(b"hello sourcemap")?;
+        z.truncate(z.len() / 2);
+        assert!(maybe_gunzip(&z).is_err());
+        Ok(())
+    }
 
     /// A typo in `kind` would store an artifact that never matches
     /// anything, and the upload would look like it worked.
