@@ -61,6 +61,11 @@ export default sentori;
 
 export { init } from './init';
 export { ErrorBoundary } from './error-boundary';
+export { RageTapCapture } from './rage-tap';
+// Dev-panel helper: crash the native layer on purpose to exercise
+// the pending-crash upload pipeline. Not part of the 8-verb surface.
+export { triggerNativeCrash } from './native';
+export { type NavigationRefLike, useTraceNavigation } from './navigation';
 
 // Wire + config types for typed hosts.
 export type {
