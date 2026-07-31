@@ -116,14 +116,23 @@ fn rewrite_frame(map: &ParsedMap, frame: &mut Value) -> bool {
     let Some(obj) = frame.as_object_mut() else {
         return false;
     };
-    // Already resolved, or never minified: a frame carrying source
-    // context has been through this once.
+    // A frame carrying source context has been through this once.
     if obj.contains_key("preContext") {
         return false;
     }
+    // A frame symbolicated before source context existed (pre-2.4.0)
+    // keeps its minified coordinates — resolve from those, so a
+    // retro pass upgrades old events with the reading window instead
+    // of skipping them forever.
+    let already = obj.get("symbolicated").and_then(Value::as_bool) == Some(true);
+    let (line_key, col_key) = if already {
+        ("minifiedLine", "minifiedColumn")
+    } else {
+        ("line", "column")
+    };
     let (Some(line), Some(column)) = (
-        obj.get("line").and_then(Value::as_u64),
-        obj.get("column").and_then(Value::as_u64),
+        obj.get(line_key).and_then(Value::as_u64),
+        obj.get(col_key).and_then(Value::as_u64),
     ) else {
         return false;
     };
@@ -155,8 +164,45 @@ fn rewrite_frame(map: &ParsedMap, frame: &mut Value) -> bool {
     if let Some(function) = res.function {
         obj.insert("function".into(), Value::from(function));
     }
+    // Source context: metro/expo maps embed sourcesContent, so the
+    // reader can see the failing line without the server ever
+    // touching a repository. ±CONTEXT_LINES around the hit; absent
+    // sourcesContent (some bundlers strip it) just means no window.
+    if res.line > 0
+        && let Some(win) = map.source_window(res.src_id, (res.line - 1) as usize, CONTEXT_LINES)
+    {
+        obj.insert("preContext".into(), context_lines_json(&win.before));
+        obj.insert("contextLine".into(), Value::from(clip_line(&win.at)));
+        obj.insert("postContext".into(), context_lines_json(&win.after));
+    }
     obj.insert("symbolicated".into(), Value::from(true));
     true
+}
+
+/// ±5, the industry-standard reading window: enough to see the
+/// statement in its surroundings, small enough that a 30-frame
+/// stack stays a few KB of payload.
+const CONTEXT_LINES: usize = 5;
+
+/// A single source line is clipped so a generated/minified original
+/// (or a data-URI literal) cannot balloon the event payload.
+const MAX_CONTEXT_LINE_CHARS: usize = 300;
+
+fn clip_line(line: &str) -> String {
+    if line.chars().count() <= MAX_CONTEXT_LINE_CHARS {
+        return line.to_owned();
+    }
+    let clipped: String = line.chars().take(MAX_CONTEXT_LINE_CHARS).collect();
+    format!("{clipped}…")
+}
+
+fn context_lines_json(lines: &[String]) -> Value {
+    Value::from(
+        lines
+            .iter()
+            .map(|l| Value::from(clip_line(l)))
+            .collect::<Vec<_>>(),
+    )
 }
 
 /// Load and parse the source map for a release, via the cache.
@@ -286,5 +332,81 @@ mod tests {
         let map = empty_map();
         let mut frame = json!({ "file": "native" });
         assert!(!rewrite_frame(&map, &mut frame));
+    }
+
+    /// With sourcesContent embedded, a rewritten frame carries the
+    /// reading window: lines before, the failing line, lines after.
+    #[test]
+    fn source_context_rides_the_rewritten_frame() {
+        let mut raw: serde_json::Value = serde_json::from_slice(
+            br#"{"version":3,"sources":["src/pay.ts"],"names":["onPay"],"mappings":"UAM0BA"}"#,
+        )
+        .expect("json");
+        let src = (1..=12)
+            .map(|n| format!("line {n} of pay.ts"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        raw["sourcesContent"] = json!([src]);
+        let map = ParsedMap::parse(serde_json::to_vec(&raw).expect("ser").as_slice())
+            .expect("map parses");
+
+        let mut frame = json!({ "file": "bundle.js", "line": 1, "column": 10 });
+        assert!(rewrite_frame(&map, &mut frame));
+
+        let line = usize::try_from(frame["line"].as_u64().expect("line")).expect("usize");
+        assert_eq!(frame["contextLine"], format!("line {line} of pay.ts"));
+        let pre = frame["preContext"].as_array().expect("pre");
+        let post = frame["postContext"].as_array().expect("post");
+        assert_eq!(pre.len(), CONTEXT_LINES.min(line - 1));
+        assert!(!post.is_empty());
+        assert_eq!(
+            pre.last().expect("last"),
+            &json!(format!("line {} of pay.ts", line - 1))
+        );
+    }
+
+    /// A frame symbolicated before 2.4.0 (has coordinates + the
+    /// minified originals, no context) gains its source window on a
+    /// retro pass without its resolved position drifting.
+    #[test]
+    fn a_pre_context_era_frame_is_upgraded_not_skipped() {
+        let mut raw: serde_json::Value = serde_json::from_slice(
+            br#"{"version":3,"sources":["src/pay.ts"],"names":["onPay"],"mappings":"UAM0BA"}"#,
+        )
+        .expect("json");
+        let src = (1..=12)
+            .map(|n| format!("line {n} of pay.ts"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        raw["sourcesContent"] = json!([src]);
+        let map = ParsedMap::parse(serde_json::to_vec(&raw).expect("ser").as_slice())
+            .expect("map parses");
+
+        // What a 2.0-2.3 server left behind.
+        let mut fresh = json!({ "file": "bundle.js", "line": 1, "column": 10 });
+        assert!(rewrite_frame(&map, &mut fresh));
+        let mut old = fresh.clone();
+        let o = old.as_object_mut().expect("obj");
+        o.remove("preContext");
+        o.remove("contextLine");
+        o.remove("postContext");
+
+        assert!(rewrite_frame(&map, &mut old), "retro pass must re-resolve");
+        assert_eq!(
+            old["line"], fresh["line"],
+            "resolved position must not drift"
+        );
+        assert_eq!(old["contextLine"], fresh["contextLine"]);
+
+        // And a third pass is a no-op (context present).
+        assert!(!rewrite_frame(&map, &mut old));
+    }
+
+    #[test]
+    fn absurdly_long_source_lines_are_clipped() {
+        let long = "x".repeat(2_000);
+        assert!(clip_line(&long).chars().count() <= MAX_CONTEXT_LINE_CHARS + 1);
+        assert!(clip_line(&long).ends_with('…'));
+        assert_eq!(clip_line("short"), "short");
     }
 }

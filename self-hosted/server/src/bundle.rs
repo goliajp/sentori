@@ -144,6 +144,49 @@ pub async fn assemble(pool: &PgPool, issue_id: Uuid) -> Result<Bundle, BundleErr
                 md.push_str(&format!("{marker} {i:2}. {func}  ({file}:{line})\n"));
             }
             md.push_str("```\n\n(→ = in-app frame)\n\n");
+
+            // Source windows for the in-app frames — the bundle's
+            // whole point is that an AI (or a human) can read the
+            // failing code without cloning anything. Top 3 in-app
+            // frames keeps the bundle readable.
+            let mut shown = 0usize;
+            for f in stack {
+                if shown >= 3 {
+                    break;
+                }
+                if !f.get("inApp").and_then(Value::as_bool).unwrap_or(false) {
+                    continue;
+                }
+                let Some(ctx_line) = f.get("contextLine").and_then(Value::as_str) else {
+                    continue;
+                };
+                let file = f.get("file").and_then(Value::as_str).unwrap_or("?");
+                let line = f.get("line").and_then(Value::as_i64).unwrap_or(0);
+                let func = f.get("function").and_then(Value::as_str).unwrap_or("?");
+                md.push_str(&format!("### {func} — {file}:{line}\n\n```\n"));
+                let pre_len = f
+                    .get("preContext")
+                    .and_then(Value::as_array)
+                    .map_or(0, Vec::len);
+                let start = line - i64::try_from(pre_len).unwrap_or(0);
+                let mut n = start;
+                if let Some(pre) = f.get("preContext").and_then(Value::as_array) {
+                    for l in pre {
+                        md.push_str(&format!("  {n:4} | {}\n", l.as_str().unwrap_or("")));
+                        n += 1;
+                    }
+                }
+                md.push_str(&format!("> {n:4} | {ctx_line}\n"));
+                n += 1;
+                if let Some(post) = f.get("postContext").and_then(Value::as_array) {
+                    for l in post {
+                        md.push_str(&format!("  {n:4} | {}\n", l.as_str().unwrap_or("")));
+                        n += 1;
+                    }
+                }
+                md.push_str("```\n\n");
+                shown += 1;
+            }
         }
         // What the user was doing — the signal ring shipped with the
         // event.
