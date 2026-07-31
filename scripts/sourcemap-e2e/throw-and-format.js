@@ -1,4 +1,4 @@
-// Phase 16 sub-E helper for run.sh.
+// Helper for run-v1.sh.
 //
 // Loads a bundled fixture in Node, captures the resulting Error's
 // stack, and prints a Sentori event JSON to stdout.
@@ -52,17 +52,19 @@ const frames = stack
     inApp: file.endsWith(path.basename(bundlePath)),
   }))
 
+// v1 five-kind wire: camelCase envelope, error payload nested under
+// `payload.error` (see docs/plans/roadmap.md wire contract anchor).
 const id = crypto.randomUUID()
 const event = {
   id,
-  timestamp: new Date().toISOString(),
   kind: 'error',
+  occurredAt: new Date().toISOString(),
   platform: 'javascript',
   release,
   environment: 'sourcemap-e2e',
-  device: { os: 'web', osVersion: process.version },
-  app: { version: '1.0.0' },
-  error: { type, message, stack: frames, cause: null },
+  payload: {
+    error: { type, message, stack: frames, cause: null },
+  },
 }
 
 console.log(JSON.stringify(event))

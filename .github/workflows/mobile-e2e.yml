@@ -12,7 +12,7 @@ name: mobile-e2e
 #                        module that depends on `:expo-modules-core` and
 #                        cannot build standalone.
 #   · mailcatcher        legacy `server/` + `server/migrations`.
-#   · sourcemap-e2e      same legacy server.
+#   · sourcemap-e2e      symbolication round trip on the v1 server.
 #
 # It had been switched to `workflow_dispatch` in v0.4 with a note to
 # restore the triggers "once those two are fixed", and then sat failing
@@ -148,9 +148,8 @@ jobs:
       - name: build + start server
         env:
           SENTORI_DATABASE_URL: postgres://postgres:dev@localhost:5432/sentori
-          SENTORI_SESSION_SECRET: ci-secret-deadbeefdeadbeefdeadbeefdeadbeef
-          SENTORI_BOOTSTRAP_OWNER_EMAIL: ci@example.com
-          SENTORI_BOOTSTRAP_OWNER_PASSWORD: ci-password-long-enough
+          SENTORI_OWNER_EMAIL: ci@example.com
+          SENTORI_OWNER_PASSWORD: ci-password-long-enough
           SENTORI_BASE_URL: http://localhost:8080
           # `fs:` rather than the default in-memory store: the
           # symbolicator reads the map back out, and an in-memory blob
@@ -174,4 +173,4 @@ jobs:
           SENTORI_BASE: http://localhost:8080
           SENTORI_OWNER_EMAIL: ci@example.com
           SENTORI_OWNER_PASSWORD: ci-password-long-enough
-        run: bash scripts/sourcemap-e2e/run-v02.sh
+        run: bash scripts/sourcemap-e2e/run-v1.sh
