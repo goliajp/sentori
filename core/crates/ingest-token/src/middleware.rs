@@ -1,5 +1,5 @@
-//! Axum middleware:`Authorization: Bearer st_pk_...` → inject
-//! `(ProjectId, WorkspaceId)` as request extensions.
+//! Axum middleware: `Authorization: Bearer st_...` → inject
+//! [`IngestContext`] as a request extension.
 
 use axum::{
     Json,
@@ -11,7 +11,7 @@ use axum::{
 use serde::Serialize;
 
 use crate::error::TokenError;
-use crate::model::TokenKind;
+use crate::model::Scope;
 use crate::parse::looks_like_token;
 use crate::store::TokenStore;
 
@@ -24,9 +24,8 @@ pub struct IngestContext {
     /// project — two apps under one project hold separate tokens and
     /// should not share an allowance.
     pub token_id: uuid::Uuid,
-    pub workspace_id: sentori_workspace_identity::WorkspaceId,
-    pub project_id: sentori_workspace_identity::ProjectId,
-    pub token_kind: TokenKind,
+    pub project_id: uuid::Uuid,
+    pub scope: Scope,
 }
 
 /// Axum middleware. Requires `Extension<TokenStore>` set on the
@@ -77,9 +76,8 @@ async fn resolve_token(
 
     Ok(IngestContext {
         token_id: token.id,
-        workspace_id: token.workspace_id,
         project_id: token.project_id,
-        token_kind: token.kind,
+        scope: token.scope,
     })
 }
 

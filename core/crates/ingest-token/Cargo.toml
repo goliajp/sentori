@@ -8,7 +8,6 @@ description = "SDK ingest token (st_pk_<26 base32>) — store + parse + axum Bea
 publish = false
 
 [dependencies]
-sentori-workspace-identity = { path = "../workspace-identity" }
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "time"] }
 axum = "0.8"
 tower = "0.5"

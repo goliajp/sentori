@@ -1,110 +1,76 @@
-//! Project admin endpoints:
-//!
-//! - `POST   /admin/api/projects` — create
-//! - `GET    /admin/api/projects/:project_id` — get one
-//! - `PATCH  /admin/api/projects/:project_id` — update (name)
-//! - `DELETE /admin/api/projects/:project_id` — delete (cascades)
-//!
-//! Combined with `GET /v1/projects` (list, already exposed) this
-//! is the full project CRUD surface dashboard needs.
+//! Project CRUD (superadmin) — design.md §9.
 
 use std::sync::Arc;
 
 use axum::{
-    Json,
-    extract::{Extension, Path, State},
-    http::{HeaderMap, StatusCode},
+    Extension, Json,
+    extract::{Path, State},
+    http::StatusCode,
 };
-
-use crate::session_mw::SessionContext;
-use sentori_workspace_identity::ProjectId;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use sqlx::Row;
-use tracing::{info, warn};
+use tracing::warn;
 use uuid::Uuid;
 
+use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
+fn superadmin_only(ctx: &SessionContext) -> Result<(), (StatusCode, Json<Value>)> {
+    if ctx.role.is_superadmin() {
+        Ok(())
+    } else {
+        Err((
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "superadmin_only" })),
+        ))
+    }
+}
+
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CreateBody {
     pub name: String,
-    pub slug: String,
+    #[serde(default)]
+    pub platform: Option<String>,
 }
 
 pub async fn create(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
-    headers: HeaderMap,
     Json(body): Json<CreateBody>,
 ) -> (StatusCode, Json<Value>) {
-    // `Role::can_create_project` has existed since the role model was
-    // written and had no caller. Any member — including the `user`
-    // role, whose whole point is that it sees only what it is granted
-    // — could create a project here.
-    if !ctx.role.can_create_project() {
-        return (
-            StatusCode::FORBIDDEN,
-            Json(
-                json!({ "error": "forbidden", "hint": "creating a project needs the owner or admin role" }),
-            ),
-        );
+    if let Err(e) = superadmin_only(&ctx) {
+        return e;
     }
-
-    if body.name.is_empty() || body.slug.is_empty() {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "name + slug required" })),
-        );
-    }
-    // Salt is 32 random bytes (sentori_privacy_salt::Salt::generate()
-    // pattern); use a deterministic placeholder here — workspace-
-    // identity's projects.create accepts arbitrary bytes.
-    let salt = [0xa5u8; 32];
-    match state
-        .identity_for(ctx.workspace_id)
-        .projects()
-        .create(&body.name, &body.slug, &salt)
+    let id = Uuid::now_v7();
+    let platform = body.platform.unwrap_or_else(|| "react-native".to_string());
+    match sqlx::query("INSERT INTO projects (id, name, platform) VALUES ($1, $2, $3)")
+        .bind(id)
+        .bind(&body.name)
+        .bind(&platform)
+        .execute(&state.pool)
         .await
     {
-        Ok(p) => {
-            info!(
-                project_id = %p.id,
-                slug = %body.slug,
-                "admin.projects created",
-            );
-            let (ip, ua) = crate::notify::extract_request_meta(&headers);
-            crate::notify::audit(
+        Ok(_) => {
+            crate::audit::record(
                 &state.pool,
-                ctx.workspace_id.into_uuid(),
-                Some(p.id.into_uuid()),
-                Some(ctx.user_id.into_uuid()),
+                Some(id),
+                ctx.user_id,
                 "project.create",
-                Some("project"),
-                Some(&p.id.to_string()),
-                crate::notify::enrich_payload(
-                    json!({ "name": body.name, "slug": body.slug }),
-                    ip.as_deref(),
-                    ua.as_deref(),
-                ),
+                "project",
+                &id.to_string(),
+                json!({ "name": body.name }),
             )
             .await;
             (
                 StatusCode::CREATED,
-                Json(json!({
-                    "id": p.id.to_string(),
-                    "name": p.name,
-                    "slug": p.slug,
-                    "created_at": crate::wire_time::rfc3339(p.created_at),
-                })),
+                Json(json!({ "id": id, "name": body.name, "platform": platform })),
             )
         }
         Err(e) => {
-            warn!(error = %e, "admin.projects create_failed");
+            warn!(error = %e, "project create failed");
             (
-                StatusCode::BAD_REQUEST,
-                Json(json!({ "error": e.to_string() })),
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "internal" })),
             )
         }
     }
@@ -115,39 +81,36 @@ pub async fn get(
     Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
 ) -> (StatusCode, Json<Value>) {
-    match state
-        .identity_for(ctx.workspace_id)
-        .projects()
-        .find(ProjectId::from_uuid(project_id))
-        .await
-    {
-        Ok(Some(p)) => (
+    if let Err(e) = super::tokens::ensure_project_access(&state, &ctx, project_id).await {
+        return e;
+    }
+    let row: Option<(String, String, time::OffsetDateTime)> =
+        sqlx::query_as("SELECT name, platform, created_at FROM projects WHERE id = $1")
+            .bind(project_id)
+            .fetch_optional(&state.pool)
+            .await
+            .unwrap_or(None);
+    match row {
+        Some((name, platform, created_at)) => (
             StatusCode::OK,
             Json(json!({
-                "id": p.id.to_string(),
-                "name": p.name,
-                "slug": p.slug,
-                "created_at": crate::wire_time::rfc3339(p.created_at),
+                "id": project_id,
+                "name": name,
+                "platform": platform,
+                "createdAt": crate::wire_time::rfc3339(created_at),
             })),
         ),
-        Ok(None) => (
+        None => (
             StatusCode::NOT_FOUND,
             Json(json!({ "error": "project_not_found" })),
         ),
-        Err(e) => {
-            warn!(error = %e, "admin.projects get_failed");
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "error": "internal" })),
-            )
-        }
     }
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct UpdateBody {
     pub name: Option<String>,
+    pub platform: Option<String>,
 }
 
 pub async fn update(
@@ -156,41 +119,38 @@ pub async fn update(
     Path(project_id): Path<Uuid>,
     Json(body): Json<UpdateBody>,
 ) -> (StatusCode, Json<Value>) {
-    let Some(name) = body.name else {
-        return (StatusCode::OK, Json(json!({ "status": "noop" })));
-    };
-    if name.is_empty() {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "name must not be empty" })),
-        );
+    if let Err(e) = superadmin_only(&ctx) {
+        return e;
     }
-    // `AND workspace_id` is the tenant guard: a rename aimed at
-    // another workspace's project matches no row → 404, not a
-    // cross-tenant write.
-    let result = sqlx::query(
-        "UPDATE projects SET name = $1 WHERE id = $2 AND workspace_id = $3 RETURNING id",
+    let r = sqlx::query(
+        "UPDATE projects SET name = COALESCE($2, name), platform = COALESCE($3, platform) \
+         WHERE id = $1",
     )
-    .bind(&name)
     .bind(project_id)
-    .bind(ctx.workspace_id.into_uuid())
-    .fetch_optional(&state.pool)
+    .bind(body.name.as_deref())
+    .bind(body.platform.as_deref())
+    .execute(&state.pool)
     .await;
-    match result {
-        Ok(Some(row)) => {
-            let id: Uuid = row.get("id");
-            info!(%id, "admin.projects renamed");
-            (
-                StatusCode::OK,
-                Json(json!({ "id": id.to_string(), "name": name })),
+    match r {
+        Ok(res) if res.rows_affected() > 0 => {
+            crate::audit::record(
+                &state.pool,
+                Some(project_id),
+                ctx.user_id,
+                "project.update",
+                "project",
+                &project_id.to_string(),
+                json!({ "name": body.name, "platform": body.platform }),
             )
+            .await;
+            (StatusCode::OK, Json(json!({ "ok": true })))
         }
-        Ok(None) => (
+        Ok(_) => (
             StatusCode::NOT_FOUND,
             Json(json!({ "error": "project_not_found" })),
         ),
         Err(e) => {
-            warn!(error = %e, "admin.projects update_failed");
+            warn!(error = %e, "project update failed");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({ "error": "internal" })),
@@ -203,33 +163,38 @@ pub async fn delete(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
-    headers: HeaderMap,
-) -> StatusCode {
-    match state
-        .identity_for(ctx.workspace_id)
-        .projects()
-        .delete(ProjectId::from_uuid(project_id))
-        .await
-    {
-        Ok(()) => {
-            info!(%project_id, "admin.projects deleted");
-            let (ip, ua) = crate::notify::extract_request_meta(&headers);
-            crate::notify::audit(
+) -> (StatusCode, Json<Value>) {
+    if let Err(e) = superadmin_only(&ctx) {
+        return e;
+    }
+    let r = sqlx::query("DELETE FROM projects WHERE id = $1")
+        .bind(project_id)
+        .execute(&state.pool)
+        .await;
+    match r {
+        Ok(res) if res.rows_affected() > 0 => {
+            crate::audit::record(
                 &state.pool,
-                ctx.workspace_id.into_uuid(),
-                Some(project_id),
-                Some(ctx.user_id.into_uuid()),
+                None,
+                ctx.user_id,
                 "project.delete",
-                Some("project"),
-                Some(&project_id.to_string()),
-                crate::notify::enrich_payload(json!({}), ip.as_deref(), ua.as_deref()),
+                "project",
+                &project_id.to_string(),
+                json!({}),
             )
             .await;
-            StatusCode::NO_CONTENT
+            (StatusCode::OK, Json(json!({ "ok": true })))
         }
+        Ok(_) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "project_not_found" })),
+        ),
         Err(e) => {
-            warn!(error = %e, "admin.projects delete_failed");
-            StatusCode::INTERNAL_SERVER_ERROR
+            warn!(error = %e, "project delete failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "internal" })),
+            )
         }
     }
 }

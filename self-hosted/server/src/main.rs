@@ -1,20 +1,10 @@
-//! Sentori self-hosted axum server binary.
+//! Sentori self-hosted server binary (v1).
 //!
-//! Single-workspace OSS deployment. Composes the 17 K
-//! crates from `core/` into a single HTTP server with:
-//!
-//! - sqlx migrate from `core/migrations/` at boot.
-//! - Optional env-driven first-owner bootstrap (sets up
-//!   the workspace + user on a fresh DB so `docker compose
-//!   up` is one-shot ready).
-//! - Wired axum router with the v0.1 essential routes:
-//!   /healthz, /v1/auth/login, /v1/auth/logout,
-//!   /v1/auth/me, /v1/projects, /v1/projects/{id}/issues,
-//!   /v1/events/{project} (SDK ingest), /v1/usage.
-//!
-//! Caller-owned background tasks (per K7-K17 stance) are
-//! also spawned: K10 cert-monitor poll, K11 notifier
-//! retry, K14 alert-rule on-event fires.
+//! Single-tenant by design: one instance, one customer. Boot order:
+//! migrate (compile-time-embedded core/migrations) → reconcile the
+//! env-declared owner → build AppState → spawn push + archive
+//! workers → serve the five-kind ingest, the AI api surface, and
+//! the dashboard from one router.
 //!
 //! Image goal: < 80 MB distroless cc + strip.
 //! Startup goal: < 30s under `docker compose up`.
@@ -36,33 +26,27 @@ use sqlx::PgPool;
 use tokio::net::TcpListener;
 use tracing::info;
 
-mod alert_fire;
 mod apns;
 mod archive_worker;
-mod billing_worker;
+mod audit;
 mod blob_store;
 mod bootstrap;
+mod bundle;
 mod client_ip;
 mod fcm;
 mod handlers;
 mod hcm;
-mod identity_link;
 mod mailer;
 mod mipush;
-mod notify;
-mod periodic_alert_worker;
-mod probe_worker;
+mod pipeline;
 mod push_quarantine;
 mod push_worker;
 mod rate_limit;
-mod saasadmin_mw;
 mod security_headers;
 mod session_mw;
 mod state;
-mod stripe;
 mod symbolicate;
 mod token_cache;
-mod webhook;
 mod webpush;
 mod webpush_encrypt;
 mod wire_time;
@@ -83,28 +67,19 @@ async fn main() -> anyhow::Result<()> {
     let pool = PgPool::connect(&db_url).await.context("db connect")?;
     run_migrations(&pool).await.context("migrate")?;
 
-    // First-owner bootstrap (env-driven, idempotent).
-    if let Err(e) = bootstrap::ensure_first_owner(&pool).await {
-        tracing::warn!(error = %e, "bootstrap first owner skipped");
+    // Env-declared owner reconcile (idempotent, declarative).
+    if let Err(e) = bootstrap::ensure_owner(&pool).await {
+        tracing::warn!(error = %e, "owner bootstrap skipped");
     }
 
     let attachments = blob_store::AttachmentStore::from_env()
         .await
         .context("attachment store init")?;
-    let state = Arc::new(AppState::new(
-        pool.clone(),
-        bootstrap::default_workspace_id(),
-        attachments,
-    ));
+    let state = Arc::new(AppState::new(pool.clone(), attachments));
 
-    // Start the push dispatcher + endpoint probe background workers.
+    // Background workers: push dispatch + retention archive.
     let token_cache = std::sync::Arc::new(token_cache::TokenCache::new());
     push_worker::spawn(pool.clone(), token_cache);
-    probe_worker::spawn(pool.clone());
-    periodic_alert_worker::spawn(pool.clone());
-    // Stripe billing worker: drains verified webhook events →
-    // workspace_billing. No-op when Stripe isn't configured.
-    billing_worker::spawn(pool.clone(), state.stripe.clone());
     archive_worker::spawn(pool);
 
     // Baseline HSTS / X-Content-Type-Options / X-Frame-Options /

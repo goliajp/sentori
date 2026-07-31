@@ -1,4 +1,4 @@
-//! Transactional auth email sender (verify / password-reset).
+//! Transactional auth email sender (password-reset).
 //!
 //! Wraps the K11 notifier [`EmailTransport`] behind env config:
 //!
@@ -18,7 +18,6 @@
 
 use sentori_notifier::{Channel, Notification};
 use sentori_notifier::{EmailConfig, EmailTransport, SmtpTls};
-use sentori_workspace_identity::WorkspaceId;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
@@ -82,24 +81,9 @@ impl Mailer {
         }
     }
 
-    pub fn send_verify(&self, workspace_id: WorkspaceId, email: &str, token_wire: &str) {
-        let link = format!("{}/verify?token={token_wire}", self.base_url);
-        self.dispatch(
-            workspace_id,
-            email,
-            "Verify your Sentori account",
-            format!(
-                "Welcome to Sentori!\n\nConfirm your email address by opening:\n\n{link}\n\nThe link expires in 24 hours. If you didn't sign up, ignore this email."
-            ),
-            "email_verify",
-            token_wire,
-        );
-    }
-
-    pub fn send_reset(&self, workspace_id: WorkspaceId, email: &str, token_wire: &str) {
+    pub fn send_reset(&self, email: &str, token_wire: &str) {
         let link = format!("{}/reset-password?token={token_wire}", self.base_url);
         self.dispatch(
-            workspace_id,
             email,
             "Reset your Sentori password",
             format!(
@@ -112,7 +96,6 @@ impl Mailer {
 
     fn dispatch(
         &self,
-        workspace_id: WorkspaceId,
         email: &str,
         subject: &str,
         body: String,
@@ -131,7 +114,6 @@ impl Mailer {
             return;
         };
         let n = Notification {
-            workspace_id,
             project_id: None,
             channel: Channel::Email,
             recipient: email.to_string(),

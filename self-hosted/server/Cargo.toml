@@ -38,29 +38,17 @@ panic = "warn"
 
 [dependencies]
 # K-tier composition. Path deps into core/.
-sentori-workspace-identity = { path = "../../core/crates/workspace-identity" }
-sentori-auth-session       = { path = "../../core/crates/auth-session" }
 sentori-attachment-store   = { path = "../../core/crates/attachment-store" }
-sentori-event-pipeline     = { path = "../../core/crates/event-pipeline" }
 sentori-identity-fingerprint = { path = "../../core/crates/identity-fingerprint" }
 sentori-sourcemap-resolver = { path = "../../core/crates/sourcemap-resolver" }
-sentori-issue-store        = { path = "../../core/crates/issue-store" }
-sentori-span-store         = { path = "../../core/crates/span-store" }
-sentori-replay-store       = { path = "../../core/crates/replay-store" }
-sentori-runtime-metrics    = { path = "../../core/crates/runtime-metrics" }
+sentori-proguard-resolver  = { path = "../../core/crates/proguard-resolver" }
+sentori-dwarf-resolver     = { path = "../../core/crates/dwarf-resolver" }
+sentori-issue-fingerprint  = { path = "../../core/crates/issue-fingerprint" }
 sentori-notifier           = { path = "../../core/crates/notifier" }
-sentori-integration-traits = { path = "../../core/crates/integration-traits" }
-sentori-audit-event        = { path = "../../core/crates/audit-event" }
-sentori-alert-rule         = { path = "../../core/crates/alert-rule" }
-sentori-saved-view         = { path = "../../core/crates/saved-view" }
-sentori-tenant-scoping     = { path = "../../core/crates/tenant-scoping" }
-sentori-billing            = { path = "../../core/crates/billing" }
 sentori-argon2-password    = { path = "../../core/crates/argon2-password" }
 sentori-cookie-session     = { path = "../../core/crates/cookie-session" }
 sentori-ingest-token       = { path = "../../core/crates/ingest-token" }
 sentori-push-provider      = { path = "../../core/crates/push-provider" }
-sentori-cert-monitor       = { path = "../../core/crates/cert-monitor" }
-sentori-stripe-webhook-verify = { path = "../../core/crates/stripe-webhook-verify" }
 
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "multipart", "query", "tokio", "tower-log", "tracing", "macros"] }
 axum-extra = { version = "0.10", default-features = false, features = ["cookie"] }
@@ -68,6 +56,7 @@ tokio = { version = "1", features = ["full"] }
 tower = { version = "0.5", default-features = false }
 tower-http = { version = "0.6", default-features = false, features = ["fs"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "time", "json", "migrate"] }
+rand = "0.9"
 uuid = { version = "1", features = ["v7", "serde"] }
 time = { version = "0.3", features = ["serde-well-known", "macros"] }
 serde = { version = "1", features = ["derive"] }
@@ -78,6 +67,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 http = "1"
 hex = "0.4"
+data-encoding = "2"
 hmac = "0.12"
 sha2 = "0.10"
 hkdf = "0.12"

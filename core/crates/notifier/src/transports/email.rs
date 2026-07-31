@@ -157,7 +157,6 @@ impl Notifier for EmailTransport {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
-    use sentori_workspace_identity::WorkspaceId;
 
     fn cfg() -> EmailConfig {
         EmailConfig {
@@ -182,13 +181,7 @@ mod tests {
     #[test]
     fn build_message_constructs_envelope() {
         let t = EmailTransport::new(cfg()).unwrap();
-        let n = Notification::new(
-            WorkspaceId::new(),
-            Channel::Email,
-            "alice@example.com",
-            "hello",
-            "world body",
-        );
+        let n = Notification::new(Channel::Email, "alice@example.com", "hello", "world body");
         let msg = t.build_message(&n).unwrap();
         let raw = String::from_utf8_lossy(&msg.formatted()).to_string();
         assert!(raw.contains("From: sentori@example.com"));
@@ -200,7 +193,7 @@ mod tests {
     #[test]
     fn build_message_rejects_bad_recipient() {
         let t = EmailTransport::new(cfg()).unwrap();
-        let n = Notification::new(WorkspaceId::new(), Channel::Email, "not-an-email", "x", "y");
+        let n = Notification::new(Channel::Email, "not-an-email", "x", "y");
         assert!(matches!(t.build_message(&n), Err(TransportError::Email(_))));
     }
 

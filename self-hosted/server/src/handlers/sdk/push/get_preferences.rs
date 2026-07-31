@@ -28,7 +28,7 @@ pub async fn handle(
          WHERE project_id = $1 AND user_fingerprint_hex = $2 \
          ORDER BY category",
     )
-    .bind(ctx.project_id.into_uuid())
+    .bind(ctx.project_id)
     .bind(&fp_bytes)
     .fetch_all(&state.pool)
     .await

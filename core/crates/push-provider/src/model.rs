@@ -1,10 +1,8 @@
 //! Typed domain models for the push-provider surface.
 
-use std::fmt;
-
-use sentori_workspace_identity::ProjectId;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::fmt;
 use thiserror::Error;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -261,7 +259,7 @@ pub struct DeviceToken {
     /// Primary key.
     pub id: Uuid,
     /// Owning project.
-    pub project_id: ProjectId,
+    pub project_id: Uuid,
     /// Which provider this token belongs to.
     pub kind: ProviderKind,
     /// Provider-native token string.

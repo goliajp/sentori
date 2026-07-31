@@ -140,14 +140,13 @@ impl Notifier for MockTransport {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
-    use sentori_workspace_identity::WorkspaceId;
 
     use super::*;
 
     #[tokio::test]
     async fn mock_records_send() {
         let t = MockTransport::new();
-        let n = Notification::new(WorkspaceId::new(), Channel::Mock, "x", "s", "b");
+        let n = Notification::new(Channel::Mock, "x", "s", "b");
         t.send(&n).await.unwrap();
         assert_eq!(t.inbox().len(), 1);
         assert_eq!(t.inbox().snapshot()[0].subject, "s");
@@ -156,14 +155,14 @@ mod tests {
     #[tokio::test]
     async fn mock_failure_injection() {
         let t = MockTransport::new().failing_for("bad");
-        let n = Notification::new(WorkspaceId::new(), Channel::Mock, "bad", "s", "b");
+        let n = Notification::new(Channel::Mock, "bad", "s", "b");
         assert!(matches!(t.send(&n).await, Err(TransportError::Mock(_))));
     }
 
     #[tokio::test]
     async fn mock_passes_non_matching_recipient() {
         let t = MockTransport::new().failing_for("bad");
-        let n = Notification::new(WorkspaceId::new(), Channel::Mock, "ok", "s", "b");
+        let n = Notification::new(Channel::Mock, "ok", "s", "b");
         t.send(&n).await.unwrap();
         assert_eq!(t.inbox().len(), 1);
     }
@@ -174,13 +173,11 @@ mod tests {
         let t = MockTransport::with_inbox(inbox.clone());
         // Add directly via Arc to avoid async fan-out in
         // this sync test.
-        t.inbox.inner.lock().unwrap().push(Notification::new(
-            WorkspaceId::new(),
-            Channel::Mock,
-            "x",
-            "s",
-            "b",
-        ));
+        t.inbox
+            .inner
+            .lock()
+            .unwrap()
+            .push(Notification::new(Channel::Mock, "x", "s", "b"));
         assert_eq!(inbox.len(), 1);
         inbox.clear();
         assert!(inbox.is_empty());

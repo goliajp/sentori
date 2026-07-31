@@ -45,7 +45,6 @@ pub async fn handle(
     match result {
         Ok(_) => {
             info!(
-                workspace_id = %ctx.workspace_id,
                 project_id = %ctx.project_id,
                 %topic,
                 "push.unsubscribe_topic unsubscribed",

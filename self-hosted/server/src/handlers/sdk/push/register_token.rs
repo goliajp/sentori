@@ -48,7 +48,7 @@ pub async fn handle(
     let new_id = uuid::Uuid::now_v7();
     let row = sqlx::query(
         "INSERT INTO device_tokens \
-         (id, workspace_id, project_id, provider, env, native_token) \
+         (id, project_id, provider, env, native_token) \
          VALUES ($1, $2, $3, $4, $5, $6) \
          ON CONFLICT (project_id, provider, native_token) DO UPDATE SET \
             env = COALESCE(EXCLUDED.env, device_tokens.env), \
@@ -58,8 +58,7 @@ pub async fn handle(
          RETURNING id, (xmax = 0) AS is_new",
     )
     .bind(new_id)
-    .bind(ctx.workspace_id.into_uuid())
-    .bind(ctx.project_id.into_uuid())
+    .bind(ctx.project_id)
     .bind(&body.kind)
     .bind(body.env.as_deref())
     .bind(&body.native_token)
@@ -85,7 +84,6 @@ pub async fn handle(
             let device_id: uuid::Uuid = row.get("id");
             let is_new: bool = row.try_get("is_new").unwrap_or(true);
             info!(
-                workspace_id = %ctx.workspace_id,
                 project_id = %ctx.project_id,
                 token_id = %device_id,
                 is_new,
@@ -100,7 +98,7 @@ pub async fn handle(
             )
         }
         Err(e) => {
-            warn!(workspace_id = %ctx.workspace_id, error = %e, "push.register_token db_error");
+            warn!(error = %e, "push.register_token db_error");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({ "error": "internal" })),

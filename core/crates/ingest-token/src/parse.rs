@@ -3,7 +3,7 @@
 use sha2::{Digest, Sha256};
 
 /// Required wire-format prefix.
-pub const TOKEN_PREFIX: &str = "st_pk_";
+pub const TOKEN_PREFIX: &str = "st_";
 
 /// Wire-format value length (base32 chars after prefix).
 pub const TOKEN_VALUE_LEN: usize = 26;
@@ -19,7 +19,7 @@ pub fn hash_token(token: &str) -> String {
 }
 
 /// Lightweight syntactic check — full validation happens at
-/// DB lookup. Returns true if the token starts with `st_pk_`
+/// DB lookup. Returns true if the token starts with `st_`
 /// and has at least the expected length.
 #[must_use]
 pub fn looks_like_token(token: &str) -> bool {

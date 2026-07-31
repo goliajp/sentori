@@ -41,14 +41,12 @@ use axum::{
     extract::{Multipart, Path, State},
     http::StatusCode,
 };
-use sentori_billing::CounterKind;
 use sentori_ingest_token::IngestContext;
 use serde_json::{Value, json};
 use time::OffsetDateTime;
 use tracing::{info, warn};
 use uuid::Uuid;
 
-use crate::handlers::sdk::quota;
 use crate::state::AppState;
 
 const MAX_BODY_BYTES: usize = 50 * 1024 * 1024; // 50 MiB hard cap
@@ -81,25 +79,19 @@ pub async fn handle(
     } = match accept(&kind, multipart).await {
         Ok(p) => p,
         Err((status, body)) => {
-            warn!(workspace_id = %ctx.workspace_id, %kind, ?body, "sdk.attachments rejected");
+            warn!(%kind, ?body, "sdk.attachments rejected");
             return (status, Json(body));
         }
     };
 
-    // K17 quota: only replay recordings meter (as one Replays unit).
     // The other five kinds are debug artefacts attached to an event
     // that was already metered, not a separately billed counter.
     let now = OffsetDateTime::now_utc();
-    if kind == "replay"
-        && let Err(body) = quota::meter(&state, ctx.project_id, CounterKind::Replays, 1, now).await
-    {
-        return (StatusCode::PAYMENT_REQUIRED, Json(body));
-    }
 
     let hash = match state.attachments.put(&bytes).await {
         Ok(h) => h,
         Err(e) => {
-            warn!(workspace_id = %ctx.workspace_id, error = %e, "sdk.attachments blob_store_error");
+            warn!(error = %e, "sdk.attachments blob_store_error");
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({ "error": "blob_store_failed" })),
@@ -112,13 +104,12 @@ pub async fn handle(
     let reference = Uuid::now_v7();
     let result = sqlx::query(
         "INSERT INTO event_attachments \
-         (ref, workspace_id, project_id, event_id, kind, media_type, \
+         (ref, project_id, event_id, kind, media_type, \
           size_bytes, captured_at, source, blob_hash) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
     )
     .bind(reference)
-    .bind(ctx.workspace_id.into_uuid())
-    .bind(ctx.project_id.into_uuid())
+    .bind(ctx.project_id)
     .bind(event_id)
     .bind(&kind)
     .bind(&media_type)
@@ -132,7 +123,6 @@ pub async fn handle(
     match result {
         Ok(_) => {
             info!(
-                workspace_id = %ctx.workspace_id,
                 project_id = %ctx.project_id,
                 %event_id,
                 %kind,
@@ -151,7 +141,7 @@ pub async fn handle(
             )
         }
         Err(e) => {
-            warn!(workspace_id = %ctx.workspace_id, error = %e, "sdk.attachments db_error");
+            warn!(error = %e, "sdk.attachments db_error");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({ "error": "internal" })),

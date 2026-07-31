@@ -16,7 +16,6 @@ use sentori_push_provider::{
     PushDispatcher, PushError, RateLimits, SendOutcome,
 };
 use sentori_secrets_vault::{KeyId, MasterKey, Vault};
-use sentori_workspace_identity::{Identity, ProjectId, WorkspaceId};
 use sqlx::{Executor, PgPool};
 use testcontainers_modules::{
     postgres::Postgres,
@@ -56,7 +55,7 @@ async fn ensure_rig() -> String {
     guard.as_ref().expect("rig").base_url.clone()
 }
 
-async fn fresh_pool() -> (PgPool, WorkspaceId) {
+async fn fresh_pool() -> PgPool {
     let base = ensure_rig().await;
     let admin = PgPool::connect(&format!("{base}/postgres"))
         .await
@@ -71,24 +70,24 @@ async fn fresh_pool() -> (PgPool, WorkspaceId) {
         .await
         .expect("connect");
     for sql in [
-        include_str!("../../../migrations/0001_workspace_identity.sql"),
-        include_str!("../../../migrations/0006_push_tokens.sql"),
+        include_str!("../../../migrations/0001_identity.sql"),
+        include_str!("../../../migrations/0002_projects.sql"),
+        include_str!("../../../migrations/0007_push.sql"),
     ] {
         pool.execute(sql).await.expect("migration");
     }
-    let workspace_id = sentori_workspace_identity::bootstrap_workspace(&pool, "test")
-        .await
-        .expect("bootstrap workspace");
-    (pool, workspace_id)
+    pool
 }
 
-async fn seed_project(pool: &PgPool, workspace_id: WorkspaceId, slug: &str) -> ProjectId {
-    Identity::new(pool.clone(), workspace_id)
-        .projects()
-        .create(slug, slug, &[0xa5u8; 32])
+async fn seed_project(pool: &PgPool, slug: &str) -> Uuid {
+    let id = Uuid::now_v7();
+    sqlx::query("INSERT INTO projects (id, name) VALUES ($1, $2)")
+        .bind(id)
+        .bind(slug)
+        .execute(pool)
         .await
-        .expect("project")
-        .id
+        .expect("project");
+    id
 }
 
 fn vault() -> Vault {
@@ -104,7 +103,7 @@ fn build_dispatcher(pool: PgPool, mock: Arc<MockProvider>, kind: ProviderKind) -
     PushDispatcher::new(pool, reg, vault(), RateLimits::default())
 }
 
-async fn seed_credential(disp: &PushDispatcher, pid: ProjectId, kind: ProviderKind) {
+async fn seed_credential(disp: &PushDispatcher, pid: Uuid, kind: ProviderKind) {
     disp.credentials()
         .upsert(
             pid,
@@ -118,7 +117,7 @@ async fn seed_credential(disp: &PushDispatcher, pid: ProjectId, kind: ProviderKi
 
 async fn seed_token(
     disp: &PushDispatcher,
-    pid: ProjectId,
+    pid: Uuid,
     kind: ProviderKind,
     native: &str,
     app_user: Option<&str>,
@@ -134,8 +133,8 @@ async fn seed_token(
 
 #[tokio::test]
 async fn token_upsert_idempotent() {
-    let (pool, ws) = fresh_pool().await;
-    let pid = seed_project(&pool, ws, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let disp = build_dispatcher(
         pool,
         Arc::new(MockProvider::always(SendOutcome::Sent)),
@@ -170,8 +169,8 @@ async fn token_upsert_idempotent() {
 
 #[tokio::test]
 async fn token_upsert_rejects_empty() {
-    let (pool, ws) = fresh_pool().await;
-    let pid = seed_project(&pool, ws, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let disp = build_dispatcher(
         pool,
         Arc::new(MockProvider::always(SendOutcome::Sent)),
@@ -187,7 +186,7 @@ async fn token_upsert_rejects_empty() {
 
 #[tokio::test]
 async fn token_upsert_unknown_project_fk() {
-    let (pool, _ws) = fresh_pool().await;
+    let pool = fresh_pool().await;
     let disp = build_dispatcher(
         pool,
         Arc::new(MockProvider::always(SendOutcome::Sent)),
@@ -195,7 +194,7 @@ async fn token_upsert_unknown_project_fk() {
     );
     let err = disp
         .tokens()
-        .upsert(ProjectId::new(), ProviderKind::Apns, "X", None, None)
+        .upsert(Uuid::now_v7(), ProviderKind::Apns, "X", None, None)
         .await
         .unwrap_err();
     assert!(matches!(err, PushError::ProjectNotFound(_)));
@@ -203,8 +202,8 @@ async fn token_upsert_unknown_project_fk() {
 
 #[tokio::test]
 async fn token_quarantine_skips_from_live_list() {
-    let (pool, ws) = fresh_pool().await;
-    let pid = seed_project(&pool, ws, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let disp = build_dispatcher(
         pool,
         Arc::new(MockProvider::always(SendOutcome::Sent)),
@@ -225,8 +224,8 @@ async fn token_quarantine_skips_from_live_list() {
 
 #[tokio::test]
 async fn token_upsert_clears_quarantine() {
-    let (pool, ws) = fresh_pool().await;
-    let pid = seed_project(&pool, ws, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let disp = build_dispatcher(
         pool,
         Arc::new(MockProvider::always(SendOutcome::Sent)),
@@ -246,8 +245,8 @@ async fn token_upsert_clears_quarantine() {
 
 #[tokio::test]
 async fn list_for_user_returns_only_user_tokens() {
-    let (pool, ws) = fresh_pool().await;
-    let pid = seed_project(&pool, ws, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let disp = build_dispatcher(
         pool,
         Arc::new(MockProvider::always(SendOutcome::Sent)),
@@ -267,8 +266,8 @@ async fn list_for_user_returns_only_user_tokens() {
 
 #[tokio::test]
 async fn credentials_round_trip_seal_unseal() {
-    let (pool, ws) = fresh_pool().await;
-    let pid = seed_project(&pool, ws, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let disp = build_dispatcher(
         pool,
         Arc::new(MockProvider::always(SendOutcome::Sent)),
@@ -295,8 +294,8 @@ async fn credentials_round_trip_seal_unseal() {
 
 #[tokio::test]
 async fn credentials_missing_returns_none() {
-    let (pool, ws) = fresh_pool().await;
-    let pid = seed_project(&pool, ws, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let disp = build_dispatcher(
         pool,
         Arc::new(MockProvider::always(SendOutcome::Sent)),
@@ -315,8 +314,8 @@ async fn credentials_missing_returns_none() {
 
 #[tokio::test]
 async fn dispatch_single_token_calls_provider_once() {
-    let (pool, ws) = fresh_pool().await;
-    let pid = seed_project(&pool, ws, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let mock = Arc::new(MockProvider::always(SendOutcome::Sent));
     let disp = build_dispatcher(pool, mock.clone(), ProviderKind::Apns);
     seed_credential(&disp, pid, ProviderKind::Apns).await;
@@ -335,8 +334,8 @@ async fn dispatch_single_token_calls_provider_once() {
 
 #[tokio::test]
 async fn dispatch_project_kind_fans_out() {
-    let (pool, ws) = fresh_pool().await;
-    let pid = seed_project(&pool, ws, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let mock = Arc::new(MockProvider::always(SendOutcome::Sent));
     let disp = build_dispatcher(pool, mock.clone(), ProviderKind::Apns);
     seed_credential(&disp, pid, ProviderKind::Apns).await;
@@ -360,8 +359,8 @@ async fn dispatch_project_kind_fans_out() {
 
 #[tokio::test]
 async fn dispatch_project_user_fans_across_providers() {
-    let (pool, ws) = fresh_pool().await;
-    let pid = seed_project(&pool, ws, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let apns = Arc::new(MockProvider::new(
         ProviderKind::Apns,
         SendOutcome::Sent,
@@ -401,8 +400,8 @@ async fn dispatch_project_user_fans_across_providers() {
 
 #[tokio::test]
 async fn dispatch_missing_credentials_errors() {
-    let (pool, ws) = fresh_pool().await;
-    let pid = seed_project(&pool, ws, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let mock = Arc::new(MockProvider::always(SendOutcome::Sent));
     let disp = build_dispatcher(pool, mock, ProviderKind::Apns);
     let token_id = seed_token(&disp, pid, ProviderKind::Apns, "T", None).await;
@@ -418,8 +417,8 @@ async fn dispatch_missing_credentials_errors() {
 
 #[tokio::test]
 async fn dispatch_unregistered_provider_errors() {
-    let (pool, ws) = fresh_pool().await;
-    let pid = seed_project(&pool, ws, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     // Register APNs but seed a Fcm token.
     let mock = Arc::new(MockProvider::always(SendOutcome::Sent));
     let disp = build_dispatcher(pool, mock, ProviderKind::Apns);
@@ -437,8 +436,8 @@ async fn dispatch_unregistered_provider_errors() {
 
 #[tokio::test]
 async fn dispatch_single_token_quarantined_errors() {
-    let (pool, ws) = fresh_pool().await;
-    let pid = seed_project(&pool, ws, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let mock = Arc::new(MockProvider::always(SendOutcome::Sent));
     let disp = build_dispatcher(pool, mock, ProviderKind::Apns);
     seed_credential(&disp, pid, ProviderKind::Apns).await;
@@ -458,8 +457,8 @@ async fn dispatch_single_token_quarantined_errors() {
 
 #[tokio::test]
 async fn permanently_invalid_quarantines_row() {
-    let (pool, ws) = fresh_pool().await;
-    let pid = seed_project(&pool, ws, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let mock = Arc::new(MockProvider::always(SendOutcome::PermanentlyInvalidToken));
     let disp = build_dispatcher(pool, mock.clone(), ProviderKind::Apns);
     seed_credential(&disp, pid, ProviderKind::Apns).await;
@@ -494,8 +493,8 @@ async fn permanently_invalid_quarantines_row() {
 
 #[tokio::test]
 async fn transient_outcome_does_not_quarantine() {
-    let (pool, ws) = fresh_pool().await;
-    let pid = seed_project(&pool, ws, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let mock = Arc::new(MockProvider::always(SendOutcome::Transient {
         retry_after_secs: Some(30),
     }));
@@ -517,8 +516,8 @@ async fn transient_outcome_does_not_quarantine() {
 
 #[tokio::test]
 async fn rate_limit_skips_after_burst() {
-    let (pool, ws) = fresh_pool().await;
-    let pid = seed_project(&pool, ws, "p1").await;
+    let pool = fresh_pool().await;
+    let pid = seed_project(&pool, "p1").await;
     let mock = Arc::new(MockProvider::always(SendOutcome::Sent));
     let mut reg = ProviderRegistry::new();
     reg.register(ProviderKind::Apns, mock.clone());
