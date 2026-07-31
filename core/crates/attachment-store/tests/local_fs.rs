@@ -143,3 +143,33 @@ async fn root_accessor_returns_configured_path() {
     let store = LocalFsBlobStore::new(dir.path()).await.unwrap();
     assert_eq!(store.root(), dir.path());
 }
+
+#[tokio::test]
+async fn list_enumerates_blobs_with_mtimes() {
+    let (_dir, store) = store().await;
+    let h1 = store.put(b"blob one").await.expect("put 1");
+    let h2 = store.put(b"blob two").await.expect("put 2");
+
+    let listed = store.list().await.expect("list");
+    let hashes: Vec<_> = listed.iter().map(|(h, _)| *h).collect();
+    assert_eq!(listed.len(), 2);
+    assert!(hashes.contains(&h1));
+    assert!(hashes.contains(&h2));
+    for (_, mtime) in &listed {
+        assert!(*mtime > std::time::SystemTime::UNIX_EPOCH);
+    }
+}
+
+#[tokio::test]
+async fn list_skips_tmp_and_foreign_files() {
+    let (dir, store) = store().await;
+    let h = store.put(b"real blob").await.expect("put");
+    // A crashed write's leftover and a stray file must not surface.
+    std::fs::create_dir_all(dir.path().join("ab")).expect("mkdir");
+    std::fs::write(dir.path().join("ab/deadbeef.bin.tmp"), b"partial").expect("tmp");
+    std::fs::write(dir.path().join("not-a-fanout-dir"), b"stray").expect("stray");
+
+    let listed = store.list().await.expect("list");
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].0, h);
+}

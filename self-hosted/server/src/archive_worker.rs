@@ -15,19 +15,37 @@
 //! DELETEs have existed since the auth crate was written with no
 //! caller. This is the caller.
 //!
+//! Since 2.2.0 it also owns the symbol-artifact retention story:
+//!
+//! - `release_artifacts` rows beyond the newest N releases per
+//!   project are dropped (the release rows themselves stay — the
+//!   regression anchor orders by `releases.created_at` and must
+//!   keep seeing old releases). Symbol files age out of usefulness
+//!   with the release; nobody symbolicates a two-year-old build.
+//! - Orphaned blobs — hashes no `release_artifacts` or
+//!   `event_attachments` row references — are deleted from the
+//!   blob store. This is also what reclaims the old bytes after a
+//!   re-upload replaces a row's content_hash in place.
+//!
 //! Tunables:
 //! - `SENTORI_ARCHIVE_WORKER_ENABLED` default on
 //! - `SENTORI_ARCHIVE_INTERVAL_SEC` default 86400 (24h)
 //! - `SENTORI_ARCHIVE_SENT_DAYS`    default 30
 //! - `SENTORI_ARCHIVE_FAILED_DAYS`  default 90
+//! - `SENTORI_ARTIFACT_KEEP_RELEASES` default 20 (0 disables both
+//!   the retention pass and the blob GC)
 
+use std::collections::HashSet;
 use std::time::Duration;
 
 use sqlx::PgPool;
+use sqlx::Row;
 use tokio::time::sleep;
 use tracing::{info, warn};
 
-pub fn spawn(pool: PgPool) {
+use crate::blob_store::AttachmentStore;
+
+pub fn spawn(pool: PgPool, attachments: AttachmentStore) {
     if !env_enabled() {
         info!("archive worker disabled via SENTORI_ARCHIVE_WORKER_ENABLED");
         return;
@@ -35,10 +53,11 @@ pub fn spawn(pool: PgPool) {
     let interval = env_interval();
     let sent_days = env_sent_days();
     let failed_days = env_failed_days();
+    let keep_releases = env_keep_releases();
     tokio::spawn(async move {
         info!(
             interval_sec = interval.as_secs(),
-            sent_days, failed_days, "archive worker started"
+            sent_days, failed_days, keep_releases, "archive worker started"
         );
         loop {
             match run_once(&pool, sent_days, failed_days).await {
@@ -51,9 +70,87 @@ pub fn spawn(pool: PgPool) {
                 }
                 Err(e) => warn!(error = %e, "auth prune pass failed"),
             }
+            if keep_releases > 0 {
+                match prune_release_artifacts(&pool, keep_releases).await {
+                    Ok(rows) => info!(rows, keep_releases, "artifact retention pass"),
+                    Err(e) => warn!(error = %e, "artifact retention pass failed"),
+                }
+                match gc_orphan_blobs(&pool, &attachments).await {
+                    Ok((deleted, kept)) => info!(deleted, kept, "orphan blob gc pass"),
+                    Err(e) => warn!(error = %e, "orphan blob gc pass failed"),
+                }
+            }
             sleep(interval).await;
         }
     });
+}
+
+/// Drop symbol artifacts for everything older than the newest
+/// `keep` releases of each project. Release rows survive — only
+/// the artifact rows go; the blobs they pointed at become orphans
+/// for [`gc_orphan_blobs`] to reap on the same pass.
+async fn prune_release_artifacts(pool: &PgPool, keep: i64) -> Result<u64, sqlx::Error> {
+    let rows = sqlx::query(
+        "DELETE FROM release_artifacts WHERE release_id IN (             SELECT id FROM (                 SELECT id, row_number() OVER (                     PARTITION BY project_id ORDER BY created_at DESC                 ) AS rn FROM releases             ) ranked WHERE ranked.rn > $1          )",
+    )
+    .bind(keep)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    Ok(rows)
+}
+
+/// How long an unreferenced blob must have sat on disk before the
+/// GC believes it is an orphan rather than an upload whose row has
+/// not committed yet.
+const ORPHAN_MIN_AGE: Duration = Duration::from_hours(1);
+
+/// Delete blobs no DB row references. The mtime guard covers the
+/// put-then-insert window of in-flight uploads.
+async fn gc_orphan_blobs(
+    pool: &PgPool,
+    attachments: &AttachmentStore,
+) -> Result<(u64, u64), Box<dyn std::error::Error + Send + Sync>> {
+    let mut referenced: HashSet<String> = HashSet::new();
+    for row in sqlx::query("SELECT content_hash FROM release_artifacts")
+        .fetch_all(pool)
+        .await?
+    {
+        referenced.insert(row.get::<String, _>(0));
+    }
+    for row in sqlx::query("SELECT blob_hash FROM event_attachments")
+        .fetch_all(pool)
+        .await?
+    {
+        referenced.insert(row.get::<String, _>(0));
+    }
+
+    let mut deleted = 0u64;
+    let mut kept = 0u64;
+    let now = std::time::SystemTime::now();
+    for (hash, mtime) in attachments.list().await? {
+        if referenced.contains(&hash.to_hex()) {
+            kept += 1;
+            continue;
+        }
+        let age = now.duration_since(mtime).unwrap_or(Duration::ZERO);
+        if age < ORPHAN_MIN_AGE {
+            kept += 1;
+            continue;
+        }
+        match attachments.delete(&hash).await {
+            Ok(()) => deleted += 1,
+            Err(e) => warn!(hash = %hash.to_hex(), error = %e, "orphan blob delete failed"),
+        }
+    }
+    Ok((deleted, kept))
+}
+
+fn env_keep_releases() -> i64 {
+    std::env::var("SENTORI_ARTIFACT_KEEP_RELEASES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(20)
 }
 
 async fn run_once(
