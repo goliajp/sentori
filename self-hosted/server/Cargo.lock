@@ -231,7 +231,6 @@ dependencies = [
  "bytes",
  "cookie",
  "futures-util",
- "headers",
  "http",
  "http-body",
  "http-body-util",
@@ -1095,30 +1094,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7382cf6263419f2d8df38c55d7da83da5c18aef87fc7a7fc1fb1e344edfe14c1"
 dependencies = [
  "hashbrown 0.15.5",
-]
-
-[[package]]
-name = "headers"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3314d5adb5d94bcdf56771f2e50dbbc80bb4bdf88967526706205ac9eff24eb"
-dependencies = [
- "base64",
- "bytes",
- "headers-core",
- "http",
- "httpdate",
- "mime",
- "sha1",
-]
-
-[[package]]
-name = "headers-core"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54b4a22553d4242c49fddb9ba998a99962b5cc6f22cb5a3482bec22522403ce4"
-dependencies = [
- "http",
 ]
 
 [[package]]
@@ -2550,30 +2525,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sentori-auth-session"
-version = "0.1.0"
-dependencies = [
- "axum",
- "axum-extra",
- "base64",
- "getrandom 0.2.17",
- "http",
- "sentori-argon2-password",
- "sentori-cookie-session",
- "sentori-workspace-identity",
- "serde",
- "sha2",
- "sqlx",
- "subtle",
- "thiserror 2.0.19",
- "time",
- "tower",
- "tracing",
- "uuid",
- "zeroize",
-]
-
-[[package]]
 name = "sentori-cookie-session"
 version = "0.1.0"
 dependencies = [
@@ -2722,7 +2673,6 @@ dependencies = [
  "reqwest",
  "sentori-argon2-password",
  "sentori-attachment-store",
- "sentori-auth-session",
  "sentori-cookie-session",
  "sentori-dwarf-resolver",
  "sentori-identity-fingerprint",
@@ -2755,23 +2705,6 @@ dependencies = [
  "lru",
  "sourcemap",
  "thiserror 2.0.19",
-]
-
-[[package]]
-name = "sentori-workspace-identity"
-version = "0.1.0"
-dependencies = [
- "base64",
- "getrandom 0.2.17",
- "serde",
- "sha2",
- "sqlx",
- "subtle",
- "thiserror 2.0.19",
- "time",
- "tracing",
- "uuid",
- "zeroize",
 ]
 
 [[package]]

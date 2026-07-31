@@ -38,7 +38,6 @@ panic = "warn"
 
 [dependencies]
 # K-tier composition. Path deps into core/.
-sentori-auth-session       = { path = "../../core/crates/auth-session" }
 sentori-attachment-store   = { path = "../../core/crates/attachment-store" }
 sentori-identity-fingerprint = { path = "../../core/crates/identity-fingerprint" }
 sentori-sourcemap-resolver = { path = "../../core/crates/sourcemap-resolver" }
