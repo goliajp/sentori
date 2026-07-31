@@ -1,4 +1,5 @@
 import Foundation
+import MachO
 
 /// Static crash handler — captures NSException and writes one JSON file
 /// per crash to <Documents>/sentori/pending/<uuid>.json. JS drains that
@@ -87,7 +88,7 @@ import Foundation
             "error": [
                 "type": exception.name.rawValue,
                 "message": exception.reason ?? "",
-                "stack": frames(from: exception.callStackSymbols),
+                "stack": frames(from: exception.callStackSymbols, addresses: exception.callStackReturnAddresses),
                 "cause": NSNull(),
             ],
             "fingerprint": [String](),
@@ -171,8 +172,11 @@ import Foundation
     ///   "1   AppName    0x0001a0b0 -[ClassName method:] + 100"
     /// We don't have file/line info in raw symbol output; sourcemap-style
     /// symbolication for native happens server-side (Phase 8+).
-    private static func frames(from symbols: [String]) -> [[String: Any]] {
-        return symbols.map { sym -> [String: Any] in
+    private static func frames(
+        from symbols: [String],
+        addresses: [NSNumber] = []
+    ) -> [[String: Any]] {
+        return symbols.enumerated().map { (i, sym) -> [[String: Any]].Element in
             let parts = sym.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
             let module = parts.count > 1 ? parts[1] : "<unknown>"
             let function = parts.count > 3 ? parts.dropFirst(3).joined(separator: " ") : "<anonymous>"
@@ -181,12 +185,52 @@ import Foundation
                 && !module.contains("CoreFoundation")
                 && !module.contains("libsystem")
                 && !module.contains("libobjc")
-            return [
+            var frame: [String: Any] = [
                 "function": function,
                 "file": module,
                 "line": 0,
                 "inApp": inApp,
             ]
+            // v5.1 — raw address + owning image (base, LC_UUID) so the
+            // server can resolve the frame through the release's dSYM
+            // slice. dladdr + load-command walk are async-signal-
+            // unsafe in general but fine here: NSException handlers
+            // run on a live runtime, same as the UIKit capture below.
+            if i < addresses.count {
+                let addr = addresses[i].uintValue
+                var info = Dl_info()
+                if dladdr(UnsafeRawPointer(bitPattern: addr), &info) != 0,
+                   let fbase = info.dli_fbase {
+                    frame["addr"] = UInt64(addr)
+                    frame["imageBase"] = UInt64(UInt(bitPattern: fbase))
+                    if let uuid = imageUuid(atBase: fbase) {
+                        frame["imageUuid"] = uuid
+                    }
+                }
+            }
+            return frame
         }
+    }
+
+    /// LC_UUID of the Mach-O image loaded at `base` — the identity a
+    /// dSYM slice is matched by. Walks the load commands off the
+    /// in-memory header; read-only, bounded, no allocation beyond
+    /// the hex string.
+    private static func imageUuid(atBase base: UnsafeRawPointer) -> String? {
+        let header = base.assumingMemoryBound(to: mach_header_64.self)
+        guard header.pointee.magic == MH_MAGIC_64 else { return nil }
+        var cursor = base.advanced(by: MemoryLayout<mach_header_64>.size)
+        for _ in 0..<header.pointee.ncmds {
+            let cmd = cursor.assumingMemoryBound(to: load_command.self)
+            if cmd.pointee.cmd == LC_UUID {
+                let uuidCmd = cursor.assumingMemoryBound(to: uuid_command.self)
+                let u = uuidCmd.pointee.uuid
+                let bytes = [u.0, u.1, u.2, u.3, u.4, u.5, u.6, u.7,
+                             u.8, u.9, u.10, u.11, u.12, u.13, u.14, u.15]
+                return bytes.map { String(format: "%02X", $0) }.joined()
+            }
+            cursor = cursor.advanced(by: Int(cmd.pointee.cmdsize))
+        }
+        return nil
     }
 }

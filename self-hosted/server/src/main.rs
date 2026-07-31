@@ -39,6 +39,7 @@ mod handlers;
 mod hcm;
 mod mailer;
 mod mipush;
+mod native_symbolicate;
 mod notify;
 mod pipeline;
 mod push_quarantine;

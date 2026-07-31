@@ -147,9 +147,33 @@ object SentoriScreenshotCapture {
         return mapOf("base64" to base64, "mediaType" to mediaType)
     }
 
+    /// v5.1 — low-bitrate replay frame: the screenshot pipeline with
+    /// the long edge and quality dialed down by the caller. A replay
+    /// ring ticks this a few times per minute, so a frame is budgeted
+    /// in tens of KB, not the crash screenshot's hundred.
+    @JvmStatic
+    fun captureReplayFrame(
+        maskedIds: List<String>,
+        longEdgePx: Double,
+        quality: Double,
+    ): Map<String, String>? {
+        val activity = SentoriForegroundActivity.current() ?: return null
+        val window = activity.window ?: return null
+        val pct = (quality * 100).toInt().coerceIn(1, 100)
+        val (base64, mediaType) =
+            captureScreen(window, maskedIds.toHashSet(), longEdgePx.toFloat(), pct)
+                ?: return null
+        return mapOf("base64" to base64, "mediaType" to mediaType)
+    }
+
     // ── screenshot ────────────────────────────────────────────────
 
-    private fun captureScreen(window: Window, maskedIds: Set<String>): Pair<String, String>? {
+    private fun captureScreen(
+        window: Window,
+        maskedIds: Set<String>,
+        longEdgePx: Float = MAX_LONG_EDGE_PX.toFloat(),
+        qualityPct: Int = -1,
+    ): Pair<String, String>? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
             // PixelCopy is API 24+. Older Android: fall back to a
             // `View.draw(Canvas)` path that *must* run on main and
@@ -175,7 +199,7 @@ object SentoriScreenshotCapture {
 
         // Long-edge scale.
         val longEdge = maxOf(w, h).toFloat()
-        val scale = if (longEdge > MAX_LONG_EDGE_PX) MAX_LONG_EDGE_PX / longEdge else 1f
+        val scale = if (longEdge > longEdgePx) longEdgePx / longEdge else 1f
         val outW = (w * scale).toInt().coerceAtLeast(1)
         val outH = (h * scale).toInt().coerceAtLeast(1)
         val bitmap = Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
@@ -244,10 +268,18 @@ object SentoriScreenshotCapture {
         val mediaType: String
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             // Android 11+: native WEBP_LOSSY ~30% smaller than JPEG q=70.
-            bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, WEBP_QUALITY, baos)
+            bitmap.compress(
+                Bitmap.CompressFormat.WEBP_LOSSY,
+                if (qualityPct in 1..100) qualityPct else WEBP_QUALITY,
+                baos,
+            )
             mediaType = "image/webp"
         } else {
-            bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, baos)
+            bitmap.compress(
+                Bitmap.CompressFormat.JPEG,
+                if (qualityPct in 1..100) qualityPct else JPEG_QUALITY,
+                baos,
+            )
             mediaType = "image/jpeg"
         }
         bitmap.recycle()

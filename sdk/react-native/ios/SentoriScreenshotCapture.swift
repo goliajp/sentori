@@ -81,6 +81,35 @@ import UIKit
         return result
     }
 
+    /// v5.1 — replay-frame capture: the screenshot pipeline with the
+    /// long edge and JPEG quality dialed down by the caller. A replay
+    /// ring ticks this a few times per minute, so a frame is budgeted
+    /// in tens of KB, not the crash screenshot's hundred.
+    @objc public static func captureReplayFrame(
+        maskedIds: [String],
+        longEdgePx: Double,
+        quality: Double
+    ) -> [String: String]? {
+        let run: () -> [String: String]? = {
+            guard let window = keyWindowDiag().window else { return nil }
+            guard
+                let jpeg = renderJpegBase64(
+                    window: window,
+                    maskedIds: Set(maskedIds),
+                    longEdgePx: CGFloat(longEdgePx),
+                    quality: CGFloat(quality)
+                )
+            else { return nil }
+            return ["base64": jpeg, "mediaType": "image/jpeg"]
+        }
+        if Thread.isMainThread {
+            return run()
+        }
+        var result: [String: String]?
+        DispatchQueue.main.sync { result = run() }
+        return result
+    }
+
     private static func captureWithMaskSync(maskedIds: [String]) -> [String: String]? {
         guard let window = keyWindowDiag().window else {
             lastDiagPath = "window.null"
@@ -191,11 +220,13 @@ import UIKit
 
     private static func renderJpegBase64(
         window: UIWindow,
-        maskedIds: Set<String> = []
+        maskedIds: Set<String> = [],
+        longEdgePx: CGFloat = maxLongEdgePx,
+        quality: CGFloat = jpegQuality
     ) -> String? {
         let bounds = window.bounds
         let longEdge = max(bounds.width, bounds.height)
-        let scale: CGFloat = longEdge > maxLongEdgePx ? maxLongEdgePx / longEdge : 1.0
+        let scale: CGFloat = longEdge > longEdgePx ? longEdgePx / longEdge : 1.0
         let outSize = CGSize(width: bounds.width * scale, height: bounds.height * scale)
         guard outSize.width > 1, outSize.height > 1 else { return nil }
 
@@ -230,7 +261,7 @@ import UIKit
                 }
             }
         }
-        guard let data = image.jpegData(compressionQuality: jpegQuality) else {
+        guard let data = image.jpegData(compressionQuality: quality) else {
             return nil
         }
         return data.base64EncodedString()

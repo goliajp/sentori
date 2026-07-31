@@ -16,6 +16,9 @@ build — exit 0 with a friendly note unless --strict):
   sentori-cli upload dsym      --release <r> --token <t> <path.dSYM>
   sentori-cli upload mapping   --release <r> --token <t> mapping.txt
                                (mapping = the R8/proguard map; stored as kind "proguard")
+  sentori-cli upload srcbundle --release <r> --token <t> <src-dir...>
+                               (native source files so dSYM/proguard frames
+                                show the failing line; nothing touches git)
   sentori-cli react-native upload --release <r> --token <t> \\
       --metro-map <m> --hermes-map <h> [--bundle <b>]
 
@@ -92,6 +95,53 @@ const UPLOAD_OPTS = {
     token: { type: 'string' },
 };
 // ── upload commands (lenient by contract) ─────────────────────────
+async function cmdUploadSrcbundle(argv) {
+    const strict = isStrict(argv);
+    let parsed;
+    try {
+        parsed = parseArgs({ allowPositionals: true, args: stripStrict(argv), options: UPLOAD_OPTS });
+    }
+    catch (e) {
+        console.error(`error: ${e.message}\n${HELP}`);
+        return 2;
+    }
+    if (parsed.values.help) {
+        console.log(HELP);
+        return 0;
+    }
+    const c = parseCommon(parsed.values);
+    if (!c)
+        return 2;
+    if (parsed.positionals.length === 0) {
+        console.error('error: at least one source directory is required');
+        return 2;
+    }
+    try {
+        const { collectSources } = await import('./srcbundle.js');
+        const { bundle, stats } = collectSources(parsed.positionals);
+        if (stats.files === 0) {
+            console.error('error: no native source files found under the given directories');
+            return 2;
+        }
+        const { writeFileSync, mkdtempSync } = await import('node:fs');
+        const { tmpdir } = await import('node:os');
+        const { join } = await import('node:path');
+        const tmp = join(mkdtempSync(join(tmpdir(), 'sentori-srcbundle-')), 'srcbundle.json');
+        writeFileSync(tmp, JSON.stringify(bundle));
+        await uploadArtifact({ ...c, kind: 'srcbundle', path: tmp, name: 'srcbundle.json' });
+        console.log(`uploaded a source bundle for "${c.release}" — ${stats.files} file(s)` +
+            `${stats.skipped ? ` (${stats.skipped} skipped as oversized/unreadable)` : ''}; ` +
+            `native frames on this release now show their source window.`);
+        return 0;
+    }
+    catch (e) {
+        return lenientFail(strict, {
+            failure: `srcbundle upload failed (${e.message})`,
+            impact: `native frames from ${c.release} will show file:line without the code window until uploaded.`,
+            retry: `sentori-cli upload srcbundle --release "${c.release}" --token <t> ${parsed.positionals.join(' ')}`,
+        });
+    }
+}
 async function cmdUploadSourcemap(argv) {
     const strict = isStrict(argv);
     let parsed;
@@ -511,6 +561,8 @@ async function main(argv) {
         return cmdUploadDsym(rest);
     if (a === 'upload' && b === 'mapping')
         return cmdUploadMapping(rest);
+    if (a === 'upload' && b === 'srcbundle')
+        return cmdUploadSrcbundle(rest);
     if (a === 'react-native' && b === 'upload')
         return cmdReactNativeUpload(rest);
     if (a === 'probes' && b === 'sync')

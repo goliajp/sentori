@@ -69,6 +69,13 @@ type SentoriNativeModule = {
    * snapshot string or null on failure.
    */
   captureWireframe?: (maskedIds: string[]) => null | string
+
+  /** v5.1 — low-bitrate replay frame; absent on older native builds. */
+  captureReplayFrame?: (
+    maskedIds: string[],
+    longEdgePx: number,
+    quality: number,
+  ) => Promise<null | { base64: string; mediaType: string }>
   /**
    * v0.9.12 — diagnostic readout for the wireframe path. Cheap
    * synchronous call that returns the path the last `captureWireframe`
@@ -387,6 +394,32 @@ export function getRecentNativeException(): null | {
  * Callers must treat `null` as "no screenshot this round" — the
  * error event still ships, just without a thumbnail.
  */
+/** v5.1 — one low-bitrate frame for the screens replay ring.
+ *  Null on every failure mode (module unbound, method missing on an
+ *  older native build, capture failed); the ring just skips a beat. */
+let warnedNoReplayFrame = false
+export async function captureNativeReplayFrame(
+  maskedIds: string[],
+  longEdgePx: number,
+  quality: number,
+): Promise<null | { base64: string; mediaType: string }> {
+  const n = native()
+  if (!n) return null
+  if (!n.captureReplayFrame) {
+    if (!warnedNoReplayFrame) {
+      warnedNoReplayFrame = true
+      logger.warn('native', 'captureReplayFrame missing — rebuild the native app for visual replay')
+    }
+    return null
+  }
+  try {
+    return (await n.captureReplayFrame(maskedIds, longEdgePx, quality)) ?? null
+  } catch (e) {
+    logger.warn('native', 'captureReplayFrame threw', e)
+    return null
+  }
+}
+
 export async function captureNativeScreenshotWithMask(
   maskedIds: string[],
 ): Promise<null | { base64: string; mediaType: string }> {

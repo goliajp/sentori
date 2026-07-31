@@ -134,6 +134,25 @@ Events received before the upload are re-symbolicated
 automatically afterwards. dSYM/proguard uploads use the same
 command with the respective file.
 
+## 6b. 5.1 additions (visual replay + native source windows)
+
+- **The minute before the event, as pixels**: upgrade to
+  `@goliapkg/sentori-react-native@^5.1.0`, add
+  `registerMaskQuery(() => [...nativeIDs to black out])` (camera
+  feeds + user identity for your compliance case), then set
+  `replaySeconds: 60, replayScreens: true` in init. Needs a
+  rebuilt dev client / release build (new native function);
+  existing builds degrade gracefully.
+- **Native source windows without git**: after `upload dsym` /
+  `upload mapping`, also run
+  `sentori-cli upload srcbundle --release <r> ios/ android/app/src`
+  — the dashboard then shows the failing Swift/Kotlin line the
+  same way it already shows JS. The bundle is built from exactly
+  the directories you pass; nothing reads your repository.
+- The §3 note about screenshots being unmasked is superseded:
+  masking is back (native-side, per-frame), and visual capture is
+  opt-in per the above.
+
 ## 7. Verify
 
 1. `bunx tsc --noEmit` + your pre-commit scenario — both were

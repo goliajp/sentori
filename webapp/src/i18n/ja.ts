@@ -112,6 +112,13 @@ export const ja: Messages = {
     'SDK がリリースを報告するか、CLI がアーティファクトをアップロードすると表示されます。',
   'releases.emptyTitle': 'リリースはまだありません',
   'releases.loadFailed': 'リリースを読み込めませんでした。',
+  'replay.empty': 'このリプレイにはフレームがありません。',
+  'replay.frameAlt': '{t} 秒時点のフレーム',
+  'replay.loadFailed': 'リプレイを読み込めませんでした。',
+  'replay.pause': '一時停止',
+  'replay.play': '再生',
+  'replay.scrubber': 'リプレイ位置',
+  'replay.title': '画面に映っていたもの',
   'releases.noArtifacts':
     'このリリースのシンボリケーション用アーティファクトがありません — アップロードまでスタックは難読化されたままです:',
 

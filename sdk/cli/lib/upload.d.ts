@@ -2,7 +2,7 @@ export type UploadOpts = {
     apiUrl: string;
     token: string;
     release: string;
-    kind: 'dsym' | 'proguard' | 'sourcemap';
+    kind: 'dsym' | 'proguard' | 'sourcemap' | 'srcbundle';
     path: string;
     /** Override the stored artifact name (defaults to the filename). */
     name?: string;

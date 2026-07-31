@@ -118,6 +118,13 @@ export const en = {
     'Releases appear when the SDK reports one or the CLI uploads artifacts.',
   'releases.emptyTitle': 'No releases yet',
   'releases.loadFailed': 'Could not load releases.',
+  'replay.empty': 'No frames in this replay.',
+  'replay.frameAlt': 'Replay frame at {t}s',
+  'replay.loadFailed': 'Could not load the replay.',
+  'replay.pause': 'Pause',
+  'replay.play': 'Play',
+  'replay.scrubber': 'Replay position',
+  'replay.title': 'What the screen showed',
   'releases.noArtifacts':
     'No symbolication artifacts for this release — stacks stay minified until uploaded:',
 

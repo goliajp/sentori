@@ -17,6 +17,7 @@ import { checkColdStart } from './mobile-vitals';
 import { markNativeJsBridgeReady, setNativeConfig } from './native';
 import { shipNativePending } from './native-pending';
 import { drainReplay, startReplay } from './replay';
+import { drainScreenReplay, startScreenReplay } from './replay-screens';
 import { drainOfflineQueue, startTransport, uploadAttachment } from './transport';
 
 let _initialized = false;
@@ -50,6 +51,7 @@ export const init = safeFn('init', (config: InitConfig): void => {
       slowApi: config.detect?.slowApi ?? false,
     },
     replaySeconds: config.replaySeconds ?? 30,
+    replayScreens: config.replayScreens ?? false,
     beforeSend: config.beforeSend,
   });
   setLogLevel(config.logLevel ?? 'warn');
@@ -69,19 +71,35 @@ export const init = safeFn('init', (config: InitConfig): void => {
   const replaySeconds = config.replaySeconds ?? 30;
   if (replaySeconds > 0) {
     startReplay({ mode: 'wireframe' });
+    // Visual ring is opt-in: screenshots can carry user content.
+    if (config.replayScreens === true) startScreenReplay(replaySeconds);
     registerEmitHook((event) => {
       if (event.kind !== 'error' && event.kind !== 'warn') return;
       if (!event.id) return;
       const lines = drainReplay();
-      if (!lines) return;
-      const base64 = base64Encode(lines);
-      if (!base64) return;
-      void uploadAttachment(
-        event.id,
-        'replay',
-        { base64, mediaType: 'application/x-sentori-replay' },
-        { source: 'js' },
-      );
+      if (lines) {
+        const base64 = base64Encode(lines);
+        if (base64) {
+          void uploadAttachment(
+            event.id,
+            'replay',
+            { base64, mediaType: 'application/x-sentori-replay' },
+            { source: 'js' },
+          );
+        }
+      }
+      const frames = drainScreenReplay();
+      if (frames) {
+        const base64 = base64Encode(frames);
+        if (base64) {
+          void uploadAttachment(
+            event.id,
+            'screens',
+            { base64, mediaType: 'application/x-sentori-screens' },
+            { source: 'js' },
+          );
+        }
+      }
     });
   }
 
