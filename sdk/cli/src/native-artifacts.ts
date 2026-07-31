@@ -1,6 +1,6 @@
-// `sentori-cli upload dsym` (iOS) + `sentori-cli upload mapping` (Android).
-// Both endpoints take the raw artifact bytes (NOT multipart) with a few
-// headers / query params.
+// `sentori-cli upload dsym` (iOS) + `sentori-cli upload mapping`
+// (Android). dwarfdump slice discovery stays local; the bytes land
+// on the unified artifacts endpoint (multipart kind + file).
 
 import { spawnSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
@@ -9,39 +9,33 @@ import { statSync, readdirSync } from 'node:fs'
 
 export type AdminUpload = {
   apiUrl: string
-  projectId: string
   release?: string
   token: string
 }
 
-async function postBytes(
-  url: string,
-  body: Buffer,
-  token: string,
-  headers: Record<string, string> = {},
-): Promise<unknown> {
+async function uploadBytes(opts: {
+  apiUrl: string
+  token: string
+  release: string
+  kind: 'dsym' | 'proguard'
+  name: string
+  bytes: Buffer
+}): Promise<void> {
+  const form = new FormData()
+  form.append('kind', opts.kind)
+  form.append('file', new Blob([new Uint8Array(opts.bytes)]), opts.name)
+  const url = `${opts.apiUrl.replace(/\/+$/, '')}/v1/releases/${encodeURIComponent(opts.release)}/artifacts`
   const resp = await fetch(url, {
-    body,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/octet-stream',
-      ...headers,
-    },
+    body: form,
+    headers: { Authorization: `Bearer ${opts.token}` },
     method: 'POST',
   })
   if (!resp.ok) {
-    let detail = ''
-    try {
-      detail = await resp.text()
-    } catch {
-      // ignore
-    }
+    const detail = await resp.text().catch(() => '')
     throw new Error(
       `${resp.status} ${resp.statusText}${detail ? ` — ${detail.slice(0, 300)}` : ''}`,
     )
   }
-  const txt = await resp.text()
-  return txt ? JSON.parse(txt) : null
 }
 
 // ── dSYM ──────────────────────────────────────────────────────────
@@ -135,20 +129,19 @@ export async function uploadDsym(opts: DsymUploadOptions): Promise<DsymUploadRes
     slices.push(...found)
   }
 
-  const base = opts.apiUrl.replace(/\/+$/, '')
-  const q = new URLSearchParams()
-  if (opts.release) q.set('release', opts.release)
-  if (opts.objectName ?? basename(opts.path).replace(/\.dSYM$/, ''))
-    q.set('objectName', opts.objectName ?? basename(opts.path).replace(/\.dSYM$/, ''))
-  const qs = q.toString()
-  const url = `${base}/admin/api/projects/${encodeURIComponent(opts.projectId)}/dsyms${qs ? '?' + qs : ''}`
-
+  const objectName = opts.objectName ?? basename(opts.path).replace(/\.dSYM$/, '')
   const uploaded: { arch: string; debugId: string }[] = []
   for (const s of slices) {
-    const body = await readFile(s.file)
-    await postBytes(url, body, opts.token, {
-      'x-sentori-arch': s.arch,
-      'x-sentori-debug-id': s.debugId,
+    const bytes = await readFile(s.file)
+    // One artifact per slice; the name carries the lookup identity
+    // (object-arch-debugId) until the dwarf wiring lands server-side.
+    await uploadBytes({
+      apiUrl: opts.apiUrl,
+      token: opts.token,
+      release: opts.release ?? '',
+      kind: 'dsym',
+      name: `${objectName}-${s.arch}-${s.debugId}`,
+      bytes,
     })
     uploaded.push({ arch: s.arch, debugId: s.debugId })
   }
@@ -171,12 +164,12 @@ export async function uploadMapping(opts: MappingUploadOptions): Promise<void> {
   const body = await readFile(opts.path)
   if (body.length === 0) throw new Error(`empty mapping file: ${opts.path}`)
 
-  const base = opts.apiUrl.replace(/\/+$/, '')
-  const q = new URLSearchParams()
-  if (opts.release) q.set('release', opts.release)
-  const qs = q.toString()
-  const url = `${base}/admin/api/projects/${encodeURIComponent(opts.projectId)}/mappings${qs ? '?' + qs : ''}`
-  const headers: Record<string, string> = {}
-  if (opts.debugId) headers['x-sentori-debug-id'] = opts.debugId
-  await postBytes(url, body, opts.token, headers)
+  await uploadBytes({
+    apiUrl: opts.apiUrl,
+    token: opts.token,
+    release: opts.release ?? '',
+    kind: 'proguard',
+    name: opts.debugId ? `mapping-${opts.debugId}.txt` : basename(opts.path),
+    bytes: body,
+  })
 }

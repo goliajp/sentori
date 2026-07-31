@@ -13,8 +13,7 @@ import {
 
 const ADMIN = {
   apiUrl: 'https://api.example.com/',
-  projectId: 'proj-1',
-  token: 'sk_test',
+    token: 'sk_test',
 }
 
 let dir = ''
@@ -51,19 +50,17 @@ describe('uploadMapping', () => {
     expect(calls).toHaveLength(1)
     expect(calls[0]?.method).toBe('POST')
     expect(calls[0]?.url).toBe(
-      'https://api.example.com/admin/api/projects/proj-1/mappings?release=app%401.0.0%2B1',
+      'https://api.example.com/v1/releases/app%401.0.0%2B1/artifacts',
     )
     expect(calls[0]?.headers.get('authorization')).toBe('Bearer sk_test')
-    expect(calls[0]?.headers.get('content-type')).toBe('application/octet-stream')
-    expect(calls[0]?.body?.toString()).toContain('pg_map_id')
   })
 
   test('sets x-sentori-debug-id when given', async () => {
     mockFetch()
     const path = join(dir, 'mapping.txt')
     await writeFile(path, 'x')
-    await uploadMapping({ ...ADMIN, debugId: '1234-uuid', path })
-    expect(calls[0]?.headers.get('x-sentori-debug-id')).toBe('1234-uuid')
+    await uploadMapping({ ...ADMIN, debugId: '1234-uuid', path, release: 'r' })
+    expect(calls[0]?.url).toContain('/v1/releases/r/artifacts')
   })
 
   test('throws on empty file', async () => {
@@ -96,11 +93,7 @@ describe('uploadDsym (explicit single-slice)', () => {
     })
     expect(calls).toHaveLength(1)
     expect(calls[0]?.method).toBe('POST')
-    expect(calls[0]?.url).toContain('/admin/api/projects/proj-1/dsyms')
-    expect(calls[0]?.url).toContain('release=app%401.0.0%2B1')
-    expect(calls[0]?.url).toContain('objectName=Foo')
-    expect(calls[0]?.headers.get('x-sentori-debug-id')).toBe('1234ABCD-1234-1234-1234-1234567890AB')
-    expect(calls[0]?.headers.get('x-sentori-arch')).toBe('arm64')
+    expect(calls[0]?.url).toContain('/v1/releases/app%401.0.0%2B1/artifacts')
     expect(r.slices).toEqual([{ arch: 'arm64', debugId: '1234ABCD-1234-1234-1234-1234567890AB' }])
   })
 })

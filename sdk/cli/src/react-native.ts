@@ -4,7 +4,8 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { uploadSourcemaps } from './upload.js'
+import { uploadArtifact } from './upload.js'
+import { basename } from 'node:path'
 
 /** Resolve `react-native/scripts/compose-source-maps.js` from the
  *  current project's node_modules. Returns null if react-native isn't
@@ -68,14 +69,20 @@ export async function reactNativeUpload(opts: RnUploadOptions): Promise<{
   const composed = composeSourceMaps(opts.metroMap, opts.hermesMap)
   try {
     const paths = [composed, ...(opts.bundle ? [opts.bundle] : [])]
-    const r = await uploadSourcemaps({
-      apiUrl: opts.apiUrl,
-      dryRun: opts.dryRun,
-      paths,
-      release: opts.release,
-      token: opts.token,
-    })
-    return { files: r.files, uploaded: r.uploaded }
+    if (opts.dryRun) return { files: paths }
+    let uploaded = 0
+    for (const p of paths) {
+      await uploadArtifact({
+        apiUrl: opts.apiUrl,
+        token: opts.token,
+        release: opts.release,
+        kind: 'sourcemap',
+        path: p,
+        name: basename(p),
+      })
+      uploaded += 1
+    }
+    return { files: paths, uploaded }
   } finally {
     try {
       rmSync(composed, { force: true })

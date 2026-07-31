@@ -1,6 +1,5 @@
 export type AdminUpload = {
     apiUrl: string;
-    projectId: string;
     release?: string;
     token: string;
 };

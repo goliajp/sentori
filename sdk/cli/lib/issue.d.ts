@@ -1,28 +1,26 @@
 type Issue = {
-    errorType: string;
-    eventCount: number;
     id: string;
-    lastSeen: string;
+    kind: string;
+    title: string;
     messageSample: string;
-    status: 'active' | 'closed' | 'resolved' | 'silenced';
+    status: string;
+    eventCount: number;
+    usersCount: number;
+    maxPerUser: number;
+    lastSeen: string;
+    regressed: boolean;
 };
-type AdminConfig = {
+export type ApiConfig = {
     apiUrl: string;
-    projectId: string;
     token: string;
 };
-export type IssueListOptions = {
-    config: AdminConfig;
-    errorType?: string;
-    limit?: number;
-    status?: 'active' | 'closed' | 'resolved' | 'silenced';
-};
-export declare function issueList(opts: IssueListOptions): Promise<Issue[]>;
-export declare function issuePatch(config: AdminConfig, issueId: string, body: {
-    resolvedInRelease?: string;
-    status: 'active' | 'closed' | 'resolved' | 'silenced';
-}): Promise<Issue>;
-/** Format one issue for terminal output — short, one line, scannable. */
+export declare function listIssues(c: ApiConfig, opts?: {
+    status?: string;
+    kind?: string;
+}): Promise<Issue[]>;
+export declare function resolveIssue(c: ApiConfig, issueId: string, release?: string): Promise<void>;
+export declare function noteIssue(c: ApiConfig, issueId: string, body: string): Promise<void>;
+export declare function fetchBundle(c: ApiConfig, issueId: string): Promise<string>;
 export declare function formatIssueLine(i: Issue): string;
 export {};
 //# sourceMappingURL=issue.d.ts.map

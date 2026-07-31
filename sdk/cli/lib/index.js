@@ -1,122 +1,53 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
-import { formatIssueLine, issueList, issuePatch } from './issue.js';
+import { fetchBundle, formatIssueLine, listIssues, noteIssue, resolveIssue, } from './issue.js';
+import { isStrict, lenientFail, stripStrict } from './lenient.js';
 import { runMcpServer } from './mcp.js';
 import { uploadDsym, uploadMapping } from './native-artifacts.js';
+import { scanProbes, syncProbes } from './probes.js';
 import { parseJsonArg, pushCredsDelete, pushCredsList, pushCredsSet, pushReceipt, pushSend, } from './push.js';
 import { reactNativeUpload } from './react-native.js';
-import { uploadSourceBundle } from './source-bundle.js';
-import { uploadSourcemaps } from './upload.js';
+import { uploadArtifact } from './upload.js';
 const HELP = `sentori-cli — Sentori command-line interface
 
-Source-map upload:
-  sentori-cli upload sourcemap [options] <path...>
-      Upload one or more files or directories. A directory is scanned
-      (one level) for *.map / *.js / *.jsbundle / *.bundle / *.hbc;
-      a file given explicitly is uploaded as-is. Use this when you
-      already have a composed sourcemap on disk:
-        - web bundlers (point at the build dir),
-        - iOS post-\`react-native-xcode.sh\` where the build phase has
-          already composed packager + Hermes maps into the final
-          \`$SOURCEMAP_FILE\` and deleted the intermediates.
-      Composed-then-uploaded vs raw-then-server-composed yield
-      identical symbolication — the server stores the same shape
-      either way.
+Symbolication artifacts (api-scope token; failures NEVER block your
+build — exit 0 with a friendly note unless --strict):
+  sentori-cli upload sourcemap --release <r> --token <t> <path...>
+  sentori-cli upload dsym      --release <r> --token <t> <path.dSYM>
+  sentori-cli upload mapping   --release <r> --token <t> mapping.txt
+  sentori-cli react-native upload --release <r> --token <t> \\
+      --metro-map <m> --hermes-map <h> [--bundle <b>]
 
-  sentori-cli react-native upload [options]
-      Compose a Metro packager map + a Hermes map into one source map
-      (uses react-native's \`scripts/compose-source-maps.js\`) and
-      upload the result. Use this when you have both raw maps on
-      disk — typical Android release path where the gradle
-      \`bundleReleaseJsAndAssets\` task leaves both maps untouched.
-      Requires --metro-map and --hermes-map. On iOS the build phase
-      deletes the intermediates, so use \`upload sourcemap\` instead.
+Regression tripwires (design: probes):
+  sentori-cli probes sync --release <r> --token <t> [--dir .]
+      Statically scans source for sentori.probe('REF') call sites and
+      registers them, so a silent probe is visibly alive.
 
-Native artifacts (project-scoped, need --project + admin token):
-  sentori-cli upload dsym --project <uuid> [--release <r>] [--object-name <n>] [--debug-id <uuid> --arch <a>] <path>
-      Upload iOS dSYM debug info. By default walks a Foo.dSYM bundle
-      and uses "dwarfdump --uuid" to enumerate slices, uploading each.
-      Pass --debug-id and --arch to upload a single slice without
-      dwarfdump (useful in Linux CI where the toolchain isn't there).
+CI triage (the same /api surface an AI agent uses):
+  sentori-cli issue list [--status open] [--kind error]
+  sentori-cli issue resolve <issue-id> [--in-release <r>]
+  sentori-cli issue note <issue-id> --body "fixed in abc123"
+  sentori-cli issue bundle <issue-id>
 
-  sentori-cli upload mapping --project <uuid> [--release <r>] [--debug-id <uuid>] <mapping.txt>
-      Upload an R8 / ProGuard mapping (raw bytes). If the file starts
-      with a "# pg_map_id:" line the server sniffs the debug-id from
-      it; otherwise you can pass it explicitly.
+MCP (for Claude Code and friends):
+  sentori-cli mcp serve --token <api-token> [--api-url <url>]
 
-  sentori-cli upload source-bundle --project <uuid> --release <r> --platform ios|android [--module <label>] <archive.tar.gz>
-      Upload a pre-built tar.gz of your project's source so the
-      dashboard can render inline source for native (Swift / Kotlin /
-      Objective-C) frames the way it already does for JS via source
-      maps. Build the archive yourself:
-        tar -czf ios-source.tar.gz Sources/
-      Pass --module to upload multiple bundles per (release, platform)
-      — e.g. \`--module main\`, \`--module watch-ext\`. Omitting --module
-      reuses the v1.3 single-bundle slot (re-uploading replaces it).
+Push (carried):
+  sentori-cli push send / receipt / creds ...
 
-CI triage:
-  sentori-cli issue list --project <uuid> [--status active|silenced|resolved|closed] [--limit N] [--error-type <t>]
-  sentori-cli issue resolve <issue-uuid> --project <uuid> [--in-release <r>]
-  sentori-cli issue silence <issue-uuid> --project <uuid>
-
-LLM agents (MCP):
-  sentori-cli mcp serve --project <uuid> [--token <t>] [--api-url <url>]
-      Run a stdio MCP server. Connect from Claude Code / any MCP
-      client by pointing at \`sentori-cli mcp serve …\` as the command.
-      Exposes sentori_issue_list / _get / _comment / _transition /
-      _assign / _set_priority / _set_labels / _watch tools.
-
-Options (upload commands):
-  --release <r>     release identifier — MUST equal the value the SDK
-                    reports via init({ release }). Required.
-  --token <t>       Sentori token (or set $SENTORI_TOKEN).
-  --api-url <url>   Sentori API base (default https://sentori.golia.jp,
-                    or $SENTORI_API_URL). For a self-hosted instance, your
-                    host. (Accepts --ingest-url as an alias.)
-  --dry-run         describe what would be uploaded; don't upload.
-  -h, --help        show this help.
-
-Options (react-native upload):
-  --metro-map <p>   the *.packager.map Metro emits (--sourcemap-output).
-  --hermes-map <p>  the *.hbc.map the Hermes compiler emits.
-  --bundle <p>      optional: also upload the bundle (.jsbundle / .bundle).
-
-Options (issue commands):
-  --project <uuid>  project id (or set $SENTORI_PROJECT_ID).
-  --token <t>       admin token, sk_… prefix (or $SENTORI_ADMIN_TOKEN /
-                    $SENTORI_TOKEN). The ingest st_pk_ token may also work
-                    on a self-hosted instance.
-  --api-url <url>   Sentori API base (same as above).
-  --in-release <r>  (resolve only) mark this release as where the fix
-                    landed; the regression detector flips the issue back
-                    to "regressed" if a matching event lands later.
-
-Hermes release build, by hand:
-
-  Android (raw maps still on disk after \`./gradlew bundleRelease\`):
-    npx @goliapkg/sentori-cli react-native upload \\
-      --release "<app>@<version>+<build>" --token "$SENTORI_TOKEN" \\
-      --metro-map  android/app/build/intermediates/sourcemaps/react/release/index.android.bundle.packager.map \\
-      --hermes-map android/app/build/intermediates/sourcemaps/react/release/index.android.bundle.compiler.map \\
-      --bundle     android/app/build/generated/assets/react/release/index.android.bundle
-
-  iOS (already-composed map after \`xcodebuild archive\`; the build
-       phase deletes intermediates so you only have the composed map):
-    npx @goliapkg/sentori-cli upload sourcemap \\
-      --release "<app>@<version>+<build>" --token "$SENTORI_TOKEN" \\
-      "$BUILT_PRODUCTS_DIR/main.jsbundle.map" \\
-      "$BUILT_PRODUCTS_DIR/main.jsbundle"
+Common options:
+  --token       api-scope token (or $SENTORI_TOKEN)
+  --api-url     instance URL (or $SENTORI_API_URL; default https://sentori.golia.jp)
+  --strict      upload commands: exit non-zero on failure
 `;
-/** Parse the shared options, or print an error + return null. */
 function parseCommon(values) {
     const release = typeof values.release === 'string' ? values.release : undefined;
     if (!release) {
-        console.error('error: --release is required (must match the SDK’s init({ release }))');
+        console.error("error: --release is required (must match the SDK's init({ release }))");
         return null;
     }
-    const dryRun = values['dry-run'] === true;
     const token = (typeof values.token === 'string' ? values.token : undefined) ?? process.env.SENTORI_TOKEN;
-    if (!token && !dryRun) {
+    if (!token) {
         console.error('error: --token (or $SENTORI_TOKEN) is required');
         return null;
     }
@@ -124,27 +55,50 @@ function parseCommon(values) {
         (typeof values['ingest-url'] === 'string' ? values['ingest-url'] : undefined) ??
         process.env.SENTORI_API_URL ??
         'https://sentori.golia.jp';
-    return { apiUrl, dryRun, release, token: token ?? '' };
+    return { apiUrl, release, token };
 }
+function parseApiCfg(values) {
+    const token = (typeof values.token === 'string' ? values.token : undefined) ??
+        process.env.SENTORI_ADMIN_TOKEN ??
+        process.env.SENTORI_TOKEN;
+    if (!token) {
+        console.error('error: --token (or $SENTORI_TOKEN) is required');
+        return null;
+    }
+    const apiUrl = (typeof values['api-url'] === 'string' ? values['api-url'] : undefined) ??
+        (typeof values['ingest-url'] === 'string' ? values['ingest-url'] : undefined) ??
+        process.env.SENTORI_API_URL ??
+        'https://sentori.golia.jp';
+    return { apiUrl, token };
+}
+function parseAdminCfg(values) {
+    const projectId = (typeof values.project === 'string' ? values.project : undefined) ??
+        process.env.SENTORI_PROJECT_ID;
+    if (!projectId) {
+        console.error('error: --project <uuid> (or $SENTORI_PROJECT_ID) is required');
+        return null;
+    }
+    const api = parseApiCfg(values);
+    if (!api)
+        return null;
+    return { apiUrl: api.apiUrl, projectId, token: api.token };
+}
+const UPLOAD_OPTS = {
+    'api-url': { type: 'string' },
+    help: { short: 'h', type: 'boolean' },
+    'ingest-url': { type: 'string' },
+    release: { type: 'string' },
+    token: { type: 'string' },
+};
+// ── upload commands (lenient by contract) ─────────────────────────
 async function cmdUploadSourcemap(argv) {
+    const strict = isStrict(argv);
     let parsed;
     try {
-        parsed = parseArgs({
-            allowPositionals: true,
-            args: argv,
-            options: {
-                'api-url': { type: 'string' },
-                'dry-run': { type: 'boolean' },
-                help: { short: 'h', type: 'boolean' },
-                'ingest-url': { type: 'string' },
-                release: { type: 'string' },
-                token: { type: 'string' },
-            },
-        });
+        parsed = parseArgs({ allowPositionals: true, args: stripStrict(argv), options: UPLOAD_OPTS });
     }
     catch (e) {
-        console.error(`error: ${e.message}\n`);
-        console.error(HELP);
+        console.error(`error: ${e.message}\n${HELP}`);
         return 2;
     }
     if (parsed.values.help) {
@@ -155,46 +109,148 @@ async function cmdUploadSourcemap(argv) {
     if (!c)
         return 2;
     if (parsed.positionals.length === 0) {
-        console.error('error: at least one path (file or directory) is required');
+        console.error('error: at least one sourcemap path is required');
         return 2;
     }
     try {
-        const result = await uploadSourcemaps({
-            apiUrl: c.apiUrl,
-            dryRun: c.dryRun,
-            paths: parsed.positionals,
-            release: c.release,
-            token: c.token,
-        });
-        reportUpload(result, c);
+        for (const p of parsed.positionals) {
+            await uploadArtifact({ ...c, kind: 'sourcemap', path: p });
+        }
+        console.log(`uploaded ${parsed.positionals.length} sourcemap(s) for "${c.release}" — minified stacks on this release now resolve to source.`);
         return 0;
     }
     catch (e) {
-        console.error(`upload failed: ${e.message}`);
-        return 1;
+        return lenientFail(strict, {
+            failure: `sourcemap upload failed (${e.message})`,
+            impact: `crashes from ${c.release} will show minified stacks until the map is uploaded.`,
+            retry: `sentori-cli upload sourcemap --release "${c.release}" --token <t> ${parsed.positionals.join(' ')}`,
+        });
     }
 }
-async function cmdReactNativeUpload(argv) {
+async function cmdUploadDsym(argv) {
+    const strict = isStrict(argv);
     let parsed;
     try {
         parsed = parseArgs({
-            args: argv,
+            allowPositionals: true,
+            args: stripStrict(argv),
             options: {
-                'api-url': { type: 'string' },
-                bundle: { type: 'string' },
-                'dry-run': { type: 'boolean' },
-                help: { short: 'h', type: 'boolean' },
-                'hermes-map': { type: 'string' },
-                'ingest-url': { type: 'string' },
-                'metro-map': { type: 'string' },
-                release: { type: 'string' },
-                token: { type: 'string' },
+                ...UPLOAD_OPTS,
+                arch: { type: 'string' },
+                'debug-id': { type: 'string' },
+                'object-name': { type: 'string' },
             },
         });
     }
     catch (e) {
-        console.error(`error: ${e.message}\n`);
-        console.error(HELP);
+        console.error(`error: ${e.message}\n${HELP}`);
+        return 2;
+    }
+    if (parsed.values.help) {
+        console.log(HELP);
+        return 0;
+    }
+    const c = parseCommon(parsed.values);
+    if (!c)
+        return 2;
+    const path = parsed.positionals[0];
+    if (!path) {
+        console.error('error: a path to a .dSYM bundle or DWARF binary is required');
+        return 2;
+    }
+    const debugId = parsed.values['debug-id'];
+    const arch = parsed.values.arch;
+    if ((debugId && !arch) || (arch && !debugId)) {
+        console.error('error: --debug-id and --arch must be passed together (or both omitted)');
+        return 2;
+    }
+    try {
+        const r = await uploadDsym({
+            apiUrl: c.apiUrl,
+            arch: typeof arch === 'string' ? arch : undefined,
+            debugId: typeof debugId === 'string' ? debugId : undefined,
+            objectName: typeof parsed.values['object-name'] === 'string'
+                ? parsed.values['object-name']
+                : undefined,
+            path,
+            release: c.release,
+            token: c.token,
+        });
+        console.log(`uploaded ${r.slices.length} dSYM slice(s):`);
+        for (const s of r.slices)
+            console.log(`  ${s.debugId}  (${s.arch})`);
+        return 0;
+    }
+    catch (e) {
+        return lenientFail(strict, {
+            failure: `dSYM upload failed (${e.message})`,
+            impact: `native iOS stacks from ${c.release} stay unsymbolicated until the dSYM lands.`,
+            retry: `sentori-cli upload dsym --release "${c.release}" --token <t> ${path}`,
+        });
+    }
+}
+async function cmdUploadMapping(argv) {
+    const strict = isStrict(argv);
+    let parsed;
+    try {
+        parsed = parseArgs({
+            allowPositionals: true,
+            args: stripStrict(argv),
+            options: { ...UPLOAD_OPTS, 'debug-id': { type: 'string' } },
+        });
+    }
+    catch (e) {
+        console.error(`error: ${e.message}\n${HELP}`);
+        return 2;
+    }
+    if (parsed.values.help) {
+        console.log(HELP);
+        return 0;
+    }
+    const c = parseCommon(parsed.values);
+    if (!c)
+        return 2;
+    const path = parsed.positionals[0];
+    if (!path) {
+        console.error('error: a path to mapping.txt is required');
+        return 2;
+    }
+    try {
+        await uploadMapping({
+            apiUrl: c.apiUrl,
+            debugId: typeof parsed.values['debug-id'] === 'string' ? parsed.values['debug-id'] : undefined,
+            path,
+            release: c.release,
+            token: c.token,
+        });
+        console.log(`uploaded mapping for "${c.release}" — R8 names on this release now demangle.`);
+        return 0;
+    }
+    catch (e) {
+        return lenientFail(strict, {
+            failure: `mapping upload failed (${e.message})`,
+            impact: `Android stacks from ${c.release} stay R8-obfuscated until the mapping lands.`,
+            retry: `sentori-cli upload mapping --release "${c.release}" --token <t> ${path}`,
+        });
+    }
+}
+async function cmdReactNativeUpload(argv) {
+    const strict = isStrict(argv);
+    let parsed;
+    try {
+        parsed = parseArgs({
+            args: stripStrict(argv),
+            options: {
+                ...UPLOAD_OPTS,
+                bundle: { type: 'string' },
+                'dry-run': { type: 'boolean' },
+                'hermes-map': { type: 'string' },
+                'metro-map': { type: 'string' },
+            },
+        });
+    }
+    catch (e) {
+        console.error(`error: ${e.message}\n${HELP}`);
         return 2;
     }
     if (parsed.values.help) {
@@ -214,65 +270,31 @@ async function cmdReactNativeUpload(argv) {
         const result = await reactNativeUpload({
             apiUrl: c.apiUrl,
             bundle: typeof parsed.values.bundle === 'string' ? parsed.values.bundle : undefined,
-            dryRun: c.dryRun,
+            dryRun: parsed.values['dry-run'] === true,
             hermesMap,
             metroMap,
             release: c.release,
             token: c.token,
         });
-        reportUpload(result, c);
+        console.log(`uploaded ${result.uploaded ?? result.files.length} file(s) for "${c.release}".`);
         return 0;
     }
     catch (e) {
-        console.error(`react-native upload failed: ${e.message}`);
-        return 1;
+        return lenientFail(strict, {
+            failure: `react-native upload failed (${e.message})`,
+            impact: `Hermes stacks from ${c.release} stay unsymbolicated until the composed map lands.`,
+            retry: `sentori-cli react-native upload --release "${c.release}" --token <t> --metro-map ${metroMap} --hermes-map ${hermesMap}`,
+        });
     }
 }
-function reportUpload(result, c) {
-    if (c.dryRun) {
-        console.log(`would upload ${result.files.length} file(s) to ${c.apiUrl.replace(/\/+$/, '')}/admin/api/releases/${encodeURIComponent(c.release)}/sourcemaps:`);
-        for (const f of result.files)
-            console.log(`  ${f}`);
-    }
-    else {
-        console.log(`uploaded ${result.uploaded ?? result.files.length} file(s) for release "${c.release}" — minified stacks on this release will now resolve to source.`);
-    }
-}
-function parseAdminCfg(values) {
-    const projectId = (typeof values.project === 'string' ? values.project : undefined) ??
-        process.env.SENTORI_PROJECT_ID;
-    if (!projectId) {
-        console.error('error: --project <uuid> (or $SENTORI_PROJECT_ID) is required');
-        return null;
-    }
-    const token = (typeof values.token === 'string' ? values.token : undefined) ??
-        process.env.SENTORI_ADMIN_TOKEN ??
-        process.env.SENTORI_TOKEN;
-    if (!token) {
-        console.error('error: --token (or $SENTORI_ADMIN_TOKEN / $SENTORI_TOKEN) is required for issue commands');
-        return null;
-    }
-    const apiUrl = (typeof values['api-url'] === 'string' ? values['api-url'] : undefined) ??
-        (typeof values['ingest-url'] === 'string' ? values['ingest-url'] : undefined) ??
-        process.env.SENTORI_API_URL ??
-        'https://sentori.golia.jp';
-    return { apiUrl, projectId, token };
-}
-async function cmdIssueList(argv) {
+// ── probes sync ───────────────────────────────────────────────────
+async function cmdProbesSync(argv) {
+    const strict = isStrict(argv);
     let parsed;
     try {
         parsed = parseArgs({
-            args: argv,
-            options: {
-                'api-url': { type: 'string' },
-                'error-type': { type: 'string' },
-                help: { short: 'h', type: 'boolean' },
-                'ingest-url': { type: 'string' },
-                limit: { type: 'string' },
-                project: { type: 'string' },
-                status: { type: 'string' },
-                token: { type: 'string' },
-            },
+            args: stripStrict(argv),
+            options: { ...UPLOAD_OPTS, dir: { type: 'string' } },
         });
     }
     catch (e) {
@@ -283,22 +305,58 @@ async function cmdIssueList(argv) {
         console.log(HELP);
         return 0;
     }
-    const cfg = parseAdminCfg(parsed.values);
-    if (!cfg)
+    const c = parseCommon(parsed.values);
+    if (!c)
         return 2;
-    const status = parsed.values.status;
-    if (status && !['active', 'closed', 'resolved', 'silenced'].includes(status)) {
-        console.error(`error: --status must be one of: active, silenced, resolved, closed`);
+    const dir = typeof parsed.values.dir === 'string' ? parsed.values.dir : '.';
+    const refs = scanProbes(dir);
+    if (refs.length === 0) {
+        console.log(`no sentori.probe() call sites found under ${dir} — nothing to register.`);
+        return 0;
+    }
+    try {
+        const r = await syncProbes({ apiUrl: c.apiUrl, token: c.token, release: c.release, refs });
+        console.log(`registered ${r.registered} probe(s) for "${c.release}": ${refs.join(', ')}`);
+        return 0;
+    }
+    catch (e) {
+        return lenientFail(strict, {
+            failure: `probes sync failed (${e.message})`,
+            impact: `silent probes on ${c.release} can't be told apart from deleted code until registered.`,
+            retry: `sentori-cli probes sync --release "${c.release}" --token <t> --dir ${dir}`,
+        });
+    }
+}
+// ── issue commands (the /api surface) ─────────────────────────────
+const ISSUE_OPTS = {
+    'api-url': { type: 'string' },
+    help: { short: 'h', type: 'boolean' },
+    'ingest-url': { type: 'string' },
+    token: { type: 'string' },
+};
+async function cmdIssueList(argv) {
+    let parsed;
+    try {
+        parsed = parseArgs({
+            args: argv,
+            options: { ...ISSUE_OPTS, kind: { type: 'string' }, status: { type: 'string' } },
+        });
+    }
+    catch (e) {
+        console.error(`error: ${e.message}\n${HELP}`);
         return 2;
     }
-    const limitStr = parsed.values.limit;
-    const limit = limitStr ? Number.parseInt(limitStr, 10) : undefined;
+    if (parsed.values.help) {
+        console.log(HELP);
+        return 0;
+    }
+    const cfg = parseApiCfg(parsed.values);
+    if (!cfg)
+        return 2;
     try {
-        const rows = await issueList({
-            config: cfg,
-            errorType: parsed.values['error-type'],
-            limit,
-            status: status,
+        const rows = await listIssues(cfg, {
+            kind: parsed.values.kind,
+            status: parsed.values.status ?? 'open',
         });
         if (rows.length === 0) {
             console.log('(no matching issues)');
@@ -313,20 +371,13 @@ async function cmdIssueList(argv) {
         return 1;
     }
 }
-async function cmdIssuePatch(argv, body, verb) {
+async function cmdIssueResolve(argv) {
     let parsed;
     try {
         parsed = parseArgs({
             allowPositionals: true,
             args: argv,
-            options: {
-                'api-url': { type: 'string' },
-                help: { short: 'h', type: 'boolean' },
-                'in-release': { type: 'string' },
-                'ingest-url': { type: 'string' },
-                project: { type: 'string' },
-                token: { type: 'string' },
-            },
+            options: { ...ISSUE_OPTS, 'in-release': { type: 'string' } },
         });
     }
     catch (e) {
@@ -337,45 +388,31 @@ async function cmdIssuePatch(argv, body, verb) {
         console.log(HELP);
         return 0;
     }
-    const cfg = parseAdminCfg(parsed.values);
+    const cfg = parseApiCfg(parsed.values);
     if (!cfg)
         return 2;
     const issueId = parsed.positionals[0];
     if (!issueId) {
-        console.error('error: <issue-uuid> is required');
+        console.error('error: <issue-id> is required');
         return 2;
     }
-    if (verb === 'resolved' && typeof parsed.values['in-release'] === 'string') {
-        body.resolvedInRelease = parsed.values['in-release'];
-    }
     try {
-        const updated = await issuePatch(cfg, issueId, body);
-        console.log(`${issueId} → ${verb}${body.resolvedInRelease ? ` (in ${body.resolvedInRelease})` : ''}: ${updated.errorType}`);
+        await resolveIssue(cfg, issueId, parsed.values['in-release']);
+        console.log(`${issueId} → resolved${parsed.values['in-release'] ? ` (in ${parsed.values['in-release']})` : ''}`);
         return 0;
     }
     catch (e) {
-        console.error(`issue ${verb} failed: ${e.message}`);
+        console.error(`issue resolve failed: ${e.message}`);
         return 1;
     }
 }
-// ── native artifact upload ────────────────────────────────────────
-async function cmdUploadDsym(argv) {
+async function cmdIssueNote(argv) {
     let parsed;
     try {
         parsed = parseArgs({
             allowPositionals: true,
             args: argv,
-            options: {
-                'api-url': { type: 'string' },
-                arch: { type: 'string' },
-                'debug-id': { type: 'string' },
-                help: { short: 'h', type: 'boolean' },
-                'ingest-url': { type: 'string' },
-                'object-name': { type: 'string' },
-                project: { type: 'string' },
-                release: { type: 'string' },
-                token: { type: 'string' },
-            },
+            options: { ...ISSUE_OPTS, body: { type: 'string' } },
         });
     }
     catch (e) {
@@ -386,57 +423,29 @@ async function cmdUploadDsym(argv) {
         console.log(HELP);
         return 0;
     }
-    const cfg = parseAdminCfg(parsed.values);
+    const cfg = parseApiCfg(parsed.values);
     if (!cfg)
         return 2;
-    const path = parsed.positionals[0];
-    if (!path) {
-        console.error('error: a path to a .dSYM bundle or DWARF binary is required');
-        return 2;
-    }
-    const debugId = parsed.values['debug-id'];
-    const arch = parsed.values.arch;
-    if ((debugId && !arch) || (arch && !debugId)) {
-        console.error('error: --debug-id and --arch must be passed together (or both omitted)');
+    const issueId = parsed.positionals[0];
+    const body = parsed.values.body;
+    if (!issueId || !body) {
+        console.error('error: <issue-id> and --body are required');
         return 2;
     }
     try {
-        const r = await uploadDsym({
-            apiUrl: cfg.apiUrl,
-            arch: typeof arch === 'string' ? arch : undefined,
-            debugId: typeof debugId === 'string' ? debugId : undefined,
-            objectName: typeof parsed.values['object-name'] === 'string' ? parsed.values['object-name'] : undefined,
-            path,
-            projectId: cfg.projectId,
-            release: typeof parsed.values.release === 'string' ? parsed.values.release : undefined,
-            token: cfg.token,
-        });
-        console.log(`uploaded ${r.slices.length} dSYM slice(s):`);
-        for (const s of r.slices)
-            console.log(`  ${s.debugId}  (${s.arch})`);
+        await noteIssue(cfg, issueId, body);
+        console.log(`${issueId} ← note added`);
         return 0;
     }
     catch (e) {
-        console.error(`dsym upload failed: ${e.message}`);
+        console.error(`issue note failed: ${e.message}`);
         return 1;
     }
 }
-async function cmdUploadMapping(argv) {
+async function cmdIssueBundle(argv) {
     let parsed;
     try {
-        parsed = parseArgs({
-            allowPositionals: true,
-            args: argv,
-            options: {
-                'api-url': { type: 'string' },
-                'debug-id': { type: 'string' },
-                help: { short: 'h', type: 'boolean' },
-                'ingest-url': { type: 'string' },
-                project: { type: 'string' },
-                release: { type: 'string' },
-                token: { type: 'string' },
-            },
-        });
+        parsed = parseArgs({ allowPositionals: true, args: argv, options: ISSUE_OPTS });
     }
     catch (e) {
         console.error(`error: ${e.message}\n${HELP}`);
@@ -446,109 +455,28 @@ async function cmdUploadMapping(argv) {
         console.log(HELP);
         return 0;
     }
-    const cfg = parseAdminCfg(parsed.values);
+    const cfg = parseApiCfg(parsed.values);
     if (!cfg)
         return 2;
-    const path = parsed.positionals[0];
-    if (!path) {
-        console.error('error: a path to mapping.txt is required');
+    const issueId = parsed.positionals[0];
+    if (!issueId) {
+        console.error('error: <issue-id> is required');
         return 2;
     }
     try {
-        await uploadMapping({
-            apiUrl: cfg.apiUrl,
-            debugId: typeof parsed.values['debug-id'] === 'string' ? parsed.values['debug-id'] : undefined,
-            path,
-            projectId: cfg.projectId,
-            release: typeof parsed.values.release === 'string' ? parsed.values.release : undefined,
-            token: cfg.token,
-        });
-        console.log(`uploaded mapping for project ${cfg.projectId}${parsed.values.release ? ` / ${parsed.values.release}` : ''}`);
+        console.log(await fetchBundle(cfg, issueId));
         return 0;
     }
     catch (e) {
-        console.error(`mapping upload failed: ${e.message}`);
+        console.error(`issue bundle failed: ${e.message}`);
         return 1;
     }
 }
-async function cmdUploadSourceBundle(argv) {
-    let parsed;
-    try {
-        parsed = parseArgs({
-            allowPositionals: true,
-            args: argv,
-            options: {
-                'api-url': { type: 'string' },
-                help: { short: 'h', type: 'boolean' },
-                'ingest-url': { type: 'string' },
-                // v1.4 W26 — optional module label so polyrepo apps can
-                // upload multiple bundles per (release, platform) without
-                // clobbering each other (main vs watch-ext vs share-ext…).
-                module: { type: 'string' },
-                platform: { type: 'string' },
-                project: { type: 'string' },
-                release: { type: 'string' },
-                token: { type: 'string' },
-            },
-        });
-    }
-    catch (e) {
-        console.error(`error: ${e.message}\n${HELP}`);
-        return 2;
-    }
-    if (parsed.values.help) {
-        console.log(HELP);
-        return 0;
-    }
-    const cfg = parseAdminCfg(parsed.values);
-    if (!cfg)
-        return 2;
-    const path = parsed.positionals[0];
-    if (!path) {
-        console.error('error: a path to a tar.gz archive is required');
-        return 2;
-    }
-    const platform = parsed.values.platform;
-    if (platform !== 'ios' && platform !== 'android') {
-        console.error('error: --platform must be ios or android');
-        return 2;
-    }
-    const release = typeof parsed.values.release === 'string' ? parsed.values.release : undefined;
-    if (!release) {
-        console.error('error: --release is required for source-bundle uploads');
-        return 2;
-    }
-    try {
-        const r = await uploadSourceBundle({
-            apiUrl: cfg.apiUrl,
-            module: typeof parsed.values.module === 'string' ? parsed.values.module : undefined,
-            path,
-            platform,
-            projectId: cfg.projectId,
-            release,
-            token: cfg.token,
-        });
-        console.log(`uploaded ${r.kind} (${r.sizeBytes} bytes, sha256:${r.contentHash.slice(0, 12)}…)`);
-        return 0;
-    }
-    catch (e) {
-        console.error(`source-bundle upload failed: ${e.message}`);
-        return 1;
-    }
-}
+// ── mcp ───────────────────────────────────────────────────────────
 async function cmdMcpServe(argv) {
     let parsed;
     try {
-        parsed = parseArgs({
-            args: argv,
-            options: {
-                'api-url': { type: 'string' },
-                help: { short: 'h', type: 'boolean' },
-                'ingest-url': { type: 'string' },
-                project: { type: 'string' },
-                token: { type: 'string' },
-            },
-        });
+        parsed = parseArgs({ args: argv, options: ISSUE_OPTS });
     }
     catch (e) {
         console.error(`error: ${e.message}\n${HELP}`);
@@ -558,11 +486,11 @@ async function cmdMcpServe(argv) {
         console.log(HELP);
         return 0;
     }
-    const cfg = parseAdminCfg(parsed.values);
+    const cfg = parseApiCfg(parsed.values);
     if (!cfg)
         return 2;
     try {
-        await runMcpServer({ apiUrl: cfg.apiUrl, projectId: cfg.projectId, token: cfg.token });
+        await runMcpServer({ apiUrl: cfg.apiUrl, token: cfg.token });
         return 0;
     }
     catch (e) {
@@ -582,20 +510,20 @@ async function main(argv) {
         return cmdUploadDsym(rest);
     if (a === 'upload' && b === 'mapping')
         return cmdUploadMapping(rest);
-    if (a === 'upload' && b === 'source-bundle')
-        return cmdUploadSourceBundle(rest);
-    if (a === 'mcp' && b === 'serve')
-        return cmdMcpServe(rest);
     if (a === 'react-native' && b === 'upload')
         return cmdReactNativeUpload(rest);
+    if (a === 'probes' && b === 'sync')
+        return cmdProbesSync(rest);
+    if (a === 'mcp' && b === 'serve')
+        return cmdMcpServe(rest);
     if (a === 'issue' && b === 'list')
         return cmdIssueList(rest);
     if (a === 'issue' && b === 'resolve')
-        return cmdIssuePatch(rest, { status: 'resolved' }, 'resolved');
-    if (a === 'issue' && b === 'silence')
-        return cmdIssuePatch(rest, { status: 'silenced' }, 'silenced');
-    if (a === 'issue' && b === 'close')
-        return cmdIssuePatch(rest, { status: 'closed' }, 'closed');
+        return cmdIssueResolve(rest);
+    if (a === 'issue' && b === 'note')
+        return cmdIssueNote(rest);
+    if (a === 'issue' && b === 'bundle')
+        return cmdIssueBundle(rest);
     if (a === 'push' && b === 'send')
         return cmdPushSend(rest);
     if (a === 'push' && b === 'receipt')
