@@ -113,8 +113,9 @@ fn group_identity(ev: &IncomingEvent) -> Result<(String, String, String), Ingest
                 .and_then(Value::as_str)
                 .unwrap_or("");
             // In-app frames of the (already symbolicated) stack.
+            let frames = err.and_then(|e| e.get("stack")).and_then(Value::as_array);
             let mut sig = String::new();
-            if let Some(frames) = err.and_then(|e| e.get("stack")).and_then(Value::as_array) {
+            if let Some(frames) = frames {
                 for f in frames {
                     if f.get("inApp").and_then(Value::as_bool) == Some(true) {
                         let file = f.get("file").and_then(Value::as_str).unwrap_or("?");
@@ -126,10 +127,24 @@ fn group_identity(ev: &IncomingEvent) -> Result<(String, String, String), Ingest
                     }
                 }
             }
-            // A stack with no in-app frames still needs a stable
-            // group: fall back to type+message so it groups at all.
+            // No in-app frames (dev-client bundles mark everything
+            // out-of-app): function names survive bundle line drift
+            // where file URLs and line numbers don't.
+            if sig.is_empty()
+                && let Some(frames) = frames
+            {
+                for f in frames {
+                    if let Some(func) = f.get("function").and_then(Value::as_str) {
+                        sig.push_str(func);
+                        sig.push('\n');
+                    }
+                }
+            }
+            // Last resort: type + message — with volatile fragments
+            // (timestamps, ids, counts) collapsed, or a message that
+            // embeds a timestamp opens a fresh issue per occurrence.
             let fp_input = if sig.is_empty() {
-                format!("error\x1f{etype}\x1f{message}")
+                format!("error\x1f{etype}\x1f{}", collapse_numbers(message))
             } else {
                 format!("error\x1f{etype}\x1f{sig}")
             };
@@ -175,6 +190,25 @@ fn group_identity(ev: &IncomingEvent) -> Result<(String, String, String), Ingest
             Ok((r.to_string(), String::new(), format!("probe\x1f{r}")))
         }
     }
+}
+
+/// Replace every digit run with `#` so messages that differ only in
+/// volatile fragments (timestamps, ids, counts) group together.
+fn collapse_numbers(msg: &str) -> String {
+    let mut out = String::with_capacity(msg.len());
+    let mut in_digits = false;
+    for c in msg.chars() {
+        if c.is_ascii_digit() {
+            if !in_digits {
+                out.push('#');
+                in_digits = true;
+            }
+        } else {
+            in_digits = false;
+            out.push(c);
+        }
+    }
+    out
 }
 
 /// Persist one event: find-or-create its issue (with atomic
@@ -477,4 +511,63 @@ pub async fn record_assert_stats(
         .await?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn error_event(message: &str, in_app: bool) -> IncomingEvent {
+        IncomingEvent {
+            id: uuid::Uuid::now_v7(),
+            project_id: uuid::Uuid::now_v7(),
+            kind: Kind::Error,
+            occurred_at: time::OffsetDateTime::now_utc(),
+            platform: "ios".into(),
+            release: "t@1".into(),
+            environment: "test".into(),
+            name: None,
+            surface: json!({}),
+            user_key: None,
+            payload: json!({
+                "error": {
+                    "type": "Error",
+                    "message": message,
+                    "stack": [
+                        { "file": "http://192.168.0.2:8081/bundle", "function": "boom", "line": 721_422, "inApp": in_app },
+                        { "file": "http://192.168.0.2:8081/bundle", "function": "press", "line": 721_001, "inApp": in_app }
+                    ]
+                }
+            }),
+        }
+    }
+
+    #[test]
+    fn dev_bundle_stacks_group_despite_timestamped_messages() -> Result<(), IngestError> {
+        let a = group_identity(&error_event("smoke @ 2026-07-31T16:24:08.939Z", false))?;
+        let b = group_identity(&error_event("smoke @ 2026-07-31T16:25:47.573Z", false))?;
+        assert_eq!(a.2, b.2, "same stack shape must share a fingerprint");
+        Ok(())
+    }
+
+    #[test]
+    fn stackless_messages_collapse_volatile_numbers() -> Result<(), IngestError> {
+        let mk = |msg: &str| IncomingEvent {
+            payload: json!({ "error": { "type": "Error", "message": msg } }),
+            ..error_event(msg, false)
+        };
+        let a = group_identity(&mk("timeout after 1500ms"))?;
+        let b = group_identity(&mk("timeout after 3200ms"))?;
+        assert_eq!(a.2, b.2);
+        Ok(())
+    }
+
+    #[test]
+    fn in_app_frames_still_take_priority() -> Result<(), IngestError> {
+        let a = group_identity(&error_event("m1", true))?;
+        let b = group_identity(&error_event("m2", true))?;
+        assert_eq!(a.2, b.2);
+        Ok(())
+    }
 }

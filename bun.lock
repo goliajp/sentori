@@ -30,7 +30,7 @@
     },
     "sdk/cli": {
       "name": "@goliapkg/sentori-cli",
-      "version": "0.6.0",
+      "version": "1.0.0",
       "bin": {
         "sentori-cli": "./lib/index.js",
       },
@@ -42,7 +42,7 @@
     },
     "sdk/core": {
       "name": "@goliapkg/sentori-core",
-      "version": "1.4.0",
+      "version": "2.0.0",
       "devDependencies": {
         "@types/bun": "latest",
         "typescript": "^7",
@@ -50,7 +50,7 @@
     },
     "sdk/expo": {
       "name": "@goliapkg/sentori-expo",
-      "version": "9.0.1",
+      "version": "10.0.0",
       "dependencies": {
         "@expo/config-plugins": "^57.0.5",
       },
@@ -60,7 +60,7 @@
         "typescript": "^7",
       },
       "peerDependencies": {
-        "@goliapkg/sentori-react-native": ">=4.0.0",
+        "@goliapkg/sentori-react-native": ">=5.0.0",
         "expo": ">=56.0.0",
         "expo-application": ">=56.0.0",
         "react-native": ">=0.82.0",
@@ -71,12 +71,12 @@
     },
     "sdk/react-native": {
       "name": "@goliapkg/sentori-react-native",
-      "version": "4.0.0",
+      "version": "5.0.0",
       "bin": {
         "sentori-rn-upload-source-bundle": "bin/sentori-rn-upload-source-bundle.cjs",
       },
       "dependencies": {
-        "@goliapkg/sentori-core": "^1.4.0",
+        "@goliapkg/sentori-core": "^2.0.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
