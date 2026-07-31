@@ -33,6 +33,7 @@ mod blob_store;
 mod bootstrap;
 mod bundle;
 mod client_ip;
+mod env_config;
 mod fcm;
 mod handlers;
 mod hcm;
@@ -58,9 +59,22 @@ use state::AppState;
 async fn main() -> anyhow::Result<()> {
     init_tracing();
 
-    let db_url = std::env::var("SENTORI_DATABASE_URL")
-        .or_else(|_| std::env::var("DATABASE_URL"))
+    let db_url = env_config::env_or_file("SENTORI_DATABASE_URL")
+        .or_else(|| env_config::env_or_file("DATABASE_URL"))
         .context("SENTORI_DATABASE_URL (or DATABASE_URL) env var required")?;
+
+    // `sentori-server reset-password <email>` — the operator path
+    // for a locked-out owner (design.md §10): no SMTP dependency,
+    // prints a fresh password to stdout and exits.
+    let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("reset-password") {
+        let email = args
+            .get(2)
+            .context("usage: sentori-server reset-password <email>")?;
+        let pool = PgPool::connect(&db_url).await.context("db connect")?;
+        return bootstrap::reset_password(&pool, email).await;
+    }
+
     let bind = std::env::var("SENTORI_BIND").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
 
     info!(%bind, "sentori self-hosted server boot");

@@ -1,43 +1,56 @@
 # Sentori self-hosted
 
-Run sentori on your own server. One docker compose command,
-postgres + server + bundled SPA in a single image.
+Crash and warning reporting for mobile apps, on your own server.
+One `docker compose` command runs the whole thing: a single app
+image (API + dashboard) plus postgres.
 
 ## Quick start
 
 ```bash
-git clone <this-repo>
-cd sentori-selfhosted
+git clone <this-repo> sentori && cd sentori/self-hosted/docker
 
-cp self-hosted/docker/.env.example .env
-# Edit POSTGRES_PASSWORD + SENTORI_SESSION_SECRET +
-# SENTORI_BOOTSTRAP_OWNER_EMAIL + SENTORI_BOOTSTRAP_OWNER_PASSWORD
+cp .env.example .env
+# Set the three required values:
+#   POSTGRES_PASSWORD   — any strong secret
+#   SENTORI_OWNER_EMAIL — your sign-in address
+#   SENTORI_BASE_URL    — public origin (keep the default for a local try-out)
 
-docker compose -f self-hosted/docker/docker-compose.yml up -d
-
-# Open http://localhost:8080
-# Sign in with the bootstrap owner credentials
+docker compose up -d
 ```
 
-Or pull the prebuilt image:
+If you didn't set `SENTORI_OWNER_PASSWORD`, the first boot
+generates one — grab it from the log:
 
 ```bash
-docker run -d --name sentori-pg \
-  -e POSTGRES_PASSWORD=changeme -p 5432:5432 \
-  postgres:18-alpine
-
-docker run -d --name sentori \
-  -e SENTORI_DATABASE_URL='postgres://postgres:changeme@host.docker.internal:5432/postgres' \
-  -e SENTORI_SESSION_SECRET="$(openssl rand -base64 24 | head -c 32)" \
-  -e SENTORI_BOOTSTRAP_OWNER_EMAIL='you@example.com' \
-  -e SENTORI_BOOTSTRAP_OWNER_PASSWORD='change-me-please' \
-  -p 8080:8080 \
-  ghcr.io/goliajp/sentori/sentori-server:latest
+docker compose logs sentori | grep password
 ```
 
-## HTTPS in production
+Open `http://localhost:8080`, sign in as the owner, and you're on
+the Inbox.
 
-Put any reverse proxy in front of port 8080:
+## Connect an app
+
+1. **Settings → Projects**: create a project.
+2. **Settings → Tokens**: mint an `ingest` token for it.
+3. In the app:
+
+```ts
+import { sentori } from '@goliapkg/sentori-react-native';
+
+sentori.init({
+  token: 'st_...',                       // the ingest token
+  ingestUrl: 'https://sentori.example.com',
+  release: 'myapp@1.4.2',
+});
+```
+
+Events group into issues on the Inbox; assertions, probes and
+trace points appear under Instruments.
+
+## HTTPS
+
+TLS belongs to your reverse proxy — point it at port 8080 and put
+the https origin in `SENTORI_BASE_URL` (it's used in email links):
 
 ```caddyfile
 sentori.example.com {
@@ -46,39 +59,38 @@ sentori.example.com {
 }
 ```
 
-Keep `SENTORI_COOKIE_SECURE=1` (default) so the session cookie
-sets the `Secure` flag.
+## Email notifications (optional)
 
-## Env vars
+Set the `SENTORI_SMTP_*` values in `.env` and restart. New issues
+and regressions then mail the owner and assigned admins;
+**Settings → Notifications** has per-project switches and a
+test-email button. Without SMTP everything else works — the page
+just shows the channel as not configured.
 
-See `self-hosted/docker/.env.example` for the full list with
-inline docs. Required:
+## Locked out?
 
-- `POSTGRES_PASSWORD`
-- `SENTORI_SESSION_SECRET` — `openssl rand -base64 24 | head -c 32`
-- `SENTORI_BOOTSTRAP_OWNER_EMAIL` + `SENTORI_BOOTSTRAP_OWNER_PASSWORD`
-  (first boot only)
-
-Optional:
-
-- `SENTORI_ATTACHMENT_STORE=fs:/data/blobs` (default — persistent
-  blob volume)
-- `SENTORI_PUSH_WORKER_ENABLED=1` (default — background push dispatcher)
-- `SENTORI_COOKIE_SECURE=1` (default — flip to 0 for local-dev HTTP)
-- `SENTORI_SAASADMIN_USER_IDS=<uuid,uuid>` (limits /admin/api/saas/*
-  visibility; leave unset on single-workspace self-hosted)
-
-## SDK integration
-
-```ts
-import { init } from '@sentori/core';
-init({
-  token: 'st_pk_...',          // from /tokens page in dashboard
-  ingestUrl: 'https://sentori.example.com',
-});
+```bash
+docker compose exec sentori sentori-server reset-password you@example.com
 ```
 
-The token format `st_pk_<26 base32>` is a permanent contract.
+Prints a fresh password (and signs out that account everywhere).
+No SMTP required.
+
+## Configuration
+
+Everything lives in `.env` — see `.env.example` for the full
+annotated list. Secret-bearing variables also accept a `_FILE`
+variant pointing at a mounted secret file
+(`SENTORI_SMTP_PASS_FILE`, ...).
+
+Upgrades:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Migrations run automatically at boot. Back up the `sentori-db`
+volume before major version jumps.
 
 ## License
 
