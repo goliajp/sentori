@@ -32,6 +32,32 @@ members = [
     "crates/push-provider",
     "crates/notifier",
 ]
+# Retired from the build (v1 redesign). Directories stay until the S9
+# sweep; excluding them keeps cargo from claiming they belong to this
+# workspace.
+exclude = [
+    "crates/license-jwt",
+    "crates/stripe-webhook-verify",
+    "crates/workspace-identity",
+    "crates/auth-session",
+    "crates/event-pipeline",
+    "crates/issue-store",
+    "crates/span-store",
+    "crates/replay-store",
+    "crates/runtime-metrics",
+    "crates/cert-monitor",
+    "crates/integration-traits",
+    "crates/audit-event",
+    "crates/alert-rule",
+    "crates/saved-view",
+    "crates/tenant-scoping",
+    "crates/billing",
+    "crates/analytics-store",
+    "crates/security-engine",
+    "crates/session-store",
+    "crates/privacy-scrubber",
+    "crates/release-store",
+]
 
 [workspace.package]
 edition = "2024"
