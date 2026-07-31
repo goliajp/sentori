@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from './api';
 
 export function formatApiError(e: unknown): string {
-  return e instanceof ApiError ? `${e.status}: ${e.body}` : String(e);
+  return e instanceof ApiError ? `: ` : String(e);
 }
 
 export interface AsyncData<T> {

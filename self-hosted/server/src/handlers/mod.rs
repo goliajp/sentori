@@ -32,6 +32,7 @@ mod audit;
 mod auth;
 mod events;
 mod health;
+mod instruments;
 mod issues;
 mod metrics_prom;
 mod projects;
@@ -219,6 +220,11 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(
             "/admin/api/issues/{issue_id}/events",
             get(issues::occurrences),
+        )
+        // instruments — the devices panel
+        .route(
+            "/admin/api/projects/{project_id}/instruments",
+            get(instruments::get),
         )
         // events + attachments (reached from issues, never browsed)
         .route("/admin/api/events/{event_id}", get(events::get))

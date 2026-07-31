@@ -30,10 +30,10 @@ export default function ResetPassword() {
     }
     setLoading(true);
     try {
-      await api.authResetPassword(token, password);
+      await api.resetPassword(token, password);
       setDone(true);
-    } catch (e) {
-      setErr(String(e));
+    } catch {
+      setErr(t('auth.resetFailed'));
     } finally {
       setLoading(false);
     }

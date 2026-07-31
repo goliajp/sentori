@@ -152,13 +152,13 @@ gate 记录(2026-07-31):
 
 ## S5 Webapp(4 导航)
 
-- [ ] 用 /frontend-design:frontend-design 出视觉设计;IA = design.md §11(Inbox / Instruments / Releases / Settings)
-- [ ] 保留 lib 层(api.ts 方法面重写)、i18n 三语、auth 页;删旧 36 页、SaasAdmin、Billing
-- [ ] 问题详情 = bundle 叙事页:录屏⊕时间轴合体、栈内源码展开、Copy for AI、守护状态卡
-- [ ] Cmd+K、j/k triage、批量操作、空状态 onboarding、四态齐
-- [ ] **gate**:bun run check 绿;本地 mock + headless Chrome 截图走查每页四态
+- [x] 用 /frontend-design:frontend-design 出视觉设计;IA = design.md §11(Inbox / Instruments / Releases / Settings)
+- [x] 保留 lib 层(api.ts 方法面重写)、i18n 三语、auth 页;删旧 36 页、SaasAdmin、Billing
+- [x] 问题详情 = bundle 叙事页:录屏⊕时间轴合体、栈内源码展开、Copy for AI、守护状态卡
+- [x] Cmd+K、j/k triage、批量操作、空状态 onboarding、四态齐
+- [x] **gate**:bun run check 绿;本地 mock + headless Chrome 截图走查每页四态
 
-gate 记录:(待)
+gate 记录:2026-07-31。`bun run check` 绿(0 errors;i18n 112 keys × 3 locales all referenced;no hard-coded prose)。真栈走查(cargo 编译 server :18099 + postgres 容器 + 真 SDK 五 kind seed + probes:sync),CDP 注入 session cookie 截图并逐张目检 16 态:login(dark 卡片)、forgot(hint 文案修正)、inbox(filled/empty/error/loading 四态)、issue-detail(open + resolved 守护状态卡 + activity)、instruments(assert 红点/probe 红绿/trace)、releases(三灯 + 空态)、settings(projects/tokens/audit tabs)、j/k 光标 + x 勾选批量条、Cmd+K palette。走查中修 4 处:登录/forgot 全局 initTheme()(dark 首屏)、forgot 说明文案误用 resetSent、login 无卡片容器、role 裸显 superadmin(显示层映射所有者/管理员)。server 侧 fmt/clippy -D warnings/32 tests 绿。
 
 ## S6 渠道(email)
 
@@ -199,8 +199,8 @@ gate 记录:(待)
 
 | 待决点 | 决策位置 | 状态 |
 |---|---|---|
-| iOS dSYM 的 SDK 侧改造深度(可先 sourcemap+mapping 100%,dSYM 随后)| S3 | 未决 |
-| spans / runtime_metrics 表去留 | S1 | 未决 |
-| SDK npm 包名(@goliapkg vs @sentori org)| S3 发包前问用户 | 未决 |
+| iOS dSYM 的 SDK 侧改造深度(可先 sourcemap+mapping 100%,dSYM 随后)| S3 → S8 | 已决:dSYM 切片身份先乘 artifact name,dwarf 接线随 S8 |
+| spans / runtime_metrics 表去留 | S1 | 已决:不建;trace 进 events |
+| SDK npm 包名(@goliapkg vs @sentori org)| 发包前问用户 | 未决(S8 发包前问) |
 | marketing 站去留 | S8 | 未决 |
 | LLM 段模型与成本参数 | S2d | 未决 |
