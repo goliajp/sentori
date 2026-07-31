@@ -15,6 +15,7 @@ build — exit 0 with a friendly note unless --strict):
   sentori-cli upload sourcemap --release <r> --token <t> <path...>
   sentori-cli upload dsym      --release <r> --token <t> <path.dSYM>
   sentori-cli upload mapping   --release <r> --token <t> mapping.txt
+                               (mapping = the R8/proguard map; stored as kind "proguard")
   sentori-cli react-native upload --release <r> --token <t> \\
       --metro-map <m> --hermes-map <h> [--bundle <b>]
 
