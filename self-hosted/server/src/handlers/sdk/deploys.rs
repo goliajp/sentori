@@ -23,12 +23,10 @@ use crate::state::AppState;
 pub struct DeployBody {
     /// Release identifier (e.g. `myapp@5.3.1`).
     release: String,
-    /// When the release was deployed. Defaults to now() if absent.
-    #[serde(default, with = "time::serde::rfc3339::option")]
-    // Accepted on the wire for SDK compat; ignored — v1 releases
-
-    // key on created_at only.
+    /// When the release was deployed. Accepted on the wire for SDK
+    /// compat; ignored — the v1 releases table keys on created_at.
     #[allow(dead_code)]
+    #[serde(default, with = "time::serde::rfc3339::option")]
     deploy_at: Option<OffsetDateTime>,
 }
 
