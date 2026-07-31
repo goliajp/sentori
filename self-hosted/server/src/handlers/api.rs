@@ -241,3 +241,46 @@ pub async fn resolve(
     .await;
     (StatusCode::OK, Json(json!({ "ok": true })))
 }
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProbeSyncBody {
+    pub release: String,
+    pub refs: Vec<String>,
+}
+
+/// POST /api/probes:sync — the CLI's static-scan registration
+/// (design.md §2): every `sentori.probe(ref)` found in the source at
+/// release-upload time lands here, so a silent probe is visibly
+/// alive — distinguishable from deleted code.
+pub async fn probes_sync(
+    Extension(ctx): Extension<IngestContext>,
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<ProbeSyncBody>,
+) -> (StatusCode, Json<Value>) {
+    if let Err(e) = require_api_scope(&ctx) {
+        return e;
+    }
+    let mut registered = 0usize;
+    for r in &body.refs {
+        let res = sqlx::query(
+            "INSERT INTO probes (id, project_id, ref, first_registered_release, last_seen_release) \
+             VALUES ($1, $2, $3, $4, $4) \
+             ON CONFLICT (project_id, ref) \
+             DO UPDATE SET last_seen_release = EXCLUDED.last_seen_release",
+        )
+        .bind(Uuid::now_v7())
+        .bind(ctx.project_id)
+        .bind(r)
+        .bind(&body.release)
+        .execute(&state.pool)
+        .await;
+        if res.is_ok() {
+            registered += 1;
+        }
+    }
+    (
+        StatusCode::OK,
+        Json(json!({ "registered": registered, "release": body.release })),
+    )
+}

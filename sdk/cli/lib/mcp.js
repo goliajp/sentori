@@ -102,34 +102,22 @@ async function dispatch(req, toolMap, ctx, tools) {
             throw new Error(`method not found: ${req.method}`);
     }
 }
-// ── Tool implementations ─────────────────────────────────────────
-async function adminGet(ctx, path) {
-    const url = `${ctx.apiUrl.replace(/\/+$/, '')}/admin/api${path}`;
-    const resp = await fetch(url, {
-        headers: { Authorization: `Bearer ${ctx.token}` },
-    });
+// ── Tool implementations — the /api closed loop ──────────────────
+//
+// Four tools, mirroring exactly what an agent needs (design.md §9):
+// pick work, pull the evidence, write back, resolve. The bundle is
+// the product; everything else is triage plumbing.
+async function apiGet(ctx, path, raw = false) {
+    const url = `${ctx.apiUrl.replace(/\/+$/, '')}${path}`;
+    const resp = await fetch(url, { headers: { Authorization: `Bearer ${ctx.token}` } });
     if (!resp.ok)
         throw new Error(`GET ${path} → ${resp.status} ${resp.statusText}`);
-    return (await resp.json());
+    return raw ? resp.text() : resp.json();
 }
-async function adminPatch(ctx, path, body) {
-    const url = `${ctx.apiUrl.replace(/\/+$/, '')}/admin/api${path}`;
+async function apiPost(ctx, path, body) {
+    const url = `${ctx.apiUrl.replace(/\/+$/, '')}${path}`;
     const resp = await fetch(url, {
         body: JSON.stringify(body),
-        headers: {
-            Authorization: `Bearer ${ctx.token}`,
-            'Content-Type': 'application/json',
-        },
-        method: 'PATCH',
-    });
-    if (!resp.ok)
-        throw new Error(`PATCH ${path} → ${resp.status} ${resp.statusText}`);
-    return (await resp.json());
-}
-async function adminPost(ctx, path, body) {
-    const url = `${ctx.apiUrl.replace(/\/+$/, '')}/admin/api${path}`;
-    const resp = await fetch(url, {
-        body: body !== undefined ? JSON.stringify(body) : undefined,
         headers: {
             Authorization: `Bearer ${ctx.token}`,
             'Content-Type': 'application/json',
@@ -138,233 +126,68 @@ async function adminPost(ctx, path, body) {
     });
     if (!resp.ok)
         throw new Error(`POST ${path} → ${resp.status} ${resp.statusText}`);
-    if (resp.status === 204)
-        return null;
-    return (await resp.json());
-}
-async function adminPut(ctx, path) {
-    const url = `${ctx.apiUrl.replace(/\/+$/, '')}/admin/api${path}`;
-    const resp = await fetch(url, {
-        headers: { Authorization: `Bearer ${ctx.token}` },
-        method: 'PUT',
-    });
-    if (!resp.ok)
-        throw new Error(`PUT ${path} → ${resp.status} ${resp.statusText}`);
-    if (resp.status === 204)
-        return null;
-    return (await resp.json());
-}
-async function adminDelete(ctx, path) {
-    const url = `${ctx.apiUrl.replace(/\/+$/, '')}/admin/api${path}`;
-    const resp = await fetch(url, {
-        headers: { Authorization: `Bearer ${ctx.token}` },
-        method: 'DELETE',
-    });
-    if (!resp.ok)
-        throw new Error(`DELETE ${path} → ${resp.status} ${resp.statusText}`);
-    if (resp.status === 204)
-        return null;
-    return (await resp.json());
+    return resp.json();
 }
 function asString(v, name) {
-    if (typeof v !== 'string' || v.length === 0) {
-        throw new Error(`${name} is required (string)`);
-    }
-    return v;
-}
-function asOptionalString(v) {
-    if (v === undefined || v === null)
-        return undefined;
-    if (typeof v !== 'string')
-        throw new Error('expected string');
+    if (typeof v !== 'string' || v.length === 0)
+        throw new Error(`${name} must be a non-empty string`);
     return v;
 }
 export function buildTools() {
     return [
         {
-            description: 'List issues for a Sentori project, with optional status / priority / label filters.',
-            handler: async (args, ctx) => {
-                const projectId = asString(args.projectId, 'projectId');
-                const usp = new URLSearchParams();
-                const status = asOptionalString(args.status) ?? 'any';
-                usp.set('status', status);
-                if (args.priority)
-                    usp.set('priority', String(args.priority));
-                if (args.label)
-                    usp.set('labels', String(args.label));
-                if (typeof args.limit === 'number')
-                    usp.set('limit', String(args.limit));
-                return await adminGet(ctx, `/projects/${projectId}/issues?${usp}`);
-            },
-            inputSchema: {
-                properties: {
-                    label: { type: 'string' },
-                    limit: { type: 'number' },
-                    priority: { type: 'string' },
-                    projectId: { type: 'string' },
-                    status: { type: 'string' },
-                },
-                required: ['projectId'],
-                type: 'object',
-            },
             name: 'sentori_issue_list',
+            description: 'List issues (default: open, ordered by objective importance — regressed first, then breadth × depth). Filter with status (open|resolved|ignored) and kind (error|warn|trace|assert|probe).',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    status: { type: 'string', enum: ['open', 'resolved', 'ignored'] },
+                    kind: { type: 'string', enum: ['assert', 'error', 'probe', 'trace', 'warn'] },
+                },
+            },
+            handler: async (args, ctx) => {
+                const q = new URLSearchParams();
+                if (typeof args.status === 'string')
+                    q.set('status', args.status);
+                if (typeof args.kind === 'string')
+                    q.set('kind', args.kind);
+                const qs = q.toString();
+                return apiGet(ctx, `/api/issues${qs ? `?${qs}` : ''}`);
+            },
         },
         {
-            description: 'Get full detail for one Sentori issue including its activity feed.',
-            handler: async (args, ctx) => {
-                const projectId = asString(args.projectId, 'projectId');
-                const issueId = asString(args.issueId, 'issueId');
-                const [issue, activity] = await Promise.all([
-                    adminGet(ctx, `/projects/${projectId}/issues/${issueId}`),
-                    adminGet(ctx, `/projects/${projectId}/issues/${issueId}/activity`),
-                ]);
-                return { activity, issue };
-            },
+            name: 'sentori_issue_bundle',
+            description: 'Fetch the full evidence bundle for one issue as markdown — read it and you have everything needed to fix: stack, user timeline, environment, distribution, guard-probe status.',
             inputSchema: {
-                properties: {
-                    issueId: { type: 'string' },
-                    projectId: { type: 'string' },
-                },
-                required: ['projectId', 'issueId'],
                 type: 'object',
+                properties: { issueId: { type: 'string' } },
+                required: ['issueId'],
             },
-            name: 'sentori_issue_get',
+            handler: async (args, ctx) => apiGet(ctx, `/api/issues/${encodeURIComponent(asString(args.issueId, 'issueId'))}/bundle`, true),
         },
         {
-            description: 'Add a comment to a Sentori issue.',
-            handler: async (args, ctx) => {
-                const projectId = asString(args.projectId, 'projectId');
-                const issueId = asString(args.issueId, 'issueId');
-                const body = asString(args.body, 'body');
-                return await adminPost(ctx, `/projects/${projectId}/issues/${issueId}/comments`, {
-                    body,
-                });
-            },
+            name: 'sentori_issue_note',
+            description: 'Append a note to an issue — write back what you did ("fixed in abc123, probe SENT-42 planted").',
             inputSchema: {
-                properties: {
-                    body: { type: 'string' },
-                    issueId: { type: 'string' },
-                    projectId: { type: 'string' },
-                },
-                required: ['projectId', 'issueId', 'body'],
                 type: 'object',
+                properties: { issueId: { type: 'string' }, body: { type: 'string' } },
+                required: ['issueId', 'body'],
             },
-            name: 'sentori_issue_comment',
+            handler: async (args, ctx) => apiPost(ctx, `/api/issues/${encodeURIComponent(asString(args.issueId, 'issueId'))}/notes`, {
+                body: asString(args.body, 'body'),
+            }),
         },
         {
-            description: 'Transition an issue to a new status (active|silenced|muted|resolved|closed).',
-            handler: async (args, ctx) => {
-                const projectId = asString(args.projectId, 'projectId');
-                const issueId = asString(args.issueId, 'issueId');
-                const status = asString(args.status, 'status');
-                return await adminPatch(ctx, `/projects/${projectId}/issues/${issueId}`, {
-                    status,
-                });
-            },
+            name: 'sentori_issue_resolve',
+            description: 'Resolve an issue, anchored on the release that carries the fix — only a recurrence in that release or newer counts as a regression.',
             inputSchema: {
-                properties: {
-                    issueId: { type: 'string' },
-                    projectId: { type: 'string' },
-                    status: {
-                        enum: ['active', 'silenced', 'muted', 'resolved', 'closed'],
-                        type: 'string',
-                    },
-                },
-                required: ['projectId', 'issueId', 'status'],
                 type: 'object',
+                properties: { issueId: { type: 'string' }, release: { type: 'string' } },
+                required: ['issueId'],
             },
-            name: 'sentori_issue_transition',
-        },
-        {
-            description: 'Assign an issue to a user, or pass userId=null to unassign.',
-            handler: async (args, ctx) => {
-                const projectId = asString(args.projectId, 'projectId');
-                const issueId = asString(args.issueId, 'issueId');
-                const userId = args.userId === null ? null : asOptionalString(args.userId);
-                return await adminPatch(ctx, `/projects/${projectId}/issues/${issueId}`, {
-                    assigneeUserId: userId ?? null,
-                });
-            },
-            inputSchema: {
-                properties: {
-                    issueId: { type: 'string' },
-                    projectId: { type: 'string' },
-                    userId: { type: ['string', 'null'] },
-                },
-                required: ['projectId', 'issueId', 'userId'],
-                type: 'object',
-            },
-            name: 'sentori_issue_assign',
-        },
-        {
-            description: 'Set the triage priority on an issue.',
-            handler: async (args, ctx) => {
-                const projectId = asString(args.projectId, 'projectId');
-                const issueId = asString(args.issueId, 'issueId');
-                const priority = asString(args.priority, 'priority');
-                return await adminPatch(ctx, `/projects/${projectId}/issues/${issueId}`, {
-                    priority,
-                });
-            },
-            inputSchema: {
-                properties: {
-                    issueId: { type: 'string' },
-                    priority: { enum: ['p0', 'p1', 'p2', 'p3'], type: 'string' },
-                    projectId: { type: 'string' },
-                },
-                required: ['projectId', 'issueId', 'priority'],
-                type: 'object',
-            },
-            name: 'sentori_issue_set_priority',
-        },
-        {
-            description: 'Replace the label set on an issue. Pass [] to clear all.',
-            handler: async (args, ctx) => {
-                const projectId = asString(args.projectId, 'projectId');
-                const issueId = asString(args.issueId, 'issueId');
-                if (!Array.isArray(args.labels))
-                    throw new Error('labels must be string[]');
-                const labels = args.labels.map((l) => {
-                    if (typeof l !== 'string')
-                        throw new Error('each label must be a string');
-                    return l;
-                });
-                return await adminPatch(ctx, `/projects/${projectId}/issues/${issueId}`, {
-                    labels,
-                });
-            },
-            inputSchema: {
-                properties: {
-                    issueId: { type: 'string' },
-                    labels: { items: { type: 'string' }, type: 'array' },
-                    projectId: { type: 'string' },
-                },
-                required: ['projectId', 'issueId', 'labels'],
-                type: 'object',
-            },
-            name: 'sentori_issue_set_labels',
-        },
-        {
-            description: 'Subscribe (watch=true) or unsubscribe (watch=false) the configured caller to an issue.',
-            handler: async (args, ctx) => {
-                const projectId = asString(args.projectId, 'projectId');
-                const issueId = asString(args.issueId, 'issueId');
-                const watch = args.watch === true;
-                if (watch) {
-                    return await adminPut(ctx, `/projects/${projectId}/issues/${issueId}/watch`);
-                }
-                return await adminDelete(ctx, `/projects/${projectId}/issues/${issueId}/watch`);
-            },
-            inputSchema: {
-                properties: {
-                    issueId: { type: 'string' },
-                    projectId: { type: 'string' },
-                    watch: { type: 'boolean' },
-                },
-                required: ['projectId', 'issueId', 'watch'],
-                type: 'object',
-            },
-            name: 'sentori_issue_watch',
+            handler: async (args, ctx) => apiPost(ctx, `/api/issues/${encodeURIComponent(asString(args.issueId, 'issueId'))}/resolve`, {
+                release: typeof args.release === 'string' ? args.release : undefined,
+            }),
         },
     ];
 }

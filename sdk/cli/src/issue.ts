@@ -1,26 +1,26 @@
-// `sentori-cli issue list / resolve / silence` — CI triage helpers.
+// `sentori-cli issue list / resolve` — CI triage over the AI
+// surface (`/api/*`, api-scope token; the same loop an agent runs).
 
 type Issue = {
-  errorType: string
-  eventCount: number
   id: string
-  lastSeen: string
+  kind: string
+  title: string
   messageSample: string
-  status: 'active' | 'closed' | 'resolved' | 'silenced'
+  status: string
+  eventCount: number
+  usersCount: number
+  maxPerUser: number
+  lastSeen: string
+  regressed: boolean
 }
 
-type AdminConfig = {
+export type ApiConfig = {
   apiUrl: string
-  projectId: string
   token: string
 }
 
-function url(c: AdminConfig, path: string): string {
-  return `${c.apiUrl.replace(/\/+$/, '')}/admin/api/projects/${c.projectId}${path}`
-}
-
-async function adminFetch<T>(c: AdminConfig, path: string, init?: RequestInit): Promise<T> {
-  const resp = await fetch(url(c, path), {
+async function apiFetch<T>(c: ApiConfig, path: string, init?: RequestInit): Promise<T> {
+  const resp = await fetch(`${c.apiUrl.replace(/\/+$/, '')}${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${c.token}`,
@@ -29,53 +29,54 @@ async function adminFetch<T>(c: AdminConfig, path: string, init?: RequestInit): 
     },
   })
   if (!resp.ok) {
-    let detail = ''
-    try {
-      detail = await resp.text()
-    } catch {
-      // ignore
-    }
+    const detail = await resp.text().catch(() => '')
     throw new Error(
       `${resp.status} ${resp.statusText}${detail ? ` — ${detail.slice(0, 300)}` : ''}`,
     )
   }
-  // PATCH /issues/<id> returns the row; some endpoints might return no
-  // content — handle both.
-  const txt = await resp.text()
-  return (txt ? JSON.parse(txt) : null) as T
+  return (await resp.json()) as T
 }
 
-export type IssueListOptions = {
-  config: AdminConfig
-  errorType?: string
-  limit?: number
-  status?: 'active' | 'closed' | 'resolved' | 'silenced'
-}
-
-export async function issueList(opts: IssueListOptions): Promise<Issue[]> {
+export async function listIssues(
+  c: ApiConfig,
+  opts: { status?: string; kind?: string } = {},
+): Promise<Issue[]> {
   const q = new URLSearchParams()
   if (opts.status) q.set('status', opts.status)
-  if (opts.limit) q.set('limit', String(opts.limit))
-  if (opts.errorType) q.set('errorType', opts.errorType)
+  if (opts.kind) q.set('kind', opts.kind)
   const qs = q.toString()
-  return adminFetch<Issue[]>(opts.config, `/issues${qs ? '?' + qs : ''}`)
+  const body = await apiFetch<{ issues: Issue[] }>(c, `/api/issues${qs ? `?${qs}` : ''}`)
+  return body.issues
 }
 
-export async function issuePatch(
-  config: AdminConfig,
+export async function resolveIssue(
+  c: ApiConfig,
   issueId: string,
-  body: { resolvedInRelease?: string; status: 'active' | 'closed' | 'resolved' | 'silenced' },
-): Promise<Issue> {
-  return adminFetch<Issue>(config, `/issues/${encodeURIComponent(issueId)}`, {
-    body: JSON.stringify(body),
-    method: 'PATCH',
+  release?: string,
+): Promise<void> {
+  await apiFetch(c, `/api/issues/${encodeURIComponent(issueId)}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify(release ? { release } : {}),
   })
 }
 
-/** Format one issue for terminal output — short, one line, scannable. */
+export async function noteIssue(c: ApiConfig, issueId: string, body: string): Promise<void> {
+  await apiFetch(c, `/api/issues/${encodeURIComponent(issueId)}/notes`, {
+    method: 'POST',
+    body: JSON.stringify({ body }),
+  })
+}
+
+export async function fetchBundle(c: ApiConfig, issueId: string): Promise<string> {
+  const resp = await fetch(
+    `${c.apiUrl.replace(/\/+$/, '')}/api/issues/${encodeURIComponent(issueId)}/bundle`,
+    { headers: { Authorization: `Bearer ${c.token}` } },
+  )
+  if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`)
+  return resp.text()
+}
+
 export function formatIssueLine(i: Issue): string {
-  const status = i.status.padEnd(9)
-  const title = `${i.errorType}${i.messageSample ? `: ${i.messageSample}` : ''}`
-  const events = `${i.eventCount}×`
-  return `${i.id}  ${status}  ${title.slice(0, 80).padEnd(80)}  ${events}`
+  const flag = i.regressed ? ' REGRESSED' : ''
+  return `${i.id}  [${i.kind}] ${i.title}  ${i.usersCount}u×${i.maxPerUser}  ${i.eventCount}ev${flag}`
 }

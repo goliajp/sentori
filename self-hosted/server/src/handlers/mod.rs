@@ -291,6 +291,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/api/issues/{issue_id}/bundle", get(api::bundle))
         .route("/api/issues/{issue_id}/notes", post(api::add_note))
         .route("/api/issues/{issue_id}/resolve", post(api::resolve))
+        .route("/api/probes:sync", post(api::probes_sync))
         .layer(axum_middleware::from_fn_with_state(
             api_token_store,
             bearer_middleware,

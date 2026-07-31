@@ -141,12 +141,14 @@ gate 记录:(待)
 
 ## S4 CLI
 
-- [ ] probe 静态扫描命令(随 release 上传注册绊线)
-- [ ] 全部 upload:失败 exit 0 + 友好提示(后果 + 可复制补救命令)+ `--strict`
-- [ ] issue / mcp serve 对齐新 API
-- [ ] **gate**:CLI 测试绿;断网 upload 实测 exit 0 + 提示文案
+- [x] probe 静态扫描命令:`probes sync --release <r> --dir .`(扫 `probe('REF')` 跨引号风格 + 去重 + 跳过 node_modules/dist;server 补 `POST /api/probes:sync` 端点,api-scope,upsert first/last_seen_release)
+- [x] 全部 upload:统一走 `POST /v1/releases/{r}/artifacts`(multipart);lenient.ts 契约(失败 exit 0 + 四要素提示 + `--strict`);dsym 保留 dwarfdump slice 解析,slice 身份暂存 artifact name(dwarf 接线 S8);source-bundle 命令删(Related code 走 git 集成,design 已定)
+- [x] issue 命令对齐 /api 面(list/resolve/note/bundle;silence/close 随三态状态机废);**mcp serve 重写为 4-tool /api 版**(issue_list/issue_bundle/issue_note/issue_resolve —— AI 闭环 1:1),协议框架保留
+- [x] **gate**:CLI 测试绿;断网 upload 实测 exit 0 + 提示文案
 
-gate 记录:(待)
+gate 记录(2026-07-31):
+- CLI 20 测试全绿(lenient 契约 3、probes 扫描 3、mcp 面 3、native-artifacts 8、react-native 3),typecheck 0 错
+- 断网实测(--api-url http://127.0.0.1:1):默认 **EXIT=0** + 完整四要素提示(不挡 build / 影响 / 可复制补救命令 / 回填承诺);`--strict` **EXIT=1**
 
 ## S5 Webapp(4 导航)
 
