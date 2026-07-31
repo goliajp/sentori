@@ -155,8 +155,45 @@ fn rewrite_frame(map: &ParsedMap, frame: &mut Value) -> bool {
     if let Some(function) = res.function {
         obj.insert("function".into(), Value::from(function));
     }
+    // Source context: metro/expo maps embed sourcesContent, so the
+    // reader can see the failing line without the server ever
+    // touching a repository. ±CONTEXT_LINES around the hit; absent
+    // sourcesContent (some bundlers strip it) just means no window.
+    if res.line > 0
+        && let Some(win) = map.source_window(res.src_id, (res.line - 1) as usize, CONTEXT_LINES)
+    {
+        obj.insert("preContext".into(), context_lines_json(&win.before));
+        obj.insert("contextLine".into(), Value::from(clip_line(&win.at)));
+        obj.insert("postContext".into(), context_lines_json(&win.after));
+    }
     obj.insert("symbolicated".into(), Value::from(true));
     true
+}
+
+/// ±5, the industry-standard reading window: enough to see the
+/// statement in its surroundings, small enough that a 30-frame
+/// stack stays a few KB of payload.
+const CONTEXT_LINES: usize = 5;
+
+/// A single source line is clipped so a generated/minified original
+/// (or a data-URI literal) cannot balloon the event payload.
+const MAX_CONTEXT_LINE_CHARS: usize = 300;
+
+fn clip_line(line: &str) -> String {
+    if line.chars().count() <= MAX_CONTEXT_LINE_CHARS {
+        return line.to_owned();
+    }
+    let clipped: String = line.chars().take(MAX_CONTEXT_LINE_CHARS).collect();
+    format!("{clipped}…")
+}
+
+fn context_lines_json(lines: &[String]) -> Value {
+    Value::from(
+        lines
+            .iter()
+            .map(|l| Value::from(clip_line(l)))
+            .collect::<Vec<_>>(),
+    )
 }
 
 /// Load and parse the source map for a release, via the cache.
@@ -286,5 +323,44 @@ mod tests {
         let map = empty_map();
         let mut frame = json!({ "file": "native" });
         assert!(!rewrite_frame(&map, &mut frame));
+    }
+
+    /// With sourcesContent embedded, a rewritten frame carries the
+    /// reading window: lines before, the failing line, lines after.
+    #[test]
+    fn source_context_rides_the_rewritten_frame() {
+        let mut raw: serde_json::Value = serde_json::from_slice(
+            br#"{"version":3,"sources":["src/pay.ts"],"names":["onPay"],"mappings":"UAM0BA"}"#,
+        )
+        .expect("json");
+        let src = (1..=12)
+            .map(|n| format!("line {n} of pay.ts"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        raw["sourcesContent"] = json!([src]);
+        let map = ParsedMap::parse(serde_json::to_vec(&raw).expect("ser").as_slice())
+            .expect("map parses");
+
+        let mut frame = json!({ "file": "bundle.js", "line": 1, "column": 10 });
+        assert!(rewrite_frame(&map, &mut frame));
+
+        let line = usize::try_from(frame["line"].as_u64().expect("line")).expect("usize");
+        assert_eq!(frame["contextLine"], format!("line {line} of pay.ts"));
+        let pre = frame["preContext"].as_array().expect("pre");
+        let post = frame["postContext"].as_array().expect("post");
+        assert_eq!(pre.len(), CONTEXT_LINES.min(line - 1));
+        assert!(!post.is_empty());
+        assert_eq!(
+            pre.last().expect("last"),
+            &json!(format!("line {} of pay.ts", line - 1))
+        );
+    }
+
+    #[test]
+    fn absurdly_long_source_lines_are_clipped() {
+        let long = "x".repeat(2_000);
+        assert!(clip_line(&long).chars().count() <= MAX_CONTEXT_LINE_CHARS + 1);
+        assert!(clip_line(&long).ends_with('…'));
+        assert_eq!(clip_line("short"), "short");
     }
 }
