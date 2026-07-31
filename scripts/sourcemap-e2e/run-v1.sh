@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Round-trip symbolication against the v0.2 server.
+# Round-trip symbolication against the v1 server.
 #
 # Bundles the fixture with Metro, uploads the map against a release,
 # sends a stack captured from the *minified* bundle, and asserts the
@@ -11,8 +11,8 @@
 # that a real Metro map, uploaded over HTTP and matched to a release by
 # name, produces the right answer — that is this script's whole job.
 #
-# Replaces `run.sh`, which drove the v0.1 server via a static dev token
-# and `server/migrations`. Neither exists on this stack.
+# Replaces `run-v02.sh`; the admin surface and token scopes moved
+# with the v1 redesign (ingest|api scopes, flat create responses).
 
 set -euo pipefail
 
@@ -40,21 +40,21 @@ curl -sS -c "$COOKIE" -X POST "$SENTORI_BASE/auth/login" \
 echo "[2/6] creating project + ingest token"
 PROJECT_ID=$(curl -sS -b "$COOKIE" -X POST "$SENTORI_BASE/admin/api/projects" \
   -H 'Content-Type: application/json' \
-  -d "{\"name\":\"sourcemap e2e\",\"slug\":\"$SLUG\"}" | jqp "['id']")
+  -d "{\"name\":\"$SLUG\",\"platform\":\"react-native\"}" | jqp "['id']")
 
 # Two tokens, because the two halves of this test need different
-# rights. Uploading a map is a build-time action and needs `admin`;
-# sending an event is what a shipped app does and needs `public`. Using
-# one token for both would pass while proving neither.
+# rights. Uploading a map is a build-time action and needs scope
+# `api`; sending an event is what a shipped app does and needs
+# `ingest`. Using one token for both would pass while proving neither.
 ADMIN_TOKEN=$(curl -sS -b "$COOKIE" -X POST \
   "$SENTORI_BASE/admin/api/projects/$PROJECT_ID/tokens" \
   -H 'Content-Type: application/json' \
-  -d '{"kind":"admin","label":"sourcemap-e2e-admin"}' | jqp "['token']")
+  -d '{"name":"sourcemap-e2e-api","scope":"api"}' | jqp "['token']")
 
 TOKEN=$(curl -sS -b "$COOKIE" -X POST \
   "$SENTORI_BASE/admin/api/projects/$PROJECT_ID/tokens" \
   -H 'Content-Type: application/json' \
-  -d '{"kind":"public","label":"sourcemap-e2e"}' | jqp "['token']")
+  -d '{"name":"sourcemap-e2e-ingest","scope":"ingest"}' | jqp "['token']")
 
 echo "[3/6] bundling fixture"
 # Bun's bundler rather than Metro: what the test needs is a real
@@ -112,9 +112,9 @@ if not any(a['kind'] == 'sourcemap' for a in arts):
 print('      admin sees %d artifact(s)' % len(arts))
 "
 
-# The public token is the one inside a shipped app. If it could upload
+# The ingest token is the one inside a shipped app. If it could upload
 # a map, anyone with the app could rewrite how a release symbolicates.
-echo "      checking a public token is refused"
+echo "      checking an ingest token is refused"
 REFUSED=$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
   "$SENTORI_BASE/v1/releases/$(python3 -c "
 import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1], safe=''))
@@ -122,13 +122,13 @@ import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1], safe=''))
   -H "Authorization: Bearer $TOKEN" \
   -F 'kind=sourcemap' -F "file=@$DIST/app.js.map")
 if [ "$REFUSED" != "403" ]; then
-  echo "FAIL: a public token uploaded an artifact (got $REFUSED, want 403)" >&2
+  echo "FAIL: an ingest token uploaded an artifact (got $REFUSED, want 403)" >&2
   exit 1
 fi
-echo "      public upload refused: $REFUSED"
+echo "      ingest upload refused: $REFUSED"
 
 echo "[5/6] throwing inside the minified bundle, sending the stack"
-EVENT_JSON=$(node "$HERE/throw-and-format.js" "$DIST/app.js" "$RELEASE")
+EVENT_JSON=$(bun "$HERE/throw-and-format.js" "$DIST/app.js" "$RELEASE")
 curl -sS -o /dev/null -w '      ingest=%{http_code}\n' -X POST "$SENTORI_BASE/v1/events" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
@@ -137,15 +137,15 @@ curl -sS -o /dev/null -w '      ingest=%{http_code}\n' -X POST "$SENTORI_BASE/v1
 echo "[6/6] reading the stored event back"
 sleep 1
 ISSUE_ID=$(curl -sS -b "$COOKIE" \
-  "$SENTORI_BASE/v1/projects/$PROJECT_ID/issues?limit=50" \
-  | jqp "[0]['id']")
+  "$SENTORI_BASE/admin/api/issues?projectId=$PROJECT_ID&limit=50" \
+  | jqp "['issues'][0]['id']")
 
 EVENT_ID=$(curl -sS -b "$COOKIE" \
-  "$SENTORI_BASE/v1/projects/$PROJECT_ID/events?issue_id=$ISSUE_ID&limit=1" \
-  | jqp "[0]['id']")
+  "$SENTORI_BASE/admin/api/issues/$ISSUE_ID/events" \
+  | jqp "['events'][0]['id']")
 
 FRAME=$(curl -sS -b "$COOKIE" \
-  "$SENTORI_BASE/v1/projects/$PROJECT_ID/events/$EVENT_ID" \
+  "$SENTORI_BASE/admin/api/events/$EVENT_ID" \
   | python3 -c '
 import sys, json
 frames = json.load(sys.stdin)["payload"]["error"]["stack"]
