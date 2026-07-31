@@ -5,7 +5,6 @@ use std::sync::Arc;
 
 use sentori_rate_limiter::{Limiter, MemoryBackend, Policy, SystemClock};
 use sentori_secrets_vault::Vault;
-use sentori_workspace_identity::ProjectId;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -51,7 +50,7 @@ pub enum DispatchTarget {
     /// Send to every live token for a `(project, kind)` pair.
     ProjectKind {
         /// The owning project.
-        project_id: ProjectId,
+        project_id: Uuid,
         /// Which vendor.
         kind: ProviderKind,
     },
@@ -61,7 +60,7 @@ pub enum DispatchTarget {
     /// browser).
     ProjectUser {
         /// The owning project.
-        project_id: ProjectId,
+        project_id: Uuid,
         /// App-side user id.
         app_user_id: String,
     },
@@ -270,7 +269,7 @@ impl PushDispatcher {
                 .load(token.project_id, token.kind)
                 .await?
                 .ok_or_else(|| PushError::CredentialsMissing {
-                    project_id: token.project_id.into_uuid(),
+                    project_id: token.project_id,
                     kind: token.kind.as_db_str().to_string(),
                 })?;
             let credential = Credential {
@@ -342,6 +341,6 @@ impl PushDispatcher {
     }
 }
 
-fn rate_key(project_id: ProjectId, kind: ProviderKind) -> String {
-    format!("{}:{}", project_id.into_uuid(), kind.as_db_str())
+fn rate_key(project_id: Uuid, kind: ProviderKind) -> String {
+    format!("{}:{}", project_id, kind.as_db_str())
 }

@@ -28,13 +28,13 @@ use tracing::info;
 
 mod apns;
 mod archive_worker;
+mod audit;
 mod blob_store;
 mod bootstrap;
 mod client_ip;
 mod fcm;
 mod handlers;
 mod hcm;
-mod identity_link;
 mod mailer;
 mod mipush;
 mod push_quarantine;

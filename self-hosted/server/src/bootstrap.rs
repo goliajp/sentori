@@ -70,7 +70,7 @@ pub async fn ensure_owner(pool: &PgPool) -> anyhow::Result<()> {
             )
             .bind(Uuid::now_v7())
             .bind(&wanted)
-            .bind(phc.as_str())
+            .bind(&phc)
             .execute(pool)
             .await?;
             info!(email = %wanted, "owner created from env");

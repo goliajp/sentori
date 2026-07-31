@@ -2710,6 +2710,7 @@ dependencies = [
  "axum",
  "axum-extra",
  "base64",
+ "data-encoding",
  "futures",
  "hex",
  "hkdf",

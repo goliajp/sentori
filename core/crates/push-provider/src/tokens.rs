@@ -1,6 +1,4 @@
 //! `push_tokens` CRUD: register / lookup / invalidate / quarantine.
-
-use sentori_workspace_identity::ProjectId;
 use sqlx::{PgPool, Row};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -33,7 +31,7 @@ impl DeviceTokenStore {
     /// - [`PushError::Db`] on database failure.
     pub async fn upsert(
         &self,
-        project_id: ProjectId,
+        project_id: Uuid,
         kind: ProviderKind,
         native_token: &str,
         env: Option<&str>,
@@ -48,8 +46,8 @@ impl DeviceTokenStore {
         let row = sqlx::query(
             r"
             INSERT INTO push_tokens
-                (id, workspace_id, project_id, kind, native_token, env, app_user_id)
-            SELECT $1, p.workspace_id, $2, $3, $4, $5, $6
+                (id, project_id, kind, native_token, env, app_user_id)
+            SELECT $1, $2, $3, $4, $5, $6
             FROM projects p WHERE p.id = $2
             ON CONFLICT (project_id, kind, native_token) DO UPDATE SET
                 last_seen_at = now(),
@@ -65,7 +63,7 @@ impl DeviceTokenStore {
             ",
         )
         .bind(new_id)
-        .bind(project_id.into_uuid())
+        .bind(project_id)
         .bind(kind.as_db_str())
         .bind(native_token)
         .bind(env)
@@ -76,7 +74,7 @@ impl DeviceTokenStore {
         // Unknown project → the driving SELECT matches zero rows → nothing is
         // inserted, the ON CONFLICT branch never runs and no FK violation is
         // raised. Absence of a RETURNING row is the only signal.
-        let row = row.ok_or_else(|| PushError::ProjectNotFound(project_id.into_uuid()))?;
+        let row = row.ok_or_else(|| PushError::ProjectNotFound(project_id))?;
 
         Ok(MintedToken {
             id: row.get("id"),
@@ -112,7 +110,7 @@ impl DeviceTokenStore {
     /// [`PushError::Db`] on database failure.
     pub async fn list_live(
         &self,
-        project_id: ProjectId,
+        project_id: Uuid,
         kind: ProviderKind,
     ) -> Result<Vec<DeviceToken>, PushError> {
         let rows = sqlx::query(
@@ -124,7 +122,7 @@ impl DeviceTokenStore {
             ORDER BY last_seen_at DESC
             ",
         )
-        .bind(project_id.into_uuid())
+        .bind(project_id)
         .bind(kind.as_db_str())
         .fetch_all(&self.pool)
         .await?;
@@ -139,7 +137,7 @@ impl DeviceTokenStore {
     /// [`PushError::Db`] on database failure.
     pub async fn list_for_user(
         &self,
-        project_id: ProjectId,
+        project_id: Uuid,
         app_user_id: &str,
     ) -> Result<Vec<DeviceToken>, PushError> {
         let rows = sqlx::query(
@@ -151,7 +149,7 @@ impl DeviceTokenStore {
             ORDER BY last_seen_at DESC
             ",
         )
-        .bind(project_id.into_uuid())
+        .bind(project_id)
         .bind(app_user_id)
         .fetch_all(&self.pool)
         .await?;
@@ -200,7 +198,7 @@ fn row_to_token(row: &sqlx::postgres::PgRow) -> Result<DeviceToken, PushError> {
     let kind_str: &str = row.get("kind");
     Ok(DeviceToken {
         id: row.get("id"),
-        project_id: ProjectId::from_uuid(row.get("project_id")),
+        project_id: row.get("project_id"),
         kind: ProviderKind::from_db_str(kind_str)?,
         native_token: row.get("native_token"),
         env: row.get::<Option<String>, _>("env"),
@@ -212,11 +210,11 @@ fn row_to_token(row: &sqlx::postgres::PgRow) -> Result<DeviceToken, PushError> {
     })
 }
 
-fn translate_fk(err: sqlx::Error, project_id: ProjectId) -> PushError {
+fn translate_fk(err: sqlx::Error, project_id: Uuid) -> PushError {
     if let sqlx::Error::Database(db_err) = &err
         && db_err.code().as_deref() == Some("23503")
     {
-        return PushError::ProjectNotFound(project_id.into_uuid());
+        return PushError::ProjectNotFound(project_id);
     }
     PushError::Db(err)
 }

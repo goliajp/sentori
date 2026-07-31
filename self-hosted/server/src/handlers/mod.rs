@@ -24,7 +24,6 @@ use serde_json::json;
 use crate::session_mw::session_middleware;
 use crate::state::AppState;
 
-mod activity_log;
 mod admin;
 mod artifacts_upload;
 mod attachments;
@@ -34,10 +33,8 @@ mod events;
 mod health;
 mod issues;
 mod metrics_prom;
-mod notifications;
 mod projects;
 mod sdk;
-mod sessions_admin;
 
 /// Refuse an IP that is hammering a credentialed auth endpoint.
 ///
@@ -112,45 +109,21 @@ async fn rate_limit_mw(
 // in one place, and splitting it would only hide the routing surface.
 #[allow(clippy::too_many_lines)]
 pub fn router(state: Arc<AppState>) -> Router {
-    // SDK ingest routes — Bearer st_pk_ gated.
+    // ── SDK ingest routes — Bearer st_ token, ingest scope ──
     let token_store = TokenStore::new(state.pool.clone());
     let sdk_routes = Router::new()
-        // ── events ──
         .route("/v1/events", post(sdk::events::handle))
         .route("/v1/events:batch", post(sdk::events_batch::handle))
         .route(
             "/v1/events/{event_id}/attachments/{kind}",
             post(sdk::events_attachments::handle),
         )
-        .route("/v1/events/_recent", get(sdk::events_recent::handle))
-        // ── tracing ──
-        .route("/v1/spans", post(sdk::spans::handle))
-        .route("/v1/spans:batch", post(sdk::spans_batch::handle))
-        // ── lifecycle ──
-        .route("/v1/heartbeat", post(sdk::heartbeat::handle))
-        .route("/v1/sessions", post(sdk::sessions::handle))
         .route("/v1/deploys", post(sdk::deploys::handle))
         .route(
             "/v1/releases/{release}/artifacts",
             post(artifacts_upload::upload_by_release_name),
         )
-        // ── metrics ──
-        .route("/v1/metrics:batch", post(sdk::metrics::handle))
-        .route(
-            "/v1/runtime-metrics:batch",
-            post(sdk::runtime_metrics::handle),
-        )
-        // ── analytics ──
-        .route("/v1/track:batch", post(sdk::track::handle))
-        // ── security ──
-        .route("/v1/security:report", post(sdk::security_report::handle))
-        .route("/v1/security/link", post(sdk::security_link::handle))
-        .route("/v1/security/score", get(sdk::security_score::handle))
-        // ── control ──
-        .route("/v1/control/poll", get(sdk::control::handle))
-        // ── feedback ──
-        .route("/v1/user-reports", post(sdk::user_reports::handle))
-        // ── push (11 endpoints) ──
+        // ── push family (carried; outside v1 acceptance) ──
         .route("/v1/push/tokens", post(sdk::push::register_token::handle))
         .route(
             "/v1/push/tokens/{handle}",
@@ -199,8 +172,17 @@ pub fn router(state: Arc<AppState>) -> Router {
         ))
         .with_state(state.clone());
 
-    // Admin routes — session-gated (cookie or Bearer session_token).
+    // ── Dashboard + admin — cookie session ──
     let admin_routes = Router::new()
+        // projects
+        .route("/admin/api/projects", get(projects::list).post(admin::projects::create))
+        .route(
+            "/admin/api/projects/{project_id}",
+            get(admin::projects::get)
+                .patch(admin::projects::update)
+                .delete(admin::projects::delete),
+        )
+        // tokens
         .route(
             "/admin/api/projects/{project_id}/tokens",
             get(admin::tokens::list).post(admin::tokens::create),
@@ -209,87 +191,29 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/tokens/{token_id}",
             delete(admin::tokens::revoke),
         )
-        .route("/admin/api/projects", post(admin::projects::create))
+        // users + assignments (owner)
+        .route("/admin/api/users", get(admin::users::list).post(admin::users::create))
+        .route("/admin/api/users/{user_id}", delete(admin::users::delete))
         .route(
-            "/admin/api/projects/{project_id}",
-            get(admin::projects::get)
-                .patch(admin::projects::update)
-                .delete(admin::projects::delete),
+            "/admin/api/users/{user_id}/projects/{project_id}",
+            axum::routing::put(admin::users::assign).delete(admin::users::unassign),
         )
+        // issues — the Inbox and the detail page
+        .route("/admin/api/issues", get(issues::list))
+        .route("/admin/api/issues/{issue_id}", get(issues::get))
+        .route("/admin/api/issues/{issue_id}/resolve", post(issues::resolve))
+        .route("/admin/api/issues/{issue_id}/ignore", post(issues::ignore))
+        .route("/admin/api/issues/{issue_id}/reopen", post(issues::reopen))
+        .route("/admin/api/issues/{issue_id}/assign", post(issues::assign))
+        .route("/admin/api/issues/{issue_id}/notes", post(issues::add_note))
         .route(
-            "/admin/api/projects/{project_id}/push/credentials",
-            get(admin::push_credentials::list).post(admin::push_credentials::upsert),
+            "/admin/api/issues/{issue_id}/events",
+            get(issues::occurrences),
         )
-        .route(
-            "/admin/api/projects/{project_id}/push/credentials/{kind}",
-            delete(admin::push_credentials::delete),
-        )
-        // ── admin: test push send ──────────────────────────
-        .route(
-            "/admin/api/projects/{project_id}/push/test",
-            post(admin::test_push::handle),
-        )
-        // ── admin: push sends list (DLQ / triage) ─────────
-        .route(
-            "/admin/api/projects/{project_id}/push/sends",
-            get(admin::push_sends::list),
-        )
-        .route(
-            "/admin/api/projects/{project_id}/push/sends/{send_id}/retry",
-            post(admin::push_sends::retry),
-        )
-        .route(
-            "/admin/api/projects/{project_id}/push/sends/_retry_all_failed",
-            post(admin::push_sends::retry_all_failed),
-        )
-        .route(
-            "/admin/api/webhooks/test",
-            post(admin::test_webhook::handle),
-        )
-        .route(
-            "/admin/api/projects/{project_id}/cert/watches",
-            post(admin::cert_watch::add),
-        )
-        .route(
-            "/admin/api/projects/{project_id}/cert/watches/{domain}",
-            delete(admin::cert_watch::remove),
-        )
-        .route(
-            "/admin/api/projects/{project_id}/integrations",
-            get(admin::integrations::list).post(admin::integrations::upsert),
-        )
-        .route(
-            "/admin/api/projects/{project_id}/integrations/{kind}",
-            delete(admin::integrations::delete),
-        )
-        .route(
-            "/admin/api/projects/{project_id}/integrations/{kind}/active",
-            patch(admin::integrations::set_active),
-        )
-        // ── admin: issue watchers (session-scoped current user) ──
-        .route(
-            "/admin/api/issues/{issue_id}/watchers",
-            post(issue_watchers::join).delete(issue_watchers::leave),
-        )
-        // ── admin: issue comments (session-scoped author) ──
-        .route(
-            "/admin/api/issues/{issue_id}/comments",
-            post(issue_comments::create),
-        )
-        .route(
-            "/admin/api/issues/{issue_id}/comments/{comment_id}",
-            delete(issue_comments::delete),
-        )
-        // ── admin: endpoint probes (synthetic monitor) ──
-        .route(
-            "/admin/api/projects/{project_id}/endpoint-probes",
-            get(admin::endpoint_probes::list).post(admin::endpoint_probes::create),
-        )
-        .route(
-            "/admin/api/endpoint-probes/{probe_id}",
-            patch(admin::endpoint_probes::patch).delete(admin::endpoint_probes::delete),
-        )
-        // ── admin: releases ───────────────────────────────
+        // events + attachments (reached from issues, never browsed)
+        .route("/admin/api/events/{event_id}", get(events::get))
+        .route("/admin/api/attachments/{ref}", get(attachments::get))
+        // releases + artifacts
         .route(
             "/admin/api/projects/{project_id}/releases",
             get(admin::releases::list),
@@ -302,206 +226,66 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/releases/{release_id}",
             delete(admin::releases::delete),
         )
-        // Session-scoped self endpoints
-        .route("/auth/me", get(auth::me))
+        // audit (owner)
+        .route("/admin/api/audit", get(audit::list))
+        // push admin (carried)
+        .route(
+            "/admin/api/projects/{project_id}/push/credentials",
+            get(admin::push_credentials::list).post(admin::push_credentials::upsert),
+        )
+        .route(
+            "/admin/api/projects/{project_id}/push/credentials/{kind}",
+            delete(admin::push_credentials::delete),
+        )
+        .route(
+            "/admin/api/projects/{project_id}/push/test",
+            post(admin::test_push::handle),
+        )
+        .route(
+            "/admin/api/projects/{project_id}/push/sends",
+            get(admin::push_sends::list),
+        )
+        .route(
+            "/admin/api/projects/{project_id}/push/sends/{send_id}/retry",
+            post(admin::push_sends::retry),
+        )
+        .route(
+            "/admin/api/projects/{project_id}/push/sends/_retry_all_failed",
+            post(admin::push_sends::retry_all_failed),
+        )
+        // session-bound auth endpoints
         .route("/auth/logout", post(auth::logout))
-        .route("/auth/sessions", get(sessions_admin::list))
-        .route(
-            "/auth/sessions/{id_hash_hex}",
-            delete(sessions_admin::revoke),
-        )
-        .route("/auth/notifications", get(notifications::list))
-        .route(
-            "/auth/notifications/_read_all",
-            post(notifications::read_all),
-        )
-        .route(
-            "/auth/notifications/{id}/read",
-            post(notifications::read_one),
-        )
+        .route("/auth/me", get(auth::me))
+        .route("/auth/change-password", post(auth::change_password))
         .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             session_middleware,
         ))
         .with_state(state.clone());
 
-    // Dashboard reads — session-gated.
-    //
-    // These were public until 2026-07-20 ("Phase E will gate with
-    // cookie session"), which meant any caller could read a
-    // customer's issues, events, traces, metrics and replays, with
-    // `/v1/projects` handing out the project ids to address them by.
-    // SDK ingest is a separate group above and keeps its own Bearer
-    // st_pk_ gate; ops probes stay open below for k8s and Prometheus.
-    let dashboard_routes = Router::new()
-        .route("/v1/_describe", get(api_describe::describe))
-        .route("/v1/_self_test", get(self_test::handle))
-        .route("/v1/projects", get(projects::list))
-        .route("/v1/projects/{project_id}/issues", get(issues::list))
-        .route(
-            "/v1/projects/{project_id}/issues/{issue_id}",
-            get(issues::get).patch(issues::patch),
-        )
-        .route("/v1/issues/{issue_id}/watchers", get(issue_watchers::list))
-        .route("/v1/issues/{issue_id}/comments", get(issue_comments::list))
-        .route("/v1/issues/{issue_id}/activity", get(activity_log::list))
-        .route(
-            "/v1/projects/{project_id}/issues/_bulk_patch",
-            post(issues::bulk_patch),
-        )
-        .route("/v1/projects/{project_id}/events", get(events::list))
-        .route("/v1/projects/{project_id}/events/trend", get(events::trend))
-        .route(
-            "/v1/projects/{project_id}/events/_recent",
-            get(events_live::handle),
-        )
-        // Registered after the two literal siblings above. The router
-        // prefers a static segment over a capture regardless of order,
-        // but `{event_id}` parses as a Uuid — if it ever did win,
-        // `/events/trend` would 400 instead of 404, so keep the
-        // precedence visible in the source too.
-        .route(
-            "/v1/projects/{project_id}/events/{event_id}",
-            get(events::get),
-        )
-        .route("/v1/projects/{project_id}/traces", get(spans::list_traces))
-        .route(
-            "/v1/projects/{project_id}/traces/{trace_id}",
-            get(spans::get_trace),
-        )
-        .route(
-            "/v1/projects/{project_id}/metrics",
-            get(metrics::list_names),
-        )
-        // `track_events` had an ingest route and no way back out; these
-        // three read it along the three indexes it already carries.
-        .route(
-            "/v1/projects/{project_id}/track/names",
-            get(track_query::names),
-        )
-        .route(
-            "/v1/projects/{project_id}/track/series",
-            get(track_query::series),
-        )
-        .route(
-            "/v1/projects/{project_id}/track/recent",
-            get(track_query::recent),
-        )
-        // The SDK's own perf rollups — the numbers behind the promise
-        // that Sentori does not make the host app stutter.
-        .route(
-            "/v1/projects/{project_id}/runtime-metrics",
-            get(runtime_metrics_query::names),
-        )
-        .route(
-            "/v1/projects/{project_id}/runtime-metrics/series",
-            get(runtime_metrics_query::series),
-        )
-        // What a user typed when the app asked them what happened.
-        .route(
-            "/v1/projects/{project_id}/user-reports",
-            get(user_reports_query::list),
-        )
-        .route(
-            "/v1/projects/{project_id}/metrics/{name}/timeseries",
-            get(metrics::timeseries),
-        )
-        // Crash evidence: what the SDK captured alongside the event.
-        .route(
-            "/v1/projects/{project_id}/events/{event_id}/attachments",
-            get(attachments::list),
-        )
-        .route(
-            "/v1/projects/{project_id}/attachments/{ref_id}",
-            get(attachments::get),
-        )
-        .route("/v1/projects/{project_id}/replays", get(replays::list))
-        .route(
-            "/v1/projects/{project_id}/replays/{replay_id}/ndjson",
-            get(replays::ndjson),
-        )
-        .route("/v1/projects/{project_id}/stats", get(stats::project_stats))
-        .route("/v1/projects/{project_id}/search", get(search::search))
-        .route(
-            "/v1/projects/{project_id}/cert/watches",
-            get(cert::list_watches),
-        )
-        .route(
-            "/v1/projects/{project_id}/cert/observations",
-            get(cert::list_observations),
-        )
-        .route(
-            "/v1/projects/{project_id}/alerts",
-            get(alerts::list_for_project),
-        )
-        .route("/v1/audit", get(audit::list))
-        .route(
-            "/v1/alerts",
-            get(alerts::list_workspace).post(alerts::create),
-        )
-        .route(
-            "/v1/alerts/{id}",
-            get(alerts::get)
-                .patch(alerts::update)
-                .delete(alerts::delete),
-        )
-        .route("/v1/alerts/{id}/_fire_test", post(alerts_fire::fire_test))
-        .route(
-            "/v1/saved-views",
-            get(saved_views::list_workspace).post(saved_views::create),
-        )
-        .route(
-            "/v1/saved-views/{id}",
-            get(saved_views::get)
-                .patch(saved_views::patch)
-                .delete(saved_views::delete),
-        )
-        .layer(axum_middleware::from_fn_with_state(
-            state.clone(),
-            session_middleware,
-        ))
-        .with_state(state.clone());
-
-    // Login-shaped endpoints share a per-IP limiter. They have no
-    // bearer token to key on, and repeated calls with different bodies
-    // is exactly what a brute force looks like. The default budget is
-    // ten attempts per five minutes per IP — an operator loosens it
-    // via SENTORI_AUTH_RATELIMIT_PER_IP / _WINDOW_SEC without touching
-    // the ingest tunables.
+    // ── Credentialed auth endpoints with their own per-IP limiter ──
     let auth_bruteforce_routes = Router::new()
-        .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login))
-        .route("/auth/forgot-password", post(auth::forgot))
+        .route("/auth/forgot-password", post(auth::forgot_password))
+        .route("/auth/reset-password", post(auth::reset_password))
         .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             auth_rate_limit_mw,
         ))
         .with_state(state.clone());
 
-    // Ops probes + the auth endpoints needed to obtain a session.
     Router::new()
         .route("/healthz", get(health::healthz))
         .route("/livez", get(health::livez))
         .route("/readyz", get(health::readyz))
         .route("/metrics", get(metrics_prom::handle))
-        // ── auth: dashboard user lifecycle (public) ──────
-        //
-        // register / login / forgot-password are merged in below as
-        // `auth_bruteforce_routes` with their own low-cap per-IP
-        // limiter. verify / reset / change-password are shaped
-        // differently: verify and reset only work with a fresh
-        // single-use token from an email we send, and change-password
-        // sits behind the session so it is bounded by that.
-        .route("/auth/verify", post(auth::verify))
-        .route("/auth/reset-password", post(auth::reset))
-        .route("/auth/change-password", post(auth::change_password))
         .with_state(state)
-        .merge(dashboard_routes)
         .merge(admin_routes)
         .merge(auth_bruteforce_routes)
         .merge(sdk_routes)
         .fallback(spa_or_api_404)
 }
+
 
 /// Path prefixes that belong to the HTTP API, not to the SPA.
 ///

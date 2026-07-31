@@ -40,26 +40,22 @@ pub async fn handle(
         );
     }
     let id = Uuid::now_v7();
-    let deploy_at = body.deploy_at.unwrap_or_else(OffsetDateTime::now_utc);
 
     let result = sqlx::query(
-        "INSERT INTO releases (id, workspace_id, project_id, name, deploy_at) \
-         VALUES ($1, $2, $3, $4, $5) \
-         ON CONFLICT (project_id, name) DO UPDATE SET deploy_at = EXCLUDED.deploy_at \
+        "INSERT INTO releases (id, project_id, name) \
+         VALUES ($1, $2, $3) \
+         ON CONFLICT (project_id, name) DO UPDATE SET name = EXCLUDED.name \
          RETURNING id",
     )
     .bind(id)
-    .bind(ctx.workspace_id.into_uuid())
-    .bind(ctx.project_id.into_uuid())
+    .bind(ctx.project_id)
     .bind(&body.release)
-    .bind(deploy_at)
     .fetch_one(&state.pool)
     .await;
 
     match result {
         Ok(_) => {
             info!(
-                workspace_id = %ctx.workspace_id,
                 project_id = %ctx.project_id,
                 release = %body.release,
                 "sdk.deploys recorded",
@@ -69,12 +65,11 @@ pub async fn handle(
                 Json(json!({
                     "status": "accepted",
                     "release": body.release,
-                    "deploy_at": deploy_at,
                 })),
             )
         }
         Err(e) => {
-            warn!(workspace_id = %ctx.workspace_id, error = %e, "sdk.deploys db_error");
+            warn!(error = %e, "sdk.deploys db_error");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({ "error": "internal" })),

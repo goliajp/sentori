@@ -1,119 +1,51 @@
-//! Token admin endpoints:
+//! Token management (owner + assigned admins).
 //!
-//! - `POST   /admin/api/projects/:project_id/tokens` — mint
-//! - `GET    /admin/api/projects/:project_id/tokens` — list
-//! - `DELETE /admin/api/tokens/:token_id` — revoke
-//!
-//! These are the new-customer onboarding entry point: SaaS user
-//! signs up → creates project → mints a token here → pastes it
-//! into their SDK `init({ token, ingestUrl })`. Self-hosted users
-//! do the same via the dashboard after first-owner bootstrap.
+//! Multiple named tokens per project, two scopes (design.md §9):
+//! `ingest` for SDKs, `api` for automation / AI agents. Rotation is
+//! create-new → switch clients → revoke-old; the plaintext appears
+//! exactly once, in the create response.
 
 use std::sync::Arc;
 
 use axum::{
-    Json,
-    extract::{Extension, Path, State},
-    http::{HeaderMap, StatusCode},
+    Extension, Json,
+    extract::{Path, State},
+    http::StatusCode,
 };
-
-use crate::session_mw::SessionContext;
-use sentori_ingest_token::{TokenKind, TokenStore};
-use sentori_workspace_identity::ProjectId;
+use sentori_ingest_token::{Scope, TokenStore};
 use serde::Deserialize;
 use serde_json::{Value, json};
-use tracing::{info, warn};
+use tracing::warn;
 use uuid::Uuid;
 
+use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateBody {
-    /// Display label (e.g. "production iOS", "qa android").
-    #[serde(default)]
-    pub label: Option<String>,
-    /// `public` (default — SDK ingest) or `admin` (server-side).
-    #[serde(default)]
-    pub kind: Option<String>,
-}
-
-pub async fn create(
-    State(state): State<Arc<AppState>>,
-    Extension(ctx): Extension<SessionContext>,
-    Path(project_id): Path<Uuid>,
-    headers: HeaderMap,
-    Json(body): Json<CreateBody>,
-) -> (StatusCode, Json<Value>) {
-    let kind = match body.kind.as_deref() {
-        None | Some("public") => TokenKind::Public,
-        Some("admin") => TokenKind::Admin,
-        Some(other) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(json!({ "error": "invalid_kind", "got": other })),
-            );
-        }
-    };
-    // Tenant guard: the project in the path must belong to the
-    // caller's workspace, or minting would attach a token to a
-    // foreign project.
-    if let Err((code, msg)) =
-        crate::handlers::tenant::guard_project(&state, ctx.workspace_id, project_id).await
-    {
-        return (code, Json(json!({ "error": msg })));
+/// 403 unless the caller may touch this project (superadmin, or an
+/// admin with an assignment row).
+pub async fn ensure_project_access(
+    state: &Arc<AppState>,
+    ctx: &SessionContext,
+    project_id: Uuid,
+) -> Result<(), (StatusCode, Json<Value>)> {
+    if ctx.role.is_superadmin() {
+        return Ok(());
     }
-    let store = TokenStore::new(state.pool.clone());
-    match store
-        .create(
-            ctx.workspace_id,
-            ProjectId::from_uuid(project_id),
-            kind,
-            body.label.as_deref(),
-        )
-        .await
-    {
-        Ok((id, plaintext)) => {
-            info!(
-                workspace_id = %ctx.workspace_id,
-                %project_id,
-                token_id = %id,
-                kind = ?kind,
-                "admin.tokens minted",
-            );
-            let (ip, ua) = crate::notify::extract_request_meta(&headers);
-            crate::notify::audit(
-                &state.pool,
-                ctx.workspace_id.into_uuid(),
-                Some(project_id),
-                Some(ctx.user_id.into_uuid()),
-                "token.mint",
-                Some("token"),
-                Some(&id.to_string()),
-                crate::notify::enrich_payload(
-                    json!({ "kind": kind.as_db_str(), "label": body.label }),
-                    ip.as_deref(),
-                    ua.as_deref(),
-                ),
-            )
-            .await;
-            (
-                StatusCode::CREATED,
-                Json(json!({
-                    "token_id": id.to_string(),
-                    "token": plaintext,
-                    "kind": kind.as_db_str(),
-                    "label": body.label,
-                })),
-            )
-        }
-        Err(e) => {
-            warn!(error = %e, "admin.tokens create_failed");
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "error": "internal" })),
-            )
-        }
+    let assigned: Option<(i32,)> = sqlx::query_as(
+        "SELECT 1 FROM project_assignments WHERE user_id = $1 AND project_id = $2",
+    )
+    .bind(ctx.user_id)
+    .bind(project_id)
+    .fetch_optional(&state.pool)
+    .await
+    .unwrap_or(None);
+    if assigned.is_some() {
+        Ok(())
+    } else {
+        Err((
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "project_access_denied" })),
+        ))
     }
 }
 
@@ -122,38 +54,85 @@ pub async fn list(
     Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
 ) -> (StatusCode, Json<Value>) {
-    // Tenant guard: only list tokens for a project the caller owns.
-    if let Err((code, msg)) =
-        crate::handlers::tenant::guard_project(&state, ctx.workspace_id, project_id).await
-    {
-        return (code, Json(json!({ "error": msg })));
+    if let Err(e) = ensure_project_access(&state, &ctx, project_id).await {
+        return e;
     }
-    let store = TokenStore::new(state.pool.clone());
-    match store
-        .list_for_project(ProjectId::from_uuid(project_id))
+    match TokenStore::new(state.pool.clone())
+        .list_for_project(project_id)
         .await
     {
-        Ok(rows) => {
-            let out: Vec<Value> = rows
+        Ok(tokens) => {
+            let rows: Vec<Value> = tokens
                 .iter()
                 .map(|t| {
                     json!({
-                        "id": t.id.to_string(),
-                        "kind": t.kind.as_db_str(),
-                        "label": t.label,
+                        "id": t.id,
+                        "name": t.name,
+                        "scope": t.scope.as_db_str(),
                         "last4": t.last4,
-                        "created_at": crate::wire_time::rfc3339(t.created_at),
-                        "revoked_at": crate::wire_time::rfc3339_opt(t.revoked_at),
+                        "createdAt": crate::wire_time::rfc3339(t.created_at),
+                        "revokedAt": t.revoked_at.map(crate::wire_time::rfc3339),
                     })
                 })
                 .collect();
-            (StatusCode::OK, Json(json!({ "tokens": out })))
+            (StatusCode::OK, Json(json!({ "tokens": rows })))
         }
         Err(e) => {
-            warn!(error = %e, "admin.tokens list_failed");
+            warn!(error = %e, "token list failed");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "tokens": [], "error": "internal" })),
+                Json(json!({ "error": "internal" })),
+            )
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct CreateBody {
+    pub name: String,
+    pub scope: String,
+}
+
+pub async fn create(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    Path(project_id): Path<Uuid>,
+    Json(body): Json<CreateBody>,
+) -> (StatusCode, Json<Value>) {
+    if let Err(e) = ensure_project_access(&state, &ctx, project_id).await {
+        return e;
+    }
+    let Some(scope) = Scope::from_db_str(&body.scope) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "invalid_scope", "hint": "ingest | api" })),
+        );
+    };
+    match TokenStore::new(state.pool.clone())
+        .create(project_id, scope, &body.name)
+        .await
+    {
+        Ok((id, plaintext)) => {
+            crate::audit::record(
+                &state.pool,
+                Some(project_id),
+                ctx.user_id,
+                "token.create",
+                "token",
+                &id.to_string(),
+                json!({ "name": body.name, "scope": body.scope }),
+            )
+            .await;
+            (
+                StatusCode::CREATED,
+                Json(json!({ "id": id, "token": plaintext })),
+            )
+        }
+        Err(e) => {
+            warn!(error = %e, "token create failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "internal" })),
             )
         }
     }
@@ -163,47 +142,42 @@ pub async fn revoke(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
     Path(token_id): Path<Uuid>,
-    headers: HeaderMap,
-) -> StatusCode {
-    // Tenant guard: the token must belong to the caller's
-    // workspace. `TokenStore::revoke` keys on id alone, so without
-    // this a caller could revoke any workspace's token by id.
-    let owned: Result<Option<(Uuid,)>, _> =
-        sqlx::query_as("SELECT id FROM tokens WHERE id = $1 AND workspace_id = $2")
-            .bind(token_id)
-            .bind(ctx.workspace_id.into_uuid())
-            .fetch_optional(&state.pool)
-            .await;
-    match owned {
-        Ok(Some(_)) => {}
-        // Absent or foreign: 404, indistinguishable.
-        Ok(None) => return StatusCode::NOT_FOUND,
-        Err(e) => {
-            warn!(error = %e, "admin.tokens revoke guard failed");
-            return StatusCode::INTERNAL_SERVER_ERROR;
-        }
+) -> (StatusCode, Json<Value>) {
+    // Resolve the token's project for the access check.
+    let row: Option<(Uuid,)> = sqlx::query_as("SELECT project_id FROM tokens WHERE id = $1")
+        .bind(token_id)
+        .fetch_optional(&state.pool)
+        .await
+        .unwrap_or(None);
+    let Some((project_id,)) = row else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "token_not_found" })),
+        );
+    };
+    if let Err(e) = ensure_project_access(&state, &ctx, project_id).await {
+        return e;
     }
-    let store = TokenStore::new(state.pool.clone());
-    match store.revoke(token_id).await {
+    match TokenStore::new(state.pool.clone()).revoke(token_id).await {
         Ok(()) => {
-            info!(%token_id, "admin.tokens revoked");
-            let (ip, ua) = crate::notify::extract_request_meta(&headers);
-            crate::notify::audit(
+            crate::audit::record(
                 &state.pool,
-                ctx.workspace_id.into_uuid(),
-                None,
-                Some(ctx.user_id.into_uuid()),
+                Some(project_id),
+                ctx.user_id,
                 "token.revoke",
-                Some("token"),
-                Some(&token_id.to_string()),
-                crate::notify::enrich_payload(json!({}), ip.as_deref(), ua.as_deref()),
+                "token",
+                &token_id.to_string(),
+                json!({}),
             )
             .await;
-            StatusCode::NO_CONTENT
+            (StatusCode::OK, Json(json!({ "ok": true })))
         }
         Err(e) => {
-            warn!(error = %e, %token_id, "admin.tokens revoke_failed");
-            StatusCode::INTERNAL_SERVER_ERROR
+            warn!(error = %e, "token revoke failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "internal" })),
+            )
         }
     }
 }

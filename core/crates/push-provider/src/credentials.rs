@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use sentori_secrets_vault::Vault;
-use sentori_workspace_identity::ProjectId;
 use serde_json::Value;
 use sqlx::{PgPool, Row};
 use time::OffsetDateTime;
@@ -19,7 +18,7 @@ pub struct StoredCredential {
     /// Primary key.
     pub id: Uuid,
     /// Owning project.
-    pub project_id: ProjectId,
+    pub project_id: Uuid,
     /// Which provider this credential is for.
     pub kind: ProviderKind,
     /// Non-secret config (vendor-shape JSONB).
@@ -83,7 +82,7 @@ impl CredentialStore {
     /// - [`PushError::Db`] on database failure.
     pub async fn upsert(
         &self,
-        project_id: ProjectId,
+        project_id: Uuid,
         kind: ProviderKind,
         config: &Value,
         secret_payload: &[u8],
@@ -96,8 +95,8 @@ impl CredentialStore {
         let row = sqlx::query(
             r"
             INSERT INTO push_credentials
-                (id, workspace_id, project_id, kind, config, secret_blob)
-            SELECT $1, p.workspace_id, $2, $3, $4, $5
+                (id, project_id, kind, config, secret_blob)
+            SELECT $1, $2, $3, $4, $5
             FROM projects p WHERE p.id = $2
             ON CONFLICT (project_id, kind) DO UPDATE SET
                 config = EXCLUDED.config,
@@ -108,7 +107,7 @@ impl CredentialStore {
             ",
         )
         .bind(new_id)
-        .bind(project_id.into_uuid())
+        .bind(project_id)
         .bind(kind.as_db_str())
         .bind(config)
         .bind(sealed.as_slice())
@@ -118,7 +117,7 @@ impl CredentialStore {
         // Unknown project → the driving SELECT matches zero rows → nothing is
         // inserted, the ON CONFLICT branch never runs and no FK violation is
         // raised. Absence of a RETURNING row is the only signal.
-        let row = row.ok_or_else(|| PushError::ProjectNotFound(project_id.into_uuid()))?;
+        let row = row.ok_or_else(|| PushError::ProjectNotFound(project_id))?;
         Ok(row.get::<Uuid, _>("id"))
     }
 
@@ -132,7 +131,7 @@ impl CredentialStore {
     /// - [`PushError::Db`] on database failure.
     pub async fn load(
         &self,
-        project_id: ProjectId,
+        project_id: Uuid,
         kind: ProviderKind,
     ) -> Result<Option<StoredCredential>, PushError> {
         let row = sqlx::query(
@@ -143,7 +142,7 @@ impl CredentialStore {
             WHERE project_id = $1 AND kind = $2
             ",
         )
-        .bind(project_id.into_uuid())
+        .bind(project_id)
         .bind(kind.as_db_str())
         .fetch_optional(&self.pool)
         .await?;
@@ -152,7 +151,7 @@ impl CredentialStore {
         let secret_payload = self.vault.open(&sealed)?;
         Ok(Some(StoredCredential {
             id: row.get("id"),
-            project_id: ProjectId::from_uuid(row.get("project_id")),
+            project_id: row.get("project_id"),
             kind,
             config: row.get("config"),
             secret_payload,
@@ -167,9 +166,9 @@ impl CredentialStore {
     /// # Errors
     ///
     /// [`PushError::Db`] on database failure.
-    pub async fn delete(&self, project_id: ProjectId, kind: ProviderKind) -> Result<(), PushError> {
+    pub async fn delete(&self, project_id: Uuid, kind: ProviderKind) -> Result<(), PushError> {
         sqlx::query("DELETE FROM push_credentials WHERE project_id = $1 AND kind = $2")
-            .bind(project_id.into_uuid())
+            .bind(project_id)
             .bind(kind.as_db_str())
             .execute(&self.pool)
             .await?;
@@ -184,7 +183,7 @@ impl CredentialStore {
     /// [`PushError::Db`] on database failure.
     pub async fn record_validate(
         &self,
-        project_id: ProjectId,
+        project_id: Uuid,
         kind: ProviderKind,
         outcome: &ValidateOutcome,
     ) -> Result<(), PushError> {
@@ -197,7 +196,7 @@ impl CredentialStore {
             ",
         )
         .bind(outcome.as_db_str())
-        .bind(project_id.into_uuid())
+        .bind(project_id)
         .bind(kind.as_db_str())
         .execute(&self.pool)
         .await?;
@@ -205,11 +204,11 @@ impl CredentialStore {
     }
 }
 
-fn translate_fk(err: sqlx::Error, project_id: ProjectId) -> PushError {
+fn translate_fk(err: sqlx::Error, project_id: Uuid) -> PushError {
     if let sqlx::Error::Database(db_err) = &err
         && db_err.code().as_deref() == Some("23503")
     {
-        return PushError::ProjectNotFound(project_id.into_uuid());
+        return PushError::ProjectNotFound(project_id);
     }
     PushError::Db(err)
 }

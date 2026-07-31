@@ -178,7 +178,13 @@ fn group_identity(ev: &IncomingEvent) -> Result<(String, String, String), Ingest
 /// event row, and — for probes — update the tripwire registry.
 pub async fn ingest(pool: &PgPool, ev: IncomingEvent) -> Result<IngestOutcome, IngestError> {
     let (group_title, message_sample, fp_input) = group_identity(&ev)?;
-    let fingerprint = hex::encode(sentori_issue_fingerprint::fingerprint(fp_input.as_bytes()));
+    let fingerprint = {
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        h.update(fp_input.as_bytes());
+        // 16 bytes / 32 hex chars — grouping key, not a secret.
+        hex::encode(&h.finalize()[..16])
+    };
 
     let mut tx = pool.begin().await?;
 

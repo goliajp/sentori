@@ -17,7 +17,6 @@ use axum::{
     http::{HeaderMap, StatusCode},
 };
 
-use crate::handlers::tenant::guard_project;
 use crate::session_mw::SessionContext;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -62,8 +61,8 @@ pub async fn upsert(
     // workspace. The INSERT derives workspace_id from the project
     // row, so without this a caller could plant credentials on
     // another tenant's project.
-    if let Err((code, msg)) = guard_project(&state, ctx.workspace_id, project_id).await {
-        return (code, Json(json!({ "error": msg })));
+    if let Err(e) = super::tokens::ensure_project_access(&state, &ctx, project_id).await {
+        return e;
     }
 
     // Use device_tokens-side push_credentials table from migration 0024.
@@ -73,8 +72,8 @@ pub async fn upsert(
     let secret_bytes = body.secret.unwrap_or_default().into_bytes();
     let result = sqlx::query(
         "INSERT INTO push_credentials \
-         (id, workspace_id, project_id, kind, config, secret_blob) \
-         SELECT $1, p.workspace_id, $2, $3, $4, $5 FROM projects p WHERE p.id = $2 \
+         (id, project_id, kind, config, secret_blob) \
+         SELECT $1, $2, $3, $4, $5 FROM projects p WHERE p.id = $2 \
          ON CONFLICT (project_id, kind) DO UPDATE SET \
             config = EXCLUDED.config, \
             secret_blob = EXCLUDED.secret_blob, \
@@ -98,22 +97,7 @@ pub async fn upsert(
                 provider = %body.provider,
                 "admin.push_credentials upserted",
             );
-            let (ip, ua) = crate::notify::extract_request_meta(&headers);
-            crate::notify::audit(
-                &state.pool,
-                ctx.workspace_id.into_uuid(),
-                Some(project_id),
-                Some(ctx.user_id.into_uuid()),
-                "push_credentials.upsert",
-                Some("push_credentials"),
-                Some(&id.to_string()),
-                crate::notify::enrich_payload(
-                    json!({ "provider": body.provider }),
-                    ip.as_deref(),
-                    ua.as_deref(),
-                ),
-            )
-            .await;
+            crate::audit::record(&state.pool, Some(project_id), ctx.user_id, "push_credentials.upsert", "push_credentials", &id.to_string(), json!({ "provider": body.provider })).await;
             (
                 StatusCode::CREATED,
                 Json(json!({ "id": id.to_string(), "provider": body.provider })),
@@ -138,7 +122,7 @@ pub async fn list(
     Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
 ) -> Json<Value> {
-    if guard_project(&state, ctx.workspace_id, project_id)
+    if super::tokens::ensure_project_access(&state, &ctx, project_id)
         .await
         .is_err()
     {
@@ -174,8 +158,8 @@ pub async fn delete(
     Extension(ctx): Extension<SessionContext>,
     Path((project_id, kind)): Path<(Uuid, String)>,
 ) -> StatusCode {
-    if let Err((code, _)) = guard_project(&state, ctx.workspace_id, project_id).await {
-        return code;
+    if let Err(e) = super::tokens::ensure_project_access(&state, &ctx, project_id).await {
+        return e.0;
     }
     let result = sqlx::query("DELETE FROM push_credentials WHERE project_id = $1 AND kind = $2")
         .bind(project_id)

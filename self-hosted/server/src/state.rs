@@ -46,12 +46,16 @@ pub struct AppState {
     pub events_bus: tokio::sync::broadcast::Sender<RecentEventTick>,
     /// Transactional email sender (password reset, issue notify).
     pub mailer: crate::mailer::Mailer,
+    /// Push device-token store (push family is carried, not part of
+    /// the v1 acceptance surface).
+    pub push_tokens: sentori_push_provider::DeviceTokenStore,
 }
 
 impl AppState {
     #[must_use]
     pub fn new(pool: PgPool, attachments: AttachmentStore) -> Self {
         let (events_bus, _) = tokio::sync::broadcast::channel(512);
+        let pool_for_push = pool.clone();
         Self {
             pool,
             source_maps: std::sync::Arc::new(crate::symbolicate::new_cache()),
@@ -60,6 +64,7 @@ impl AppState {
             attachments,
             events_bus,
             mailer: crate::mailer::Mailer::from_env(),
+            push_tokens: sentori_push_provider::DeviceTokenStore::new(pool_for_push),
         }
     }
 }

@@ -6,6 +6,7 @@
 //! for now they're open (single-tenant self-hosted dev).
 
 pub mod projects;
+pub mod users;
 pub mod push_credentials;
 pub mod push_sends;
 pub mod releases;

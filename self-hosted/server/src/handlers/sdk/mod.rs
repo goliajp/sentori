@@ -31,7 +31,7 @@ pub mod push;
 pub(crate) fn require_admin_token(
     ctx: &sentori_ingest_token::IngestContext,
 ) -> Result<(), (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
-    if ctx.token_kind.is_admin() {
+    if ctx.scope == sentori_ingest_token::Scope::Api {
         return Ok(());
     }
     Err((

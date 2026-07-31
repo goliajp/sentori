@@ -17,7 +17,6 @@ use sqlx::Row;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::handlers::tenant::guard_project;
 use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
@@ -46,8 +45,8 @@ pub async fn handle(
 ) -> (StatusCode, Json<Value>) {
     // Tenant guard: the project must belong to the caller's
     // workspace before we touch its device tokens / queue a send.
-    if let Err((code, msg)) = guard_project(&state, ctx.workspace_id, project_id).await {
-        return (code, Json(json!({ "error": msg })));
+    if let Err(e) = super::tokens::ensure_project_access(&state, &ctx, project_id).await {
+        return e;
     }
     // Verify the device_token belongs to this project.
     let owns = sqlx::query(
@@ -76,11 +75,10 @@ pub async fn handle(
 
     let send_id = Uuid::now_v7();
     let result = sqlx::query(
-        "INSERT INTO push_sends (id, workspace_id, project_id, token_id, provider, payload, status) \
+        "INSERT INTO push_sends (id, project_id, token_id, provider, payload, status) \
          VALUES ($1, $2, $3, $4, $5, $6, 'queued') RETURNING id",
     )
     .bind(send_id)
-    .bind(ctx.workspace_id.into_uuid())
     .bind(project_id)
     .bind(body.device_token_id)
     .bind(&provider)
