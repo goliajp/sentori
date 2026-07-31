@@ -46,6 +46,7 @@
     "sentori-rn-upload-source-bundle": "bin/sentori-rn-upload-source-bundle.cjs"
   },
   "files": [
+    "MIGRATION.md",
     "lib/",
     "src/",
     "bin/",
