@@ -1,3 +1,9 @@
+// rn-example — the eight-verb walkthrough app.
+//
+// One button per verb (plus the crash lanes). Point it at a local
+// stack (`cargo run` + postgres) and every tap should land as an
+// event, group into an issue, and show up in `GET /api/issues`.
+
 import { useState } from 'react';
 import {
   Platform,
@@ -8,34 +14,23 @@ import {
   View,
 } from 'react-native';
 
-import {
-  addBreadcrumb,
-  drainReplay,
-  probeNativeScreenshot,
-  probeNativeWireframe,
-  recordMetric,
-  sentori,
-  startAnrWatchdog,
-  startTrace,
-  track,
-  triggerNativeCrash,
-  withScopedSpan,
-} from '@goliapkg/sentori-react-native';
+import { RageTapCapture, sentori } from '@goliapkg/sentori-react-native';
 
 const INGEST_URL =
   Platform.OS === 'android' ? 'http://10.0.2.2:8080' : 'http://localhost:8080';
 
-const TOKEN = 'st_pk_dev0000000000000000000000';
+// Paste an `ingest`-scope token minted from the local dashboard/API.
+const TOKEN = 'st_dev0000000000000000000000';
 
 sentori.init({
   token: TOKEN,
+  ingestUrl: INGEST_URL,
   release: 'sentori-example@1.0.0+1',
   environment: 'dev',
-  ingestUrl: INGEST_URL,
-  capture: { replay: { mode: 'wireframe' } },
+  detect: { rageTap: true, longFreeze: true, slowColdStart: true, slowApi: true },
 });
-
-startAnrWatchdog({ force: true, intervalMs: 500, timeoutMs: 2000 });
+sentori.user({ id: 'demo-user-1', email: 'demo@example.com' });
+sentori.context({ variant: 'walkthrough', flag_new_checkout: true });
 
 type LogLine = { id: number; text: string };
 
@@ -44,13 +39,13 @@ export default function App() {
 
   const append = (text: string) => {
     setLog((prev) =>
-      [{ id: Date.now() + Math.random(), text }, ...prev].slice(0, 10),
+      [{ id: Date.now() + Math.random(), text }, ...prev].slice(0, 12),
     );
   };
 
-
   const buttons: { onPress: () => void; title: string }[] = [
     {
+      title: 'throw TypeError (auto capture)',
       onPress: () => {
         append('throwing TypeError…');
         setTimeout(() => {
@@ -58,264 +53,112 @@ export default function App() {
           x.foo();
         }, 0);
       },
-      title: 'Throw TypeError (global handler)',
     },
     {
+      title: 'sentori.error(manual)',
       onPress: () => {
-        append('rejecting promise…');
-        void Promise.reject(new Error('unhandled rejection demo'));
-      },
-      title: 'Unhandled promise rejection',
-    },
-    {
-      onPress: () => {
-        append('captureException manual…');
-        sentori.captureException(new Error('manual capture'), {
-          tags: { source: 'button' },
+        const id = sentori.error(new Error('manual error from walkthrough'), {
+          lane: 'manual',
         });
+        append(`error → ${id.slice(0, 8)}`);
       },
-      title: 'Manual sentori.captureException()',
     },
     {
+      title: 'sentori.warn(pay.gateway-retry)',
       onPress: () => {
-        append('captureMessage info…');
-        sentori.captureMessage('demo: feature flag rolled out to 100%', {
-          level: 'info',
-          tags: { source: 'button', feature: 'demo' },
+        const id = sentori.warn('pay.gateway-retry', {
+          attempt: 2,
+          error: new TypeError('gateway 503'),
         });
+        append(`warn → ${id.slice(0, 8)}`);
       },
-      title: 'Manual sentori.captureMessage() — info',
     },
     {
+      title: 'sentori.trace(checkout.start)',
       onPress: () => {
-        append('captureMessage warning…');
-        sentori.captureMessage('demo: payment provider returned 500, used fallback', {
-          level: 'warning',
-          tags: { source: 'button', surface: 'checkout' },
-        });
+        const id = sentori.trace('checkout.start', { cartSize: 3 });
+        append(`trace → ${id.slice(0, 8)}`);
       },
-      title: 'Manual sentori.captureMessage() — warning',
     },
     {
-      onPress: async () => {
-        append('fetch then capture…');
-        try {
-          await fetch('http://localhost:9999/does-not-exist');
-        } catch {
-          /* expected */
-        }
-        sentori.captureException(new Error('after a failed fetch'));
-      },
-      title: 'fetch failure → capture',
-    },
-    // v2.0 W4 — one button per manual-instrumentation recipe.
-    // Tap, watch the log line update, then check the dashboard
-    // (issues / traces / metrics modules) for the corresponding
-    // entry.
-    {
+      title: 'sentori.assert pass ×5',
       onPress: () => {
-        addBreadcrumb({
-          type: 'user',
-          data: { message: 'demo: clicked addBreadcrumb', route: 'manual-recipe' },
-        });
-        append('breadcrumb added (rides on next capture)');
+        for (let i = 0; i < 5; i++) sentori.assert('total-positive', true);
+        append('assert ×5 pass (aggregates, no events)');
       },
-      title: 'Manual sentori.addBreadcrumb()',
     },
     {
+      title: 'sentori.assert FAIL',
       onPress: () => {
-        track('demo.checkout.click', { sku: 'SKU-42', tier: 'pro' });
-        append('track demo.checkout.click emitted');
+        const id = sentori.assert('total-positive', false, { total: -1 });
+        append(`assert fail → ${id.slice(0, 8)}`);
       },
-      title: 'Manual sentori.track() — analytics event',
     },
     {
-      onPress: async () => {
-        append('startTrace + withScopedSpan + recordMetric…');
-        const trace = startTrace('checkout.demo');
-        await withScopedSpan(
-          'db.query.users',
-          async (span) => {
-            await new Promise((r) => setTimeout(r, 25));
-            // v2.0 W3 — recordMetric ties this point to its emitting
-            // span via tags.span_id; dashboard renders related
-            // metrics row.
-            recordMetric('db.users.row_count', 42, undefined, { parent: span });
-          },
-          { parent: trace },
-        );
-        trace.end({ status: 'ok' });
-        append('trace + span + metric emitted (look on dashboard)');
-      },
-      title: 'Manual trace + span + recordMetric',
-    },
-    {
+      title: 'sentori.probe(SENT-1)',
       onPress: () => {
-        // v2.0 W3 captureException combined with a track auto-breadcrumb
-        // demonstrates the customer-journey chain (requires
-        // init.capture.trackAutoBreadcrumb: true to bring track events
-        // into the breadcrumb trail visible on the next capture).
-        track('demo.journey.step1', { surface: 'onboard' });
-        track('demo.journey.step2', { surface: 'paywall' });
-        sentori.captureException(new Error('after-track demo'), {
-          tags: { source: 'manual-journey' },
-        });
-        append('track ×2 then captureException (journey breadcrumbs on issue)');
+        const id = sentori.probe('SENT-1', { cardToken: null });
+        append(`probe → ${id.slice(0, 8)}`);
       },
-      title: 'track ×2 → captureException (journey demo)',
     },
     {
+      title: 'block JS thread 2.5 s (long_freeze)',
       onPress: () => {
-        append('triggering native crash…');
-        triggerNativeCrash();
+        append('blocking…');
+        setTimeout(() => {
+          const until = Date.now() + 2_500;
+          while (Date.now() < until) {
+            // spin
+          }
+          append('unblocked — long_freeze should fire');
+        }, 50);
       },
-      title: 'Native crash (relaunch sends)',
-    },
-    {
-      onPress: () => {
-        append('hanging main for 5s…');
-        const start = Date.now();
-        while (Date.now() - start < 5000) {
-          /* busy-loop */
-        }
-        append('main resumed');
-      },
-      title: 'Hang main thread 5 s',
-    },
-    {
-      onPress: () => {
-        const p = probeNativeWireframe();
-        const msg = `probe path=${p.lastPath} nodes=${p.lastNodes} scenes=${p.sceneCount} windows=${p.windowCount}`;
-        append(msg);
-        console.warn('[replay-test]', msg);
-      },
-      title: '[replay] probe wireframe state',
-    },
-    {
-      onPress: () => {
-        const p = probeNativeScreenshot();
-        const tracked = (p.raw.trackedSource as string | undefined) ?? 'n/a';
-        const decor = (p.raw.decorViewFound as boolean | undefined) ?? false;
-        const msg = `probe screenshot path=${p.lastPath} tracked=${tracked} decor=${decor}`;
-        append(msg);
-        console.warn('[verify-android]', msg, p.raw);
-      },
-      title: '[screenshot] probe state',
-    },
-    {
-      onPress: () => {
-        const ndjson = drainReplay();
-        const lines = ndjson ? ndjson.split('\n').length : 0;
-        const head = ndjson.slice(0, 120).replace(/\n/g, ' | ');
-        const msg = `drained frames=${lines} bytes=${ndjson.length}`;
-        append(msg);
-        console.warn('[replay-test]', msg, '\n  head:', head);
-      },
-      title: '[replay] drain ring (no crash)',
     },
   ];
 
   return (
-    <View style={styles.root}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Sentori</Text>
-        <Text style={styles.subtitle}>example · Expo 55 · RN 0.83</Text>
-        <Text style={styles.meta}>ingest: {INGEST_URL}</Text>
-        {/* rc.4 verify — JP / em-dash / emoji so the walked
-            wireframe NDJSON carries non-Latin-1 text. The pre-rc.4
-            inline `btoa(ndjson)` path threw on this content; rc.4
-            routes through base64Utf8. */}
-        <Text style={styles.meta}>設定 · ログアウト · こんにちは — 🎉</Text>
-      </View>
-
-      <View style={styles.buttons}>
-        {buttons.map((b) => (
-          <Pressable
-            key={b.title}
-            onPress={b.onPress}
-            style={({ pressed }) => [styles.btn, pressed && styles.btnPressed]}
-          >
-            <Text style={styles.btnLabel}>{b.title}</Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <View style={styles.logHeader}>
-        <Text style={styles.logHeaderText}>recent</Text>
-      </View>
-      <ScrollView style={styles.log}>
-        {log.length === 0 ? (
-          <Text style={styles.logEmpty}>
-            tap a button — then watch sentori-server stdout
-          </Text>
-        ) : (
-          log.map((l) => (
+    <RageTapCapture style={styles.root}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Sentori · eight verbs</Text>
+        <Text style={styles.subtitle}>{INGEST_URL}</Text>
+        <ScrollView style={styles.buttons}>
+          {buttons.map((b) => (
+            <Pressable key={b.title} onPress={b.onPress} style={styles.button}>
+              <Text style={styles.buttonText}>{b.title}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+        <View style={styles.log}>
+          {log.map((l) => (
             <Text key={l.id} style={styles.logLine}>
               {l.text}
             </Text>
-          ))
-        )}
-      </ScrollView>
-    </View>
+          ))}
+        </View>
+      </View>
+    </RageTapCapture>
   );
 }
 
 const styles = StyleSheet.create({
-  btn: {
-    backgroundColor: '#1a1a1f',
-    borderColor: '#2a2a32',
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  btnLabel: { color: '#e0e0e6', fontSize: 14 },
-  btnPressed: { backgroundColor: '#222229' },
-  buttons: { gap: 8, marginBottom: 24 },
-  header: { marginBottom: 24 },
-  log: { flex: 1 },
-  logEmpty: {
-    color: '#5a5a62',
-    fontSize: 12,
-    fontStyle: 'italic',
-    paddingVertical: 8,
-  },
-  logHeader: {
-    borderTopColor: '#1a1a1f',
-    borderTopWidth: 1,
-    marginBottom: 8,
-    paddingTop: 12,
-  },
-  logHeaderText: {
-    color: '#7a7a82',
-    fontSize: 11,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  logLine: {
-    color: '#a0a0a8',
-    fontFamily: Platform.select({ android: 'monospace', ios: 'Menlo' }),
-    fontSize: 12,
-    paddingVertical: 4,
-  },
-  meta: {
-    color: '#5a5a62',
-    fontFamily: Platform.select({ android: 'monospace', ios: 'Menlo' }),
-    fontSize: 11,
-    marginTop: 8,
-  },
-  root: {
-    backgroundColor: '#0e0e10',
-    flex: 1,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-    paddingTop: 64,
-  },
-  subtitle: { color: '#7a7a82', fontSize: 14, marginTop: 2 },
+  root: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#101014', paddingTop: 64 },
   title: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '600',
-    letterSpacing: -0.5,
+    color: '#f5f5f7',
+    fontSize: 22,
+    fontWeight: '700',
+    paddingHorizontal: 20,
   },
+  subtitle: { color: '#8e8e93', fontSize: 12, paddingHorizontal: 20, paddingBottom: 12 },
+  buttons: { flexGrow: 0 },
+  button: {
+    backgroundColor: '#1c1c22',
+    borderRadius: 10,
+    marginHorizontal: 16,
+    marginVertical: 4,
+    padding: 14,
+  },
+  buttonText: { color: '#e5e5ea', fontSize: 15 },
+  log: { flex: 1, padding: 16 },
+  logLine: { color: '#30d158', fontFamily: 'Menlo', fontSize: 11, paddingVertical: 1 },
 });
