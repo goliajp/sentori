@@ -369,8 +369,7 @@ async fn list_recent_returns_ordered() {
     let pid = seed_project(&pool, "p1").await;
     let (svc, _) = build_service_with_mock(pool);
     for i in 0..5 {
-        let n = Notification::new(Channel::Mock, "ops", format!("s{i}"), "b")
-            .with_project(pid);
+        let n = Notification::new(Channel::Mock, "ops", format!("s{i}"), "b").with_project(pid);
         svc.dispatch(&n).await.unwrap();
     }
     let recent = svc
@@ -405,7 +404,8 @@ async fn webhook_transport_sends_payload() {
     let server = MockHttp::start().await;
     let mut svc = NotifierService::new(pool);
     svc.register(Arc::new(WebhookTransport::new()));
-    let n = Notification::new(Channel::Webhook,
+    let n = Notification::new(
+        Channel::Webhook,
         format!("{}/hook", server.base_url),
         "alert",
         "{\"k\":1}",
@@ -424,7 +424,8 @@ async fn webhook_transport_records_502() {
     server.fail_with(502);
     let mut svc = NotifierService::new(pool);
     svc.register(Arc::new(WebhookTransport::new()));
-    let n = Notification::new(Channel::Webhook,
+    let n = Notification::new(
+        Channel::Webhook,
         format!("{}/hook", server.base_url),
         "alert",
         "{}",

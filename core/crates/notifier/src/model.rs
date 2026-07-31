@@ -2,11 +2,11 @@
 
 use std::fmt;
 
-use uuid::Uuid as ProjectUuid;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 use time::OffsetDateTime;
+use uuid::Uuid as ProjectUuid;
 use uuid::Uuid;
 
 /// What surface this notification rides on. Drives transport
@@ -349,15 +349,10 @@ mod tests {
     #[test]
     fn builder_helpers_chain() {
         let pid = uuid::Uuid::now_v7();
-        let n = Notification::new(
-            Channel::Email,
-            "x@y.com",
-            "subj",
-            "body",
-        )
-        .with_project(pid)
-        .with_dedup_key("k1")
-        .with_metadata(serde_json::json!({"foo": 1}));
+        let n = Notification::new(Channel::Email, "x@y.com", "subj", "body")
+            .with_project(pid)
+            .with_dedup_key("k1")
+            .with_metadata(serde_json::json!({"foo": 1}));
         assert_eq!(n.project_id, Some(pid));
         assert_eq!(n.dedup_key.as_deref(), Some("k1"));
         assert_eq!(n.metadata["foo"], 1);

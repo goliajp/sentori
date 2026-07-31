@@ -25,6 +25,10 @@ pub struct DeployBody {
     release: String,
     /// When the release was deployed. Defaults to now() if absent.
     #[serde(default, with = "time::serde::rfc3339::option")]
+    // Accepted on the wire for SDK compat; ignored — v1 releases
+
+    // key on created_at only.
+    #[allow(dead_code)]
     deploy_at: Option<OffsetDateTime>,
 }
 

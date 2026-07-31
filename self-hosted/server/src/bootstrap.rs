@@ -51,17 +51,14 @@ pub async fn ensure_owner(pool: &PgPool) -> anyhow::Result<()> {
             Ok(())
         }
         (None, Some(wanted)) => {
-            let password = match read_env("SENTORI_OWNER_PASSWORD") {
-                Some(p) => p,
-                None => {
-                    let generated = random_password();
-                    // Printed exactly once, at first boot, to the
-                    // container log — the operator copies it and can
-                    // change it in the dashboard.
-                    info!(email = %wanted, password = %generated, "owner created with generated password (change it after first login)");
-                    generated
-                }
-            };
+            let password = read_env("SENTORI_OWNER_PASSWORD").unwrap_or_else(|| {
+                let generated = random_password();
+                // Printed exactly once, at first boot, to the
+                // container log — the operator copies it and can
+                // change it in the dashboard.
+                info!(email = %wanted, password = %generated, "owner created with generated password (change it after first login)");
+                generated
+            });
             let phc = sentori_argon2_password::PasswordHash::hash(&password)
                 .map_err(|e| anyhow::anyhow!("argon2 hash failed: {e}"))?;
             sqlx::query(

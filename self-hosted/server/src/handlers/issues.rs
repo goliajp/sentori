@@ -273,7 +273,14 @@ async fn set_status(
             Json(json!({ "error": "internal" })),
         );
     }
-    record_activity(state, issue_id, Some(ctx.user_id), "status", json!({ "to": to })).await;
+    record_activity(
+        state,
+        issue_id,
+        Some(ctx.user_id),
+        "status",
+        json!({ "to": to }),
+    )
+    .await;
     (StatusCode::OK, Json(json!({ "ok": true })))
 }
 

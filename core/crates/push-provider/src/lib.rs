@@ -55,7 +55,7 @@
 //!     ProviderRegistry, PushDispatcher, RateLimits, SendOutcome,
 //! };
 //! use sentori_secrets_vault::{MasterKey, Vault, KeyId};
-//! use sentori_workspace_identity::Uuid;
+//! use uuid::Uuid;
 //! use sqlx::PgPool;
 //!
 //! # async fn demo(pool: PgPool, project_id: Uuid) -> Result<(), Box<dyn std::error::Error>> {

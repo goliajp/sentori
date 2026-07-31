@@ -179,8 +179,16 @@ mod tests {
     #[test]
     fn extract_prefers_bearer_over_cookie() {
         let mut h = HeaderMap::new();
-        h.insert(header::AUTHORIZATION, "Bearer tok-a".parse().unwrap_or_else(|_| unreachable!()));
-        h.insert(header::COOKIE, "sentori_session=tok-b".parse().unwrap_or_else(|_| unreachable!()));
+        h.insert(
+            header::AUTHORIZATION,
+            "Bearer tok-a".parse().unwrap_or_else(|_| unreachable!()),
+        );
+        h.insert(
+            header::COOKIE,
+            "sentori_session=tok-b"
+                .parse()
+                .unwrap_or_else(|_| unreachable!()),
+        );
         assert_eq!(extract_token(&h).as_deref(), Some("tok-a"));
     }
 }

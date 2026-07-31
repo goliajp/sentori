@@ -10,13 +10,15 @@
 
 [workspace]
 resolver = "3"
+# v1 members: only what the self-hosted server actually composes
+# (design.md §7-9). Retired-from-build crates keep their directories
+# until the S9 sweep; a crate no gate compiles is a crate that cannot
+# silently rot the build.
 members = [
-    "crates/license-jwt",
     "crates/privacy-salt",
     "crates/issue-fingerprint",
     "crates/identity-fingerprint",
     "crates/event-ringbuffer",
-    "crates/stripe-webhook-verify",
     "crates/sourcemap-resolver",
     "crates/dwarf-resolver",
     "crates/proguard-resolver",
@@ -26,33 +28,9 @@ members = [
     "crates/secrets-vault",
     "crates/argon2-password",
     "crates/ingest-token",
-    "crates/workspace-identity",
-    "crates/auth-session",
     "crates/attachment-store",
-    "crates/event-pipeline",
-    "crates/issue-store",
-    "crates/span-store",
     "crates/push-provider",
-    "crates/replay-store",
-    "crates/runtime-metrics",
-    "crates/cert-monitor",
     "crates/notifier",
-    "crates/integration-traits",
-    "crates/audit-event",
-    "crates/alert-rule",
-    "crates/saved-view",
-    "crates/tenant-scoping",
-    "crates/billing",
-    # Phase 1 石头 13/13 (S13 argon2-password added 2026-06-20 per user
-    # decision: bcrypt (S9) and argon2 are not interchangeable — callers
-    # pick by use case). Note: workspace member listing order is
-    # alphabetical-ish + ship-order mixed; the real ordering is the S/K
-    # number suffix in Section B of v0.1-execution-plan.md.
-    # Phase 2 钢筋 已开工: K1 workspace-identity
-    # Phase 2 钢筋 依次加入: workspace-identity, auth-session, attachment-store,
-    # event-pipeline, issue-store, span-store, push-provider, replay-store,
-    # runtime-metrics, cert-monitor, notifier, integration-traits, audit-event,
-    # alert-rule, saved-view, tenant-scoping, billing
 ]
 
 [workspace.package]

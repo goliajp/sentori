@@ -140,7 +140,11 @@ fn group_identity(ev: &IncomingEvent) -> Result<(String, String, String), Ingest
                 .name
                 .as_deref()
                 .ok_or(IngestError::Invalid("warn requires name"))?;
-            let screen = ev.surface.get("screen").and_then(Value::as_str).unwrap_or("");
+            let screen = ev
+                .surface
+                .get("screen")
+                .and_then(Value::as_str)
+                .unwrap_or("");
             let element = ev
                 .surface
                 .get("element")
@@ -176,6 +180,9 @@ fn group_identity(ev: &IncomingEvent) -> Result<(String, String, String), Ingest
 /// Persist one event: find-or-create its issue (with atomic
 /// regression detection), bump the importance counters, insert the
 /// event row, and — for probes — update the tripwire registry.
+// One transaction, one narrative: splitting the steps into helpers
+// would hide the ordering the row locks depend on.
+#[allow(clippy::too_many_lines)]
 pub async fn ingest(pool: &PgPool, ev: IncomingEvent) -> Result<IngestOutcome, IngestError> {
     let (group_title, message_sample, fp_input) = group_identity(&ev)?;
     let fingerprint = {
@@ -189,15 +196,14 @@ pub async fn ingest(pool: &PgPool, ev: IncomingEvent) -> Result<IngestOutcome, I
     let mut tx = pool.begin().await?;
 
     // Lock-or-create the issue row.
-    let existing: Option<(Uuid, String, Option<String>, Option<OffsetDateTime>)> =
-        sqlx::query_as(
-            "SELECT id, status, resolved_in_release, resolved_at FROM issues \
+    let existing: Option<(Uuid, String, Option<String>, Option<OffsetDateTime>)> = sqlx::query_as(
+        "SELECT id, status, resolved_in_release, resolved_at FROM issues \
              WHERE project_id = $1 AND fingerprint = $2 FOR UPDATE",
-        )
-        .bind(ev.project_id)
-        .bind(&fingerprint)
-        .fetch_optional(&mut *tx)
-        .await?;
+    )
+    .bind(ev.project_id)
+    .bind(&fingerprint)
+    .fetch_optional(&mut *tx)
+    .await?;
 
     let (issue_id, is_new_issue, regressed) = match existing {
         None => {
@@ -412,7 +418,10 @@ async fn is_regression(
         .bind(resolved_release)
         .fetch_all(&mut **tx)
         .await?;
-        let ev_at = pair.iter().find(|(n, _)| n == event_release).map(|(_, t)| *t);
+        let ev_at = pair
+            .iter()
+            .find(|(n, _)| n == event_release)
+            .map(|(_, t)| *t);
         let res_at = pair
             .iter()
             .find(|(n, _)| n == resolved_release)

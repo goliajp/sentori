@@ -67,11 +67,11 @@ pub async fn login(
     let token = mint_session_token();
     let hash = hash_token(&token);
     let expires = OffsetDateTime::now_utc() + Duration::days(SESSION_TTL_DAYS);
-    let ip = crate::client_ip::client_ip(&headers).map(|ip| ip.to_string());
+    let ip = crate::client_ip::client_ip(&headers);
     let ua = headers
         .get(axum::http::header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
-        .map(String::from);
+        .map(std::borrow::ToOwned::to_owned);
     if let Err(e) = sqlx::query(
         "INSERT INTO auth_sessions (id_hash, user_id, expires_at, ip, user_agent) \
          VALUES ($1, $2, $3, $4, $5)",
@@ -178,7 +178,8 @@ pub async fn change_password(
             Json(json!({ "error": "user_not_found" })),
         );
     };
-    if !sentori_argon2_password::PasswordHash::verify(&body.current_password, &phc).unwrap_or(false) {
+    if !sentori_argon2_password::PasswordHash::verify(&body.current_password, &phc).unwrap_or(false)
+    {
         return (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "error": "wrong_password" })),
@@ -313,7 +314,9 @@ fn mint_session_token() -> String {
     use rand::RngCore;
     let mut bytes = [0u8; 32];
     rand::rng().fill_bytes(&mut bytes);
-    data_encoding::BASE32_NOPAD.encode(&bytes).to_ascii_lowercase()
+    data_encoding::BASE32_NOPAD
+        .encode(&bytes)
+        .to_ascii_lowercase()
 }
 
 fn unauthorized() -> axum::response::Response {

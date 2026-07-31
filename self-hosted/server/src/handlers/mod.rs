@@ -17,7 +17,7 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::middleware as axum_middleware;
 use axum::response::IntoResponse;
-use axum::routing::{delete, get, patch, post};
+use axum::routing::{delete, get, post};
 use sentori_ingest_token::{TokenStore, bearer_middleware};
 use serde_json::json;
 
@@ -25,6 +25,7 @@ use crate::session_mw::session_middleware;
 use crate::state::AppState;
 
 mod admin;
+mod api;
 mod artifacts_upload;
 mod attachments;
 mod audit;
@@ -175,7 +176,10 @@ pub fn router(state: Arc<AppState>) -> Router {
     // ── Dashboard + admin — cookie session ──
     let admin_routes = Router::new()
         // projects
-        .route("/admin/api/projects", get(projects::list).post(admin::projects::create))
+        .route(
+            "/admin/api/projects",
+            get(projects::list).post(admin::projects::create),
+        )
         .route(
             "/admin/api/projects/{project_id}",
             get(admin::projects::get)
@@ -192,7 +196,10 @@ pub fn router(state: Arc<AppState>) -> Router {
             delete(admin::tokens::revoke),
         )
         // users + assignments (owner)
-        .route("/admin/api/users", get(admin::users::list).post(admin::users::create))
+        .route(
+            "/admin/api/users",
+            get(admin::users::list).post(admin::users::create),
+        )
         .route("/admin/api/users/{user_id}", delete(admin::users::delete))
         .route(
             "/admin/api/users/{user_id}/projects/{project_id}",
@@ -201,7 +208,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         // issues — the Inbox and the detail page
         .route("/admin/api/issues", get(issues::list))
         .route("/admin/api/issues/{issue_id}", get(issues::get))
-        .route("/admin/api/issues/{issue_id}/resolve", post(issues::resolve))
+        .route(
+            "/admin/api/issues/{issue_id}/resolve",
+            post(issues::resolve),
+        )
         .route("/admin/api/issues/{issue_id}/ignore", post(issues::ignore))
         .route("/admin/api/issues/{issue_id}/reopen", post(issues::reopen))
         .route("/admin/api/issues/{issue_id}/assign", post(issues::assign))
@@ -274,6 +284,19 @@ pub fn router(state: Arc<AppState>) -> Router {
         ))
         .with_state(state.clone());
 
+    // ── AI closed loop — Bearer api-scope token ──
+    let api_token_store = TokenStore::new(state.pool.clone());
+    let api_routes = Router::new()
+        .route("/api/issues", get(api::list))
+        .route("/api/issues/{issue_id}/bundle", get(api::bundle))
+        .route("/api/issues/{issue_id}/notes", post(api::add_note))
+        .route("/api/issues/{issue_id}/resolve", post(api::resolve))
+        .layer(axum_middleware::from_fn_with_state(
+            api_token_store,
+            bearer_middleware,
+        ))
+        .with_state(state.clone());
+
     Router::new()
         .route("/healthz", get(health::healthz))
         .route("/livez", get(health::livez))
@@ -282,10 +305,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         .with_state(state)
         .merge(admin_routes)
         .merge(auth_bruteforce_routes)
+        .merge(api_routes)
         .merge(sdk_routes)
         .fallback(spa_or_api_404)
 }
-
 
 /// Path prefixes that belong to the HTTP API, not to the SPA.
 ///

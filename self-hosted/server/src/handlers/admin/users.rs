@@ -129,10 +129,15 @@ pub async fn create(
             .await;
             (StatusCode::CREATED, Json(json!({ "id": id })))
         }
-        Err(e) if e.as_database_error().is_some_and(sqlx::error::DatabaseError::is_unique_violation) => (
-            StatusCode::CONFLICT,
-            Json(json!({ "error": "email_taken" })),
-        ),
+        Err(e)
+            if e.as_database_error()
+                .is_some_and(sqlx::error::DatabaseError::is_unique_violation) =>
+        {
+            (
+                StatusCode::CONFLICT,
+                Json(json!({ "error": "email_taken" })),
+            )
+        }
         Err(e) => {
             warn!(error = %e, "user create failed");
             (

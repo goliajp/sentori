@@ -1,8 +1,8 @@
 //! Typed domain models for the push-provider surface.
 
-use std::fmt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::fmt;
 use thiserror::Error;
 use time::OffsetDateTime;
 use uuid::Uuid;

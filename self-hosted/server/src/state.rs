@@ -14,6 +14,8 @@ use crate::blob_store::AttachmentStore;
 /// One row of the broadcast bus — minimal so the channel stays
 /// cheap to clone per fanout.
 #[derive(Clone, Debug)]
+// Read by future bus subscribers (live tail); today only constructed.
+#[allow(dead_code)]
 pub struct RecentEventTick {
     pub project_id: uuid::Uuid,
     pub issue_id: uuid::Uuid,

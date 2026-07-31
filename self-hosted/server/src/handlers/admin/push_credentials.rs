@@ -44,7 +44,7 @@ pub async fn upsert(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
-    headers: HeaderMap,
+    _headers: HeaderMap,
     Json(body): Json<UpsertBody>,
 ) -> (StatusCode, Json<Value>) {
     if !matches!(
@@ -97,7 +97,16 @@ pub async fn upsert(
                 provider = %body.provider,
                 "admin.push_credentials upserted",
             );
-            crate::audit::record(&state.pool, Some(project_id), ctx.user_id, "push_credentials.upsert", "push_credentials", &id.to_string(), json!({ "provider": body.provider })).await;
+            crate::audit::record(
+                &state.pool,
+                Some(project_id),
+                ctx.user_id,
+                "push_credentials.upsert",
+                "push_credentials",
+                &id.to_string(),
+                json!({ "provider": body.provider }),
+            )
+            .await;
             (
                 StatusCode::CREATED,
                 Json(json!({ "id": id.to_string(), "provider": body.provider })),

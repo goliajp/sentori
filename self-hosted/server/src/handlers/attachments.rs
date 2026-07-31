@@ -41,12 +41,7 @@ pub async fn get(
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     };
     match state.attachments.get(&hash).await {
-        Ok(bytes) => (
-            StatusCode::OK,
-            [(header::CONTENT_TYPE, media_type)],
-            bytes,
-        )
-            .into_response(),
+        Ok(bytes) => (StatusCode::OK, [(header::CONTENT_TYPE, media_type)], bytes).into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
 }

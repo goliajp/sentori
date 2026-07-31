@@ -31,14 +31,13 @@ pub async fn ensure_project_access(
     if ctx.role.is_superadmin() {
         return Ok(());
     }
-    let assigned: Option<(i32,)> = sqlx::query_as(
-        "SELECT 1 FROM project_assignments WHERE user_id = $1 AND project_id = $2",
-    )
-    .bind(ctx.user_id)
-    .bind(project_id)
-    .fetch_optional(&state.pool)
-    .await
-    .unwrap_or(None);
+    let assigned: Option<(i32,)> =
+        sqlx::query_as("SELECT 1 FROM project_assignments WHERE user_id = $1 AND project_id = $2")
+            .bind(ctx.user_id)
+            .bind(project_id)
+            .fetch_optional(&state.pool)
+            .await
+            .unwrap_or(None);
     if assigned.is_some() {
         Ok(())
     } else {

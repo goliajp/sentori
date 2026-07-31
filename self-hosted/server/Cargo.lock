@@ -2670,7 +2670,6 @@ dependencies = [
  "async-trait",
  "sentori-rate-limiter",
  "sentori-secrets-vault",
- "sentori-workspace-identity",
  "serde",
  "serde_json",
  "sqlx",
