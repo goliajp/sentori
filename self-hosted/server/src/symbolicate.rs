@@ -116,14 +116,23 @@ fn rewrite_frame(map: &ParsedMap, frame: &mut Value) -> bool {
     let Some(obj) = frame.as_object_mut() else {
         return false;
     };
-    // Already resolved, or never minified: a frame carrying source
-    // context has been through this once.
+    // A frame carrying source context has been through this once.
     if obj.contains_key("preContext") {
         return false;
     }
+    // A frame symbolicated before source context existed (pre-2.4.0)
+    // keeps its minified coordinates — resolve from those, so a
+    // retro pass upgrades old events with the reading window instead
+    // of skipping them forever.
+    let already = obj.get("symbolicated").and_then(Value::as_bool) == Some(true);
+    let (line_key, col_key) = if already {
+        ("minifiedLine", "minifiedColumn")
+    } else {
+        ("line", "column")
+    };
     let (Some(line), Some(column)) = (
-        obj.get("line").and_then(Value::as_u64),
-        obj.get("column").and_then(Value::as_u64),
+        obj.get(line_key).and_then(Value::as_u64),
+        obj.get(col_key).and_then(Value::as_u64),
     ) else {
         return false;
     };
@@ -354,6 +363,43 @@ mod tests {
             pre.last().expect("last"),
             &json!(format!("line {} of pay.ts", line - 1))
         );
+    }
+
+    /// A frame symbolicated before 2.4.0 (has coordinates + the
+    /// minified originals, no context) gains its source window on a
+    /// retro pass without its resolved position drifting.
+    #[test]
+    fn a_pre_context_era_frame_is_upgraded_not_skipped() {
+        let mut raw: serde_json::Value = serde_json::from_slice(
+            br#"{"version":3,"sources":["src/pay.ts"],"names":["onPay"],"mappings":"UAM0BA"}"#,
+        )
+        .expect("json");
+        let src = (1..=12)
+            .map(|n| format!("line {n} of pay.ts"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        raw["sourcesContent"] = json!([src]);
+        let map = ParsedMap::parse(serde_json::to_vec(&raw).expect("ser").as_slice())
+            .expect("map parses");
+
+        // What a 2.0-2.3 server left behind.
+        let mut fresh = json!({ "file": "bundle.js", "line": 1, "column": 10 });
+        assert!(rewrite_frame(&map, &mut fresh));
+        let mut old = fresh.clone();
+        let o = old.as_object_mut().expect("obj");
+        o.remove("preContext");
+        o.remove("contextLine");
+        o.remove("postContext");
+
+        assert!(rewrite_frame(&map, &mut old), "retro pass must re-resolve");
+        assert_eq!(
+            old["line"], fresh["line"],
+            "resolved position must not drift"
+        );
+        assert_eq!(old["contextLine"], fresh["contextLine"]);
+
+        // And a third pass is a no-op (context present).
+        assert!(!rewrite_frame(&map, &mut old));
     }
 
     #[test]
