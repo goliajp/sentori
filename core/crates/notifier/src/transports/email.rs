@@ -132,7 +132,13 @@ impl EmailTransport {
                 .parse()
                 .map_err(|e| TransportError::Email(format!("to parse: {e}")))?)
             .subject(&n.subject)
-            .body(n.body.clone())
+            // Explicit charset: without it some readers fall back to
+            // latin-1 and UTF-8 punctuation renders mojibake.
+            .singlepart(
+                lettre::message::SinglePart::builder()
+                    .header(lettre::message::header::ContentType::TEXT_PLAIN)
+                    .body(n.body.clone()),
+            )
             .map_err(|e| TransportError::Email(format!("body build: {e}")))
     }
 }

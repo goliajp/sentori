@@ -132,6 +132,17 @@ export type AuditRow = {
   createdAt: string;
 };
 
+export type SmtpStatus =
+  | { configured: true; host: string; from: string }
+  | { configured: false };
+
+export type NotificationPref = {
+  projectId: string;
+  projectName: string;
+  onNewIssue: boolean;
+  onRegression: boolean;
+};
+
 const DEFAULT_BASE = '';
 
 class ApiError extends Error {
@@ -326,6 +337,27 @@ class Api {
   // ── audit (owner) ──
   listAudit(limit = 100) {
     return this.get<{ entries: AuditRow[] }>(`/admin/api/audit?limit=${limit}`);
+  }
+
+  // ── notifications (email channel) ──
+  smtpStatus() {
+    return this.get<SmtpStatus>('/admin/api/smtp');
+  }
+
+  smtpTest() {
+    return this.post<{ ok: boolean; to: string }>('/admin/api/smtp/test');
+  }
+
+  listNotificationPrefs() {
+    return this.get<{ prefs: NotificationPref[] }>('/admin/api/notification-prefs');
+  }
+
+  putNotificationPref(pref: {
+    projectId: string;
+    onNewIssue: boolean;
+    onRegression: boolean;
+  }) {
+    return this.send<{ ok: boolean }>('PUT', '/admin/api/notification-prefs', pref);
   }
 }
 

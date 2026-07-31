@@ -98,6 +98,20 @@ export const en = {
   'nav.instruments': 'Instruments',
   'nav.releases': 'Releases',
   'nav.settings': 'Settings',
+
+  'notify.loadFailed': 'Could not load notification preferences.',
+  'notify.onNewIssue': 'new issue',
+  'notify.onRegression': 'regression',
+  'notify.prefsHint':
+    'Per-project switches for your own inbox. Both on by default.',
+  'notify.prefsTitle': 'Email me about',
+  'notify.smtpTitle': 'SMTP',
+  'notify.smtpUnconfigured':
+    'SMTP is not configured — set SENTORI_SMTP_HOST to enable email notifications.',
+  'notify.testButton': 'Send test email',
+  'notify.testFailed': 'Test email failed — check the SMTP settings and server log.',
+  'notify.testSending': 'Sending…',
+  'notify.testSent': 'Test email sent — check your inbox.',
   'palette.placeholder': 'Jump to a page or search issues…',
 
   'releases.emptyHint':
@@ -129,6 +143,7 @@ export const en = {
   'settings.saved': 'Saved',
   'settings.tab.account': 'Account',
   'settings.tab.audit': 'Audit',
+  'settings.tab.notifications': 'Notifications',
   'settings.tab.projects': 'Projects',
   'settings.tab.tokens': 'Tokens',
   'settings.tab.users': 'Admins',

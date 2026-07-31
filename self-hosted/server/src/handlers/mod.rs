@@ -35,6 +35,7 @@ mod health;
 mod instruments;
 mod issues;
 mod metrics_prom;
+mod notify_admin;
 mod projects;
 mod sdk;
 
@@ -244,6 +245,13 @@ pub fn router(state: Arc<AppState>) -> Router {
         )
         // audit (owner)
         .route("/admin/api/audit", get(audit::list))
+        // notification channel (email)
+        .route("/admin/api/smtp", get(notify_admin::smtp_status))
+        .route("/admin/api/smtp/test", post(notify_admin::smtp_test))
+        .route(
+            "/admin/api/notification-prefs",
+            get(notify_admin::prefs_list).put(notify_admin::prefs_put),
+        )
         // push admin (carried)
         .route(
             "/admin/api/projects/{project_id}/push/credentials",

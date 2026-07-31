@@ -88,6 +88,13 @@ pub async fn handle(
                             issue_id: o.issue_id,
                             ..tick
                         });
+                        crate::notify::spawn_issue_notification(
+                            &state,
+                            ctx.project_id,
+                            o.issue_id,
+                            o.is_new_issue,
+                            o.regressed,
+                        );
                         outcomes.push(json!({
                             "eventId": o.event_id,
                             "issueId": o.issue_id,

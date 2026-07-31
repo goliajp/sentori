@@ -25,6 +25,10 @@ use tracing::{error, info, warn};
 pub struct Mailer {
     transport: Option<Arc<EmailTransport>>,
     base_url: String,
+    /// (host, from) when configured — surfaced on the admin SMTP
+    /// status endpoint so the operator can see what the server
+    /// actually loaded.
+    smtp_info: Option<(String, String)>,
 }
 
 impl Mailer {
@@ -39,6 +43,7 @@ impl Mailer {
             return Self {
                 transport: None,
                 base_url,
+                smtp_info: None,
             };
         };
         if host.is_empty() {
@@ -46,6 +51,7 @@ impl Mailer {
             return Self {
                 transport: None,
                 base_url,
+                smtp_info: None,
             };
         }
         let cfg = EmailConfig {
@@ -66,19 +72,43 @@ impl Mailer {
                 &std::env::var("SENTORI_SMTP_TLS").unwrap_or_else(|_| "starttls".to_string()),
             ),
         };
+        let info = (cfg.smtp_host.clone(), cfg.from.clone());
         match EmailTransport::new(cfg) {
             Ok(t) => Self {
                 transport: Some(Arc::new(t)),
                 base_url,
+                smtp_info: Some(info),
             },
             Err(e) => {
                 error!(%e, "SMTP transport init failed — auth emails disabled, tokens logged");
                 Self {
                     transport: None,
                     base_url,
+                    smtp_info: None,
                 }
             }
         }
+    }
+
+    /// (host, from) when configured.
+    #[must_use]
+    pub fn smtp_info(&self) -> Option<(&str, &str)> {
+        self.smtp_info
+            .as_ref()
+            .map(|(h, f)| (h.as_str(), f.as_str()))
+    }
+
+    /// Public dashboard origin for links in email bodies.
+    #[must_use]
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
+    /// Borrow the shared transport (issue notifications reuse the
+    /// same SMTP connection config as auth mail).
+    #[must_use]
+    pub fn transport(&self) -> Option<Arc<EmailTransport>> {
+        self.transport.clone()
     }
 
     pub fn send_reset(&self, email: &str, token_wire: &str) {
@@ -138,6 +168,7 @@ impl std::fmt::Debug for Mailer {
         f.debug_struct("Mailer")
             .field("enabled", &self.transport.is_some())
             .field("base_url", &self.base_url)
+            .field("smtp_info", &self.smtp_info)
             .finish()
     }
 }
