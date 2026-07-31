@@ -145,6 +145,10 @@ export const ja: Messages = {
   'settings.tokenName': 'トークン名',
   'settings.tokenOnce': 'このトークンは一度だけ表示されます — 今コピーしてください。',
   'settings.usersLoadFailed': '管理者一覧を読み込めませんでした。',
+  'stack.libraryFrames': 'ライブラリフレーム {n} 件',
+  'stack.libraryFramesOpen': 'ライブラリフレーム',
+  'stack.minified': 'minified',
+  'stack.truncated': '… 残り {n} フレーム',
 
   'table.empty': 'まだ何もありません',
 

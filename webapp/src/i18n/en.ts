@@ -150,6 +150,10 @@ export const en = {
   'settings.tokenName': 'token name',
   'settings.tokenOnce': 'This token is shown exactly once — copy it now.',
   'settings.usersLoadFailed': 'Could not load admins.',
+  'stack.libraryFrames': '{n} library frames',
+  'stack.libraryFramesOpen': 'library frames',
+  'stack.minified': 'minified',
+  'stack.truncated': '… {n} more frames',
 
   'table.empty': 'Nothing here yet',
 

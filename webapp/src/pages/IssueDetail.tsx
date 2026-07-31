@@ -21,12 +21,7 @@ import {
 } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 
-type Frame = {
-  file?: string;
-  function?: string;
-  line?: number;
-  inApp?: boolean;
-};
+import { StackTrace, type StackFrame as Frame } from '../components/StackTrace';
 
 type Signal = { t: number; kind: string; data?: Record<string, unknown> };
 
@@ -134,24 +129,7 @@ export default function IssueDetail() {
 
         {payload?.error?.stack && payload.error.stack.length > 0 && (
           <Section title={t('issue.stack')}>
-            <div className="overflow-x-auto rounded-md bg-[var(--gds-surface-sunken,#121216)] p-3 font-mono text-xs leading-5">
-              {payload.error.stack.slice(0, 40).map((f, i) => (
-                <div
-                  key={i}
-                  className={
-                    f.inApp
-                      ? 'border-l-2 border-[#ff5d5d] pl-2 text-[var(--gds-text,#e5e5ea)]'
-                      : 'pl-2.5 opacity-45'
-                  }
-                >
-                  {f.function ?? '?'}{' '}
-                  <span className="opacity-60">
-                    ({f.file ?? '?'}
-                    {f.line ? `:${f.line}` : ''})
-                  </span>
-                </div>
-              ))}
-            </div>
+            <StackTrace frames={payload.error.stack} />
           </Section>
         )}
 
@@ -458,6 +436,8 @@ function buildMarkdown(
   );
   lines.push(`- Last release: ${issue.lastRelease || 'unknown'}`);
   if (payload?.error?.stack) {
+    // (frame list first, source windows after — same shape as the
+    // server-side bundle)
     lines.push('', '## Stack trace', '```');
     for (const f of payload.error.stack.slice(0, 40)) {
       lines.push(
@@ -465,6 +445,22 @@ function buildMarkdown(
       );
     }
     lines.push('```');
+    // Source windows for the top in-app frames, so the AI reads the
+    // failing code straight out of the paste.
+    let shown = 0;
+    for (const f of payload.error.stack) {
+      if (shown >= 3) break;
+      if (!f.inApp || typeof f.contextLine !== 'string') continue;
+      const pre = f.preContext ?? [];
+      const post = f.postContext ?? [];
+      const hit = f.line ?? 0;
+      lines.push('', `### ${f.function ?? '?'} — ${f.file ?? '?'}:${hit}`, '```');
+      pre.forEach((l, i) => lines.push(`  ${String(hit - pre.length + i).padStart(4)} | ${l}`));
+      lines.push(`> ${String(hit).padStart(4)} | ${f.contextLine}`);
+      post.forEach((l, i) => lines.push(`  ${String(hit + 1 + i).padStart(4)} | ${l}`));
+      lines.push('```');
+      shown += 1;
+    }
   }
   if (payload?.signals?.length) {
     lines.push('', '## What the user was doing');

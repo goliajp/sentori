@@ -135,6 +135,10 @@ export const zh: Messages = {
   'settings.tokenName': 'token 名',
   'settings.tokenOnce': '此 token 只显示一次 —— 现在就复制。',
   'settings.usersLoadFailed': '管理员列表加载失败。',
+  'stack.libraryFrames': '{n} 个库帧',
+  'stack.libraryFramesOpen': '库帧',
+  'stack.minified': 'minified',
+  'stack.truncated': '… 还有 {n} 帧',
 
   'table.empty': '暂无内容',
 
