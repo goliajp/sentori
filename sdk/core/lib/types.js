@@ -1,10 +1,9 @@
-/**
- * Wire-format types for the Sentori `/v1/events` endpoint.
- *
- * Single source of truth shared by every `@goliapkg/sentori-*` SDK and
- * mirrored by the server's `event::Event` Rust type. Anything added /
- * removed / renamed here must move in lockstep with `docs/protocol.md`
- * and the server.
- */
+// The v1 wire protocol — single source of truth for what the SDK
+// sends and the server stores (design.md §2/§4; server counterpart:
+// self-hosted/server/src/handlers/sdk/events.rs).
+//
+// Five kinds, five verbs, no severity dimension. Breadcrumbs, spans,
+// message levels and the capture* vocabulary are gone with the
+// Sentry compatibility they came from.
 export {};
 //# sourceMappingURL=types.js.map

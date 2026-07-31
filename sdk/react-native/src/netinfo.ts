@@ -5,11 +5,11 @@
 // standard library), we subscribe at SDK init time and cache the
 // latest network state. `collectDevice()` reads the cache
 // synchronously at capture time. If the peer isn't installed, the
-// cache stays `undefined` and `device.networkType` is omitted —
+// cache stays `undefined` and `device.network` is omitted —
 // no warning, no crash.
 //
 // We collapse NetInfo's enum into the smaller set the protocol
-// allows (see `Device.networkType` in `sdk/core/src/types.ts`):
+// allows (see `Device.network` in `sdk/core/src/types.ts`):
 // `wifi`, `2g/3g/4g/slow-2g`, `offline`, `unknown`. 5G collapses
 // into `4g` because the schema doesn't have a 5g slot yet; the
 // information loss is acceptable for an analytics dimension.
@@ -18,7 +18,7 @@ import type { Device } from '@goliapkg/sentori-core';
 
 import { isNativeModuleLinked } from './native-loader';
 
-type NetworkType = Device['networkType'];
+type NetworkType = Device['network'];
 
 type NetInfoState = {
   details?: { cellularGeneration?: null | string };

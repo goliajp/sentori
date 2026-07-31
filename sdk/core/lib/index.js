@@ -1,32 +1,19 @@
+// @goliapkg/sentori-core — the platform-agnostic heart of the v1 SDK.
+//
+// What lives here: the wire types (single source of truth), the
+// signal ring, error coercion, the iron-rule primitives (safe
+// wrappers + the self-report circuit breaker), stack parsing, id
+// minting, identity hashing. Transport and the 8-verb binding live
+// in the per-platform SDKs.
 export { coerceError } from './coerce-error.js';
-export { MomentHandle, startMoment, } from './moments.js';
-export { shouldSample, shouldSampleTrace } from './sampling.js';
-export { uuidV7 } from './uuid.js';
-export { BreadcrumbBuffer, addBreadcrumb, clearBreadcrumbs, getBreadcrumbs, } from './breadcrumbs.js';
+export { clearSignals, configureRing, pushSignal, snapshotSignals, } from './signal-ring.js';
 export { parseStack } from './stack.js';
 export { normalizeUrl } from './url.js';
 export { SessionTracker, } from './session.js';
-export { SpanBuffer, SpanHandle, clearSpans, drainSpans, getSpans, startSpan, startTrace, withScopedSpan, 
-// v2.3 — `withSpan` is now the unified entry point per design §2.3.
-// Overloaded: `withSpan(name, fn)` = high-level wrap helper
-// (equivalent to `withScopedSpan`); `withSpan(span, fn)` = low-level
-// active-span manager (equivalent to `withActiveSpan`).
-withSpan, } from './spans.js';
-export { __resetTraceContextForTests, __useFallbackTraceContextForTests, activeSpan, setActiveSpan, 
-// v2.3 — renamed from `withSpan` (which now dispatches in spans.ts).
-// `withActiveSpan(span, fn)` is the explicit name for the
-// low-level active-context manager.
-withActiveSpan, } from './trace-context.js';
-export { TrailBuffer, sealTrail, } from './trail.js';
+export { shouldSample, shouldSampleTrace } from './sampling.js';
+export { uuidV7 } from './uuid.js';
 export { safeAsync, safeFn } from './safe.js';
 export { __resetCircuitForTests, isCircuitOpen, reportInternal, setInternalReporter, } from './self-report.js';
 export { getLogLevel, logger, setLogLevel, setLogTransport, } from './logger.js';
 export { hashIdentities } from './identity.js';
-/** v2.1 W2 — runtime metrics ring + emit API. Storage primitive
- *  only — transport (POST /v1/runtime-metrics:batch) lives in
- *  the per-platform SDK. Auto-instrument modules (FPS / heap /
- *  cold-start / route-nav / network) push via `emitMetric`; the
- *  per-SDK flusher drains via `drainRuntimeMetricsForFlush()`
- *  on its 30 s tick, coalesced with the existing event flush. */
-export { RuntimeMetricBuffer, __peekRuntimeMetricsSize, __resetRuntimeMetricsForTests, drainRuntimeMetricsForFlush, emitMetric, rebufferRuntimeMetrics, } from './runtime-metrics.js';
 //# sourceMappingURL=index.js.map

@@ -1,4 +1,4 @@
-import { captureError } from '../capture';
+import { error as captureError } from '../verbs';
 
 type ErrorUtilsHandler = (error: Error, isFatal?: boolean) => void;
 

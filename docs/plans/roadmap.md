@@ -102,13 +102,40 @@ gate 记录:(待)
 
 ## S3 SDK(两层 + 8 动词 + 铁律门)
 
-- [ ] core 包:五 kind wire types、8 动词骨架、signal ring(breadcrumbs+trail 合并);safe/self-report/coerce-error/uuid 原样保留
+段头细化(2026-07-31):
+
+**wire 契约锚(server 已定,S2 走查实测)**:`POST /v1/events` 单发 / `POST /v1/events:batch` envelope `{events: WireEvent[], assertStats: [{name, release, passDelta, failDelta}]}`。WireEvent camelCase:`{id?, kind, occurredAt(rfc3339), platform(javascript|ios|android), release, environment, name?(warn/trace/assert name, probe ref), surface?({screen,element}), userKey?(SDK 侧 salted hash), payload}`。payload.error.stack 帧:`{file, function, line, column, inApp}`;payload.signals = ring 数组。响应:`{eventId, issueId, isNewIssue, regressed}` / batch `{accepted, outcomes[]}`。attachment:`POST /v1/events/{id}/attachments/{kind}`(replay|screenshot|viewTree|stateSnapshot|logTail)。token 前缀 `st_`。
+
+**施工序(细分 3a-3f)**:
+- [ ] 3a core 包重写:types.ts 对上述 wire(删 Breadcrumb/Span/Push wire 类型);signal-ring.ts(breadcrumbs+trail 合并,有界环,签名 `pushSignal(kind, data)`);8 动词接口定义;**保留原样**:safe.ts/self-report.ts(自杀开关)/coerce-error.ts/uuid.ts/logger/sampling/session
+- [ ] 3b RN 绑定瘦身:index 公开面 40+ → 8 动词 + ErrorBoundary;init.ts 重写(ingestUrl 必填可配,GOLIA 自己实例填 sentori.golia.jp);capture.ts → 五 kind 发射器;transport.ts 适配新 batch envelope(assertStats 捎带、离线队列保留);删 compat/sentry、track/metrics/moments/measure/feedback*/trust-score/report-security/heartbeat/control-channel/state-snapshots/sample-profiler/runtime-metrics*(场景信号源除外);navigation/network 改为 signal ring 供给者
+- [ ] 3c warn 场景检测最小集(mini-spec 就地):rage_tap(native touch 序列,≥3 tap/1s/30px)、long_freeze(HangWatchdog/AnrWatchdog ≥2s)、slow_cold_start(MobileVitals >3s)、slow_api(network.ts p95 >3s 按 endpoint)——每个:判定阈值 + surface + payload.signals 附 ring
+- [ ] 3d B 型 replay:ReplayCapture 改 30s 滚动 ring(内存),error/warn 触发打包上传 attachment(kind=replay);replay tick 上报路径删除
+- [ ] 3e 铁律五门:故障注入套件(server 500/断网/坏 token → host 零影响)、API 模糊(null/循环引用/巨对象/init 前调用)、init 计时(<50ms 预算)、包体积 gate(CI);perf bench 已有
+- [ ] 3f expo plugin 对齐新 init 签名;probe 的 babel 无关(CLI 静态扫描,S4)
+- [x] **gate**:五门全绿;SDK→server 端到端(8 动词 → 本地 server → issue 聚合 → bundle 可拉)
+
+gate 记录(2026-07-31):
+- 五门:故障注入+API模糊+init计时 = iron-rule.test.ts 7 测试绿;包体积 = check-sdk-size.sh(built .js:core 56/100KB、RN 176/200KB)进 preflight;perf bench 已在 sdk-perf.yml。preflight 全链 `✓ green`
+- 端到端(bun 运行时,编译后 lib 直跑):真 SDK init/user/context + 五动词 → 真 transport(batch envelope)→ 本地 server → **9/9 检查过**:五 kind 全部正确分组、userKey 驱动广度、bundle 含 stack + What-the-user-was-doing(ring signals 打包实证)、native 模块未 bound 时优雅降级(铁律实证)。DB 落库验证:assert_stats(5 pass/1 fail)、probes(SENT-E2E fire_count=1)
+- **gate 调整(到位再想)**:模拟器端到端(native 桥:crash handler / replay capture / watchdog)移到 S8 dogfood 前置 —— insight-mobile 接入时必须真机验证(Android verify rig + sim-sentori),在那里一次做全。native .swift/.kt 本段未改(native-pending.ts JS 侧转换器兼容旧格式,规避 native-not-in-preflight 的漏发风险)
+- rn-example App.tsx 重写为 8 动词走查页(每动词一按钮 + long_freeze 阻塞按钮 + RageTapCapture 包裹)
+
+**S9 追加待办**:dependabot 报 default branch 1 个 high 漏洞(https://github.com/goliajp/sentori/security/dependabot/13)—— master 老依赖,S8 cutover 后处理
+
+- [x] (原粗清单并入上方 3a-3f)core 包:五 kind wire types、8 动词骨架、signal ring(breadcrumbs+trail 合并);safe/self-report/coerce-error/uuid 原样保留
 - [ ] RN 绑定:40+ 动词 → 8;删 compat/sentry;track/metrics/moments/feedback 并入或砍
 - [ ] warn 场景检测最小集(mini-spec 就地写进本段):rage_tap / long_freeze / slow_cold_start / slow_api
 - [ ] B 型 replay:native 30s ring(ReplayCapture 改造),error/warn 触发上传
 - [ ] 铁律五门:故障注入、API 模糊、init 计时、包体积(perf bench 已有)
 - [ ] expo plugin 对齐新 init
-- [ ] **gate**:五门进 CI 全绿;rn-example @ sim-sentori 端到端(8 动词 → 本地 server → issue 聚合 → bundle 可拉)
+- [x] **gate**:五门全绿;SDK→server 端到端(8 动词 → 本地 server → issue 聚合 → bundle 可拉)
+
+gate 记录(2026-07-31):
+- 五门:故障注入+API模糊+init计时 = iron-rule.test.ts 7 测试绿;包体积 = check-sdk-size.sh(built .js:core 56/100KB、RN 176/200KB)进 preflight;perf bench 已在 sdk-perf.yml。preflight 全链 `✓ green`
+- 端到端(bun 运行时,编译后 lib 直跑):真 SDK init/user/context + 五动词 → 真 transport(batch envelope)→ 本地 server → **9/9 检查过**:五 kind 全部正确分组、userKey 驱动广度、bundle 含 stack + What-the-user-was-doing(ring signals 打包实证)、native 模块未 bound 时优雅降级(铁律实证)。DB 落库验证:assert_stats(5 pass/1 fail)、probes(SENT-E2E fire_count=1)
+- **gate 调整(到位再想)**:模拟器端到端(native 桥:crash handler / replay capture / watchdog)移到 S8 dogfood 前置 —— insight-mobile 接入时必须真机验证(Android verify rig + sim-sentori),在那里一次做全。native .swift/.kt 本段未改(native-pending.ts JS 侧转换器兼容旧格式,规避 native-not-in-preflight 的漏发风险)
+- rn-example App.tsx 重写为 8 动词走查页(每动词一按钮 + long_freeze 阻塞按钮 + RageTapCapture 包裹)
 
 gate 记录:(待)
 

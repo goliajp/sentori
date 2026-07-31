@@ -1,58 +1,30 @@
-import type { BeforeSendHook, LogLevel, ReadyInfo } from '@goliapkg/sentori-core';
+// SDK-internal runtime config, set once by init(). Everything else
+// reads through getConfig() and treats null as "not initialized →
+// every verb is a no-op" (the failure-isolation iron rule).
 
-/**
- * v2.3 — `ReadyInfo` is shared across SDKs via `@goliapkg/sentori-core`
- * so a host that switches from web to RN reads the same shape. The RN
- * SDK always populates `native` + `coldStartMs`; the core type marks
- * both optional for the web SDK's benefit (web has no native module).
- */
-export type { ReadyInfo };
+import type { LogLevel, WireEvent } from '@goliapkg/sentori-core';
 
 export type Config = {
   token: string;
+  ingestUrl: string;
   release: string;
   environment: string;
-  ingestUrl: string;
   enabled: boolean;
-  /** Phase 42 sub-D.07: opt-in screenshot capture on captureException. */
-  screenshotsEnabled: boolean;
-  /** Phase 44 sub-B: per-event-class sampling rates 0..1.
-   *  `null` = keep everything (default). */
-  errorSampleRate: null | number;
-  traceSampleRate: null | number;
-  /** v2.0 — sampling rate for `kind: 'message'` events emitted via
-   *  `captureMessage`. `null` = keep all (default). */
-  messageSampleRate: null | number;
-  /** Phase 46: when true, every `captureException` seals the
-   *  session-trail buffer and uploads it as a `sessionTrail`
-   *  attachment. Defaults to false. */
-  sessionTrailEnabled: boolean;
-  /** v2.0 W3 — when true, every `track(name, props)` call also
-   *  pushes a `{ type: 'track', data: { name, props } }` breadcrumb
-   *  so a subsequent capture carries the customer journey. Defaults
-   *  to false to preserve v1 customer breadcrumb shape on upgrade. */
-  trackAutoBreadcrumb: boolean;
-  /** v2.3 — Sentori console output gate.
-   *
-   *  Default `warn`: SDK is silent on host's console unless
-   *  something is genuinely broken (transport sustained failure,
-   *  native module not found, internal SDK exception). No
-   *  per-tick / per-init / per-breadcrumb noise.
-   *
-   *  Set `'silent'` for absolute silence (e.g. CI smoke runs);
-   *  set `'info'` or `'debug'` when debugging Sentori itself. */
+  /** Warn-scenario auto-detection switches (conservative defaults). */
+  detect: {
+    rageTap: boolean;
+    longFreeze: boolean;
+    slowColdStart: boolean;
+    slowApi: boolean;
+  };
+  /** B-type replay rolling buffer, seconds. 0 disables. */
+  replaySeconds: number;
+  /** Sentori console output gate. Default `warn`: silent on the
+   *  host's console unless something is genuinely broken. */
   logLevel?: LogLevel;
-  /** v2.3 — fires once after init completes. Use this to know the
-   *  SDK is live instead of scanning the console. `info` carries
-   *  the native-module bind status + cold-start timing. Host
-   *  wraps any host-side logging here. */
-  onReady?: (info: ReadyInfo) => void;
-  /** v2.3 — host-side mutate-or-drop hook called once per event
-   *  just before transport enqueue. Return the event to send it,
-   *  `null` to drop. Sync only. If the hook throws or returns a
-   *  non-event, SDK falls back to the un-mutated event and emits
-   *  one one-shot warn. */
-  beforeSend?: BeforeSendHook;
+  /** Host-side mutate-or-drop hook, sync only. Throw / bad return →
+   *  the un-mutated event ships and one warn is emitted. */
+  beforeSend?: (event: WireEvent) => WireEvent | null;
 };
 
 let _config: Config | null = null;

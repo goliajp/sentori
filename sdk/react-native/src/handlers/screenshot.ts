@@ -25,7 +25,6 @@
 //   - On any failure we silently return null. The error event still
 //     goes to the server; the user just doesn't see a thumbnail.
 
-import { getRegisteredMaskQuery } from '../mask';
 import { captureNativeScreenshotWithMask } from '../native';
 
 /** What `captureScreenshot()` hands back when it succeeds. */
@@ -51,16 +50,9 @@ export async function captureScreenshot(): Promise<ScreenshotBlob | null> {
   // the host never called `registerMaskQuery`, no mask is applied
   // and the full screenshot ships — sane default: SDK does nothing
   // unless told to.
-  const query = getRegisteredMaskQuery();
-  let maskedIds: string[] = [];
-  if (query) {
-    try {
-      maskedIds = query();
-    } catch {
-      // A throwing query is the host's bug, not ours; skip mask
-      // rather than skip the screenshot.
-      maskedIds = [];
-    }
+  // Masking will return with a v1 privacy pass; nothing masks today.
+  const maskedIds: string[] = [];
+  {
   }
 
   const result = await captureNativeScreenshotWithMask(maskedIds);

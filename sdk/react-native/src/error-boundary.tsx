@@ -1,6 +1,6 @@
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
 
-import { captureError } from './capture';
+import { error as captureError } from  "./verbs";
 
 export type ErrorBoundaryProps = {
   fallback?: ReactNode | ((error: Error, reset: () => void) => ReactNode);
