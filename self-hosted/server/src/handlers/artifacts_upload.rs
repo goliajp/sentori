@@ -35,7 +35,7 @@ use crate::state::AppState;
 
 /// What a symbolicator can consume. Anything else is a typo, and
 /// storing it would mean an artifact that silently never matches.
-const KINDS: [&str; 3] = ["sourcemap", "dsym", "proguard"];
+const KINDS: [&str; 4] = ["sourcemap", "dsym", "proguard", "srcbundle"];
 
 /// Decompressed cap, 512 MB. The main dSYM of an RN + Expo app runs
 /// hundreds of MB raw (insight-mobile's is 291 MB) — this bounds what
@@ -288,6 +288,7 @@ mod tests {
         assert!(KINDS.contains(&"sourcemap"));
         assert!(KINDS.contains(&"dsym"));
         assert!(KINDS.contains(&"proguard"));
+        assert!(KINDS.contains(&"srcbundle"));
         assert!(!KINDS.contains(&"source-map"));
         assert!(!KINDS.contains(&"symbols"));
     }

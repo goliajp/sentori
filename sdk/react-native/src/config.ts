@@ -19,6 +19,7 @@ export type Config = {
   };
   /** B-type replay rolling buffer, seconds. 0 disables. */
   replaySeconds: number;
+  replayScreens: boolean;
   /** Sentori console output gate. Default `warn`: silent on the
    *  host's console unless something is genuinely broken. */
   logLevel?: LogLevel;

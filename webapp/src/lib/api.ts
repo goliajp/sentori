@@ -339,6 +339,15 @@ class Api {
     return this.get<{ entries: AuditRow[] }>(`/admin/api/audit?limit=${limit}`);
   }
 
+  // ── attachments (blob fetch) ──
+  async fetchAttachmentText(ref: string): Promise<string> {
+    const resp = await fetch(`${this.base}/admin/api/attachments/${ref}`, {
+      credentials: 'include',
+    });
+    if (!resp.ok) throw new Error(`attachment ${resp.status}`);
+    return resp.text();
+  }
+
   // ── notifications (email channel) ──
   smtpStatus() {
     return this.get<SmtpStatus>('/admin/api/smtp');

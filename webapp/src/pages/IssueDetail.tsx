@@ -21,6 +21,7 @@ import {
 } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 
+import { ReplayPlayer } from '../components/ReplayPlayer';
 import { StackTrace, type StackFrame as Frame } from '../components/StackTrace';
 
 type Signal = { t: number; kind: string; data?: Record<string, unknown> };
@@ -57,6 +58,7 @@ export default function IssueDetail() {
     }
   };
 
+  const screensRef = latest?.attachments?.find((a) => a.kind === 'screens')?.ref ?? null;
   const payload = latest?.payload as
     | { error?: { type?: string; message?: string; stack?: Frame[] }; signals?: Signal[]; device?: Record<string, unknown> }
     | undefined;
@@ -130,6 +132,12 @@ export default function IssueDetail() {
         {payload?.error?.stack && payload.error.stack.length > 0 && (
           <Section title={t('issue.stack')}>
             <StackTrace frames={payload.error.stack} />
+          </Section>
+        )}
+
+        {screensRef && (
+          <Section title={t('replay.title')}>
+            <ReplayPlayer attachmentRef={screensRef} />
           </Section>
         )}
 

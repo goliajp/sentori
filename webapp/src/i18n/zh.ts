@@ -106,6 +106,13 @@ export const zh: Messages = {
   'releases.emptyHint': 'SDK 上报版本或 CLI 上传物料后会出现在这里。',
   'releases.emptyTitle': '还没有版本',
   'releases.loadFailed': '版本列表加载失败。',
+  'replay.empty': '该录屏没有帧。',
+  'replay.frameAlt': '{t} 秒时的帧',
+  'replay.loadFailed': '录屏加载失败。',
+  'replay.pause': '暂停',
+  'replay.play': '播放',
+  'replay.scrubber': '录屏进度',
+  'replay.title': '用户屏幕上是什么',
   'releases.noArtifacts': '该版本没有符号化物料 —— 上传前调用栈保持混淆状态:',
 
   'settings.adminEmail': '管理员邮箱',

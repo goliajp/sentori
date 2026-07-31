@@ -30,7 +30,7 @@
     },
     "sdk/cli": {
       "name": "@goliapkg/sentori-cli",
-      "version": "1.0.0",
+      "version": "1.2.0",
       "bin": {
         "sentori-cli": "./lib/index.js",
       },
@@ -42,7 +42,7 @@
     },
     "sdk/core": {
       "name": "@goliapkg/sentori-core",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "devDependencies": {
         "@types/bun": "latest",
         "typescript": "^7",
@@ -71,12 +71,12 @@
     },
     "sdk/react-native": {
       "name": "@goliapkg/sentori-react-native",
-      "version": "5.0.0",
+      "version": "5.1.0",
       "bin": {
         "sentori-rn-upload-source-bundle": "bin/sentori-rn-upload-source-bundle.cjs",
       },
       "dependencies": {
-        "@goliapkg/sentori-core": "^2.0.0",
+        "@goliapkg/sentori-core": "^2.1.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
