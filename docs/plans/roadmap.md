@@ -19,11 +19,11 @@
 - [x] roadmap.md 落盘(本文件)
 - [x] 开 `feature/v1-redesign`
 - [x] 版本策略定稿(见头部第 7 条)
-- [ ] 清场 v0.1 尸体:`server/`、`web/`、根 `docker-compose.yml` + `docker-compose.override.example.yml`、`/docker/`、`migrate-tool/`
-- [ ] 删 6 个 Web SDK 包:`sdk/{javascript,react,next,vue,svelte,solid}`
-- [ ] 根 `package.json`:workspaces / build:sdks / test:sdks 收缩到 4 包(core / react-native / expo / cli)
-- [ ] CI 收缩:build.yml 的 sdk matrix、paths-filter;sdk-perf.yml 路径
-- [ ] preflight 重写:指向 core(fmt/clippy/check)+ self-hosted/server(test)+ webapp(check)+ 4 包 SDK(build+test),删除 server/、web/ 步骤
+- [x] 清场 v0.1 尸体:`server/`、`web/`、根 `docker-compose.yml` + `docker-compose.override.example.yml`、`/docker/`、`migrate-tool/`(477+236 tracked 文件,7.4GB 磁盘)
+- [x] 删 6 个 Web SDK 包:`sdk/{javascript,react,next,vue,svelte,solid}`(残余引用仅注释,S3 清理)
+- [x] 根 `package.json`:workspaces / build:sdks / test:sdks 收缩到 4 包;bun.lock 更新
+- [x] CI 收缩:build.yml(sdk matrix 4 包、server-test 去 services/free-disk、infra filter 去 docker/**、加 workflow_dispatch);sdk-perf.yml 去 sdk/javascript;**v0.2-core-check.yml branches 改 feature/\*\***(修「gate 憋到 develop 才爆」的坑)
+- [x] preflight 重写:core(fmt/clippy/check)+ self-hosted/server(fmt/clippy/check + lib test)+ rfc3339/orphan + webapp(check)+ 4 包 SDK;check-rfc3339/check-orphan-modules/check-cargo-features 扫描根重指;check-error-docs(扫死目录)暂摘出,S2 重建 error-docs 体系时定
 - [ ] **gate**:`bun run preflight` 全绿;build.yml 在 feature 分支 workflow_dispatch 跑绿
 
 gate 记录:(待)

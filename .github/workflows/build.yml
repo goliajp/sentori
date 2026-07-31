@@ -17,6 +17,7 @@ on:
   push:
     branches: [master]
   pull_request:
+  workflow_dispatch:
 
 # v2.1 — opt into Node.js 24 ahead of GitHub Actions' 2026-06-02
 # forced cutover. Several pinned action versions in this file
@@ -54,7 +55,6 @@ jobs:
               - 'bun.lock'
               - 'Cargo.toml'
               - 'Cargo.lock'
-              - 'docker/**'
               - 'scripts/**'
             # Drives the `server-test` job, which after the v0.1
             # decommission runs the cli gates and the repo-wide checks
@@ -90,44 +90,13 @@ jobs:
     if: needs.changes.outputs.server == 'true' || needs.changes.outputs.infra == 'true'
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: dev
-          POSTGRES_DB: sentori
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d sentori"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
-      valkey:
-        image: valkey/valkey:8-alpine
-        ports:
-          - 6379:6379
-
-    env:
-      DATABASE_URL: postgres://postgres:dev@localhost:5432/sentori
-      VALKEY_URL: redis://localhost:6379
-
+    # No postgres/valkey services and no disk-freeing step: both existed
+    # for the legacy v0.1 `server/` workspace, deleted in the v1 S0
+    # clear-out. The v0.2+ server surface (core/ + self-hosted/server/)
+    # is gated by `v0.2-core-check.yml`, which owns the DB-backed
+    # integration tests; this job runs the repo-wide source checks and
+    # the Rust cli gates.
     steps:
-      # The legacy server workspace + its dep tree fills the
-      # ubuntu-latest disk: 2026-07-20 the `cargo test (server)` step
-      # died mid-run with "No space left on device" (the runner
-      # couldn't even write its own diagnostic log). The preinstalled
-      # Android SDK / .NET / GHC / CodeQL bundles are ~25 GB we never
-      # touch.
-      - name: free runner disk
-        run: |
-          df -h / | tail -1
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet \
-                      /opt/ghc /usr/local/.ghcup \
-                      /opt/hostedtoolcache/CodeQL
-          df -h / | tail -1
-
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
@@ -135,7 +104,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            server -> target
             cli -> target
 
       - name: check rfc3339 serde annotations (phase 29 sub-C)
@@ -185,13 +153,7 @@ jobs:
       matrix:
         package:
           - sdk/core
-          - sdk/javascript
-          - sdk/react
-          - sdk/next
           - sdk/react-native
-          - sdk/vue
-          - sdk/svelte
-          - sdk/solid
           - sdk/expo
           - sdk/cli
 

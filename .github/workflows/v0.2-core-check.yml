@@ -2,7 +2,7 @@ name: v0.2 core — fmt + clippy + check
 
 on:
   push:
-    branches: [feature/v0.2-**, develop, master]
+    branches: [feature/**, develop, master]
     paths:
       - 'core/**'
       - 'self-hosted/server/**'

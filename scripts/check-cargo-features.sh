@@ -27,7 +27,7 @@
 
 set -euo pipefail
 
-CARGO_TOML="${1:-server/Cargo.toml}"
+CARGO_TOML="${1:-self-hosted/server/Cargo.toml}"
 
 if [[ ! -f "$CARGO_TOML" ]]; then
   echo "error: $CARGO_TOML not found (cwd=$(pwd))" >&2

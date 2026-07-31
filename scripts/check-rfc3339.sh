@@ -62,7 +62,7 @@ ATTR_LINE        = re.compile(r'^\s*#\[')
 BLANK_LINE       = re.compile(r'^\s*$')
 DOC_COMMENT      = re.compile(r'^\s*///?')
 
-ROOTS = ('server/src', 'self-hosted/server/src', 'core/crates')
+ROOTS = ('self-hosted/server/src', 'core/crates')
 
 violations = []
 sources = [
