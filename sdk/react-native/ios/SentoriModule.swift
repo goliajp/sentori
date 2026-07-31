@@ -77,6 +77,18 @@ public class SentoriModule: Module {
             return SentoriScreenshotCapture.captureScreenshotWithMask(maskedIds: maskedIds)
         }
 
+        // v5.1 — low-bitrate replay frame (screens ring). Long edge +
+        // quality come from JS so the frame budget is tunable without
+        // a native release.
+        AsyncFunction("captureReplayFrame") {
+            (maskedIds: [String], longEdgePx: Double, quality: Double) -> [String: String]? in
+            return SentoriScreenshotCapture.captureReplayFrame(
+                maskedIds: maskedIds,
+                longEdgePx: longEdgePx,
+                quality: quality
+            )
+        }
+
         // Phase 22 sub-E: opt-in iOS hang watchdog. Same JS function
         // name as Android (sub-D) so the host app calls
         // `startAnrWatchdog(...)` once, both platforms react.

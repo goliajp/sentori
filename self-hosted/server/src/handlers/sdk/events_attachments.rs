@@ -54,9 +54,10 @@ const MAX_BODY_BYTES: usize = 50 * 1024 * 1024; // 50 MiB hard cap
 /// The kinds migration 0022's CHECK constraint accepts. Anything else
 /// would be rejected by the database, so reject it here with a usable
 /// message instead.
-const KINDS: [&str; 6] = [
+const KINDS: [&str; 7] = [
     "logTail",
     "replay",
+    "screens",
     "screenshot",
     "sessionTrail",
     "stateSnapshot",

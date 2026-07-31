@@ -79,6 +79,14 @@ class SentoriModule : Module() {
             SentoriScreenshotCapture.captureScreenshotWithMask(maskedIds)
         }
 
+        // v5.1 — low-bitrate replay frame (screens ring). Long edge +
+        // quality come from JS so the frame budget is tunable without
+        // a native release.
+        AsyncFunction("captureReplayFrame") {
+            maskedIds: List<String>, longEdgePx: Double, quality: Double ->
+            SentoriScreenshotCapture.captureReplayFrame(maskedIds, longEdgePx, quality)
+        }
+
         // Watchdog is opt-in from JS so the host app picks the
         // trade-off — stricter detection vs noise from the Metro
         // debugger pausing the main thread. Pass `force: true` to

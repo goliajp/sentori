@@ -62,6 +62,9 @@ export default sentori;
 export { init } from './init';
 export { ErrorBoundary } from './error-boundary';
 export { RageTapCapture } from './rage-tap';
+// Privacy: register a query returning nativeIDs that must be
+// blacked out in every captured frame (visual replay, screenshots).
+export { registerMaskQuery } from './mask';
 // Dev-panel helper: crash the native layer on purpose to exercise
 // the pending-crash upload pipeline. Not part of the 8-verb surface.
 export { triggerNativeCrash } from './native';

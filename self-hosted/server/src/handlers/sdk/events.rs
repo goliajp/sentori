@@ -83,6 +83,22 @@ pub async fn prepare(
         if n > 0 {
             tracing::debug!(frames = n, "symbolicated");
         }
+        // Native frames (JVM class.method+line, or iOS addr+image
+        // info) go through the proguard / DWARF resolvers.
+        if w.platform == "android" || w.platform == "ios" {
+            let n = crate::native_symbolicate::symbolicate_native(
+                &state.pool,
+                &state.attachments,
+                project_id,
+                &w.release,
+                &w.platform,
+                &mut w.payload,
+            )
+            .await;
+            if n > 0 {
+                tracing::debug!(frames = n, "native symbolicated");
+            }
+        }
     }
     Ok(IncomingEvent {
         id: w.id.unwrap_or_else(Uuid::now_v7),
