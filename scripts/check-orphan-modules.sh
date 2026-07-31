@@ -32,7 +32,6 @@ ROOTS = [
     "self-hosted/server/src",
     "cli/src",
     "saas/server/src",
-    "wasm/score/src",
 ]
 
 orphans = []

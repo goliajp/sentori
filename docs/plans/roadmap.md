@@ -202,11 +202,11 @@ gate 记录:2026-08-01。生产闭环:error(dev smoke)+ warn(slow_cold_start,检
 
 ## S9 收尾
 
-- [ ] saas/ marketing/ docs-site/ 处置执行;oss-mirror 排除表校准;preflight 最终校准
-- [ ] Stripe 摘除确认(账号冻结保留);memory 更新;design.md 台账回填
-- [ ] **gate**:三栏交账;残留清单归零或明示
+- [x] saas/ marketing/ docs-site/ 处置执行;oss-mirror 排除表校准;preflight 最终校准
+- [x] Stripe 摘除确认(账号冻结保留);memory 更新;design.md 台账回填
+- [x] **gate**:三栏交账;残留清单归零或明示
 
-gate 记录:(待)
+gate 记录:2026-08-01。删除死代码:根 `cli/`(v0.x Rust CLI)、`saas/`、`e2e/`(旧包名 e2e)、`wasm/`、`tools/`、core 五个 SaaS crates(billing / license-jwt / stripe-webhook-verify / tenant-scoping / workspace-identity)+ async-stripe 依赖;healthz 摘 billing_* 字段(查询的 stripe_events 表在 v1 schema 不存在,map_or 静默 0 —— 「写了但没在跑」活例)。server 全局 grep stripe/billing 零命中;dependabot open alerts 归零。保留待用户拍板:`marketing/`、`docs-site/`(caddy 路由已摘,repo 目录与生产容器留)、`ops/`(运维手册,含 backup/restore)、`docs-v0.1/`、`docs-v0.2/`、`apps/ios-showcase`(判定为活资产:纯 Swift showcase)。oss-mirror 排除表经死目录删除后自然收敛(docs/ 私有计划已排除)。preflight 终验全绿;core workspace + server check 绿。design.md 加 §14 实施回填;memory 更新(project_v1_redesign_live 新主线 + 旧主线标注取代)。三栏交账见 session final。
 
 ---
 
