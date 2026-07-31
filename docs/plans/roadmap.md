@@ -189,16 +189,16 @@ gate 记录:2026-08-01。镜像本地构建 69.6MB(<100MB 目标内,distroless +
 
 细步骤(2026-08-01 到段展开)。cutover 决策(照 v0.2 cutover 剧本):v1 栈全新容器 + 全新卷(数据全扔已定);v0.2 栈(postgres-v2/server-v2/saas-control)容器保留为 rollback,caddy 摘除引用;marketing/docs 容器与 dist 保留但 caddy 不再路由 —— 旧内容是 SaaS 卖点文案,与 v1 self-host 定位相悖,挂着比摘掉更误导;最终去留 S9 三栏交账给用户拍板。webapp 接管 sentori.golia.jp 根路径。
 
-- [ ] 8a 版本 bump 2.0.0(server Cargo.toml / webapp / VERSION);本地 preflight 全绿
-- [ ] 8b repo 侧 CI:deploy.yml 重写(build server-v1 镜像 + webapp rsync + compose up + :18092 smoke/version 核对;去 marketing/docs/saas 构建);prod-drift 对齐新容器名
-- [ ] 8c devops compose 加 v1 栈段(postgres-v1 新卷 :15434 / server-v1 :18092,9-env 面,owner=takagi@golia.jp 密码走生成路径);push devops develop
-- [ ] 8d release/2.0.0 分支 push → deploy.yml 起新栈 → lx64 :18092 healthz version=2.0.0
-- [ ] 8e caddy 切换(⛔ 铁律:ssh t01 edit live → reload → `devops caddy import t01 --accept-live --apply` → repo diff sync):sentori.golia.jp / → server-v1;摘 marketing/docs/saas 块;ingest.sentori.golia.jp → server-v1
-- [ ] 8f git-flow 收束:release → master merge + tag v2.0.0 + back-merge develop;`gh run list` 全绿;生产 /healthz version 核对(memory:绿的 deploy 可能什么都没发)
-- [ ] 8g insight-mobile(qualcomm repo)接新 SDK(tarball 本地依赖,npm 发包留 S9 问包名):init + 8 动词接入 + sourcemap 上传 + 种一颗真 probe;模拟器跑真 crash + warn
-- [ ] **gate**:生产真实 crash + warn 各 ≥1 例走完闭环(事件→issue→bundle→email);gh run list 全绿;/healthz version 核对
+- [x] 8a 版本 bump 2.0.0(server Cargo.toml / webapp / VERSION);本地 preflight 全绿
+- [x] 8b repo 侧 CI:deploy.yml 重写(build server-v1 镜像 + webapp rsync + compose up + :18092 smoke/version 核对;去 marketing/docs/saas 构建);prod-drift 无需改(比对 Cargo.toml vs healthz,天然适用)
+- [x] 8c devops compose 加 v1 栈段(postgres-v1 新卷 :15434 / server-v1 :18092,9-env 面,owner=takagi@golia.jp 密码走生成路径);push devops develop(`6c4de28`)
+- [x] 8d release/2.0.0 push → deploy 绿(version smoke 过)→ lx64 :18092 serving 2.0.0
+- [x] 8e caddy 切换(铁律三步全走:live 拉取→精准 patch→t01 validate→reload→`devops caddy import t01 --accept-live --apply`(drift in sync)→ mirror 从 live 同步 commit `6f430e3`):sentori.golia.jp 全域 → server-v1;marketing/docs/saas 块摘除;ingest./api./app./docs. 子域对齐
+- [x] 8f git-flow 收束:release/2.0.0→master + tag;后续 2.0.1/2.0.2 dogfood 修复各走完整 release 流;master 7 workflows 全绿(build/deploy/mobile-e2e/core-check/sdk-perf/oss-mirror/镜像);生产 /healthz version=2.0.2 核对
+- [x] 8g insight-mobile 接新 SDK(vendor/ 目录 file: 依赖;captureException→error 等 API 全迁移;tsc + eslint + prettier + pre-commit 全绿 commit 于 insight `feature/sentori-v2`);GOL-663 真 probe 种于 switch-without-session 坏分支并 `probes sync` 注册;22MB hermes sourcemap 经 CLI 上传成功;sim-insight + metro 真跑:error smoke + **slow_cold_start 检测器自主触发的 warn** 双双上报生产
+- [x] **gate**:生产真实 crash + warn 各 ≥1 例走完闭环;gh run list 全绿;/healthz version 核对
 
-gate 记录:(待)
+gate 记录:2026-08-01。生产闭环:error(dev smoke)+ warn(slow_cold_start,检测器自动)→ issue → bundle(stack/impact/release 完整)→ email;resolve 锚定 release 后同指纹再现 → regressed_at 置位 + regressed_in_release + **Regression 邮件 delivered**;probe GOL-663 注册于 focus-ai-app@5.4.26073101+381(silent = fix holding)。dogfood 抓到并修复 3 个真缺陷,各自走完整 release 流:①(2.0.1)dev bundle 全帧 inApp=false → error 指纹跌到 type+message,时间戳 message 每次开新 issue —— 新增 function-name 次级签名 + digit-collapse 末级(3 单测);②(2.0.2)axum 2MB 默认 body limit 截断 22MB sourcemap multipart(应用层 200MB 检查从未生效)—— 两条 artifact route 显式 DefaultBodyLimit;③ sourcemap-e2e CI 门还在说 v0.2 API(BOOTSTRAP_* env / admin·public token kind / slug create / v0.2 wire)——重写 run-v1.sh 本地 PASSED 后 CI 绿。附带修复:mailrs TLS 证书 7-30 过期(memory 预言的 90 天断链)→ 从 t02 Caddy live 证书 sync + 重启,SMTP 恢复,前两封 failed 邮件后的全部 delivered。生产 owner 密码在 lx64 `docker logs sentori-server-v1 | grep password`(用户应登录后修改)。
 
 ## S9 收尾
 
