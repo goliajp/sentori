@@ -52,6 +52,22 @@ impl AttachmentStore {
     /// snapshots, log tails, session trails, replay recordings — was
     /// write-only: stored, then unreachable. The crash detail view is
     /// built on reading these back.
+    /// Every stored blob with its mtime — the orphan-GC's input.
+    pub async fn list(&self) -> BlobResult<Vec<(BlobHash, std::time::SystemTime)>> {
+        match self {
+            Self::Memory(s) => s.list().await,
+            Self::Fs(s) => s.list().await,
+        }
+    }
+
+    /// Remove one blob. Idempotent at the GC's level of care.
+    pub async fn delete(&self, hash: &BlobHash) -> BlobResult<()> {
+        match self {
+            Self::Memory(s) => s.delete(hash).await,
+            Self::Fs(s) => s.delete(hash).await,
+        }
+    }
+
     pub async fn get(&self, hash: &BlobHash) -> BlobResult<Vec<u8>> {
         match self {
             Self::Memory(s) => s.get(hash).await,

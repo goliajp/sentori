@@ -96,4 +96,13 @@ pub trait BlobStore: Send + Sync {
     ///
     /// [`crate::BlobError::Backend`] on backend I/O.
     fn delete(&self, hash: &BlobHash) -> impl Future<Output = BlobResult<()>> + Send;
+
+    /// Every blob currently in the store, with its last-modified
+    /// time. The GC that reaps orphaned blobs needs both: the hash
+    /// to compare against DB references, and the mtime so a blob
+    /// whose referencing row has not been written YET (upload in
+    /// flight) is left alone.
+    fn list(
+        &self,
+    ) -> impl Future<Output = BlobResult<Vec<(BlobHash, std::time::SystemTime)>>> + Send;
 }

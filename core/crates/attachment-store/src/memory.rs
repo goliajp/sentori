@@ -100,6 +100,18 @@ impl BlobStore for MemoryBlobStore {
         }
         Ok(())
     }
+
+    async fn list(&self) -> BlobResult<Vec<(BlobHash, std::time::SystemTime)>> {
+        // Fresh mtimes on purpose: the dev/ephemeral store has no
+        // real modification times, and "now" makes the GC's
+        // age-guard skip everything — nothing to reclaim in RAM.
+        let now = std::time::SystemTime::now();
+        let map = lock(&self.blobs);
+        Ok(map
+            .keys()
+            .map(|k| (BlobHash::from_bytes(*k), now))
+            .collect())
+    }
 }
 
 /// Acquire the inner mutex, recovering from poison.

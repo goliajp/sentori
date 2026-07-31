@@ -95,7 +95,7 @@ async fn main() -> anyhow::Result<()> {
     // Background workers: push dispatch + retention archive.
     let token_cache = std::sync::Arc::new(token_cache::TokenCache::new());
     push_worker::spawn(pool.clone(), token_cache);
-    archive_worker::spawn(pool);
+    archive_worker::spawn(pool, state.attachments.clone());
 
     // Baseline HSTS / X-Content-Type-Options / X-Frame-Options /
     // Referrer-Policy on every response. Wrapping at the outermost
