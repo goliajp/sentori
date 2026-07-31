@@ -30,14 +30,20 @@ gate 记录:(待)
 
 ## S1 Schema 从零(五 kind + 单租户)
 
-- [ ] 决策:spans / runtime_metrics 表去留(倾向:不建 spans;runtime_metrics 保留待议)
-- [ ] 清空 `core/migrations/`,新 0001 系列,表清单:
-  - users(role: superadmin|admin)、sessions
-  - projects、project_assignments、tokens(scope: ingest|api,named,多个)
-  - events(kind: error|warn|trace|assert|probe)、issues(open|resolved|ignored + regressed_at/regressed_in_release + resolved_in_release + 广度深度列)、issue_activity(系统事件 + note)
-  - event_attachments、releases、release_artifacts(sourcemap|dsym|proguard)、probes(release 注册表)、assert_stats
-  - audit_logs、notifications;push 表机械保留
-- [ ] **gate**:空库 migrate 跑通;表形状 vs design.md §2/§9 走查一致(逐表核对记录)
+段头细化(2026-07-31,S0 等 CI 期间展开):
+
+- [ ] **决策落定**:不建 `spans`(trace 是 events 的一个 kind;APM 语汇随 Sentry 兼容一起废)。不建 `runtime_metrics` 表(metric 流降级为 SDK 侧场景判定信号,不上报;S3 落实删 batch 上报)。不建独立 `replay_sessions`(B 型 replay = event attachment,replay-store 的 PII scrub/gzip 逻辑复用到 attachment 写入路径)。不建 session ping 表。
+- [ ] 清空 `core/migrations/`(旧 0001-0036 git 里留档),新序列:
+  - `0001_identity.sql` — users(id, email uq, password_hash, role CHECK superadmin|admin, display_name, created_at, last_login_at)、sessions(复用 auth-session crate 表形状)、audit_logs(复用 audit-event crate 表形状,去 workspace 列)
+  - `0002_projects.sql` — projects(id, name, platform, created_at)、project_assignments(user_id, project_id, assigned_by, created_at, PK(user,project))、tokens(id, project_id, name, scope CHECK ingest|api, secret_hash, created_at, last_used_at, revoked_at)
+  - `0003_events.sql` — events(id 客户端预生成, project_id, issue_id, kind CHECK 五值, received_at, occurred_at, release, environment, platform, user_key, payload jsonb;BRIN(received_at),不分区 —— replay tick 已死,量级回落)、issues(id, project_id, fingerprint uq(project,fingerprint), kind, title, status CHECK open|resolved|ignored, first_seen, last_seen, event_count, users_count 广度, max_per_user 深度, assignee_user_id, surface jsonb, resolved_at, resolved_in_release, regressed_at, regressed_in_release)、issue_user_hits(issue_id, user_key, hit_count, last_hit, PK(issue,user_key))— 广度×深度实现核心、issue_activity(id, issue_id, at, actor_user_id nullable, kind CHECK status|assign|note|regression, body)
+  - `0004_attachments.sql` — event_attachments(ref, project_id, event_id, kind, media_type, size_bytes, blob_hash, received_at)
+  - `0005_releases.sql` — releases(id, project_id, name uq(project,name), created_at)、release_artifacts(id, release_id, kind CHECK sourcemap|dsym|proguard, content_hash, meta jsonb, created_at)、probes(id, project_id, ref, uq(project,ref), issue_id nullable, first_registered_release, last_seen_release, registered_at, last_fired_at, fire_count)、assert_stats(project_id, name, release, pass_count, fail_count, last_pass_at, last_fail_at, PK(project,name,release))
+  - `0006_notifications.sql` — notification_prefs(user_id, project_id, on_new_issue, on_regression)
+  - `0007_push.sql` — push 系列表机械搬运(去 workspace 列)
+- [ ] **gate**:空库 migrate 跑通;表形状 vs design.md §2/§9 逐表核对记录
+
+gate 记录:(待)
 
 gate 记录:(待)
 

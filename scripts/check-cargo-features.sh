@@ -48,10 +48,17 @@ fi
 # So the check unconditionally requires the listed feature to appear
 # in the features list.
 #
-# Format: "<crate> <feature>" one per line. Parallel-array form (instead
-# of `declare -A`) so this script runs under macOS's bash 3.2 too.
+# Format: "<crate> <feature>" one per line; alternatives separated by
+# `|` — any one of them satisfies the check. Parallel-array form
+# (instead of `declare -A`) so this script runs under macOS's bash 3.2
+# too.
+#
+# jsonwebtoken 10 requires *a* crypto provider, not a specific one:
+# the v1.1.2 incident was shipping with neither, which panics at
+# runtime. The v0.2 server selects aws_lc_rs; rust_crypto is equally
+# valid.
 REQUIRED_FEATURES_LIST="
-jsonwebtoken rust_crypto
+jsonwebtoken rust_crypto|aws_lc_rs
 reqwest http2
 "
 
@@ -73,7 +80,9 @@ while read -r crate required; do
     continue   # crate not declared in [dependencies] — nothing to check
   fi
   checked=$((checked + 1))
-  if echo "$line" | grep -qE "\"$required\""; then
+  # `required` may be alternatives like `a|b`; wrap in a group so the
+  # alternation stays inside the surrounding quotes.
+  if echo "$line" | grep -qE "\"($required)\""; then
     echo "ok:   $crate carries required feature '$required'"
   else
     echo "FAIL: $crate missing required feature '$required'"
