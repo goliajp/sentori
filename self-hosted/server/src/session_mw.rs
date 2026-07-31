@@ -1,12 +1,17 @@
-//! Cookie / Bearer session middleware for dashboard + admin
-//! routes.
+//! Cookie / Bearer session middleware for dashboard + admin routes.
 //!
 //! Resolves the session token from either:
-//! 1. `Authorization: Bearer <session_token_wire>` header
-//! 2. `Cookie: sentori_session=<session_token_wire>`
+//! 1. `Authorization: Bearer <token>` header
+//! 2. `Cookie: sentori_session=<token>`
 //!
-//! On success injects `Extension<SessionContext { user_id }>`
-//! into the request. On failure returns 401 with `WWW-Authenticate`.
+//! The token is an opaque random string; the DB stores its SHA-256
+//! (`auth_sessions.id_hash`), so a dump of the table cannot forge a
+//! session. Looking the hash up IS the validation — no HMAC layer,
+//! because there is nothing to verify offline in a single-tenant
+//! server that owns its own session table.
+//!
+//! On success injects `Extension<SessionContext>`. On failure
+//! returns 401 with `WWW-Authenticate`.
 
 use std::sync::Arc;
 
@@ -17,41 +22,63 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
-use sentori_auth_session::{AuthOptions, AuthService};
-use sentori_cookie_session::SecretKey;
-use sentori_workspace_identity::{Members, Role, UserId};
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use tracing::warn;
+use uuid::Uuid;
 
 use crate::state::AppState;
 
-/// Who the caller is, which workspace their request is acting in,
-/// and the role they hold there.
-///
-/// `workspace_id` is the session's *active* workspace (a user can
-/// belong to many; the switcher UPDATEs which one is active). It is
-/// resolved + membership-validated here rather than left to each
-/// handler: dashboard queries used to select across the whole
-/// table, so any authenticated user saw every tenant's projects,
-/// events, spans, metrics and replays. Carrying the scope on the
-/// request makes the filter something a handler has to actively
-/// drop rather than something it has to remember to add.
-///
-/// `role` is the caller's RBAC role in the active workspace — the
-/// membership check that authorizes the request already fetched it,
-/// so handlers can gate mutations (e.g. `role.can_manage_workspace()`)
-/// without a second query.
+/// The two roles that exist (design.md §9). Superadmin sees and
+/// manages everything; admin sees assigned projects.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Role {
+    Superadmin,
+    Admin,
+}
+
+impl Role {
+    #[must_use]
+    pub fn from_db_str(s: &str) -> Option<Self> {
+        match s {
+            "superadmin" => Some(Self::Superadmin),
+            "admin" => Some(Self::Admin),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn as_db_str(self) -> &'static str {
+        match self {
+            Self::Superadmin => "superadmin",
+            Self::Admin => "admin",
+        }
+    }
+
+    #[must_use]
+    pub fn is_superadmin(self) -> bool {
+        matches!(self, Self::Superadmin)
+    }
+}
+
+/// Who the caller is and what they may do.
 #[derive(Clone, Copy, Debug)]
 pub struct SessionContext {
-    pub user_id: UserId,
-    pub workspace_id: sentori_workspace_identity::WorkspaceId,
+    pub user_id: Uuid,
     pub role: Role,
-    /// SHA-256 of the current session id. The workspace switcher
-    /// needs it to UPDATE this exact session's active workspace;
-    /// carrying it here avoids re-parsing the cookie in the
-    /// handler. Zero-filled only if the hex failed to decode,
-    /// which cannot happen for a session that just looked up.
+    /// SHA-256 of the current session token — lets a handler target
+    /// exactly this session (logout, session list highlighting)
+    /// without re-parsing the cookie.
     pub session_id_hash: [u8; 32],
+}
+
+/// SHA-256 of a wire session token — the shape stored in
+/// `auth_sessions.id_hash`.
+#[must_use]
+pub fn hash_token(token: &str) -> [u8; 32] {
+    let mut h = Sha256::new();
+    h.update(token.as_bytes());
+    h.finalize().into()
 }
 
 pub async fn session_middleware(
@@ -63,32 +90,35 @@ pub async fn session_middleware(
     let Some(token) = extract_token(&headers) else {
         return reject("session token missing");
     };
+    let hash = hash_token(&token);
 
-    let auth = build_auth(&state);
-    match auth.lookup_session(&token).await {
-        Ok(Some((user, session))) => {
-            // The session carries its *active* workspace. Validate
-            // the user still belongs to it: a revoked membership (or
-            // any stale active workspace) must be rejected, not
-            // trusted — otherwise removing someone from a workspace
-            // would leave their live sessions with access.
-            let workspace_id = session.workspace_id;
-            match Members::new(&state.pool, workspace_id).find(user.id).await {
-                Ok(Some(member)) => {
-                    req.extensions_mut().insert(SessionContext {
-                        user_id: user.id,
-                        workspace_id,
-                        role: member.role,
-                        session_id_hash: decode_hash(&session.id_hash_hex),
-                    });
-                    next.run(req).await
-                }
-                Ok(None) => reject("workspace access revoked"),
-                Err(e) => {
-                    warn!(error = %e, "membership check failed");
-                    reject("internal")
-                }
-            }
+    let row: Result<Option<(Uuid, String)>, sqlx::Error> = sqlx::query_as(
+        "SELECT u.id, u.role FROM auth_sessions s \
+         JOIN users u ON u.id = s.user_id \
+         WHERE s.id_hash = $1 AND s.expires_at > now()",
+    )
+    .bind(hash.as_slice())
+    .fetch_optional(&state.pool)
+    .await;
+
+    match row {
+        Ok(Some((user_id, role_str))) => {
+            let Some(role) = Role::from_db_str(&role_str) else {
+                warn!(%user_id, role = %role_str, "unknown role in users table");
+                return reject("internal");
+            };
+            // Sliding freshness, best-effort: a failed touch must not
+            // fail the request it rode in on.
+            let _ = sqlx::query("UPDATE auth_sessions SET last_seen_at = now() WHERE id_hash = $1")
+                .bind(hash.as_slice())
+                .execute(&state.pool)
+                .await;
+            req.extensions_mut().insert(SessionContext {
+                user_id,
+                role,
+                session_id_hash: hash,
+            });
+            next.run(req).await
         }
         Ok(None) => reject("session expired or invalid"),
         Err(e) => {
@@ -96,28 +126,6 @@ pub async fn session_middleware(
             reject("internal")
         }
     }
-}
-
-/// Decode a 64-char hex session-id hash back into 32 bytes. The
-/// value comes straight from `Session::id_hash_hex`, which we
-/// produced from a real 32-byte hash, so a malformed string is not
-/// reachable in practice; we return zeroes rather than panic so a
-/// freak decode failure downgrades to "switcher can't target this
-/// session" instead of a 500 on every request.
-fn decode_hash(hex: &str) -> [u8; 32] {
-    let mut out = [0u8; 32];
-    if hex.len() == 64 {
-        for (i, chunk) in hex.as_bytes().chunks_exact(2).enumerate() {
-            let hi = (chunk[0] as char).to_digit(16);
-            let lo = (chunk[1] as char).to_digit(16);
-            if let (Some(hi), Some(lo)) = (hi, lo) {
-                // hi, lo are single hex nibbles (0..=15), so the
-                // assembled byte always fits u8; unwrap_or is dead.
-                out[i] = u8::try_from((hi << 4) | lo).unwrap_or(0);
-            }
-        }
-    }
-    out
 }
 
 fn extract_token(headers: &HeaderMap) -> Option<String> {
@@ -140,22 +148,6 @@ fn extract_token(headers: &HeaderMap) -> Option<String> {
     None
 }
 
-fn build_auth(state: &Arc<AppState>) -> AuthService {
-    let raw = std::env::var("SENTORI_SESSION_SECRET").ok();
-    let key = match raw {
-        Some(s) if s.len() >= 32 => {
-            let mut a = [0u8; 32];
-            a.copy_from_slice(&s.as_bytes()[..32]);
-            SecretKey::from_bytes(a)
-        }
-        // Only fails if the OS CSPRNG is unavailable, which no request
-        // could be served through anyway.
-        #[allow(clippy::expect_used)]
-        _ => SecretKey::generate().expect("ephemeral session key"),
-    };
-    AuthService::new(state.identity.clone(), key, AuthOptions::default())
-}
-
 fn reject(reason: &str) -> Response {
     let body = json!({ "error": "unauthorized", "reason": reason });
     let mut resp = (StatusCode::UNAUTHORIZED, axum::Json(body)).into_response();
@@ -164,4 +156,31 @@ fn reject(reason: &str) -> Response {
         header::HeaderValue::from_static("Bearer realm=\"sentori\""),
     );
     resp
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn role_round_trips() {
+        for r in [Role::Superadmin, Role::Admin] {
+            assert_eq!(Role::from_db_str(r.as_db_str()), Some(r));
+        }
+        assert_eq!(Role::from_db_str("owner"), None);
+    }
+
+    #[test]
+    fn token_hash_is_stable_and_token_sensitive() {
+        assert_eq!(hash_token("abc"), hash_token("abc"));
+        assert_ne!(hash_token("abc"), hash_token("abd"));
+    }
+
+    #[test]
+    fn extract_prefers_bearer_over_cookie() {
+        let mut h = HeaderMap::new();
+        h.insert(header::AUTHORIZATION, "Bearer tok-a".parse().unwrap_or_else(|_| unreachable!()));
+        h.insert(header::COOKIE, "sentori_session=tok-b".parse().unwrap_or_else(|_| unreachable!()));
+        assert_eq!(extract_token(&h).as_deref(), Some("tok-a"));
+    }
 }

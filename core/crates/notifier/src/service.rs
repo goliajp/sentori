@@ -3,7 +3,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use sentori_workspace_identity::ProjectId;
 use sqlx::PgPool;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -107,16 +106,15 @@ impl NotifierService {
         let inserted: Option<(Uuid,)> = sqlx::query_as(
             r"
             INSERT INTO delivery_log
-                (id, workspace_id, project_id, channel, recipient, subject,
+                (id, project_id, channel, recipient, subject,
                  body_preview, metadata, status, retries, dedup_key)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', 0, $9)
-            ON CONFLICT (workspace_id, dedup_key) WHERE dedup_key IS NOT NULL DO NOTHING
+            VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', 0, $8)
+            ON CONFLICT (dedup_key) WHERE dedup_key IS NOT NULL DO NOTHING
             RETURNING id
             ",
         )
         .bind(id)
-        .bind(n.workspace_id.into_uuid())
-        .bind(n.project_id.map(ProjectId::into_uuid))
+        .bind(n.project_id)
         .bind(n.channel.as_db_str())
         .bind(&n.recipient)
         .bind(&n.subject)
@@ -189,7 +187,6 @@ impl NotifierService {
             })
         })?;
         let n = Notification {
-            workspace_id: log.workspace_id,
             project_id: log.project_id,
             channel: log.channel,
             recipient: log.recipient.clone(),
@@ -266,13 +263,13 @@ impl NotifierService {
     /// [`NotifierError::Db`] on database failure.
     pub async fn list_recent(
         &self,
-        project_id: ProjectId,
+        project_id: Uuid,
         since: OffsetDateTime,
         limit: u32,
     ) -> Result<Vec<DeliveryLog>, NotifierError> {
         let rows = sqlx::query(
             r"
-            SELECT id, workspace_id, project_id, channel, recipient, subject,
+            SELECT id, project_id, channel, recipient, subject,
                    body_preview, metadata, status, retries, error,
                    dedup_key, sent_at, created_at
             FROM delivery_log
@@ -281,7 +278,7 @@ impl NotifierService {
             LIMIT $3
             ",
         )
-        .bind(project_id.into_uuid())
+        .bind(project_id)
         .bind(since)
         .bind(i64::from(limit))
         .fetch_all(&self.pool)
@@ -302,7 +299,7 @@ impl NotifierService {
     ) -> Result<Vec<DeliveryLog>, NotifierError> {
         let rows = sqlx::query(
             r"
-            SELECT id, workspace_id, project_id, channel, recipient, subject,
+            SELECT id, project_id, channel, recipient, subject,
                    body_preview, metadata, status, retries, error,
                    dedup_key, sent_at, created_at
             FROM delivery_log
@@ -347,7 +344,7 @@ impl NotifierService {
 // ── helpers ──────────────────────────────────────────────────
 
 const SELECT_COLS: &str = r"
-    SELECT id, workspace_id, project_id, channel, recipient, subject,
+    SELECT id, project_id, channel, recipient, subject,
            body_preview, metadata, status, retries, error,
            dedup_key, sent_at, created_at
     FROM delivery_log
@@ -355,7 +352,7 @@ const SELECT_COLS: &str = r"
 ";
 
 const SELECT_COLS_BY_DEDUP: &str = r"
-    SELECT id, workspace_id, project_id, channel, recipient, subject,
+    SELECT id, project_id, channel, recipient, subject,
            body_preview, metadata, status, retries, error,
            dedup_key, sent_at, created_at
     FROM delivery_log
@@ -387,12 +384,12 @@ fn validate(n: &Notification) -> Result<(), NotifierError> {
     Ok(())
 }
 
-fn translate_fk(err: sqlx::Error, project_id: Option<ProjectId>) -> NotifierError {
+fn translate_fk(err: sqlx::Error, project_id: Option<Uuid>) -> NotifierError {
     if let sqlx::Error::Database(db_err) = &err
         && db_err.code().as_deref() == Some("23503")
         && let Some(pid) = project_id
     {
-        return NotifierError::ProjectNotFound(pid.into_uuid());
+        return NotifierError::ProjectNotFound(pid);
     }
     NotifierError::Db(err)
 }

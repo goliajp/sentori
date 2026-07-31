@@ -57,7 +57,39 @@ gate 记录(2026-07-31):
 
 ## S2 Server 核心(执行时细分 2a-2e)
 
-- [ ] 2a 单租户化:删 saas_routes / saasadmin_mw / workspace-identity / tenant-scoping / billing / stripe*(代码摘除,Stripe 账号冻结);state.rs 收敛;bootstrap env 声明式 owner;owner/admin 两角色 + project 分配 API
+段头细化(2026-07-31,施工中转向记录):
+
+**转向:改造 → 重建。** 2a-i(删 SaaS/billing/OAuth 面 13 文件 + 路由 + state 摘除)做完后确认:AppState 挂的 IngestService/IssueStore/SpanStore/MetricsStore/ReplayStore 全部绑死旧 schema,「带着 30 个旧 handler 剥 workspace」不如「按新 API 面重建 handlers」。旧 handler 大面积删除,保留横切件 + push 系列(机械改)+ auth(裁剪)。bootstrap.rs 已重写为声明式 owner(SENTORI_OWNER_EMAIL/PASSWORD,密码缺省随机生成打日志,email 声明式 reconcile,password 永不覆盖已有账号)。
+
+**新 API 面(全清单,server 的目标形状):**
+
+SDK 面(Bearer ingest-scope token):
+- `POST /v1/events` + `/v1/events:batch` — 五 kind 统一入口;assert 聚合计数捎带在 batch envelope(`assertStats` 字段);ingest response 捎带 kill-switch 指令位
+- `POST /v1/events/{id}/attachments/{kind}` — replay/screenshot/viewTree/stateSnapshot/logTail
+- `POST /v1/deploys`(release 注册)、`POST /v1/releases/{release}/artifacts`(sourcemap/dsym/proguard 上传,触发 retro-symbolication)
+- push 系列 11 endpoints 机械保留
+- 删除:spans、metrics、track、security、control、heartbeat、sessions、user_reports、cert 相关全部 SDK 端点
+
+AI 面(Bearer api-scope token):
+- `GET /api/issues?status=&project=` / `GET /api/issues/{id}` / `GET /api/issues/{id}/bundle`(markdown + json)/ `POST /api/issues/{id}/notes` / `POST /api/issues/{id}/resolve`(body 带 release)
+
+Dashboard 面(cookie session):
+- auth:login/logout/me/change-password + reset(密码重置);**无 register/verify/oauth**
+- owner 管理:users CRUD、project_assignments、projects CRUD、tokens CRUD(双 scope)、audit 查询、SMTP 状态+测试邮件
+- 工作流:issues list(Inbox 排序 = 广度×深度)/detail/resolve/ignore/assign/notes、occurrences、attachments 读(replay 播放)、releases + artifacts 三灯 + probes、instruments(assert_stats/probes/trace 聚合)、stats(pulse:今日新增/回归/crash-free)
+- CLI 复用 api-scope 或 session:probe 注册 `POST /admin/api/projects/{id}/probes:sync`(release + refs 清单)
+
+废除 handler 清单(除 2a-i 已删外):spans、metrics、track_query、runtime_metrics_query、user_reports_query、search、self_test、api_describe、cert、alerts + alerts_fire + periodic_alert_worker(规则引擎废,S6 用 notification_prefs)、saved_views、events_live、issue_comments、issue_watchers、replays(重做为 attachment 读)、heartbeat、sessions、security_*、control、track、tenant、sessions_admin(保留——自身会话管理)、notifications(重做为 prefs)、archive_worker(改新表)、probe_worker(endpoint 探活,与新 probe 概念无关,废)、cert-monitor 接线
+
+Crate 处置:event-pipeline 重写(五 kind + fingerprint 规则 + 广度深度 + probe 触发/regression + assert 聚合)、issue-store 重写(三态 + activity + bundle 数据装配)、release-store 实现(stub→真)、ingest-token 改 scope、auth-session 裁剪(去 workspace/verify)、span-store/runtime-metrics/replay-store/saved-view/alert-rule/cert-monitor/integration-traits/workspace-identity/tenant-scoping/billing/stripe-webhook-verify/license-jwt/analytics-store/security-engine/session-store 从 server 依赖中摘除(crate 文件留在 repo,不编译不算账;S9 收尾时统一删目录)
+
+**施工状态(2026-07-31,S2 进行中,供压缩后接续)**:
+- 已完成:13 文件 SaaS/billing/OAuth 面删除;39 个废 handler/worker 删除;三个 mod.rs 声明清理;state.rs 重写(thin:pool/source_maps/limiters/attachments/events_bus/mailer);bootstrap.rs 重写(声明式 owner,SENTORI_OWNER_EMAIL/PASSWORD + 随机密码打日志 + email reconcile + password 不覆盖 + 2 单测);main.rs 对齐;Cargo.toml 摘 12 个 crate 依赖加 proguard/dwarf/issue-fingerprint/rand;5 个 sdk handler quota 剥离
+- **已完成(第二批)**:①② done;③ session_mw.rs 重写(直接 sqlx,SessionContext{user_id,role,session_id_hash},Role enum superadmin/admin,hash_token 供 auth.rs,auth-session crate 摘除待办);④ src/pipeline.rs 写完(Kind enum、group_identity per-kind fingerprint、锁行事务式 ingest、release 锚定 is_regression(双注册比 created_at,否则 fallback resolved_at 时间)、issue_user_hits 广度深度、probe 触发 + guarded issue 联动 regression、record_assert_stats);⑤ sdk/events.rs(WireEvent camelCase + prepare 含 symbolicate)+ events_batch.rs(envelope events+assertStats,MAX_BATCH 200,逐条 outcome)重写完,**events_batch.rs 是 untracked 新文件,commit 需显式 add**;notifier crate 单租户化完成(lib 16 测试绿,integration fixture 已对新 0001/0002/0006);ingest-token crate 改造完成(TokenKind→Scope ingest|api,st_ 前缀,touch(),去 workspace,all-targets 绿)
+- **剩余(cargo check 26 文件,模式已知)**:push 系 11 文件(ctx.workspace_id 删、ProjectId→Uuid、ctx.token_kind→ctx.scope、SQL 去 workspace 列)→ admin/tokens(新 TokenStore.create(project_id, scope, name) 签名)→ admin/projects(新表列 + audit 直接 sqlx)→ ⑥ issues.rs 重写(Inbox 排序 users_count desc + api-scope 闭环 GET/resolve/notes)→ ⑧ auth.rs 裁剪(login/logout/me/change-password/reset only,session 直接 sqlx 写 auth_sessions,用 session_mw::hash_token)→ ⑨ audit.rs / ⑩ projects.rs(assignments 过滤)/ attachments.rs / artifacts_upload.rs(新 release_artifacts 列)/ activity_log.rs(→issue_activity)/ notifications.rs(→notification_prefs)/ sessions_admin.rs / events.rs(dashboard occurrences)→ ⑫ handlers/mod.rs 路由重排 ⑬ archive_worker 新表 ⑭ health.rs;还有 2c bundle.rs + /api scope 面 + 2e dwarf/proguard 接线 + retro-symbolication 未开工
+- 注意:core/crates 一批 crate 的 testcontainers 测试 include_str! 旧 migration 文件名,全部红着 —— 摘依赖后 core-check 只测仍被引用的 crate?不对,core-check 在 core/ workspace 全量跑 —— **需要在 core/Cargo.toml workspace members 里摘除废 crate 或修其测试**,gate 前处理
+
+- [x] 2a 单租户化(骨架部分):删 saas_routes / saasadmin_mw / billing / stripe*(代码摘除,Stripe 账号冻结);state.rs 收敛;bootstrap env 声明式 owner;owner/admin 两角色 + project 分配 API(admin API 部分待 ⑦)
 - [ ] 2b 五 kind ingest:新 wire 协议、per-kind fingerprint、广度×深度、assert 聚合捎带、probe 注册消费 + 触发→regression、error-in-data
 - [ ] 2c issue 体系:三态 + regressed(resolve 锚定 release)、activity/note、api-scope AI 闭环 API(GET issues / GET bundle / POST notes / POST resolve)
 - [ ] 2d bundle 生成:markdown + bundle.json;LLM 段可选(ANTHROPIC key 未配则跳过)

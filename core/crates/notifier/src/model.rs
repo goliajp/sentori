@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use sentori_workspace_identity::{ProjectId, WorkspaceId};
+use uuid::Uuid as ProjectUuid;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
@@ -108,14 +108,10 @@ impl DeliveryStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Notification {
-    /// Owning workspace. Required even for system-level
-    /// notifications (they belong to a reserved system
-    /// workspace by convention).
-    pub workspace_id: WorkspaceId,
-    /// Owning project. `None` for workspace-level (boot-time
+    /// Owning project. `None` for system-level (boot-time
     /// admin notifications, infra alerts).
     #[serde(default)]
-    pub project_id: Option<ProjectId>,
+    pub project_id: Option<ProjectUuid>,
     /// Which transport.
     pub channel: Channel,
     /// Email address / webhook URL / mock label.
@@ -137,19 +133,16 @@ pub struct Notification {
 }
 
 impl Notification {
-    /// Builder for the common (workspace, Email, recipient,
-    /// subject, body) tuple. Chain `.with_*` to populate the
-    /// rest.
+    /// Builder for the common (Email, recipient, subject,
+    /// body) tuple. Chain `.with_*` to populate the rest.
     #[must_use]
     pub fn new(
-        workspace_id: WorkspaceId,
         channel: Channel,
         recipient: impl Into<String>,
         subject: impl Into<String>,
         body: impl Into<String>,
     ) -> Self {
         Self {
-            workspace_id,
             project_id: None,
             channel,
             recipient: recipient.into(),
@@ -162,7 +155,7 @@ impl Notification {
 
     /// Set the owning project.
     #[must_use]
-    pub fn with_project(mut self, project_id: ProjectId) -> Self {
+    pub fn with_project(mut self, project_id: ProjectUuid) -> Self {
         self.project_id = Some(project_id);
         self
     }
@@ -188,10 +181,8 @@ impl Notification {
 pub struct DeliveryLog {
     /// Primary key.
     pub id: Uuid,
-    /// Owning workspace.
-    pub workspace_id: WorkspaceId,
-    /// Owning project (None for workspace-level notifications).
-    pub project_id: Option<ProjectId>,
+    /// Owning project (None for system-level notifications).
+    pub project_id: Option<ProjectUuid>,
     /// Transport.
     pub channel: Channel,
     /// Email addr / URL / label.
@@ -295,10 +286,7 @@ pub(crate) fn row_to_log(row: &sqlx::postgres::PgRow) -> Result<DeliveryLog, cra
     let channel = Channel::from_db_str(channel_str)?;
     Ok(DeliveryLog {
         id: row.get("id"),
-        workspace_id: WorkspaceId::from_uuid(row.get::<Uuid, _>("workspace_id")),
-        project_id: row
-            .get::<Option<Uuid>, _>("project_id")
-            .map(ProjectId::from_uuid),
+        project_id: row.get::<Option<Uuid>, _>("project_id"),
         channel,
         recipient: row.get("recipient"),
         subject: row.get("subject"),
@@ -360,9 +348,8 @@ mod tests {
 
     #[test]
     fn builder_helpers_chain() {
-        let pid = sentori_workspace_identity::ProjectId::new();
+        let pid = uuid::Uuid::now_v7();
         let n = Notification::new(
-            WorkspaceId::new(),
             Channel::Email,
             "x@y.com",
             "subj",

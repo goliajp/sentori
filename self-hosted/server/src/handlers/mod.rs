@@ -21,48 +21,23 @@ use axum::routing::{delete, get, patch, post};
 use sentori_ingest_token::{TokenStore, bearer_middleware};
 use serde_json::json;
 
-use crate::saasadmin_mw::saasadmin_only;
 use crate::session_mw::session_middleware;
 use crate::state::AppState;
 
 mod activity_log;
 mod admin;
-mod alerts;
-mod alerts_fire;
-mod api_describe;
 mod artifacts_upload;
 mod attachments;
 mod audit;
 mod auth;
-mod billing;
-mod cert;
 mod events;
-mod events_live;
 mod health;
-mod ingest;
-mod issue_comments;
-mod issue_watchers;
 mod issues;
-mod metrics;
 mod metrics_prom;
 mod notifications;
-mod oauth;
 mod projects;
-mod replays;
-mod runtime_metrics_query;
-mod saved_views;
 mod sdk;
-mod search;
-mod self_test;
 mod sessions_admin;
-mod spans;
-mod stats;
-mod stripe_webhook;
-pub mod tenant;
-mod track_query;
-mod usage;
-mod user_reports_query;
-mod workspaces;
 
 /// Refuse an IP that is hammering a credentialed auth endpoint.
 ///
@@ -226,10 +201,6 @@ pub fn router(state: Arc<AppState>) -> Router {
 
     // Admin routes — session-gated (cookie or Bearer session_token).
     let admin_routes = Router::new()
-        // Workspace switcher (multi-workspace 1:N): list the caller's
-        // memberships + repoint the current session.
-        .route("/admin/api/workspaces", get(workspaces::list))
-        .route("/admin/api/workspaces/switch", post(workspaces::switch))
         .route(
             "/admin/api/projects/{project_id}/tokens",
             get(admin::tokens::list).post(admin::tokens::create),
@@ -275,23 +246,6 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/webhooks/test",
             post(admin::test_webhook::handle),
         )
-        // ── self-serve billing (caller's own workspace) ──────
-        .route("/admin/api/billing", get(billing::get))
-        .route("/admin/api/billing/checkout", post(billing::checkout))
-        .route("/admin/api/billing/portal", post(billing::portal))
-        .route("/admin/api/members", get(admin::members::list))
-        .route(
-            "/admin/api/members/{user_id}",
-            patch(admin::members::update_role).delete(admin::members::remove),
-        )
-        .route(
-            "/admin/api/invites",
-            get(admin::invites::list).post(admin::invites::create),
-        )
-        // Accept lives before `{id}` conceptually but is a distinct
-        // path; the logged-in caller joins the token's workspace.
-        .route("/admin/api/invites/accept", post(admin::invites::accept))
-        .route("/admin/api/invites/{id}", delete(admin::invites::revoke))
         .route(
             "/admin/api/projects/{project_id}/cert/watches",
             post(admin::cert_watch::add),
@@ -340,18 +294,6 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/projects/{project_id}/releases",
             get(admin::releases::list),
         )
-        // Per-project access for the `user` role. The store behind
-        // these has existed since the identity crate was written with
-        // no way to reach it, which is why `user` members saw every
-        // project.
-        .route(
-            "/admin/api/projects/{project_id}/visibility",
-            get(admin::visibility::list),
-        )
-        .route(
-            "/admin/api/projects/{project_id}/visibility/{user_id}",
-            axum::routing::put(admin::visibility::grant).delete(admin::visibility::revoke),
-        )
         .route(
             "/admin/api/projects/{project_id}/releases/{release_id}/artifacts",
             get(admin::releases::list_artifacts).post(artifacts_upload::upload),
@@ -377,37 +319,6 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/auth/notifications/{id}/read",
             post(notifications::read_one),
         )
-        .layer(axum_middleware::from_fn_with_state(
-            state.clone(),
-            session_middleware,
-        ))
-        .with_state(state.clone());
-
-    // SaaS cross-workspace endpoints — session-gated AND
-    // saasadmin-role-gated (env-driven allowlist).
-    let saas_routes = Router::new()
-        .route(
-            "/admin/api/saas/workspaces",
-            get(admin::saas::workspaces).post(admin::saas::create_workspace),
-        )
-        .route(
-            "/admin/api/saas/workspaces/{id}",
-            delete(admin::saas::delete_workspace),
-        )
-        .route(
-            "/admin/api/saas/workspaces/{id}/plan",
-            post(admin::saas::set_plan),
-        )
-        .route(
-            "/admin/api/saas/workspaces/{id}/suspend",
-            post(admin::saas::suspend_workspace),
-        )
-        .route(
-            "/admin/api/saas/workspaces/{id}/resume",
-            post(admin::saas::resume_workspace),
-        )
-        .route("/admin/api/saas/stats", get(admin::saas::workspace_stats))
-        .layer(axum_middleware::from_fn(saasadmin_only))
         .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             session_middleware,
@@ -523,7 +434,6 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/v1/projects/{project_id}/alerts",
             get(alerts::list_for_project),
         )
-        .route("/v1/usage", get(usage::current))
         .route("/v1/audit", get(audit::list))
         .route(
             "/v1/alerts",
@@ -545,11 +455,6 @@ pub fn router(state: Arc<AppState>) -> Router {
             get(saved_views::get)
                 .patch(saved_views::patch)
                 .delete(saved_views::delete),
-        )
-        // legacy fresh-start ingest stubs (defer to SDK-auth path)
-        .route(
-            "/v1/projects/{project_id}/ingest",
-            post(ingest::ingest_event),
         )
         .layer(axum_middleware::from_fn_with_state(
             state.clone(),
@@ -579,8 +484,6 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/livez", get(health::livez))
         .route("/readyz", get(health::readyz))
         .route("/metrics", get(metrics_prom::handle))
-        // ── stripe webhook (public; HMAC-signature authed) ──
-        .route("/webhooks/stripe", post(stripe_webhook::ingest))
         // ── auth: dashboard user lifecycle (public) ──────
         //
         // register / login / forgot-password are merged in below as
@@ -592,17 +495,9 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/auth/verify", post(auth::verify))
         .route("/auth/reset-password", post(auth::reset))
         .route("/auth/change-password", post(auth::change_password))
-        // ── auth: dashboard OAuth (public) ──────────────
-        // Public for the same reason the rows above are: these are
-        // how a session is obtained, so gating them on one would
-        // lock every OAuth user out.
-        .route("/auth/oauth/providers", get(oauth::providers))
-        .route("/auth/oauth/{provider}/start", get(oauth::start))
-        .route("/auth/oauth/{provider}/callback", get(oauth::callback))
         .with_state(state)
         .merge(dashboard_routes)
         .merge(admin_routes)
-        .merge(saas_routes)
         .merge(auth_bruteforce_routes)
         .merge(sdk_routes)
         .fallback(spa_or_api_404)

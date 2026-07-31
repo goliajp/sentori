@@ -1,12 +1,11 @@
 //! `tokens` table CRUD.
 
-use sentori_workspace_identity::{ProjectId, WorkspaceId};
 use sqlx::{PgPool, Row};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::error::TokenError;
-use crate::model::{Token, TokenKind};
+use crate::model::{Scope, Token};
 use crate::parse::hash_token;
 
 #[derive(Clone, Debug)]
@@ -21,19 +20,16 @@ impl TokenStore {
     }
 
     /// Mint a new token. Returns `(token_id, plaintext_token)`.
-    /// **The plaintext is returned ONCE** — caller is responsible
-    /// for showing it to the user (typically in a `<code>` block
-    /// they can copy). DB stores only the SHA-256 hash.
+    /// **The plaintext is returned ONCE** — DB stores only the hash.
     ///
     /// # Errors
     ///
     /// [`TokenError::Db`] on backend failure.
     pub async fn create(
         &self,
-        workspace_id: WorkspaceId,
-        project_id: ProjectId,
-        kind: TokenKind,
-        label: Option<&str>,
+        project_id: Uuid,
+        scope: Scope,
+        name: &str,
     ) -> Result<(Uuid, String), TokenError> {
         let plaintext = mint_random_token();
         let token_hash = hash_token(&plaintext);
@@ -42,15 +38,14 @@ impl TokenStore {
         let id = Uuid::now_v7();
 
         sqlx::query(
-            "INSERT INTO tokens (id, workspace_id, project_id, kind, token_hash, label, last4) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            "INSERT INTO tokens (id, project_id, scope, name, token_hash, last4) \
+             VALUES ($1, $2, $3, $4, $5, $6)",
         )
         .bind(id)
-        .bind(workspace_id.into_uuid())
-        .bind(project_id.into_uuid())
-        .bind(kind.as_db_str())
+        .bind(project_id)
+        .bind(scope.as_db_str())
+        .bind(name)
         .bind(&token_hash)
-        .bind(label)
         .bind(&last4)
         .execute(&self.pool)
         .await?;
@@ -58,9 +53,8 @@ impl TokenStore {
         Ok((id, plaintext))
     }
 
-    /// Look up a token by plaintext value. Returns the row
-    /// regardless of kind — caller checks
-    /// [`Token::is_active`] + kind.
+    /// Look up a token by plaintext value. Returns the row regardless
+    /// of scope — caller checks [`Token::is_active`] + scope.
     ///
     /// # Errors
     ///
@@ -68,7 +62,7 @@ impl TokenStore {
     pub async fn lookup_by_plaintext(&self, plaintext: &str) -> Result<Option<Token>, TokenError> {
         let token_hash = hash_token(plaintext);
         let row = sqlx::query(
-            "SELECT id, workspace_id, project_id, kind, label, last4, created_at, revoked_at \
+            "SELECT id, project_id, scope, name, last4, created_at, revoked_at \
              FROM tokens WHERE token_hash = $1",
         )
         .bind(&token_hash)
@@ -76,22 +70,7 @@ impl TokenStore {
         .await?;
 
         let Some(row) = row else { return Ok(None) };
-        let kind_str: &str = row.get("kind");
-        let kind = TokenKind::from_db_str(kind_str).ok_or_else(|| {
-            TokenError::Db(sqlx::Error::Protocol(format!(
-                "invalid token kind in DB: {kind_str}"
-            )))
-        })?;
-        Ok(Some(Token {
-            id: row.get("id"),
-            workspace_id: WorkspaceId::from_uuid(row.get::<Uuid, _>("workspace_id")),
-            project_id: ProjectId::from_uuid(row.get::<Uuid, _>("project_id")),
-            kind,
-            label: row.get("label"),
-            last4: row.get("last4"),
-            created_at: row.get::<OffsetDateTime, _>("created_at"),
-            revoked_at: row.get::<Option<OffsetDateTime>, _>("revoked_at"),
-        }))
+        row_to_token(&row).map(Some)
     }
 
     /// List tokens for a project (UI dashboard).
@@ -99,35 +78,16 @@ impl TokenStore {
     /// # Errors
     ///
     /// [`TokenError::Db`] on backend failure.
-    pub async fn list_for_project(&self, project_id: ProjectId) -> Result<Vec<Token>, TokenError> {
+    pub async fn list_for_project(&self, project_id: Uuid) -> Result<Vec<Token>, TokenError> {
         let rows = sqlx::query(
-            "SELECT id, workspace_id, project_id, kind, label, last4, created_at, revoked_at \
+            "SELECT id, project_id, scope, name, last4, created_at, revoked_at \
              FROM tokens WHERE project_id = $1 ORDER BY created_at DESC",
         )
-        .bind(project_id.into_uuid())
+        .bind(project_id)
         .fetch_all(&self.pool)
         .await?;
 
-        let mut out = Vec::with_capacity(rows.len());
-        for r in rows {
-            let kind_str: &str = r.get("kind");
-            let kind = TokenKind::from_db_str(kind_str).ok_or_else(|| {
-                TokenError::Db(sqlx::Error::Protocol(format!(
-                    "invalid token kind: {kind_str}"
-                )))
-            })?;
-            out.push(Token {
-                id: r.get("id"),
-                workspace_id: WorkspaceId::from_uuid(r.get::<Uuid, _>("workspace_id")),
-                project_id: ProjectId::from_uuid(r.get::<Uuid, _>("project_id")),
-                kind,
-                label: r.get("label"),
-                last4: r.get("last4"),
-                created_at: r.get::<OffsetDateTime, _>("created_at"),
-                revoked_at: r.get::<Option<OffsetDateTime>, _>("revoked_at"),
-            });
-        }
-        Ok(out)
+        rows.iter().map(row_to_token).collect()
     }
 
     /// Soft-delete a token. Idempotent.
@@ -142,17 +102,41 @@ impl TokenStore {
             .await?;
         Ok(())
     }
+
+    /// Stamp `last_used_at`, best-effort — auth must not fail on it.
+    pub async fn touch(&self, id: Uuid) {
+        let _ = sqlx::query("UPDATE tokens SET last_used_at = now() WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await;
+    }
 }
 
-/// Generate a fresh `st_pk_<26 base32>` plaintext token. Uses
-/// 16 bytes of crypto-random entropy encoded as 26 base32 chars
-/// (RFC 4648 unpadded).
+fn row_to_token(row: &sqlx::postgres::PgRow) -> Result<Token, TokenError> {
+    let scope_str: &str = row.get("scope");
+    let scope = Scope::from_db_str(scope_str).ok_or_else(|| {
+        TokenError::Db(sqlx::Error::Protocol(format!(
+            "invalid token scope in DB: {scope_str}"
+        )))
+    })?;
+    Ok(Token {
+        id: row.get("id"),
+        project_id: row.get("project_id"),
+        scope,
+        name: row.get("name"),
+        last4: row.get("last4"),
+        created_at: row.get::<OffsetDateTime, _>("created_at"),
+        revoked_at: row.get::<Option<OffsetDateTime>, _>("revoked_at"),
+    })
+}
+
+/// Generate a fresh `st_<26 base32>` plaintext token: 16 bytes of
+/// crypto-random entropy as 26 unpadded base32 chars.
 fn mint_random_token() -> String {
     use data_encoding::BASE32_NOPAD;
     use rand::RngCore;
     let mut bytes = [0u8; 16];
     rand::thread_rng().fill_bytes(&mut bytes);
     let encoded = BASE32_NOPAD.encode(&bytes).to_ascii_lowercase();
-    // 16 bytes → 26 base32 chars
     format!("{}{}", crate::parse::TOKEN_PREFIX, encoded)
 }
