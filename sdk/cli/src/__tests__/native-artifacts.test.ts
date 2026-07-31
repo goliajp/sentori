@@ -123,3 +123,41 @@ describe('helpers', () => {
     expect(slices).toEqual([])
   })
 })
+
+describe('gzip on the wire', () => {
+  test('mapping upload body is gzip and filename gains .gz', async () => {
+    const captured: { name: string; bytes: Uint8Array }[] = []
+    globalThis.fetch = (async (_url: Request | string | URL, init?: RequestInit) => {
+      const form = init?.body as FormData
+      const file = form.get('file') as File
+      captured.push({
+        bytes: new Uint8Array(await file.arrayBuffer()),
+        name: file.name,
+      })
+      return new Response('{}', { status: 201 })
+    }) as typeof fetch
+    const path = join(dir, 'mapping.txt')
+    await writeFile(path, 'foo.bar -> a.b:\n'.repeat(1000))
+    await uploadMapping({ ...ADMIN, path, release: 'r' })
+    expect(captured).toHaveLength(1)
+    expect(captured[0]?.name).toEndWith('.gz')
+    expect(captured[0]?.bytes[0]).toBe(0x1f)
+    expect(captured[0]?.bytes[1]).toBe(0x8b)
+  })
+
+  test('already-gzipped input passes through un-recompressed', async () => {
+    const { gzipSync } = await import('node:zlib')
+    const pre = gzipSync('already compressed')
+    const captured: Uint8Array[] = []
+    globalThis.fetch = (async (_url: Request | string | URL, init?: RequestInit) => {
+      const form = init?.body as FormData
+      const file = form.get('file') as File
+      captured.push(new Uint8Array(await file.arrayBuffer()))
+      return new Response('{}', { status: 201 })
+    }) as typeof fetch
+    const path = join(dir, 'mapping.txt.gz')
+    await writeFile(path, pre)
+    await uploadMapping({ ...ADMIN, path, release: 'r' })
+    expect(Buffer.from(captured[0] ?? [])).toEqual(pre)
+  })
+})

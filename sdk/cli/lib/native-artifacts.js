@@ -5,10 +5,14 @@ import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { statSync, readdirSync } from 'node:fs';
+import { gzipForWire, wireArrayBuffer } from './upload.js';
 async function uploadBytes(opts) {
+    // Gzip on the wire — DWARF ~3:1, R8 mapping ~10:1; a real app's
+    // main dSYM only fits the server's transport cap compressed.
+    const { wire, wireName } = gzipForWire(opts.bytes, opts.name);
     const form = new FormData();
     form.append('kind', opts.kind);
-    form.append('file', new Blob([new Uint8Array(opts.bytes)]), opts.name);
+    form.append('file', new Blob([wireArrayBuffer(wire)]), wireName);
     const url = `${opts.apiUrl.replace(/\/+$/, '')}/v1/releases/${encodeURIComponent(opts.release)}/artifacts`;
     const resp = await fetch(url, {
         body: form,
