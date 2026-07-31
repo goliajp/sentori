@@ -1,4 +1,4 @@
-name: v0.2 self-hosted — docker image build + push to GHCR
+name: self-hosted image — build + push to GHCR
 
 # Builds sentori-server (the unified main binary) into a docker image
 # that anyone can `docker pull` and run. Triggered on master push +
@@ -23,9 +23,9 @@ on:
     paths:
       - 'core/**'
       - 'self-hosted/server/**'
+      - 'self-hosted/docker/**'
       - 'webapp/**'
-      - 'docker/**'
-      - '.github/workflows/v0.2-self-hosted-image.yml'
+      - '.github/workflows/selfhosted-image.yml'
   workflow_dispatch:
 
 env:

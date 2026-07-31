@@ -51,7 +51,7 @@ pub async fn ensure_owner(pool: &PgPool) -> anyhow::Result<()> {
             Ok(())
         }
         (None, Some(wanted)) => {
-            let password = read_env("SENTORI_OWNER_PASSWORD").unwrap_or_else(|| {
+            let password = crate::env_config::env_or_file("SENTORI_OWNER_PASSWORD").unwrap_or_else(|| {
                 let generated = random_password();
                 // Printed exactly once, at first boot, to the
                 // container log — the operator copies it and can
@@ -95,6 +95,35 @@ fn read_env(key: &str) -> Option<String> {
         .ok()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
+}
+
+/// `sentori-server reset-password <email>` — set a fresh random
+/// password for an existing account and print it to stdout. The
+/// SMTP-free recovery path for a locked-out operator.
+pub async fn reset_password(pool: &PgPool, email: &str) -> anyhow::Result<()> {
+    let user: Option<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE email = $1")
+        .bind(email)
+        .fetch_optional(pool)
+        .await?;
+    let Some(id) = user else {
+        anyhow::bail!("no account with email {email}");
+    };
+    let password = random_password();
+    let phc = sentori_argon2_password::PasswordHash::hash(&password)
+        .map_err(|e| anyhow::anyhow!("argon2 hash failed: {e}"))?;
+    sqlx::query("UPDATE users SET password_hash = $1 WHERE id = $2")
+        .bind(&phc)
+        .bind(id)
+        .execute(pool)
+        .await?;
+    // Invalidate every live session for the account — a reset that
+    // leaves stolen sessions alive isn't a reset.
+    sqlx::query("DELETE FROM auth_sessions WHERE user_id = $1")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    println!("password reset for {email}\nnew password: {password}\nchange it after signing in");
+    Ok(())
 }
 
 #[cfg(test)]

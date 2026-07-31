@@ -174,11 +174,16 @@ gate 记录:2026-08-01。mailpit(:51025/:58025)+ postgres + SMTP-配置 server �
 
 ## S7 Self-host 打包
 
-- [ ] compose 定稿唯一入口(env 面 = design.md §10;_FILE 变体;cookie 密钥自动生成)
-- [ ] .env.example / README(客户视角)对齐;镜像 CI 改造
-- [ ] **gate**:干净目录 `docker compose up -d` 冷启动 → owner 登录 → 建 project → rn-example 上报 → bundle 可拉,全程只靠 README
+细步骤(2026-08-01 到段展开)。注:design §10「cookie 密钥自动生成存卷」已被 DB-backed session token 方案自然消解 —— server 无 cookie 密钥可管理,该条标不适用:
 
-gate 记录:(待)
+- [x] 7a server:`env_or_file` helper(SENTORI_DATABASE_URL / SENTORI_OWNER_PASSWORD / SENTORI_SMTP_PASS 支持 `_FILE` 变体);`sentori-server reset-password <email>` 子命令(design §10 owner 忘密码路径,不依赖 SMTP;顺带清空该账号全部 session)
+- [x] 7b compose 定稿:9-env 面(必须 3:POSTGRES_PASSWORD 组装 DSN / OWNER_EMAIL / BASE_URL;SMTP 6 可选),清掉旧名(SESSION_SECRET / BOOTSTRAP_*);db + data 卷;prebuilt image + build fallback
+- [x] 7c `.env.example` 新写(9 env 带注释;高级面注释掉)
+- [x] 7d `self-hosted/README.md` 客户视角重写(冷启动、反代、reset-password、SDK 接入四步)
+- [x] 7e 镜像 workflow 校准(v0.2-self-hosted-image.yml → selfhosted-image.yml;paths 修正)
+- [x] **gate**:干净目录 `docker compose up -d` 冷启动 → owner 登录 → 建 project → SDK 上报 → bundle 可拉,全程只靠 README;`_FILE` 变体 + reset-password 实测
+
+gate 记录:2026-08-01。镜像本地构建 69.6MB(<100MB 目标内,distroless + bundled SPA)。冷启动走查(scratchpad 干净目录,只按 README 步骤):cp .env.example → 填 3 必须值(owner password 留空走生成路径)→ up -d → 日志抓生成密码 → 登录 → 建 project → 双 token → **真 SDK**(编译产物)8 动词上报 → /api 校验 9/9(五 kind 分组、breadth、bundle stack/signals/in-app)。途中修 2 个冷启动才暴露的问题:postgres:18 镜像拒绝 /var/lib/postgresql/data 挂载点(改挂 /var/lib/postgresql);distroless nonroot 下 named volume /data 会 root 属主(Dockerfile 烘焙 --chown skeleton)。reset-password 双路径实测(compose exec + `SENTORI_DATABASE_URL_FILE` 挂 secret 的 docker run,后者同时验 _FILE 变体),旧 session 401、新密码 200。server fmt/clippy/37 tests 绿(+5 env_config)。注:macOS 下 `localhost:8080` 走 IPv6 会 connection reset,`127.0.0.1` 正常 —— docker-proxy 行为,非产品问题。
 
 ## S8 Dogfood cutover(生产)
 

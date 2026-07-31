@@ -63,9 +63,7 @@ impl Mailer {
             smtp_user: std::env::var("SENTORI_SMTP_USER")
                 .ok()
                 .filter(|s| !s.is_empty()),
-            smtp_pass: std::env::var("SENTORI_SMTP_PASS")
-                .ok()
-                .filter(|s| !s.is_empty()),
+            smtp_pass: crate::env_config::env_or_file("SENTORI_SMTP_PASS"),
             from: std::env::var("SENTORI_SMTP_FROM")
                 .unwrap_or_else(|_| "sentori@golia.jp".to_string()),
             tls: SmtpTls::from_env_str(
