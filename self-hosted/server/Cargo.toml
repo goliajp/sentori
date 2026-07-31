@@ -13,7 +13,7 @@
 
 [package]
 name = "sentori-server"
-version = "2.0.3"
+version = "2.1.0"
 edition = "2024"
 authors = ["GOLIA K.K. <takagi@golia.jp>"]
 license = "Apache-2.0 OR MIT"
@@ -37,6 +37,9 @@ expect_used = "warn"
 panic = "warn"
 
 [dependencies]
+# gzip-transparent artifact uploads: dSYMs for RN apps run hundreds
+# of MB raw but ~3:1 compressed; the CLI gzips, we inflate.
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 # K-tier composition. Path deps into core/.
 sentori-attachment-store   = { path = "../../core/crates/attachment-store" }
 sentori-identity-fingerprint = { path = "../../core/crates/identity-fingerprint" }
