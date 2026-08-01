@@ -3,7 +3,6 @@
 // failed 3"), probes (silent = fix holding), traces (did it run,
 // what magnitude). A status panel, not a data browser.
 
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { useShell } from '../App';
@@ -12,7 +11,6 @@ import {
   PageShell,
   Panel,
   PanelEmpty,
-  Select,
   formatRelative,
 } from '../components/ui';
 import { useT } from '../i18n';
@@ -45,9 +43,8 @@ type Instruments = {
 
 export default function InstrumentsPage() {
   const t = useT();
-  const { projects } = useShell();
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const active = projectId ?? projects[0]?.id ?? null;
+  const { activeProject } = useShell();
+  const active = activeProject?.id ?? null;
 
   const { data, error, loading, reload } = useAsyncData<Instruments | null>(
     () => (active ? fetchInstruments(active) : Promise.resolve(null)),
@@ -57,21 +54,6 @@ export default function InstrumentsPage() {
   return (
     <PageShell
       title={t('nav.instruments')}
-      toolbar={
-        projects.length > 1 ? (
-          <Select
-            value={active ?? ''}
-            onChange={(e) => setProjectId(e.target.value)}
-            className="h-7 text-xs"
-          >
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-        ) : undefined
-      }
     >
       {error && (
         <ErrorBanner>

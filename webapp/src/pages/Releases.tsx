@@ -12,7 +12,6 @@ import {
   PageShell,
   Panel,
   PanelEmpty,
-  Select,
   formatRelative,
 } from '../components/ui';
 import { useT } from '../i18n';
@@ -21,9 +20,8 @@ import { useAsyncData } from '../lib/useAsyncData';
 
 export default function ReleasesPage() {
   const t = useT();
-  const { projects } = useShell();
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const active = projectId ?? projects[0]?.id ?? null;
+  const { activeProject } = useShell();
+  const active = activeProject?.id ?? null;
 
   const { data, error, loading, reload } = useAsyncData(
     () => (active ? api.listReleases(active) : Promise.resolve({ releases: [] })),
@@ -33,21 +31,6 @@ export default function ReleasesPage() {
   return (
     <PageShell
       title={t('nav.releases')}
-      toolbar={
-        projects.length > 1 ? (
-          <Select
-            value={active ?? ''}
-            onChange={(e) => setProjectId(e.target.value)}
-            className="h-7 text-xs"
-          >
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-        ) : undefined
-      }
     >
       {error && (
         <ErrorBanner>
