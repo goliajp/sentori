@@ -152,7 +152,13 @@ export default function IssueDetail() {
           {latest && (
             <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[13px] text-fg-muted">
               <span className="text-fg-subtle">{t('issue.latestCase')}</span>
-              {latest.userKey && <span className="text-fg">{latest.userKey}</span>}
+              {latest.userKey && (
+                <span className="text-fg" title={latest.userKey}>
+                  {latest.userKey.length > 16
+                    ? `${latest.userKey.slice(0, 16)}…`
+                    : latest.userKey}
+                </span>
+              )}
               <span>{formatRelative(latest.occurredAt)}</span>
               <span>
                 {[device?.model, device?.os && `${String(device.os)} ${String(device.osVersion ?? '')}`.trim()]
