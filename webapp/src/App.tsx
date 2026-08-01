@@ -2,7 +2,7 @@ import { useSetThemeMode, useTheme, useThemeEffect } from '@goliapkg/gds/systems
 import { createContext, useContext, useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 
-import { CommandPalette } from './components/CommandPalette';
+import { CommandPalette, openPalette } from './components/CommandPalette';
 import { useT } from './i18n';
 import { api, type Me, type Project } from './lib/api';
 import type { ThemeMode } from './lib/theme';
@@ -23,9 +23,10 @@ export function useShell(): Shell {
   return s;
 }
 
-/// App shell — a narrow icon-free nav rail with exactly four
-/// destinations (design.md §11: pages answer workflow questions),
-/// the theme switch, the signed-in identity, and the content outlet.
+/// App frame — this is an application, not a document: a fixed
+/// viewport split into a nav rail, a slim topbar (search, theme,
+/// identity) and a content region that panes scroll inside of. The
+/// page never scrolls as a whole.
 export function App() {
   const t = useT();
   const [me, setMe] = useState<Me | null>(null);
@@ -53,7 +54,7 @@ export function App() {
   }
 
   const navCls = ({ isActive }: { isActive: boolean }) =>
-    `block rounded-md px-3 py-1.5 text-sm transition-colors ${
+    `block rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${
       isActive
         ? 'bg-raised font-medium text-fg'
         : 'text-fg-muted hover:bg-raised/60 hover:text-fg'
@@ -61,10 +62,10 @@ export function App() {
 
   return (
     <ShellContext.Provider value={{ me, projects, reloadProjects }}>
-      <div className="flex h-screen overflow-hidden">
-        <aside className="flex w-52 shrink-0 flex-col border-r border-border p-3">
-          <div className="mb-6 px-3 pt-1">
-            <span className="text-base font-semibold tracking-tight">sentori</span>
+      <div className="flex h-screen overflow-hidden bg-canvas">
+        <aside className="flex w-48 shrink-0 flex-col border-r border-border bg-bg p-2.5">
+          <div className="mb-5 px-2.5 pt-1.5">
+            <span className="text-[15px] font-semibold tracking-tight">sentori</span>
           </div>
           <nav className="flex flex-col gap-0.5">
             <NavLink to="/" end className={navCls}>
@@ -80,19 +81,37 @@ export function App() {
               {t('nav.settings')}
             </NavLink>
           </nav>
-          <div className="mt-auto space-y-3 px-3 pb-1">
+          <div className="mt-auto px-1 pb-1">
             <ThemeSwitch />
-            <div className="text-xs text-fg-subtle">
-              <div className="truncate">{me.email}</div>
-              <div>
-                {me.role === 'superadmin' ? t('shell.roleOwner') : t('shell.roleAdmin')}
-              </div>
-            </div>
           </div>
         </aside>
-        <main className="flex-1 overflow-y-auto">
-          <Outlet />
-        </main>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="flex h-11 shrink-0 items-center gap-3 border-b border-border bg-bg px-4">
+            <button
+              type="button"
+              onClick={openPalette}
+              className="flex h-7 w-72 items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-[13px] text-fg-subtle transition-colors hover:border-border-strong hover:text-fg-muted"
+            >
+              <span aria-hidden>⌕</span>
+              <span className="min-w-0 flex-1 truncate text-left">
+                {t('palette.placeholder')}
+              </span>
+              <kbd className="rounded border border-border px-1 font-mono text-[10px]">⌘K</kbd>
+            </button>
+            <div className="ml-auto flex items-center gap-3">
+              <span className="text-xs text-fg-subtle">
+                {me.email}
+                <span className="ml-1.5 text-fg-subtle/70">
+                  {me.role === 'superadmin' ? t('shell.roleOwner') : t('shell.roleAdmin')}
+                </span>
+              </span>
+            </div>
+          </header>
+          <main className="min-h-0 flex-1 overflow-hidden">
+            <Outlet />
+          </main>
+        </div>
         <CommandPalette />
       </div>
     </ShellContext.Provider>

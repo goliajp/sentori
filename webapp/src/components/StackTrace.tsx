@@ -46,7 +46,7 @@ export function StackTrace({ frames }: { frames: StackFrame[] }) {
   });
 
   return (
-    <div className="overflow-hidden rounded-md border border-border bg-surface">
+    <div className="overflow-hidden">
       {groups.map((g, gi) =>
         g.inApp ? (
           g.frames.map(({ f, i }) => (

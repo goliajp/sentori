@@ -29,7 +29,7 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>(tabs[0] ?? 'account');
 
   return (
-    <div className="mx-auto max-w-[1760px] px-7 py-5">
+    <div className="h-full overflow-y-auto"><div className="mx-auto max-w-[1760px] px-6 py-5">
       <h1 className="mb-4 text-base font-semibold">{t('nav.settings')}</h1>
       <div className="mb-5 flex gap-1 border-b border-border">
         {tabs.map((x) => (
@@ -53,7 +53,7 @@ export default function SettingsPage() {
       {tab === 'notifications' && <NotificationsTab />}
       {tab === 'audit' && <AuditTab />}
       {tab === 'account' && <AccountTab />}
-    </div>
+    </div></div>
   );
 }
 

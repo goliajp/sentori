@@ -1,26 +1,23 @@
-// Issue detail — the interactive rendering of the bundle
-// (design.md §11): one narrative, no tabs, ordered by what a human
-// asks first when something broke on a phone:
-//
-//   ① where it broke      — the failing line, source window open
-//   ② what the user saw   — replay dock in a square viewport
-//   ③ what they were doing — the signal timeline
-//
-// The replay lives in a right-hand column: the dock beside the code
-// reads like holding the user's phone next to the stack trace. Its
-// viewport is square so portrait and landscape frames both
-// letterbox gracefully. Everything else — triage,
-// occurrences, raw environment, activity — is obligation, not
-// desire: triage compresses into the header toolbar, the rest folds
-// into corner rows at the bottom. (The UX iron rule: give what they
-// came for in full, hide what they didn't, corner the obligatory.)
+// The case file — the right half of the triage split. A pinned
+// header answers who/when/on-what in two dense lines; the body is
+// a grid of named panels ordered by the human question sequence:
+// where it broke → what the user saw → what they were doing → how
+// to deal with it (the AI hand-off closes the path). Panels exist
+// whether or not their data does — a sparse warn still renders a
+// structured case, not a void.
 
 import { useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 
 import { useShell } from '../App';
 import { KindBadge, RegressedBadge, kindColor } from '../components/kind';
-import { Button, EmptyState, ErrorBanner, Input, formatRelative } from '../components/ui';
+import {
+  Button,
+  FoldPanel,
+  Input,
+  Panel,
+  PanelEmpty,
+  formatRelative,
+} from '../components/ui';
 import { useT } from '../i18n';
 import {
   api,
@@ -31,22 +28,26 @@ import {
 import { useAsyncData } from '../lib/useAsyncData';
 
 import { ReplayPlayer } from '../components/ReplayPlayer';
-import { WireframePlayer } from '../components/WireframePlayer';
 import { StackTrace, type StackFrame as Frame } from '../components/StackTrace';
+import { WireframePlayer } from '../components/WireframePlayer';
 
 type Signal = { t: number; kind: string; data?: Record<string, unknown> };
 
-export default function IssueDetail() {
+export function IssueDetailPane({
+  issueId,
+  onChanged,
+}: {
+  issueId: string;
+  onChanged?: () => void;
+}) {
   const t = useT();
-  const { issueId } = useParams<{ issueId: string }>();
-  const navigate = useNavigate();
-  const { me, projects } = useShell();
+  const { me } = useShell();
 
   const { data: issue, error, loading, reload } = useAsyncData(
-    () => api.getIssue(issueId ?? ''),
+    () => api.getIssue(issueId),
     [issueId],
   );
-  const { data: occ } = useAsyncData(() => api.listOccurrences(issueId ?? ''), [issueId]);
+  const { data: occ } = useAsyncData(() => api.listOccurrences(issueId), [issueId]);
   const latestId = occ?.events[0]?.id;
   const { data: latest } = useAsyncData<EventDetail | null>(
     () => (latestId ? api.getEvent(latestId) : Promise.resolve(null)),
@@ -63,6 +64,7 @@ export default function IssueDetail() {
     try {
       await fn();
       reload();
+      onChanged?.();
     } finally {
       setBusy(false);
     }
@@ -70,9 +72,8 @@ export default function IssueDetail() {
 
   // Replay ladder, same-event first, richest form first:
   //   ① this event's pixels  ② this event's wireframe (always-on
-  //   capture — every SDK event has one even when replayScreens is
-  //   off)  ③ pixels from the newest occurrence that captured any
-  //   (an older-SDK event on top must not hide an existing replay).
+  //   capture)  ③ pixels from the newest occurrence that captured
+  //   any  ④ the enable hint.
   const screensLatest =
     latest?.attachments?.find((a) => a.kind === 'screens')?.ref ?? null;
   const wireframeLatest =
@@ -103,68 +104,101 @@ export default function IssueDetail() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-3xl px-7 py-8">
-        <ErrorBanner>
+      <div className="flex h-full items-center justify-center">
+        <p className="text-sm text-fg-subtle">
           {t('issue.loadFailed')}{' '}
           <button type="button" className="underline" onClick={reload}>
             {t('common.retry')}
           </button>
-        </ErrorBanner>
+        </p>
       </div>
     );
   }
   if (loading || !issue) {
-    return <div className="py-16 text-center text-sm text-fg-subtle">…</div>;
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-fg-subtle">
+        …
+      </div>
+    );
   }
 
-  const project = projects.find((p) => p.id === issue.projectId);
   const surface = issue.surface as { screen?: string; element?: string };
   const hasStack = !!payload?.error?.stack && payload.error.stack.length > 0;
   const device = payload?.device;
 
   return (
-    <div className="mx-auto max-w-[1760px] px-7 py-5">
-      {/* ── header: identity left, triage right ── */}
-      <header className="mb-6">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="mb-2 text-sm text-fg-subtle hover:text-fg"
-        >
-          ← {t('issue.back')}
-        </button>
-        <div className="min-w-0">
-          <div className="mb-1.5 flex items-center gap-2">
-            <KindBadge kind={issue.kind} />
-            {issue.regressedAt && issue.status === 'open' && <RegressedBadge />}
-            <span className="text-sm text-fg-subtle">{project?.name}</span>
-            {surface.screen && (
-              <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
-                {surface.screen}
-                {surface.element ? ` · ${surface.element}` : ''}
-              </span>
-            )}
-          </div>
-          <h1 className="text-xl font-semibold tracking-tight">{issue.title}</h1>
-          {issue.messageSample && (
-            <p className="mt-1 text-[15px] text-fg-muted">{issue.messageSample}</p>
+    <div className="flex h-full min-w-0 flex-col">
+      {/* ── pinned case header ── */}
+      <header className="shrink-0 border-b border-border bg-bg px-5 pb-3 pt-3.5">
+        <div className="flex items-center gap-2">
+          <KindBadge kind={issue.kind} />
+          {issue.regressedAt && issue.status === 'open' && <RegressedBadge />}
+          {surface.screen && (
+            <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
+              {surface.screen}
+              {surface.element ? ` · ${surface.element}` : ''}
+            </span>
           )}
-          <div className="mt-2.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[13px] tabular-nums text-fg-muted">
-            <span className="text-fg">
-              {issue.usersCount}u × {issue.maxPerUser} · {issue.eventCount}ev
-            </span>
-            <span>
-              {t('issue.firstSeen')} {formatRelative(issue.firstSeen)}
-            </span>
-            <span>
-              {t('issue.lastSeen')} {formatRelative(issue.lastSeen)}
-            </span>
-            {issue.lastRelease && <span>{issue.lastRelease}</span>}
-          </div>
-          {/* who / when / on what — the latest case, one line. The
-              narrative's opening facts, not a folded appendix. */}
+          <span className="ml-auto flex items-center gap-2">
+            {issue.status === 'open' ? (
+              <>
+                <Input
+                  value={resolveRelease}
+                  onChange={(e) => setResolveRelease(e.target.value)}
+                  placeholder={issue.lastRelease || 'app@x.y.z'}
+                  title={t('issue.resolveInRelease')}
+                  aria-label={t('issue.resolveInRelease')}
+                  className="h-7 w-44 font-mono text-xs"
+                />
+                <Button
+                  size="sm"
+                  disabled={busy}
+                  onClick={() =>
+                    void act(() => api.resolveIssue(issue.id, resolveRelease || undefined))
+                  }
+                >
+                  {t('issue.resolve')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => void act(() => api.ignoreIssue(issue.id))}
+                >
+                  {t('issue.ignore')}
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                disabled={busy}
+                onClick={() => void act(() => api.reopenIssue(issue.id))}
+              >
+                {t('issue.reopen')}
+              </Button>
+            )}
+          </span>
+        </div>
+        <h1 className="mt-1.5 truncate text-lg font-semibold tracking-tight">
+          {issue.title}
+        </h1>
+        {issue.messageSample && !issue.title.includes(issue.messageSample) && (
+          <p className="mt-0.5 truncate text-sm text-fg-muted">{issue.messageSample}</p>
+        )}
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-xs tabular-nums text-fg-muted">
+          <span className="text-fg">
+            {issue.usersCount}u × {issue.maxPerUser} · {issue.eventCount}ev
+          </span>
+          <span>
+            {t('issue.firstSeen')} {formatRelative(issue.firstSeen)}
+          </span>
+          <span>
+            {t('issue.lastSeen')} {formatRelative(issue.lastSeen)}
+          </span>
+          {issue.lastRelease && <span>{issue.lastRelease}</span>}
           {latest && (
-            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[13px] text-fg-muted">
+            <>
+              <span className="text-fg-subtle">·</span>
               <span className="text-fg-subtle">{t('issue.latestCase')}</span>
               {latest.userKey && (
                 <span className="text-fg" title={latest.userKey}>
@@ -173,49 +207,114 @@ export default function IssueDetail() {
                     : latest.userKey}
                 </span>
               )}
-              <span>{formatRelative(latest.occurredAt)}</span>
               <span>
-                {[device?.model, device?.os && `${String(device.os)} ${String(device.osVersion ?? '')}`.trim()]
+                {[
+                  device?.model,
+                  device?.os &&
+                    `${String(device.os)} ${String(device.osVersion ?? '')}`.trim(),
+                ]
                   .filter(Boolean)
                   .join(' · ')}
               </span>
-              {device?.appVersion !== undefined && <span>app {String(device.appVersion)}</span>}
+              {device?.appVersion !== undefined && (
+                <span>app {String(device.appVersion)}</span>
+              )}
               <span>{latest.environment}</span>
-            </div>
+            </>
           )}
         </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-7 xl:grid-cols-[minmax(0,1fr)_400px]">
-        {/* ── the narrative ── */}
-        <div className="min-w-0">
-          {hasStack && (
-            <Section title={t('issue.code')}>
-              <StackTrace frames={payload!.error!.stack!} />
-            </Section>
-          )}
+      {/* ── the evidence, in panels ── */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
+          <div className="min-w-0 space-y-4">
+            {hasStack && (
+              <Panel title={t('issue.code')}>
+                <StackTrace frames={payload!.error!.stack!} />
+              </Panel>
+            )}
+            <Panel title={t('issue.timeline')}>
+              {payload?.signals && payload.signals.length > 0 ? (
+                <div className="p-4">
+                  <Timeline signals={payload.signals} kind={issue.kind} />
+                </div>
+              ) : (
+                <PanelEmpty>{t('issue.timelineEmpty')}</PanelEmpty>
+              )}
+            </Panel>
+          </div>
 
-          {payload?.signals && payload.signals.length > 0 && (
-            <Section title={t('issue.timeline')}>
-              <Timeline signals={payload.signals} kind={issue.kind} />
-            </Section>
-          )}
+          <div className="min-w-0 space-y-4">
+            <Panel
+              title={t('replay.title')}
+              action={
+                screensFallback ? (
+                  <span className="truncate text-[11px] normal-case tracking-normal text-fg-subtle">
+                    {t('issue.replayFrom', {
+                      when: formatRelative(screensFallback.occurredAt),
+                    })}
+                  </span>
+                ) : !screensRef && wireframeLatest ? (
+                  <span className="text-[11px] normal-case tracking-normal text-fg-subtle">
+                    wireframe
+                  </span>
+                ) : undefined
+              }
+            >
+              {screensRef ? (
+                <ReplayPlayer attachmentRef={screensRef} />
+              ) : wireframeLatest ? (
+                <div>
+                  <WireframePlayer attachmentRef={wireframeLatest} />
+                  <p className="border-t border-border px-3.5 py-2 text-xs text-fg-subtle">
+                    {t('issue.replayWireframe')}
+                  </p>
+                </div>
+              ) : (
+                <PanelEmpty>{t('issue.replayNone')}</PanelEmpty>
+              )}
+            </Panel>
 
-          {/* corner rows: obligatory, folded */}
+            <Panel title={t('issue.handoff')}>
+              <div className="space-y-2.5 p-3.5">
+                <p className="text-[13px] text-fg-muted">{t('issue.handoffHint')}</p>
+                <Button variant="primary" onClick={() => void copyForAi()}>
+                  {copied ? t('issue.copied') : t('issue.copyForAi')}
+                </Button>
+              </div>
+            </Panel>
+
+            {issue.status === 'resolved' && (
+              <Panel title={<span className="text-ok">{t('issue.guardTitle')}</span>}>
+                <div className="space-y-1 p-3.5 text-[13px] text-fg-muted">
+                  <p>
+                    {issue.resolvedInRelease
+                      ? t('issue.guardAnchored', { release: issue.resolvedInRelease })
+                      : t('issue.guardUnanchored')}
+                  </p>
+                  <p>{t('issue.guardProbeHint')}</p>
+                </div>
+              </Panel>
+            )}
+          </div>
+        </div>
+
+        {/* the obligatory corners */}
+        <div className="mt-4 space-y-2">
           {occ && occ.events.length > 0 && (
-            <Section title={`${t('issue.occurrences')} (${occ.events.length})`} collapsed>
-              <div className="divide-y divide-border rounded-md border border-border bg-surface">
+            <FoldPanel title={`${t('issue.occurrences')} (${occ.events.length})`}>
+              <div className="divide-y divide-border/60">
                 {occ.events.map((e) => (
                   <OccRow key={e.id} row={e} active={e.id === latestId} />
                 ))}
               </div>
-            </Section>
+            </FoldPanel>
           )}
-
-          {payload?.device && (
-            <Section title={t('issue.environment')} collapsed>
-              <dl className="grid grid-cols-2 gap-x-8 gap-y-1.5 rounded-md border border-border bg-surface p-4 font-mono text-[13px] sm:grid-cols-3">
-                {Object.entries(payload.device)
+          {device && (
+            <FoldPanel title={t('issue.environment')}>
+              <dl className="grid grid-cols-2 gap-x-8 gap-y-1.5 p-4 font-mono text-[13px] sm:grid-cols-3">
+                {Object.entries(device)
                   .filter(([, v]) => typeof v !== 'object')
                   .map(([k, v]) => (
                     <div key={k} className="flex justify-between gap-2">
@@ -224,197 +323,65 @@ export default function IssueDetail() {
                     </div>
                   ))}
               </dl>
-            </Section>
+            </FoldPanel>
           )}
-
-          <Section
+          <FoldPanel
             title={`${t('issue.activity')}${issue.activity.length ? ` (${issue.activity.length})` : ''}`}
-            collapsed={issue.activity.length === 0}
           >
-            {issue.activity.length === 0 && (
-              <EmptyState title={t('issue.noActivity')} hint="" />
-            )}
-            <ul className="space-y-2">
-              {issue.activity.map((a) => (
-                <li key={a.id} className="flex items-baseline gap-2.5 text-[13px]">
-                  <span className="w-16 shrink-0 font-mono text-fg-subtle">
-                    {formatRelative(a.at)}
-                  </span>
-                  <span className="rounded bg-raised px-1.5 font-mono text-xs text-fg-muted">
-                    {a.kind}
-                  </span>
-                  <span className="text-fg-muted">
-                    {a.actorEmail ?? t('issue.system')} · {summarizeActivity(a.body)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-3 flex items-center gap-2">
-              <Input
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder={t('issue.note')}
-                aria-label={t('issue.note')}
-                className="min-w-0 max-w-96 flex-1 text-sm"
-              />
-              <Button
-                size="sm"
-                disabled={busy || note.trim().length === 0}
-                onClick={() =>
-                  void act(async () => {
-                    await api.addNote(issue.id, note.trim());
-                    setNote('');
-                  })
-                }
-              >
-                {t('issue.addNote')}
-              </Button>
-              {me.role === 'superadmin' && <AssignSelect issue={issue} onDone={reload} />}
-            </div>
-          </Section>
-        </div>
-
-        {/* ── the phone: what the user saw + the quiet obligations ── */}
-        <aside className="min-w-0">
-          <div className="sticky top-5 space-y-4">
-            <SectionLabel>{t('replay.title')}</SectionLabel>
-            {screensRef ? (
-              <div>
-                <ReplayPlayer attachmentRef={screensRef} />
-                {screensFallback && (
-                  <p className="mt-1.5 text-xs text-fg-subtle">
-                    {t('issue.replayFrom', {
-                      when: formatRelative(screensFallback.occurredAt),
-                    })}
-                  </p>
-                )}
-              </div>
-            ) : wireframeLatest ? (
-              <div>
-                <WireframePlayer attachmentRef={wireframeLatest} />
-                <p className="mt-1.5 text-xs text-fg-subtle">
-                  {t('issue.replayWireframe')}
-                </p>
-              </div>
-            ) : (
-              <p className="rounded-md border border-border bg-surface px-4 py-3 text-sm text-fg-subtle">
-                {t('issue.replayNone')}
-              </p>
-            )}
-
-            {/* the narrative's last stop: what to do about it. The
-                AI copy is the primary exit — it carries the code,
-                the journey and the environment in one paste. */}
-            <div className="rounded-md border border-accent/40 bg-surface p-3.5">
-              <div className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
-                {t('issue.handoff')}
-              </div>
-              <p className="mb-3 text-sm text-fg-muted">{t('issue.handoffHint')}</p>
-              <div className="flex flex-col gap-2">
-                <Button variant="primary" onClick={() => void copyForAi()}>
-                  {copied ? t('issue.copied') : t('issue.copyForAi')}
+            <div className="p-4">
+              {issue.activity.length === 0 && (
+                <p className="pb-2 text-sm text-fg-subtle">{t('issue.noActivity')}</p>
+              )}
+              <ul className="space-y-2">
+                {issue.activity.map((a) => (
+                  <li key={a.id} className="flex items-baseline gap-2.5 text-[13px]">
+                    <span className="w-16 shrink-0 font-mono text-fg-subtle">
+                      {formatRelative(a.at)}
+                    </span>
+                    <span className="rounded bg-raised px-1.5 font-mono text-xs text-fg-muted">
+                      {a.kind}
+                    </span>
+                    <span className="text-fg-muted">
+                      {a.actorEmail ?? t('issue.system')} · {summarizeActivity(a.body)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-3 flex items-center gap-2">
+                <Input
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder={t('issue.note')}
+                  aria-label={t('issue.note')}
+                  className="min-w-0 max-w-96 flex-1 text-sm"
+                />
+                <Button
+                  size="sm"
+                  disabled={busy || note.trim().length === 0}
+                  onClick={() =>
+                    void act(async () => {
+                      await api.addNote(issue.id, note.trim());
+                      setNote('');
+                    })
+                  }
+                >
+                  {t('issue.addNote')}
                 </Button>
-                {issue.status === 'open' ? (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={resolveRelease}
-                      onChange={(e) => setResolveRelease(e.target.value)}
-                      placeholder={issue.lastRelease || 'app@x.y.z'}
-                      title={t('issue.resolveInRelease')}
-                      aria-label={t('issue.resolveInRelease')}
-                      className="min-w-0 flex-1 font-mono text-xs"
-                    />
-                    <Button
-                      size="sm"
-                      disabled={busy}
-                      onClick={() =>
-                        void act(() => api.resolveIssue(issue.id, resolveRelease || undefined))
-                      }
-                    >
-                      {t('issue.resolve')}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => void act(() => api.ignoreIssue(issue.id))}
-                    >
-                      {t('issue.ignore')}
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    disabled={busy}
-                    onClick={() => void act(() => api.reopenIssue(issue.id))}
-                  >
-                    {t('issue.reopen')}
-                  </Button>
+                {me.role === 'superadmin' && (
+                  <AssignSelect issue={issue} onDone={reload} />
                 )}
               </div>
             </div>
-
-            {/* guard status — "fixed" and "verified fixed" are two
-                different states, and this card is where that shows */}
-            {issue.status === 'resolved' && (
-              <div className="rounded-md border border-ok/40 bg-surface p-3.5 text-sm">
-                <div className="mb-1 font-semibold text-ok">{t('issue.guardTitle')}</div>
-                <p className="text-fg-muted">
-                  {issue.resolvedInRelease
-                    ? t('issue.guardAnchored', { release: issue.resolvedInRelease })
-                    : t('issue.guardUnanchored')}
-                </p>
-                <p className="mt-1 text-fg-muted">{t('issue.guardProbeHint')}</p>
-              </div>
-            )}
-
-          </div>
-        </aside>
+          </FoldPanel>
+        </div>
       </div>
     </div>
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
-      {children}
-    </h3>
-  );
-}
-
-function Section({
-  title,
-  collapsed,
-  children,
-}: {
-  title: string;
-  collapsed?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(!collapsed);
-  return (
-    <section className="mb-7">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle hover:text-fg-muted"
-      >
-        {open ? '▾' : '▸'} {title}
-      </button>
-      {open && children}
-    </section>
-  );
-}
-
 /// The signal timeline — a readable rendering of the last 30
 /// seconds, ending on the moment the event fired.
-function Timeline({
-  signals,
-  kind,
-}: {
-  signals: Signal[];
-  kind: IssueDetailT['kind'];
-}) {
+function Timeline({ signals, kind }: { signals: Signal[]; kind: IssueDetailT['kind'] }) {
   const t = useT();
   const rows = useMemo(() => [...signals].sort((a, b) => a.t - b.t), [signals]);
   return (
@@ -442,7 +409,9 @@ function Timeline({
           className="absolute -left-[26px] top-[4px] h-2.5 w-2.5 rounded-full"
           style={{ backgroundColor: kindColor(kind) }}
         />
-        <span className="mr-2.5 inline-block w-12 text-right font-mono tabular-nums">0.0s</span>
+        <span className="mr-2.5 inline-block w-12 text-right font-mono tabular-nums">
+          0.0s
+        </span>
         <span>{t('issue.eventMoment', { kind })}</span>
       </li>
     </ol>
