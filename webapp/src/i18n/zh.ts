@@ -83,6 +83,7 @@ export const zh: Messages = {
   'issue.note': '备注',
   'issue.occurrences': '发生记录',
   'issue.reopen': '重新打开',
+  'issue.replayFrom': '来自 {when} 的一次发生 —— 最新事件没有携带录屏。',
   'issue.replayNone':
     '该事件没有携带录屏 —— 在 SDK 里开启 replayScreens: true 才会捕获出错前一分钟的画面。',
   'issue.resolve': '解决',
