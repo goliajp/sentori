@@ -230,6 +230,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         )
         // instruments — the devices panel
         .route(
+            "/admin/api/projects/{project_id}/health",
+            get(admin::projects::health),
+        )
+        .route(
             "/admin/api/projects/{project_id}/instruments",
             get(instruments::get),
         )
@@ -394,6 +398,7 @@ async fn spa_or_api_404(req: axum::extract::Request) -> axum::response::Response
     // Assets serve from a ServeDir with no index fallback, so a miss
     // stays a 404 instead of becoming the shell. The two ServeDirs
     // differ in their fallback type parameter, hence the two arms.
+    let path_owned = path.to_string();
     let served = if is_asset_path(path) {
         tower::ServiceExt::oneshot(webapp_assets(), req)
             .await
@@ -405,7 +410,22 @@ async fn spa_or_api_404(req: axum::extract::Request) -> axum::response::Response
     };
 
     match served {
-        Ok(res) => res,
+        Ok(mut res) => {
+            // Cache posture: the shell must revalidate every load —
+            // a heuristically-cached index.html kept users on stale
+            // bundles across deploys until a hard refresh. Assets
+            // are content-hashed and can live forever.
+            let cache = if is_asset_path(path_owned.as_str()) {
+                "public, max-age=31536000, immutable"
+            } else {
+                "no-cache"
+            };
+            if let Ok(v) = axum::http::HeaderValue::from_str(cache) {
+                res.headers_mut()
+                    .insert(axum::http::header::CACHE_CONTROL, v);
+            }
+            res
+        }
         Err(e) => {
             tracing::error!(%e, "webapp static serve failed");
             axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response()

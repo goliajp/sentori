@@ -49,6 +49,9 @@ export const en = {
   'inbox.selectedCount': '{n} selected',
   'inbox.clearSelection': 'Clear',
 
+  'health.replay': 'replay',
+  'health.silent': 'no events yet',
+
   'identity.copied': 'Copied',
   'identity.copyHint': 'Copy the full user key',
 
@@ -188,6 +191,7 @@ export const en = {
   'theme.label': 'Theme',
   'theme.light': 'Light',
   'theme.system': 'Match system',
+  'shell.project': 'Project',
   'shell.roleAdmin': 'Admin',
   'shell.roleOwner': 'Owner',
 } as const;

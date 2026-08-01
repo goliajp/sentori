@@ -21,14 +21,14 @@ const KINDS = ['error', 'warn', 'trace', 'assert', 'probe'] as const;
 
 export default function TriageView() {
   const t = useT();
-  const { projects } = useShell();
+  const { activeProject } = useShell();
   const { issueId } = useParams<{ issueId: string }>();
   const navigate = useNavigate();
   const [search, setSearch] = useSearchParams();
 
   const status = (search.get('status') ?? 'open') as 'ignored' | 'open' | 'resolved';
   const kind = search.get('kind');
-  const projectId = search.get('project');
+  const projectId = activeProject?.id ?? null;
 
   const setFilter = (key: string, value: string | null) => {
     const next = new URLSearchParams(search);
@@ -200,22 +200,6 @@ export default function TriageView() {
                 {k}
               </button>
             ))}
-            {projects.length > 1 &&
-              projects.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setFilter('project', projectId === p.id ? null : p.id)}
-                  className={clsx(
-                    'rounded border px-1.5 py-0.5 text-[11px] transition-colors',
-                    projectId === p.id
-                      ? 'border-border-strong bg-raised text-fg'
-                      : 'border-border text-fg-subtle hover:text-fg-muted',
-                  )}
-                >
-                  {p.name}
-                </button>
-              ))}
           </div>
         </header>
 
@@ -268,7 +252,7 @@ export default function TriageView() {
             <div className="px-4 py-16 text-center">
               <p className="text-sm text-fg-muted">{t('inbox.emptyTitle')}</p>
               <p className="mt-1.5 text-xs text-fg-subtle">
-                {projects.length === 0 ? t('inbox.emptyNoProject') : t('inbox.emptyHint')}
+                {activeProject ? t('inbox.emptyHint') : t('inbox.emptyNoProject')}
               </p>
             </div>
           )}

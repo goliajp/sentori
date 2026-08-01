@@ -43,6 +43,9 @@ export const zh: Messages = {
   'inbox.selectedCount': '已选 {n} 项',
   'inbox.clearSelection': '清除选择',
 
+  'health.replay': '录屏',
+  'health.silent': '暂无事件',
+
   'identity.copied': '已复制',
   'identity.copyHint': '复制完整用户标识',
 
@@ -171,6 +174,7 @@ export const zh: Messages = {
   'theme.label': '主题',
   'theme.light': '浅色',
   'theme.system': '跟随系统',
+  'shell.project': '项目',
   'shell.roleAdmin': '管理员',
   'shell.roleOwner': '所有者',
 };
