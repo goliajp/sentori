@@ -100,6 +100,7 @@ export const zh: Messages = {
 
   'nav.inbox': '收件箱',
   'nav.instruments': '监测',
+  'nav.projects': '项目',
   'nav.releases': '版本',
   'nav.settings': '设置',
 
@@ -115,6 +116,14 @@ export const zh: Messages = {
   'notify.testSending': '发送中…',
   'notify.testSent': '测试邮件已发出 —— 查收收件箱。',
   'palette.placeholder': '跳转页面或搜索 issue…',
+
+  'projects.col.created': '创建',
+  'projects.col.lastEvent': '最近事件',
+  'projects.col.name': '项目',
+  'projects.col.platform': '平台',
+  'projects.col.release': '线上版本',
+  'projects.col.users': '用户',
+  'projects.count': '共 {n} 个项目',
 
   'releases.emptyHint': 'SDK 上报版本或 CLI 上传物料后会出现在这里。',
   'releases.emptyTitle': '还没有版本',
@@ -174,7 +183,6 @@ export const zh: Messages = {
   'theme.label': '主题',
   'theme.light': '浅色',
   'theme.system': '跟随系统',
-  'shell.project': '项目',
   'shell.roleAdmin': '管理员',
   'shell.roleOwner': '所有者',
 };

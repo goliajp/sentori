@@ -6,6 +6,7 @@ import { App } from './App';
 import { I18nProvider } from './i18n/provider';
 import ForgotPassword from './pages/ForgotPassword';
 import Instruments from './pages/Instruments';
+import ProjectsPage from './pages/Projects';
 import TriageView from './pages/TriageView';
 import { LoginPage } from './pages/Login';
 import Releases from './pages/Releases';
@@ -31,6 +32,7 @@ if (root) {
             <Route element={<App />}>
               <Route path="/" element={<TriageView />} />
               <Route path="/issues/:issueId" element={<TriageView />} />
+              <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/instruments" element={<Instruments />} />
               <Route path="/releases" element={<Releases />} />
               <Route path="/settings" element={<Settings />} />

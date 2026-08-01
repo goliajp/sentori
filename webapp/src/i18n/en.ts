@@ -111,6 +111,7 @@ export const en = {
 
   'nav.inbox': 'Inbox',
   'nav.instruments': 'Instruments',
+  'nav.projects': 'Projects',
   'nav.releases': 'Releases',
   'nav.settings': 'Settings',
 
@@ -128,6 +129,14 @@ export const en = {
   'notify.testSending': 'Sending…',
   'notify.testSent': 'Test email sent — check your inbox.',
   'palette.placeholder': 'Jump to a page or search issues…',
+
+  'projects.col.created': 'Created',
+  'projects.col.lastEvent': 'Last event',
+  'projects.col.name': 'Project',
+  'projects.col.platform': 'Platform',
+  'projects.col.release': 'Release in the field',
+  'projects.col.users': 'Users',
+  'projects.count': '{n} projects',
 
   'releases.emptyHint':
     'Releases appear when the SDK reports one or the CLI uploads artifacts.',
@@ -191,7 +200,6 @@ export const en = {
   'theme.label': 'Theme',
   'theme.light': 'Light',
   'theme.system': 'Match system',
-  'shell.project': 'Project',
   'shell.roleAdmin': 'Admin',
   'shell.roleOwner': 'Owner',
 } as const;
