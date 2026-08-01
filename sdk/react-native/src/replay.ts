@@ -76,7 +76,7 @@ let _running = false;
 /** Last emit's reconstructed state — fingerprint → node. Null until
  *  the first keyframe lands; reset on drain so the next session
  *  starts with a fresh keyframe. */
-let _lastFrameState: Map<string, Node> | null = null;
+let _lastFrameState: Map<string, { node: Node; at: number }> | null = null;
 let _lastKeyframeTs = 0;
 
 let _nativeMod: ReplayNativeModule | null = null;
@@ -182,8 +182,7 @@ function captureTick(): void {
 }
 
 function encodeAndPush(snapshot: NativeFrame): void {
-  const currentState = new Map<string, Node>();
-  for (const n of snapshot.nodes) currentState.set(fingerprint(n), n);
+  const currentState = indexNodes(snapshot.nodes);
 
   const ts = snapshot.ts;
   const isCold = _lastFrameState === null;
@@ -195,7 +194,10 @@ function encodeAndPush(snapshot: NativeFrame): void {
     line = encodeKeyframe(snapshot);
     _lastKeyframeTs = ts;
   } else {
-    const delta = computeDelta(_lastFrameState as Map<string, Node>, currentState);
+    const delta = computeDelta(
+      _lastFrameState as Map<string, { node: Node; at: number }>,
+      currentState,
+    );
     const totalChanged = delta.added.length + delta.changed.length + delta.removed.length;
     if (totalChanged === 0) {
       // No-op heartbeat — drop. Keep _lastFrameState as-is (identical).
@@ -248,28 +250,58 @@ function fingerprint(n: Node): string {
   return `${n.x | 0},${n.y | 0},${n.w | 0},${n.h | 0}`;
 }
 
-type Delta = { added: Node[]; changed: Node[]; removed: Pick<Node, 'x' | 'y' | 'w' | 'h'>[] };
+/**
+ * Identity = geometry + occurrence index in walk order.
+ *
+ * Geometry alone is NOT identity: a page root and the fullscreen
+ * overlay covering it share x/y/w/h, and keying a Map on that
+ * collapsed them into one node — the overlay inherited the root's
+ * z-position and the replay drew the page THROUGH it (insight
+ * 2026-08-01). The occurrence suffix keeps every stacked layer its
+ * own entry, and stays stable across ticks because the native walk
+ * order is deterministic for a stable tree.
+ */
+export function indexNodes(nodes: Node[]): Map<string, { node: Node; at: number }> {
+  const out = new Map<string, { node: Node; at: number }>();
+  const seen = new Map<string, number>();
+  nodes.forEach((n, at) => {
+    const base = fingerprint(n);
+    const occ = seen.get(base) ?? 0;
+    seen.set(base, occ + 1);
+    out.set(`${base}#${occ}`, { node: n, at });
+  });
+  return out;
+}
 
-export function computeDelta(prev: Map<string, Node>, curr: Map<string, Node>): Delta {
-  const added: Node[] = [];
-  const changed: Node[] = [];
-  const removed: Pick<Node, 'x' | 'y' | 'w' | 'h'>[] = [];
-  for (const [fp, node] of curr) {
-    const p = prev.get(fp);
+type Delta = {
+  added: (Node & { at: number; id: string })[];
+  changed: (Node & { id: string })[];
+  removed: (Pick<Node, 'x' | 'y' | 'w' | 'h'> & { id: string })[];
+};
+
+export function computeDelta(
+  prev: Map<string, { node: Node; at: number }>,
+  curr: Map<string, { node: Node; at: number }>,
+): Delta {
+  const added: Delta['added'] = [];
+  const changed: Delta['changed'] = [];
+  const removed: Delta['removed'] = [];
+  for (const [id, { node, at }] of curr) {
+    const p = prev.get(id);
     if (!p) {
-      added.push(node);
+      added.push({ ...node, at, id });
       continue;
     }
     if (
-      (p.kind ?? '') !== (node.kind ?? '') ||
-      (p.color ?? '') !== (node.color ?? '') ||
-      (p.text ?? '') !== (node.text ?? '')
+      (p.node.kind ?? '') !== (node.kind ?? '') ||
+      (p.node.color ?? '') !== (node.color ?? '') ||
+      (p.node.text ?? '') !== (node.text ?? '')
     ) {
-      changed.push(node);
+      changed.push({ ...node, id });
     }
   }
-  for (const [fp, node] of prev) {
-    if (!curr.has(fp)) removed.push({ x: node.x, y: node.y, w: node.w, h: node.h });
+  for (const [id, { node }] of prev) {
+    if (!curr.has(id)) removed.push({ x: node.x, y: node.y, w: node.w, h: node.h, id });
   }
   return { added, changed, removed };
 }

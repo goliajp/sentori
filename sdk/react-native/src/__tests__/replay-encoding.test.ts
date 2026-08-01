@@ -5,6 +5,7 @@ import {
   __resetReplayForTests,
   computeDelta,
   drainReplay,
+  indexNodes,
 } from '../replay';
 
 // Unit coverage for the rc.9 v2 replay encoder.
@@ -206,9 +207,7 @@ describe('rc.9 encoder — keyframe vs delta', () => {
 });
 
 describe('computeDelta', () => {
-  function asMap(nodes: Node[]): Map<string, Node> {
-    return new Map(nodes.map((n) => [`${n.x | 0},${n.y | 0},${n.w | 0},${n.h | 0}`, n]));
-  }
+  const asMap = (nodes: Node[]) => indexNodes(nodes);
 
   test('empty-vs-empty produces all-empty delta', () => {
     const d = computeDelta(new Map(), new Map());
@@ -233,5 +232,33 @@ describe('computeDelta', () => {
     expect(d.added.length).toBe(0);
     expect(d.changed.length).toBe(0);
     expect(d.removed.length).toBe(0);
+  });
+
+  test('stacked same-geometry layers keep separate identities (insight overlay bug)', () => {
+    // A page root and a fullscreen opaque overlay: identical x/y/w/h.
+    const pageRoot: Node = { x: 0, y: 0, w: 400, h: 800, kind: 'rect', color: '#101014FF' };
+    const overlay: Node = { x: 0, y: 0, w: 400, h: 800, kind: 'rect', color: '#FFFFFFFF' };
+    const m = indexNodes([pageRoot, overlay]);
+    // Both survive indexing…
+    expect(m.size).toBe(2);
+    expect([...m.keys()]).toEqual(['0,0,400,800#0', '0,0,400,800#1']);
+    // …and z-order info rides along.
+    expect(m.get('0,0,400,800#1')?.at).toBe(1);
+  });
+
+  test('delta entries carry ids; overlay removal targets the right layer', () => {
+    const pageRoot: Node = { x: 0, y: 0, w: 400, h: 800, kind: 'rect', color: '#101014FF' };
+    const overlay: Node = { x: 0, y: 0, w: 400, h: 800, kind: 'rect', color: '#FFFFFFFF' };
+    const withOverlay = indexNodes([pageRoot, overlay]);
+    const without = indexNodes([pageRoot]);
+
+    const closed = computeDelta(withOverlay, without);
+    expect(closed.removed.length).toBe(1);
+    expect(closed.removed[0]?.id).toBe('0,0,400,800#1');
+
+    const opened = computeDelta(without, withOverlay);
+    expect(opened.added.length).toBe(1);
+    expect(opened.added[0]?.id).toBe('0,0,400,800#1');
+    expect(opened.added[0]?.at).toBe(1);
   });
 });
