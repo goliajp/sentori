@@ -10,7 +10,9 @@ import { useNavigate } from 'react-router-dom';
 
 import { useShell } from '../App';
 import {
+  Button,
   DataTable,
+  Input,
   PageShell,
   Panel,
   formatRelative,
@@ -24,8 +26,11 @@ type Row = Project & { health: ProjectHealth | null };
 
 export default function ProjectsPage() {
   const t = useT();
-  const { projects, activeProject, setActiveProjectId } = useShell();
+  const { me, projects, activeProject, setActiveProjectId, reloadProjects } =
+    useShell();
   const navigate = useNavigate();
+  const owner = me.role === 'superadmin';
+  const [name, setName] = useState('');
 
   // Captured per render, not called in render (react-hooks/purity).
   const [now] = useState(() => Date.now());
@@ -47,7 +52,34 @@ export default function ProjectsPage() {
   };
 
   return (
-    <PageShell title={t('nav.projects')}>
+    <PageShell
+      title={t('nav.projects')}
+      toolbar={
+        owner ? (
+          <div className="ml-auto flex items-center gap-2">
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t('settings.projectName')}
+              className="h-7 w-56 text-[13px]"
+            />
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={name.trim().length === 0}
+              onClick={() => {
+                void api.createProject(name.trim()).then(() => {
+                  setName('');
+                  reloadProjects();
+                });
+              }}
+            >
+              {t('settings.createProject')}
+            </Button>
+          </div>
+        ) : undefined
+      }
+    >
       <Panel title={`${t('nav.projects')} (${projects.length})`}>
         <DataTable<Row>
           columns={[
@@ -137,6 +169,34 @@ export default function ProjectsPage() {
                 <span className="font-mono text-xs">{formatRelative(r.createdAt)}</span>
               ),
             },
+            ...(owner
+              ? [
+                  {
+                    key: 'actions',
+                    label: '',
+                    align: 'right' as const,
+                    width: '70px',
+                    render: (r: Row) => (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (
+                            window.confirm(
+                              t('settings.deleteProjectConfirm', { name: r.name }),
+                            )
+                          ) {
+                            void api.deleteProject(r.id).then(reloadProjects);
+                          }
+                        }}
+                        className="text-xs text-kind-error/70 hover:text-kind-error"
+                      >
+                        {t('common.delete')}
+                      </button>
+                    ),
+                  },
+                ]
+              : []),
           ]}
           rows={rows}
           rowKey={(r) => r.id}

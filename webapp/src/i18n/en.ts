@@ -175,7 +175,6 @@ export const en = {
   'settings.tab.account': 'Account',
   'settings.tab.audit': 'Audit',
   'settings.tab.notifications': 'Notifications',
-  'settings.tab.projects': 'Projects',
   'settings.tab.tokens': 'Tokens',
   'settings.tab.users': 'Admins',
   'settings.tokenName': 'token name',
