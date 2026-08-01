@@ -6,10 +6,11 @@
 // whether or not their data does — a sparse warn still renders a
 // structured case, not a void.
 
-import { useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { useShell } from '../App';
-import { KindBadge, RegressedBadge, kindColor } from '../components/kind';
+import { KindBadge, RegressedBadge } from '../components/kind';
+import { UserChip } from '../components/identity';
 import {
   Button,
   FoldPanel,
@@ -17,6 +18,7 @@ import {
   Panel,
   PanelEmpty,
   formatRelative,
+  formatRelease,
 } from '../components/ui';
 import { useT } from '../i18n';
 import {
@@ -29,6 +31,11 @@ import { useAsyncData } from '../lib/useAsyncData';
 
 import { ReplayPlayer } from '../components/ReplayPlayer';
 import { StackTrace, type StackFrame as Frame } from '../components/StackTrace';
+import {
+  TimelineStrip,
+  summarizeSignal,
+  type StripContextEvent,
+} from '../components/TimelineStrip';
 import { WireframePlayer } from '../components/WireframePlayer';
 
 type Signal = { t: number; kind: string; data?: Record<string, unknown> };
@@ -53,9 +60,20 @@ export function IssueDetailPane({
     () => (latestId ? api.getEvent(latestId) : Promise.resolve(null)),
     [latestId],
   );
+  const { data: ctx } = useAsyncData(
+    () => (latestId ? api.eventContext(latestId) : Promise.resolve({ events: [] })),
+    [latestId],
+  );
 
   const [note, setNote] = useState('');
   const [replaySeek, setReplaySeek] = useState<{ t: number; n: number } | null>(null);
+  // Frame moments arrive from whichever player loaded; tagged with
+  // the event they belong to so switching issues never shows stale
+  // ticks (and needs no reset effect).
+  const [framesFor, setFramesFor] = useState<{ id: null | string; times: number[] }>({
+    id: null,
+    times: [],
+  });
   const [resolveRelease, setResolveRelease] = useState('');
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -87,6 +105,19 @@ export function IssueDetailPane({
   const replaySeekable = !!(screensLatest || wireframeLatest);
   const seekReplay = (t: number) =>
     setReplaySeek((prev) => ({ t, n: (prev?.n ?? 0) + 1 }));
+  const frameTimes = framesFor.id === latestId ? framesFor.times : [];
+  const reportFrames = useCallback(
+    (times: number[]) => setFramesFor({ id: latestId ?? null, times }),
+    [latestId],
+  );
+  const eventAtMs = latest ? new Date(latest.occurredAt).getTime() : 0;
+  const contextEvents: StripContextEvent[] = (ctx?.events ?? []).map((e) => ({
+    id: e.id,
+    issueId: e.issueId,
+    kind: e.kind,
+    name: e.name,
+    t: (new Date(e.occurredAt).getTime() - eventAtMs) / 1000,
+  }));
   const payload = latest?.payload as
     | {
         error?: { type?: string; message?: string; stack?: Frame[] };
@@ -199,18 +230,14 @@ export function IssueDetailPane({
           <span>
             {t('issue.lastSeen')} {formatRelative(issue.lastSeen)}
           </span>
-          {issue.lastRelease && <span>{issue.lastRelease}</span>}
+          {issue.lastRelease && (
+            <span title={issue.lastRelease}>{formatRelease(issue.lastRelease)}</span>
+          )}
           {latest && (
             <>
               <span className="text-fg-subtle">·</span>
               <span className="text-fg-subtle">{t('issue.latestCase')}</span>
-              {latest.userKey && (
-                <span className="text-fg" title={latest.userKey}>
-                  {latest.userKey.length > 16
-                    ? `${latest.userKey.slice(0, 16)}…`
-                    : latest.userKey}
-                </span>
-              )}
+              {latest.userKey && <UserChip userKey={latest.userKey} />}
               <span>
                 {[
                   device?.model,
@@ -220,40 +247,17 @@ export function IssueDetailPane({
                   .filter(Boolean)
                   .join(' · ')}
               </span>
-              {device?.appVersion !== undefined && (
-                <span>app {String(device.appVersion)}</span>
-              )}
               <span>{latest.environment}</span>
             </>
           )}
         </div>
       </header>
 
-      {/* ── the evidence, in panels ── */}
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
-          <div className="min-w-0 space-y-4">
-            {hasStack && (
-              <Panel title={t('issue.code')}>
-                <StackTrace frames={payload!.error!.stack!} />
-              </Panel>
-            )}
-            <Panel title={t('issue.timeline')}>
-              {payload?.signals && payload.signals.length > 0 ? (
-                <div className="p-4">
-                  <Timeline
-                    signals={payload.signals}
-                    kind={issue.kind}
-                    onSeek={replaySeekable ? seekReplay : undefined}
-                  />
-                </div>
-              ) : (
-                <PanelEmpty>{t('issue.timelineEmpty')}</PanelEmpty>
-              )}
-            </Panel>
-          </div>
-
-          <div className="min-w-0 space-y-4">
+      {/* ── the evidence: what the user saw (primary), the code
+          (secondary), and the minute itself pinned underneath ── */}
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <div className="grid h-full grid-cols-1 gap-4 overflow-y-auto p-4 xl:grid-cols-[minmax(360px,460px)_minmax(0,1fr)] xl:overflow-hidden">
+          <div className="min-w-0 space-y-4 xl:overflow-y-auto">
             <Panel
               title={t('replay.title')}
               action={
@@ -271,10 +275,18 @@ export function IssueDetailPane({
               }
             >
               {screensRef ? (
-                <ReplayPlayer attachmentRef={screensRef} seek={replaySeek} />
+                <ReplayPlayer
+                  attachmentRef={screensRef}
+                  seek={replaySeek}
+                  onFrames={screensLatest ? reportFrames : undefined}
+                />
               ) : wireframeLatest ? (
                 <div>
-                  <WireframePlayer attachmentRef={wireframeLatest} seek={replaySeek} />
+                  <WireframePlayer
+                    attachmentRef={wireframeLatest}
+                    seek={replaySeek}
+                    onFrames={reportFrames}
+                  />
                   <p className="border-t border-border px-3.5 py-2 text-xs text-fg-subtle">
                     {t('issue.replayWireframe')}
                   </p>
@@ -306,175 +318,99 @@ export function IssueDetailPane({
               </Panel>
             )}
           </div>
-        </div>
 
-        {/* the obligatory corners */}
-        <div className="mt-4 space-y-2">
-          {occ && occ.events.length > 0 && (
-            <FoldPanel title={`${t('issue.occurrences')} (${occ.events.length})`}>
-              <div className="divide-y divide-border/60">
-                {occ.events.map((e) => (
-                  <OccRow key={e.id} row={e} active={e.id === latestId} />
-                ))}
-              </div>
-            </FoldPanel>
-          )}
-          {device && (
-            <FoldPanel title={t('issue.environment')}>
-              <dl className="grid grid-cols-2 gap-x-8 gap-y-1.5 p-4 font-mono text-[13px] sm:grid-cols-3">
-                {Object.entries(device)
-                  .filter(([, v]) => typeof v !== 'object')
-                  .map(([k, v]) => (
-                    <div key={k} className="flex justify-between gap-2">
-                      <dt className="text-fg-subtle">{k}</dt>
-                      <dd className="truncate text-fg-muted">{String(v)}</dd>
-                    </div>
+          <div className="min-w-0 space-y-4 xl:overflow-y-auto">
+            {hasStack && (
+              <Panel title={t('issue.code')}>
+                <StackTrace frames={payload!.error!.stack!} />
+              </Panel>
+            )}
+
+            {occ && occ.events.length > 0 && (
+              <FoldPanel title={`${t('issue.occurrences')} (${occ.events.length})`}>
+                <div className="divide-y divide-border/60">
+                  {occ.events.map((e) => (
+                    <OccRow key={e.id} row={e} active={e.id === latestId} />
                   ))}
-              </dl>
-            </FoldPanel>
-          )}
-          <FoldPanel
-            title={`${t('issue.activity')}${issue.activity.length ? ` (${issue.activity.length})` : ''}`}
-          >
-            <div className="p-4">
-              {issue.activity.length === 0 && (
-                <p className="pb-2 text-sm text-fg-subtle">{t('issue.noActivity')}</p>
-              )}
-              <ul className="space-y-2">
-                {issue.activity.map((a) => (
-                  <li key={a.id} className="flex items-baseline gap-2.5 text-[13px]">
-                    <span className="w-16 shrink-0 font-mono text-fg-subtle">
-                      {formatRelative(a.at)}
-                    </span>
-                    <span className="rounded bg-raised px-1.5 font-mono text-xs text-fg-muted">
-                      {a.kind}
-                    </span>
-                    <span className="text-fg-muted">
-                      {a.actorEmail ?? t('issue.system')} · {summarizeActivity(a.body)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-3 flex items-center gap-2">
-                <Input
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder={t('issue.note')}
-                  aria-label={t('issue.note')}
-                  className="min-w-0 max-w-96 flex-1 text-sm"
-                />
-                <Button
-                  size="sm"
-                  disabled={busy || note.trim().length === 0}
-                  onClick={() =>
-                    void act(async () => {
-                      await api.addNote(issue.id, note.trim());
-                      setNote('');
-                    })
-                  }
-                >
-                  {t('issue.addNote')}
-                </Button>
-                {me.role === 'superadmin' && (
-                  <AssignSelect issue={issue} onDone={reload} />
+                </div>
+              </FoldPanel>
+            )}
+            {device && (
+              <FoldPanel title={t('issue.environment')}>
+                <dl className="grid grid-cols-2 gap-x-8 gap-y-1.5 p-4 font-mono text-[13px] sm:grid-cols-3">
+                  {Object.entries(device)
+                    .filter(([, v]) => typeof v !== 'object')
+                    .map(([k, v]) => (
+                      <div key={k} className="flex justify-between gap-2">
+                        <dt className="text-fg-subtle">{k}</dt>
+                        <dd className="truncate text-fg-muted">{String(v)}</dd>
+                      </div>
+                    ))}
+                </dl>
+              </FoldPanel>
+            )}
+            <FoldPanel
+              title={`${t('issue.activity')}${issue.activity.length ? ` (${issue.activity.length})` : ''}`}
+            >
+              <div className="p-4">
+                {issue.activity.length === 0 && (
+                  <p className="pb-2 text-sm text-fg-subtle">{t('issue.noActivity')}</p>
                 )}
+                <ul className="space-y-2">
+                  {issue.activity.map((a) => (
+                    <li key={a.id} className="flex items-baseline gap-2.5 text-[13px]">
+                      <span className="w-16 shrink-0 font-mono text-fg-subtle">
+                        {formatRelative(a.at)}
+                      </span>
+                      <span className="rounded bg-raised px-1.5 font-mono text-xs text-fg-muted">
+                        {a.kind}
+                      </span>
+                      <span className="text-fg-muted">
+                        {a.actorEmail ?? t('issue.system')} · {summarizeActivity(a.body)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-3 flex items-center gap-2">
+                  <Input
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder={t('issue.note')}
+                    aria-label={t('issue.note')}
+                    className="min-w-0 max-w-96 flex-1 text-sm"
+                  />
+                  <Button
+                    size="sm"
+                    disabled={busy || note.trim().length === 0}
+                    onClick={() =>
+                      void act(async () => {
+                        await api.addNote(issue.id, note.trim());
+                        setNote('');
+                      })
+                    }
+                  >
+                    {t('issue.addNote')}
+                  </Button>
+                  {me.role === 'superadmin' && (
+                    <AssignSelect issue={issue} onDone={reload} />
+                  )}
+                </div>
               </div>
-            </div>
-          </FoldPanel>
+            </FoldPanel>
+          </div>
         </div>
       </div>
+
+      {/* ── the minute itself: the case's narrative spine ── */}
+      <TimelineStrip
+        signals={(payload?.signals ?? []) as { t: number; kind: string; data?: Record<string, unknown> }[]}
+        frameTimes={frameTimes}
+        context={contextEvents}
+        issueKind={issue.kind}
+        onSeek={replaySeekable ? seekReplay : undefined}
+      />
     </div>
   );
-}
-
-/// The signal timeline — a readable rendering of the last 30
-/// seconds, ending on the moment the event fired.
-function Timeline({
-  signals,
-  kind,
-  onSeek,
-}: {
-  signals: Signal[];
-  kind: IssueDetailT['kind'];
-  /** When the case has a same-event replay, a moment is a link:
-   *  clicking a row jumps the replay to that instant. */
-  onSeek?: (t: number) => void;
-}) {
-  const t = useT();
-  const rows = useMemo(() => [...signals].sort((a, b) => a.t - b.t), [signals]);
-  return (
-    <ol className="ml-1.5 border-l border-border pl-5">
-      {rows.map((s, i) => (
-        <li key={i} className="relative mb-0.5 text-[13px]">
-          <span
-            className="absolute -left-[25px] top-[9px] h-2 w-2 rounded-full"
-            style={{ backgroundColor: signalColor(s.kind) }}
-          />
-          <button
-            type="button"
-            disabled={!onSeek}
-            onClick={() => onSeek?.(s.t)}
-            title={onSeek ? t('issue.seekReplay') : undefined}
-            className={`-ml-1.5 flex w-full items-baseline gap-2.5 rounded px-1.5 py-1 text-left ${
-              onSeek ? 'cursor-pointer hover:bg-raised' : 'cursor-default'
-            }`}
-          >
-            <span className="inline-block w-12 shrink-0 text-right font-mono tabular-nums text-fg-subtle">
-              {s.t.toFixed(1)}s
-            </span>
-            <span
-              className="shrink-0 font-mono text-[11px] uppercase tracking-wide"
-              style={{ color: signalColor(s.kind) }}
-            >
-              {s.kind}
-            </span>
-            <span className="min-w-0 truncate font-mono text-fg-muted">
-              {summarizeSignal(s)}
-            </span>
-          </button>
-        </li>
-      ))}
-      <li className="relative text-[13px] font-semibold" style={{ color: kindColor(kind) }}>
-        <span
-          className="absolute -left-[26px] top-[4px] h-2.5 w-2.5 rounded-full"
-          style={{ backgroundColor: kindColor(kind) }}
-        />
-        <span className="mr-2.5 inline-block w-12 text-right font-mono tabular-nums">
-          0.0s
-        </span>
-        <span>{t('issue.eventMoment', { kind })}</span>
-      </li>
-    </ol>
-  );
-}
-
-/** Timeline hues borrow the five kind hues so the palette keeps one
- *  concept model: nav reads calm, freeze reads like the error it
- *  usually precedes. */
-function signalColor(kind: string): string {
-  switch (kind) {
-    case 'nav':
-      return 'var(--s-kind-trace)';
-    case 'tap':
-      return 'var(--s-kind-warn)';
-    case 'http':
-      return 'var(--s-kind-assert)';
-    case 'trace':
-      return 'var(--s-kind-probe)';
-    case 'freeze':
-      return 'var(--s-kind-error)';
-    default:
-      return 'var(--gds-fg-muted)';
-  }
-}
-
-function summarizeSignal(s: Signal): string {
-  const d = s.data ?? {};
-  const parts = Object.entries(d)
-    .filter(([, v]) => v !== undefined && v !== null)
-    .slice(0, 4)
-    .map(([k, v]) => `${k}=${String(v)}`);
-  return parts.join(' ');
 }
 
 function summarizeActivity(body: Record<string, unknown>): string {
@@ -495,9 +431,15 @@ function OccRow({ row, active }: { row: OccurrenceRow; active: boolean }) {
     >
       <span className="text-fg-subtle">{formatRelative(row.receivedAt)}</span>
       <span className="text-fg">{row.platform}</span>
-      <span className="text-fg-muted">{row.release}</span>
+      <span className="text-fg-muted" title={row.release}>
+        {formatRelease(row.release)}
+      </span>
       <span className="text-fg-subtle">{row.environment}</span>
-      {row.userKey && <span className="text-fg-subtle/70">{row.userKey.slice(0, 8)}</span>}
+      {row.userKey && (
+        <span className="text-fg-subtle">
+          <UserChip userKey={row.userKey} />
+        </span>
+      )}
     </div>
   );
 }

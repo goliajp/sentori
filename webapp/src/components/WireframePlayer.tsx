@@ -88,12 +88,15 @@ const CANVAS_PX = 640;
 export function WireframePlayer({
   attachmentRef,
   seek,
+  onFrames,
 }: {
   attachmentRef: string;
   /** Timeline → replay: jump to the frame nearest this moment
    *  (seconds relative to the event, negative). Frame timestamps
    *  are absolute ms; the last frame is ~the event moment. */
   seek?: { t: number; n: number } | null;
+  /** Replay → timeline: the loaded frame moments (relative s). */
+  onFrames?: (times: number[]) => void;
 }) {
   const t = useT();
   const [frames, setFrames] = useState<Frame[] | null>(null);
@@ -119,6 +122,16 @@ export function WireframePlayer({
       alive = false;
     };
   }, [attachmentRef]);
+
+  // Report loaded frame moments upward (relative seconds; the last
+  // frame anchors the event). A separate effect, NOT the fetch
+  // closure — see ReplayPlayer for the fallback-race rationale.
+  useEffect(() => {
+    if (frames && frames.length > 0) {
+      const last = frames[frames.length - 1]!.ts;
+      onFrames?.(frames.map((f) => (f.ts - last) / 1000));
+    }
+  }, [frames, onFrames]);
 
   // Seek applies during render (the adjust-state-from-props pattern)
   // — an effect would be a cascading second render for no gain.
@@ -302,7 +315,10 @@ export function WireframePlayer({
         }
       }}
     >
-      <div className="flex aspect-square w-full items-center justify-center bg-bg p-3">
+      {/* Always a bounded square: below the xl split the panel goes
+          full-width and an uncapped aspect-square balloons into a
+          viewport-sized block. */}
+      <div className="mx-auto flex aspect-square w-full max-w-[440px] items-center justify-center bg-bg p-3">
         <canvas
           ref={canvasRef}
           width={CANVAS_PX}

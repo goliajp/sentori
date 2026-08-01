@@ -131,6 +131,10 @@ body,
  */
 body {
   margin: 0;
+  /* The app is absolutely positioned into the viewport; the page
+   * itself must never scroll — every scroll area is an explicit
+   * interior region. */
+  overflow: hidden;
   background-color: var(--gds-canvas);
   color: var(--gds-fg);
   font-family: var(--font-sans);

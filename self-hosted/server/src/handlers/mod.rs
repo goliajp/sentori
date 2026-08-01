@@ -235,6 +235,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         )
         // events + attachments (reached from issues, never browsed)
         .route("/admin/api/events/{event_id}", get(events::get))
+        .route("/admin/api/events/{event_id}/context", get(events::context))
         .route("/admin/api/attachments/{ref}", get(attachments::get))
         // releases + artifacts
         .route(

@@ -2,6 +2,8 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
+import pkg from './package.json' with { type: 'json' };
+
 // Sentori webapp Vite config.
 // - Default dev server proxies /v1 + /healthz to the local
 //   self-hosted server on :8080 so the dashboard works in
@@ -9,6 +11,9 @@ import { defineConfig } from 'vite';
 // - Production build emits static assets that any HTTP
 //   server (Caddy, nginx, GitHub Pages) can serve.
 export default defineConfig({
+  // The status bar reads this — bump webapp/package.json on every
+  // webapp change so what's deployed is always identifiable.
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   plugins: [tailwindcss(), react()],
   server: {
     port: 3000,

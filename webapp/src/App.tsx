@@ -1,11 +1,20 @@
-import { useSetThemeMode, useTheme, useThemeEffect } from '@goliapkg/gds/systems';
+import {
+  useSetThemeElevation,
+  useSetThemeGlass,
+  useSetThemeMode,
+  useSetThemePrimaryColor,
+  useTheme,
+  useThemeEffect,
+} from '@goliapkg/gds/systems';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 
 import { CommandPalette, openPalette } from './components/CommandPalette';
 import { useT } from './i18n';
 import { api, type Me, type Project } from './lib/api';
-import type { ThemeMode } from './lib/theme';
+import { BRAND, type ThemeMode } from './lib/theme';
+
+import goliaMark from './assets/golia-mark.svg';
 
 /// Shell context: who is logged in + which projects are visible.
 /// Pages read the project scope from here instead of re-fetching.
@@ -32,6 +41,7 @@ export function App() {
   const [me, setMe] = useState<Me | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   useThemeEffect();
+  useBrandInk();
 
   useEffect(() => {
     // Boot probe: a 401 inside api.authMe() redirects to /login.
@@ -62,9 +72,13 @@ export function App() {
 
   return (
     <ShellContext.Provider value={{ me, projects, reloadProjects }}>
-      <div className="flex h-screen overflow-hidden bg-canvas">
+      {/* The app owns the viewport absolutely: the page never
+          scrolls; every scroll area is an explicit interior region. */}
+      <div className="fixed inset-0 flex flex-col bg-canvas">
+      <div className="flex min-h-0 flex-1">
         <aside className="flex w-48 shrink-0 flex-col border-r border-border bg-bg p-2.5">
-          <div className="mb-5 px-2.5 pt-1.5">
+          <div className="mb-5 flex items-center gap-2 px-2.5 pt-1.5">
+            <img src={goliaMark} alt="GOLIA" className="h-4.5 w-4.5" />
             <span className="text-[15px] font-semibold tracking-tight">sentori</span>
           </div>
           <nav className="flex flex-col gap-0.5">
@@ -112,10 +126,52 @@ export function App() {
             <Outlet />
           </main>
         </div>
-        <CommandPalette />
+      </div>
+      <StatusBar />
+      <CommandPalette />
       </div>
     </ShellContext.Provider>
   );
+}
+
+/// The frame's ground line: who made this, which build is talking.
+/// The webapp version is compiled in from package.json; the server
+/// version comes from the instance actually answering.
+function StatusBar() {
+  const [server, setServer] = useState<string | null>(null);
+  useEffect(() => {
+    fetch('/healthz')
+      .then((r) => r.json())
+      .then((j: { version?: string }) => setServer(j.version ?? null))
+      .catch(() => undefined);
+  }, []);
+  return (
+    <footer className="flex h-6 shrink-0 items-center gap-2 border-t border-border bg-bg px-3 font-mono text-[11px] text-fg-subtle">
+      <img src={goliaMark} alt="" aria-hidden className="h-3 w-3 opacity-80" />
+      <span>GOLIA · sentori</span>
+      <span className="ml-auto flex items-center gap-3 tabular-nums">
+        <span>webapp v{__APP_VERSION__}</span>
+        {server && <span>server v{server}</span>}
+      </span>
+    </footer>
+  );
+}
+
+/// GDS's theme atom snapshots storage at module load — before
+/// initTheme ran — so on a first visit the atom still holds the GDS
+/// default and its repaint would wash the brand ink off. This
+/// converges the atom to the brand once per divergence; mode stays
+/// whatever the user picked.
+function useBrandInk() {
+  const theme = useTheme();
+  const setPrimary = useSetThemePrimaryColor();
+  const setElevation = useSetThemeElevation();
+  const setGlass = useSetThemeGlass();
+  useEffect(() => {
+    if (theme.primaryColor !== BRAND.primaryColor) setPrimary(BRAND.primaryColor);
+    if (theme.elevation !== BRAND.elevation) setElevation(BRAND.elevation);
+    if (theme.glass !== BRAND.glass) setGlass(BRAND.glass);
+  }, [theme.primaryColor, theme.elevation, theme.glass, setPrimary, setElevation, setGlass]);
 }
 
 /// Three-state theme switch. GDS owns the state + persistence; this

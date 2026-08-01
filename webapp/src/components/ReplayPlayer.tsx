@@ -21,12 +21,15 @@ const PLAYBACK_SPEED = 4;
 export function ReplayPlayer({
   attachmentRef,
   seek,
+  onFrames,
 }: {
   attachmentRef: string;
   /** Timeline → replay: jump to the frame nearest this moment
    *  (seconds relative to the event, negative). `n` re-arms the
    *  same instant twice in a row. */
   seek?: { t: number; n: number } | null;
+  /** Replay → timeline: the loaded frame moments (relative s). */
+  onFrames?: (times: number[]) => void;
 }) {
   const t = useT();
   const [frames, setFrames] = useState<null | ReplayFrame[]>(null);
@@ -56,6 +59,14 @@ export function ReplayPlayer({
       alive = false;
     };
   }, [attachmentRef]);
+
+  // Report loaded frame moments upward. A separate effect, NOT the
+  // fetch closure: the player can mount via the occurrence-fallback
+  // race with `onFrames` still undefined, and the fetch effect never
+  // re-runs for a prop identity change.
+  useEffect(() => {
+    if (frames) onFrames?.(frames.map((f) => f.t));
+  }, [frames, onFrames]);
 
   // Advance on a per-frame timer scaled by the real inter-frame gap.
   // The end-of-strip stop happens inside the timer callback (never
@@ -137,7 +148,10 @@ export function ReplayPlayer({
           phone or a tablet sends landscape — a square is the one
           shape that letterboxes both gracefully instead of betting
           on an orientation. */}
-      <div className="flex aspect-square w-full items-center justify-center bg-bg p-3">
+      {/* Always a bounded square: below the xl split the panel goes
+          full-width and an uncapped aspect-square balloons into a
+          viewport-sized block. */}
+      <div className="mx-auto flex aspect-square w-full max-w-[440px] items-center justify-center bg-bg p-3">
         {src && (
           <img
             src={src}

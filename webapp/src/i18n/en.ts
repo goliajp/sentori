@@ -49,6 +49,9 @@ export const en = {
   'inbox.selectedCount': '{n} selected',
   'inbox.clearSelection': 'Clear',
 
+  'identity.copied': 'Copied',
+  'identity.copyHint': 'Copy the full user key',
+
   'instruments.assertRan': 'ran {total} · failed {failed}',
   'instruments.asserts': 'Assertions',
   'instruments.assertsEmpty':
@@ -99,10 +102,8 @@ export const en = {
     'No visual replay came with this event — set replayScreens: true in the SDK to capture the minute before.',
   'issue.resolve': 'Resolve',
   'issue.resolveInRelease': 'Fixed in release',
-  'issue.seekReplay': 'Jump the replay to this moment',
   'issue.system': 'system',
   'issue.timeline': 'What the user was doing',
-  'issue.timelineEmpty': 'No signals arrived with this event.',
   'issue.unassigned': 'Unassigned',
 
   'nav.inbox': 'Inbox',
@@ -179,6 +180,10 @@ export const en = {
   'triage.pickTitle': 'Pick an issue from the queue',
 
   'shell.loading': 'Loading…',
+
+  'strip.events': 'events',
+  'strip.frames': 'frames',
+  'strip.signals': 'actions',
   'theme.dark': 'Dark',
   'theme.label': 'Theme',
   'theme.light': 'Light',
