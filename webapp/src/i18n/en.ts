@@ -72,7 +72,6 @@ export const en = {
   'issue.back': 'Inbox',
   'issue.copied': 'Copied',
   'issue.copyForAi': 'Copy for AI',
-  'issue.device': 'Device',
   'issue.eventMoment': '{kind} fired',
   'issue.environment': 'Environment',
   'issue.firstSeen': 'first',
@@ -81,10 +80,14 @@ export const en = {
   'issue.guardProbeHint':
     'Plant sentori.probe(ref) in the fixed branch — a silent probe is proof the fix holds.',
   'issue.guardTitle': 'Guard status',
+  'issue.handoff': 'Fix it',
+  'issue.handoffHint':
+    'One paste for your AI: the failing code, the journey, the environment.',
   'issue.guardUnanchored':
     'Resolved without a release anchor — any later recurrence reopens this.',
   'issue.ignore': 'Ignore',
   'issue.lastSeen': 'last',
+  'issue.latestCase': 'latest',
   'issue.loadFailed': 'Could not load this issue.',
   'issue.noActivity': 'No activity yet',
   'issue.note': 'Note',

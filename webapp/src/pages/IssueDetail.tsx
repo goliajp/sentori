@@ -106,6 +106,7 @@ export default function IssueDetail() {
   const project = projects.find((p) => p.id === issue.projectId);
   const surface = issue.surface as { screen?: string; element?: string };
   const hasStack = !!payload?.error?.stack && payload.error.stack.length > 0;
+  const device = payload?.device;
 
   return (
     <div className="mx-auto max-w-[1760px] px-7 py-5">
@@ -118,74 +119,50 @@ export default function IssueDetail() {
         >
           ← {t('issue.back')}
         </button>
-        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-          <div className="min-w-0">
-            <div className="mb-1.5 flex items-center gap-2">
-              <KindBadge kind={issue.kind} />
-              {issue.regressedAt && issue.status === 'open' && <RegressedBadge />}
-              <span className="text-sm text-fg-subtle">{project?.name}</span>
-              {surface.screen && (
-                <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
-                  {surface.screen}
-                  {surface.element ? ` · ${surface.element}` : ''}
-                </span>
-              )}
-            </div>
-            <h1 className="text-xl font-semibold tracking-tight">{issue.title}</h1>
-            {issue.messageSample && (
-              <p className="mt-1 text-[15px] text-fg-muted">{issue.messageSample}</p>
+        <div className="min-w-0">
+          <div className="mb-1.5 flex items-center gap-2">
+            <KindBadge kind={issue.kind} />
+            {issue.regressedAt && issue.status === 'open' && <RegressedBadge />}
+            <span className="text-sm text-fg-subtle">{project?.name}</span>
+            {surface.screen && (
+              <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
+                {surface.screen}
+                {surface.element ? ` · ${surface.element}` : ''}
+              </span>
             )}
-            <div className="mt-2.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[13px] tabular-nums text-fg-muted">
-              <span className="text-fg">
-                {issue.usersCount}u × {issue.maxPerUser} · {issue.eventCount}ev
-              </span>
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight">{issue.title}</h1>
+          {issue.messageSample && (
+            <p className="mt-1 text-[15px] text-fg-muted">{issue.messageSample}</p>
+          )}
+          <div className="mt-2.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[13px] tabular-nums text-fg-muted">
+            <span className="text-fg">
+              {issue.usersCount}u × {issue.maxPerUser} · {issue.eventCount}ev
+            </span>
+            <span>
+              {t('issue.firstSeen')} {formatRelative(issue.firstSeen)}
+            </span>
+            <span>
+              {t('issue.lastSeen')} {formatRelative(issue.lastSeen)}
+            </span>
+            {issue.lastRelease && <span>{issue.lastRelease}</span>}
+          </div>
+          {/* who / when / on what — the latest case, one line. The
+              narrative's opening facts, not a folded appendix. */}
+          {latest && (
+            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[13px] text-fg-muted">
+              <span className="text-fg-subtle">{t('issue.latestCase')}</span>
+              {latest.userKey && <span className="text-fg">{latest.userKey}</span>}
+              <span>{formatRelative(latest.occurredAt)}</span>
               <span>
-                {t('issue.firstSeen')} {formatRelative(issue.firstSeen)}
+                {[device?.model, device?.os && `${String(device.os)} ${String(device.osVersion ?? '')}`.trim()]
+                  .filter(Boolean)
+                  .join(' · ')}
               </span>
-              <span>
-                {t('issue.lastSeen')} {formatRelative(issue.lastSeen)}
-              </span>
-              {issue.lastRelease && <span>{issue.lastRelease}</span>}
+              {device?.appVersion !== undefined && <span>app {String(device.appVersion)}</span>}
+              <span>{latest.environment}</span>
             </div>
-          </div>
-
-          {/* triage toolbar — obligation, compressed to one row */}
-          <div className="flex shrink-0 items-center gap-2">
-            {issue.status === 'open' ? (
-              <>
-                <Input
-                  value={resolveRelease}
-                  onChange={(e) => setResolveRelease(e.target.value)}
-                  placeholder={issue.lastRelease || 'app@x.y.z'}
-                  title={t('issue.resolveInRelease')}
-                  aria-label={t('issue.resolveInRelease')}
-                  className="w-44 font-mono text-xs"
-                />
-                <Button
-                  disabled={busy}
-                  onClick={() =>
-                    void act(() => api.resolveIssue(issue.id, resolveRelease || undefined))
-                  }
-                >
-                  {t('issue.resolve')}
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => void act(() => api.ignoreIssue(issue.id))}
-                >
-                  {t('issue.ignore')}
-                </Button>
-              </>
-            ) : (
-              <Button disabled={busy} onClick={() => void act(() => api.reopenIssue(issue.id))}>
-                {t('issue.reopen')}
-              </Button>
-            )}
-            <Button variant="primary" onClick={() => void copyForAi()}>
-              {copied ? t('issue.copied') : t('issue.copyForAi')}
-            </Button>
-          </div>
+          )}
         </div>
       </header>
 
@@ -252,6 +229,28 @@ export default function IssueDetail() {
                 </li>
               ))}
             </ul>
+            <div className="mt-3 flex items-center gap-2">
+              <Input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={t('issue.note')}
+                aria-label={t('issue.note')}
+                className="min-w-0 max-w-96 flex-1 text-sm"
+              />
+              <Button
+                size="sm"
+                disabled={busy || note.trim().length === 0}
+                onClick={() =>
+                  void act(async () => {
+                    await api.addNote(issue.id, note.trim());
+                    setNote('');
+                  })
+                }
+              >
+                {t('issue.addNote')}
+              </Button>
+              {me.role === 'superadmin' && <AssignSelect issue={issue} onDone={reload} />}
+            </div>
           </Section>
         </div>
 
@@ -267,7 +266,56 @@ export default function IssueDetail() {
               </p>
             )}
 
-            {payload?.device && <DeviceCard device={payload.device} />}
+            {/* the narrative's last stop: what to do about it. The
+                AI copy is the primary exit — it carries the code,
+                the journey and the environment in one paste. */}
+            <div className="rounded-md border border-accent/40 bg-surface p-3.5">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+                {t('issue.handoff')}
+              </div>
+              <p className="mb-3 text-sm text-fg-muted">{t('issue.handoffHint')}</p>
+              <div className="flex flex-col gap-2">
+                <Button variant="primary" onClick={() => void copyForAi()}>
+                  {copied ? t('issue.copied') : t('issue.copyForAi')}
+                </Button>
+                {issue.status === 'open' ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={resolveRelease}
+                      onChange={(e) => setResolveRelease(e.target.value)}
+                      placeholder={issue.lastRelease || 'app@x.y.z'}
+                      title={t('issue.resolveInRelease')}
+                      aria-label={t('issue.resolveInRelease')}
+                      className="min-w-0 flex-1 font-mono text-xs"
+                    />
+                    <Button
+                      size="sm"
+                      disabled={busy}
+                      onClick={() =>
+                        void act(() => api.resolveIssue(issue.id, resolveRelease || undefined))
+                      }
+                    >
+                      {t('issue.resolve')}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => void act(() => api.ignoreIssue(issue.id))}
+                    >
+                      {t('issue.ignore')}
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    disabled={busy}
+                    onClick={() => void act(() => api.reopenIssue(issue.id))}
+                  >
+                    {t('issue.reopen')}
+                  </Button>
+                )}
+              </div>
+            </div>
 
             {/* guard status — "fixed" and "verified fixed" are two
                 different states, and this card is where that shows */}
@@ -283,30 +331,6 @@ export default function IssueDetail() {
               </div>
             )}
 
-            <div className="rounded-md border border-border bg-surface p-3.5">
-              <label className="mb-1.5 block text-xs text-fg-subtle">{t('issue.note')}</label>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                rows={2}
-                className="mb-2 w-full rounded border border-border bg-transparent px-2.5 py-1.5 text-sm text-fg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-accent"
-              />
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  size="sm"
-                  disabled={busy || note.trim().length === 0}
-                  onClick={() =>
-                    void act(async () => {
-                      await api.addNote(issue.id, note.trim());
-                      setNote('');
-                    })
-                  }
-                >
-                  {t('issue.addNote')}
-                </Button>
-                {me.role === 'superadmin' && <AssignSelect issue={issue} onDone={reload} />}
-              </div>
-            </div>
           </div>
         </aside>
       </div>
@@ -425,33 +449,6 @@ function summarizeActivity(body: Record<string, unknown>): string {
   }
   if (typeof body.in_release === 'string') return `↩ ${String(body.in_release)}`;
   return JSON.stringify(body);
-}
-
-/** The four facts about the machine a triager reaches for first;
- *  the full dictionary stays in the folded Environment corner. */
-const DEVICE_KEYS = ['os', 'osVersion', 'model', 'appVersion', 'locale', 'freeMemMb'];
-
-function DeviceCard({ device }: { device: Record<string, unknown> }) {
-  const t = useT();
-  const rows = DEVICE_KEYS.map((k) => [k, device[k]] as const).filter(
-    ([, v]) => v !== undefined && v !== null && typeof v !== 'object',
-  );
-  if (rows.length === 0) return null;
-  return (
-    <div className="rounded-md border border-border bg-surface p-3.5">
-      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
-        {t('issue.device')}
-      </div>
-      <dl className="space-y-1 font-mono text-[13px]">
-        {rows.map(([k, v]) => (
-          <div key={k} className="flex justify-between gap-3">
-            <dt className="text-fg-subtle">{k}</dt>
-            <dd className="truncate text-fg">{String(v)}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
 }
 
 function OccRow({ row, active }: { row: OccurrenceRow; active: boolean }) {
