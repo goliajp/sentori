@@ -29,14 +29,16 @@ type Node = {
   color?: string;
 };
 
+type WireNode = Node & { at?: number; id?: string };
+
 type Frame =
   | { ts: number; kind: 'key'; width: number; height: number; nodes: Node[] }
   | {
       ts: number;
       kind: 'delta';
-      added: Node[];
-      changed: Node[];
-      removed: Pick<Node, 'x' | 'y' | 'w' | 'h'>[];
+      added: WireNode[];
+      changed: WireNode[];
+      removed: (Pick<Node, 'x' | 'y' | 'w' | 'h'> & { id?: string })[];
     };
 
 /** NDJSON to frames. One malformed line must not cost the whole
@@ -57,6 +59,29 @@ function decodeFrames(text: string): Frame[] {
 
 const fp = (n: Pick<Node, 'x' | 'y' | 'w' | 'h'>) =>
   `${n.x | 0},${n.y | 0},${n.w | 0},${n.h | 0}`;
+
+type Entry = { id: string; node: Node };
+
+/** Ids for a keyframe's nodes: geometry + occurrence, the same
+ *  derivation the SDK uses — so SDK-minted delta ids land on the
+ *  entries a keyframe created. */
+function indexKeyNodes(nodes: Node[]): Entry[] {
+  const seen = new Map<string, number>();
+  return nodes.map((node) => {
+    const base = fp(node);
+    const occ = seen.get(base) ?? 0;
+    seen.set(base, occ + 1);
+    return { id: `${base}#${occ}`, node };
+  });
+}
+
+/** Pre-5.1.4 recordings carry no ids — fall back to the first entry
+ *  with matching geometry (the old, ambiguous behaviour, kept only
+ *  for old data). */
+function findLegacy(order: Entry[], n: Pick<Node, 'x' | 'y' | 'w' | 'h'>): number {
+  const base = fp(n);
+  return order.findIndex((e) => e.id.startsWith(`${base}#`));
+}
 
 const CANVAS_PX = 640;
 
@@ -87,26 +112,49 @@ export function WireframePlayer({ attachmentRef }: { attachmentRef: string }) {
   }, [attachmentRef]);
 
   /** Screen size comes from the most recent keyframe at or before the
-   *  playhead — a rotation mid-recording changes it. */
+   *  playhead — a rotation mid-recording changes it.
+   *
+   *  Reconstruction keeps an ORDERED entry list, never a
+   *  geometry-keyed Map: a page root and the fullscreen overlay
+   *  covering it share x/y/w/h, and a Map collapsed them into one
+   *  node at the wrong z-position — the replay drew the page
+   *  through its own opaque overlay (insight 2026-08-01). The
+   *  keyframe's array order IS the native paint order; deltas
+   *  locate entries by the SDK-minted id (geometry#occurrence). */
   const { nodes, width, height } = useMemo(() => {
-    if (!frames?.length) return { nodes: [], width: 0, height: 0 };
-    const state = new Map<string, Node>();
+    if (!frames?.length) return { nodes: [] as Node[], width: 0, height: 0 };
+    let order: Entry[] = [];
     let w = 0;
     let h = 0;
     for (let i = 0; i <= Math.min(index, frames.length - 1); i++) {
       const f = frames[i]!;
       if (f.kind === 'key') {
-        state.clear();
-        for (const n of f.nodes) state.set(fp(n), n);
+        order = indexKeyNodes(f.nodes);
         w = f.width;
         h = f.height;
       } else {
-        for (const n of f.removed) state.delete(fp(n));
-        for (const n of f.added) state.set(fp(n), n);
-        for (const n of f.changed) state.set(fp(n), n);
+        for (const n of f.removed) {
+          const at = n.id ? order.findIndex((e) => e.id === n.id) : findLegacy(order, n);
+          if (at >= 0) order.splice(at, 1);
+        }
+        for (const n of f.changed) {
+          const at = n.id ? order.findIndex((e) => e.id === n.id) : findLegacy(order, n);
+          if (at >= 0) order[at] = { id: order[at]!.id, node: n };
+        }
+        for (const n of f.added) {
+          const id = n.id ?? `${fp(n)}#new${i}`;
+          const existing = order.findIndex((e) => e.id === id);
+          if (existing >= 0) {
+            order[existing] = { id, node: n };
+          } else if (typeof n.at === 'number' && n.at >= 0 && n.at <= order.length) {
+            order.splice(n.at, 0, { id, node: n });
+          } else {
+            order.push({ id, node: n });
+          }
+        }
       }
     }
-    return { nodes: [...state.values()], width: w, height: h };
+    return { nodes: order.map((e) => e.node), width: w, height: h };
   }, [frames, index]);
 
   // Playback steps frame-to-frame at the recording's own pacing,
