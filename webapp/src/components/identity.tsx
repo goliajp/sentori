@@ -9,6 +9,7 @@
 // comparable across rows) + a four-character tag, and the full key
 // one click away on the clipboard.
 
+import { Check } from 'lucide-react';
 import { useState } from 'react';
 
 import { useT } from '../i18n';
@@ -43,7 +44,11 @@ export function UserChip({ userKey }: { userKey: string }) {
         className="h-2 w-2 rounded-full"
         style={{ backgroundColor: `hsl(${hue} 55% 55%)` }}
       />
-      <span>{copied ? '✓' : `#${tag}`}</span>
+      {copied ? (
+        <Check aria-hidden className="h-3 w-3 text-ok" />
+      ) : (
+        <span>#{tag}</span>
+      )}
     </button>
   );
 }

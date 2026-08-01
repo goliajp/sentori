@@ -104,3 +104,37 @@ it('SDK_VERSION constant matches package.json (staleness gate)', async () => {
   const pkg = (await import('../../package.json')) as { default?: { version?: string }; version?: string };
   expect(__sdkVersion()).toBe(pkg.default?.version ?? pkg.version);
 });
+
+it('the batch envelope carries backendHealthUrl when configured', async () => {
+  const { __resetForTests, enqueue, flush, startTransport } = await import('../transport');
+  const { __resetForTests: resetCfg, setConfig } = await import('../config');
+  __resetForTests();
+  resetCfg();
+  setConfig({
+    token: 'st_t',
+    ingestUrl: 'http://localhost:1',
+    release: 'a@1',
+    environment: 'test',
+    enabled: true,
+    detect: { rageTap: false, longFreeze: false, slowColdStart: false, slowApi: false },
+    replaySeconds: 0,
+    replayScreens: false,
+    backendHealthUrl: 'https://api.example.com/healthz',
+  });
+  startTransport();
+  const seen: unknown[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = ((url: unknown, opts: { body?: string }) => {
+    seen.push(JSON.parse(opts.body ?? '{}'));
+    return Promise.resolve(new Response('{}', { status: 200 }));
+  }) as typeof fetch;
+  try {
+    enqueue({ id: 'e1', kind: 'trace', occurredAt: 'now', platform: 'ios', release: 'a@1', environment: 'test', payload: {} } as never);
+    await flush();
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  expect((seen[0] as { backendHealthUrl?: string }).backendHealthUrl).toBe(
+    'https://api.example.com/healthz',
+  );
+});

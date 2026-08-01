@@ -44,6 +44,7 @@ export const ja: Messages = {
   'inbox.selectedCount': '{n} 件選択中',
   'inbox.clearSelection': '選択解除',
 
+  'health.backend': 'バックエンド',
   'health.replay': 'リプレイ',
   'health.silent': 'イベントなし',
 
@@ -106,6 +107,7 @@ export const ja: Messages = {
 
   'nav.inbox': '受信箱',
   'nav.instruments': '計測',
+  'nav.projects': 'プロジェクト',
   'nav.releases': 'リリース',
   'nav.settings': '設定',
 
@@ -122,6 +124,7 @@ export const ja: Messages = {
   'notify.testSending': '送信中…',
   'notify.testSent': 'テストメールを送信しました — 受信箱を確認してください。',
   'palette.placeholder': 'ページへ移動、または issue を検索…',
+
 
   'releases.emptyHint':
     'SDK がリリースを報告するか、CLI がアーティファクトをアップロードすると表示されます。',
@@ -161,7 +164,6 @@ export const ja: Messages = {
   'settings.tab.account': 'アカウント',
   'settings.tab.audit': '監査',
   'settings.tab.notifications': '通知',
-  'settings.tab.projects': 'プロジェクト',
   'settings.tab.tokens': 'トークン',
   'settings.tab.users': '管理者',
   'settings.tokenName': 'トークン名',
@@ -186,7 +188,6 @@ export const ja: Messages = {
   'theme.label': 'テーマ',
   'theme.light': 'ライト',
   'theme.system': 'システムに従う',
-  'shell.project': 'プロジェクト',
   'shell.roleAdmin': '管理者',
   'shell.roleOwner': 'オーナー',
 };

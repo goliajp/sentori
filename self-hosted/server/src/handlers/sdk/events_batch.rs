@@ -41,6 +41,11 @@ pub struct BatchEnvelope {
     pub events: Vec<WireEvent>,
     #[serde(default)]
     pub assert_stats: Vec<pipeline::AssertStat>,
+    /// The integrator's backend health URL, written in
+    /// `sentori.init()` and carried on every batch — the server
+    /// remembers it per project and probes it (backend_check_worker).
+    #[serde(default)]
+    pub backend_health_url: Option<String>,
 }
 
 pub async fn handle(
@@ -56,6 +61,25 @@ pub async fn handle(
                 "max": MAX_BATCH,
             })),
         );
+    }
+
+    if let Some(url) = envelope
+        .backend_health_url
+        .as_deref()
+        .filter(|u| u.len() <= 512 && (u.starts_with("http://") || u.starts_with("https://")))
+    {
+        // Written only on change — batches arrive every few seconds.
+        let r = sqlx::query(
+            "UPDATE projects SET backend_health_url = $2 \
+             WHERE id = $1 AND backend_health_url IS DISTINCT FROM $2",
+        )
+        .bind(ctx.project_id)
+        .bind(url)
+        .execute(&state.pool)
+        .await;
+        if let Err(e) = r {
+            warn!(project_id = %ctx.project_id, error = %e, "backend url update failed");
+        }
     }
 
     if !envelope.assert_stats.is_empty()

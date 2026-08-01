@@ -49,6 +49,7 @@ export const en = {
   'inbox.selectedCount': '{n} selected',
   'inbox.clearSelection': 'Clear',
 
+  'health.backend': 'backend',
   'health.replay': 'replay',
   'health.silent': 'no events yet',
 
@@ -111,6 +112,7 @@ export const en = {
 
   'nav.inbox': 'Inbox',
   'nav.instruments': 'Instruments',
+  'nav.projects': 'Projects',
   'nav.releases': 'Releases',
   'nav.settings': 'Settings',
 
@@ -128,6 +130,7 @@ export const en = {
   'notify.testSending': 'Sending…',
   'notify.testSent': 'Test email sent — check your inbox.',
   'palette.placeholder': 'Jump to a page or search issues…',
+
 
   'releases.emptyHint':
     'Releases appear when the SDK reports one or the CLI uploads artifacts.',
@@ -166,7 +169,6 @@ export const en = {
   'settings.tab.account': 'Account',
   'settings.tab.audit': 'Audit',
   'settings.tab.notifications': 'Notifications',
-  'settings.tab.projects': 'Projects',
   'settings.tab.tokens': 'Tokens',
   'settings.tab.users': 'Admins',
   'settings.tokenName': 'token name',
@@ -191,7 +193,6 @@ export const en = {
   'theme.label': 'Theme',
   'theme.light': 'Light',
   'theme.system': 'Match system',
-  'shell.project': 'Project',
   'shell.roleAdmin': 'Admin',
   'shell.roleOwner': 'Owner',
 } as const;

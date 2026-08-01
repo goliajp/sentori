@@ -1,115 +1,112 @@
 /*
- * Sentori dashboard — the local CSS layer.
+ * Sentori dashboard — the whole design token layer, self-owned.
  *
- * Colour, elevation, radius and both modes come from
- * @goliapkg/gds: the same design system golia.jp and the legacy
- * dashboard run on, so the three surfaces are one product rather
- * than three houses with similar paint. The blue accent, the
- * greys, the light-mode derivation — all of it arrives with the
- * tokens; nothing here re-invents a palette.
+ * No design-system dependency: two hand-tuned palettes (dark is the
+ * native one; light is re-inked to Jira-calibre contrast), the
+ * GOLIA brand purple as the single accent, and the five-kind hues
+ * doing double duty as the status colours — one concept model,
+ * everywhere. Type is the Jira posture: the platform's own UI
+ * fonts, 14px base, dense but never cramped.
  *
- * What this file owns: the type scale, the spacing rhythm, and the
- * few role names Sentori uses that GDS spells differently.
+ * Components speak only the semantic Tailwind names mapped below
+ * (`bg-surface`, `text-fg-muted`, `border-border`, `text-kind-*`);
+ * nothing outside this file may name a hex.
  */
-@import '@goliapkg/gds/tokens.css';
-@import '@goliapkg/gds/theme.css';
-@import '@goliapkg/gds/fonts.css';
 @import 'tailwindcss';
 
-/* Tailwind v4 only scans src/ by default, so utility classes that
- * exist solely inside GDS's compiled components never reach the
- * bundle and those components render as unstyled skeletons. */
-@source '../../node_modules/@goliapkg/gds/dist/**/*.js';
-
-/*
- * Role names Sentori uses that GDS spells differently, plus the two
- * severities it names in full. Declared after the GDS import so
- * these win.
- *
- * The `fg` ramp is three steps on purpose — primary, secondary,
- * faint — because a crash page leans on exactly that: the frame you
- * wrote, the file it lives in, and the line number beside it. GDS
- * calls the middle step `fg-secondary`; Sentori calls it `fg-muted`
- * and keeps `fg-subtle` for the faintest.
- */
-@theme inline {
-  /*
-   * The page canvas — what a card sits *on*.
-   *
-   * Elevation runs in opposite directions in the two modes: in dark a
-   * card lifts by getting lighter than the page, in light it lifts by
-   * staying white while the page steps back to grey. GDS gives both
-   * values but has no single name for "the thing behind the cards",
-   * so one is defined here and flipped by mode below. Without it,
-   * light mode put white cards on a white page and nothing lifted at
-   * all — the borders were doing the entire job.
-   */
-  --color-canvas: var(--gds-canvas);
-  --color-raised: var(--gds-bg-tertiary);
-  --color-fg-muted: var(--gds-fg-secondary);
-  --color-fg-subtle: var(--gds-fg-muted);
-  --color-warn: var(--gds-warning);
-  --color-ok: var(--gds-success);
-
-  /* The five-kind hues + the signal-timeline hues, resolved per
-   * mode below. Components must reach for these — a hex literal is
-   * a dark-mode-only decision someone made without saying so. */
-  --color-kind-error: var(--s-kind-error);
-  --color-kind-warn: var(--s-kind-warn);
-  --color-kind-trace: var(--s-kind-trace);
-  --color-kind-assert: var(--s-kind-assert);
-  --color-kind-probe: var(--s-kind-probe);
-
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
-  /* Reserved for the wordmark. A display face earns its place on a
-     name, not on every section heading — in a tool read at speed,
-     hierarchy is the job of size, weight and colour. */
-  --font-display: 'Roboto Flex', 'Inter', sans-serif;
-}
-
-/*
- * The canvas replay player cannot read Tailwind utilities, so it
- * samples these directly off the document.
- */
 :root {
-  --s-bg: var(--gds-bg);
-  --s-surface: var(--gds-surface);
-  --s-border-strong: var(--gds-border-strong);
-  --s-fg-muted: var(--gds-fg-secondary);
+  /* ── dark (native) ── */
+  --sn-bg: #101014;
+  --sn-canvas: #101014;
+  --sn-surface: #17171c;
+  --sn-raised: #23232b;
+  --sn-fg: #e7e7ec;
+  --sn-fg-muted: #a3a3ae;
+  --sn-fg-subtle: #767681;
+  --sn-border: #2a2a32;
+  --sn-border-strong: #3d3d47;
 
-  /*
-   * Kind hues, dark mode: bright enough to carry a badge on a dark
-   * card. The signal timeline borrows the same five hues (nav=trace,
-   * tap=warn, http=assert, trace-signal=probe, freeze=error) so the
-   * palette keeps teaching the same concept model.
-   */
+  /* GOLIA ink — the one accent (golia.jp / devops console purple),
+   * lifted slightly on dark so it carries on #17171c. */
+  --sn-accent: #8b45ff;
+  --sn-accent-hover: #9a5eff;
+  --sn-accent-fg: #ffffff;
+
+  /* The five-kind hues. The signal timeline borrows them
+   * (nav=trace, tap=warn, http=assert, trace-signal=probe,
+   * freeze=error), and the status roles below alias them — the
+   * palette keeps teaching the same model. */
   --s-kind-error: #ff5d5d;
   --s-kind-warn: #ffb340;
   --s-kind-trace: #7fa7c9;
   --s-kind-assert: #b18cff;
   --s-kind-probe: #4cd97b;
 
-  --gds-canvas: var(--gds-bg);
-
-  /* GDS's compact density sets body text to 13px. Raise its own
-     token rather than overriding the rule it feeds — otherwise the
-     two declarations sit in the cascade waiting for one of them to
-     move. See the note on the body rule below for why 14. */
-  --gds-text-body: 14px;
+  /* the canvas replay player samples these off the document */
+  --s-bg: var(--sn-bg);
+  --s-surface: var(--sn-surface);
+  --s-border-strong: var(--sn-border-strong);
+  --s-fg-muted: var(--sn-fg-muted);
+  --sn-mono-ink: var(--sn-fg-muted);
 }
 
 :root[data-theme='light'] {
-  --gds-canvas: var(--gds-bg-secondary);
+  /* ── light, Jira-calibre ink: hairlines that exist, secondary
+   * text that reads. ── */
+  --sn-bg: #f7f8fa;
+  --sn-canvas: #f1f2f5;
+  --sn-surface: #ffffff;
+  --sn-raised: #eceef2;
+  --sn-fg: #1c2128;
+  --sn-fg-muted: #404854;
+  --sn-fg-subtle: #68707e;
+  --sn-border: #d5d9e0;
+  --sn-border-strong: #aab1bc;
 
-  /* The same five hues, re-inked for white paper: darker and more
-   * saturated, because a colour that glows on #17171c washes out on
-   * #ffffff. Contrast target ≥ 4.5:1 as badge text on its 12% tint. */
+  --sn-accent: #7a2de0;
+  --sn-accent-hover: #6a1fd0;
+  --sn-accent-fg: #ffffff;
+
+  /* the same five hues, re-inked for white paper */
   --s-kind-error: #c93838;
   --s-kind-warn: #9a6700;
   --s-kind-trace: #3d6e99;
   --s-kind-assert: #6f42c1;
   --s-kind-probe: #1a7f4b;
+}
+
+@theme inline {
+  --color-bg: var(--sn-bg);
+  --color-canvas: var(--sn-canvas);
+  --color-surface: var(--sn-surface);
+  --color-raised: var(--sn-raised);
+  --color-fg: var(--sn-fg);
+  --color-fg-muted: var(--sn-fg-muted);
+  --color-fg-subtle: var(--sn-fg-subtle);
+  --color-border: var(--sn-border);
+  --color-border-strong: var(--sn-border-strong);
+  --color-accent: var(--sn-accent);
+  --color-accent-hover: var(--sn-accent-hover);
+  --color-accent-fg: var(--sn-accent-fg);
+
+  /* status = kind: one concept model */
+  --color-danger: var(--s-kind-error);
+  --color-warn: var(--s-kind-warn);
+  --color-ok: var(--s-kind-probe);
+  --color-kind-error: var(--s-kind-error);
+  --color-kind-warn: var(--s-kind-warn);
+  --color-kind-trace: var(--s-kind-trace);
+  --color-kind-assert: var(--s-kind-assert);
+  --color-kind-probe: var(--s-kind-probe);
+
+  /* Jira's posture: the platform's own faces, no font downloads. */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    'Hiragino Sans', 'Noto Sans CJK JP', 'PingFang SC', 'Microsoft YaHei',
+    sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
+    'Liberation Mono', monospace;
 }
 
 html,
@@ -119,15 +116,9 @@ body,
 }
 
 /*
- * 14px base, not 13.
- *
- * The dashboard had drifted to a 10–13px world: `text-[10px]`
- * timestamps, 11px labels, 12px body. It read as cramped rather
- * than dense — dense is an information-per-screen property, and you
- * get it from tight spacing and short rows, not from shrinking type
- * past comfortable reading. 14px body with a 12px floor keeps the
- * same row heights while making the thing legible at arm's length,
- * which is where a dashboard on a second monitor actually lives.
+ * 14px base. Dense is an information-per-screen property — you get
+ * it from tight spacing and short rows, not from shrinking type
+ * past comfortable reading.
  */
 body {
   margin: 0;
@@ -135,8 +126,8 @@ body {
    * itself must never scroll — every scroll area is an explicit
    * interior region. */
   overflow: hidden;
-  background-color: var(--gds-canvas);
-  color: var(--gds-fg);
+  background-color: var(--sn-canvas);
+  color: var(--sn-fg);
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.5;

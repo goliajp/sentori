@@ -44,7 +44,7 @@ export function signalColor(kind: string): string {
     case 'freeze':
       return 'var(--s-kind-error)';
     default:
-      return 'var(--gds-fg-muted)';
+      return 'var(--sn-fg-muted)';
   }
 }
 
@@ -97,7 +97,7 @@ export function TimelineStrip({
   return (
     <section className="flex h-36 shrink-0 flex-col border-t border-border bg-bg">
       <header className="flex h-7 shrink-0 items-center gap-3 border-b border-border px-4">
-        <h3 className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+        <h3 className="shrink-0 text-[13px] font-semibold text-fg-muted">
           {t('issue.timeline')}
         </h3>
         <span className="min-w-0 flex-1 truncate text-right font-mono text-[11px] text-fg-muted">

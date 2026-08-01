@@ -214,7 +214,7 @@ export function IssueDetailPane({
             )}
           </span>
         </div>
-        <h1 className="mt-1.5 truncate text-lg font-semibold tracking-tight">
+        <h1 className="mt-1.5 truncate text-[20px] font-semibold tracking-tight">
           {issue.title}
         </h1>
         {issue.messageSample && !issue.title.includes(issue.messageSample) && (

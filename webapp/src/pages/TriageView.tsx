@@ -329,7 +329,7 @@ function QueueGroup({
     <div>
       <div
         className={clsx(
-          'sticky top-0 z-10 border-b border-border bg-bg px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]',
+          'sticky top-0 z-10 border-b border-border bg-bg px-3 py-1 text-xs font-semibold',
           tone === 'danger' ? 'text-kind-error' : 'text-fg-subtle',
         )}
       >

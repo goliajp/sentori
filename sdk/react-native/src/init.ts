@@ -52,6 +52,7 @@ export const init = safeFn('init', (config: InitConfig): void => {
     },
     replaySeconds: config.replaySeconds ?? 30,
     replayScreens: config.replayScreens ?? false,
+    backendHealthUrl: config.backendHealthUrl,
     beforeSend: config.beforeSend,
   });
   setLogLevel(config.logLevel ?? 'warn');

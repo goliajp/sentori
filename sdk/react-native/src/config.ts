@@ -20,6 +20,9 @@ export type Config = {
   /** B-type replay rolling buffer, seconds. 0 disables. */
   replaySeconds: number;
   replayScreens: boolean;
+  /** The integrator's backend health URL; carried on batches, probed
+   *  server-side. The app itself never pings it. */
+  backendHealthUrl?: string;
   /** Sentori console output gate. Default `warn`: silent on the
    *  host's console unless something is genuinely broken. */
   logLevel?: LogLevel;

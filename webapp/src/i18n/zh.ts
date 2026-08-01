@@ -43,6 +43,7 @@ export const zh: Messages = {
   'inbox.selectedCount': '已选 {n} 项',
   'inbox.clearSelection': '清除选择',
 
+  'health.backend': '后端',
   'health.replay': '录屏',
   'health.silent': '暂无事件',
 
@@ -100,6 +101,7 @@ export const zh: Messages = {
 
   'nav.inbox': '收件箱',
   'nav.instruments': '监测',
+  'nav.projects': '项目',
   'nav.releases': '版本',
   'nav.settings': '设置',
 
@@ -115,6 +117,7 @@ export const zh: Messages = {
   'notify.testSending': '发送中…',
   'notify.testSent': '测试邮件已发出 —— 查收收件箱。',
   'palette.placeholder': '跳转页面或搜索 issue…',
+
 
   'releases.emptyHint': 'SDK 上报版本或 CLI 上传物料后会出现在这里。',
   'releases.emptyTitle': '还没有版本',
@@ -149,7 +152,6 @@ export const zh: Messages = {
   'settings.tab.account': '账号',
   'settings.tab.audit': '审计',
   'settings.tab.notifications': '通知',
-  'settings.tab.projects': '项目',
   'settings.tab.tokens': 'Token',
   'settings.tab.users': '管理员',
   'settings.tokenName': 'token 名',
@@ -174,7 +176,6 @@ export const zh: Messages = {
   'theme.label': '主题',
   'theme.light': '浅色',
   'theme.system': '跟随系统',
-  'shell.project': '项目',
   'shell.roleAdmin': '管理员',
   'shell.roleOwner': '所有者',
 };
