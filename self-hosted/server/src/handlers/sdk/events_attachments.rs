@@ -210,11 +210,27 @@ async fn read_multipart(mut multipart: Multipart) -> Result<Parsed, String> {
                 if let Some(ct) = field.content_type() {
                     media_type = ct.to_string();
                 }
+                // RN cannot put raw binary in a hand-built multipart
+                // string body, so binary parts arrive base64 with
+                // this header; decode so the stored blob is the
+                // real content, same as any other client's upload.
+                let is_base64 = field
+                    .headers()
+                    .get("content-transfer-encoding")
+                    .and_then(|v| v.to_str().ok())
+                    .is_some_and(|v| v.eq_ignore_ascii_case("base64"));
                 let data = field
                     .bytes()
                     .await
                     .map_err(|e| format!("reading file part: {e}"))?;
-                bytes = Some(data.to_vec());
+                bytes = Some(if is_base64 {
+                    use base64::Engine;
+                    base64::engine::general_purpose::STANDARD
+                        .decode(data.as_ref())
+                        .map_err(|e| format!("base64 file part: {e}"))?
+                } else {
+                    data.to_vec()
+                });
             }
             Some("source") => {
                 source = field

@@ -82,9 +82,50 @@ export const flush = async (): Promise<void> => {
 
   try {
     await sendWithRetry(envelope, config.ingestUrl, config.token);
+    // Only now do the events exist server-side — release their
+    // queued attachments. Uploading before this point 404s: the
+    // attachment races the 5s event batch and always wins.
+    for (const ev of events) {
+      if (ev.id) void sendQueuedAttachments(ev.id);
+    }
   } catch {
     // Events survive offline; assert deltas are cheap enough to lose.
+    // Their attachments are memory-only and lost with the process —
+    // documented; a replay is context, not the crash report itself.
     await persist(events);
+  }
+};
+
+// ── attachments (deferred until their event is delivered) ─────────
+
+type QueuedAttachment = {
+  kind: import('@goliapkg/sentori-core').AttachmentKind;
+  blob: { base64?: string; text?: string; mediaType: string };
+  source: 'android' | 'ios' | 'js';
+};
+
+const _pendingAttachments = new Map<string, QueuedAttachment[]>();
+
+/** Attach a blob to an event that is still in the batch queue. It
+ *  uploads right after the batch containing the event lands, so the
+ *  server always already knows the event. */
+export const queueAttachment = (
+  eventId: string,
+  kind: QueuedAttachment['kind'],
+  blob: QueuedAttachment['blob'],
+  opts: { source?: QueuedAttachment['source'] } = {},
+): void => {
+  const list = _pendingAttachments.get(eventId) ?? [];
+  list.push({ kind, blob, source: opts.source ?? 'js' });
+  _pendingAttachments.set(eventId, list);
+};
+
+const sendQueuedAttachments = async (eventId: string): Promise<void> => {
+  const list = _pendingAttachments.get(eventId);
+  if (!list) return;
+  _pendingAttachments.delete(eventId);
+  for (const a of list) {
+    await uploadAttachment(eventId, a.kind, a.blob, { source: a.source });
   }
 };
 
@@ -206,26 +247,40 @@ export const drainOfflineQueue = async (): Promise<void> => {
 export const uploadAttachment = async (
   eventId: string,
   kind: import('@goliapkg/sentori-core').AttachmentKind,
-  blob: { base64: string; mediaType: string },
+  blob: { base64?: string; text?: string; mediaType: string },
   opts: { source?: 'android' | 'ios' | 'js' } = {},
 ): Promise<{ ref: string } | null> => {
   const config = getConfig();
   if (!config) return null;
   const url = `${config.ingestUrl}/v1/events/${encodeURIComponent(eventId)}/attachments/${encodeURIComponent(kind)}`;
 
-  const form = new FormData();
-  form.append('file', {
-    name: `${kind}.bin`,
-    type: blob.mediaType,
-    uri: `data:${blob.mediaType};base64,${blob.base64}`,
-  } as unknown as Blob);
-  form.append('source', opts.source ?? 'js');
+  // Hand-built multipart. React Native's FormData file part wants a
+  // `uri`, and its `data:` URI form throws a bare network error on
+  // iOS — this shipped untested and every JS attachment silently
+  // died. Text payloads (replay/screens NDJSON) embed directly;
+  // base64 payloads embed as base64 with the transfer-encoding
+  // header so the server knows to decode.
+  const boundary = `----sentori-${eventId}`;
+  const isText = typeof blob.text === 'string';
+  const content = isText ? (blob.text ?? '') : (blob.base64 ?? '');
+  const encodingHeader = isText ? '' : 'Content-Transfer-Encoding: base64\r\n';
+  const wireBody =
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="file"; filename="${kind}.bin"\r\n` +
+    `Content-Type: ${blob.mediaType}\r\n` +
+    encodingHeader +
+    `\r\n${content}\r\n` +
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="source"\r\n` +
+    `\r\n${opts.source ?? 'js'}\r\n` +
+    `--${boundary}--\r\n`;
 
   try {
     const resp = await fetch(url, {
-      body: form,
+      body: wireBody,
       headers: {
         Authorization: `Bearer ${config.token}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
         'Sentori-Sdk': `react-native/${SDK_VERSION}`,
       },
       method: 'POST',
