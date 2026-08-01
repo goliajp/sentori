@@ -137,7 +137,10 @@ export function ReplayPlayer({
           phone or a tablet sends landscape — a square is the one
           shape that letterboxes both gracefully instead of betting
           on an orientation. */}
-      <div className="flex aspect-square w-full items-center justify-center bg-bg p-3">
+      {/* Always a bounded square: below the xl split the panel goes
+          full-width and an uncapped aspect-square balloons into a
+          viewport-sized block. */}
+      <div className="mx-auto flex aspect-square w-full max-w-[440px] items-center justify-center bg-bg p-3">
         {src && (
           <img
             src={src}
