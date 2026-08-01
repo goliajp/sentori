@@ -589,6 +589,17 @@ export function formatRelative(
     .format(-value, unit);
 }
 
+/**
+ * A release for human eyes: `app@5.4.26073101+381` carries a build
+ * suffix that only Android understands — on an issue page it reads
+ * as noise (and confuses iOS rows). Display drops it; the full
+ * string stays in the tooltip and everywhere identity matters
+ * (Releases page, upload commands, resolve anchoring).
+ */
+export function formatRelease(release: string): string {
+  return release.replace(/\+\d+$/, '');
+}
+
 export function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;

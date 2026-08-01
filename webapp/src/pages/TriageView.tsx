@@ -381,10 +381,8 @@ function QueueRow({
       }}
       data-active={active || undefined}
       className={clsx(
-        'group cursor-pointer border-l-2 px-3 py-2 transition-colors',
-        active
-          ? 'border-accent bg-surface'
-          : 'border-transparent hover:bg-surface/60',
+        'group cursor-pointer px-3 py-2 transition-colors',
+        active ? 'bg-raised' : 'hover:bg-surface/60',
       )}
     >
       <div className="flex items-center gap-2">

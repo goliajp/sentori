@@ -43,6 +43,9 @@ export const zh: Messages = {
   'inbox.selectedCount': '已选 {n} 项',
   'inbox.clearSelection': '清除选择',
 
+  'identity.copied': '已复制',
+  'identity.copyHint': '复制完整用户标识',
+
   'instruments.assertRan': '跑了 {total} · 失败 {failed}',
   'instruments.asserts': '断言',
   'instruments.assertsEmpty':
@@ -88,10 +91,8 @@ export const zh: Messages = {
     '该事件没有携带录屏 —— 在 SDK 里开启 replayScreens: true 才会捕获出错前一分钟的画面。',
   'issue.resolve': '解决',
   'issue.resolveInRelease': '修复版本',
-  'issue.seekReplay': '回放跳到这一刻',
   'issue.system': '系统',
   'issue.timeline': '用户当时在做什么',
-  'issue.timelineEmpty': '该事件没有携带行为信号。',
   'issue.unassigned': '未分配',
 
   'nav.inbox': '收件箱',
@@ -162,6 +163,10 @@ export const zh: Messages = {
   'triage.pickTitle': '从左侧队列选择一个 issue',
 
   'shell.loading': '加载中…',
+
+  'strip.events': '事件',
+  'strip.frames': '帧',
+  'strip.signals': '行为',
   'theme.dark': '深色',
   'theme.label': '主题',
   'theme.light': '浅色',
