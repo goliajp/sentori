@@ -3,12 +3,13 @@
 // asks first when something broke on a phone:
 //
 //   ① where it broke      — the failing line, source window open
-//   ② what the user saw   — portrait replay dock, phone-shaped
+//   ② what the user saw   — replay dock in a square viewport
 //   ③ what they were doing — the signal timeline
 //
-// The replay lives in a right-hand column because mobile frames are
-// tall: a portrait dock beside the code reads like holding the
-// user's phone next to the stack trace. Everything else — triage,
+// The replay lives in a right-hand column: the dock beside the code
+// reads like holding the user's phone next to the stack trace. Its
+// viewport is square so portrait and landscape frames both
+// letterbox gracefully. Everything else — triage,
 // occurrences, raw environment, activity — is obligation, not
 // desire: triage compresses into the header toolbar, the rest folds
 // into corner rows at the bottom. (The UX iron rule: give what they
