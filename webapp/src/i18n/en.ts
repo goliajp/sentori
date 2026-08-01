@@ -49,6 +49,7 @@ export const en = {
   'inbox.selectedCount': '{n} selected',
   'inbox.clearSelection': 'Clear',
 
+  'health.backend': 'backend',
   'health.replay': 'replay',
   'health.silent': 'no events yet',
 

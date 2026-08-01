@@ -29,6 +29,7 @@ use tracing::info;
 mod apns;
 mod archive_worker;
 mod audit;
+mod backend_check_worker;
 mod blob_store;
 mod bootstrap;
 mod bundle;
@@ -96,6 +97,7 @@ async fn main() -> anyhow::Result<()> {
     // Background workers: push dispatch + retention archive.
     let token_cache = std::sync::Arc::new(token_cache::TokenCache::new());
     push_worker::spawn(pool.clone(), token_cache);
+    backend_check_worker::spawn(pool.clone());
     archive_worker::spawn(pool, state.attachments.clone());
 
     // Baseline HSTS / X-Content-Type-Options / X-Frame-Options /

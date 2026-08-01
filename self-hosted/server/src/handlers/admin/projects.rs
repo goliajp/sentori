@@ -199,6 +199,52 @@ pub async fn delete(
     }
 }
 
+/// The backend probe's story for one project: latest check + a
+/// day's uptime. `Value::Null` when no URL is configured.
+async fn backend_block(state: &Arc<AppState>, project_id: Uuid) -> Value {
+    let url: Option<String> =
+        sqlx::query_scalar("SELECT backend_health_url FROM projects WHERE id = $1")
+            .bind(project_id)
+            .fetch_one(&state.pool)
+            .await
+            .unwrap_or(None);
+    let Some(url) = url else {
+        return Value::Null;
+    };
+    let last = sqlx::query(
+        "SELECT ok, status_code, latency_ms, checked_at FROM backend_checks \
+         WHERE project_id = $1 ORDER BY checked_at DESC LIMIT 1",
+    )
+    .bind(project_id)
+    .fetch_optional(&state.pool)
+    .await
+    .unwrap_or(None);
+    let agg = sqlx::query(
+        "SELECT count(*) AS total, count(*) FILTER (WHERE ok) AS ok_n \
+         FROM backend_checks \
+         WHERE project_id = $1 AND checked_at > now() - interval '24 hours'",
+    )
+    .bind(project_id)
+    .fetch_one(&state.pool)
+    .await
+    .ok();
+    let (total, ok_n) = agg.map_or((0i64, 0i64), |r| {
+        (
+            sqlx::Row::get::<i64, _>(&r, "total"),
+            sqlx::Row::get::<i64, _>(&r, "ok_n"),
+        )
+    });
+    json!({
+        "url": url,
+        "lastOk": last.as_ref().map(|r| sqlx::Row::get::<bool, _>(r, "ok")),
+        "lastStatus": last.as_ref().and_then(|r| sqlx::Row::get::<Option<i32>, _>(r, "status_code")),
+        "lastLatencyMs": last.as_ref().map(|r| sqlx::Row::get::<i32, _>(r, "latency_ms")),
+        "lastCheckedAt": last.as_ref().map(|r| crate::wire_time::rfc3339(sqlx::Row::get(r, "checked_at"))),
+        "checks24h": total,
+        "ok24h": ok_n,
+    })
+}
+
 /// One `GROUP BY` aggregate folded into a JSON map — the health
 /// endpoint reads several of these.
 async fn count_by(
@@ -306,9 +352,11 @@ pub async fn health(
             sqlx::Row::get::<i64, _>(&r, "with_screens"),
         )
     });
+    let backend = backend_block(&state, project_id).await;
     (
         StatusCode::OK,
         Json(json!({
+            "backend": backend,
             "lastEventAt": last_event_at.map(crate::wire_time::rfc3339),
             "counts24h": counts,
             "users24h": users_24h,

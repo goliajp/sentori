@@ -90,6 +90,16 @@ export type EventDetail = {
 };
 
 export type ProjectHealth = {
+  /** Null until the SDK carries a backendHealthUrl for the project. */
+  backend: null | {
+    url: string;
+    lastOk: boolean | null;
+    lastStatus: number | null;
+    lastLatencyMs: number | null;
+    lastCheckedAt: null | string;
+    checks24h: number;
+    ok24h: number;
+  };
   lastEventAt: null | string;
   counts24h: Record<string, number>;
   users24h: number;

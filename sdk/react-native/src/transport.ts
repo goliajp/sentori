@@ -20,7 +20,7 @@ const STORAGE_KEY = '@sentori/pending';
 const MAX_PERSISTED = 1000;
 
 // Pinned to package.json by a test — bump both together.
-const SDK_VERSION = '5.1.4';
+const SDK_VERSION = '5.2.0';
 
 let _queue: WireEvent[] = [];
 let _assertStats = new Map<string, AssertStat>();
@@ -80,6 +80,7 @@ export const flush = async (): Promise<void> => {
 
   const envelope: BatchEnvelope = { events };
   if (stats.length > 0) envelope.assertStats = stats;
+  if (config.backendHealthUrl) envelope.backendHealthUrl = config.backendHealthUrl;
 
   try {
     await sendWithRetry(envelope, config.ingestUrl, config.token);
