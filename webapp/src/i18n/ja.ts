@@ -44,6 +44,9 @@ export const ja: Messages = {
   'inbox.selectedCount': '{n} 件選択中',
   'inbox.clearSelection': '選択解除',
 
+  'identity.copied': 'コピーしました',
+  'identity.copyHint': 'ユーザーキー全体をコピー',
+
   'instruments.assertRan': '実行 {total} · 失敗 {failed}',
   'instruments.asserts': 'アサーション',
   'instruments.assertsEmpty':
@@ -94,10 +97,8 @@ export const ja: Messages = {
     'このイベントにはリプレイが付いていません — SDK で replayScreens: true を有効にすると、直前の1分間の画面を記録できます。',
   'issue.resolve': '解決',
   'issue.resolveInRelease': '修正リリース',
-  'issue.seekReplay': 'リプレイをこの時点へ',
   'issue.system': 'システム',
   'issue.timeline': 'ユーザーが何をしていたか',
-  'issue.timelineEmpty': 'このイベントには行動シグナルがありません。',
   'issue.unassigned': '未割り当て',
 
   'nav.inbox': '受信箱',
@@ -174,6 +175,10 @@ export const ja: Messages = {
   'triage.pickTitle': '左のキューから issue を選択',
 
   'shell.loading': '読み込み中…',
+
+  'strip.events': 'イベント',
+  'strip.frames': 'フレーム',
+  'strip.signals': '操作',
   'theme.dark': 'ダーク',
   'theme.label': 'テーマ',
   'theme.light': 'ライト',

@@ -89,6 +89,14 @@ export type EventDetail = {
   attachments: AttachmentRow[];
 };
 
+export type ContextEventRow = {
+  id: string;
+  issueId: string;
+  kind: IssueSummary['kind'];
+  name: string;
+  occurredAt: string;
+};
+
 export type TokenRow = {
   id: string;
   name: string;
@@ -324,6 +332,12 @@ class Api {
   }
   attachmentUrl(ref: string): string {
     return `${this.base}/admin/api/attachments/${ref}`;
+  }
+
+  /** The other events this user's app reported in the minute
+   *  around this one — the case timeline's third lane. */
+  eventContext(id: string) {
+    return this.get<{ events: ContextEventRow[] }>(`/admin/api/events/${id}/context`);
   }
 
   // ── releases ──

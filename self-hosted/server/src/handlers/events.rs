@@ -77,3 +77,65 @@ pub async fn get(
         })),
     )
 }
+
+/// GET /admin/api/events/{id}/context — what else this user's app
+/// reported in the minute around the event: traces walked, probes
+/// tripped, asserts failed, other errors. This is the raw material
+/// of the case timeline — the marks that turn "a crash happened"
+/// into "the crash happened right after THIS".
+pub async fn context(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    Path(event_id): Path<Uuid>,
+) -> (StatusCode, Json<Value>) {
+    let row = sqlx::query("SELECT project_id, user_key, occurred_at FROM events WHERE id = $1")
+        .bind(event_id)
+        .fetch_optional(&state.pool)
+        .await
+        .unwrap_or(None);
+    let Some(r) = row else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "event_not_found" })),
+        );
+    };
+    let project_id: Uuid = r.get("project_id");
+    if let Err(e) = super::admin::tokens::ensure_project_access(&state, &ctx, project_id).await {
+        return e;
+    }
+    let Some(user_key) = r.get::<Option<String>, _>("user_key") else {
+        // No user identity, no journey to join against.
+        return (StatusCode::OK, Json(json!({ "events": [] })));
+    };
+    let at: time::OffsetDateTime = r.get("occurred_at");
+    // A 75s look-back covers the 60s replay window plus clock slop;
+    // 5s forward catches the batch-mates of the same flush.
+    let rows = sqlx::query(
+        "SELECT e.id, e.issue_id, e.kind, i.group_title AS name, e.occurred_at \
+         FROM events e JOIN issues i ON i.id = e.issue_id \
+         WHERE e.project_id = $1 AND e.user_key = $2 AND e.id != $3 \
+           AND e.occurred_at BETWEEN $4 AND $5 \
+         ORDER BY e.occurred_at LIMIT 200",
+    )
+    .bind(project_id)
+    .bind(&user_key)
+    .bind(event_id)
+    .bind(at - time::Duration::seconds(75))
+    .bind(at + time::Duration::seconds(5))
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default();
+    let out: Vec<Value> = rows
+        .iter()
+        .map(|e| {
+            json!({
+                "id": e.get::<Uuid, _>("id"),
+                "issueId": e.get::<Uuid, _>("issue_id"),
+                "kind": e.get::<String, _>("kind"),
+                "name": e.get::<String, _>("name"),
+                "occurredAt": crate::wire_time::rfc3339(e.get("occurred_at")),
+            })
+        })
+        .collect();
+    (StatusCode::OK, Json(json!({ "events": out })))
+}

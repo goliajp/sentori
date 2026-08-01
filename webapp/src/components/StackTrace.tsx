@@ -91,7 +91,7 @@ function AppFrame({ frame, defaultOpen }: { frame: StackFrame; defaultOpen: bool
         >
           ▸
         </span>
-        <span className="shrink-0 border-l-2 border-kind-error pl-2 font-medium text-fg">
+        <span className="shrink-0 font-medium text-fg">
           {frame.function ?? '?'}
         </span>
         <span className="min-w-0 flex-1 truncate text-fg-subtle">

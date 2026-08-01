@@ -21,12 +21,15 @@ const PLAYBACK_SPEED = 4;
 export function ReplayPlayer({
   attachmentRef,
   seek,
+  onFrames,
 }: {
   attachmentRef: string;
   /** Timeline → replay: jump to the frame nearest this moment
    *  (seconds relative to the event, negative). `n` re-arms the
    *  same instant twice in a row. */
   seek?: { t: number; n: number } | null;
+  /** Replay → timeline: the loaded frame moments (relative s). */
+  onFrames?: (times: number[]) => void;
 }) {
   const t = useT();
   const [frames, setFrames] = useState<null | ReplayFrame[]>(null);
@@ -56,6 +59,14 @@ export function ReplayPlayer({
       alive = false;
     };
   }, [attachmentRef]);
+
+  // Report loaded frame moments upward. A separate effect, NOT the
+  // fetch closure: the player can mount via the occurrence-fallback
+  // race with `onFrames` still undefined, and the fetch effect never
+  // re-runs for a prop identity change.
+  useEffect(() => {
+    if (frames) onFrames?.(frames.map((f) => f.t));
+  }, [frames, onFrames]);
 
   // Advance on a per-frame timer scaled by the real inter-frame gap.
   // The end-of-strip stop happens inside the timer callback (never
