@@ -62,7 +62,6 @@ export const zh: Messages = {
   'issue.code': '出错位置',
   'issue.addNote': '添加备注',
   'issue.assignee': '负责人',
-  'issue.back': '收件箱',
   'issue.copied': '已复制',
   'issue.copyForAi': '复制给 AI',
   'issue.eventMoment': '{kind} 触发',
@@ -91,6 +90,7 @@ export const zh: Messages = {
   'issue.resolveInRelease': '修复版本',
   'issue.system': '系统',
   'issue.timeline': '用户当时在做什么',
+  'issue.timelineEmpty': '该事件没有携带行为信号。',
   'issue.unassigned': '未分配',
 
   'nav.inbox': '收件箱',
@@ -156,6 +156,9 @@ export const zh: Messages = {
   'stack.truncated': '… 还有 {n} 帧',
 
   'table.empty': '暂无内容',
+
+  'triage.pickHint': 'j/k 移动 · Enter 打开 · ⌘K 搜索',
+  'triage.pickTitle': '从左侧队列选择一个 issue',
 
   'shell.loading': '加载中…',
   'theme.dark': '深色',

@@ -69,7 +69,6 @@ export const en = {
   'issue.code': 'Where it broke',
   'issue.addNote': 'Add note',
   'issue.assignee': 'Assignee',
-  'issue.back': 'Inbox',
   'issue.copied': 'Copied',
   'issue.copyForAi': 'Copy for AI',
   'issue.eventMoment': '{kind} fired',
@@ -102,6 +101,7 @@ export const en = {
   'issue.resolveInRelease': 'Fixed in release',
   'issue.system': 'system',
   'issue.timeline': 'What the user was doing',
+  'issue.timelineEmpty': 'No signals arrived with this event.',
   'issue.unassigned': 'Unassigned',
 
   'nav.inbox': 'Inbox',
@@ -173,6 +173,9 @@ export const en = {
   'stack.truncated': '… {n} more frames',
 
   'table.empty': 'Nothing here yet',
+
+  'triage.pickHint': 'j/k move · Enter opens · ⌘K search',
+  'triage.pickTitle': 'Pick an issue from the queue',
 
   'shell.loading': 'Loading…',
   'theme.dark': 'Dark',

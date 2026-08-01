@@ -87,7 +87,7 @@ export function ReplayPlayer({ attachmentRef }: { attachmentRef: string }) {
 
   return (
     <div
-      className="overflow-hidden rounded-md border border-border bg-surface"
+      className="overflow-hidden"
       tabIndex={0}
       role="group"
       aria-label={t('replay.title')}

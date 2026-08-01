@@ -64,7 +64,6 @@ export const ja: Messages = {
   'issue.code': '発生箇所',
   'issue.addNote': 'ノートを追加',
   'issue.assignee': '担当者',
-  'issue.back': '受信箱',
   'issue.copied': 'コピーしました',
   'issue.copyForAi': 'AI 用にコピー',
   'issue.eventMoment': '{kind} 発生',
@@ -97,6 +96,7 @@ export const ja: Messages = {
   'issue.resolveInRelease': '修正リリース',
   'issue.system': 'システム',
   'issue.timeline': 'ユーザーが何をしていたか',
+  'issue.timelineEmpty': 'このイベントには行動シグナルがありません。',
   'issue.unassigned': '未割り当て',
 
   'nav.inbox': '受信箱',
@@ -168,6 +168,9 @@ export const ja: Messages = {
   'stack.truncated': '… 残り {n} フレーム',
 
   'table.empty': 'まだ何もありません',
+
+  'triage.pickHint': 'j/k 移動 · Enter 開く · ⌘K 検索',
+  'triage.pickTitle': '左のキューから issue を選択',
 
   'shell.loading': '読み込み中…',
   'theme.dark': 'ダーク',

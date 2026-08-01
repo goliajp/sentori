@@ -23,7 +23,7 @@ export default function ReleasesPage() {
   );
 
   return (
-    <div className="mx-auto max-w-[1760px] px-7 py-5">
+    <div className="h-full overflow-y-auto"><div className="mx-auto max-w-[1760px] px-6 py-5">
       <div className="mb-4 flex items-center gap-3">
         <h1 className="text-base font-semibold">{t('nav.releases')}</h1>
         {projects.length > 1 && (
@@ -59,7 +59,7 @@ export default function ReleasesPage() {
           <ReleaseRowView key={r.id} release={r} projectId={active ?? ''} />
         ))}
       </div>
-    </div>
+    </div></div>
   );
 }
 

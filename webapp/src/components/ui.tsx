@@ -11,7 +11,7 @@
 //   · a card's contents sit at one inset (`px-5`), header and body
 //     and table cells alike, so the left edge is a single line.
 
-import { isValidElement, type ReactNode } from 'react';
+import { isValidElement, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
 import { useT } from '../i18n';
@@ -223,6 +223,80 @@ export function Badge({
     >
       {children}
     </span>
+  );
+}
+
+// ── Panel ──────────────────────────────────────────────────
+
+/**
+ * The app's unit of structure: a bordered surface with a named
+ * header. Every region of a screen lives inside one — content
+ * never floats on the canvas, and a panel with no data still
+ * stands (its body shows a quiet empty line instead of the panel
+ * vanishing and leaving a hole in the page).
+ */
+export function Panel({
+  title,
+  action,
+  children,
+  className = '',
+  padded = false,
+}: {
+  title: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  /** Give the body the standard inset. Evidence bodies (code,
+   *  replay, tables) manage their own edges. */
+  padded?: boolean;
+}) {
+  return (
+    <section
+      className={`flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-surface ${className}`}
+    >
+      <header className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-border px-3.5">
+        <h3 className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+          {title}
+        </h3>
+        {action}
+      </header>
+      <div className={`min-h-0 flex-1 ${padded ? 'p-3.5' : ''}`}>{children}</div>
+    </section>
+  );
+}
+
+/** A quiet in-panel empty line — the panel stays, the void goes. */
+export function PanelEmpty({ children }: { children: ReactNode }) {
+  return <p className="px-3.5 py-4 text-sm text-fg-subtle">{children}</p>;
+}
+
+/** A collapsed strip panel for the obligatory corners
+ *  (occurrences, raw environment, activity). */
+export function FoldPanel({
+  title,
+  defaultOpen = false,
+  children,
+}: {
+  title: ReactNode;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="overflow-hidden rounded-lg border border-border bg-surface">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex h-9 w-full items-center gap-2 px-3.5 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-fg-subtle hover:text-fg-muted"
+      >
+        <span className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden>
+          ▸
+        </span>
+        {title}
+      </button>
+      {open && <div className="border-t border-border">{children}</div>}
+    </section>
   );
 }
 

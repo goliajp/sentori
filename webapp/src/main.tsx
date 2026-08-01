@@ -5,9 +5,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { App } from './App';
 import { I18nProvider } from './i18n/provider';
 import ForgotPassword from './pages/ForgotPassword';
-import Inbox from './pages/Inbox';
 import Instruments from './pages/Instruments';
-import IssueDetail from './pages/IssueDetail';
+import TriageView from './pages/TriageView';
 import { LoginPage } from './pages/Login';
 import Releases from './pages/Releases';
 import ResetPassword from './pages/ResetPassword';
@@ -30,8 +29,8 @@ if (root) {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route element={<App />}>
-              <Route path="/" element={<Inbox />} />
-              <Route path="/issues/:issueId" element={<IssueDetail />} />
+              <Route path="/" element={<TriageView />} />
+              <Route path="/issues/:issueId" element={<TriageView />} />
               <Route path="/instruments" element={<Instruments />} />
               <Route path="/releases" element={<Releases />} />
               <Route path="/settings" element={<Settings />} />
