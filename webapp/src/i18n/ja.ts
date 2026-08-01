@@ -124,13 +124,6 @@ export const ja: Messages = {
   'notify.testSent': 'テストメールを送信しました — 受信箱を確認してください。',
   'palette.placeholder': 'ページへ移動、または issue を検索…',
 
-  'projects.col.created': '作成',
-  'projects.col.lastEvent': '直近イベント',
-  'projects.col.name': 'プロジェクト',
-  'projects.col.platform': 'プラットフォーム',
-  'projects.col.release': '稼働中リリース',
-  'projects.col.users': 'ユーザー',
-  'projects.count': '全 {n} プロジェクト',
 
   'releases.emptyHint':
     'SDK がリリースを報告するか、CLI がアーティファクトをアップロードすると表示されます。',

@@ -12,6 +12,7 @@
 // in that case every frame is shown flat. An empty-looking stack is
 // a UI bug, not a data property.
 
+import { ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
 import { useT } from '../i18n';
@@ -83,14 +84,12 @@ function AppFrame({ frame, defaultOpen }: { frame: StackFrame; defaultOpen: bool
           hasContext ? 'cursor-pointer hover:bg-raised' : 'cursor-default'
         }`}
       >
-        <span
-          className={`inline-block w-3 shrink-0 text-center transition-transform ${
+        <ChevronRight
+          aria-hidden
+          className={`h-3.5 w-3.5 shrink-0 transition-transform ${
             hasContext ? 'text-fg-subtle' : 'opacity-0'
           } ${open ? 'rotate-90' : ''}`}
-          aria-hidden
-        >
-          ▸
-        </span>
+        />
         <span className="shrink-0 font-medium text-fg">
           {frame.function ?? '?'}
         </span>
@@ -167,12 +166,10 @@ function LibraryRun({ frames }: { frames: { f: StackFrame; i: number }[] }) {
         aria-expanded={open}
         className="flex w-full items-baseline gap-2 px-3.5 py-1.5 text-left font-mono text-xs text-fg-subtle hover:bg-raised hover:text-fg-muted"
       >
-        <span
-          className={`inline-block w-3 shrink-0 text-center transition-transform ${open ? 'rotate-90' : ''}`}
+        <ChevronRight
           aria-hidden
-        >
-          ▸
-        </span>
+          className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`}
+        />
         {open
           ? t('stack.libraryFramesOpen')
           : t('stack.libraryFrames', { n: String(frames.length) })}

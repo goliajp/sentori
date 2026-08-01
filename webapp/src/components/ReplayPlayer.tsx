@@ -9,6 +9,7 @@
 // apart; a minute of context should take fifteen seconds to review,
 // not sixty). Scrubbing pauses; ←/→ step frames while focused.
 
+import { Pause, Play } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useT } from '../i18n';
@@ -168,9 +169,13 @@ export function ReplayPlayer({
             setPlaying((p) => !p);
           }}
           aria-label={playing ? t('replay.pause') : t('replay.play')}
-          className="h-7 w-7 shrink-0 rounded border border-border-strong text-sm text-fg hover:bg-raised"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-border-strong text-fg hover:bg-raised"
         >
-          {playing ? '⏸' : '▶'}
+          {playing ? (
+            <Pause aria-hidden className="h-3.5 w-3.5" />
+          ) : (
+            <Play aria-hidden className="h-3.5 w-3.5" />
+          )}
         </button>
         <input
           type="range"

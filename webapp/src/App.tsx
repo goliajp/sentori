@@ -1,18 +1,21 @@
 import {
-  useSetThemeElevation,
-  useSetThemeGlass,
-  useSetThemeMode,
-  useSetThemePrimaryColor,
-  useTheme,
-  useThemeEffect,
-} from '@goliapkg/gds/systems';
+  Activity,
+  FolderKanban,
+  Inbox,
+  Moon,
+  Monitor,
+  Package,
+  Search,
+  Settings,
+  Sun,
+} from 'lucide-react';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 
 import { CommandPalette, openPalette } from './components/CommandPalette';
 import { useT } from './i18n';
 import { api, type Me, type Project } from './lib/api';
-import { BRAND, type ThemeMode } from './lib/theme';
+import { setThemeMode, useThemeMode, type ThemeMode } from './lib/theme';
 
 import goliaMark from './assets/golia-mark.svg';
 
@@ -43,8 +46,6 @@ export function App() {
   const t = useT();
   const [me, setMe] = useState<Me | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
-  useThemeEffect();
-  useBrandInk();
 
   useEffect(() => {
     // Boot probe: a 401 inside api.authMe() redirects to /login.
@@ -87,11 +88,12 @@ export function App() {
   }
 
   const navCls = ({ isActive }: { isActive: boolean }) =>
-    `block rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${
+    `flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${
       isActive
         ? 'bg-raised font-medium text-fg'
         : 'text-fg-muted hover:bg-raised/60 hover:text-fg'
     }`;
+  const navIcon = 'h-4 w-4 shrink-0 text-fg-subtle';
 
   return (
     <ShellContext.Provider
@@ -108,27 +110,32 @@ export function App() {
           </div>
           <nav className="flex flex-col gap-0.5">
             <NavLink to="/projects" className={navCls}>
+              <FolderKanban className={navIcon} aria-hidden />
               {t('nav.projects')}
             </NavLink>
             {activeProject && (
               <>
                 {/* the chosen project's own workspace */}
-                <div className="mb-0.5 mt-3 truncate px-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+                <div className="mb-0.5 mt-3 truncate px-2.5 text-xs font-semibold text-fg-subtle">
                   {activeProject.name}
                 </div>
                 <NavLink to="/" end className={navCls}>
+                  <Inbox className={navIcon} aria-hidden />
                   {t('nav.inbox')}
                 </NavLink>
                 <NavLink to="/instruments" className={navCls}>
+                  <Activity className={navIcon} aria-hidden />
                   {t('nav.instruments')}
                 </NavLink>
                 <NavLink to="/releases" className={navCls}>
+                  <Package className={navIcon} aria-hidden />
                   {t('nav.releases')}
                 </NavLink>
               </>
             )}
             <div className="mt-3" />
             <NavLink to="/settings" className={navCls}>
+              <Settings className={navIcon} aria-hidden />
               {t('nav.settings')}
             </NavLink>
           </nav>
@@ -144,7 +151,7 @@ export function App() {
               onClick={openPalette}
               className="flex h-7 w-72 items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-[13px] text-fg-subtle transition-colors hover:border-border-strong hover:text-fg-muted"
             >
-              <span aria-hidden>⌕</span>
+              <Search aria-hidden className="h-3.5 w-3.5 shrink-0" />
               <span className="min-w-0 flex-1 truncate text-left">
                 {t('palette.placeholder')}
               </span>
@@ -194,34 +201,21 @@ function StatusBar() {
   );
 }
 
-/// GDS's theme atom snapshots storage at module load — before
-/// initTheme ran — so on a first visit the atom still holds the GDS
-/// default and its repaint would wash the brand ink off. This
-/// converges the atom to the brand once per divergence; mode stays
-/// whatever the user picked.
-function useBrandInk() {
-  const theme = useTheme();
-  const setPrimary = useSetThemePrimaryColor();
-  const setElevation = useSetThemeElevation();
-  const setGlass = useSetThemeGlass();
-  useEffect(() => {
-    if (theme.primaryColor !== BRAND.primaryColor) setPrimary(BRAND.primaryColor);
-    if (theme.elevation !== BRAND.elevation) setElevation(BRAND.elevation);
-    if (theme.glass !== BRAND.glass) setGlass(BRAND.glass);
-  }, [theme.primaryColor, theme.elevation, theme.glass, setPrimary, setElevation, setGlass]);
-}
-
 /// Three-state theme switch. GDS owns the state + persistence; this
 /// is just the smallest possible handle on it — a segmented row that
 /// reads as furniture, not as a feature.
 function ThemeSwitch() {
   const t = useT();
-  const theme = useTheme();
-  const setMode = useSetThemeMode();
-  const options: { mode: ThemeMode; label: string; glyph: string }[] = [
-    { mode: 'system', label: t('theme.system'), glyph: '◐' },
-    { mode: 'light', label: t('theme.light'), glyph: '○' },
-    { mode: 'dark', label: t('theme.dark'), glyph: '●' },
+  const mode = useThemeMode();
+  const setMode = setThemeMode;
+  const options: {
+    mode: ThemeMode;
+    label: string;
+    Glyph: typeof Monitor;
+  }[] = [
+    { mode: 'system', label: t('theme.system'), Glyph: Monitor },
+    { mode: 'light', label: t('theme.light'), Glyph: Sun },
+    { mode: 'dark', label: t('theme.dark'), Glyph: Moon },
   ];
   return (
     <div
@@ -234,17 +228,17 @@ function ThemeSwitch() {
           key={o.mode}
           type="button"
           role="radio"
-          aria-checked={theme.mode === o.mode}
+          aria-checked={mode === o.mode}
           title={o.label}
           aria-label={o.label}
           onClick={() => setMode(o.mode)}
-          className={`flex-1 rounded py-1 text-center text-xs transition-colors ${
-            theme.mode === o.mode
+          className={`flex flex-1 items-center justify-center rounded py-1 transition-colors ${
+            mode === o.mode
               ? 'bg-raised text-fg'
               : 'text-fg-subtle hover:text-fg-muted'
           }`}
         >
-          {o.glyph}
+          <o.Glyph aria-hidden className="h-3.5 w-3.5" />
         </button>
       ))}
     </div>

@@ -130,13 +130,6 @@ export const en = {
   'notify.testSent': 'Test email sent — check your inbox.',
   'palette.placeholder': 'Jump to a page or search issues…',
 
-  'projects.col.created': 'Created',
-  'projects.col.lastEvent': 'Last event',
-  'projects.col.name': 'Project',
-  'projects.col.platform': 'Platform',
-  'projects.col.release': 'Release in the field',
-  'projects.col.users': 'Users',
-  'projects.count': '{n} projects',
 
   'releases.emptyHint':
     'Releases appear when the SDK reports one or the CLI uploads artifacts.',

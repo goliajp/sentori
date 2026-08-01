@@ -1,9 +1,9 @@
-// Projects — the layer above everything else. One professional
-// table row per project, joined with the pulse its SDK traffic
-// reports (heartbeat, day counts, users, replay coverage, artifact
-// lights). Picking a row scopes the whole app to that project and
-// lands in its inbox — the Jira space model: the sidebar names
-// where you are; this page is where you choose.
+// Projects — the layer above everything else. One card per
+// project, carrying the pulse its SDK traffic reports (heartbeat,
+// day counts, users, replay coverage, artifact lights). Picking a
+// card scopes the whole app to that project and lands in its inbox
+// — the Jira space model: the sidebar names where you are; this
+// page is where you choose.
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -11,10 +11,9 @@ import { useNavigate } from 'react-router-dom';
 import { useShell } from '../App';
 import {
   Button,
-  DataTable,
   Input,
   PageShell,
-  Panel,
+  clsx,
   formatRelative,
   formatRelease,
 } from '../components/ui';
@@ -80,132 +79,116 @@ export default function ProjectsPage() {
         ) : undefined
       }
     >
-      <Panel title={`${t('nav.projects')} (${projects.length})`}>
-        <DataTable<Row>
-          columns={[
-            {
-              key: 'name',
-              label: t('projects.col.name'),
-              render: (r) => (
-                <span className="flex items-center gap-2">
-                  <Pulse health={r.health} now={now} />
-                  <span className="font-medium text-fg">{r.name}</span>
-                </span>
-              ),
-            },
-            { key: 'platform', label: t('projects.col.platform'), width: '90px' },
-            {
-              key: 'lastEvent',
-              label: t('projects.col.lastEvent'),
-              width: '110px',
-              render: (r) =>
-                r.health?.lastEventAt ? (
-                  <span className="font-mono text-xs">
-                    {formatRelative(r.health.lastEventAt)}
-                  </span>
-                ) : (
-                  <span className="text-fg-subtle">{t('health.silent')}</span>
-                ),
-            },
-            {
-              key: 'err',
-              label: '24h err',
-              align: 'right',
-              width: '80px',
-              render: (r) => <Num n={r.health?.counts24h.error} tone="error" />,
-            },
-            {
-              key: 'warn',
-              label: '24h warn',
-              align: 'right',
-              width: '90px',
-              render: (r) => <Num n={r.health?.counts24h.warn} tone="warn" />,
-            },
-            {
-              key: 'users',
-              label: t('projects.col.users'),
-              align: 'right',
-              width: '80px',
-              render: (r) => <Num n={r.health?.users24h} />,
-            },
-            {
-              key: 'replay',
-              label: t('health.replay'),
-              align: 'right',
-              width: '90px',
-              render: (r) =>
-                r.health && r.health.replay24h.eligible > 0 ? (
-                  <span className="font-mono text-xs">
-                    {r.health.replay24h.withScreens}/{r.health.replay24h.eligible}
-                  </span>
-                ) : (
-                  <span className="text-fg-subtle">—</span>
-                ),
-            },
-            {
-              key: 'release',
-              label: t('projects.col.release'),
-              render: (r) =>
-                r.health?.latestRelease ? (
-                  <span
-                    className="flex items-center gap-2 font-mono text-xs"
-                    title={r.health.latestRelease}
-                  >
-                    <span className="min-w-0 max-w-56 truncate">
-                      {formatRelease(r.health.latestRelease)}
-                    </span>
-                    <ArtifactLights kinds={r.health.latestReleaseArtifacts} />
-                  </span>
-                ) : (
-                  <span className="text-fg-subtle">—</span>
-                ),
-            },
-            {
-              key: 'createdAt',
-              label: t('projects.col.created'),
-              align: 'right',
-              width: '100px',
-              render: (r) => (
-                <span className="font-mono text-xs">{formatRelative(r.createdAt)}</span>
-              ),
-            },
-            ...(owner
-              ? [
-                  {
-                    key: 'actions',
-                    label: '',
-                    align: 'right' as const,
-                    width: '70px',
-                    render: (r: Row) => (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (
-                            window.confirm(
-                              t('settings.deleteProjectConfirm', { name: r.name }),
-                            )
-                          ) {
-                            void api.deleteProject(r.id).then(reloadProjects);
-                          }
-                        }}
-                        className="text-xs text-kind-error/70 hover:text-kind-error"
-                      >
-                        {t('common.delete')}
-                      </button>
-                    ),
-                  },
-                ]
-              : []),
-          ]}
-          rows={rows}
-          rowKey={(r) => r.id}
-          activeKey={activeProject?.id ?? null}
-          onRowClick={open}
-          footer={t('projects.count', { n: String(projects.length) })}
-        />
-      </Panel>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {rows.map((r) => (
+          <ProjectCard
+            key={r.id}
+            row={r}
+            now={now}
+            active={r.id === activeProject?.id}
+            owner={owner}
+            onOpen={() => open(r)}
+            onDelete={() => {
+              if (window.confirm(t('settings.deleteProjectConfirm', { name: r.name }))) {
+                void api.deleteProject(r.id).then(reloadProjects);
+              }
+            }}
+          />
+        ))}
+      </div>
     </PageShell>
+  );
+}
+
+function ProjectCard({
+  row,
+  now,
+  active,
+  owner,
+  onOpen,
+  onDelete,
+}: {
+  row: Row;
+  now: number;
+  active: boolean;
+  owner: boolean;
+  onOpen: () => void;
+  onDelete: () => void;
+}) {
+  const t = useT();
+  const h = row.health;
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onOpen();
+      }}
+      className={clsx(
+        'group cursor-pointer rounded-lg border bg-surface p-4 transition-colors',
+        active
+          ? 'border-accent'
+          : 'border-border hover:border-border-strong',
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <Pulse health={h} now={now} />
+        <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-fg">
+          {row.name}
+        </span>
+        <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-[11px] text-fg-muted">
+          {row.platform}
+        </span>
+        {owner && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="text-xs text-kind-error/0 transition-colors group-hover:text-kind-error/70 hover:!text-kind-error"
+          >
+            {t('common.delete')}
+          </button>
+        )}
+      </div>
+
+      <div className="mt-3 flex items-baseline gap-5 font-mono text-[13px] tabular-nums">
+        <span>
+          <Num n={h?.counts24h.error} tone="error" />{' '}
+          <span className="text-fg-subtle">err</span>
+        </span>
+        <span>
+          <Num n={h?.counts24h.warn} tone="warn" />{' '}
+          <span className="text-fg-subtle">warn</span>
+        </span>
+        <span>
+          <Num n={h?.users24h} /> <span className="text-fg-subtle">u</span>
+        </span>
+        {h && h.replay24h.eligible > 0 && (
+          <span className="ml-auto text-fg-muted">
+            {t('health.replay')} {h.replay24h.withScreens}/{h.replay24h.eligible}
+          </span>
+        )}
+      </div>
+
+      <div className="mt-2.5 flex items-center gap-2 border-t border-border/60 pt-2.5 font-mono text-[11px] text-fg-subtle">
+        {h?.latestRelease ? (
+          <>
+            <span className="min-w-0 flex-1 truncate" title={h.latestRelease}>
+              {formatRelease(h.latestRelease)}
+            </span>
+            <ArtifactLights kinds={h.latestReleaseArtifacts} />
+          </>
+        ) : (
+          <span className="flex-1">—</span>
+        )}
+        <span className="shrink-0">
+          {h?.lastEventAt ? formatRelative(h.lastEventAt) : t('health.silent')}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -214,7 +197,7 @@ function Pulse({ health, now }: { health: ProjectHealth | null; now: number }) {
   const age = last === null ? null : now - last;
   const color =
     age === null
-      ? 'var(--gds-fg-muted)'
+      ? 'var(--sn-fg-muted)'
       : age < 10 * 60_000
         ? 'var(--s-kind-probe)'
         : age < 60 * 60_000
