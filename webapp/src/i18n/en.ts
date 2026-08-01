@@ -69,7 +69,6 @@ export const en = {
   'issue.code': 'Where it broke',
   'issue.addNote': 'Add note',
   'issue.assignee': 'Assignee',
-  'issue.back': 'Inbox',
   'issue.copied': 'Copied',
   'issue.copyForAi': 'Copy for AI',
   'issue.eventMoment': '{kind} fired',
@@ -94,12 +93,16 @@ export const en = {
   'issue.occurrences': 'Occurrences',
   'issue.reopen': 'Reopen',
   'issue.replayFrom': 'From the occurrence {when} — the newest event carried no replay.',
+  'issue.replayWireframe':
+    'Wireframe replay — this build has replayScreens off, so no pixels were captured.',
   'issue.replayNone':
     'No visual replay came with this event — set replayScreens: true in the SDK to capture the minute before.',
   'issue.resolve': 'Resolve',
   'issue.resolveInRelease': 'Fixed in release',
+  'issue.seekReplay': 'Jump the replay to this moment',
   'issue.system': 'system',
   'issue.timeline': 'What the user was doing',
+  'issue.timelineEmpty': 'No signals arrived with this event.',
   'issue.unassigned': 'Unassigned',
 
   'nav.inbox': 'Inbox',
@@ -171,6 +174,9 @@ export const en = {
   'stack.truncated': '… {n} more frames',
 
   'table.empty': 'Nothing here yet',
+
+  'triage.pickHint': 'j/k move · Enter opens · ⌘K search',
+  'triage.pickTitle': 'Pick an issue from the queue',
 
   'shell.loading': 'Loading…',
   'theme.dark': 'Dark',

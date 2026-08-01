@@ -64,7 +64,6 @@ export const ja: Messages = {
   'issue.code': '発生箇所',
   'issue.addNote': 'ノートを追加',
   'issue.assignee': '担当者',
-  'issue.back': '受信箱',
   'issue.copied': 'コピーしました',
   'issue.copyForAi': 'AI 用にコピー',
   'issue.eventMoment': '{kind} 発生',
@@ -89,12 +88,16 @@ export const ja: Messages = {
   'issue.occurrences': '発生一覧',
   'issue.reopen': '再オープン',
   'issue.replayFrom': '{when}の発生時のリプレイです — 直近のイベントには付いていません。',
+  'issue.replayWireframe':
+    'ワイヤーフレームリプレイ — このビルドは replayScreens が無効のため、実画面は記録されていません。',
   'issue.replayNone':
     'このイベントにはリプレイが付いていません — SDK で replayScreens: true を有効にすると、直前の1分間の画面を記録できます。',
   'issue.resolve': '解決',
   'issue.resolveInRelease': '修正リリース',
+  'issue.seekReplay': 'リプレイをこの時点へ',
   'issue.system': 'システム',
   'issue.timeline': 'ユーザーが何をしていたか',
+  'issue.timelineEmpty': 'このイベントには行動シグナルがありません。',
   'issue.unassigned': '未割り当て',
 
   'nav.inbox': '受信箱',
@@ -166,6 +169,9 @@ export const ja: Messages = {
   'stack.truncated': '… 残り {n} フレーム',
 
   'table.empty': 'まだ何もありません',
+
+  'triage.pickHint': 'j/k 移動 · Enter 開く · ⌘K 検索',
+  'triage.pickTitle': '左のキューから issue を選択',
 
   'shell.loading': '読み込み中…',
   'theme.dark': 'ダーク',

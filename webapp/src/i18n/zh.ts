@@ -62,7 +62,6 @@ export const zh: Messages = {
   'issue.code': '出错位置',
   'issue.addNote': '添加备注',
   'issue.assignee': '负责人',
-  'issue.back': '收件箱',
   'issue.copied': '已复制',
   'issue.copyForAi': '复制给 AI',
   'issue.eventMoment': '{kind} 触发',
@@ -84,12 +83,15 @@ export const zh: Messages = {
   'issue.occurrences': '发生记录',
   'issue.reopen': '重新打开',
   'issue.replayFrom': '来自 {when} 的一次发生 —— 最新事件没有携带录屏。',
+  'issue.replayWireframe': '线框回放 —— 该构建没开 replayScreens,没有捕获真实画面。',
   'issue.replayNone':
     '该事件没有携带录屏 —— 在 SDK 里开启 replayScreens: true 才会捕获出错前一分钟的画面。',
   'issue.resolve': '解决',
   'issue.resolveInRelease': '修复版本',
+  'issue.seekReplay': '回放跳到这一刻',
   'issue.system': '系统',
   'issue.timeline': '用户当时在做什么',
+  'issue.timelineEmpty': '该事件没有携带行为信号。',
   'issue.unassigned': '未分配',
 
   'nav.inbox': '收件箱',
@@ -155,6 +157,9 @@ export const zh: Messages = {
   'stack.truncated': '… 还有 {n} 帧',
 
   'table.empty': '暂无内容',
+
+  'triage.pickHint': 'j/k 移动 · Enter 打开 · ⌘K 搜索',
+  'triage.pickTitle': '从左侧队列选择一个 issue',
 
   'shell.loading': '加载中…',
   'theme.dark': '深色',

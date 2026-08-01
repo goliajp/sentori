@@ -1,14 +1,22 @@
 // Releases — "did this version ship healthy?" (design.md §11).
 // One row per release: the three symbolication lights (sourcemap /
 // dsym / proguard), backed by upload commands when a light is off.
-// Artifact gaps are most visible here, on purpose.
+// Artifact gaps are most visible here, on purpose — the lights are
+// live on load, not hidden behind a click.
 
 import { useState } from 'react';
 
 import { useShell } from '../App';
-import { EmptyState, ErrorBanner, formatRelative } from '../components/ui';
+import {
+  ErrorBanner,
+  PageShell,
+  Panel,
+  PanelEmpty,
+  Select,
+  formatRelative,
+} from '../components/ui';
 import { useT } from '../i18n';
-import { api, type ArtifactRow, type ReleaseRow } from '../lib/api';
+import { api, type ReleaseRow } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 
 export default function ReleasesPage() {
@@ -23,24 +31,24 @@ export default function ReleasesPage() {
   );
 
   return (
-    <div className="mx-auto max-w-[1760px] px-7 py-5">
-      <div className="mb-4 flex items-center gap-3">
-        <h1 className="text-base font-semibold">{t('nav.releases')}</h1>
-        {projects.length > 1 && (
-          <select
+    <PageShell
+      title={t('nav.releases')}
+      toolbar={
+        projects.length > 1 ? (
+          <Select
             value={active ?? ''}
             onChange={(e) => setProjectId(e.target.value)}
-            className="rounded border border-border bg-transparent px-2 py-1 text-xs"
+            className="h-7 text-xs"
           >
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
             ))}
-          </select>
-        )}
-      </div>
-
+          </Select>
+        ) : undefined
+      }
+    >
       {error && (
         <ErrorBanner>
           {t('releases.loadFailed')}{' '}
@@ -49,69 +57,87 @@ export default function ReleasesPage() {
           </button>
         </ErrorBanner>
       )}
-      {loading && !data && <div className="py-16 text-center text-sm opacity-50">…</div>}
-      {data && data.releases.length === 0 && (
-        <EmptyState title={t('releases.emptyTitle')} hint={t('releases.emptyHint')} />
+      {loading && !data && (
+        <div className="py-16 text-center text-sm text-fg-subtle">…</div>
       )}
 
-      <div className="space-y-1.5">
-        {(data?.releases ?? []).map((r) => (
-          <ReleaseRowView key={r.id} release={r} projectId={active ?? ''} />
-        ))}
-      </div>
-    </div>
+      <Panel title={`${t('nav.releases')} (${data?.releases.length ?? 0})`}>
+        {data && data.releases.length === 0 ? (
+          <PanelEmpty>
+            {t('releases.emptyTitle')} — {t('releases.emptyHint')}
+          </PanelEmpty>
+        ) : (
+          <div className="divide-y divide-border/60">
+            {(data?.releases ?? []).map((r) => (
+              <ReleaseRowView key={r.id} release={r} projectId={active ?? ''} />
+            ))}
+          </div>
+        )}
+      </Panel>
+    </PageShell>
   );
 }
 
 function ReleaseRowView({ release, projectId }: { release: ReleaseRow; projectId: string }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  // Artifacts load with the row: the lights ARE the page — greying
+  // them out until a click would hide exactly the gap this screen
+  // exists to show.
   const { data } = useAsyncData(
-    () =>
-      open
-        ? api.listArtifacts(projectId, release.id)
-        : Promise.resolve({ artifacts: [] as ArtifactRow[] }),
-    [open, release.id],
+    () => api.listArtifacts(projectId, release.id),
+    [release.id],
   );
   const artifacts = data?.artifacts ?? [];
   const kinds = new Set(artifacts.map((a) => a.kind));
   const created = release.createdAt ?? release.created_at;
 
   return (
-    <div className="rounded-lg border border-border">
+    <div>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 px-3 py-2 text-left"
+        aria-expanded={open}
+        className="flex w-full items-center gap-4 px-3.5 py-2 text-left hover:bg-raised/50"
       >
-        <span className="min-w-0 flex-1 truncate font-mono text-sm">{release.name}</span>
-        <Light on={open ? kinds.has('sourcemap') : undefined} label="js" />
-        <Light on={open ? kinds.has('dsym') : undefined} label="ios" />
-        <Light on={open ? kinds.has('proguard') : undefined} label="android" />
+        <span
+          className={`inline-block w-3 shrink-0 text-center text-fg-subtle transition-transform ${open ? 'rotate-90' : ''}`}
+          aria-hidden
+        >
+          ▸
+        </span>
+        <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-fg">
+          {release.name}
+        </span>
+        <Light on={data ? kinds.has('sourcemap') : undefined} label="js" />
+        <Light on={data ? kinds.has('dsym') : undefined} label="ios" />
+        <Light on={data ? kinds.has('proguard') : undefined} label="android" />
         {created && (
-          <span className="w-16 text-right font-mono text-[11px] opacity-40">
+          <span className="w-16 text-right font-mono text-[11px] text-fg-subtle">
             {formatRelative(created)}
           </span>
         )}
       </button>
       {open && (
-        <div className="border-t border-border px-3 py-2">
+        <div className="border-t border-border/60 bg-bg px-3.5 py-2.5 pl-10">
           {artifacts.length === 0 ? (
-            <div className="text-xs opacity-60">
+            <div className="text-xs text-fg-muted">
               <p>{t('releases.noArtifacts')}</p>
-              <code className="mt-1 block rounded bg-bg p-2 font-mono text-[11px]">
+              <code className="mt-1.5 block rounded bg-surface p-2 font-mono text-[11px]">
                 sentori-cli upload sourcemap --release &quot;{release.name}&quot; --token
                 &lt;api-token&gt; &lt;map&gt;
               </code>
             </div>
           ) : (
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               {artifacts.map((a) => (
                 <div key={a.id} className="flex gap-3 font-mono text-xs">
-                  <span className="w-20 opacity-60">{a.kind}</span>
-                  <span className="min-w-0 flex-1 truncate">{a.name}</span>
+                  <span className="w-20 text-fg-subtle">{a.kind}</span>
+                  <span className="min-w-0 flex-1 truncate text-fg-muted">{a.name}</span>
                   {a.size_bytes !== undefined && (
-                    <span className="opacity-40">{Math.round(a.size_bytes / 1024)} KB</span>
+                    <span className="text-fg-subtle">
+                      {Math.round(a.size_bytes / 1024)} KB
+                    </span>
                   )}
                 </div>
               ))}
@@ -125,11 +151,16 @@ function ReleaseRowView({ release, projectId }: { release: ReleaseRow; projectId
 
 function Light({ on, label }: { on: boolean | undefined; label: string }) {
   return (
-    <span className="flex items-center gap-1 font-mono text-[10px] opacity-70">
+    <span className="flex items-center gap-1.5 font-mono text-[11px] text-fg-muted">
       <span
         className="h-2 w-2 rounded-full"
         style={{
-          backgroundColor: on === undefined ? 'color-mix(in srgb, var(--gds-fg-muted) 30%, transparent)' : on ? 'var(--s-kind-probe)' : 'var(--s-kind-error)',
+          backgroundColor:
+            on === undefined
+              ? 'color-mix(in srgb, var(--gds-fg-muted) 30%, transparent)'
+              : on
+                ? 'var(--s-kind-probe)'
+                : 'var(--s-kind-error)',
         }}
       />
       {label}

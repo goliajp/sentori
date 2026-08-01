@@ -13,6 +13,12 @@ type Item =
   | { type: 'nav'; label: string; to: string }
   | { type: 'issue'; issue: IssueSummary };
 
+/** Programmatic open — the topbar search button and the ⌘K chord
+ *  are the same door. */
+export const openPalette = (): void => {
+  window.dispatchEvent(new CustomEvent('sentori:palette'));
+};
+
 export function CommandPalette() {
   const t = useT();
   const navigate = useNavigate();
@@ -43,8 +49,15 @@ export function CommandPalette() {
         setOpenReset(false);
       }
     }
+    function onOpen() {
+      setOpenReset(true);
+    }
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('sentori:palette', onOpen);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('sentori:palette', onOpen);
+    };
     // setOpenReset is identity-stable enough for a mount-lifetime listener
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
