@@ -44,6 +44,9 @@ export const ja: Messages = {
   'inbox.selectedCount': '{n} 件選択中',
   'inbox.clearSelection': '選択解除',
 
+  'health.replay': 'リプレイ',
+  'health.silent': 'イベントなし',
+
   'identity.copied': 'コピーしました',
   'identity.copyHint': 'ユーザーキー全体をコピー',
 
@@ -183,6 +186,7 @@ export const ja: Messages = {
   'theme.label': 'テーマ',
   'theme.light': 'ライト',
   'theme.system': 'システムに従う',
+  'shell.project': 'プロジェクト',
   'shell.roleAdmin': '管理者',
   'shell.roleOwner': 'オーナー',
 };

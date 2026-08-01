@@ -198,3 +198,124 @@ pub async fn delete(
         }
     }
 }
+
+/// One `GROUP BY` aggregate folded into a JSON map — the health
+/// endpoint reads several of these.
+async fn count_by(
+    state: &Arc<AppState>,
+    project_id: Uuid,
+    sql: &str,
+) -> serde_json::Map<String, Value> {
+    let rows = sqlx::query(sql)
+        .bind(project_id)
+        .fetch_all(&state.pool)
+        .await
+        .unwrap_or_default();
+    let mut out = serde_json::Map::new();
+    for r in &rows {
+        out.insert(
+            sqlx::Row::get::<String, _>(r, "k"),
+            Value::from(sqlx::Row::get::<i64, _>(r, "n")),
+        );
+    }
+    out
+}
+
+/// GET /admin/api/projects/{id}/health — what the SDK's own traffic
+/// says about the deployment, curated to the actionable set: is the
+/// SDK alive (last event), how loud was the last day (per-kind
+/// counts + distinct users), is one platform silently dark, what
+/// release runs in the field and can its stacks be read (artifact
+/// lights), and did error/warn events actually carry pixels
+/// (replayScreens coverage).
+pub async fn health(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    Path(project_id): Path<Uuid>,
+) -> (StatusCode, Json<Value>) {
+    if let Err(e) = super::tokens::ensure_project_access(&state, &ctx, project_id).await {
+        return e;
+    }
+    let last_event_at: Option<time::OffsetDateTime> =
+        sqlx::query_scalar("SELECT max(received_at) FROM events WHERE project_id = $1")
+            .bind(project_id)
+            .fetch_one(&state.pool)
+            .await
+            .unwrap_or(None);
+    let counts = count_by(
+        &state,
+        project_id,
+        "SELECT kind AS k, count(*) AS n FROM events \
+         WHERE project_id = $1 AND received_at > now() - interval '24 hours' \
+         GROUP BY kind",
+    )
+    .await;
+    let users_24h: i64 = sqlx::query_scalar(
+        "SELECT count(DISTINCT user_key) FROM events \
+         WHERE project_id = $1 AND received_at > now() - interval '24 hours' \
+           AND user_key IS NOT NULL",
+    )
+    .bind(project_id)
+    .fetch_one(&state.pool)
+    .await
+    .unwrap_or(0);
+    let platforms = count_by(
+        &state,
+        project_id,
+        "SELECT platform AS k, count(*) AS n FROM events \
+         WHERE project_id = $1 AND received_at > now() - interval '24 hours' \
+         GROUP BY platform",
+    )
+    .await;
+    let latest_release: Option<String> = sqlx::query_scalar(
+        "SELECT release FROM events WHERE project_id = $1 ORDER BY received_at DESC LIMIT 1",
+    )
+    .bind(project_id)
+    .fetch_one(&state.pool)
+    .await
+    .unwrap_or(None);
+    let artifact_kinds: Vec<String> = match &latest_release {
+        Some(rel) => sqlx::query_scalar(
+            "SELECT DISTINCT a.kind FROM release_artifacts a \
+             JOIN releases r ON r.id = a.release_id \
+             WHERE r.project_id = $1 AND r.name = $2",
+        )
+        .bind(project_id)
+        .bind(rel)
+        .fetch_all(&state.pool)
+        .await
+        .unwrap_or_default(),
+        None => Vec::new(),
+    };
+    let replay_row = sqlx::query(
+        "SELECT count(*) AS eligible, \
+                count(*) FILTER (WHERE EXISTS ( \
+                    SELECT 1 FROM event_attachments a \
+                    WHERE a.event_id = e.id AND a.kind = 'screens')) AS with_screens \
+         FROM events e \
+         WHERE e.project_id = $1 AND e.received_at > now() - interval '24 hours' \
+           AND e.kind IN ('error', 'warn')",
+    )
+    .bind(project_id)
+    .fetch_one(&state.pool)
+    .await
+    .ok();
+    let (eligible, with_screens) = replay_row.map_or((0, 0), |r| {
+        (
+            sqlx::Row::get::<i64, _>(&r, "eligible"),
+            sqlx::Row::get::<i64, _>(&r, "with_screens"),
+        )
+    });
+    (
+        StatusCode::OK,
+        Json(json!({
+            "lastEventAt": last_event_at.map(crate::wire_time::rfc3339),
+            "counts24h": counts,
+            "users24h": users_24h,
+            "platforms24h": platforms,
+            "latestRelease": latest_release,
+            "latestReleaseArtifacts": artifact_kinds,
+            "replay24h": { "eligible": eligible, "withScreens": with_screens },
+        })),
+    )
+}

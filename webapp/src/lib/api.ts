@@ -89,6 +89,16 @@ export type EventDetail = {
   attachments: AttachmentRow[];
 };
 
+export type ProjectHealth = {
+  lastEventAt: null | string;
+  counts24h: Record<string, number>;
+  users24h: number;
+  platforms24h: Record<string, number>;
+  latestRelease: null | string;
+  latestReleaseArtifacts: string[];
+  replay24h: { eligible: number; withScreens: number };
+};
+
 export type ContextEventRow = {
   id: string;
   issueId: string;
@@ -289,6 +299,11 @@ class Api {
       'DELETE',
       `/admin/api/users/${userId}/projects/${projectId}`,
     );
+  }
+
+  /** What the SDK's own traffic says about a project's deployment. */
+  projectHealth(id: string) {
+    return this.get<ProjectHealth>(`/admin/api/projects/${id}/health`);
   }
 
   // ── issues ──
