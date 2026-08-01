@@ -275,8 +275,23 @@ import UIKit
         ids: Set<String>
     ) -> [UIView] {
         var found: [UIView] = []
-        func walk(_ v: UIView) {
+        func matches(_ v: UIView) -> Bool {
+            // RN maps `testID` to accessibilityIdentifier on iOS,
+            // and keeps `nativeID` as its own property on the view —
+            // accept either so a host masks with one prop on both
+            // platforms (Android matches nativeID via the view tag).
             if let id = v.accessibilityIdentifier, ids.contains(id) {
+                return true
+            }
+            if v.responds(to: NSSelectorFromString("nativeID")),
+               let nid = v.value(forKey: "nativeID") as? String,
+               ids.contains(nid) {
+                return true
+            }
+            return false
+        }
+        func walk(_ v: UIView) {
+            if matches(v) {
                 found.append(v)
                 return
             }

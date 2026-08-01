@@ -2,7 +2,10 @@
 //
 // The host registers a query returning the `nativeID`s of views
 // that must never appear in a screenshot (camera feeds, user
-// identity, payment fields). Native paints black rectangles over
+// identity, payment fields). On iOS the native matcher accepts the
+// same value via either `nativeID` or `testID` (RN maps testID to
+// accessibilityIdentifier); on Android `nativeID` rides the view
+// tag. One prop, both platforms: use `nativeID`. Native paints black rectangles over
 // those subtrees in the same render pass, so the pixels never
 // leave the device.
 //
