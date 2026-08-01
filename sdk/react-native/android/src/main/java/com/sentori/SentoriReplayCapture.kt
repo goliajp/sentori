@@ -120,7 +120,8 @@ object SentoriReplayCapture {
         val nodes = JSONArray()
         val rootLoc = IntArray(2).also { root.getLocationInWindow(it) }
         val ctx = WalkContext(rootLoc = rootLoc, maskedSet = maskedSet)
-        walk(root, depth = 0, parentMasked = false, ctx = ctx, nodes = nodes)
+        val rootClip = android.graphics.Rect(0, 0, root.width, root.height)
+        walk(root, depth = 0, parentMasked = false, ctx = ctx, clip = rootClip, nodes = nodes)
 
         val payload = JSONObject().apply {
             put("ts", System.currentTimeMillis())
@@ -173,6 +174,7 @@ object SentoriReplayCapture {
         depth: Int,
         parentMasked: Boolean,
         ctx: WalkContext,
+        clip: android.graphics.Rect,
         nodes: JSONArray,
     ) {
         if (nodes.length() >= MAX_NODES) return
@@ -188,68 +190,94 @@ object SentoriReplayCapture {
         val w = view.width
         val h = view.height
 
+        // Insight 2026-08-01: nothing was clipped here at all — a
+        // scroll container's full content width shipped as-is and
+        // drew past the device in the replay. `clip` accumulates
+        // every clipping ancestor (clipChildren defaults to true, so
+        // scroll viewports narrow it); a node ships as its visible
+        // intersection, an invisible one not at all. This is the
+        // root-cause fix the 05-18 decorView→content anchor swap
+        // only sidestepped.
+        var childClip = clip
+
         // Emit a node ONLY when the view has visual extent. A zero-
         // size view contributes nothing to render but its subtree
-        // might; recurse below regardless.
+        // might; recurse below regardless (and without narrowing the
+        // clip — transient zero-size Fabric wrappers do not really
+        // clip their laid-out descendants).
         if (w > 0 && h > 0) {
             val loc = IntArray(2)
             view.getLocationInWindow(loc)
             val x = loc[0] - ctx.rootLoc[0]
             val y = loc[1] - ctx.rootLoc[1]
 
-            val node = JSONObject().apply {
-                put("x", x)
-                put("y", y)
-                put("w", w)
-                put("h", h)
+            val selfRect = android.graphics.Rect(x, y, x + w, y + h)
+            val visible = android.graphics.Rect(selfRect)
+            if (!visible.intersect(clip)) {
+                // Fully outside every clipping ancestor: the view
+                // shows nothing, and if it clips its own children the
+                // whole subtree is gone with it.
+                if (view is ViewGroup && view.clipChildren) return
+                visible.setEmpty()
             }
+            if (view is ViewGroup && view.clipChildren) {
+                childClip = android.graphics.Rect(visible)
+            }
+            if (!visible.isEmpty) {
+                val node = JSONObject().apply {
+                    put("x", visible.left)
+                    put("y", visible.top)
+                    put("w", visible.width())
+                    put("h", visible.height())
+                }
 
-            var kindEmitted = false
-            when {
-                masked -> {
-                    node.put("kind", "mask")
-                    kindEmitted = true
-                }
-                view is TextView && !view.text.isNullOrEmpty() -> {
-                    node.put("kind", "text")
-                    val text = view.text.toString().let { if (it.length > 200) it.substring(0, 200) else it }
-                    node.put("text", text)
-                    node.put("color", colorToHex(view.currentTextColor))
-                    kindEmitted = true
-                }
-                view is EditText -> {
-                    node.put("kind", "text")
-                    val text = (view.text ?: "").toString().let { if (it.length > 200) it.substring(0, 200) else it }
-                    node.put("text", text)
-                    kindEmitted = true
-                }
-                view is ImageView -> {
-                    node.put("kind", "image")
-                    kindEmitted = true
-                }
-                view.background != null -> {
-                    // rc.8 — backgrounds backed by a BitmapDrawable
-                    // (a View whose backgroundImage / drawable
-                    // resource is a raster) emit as `image` kind so
-                    // the dashboard renders them as a media region,
-                    // not as a grey rect. Everything else stays
-                    // `rect` and tries to extract a fill colour.
-                    val bg = view.background
-                    if (bg is BitmapDrawable) {
-                        node.put("kind", "image")
-                    } else {
-                        node.put("kind", "rect")
-                        val color = extractDrawableColor(bg)
-                        if (color != null && (color shr 24 and 0xff) != 0) {
-                            node.put("color", colorToHex(color))
-                        }
+                var kindEmitted = false
+                when {
+                    masked -> {
+                        node.put("kind", "mask")
+                        kindEmitted = true
                     }
-                    kindEmitted = true
+                    view is TextView && !view.text.isNullOrEmpty() -> {
+                        node.put("kind", "text")
+                        val text = view.text.toString().let { if (it.length > 200) it.substring(0, 200) else it }
+                        node.put("text", text)
+                        node.put("color", colorToHex(view.currentTextColor))
+                        kindEmitted = true
+                    }
+                    view is EditText -> {
+                        node.put("kind", "text")
+                        val text = (view.text ?: "").toString().let { if (it.length > 200) it.substring(0, 200) else it }
+                        node.put("text", text)
+                        kindEmitted = true
+                    }
+                    view is ImageView -> {
+                        node.put("kind", "image")
+                        kindEmitted = true
+                    }
+                    view.background != null -> {
+                        // rc.8 — backgrounds backed by a BitmapDrawable
+                        // (a View whose backgroundImage / drawable
+                        // resource is a raster) emit as `image` kind so
+                        // the dashboard renders them as a media region,
+                        // not as a grey rect. Everything else stays
+                        // `rect` and tries to extract a fill colour.
+                        val bg = view.background
+                        if (bg is BitmapDrawable) {
+                            node.put("kind", "image")
+                        } else {
+                            node.put("kind", "rect")
+                            val color = extractDrawableColor(bg)
+                            if (color != null && (color shr 24 and 0xff) != 0) {
+                                node.put("color", colorToHex(color))
+                            }
+                        }
+                        kindEmitted = true
+                    }
                 }
-            }
 
-            if (kindEmitted) {
-                nodes.put(node)
+                if (kindEmitted) {
+                    nodes.put(node)
+                }
             }
         }
 
@@ -257,7 +285,7 @@ object SentoriReplayCapture {
         // descendants (the rc.3 fix).
         if (!masked && view is ViewGroup) {
             for (i in 0 until view.childCount) {
-                walk(view.getChildAt(i), depth + 1, masked, ctx, nodes)
+                walk(view.getChildAt(i), depth + 1, masked, ctx, childClip, nodes)
             }
         }
     }

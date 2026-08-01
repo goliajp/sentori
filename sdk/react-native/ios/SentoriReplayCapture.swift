@@ -74,6 +74,7 @@ import UIKit
             parentMasked: false,
             maskedIds: maskedIds,
             window: window,
+            clip: window.bounds,
             nodes: &nodes
         )
         lastDiagNodes = nodes.count
@@ -195,6 +196,7 @@ import UIKit
         parentMasked: Bool,
         maskedIds: Set<String>,
         window: UIWindow,
+        clip: CGRect,
         nodes: inout [[String: Any]]
     ) {
         if nodes.count >= MAX_NODES { return }
@@ -207,17 +209,29 @@ import UIKit
             .map { maskedIds.contains($0) } ?? false
         let masked = parentMasked || isThisMasked
 
+        // Insight 2026-08-01: the old check culled only nodes FULLY
+        // outside the window, so a 2000pt scroll ruler shipped at
+        // 2000pt and drew past the phone. `clip` accumulates every
+        // clipping ancestor (scroll views, clipsToBounds containers)
+        // from the window down; a node ships as the part of it that
+        // is actually visible, and a subtree behind a clipping edge
+        // ships not at all. This replaces the 05-18 anchor-swap class
+        // of fix: clipping is the root cause, anchors were symptoms.
         let frame = view.convert(view.bounds, to: window)
-        // Skip nodes outside the window bounds (off-screen recyclers).
-        if !frame.intersects(window.bounds) {
-            return
+        let visible = frame.intersection(clip)
+        let clipsChildren = view.clipsToBounds
+        if visible.isNull || visible.isEmpty {
+            // Nothing of this view shows. Its children can still show
+            // when this view does not clip them (transform-heavy or
+            // zero-size wrappers); a clipping view ends the subtree.
+            if clipsChildren { return }
         }
 
         var node: [String: Any] = [
-            "x": Double(frame.origin.x),
-            "y": Double(frame.origin.y),
-            "w": Double(frame.size.width),
-            "h": Double(frame.size.height),
+            "x": Double(visible.origin.x),
+            "y": Double(visible.origin.y),
+            "w": Double(visible.size.width),
+            "h": Double(visible.size.height),
         ]
 
         if masked {
@@ -239,11 +253,14 @@ import UIKit
         }
         // else: invisible container — skip emitting but recurse.
 
-        if node["kind"] != nil {
+        if node["kind"] != nil, !visible.isNull, !visible.isEmpty {
             nodes.append(node)
         }
 
         if !masked {
+            // A clipping view narrows the clip for everything below
+            // it; a non-clipping one passes the inherited clip on.
+            let childClip = clipsChildren ? visible : clip
             // Don't expose internals of masked subtrees.
             for sub in view.subviews {
                 walk(
@@ -253,6 +270,7 @@ import UIKit
                     parentMasked: masked,
                     maskedIds: maskedIds,
                     window: window,
+                    clip: childClip,
                     nodes: &nodes
                 )
             }
