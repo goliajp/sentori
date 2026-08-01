@@ -1,17 +1,25 @@
 // Issue detail — the interactive rendering of the bundle
-// (design.md §11): one vertical narrative, no tabs. Summary →
-// stack with in-app frames highlighted → the signal timeline ("what
-// the user was doing") → environment → occurrences (collapsed) →
-// activity. A sticky action rail on the right carries triage +
-// Copy-for-AI + the guard-status card. The narrative order IS the
-// design signature.
+// (design.md §11): one narrative, no tabs, ordered by what a human
+// asks first when something broke on a phone:
+//
+//   ① where it broke      — the failing line, source window open
+//   ② what the user saw   — portrait replay dock, phone-shaped
+//   ③ what they were doing — the signal timeline
+//
+// The replay lives in a right-hand column because mobile frames are
+// tall: a portrait dock beside the code reads like holding the
+// user's phone next to the stack trace. Everything else — triage,
+// occurrences, raw environment, activity — is obligation, not
+// desire: triage compresses into the header toolbar, the rest folds
+// into corner rows at the bottom. (The UX iron rule: give what they
+// came for in full, hide what they didn't, corner the obligatory.)
 
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useShell } from '../App';
-import { KindBadge, RegressedBadge } from '../components/kind';
-import { EmptyState, ErrorBanner, formatRelative } from '../components/ui';
+import { KindBadge, RegressedBadge, kindColor } from '../components/kind';
+import { Button, EmptyState, ErrorBanner, Input, formatRelative } from '../components/ui';
 import { useT } from '../i18n';
 import {
   api,
@@ -60,7 +68,11 @@ export default function IssueDetail() {
 
   const screensRef = latest?.attachments?.find((a) => a.kind === 'screens')?.ref ?? null;
   const payload = latest?.payload as
-    | { error?: { type?: string; message?: string; stack?: Frame[] }; signals?: Signal[]; device?: Record<string, unknown> }
+    | {
+        error?: { type?: string; message?: string; stack?: Frame[] };
+        signals?: Signal[];
+        device?: Record<string, unknown>;
+      }
     | undefined;
 
   const copyForAi = async () => {
@@ -76,7 +88,7 @@ export default function IssueDetail() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-3xl px-6 py-8">
+      <div className="mx-auto max-w-3xl px-7 py-8">
         <ErrorBanner>
           {t('issue.loadFailed')}{' '}
           <button type="button" className="underline" onClick={reload}>
@@ -87,211 +99,225 @@ export default function IssueDetail() {
     );
   }
   if (loading || !issue) {
-    return <div className="py-16 text-center text-sm opacity-50">…</div>;
+    return <div className="py-16 text-center text-sm text-fg-subtle">…</div>;
   }
 
   const project = projects.find((p) => p.id === issue.projectId);
   const surface = issue.surface as { screen?: string; element?: string };
+  const hasStack = !!payload?.error?.stack && payload.error.stack.length > 0;
 
   return (
-    <div className="mx-auto flex max-w-6xl gap-6 px-6 py-5">
-      {/* ── the narrative ── */}
-      <div className="min-w-0 flex-1">
+    <div className="mx-auto max-w-[1760px] px-7 py-5">
+      {/* ── header: identity left, triage right ── */}
+      <header className="mb-6">
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="mb-3 text-xs opacity-50 hover:opacity-100"
+          className="mb-2 text-sm text-fg-subtle hover:text-fg"
         >
           ← {t('issue.back')}
         </button>
-
-        <header className="mb-5">
-          <div className="mb-1 flex items-center gap-2">
-            <KindBadge kind={issue.kind} />
-            {issue.regressedAt && issue.status === 'open' && <RegressedBadge />}
-            <span className="text-xs opacity-40">{project?.name}</span>
-          </div>
-          <h1 className="text-lg font-semibold">{issue.title}</h1>
-          {issue.messageSample && (
-            <p className="mt-0.5 text-sm opacity-60">{issue.messageSample}</p>
-          )}
-          <div className="mt-2 font-mono text-xs opacity-60">
-            {issue.usersCount}u × {issue.maxPerUser} · {issue.eventCount}ev ·{' '}
-            {t('issue.firstSeen')} {formatRelative(issue.firstSeen)} · {t('issue.lastSeen')}{' '}
-            {formatRelative(issue.lastSeen)}
-            {issue.lastRelease && <> · {issue.lastRelease}</>}
-          </div>
-          {surface.screen && (
-            <div className="mt-1 font-mono text-xs opacity-40">
-              {surface.screen}
-              {surface.element ? ` · ${surface.element}` : ''}
-            </div>
-          )}
-        </header>
-
-        {payload?.error?.stack && payload.error.stack.length > 0 && (
-          <Section title={t('issue.stack')}>
-            <StackTrace frames={payload.error.stack} />
-          </Section>
-        )}
-
-        {screensRef && (
-          <Section title={t('replay.title')}>
-            <ReplayPlayer attachmentRef={screensRef} />
-          </Section>
-        )}
-
-        {payload?.signals && payload.signals.length > 0 && (
-          <Section title={t('issue.timeline')}>
-            <Timeline signals={payload.signals} />
-          </Section>
-        )}
-
-        {payload?.device && (
-          <Section title={t('issue.environment')}>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-3">
-              {Object.entries(payload.device)
-                .filter(([, v]) => typeof v !== 'object')
-                .map(([k, v]) => (
-                  <div key={k} className="flex justify-between gap-2 font-mono">
-                    <dt className="opacity-50">{k}</dt>
-                    <dd>{String(v)}</dd>
-                  </div>
-                ))}
-            </dl>
-          </Section>
-        )}
-
-        {occ && occ.events.length > 0 && (
-          <Section title={`${t('issue.occurrences')} (${occ.events.length})`} collapsed>
-            <div className="divide-y divide-[var(--gds-border,#2a2a30)]">
-              {occ.events.map((e) => (
-                <OccRow key={e.id} row={e} active={e.id === latestId} />
-              ))}
-            </div>
-          </Section>
-        )}
-
-        <Section title={t('issue.activity')}>
-          {issue.activity.length === 0 && (
-            <EmptyState title={t('issue.noActivity')} hint="" />
-          )}
-          <ul className="space-y-1.5">
-            {issue.activity.map((a) => (
-              <li key={a.id} className="flex items-baseline gap-2 text-xs">
-                <span className="w-16 shrink-0 font-mono opacity-40">
-                  {formatRelative(a.at)}
+        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+          <div className="min-w-0">
+            <div className="mb-1.5 flex items-center gap-2">
+              <KindBadge kind={issue.kind} />
+              {issue.regressedAt && issue.status === 'open' && <RegressedBadge />}
+              <span className="text-sm text-fg-subtle">{project?.name}</span>
+              {surface.screen && (
+                <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
+                  {surface.screen}
+                  {surface.element ? ` · ${surface.element}` : ''}
                 </span>
-                <span className="rounded bg-[var(--gds-surface-raised,#26262c)] px-1 font-mono text-[10px]">
-                  {a.kind}
-                </span>
-                <span className="opacity-80">
-                  {a.actorEmail ?? t('issue.system')} · {summarizeActivity(a.body)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      </div>
-
-      {/* ── action rail ── */}
-      <aside className="w-60 shrink-0">
-        <div className="sticky top-5 space-y-3">
-          <button
-            type="button"
-            onClick={copyForAi}
-            className="w-full rounded-md bg-[var(--gds-accent,#4c8dff)] px-3 py-1.5 text-sm font-medium text-black"
-          >
-            {copied ? t('issue.copied') : t('issue.copyForAi')}
-          </button>
-
-          {issue.status === 'open' && (
-            <div className="rounded-md border border-[var(--gds-border,#2a2a30)] p-3">
-              <label className="mb-1 block text-[11px] opacity-60">
-                {t('issue.resolveInRelease')}
-              </label>
-              <input
-                value={resolveRelease}
-                onChange={(e) => setResolveRelease(e.target.value)}
-                placeholder={issue.lastRelease || 'app@x.y.z'}
-                className="mb-2 w-full rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 font-mono text-xs"
-              />
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() =>
-                  act(() => api.resolveIssue(issue.id, resolveRelease || undefined))
-                }
-                className="w-full rounded-md bg-[#4cd97b] px-3 py-1.5 text-sm font-medium text-black disabled:opacity-40"
-              >
-                {t('issue.resolve')}
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => act(() => api.ignoreIssue(issue.id))}
-                className="mt-1.5 w-full rounded-md border border-[var(--gds-border,#2a2a30)] px-3 py-1.5 text-sm opacity-70 hover:opacity-100 disabled:opacity-40"
-              >
-                {t('issue.ignore')}
-              </button>
+              )}
             </div>
-          )}
-          {issue.status !== 'open' && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => act(() => api.reopenIssue(issue.id))}
-              className="w-full rounded-md border border-[var(--gds-border,#2a2a30)] px-3 py-1.5 text-sm"
-            >
-              {t('issue.reopen')}
-            </button>
-          )}
-
-          {/* guard status — "fixed" and "verified fixed" are two
-              different states, and this card is where that shows */}
-          {issue.status === 'resolved' && (
-            <div className="rounded-md border border-[#4cd97b40] p-3 text-xs">
-              <div className="mb-1 font-semibold text-[#4cd97b]">
-                {t('issue.guardTitle')}
-              </div>
-              <p className="opacity-70">
-                {issue.resolvedInRelease
-                  ? t('issue.guardAnchored', { release: issue.resolvedInRelease })
-                  : t('issue.guardUnanchored')}
-              </p>
-              <p className="mt-1 opacity-70">{t('issue.guardProbeHint')}</p>
+            <h1 className="text-xl font-semibold tracking-tight">{issue.title}</h1>
+            {issue.messageSample && (
+              <p className="mt-1 text-[15px] text-fg-muted">{issue.messageSample}</p>
+            )}
+            <div className="mt-2.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[13px] tabular-nums text-fg-muted">
+              <span className="text-fg">
+                {issue.usersCount}u × {issue.maxPerUser} · {issue.eventCount}ev
+              </span>
+              <span>
+                {t('issue.firstSeen')} {formatRelative(issue.firstSeen)}
+              </span>
+              <span>
+                {t('issue.lastSeen')} {formatRelative(issue.lastSeen)}
+              </span>
+              {issue.lastRelease && <span>{issue.lastRelease}</span>}
             </div>
-          )}
-
-          <div className="rounded-md border border-[var(--gds-border,#2a2a30)] p-3">
-            <label className="mb-1 block text-[11px] opacity-60">{t('issue.note')}</label>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={3}
-              className="mb-2 w-full rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 text-xs"
-            />
-            <button
-              type="button"
-              disabled={busy || note.trim().length === 0}
-              onClick={() =>
-                act(async () => {
-                  await api.addNote(issue.id, note.trim());
-                  setNote('');
-                })
-              }
-              className="w-full rounded-md border border-[var(--gds-border,#2a2a30)] px-3 py-1 text-xs disabled:opacity-40"
-            >
-              {t('issue.addNote')}
-            </button>
           </div>
 
-          {me.role === 'superadmin' && (
-            <AssignBox issue={issue} onDone={reload} />
-          )}
+          {/* triage toolbar — obligation, compressed to one row */}
+          <div className="flex shrink-0 items-center gap-2">
+            {issue.status === 'open' ? (
+              <>
+                <Input
+                  value={resolveRelease}
+                  onChange={(e) => setResolveRelease(e.target.value)}
+                  placeholder={issue.lastRelease || 'app@x.y.z'}
+                  title={t('issue.resolveInRelease')}
+                  aria-label={t('issue.resolveInRelease')}
+                  className="w-44 font-mono text-xs"
+                />
+                <Button
+                  disabled={busy}
+                  onClick={() =>
+                    void act(() => api.resolveIssue(issue.id, resolveRelease || undefined))
+                  }
+                >
+                  {t('issue.resolve')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => void act(() => api.ignoreIssue(issue.id))}
+                >
+                  {t('issue.ignore')}
+                </Button>
+              </>
+            ) : (
+              <Button disabled={busy} onClick={() => void act(() => api.reopenIssue(issue.id))}>
+                {t('issue.reopen')}
+              </Button>
+            )}
+            <Button variant="primary" onClick={() => void copyForAi()}>
+              {copied ? t('issue.copied') : t('issue.copyForAi')}
+            </Button>
+          </div>
         </div>
-      </aside>
+      </header>
+
+      <div className="grid grid-cols-1 gap-7 xl:grid-cols-[minmax(0,1fr)_400px]">
+        {/* ── the narrative ── */}
+        <div className="min-w-0">
+          {hasStack && (
+            <Section title={t('issue.code')}>
+              <StackTrace frames={payload!.error!.stack!} />
+            </Section>
+          )}
+
+          {payload?.signals && payload.signals.length > 0 && (
+            <Section title={t('issue.timeline')}>
+              <Timeline signals={payload.signals} kind={issue.kind} />
+            </Section>
+          )}
+
+          {/* corner rows: obligatory, folded */}
+          {occ && occ.events.length > 0 && (
+            <Section title={`${t('issue.occurrences')} (${occ.events.length})`} collapsed>
+              <div className="divide-y divide-border rounded-md border border-border bg-surface">
+                {occ.events.map((e) => (
+                  <OccRow key={e.id} row={e} active={e.id === latestId} />
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {payload?.device && (
+            <Section title={t('issue.environment')} collapsed>
+              <dl className="grid grid-cols-2 gap-x-8 gap-y-1.5 rounded-md border border-border bg-surface p-4 font-mono text-[13px] sm:grid-cols-3">
+                {Object.entries(payload.device)
+                  .filter(([, v]) => typeof v !== 'object')
+                  .map(([k, v]) => (
+                    <div key={k} className="flex justify-between gap-2">
+                      <dt className="text-fg-subtle">{k}</dt>
+                      <dd className="truncate text-fg-muted">{String(v)}</dd>
+                    </div>
+                  ))}
+              </dl>
+            </Section>
+          )}
+
+          <Section
+            title={`${t('issue.activity')}${issue.activity.length ? ` (${issue.activity.length})` : ''}`}
+            collapsed={issue.activity.length === 0}
+          >
+            {issue.activity.length === 0 && (
+              <EmptyState title={t('issue.noActivity')} hint="" />
+            )}
+            <ul className="space-y-2">
+              {issue.activity.map((a) => (
+                <li key={a.id} className="flex items-baseline gap-2.5 text-[13px]">
+                  <span className="w-16 shrink-0 font-mono text-fg-subtle">
+                    {formatRelative(a.at)}
+                  </span>
+                  <span className="rounded bg-raised px-1.5 font-mono text-xs text-fg-muted">
+                    {a.kind}
+                  </span>
+                  <span className="text-fg-muted">
+                    {a.actorEmail ?? t('issue.system')} · {summarizeActivity(a.body)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        </div>
+
+        {/* ── the phone: what the user saw + the quiet obligations ── */}
+        <aside className="min-w-0">
+          <div className="sticky top-5 space-y-4">
+            <SectionLabel>{t('replay.title')}</SectionLabel>
+            {screensRef ? (
+              <ReplayPlayer attachmentRef={screensRef} />
+            ) : (
+              <p className="rounded-md border border-border bg-surface px-4 py-3 text-sm text-fg-subtle">
+                {t('issue.replayNone')}
+              </p>
+            )}
+
+            {payload?.device && <DeviceCard device={payload.device} />}
+
+            {/* guard status — "fixed" and "verified fixed" are two
+                different states, and this card is where that shows */}
+            {issue.status === 'resolved' && (
+              <div className="rounded-md border border-ok/40 bg-surface p-3.5 text-sm">
+                <div className="mb-1 font-semibold text-ok">{t('issue.guardTitle')}</div>
+                <p className="text-fg-muted">
+                  {issue.resolvedInRelease
+                    ? t('issue.guardAnchored', { release: issue.resolvedInRelease })
+                    : t('issue.guardUnanchored')}
+                </p>
+                <p className="mt-1 text-fg-muted">{t('issue.guardProbeHint')}</p>
+              </div>
+            )}
+
+            <div className="rounded-md border border-border bg-surface p-3.5">
+              <label className="mb-1.5 block text-xs text-fg-subtle">{t('issue.note')}</label>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={2}
+                className="mb-2 w-full rounded border border-border bg-transparent px-2.5 py-1.5 text-sm text-fg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-accent"
+              />
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  size="sm"
+                  disabled={busy || note.trim().length === 0}
+                  onClick={() =>
+                    void act(async () => {
+                      await api.addNote(issue.id, note.trim());
+                      setNote('');
+                    })
+                  }
+                >
+                  {t('issue.addNote')}
+                </Button>
+                {me.role === 'superadmin' && <AssignSelect issue={issue} onDone={reload} />}
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
     </div>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+      {children}
+    </h3>
   );
 }
 
@@ -306,11 +332,11 @@ function Section({
 }) {
   const [open, setOpen] = useState(!collapsed);
   return (
-    <section className="mb-5">
+    <section className="mb-7">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider opacity-50 hover:opacity-80"
+        className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle hover:text-fg-muted"
       >
         {open ? '▾' : '▸'} {title}
       </button>
@@ -319,49 +345,66 @@ function Section({
   );
 }
 
-/// The signal timeline — a vertical, readable rendering of the last
-/// 30 seconds. This is the page's centerpiece; replay frames join it
-/// when the wireframe player lands.
-function Timeline({ signals }: { signals: Signal[] }) {
+/// The signal timeline — a readable rendering of the last 30
+/// seconds, ending on the moment the event fired.
+function Timeline({
+  signals,
+  kind,
+}: {
+  signals: Signal[];
+  kind: IssueDetailT['kind'];
+}) {
+  const t = useT();
   const rows = useMemo(() => [...signals].sort((a, b) => a.t - b.t), [signals]);
   return (
-    <ol className="border-l border-[var(--gds-border,#2a2a30)] pl-4">
+    <ol className="ml-1.5 border-l border-border pl-5">
       {rows.map((s, i) => (
-        <li key={i} className="relative mb-1.5 text-xs">
+        <li key={i} className="relative mb-2 text-[13px]">
           <span
-            className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full"
+            className="absolute -left-[25px] top-[5px] h-2 w-2 rounded-full"
             style={{ backgroundColor: signalColor(s.kind) }}
           />
-          <span className="mr-2 inline-block w-12 text-right font-mono opacity-40">
+          <span className="mr-2.5 inline-block w-12 text-right font-mono tabular-nums text-fg-subtle">
             {s.t.toFixed(1)}s
           </span>
-          <span className="mr-2 font-mono text-[10px] uppercase opacity-60">{s.kind}</span>
-          <span className="font-mono opacity-80">{summarizeSignal(s)}</span>
+          <span
+            className="mr-2.5 font-mono text-[11px] uppercase tracking-wide"
+            style={{ color: signalColor(s.kind) }}
+          >
+            {s.kind}
+          </span>
+          <span className="font-mono text-fg-muted">{summarizeSignal(s)}</span>
         </li>
       ))}
-      <li className="relative text-xs font-semibold text-[#ff5d5d]">
-        <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-[#ff5d5d]" />
-        <span className="mr-2 inline-block w-12 text-right font-mono">0.0s</span>
-        <span>●</span>
+      <li className="relative text-[13px] font-semibold" style={{ color: kindColor(kind) }}>
+        <span
+          className="absolute -left-[26px] top-[4px] h-2.5 w-2.5 rounded-full"
+          style={{ backgroundColor: kindColor(kind) }}
+        />
+        <span className="mr-2.5 inline-block w-12 text-right font-mono tabular-nums">0.0s</span>
+        <span>{t('issue.eventMoment', { kind })}</span>
       </li>
     </ol>
   );
 }
 
+/** Timeline hues borrow the five kind hues so the palette keeps one
+ *  concept model: nav reads calm, freeze reads like the error it
+ *  usually precedes. */
 function signalColor(kind: string): string {
   switch (kind) {
     case 'nav':
-      return '#7fa7c9';
+      return 'var(--s-kind-trace)';
     case 'tap':
-      return '#ffb340';
+      return 'var(--s-kind-warn)';
     case 'http':
-      return '#b18cff';
+      return 'var(--s-kind-assert)';
     case 'trace':
-      return '#4cd97b';
+      return 'var(--s-kind-probe)';
     case 'freeze':
-      return '#ff5d5d';
+      return 'var(--s-kind-error)';
     default:
-      return '#8e8e93';
+      return 'var(--gds-fg-muted)';
   }
 }
 
@@ -383,52 +426,81 @@ function summarizeActivity(body: Record<string, unknown>): string {
   return JSON.stringify(body);
 }
 
-function OccRow({ row, active }: { row: OccurrenceRow; active: boolean }) {
+/** The four facts about the machine a triager reaches for first;
+ *  the full dictionary stays in the folded Environment corner. */
+const DEVICE_KEYS = ['os', 'osVersion', 'model', 'appVersion', 'locale', 'freeMemMb'];
+
+function DeviceCard({ device }: { device: Record<string, unknown> }) {
+  const t = useT();
+  const rows = DEVICE_KEYS.map((k) => [k, device[k]] as const).filter(
+    ([, v]) => v !== undefined && v !== null && typeof v !== 'object',
+  );
+  if (rows.length === 0) return null;
   return (
-    <div
-      className={`flex items-center gap-3 px-2 py-1.5 font-mono text-xs ${
-        active ? 'bg-[var(--gds-surface-raised,#1c1c22)]' : ''
-      }`}
-    >
-      <span className="opacity-40">{formatRelative(row.receivedAt)}</span>
-      <span>{row.platform}</span>
-      <span className="opacity-60">{row.release}</span>
-      <span className="opacity-40">{row.environment}</span>
-      {row.userKey && <span className="opacity-30">{row.userKey.slice(0, 8)}</span>}
+    <div className="rounded-md border border-border bg-surface p-3.5">
+      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+        {t('issue.device')}
+      </div>
+      <dl className="space-y-1 font-mono text-[13px]">
+        {rows.map(([k, v]) => (
+          <div key={k} className="flex justify-between gap-3">
+            <dt className="text-fg-subtle">{k}</dt>
+            <dd className="truncate text-fg">{String(v)}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
 
-function AssignBox({ issue, onDone }: { issue: IssueDetailT; onDone: () => void }) {
+function OccRow({ row, active }: { row: OccurrenceRow; active: boolean }) {
+  return (
+    <div
+      className={`flex items-center gap-4 px-3.5 py-2 font-mono text-[13px] ${
+        active ? 'bg-raised' : ''
+      }`}
+    >
+      <span className="text-fg-subtle">{formatRelative(row.receivedAt)}</span>
+      <span className="text-fg">{row.platform}</span>
+      <span className="text-fg-muted">{row.release}</span>
+      <span className="text-fg-subtle">{row.environment}</span>
+      {row.userKey && <span className="text-fg-subtle/70">{row.userKey.slice(0, 8)}</span>}
+    </div>
+  );
+}
+
+function AssignSelect({ issue, onDone }: { issue: IssueDetailT; onDone: () => void }) {
   const t = useT();
   const { data } = useAsyncData(() => api.listUsers(), []);
   return (
-    <div className="rounded-md border border-[var(--gds-border,#2a2a30)] p-3">
-      <label className="mb-1 block text-[11px] opacity-60">{t('issue.assignee')}</label>
-      <select
-        value={issue.assigneeUserId ?? ''}
-        onChange={(e) => {
-          void api
-            .assignIssue(issue.id, e.target.value === '' ? null : e.target.value)
-            .then(onDone);
-        }}
-        className="w-full rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 text-xs"
-      >
-        <option value="">{t('issue.unassigned')}</option>
-        {(data?.users ?? []).map((u) => (
-          <option key={u.id} value={u.id}>
-            {u.email}
-          </option>
-        ))}
-      </select>
-    </div>
+    <select
+      value={issue.assigneeUserId ?? ''}
+      aria-label={t('issue.assignee')}
+      onChange={(e) => {
+        void api
+          .assignIssue(issue.id, e.target.value === '' ? null : e.target.value)
+          .then(onDone);
+      }}
+      className="h-7 min-w-0 max-w-40 rounded border border-border bg-surface px-1.5 text-xs text-fg-muted"
+    >
+      <option value="">{t('issue.unassigned')}</option>
+      {(data?.users ?? []).map((u) => (
+        <option key={u.id} value={u.id}>
+          {u.email}
+        </option>
+      ))}
+    </select>
   );
 }
 
 function buildMarkdown(
   issue: IssueDetailT,
   payload:
-    | { error?: { type?: string; message?: string; stack?: Frame[] }; signals?: Signal[]; device?: Record<string, unknown> }
+    | {
+        error?: { type?: string; message?: string; stack?: Frame[] };
+        signals?: Signal[];
+        device?: Record<string, unknown>;
+      }
     | undefined,
   occ: OccurrenceRow[],
 ): string {

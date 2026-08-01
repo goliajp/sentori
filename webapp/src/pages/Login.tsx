@@ -48,7 +48,7 @@ export function LoginPage() {
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="username"
             required
-            className="w-full rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1.5"
+            className="w-full rounded border border-border bg-transparent px-2 py-1.5"
           />
         </label>
         <label className="mb-4 block text-sm">
@@ -59,18 +59,18 @@ export function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
             required
-            className="w-full rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1.5"
+            className="w-full rounded border border-border bg-transparent px-2 py-1.5"
           />
         </label>
 
         {failed && (
-          <p className="mb-3 text-xs text-[#ff5d5d]">{t('auth.signInFailed')}</p>
+          <p className="mb-3 text-xs text-kind-error">{t('auth.signInFailed')}</p>
         )}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-md bg-[var(--gds-accent,#4c8dff)] px-3 py-1.5 text-sm font-medium text-black disabled:opacity-40"
+          className="w-full rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg disabled:opacity-40"
         >
           {loading ? t('auth.signingIn') : t('auth.signIn')}
         </button>

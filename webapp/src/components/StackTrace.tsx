@@ -4,9 +4,13 @@
 // from the sourcemap's embedded sourcesContent; no repository
 // access anywhere) and open by default: the reader should see the
 // failing line without a click. Library frames collapse into a
-// single count row — they are context, not suspects. A frame the
-// server could not symbolicate says so with a "minified" badge
-// instead of pretending its coordinates mean something.
+// single count row — they are context, not suspects.
+//
+// When the classifier finds NO in-app frame (dev bundles before the
+// SDK's Metro symbolication, exotic runtimes), folding would leave
+// the reader a single "13 library frames" row and nothing else — so
+// in that case every frame is shown flat. An empty-looking stack is
+// a UI bug, not a data property.
 
 import { useState } from 'react';
 
@@ -29,27 +33,31 @@ const MAX_FRAMES = 40;
 export function StackTrace({ frames }: { frames: StackFrame[] }) {
   const t = useT();
   const shown = frames.slice(0, MAX_FRAMES);
+  const anyInApp = shown.some((f) => f.inApp === true);
 
-  // Group runs of library frames so they collapse to one row each.
+  // Group runs of library frames so they collapse to one row each —
+  // but only when there are in-app frames to anchor the reading.
   const groups: { frames: { f: StackFrame; i: number }[]; inApp: boolean }[] = [];
   shown.forEach((f, i) => {
-    const inApp = f.inApp === true;
+    const inApp = !anyInApp || f.inApp === true;
     const last = groups.at(-1);
     if (last && last.inApp === inApp) last.frames.push({ f, i });
     else groups.push({ frames: [{ f, i }], inApp });
   });
 
   return (
-    <div className="overflow-hidden rounded-md border border-[var(--gds-border,#2a2a30)] bg-[var(--gds-surface-sunken,#121216)]">
+    <div className="overflow-hidden rounded-md border border-border bg-surface">
       {groups.map((g, gi) =>
         g.inApp ? (
-          g.frames.map(({ f, i }) => <AppFrame key={i} frame={f} defaultOpen />)
+          g.frames.map(({ f, i }) => (
+            <AppFrame key={i} frame={f} defaultOpen={i < 3} />
+          ))
         ) : (
           <LibraryRun key={`lib-${gi}`} frames={g.frames} />
         ),
       )}
       {frames.length > MAX_FRAMES && (
-        <div className="border-t border-[var(--gds-border,#2a2a30)] px-3 py-1.5 font-mono text-[11px] opacity-40">
+        <div className="border-t border-border px-3.5 py-1.5 font-mono text-xs text-fg-subtle">
           {t('stack.truncated', { n: String(frames.length - MAX_FRAMES) })}
         </div>
       )}
@@ -65,34 +73,34 @@ function AppFrame({ frame, defaultOpen }: { frame: StackFrame; defaultOpen: bool
   const [open, setOpen] = useState(defaultOpen && hasContext);
 
   return (
-    <div className="border-b border-[var(--gds-border,#2a2a30)] last:border-b-0">
+    <div className="border-b border-border last:border-b-0">
       <button
         type="button"
         disabled={!hasContext}
         onClick={() => setOpen((o) => !o)}
         aria-expanded={hasContext ? open : undefined}
-        className={`flex w-full items-baseline gap-2 px-3 py-1.5 text-left font-mono text-xs ${
-          hasContext ? 'cursor-pointer hover:bg-[var(--gds-surface-raised,#1c1c22)]' : 'cursor-default'
+        className={`flex w-full items-baseline gap-2 px-3.5 py-2 text-left font-mono text-[13px] ${
+          hasContext ? 'cursor-pointer hover:bg-raised' : 'cursor-default'
         }`}
       >
         <span
           className={`inline-block w-3 shrink-0 text-center transition-transform ${
-            hasContext ? 'opacity-50' : 'opacity-0'
+            hasContext ? 'text-fg-subtle' : 'opacity-0'
           } ${open ? 'rotate-90' : ''}`}
           aria-hidden
         >
           ▸
         </span>
-        <span className="border-l-2 border-[#ff5d5d] pl-2 font-medium text-[var(--gds-text,#e5e5ea)]">
+        <span className="shrink-0 border-l-2 border-kind-error pl-2 font-medium text-fg">
           {frame.function ?? '?'}
         </span>
-        <span className="min-w-0 flex-1 truncate opacity-50">
+        <span className="min-w-0 flex-1 truncate text-fg-subtle">
           {frame.file ?? '?'}
           {frame.line !== undefined ? `:${frame.line}` : ''}
           {frame.column !== undefined ? `:${frame.column}` : ''}
         </span>
         {frame.symbolicated !== true && (
-          <span className="shrink-0 rounded border border-[var(--gds-border,#3a3a42)] px-1 text-[10px] uppercase tracking-wide opacity-50">
+          <span className="shrink-0 rounded border border-border-strong px-1 text-[10px] uppercase tracking-wide text-fg-subtle">
             {t('stack.minified')}
           </span>
         )}
@@ -116,21 +124,28 @@ function SourceWindow({ frame }: { frame: StackFrame }) {
   ];
 
   return (
-    <div className="overflow-x-auto border-t border-[var(--gds-border,#2a2a30)] bg-[var(--gds-bg,#0d0d10)]">
-      <table className="w-full border-collapse font-mono text-xs leading-5">
+    <div className="overflow-x-auto border-t border-border bg-bg">
+      <table className="w-full border-collapse font-mono text-[13px] leading-6">
         <tbody>
           {rows.map((r) => (
-            <tr key={r.n} className={r.hit ? 'bg-[rgba(255,93,93,0.09)]' : ''}>
+            <tr
+              key={r.n}
+              style={
+                r.hit
+                  ? { backgroundColor: 'color-mix(in srgb, var(--s-kind-error) 9%, transparent)' }
+                  : undefined
+              }
+            >
               <td
-                className={`w-px select-none border-r py-0 pl-3 pr-2 text-right align-top ${
+                className={`w-px select-none border-r py-0 pl-3.5 pr-2 text-right align-top ${
                   r.hit
-                    ? 'border-[#ff5d5d] text-[#ff5d5d]'
-                    : 'border-[var(--gds-border,#2a2a30)] opacity-35'
+                    ? 'border-kind-error text-kind-error'
+                    : 'border-border text-fg-subtle/70'
                 }`}
               >
                 {r.n}
               </td>
-              <td className="whitespace-pre py-0 pl-3 pr-4">{r.text || ' '}</td>
+              <td className="whitespace-pre py-0 pl-3.5 pr-4 text-fg">{r.text || ' '}</td>
             </tr>
           ))}
         </tbody>
@@ -145,12 +160,12 @@ function LibraryRun({ frames }: { frames: { f: StackFrame; i: number }[] }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="border-b border-[var(--gds-border,#2a2a30)] last:border-b-0">
+    <div className="border-b border-border last:border-b-0">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex w-full items-baseline gap-2 px-3 py-1.5 text-left font-mono text-[11px] opacity-45 hover:bg-[var(--gds-surface-raised,#1c1c22)] hover:opacity-70"
+        className="flex w-full items-baseline gap-2 px-3.5 py-1.5 text-left font-mono text-xs text-fg-subtle hover:bg-raised hover:text-fg-muted"
       >
         <span
           className={`inline-block w-3 shrink-0 text-center transition-transform ${open ? 'rotate-90' : ''}`}
@@ -164,7 +179,10 @@ function LibraryRun({ frames }: { frames: { f: StackFrame; i: number }[] }) {
       </button>
       {open &&
         frames.map(({ f, i }) => (
-          <div key={i} className="flex items-baseline gap-2 py-0.5 pl-8 pr-3 font-mono text-[11px] opacity-40">
+          <div
+            key={i}
+            className="flex items-baseline gap-2 py-0.5 pl-8 pr-3.5 font-mono text-xs text-fg-subtle"
+          >
             <span>{f.function ?? '?'}</span>
             <span className="min-w-0 flex-1 truncate">
               {f.file ?? '?'}

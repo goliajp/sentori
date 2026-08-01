@@ -34,11 +34,14 @@ error.
 
 ```diff
 -    "@goliapkg/sentori-react-native": "^5.0.0",
-+    "@goliapkg/sentori-react-native": "^5.1.1",
++    "@goliapkg/sentori-react-native": "^5.1.2",
 ```
 
 **Skip 5.1.0** — its attachment upload is broken on real devices
-(found and fixed in 5.1.1). `bun install`, done. No other package
+(found and fixed in 5.1.1). 5.1.2 additionally makes **dev-client
+errors readable**: stacks are symbolicated locally against Metro,
+so the dashboard shows your source line instead of
+`entry.bundle:721724`. `bun install`, done. No other package
 moves.
 
 ## 2. Rebuild the native app (required once)

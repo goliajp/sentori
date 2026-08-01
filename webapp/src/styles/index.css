@@ -51,6 +51,15 @@
   --color-warn: var(--gds-warning);
   --color-ok: var(--gds-success);
 
+  /* The five-kind hues + the signal-timeline hues, resolved per
+   * mode below. Components must reach for these — a hex literal is
+   * a dark-mode-only decision someone made without saying so. */
+  --color-kind-error: var(--s-kind-error);
+  --color-kind-warn: var(--s-kind-warn);
+  --color-kind-trace: var(--s-kind-trace);
+  --color-kind-assert: var(--s-kind-assert);
+  --color-kind-probe: var(--s-kind-probe);
+
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
   /* Reserved for the wordmark. A display face earns its place on a
@@ -69,6 +78,18 @@
   --s-border-strong: var(--gds-border-strong);
   --s-fg-muted: var(--gds-fg-secondary);
 
+  /*
+   * Kind hues, dark mode: bright enough to carry a badge on a dark
+   * card. The signal timeline borrows the same five hues (nav=trace,
+   * tap=warn, http=assert, trace-signal=probe, freeze=error) so the
+   * palette keeps teaching the same concept model.
+   */
+  --s-kind-error: #ff5d5d;
+  --s-kind-warn: #ffb340;
+  --s-kind-trace: #7fa7c9;
+  --s-kind-assert: #b18cff;
+  --s-kind-probe: #4cd97b;
+
   --gds-canvas: var(--gds-bg);
 
   /* GDS's compact density sets body text to 13px. Raise its own
@@ -80,6 +101,15 @@
 
 :root[data-theme='light'] {
   --gds-canvas: var(--gds-bg-secondary);
+
+  /* The same five hues, re-inked for white paper: darker and more
+   * saturated, because a colour that glows on #17171c washes out on
+   * #ffffff. Contrast target ≥ 4.5:1 as badge text on its 12% tint. */
+  --s-kind-error: #c93838;
+  --s-kind-warn: #9a6700;
+  --s-kind-trace: #3d6e99;
+  --s-kind-assert: #6f42c1;
+  --s-kind-probe: #1a7f4b;
 }
 
 html,
