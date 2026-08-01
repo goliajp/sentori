@@ -1,9 +1,9 @@
 // The dashboard's layout and data primitives.
 //
-// Colour, elevation, radius and both modes come from @goliapkg/gds —
-// the same system golia.jp runs on. Nothing here names a palette
-// value; everything reaches for a role (`accent`, `ok`, `danger`,
-// `fg-muted`) so one definition serves light and dark alike.
+// Colour and both modes come from the self-owned token sheet in
+// styles/index.css. Nothing here names a palette value; everything
+// reaches for a role (`accent`, `ok`, `danger`, `fg-muted`) so one
+// definition serves light and dark alike.
 //
 // Two invariants this file exists to hold:
 //   · a control's height is written once (`CONTROL_H`), never
@@ -11,6 +11,7 @@
 //   · a card's contents sit at one inset (`px-5`), header and body
 //     and table cells alike, so the left edge is a single line.
 
+import { ChevronRight } from 'lucide-react';
 import { isValidElement, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -246,7 +247,7 @@ export function PageShell({
   return (
     <div className="flex h-full min-w-0 flex-col">
       <header className="flex h-11 shrink-0 items-center gap-3 border-b border-border bg-bg px-4">
-        <h1 className="text-[13px] font-semibold">{title}</h1>
+        <h1 className="text-sm font-semibold">{title}</h1>
         {toolbar}
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -285,9 +286,7 @@ export function Panel({
       className={`flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-surface ${className}`}
     >
       <header className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-border px-3.5">
-        <h3 className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-fg-subtle">
-          {title}
-        </h3>
+        <h3 className="truncate text-[13px] font-semibold text-fg-muted">{title}</h3>
         {action}
       </header>
       <div className={`min-h-0 flex-1 ${padded ? 'p-3.5' : ''}`}>{children}</div>
@@ -318,11 +317,12 @@ export function FoldPanel({
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex h-9 w-full items-center gap-2 px-3.5 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-fg-subtle hover:text-fg-muted"
+        className="flex h-9 w-full items-center gap-1.5 px-3.5 text-left text-[13px] font-semibold text-fg-muted hover:text-fg"
       >
-        <span className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden>
-          ▸
-        </span>
+        <ChevronRight
+          aria-hidden
+          className={`h-3.5 w-3.5 text-fg-subtle transition-transform ${open ? 'rotate-90' : ''}`}
+        />
         {title}
       </button>
       {open && <div className="border-t border-border">{children}</div>}
@@ -404,7 +404,7 @@ export function DataTable<T>({
             {columns.map((c) => (
               <th
                 key={String(c.key)}
-                className={`whitespace-nowrap px-4 py-2 text-xs font-medium uppercase tracking-wide text-fg-subtle ${alignCls(c)}`}
+                className={`whitespace-nowrap px-4 py-2 text-xs font-medium text-fg-muted ${alignCls(c)}`}
                 style={c.width ? { width: c.width } : undefined}
               >
                 {c.label}

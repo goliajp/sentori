@@ -4,6 +4,7 @@
 // Artifact gaps are most visible here, on purpose — the lights are
 // live on load, not hidden behind a click.
 
+import { ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
 import { useShell } from '../App';
@@ -83,12 +84,10 @@ function ReleaseRowView({ release, projectId }: { release: ReleaseRow; projectId
         aria-expanded={open}
         className="flex w-full items-center gap-4 px-3.5 py-2 text-left hover:bg-raised/50"
       >
-        <span
-          className={`inline-block w-3 shrink-0 text-center text-fg-subtle transition-transform ${open ? 'rotate-90' : ''}`}
+        <ChevronRight
           aria-hidden
-        >
-          ▸
-        </span>
+          className={`h-3.5 w-3.5 shrink-0 text-fg-subtle transition-transform ${open ? 'rotate-90' : ''}`}
+        />
         <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-fg">
           {release.name}
         </span>
@@ -140,7 +139,7 @@ function Light({ on, label }: { on: boolean | undefined; label: string }) {
         style={{
           backgroundColor:
             on === undefined
-              ? 'color-mix(in srgb, var(--gds-fg-muted) 30%, transparent)'
+              ? 'color-mix(in srgb, var(--sn-fg-muted) 30%, transparent)'
               : on
                 ? 'var(--s-kind-probe)'
                 : 'var(--s-kind-error)',
