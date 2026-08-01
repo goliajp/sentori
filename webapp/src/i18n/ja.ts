@@ -170,7 +170,6 @@ export const ja: Messages = {
   'settings.tab.account': 'アカウント',
   'settings.tab.audit': '監査',
   'settings.tab.notifications': '通知',
-  'settings.tab.projects': 'プロジェクト',
   'settings.tab.tokens': 'トークン',
   'settings.tab.users': '管理者',
   'settings.tokenName': 'トークン名',

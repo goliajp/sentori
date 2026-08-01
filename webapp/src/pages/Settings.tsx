@@ -21,20 +21,19 @@ import { useLocale, useSetLocale, useT } from '../i18n';
 import {
   api,
   type NotificationPref,
-  type Project,
   type TokenRow,
   type UserRow,
 } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 
-type Tab = 'account' | 'audit' | 'notifications' | 'projects' | 'tokens' | 'users';
+type Tab = 'account' | 'audit' | 'notifications' | 'tokens' | 'users';
 
 export default function SettingsPage() {
   const t = useT();
   const { me } = useShell();
   const owner = me.role === 'superadmin';
   const tabs: Tab[] = owner
-    ? ['projects', 'tokens', 'users', 'notifications', 'audit', 'account']
+    ? ['tokens', 'users', 'notifications', 'audit', 'account']
     : ['tokens', 'notifications', 'account'];
   const [tab, setTab] = useState<Tab>(tabs[0] ?? 'account');
 
@@ -61,64 +60,12 @@ export default function SettingsPage() {
         </div>
       }
     >
-      {tab === 'projects' && <ProjectsTab />}
       {tab === 'tokens' && <TokensTab />}
       {tab === 'users' && <UsersTab />}
       {tab === 'notifications' && <NotificationsTab />}
       {tab === 'audit' && <AuditTab />}
       {tab === 'account' && <AccountTab />}
     </PageShell>
-  );
-}
-
-function ProjectsTab() {
-  const t = useT();
-  const { projects, reloadProjects } = useShell();
-  const [name, setName] = useState('');
-  return (
-    <div className="max-w-2xl space-y-3">
-      <div className="flex gap-2">
-        <Input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={t('settings.projectName')}
-          className="flex-1"
-        />
-        <Button
-          variant="primary"
-          disabled={name.trim().length === 0}
-          onClick={() => {
-            void api.createProject(name.trim()).then(() => {
-              setName('');
-              reloadProjects();
-            });
-          }}
-        >
-          {t('settings.createProject')}
-        </Button>
-      </div>
-      <Panel title={`${t('settings.tab.projects')} (${projects.length})`}>
-        <div className="divide-y divide-border/60">
-          {projects.map((p: Project) => (
-            <div key={p.id} className="flex items-center gap-3 px-3.5 py-2 text-sm">
-              <span className="flex-1 text-fg">{p.name}</span>
-              <span className="font-mono text-xs text-fg-subtle">{p.platform}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm(t('settings.deleteProjectConfirm', { name: p.name }))) {
-                    void api.deleteProject(p.id).then(reloadProjects);
-                  }
-                }}
-                className="text-xs text-kind-error/70 hover:text-kind-error"
-              >
-                {t('common.delete')}
-              </button>
-            </div>
-          ))}
-        </div>
-      </Panel>
-    </div>
   );
 }
 

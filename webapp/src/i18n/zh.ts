@@ -158,7 +158,6 @@ export const zh: Messages = {
   'settings.tab.account': '账号',
   'settings.tab.audit': '审计',
   'settings.tab.notifications': '通知',
-  'settings.tab.projects': '项目',
   'settings.tab.tokens': 'Token',
   'settings.tab.users': '管理员',
   'settings.tokenName': 'token 名',
