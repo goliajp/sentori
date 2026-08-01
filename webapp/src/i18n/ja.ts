@@ -89,6 +89,8 @@ export const ja: Messages = {
   'issue.occurrences': '発生一覧',
   'issue.reopen': '再オープン',
   'issue.replayFrom': '{when}の発生時のリプレイです — 直近のイベントには付いていません。',
+  'issue.replayWireframe':
+    'ワイヤーフレームリプレイ — このビルドは replayScreens が無効のため、実画面は記録されていません。',
   'issue.replayNone':
     'このイベントにはリプレイが付いていません — SDK で replayScreens: true を有効にすると、直前の1分間の画面を記録できます。',
   'issue.resolve': '解決',

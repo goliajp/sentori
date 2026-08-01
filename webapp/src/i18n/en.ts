@@ -94,6 +94,8 @@ export const en = {
   'issue.occurrences': 'Occurrences',
   'issue.reopen': 'Reopen',
   'issue.replayFrom': 'From the occurrence {when} — the newest event carried no replay.',
+  'issue.replayWireframe':
+    'Wireframe replay — this build has replayScreens off, so no pixels were captured.',
   'issue.replayNone':
     'No visual replay came with this event — set replayScreens: true in the SDK to capture the minute before.',
   'issue.resolve': 'Resolve',
