@@ -31,6 +31,7 @@ import {
 import { useAsyncData } from '../lib/useAsyncData';
 
 import { ReplayPlayer } from '../components/ReplayPlayer';
+import { WireframePlayer } from '../components/WireframePlayer';
 import { StackTrace, type StackFrame as Frame } from '../components/StackTrace';
 
 type Signal = { t: number; kind: string; data?: Record<string, unknown> };
@@ -67,14 +68,19 @@ export default function IssueDetail() {
     }
   };
 
-  // Replay source: the latest event's screens attachment when it has
-  // one; otherwise the newest occurrence that captured pixels (an
-  // older-SDK event on top must not hide an existing replay).
+  // Replay ladder, same-event first, richest form first:
+  //   ① this event's pixels  ② this event's wireframe (always-on
+  //   capture — every SDK event has one even when replayScreens is
+  //   off)  ③ pixels from the newest occurrence that captured any
+  //   (an older-SDK event on top must not hide an existing replay).
   const screensLatest =
     latest?.attachments?.find((a) => a.kind === 'screens')?.ref ?? null;
-  const screensFallback = screensLatest
-    ? null
-    : (occ?.events.find((e) => e.screensRef) ?? null);
+  const wireframeLatest =
+    latest?.attachments?.find((a) => a.kind === 'replay')?.ref ?? null;
+  const screensFallback =
+    screensLatest || wireframeLatest
+      ? null
+      : (occ?.events.find((e) => e.screensRef) ?? null);
   const screensRef = screensLatest ?? screensFallback?.screensRef ?? null;
   const payload = latest?.payload as
     | {
@@ -282,6 +288,13 @@ export default function IssueDetail() {
                     })}
                   </p>
                 )}
+              </div>
+            ) : wireframeLatest ? (
+              <div>
+                <WireframePlayer attachmentRef={wireframeLatest} />
+                <p className="mt-1.5 text-xs text-fg-subtle">
+                  {t('issue.replayWireframe')}
+                </p>
               </div>
             ) : (
               <p className="rounded-md border border-border bg-surface px-4 py-3 text-sm text-fg-subtle">
