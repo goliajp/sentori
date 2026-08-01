@@ -98,3 +98,9 @@ describe('transport (v1 wire)', () => {
     expect(__peekQueue().length).toBe(1);
   });
 });
+
+it('SDK_VERSION constant matches package.json (staleness gate)', async () => {
+  const { __sdkVersion } = await import('../transport');
+  const pkg = (await import('../../package.json')) as { default?: { version?: string }; version?: string };
+  expect(__sdkVersion()).toBe(pkg.default?.version ?? pkg.version);
+});
