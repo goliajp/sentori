@@ -66,11 +66,14 @@ export const en = {
     'No observation points yet — sentori.trace(name) marks a code path as seen.',
 
   'issue.activity': 'Activity',
+  'issue.code': 'Where it broke',
   'issue.addNote': 'Add note',
   'issue.assignee': 'Assignee',
   'issue.back': 'Inbox',
   'issue.copied': 'Copied',
   'issue.copyForAi': 'Copy for AI',
+  'issue.device': 'Device',
+  'issue.eventMoment': '{kind} fired',
   'issue.environment': 'Environment',
   'issue.firstSeen': 'first',
   'issue.guardAnchored':
@@ -87,9 +90,10 @@ export const en = {
   'issue.note': 'Note',
   'issue.occurrences': 'Occurrences',
   'issue.reopen': 'Reopen',
+  'issue.replayNone':
+    'No visual replay came with this event — set replayScreens: true in the SDK to capture the minute before.',
   'issue.resolve': 'Resolve',
   'issue.resolveInRelease': 'Fixed in release',
-  'issue.stack': 'Stack trace',
   'issue.system': 'system',
   'issue.timeline': 'What the user was doing',
   'issue.unassigned': 'Unassigned',
@@ -165,6 +169,10 @@ export const en = {
   'table.empty': 'Nothing here yet',
 
   'shell.loading': 'Loading…',
+  'theme.dark': 'Dark',
+  'theme.label': 'Theme',
+  'theme.light': 'Light',
+  'theme.system': 'Match system',
   'shell.roleAdmin': 'Admin',
   'shell.roleOwner': 'Owner',
 } as const;

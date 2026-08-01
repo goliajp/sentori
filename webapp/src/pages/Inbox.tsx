@@ -146,7 +146,7 @@ export default function Inbox() {
   const cursorId = cursor >= 0 && cursor < flat.length ? flat[cursor].id : null;
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-5">
+    <div className="mx-auto max-w-[1760px] px-7 py-5">
       {/* pulse — one quiet line, never a chart page */}
       <div className="mb-4 font-mono text-xs opacity-60">
         {t('inbox.pulse', { fresh: String(todayNew), regressed: String(todayRegressed) })}
@@ -198,7 +198,7 @@ export default function Inbox() {
       </div>
 
       {checked.size > 0 && (
-        <div className="sticky top-2 z-10 mb-3 flex items-center gap-3 rounded-md border border-[var(--gds-border,#2a2a30)] bg-[var(--gds-surface-raised,#1c1c22)] px-3 py-1.5 text-xs">
+        <div className="sticky top-2 z-10 mb-3 flex items-center gap-3 rounded-md border border-border bg-raised px-3 py-1.5 text-xs">
           <span className="font-medium">
             {t('inbox.selectedCount', { n: String(checked.size) })}
           </span>
@@ -206,7 +206,7 @@ export default function Inbox() {
             type="button"
             disabled={busy}
             onClick={() => bulkAct('resolve', [...checked])}
-            className="rounded bg-[var(--gds-accent,#4c8dff)] px-2 py-0.5 font-medium text-black disabled:opacity-40"
+            className="rounded bg-accent px-2 py-0.5 font-medium text-accent-fg disabled:opacity-40"
           >
             {t('issue.resolve')}
           </button>
@@ -214,7 +214,7 @@ export default function Inbox() {
             type="button"
             disabled={busy}
             onClick={() => bulkAct('ignore', [...checked])}
-            className="rounded border border-[var(--gds-border,#2a2a30)] px-2 py-0.5 disabled:opacity-40"
+            className="rounded border border-border px-2 py-0.5 disabled:opacity-40"
           >
             {t('issue.ignore')}
           </button>
@@ -303,8 +303,8 @@ function Chip({
       onClick={onClick}
       className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
         active
-          ? 'border-transparent bg-[var(--gds-surface-raised,#26262c)] font-medium'
-          : 'border-[var(--gds-border,#2a2a30)] opacity-60 hover:opacity-100'
+          ? 'border-transparent bg-raised font-medium'
+          : 'border-border opacity-60 hover:opacity-100'
       }`}
     >
       {children}
@@ -325,12 +325,12 @@ function Group({
     <section className="mb-6">
       <h2
         className={`mb-1.5 text-[11px] font-semibold uppercase tracking-wider ${
-          tone === 'danger' ? 'text-[#ff5d5d]' : 'opacity-50'
+          tone === 'danger' ? 'text-kind-error' : 'opacity-50'
         }`}
       >
         {label}
       </h2>
-      <div className="divide-y divide-[var(--gds-border,#2a2a30)] rounded-lg border border-[var(--gds-border,#2a2a30)]">
+      <div className="divide-y divide-border rounded-lg border border-border">
         {children}
       </div>
     </section>
@@ -354,8 +354,8 @@ function Row({
     <Link
       to={`/issues/${issue.id}`}
       data-cursor={atCursor || undefined}
-      className={`group flex items-center gap-3 px-3 py-2 transition-colors hover:bg-[var(--gds-surface-raised,#1c1c22)] ${
-        atCursor ? 'bg-[var(--gds-surface-raised,#1c1c22)] ring-1 ring-inset ring-[var(--gds-accent,#4c8dff)]' : ''
+      className={`group flex items-center gap-3 px-3 py-2 transition-colors hover:bg-raised ${
+        atCursor ? 'bg-raised ring-1 ring-inset ring-accent' : ''
       }`}
     >
       <input
@@ -363,16 +363,21 @@ function Row({
         checked={checked}
         onClick={(e) => e.stopPropagation()}
         onChange={onToggle}
-        className={`h-3.5 w-3.5 accent-[var(--gds-accent,#4c8dff)] ${
+        className={`h-3.5 w-3.5 accent-accent ${
           checked ? '' : 'opacity-0 transition-opacity group-hover:opacity-60'
         }`}
       />
       <KindBadge kind={issue.kind} />
       <span className="min-w-0 flex-1 truncate text-sm">
         <span className="font-medium">{issue.title}</span>
-        {issue.messageSample && (
-          <span className="ml-2 opacity-50">{issue.messageSample}</span>
-        )}
+        {/* An error's title usually already contains its message, and
+            a detected warn's message is often just its surface —
+            repeating either doubles the row for zero information. */}
+        {issue.messageSample &&
+          !issue.title.includes(issue.messageSample) &&
+          issue.messageSample !== where && (
+            <span className="ml-2 opacity-50">{issue.messageSample}</span>
+          )}
         {where && <span className="ml-2 font-mono text-xs opacity-40">{where}</span>}
       </span>
       {issue.regressedAt && issue.status === 'open' && <RegressedBadge />}

@@ -51,14 +51,14 @@ export default function InstrumentsPage() {
   );
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-5">
+    <div className="mx-auto max-w-[1760px] px-7 py-5">
       <div className="mb-4 flex items-center gap-3">
         <h1 className="text-base font-semibold">{t('nav.instruments')}</h1>
         {projects.length > 1 && (
           <select
             value={active ?? ''}
             onChange={(e) => setProjectId(e.target.value)}
-            className="rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 text-xs"
+            className="rounded border border-border bg-transparent px-2 py-1 text-xs"
           >
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
@@ -96,7 +96,7 @@ export default function InstrumentsPage() {
                   >
                     <span
                       className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: healthy ? '#4cd97b' : '#ff5d5d' }}
+                      style={{ backgroundColor: healthy ? 'var(--s-kind-probe)' : 'var(--s-kind-error)' }}
                     />
                     <span className="min-w-0 flex-1 truncate">{a.name}</span>
                     <span className="opacity-40">{a.release}</span>
@@ -125,7 +125,7 @@ export default function InstrumentsPage() {
                   >
                     <span
                       className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: silent ? '#4cd97b' : '#ff5d5d' }}
+                      style={{ backgroundColor: silent ? 'var(--s-kind-probe)' : 'var(--s-kind-error)' }}
                     />
                     <span className="min-w-0 flex-1 truncate">{p.ref}</span>
                     {p.lastSeenRelease && (
@@ -200,7 +200,7 @@ function Panel({
       <h2 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider opacity-50">
         {title} <span className="font-mono">({count})</span>
       </h2>
-      <div className="divide-y divide-[var(--gds-border,#2a2a30)] rounded-lg border border-[var(--gds-border,#2a2a30)]">
+      <div className="divide-y divide-border rounded-lg border border-border">
         {children}
       </div>
     </section>

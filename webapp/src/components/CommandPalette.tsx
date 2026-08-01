@@ -103,11 +103,11 @@ export function CommandPalette() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-[18vh]"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-[18vh]"
       onClick={() => setOpenReset(false)}
     >
       <div
-        className="w-full max-w-lg overflow-hidden rounded-lg border border-[var(--gds-border,#2a2a30)] bg-[var(--gds-surface,#17171c)] shadow-2xl"
+        className="w-full max-w-lg overflow-hidden rounded-lg border border-border bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <input
@@ -130,11 +130,11 @@ export function CommandPalette() {
             }
           }}
           placeholder={t('palette.placeholder')}
-          className="w-full border-b border-[var(--gds-border,#2a2a30)] bg-transparent px-4 py-3 text-sm outline-none"
+          className="w-full border-b border-border bg-transparent px-4 py-3 text-sm text-fg outline-none placeholder:text-fg-subtle"
         />
         <div className="max-h-72 overflow-y-auto py-1">
           {items.length === 0 && (
-            <div className="px-4 py-6 text-center text-sm opacity-40">
+            <div className="px-4 py-6 text-center text-sm text-fg-subtle">
               {t('table.empty')}
             </div>
           )}
@@ -145,7 +145,7 @@ export function CommandPalette() {
               onClick={() => go(item)}
               onMouseEnter={() => setCursor(idx)}
               className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm ${
-                idx === cursor ? 'bg-[var(--gds-surface-raised,#26262c)]' : ''
+                idx === cursor ? 'bg-raised' : ''
               }`}
             >
               {item.type === 'nav' ? (
@@ -156,7 +156,7 @@ export function CommandPalette() {
                   <span className="min-w-0 flex-1 truncate">
                     <span className="font-medium">{item.issue.title}</span>
                     {item.issue.messageSample && (
-                      <span className="ml-2 opacity-50">
+                      <span className="ml-2 text-fg-subtle">
                         {item.issue.messageSample}
                       </span>
                     )}

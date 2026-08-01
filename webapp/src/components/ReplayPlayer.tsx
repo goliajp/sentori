@@ -1,12 +1,13 @@
 // The visual replay player — the minute before the event, as the
 // user saw it.
 //
-// The `screens` attachment is NDJSON: one low-bitrate frame per
-// line, `t` in seconds relative to the event (negative). Playback
-// runs at 4× real time (frames arrive ~2.5s apart on the wire; a
-// minute of context should take fifteen seconds to review, not
-// sixty). Scrubbing pauses; ←/→ step frames while the player is
-// focused.
+// Mobile frames are portrait, so the player is a portrait dock: a
+// phone-shaped viewport that fills its column instead of a letter-
+// boxed landscape strip. The `screens` attachment is NDJSON: one
+// low-bitrate frame per line, `t` in seconds relative to the event
+// (negative). Playback runs at 4× real time (frames arrive ~2.5 s
+// apart; a minute of context should take fifteen seconds to review,
+// not sixty). Scrubbing pauses; ←/→ step frames while focused.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -75,18 +76,18 @@ export function ReplayPlayer({ attachmentRef }: { attachmentRef: string }) {
   );
 
   if (failed) {
-    return <p className="text-xs opacity-50">{t('replay.loadFailed')}</p>;
+    return <p className="text-sm text-fg-subtle">{t('replay.loadFailed')}</p>;
   }
   if (!frames) {
-    return <p className="text-xs opacity-50">{t('shell.loading')}</p>;
+    return <p className="text-sm text-fg-subtle">{t('shell.loading')}</p>;
   }
   if (frames.length === 0) {
-    return <p className="text-xs opacity-50">{t('replay.empty')}</p>;
+    return <p className="text-sm text-fg-subtle">{t('replay.empty')}</p>;
   }
 
   return (
     <div
-      className="overflow-hidden rounded-md border border-[var(--gds-border,#2a2a30)] bg-[var(--gds-surface-sunken,#121216)]"
+      className="overflow-hidden rounded-md border border-border bg-surface"
       tabIndex={0}
       role="group"
       aria-label={t('replay.title')}
@@ -105,16 +106,20 @@ export function ReplayPlayer({ attachmentRef }: { attachmentRef: string }) {
         }
       }}
     >
-      <div className="flex items-center justify-center bg-black/40 p-2">
+      {/* Portrait viewport: the column is narrow, the frame is tall —
+          let the frame own the height instead of pillar-boxing it
+          inside a landscape band. Capped so an ultra-tall monitor
+          doesn't turn the phone into a poster. */}
+      <div className="flex items-center justify-center bg-bg p-3">
         {src && (
           <img
             src={src}
             alt={t('replay.frameAlt', { t: current!.t.toFixed(1) })}
-            className="max-h-[420px] rounded-sm object-contain"
+            className="h-[min(56vh,600px)] w-auto max-w-full rounded-sm border border-border object-contain"
           />
         )}
       </div>
-      <div className="flex items-center gap-3 border-t border-[var(--gds-border,#2a2a30)] px-3 py-2">
+      <div className="flex items-center gap-2.5 border-t border-border px-3 py-2">
         <button
           type="button"
           onClick={() => {
@@ -122,7 +127,7 @@ export function ReplayPlayer({ attachmentRef }: { attachmentRef: string }) {
             setPlaying((p) => !p);
           }}
           aria-label={playing ? t('replay.pause') : t('replay.play')}
-          className="w-7 rounded border border-[var(--gds-border,#3a3a42)] py-0.5 text-sm hover:bg-[var(--gds-surface-raised,#1c1c22)]"
+          className="h-7 w-7 shrink-0 rounded border border-border-strong text-sm text-fg hover:bg-raised"
         >
           {playing ? '⏸' : '▶'}
         </button>
@@ -136,9 +141,9 @@ export function ReplayPlayer({ attachmentRef }: { attachmentRef: string }) {
             setIdx(Number(e.target.value));
           }}
           aria-label={t('replay.scrubber')}
-          className="min-w-0 flex-1 accent-[var(--gds-accent,#4c8dff)]"
+          className="min-w-0 flex-1 accent-accent"
         />
-        <span className="w-24 shrink-0 text-right font-mono text-[11px] opacity-60">
+        <span className="shrink-0 text-right font-mono text-xs tabular-nums text-fg-muted">
           {current!.t.toFixed(1)}s · {idx + 1}/{frames.length}
         </span>
       </div>

@@ -89,3 +89,46 @@ describe('the five verbs', () => {
     expect(__peekQueue().length).toBe(0);
   });
 });
+
+describe('dev symbolication wiring', () => {
+  beforeEach(() => {
+    resetTransport();
+    resetConfig();
+    resetScope();
+    clearSignals();
+    setConfig(baseConfig);
+    startTransport();
+  });
+  afterEach(() => {
+    resetTransport();
+    resetConfig();
+    resetScope();
+    clearSignals();
+    delete (globalThis as { __DEV__?: boolean }).__DEV__;
+  });
+
+  it('in __DEV__ an error is enqueued asynchronously, never lost', async () => {
+    (globalThis as { __DEV__?: boolean }).__DEV__ = true;
+    const id = verbs.error(new Error('dev boom'));
+    expect(typeof id).toBe('string');
+    // Held out of the batch while Metro symbolication settles…
+    expect(__peekQueue().length).toBe(0);
+    // …and lands afterwards (no Metro in tests → original stack).
+    await new Promise((r) => setTimeout(r, 20));
+    expect(__peekQueue().length).toBe(1);
+    expect(__peekQueue()[0]?.payload.error?.message).toBe('dev boom');
+  });
+
+  it('outside __DEV__ the error path stays fully synchronous', () => {
+    verbs.error(new Error('prod boom'));
+    expect(__peekQueue().length).toBe(1);
+  });
+
+  it('a warn carrying error-in-data also takes the deferred path in dev', async () => {
+    (globalThis as { __DEV__?: boolean }).__DEV__ = true;
+    verbs.warn('pay.retry', { error: new TypeError('gateway 503') });
+    expect(__peekQueue().length).toBe(0);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(__peekQueue().length).toBe(1);
+  });
+});

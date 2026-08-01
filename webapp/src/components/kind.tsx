@@ -1,23 +1,23 @@
 // The five-kind color system — one stable hue per kind, used
 // everywhere a kind appears (Inbox, detail, Instruments) so the
-// palette itself teaches the concept model.
+// palette itself teaches the concept model. The values live in
+// index.css as `--s-kind-*` and are re-inked per theme; nothing
+// here may name a hex.
 
 import type { IssueSummary } from '../lib/api';
 
-export const KIND_COLOR: Record<IssueSummary['kind'], string> = {
-  error: '#ff5d5d',
-  warn: '#ffb340',
-  trace: '#7fa7c9',
-  assert: '#b18cff',
-  probe: '#4cd97b',
-};
+export const kindColor = (kind: IssueSummary['kind']): string =>
+  `var(--s-kind-${kind})`;
+
+/** A 12% tint of the kind hue — badge fill, row accents. */
+export const kindTint = (kind: IssueSummary['kind'], pct = 12): string =>
+  `color-mix(in srgb, var(--s-kind-${kind}) ${pct}%, transparent)`;
 
 export function KindBadge({ kind }: { kind: IssueSummary['kind'] }) {
-  const c = KIND_COLOR[kind];
   return (
     <span
-      className="inline-block rounded px-1.5 py-0.5 font-mono text-[11px] font-medium"
-      style={{ backgroundColor: `${c}1f`, color: c }}
+      className="inline-block rounded px-1.5 py-0.5 font-mono text-xs font-medium"
+      style={{ backgroundColor: kindTint(kind), color: kindColor(kind) }}
     >
       {kind}
     </span>
@@ -26,7 +26,7 @@ export function KindBadge({ kind }: { kind: IssueSummary['kind'] }) {
 
 export function RegressedBadge() {
   return (
-    <span className="inline-block rounded bg-[#ff5d5d] px-1.5 py-0.5 text-[11px] font-semibold text-black">
+    <span className="inline-block rounded bg-kind-error px-1.5 py-0.5 text-xs font-semibold text-white">
       REGRESSED
     </span>
   );
@@ -43,7 +43,7 @@ export function ImpactCell({
   events: number;
 }) {
   return (
-    <span className="font-mono text-xs tabular-nums opacity-80">
+    <span className="font-mono text-xs tabular-nums text-fg-muted">
       {users}u×{maxPerUser} · {events}ev
     </span>
   );

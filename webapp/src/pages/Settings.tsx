@@ -29,9 +29,9 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>(tabs[0] ?? 'account');
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-5">
+    <div className="mx-auto max-w-[1760px] px-7 py-5">
       <h1 className="mb-4 text-base font-semibold">{t('nav.settings')}</h1>
-      <div className="mb-5 flex gap-1 border-b border-[var(--gds-border,#2a2a30)]">
+      <div className="mb-5 flex gap-1 border-b border-border">
         {tabs.map((x) => (
           <button
             key={x}
@@ -39,7 +39,7 @@ export default function SettingsPage() {
             onClick={() => setTab(x)}
             className={`px-3 py-1.5 text-sm ${
               tab === x
-                ? 'border-b-2 border-[var(--gds-accent,#4c8dff)] font-medium'
+                ? 'border-b-2 border-accent font-medium'
                 : 'opacity-60 hover:opacity-100'
             }`}
           >
@@ -68,7 +68,7 @@ function ProjectsTab() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={t('settings.projectName')}
-          className="flex-1 rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 text-sm"
+          className="flex-1 rounded border border-border bg-transparent px-2 py-1 text-sm"
         />
         <button
           type="button"
@@ -79,12 +79,12 @@ function ProjectsTab() {
               reloadProjects();
             });
           }}
-          className="rounded bg-[var(--gds-accent,#4c8dff)] px-3 py-1 text-sm font-medium text-black disabled:opacity-40"
+          className="rounded bg-accent px-3 py-1 text-sm font-medium text-accent-fg disabled:opacity-40"
         >
           {t('settings.createProject')}
         </button>
       </div>
-      <div className="divide-y divide-[var(--gds-border,#2a2a30)] rounded-lg border border-[var(--gds-border,#2a2a30)]">
+      <div className="divide-y divide-border rounded-lg border border-border">
         {projects.map((p: Project) => (
           <div key={p.id} className="flex items-center gap-3 px-3 py-2 text-sm">
             <span className="flex-1">{p.name}</span>
@@ -96,7 +96,7 @@ function ProjectsTab() {
                   void api.deleteProject(p.id).then(reloadProjects);
                 }
               }}
-              className="text-xs text-[#ff5d5d] opacity-60 hover:opacity-100"
+              className="text-xs text-kind-error opacity-60 hover:opacity-100"
             >
               {t('common.delete')}
             </button>
@@ -125,7 +125,7 @@ function TokensTab() {
         <select
           value={projectId}
           onChange={(e) => setProjectId(e.target.value)}
-          className="rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 text-xs"
+          className="rounded border border-border bg-transparent px-2 py-1 text-xs"
         >
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
@@ -139,12 +139,12 @@ function TokensTab() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={t('settings.tokenName')}
-          className="flex-1 rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 text-sm"
+          className="flex-1 rounded border border-border bg-transparent px-2 py-1 text-sm"
         />
         <select
           value={scope}
           onChange={(e) => setScope(e.target.value as 'api' | 'ingest')}
-          className="rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 text-sm"
+          className="rounded border border-border bg-transparent px-2 py-1 text-sm"
         >
           <option value="ingest">ingest</option>
           <option value="api">api</option>
@@ -159,24 +159,24 @@ function TokensTab() {
               reload();
             });
           }}
-          className="rounded bg-[var(--gds-accent,#4c8dff)] px-3 py-1 text-sm font-medium text-black disabled:opacity-40"
+          className="rounded bg-accent px-3 py-1 text-sm font-medium text-accent-fg disabled:opacity-40"
         >
           {t('settings.mintToken')}
         </button>
       </div>
       {minted && (
-        <div className="rounded border border-[#4cd97b40] p-3 text-xs">
+        <div className="rounded border border-ok/40 p-3 text-xs">
           <p className="mb-1 opacity-70">{t('settings.tokenOnce')}</p>
-          <code className="block break-all rounded bg-[var(--gds-surface-sunken,#121216)] p-2 font-mono">
+          <code className="block break-all rounded bg-bg p-2 font-mono">
             {minted}
           </code>
         </div>
       )}
-      <div className="divide-y divide-[var(--gds-border,#2a2a30)] rounded-lg border border-[var(--gds-border,#2a2a30)]">
+      <div className="divide-y divide-border rounded-lg border border-border">
         {(data?.tokens ?? []).map((tok: TokenRow) => (
           <div key={tok.id} className="flex items-center gap-3 px-3 py-2 text-sm">
             <span className="flex-1">{tok.name}</span>
-            <span className="rounded bg-[var(--gds-surface-raised,#26262c)] px-1.5 font-mono text-[11px]">
+            <span className="rounded bg-raised px-1.5 font-mono text-[11px]">
               {tok.scope}
             </span>
             {tok.last4 && <span className="font-mono text-xs opacity-40">…{tok.last4}</span>}
@@ -190,7 +190,7 @@ function TokensTab() {
                     void api.revokeToken(tok.id).then(reload);
                   }
                 }}
-                className="text-xs text-[#ff5d5d] opacity-60 hover:opacity-100"
+                className="text-xs text-kind-error opacity-60 hover:opacity-100"
               >
                 {t('settings.revoke')}
               </button>
@@ -217,14 +217,14 @@ function UsersTab() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder={t('settings.adminEmail')}
-          className="flex-1 rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 text-sm"
+          className="flex-1 rounded border border-border bg-transparent px-2 py-1 text-sm"
         />
         <input
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           type="password"
           placeholder={t('settings.initialPassword')}
-          className="flex-1 rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 text-sm"
+          className="flex-1 rounded border border-border bg-transparent px-2 py-1 text-sm"
         />
         <button
           type="button"
@@ -236,12 +236,12 @@ function UsersTab() {
               reload();
             });
           }}
-          className="rounded bg-[var(--gds-accent,#4c8dff)] px-3 py-1 text-sm font-medium text-black disabled:opacity-40"
+          className="rounded bg-accent px-3 py-1 text-sm font-medium text-accent-fg disabled:opacity-40"
         >
           {t('settings.createAdmin')}
         </button>
       </div>
-      <div className="divide-y divide-[var(--gds-border,#2a2a30)] rounded-lg border border-[var(--gds-border,#2a2a30)]">
+      <div className="divide-y divide-border rounded-lg border border-border">
         {(data?.users ?? []).map((u: UserRow) => (
           <div key={u.id} className="px-3 py-2 text-sm">
             <div className="flex items-center gap-3">
@@ -260,7 +260,7 @@ function UsersTab() {
                       void api.deleteUser(u.id).then(reload);
                     }
                   }}
-                  className="text-xs text-[#ff5d5d] opacity-60 hover:opacity-100"
+                  className="text-xs text-kind-error opacity-60 hover:opacity-100"
                 >
                   {t('common.delete')}
                 </button>
@@ -282,8 +282,8 @@ function UsersTab() {
                       }}
                       className={`rounded-full border px-2 py-0.5 text-[11px] ${
                         has
-                          ? 'border-transparent bg-[var(--gds-surface-raised,#26262c)]'
-                          : 'border-[var(--gds-border,#2a2a30)] opacity-50'
+                          ? 'border-transparent bg-raised'
+                          : 'border-border opacity-50'
                       }`}
                     >
                       {p.name}
@@ -305,7 +305,7 @@ function AuditTab() {
   return (
     <div className="max-w-4xl">
       {error && <ErrorBanner>{t('settings.auditLoadFailed')}</ErrorBanner>}
-      <div className="divide-y divide-[var(--gds-border,#2a2a30)] rounded-lg border border-[var(--gds-border,#2a2a30)]">
+      <div className="divide-y divide-border rounded-lg border border-border">
         {(data?.entries ?? []).map((e) => (
           <div key={e.id} className="flex items-center gap-3 px-3 py-1.5 font-mono text-xs">
             <span className="w-16 opacity-40">{formatRelative(e.createdAt)}</span>
@@ -334,7 +334,7 @@ function AccountTab() {
         <select
           value={locale}
           onChange={(e) => setLocale(e.target.value as typeof locale)}
-          className="rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 text-sm"
+          className="rounded border border-border bg-transparent px-2 py-1 text-sm"
         >
           <option value="en">English</option>
           <option value="ja">日本語</option>
@@ -348,14 +348,14 @@ function AccountTab() {
           value={current}
           onChange={(e) => setCurrent(e.target.value)}
           placeholder={t('settings.currentPassword')}
-          className="w-full rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 text-sm"
+          className="w-full rounded border border-border bg-transparent px-2 py-1 text-sm"
         />
         <input
           type="password"
           value={next}
           onChange={(e) => setNext(e.target.value)}
           placeholder={t('settings.newPassword')}
-          className="w-full rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 text-sm"
+          className="w-full rounded border border-border bg-transparent px-2 py-1 text-sm"
         />
         <button
           type="button"
@@ -368,7 +368,7 @@ function AccountTab() {
               setTimeout(() => setSaved(false), 2000);
             });
           }}
-          className="rounded bg-[var(--gds-accent,#4c8dff)] px-3 py-1 text-sm font-medium text-black disabled:opacity-40"
+          className="rounded bg-accent px-3 py-1 text-sm font-medium text-accent-fg disabled:opacity-40"
         >
           {saved ? t('settings.saved') : t('settings.save')}
         </button>
@@ -408,8 +408,8 @@ function NotificationsTab() {
       <section>
         <h2 className="mb-2 text-sm font-medium">{t('notify.smtpTitle')}</h2>
         {smtp.data && smtp.data.configured && (
-          <div className="flex items-center gap-3 rounded-md border border-[var(--gds-border,#2a2a30)] px-3 py-2 text-sm">
-            <span className="h-2 w-2 rounded-full bg-[#4cd97b]" />
+          <div className="flex items-center gap-3 rounded-md border border-border px-3 py-2 text-sm">
+            <span className="h-2 w-2 rounded-full bg-ok" />
             <span className="font-mono text-xs opacity-70">
               {smtp.data.host} · {smtp.data.from}
             </span>
@@ -423,23 +423,23 @@ function NotificationsTab() {
                   () => setTestState('error'),
                 );
               }}
-              className="ml-auto rounded border border-[var(--gds-border,#2a2a30)] px-2 py-0.5 text-xs hover:bg-[var(--gds-surface-raised,#1c1c22)] disabled:opacity-40"
+              className="ml-auto rounded border border-border px-2 py-0.5 text-xs hover:bg-raised disabled:opacity-40"
             >
               {testState === 'sending' ? t('notify.testSending') : t('notify.testButton')}
             </button>
           </div>
         )}
         {smtp.data && !smtp.data.configured && (
-          <div className="flex items-center gap-3 rounded-md border border-[var(--gds-border,#2a2a30)] px-3 py-2 text-sm opacity-70">
-            <span className="h-2 w-2 rounded-full bg-[var(--gds-border,#3a3a42)]" />
+          <div className="flex items-center gap-3 rounded-md border border-border px-3 py-2 text-sm opacity-70">
+            <span className="h-2 w-2 rounded-full bg-border-strong" />
             {t('notify.smtpUnconfigured')}
           </div>
         )}
         {testState === 'sent' && (
-          <p className="mt-2 text-xs text-[#4cd97b]">{t('notify.testSent')}</p>
+          <p className="mt-2 text-xs text-ok">{t('notify.testSent')}</p>
         )}
         {testState === 'error' && (
-          <p className="mt-2 text-xs text-[#ff5d5d]">{t('notify.testFailed')}</p>
+          <p className="mt-2 text-xs text-kind-error">{t('notify.testFailed')}</p>
         )}
       </section>
 
@@ -451,7 +451,7 @@ function NotificationsTab() {
           <p className="text-sm opacity-50">{t('table.empty')}</p>
         )}
         {rows.length > 0 && (
-          <div className="divide-y divide-[var(--gds-border,#2a2a30)] rounded-lg border border-[var(--gds-border,#2a2a30)]">
+          <div className="divide-y divide-border rounded-lg border border-border">
             {rows.map((p) => (
               <div key={p.projectId} className="flex items-center gap-4 px-3 py-2 text-sm">
                 <span className="min-w-0 flex-1 truncate font-medium">{p.projectName}</span>
@@ -460,7 +460,7 @@ function NotificationsTab() {
                     type="checkbox"
                     checked={p.onNewIssue}
                     onChange={() => flip(p, 'onNewIssue')}
-                    className="h-3.5 w-3.5 accent-[var(--gds-accent,#4c8dff)]"
+                    className="h-3.5 w-3.5 accent-accent"
                   />
                   {t('notify.onNewIssue')}
                 </label>
@@ -469,7 +469,7 @@ function NotificationsTab() {
                     type="checkbox"
                     checked={p.onRegression}
                     onChange={() => flip(p, 'onRegression')}
-                    className="h-3.5 w-3.5 accent-[var(--gds-accent,#4c8dff)]"
+                    className="h-3.5 w-3.5 accent-accent"
                   />
                   {t('notify.onRegression')}
                 </label>
