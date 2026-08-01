@@ -67,7 +67,6 @@ export const ja: Messages = {
   'issue.back': '受信箱',
   'issue.copied': 'コピーしました',
   'issue.copyForAi': 'AI 用にコピー',
-  'issue.device': '端末',
   'issue.eventMoment': '{kind} 発生',
   'issue.environment': '環境',
   'issue.firstSeen': '初回',
@@ -76,10 +75,14 @@ export const ja: Messages = {
   'issue.guardProbeHint':
     '修正したブランチに sentori.probe(ref) を置いてください — 静かなプローブが修正維持の証明です。',
   'issue.guardTitle': 'ガード状態',
+  'issue.handoff': '修正へ',
+  'issue.handoffHint':
+    'ワンコピーで AI へ:失敗したコード、ユーザーの行動、環境をまとめて渡せます。',
   'issue.guardUnanchored':
     'リリースアンカーなしで解決 — 以後の再発はすべて再オープンさせます。',
   'issue.ignore': '無視',
   'issue.lastSeen': '直近',
+  'issue.latestCase': '直近の1件',
   'issue.loadFailed': 'この issue を読み込めませんでした。',
   'issue.noActivity': 'アクティビティはまだありません',
   'issue.note': 'ノート',
