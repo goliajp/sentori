@@ -85,7 +85,16 @@ function findLegacy(order: Entry[], n: Pick<Node, 'x' | 'y' | 'w' | 'h'>): numbe
 
 const CANVAS_PX = 640;
 
-export function WireframePlayer({ attachmentRef }: { attachmentRef: string }) {
+export function WireframePlayer({
+  attachmentRef,
+  seek,
+}: {
+  attachmentRef: string;
+  /** Timeline → replay: jump to the frame nearest this moment
+   *  (seconds relative to the event, negative). Frame timestamps
+   *  are absolute ms; the last frame is ~the event moment. */
+  seek?: { t: number; n: number } | null;
+}) {
   const t = useT();
   const [frames, setFrames] = useState<Frame[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -110,6 +119,26 @@ export function WireframePlayer({ attachmentRef }: { attachmentRef: string }) {
       alive = false;
     };
   }, [attachmentRef]);
+
+  // Seek applies during render (the adjust-state-from-props pattern)
+  // — an effect would be a cascading second render for no gain.
+  const [appliedSeek, setAppliedSeek] = useState(0);
+  if (seek && frames && frames.length > 0 && seek.n !== appliedSeek) {
+    setAppliedSeek(seek.n);
+    setPlaying(false);
+    const eventTs = frames[frames.length - 1]!.ts;
+    const target = eventTs + seek.t * 1000;
+    let best = 0;
+    let bestGap = Infinity;
+    frames.forEach((f, i) => {
+      const gap = Math.abs(f.ts - target);
+      if (gap < bestGap) {
+        bestGap = gap;
+        best = i;
+      }
+    });
+    setIndex(best);
+  }
 
   /** Screen size comes from the most recent keyframe at or before the
    *  playhead — a rotation mid-recording changes it.
