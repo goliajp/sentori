@@ -60,6 +60,10 @@ export type OccurrenceRow = {
   release: string;
   environment: string;
   userKey: string | null;
+  /** Ref of this event's `screens` attachment, when it has one —
+   *  lets the replay dock fall back to the newest occurrence that
+   *  actually captured pixels. */
+  screensRef: string | null;
 };
 
 export type AttachmentRow = {

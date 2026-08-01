@@ -357,9 +357,19 @@ pub async fn occurrences(
     if let Err(e) = load_issue(&state, &ctx, issue_id).await {
         return e;
     }
+    // `screens_ref` rides each row so the dashboard can fall back to
+    // the newest occurrence that HAS a visual replay — the newest
+    // event alone may come from an older SDK that captured nothing,
+    // and a replay from an hour ago beats no replay at all.
     let rows = sqlx::query(
-        "SELECT id, kind, platform, occurred_at, received_at, release, environment, user_key \
-         FROM events WHERE issue_id = $1 ORDER BY received_at DESC LIMIT 100",
+        "SELECT e.id, e.kind, e.platform, e.occurred_at, e.received_at, \
+                e.release, e.environment, e.user_key, sc.ref AS screens_ref \
+         FROM events e \
+         LEFT JOIN LATERAL ( \
+             SELECT a.ref FROM event_attachments a \
+             WHERE a.event_id = e.id AND a.kind = 'screens' LIMIT 1 \
+         ) sc ON TRUE \
+         WHERE e.issue_id = $1 ORDER BY e.received_at DESC LIMIT 100",
     )
     .bind(issue_id)
     .fetch_all(&state.pool)
@@ -377,6 +387,7 @@ pub async fn occurrences(
                 "release": r.get::<String, _>("release"),
                 "environment": r.get::<String, _>("environment"),
                 "userKey": r.get::<Option<String>, _>("user_key"),
+                "screensRef": r.get::<Option<Uuid>, _>("screens_ref"),
             })
         })
         .collect();

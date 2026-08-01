@@ -67,7 +67,15 @@ export default function IssueDetail() {
     }
   };
 
-  const screensRef = latest?.attachments?.find((a) => a.kind === 'screens')?.ref ?? null;
+  // Replay source: the latest event's screens attachment when it has
+  // one; otherwise the newest occurrence that captured pixels (an
+  // older-SDK event on top must not hide an existing replay).
+  const screensLatest =
+    latest?.attachments?.find((a) => a.kind === 'screens')?.ref ?? null;
+  const screensFallback = screensLatest
+    ? null
+    : (occ?.events.find((e) => e.screensRef) ?? null);
+  const screensRef = screensLatest ?? screensFallback?.screensRef ?? null;
   const payload = latest?.payload as
     | {
         error?: { type?: string; message?: string; stack?: Frame[] };
@@ -265,7 +273,16 @@ export default function IssueDetail() {
           <div className="sticky top-5 space-y-4">
             <SectionLabel>{t('replay.title')}</SectionLabel>
             {screensRef ? (
-              <ReplayPlayer attachmentRef={screensRef} />
+              <div>
+                <ReplayPlayer attachmentRef={screensRef} />
+                {screensFallback && (
+                  <p className="mt-1.5 text-xs text-fg-subtle">
+                    {t('issue.replayFrom', {
+                      when: formatRelative(screensFallback.occurredAt),
+                    })}
+                  </p>
+                )}
+              </div>
             ) : (
               <p className="rounded-md border border-border bg-surface px-4 py-3 text-sm text-fg-subtle">
                 {t('issue.replayNone')}
