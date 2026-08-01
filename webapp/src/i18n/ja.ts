@@ -30,16 +30,16 @@ export const ja: Messages = {
   'inbox.emptyHint': '処理するものはありません — イベントは issue としてここに集まります。',
   'inbox.emptyNoProject':
     '設定でプロジェクトを作成し、ingest トークンを発行して SDK をこのインスタンスに向けてください。',
-  'inbox.emptyTitle': 'Inbox ゼロ',
+  'inbox.emptyTitle': '受信箱ゼロ',
   'inbox.group.ignored': '無視',
-  'inbox.group.open': 'オープン',
+  'inbox.group.open': '未解決',
   'inbox.group.resolved': '解決済み',
   'inbox.groupNew': '新規（24時間）',
   'inbox.groupRegressed': 'リグレッション',
-  'inbox.loadFailed': 'Inbox を読み込めませんでした。',
+  'inbox.loadFailed': '受信箱を読み込めませんでした。',
   'inbox.pulse': '今日: 新規 {fresh} · リグレッション {regressed}',
   'inbox.status.ignored': '無視',
-  'inbox.status.open': 'オープン',
+  'inbox.status.open': '未解決',
   'inbox.status.resolved': '解決済み',
   'inbox.selectedCount': '{n} 件選択中',
   'inbox.clearSelection': '選択解除',
@@ -49,7 +49,7 @@ export const ja: Messages = {
   'instruments.assertsEmpty':
     '本番アサーションはまだありません — sentori.assert(name, ok) が生存台帳を作ります。',
   'instruments.guardedIssue': '保護対象 issue',
-  'instruments.loadFailed': 'インストゥルメントを読み込めませんでした。',
+  'instruments.loadFailed': '計測パネルを読み込めませんでした。',
   'instruments.noProject': 'プロジェクトがまだありません',
   'instruments.probeFired': '発火 {count}回 · 直近 {last}',
   'instruments.probeSilent': '{since} から静か — 修正は保たれています',
@@ -61,11 +61,14 @@ export const ja: Messages = {
     '観測点はまだありません — sentori.trace(name) がコードパスの通過を記録します。',
 
   'issue.activity': 'アクティビティ',
+  'issue.code': '発生箇所',
   'issue.addNote': 'ノートを追加',
   'issue.assignee': '担当者',
-  'issue.back': 'Inbox',
+  'issue.back': '受信箱',
   'issue.copied': 'コピーしました',
   'issue.copyForAi': 'AI 用にコピー',
+  'issue.device': '端末',
+  'issue.eventMoment': '{kind} 発生',
   'issue.environment': '環境',
   'issue.firstSeen': '初回',
   'issue.guardAnchored':
@@ -82,15 +85,16 @@ export const ja: Messages = {
   'issue.note': 'ノート',
   'issue.occurrences': '発生一覧',
   'issue.reopen': '再オープン',
+  'issue.replayNone':
+    'このイベントにはリプレイが付いていません — SDK で replayScreens: true を有効にすると、直前の1分間の画面を記録できます。',
   'issue.resolve': '解決',
   'issue.resolveInRelease': '修正リリース',
-  'issue.stack': 'スタックトレース',
   'issue.system': 'システム',
   'issue.timeline': 'ユーザーが何をしていたか',
   'issue.unassigned': '未割り当て',
 
-  'nav.inbox': 'Inbox',
-  'nav.instruments': 'インストゥルメント',
+  'nav.inbox': '受信箱',
+  'nav.instruments': '計測',
   'nav.releases': 'リリース',
   'nav.settings': '設定',
 
@@ -118,7 +122,7 @@ export const ja: Messages = {
   'replay.pause': '一時停止',
   'replay.play': '再生',
   'replay.scrubber': 'リプレイ位置',
-  'replay.title': '画面に映っていたもの',
+  'replay.title': 'ユーザーが見ていた画面',
   'releases.noArtifacts':
     'このリリースのシンボリケーション用アーティファクトがありません — アップロードまでスタックは難読化されたままです:',
 
@@ -160,6 +164,10 @@ export const ja: Messages = {
   'table.empty': 'まだ何もありません',
 
   'shell.loading': '読み込み中…',
+  'theme.dark': 'ダーク',
+  'theme.label': 'テーマ',
+  'theme.light': 'ライト',
+  'theme.system': 'システムに従う',
   'shell.roleAdmin': '管理者',
   'shell.roleOwner': 'オーナー',
 };

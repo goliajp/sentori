@@ -29,8 +29,11 @@ import type {
 import { getConfig } from './config';
 import { collectDevice } from './device';
 import { onEventEmitted } from './emit-hooks';
+import { symbolicateErrorViaMetro } from './handlers/dev-symbolicate';
 import { currentContext, currentUserKey } from './scope';
 import { countAssert, enqueue } from './transport';
+
+declare const __DEV__: boolean | undefined;
 
 /** Serialize any Error instances found in the data argument — the
  *  error-in-data convention (design.md §4): a caught-but-noteworthy
@@ -121,9 +124,46 @@ const emit = (kind: EventKind, opts: EmitOptions): string => {
     }
   }
 
-  enqueue(event);
+  // In dev there is no uploaded source map, so without local
+  // symbolication errors land as `entry.bundle:721724`. Hold the
+  // event out of the batch until Metro's /symbolicate answers
+  // (bounded at 2 s inside, never throws) — mutating it after
+  // enqueue would race the flush timer. Release builds and
+  // error-free events enqueue synchronously as before.
+  if (isDevRuntime() && hasErrorShape(payload)) {
+    void devSymbolicateThenEnqueue(event);
+  } else {
+    enqueue(event);
+  }
   onEventEmitted(event);
   return id;
+};
+
+const isDevRuntime = (): boolean =>
+  typeof __DEV__ !== 'undefined' && !!__DEV__;
+
+const hasErrorShape = (payload: WirePayload): boolean => {
+  if (payload.error) return true;
+  return Object.values(payload.data ?? {}).some(
+    (v) => !!v && typeof v === 'object' && Array.isArray((v as SentoriError).stack),
+  );
+};
+
+const devSymbolicateThenEnqueue = async (event: WireEvent): Promise<void> => {
+  try {
+    const { error: err, data } = event.payload;
+    if (err) await symbolicateErrorViaMetro(err);
+    for (const v of Object.values(data ?? {})) {
+      // The error-in-data convention: serialized errors riding warn/
+      // trace data get the same treatment as the headline error.
+      if (!!v && typeof v === 'object' && Array.isArray((v as SentoriError).stack)) {
+        await symbolicateErrorViaMetro(v as SentoriError);
+      }
+    }
+  } catch {
+    // Symbolication is garnish; delivery is the contract.
+  }
+  enqueue(event);
 };
 
 // ── the verbs ──────────────────────────────────────────────────────

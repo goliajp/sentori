@@ -23,14 +23,14 @@ export default function ReleasesPage() {
   );
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-5">
+    <div className="mx-auto max-w-[1760px] px-7 py-5">
       <div className="mb-4 flex items-center gap-3">
         <h1 className="text-base font-semibold">{t('nav.releases')}</h1>
         {projects.length > 1 && (
           <select
             value={active ?? ''}
             onChange={(e) => setProjectId(e.target.value)}
-            className="rounded border border-[var(--gds-border,#2a2a30)] bg-transparent px-2 py-1 text-xs"
+            className="rounded border border-border bg-transparent px-2 py-1 text-xs"
           >
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
@@ -78,7 +78,7 @@ function ReleaseRowView({ release, projectId }: { release: ReleaseRow; projectId
   const created = release.createdAt ?? release.created_at;
 
   return (
-    <div className="rounded-lg border border-[var(--gds-border,#2a2a30)]">
+    <div className="rounded-lg border border-border">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -95,11 +95,11 @@ function ReleaseRowView({ release, projectId }: { release: ReleaseRow; projectId
         )}
       </button>
       {open && (
-        <div className="border-t border-[var(--gds-border,#2a2a30)] px-3 py-2">
+        <div className="border-t border-border px-3 py-2">
           {artifacts.length === 0 ? (
             <div className="text-xs opacity-60">
               <p>{t('releases.noArtifacts')}</p>
-              <code className="mt-1 block rounded bg-[var(--gds-surface-sunken,#121216)] p-2 font-mono text-[11px]">
+              <code className="mt-1 block rounded bg-bg p-2 font-mono text-[11px]">
                 sentori-cli upload sourcemap --release &quot;{release.name}&quot; --token
                 &lt;api-token&gt; &lt;map&gt;
               </code>
@@ -129,7 +129,7 @@ function Light({ on, label }: { on: boolean | undefined; label: string }) {
       <span
         className="h-2 w-2 rounded-full"
         style={{
-          backgroundColor: on === undefined ? '#8e8e9340' : on ? '#4cd97b' : '#ff5d5d',
+          backgroundColor: on === undefined ? 'color-mix(in srgb, var(--gds-fg-muted) 30%, transparent)' : on ? 'var(--s-kind-probe)' : 'var(--s-kind-error)',
         }}
       />
       {label}

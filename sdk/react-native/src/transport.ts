@@ -19,7 +19,8 @@ const MAX_RETRY = 3;
 const STORAGE_KEY = '@sentori/pending';
 const MAX_PERSISTED = 1000;
 
-const SDK_VERSION = '5.0.0';
+// Pinned to package.json by a test — bump both together.
+const SDK_VERSION = '5.1.2';
 
 let _queue: WireEvent[] = [];
 let _assertStats = new Map<string, AssertStat>();
@@ -306,4 +307,5 @@ export const __resetForTests = (): void => {
 };
 
 export const __peekQueue = (): readonly WireEvent[] => _queue;
+export const __sdkVersion = (): string => SDK_VERSION;
 export const __peekAssertStats = (): readonly AssertStat[] => [..._assertStats.values()];

@@ -63,9 +63,17 @@ export function parseStack(
 
 function isInApp(file: string): boolean {
   if (!file || file === '<anonymous>') return false
-  if (file.includes('node_modules/')) return false
   if (file.startsWith('node:')) return false
-  if (/^https?:\/\//.test(file)) return false
+  if (/^https?:\/\//.test(file)) {
+    // A Metro dev-server bundle URL IS the app: every JS frame in a
+    // RN dev session points into it. Its path routinely contains
+    // node_modules (`.../node_modules/expo-router/entry.bundle`), so
+    // this must be decided before the vendor check below — otherwise
+    // a dev session has zero in-app frames and the dashboard folds
+    // the whole stack.
+    return /\.bundle([/?&#]|$)/.test(file)
+  }
+  if (file.includes('node_modules/')) return false
   return true
 }
 

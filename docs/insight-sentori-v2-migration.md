@@ -137,7 +137,8 @@ command with the respective file.
 ## 6b. 5.1 additions (visual replay + native source windows)
 
 - **The minute before the event, as pixels**: upgrade to
-  `@goliapkg/sentori-react-native@^5.1.0`, add
+  `@goliapkg/sentori-react-native@^5.1.1` (skip 5.1.0 — its
+  attachment upload is broken on device), add
   `registerMaskQuery(() => [...nativeIDs to black out])` (camera
   feeds + user identity for your compliance case), then set
   `replaySeconds: 60, replayScreens: true` in init. Needs a
