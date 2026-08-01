@@ -106,16 +106,16 @@ export function ReplayPlayer({ attachmentRef }: { attachmentRef: string }) {
         }
       }}
     >
-      {/* Portrait viewport: the column is narrow, the frame is tall —
-          let the frame own the height instead of pillar-boxing it
-          inside a landscape band. Capped so an ultra-tall monitor
-          doesn't turn the phone into a poster. */}
-      <div className="flex items-center justify-center bg-bg p-3">
+      {/* Square viewport: frames are usually portrait, but a rotated
+          phone or a tablet sends landscape — a square is the one
+          shape that letterboxes both gracefully instead of betting
+          on an orientation. */}
+      <div className="flex aspect-square w-full items-center justify-center bg-bg p-3">
         {src && (
           <img
             src={src}
             alt={t('replay.frameAlt', { t: current!.t.toFixed(1) })}
-            className="h-[min(56vh,600px)] w-auto max-w-full rounded-sm border border-border object-contain"
+            className="max-h-full max-w-full rounded-sm border border-border object-contain"
           />
         )}
       </div>
