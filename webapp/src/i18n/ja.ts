@@ -44,6 +44,7 @@ export const ja: Messages = {
   'inbox.selectedCount': '{n} 件選択中',
   'inbox.clearSelection': '選択解除',
 
+  'health.backend': 'バックエンド',
   'health.replay': 'リプレイ',
   'health.silent': 'イベントなし',
 

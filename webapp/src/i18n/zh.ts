@@ -43,6 +43,7 @@ export const zh: Messages = {
   'inbox.selectedCount': '已选 {n} 项',
   'inbox.clearSelection': '清除选择',
 
+  'health.backend': '后端',
   'health.replay': '录屏',
   'health.silent': '暂无事件',
 

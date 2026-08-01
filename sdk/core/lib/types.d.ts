@@ -100,6 +100,10 @@ export type AssertStat = {
 export type BatchEnvelope = {
     events: WireEvent[];
     assertStats?: AssertStat[];
+    /** The integrator's backend health-check URL (from init) — the
+     *  server remembers it per project and probes it for the
+     *  availability card. */
+    backendHealthUrl?: string;
 };
 /** Per-event server outcome. */
 export type IngestOutcome = {
@@ -156,6 +160,10 @@ export type InitConfig = {
      *  fires. OFF by default — screenshots can carry user content;
      *  pair with `registerMaskQuery` before enabling. */
     replayScreens?: boolean;
+    /** A GET-able health endpoint of YOUR backend. Sentori's server
+     *  probes it once a minute and shows availability next to the
+     *  project — the SDK only carries the URL, the app never pings. */
+    backendHealthUrl?: string;
     /** Console gate: default `warn` — silent unless genuinely broken. */
     logLevel?: 'debug' | 'error' | 'info' | 'silent' | 'warn';
     /** Last-resort event filter; exceptions fall back to the event. */

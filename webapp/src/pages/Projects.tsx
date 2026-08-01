@@ -173,6 +173,35 @@ function ProjectCard({
         )}
       </div>
 
+      {h?.backend && (
+        <div
+          className="mt-2.5 flex items-center gap-2 font-mono text-[13px] tabular-nums"
+          title={h.backend.url}
+        >
+          <span
+            aria-hidden
+            className="h-2 w-2 shrink-0 rounded-full"
+            style={{
+              backgroundColor:
+                h.backend.lastOk === null
+                  ? 'var(--sn-fg-muted)'
+                  : h.backend.lastOk
+                    ? 'var(--s-kind-probe)'
+                    : 'var(--s-kind-error)',
+            }}
+          />
+          <span className="text-fg-subtle">{t('health.backend')}</span>
+          {h.backend.checks24h > 0 && (
+            <span className="text-fg-muted">
+              {((h.backend.ok24h / h.backend.checks24h) * 100).toFixed(1)}%
+            </span>
+          )}
+          {h.backend.lastLatencyMs !== null && (
+            <span className="ml-auto text-fg-subtle">{h.backend.lastLatencyMs}ms</span>
+          )}
+        </div>
+      )}
+
       <div className="mt-2.5 flex items-center gap-2 border-t border-border/60 pt-2.5 font-mono text-[11px] text-fg-subtle">
         {h?.latestRelease ? (
           <>
