@@ -226,6 +226,36 @@ export function Badge({
   );
 }
 
+// ── PageShell ──────────────────────────────────────────────
+
+/**
+ * The anatomy every non-split page shares: a slim toolbar naming
+ * the page (plus its controls), and a content region that scrolls
+ * on its own. Content is left-aligned under a readable cap —
+ * admin lists at full monitor width read as spreadsheets.
+ */
+export function PageShell({
+  title,
+  toolbar,
+  children,
+}: {
+  title: ReactNode;
+  toolbar?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex h-full min-w-0 flex-col">
+      <header className="flex h-11 shrink-0 items-center gap-3 border-b border-border bg-bg px-4">
+        <h1 className="text-[13px] font-semibold">{title}</h1>
+        {toolbar}
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className="max-w-[1100px] space-y-4">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 // ── Panel ──────────────────────────────────────────────────
 
 /**
