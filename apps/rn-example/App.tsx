@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 
-import { RageTapCapture, sentori } from '@goliapkg/sentori-react-native';
+import { RageTapCapture, registerMaskQuery, sentori } from '@goliapkg/sentori-react-native';
 
 const INGEST_URL =
   Platform.OS === 'android' ? 'http://10.0.2.2:8080' : 'http://localhost:8080';
@@ -22,12 +22,15 @@ const INGEST_URL =
 // Paste an `ingest`-scope token minted from the local dashboard/API.
 const TOKEN = 'st_dev0000000000000000000000';
 
+registerMaskQuery(() => ['mask-me']);
 sentori.init({
   token: TOKEN,
   ingestUrl: INGEST_URL,
   release: 'sentori-example@1.0.0+1',
   environment: 'dev',
   detect: { rageTap: true, longFreeze: true, slowColdStart: true, slowApi: true },
+  replaySeconds: 30,
+  replayScreens: true,
 });
 sentori.user({ id: 'demo-user-1', email: 'demo@example.com' });
 sentori.context({ variant: 'walkthrough', flag_new_checkout: true });
@@ -121,6 +124,11 @@ export default function App() {
       <View style={styles.container}>
         <Text style={styles.title}>Sentori · eight verbs</Text>
         <Text style={styles.subtitle}>{INGEST_URL}</Text>
+        {/* masked in every captured frame — the black box in the
+            replay proves masking end to end */}
+        <Text nativeID="mask-me" testID="mask-me" style={styles.subtitle}>
+          SECRET user@example.com · card 4242
+        </Text>
         <ScrollView style={styles.buttons}>
           {buttons.map((b) => (
             <Pressable key={b.title} onPress={b.onPress} style={styles.button}>

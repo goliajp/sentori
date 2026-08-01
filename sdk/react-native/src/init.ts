@@ -18,7 +18,7 @@ import { markNativeJsBridgeReady, setNativeConfig } from './native';
 import { shipNativePending } from './native-pending';
 import { drainReplay, startReplay } from './replay';
 import { drainScreenReplay, startScreenReplay } from './replay-screens';
-import { drainOfflineQueue, startTransport, uploadAttachment } from './transport';
+import { drainOfflineQueue, queueAttachment, startTransport } from './transport';
 
 let _initialized = false;
 
@@ -78,27 +78,17 @@ export const init = safeFn('init', (config: InitConfig): void => {
       if (!event.id) return;
       const lines = drainReplay();
       if (lines) {
-        const base64 = base64Encode(lines);
-        if (base64) {
-          void uploadAttachment(
-            event.id,
-            'replay',
-            { base64, mediaType: 'application/x-sentori-replay' },
-            { source: 'js' },
-          );
-        }
+        queueAttachment(event.id, 'replay', {
+          text: lines,
+          mediaType: 'application/x-sentori-replay',
+        });
       }
       const frames = drainScreenReplay();
       if (frames) {
-        const base64 = base64Encode(frames);
-        if (base64) {
-          void uploadAttachment(
-            event.id,
-            'screens',
-            { base64, mediaType: 'application/x-sentori-screens' },
-            { source: 'js' },
-          );
-        }
+        queueAttachment(event.id, 'screens', {
+          text: frames,
+          mediaType: 'application/x-sentori-screens',
+        });
       }
     });
   }
@@ -120,18 +110,6 @@ export const init = safeFn('init', (config: InitConfig): void => {
   void drainOfflineQueue();
 });
 
-/** RN's Hermes has no btoa in older releases; go through base64.ts. */
-const base64Encode = (text: string): string | null => {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { encodeBase64 } = require('./base64') as {
-      encodeBase64: (s: string) => string;
-    };
-    return encodeBase64(text);
-  } catch {
-    return null;
-  }
-};
 
 export const __resetForTests = (): void => {
   _initialized = false;
