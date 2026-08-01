@@ -99,6 +99,7 @@ export const en = {
     'No visual replay came with this event — set replayScreens: true in the SDK to capture the minute before.',
   'issue.resolve': 'Resolve',
   'issue.resolveInRelease': 'Fixed in release',
+  'issue.seekReplay': 'Jump the replay to this moment',
   'issue.system': 'system',
   'issue.timeline': 'What the user was doing',
   'issue.timelineEmpty': 'No signals arrived with this event.',

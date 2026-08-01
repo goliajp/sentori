@@ -94,6 +94,7 @@ export const ja: Messages = {
     'このイベントにはリプレイが付いていません — SDK で replayScreens: true を有効にすると、直前の1分間の画面を記録できます。',
   'issue.resolve': '解決',
   'issue.resolveInRelease': '修正リリース',
+  'issue.seekReplay': 'リプレイをこの時点へ',
   'issue.system': 'システム',
   'issue.timeline': 'ユーザーが何をしていたか',
   'issue.timelineEmpty': 'このイベントには行動シグナルがありません。',

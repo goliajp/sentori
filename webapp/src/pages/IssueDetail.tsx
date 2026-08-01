@@ -55,6 +55,7 @@ export function IssueDetailPane({
   );
 
   const [note, setNote] = useState('');
+  const [replaySeek, setReplaySeek] = useState<{ t: number; n: number } | null>(null);
   const [resolveRelease, setResolveRelease] = useState('');
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -83,6 +84,9 @@ export function IssueDetailPane({
       ? null
       : (occ?.events.find((e) => e.screensRef) ?? null);
   const screensRef = screensLatest ?? screensFallback?.screensRef ?? null;
+  const replaySeekable = !!(screensLatest || wireframeLatest);
+  const seekReplay = (t: number) =>
+    setReplaySeek((prev) => ({ t, n: (prev?.n ?? 0) + 1 }));
   const payload = latest?.payload as
     | {
         error?: { type?: string; message?: string; stack?: Frame[] };
@@ -237,7 +241,11 @@ export function IssueDetailPane({
             <Panel title={t('issue.timeline')}>
               {payload?.signals && payload.signals.length > 0 ? (
                 <div className="p-4">
-                  <Timeline signals={payload.signals} kind={issue.kind} />
+                  <Timeline
+                    signals={payload.signals}
+                    kind={issue.kind}
+                    onSeek={replaySeekable ? seekReplay : undefined}
+                  />
                 </div>
               ) : (
                 <PanelEmpty>{t('issue.timelineEmpty')}</PanelEmpty>
@@ -263,10 +271,10 @@ export function IssueDetailPane({
               }
             >
               {screensRef ? (
-                <ReplayPlayer attachmentRef={screensRef} />
+                <ReplayPlayer attachmentRef={screensRef} seek={replaySeek} />
               ) : wireframeLatest ? (
                 <div>
-                  <WireframePlayer attachmentRef={wireframeLatest} />
+                  <WireframePlayer attachmentRef={wireframeLatest} seek={replaySeek} />
                   <p className="border-t border-border px-3.5 py-2 text-xs text-fg-subtle">
                     {t('issue.replayWireframe')}
                   </p>
@@ -381,27 +389,49 @@ export function IssueDetailPane({
 
 /// The signal timeline — a readable rendering of the last 30
 /// seconds, ending on the moment the event fired.
-function Timeline({ signals, kind }: { signals: Signal[]; kind: IssueDetailT['kind'] }) {
+function Timeline({
+  signals,
+  kind,
+  onSeek,
+}: {
+  signals: Signal[];
+  kind: IssueDetailT['kind'];
+  /** When the case has a same-event replay, a moment is a link:
+   *  clicking a row jumps the replay to that instant. */
+  onSeek?: (t: number) => void;
+}) {
   const t = useT();
   const rows = useMemo(() => [...signals].sort((a, b) => a.t - b.t), [signals]);
   return (
     <ol className="ml-1.5 border-l border-border pl-5">
       {rows.map((s, i) => (
-        <li key={i} className="relative mb-2 text-[13px]">
+        <li key={i} className="relative mb-0.5 text-[13px]">
           <span
-            className="absolute -left-[25px] top-[5px] h-2 w-2 rounded-full"
+            className="absolute -left-[25px] top-[9px] h-2 w-2 rounded-full"
             style={{ backgroundColor: signalColor(s.kind) }}
           />
-          <span className="mr-2.5 inline-block w-12 text-right font-mono tabular-nums text-fg-subtle">
-            {s.t.toFixed(1)}s
-          </span>
-          <span
-            className="mr-2.5 font-mono text-[11px] uppercase tracking-wide"
-            style={{ color: signalColor(s.kind) }}
+          <button
+            type="button"
+            disabled={!onSeek}
+            onClick={() => onSeek?.(s.t)}
+            title={onSeek ? t('issue.seekReplay') : undefined}
+            className={`-ml-1.5 flex w-full items-baseline gap-2.5 rounded px-1.5 py-1 text-left ${
+              onSeek ? 'cursor-pointer hover:bg-raised' : 'cursor-default'
+            }`}
           >
-            {s.kind}
-          </span>
-          <span className="font-mono text-fg-muted">{summarizeSignal(s)}</span>
+            <span className="inline-block w-12 shrink-0 text-right font-mono tabular-nums text-fg-subtle">
+              {s.t.toFixed(1)}s
+            </span>
+            <span
+              className="shrink-0 font-mono text-[11px] uppercase tracking-wide"
+              style={{ color: signalColor(s.kind) }}
+            >
+              {s.kind}
+            </span>
+            <span className="min-w-0 truncate font-mono text-fg-muted">
+              {summarizeSignal(s)}
+            </span>
+          </button>
         </li>
       ))}
       <li className="relative text-[13px] font-semibold" style={{ color: kindColor(kind) }}>

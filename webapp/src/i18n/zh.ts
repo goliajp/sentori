@@ -88,6 +88,7 @@ export const zh: Messages = {
     '该事件没有携带录屏 —— 在 SDK 里开启 replayScreens: true 才会捕获出错前一分钟的画面。',
   'issue.resolve': '解决',
   'issue.resolveInRelease': '修复版本',
+  'issue.seekReplay': '回放跳到这一刻',
   'issue.system': '系统',
   'issue.timeline': '用户当时在做什么',
   'issue.timelineEmpty': '该事件没有携带行为信号。',

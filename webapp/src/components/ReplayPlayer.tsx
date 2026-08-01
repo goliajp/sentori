@@ -18,7 +18,16 @@ type ReplayFrame = { t: number; mediaType: string; base64: string };
 
 const PLAYBACK_SPEED = 4;
 
-export function ReplayPlayer({ attachmentRef }: { attachmentRef: string }) {
+export function ReplayPlayer({
+  attachmentRef,
+  seek,
+}: {
+  attachmentRef: string;
+  /** Timeline → replay: jump to the frame nearest this moment
+   *  (seconds relative to the event, negative). `n` re-arms the
+   *  same instant twice in a row. */
+  seek?: { t: number; n: number } | null;
+}) {
   const t = useT();
   const [frames, setFrames] = useState<null | ReplayFrame[]>(null);
   const [failed, setFailed] = useState(false);
@@ -68,6 +77,24 @@ export function ReplayPlayer({ attachmentRef }: { attachmentRef: string }) {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [playing, idx, frames]);
+
+  // Seek applies during render (the adjust-state-from-props pattern)
+  // — an effect would be a cascading second render for no gain.
+  const [appliedSeek, setAppliedSeek] = useState(0);
+  if (seek && frames && frames.length > 0 && seek.n !== appliedSeek) {
+    setAppliedSeek(seek.n);
+    setPlaying(false);
+    let best = 0;
+    let bestGap = Infinity;
+    frames.forEach((f, i) => {
+      const gap = Math.abs(f.t - seek.t);
+      if (gap < bestGap) {
+        bestGap = gap;
+        best = i;
+      }
+    });
+    setIdx(best);
+  }
 
   const current = frames?.[idx];
   const src = useMemo(
