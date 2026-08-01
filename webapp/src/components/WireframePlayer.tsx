@@ -136,13 +136,26 @@ export function WireframePlayer({ attachmentRef }: { attachmentRef: string }) {
 
     const css = getComputedStyle(document.documentElement);
     const surface = css.getPropertyValue('--s-surface').trim() || '#18181b';
-    const stroke = css.getPropertyValue('--s-border-strong').trim() || '#3f3f46';
+    const outline = css.getPropertyValue('--s-border-strong').trim() || '#3f3f46';
     const ink = css.getPropertyValue('--s-fg-muted').trim() || '#a1a1aa';
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = surface;
     ctx.fillRect(ox, oy, width * scale, height * scale);
 
+    // Everything draws inside the device rectangle. SDKs before
+    // 5.1.3 report scroll content at its full unclipped size (a
+    // 2000pt ruler arrives as 2000pt), so the clip is what keeps
+    // historical recordings inside the phone.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(ox, oy, width * scale, height * scale);
+    ctx.clip();
+
+    // Solid fills only — per-node strokes turned a busy screen into
+    // a grid of borders. Layers separate by luminance, the way a
+    // squinted-at screenshot would; an image is a flat neutral
+    // block, not a hollow frame.
     for (const n of nodes) {
       const x = ox + n.x * scale;
       const y = oy + n.y * scale;
@@ -151,10 +164,10 @@ export function WireframePlayer({ attachmentRef }: { attachmentRef: string }) {
       if (n.color) {
         ctx.fillStyle = n.color;
         ctx.fillRect(x, y, w, h);
+      } else if (n.kind === 'image') {
+        ctx.fillStyle = 'rgba(128, 128, 128, 0.45)';
+        ctx.fillRect(x, y, w, h);
       }
-      ctx.strokeStyle = stroke;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
       if (n.text && h > 10) {
         ctx.fillStyle = ink;
         ctx.font = `${Math.max(9, Math.min(13, h * scale * 0.5))}px ui-monospace, monospace`;
@@ -166,6 +179,13 @@ export function WireframePlayer({ attachmentRef }: { attachmentRef: string }) {
         ctx.restore();
       }
     }
+    ctx.restore();
+
+    // One outline for the device itself, so the phone still reads as
+    // an object against the canvas.
+    ctx.strokeStyle = outline;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(ox + 0.5, oy + 0.5, width * scale - 1, height * scale - 1);
   }, [nodes, width, height]);
 
   useEffect(draw, [draw]);
