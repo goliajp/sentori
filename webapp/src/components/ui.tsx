@@ -353,16 +353,34 @@ function cell(row: unknown, key: PropertyKey): ReactNode {
   return String(v);
 }
 
+export type Column<T> = {
+  key: keyof T | string;
+  label: string;
+  render?: (row: T) => ReactNode;
+  width?: string;
+  /** Numeric columns read right-aligned, tabular. */
+  align?: 'left' | 'right';
+};
+
 export function DataTable<T>({
   columns,
   rows,
   empty,
   rowKey,
+  onRowClick,
+  activeKey,
+  footer,
 }: {
-  columns: { key: keyof T | string; label: string; render?: (row: T) => ReactNode; width?: string }[];
+  columns: Column<T>[];
   rows: T[];
   empty?: string;
   rowKey?: (row: T) => string;
+  /** Rows become interactive (hover affordance, pointer). */
+  onRowClick?: (row: T) => void;
+  /** The selected row's key, filled like an open file. */
+  activeKey?: null | string;
+  /** Count line under the table — "37 of 37" furniture. */
+  footer?: ReactNode;
 }) {
   // Resolved here rather than as a default parameter: a default is
   // evaluated where the signature is written, which has no hook and
@@ -376,6 +394,8 @@ export function DataTable<T>({
       </div>
     );
   }
+  const alignCls = (c: Column<T>) =>
+    c.align === 'right' ? 'text-right tabular-nums' : 'text-left';
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -384,7 +404,7 @@ export function DataTable<T>({
             {columns.map((c) => (
               <th
                 key={String(c.key)}
-                className="whitespace-nowrap px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-fg-subtle"
+                className={`whitespace-nowrap px-4 py-2 text-xs font-medium uppercase tracking-wide text-fg-subtle ${alignCls(c)}`}
                 style={c.width ? { width: c.width } : undefined}
               >
                 {c.label}
@@ -392,18 +412,40 @@ export function DataTable<T>({
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-border">
-          {rows.map((r, i) => (
-            <tr key={rowKey ? rowKey(r) : String(i)} className="hover:bg-surface/50">
-              {columns.map((c) => (
-                <td key={String(c.key)} className="px-5 py-3 text-fg-muted">
-                  {c.render ? c.render(r) : cell(r, c.key)}
-                </td>
-              ))}
-            </tr>
-          ))}
+        <tbody className="divide-y divide-border/60">
+          {rows.map((r, i) => {
+            const key = rowKey ? rowKey(r) : String(i);
+            return (
+              <tr
+                key={key}
+                onClick={onRowClick ? () => onRowClick(r) : undefined}
+                className={clsx(
+                  activeKey != null && key === activeKey
+                    ? 'bg-raised'
+                    : onRowClick
+                      ? 'hover:bg-surface/60'
+                      : 'hover:bg-surface/50',
+                  onRowClick && 'cursor-pointer',
+                )}
+              >
+                {columns.map((c) => (
+                  <td
+                    key={String(c.key)}
+                    className={`whitespace-nowrap px-4 py-2 text-fg-muted ${alignCls(c)}`}
+                  >
+                    {c.render ? c.render(r) : cell(r, c.key)}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
+      {footer && (
+        <div className="border-t border-border px-4 py-1.5 text-right font-mono text-[11px] tabular-nums text-fg-subtle">
+          {footer}
+        </div>
+      )}
     </div>
   );
 }
