@@ -97,5 +97,17 @@ export {
   setLogTransport,
 } from '@goliapkg/sentori-core';
 
+// The signal channel, for hosts feeding their own breadcrumbs into
+// the ring (insight round-4 §4). Same O(1) fire-and-forget the
+// auto signals use; entries ride payload.signals when an error/warn
+// fires and appear on the case timeline + user-events panel.
+//
+// Field conventions the dashboard understands:
+//   pushSignal('http', { method, url, status, ms })  — a request's
+//     outcome (host's own interceptor is the right producer; the
+//     SDK deliberately does not monkey-patch fetch/XHR)
+//   any other kind renders with its data as `k=v` pairs.
+export { pushSignal } from '@goliapkg/sentori-core';
+
 // Push namespace — carried as-is; outside the v1 acceptance surface.
 export * as push from './push';
