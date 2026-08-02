@@ -20,7 +20,7 @@ const STORAGE_KEY = '@sentori/pending';
 const MAX_PERSISTED = 1000;
 
 // Pinned to package.json by a test — bump both together.
-const SDK_VERSION = '5.2.0';
+const SDK_VERSION = '5.3.0';
 
 let _queue: WireEvent[] = [];
 let _assertStats = new Map<string, AssertStat>();

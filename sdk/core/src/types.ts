@@ -19,6 +19,17 @@ export type Frame = {
   column?: number
   inApp?: boolean
   absolutePath?: string
+  /** True once real source positions are resolved — set by the
+   *  server at ingest (release builds) or by the SDK's Metro
+   *  symbolication (dev builds). The dashboard's MINIFIED badge
+   *  keys off it. */
+  symbolicated?: boolean
+  /** Source window around the failing line, when the symbolication
+   *  source had one (Metro's codeFrame in dev; the sourcemap's
+   *  sourcesContent at ingest). */
+  preContext?: string[]
+  contextLine?: string
+  postContext?: string[]
 }
 
 /** A thrown error, normalized (coerce-error.ts produces these). */
