@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use axum::{
     Extension, Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
 };
 use serde::Deserialize;
@@ -289,6 +289,68 @@ pub async fn environments(
     .unwrap_or_default();
     let envs: Vec<String> = rows.into_iter().map(|(e,)| e).collect();
     (StatusCode::OK, Json(json!({ "environments": envs })))
+}
+
+/// GET /admin/api/projects/{id}/context-keys — the context keys this
+/// project's events have actually reported. Sentori does not know
+/// what `qa` or `tenant` MEAN — it only offers them as slicing
+/// dimensions; the reader supplies the semantics (insight
+/// context-dimensions feedback: generic capability for private
+/// vocabulary, first-class fields only for universal concepts).
+pub async fn context_keys(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    Path(project_id): Path<Uuid>,
+) -> (StatusCode, Json<Value>) {
+    if let Err(e) = super::tokens::ensure_project_access(&state, &ctx, project_id).await {
+        return e;
+    }
+    let rows: Vec<(String,)> = sqlx::query_as(
+        "SELECT key FROM events, \
+                LATERAL jsonb_object_keys(payload->'context') AS key \
+         WHERE project_id = $1 \
+           AND jsonb_typeof(payload->'context') = 'object' \
+         GROUP BY key ORDER BY max(received_at) DESC LIMIT 50",
+    )
+    .bind(project_id)
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default();
+    let keys: Vec<String> = rows.into_iter().map(|(k,)| k).collect();
+    (StatusCode::OK, Json(json!({ "keys": keys })))
+}
+
+#[derive(Deserialize)]
+pub struct ContextValuesQuery {
+    pub key: String,
+}
+
+/// GET /admin/api/projects/{id}/context-values?key=X — the values
+/// that key has taken, newest-traffic first. Booleans and numbers
+/// arrive as their text form ('true', '42') — the same form the
+/// issues filter compares with.
+pub async fn context_values(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    Path(project_id): Path<Uuid>,
+    Query(q): Query<ContextValuesQuery>,
+) -> (StatusCode, Json<Value>) {
+    if let Err(e) = super::tokens::ensure_project_access(&state, &ctx, project_id).await {
+        return e;
+    }
+    let rows: Vec<(String,)> = sqlx::query_as(
+        "SELECT payload->'context'->>$2 AS val FROM events \
+         WHERE project_id = $1 AND payload->'context' ? $2 \
+           AND payload->'context'->>$2 IS NOT NULL \
+         GROUP BY val ORDER BY max(received_at) DESC LIMIT 50",
+    )
+    .bind(project_id)
+    .bind(&q.key)
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default();
+    let values: Vec<String> = rows.into_iter().map(|(v,)| v).collect();
+    (StatusCode::OK, Json(json!({ "values": values })))
 }
 
 /// GET /admin/api/projects/{id}/health — what the SDK's own traffic

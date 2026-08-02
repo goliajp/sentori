@@ -39,6 +39,14 @@ pub struct ListQuery {
     /// environments; the queue slices them).
     #[serde(default)]
     pub environment: Option<String>,
+    /// Context-dimension filter (key + value together): only issues
+    /// with at least one event whose payload.context[key] equals the
+    /// value (text form). Sentori attaches no meaning to the key —
+    /// the reader does.
+    #[serde(default)]
+    pub context_key: Option<String>,
+    #[serde(default)]
+    pub context_value: Option<String>,
 }
 
 fn issue_row_json(r: &sqlx::postgres::PgRow) -> Value {
@@ -109,6 +117,10 @@ pub async fn list(
            AND ($6::text IS NULL OR EXISTS ( \
                  SELECT 1 FROM events e \
                  WHERE e.issue_id = issues.id AND e.environment = $6)) \
+           AND ($7::text IS NULL OR $8::text IS NULL OR EXISTS ( \
+                 SELECT 1 FROM events e \
+                 WHERE e.issue_id = issues.id \
+                   AND e.payload->'context'->>$7 = $8)) \
          ORDER BY (regressed_at IS NOT NULL AND status = 'open') DESC, \
                   users_count DESC, max_per_user DESC, last_seen DESC \
          LIMIT $5",
@@ -119,6 +131,8 @@ pub async fn list(
     .bind(scope.as_deref())
     .bind(limit)
     .bind(q.environment.as_deref())
+    .bind(q.context_key.as_deref())
+    .bind(q.context_value.as_deref())
     .fetch_all(&state.pool)
     .await;
     match rows {

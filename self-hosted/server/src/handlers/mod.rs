@@ -238,6 +238,14 @@ pub fn router(state: Arc<AppState>) -> Router {
             get(admin::projects::environments),
         )
         .route(
+            "/admin/api/projects/{project_id}/context-keys",
+            get(admin::projects::context_keys),
+        )
+        .route(
+            "/admin/api/projects/{project_id}/context-values",
+            get(admin::projects::context_values),
+        )
+        .route(
             "/admin/api/projects/{project_id}/instruments",
             get(instruments::get),
         )
