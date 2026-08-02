@@ -177,6 +177,15 @@ export function IssueDetailPane({
   const signals = ((payload?.signals ?? []) as Signal[])
     .slice()
     .sort((a, b) => a.t - b.t);
+  // Tap moments with coordinates (SDK ≥ 5.3) — drawn on the replay.
+  const taps = signals
+    .filter(
+      (s) =>
+        s.kind === 'tap' &&
+        typeof s.data?.x === 'number' &&
+        typeof s.data?.y === 'number',
+    )
+    .map((s) => ({ t: s.t, x: s.data!.x as number, y: s.data!.y as number }));
 
   // A bare "Error" is a type, not a headline (A13).
   const demoteTitle =
@@ -333,6 +342,7 @@ export function IssueDetailPane({
                   seek={replaySeek}
                   onFrames={reportFrames}
                   onTime={reportTime}
+                  taps={taps}
                 />
               ) : (
                 <PanelEmpty>{t('issue.replayNone')}</PanelEmpty>

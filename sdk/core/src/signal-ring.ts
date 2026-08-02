@@ -15,7 +15,10 @@ type RingEntry = {
 }
 
 const DEFAULT_CAPACITY = 100
-const DEFAULT_WINDOW_MS = 30_000
+// Matches the replay window: with signals at 30s and replay at 60s
+// the left half of the case timeline had frames but never events
+// (insight round-4 A3).
+const DEFAULT_WINDOW_MS = 60_000
 
 let entries: RingEntry[] = []
 let capacity = DEFAULT_CAPACITY

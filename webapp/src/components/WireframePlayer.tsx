@@ -91,6 +91,7 @@ export function WireframePlayer({
   seek,
   onFrames,
   onTime,
+  taps,
 }: {
   attachmentRef: string;
   /** Timeline → replay: jump to the frame nearest this moment
@@ -102,6 +103,10 @@ export function WireframePlayer({
   /** Replay → page: the playhead moment (relative s), on every
    *  frame step — the signal list highlights along. */
   onTime?: (t: number) => void;
+  /** Tap moments with logical-pt coordinates (SDK ≥ 5.3): drawn as
+   *  rings on the wireframe near their moment, so "the user tapped
+   *  HERE" is visible instead of an internal node number. */
+  taps?: { t: number; x: number; y: number }[];
 }) {
   const t = useT();
   const [frames, setFrames] = useState<Frame[] | null>(null);
@@ -290,7 +295,37 @@ export function WireframePlayer({
     ctx.strokeStyle = outline;
     ctx.lineWidth = 1;
     ctx.strokeRect(ox + 0.5, oy + 0.5, width * scale - 1, height * scale - 1);
-  }, [nodes, width, height]);
+
+    // Tap markers (SDK ≥ 5.3 sends pageX/pageY in the same logical-pt
+    // space as the wireframe): a ring at the touch point, visible for
+    // ~1.2s of recording time around the tap and fading out.
+    if (taps?.length && frames?.length) {
+      const tapInk = css.getPropertyValue('--s-kind-warn').trim() || '#ffb340';
+      const playheadTs = frames[Math.min(index, frames.length - 1)]!.ts;
+      const eventTs = frames[frames.length - 1]!.ts;
+      for (const tap of taps) {
+        const tapTs = eventTs + tap.t * 1000;
+        const age = playheadTs - tapTs;
+        if (age < -400 || age > 1200) continue;
+        const fade = age <= 0 ? 1 : 1 - age / 1200;
+        const x = ox + tap.x * scale;
+        const y = oy + tap.y * scale;
+        ctx.save();
+        ctx.globalAlpha = 0.35 * fade;
+        ctx.beginPath();
+        ctx.arc(x, y, 9, 0, Math.PI * 2);
+        ctx.fillStyle = tapInk;
+        ctx.fill();
+        ctx.globalAlpha = 0.9 * fade;
+        ctx.beginPath();
+        ctx.arc(x, y, 9 + (1 - fade) * 6, 0, Math.PI * 2);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = tapInk;
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }, [nodes, width, height, taps, frames, index]);
 
   useEffect(draw, [draw]);
 
