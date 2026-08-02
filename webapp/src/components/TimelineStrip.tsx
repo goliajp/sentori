@@ -1,14 +1,16 @@
 // The case timeline — the narrative spine of an issue, pinned to
 // the bottom of the case file like a video editor's track area.
 //
-// One horizontal minute, ending on the event: replay frames as
-// ticks, user behaviour (nav / tap / http / freeze / trace signals)
-// as dots, and the OTHER events this user's app reported in the
-// same window — traces walked, probes tripped, asserts failed — as
-// flags. That last lane is what turns "a crash happened" into "the
-// crash happened right after THIS". Everything is a link: clicking
-// any moment (or the bare track) seeks the replay. Hovering reads
-// the item out in the strip header.
+// The axis is fitted to the data, not to a fixed minute: a 3-second
+// automation run gets a 5-second axis, a long session stretches to
+// whatever the signals cover. The event moment keeps fixed breathing
+// room on the right, ticks land on round numbers only, and the span
+// before the earliest captured moment is dimmed — "nothing captured
+// here" must read differently from "nothing happened here".
+//
+// Three lanes: replay frames as ticks, user behaviour as dots, the
+// OTHER events this user's app reported in the window as flags.
+// Everything seeks the replay on click.
 
 import { useMemo, useRef, useState } from 'react';
 
@@ -25,8 +27,6 @@ export type StripContextEvent = {
   /** Seconds relative to the event, negative. */
   t: number;
 };
-
-const WINDOW_S = 60;
 
 /** Timeline hues borrow the five kind hues so the palette keeps one
  *  concept model: nav reads calm, freeze reads like the error it
@@ -57,8 +57,25 @@ export function summarizeSignal(s: StripSignal): string {
   return parts.join(' ');
 }
 
-const pct = (t: number): number =>
-  Math.min(100, Math.max(0, ((t + WINDOW_S) / WINDOW_S) * 100));
+/** The event moment sits at 95%, not the edge — the most important
+ *  point on the axis gets breathing room. */
+const RIGHT_PAD_PCT = 5;
+
+/** Round axis spans (s). Beyond the table, multiples of 60. */
+const NICE_SPANS = [5, 10, 15, 30, 60, 120, 300];
+
+function niceSpan(coverS: number): number {
+  for (const s of NICE_SPANS) if (coverS <= s) return s;
+  return Math.ceil(coverS / 60) * 60;
+}
+
+/** A tick step that yields 4–8 round labels. */
+function tickStep(span: number): number {
+  for (const step of [1, 2, 5, 10, 15, 30, 60, 120]) {
+    if (span / step <= 8) return step;
+  }
+  return Math.ceil(span / 6 / 60) * 60;
+}
 
 export function TimelineStrip({
   signals,
@@ -78,20 +95,42 @@ export function TimelineStrip({
   const trackRef = useRef<HTMLDivElement>(null);
   const [readout, setReadout] = useState<string | null>(null);
 
+  // Fit the axis to the data: earliest captured moment across all
+  // three sources decides the span (min 5s, round numbers only).
+  const { spanS, coverStart, ticks } = useMemo(() => {
+    const all = [
+      ...signals.map((s) => s.t),
+      ...frameTimes,
+      ...context.map((c) => c.t),
+    ].filter((v) => v <= 0);
+    const earliest = all.length ? Math.min(...all) : -60;
+    const span = niceSpan(Math.max(5, -earliest));
+    const step = tickStep(span);
+    const marks: number[] = [];
+    for (let s = -span; s < 0; s += step) marks.push(s);
+    marks.push(0);
+    return { spanS: span, coverStart: all.length ? earliest : null, ticks: marks };
+  }, [signals, frameTimes, context]);
+
+  const pct = (tv: number): number =>
+    Math.min(100, Math.max(0, ((tv + spanS) / spanS) * (100 - RIGHT_PAD_PCT)));
+
   const inWindow = useMemo(
     () => ({
-      signals: signals.filter((s) => s.t >= -WINDOW_S && s.t <= 0),
-      frames: frameTimes.filter((f) => f >= -WINDOW_S && f <= 0),
-      context: context.filter((c) => c.t >= -WINDOW_S && c.t <= 0),
+      signals: signals.filter((s) => s.t >= -spanS && s.t <= 0),
+      frames: frameTimes.filter((f) => f >= -spanS && f <= 0),
+      context: context.filter((c) => c.t >= -spanS && c.t <= 0),
     }),
-    [signals, frameTimes, context],
+    [signals, frameTimes, context, spanS],
   );
 
   const seekFromTrack = (e: React.MouseEvent) => {
     if (!onSeek || !trackRef.current) return;
     const box = trackRef.current.getBoundingClientRect();
     const frac = Math.min(1, Math.max(0, (e.clientX - box.left) / box.width));
-    onSeek(frac * WINDOW_S - WINDOW_S);
+    // invert pct(): the horizontal fraction back to event-relative s
+    const tv = (frac * 100 / (100 - RIGHT_PAD_PCT)) * spanS - spanS;
+    onSeek(Math.min(0, tv));
   };
 
   return (
@@ -100,6 +139,7 @@ export function TimelineStrip({
         <h3 className="shrink-0 text-[13px] font-semibold text-fg-muted">
           {t('issue.timeline')}
         </h3>
+        <span className="font-mono text-[11px] text-fg-subtle">{spanS}s</span>
         <span className="min-w-0 flex-1 truncate text-right font-mono text-[11px] text-fg-muted">
           {readout ?? ''}
         </span>
@@ -119,8 +159,18 @@ export function TimelineStrip({
           onClick={seekFromTrack}
           className={`relative ml-14 mr-1.5 h-full ${onSeek ? 'cursor-pointer' : ''}`}
         >
-          {/* gridlines every 10s + second labels */}
-          {Array.from({ length: 7 }, (_, i) => -WINDOW_S + i * 10).map((sec) => (
+          {/* the span before the earliest captured moment: nothing was
+              captured there — dim it so it can't read as "quiet" */}
+          {coverStart !== null && coverStart > -spanS && (
+            <div
+              aria-hidden
+              className="absolute inset-y-0 left-0 bg-raised/40"
+              style={{ width: `${pct(coverStart)}%` }}
+            />
+          )}
+
+          {/* gridlines on round seconds + the event line */}
+          {ticks.map((sec) => (
             <div
               key={sec}
               className="absolute inset-y-0"

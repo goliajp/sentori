@@ -76,44 +76,33 @@ export const ja: Messages = {
   'instruments.tracesEmpty':
     '観測点はまだありません — sentori.trace(name) がコードパスの通過を記録します。',
 
-  'issue.activity': 'アクティビティ',
   'issue.code': '発生箇所',
-  'issue.addNote': 'ノートを追加',
-  'issue.assignee': '担当者',
-  'issue.copied': 'コピーしました',
-  'issue.copyForAi': 'AI 用にコピー',
   'issue.eventMoment': '{kind} 発生',
-  'issue.environment': '環境',
   'issue.firstSeen': '初回',
+  'issue.impactAnon': '計 {events} 件',
+  'issue.impactUsers': '{users} 人のユーザー · 計 {events} 件(最大 {max} 件/人)',
+  'issue.signals': 'ユーザーイベント',
+  'issue.signalsNone': 'このイベントには行動シグナルが付いていません。',
+  'issue.replayWireframeTip':
+    'このビルドは replayScreens が無効 — ワイヤーフレームは常時オンの構造キャプチャによるものです。',
   'issue.guardAnchored':
     '{release} で解決済み。そのリリース以降での再発のみが再オープンさせます。',
   'issue.guardProbeHint':
     '修正したブランチに sentori.probe(ref) を置いてください — 静かなプローブが修正維持の証明です。',
   'issue.guardTitle': 'ガード状態',
-  'issue.handoff': '修正へ',
-  'issue.handoffHint':
-    'ワンコピーで AI へ:失敗したコード、ユーザーの行動、環境をまとめて渡せます。',
   'issue.guardUnanchored':
     'リリースアンカーなしで解決 — 以後の再発はすべて再オープンさせます。',
   'issue.ignore': '無視',
   'issue.lastSeen': '直近',
-  'issue.latestCase': '直近の1件',
   'issue.loadFailed': 'この issue を読み込めませんでした。',
-  'issue.noActivity': 'アクティビティはまだありません',
-  'issue.note': 'ノート',
   'issue.occurrences': '発生一覧',
   'issue.reopen': '再オープン',
   'issue.replayFrom': '{when}の発生時のリプレイです — 直近のイベントには付いていません。',
-  'issue.replayWireframe':
-    'ワイヤーフレームリプレイ — このビルドは replayScreens が無効のため、実画面は記録されていません。',
   'issue.replayNone':
     'このイベントにはリプレイが付いていません — SDK で replayScreens: true を有効にすると、直前の1分間の画面を記録できます。',
   'issue.resolve': '解決',
   'issue.resolveInRelease': '修正リリース',
-  'issue.system': 'システム',
-  'issue.timeline': 'ユーザーが何をしていたか',
-  'issue.unassigned': '未割り当て',
-
+  'issue.timeline': 'タイムライン',
   'nav.inbox': '受信箱',
   'nav.instruments': '計測',
   'nav.projects': 'プロジェクト',
@@ -145,7 +134,7 @@ export const ja: Messages = {
   'replay.pause': '一時停止',
   'replay.play': '再生',
   'replay.scrubber': 'リプレイ位置',
-  'replay.title': 'ユーザーが見ていた画面',
+  'replay.title': 'セッションリプレイ',
   'releases.noArtifacts':
     'このリリースのシンボリケーション用アーティファクトがありません — アップロードまでスタックは難読化されたままです:',
 

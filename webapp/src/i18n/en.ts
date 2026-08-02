@@ -81,44 +81,33 @@ export const en = {
   'instruments.tracesEmpty':
     'No observation points yet — sentori.trace(name) marks a code path as seen.',
 
-  'issue.activity': 'Activity',
   'issue.code': 'Where it broke',
-  'issue.addNote': 'Add note',
-  'issue.assignee': 'Assignee',
-  'issue.copied': 'Copied',
-  'issue.copyForAi': 'Copy for AI',
   'issue.eventMoment': '{kind} fired',
-  'issue.environment': 'Environment',
   'issue.firstSeen': 'first',
+  'issue.impactAnon': '{events} events',
+  'issue.impactUsers': '{users} users · {events} events (up to {max} per user)',
+  'issue.signals': 'User events',
+  'issue.signalsNone': 'No behaviour signals came with this event.',
+  'issue.replayWireframeTip':
+    'This build has replayScreens off — the wireframe comes from the always-on structural capture.',
   'issue.guardAnchored':
     'Resolved in {release}. Only a recurrence in that release or newer reopens this.',
   'issue.guardProbeHint':
     'Plant sentori.probe(ref) in the fixed branch — a silent probe is proof the fix holds.',
   'issue.guardTitle': 'Guard status',
-  'issue.handoff': 'Fix it',
-  'issue.handoffHint':
-    'One paste for your AI: the failing code, the journey, the environment.',
   'issue.guardUnanchored':
     'Resolved without a release anchor — any later recurrence reopens this.',
   'issue.ignore': 'Ignore',
   'issue.lastSeen': 'last',
-  'issue.latestCase': 'latest',
   'issue.loadFailed': 'Could not load this issue.',
-  'issue.noActivity': 'No activity yet',
-  'issue.note': 'Note',
   'issue.occurrences': 'Occurrences',
   'issue.reopen': 'Reopen',
   'issue.replayFrom': 'From the occurrence {when} — the newest event carried no replay.',
-  'issue.replayWireframe':
-    'Wireframe replay — this build has replayScreens off, so no pixels were captured.',
   'issue.replayNone':
     'No visual replay came with this event — set replayScreens: true in the SDK to capture the minute before.',
   'issue.resolve': 'Resolve',
   'issue.resolveInRelease': 'Fixed in release',
-  'issue.system': 'system',
-  'issue.timeline': 'What the user was doing',
-  'issue.unassigned': 'Unassigned',
-
+  'issue.timeline': 'Timeline',
   'nav.inbox': 'Inbox',
   'nav.instruments': 'Instruments',
   'nav.projects': 'Projects',
@@ -151,7 +140,7 @@ export const en = {
   'replay.pause': 'Pause',
   'replay.play': 'Play',
   'replay.scrubber': 'Replay position',
-  'replay.title': 'What the screen showed',
+  'replay.title': 'Session replay',
   'releases.noArtifacts':
     'No symbolication artifacts for this release — stacks stay minified until uploaded:',
 

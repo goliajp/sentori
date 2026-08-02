@@ -22,22 +22,37 @@ function hashHue(key: string): number {
   return ((h % 360) + 360) % 360;
 }
 
-export function UserChip({ userKey }: { userKey: string }) {
+export function UserChip({
+  userKey,
+  label,
+  muted = false,
+}: {
+  userKey: string;
+  /** Human-meaningful text instead of the hash tag — the occurrence
+   *  list numbers users per issue ("U1", "U2"), because a hash
+   *  fragment carries no meaning for a reader (insight A6). */
+  label?: string;
+  /** Dimmed when the field doesn't vary across the list. */
+  muted?: boolean;
+}) {
   const t = useT();
   const [copied, setCopied] = useState(false);
-  const tag = userKey.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4) || '····';
+  const tag = label ?? `#${userKey.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4) || '····'}`;
   const hue = hashHue(userKey);
   return (
     <button
       type="button"
       title={copied ? t('identity.copied') : t('identity.copyHint')}
-      onClick={() => {
+      onClick={(e) => {
+        e.stopPropagation();
         void navigator.clipboard.writeText(userKey).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         });
       }}
-      className="inline-flex items-center gap-1.5 rounded border border-transparent px-1 py-0 font-mono text-inherit hover:border-border hover:bg-raised"
+      className={`inline-flex items-center gap-1.5 rounded border border-transparent px-1 py-0 font-mono hover:border-border hover:bg-raised ${
+        muted ? 'text-fg-subtle/60' : 'text-inherit'
+      }`}
     >
       <span
         aria-hidden
@@ -47,7 +62,7 @@ export function UserChip({ userKey }: { userKey: string }) {
       {copied ? (
         <Check aria-hidden className="h-3 w-3 text-ok" />
       ) : (
-        <span>#{tag}</span>
+        <span>{tag}</span>
       )}
     </button>
   );
