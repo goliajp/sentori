@@ -224,7 +224,10 @@ export function IssueDetailPane({
         )}
         <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-xs tabular-nums text-fg-muted">
           <span className="text-fg">
-            {issue.usersCount}u × {issue.maxPerUser} · {issue.eventCount}ev
+            {issue.usersCount > 0
+              ? `${issue.usersCount}u × ${issue.maxPerUser} · `
+              : ''}
+            {issue.eventCount}ev
           </span>
           <span>
             {t('issue.firstSeen')} {formatRelative(issue.firstSeen)}

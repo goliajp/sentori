@@ -412,9 +412,12 @@ function QueueRow({
             regressed
           </span>
         )}
-        {where && (
+        {/* the second line's context slot: the surface when we have
+            one, else the message sample — a bare "Error" title row
+            should still say what the error said */}
+        {(where || issue.messageSample) && (
           <span className="min-w-0 truncate font-mono text-[11px] text-fg-subtle">
-            {where}
+            {where || issue.messageSample}
           </span>
         )}
         <span className="ml-auto shrink-0">
