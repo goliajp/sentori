@@ -335,6 +335,7 @@ export function IssueDetailPane({
                   seek={replaySeek}
                   onFrames={screensLatest ? reportFrames : undefined}
                   onTime={screensLatest ? reportTime : undefined}
+                  taps={screensLatest ? taps : undefined}
                 />
               ) : wireframeLatest ? (
                 <WireframePlayer
