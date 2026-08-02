@@ -151,7 +151,7 @@ function TokensTab() {
               label: t('settings.fieldScope'),
               width: '110px',
               render: (r) => (
-                <span className="rounded bg-raised px-1.5 font-mono text-[11px] text-fg-muted">
+                <span className="rounded bg-raised px-1.5 font-mono text-xs text-fg-muted">
                   {r.scope}
                 </span>
               ),
@@ -173,7 +173,7 @@ function TokensTab() {
               width: '120px',
               align: 'right',
               render: (r) => (
-                <span className="font-mono text-xs text-fg-subtle">
+                <span className="text-xs tabular-nums text-fg-subtle">
                   {formatRelative(r.createdAt)}
                 </span>
               ),
@@ -267,10 +267,10 @@ function UsersTab() {
             <div key={u.id} className="px-4 py-2 text-sm">
               <div className="flex items-center gap-3">
                 <span className="flex-1 text-fg">{u.email}</span>
-                <span className="w-24 font-mono text-[11px] text-fg-subtle">
+                <span className="w-24 text-xs text-fg-subtle">
                   {u.role}
                 </span>
-                <span className="w-24 text-right font-mono text-[11px] text-fg-subtle">
+                <span className="w-24 text-right text-xs tabular-nums text-fg-subtle">
                   {u.lastLoginAt ? formatRelative(u.lastLoginAt) : '—'}
                 </span>
                 <span className="w-14 text-right">
@@ -308,7 +308,7 @@ function UsersTab() {
                           void op.then(reload);
                         }}
                         className={clsx(
-                          'rounded-full border px-2 py-0.5 text-[11px] transition-colors',
+                          'rounded-full border px-2 py-0.5 text-xs transition-colors',
                           has
                             ? 'border-transparent bg-raised text-fg'
                             : 'border-border text-fg-subtle hover:text-fg-muted',
@@ -345,7 +345,7 @@ function AuditTab() {
               label: t('settings.colWhen'),
               width: '110px',
               render: (r) => (
-                <span className="font-mono text-xs text-fg-subtle">
+                <span className="text-xs tabular-nums text-fg-subtle">
                   {formatRelative(r.createdAt)}
                 </span>
               ),

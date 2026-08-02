@@ -60,7 +60,7 @@ export default function ProjectsPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t('settings.projectName')}
-              className="h-7 w-56 text-[13px]"
+              className="h-7 w-56 text-sm"
             />
             <Button
               size="sm"
@@ -139,7 +139,7 @@ function ProjectCard({
         <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-fg">
           {row.name}
         </span>
-        <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-[11px] text-fg-muted">
+        <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
           {row.platform}
         </span>
         {owner && (
@@ -156,7 +156,7 @@ function ProjectCard({
         )}
       </div>
 
-      <div className="mt-3 flex items-baseline gap-5 font-mono text-[13px] tabular-nums">
+      <div className="mt-3 flex items-baseline gap-5 text-sm tabular-nums">
         <span>
           <Num n={h?.counts24h.error} tone="error" />{' '}
           <span className="text-fg-subtle">err</span>
@@ -177,7 +177,7 @@ function ProjectCard({
 
       {h?.backend && (
         <div
-          className="mt-2.5 flex items-center gap-2 font-mono text-[13px] tabular-nums"
+          className="mt-2.5 flex items-center gap-2 text-sm tabular-nums"
           title={h.backend.url}
         >
           <span
@@ -207,10 +207,10 @@ function ProjectCard({
       {/* the growing spacer pins the footer to the card's bottom,
           with a guaranteed minimum gap when content fills the card */}
       <div className="min-h-2.5 flex-1" />
-      <div className="flex items-center gap-2 border-t border-border/60 pt-2.5 font-mono text-[11px] text-fg-subtle">
+      <div className="flex items-center gap-2 border-t border-border/60 pt-2.5 text-xs text-fg-subtle">
         {h?.latestRelease ? (
           <>
-            <span className="min-w-0 flex-1 truncate" title={h.latestRelease}>
+            <span className="min-w-0 flex-1 truncate font-mono" title={h.latestRelease}>
               {formatRelease(h.latestRelease)}
             </span>
             <ArtifactLights kinds={h.latestReleaseArtifacts} />
@@ -251,7 +251,7 @@ function Num({ n, tone }: { n: number | undefined; tone?: 'error' | 'warn' }) {
     return <span className="text-fg-subtle">{n ?? '—'}</span>;
   return (
     <span
-      className="font-mono text-xs font-medium"
+      className="text-xs font-medium tabular-nums"
       style={tone ? { color: `var(--s-kind-${tone})` } : undefined}
     >
       {n}
@@ -266,7 +266,7 @@ function ArtifactLights({ kinds }: { kinds: string[] }) {
     ['android', 'proguard'],
   ];
   return (
-    <span className="flex shrink-0 gap-1.5 text-[10px]">
+    <span className="flex shrink-0 gap-1.5 text-xs">
       {lights.map(([label, kind]) => (
         <span
           key={label}

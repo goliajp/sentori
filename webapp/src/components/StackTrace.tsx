@@ -125,7 +125,7 @@ function AppFrame({
         disabled={!hasContext}
         onClick={() => setOpen((o) => !o)}
         aria-expanded={hasContext ? open : undefined}
-        className={`flex w-full items-baseline gap-2 px-3.5 py-2 text-left font-mono text-[13px] ${
+        className={`flex w-full items-baseline gap-2 px-3.5 py-2 text-left font-mono text-sm ${
           hasContext ? 'cursor-pointer hover:bg-raised' : 'cursor-default'
         }`}
       >
@@ -154,7 +154,7 @@ function AppFrame({
           {frame.column !== undefined ? `:${frame.column}` : ''}
         </span>
         {looksMinified(frame) && (
-          <span className="shrink-0 rounded border border-border-strong px-1 text-[10px] uppercase tracking-wide text-fg-subtle">
+          <span className="shrink-0 rounded border border-border-strong px-1 text-xs uppercase tracking-wide text-fg-subtle">
             {t('stack.minified')}
           </span>
         )}
@@ -179,7 +179,7 @@ function SourceWindow({ frame }: { frame: StackFrame }) {
 
   return (
     <div className="overflow-x-auto border-t border-border bg-bg">
-      <table className="w-full border-collapse font-mono text-[13px] leading-6">
+      <table className="w-full border-collapse font-mono text-sm leading-6">
         <tbody>
           {rows.map((r) => (
             <tr

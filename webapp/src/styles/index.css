@@ -102,11 +102,13 @@
   --color-kind-assert: var(--s-kind-assert);
   --color-kind-probe: var(--s-kind-probe);
 
-  /* Jira's posture: the platform's own faces, no font downloads. */
+  /* Atlassian's own stack (platform faces, no downloads), with the
+   * CJK faces appended so 中文/日本語 pick a matching grotesque.
+   * Mono is reserved for code and identifiers — prose never sets it. */
   --font-sans:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
-    'Hiragino Sans', 'Noto Sans CJK JP', 'PingFang SC', 'Microsoft YaHei',
-    sans-serif;
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+    'Fira Sans', 'Droid Sans', 'Helvetica Neue', 'Hiragino Sans',
+    'Noto Sans CJK JP', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-mono:
     ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
     'Liberation Mono', monospace;

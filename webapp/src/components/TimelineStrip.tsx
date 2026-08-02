@@ -136,18 +136,18 @@ export function TimelineStrip({
   return (
     <section className="flex h-36 shrink-0 flex-col border-t border-border bg-bg">
       <header className="flex h-7 shrink-0 items-center gap-3 border-b border-border px-4">
-        <h3 className="shrink-0 text-[13px] font-semibold text-fg-muted">
+        <h3 className="shrink-0 text-sm font-semibold text-fg-muted">
           {t('issue.timeline')}
         </h3>
-        <span className="font-mono text-[11px] text-fg-subtle">{spanS}s</span>
-        <span className="min-w-0 flex-1 truncate text-right font-mono text-[11px] text-fg-muted">
+        <span className="font-mono text-xs text-fg-subtle">{spanS}s</span>
+        <span className="min-w-0 flex-1 truncate text-right font-mono text-xs text-fg-muted">
           {readout ?? ''}
         </span>
       </header>
 
       <div className="relative min-h-0 flex-1 px-4 py-2">
         {/* lane labels */}
-        <div className="pointer-events-none absolute inset-y-2 left-4 z-10 flex w-12 flex-col justify-between py-0.5 font-mono text-[10px] text-fg-subtle">
+        <div className="pointer-events-none absolute inset-y-2 left-4 z-10 flex w-12 flex-col justify-between py-0.5 font-mono text-xs text-fg-subtle">
           <span>{t('strip.frames')}</span>
           <span>{t('strip.signals')}</span>
           <span>{t('strip.events')}</span>
@@ -187,7 +187,7 @@ export function TimelineStrip({
               {/* the 0s label hangs left of its line so the track's
                   right edge never clips it */}
               <span
-                className={`absolute bottom-0 whitespace-nowrap font-mono text-[10px] ${
+                className={`absolute bottom-0 whitespace-nowrap font-mono text-xs ${
                   sec === 0
                     ? '-translate-x-full pr-1.5 font-semibold'
                     : '-translate-x-1/2 text-fg-subtle'

@@ -63,7 +63,7 @@ function Dot({ ok }: { ok: boolean }) {
 function ReleaseCell({ release }: { release: string | null }) {
   if (!release) return <span>—</span>;
   return (
-    <span className="font-mono text-[11px] text-fg-subtle" title={release}>
+    <span className="font-mono text-xs text-fg-subtle" title={release}>
       {formatRelease(release)}
     </span>
   );
@@ -108,7 +108,7 @@ export default function InstrumentsPage() {
                   key: 'name',
                   label: t('instruments.colName'),
                   render: (a) => (
-                    <span className="inline-flex items-center gap-2.5 font-mono text-[13px] text-fg">
+                    <span className="inline-flex items-center gap-2.5 font-mono text-sm text-fg">
                       <Dot ok={a.failCount === 0} />
                       {a.name}
                     </span>
@@ -126,7 +126,7 @@ export default function InstrumentsPage() {
                   width: '220px',
                   align: 'right',
                   render: (a) => (
-                    <span className="font-mono text-[13px] tabular-nums text-fg-muted">
+                    <span className="text-sm tabular-nums text-fg-muted">
                       {t('instruments.assertRan', {
                         total: String(a.passCount + a.failCount),
                         failed: String(a.failCount),
@@ -141,7 +141,7 @@ export default function InstrumentsPage() {
                   align: 'right',
                   render: (a) => (
                     <span
-                      className={`font-mono text-xs ${
+                      className={`text-xs tabular-nums ${
                         a.lastFailAt ? 'text-kind-error' : 'text-fg-subtle'
                       }`}
                     >
@@ -163,7 +163,7 @@ export default function InstrumentsPage() {
                   key: 'ref',
                   label: t('instruments.colName'),
                   render: (p) => (
-                    <span className="inline-flex items-center gap-2.5 font-mono text-[13px] text-fg">
+                    <span className="inline-flex items-center gap-2.5 font-mono text-sm text-fg">
                       <Dot ok={p.fireCount === 0} />
                       {p.ref}
                     </span>
@@ -181,7 +181,7 @@ export default function InstrumentsPage() {
                   width: '300px',
                   align: 'right',
                   render: (p) => (
-                    <span className="font-mono text-[13px] tabular-nums text-fg-muted">
+                    <span className="text-sm tabular-nums text-fg-muted">
                       {p.fireCount === 0
                         ? t('instruments.probeSilent', {
                             since: formatRelative(p.registeredAt),
@@ -224,7 +224,7 @@ export default function InstrumentsPage() {
                   key: 'name',
                   label: t('instruments.colName'),
                   render: (tr) => (
-                    <span className="font-mono text-[13px] text-fg">{tr.name}</span>
+                    <span className="font-mono text-sm text-fg">{tr.name}</span>
                   ),
                 },
                 {
@@ -233,7 +233,7 @@ export default function InstrumentsPage() {
                   width: '180px',
                   align: 'right',
                   render: (tr) => (
-                    <span className="font-mono text-[13px] tabular-nums text-fg-muted">
+                    <span className="text-sm tabular-nums text-fg-muted">
                       {tr.eventCount}ev · {tr.usersCount}u
                     </span>
                   ),
@@ -244,7 +244,7 @@ export default function InstrumentsPage() {
                   width: '110px',
                   align: 'right',
                   render: (tr) => (
-                    <span className="font-mono text-xs text-fg-subtle">
+                    <span className="text-xs tabular-nums text-fg-subtle">
                       {formatRelative(tr.lastSeen)}
                     </span>
                   ),
