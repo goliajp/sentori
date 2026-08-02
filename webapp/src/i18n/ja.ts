@@ -37,6 +37,8 @@ export const ja: Messages = {
   'inbox.group.ignored': '無視',
   'inbox.group.open': '未解決',
   'inbox.group.resolved': '解決済み',
+  'inbox.envAll': 'すべての環境',
+  'inbox.envFilter': '環境',
   'inbox.groupNew': '新規 · 24h',
   'inbox.groupRegressed': 'リグレッション',
   'inbox.loadFailed': '受信箱を読み込めませんでした。',

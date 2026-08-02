@@ -424,14 +424,25 @@ function SignalList({
     <div className="max-h-72 overflow-y-auto">
       {signals.map((s, i) => {
         const near = playhead !== null && Math.abs(s.t - playhead) < 2.5;
-        // `target` is RN's internal node tag — meaningless to a
-        // reader (A2); it stays in the raw payload only.
-        const summary = summarizeSignal({
-          ...s,
-          data: Object.fromEntries(
-            Object.entries(s.data ?? {}).filter(([k]) => k !== 'target'),
-          ),
-        });
+        // http rows read as a request line, not as k=v soup; a
+        // failed request (no response / 5xx) carries the error hue.
+        const d = s.data ?? {};
+        const httpFailed =
+          s.kind === 'http' &&
+          (d.status === 0 || (typeof d.status === 'number' && d.status >= 500));
+        const summary =
+          s.kind === 'http'
+            ? `${String(d.method ?? '?')} ${String(d.url ?? '?')} → ${
+                d.status === 0 ? '×' : String(d.status ?? '?')
+              }${typeof d.ms === 'number' ? ` · ${d.ms}ms` : ''}`
+            : // `target` is RN's internal node tag — meaningless to a
+              // reader (A2); it stays in the raw payload only.
+              summarizeSignal({
+                ...s,
+                data: Object.fromEntries(
+                  Object.entries(d).filter(([k]) => k !== 'target'),
+                ),
+              });
         return (
           <button
             key={i}
@@ -452,7 +463,13 @@ function SignalList({
               style={{ backgroundColor: signalColor(s.kind) }}
             />
             <span className="w-14 shrink-0 text-fg">{s.kind}</span>
-            <span className="min-w-0 flex-1 truncate text-fg-muted">{summary}</span>
+            <span
+              className={`min-w-0 flex-1 truncate ${
+                httpFailed ? 'text-kind-error' : 'text-fg-muted'
+              }`}
+            >
+              {summary}
+            </span>
           </button>
         );
       })}

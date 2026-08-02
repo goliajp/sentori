@@ -34,6 +34,11 @@ pub struct ListQuery {
     pub project_id: Option<Uuid>,
     #[serde(default)]
     pub limit: Option<i64>,
+    /// Deployment-environment filter: only issues with at least one
+    /// event in this environment (issues aggregate across
+    /// environments; the queue slices them).
+    #[serde(default)]
+    pub environment: Option<String>,
 }
 
 fn issue_row_json(r: &sqlx::postgres::PgRow) -> Value {
@@ -101,6 +106,9 @@ pub async fn list(
            AND ($2::uuid IS NULL OR project_id = $2) \
            AND ($3::text IS NULL OR kind = $3) \
            AND ($4::uuid[] IS NULL OR project_id = ANY($4)) \
+           AND ($6::text IS NULL OR EXISTS ( \
+                 SELECT 1 FROM events e \
+                 WHERE e.issue_id = issues.id AND e.environment = $6)) \
          ORDER BY (regressed_at IS NOT NULL AND status = 'open') DESC, \
                   users_count DESC, max_per_user DESC, last_seen DESC \
          LIMIT $5",
@@ -110,6 +118,7 @@ pub async fn list(
     .bind(q.kind.as_deref())
     .bind(scope.as_deref())
     .bind(limit)
+    .bind(q.environment.as_deref())
     .fetch_all(&state.pool)
     .await;
     match rows {

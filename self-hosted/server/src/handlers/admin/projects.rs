@@ -267,6 +267,30 @@ async fn count_by(
     out
 }
 
+/// GET /admin/api/projects/{id}/environments — the deployment
+/// environments this project's events have actually reported, for
+/// the queue's environment filter. Small by construction (a handful
+/// of deployment targets), newest-traffic first.
+pub async fn environments(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    Path(project_id): Path<Uuid>,
+) -> (StatusCode, Json<Value>) {
+    if let Err(e) = super::tokens::ensure_project_access(&state, &ctx, project_id).await {
+        return e;
+    }
+    let rows: Vec<(String,)> = sqlx::query_as(
+        "SELECT environment FROM events WHERE project_id = $1 \
+         GROUP BY environment ORDER BY max(received_at) DESC",
+    )
+    .bind(project_id)
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default();
+    let envs: Vec<String> = rows.into_iter().map(|(e,)| e).collect();
+    (StatusCode::OK, Json(json!({ "environments": envs })))
+}
+
 /// GET /admin/api/projects/{id}/health — what the SDK's own traffic
 /// says about the deployment, curated to the actionable set: is the
 /// SDK alive (last event), how loud was the last day (per-kind

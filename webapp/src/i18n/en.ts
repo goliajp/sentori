@@ -42,6 +42,8 @@ export const en = {
   'inbox.group.ignored': 'Ignored',
   'inbox.group.open': 'Open',
   'inbox.group.resolved': 'Resolved',
+  'inbox.envAll': 'all environments',
+  'inbox.envFilter': 'Environment',
   'inbox.groupNew': 'New · 24h',
   'inbox.groupRegressed': 'Regressed',
   'inbox.loadFailed': 'Could not load the inbox.',
