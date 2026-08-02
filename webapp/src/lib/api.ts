@@ -323,6 +323,8 @@ class Api {
     projectId?: string;
     limit?: number;
     environment?: string;
+    contextKey?: string;
+    contextValue?: string;
   }) {
     const usp = new URLSearchParams();
     if (q.status) usp.set('status', q.status);
@@ -330,6 +332,10 @@ class Api {
     if (q.projectId) usp.set('project_id', q.projectId);
     if (q.limit) usp.set('limit', String(q.limit));
     if (q.environment) usp.set('environment', q.environment);
+    if (q.contextKey && q.contextValue) {
+      usp.set('context_key', q.contextKey);
+      usp.set('context_value', q.contextValue);
+    }
     const qs = usp.toString();
     return this.get<{ issues: IssueSummary[] }>(`/admin/api/issues${qs ? `?${qs}` : ''}`);
   }
@@ -337,6 +343,18 @@ class Api {
   projectEnvironments(projectId: string) {
     return this.get<{ environments: string[] }>(
       `/admin/api/projects/${projectId}/environments`,
+    );
+  }
+  /** Context keys this project's events have reported — slicing
+   *  dimensions whose meaning belongs to the host, not to Sentori. */
+  projectContextKeys(projectId: string) {
+    return this.get<{ keys: string[] }>(
+      `/admin/api/projects/${projectId}/context-keys`,
+    );
+  }
+  projectContextValues(projectId: string, key: string) {
+    return this.get<{ values: string[] }>(
+      `/admin/api/projects/${projectId}/context-values?key=${encodeURIComponent(key)}`,
     );
   }
   getIssue(id: string) {

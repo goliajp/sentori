@@ -29,6 +29,10 @@ export default function TriageView() {
   const status = (search.get('status') ?? 'open') as 'ignored' | 'open' | 'resolved';
   const kind = search.get('kind');
   const env = search.get('env');
+  // Context dimension: a host-defined key/value pair. Sentori knows
+  // nothing about what `qa` or `tenant` mean — it only slices.
+  const ctxKey = search.get('ck');
+  const ctxVal = search.get('cv');
   const projectId = activeProject?.id ?? null;
 
   // Deployment environments actually seen — the env filter's options.
@@ -40,11 +44,38 @@ export default function TriageView() {
     [projectId],
   );
   const environments = envData?.environments ?? [];
+  const { data: ckData } = useAsyncData(
+    () =>
+      projectId
+        ? api.projectContextKeys(projectId)
+        : Promise.resolve({ keys: [] }),
+    [projectId],
+  );
+  const contextKeys = ckData?.keys ?? [];
+  const { data: cvData } = useAsyncData(
+    () =>
+      projectId && ctxKey
+        ? api.projectContextValues(projectId, ctxKey)
+        : Promise.resolve({ values: [] }),
+    [projectId, ctxKey],
+  );
+  const contextValues = cvData?.values ?? [];
 
   const setFilter = (key: string, value: string | null) => {
     const next = new URLSearchParams(search);
     if (value === null) next.delete(key);
     else next.set(key, value);
+    setSearch(next, { replace: true });
+    setChecked(new Set());
+  };
+  /** Key + value move together: picking a new key clears the value,
+   *  clearing the key clears both. */
+  const setCtx = (key: null | string, value: null | string) => {
+    const next = new URLSearchParams(search);
+    if (key === null) next.delete('ck');
+    else next.set('ck', key);
+    if (value === null) next.delete('cv');
+    else next.set('cv', value);
     setSearch(next, { replace: true });
     setChecked(new Set());
   };
@@ -56,9 +87,11 @@ export default function TriageView() {
         kind: kind ?? undefined,
         projectId: projectId ?? undefined,
         environment: env ?? undefined,
+        contextKey: ctxKey ?? undefined,
+        contextValue: ctxVal ?? undefined,
         limit: 200,
       }),
-    [status, kind, env, projectId],
+    [status, kind, env, ctxKey, ctxVal, projectId],
   );
 
   // Captured per render, not inside the memo (react-hooks/purity).
@@ -210,6 +243,38 @@ export default function TriageView() {
                 {environments.map((e) => (
                   <option key={e} value={e}>
                     {e}
+                  </option>
+                ))}
+              </select>
+            )}
+            {/* host-defined context dimension: pick a key, then a
+                value; sentori attaches no meaning to either */}
+            {contextKeys.length > 0 && (
+              <select
+                value={ctxKey ?? ''}
+                onChange={(e) => setCtx(e.target.value || null, null)}
+                aria-label={t('inbox.ctxKeyFilter')}
+                className="h-[22px] rounded border border-border bg-surface px-1 text-xs text-fg-muted"
+              >
+                <option value="">{t('inbox.ctxKeyNone')}</option>
+                {contextKeys.map((k) => (
+                  <option key={k} value={k}>
+                    {k}
+                  </option>
+                ))}
+              </select>
+            )}
+            {ctxKey && (
+              <select
+                value={ctxVal ?? ''}
+                onChange={(e) => setCtx(ctxKey, e.target.value || null)}
+                aria-label={t('inbox.ctxValueFilter')}
+                className="mr-1 h-[22px] rounded border border-border bg-surface px-1 text-xs text-fg-muted"
+              >
+                <option value="">{t('inbox.ctxValueAll')}</option>
+                {contextValues.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
                   </option>
                 ))}
               </select>
