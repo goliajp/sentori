@@ -6,7 +6,10 @@
 // the entry object itself. Auto signals (nav / tap / http /
 // lifecycle) and quiet traces both land here.
 const DEFAULT_CAPACITY = 100;
-const DEFAULT_WINDOW_MS = 30_000;
+// Matches the replay window: with signals at 30s and replay at 60s
+// the left half of the case timeline had frames but never events
+// (insight round-4 A3).
+const DEFAULT_WINDOW_MS = 60_000;
 let entries = [];
 let capacity = DEFAULT_CAPACITY;
 let windowMs = DEFAULT_WINDOW_MS;
