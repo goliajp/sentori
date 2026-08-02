@@ -270,7 +270,7 @@ export function IssueDetailPane({
         {!demoteTitle && subline && (
           <p className="mt-0.5 truncate text-sm text-fg-muted">{subline}</p>
         )}
-        <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-xs tabular-nums text-fg-muted">
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs tabular-nums text-fg-muted">
           <span className="text-fg">
             {issue.usersCount > 0
               ? t('issue.impactUsers', {
@@ -314,14 +314,14 @@ export function IssueDetailPane({
               title={t('replay.title')}
               action={
                 screensFallback ? (
-                  <span className="truncate text-[11px] normal-case tracking-normal text-fg-subtle">
+                  <span className="truncate text-xs normal-case tracking-normal text-fg-subtle">
                     {t('issue.replayFrom', {
                       when: formatRelative(screensFallback.occurredAt),
                     })}
                   </span>
                 ) : !screensRef && wireframeLatest ? (
                   <span
-                    className="text-[11px] normal-case tracking-normal text-fg-subtle"
+                    className="text-xs normal-case tracking-normal text-fg-subtle"
                     title={t('issue.replayWireframeTip')}
                   >
                     wireframe
@@ -352,7 +352,7 @@ export function IssueDetailPane({
 
             {issue.status === 'resolved' && (
               <Panel title={<span className="text-ok">{t('issue.guardTitle')}</span>}>
-                <div className="space-y-1 p-3.5 text-[13px] text-fg-muted">
+                <div className="space-y-1 p-3.5 text-sm text-fg-muted">
                   <p>
                     {issue.resolvedInRelease
                       ? t('issue.guardAnchored', { release: issue.resolvedInRelease })
@@ -450,7 +450,7 @@ function SignalList({
             disabled={!onSeek}
             onClick={() => onSeek?.(s.t)}
             className={clsx(
-              'flex w-full items-baseline gap-2.5 border-b border-border/60 px-3.5 py-1.5 text-left font-mono text-xs last:border-b-0',
+              'flex w-full items-baseline gap-2.5 border-b border-border/60 px-3.5 py-1.5 text-left text-xs last:border-b-0',
               near ? 'bg-raised' : onSeek ? 'hover:bg-raised/50' : '',
             )}
           >
@@ -464,7 +464,7 @@ function SignalList({
             />
             <span className="w-14 shrink-0 text-fg">{s.kind}</span>
             <span
-              className={`min-w-0 flex-1 truncate ${
+              className={`min-w-0 flex-1 truncate font-mono ${
                 httpFailed ? 'text-kind-error' : 'text-fg-muted'
               }`}
             >
@@ -515,7 +515,7 @@ function OccurrenceList({
           type="button"
           onClick={() => onPick(r.id)}
           className={clsx(
-            'flex w-full items-center gap-4 px-3.5 py-2 text-left font-mono text-[13px] transition-colors',
+            'flex w-full items-center gap-4 px-3.5 py-2 text-left text-sm transition-colors',
             r.id === currentId ? 'bg-raised' : 'hover:bg-raised/50',
           )}
         >
@@ -528,7 +528,10 @@ function OccurrenceList({
             {formatRelative(r.receivedAt)}
           </span>
           <span className={dim(varies.platform)}>{r.platform}</span>
-          <span className={clsx('min-w-0 truncate', dim(varies.release))} title={r.release}>
+          <span
+            className={clsx('min-w-0 truncate font-mono text-xs', dim(varies.release))}
+            title={r.release}
+          >
             {formatRelease(r.release)}
           </span>
           <span className={dim(varies.environment)}>{r.environment}</span>

@@ -16,7 +16,7 @@ export const kindTint = (kind: IssueSummary['kind'], pct = 12): string =>
 export function KindBadge({ kind }: { kind: IssueSummary['kind'] }) {
   return (
     <span
-      className="inline-block rounded px-1.5 py-0.5 font-mono text-xs font-medium"
+      className="inline-block rounded px-1.5 py-0.5 text-xs font-medium"
       style={{ backgroundColor: kindTint(kind), color: kindColor(kind) }}
     >
       {kind}
@@ -32,7 +32,7 @@ export function RegressedBadge() {
   );
 }
 
-/** breadth × depth, the objective importance pair, in mono.
+/** breadth × depth, the objective importance pair.
  *  Events without a userKey (pre-identify boot signals) make the
  *  breadth zero — "0u×0" is noise, so the pair collapses to the
  *  event count alone. */
@@ -46,7 +46,7 @@ export function ImpactCell({
   events: number;
 }) {
   return (
-    <span className="font-mono text-xs tabular-nums text-fg-muted">
+    <span className="text-xs tabular-nums text-fg-muted">
       {users > 0 ? `${users}u×${maxPerUser} · ` : ''}
       {events}ev
     </span>

@@ -291,7 +291,7 @@ export function Panel({
       className={`flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-surface ${className}`}
     >
       <header className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-border px-3.5">
-        <h3 className="truncate text-[13px] font-semibold text-fg-muted">{title}</h3>
+        <h3 className="truncate text-sm font-semibold text-fg-muted">{title}</h3>
         {action}
       </header>
       <div className={`min-h-0 flex-1 ${padded ? 'p-3.5' : ''}`}>{children}</div>
@@ -347,7 +347,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
  *  the topbar and j/k in the empty state read as the same object. */
 export function Kbd({ children }: { children: ReactNode }) {
   return (
-    <kbd className="rounded border border-border bg-surface px-1 font-mono text-[10px] leading-4 text-fg-muted">
+    <kbd className="rounded border border-border bg-surface px-1 font-mono text-xs leading-4 text-fg-muted">
       {children}
     </kbd>
   );
@@ -371,7 +371,7 @@ export function FoldPanel({
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex h-9 w-full items-center gap-1.5 px-3.5 text-left text-[13px] font-semibold text-fg-muted hover:text-fg"
+        className="flex h-9 w-full items-center gap-1.5 px-3.5 text-left text-sm font-semibold text-fg-muted hover:text-fg"
       >
         <ChevronRight
           aria-hidden
@@ -496,7 +496,7 @@ export function DataTable<T>({
         </tbody>
       </table>
       {footer && (
-        <div className="border-t border-border px-4 py-1.5 text-right font-mono text-[11px] tabular-nums text-fg-subtle">
+        <div className="border-t border-border px-4 py-1.5 text-right font-mono text-xs tabular-nums text-fg-subtle">
           {footer}
         </div>
       )}
