@@ -135,7 +135,14 @@ function AppFrame({
             hasContext ? 'text-fg-subtle' : 'opacity-0'
           } ${open ? 'rotate-90' : ''}`}
         />
-        <span className="shrink-0 font-medium text-fg">
+        {/* fixed-width function column: locations start on one
+            vertical line, so the eye can scan either column — free
+            widths interleaved names and paths into an unreadable
+            zigzag */}
+        <span
+          className="w-64 shrink-0 truncate font-medium text-fg"
+          title={frame.function}
+        >
           {frame.function ?? '?'}
         </span>
         <span
@@ -234,7 +241,10 @@ function LibraryRun({
             key={i}
             className="flex items-baseline gap-2 py-0.5 pl-8 pr-3.5 font-mono text-xs text-fg-subtle"
           >
-            <span>{f.function ?? '?'}</span>
+            {/* same two-column discipline as the app frames */}
+            <span className="w-60 shrink-0 truncate" title={f.function}>
+              {f.function ?? '?'}
+            </span>
             <span className="min-w-0 flex-1 truncate" title={f.file}>
               {(f.file?.startsWith(strip) ? f.file.slice(strip.length) : f.file) ?? '?'}
               {f.line !== undefined ? `:${f.line}` : ''}
