@@ -29,6 +29,10 @@ export default function TriageView() {
   const status = (search.get('status') ?? 'open') as 'ignored' | 'open' | 'resolved';
   const kind = search.get('kind');
   const env = search.get('env');
+  // Context dimension: a host-defined key/value pair. Sentori knows
+  // nothing about what `qa` or `tenant` mean — it only slices.
+  const ctxKey = search.get('ck');
+  const ctxVal = search.get('cv');
   const projectId = activeProject?.id ?? null;
 
   // Deployment environments actually seen — the env filter's options.
@@ -40,11 +44,38 @@ export default function TriageView() {
     [projectId],
   );
   const environments = envData?.environments ?? [];
+  const { data: ckData } = useAsyncData(
+    () =>
+      projectId
+        ? api.projectContextKeys(projectId)
+        : Promise.resolve({ keys: [] }),
+    [projectId],
+  );
+  const contextKeys = ckData?.keys ?? [];
+  const { data: cvData } = useAsyncData(
+    () =>
+      projectId && ctxKey
+        ? api.projectContextValues(projectId, ctxKey)
+        : Promise.resolve({ values: [] }),
+    [projectId, ctxKey],
+  );
+  const contextValues = cvData?.values ?? [];
 
   const setFilter = (key: string, value: string | null) => {
     const next = new URLSearchParams(search);
     if (value === null) next.delete(key);
     else next.set(key, value);
+    setSearch(next, { replace: true });
+    setChecked(new Set());
+  };
+  /** Key + value move together: picking a new key clears the value,
+   *  clearing the key clears both. */
+  const setCtx = (key: null | string, value: null | string) => {
+    const next = new URLSearchParams(search);
+    if (key === null) next.delete('ck');
+    else next.set('ck', key);
+    if (value === null) next.delete('cv');
+    else next.set('cv', value);
     setSearch(next, { replace: true });
     setChecked(new Set());
   };
@@ -56,9 +87,11 @@ export default function TriageView() {
         kind: kind ?? undefined,
         projectId: projectId ?? undefined,
         environment: env ?? undefined,
+        contextKey: ctxKey ?? undefined,
+        contextValue: ctxVal ?? undefined,
         limit: 200,
       }),
-    [status, kind, env, projectId],
+    [status, kind, env, ctxKey, ctxVal, projectId],
   );
 
   // Captured per render, not inside the memo (react-hooks/purity).
@@ -189,7 +222,7 @@ export default function TriageView() {
                 {t(`inbox.status.${s}`)}
               </button>
             ))}
-            <span className="ml-auto font-mono text-[11px] tabular-nums text-fg-subtle">
+            <span className="ml-auto text-xs tabular-nums text-fg-subtle">
               {t('inbox.pulse', {
                 fresh: String(todayNew),
                 regressed: String(todayRegressed),
@@ -204,12 +237,44 @@ export default function TriageView() {
                 value={env ?? ''}
                 onChange={(e) => setFilter('env', e.target.value || null)}
                 aria-label={t('inbox.envFilter')}
-                className="mr-1 h-[22px] rounded border border-border bg-surface px-1 font-mono text-[11px] text-fg-muted"
+                className="mr-1 h-[22px] rounded border border-border bg-surface px-1 text-xs text-fg-muted"
               >
                 <option value="">{t('inbox.envAll')}</option>
                 {environments.map((e) => (
                   <option key={e} value={e}>
                     {e}
+                  </option>
+                ))}
+              </select>
+            )}
+            {/* host-defined context dimension: pick a key, then a
+                value; sentori attaches no meaning to either */}
+            {contextKeys.length > 0 && (
+              <select
+                value={ctxKey ?? ''}
+                onChange={(e) => setCtx(e.target.value || null, null)}
+                aria-label={t('inbox.ctxKeyFilter')}
+                className="h-[22px] rounded border border-border bg-surface px-1 text-xs text-fg-muted"
+              >
+                <option value="">{t('inbox.ctxKeyNone')}</option>
+                {contextKeys.map((k) => (
+                  <option key={k} value={k}>
+                    {k}
+                  </option>
+                ))}
+              </select>
+            )}
+            {ctxKey && (
+              <select
+                value={ctxVal ?? ''}
+                onChange={(e) => setCtx(ctxKey, e.target.value || null)}
+                aria-label={t('inbox.ctxValueFilter')}
+                className="mr-1 h-[22px] rounded border border-border bg-surface px-1 text-xs text-fg-muted"
+              >
+                <option value="">{t('inbox.ctxValueAll')}</option>
+                {contextValues.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
                   </option>
                 ))}
               </select>
@@ -220,7 +285,7 @@ export default function TriageView() {
                 type="button"
                 onClick={() => setFilter('kind', kind === k ? null : k)}
                 className={clsx(
-                  'flex items-center gap-1.5 rounded border px-1.5 py-0.5 font-mono text-[11px] transition-colors',
+                  'flex items-center gap-1.5 rounded border px-1.5 py-0.5 font-mono text-xs transition-colors',
                   kind === k
                     ? 'border-border-strong bg-raised text-fg'
                     : 'border-border text-fg-subtle hover:text-fg-muted',
@@ -427,17 +492,17 @@ function QueueRow({
             checked ? '' : 'opacity-0 transition-opacity group-hover:opacity-60',
           )}
         />
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-fg">
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-fg">
           {issue.title}
         </span>
-        <span className="shrink-0 font-mono text-[10px] tabular-nums text-fg-subtle">
+        <span className="shrink-0 text-xs tabular-nums text-fg-subtle">
           {formatRelative(issue.lastSeen)}
         </span>
       </div>
       <div className="mt-0.5 flex items-center gap-2 pl-[22px]">
         <KindBadge kind={issue.kind} />
         {issue.regressedAt && issue.status === 'open' && (
-          <span className="font-mono text-[10px] font-semibold uppercase text-kind-error">
+          <span className="font-mono text-xs font-semibold uppercase text-kind-error">
             regressed
           </span>
         )}
@@ -445,7 +510,7 @@ function QueueRow({
             one, else the message sample — a bare "Error" title row
             should still say what the error said */}
         {(where || issue.messageSample) && (
-          <span className="min-w-0 truncate font-mono text-[11px] text-fg-subtle">
+          <span className="min-w-0 truncate text-xs text-fg-subtle">
             {where || issue.messageSample}
           </span>
         )}

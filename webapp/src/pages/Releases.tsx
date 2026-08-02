@@ -88,14 +88,14 @@ function ReleaseRowView({ release, projectId }: { release: ReleaseRow; projectId
           aria-hidden
           className={`h-3.5 w-3.5 shrink-0 text-fg-subtle transition-transform ${open ? 'rotate-90' : ''}`}
         />
-        <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-fg">
+        <span className="min-w-0 flex-1 truncate font-mono text-sm text-fg">
           {release.name}
         </span>
         <Light on={data ? kinds.has('sourcemap') : undefined} label="js" />
         <Light on={data ? kinds.has('dsym') : undefined} label="ios" />
         <Light on={data ? kinds.has('proguard') : undefined} label="android" />
         {created && (
-          <span className="w-16 text-right font-mono text-[11px] text-fg-subtle">
+          <span className="w-16 text-right text-xs tabular-nums text-fg-subtle">
             {formatRelative(created)}
           </span>
         )}
@@ -105,7 +105,7 @@ function ReleaseRowView({ release, projectId }: { release: ReleaseRow; projectId
           {artifacts.length === 0 ? (
             <div className="text-xs text-fg-muted">
               <p>{t('releases.noArtifacts')}</p>
-              <code className="mt-1.5 block rounded bg-surface p-2 font-mono text-[11px]">
+              <code className="mt-1.5 block rounded bg-surface p-2 font-mono text-xs">
                 sentori-cli upload sourcemap --release &quot;{release.name}&quot; --token
                 &lt;api-token&gt; &lt;map&gt;
               </code>
@@ -133,7 +133,7 @@ function ReleaseRowView({ release, projectId }: { release: ReleaseRow; projectId
 
 function Light({ on, label }: { on: boolean | undefined; label: string }) {
   return (
-    <span className="flex items-center gap-1.5 font-mono text-[11px] text-fg-muted">
+    <span className="flex items-center gap-1.5 font-mono text-xs text-fg-muted">
       <span
         className="h-2 w-2 rounded-full"
         style={{

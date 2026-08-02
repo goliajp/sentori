@@ -89,7 +89,7 @@ export function App() {
   }
 
   const navCls = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${
+    `flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors ${
       isActive
         ? 'bg-raised font-medium text-fg'
         : 'text-fg-muted hover:bg-raised/60 hover:text-fg'
@@ -150,7 +150,7 @@ export function App() {
             <button
               type="button"
               onClick={openPalette}
-              className="flex h-7 w-72 items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-[13px] text-fg-subtle transition-colors hover:border-border-strong hover:text-fg-muted"
+              className="flex h-7 w-72 items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-sm text-fg-subtle transition-colors hover:border-border-strong hover:text-fg-muted"
             >
               <Search aria-hidden className="h-3.5 w-3.5 shrink-0" />
               <span className="min-w-0 flex-1 truncate text-left">
@@ -191,7 +191,7 @@ function StatusBar() {
       .catch(() => undefined);
   }, []);
   return (
-    <footer className="flex h-6 shrink-0 items-center gap-2 border-t border-border bg-bg px-3 font-mono text-[11px] text-fg-subtle">
+    <footer className="flex h-6 shrink-0 items-center gap-2 border-t border-border bg-bg px-3 font-mono text-xs text-fg-subtle">
       <img src={goliaMark} alt="" aria-hidden className="h-3 w-3 opacity-80" />
       <span>GOLIA · sentori</span>
       <span className="ml-auto flex items-center gap-3 tabular-nums">
