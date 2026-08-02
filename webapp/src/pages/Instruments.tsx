@@ -12,6 +12,7 @@ import {
   Panel,
   PanelEmpty,
   formatRelative,
+  formatRelease,
 } from '../components/ui';
 import { useT } from '../i18n';
 import { useAsyncData } from '../lib/useAsyncData';
@@ -92,7 +93,9 @@ export default function InstrumentsPage() {
                         }}
                       />
                       <span className="min-w-0 flex-1 truncate text-fg">{a.name}</span>
-                      <span className="text-fg-subtle">{a.release}</span>
+                      <span className="text-[11px] text-fg-subtle" title={a.release}>
+                        {formatRelease(a.release)}
+                      </span>
                       <span className="tabular-nums text-fg-muted">
                         {t('instruments.assertRan', {
                           total: String(total),
@@ -128,7 +131,9 @@ export default function InstrumentsPage() {
                       />
                       <span className="min-w-0 flex-1 truncate text-fg">{p.ref}</span>
                       {p.lastSeenRelease && (
-                        <span className="text-fg-subtle">{p.lastSeenRelease}</span>
+                        <span className="text-[11px] text-fg-subtle" title={p.lastSeenRelease}>
+                          {formatRelease(p.lastSeenRelease)}
+                        </span>
                       )}
                       <span className="tabular-nums text-fg-muted">
                         {silent

@@ -13,6 +13,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 
 import { CommandPalette, openPalette } from './components/CommandPalette';
+import { Kbd } from './components/ui';
 import { useT } from './i18n';
 import { api, type Me, type Project } from './lib/api';
 import { setThemeMode, useThemeMode, type ThemeMode } from './lib/theme';
@@ -155,7 +156,7 @@ export function App() {
               <span className="min-w-0 flex-1 truncate text-left">
                 {t('palette.placeholder')}
               </span>
-              <kbd className="rounded border border-border px-1 font-mono text-[10px]">⌘K</kbd>
+              <Kbd>⌘K</Kbd>
             </button>
             <div className="ml-auto flex items-center gap-3">
               <span className="text-xs text-fg-subtle">
@@ -201,9 +202,9 @@ function StatusBar() {
   );
 }
 
-/// Three-state theme switch. GDS owns the state + persistence; this
-/// is just the smallest possible handle on it — a segmented row that
-/// reads as furniture, not as a feature.
+/// Three-state theme switch — a segmented row that reads as
+/// furniture, not as a feature. State + persistence live in
+/// lib/theme.ts.
 function ThemeSwitch() {
   const t = useT();
   const mode = useThemeMode();

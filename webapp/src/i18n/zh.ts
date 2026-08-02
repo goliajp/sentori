@@ -33,7 +33,7 @@ export const zh: Messages = {
   'inbox.group.ignored': '已忽略',
   'inbox.group.open': '未解决',
   'inbox.group.resolved': '已解决',
-  'inbox.groupNew': '新增(24 小时)',
+  'inbox.groupNew': '新增 · 24h',
   'inbox.groupRegressed': '回归',
   'inbox.loadFailed': '收件箱加载失败。',
   'inbox.pulse': '今日:新增 {fresh} · 回归 {regressed}',
@@ -164,7 +164,9 @@ export const zh: Messages = {
 
   'table.empty': '暂无内容',
 
-  'triage.pickHint': 'j/k 移动 · Enter 打开 · ⌘K 搜索',
+  'triage.hintMove': '移动',
+  'triage.hintOpen': '打开',
+  'triage.hintSearch': '搜索',
   'triage.pickTitle': '从左侧队列选择一个 issue',
 
   'shell.loading': '加载中…',

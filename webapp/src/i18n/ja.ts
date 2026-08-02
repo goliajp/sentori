@@ -34,7 +34,7 @@ export const ja: Messages = {
   'inbox.group.ignored': '無視',
   'inbox.group.open': '未解決',
   'inbox.group.resolved': '解決済み',
-  'inbox.groupNew': '新規（24時間）',
+  'inbox.groupNew': '新規 · 24h',
   'inbox.groupRegressed': 'リグレッション',
   'inbox.loadFailed': '受信箱を読み込めませんでした。',
   'inbox.pulse': '今日: 新規 {fresh} · リグレッション {regressed}',
@@ -176,7 +176,9 @@ export const ja: Messages = {
 
   'table.empty': 'まだ何もありません',
 
-  'triage.pickHint': 'j/k 移動 · Enter 開く · ⌘K 検索',
+  'triage.hintMove': '移動',
+  'triage.hintOpen': '開く',
+  'triage.hintSearch': '検索',
   'triage.pickTitle': '左のキューから issue を選択',
 
   'shell.loading': '読み込み中…',

@@ -117,7 +117,7 @@ export function TimelineStrip({
           ref={trackRef}
           role="presentation"
           onClick={seekFromTrack}
-          className={`relative ml-14 h-full ${onSeek ? 'cursor-pointer' : ''}`}
+          className={`relative ml-14 mr-1.5 h-full ${onSeek ? 'cursor-pointer' : ''}`}
         >
           {/* gridlines every 10s + second labels */}
           {Array.from({ length: 7 }, (_, i) => -WINDOW_S + i * 10).map((sec) => (
@@ -134,9 +134,13 @@ export function TimelineStrip({
                 }
                 style={sec === 0 ? { backgroundColor: kindColor(issueKind) } : undefined}
               />
+              {/* the 0s label hangs left of its line so the track's
+                  right edge never clips it */}
               <span
-                className={`absolute bottom-0 -translate-x-1/2 font-mono text-[10px] ${
-                  sec === 0 ? 'font-semibold' : 'text-fg-subtle'
+                className={`absolute bottom-0 whitespace-nowrap font-mono text-[10px] ${
+                  sec === 0
+                    ? '-translate-x-full pr-1.5 font-semibold'
+                    : '-translate-x-1/2 text-fg-subtle'
                 }`}
                 style={sec === 0 ? { color: kindColor(issueKind) } : undefined}
               >

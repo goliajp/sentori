@@ -180,10 +180,12 @@ export function IssueDetailPane({
                 <Input
                   value={resolveRelease}
                   onChange={(e) => setResolveRelease(e.target.value)}
-                  placeholder={issue.lastRelease || 'app@x.y.z'}
+                  placeholder={
+                    issue.lastRelease ? formatRelease(issue.lastRelease) : 'app@x.y.z'
+                  }
                   title={t('issue.resolveInRelease')}
                   aria-label={t('issue.resolveInRelease')}
-                  className="h-7 w-44 font-mono text-xs"
+                  className="h-7 w-52 font-mono text-xs"
                 />
                 <Button
                   size="sm"

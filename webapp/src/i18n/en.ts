@@ -39,7 +39,7 @@ export const en = {
   'inbox.group.ignored': 'Ignored',
   'inbox.group.open': 'Open',
   'inbox.group.resolved': 'Resolved',
-  'inbox.groupNew': 'New (24h)',
+  'inbox.groupNew': 'New · 24h',
   'inbox.groupRegressed': 'Regressed',
   'inbox.loadFailed': 'Could not load the inbox.',
   'inbox.pulse': 'today: {fresh} new · {regressed} regressed',
@@ -181,7 +181,9 @@ export const en = {
 
   'table.empty': 'Nothing here yet',
 
-  'triage.pickHint': 'j/k move · Enter opens · ⌘K search',
+  'triage.hintMove': 'move',
+  'triage.hintOpen': 'open',
+  'triage.hintSearch': 'search',
   'triage.pickTitle': 'Pick an issue from the queue',
 
   'shell.loading': 'Loading…',
