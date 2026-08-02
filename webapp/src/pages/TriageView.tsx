@@ -9,8 +9,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { useShell } from '../App';
-import { ImpactCell, KindBadge } from '../components/kind';
-import { ErrorBanner, clsx, formatRelative } from '../components/ui';
+import { ImpactCell, KindBadge, kindColor } from '../components/kind';
+import { ErrorBanner, Kbd, clsx, formatRelative } from '../components/ui';
 import { useT } from '../i18n';
 import { api, type IssueSummary } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
@@ -191,12 +191,19 @@ export default function TriageView() {
                 type="button"
                 onClick={() => setFilter('kind', kind === k ? null : k)}
                 className={clsx(
-                  'rounded border px-1.5 py-0.5 font-mono text-[11px] transition-colors',
+                  'flex items-center gap-1.5 rounded border px-1.5 py-0.5 font-mono text-[11px] transition-colors',
                   kind === k
                     ? 'border-border-strong bg-raised text-fg'
                     : 'border-border text-fg-subtle hover:text-fg-muted',
                 )}
               >
+                {/* the kind's own hue — the palette teaching its
+                    one concept model even in a filter chip */}
+                <span
+                  aria-hidden
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: kindColor(k) }}
+                />
                 {k}
               </button>
             ))}
@@ -306,9 +313,20 @@ export default function TriageView() {
         {issueId ? (
           <IssueDetailPane issueId={issueId} onChanged={reload} />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2">
+          <div className="flex h-full flex-col items-center justify-center gap-3">
             <p className="text-sm text-fg-muted">{t('triage.pickTitle')}</p>
-            <p className="font-mono text-xs text-fg-subtle">{t('triage.pickHint')}</p>
+            <p className="flex items-center gap-3 text-xs text-fg-subtle">
+              <span className="flex items-center gap-1">
+                <Kbd>j</Kbd>
+                <Kbd>k</Kbd> {t('triage.hintMove')}
+              </span>
+              <span className="flex items-center gap-1">
+                <Kbd>⏎</Kbd> {t('triage.hintOpen')}
+              </span>
+              <span className="flex items-center gap-1">
+                <Kbd>⌘K</Kbd> {t('triage.hintSearch')}
+              </span>
+            </p>
           </div>
         )}
       </section>

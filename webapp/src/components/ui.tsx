@@ -299,6 +299,16 @@ export function PanelEmpty({ children }: { children: ReactNode }) {
   return <p className="px-3.5 py-4 text-sm text-fg-subtle">{children}</p>;
 }
 
+/** A keycap, wherever a shortcut is named. One definition so ⌘K in
+ *  the topbar and j/k in the empty state read as the same object. */
+export function Kbd({ children }: { children: ReactNode }) {
+  return (
+    <kbd className="rounded border border-border bg-surface px-1 font-mono text-[10px] leading-4 text-fg-muted">
+      {children}
+    </kbd>
+  );
+}
+
 /** A collapsed strip panel for the obligatory corners
  *  (occurrences, raw environment, activity). */
 export function FoldPanel({
