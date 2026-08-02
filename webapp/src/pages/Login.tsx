@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
+import { AuthShell, Field, Input } from '../components/ui';
 import { useT } from '../i18n';
 import { api } from '../lib/api';
 
@@ -32,55 +33,44 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <form
-        onSubmit={submit}
-        className="w-full max-w-sm rounded-lg border border-border bg-surface p-6"
-      >
-        <h1 className="mb-1 text-xl font-semibold">{t('auth.signInTitle')}</h1>
-        <p className="mb-5 font-mono text-xs opacity-40">sentori</p>
-
-        <label className="mb-3 block text-sm">
-          <span className="mb-1 block opacity-60">{t('auth.email')}</span>
-          <input
+    <AuthShell>
+      <form onSubmit={submit} className="space-y-3">
+        <h1 className="text-lg font-semibold">{t('auth.signInTitle')}</h1>
+        <Field label={t('auth.email')}>
+          <Input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="username"
             required
-            className="w-full rounded border border-border bg-transparent px-2 py-1.5"
           />
-        </label>
-        <label className="mb-4 block text-sm">
-          <span className="mb-1 block opacity-60">{t('auth.password')}</span>
-          <input
+        </Field>
+        <Field label={t('auth.password')}>
+          <Input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
             required
-            className="w-full rounded border border-border bg-transparent px-2 py-1.5"
           />
-        </label>
+        </Field>
 
-        {failed && (
-          <p className="mb-3 text-xs text-kind-error">{t('auth.signInFailed')}</p>
-        )}
+        {failed && <p className="text-xs text-kind-error">{t('auth.signInFailed')}</p>}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg disabled:opacity-40"
+          className="h-8 w-full rounded-md bg-accent text-sm font-medium text-accent-fg transition hover:opacity-90 disabled:opacity-40"
         >
           {loading ? t('auth.signingIn') : t('auth.signIn')}
         </button>
 
-        <div className="mt-4 text-center text-xs opacity-50">
-          <Link to="/forgot-password" className="hover:opacity-100">
+        <p className="pt-1 text-center text-xs text-fg-subtle">
+          <Link to="/forgot-password" className="hover:text-fg-muted">
             {t('auth.forgot')}
           </Link>
-        </div>
+        </p>
       </form>
-    </div>
+    </AuthShell>
   );
 }

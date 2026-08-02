@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import { AuthShell, Field, Input } from '../components/ui';
 import { useT } from '../i18n';
 import { api } from '../lib/api';
 
@@ -30,42 +31,37 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-bg">
-      <form
-        onSubmit={submit}
-        className="w-96 rounded-lg border border-border bg-surface p-6"
-      >
-        <h1 className="mb-1 text-xl font-semibold">{t('auth.forgot')}</h1>
-        <p className="mb-6 text-sm text-fg-subtle">
-          {t('auth.forgotHint')}
-        </p>
-        <label className="mb-3 block text-sm">
-          <span className="mb-1 block text-fg-muted">{t('auth.email')}</span>
-          <input
+    <AuthShell>
+      <form onSubmit={submit} className="space-y-3">
+        <div>
+          <h1 className="text-lg font-semibold">{t('auth.forgot')}</h1>
+          <p className="mt-1 text-sm text-fg-subtle">{t('auth.forgotHint')}</p>
+        </div>
+        <Field label={t('auth.email')}>
+          <Input
             type="email"
             autoFocus
             value={email}
-            onChange={e => setEmail(e.target.value)}
-            className="w-full rounded border border-border-strong bg-bg px-3 py-2 text-sm focus:border-accent focus:outline-none"
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="username"
+            required
           />
-        </label>
-        {err && (
-          <p className="mb-3 text-xs text-danger break-all">{err}</p>
-        )}
-        {silent && (
-          <p className="mb-3 text-xs text-fg-muted">{t('auth.resetSent')}</p>
-        )}
+        </Field>
+        {err && <p className="break-all text-xs text-danger">{err}</p>}
+        {silent && <p className="text-xs text-fg-muted">{t('auth.resetSent')}</p>}
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded bg-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="h-8 w-full rounded-md bg-accent text-sm font-medium text-accent-fg transition hover:opacity-90 disabled:opacity-40"
         >
           {loading ? t('auth.sending') : t('auth.sendReset')}
         </button>
-        <div className="mt-4 text-center text-xs text-fg-subtle">
-          <Link to="/login" className="hover:text-fg-muted">{t('auth.backToSignIn')}</Link>
-        </div>
+        <p className="pt-1 text-center text-xs text-fg-subtle">
+          <Link to="/login" className="hover:text-fg-muted">
+            {t('auth.backToSignIn')}
+          </Link>
+        </p>
       </form>
-    </div>
+    </AuthShell>
   );
 }
