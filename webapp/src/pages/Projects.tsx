@@ -126,7 +126,9 @@ function ProjectCard({
         if (e.key === 'Enter') onOpen();
       }}
       className={clsx(
-        'group cursor-pointer rounded-lg border bg-surface p-4 transition-colors',
+        // Full-height flex column so neighbouring cards' footers sit
+        // on one baseline whether or not a card has a backend row.
+        'group flex h-full cursor-pointer flex-col rounded-lg border bg-surface p-4 transition-colors',
         active
           ? 'border-accent'
           : 'border-border hover:border-border-strong',
@@ -202,7 +204,10 @@ function ProjectCard({
         </div>
       )}
 
-      <div className="mt-2.5 flex items-center gap-2 border-t border-border/60 pt-2.5 font-mono text-[11px] text-fg-subtle">
+      {/* the growing spacer pins the footer to the card's bottom,
+          with a guaranteed minimum gap when content fills the card */}
+      <div className="min-h-2.5 flex-1" />
+      <div className="flex items-center gap-2 border-t border-border/60 pt-2.5 font-mono text-[11px] text-fg-subtle">
         {h?.latestRelease ? (
           <>
             <span className="min-w-0 flex-1 truncate" title={h.latestRelease}>

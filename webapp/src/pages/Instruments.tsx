@@ -1,45 +1,73 @@
 // Instruments — "how are the devices I planted doing?" (design.md
-// §11). Three panels: asserts (alive + failure rate, "ran 45k,
+// §11). Three tables: asserts (alive + failure rate, "ran 45k,
 // failed 3"), probes (silent = fix holding), traces (did it run,
-// what magnitude). A status panel, not a data browser.
+// what magnitude). A status surface, not a data browser — but a
+// status surface with real columns, headers, and one baseline.
 
 import { Link } from 'react-router-dom';
 
 import { useShell } from '../App';
 import {
+  DataTable,
   ErrorBanner,
   PageShell,
   Panel,
   PanelEmpty,
   formatRelative,
+  formatRelease,
 } from '../components/ui';
 import { useT } from '../i18n';
 import { useAsyncData } from '../lib/useAsyncData';
 
-type Instruments = {
-  asserts: Array<{
-    name: string;
-    release: string;
-    passCount: number;
-    failCount: number;
-    lastPassAt: string | null;
-    lastFailAt: string | null;
-  }>;
-  probes: Array<{
-    ref: string;
-    issueId: string | null;
-    lastSeenRelease: string | null;
-    registeredAt: string;
-    lastFiredAt: string | null;
-    fireCount: number;
-  }>;
-  traces: Array<{
-    name: string;
-    eventCount: number;
-    usersCount: number;
-    lastSeen: string;
-  }>;
+type AssertRow = {
+  name: string;
+  release: string;
+  passCount: number;
+  failCount: number;
+  lastPassAt: string | null;
+  lastFailAt: string | null;
 };
+type ProbeRow = {
+  ref: string;
+  issueId: string | null;
+  lastSeenRelease: string | null;
+  registeredAt: string;
+  lastFiredAt: string | null;
+  fireCount: number;
+};
+type TraceRow = {
+  name: string;
+  eventCount: number;
+  usersCount: number;
+  lastSeen: string;
+};
+type Instruments = {
+  asserts: AssertRow[];
+  probes: ProbeRow[];
+  traces: TraceRow[];
+};
+
+/** The green/red life sign in a table's first column. */
+function Dot({ ok }: { ok: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className="inline-block h-2 w-2 rounded-full align-middle"
+      style={{
+        backgroundColor: ok ? 'var(--s-kind-probe)' : 'var(--s-kind-error)',
+      }}
+    />
+  );
+}
+
+function ReleaseCell({ release }: { release: string | null }) {
+  if (!release) return <span>—</span>;
+  return (
+    <span className="font-mono text-[11px] text-fg-subtle" title={release}>
+      {formatRelease(release)}
+    </span>
+  );
+}
 
 export default function InstrumentsPage() {
   const t = useT();
@@ -71,111 +99,158 @@ export default function InstrumentsPage() {
       {data && (
         <>
           <Panel title={`${t('instruments.asserts')} (${data.asserts.length})`}>
-            {data.asserts.length === 0 ? (
-              <PanelEmpty>{t('instruments.assertsEmpty')}</PanelEmpty>
-            ) : (
-              <div className="divide-y divide-border/60">
-                {data.asserts.map((a) => {
-                  const total = a.passCount + a.failCount;
-                  const healthy = a.failCount === 0;
-                  return (
-                    <div
-                      key={`${a.name}-${a.release}`}
-                      className="flex items-center gap-3 px-3.5 py-2 font-mono text-[13px]"
+            <DataTable<AssertRow>
+              rows={data.asserts}
+              rowKey={(a) => `${a.name}-${a.release}`}
+              empty={t('instruments.assertsEmpty')}
+              columns={[
+                {
+                  key: 'name',
+                  label: t('instruments.colName'),
+                  render: (a) => (
+                    <span className="inline-flex items-center gap-2.5 font-mono text-[13px] text-fg">
+                      <Dot ok={a.failCount === 0} />
+                      {a.name}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'release',
+                  label: t('instruments.colRelease'),
+                  width: '220px',
+                  render: (a) => <ReleaseCell release={a.release} />,
+                },
+                {
+                  key: 'ran',
+                  label: t('instruments.colStatus'),
+                  width: '220px',
+                  align: 'right',
+                  render: (a) => (
+                    <span className="font-mono text-[13px] tabular-nums text-fg-muted">
+                      {t('instruments.assertRan', {
+                        total: String(a.passCount + a.failCount),
+                        failed: String(a.failCount),
+                      })}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'lastFailAt',
+                  label: t('instruments.colLastFail'),
+                  width: '110px',
+                  align: 'right',
+                  render: (a) => (
+                    <span
+                      className={`font-mono text-xs ${
+                        a.lastFailAt ? 'text-kind-error' : 'text-fg-subtle'
+                      }`}
                     >
-                      <span
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{
-                          backgroundColor: healthy
-                            ? 'var(--s-kind-probe)'
-                            : 'var(--s-kind-error)',
-                        }}
-                      />
-                      <span className="min-w-0 flex-1 truncate text-fg">{a.name}</span>
-                      <span className="text-fg-subtle">{a.release}</span>
-                      <span className="tabular-nums text-fg-muted">
-                        {t('instruments.assertRan', {
-                          total: String(total),
-                          failed: String(a.failCount),
-                        })}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                      {a.lastFailAt ? formatRelative(a.lastFailAt) : '—'}
+                    </span>
+                  ),
+                },
+              ]}
+            />
           </Panel>
 
           <Panel title={`${t('instruments.probes')} (${data.probes.length})`}>
-            {data.probes.length === 0 ? (
-              <PanelEmpty>{t('instruments.probesEmpty')}</PanelEmpty>
-            ) : (
-              <div className="divide-y divide-border/60">
-                {data.probes.map((p) => {
-                  const silent = p.fireCount === 0;
-                  return (
-                    <div
-                      key={p.ref}
-                      className="flex items-center gap-3 px-3.5 py-2 font-mono text-[13px]"
-                    >
-                      <span
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{
-                          backgroundColor: silent
-                            ? 'var(--s-kind-probe)'
-                            : 'var(--s-kind-error)',
-                        }}
-                      />
-                      <span className="min-w-0 flex-1 truncate text-fg">{p.ref}</span>
-                      {p.lastSeenRelease && (
-                        <span className="text-fg-subtle">{p.lastSeenRelease}</span>
-                      )}
-                      <span className="tabular-nums text-fg-muted">
-                        {silent
-                          ? t('instruments.probeSilent', {
-                              since: formatRelative(p.registeredAt),
-                            })
-                          : t('instruments.probeFired', {
-                              count: String(p.fireCount),
-                              last: p.lastFiredAt ? formatRelative(p.lastFiredAt) : '',
-                            })}
-                      </span>
-                      {p.issueId && (
-                        <Link
-                          to={`/issues/${p.issueId}`}
-                          className="text-fg-muted underline hover:text-fg"
-                        >
-                          {t('instruments.guardedIssue')}
-                        </Link>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <DataTable<ProbeRow>
+              rows={data.probes}
+              rowKey={(p) => p.ref}
+              empty={t('instruments.probesEmpty')}
+              columns={[
+                {
+                  key: 'ref',
+                  label: t('instruments.colName'),
+                  render: (p) => (
+                    <span className="inline-flex items-center gap-2.5 font-mono text-[13px] text-fg">
+                      <Dot ok={p.fireCount === 0} />
+                      {p.ref}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'lastSeenRelease',
+                  label: t('instruments.colRelease'),
+                  width: '220px',
+                  render: (p) => <ReleaseCell release={p.lastSeenRelease} />,
+                },
+                {
+                  key: 'status',
+                  label: t('instruments.colStatus'),
+                  width: '300px',
+                  align: 'right',
+                  render: (p) => (
+                    <span className="font-mono text-[13px] tabular-nums text-fg-muted">
+                      {p.fireCount === 0
+                        ? t('instruments.probeSilent', {
+                            since: formatRelative(p.registeredAt),
+                          })
+                        : t('instruments.probeFired', {
+                            count: String(p.fireCount),
+                            last: p.lastFiredAt ? formatRelative(p.lastFiredAt) : '',
+                          })}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'issueId',
+                  label: '',
+                  width: '110px',
+                  align: 'right',
+                  render: (p) =>
+                    p.issueId ? (
+                      <Link
+                        to={`/issues/${p.issueId}`}
+                        className="text-xs text-fg-muted underline hover:text-fg"
+                      >
+                        {t('instruments.guardedIssue')}
+                      </Link>
+                    ) : (
+                      ''
+                    ),
+                },
+              ]}
+            />
           </Panel>
 
           <Panel title={`${t('instruments.traces')} (${data.traces.length})`}>
-            {data.traces.length === 0 ? (
-              <PanelEmpty>{t('instruments.tracesEmpty')}</PanelEmpty>
-            ) : (
-              <div className="divide-y divide-border/60">
-                {data.traces.map((tr) => (
-                  <div
-                    key={tr.name}
-                    className="flex items-center gap-3 px-3.5 py-2 font-mono text-[13px]"
-                  >
-                    <span className="min-w-0 flex-1 truncate text-fg">{tr.name}</span>
-                    <span className="tabular-nums text-fg-muted">
+            <DataTable<TraceRow>
+              rows={data.traces}
+              rowKey={(tr) => tr.name}
+              empty={t('instruments.tracesEmpty')}
+              columns={[
+                {
+                  key: 'name',
+                  label: t('instruments.colName'),
+                  render: (tr) => (
+                    <span className="font-mono text-[13px] text-fg">{tr.name}</span>
+                  ),
+                },
+                {
+                  key: 'volume',
+                  label: t('instruments.colVolume'),
+                  width: '180px',
+                  align: 'right',
+                  render: (tr) => (
+                    <span className="font-mono text-[13px] tabular-nums text-fg-muted">
                       {tr.eventCount}ev · {tr.usersCount}u
                     </span>
-                    <span className="w-16 text-right text-fg-subtle">
+                  ),
+                },
+                {
+                  key: 'lastSeen',
+                  label: t('instruments.colLastSeen'),
+                  width: '110px',
+                  align: 'right',
+                  render: (tr) => (
+                    <span className="font-mono text-xs text-fg-subtle">
                       {formatRelative(tr.lastSeen)}
                     </span>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ),
+                },
+              ]}
+            />
           </Panel>
         </>
       )}

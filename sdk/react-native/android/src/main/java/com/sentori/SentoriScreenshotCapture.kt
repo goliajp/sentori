@@ -156,14 +156,24 @@ object SentoriScreenshotCapture {
         maskedIds: List<String>,
         longEdgePx: Double,
         quality: Double,
-    ): Map<String, String>? {
+    ): Map<String, Any>? {
         val activity = SentoriForegroundActivity.current() ?: return null
         val window = activity.window ?: return null
         val pct = (quality * 100).toInt().coerceIn(1, 100)
         val (base64, mediaType) =
             captureScreen(window, maskedIds.toHashSet(), longEdgePx.toFloat(), pct)
                 ?: return null
-        return mapOf("base64" to base64, "mediaType" to mediaType)
+        // v5.4 — the window's logical size (dp), the same space RN's
+        // pageX/pageY taps live in: the dashboard maps tap
+        // coordinates onto the scaled-down JPEG with it.
+        val density = activity.resources.displayMetrics.density
+        val view = window.decorView
+        return mapOf(
+            "base64" to base64,
+            "mediaType" to mediaType,
+            "w" to (view.width / density).toDouble(),
+            "h" to (view.height / density).toDouble(),
+        )
     }
 
     // ── screenshot ────────────────────────────────────────────────

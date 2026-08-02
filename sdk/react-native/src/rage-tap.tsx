@@ -40,7 +40,18 @@ export function RageTapCapture({
       const target = e.nativeEvent?.target;
       if (typeof target !== 'number') return;
       const tapAt = Date.now();
-      pushSignal('tap', { target });
+      // pageX/pageY (logical pt, same space as the wireframe frames)
+      // let the dashboard draw the tap on the replay; `target` is
+      // RN's internal node tag and is only kept for the dead-tap
+      // bucketing below (insight round-4 A2).
+      const px = e.nativeEvent?.pageX;
+      const py = e.nativeEvent?.pageY;
+      pushSignal('tap', {
+        target,
+        ...(typeof px === 'number' && typeof py === 'number'
+          ? { x: Math.round(px), y: Math.round(py) }
+          : {}),
+      });
 
       // Responsiveness verdict lands after the window closes: the
       // ring tells us whether the app reacted to this tap at all.

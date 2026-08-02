@@ -32,7 +32,10 @@ export function RegressedBadge() {
   );
 }
 
-/** breadth × depth, the objective importance pair, in mono. */
+/** breadth × depth, the objective importance pair, in mono.
+ *  Events without a userKey (pre-identify boot signals) make the
+ *  breadth zero — "0u×0" is noise, so the pair collapses to the
+ *  event count alone. */
 export function ImpactCell({
   users,
   maxPerUser,
@@ -44,7 +47,8 @@ export function ImpactCell({
 }) {
   return (
     <span className="font-mono text-xs tabular-nums text-fg-muted">
-      {users}u×{maxPerUser} · {events}ev
+      {users > 0 ? `${users}u×${maxPerUser} · ` : ''}
+      {events}ev
     </span>
   );
 }

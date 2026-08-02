@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 
-import { symbolicateErrorViaMetro, symbolicateStackViaMetro } from '../handlers/dev-symbolicate';
+import {
+  parseCodeFrame,
+  symbolicateErrorViaMetro,
+  symbolicateStackViaMetro,
+} from '../handlers/dev-symbolicate';
 import type { Frame, SentoriError } from '../types';
 
 const URL = 'http://localhost:8081/symbolicate';
@@ -72,6 +76,47 @@ describe('symbolicateStackViaMetro', () => {
     });
     // node_modules + collapse → not in-app
     expect(out![1]?.inApp).toBe(false);
+    // Metro-resolved positions are real source positions — without
+    // this the dashboard stamps dev frames MINIFIED (insight A5).
+    expect(out![0]?.symbolicated).toBe(true);
+  });
+
+  test('attaches Metro codeFrame as the source window on the matching frame', async () => {
+    const esc = String.fromCharCode(27);
+    const content = [
+      `${esc}[0m  141 |   }`,
+      `${esc}[31m> 142 |   const sid = target.session.sessionId${esc}[0m`,
+      `      |                              ^`,
+      `  143 |   await api.adoptSession(sid)`,
+    ].join('\n');
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({
+          codeFrame: {
+            content,
+            fileName: '/proj/src/hooks/use-auth-listener.ts',
+            location: { column: 30, row: 142 },
+          },
+          stack: [
+            {
+              collapse: false,
+              column: 23,
+              file: '/proj/src/hooks/use-auth-listener.ts',
+              lineNumber: 142,
+              methodName: 'reseedSession',
+            },
+          ],
+        }),
+        { headers: { 'content-type': 'application/json' }, status: 200 },
+      )) as typeof fetch;
+
+    const out = await symbolicateStackViaMetro([minified(1)], { url: URL });
+    expect(out![0]).toMatchObject({
+      contextLine: '   const sid = target.session.sessionId',
+      postContext: ['   await api.adoptSession(sid)'],
+      preContext: ['   }'],
+      symbolicated: true,
+    });
   });
 
   test('keeps the original frame when Metro can’t resolve it (file null)', async () => {
@@ -104,6 +149,22 @@ describe('symbolicateStackViaMetro', () => {
         status: 200,
       })) as typeof fetch;
     expect(await symbolicateStackViaMetro([minified(1), minified(2)], { url: URL })).toBeNull();
+  });
+});
+
+describe('parseCodeFrame', () => {
+  test('returns null when no marked line exists', () => {
+    expect(parseCodeFrame('nothing here')).toBeNull();
+  });
+
+  test('skips gutter-only pointer rows', () => {
+    const win = parseCodeFrame(['  1 | a', '> 2 | b', '    |  ^', '  3 | c'].join('\n'));
+    expect(win).toEqual({
+      contextLine: ' b',
+      line: 2,
+      postContext: [' c'],
+      preContext: [' a'],
+    });
   });
 });
 

@@ -52,11 +52,14 @@
 
 :root[data-theme='light'] {
   /* ── light, Jira-calibre ink: hairlines that exist, secondary
-   * text that reads. ── */
-  --sn-bg: #f7f8fa;
-  --sn-canvas: #f1f2f5;
+   * text that reads. The four grey levels are deliberately far
+   * apart — canvas clearly grey, chrome a step lighter, cards pure
+   * white, hover/selection clearly darker than a card — so the
+   * stacking order reads at a glance. ── */
+  --sn-bg: #f3f4f7;
+  --sn-canvas: #e9ebef;
   --sn-surface: #ffffff;
-  --sn-raised: #eceef2;
+  --sn-raised: #e2e5ea;
   --sn-fg: #1c2128;
   --sn-fg-muted: #404854;
   --sn-fg-subtle: #68707e;
@@ -141,6 +144,42 @@ body {
 table,
 time {
   font-variant-numeric: tabular-nums;
+}
+
+/* Scrollbars are furniture: thin, theme-inked, invisible until
+   needed. The default chrome bar reads as a foreign object on both
+   palettes. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sn-border-strong) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background-color: var(--sn-border-strong);
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--sn-fg-subtle);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Text selection carries the brand, softly. */
+::selection {
+  background-color: color-mix(in srgb, var(--sn-accent) 28%, transparent);
+}
+
+/* Keyboard focus is always visible. Components that draw their own
+   ring (inputs, buttons) override this with their utility classes;
+   everything else — queue rows, chips, ticks — gets the accent ring
+   for free. */
+:focus-visible {
+  outline: 2px solid var(--sn-accent);
+  outline-offset: 1px;
 }
 
 /* Anyone who asked their OS to stop animating things means it. */

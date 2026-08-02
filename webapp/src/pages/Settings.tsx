@@ -1,18 +1,19 @@
 // Settings — the admin surface. Owner sections (projects / admins /
 // tokens / audit) plus the personal section (password, language).
-// Tables are fine here: the anti-data-pool rule governs observability
-// data, not management screens.
+// Jira posture throughout: visible labels on every control, real
+// tables with headers for every list, full width put to work.
 
 import { useState } from 'react';
 
 import { useShell } from '../App';
 import {
   Button,
+  DataTable,
   ErrorBanner,
+  Field,
   Input,
   PageShell,
   Panel,
-  PanelEmpty,
   Select,
   clsx,
   formatRelative,
@@ -20,6 +21,7 @@ import {
 import { useLocale, useSetLocale, useT } from '../i18n';
 import {
   api,
+  type AuditRow,
   type NotificationPref,
   type TokenRow,
   type UserRow,
@@ -72,7 +74,11 @@ export default function SettingsPage() {
 function TokensTab() {
   const t = useT();
   const { projects } = useShell();
-  const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
+  // `projects` loads async: a state initialised from projects[0] at
+  // mount stays '' forever on a direct /settings load, and the list
+  // never fetches. Derive the effective project instead.
+  const [chosenId, setChosenId] = useState<null | string>(null);
+  const projectId = chosenId ?? projects[0]?.id ?? '';
   const [name, setName] = useState('');
   const [scope, setScope] = useState<'api' | 'ingest'>('ingest');
   const [minted, setMinted] = useState<string | null>(null);
@@ -80,87 +86,122 @@ function TokensTab() {
     () => (projectId ? api.listTokens(projectId) : Promise.resolve({ tokens: [] })),
     [projectId],
   );
+  const tokens = data?.tokens ?? [];
 
   return (
-    <div className="max-w-2xl space-y-3">
-      <div className="flex gap-2">
-        {projects.length > 1 && (
-          <Select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-        )}
-        <Input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={t('settings.tokenName')}
-          className="flex-1"
-        />
-        <Select
-          value={scope}
-          onChange={(e) => setScope(e.target.value as 'api' | 'ingest')}
-        >
-          <option value="ingest">ingest</option>
-          <option value="api">api</option>
-        </Select>
-        <Button
-          variant="primary"
-          disabled={!projectId || name.trim().length === 0}
-          onClick={() => {
-            void api.createToken(projectId, name.trim(), scope).then((r) => {
-              setMinted(r.token);
-              setName('');
-              reload();
-            });
-          }}
-        >
-          {t('settings.mintToken')}
-        </Button>
-      </div>
-      {minted && (
-        <div className="rounded-lg border border-ok/40 bg-surface p-3 text-xs">
-          <p className="mb-1.5 text-fg-muted">{t('settings.tokenOnce')}</p>
-          <code className="block break-all rounded bg-bg p-2 font-mono text-fg">
-            {minted}
-          </code>
+    <div className="space-y-4">
+      <Panel title={t('settings.mintToken')}>
+        {/* items-end so the button shares the controls' baseline */}
+        <div className="flex flex-wrap items-end gap-3 p-3.5">
+          {projects.length > 1 && (
+            <Field label={t('settings.fieldProject')}>
+              <Select value={projectId} onChange={(e) => setChosenId(e.target.value)}>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+          <Field label={t('settings.tokenName')} className="w-64">
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field label={t('settings.fieldScope')}>
+            <Select
+              value={scope}
+              onChange={(e) => setScope(e.target.value as 'api' | 'ingest')}
+            >
+              <option value="ingest">ingest</option>
+              <option value="api">api</option>
+            </Select>
+          </Field>
+          <Button
+            variant="primary"
+            disabled={!projectId || name.trim().length === 0}
+            onClick={() => {
+              void api.createToken(projectId, name.trim(), scope).then((r) => {
+                setMinted(r.token);
+                setName('');
+                reload();
+              });
+            }}
+          >
+            {t('settings.mintToken')}
+          </Button>
         </div>
-      )}
-      <Panel title={`${t('settings.tab.tokens')} (${(data?.tokens ?? []).length})`}>
-        {(data?.tokens ?? []).length === 0 ? (
-          <PanelEmpty>{t('table.empty')}</PanelEmpty>
-        ) : (
-          <div className="divide-y divide-border/60">
-            {(data?.tokens ?? []).map((tok: TokenRow) => (
-              <div key={tok.id} className="flex items-center gap-3 px-3.5 py-2 text-sm">
-                <span className="flex-1 text-fg">{tok.name}</span>
+        {minted && (
+          <div className="border-t border-border p-3.5 text-xs">
+            <p className="mb-1.5 text-fg-muted">{t('settings.tokenOnce')}</p>
+            <code className="block break-all rounded bg-bg p-2 font-mono text-fg">
+              {minted}
+            </code>
+          </div>
+        )}
+      </Panel>
+
+      <Panel title={`${t('settings.tab.tokens')} (${tokens.length})`}>
+        <DataTable<TokenRow>
+          rows={tokens}
+          rowKey={(r) => r.id}
+          columns={[
+            { key: 'name', label: t('settings.tokenName') },
+            {
+              key: 'scope',
+              label: t('settings.fieldScope'),
+              width: '110px',
+              render: (r) => (
                 <span className="rounded bg-raised px-1.5 font-mono text-[11px] text-fg-muted">
-                  {tok.scope}
+                  {r.scope}
                 </span>
-                {tok.last4 && (
-                  <span className="font-mono text-xs text-fg-subtle">…{tok.last4}</span>
-                )}
-                {tok.revokedAt ? (
+              ),
+            },
+            {
+              key: 'last4',
+              label: t('settings.colToken'),
+              width: '110px',
+              render: (r) =>
+                r.last4 ? (
+                  <span className="font-mono text-xs text-fg-subtle">…{r.last4}</span>
+                ) : (
+                  '—'
+                ),
+            },
+            {
+              key: 'createdAt',
+              label: t('settings.colCreated'),
+              width: '120px',
+              align: 'right',
+              render: (r) => (
+                <span className="font-mono text-xs text-fg-subtle">
+                  {formatRelative(r.createdAt)}
+                </span>
+              ),
+            },
+            {
+              key: 'actions',
+              label: '',
+              width: '90px',
+              align: 'right',
+              render: (r) =>
+                r.revokedAt ? (
                   <span className="text-xs text-fg-subtle">{t('settings.revoked')}</span>
                 ) : (
                   <button
                     type="button"
                     onClick={() => {
-                      if (window.confirm(t('settings.revokeConfirm', { name: tok.name }))) {
-                        void api.revokeToken(tok.id).then(reload);
+                      if (window.confirm(t('settings.revokeConfirm', { name: r.name }))) {
+                        void api.revokeToken(r.id).then(reload);
                       }
                     }}
                     className="text-xs text-kind-error/70 hover:text-kind-error"
                   >
                     {t('settings.revoke')}
                   </button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+                ),
+            },
+          ]}
+        />
       </Panel>
     </div>
   );
@@ -172,65 +213,85 @@ function UsersTab() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { data, error, reload } = useAsyncData(() => api.listUsers(), []);
+  const users = data?.users ?? [];
 
   return (
-    <div className="max-w-3xl space-y-3">
+    <div className="space-y-4">
       {error && <ErrorBanner>{t('settings.usersLoadFailed')}</ErrorBanner>}
-      <div className="flex gap-2">
-        <Input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder={t('settings.adminEmail')}
-          className="flex-1"
-        />
-        <Input
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          type="password"
-          placeholder={t('settings.initialPassword')}
-          className="flex-1"
-        />
-        <Button
-          variant="primary"
-          disabled={!email.includes('@') || password.length < 8}
-          onClick={() => {
-            void api.createUser(email.trim(), password).then(() => {
-              setEmail('');
-              setPassword('');
-              reload();
-            });
-          }}
-        >
-          {t('settings.createAdmin')}
-        </Button>
-      </div>
-      <Panel title={`${t('settings.tab.users')} (${(data?.users ?? []).length})`}>
+      <Panel title={t('settings.createAdmin')}>
+        <div className="flex flex-wrap items-end gap-3 p-3.5">
+          <Field label={t('settings.adminEmail')} className="w-72">
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </Field>
+          {/* no hint line here: in an items-end inline form a hint
+              would push the neighbouring button off the baseline */}
+          <Field label={t('settings.initialPassword')} className="w-64">
+            <Input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+            />
+          </Field>
+          <Button
+            variant="primary"
+            disabled={!email.includes('@') || password.length < 8}
+            onClick={() => {
+              void api.createUser(email.trim(), password).then(() => {
+                setEmail('');
+                setPassword('');
+                reload();
+              });
+            }}
+          >
+            {t('settings.createAdmin')}
+          </Button>
+        </div>
+      </Panel>
+
+      <Panel title={`${t('settings.tab.users')} (${users.length})`}>
         <div className="divide-y divide-border/60">
-          {(data?.users ?? []).map((u: UserRow) => (
-            <div key={u.id} className="px-3.5 py-2 text-sm">
+          {/* header row — the assignment chips give each row a second
+              line, so this stays a disciplined flex list rather than
+              a <table>; the columns still line up via fixed widths */}
+          <div className="flex items-center gap-3 bg-bg/50 px-4 py-2 text-xs font-medium text-fg-muted">
+            <span className="flex-1">{t('settings.adminEmail')}</span>
+            <span className="w-24">{t('settings.colRole')}</span>
+            <span className="w-24 text-right">{t('settings.colLastLogin')}</span>
+            <span className="w-14" />
+          </div>
+          {users.map((u: UserRow) => (
+            <div key={u.id} className="px-4 py-2 text-sm">
               <div className="flex items-center gap-3">
                 <span className="flex-1 text-fg">{u.email}</span>
-                <span className="font-mono text-[11px] text-fg-subtle">{u.role}</span>
-                {u.lastLoginAt && (
-                  <span className="font-mono text-[11px] text-fg-subtle">
-                    {formatRelative(u.lastLoginAt)}
-                  </span>
-                )}
-                {u.role === 'admin' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (
-                        window.confirm(t('settings.deleteAdminConfirm', { email: u.email }))
-                      ) {
-                        void api.deleteUser(u.id).then(reload);
-                      }
-                    }}
-                    className="text-xs text-kind-error/70 hover:text-kind-error"
-                  >
-                    {t('common.delete')}
-                  </button>
-                )}
+                <span className="w-24 font-mono text-[11px] text-fg-subtle">
+                  {u.role}
+                </span>
+                <span className="w-24 text-right font-mono text-[11px] text-fg-subtle">
+                  {u.lastLoginAt ? formatRelative(u.lastLoginAt) : '—'}
+                </span>
+                <span className="w-14 text-right">
+                  {u.role === 'admin' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            t('settings.deleteAdminConfirm', { email: u.email }),
+                          )
+                        ) {
+                          void api.deleteUser(u.id).then(reload);
+                        }
+                      }}
+                      className="text-xs text-kind-error/70 hover:text-kind-error"
+                    >
+                      {t('common.delete')}
+                    </button>
+                  )}
+                </span>
               </div>
               {u.role === 'admin' && (
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -270,27 +331,51 @@ function UsersTab() {
 function AuditTab() {
   const t = useT();
   const { data, error } = useAsyncData(() => api.listAudit(200), []);
+  const entries = data?.entries ?? [];
   return (
-    <div className="max-w-4xl space-y-3">
+    <div className="space-y-4">
       {error && <ErrorBanner>{t('settings.auditLoadFailed')}</ErrorBanner>}
-      <Panel title={`${t('settings.tab.audit')} (${(data?.entries ?? []).length})`}>
-        {(data?.entries ?? []).length === 0 ? (
-          <PanelEmpty>{t('table.empty')}</PanelEmpty>
-        ) : (
-          <div className="divide-y divide-border/60">
-            {(data?.entries ?? []).map((e) => (
-              <div
-                key={e.id}
-                className="flex items-center gap-3 px-3.5 py-1.5 font-mono text-xs"
-              >
-                <span className="w-16 text-fg-subtle">{formatRelative(e.createdAt)}</span>
-                <span className="text-fg-muted">{e.actorEmail ?? '—'}</span>
-                <span className="flex-1 text-fg">{e.action}</span>
-                <span className="text-fg-subtle">{e.targetId?.slice(0, 8)}</span>
-              </div>
-            ))}
-          </div>
-        )}
+      <Panel title={`${t('settings.tab.audit')} (${entries.length})`}>
+        <DataTable<AuditRow>
+          rows={entries}
+          rowKey={(r) => r.id}
+          columns={[
+            {
+              key: 'createdAt',
+              label: t('settings.colWhen'),
+              width: '110px',
+              render: (r) => (
+                <span className="font-mono text-xs text-fg-subtle">
+                  {formatRelative(r.createdAt)}
+                </span>
+              ),
+            },
+            {
+              key: 'actorEmail',
+              label: t('settings.colActor'),
+              width: '240px',
+              render: (r) => (
+                <span className="text-fg-muted">{r.actorEmail ?? '—'}</span>
+              ),
+            },
+            {
+              key: 'action',
+              label: t('settings.colAction'),
+              render: (r) => <span className="font-mono text-xs text-fg">{r.action}</span>,
+            },
+            {
+              key: 'targetId',
+              label: t('settings.colTarget'),
+              width: '120px',
+              align: 'right',
+              render: (r) => (
+                <span className="font-mono text-xs text-fg-subtle">
+                  {r.targetId?.slice(0, 8) ?? '—'}
+                </span>
+              ),
+            },
+          ]}
+        />
       </Panel>
     </div>
   );
@@ -305,33 +390,23 @@ function AccountTab() {
   const [saved, setSaved] = useState(false);
 
   return (
-    <div className="max-w-md space-y-3">
-      <Panel title={t('settings.language')}>
-        <div className="p-3.5">
-          <Select
-            value={locale}
-            onChange={(e) => setLocale(e.target.value as typeof locale)}
-          >
-            <option value="en">English</option>
-            <option value="ja">日本語</option>
-            <option value="zh">简体中文</option>
-          </Select>
-        </div>
-      </Panel>
+    <div className="grid max-w-4xl grid-cols-1 items-start gap-4 md:grid-cols-2">
       <Panel title={t('settings.changePassword')}>
-        <div className="space-y-2 p-3.5">
-          <Input
-            type="password"
-            value={current}
-            onChange={(e) => setCurrent(e.target.value)}
-            placeholder={t('settings.currentPassword')}
-          />
-          <Input
-            type="password"
-            value={next}
-            onChange={(e) => setNext(e.target.value)}
-            placeholder={t('settings.newPassword')}
-          />
+        <div className="space-y-3 p-3.5">
+          <Field label={t('settings.currentPassword')}>
+            <Input
+              type="password"
+              value={current}
+              onChange={(e) => setCurrent(e.target.value)}
+            />
+          </Field>
+          <Field label={t('settings.newPassword')}>
+            <Input
+              type="password"
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+            />
+          </Field>
           <Button
             variant="primary"
             disabled={current.length === 0 || next.length < 8}
@@ -346,6 +421,20 @@ function AccountTab() {
           >
             {saved ? t('settings.saved') : t('settings.save')}
           </Button>
+        </div>
+      </Panel>
+      <Panel title={t('settings.language')}>
+        <div className="p-3.5">
+          <Field label={t('settings.language')}>
+            <Select
+              value={locale}
+              onChange={(e) => setLocale(e.target.value as typeof locale)}
+            >
+              <option value="en">English</option>
+              <option value="ja">日本語</option>
+              <option value="zh">简体中文</option>
+            </Select>
+          </Field>
         </div>
       </Panel>
     </div>
@@ -379,7 +468,7 @@ function NotificationsTab() {
   };
 
   return (
-    <div className="max-w-2xl space-y-3">
+    <div className="space-y-4">
       <Panel title={t('notify.smtpTitle')}>
         <div className="p-3.5">
           {smtp.data && smtp.data.configured && (
@@ -425,7 +514,7 @@ function NotificationsTab() {
           </div>
         )}
         {rows.length === 0 && !prefs.loading && !prefs.error && (
-          <PanelEmpty>{t('table.empty')}</PanelEmpty>
+          <p className="px-3.5 py-4 text-sm text-fg-subtle">{t('table.empty')}</p>
         )}
         {rows.length > 0 && (
           <>

@@ -89,7 +89,48 @@ function fromMetroFrame(m: MetroFrame, fallback: Frame): Frame {
     function: m.methodName ?? undefined,
     inApp: !m.collapse && !m.file.includes('node_modules'),
     line: typeof m.lineNumber === 'number' ? m.lineNumber : 0,
+    // These ARE real source positions — without the flag the
+    // dashboard stamped Metro-resolved dev frames MINIFIED
+    // (insight round-4 A5).
+    symbolicated: true,
   };
+}
+
+/** Metro's `codeFrame.content` is an ANSI-coloured code frame:
+ *
+ *      140 |     return
+ *    > 142 |   const sid = target.session.sessionId
+ *          |                              ^
+ *      143 |   await api.adoptSession(sid)
+ *
+ *  Parse it into the wire's source-window fields so the dev
+ *  dashboard shows the failing line in context, same as release
+ *  builds get from the sourcemap's sourcesContent. */
+export function parseCodeFrame(content: string): null | {
+  line: number;
+  preContext: string[];
+  contextLine: string;
+  postContext: string[];
+} {
+  // eslint-disable-next-line no-control-regex
+  const clean = content.replace(/\u001b\[[0-9;]*m/g, '');
+  const pre: string[] = [];
+  const post: string[] = [];
+  let hit: null | { line: number; text: string } = null;
+  for (const raw of clean.split('\n')) {
+    const m = /^(>?)\s*(\d+)\s\|(.*)$/.exec(raw);
+    if (!m) continue; // gutter-only rows (the ^ pointer) carry no source
+    const text = m[3] ?? '';
+    if (m[1] === '>') {
+      hit = { line: Number(m[2]), text };
+    } else if (hit) {
+      post.push(text);
+    } else {
+      pre.push(text);
+    }
+  }
+  if (!hit) return null;
+  return { contextLine: hit.text, line: hit.line, postContext: post, preContext: pre };
 }
 
 /**
@@ -118,9 +159,34 @@ export async function symbolicateStackViaMetro(
       clearTimeout(timer);
     }
     if (!resp.ok) return null;
-    const body = (await resp.json()) as { stack?: MetroFrame[] };
+    const body = (await resp.json()) as {
+      codeFrame?: { content?: string; fileName?: string; location?: { row?: number } };
+      stack?: MetroFrame[];
+    };
     if (!Array.isArray(body.stack) || body.stack.length !== frames.length) return null;
-    return body.stack.map((m, i) => fromMetroFrame(m, frames[i]!));
+    const mapped = body.stack.map((m, i) => fromMetroFrame(m, frames[i]!));
+    // Metro sends one codeFrame (for the crashing frame): attach its
+    // source window to the frame it belongs to, or the top in-app
+    // frame when the location doesn't match any.
+    const codeFrame = body.codeFrame;
+    if (typeof codeFrame?.content === 'string') {
+      const win = parseCodeFrame(codeFrame.content);
+      if (win) {
+        const exact = mapped.findIndex(
+          (f) => f.file === codeFrame.fileName && f.line === codeFrame.location?.row,
+        );
+        const at = exact >= 0 ? exact : mapped.findIndex((f) => f.inApp);
+        if (at >= 0) {
+          mapped[at] = {
+            ...mapped[at]!,
+            contextLine: win.contextLine,
+            postContext: win.postContext,
+            preContext: win.preContext,
+          };
+        }
+      }
+    }
+    return mapped;
   } catch {
     return null;
   }
