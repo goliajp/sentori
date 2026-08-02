@@ -81,7 +81,7 @@ public class SentoriModule: Module {
         // quality come from JS so the frame budget is tunable without
         // a native release.
         AsyncFunction("captureReplayFrame") {
-            (maskedIds: [String], longEdgePx: Double, quality: Double) -> [String: String]? in
+            (maskedIds: [String], longEdgePx: Double, quality: Double) -> [String: Any]? in
             return SentoriScreenshotCapture.captureReplayFrame(
                 maskedIds: maskedIds,
                 longEdgePx: longEdgePx,

@@ -75,7 +75,7 @@ type SentoriNativeModule = {
     maskedIds: string[],
     longEdgePx: number,
     quality: number,
-  ) => Promise<null | { base64: string; mediaType: string }>
+  ) => Promise<null | { base64: string; mediaType: string; w?: number; h?: number }>
   /**
    * v0.9.12 — diagnostic readout for the wireframe path. Cheap
    * synchronous call that returns the path the last `captureWireframe`
@@ -402,7 +402,7 @@ export async function captureNativeReplayFrame(
   maskedIds: string[],
   longEdgePx: number,
   quality: number,
-): Promise<null | { base64: string; mediaType: string }> {
+): Promise<null | { base64: string; mediaType: string; w?: number; h?: number }> {
   const n = native()
   if (!n) return null
   if (!n.captureReplayFrame) {

@@ -89,8 +89,8 @@ import UIKit
         maskedIds: [String],
         longEdgePx: Double,
         quality: Double
-    ) -> [String: String]? {
-        let run: () -> [String: String]? = {
+    ) -> [String: Any]? {
+        let run: () -> [String: Any]? = {
             guard let window = keyWindowDiag().window else { return nil }
             guard
                 let jpeg = renderJpegBase64(
@@ -100,12 +100,20 @@ import UIKit
                     quality: CGFloat(quality)
                 )
             else { return nil }
-            return ["base64": jpeg, "mediaType": "image/jpeg"]
+            // v5.4 — the window's logical size (pt), the same space
+            // RN's pageX/pageY taps live in: the dashboard maps tap
+            // coordinates onto the scaled-down JPEG with it.
+            return [
+                "base64": jpeg,
+                "mediaType": "image/jpeg",
+                "w": Double(window.bounds.width),
+                "h": Double(window.bounds.height),
+            ]
         }
         if Thread.isMainThread {
             return run()
         }
-        var result: [String: String]?
+        var result: [String: Any]?
         DispatchQueue.main.sync { result = run() }
         return result
     }

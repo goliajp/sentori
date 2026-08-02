@@ -28,7 +28,16 @@ const FRAME_LONG_EDGE_PX = 360;
 /** JPEG/WebP quality for replay frames. */
 const FRAME_QUALITY = 0.35;
 
-type ScreenFrame = { t: number; base64: string; mediaType: string };
+type ScreenFrame = {
+  t: number;
+  base64: string;
+  mediaType: string;
+  /** Window logical size (pt/dp), same space as tap pageX/pageY —
+   *  present from native ≥ 5.4; older binaries omit it and the
+   *  dashboard simply draws no tap markers on pixels. */
+  w?: number;
+  h?: number;
+};
 
 let _ring: ScreenFrame[] = [];
 let _capacity = 0;
@@ -75,6 +84,9 @@ export const drainScreenReplay = (): null | string => {
       JSON.stringify({
         t: Number(((f.t - now) / 1000).toFixed(1)),
         mediaType: f.mediaType,
+        ...(typeof f.w === 'number' && typeof f.h === 'number'
+          ? { w: f.w, h: f.h }
+          : {}),
         base64: f.base64,
       }),
     )

@@ -15,7 +15,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '../i18n';
 import { api } from '../lib/api';
 
-type ReplayFrame = { t: number; mediaType: string; base64: string };
+type ReplayFrame = {
+  t: number;
+  mediaType: string;
+  base64: string;
+  /** Window logical size (pt/dp) — present from SDK native ≥ 5.4;
+   *  the tap markers need it to map coordinates onto the JPEG. */
+  w?: number;
+  h?: number;
+};
 
 const PLAYBACK_SPEED = 4;
 
@@ -24,6 +32,7 @@ export function ReplayPlayer({
   seek,
   onFrames,
   onTime,
+  taps,
 }: {
   attachmentRef: string;
   /** Timeline → replay: jump to the frame nearest this moment
@@ -35,6 +44,10 @@ export function ReplayPlayer({
   /** Replay → page: the playhead moment (relative s), on every
    *  frame step — the signal list highlights along. */
   onTime?: (t: number) => void;
+  /** Tap moments with logical-pt coordinates (SDK ≥ 5.3): drawn as
+   *  rings over the frame near their moment — needs frames that
+   *  carry the window size (native ≥ 5.4), else nothing is drawn. */
+  taps?: { t: number; x: number; y: number }[];
 }) {
   const t = useT();
   const [frames, setFrames] = useState<null | ReplayFrame[]>(null);
@@ -166,11 +179,33 @@ export function ReplayPlayer({
           viewport-sized block. */}
       <div className="mx-auto flex aspect-square w-full max-w-[440px] items-center justify-center bg-bg p-3">
         {src && (
-          <img
-            src={src}
-            alt={t('replay.frameAlt', { t: current!.t.toFixed(1) })}
-            className="max-h-full max-w-full rounded-sm border border-border object-contain"
-          />
+          // relative wrapper shrink-wraps the img, so percentage
+          // positions inside it ARE positions on the frame
+          <span className="relative inline-flex max-h-full max-w-full">
+            <img
+              src={src}
+              alt={t('replay.frameAlt', { t: current!.t.toFixed(1) })}
+              className="max-h-full max-w-full rounded-sm border border-border object-contain"
+            />
+            {typeof current!.w === 'number' &&
+              typeof current!.h === 'number' &&
+              (taps ?? [])
+                .filter((tap) => Math.abs(tap.t - current!.t) <= 1.5)
+                .map((tap, i) => (
+                  <span
+                    key={i}
+                    aria-hidden
+                    className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2"
+                    style={{
+                      left: `${(tap.x / current!.w!) * 100}%`,
+                      top: `${(tap.y / current!.h!) * 100}%`,
+                      borderColor: 'var(--s-kind-warn)',
+                      backgroundColor:
+                        'color-mix(in srgb, var(--s-kind-warn) 30%, transparent)',
+                    }}
+                  />
+                ))}
+          </span>
         )}
       </div>
       <div className="flex items-center gap-2.5 border-t border-border px-3 py-2">
