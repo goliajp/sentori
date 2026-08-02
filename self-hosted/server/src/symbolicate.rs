@@ -182,7 +182,7 @@ fn rewrite_frame(map: &ParsedMap, frame: &mut Value) -> bool {
 /// ±5, the industry-standard reading window: enough to see the
 /// statement in its surroundings, small enough that a 30-frame
 /// stack stays a few KB of payload.
-const CONTEXT_LINES: usize = 5;
+const CONTEXT_LINES: usize = 11;
 
 /// A single source line is clipped so a generated/minified original
 /// (or a data-URI literal) cannot balloon the event payload.
