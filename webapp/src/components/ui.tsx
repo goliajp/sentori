@@ -17,6 +17,8 @@ import { Link } from 'react-router-dom';
 
 import { useT } from '../i18n';
 
+import goliaMark from '../assets/golia-mark.svg';
+
 // ── Card ───────────────────────────────────────────────────
 
 export function Card({
@@ -250,8 +252,11 @@ export function PageShell({
         <h1 className="text-sm font-semibold">{title}</h1>
         {toolbar}
       </header>
+      {/* Full width: an app pane uses the monitor it was given.
+          Density comes from the tables' own column discipline, not
+          from a page-level width cap. */}
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        <div className="max-w-[1100px] space-y-4">{children}</div>
+        <div className="space-y-4">{children}</div>
       </div>
     </div>
   );
@@ -297,6 +302,45 @@ export function Panel({
 /** A quiet in-panel empty line — the panel stays, the void goes. */
 export function PanelEmpty({ children }: { children: ReactNode }) {
   return <p className="px-3.5 py-4 text-sm text-fg-subtle">{children}</p>;
+}
+
+/** A labelled control — the form primitive. The label is visible
+ *  (placeholder-only forms make the reader hold the schema in their
+ *  head), sits above the control, and clicks through to it. */
+export function Field({
+  label,
+  hint,
+  children,
+  className = '',
+}: {
+  label: ReactNode;
+  hint?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <label className={`block ${className}`}>
+      <span className="mb-1 block text-xs font-medium text-fg-muted">{label}</span>
+      {children}
+      {hint && <span className="mt-1 block text-xs text-fg-subtle">{hint}</span>}
+    </label>
+  );
+}
+
+/** The public pages' shared frame: brand above, one card, canvas
+ *  behind — the same visual family as the app the door leads into. */
+export function AuthShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-4 flex items-center justify-center gap-2">
+          <img src={goliaMark} alt="GOLIA" className="h-5 w-5" />
+          <span className="text-lg font-semibold tracking-tight text-fg">sentori</span>
+        </div>
+        <div className="rounded-lg border border-border bg-surface p-6">{children}</div>
+      </div>
+    </div>
+  );
 }
 
 /** A keycap, wherever a shortcut is named. One definition so ⌘K in
