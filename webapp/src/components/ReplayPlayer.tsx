@@ -23,6 +23,7 @@ export function ReplayPlayer({
   attachmentRef,
   seek,
   onFrames,
+  onTime,
 }: {
   attachmentRef: string;
   /** Timeline → replay: jump to the frame nearest this moment
@@ -31,6 +32,9 @@ export function ReplayPlayer({
   seek?: { t: number; n: number } | null;
   /** Replay → timeline: the loaded frame moments (relative s). */
   onFrames?: (times: number[]) => void;
+  /** Replay → page: the playhead moment (relative s), on every
+   *  frame step — the signal list highlights along. */
+  onTime?: (t: number) => void;
 }) {
   const t = useT();
   const [frames, setFrames] = useState<null | ReplayFrame[]>(null);
@@ -68,6 +72,14 @@ export function ReplayPlayer({
   useEffect(() => {
     if (frames) onFrames?.(frames.map((f) => f.t));
   }, [frames, onFrames]);
+
+  // Playhead position, up to the page (drives the signal-list
+  // highlight). Fires at frame pacing, ~2–4 Hz.
+  useEffect(() => {
+    if (frames && frames.length > 0 && onTime) {
+      onTime(frames[Math.min(idx, frames.length - 1)]!.t);
+    }
+  }, [frames, idx, onTime]);
 
   // Advance on a per-frame timer scaled by the real inter-frame gap.
   // The end-of-strip stop happens inside the timer callback (never

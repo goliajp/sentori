@@ -90,6 +90,7 @@ export function WireframePlayer({
   attachmentRef,
   seek,
   onFrames,
+  onTime,
 }: {
   attachmentRef: string;
   /** Timeline → replay: jump to the frame nearest this moment
@@ -98,6 +99,9 @@ export function WireframePlayer({
   seek?: { t: number; n: number } | null;
   /** Replay → timeline: the loaded frame moments (relative s). */
   onFrames?: (times: number[]) => void;
+  /** Replay → page: the playhead moment (relative s), on every
+   *  frame step — the signal list highlights along. */
+  onTime?: (t: number) => void;
 }) {
   const t = useT();
   const [frames, setFrames] = useState<Frame[] | null>(null);
@@ -133,6 +137,15 @@ export function WireframePlayer({
       onFrames?.(frames.map((f) => (f.ts - last) / 1000));
     }
   }, [frames, onFrames]);
+
+  // Playhead position, up to the page (drives the signal-list
+  // highlight). Cheap: fires at frame pacing, ~2–4 Hz.
+  useEffect(() => {
+    if (frames && frames.length > 0 && onTime) {
+      const lastTs = frames[frames.length - 1]!.ts;
+      onTime((frames[Math.min(index, frames.length - 1)]!.ts - lastTs) / 1000);
+    }
+  }, [frames, index, onTime]);
 
   // Seek applies during render (the adjust-state-from-props pattern)
   // — an effect would be a cascading second render for no gain.

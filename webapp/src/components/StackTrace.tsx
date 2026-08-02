@@ -31,10 +31,44 @@ export type StackFrame = {
 
 const MAX_FRAMES = 40;
 
+/** Strip the directory prefix every frame shares — dev builds carry
+ *  the developer's absolute machine paths (`/Users/x/workspace/…`),
+ *  which are noise AND leak the local username onto a shared board.
+ *  The common prefix is computed per stack, so release-build
+ *  repo-relative paths pass through untouched. The full path stays
+ *  in the hover. */
+function commonPrefix(paths: string[]): string {
+  const splitted = paths
+    .filter((p) => p.startsWith('/'))
+    .map((p) => p.split('/').slice(0, -1));
+  if (splitted.length < 2) return '';
+  let prefix = splitted[0]!;
+  for (const segs of splitted.slice(1)) {
+    let i = 0;
+    while (i < prefix.length && i < segs.length && prefix[i] === segs[i]) i++;
+    prefix = prefix.slice(0, i);
+  }
+  // Only strip a real machine prefix (at least /Users/x or /home/x),
+  // and keep the repo dir itself readable.
+  return prefix.length >= 3 ? prefix.join('/') + '/' : '';
+}
+
+/** `minified` means the reader is looking at bundle coordinates.
+ *  A dev-client stack symbolicated against Metro has real function
+ *  names and file paths but (pre-5.3 SDKs) no `symbolicated` flag —
+ *  flagging those frames MINIFIED is wrong. The badge shows only
+ *  when the location actually looks like a bundle. */
+function looksMinified(f: StackFrame): boolean {
+  if (f.symbolicated === true) return false;
+  const file = f.file ?? '';
+  return /^https?:\/\//.test(file) || /\.(bundle|jsbundle)/.test(file);
+}
+
 export function StackTrace({ frames }: { frames: StackFrame[] }) {
   const t = useT();
   const shown = frames.slice(0, MAX_FRAMES);
   const anyInApp = shown.some((f) => f.inApp === true);
+  const strip = commonPrefix(shown.map((f) => f.file ?? ''));
 
   // Group runs of library frames so they collapse to one row each —
   // but only when there are in-app frames to anchor the reading.
@@ -51,10 +85,10 @@ export function StackTrace({ frames }: { frames: StackFrame[] }) {
       {groups.map((g, gi) =>
         g.inApp ? (
           g.frames.map(({ f, i }) => (
-            <AppFrame key={i} frame={f} defaultOpen={i < 3} />
+            <AppFrame key={i} frame={f} defaultOpen={i < 3} strip={strip} />
           ))
         ) : (
-          <LibraryRun key={`lib-${gi}`} frames={g.frames} />
+          <LibraryRun key={`lib-${gi}`} frames={g.frames} strip={strip} />
         ),
       )}
       {frames.length > MAX_FRAMES && (
@@ -68,10 +102,21 @@ export function StackTrace({ frames }: { frames: StackFrame[] }) {
 
 /** One in-app frame: header row + (when the server resolved it) the
  *  source window. */
-function AppFrame({ frame, defaultOpen }: { frame: StackFrame; defaultOpen: boolean }) {
+function AppFrame({
+  frame,
+  defaultOpen,
+  strip,
+}: {
+  frame: StackFrame;
+  defaultOpen: boolean;
+  strip: string;
+}) {
   const t = useT();
   const hasContext = typeof frame.contextLine === 'string';
   const [open, setOpen] = useState(defaultOpen && hasContext);
+  const shownFile = frame.file?.startsWith(strip)
+    ? frame.file.slice(strip.length)
+    : frame.file;
 
   return (
     <div className="border-b border-border last:border-b-0">
@@ -93,12 +138,15 @@ function AppFrame({ frame, defaultOpen }: { frame: StackFrame; defaultOpen: bool
         <span className="shrink-0 font-medium text-fg">
           {frame.function ?? '?'}
         </span>
-        <span className="min-w-0 flex-1 truncate text-fg-subtle">
-          {frame.file ?? '?'}
+        <span
+          className="min-w-0 flex-1 truncate text-fg-subtle"
+          title={frame.file}
+        >
+          {shownFile ?? '?'}
           {frame.line !== undefined ? `:${frame.line}` : ''}
           {frame.column !== undefined ? `:${frame.column}` : ''}
         </span>
-        {frame.symbolicated !== true && (
+        {looksMinified(frame) && (
           <span className="shrink-0 rounded border border-border-strong px-1 text-[10px] uppercase tracking-wide text-fg-subtle">
             {t('stack.minified')}
           </span>
@@ -154,7 +202,13 @@ function SourceWindow({ frame }: { frame: StackFrame }) {
 }
 
 /** A run of consecutive library frames, folded to one row. */
-function LibraryRun({ frames }: { frames: { f: StackFrame; i: number }[] }) {
+function LibraryRun({
+  frames,
+  strip,
+}: {
+  frames: { f: StackFrame; i: number }[];
+  strip: string;
+}) {
   const t = useT();
   const [open, setOpen] = useState(false);
 
@@ -181,8 +235,8 @@ function LibraryRun({ frames }: { frames: { f: StackFrame; i: number }[] }) {
             className="flex items-baseline gap-2 py-0.5 pl-8 pr-3.5 font-mono text-xs text-fg-subtle"
           >
             <span>{f.function ?? '?'}</span>
-            <span className="min-w-0 flex-1 truncate">
-              {f.file ?? '?'}
+            <span className="min-w-0 flex-1 truncate" title={f.file}>
+              {(f.file?.startsWith(strip) ? f.file.slice(strip.length) : f.file) ?? '?'}
               {f.line !== undefined ? `:${f.line}` : ''}
             </span>
           </div>
