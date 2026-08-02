@@ -36,6 +36,8 @@ export const zh: Messages = {
   'inbox.group.ignored': '已忽略',
   'inbox.group.open': '未解决',
   'inbox.group.resolved': '已解决',
+  'inbox.envAll': '全部环境',
+  'inbox.envFilter': '环境',
   'inbox.groupNew': '新增 · 24h',
   'inbox.groupRegressed': '回归',
   'inbox.loadFailed': '收件箱加载失败。',

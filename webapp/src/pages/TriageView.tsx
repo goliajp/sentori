@@ -28,7 +28,18 @@ export default function TriageView() {
 
   const status = (search.get('status') ?? 'open') as 'ignored' | 'open' | 'resolved';
   const kind = search.get('kind');
+  const env = search.get('env');
   const projectId = activeProject?.id ?? null;
+
+  // Deployment environments actually seen — the env filter's options.
+  const { data: envData } = useAsyncData(
+    () =>
+      projectId
+        ? api.projectEnvironments(projectId)
+        : Promise.resolve({ environments: [] }),
+    [projectId],
+  );
+  const environments = envData?.environments ?? [];
 
   const setFilter = (key: string, value: string | null) => {
     const next = new URLSearchParams(search);
@@ -44,9 +55,10 @@ export default function TriageView() {
         status,
         kind: kind ?? undefined,
         projectId: projectId ?? undefined,
+        environment: env ?? undefined,
         limit: 200,
       }),
-    [status, kind, projectId],
+    [status, kind, env, projectId],
   );
 
   // Captured per render, not inside the memo (react-hooks/purity).
@@ -185,6 +197,23 @@ export default function TriageView() {
             </span>
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1">
+            {/* deployment-environment slice — only when the project
+                reports more than one */}
+            {environments.length > 1 && (
+              <select
+                value={env ?? ''}
+                onChange={(e) => setFilter('env', e.target.value || null)}
+                aria-label={t('inbox.envFilter')}
+                className="mr-1 h-[22px] rounded border border-border bg-surface px-1 font-mono text-[11px] text-fg-muted"
+              >
+                <option value="">{t('inbox.envAll')}</option>
+                {environments.map((e) => (
+                  <option key={e} value={e}>
+                    {e}
+                  </option>
+                ))}
+              </select>
+            )}
             {KINDS.map((k) => (
               <button
                 key={k}

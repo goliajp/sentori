@@ -234,6 +234,10 @@ pub fn router(state: Arc<AppState>) -> Router {
             get(admin::projects::health),
         )
         .route(
+            "/admin/api/projects/{project_id}/environments",
+            get(admin::projects::environments),
+        )
+        .route(
             "/admin/api/projects/{project_id}/instruments",
             get(instruments::get),
         )

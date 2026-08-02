@@ -317,14 +317,27 @@ class Api {
   }
 
   // ── issues ──
-  listIssues(q: { status?: string; kind?: string; projectId?: string; limit?: number }) {
+  listIssues(q: {
+    status?: string;
+    kind?: string;
+    projectId?: string;
+    limit?: number;
+    environment?: string;
+  }) {
     const usp = new URLSearchParams();
     if (q.status) usp.set('status', q.status);
     if (q.kind) usp.set('kind', q.kind);
     if (q.projectId) usp.set('project_id', q.projectId);
     if (q.limit) usp.set('limit', String(q.limit));
+    if (q.environment) usp.set('environment', q.environment);
     const qs = usp.toString();
     return this.get<{ issues: IssueSummary[] }>(`/admin/api/issues${qs ? `?${qs}` : ''}`);
+  }
+  /** Deployment environments this project's events have reported. */
+  projectEnvironments(projectId: string) {
+    return this.get<{ environments: string[] }>(
+      `/admin/api/projects/${projectId}/environments`,
+    );
   }
   getIssue(id: string) {
     return this.get<IssueDetail>(`/admin/api/issues/${id}`);
