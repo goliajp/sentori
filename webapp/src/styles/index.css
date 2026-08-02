@@ -52,11 +52,14 @@
 
 :root[data-theme='light'] {
   /* ── light, Jira-calibre ink: hairlines that exist, secondary
-   * text that reads. ── */
-  --sn-bg: #f7f8fa;
-  --sn-canvas: #f1f2f5;
+   * text that reads. The four grey levels are deliberately far
+   * apart — canvas clearly grey, chrome a step lighter, cards pure
+   * white, hover/selection clearly darker than a card — so the
+   * stacking order reads at a glance. ── */
+  --sn-bg: #f3f4f7;
+  --sn-canvas: #e9ebef;
   --sn-surface: #ffffff;
-  --sn-raised: #eceef2;
+  --sn-raised: #e2e5ea;
   --sn-fg: #1c2128;
   --sn-fg-muted: #404854;
   --sn-fg-subtle: #68707e;
