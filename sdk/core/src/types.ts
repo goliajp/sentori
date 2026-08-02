@@ -41,14 +41,19 @@ export type SentoriError = {
 }
 
 /**
- * One entry of the signal ring — the last-30-seconds context that
+ * One entry of the signal ring — the last-60-seconds context that
  * ships inside `payload.signals` when an error/warn goes out.
  * Replaces the Sentry breadcrumb + trail pair.
  */
 export type Signal = {
   /** Seconds relative to the event (negative = before). */
   t: number
-  /** nav | tap | http | lifecycle | trace | log */
+  /**
+   * Auto-produced: nav | tap | lifecycle | freeze | push.
+   * Host-produced via `pushSignal` (any kind accepted); dashboard
+   * conventions: `http` with { method, url, status, ms } for a
+   * request's outcome, `trace` for quiet business breadcrumbs.
+   */
   kind: string
   data?: Record<string, unknown>
 }
