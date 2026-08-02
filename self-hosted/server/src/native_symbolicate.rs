@@ -28,7 +28,7 @@ use uuid::Uuid;
 use sentori_dwarf_resolver::DwarfModule;
 use sentori_proguard_resolver::ParsedMapping;
 
-const CONTEXT_LINES: usize = 5;
+const CONTEXT_LINES: usize = 11;
 const MAX_CONTEXT_LINE_CHARS: usize = 300;
 
 /// Parsed srcbundle: project-relative path → file content.
@@ -340,15 +340,15 @@ mod tests {
 
     #[test]
     fn srcbundle_window_fills_context() -> Result<(), Box<dyn std::error::Error>> {
-        let src = (1..=12)
+        let src = (1..=30)
             .map(|n| format!("kt line {n}"))
             .collect::<Vec<_>>()
             .join("\n");
         let bundle = SrcBundle::parse(json!({ "app/src/Pay.kt": src }).to_string().as_bytes())
             .ok_or("bundle parse failed")?;
-        let mut frame = json!({ "file": "Pay.kt", "line": 7 });
+        let mut frame = json!({ "file": "Pay.kt", "line": 15 });
         fill_context(Some(&bundle), &mut frame);
-        assert_eq!(frame["contextLine"], "kt line 7");
+        assert_eq!(frame["contextLine"], "kt line 15");
         assert_eq!(
             frame["preContext"].as_array().ok_or("pre missing")?.len(),
             CONTEXT_LINES
