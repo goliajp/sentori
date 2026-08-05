@@ -70,6 +70,11 @@ export const en = {
   'instruments.assertsEmpty':
     'No production assertions yet — sentori.assert(name, ok) creates the liveness ledger.',
   'instruments.guardedIssue': 'guarded issue',
+  'instruments.colSamples': 'Samples',
+  'instruments.launch': 'Launch',
+  'instruments.launchEmpty':
+    'No staged launch data yet — call sentori.launch.complete() when the app becomes usable (optionally sentori.launch.mark(name) for waypoints); every start aggregates into app.launch.',
+  'instruments.prewarmedTip': 'pre-warmed phantom samples, excluded from percentiles',
   'instruments.loadFailed': 'Could not load instruments.',
   'instruments.noProject': 'No project yet',
   'instruments.probeFired': 'fired {count}× · last {last}',
