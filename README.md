@@ -1,31 +1,29 @@
 # Sentori
 
-> Error tracking, built React-first. Self-hostable.
+> Self-hosted observability for mobile apps. Five kinds of signal,
+> eight verbs, zero cost to the host app.
 
-First-class SDKs for **React, React Native, Next.js, Vue, Svelte,
-and SolidJS** — and a camelCase wire protocol any other platform
-can speak. Dense Linear-style dashboard, single Rust binary
-deploy. Self-host on a VM today; managed SaaS at
-[sentori.golia.jp](https://sentori.golia.jp).
+Sentori watches a React Native app the way a triager actually works:
+**errors** (what broke), **warns** (where users hurt — rage taps,
+long freezes, slow launches, detected automatically), **traces**
+(what happened), **asserts** (what should hold — and never halts
+production), and **probes** (did that bug come back). Events group
+into issues; every issue is a self-contained case file — session
+replay, the failing source line, the user's own actions, the minute
+before — on a dense, fast dashboard.
 
-![iOS showcase hero](marketing/assets/showcase-hero.png)
-
----
+One Rust binary + PostgreSQL. Your data never leaves your machines.
 
 ## What's in the box
 
 | | What | Where |
 |---|---|---|
-| 📡 | **SDKs** | `sdk/` — `@goliapkg/sentori-{core,javascript,react,react-native,next,vue,svelte,solid,expo}` |
-| ✋ | **Manual instrumentation** | `sentori.captureMessage` / `startTrace` / `startSpan` / `withScopedSpan` / `track` / `recordMetric(..., { parent })` / `addBreadcrumb` — one first-class API per signal. See `docs-site` recipes: `manual-issue`, `manual-trace`, `manual-span`, `manual-moment`, `track-and-metrics`, `manual-breadcrumb`, `v1-to-v2-migration` |
-| 🔁 | **Sentry compat** | `@goliapkg/sentori-{javascript,react-native,…}/compat` — drop-in `import * as Sentry from "@goliapkg/sentori-react-native/compat"` |
-| 🖥️ | **Dashboard** | `web/` — React 19 + Vite + Tailwind v4 SPA, served at `/main` |
-| 🚀 | **iOS showcase** | `apps/ios-showcase/` — SwiftUI 6 / iOS 26 native demo |
-| ⚙️ | **Server** | `server/` — Rust + axum 0.8, PostgreSQL 18, Valkey |
-| 🔧 | **CLIs** | `cli/` (Rust, source-map upload) + `sdk/cli/` (Node, issue triage + MCP) |
-| 📚 | **Docs site** | `docs-site/` — Astro Starlight at [sentori.golia.jp/docs](https://sentori.golia.jp/docs) |
-
----
+| 📱 | **React Native SDK** | `sdk/react-native` — JS + Swift + Kotlin, Expo module (bare RN works too) |
+| 🧩 | **Core** | `sdk/core` — types, wire protocol, the never-throw safety layer |
+| 🔧 | **CLI** | `sdk/cli` — sourcemap / dSYM / Proguard / source-bundle upload, probe registry, MCP server for AI triage |
+| ⚙️ | **Server** | `self-hosted/server` — Rust + axum, PostgreSQL 18 |
+| 🖥️ | **Dashboard** | `webapp/` — React 19 SPA, baked into the server image |
+| 🚀 | **Deploy** | `self-hosted/docker` — one compose file, distroless image |
 
 ## Use it from a React Native app (60 s)
 
@@ -38,138 +36,86 @@ cd ios && pod install --repo-update
 import { sentori } from '@goliapkg/sentori-react-native'
 
 sentori.init({
-  token: '<your project token>',  // st_pk_…
+  token: 'st_…',                       // ingest token, Settings → Tokens
+  ingestUrl: 'https://sentori.your-domain.example',
   release: 'my-app@1.2.3',
-  environment: 'prod',
-  // ingestUrl is optional — defaults to https://ingest.sentori.golia.jp.
-  // Override only if you're self-hosting.
-  capture: { replay: { mode: 'wireframe', hz: 1 } },
+  environment: 'production',
 })
 
-// Optional — privacy-preserving cross-project user lookup. Identity
-// is hashed on-device; the server never sees raw email / phone.
-sentori.setUser({ linkBy: { email: user.email } })
+sentori.error(new Error('boom'))       // what broke
+sentori.warn('pay.gateway-retry')      // where users hurt
+sentori.trace('checkout.start')        // what happened
+sentori.assert('total-positive', ok)   // what should hold (never halts)
+sentori.probe('BUG-123')               // did that bug come back
 ```
 
-Errors thrown anywhere in JS, iOS `NSException`s, Android uncaught
-exceptions, fetch breadcrumbs, native crash files, and the wireframe
-replay ring are all flushed automatically on `captureException`. No
-extra plumbing.
-
-→ Full guide: [sentori.golia.jp/docs/getting-started/react-native](https://sentori.golia.jp/docs/getting-started/react-native).
-
----
-
-## Migrating from Sentry?
-
-```ts
-// One-line drop-in. Translates Sentry.init / captureException /
-// captureMessage / setUser / setTag / addBreadcrumb. A console.warn
-// fires once per non-translatable call so you know what to migrate
-// natively when you're ready.
-import * as Sentry from '@goliapkg/sentori-react-native/compat'
-
-Sentry.init({ dsn: 'st_pk_…' })  // dsn is your Sentori token; ingest URL is bundled
-Sentry.captureException(err)
-```
-
-→ Migration guide: [sentori.golia.jp/docs/migration-v1-to-v2](https://sentori.golia.jp/docs/migration-v1-to-v2)
-→ Translation table: [sentori.golia.jp/docs/sentry-compat](https://sentori.golia.jp/docs/sentry-compat)
-
----
+Crashes (JS, `NSException`, Android uncaught), warn scenarios,
+the behaviour timeline and wireframe replay are all automatic.
+**Every call is synchronous and can never throw into your app** —
+that contract, plus the full API (staged launch measurement, custom
+breadcrumbs, visual replay with masking, backend availability), is
+documented in
+[`sdk/react-native/README.md`](sdk/react-native/README.md).
 
 ## Self-host
 
 ```sh
-git clone https://github.com/goliajp/sentori
-cd sentori
+git clone https://github.com/goliajp/sentori-selfhosted
+cd sentori-selfhosted/self-hosted/docker
 
 cat > .env <<EOF
-SENTORI_DEV_TOKEN=st_pk_dev0000000000000000000000
-SENTORI_ADMIN_PASSWORD=changeme
-SENTORI_SESSION_SECRET=$(openssl rand -hex 32)
-SENTORI_PG_PASSWORD=$(openssl rand -hex 16)
+POSTGRES_PASSWORD=$(openssl rand -hex 16)
+SENTORI_OWNER_EMAIL=you@example.com
+SENTORI_OWNER_PASSWORD=changeme-12chars
 SENTORI_BASE_URL=https://sentori.your-domain.example
 EOF
 
 docker compose up -d
-open https://sentori.your-domain.example/login
+open http://localhost:8080
 ```
 
-Sign in with `SENTORI_ADMIN_PASSWORD`. Full guide:
-[sentori.golia.jp/docs/self-hosting](https://sentori.golia.jp/docs/self-hosting).
+Sign in as the owner, create a project, mint an ingest token, point
+the SDK at your instance. TLS stays with your reverse proxy —
+point it at `:8080`.
 
----
+## Why it's different
 
-## What's React-first about it
-
-- **First-class hooks for every supported framework.** Not "JS SDK
-  + framework adapter" — the React / Vue / Svelte / Solid bindings
-  are written against each framework's own primitives (Error
-  Boundaries, `setup()`, `$capture_error`, error context).
-- **Wireframe replay**, not raster session replay. 60 slots ×
-  ~120 bytes/frame at idle. Renders as SVG rects in the dashboard,
-  scrub-able prop-by-prop. No pixel-PII leak.
-- **Cross-project user lookup with on-device identity hashing.**
-  `linkBy: { email }` → SHA-256 of `salt || "email:" || email`
-  ships to the server. The server stores per-org-salted
-  fingerprints. Operator can look up "what errors did this user
-  hit across all our projects" without ever seeing the raw email.
-- **Silent + LLM-friendly.** `logLevel: 'silent'` config + flat
-  type definitions + structured `onReady` callback so Claude /
-  Cursor / Aider can generate correct integration code on the
-  first try. Sentori SDK failures are swallowed and self-reported
-  via a circuit breaker — host code never sees a stack trace
-  from inside Sentori.
-- **Free bonus, never a burden.** < 1% main-thread budget on
-  mid-end devices, < 500 KB per `captureException`. NEVER rule:
-  Sentori SDK failures must never cause host-app perf or network
-  hiccups.
-
----
-
-## Roadmap
-
-- **v0.1 – v0.9** — self-hostable single-binary baseline. Done.
-  Capture / dashboard / source maps / privacy classifier / hang
-  watchdog / mobile vitals / screenshot + view-tree + state /
-  session trail / wireframe replay sampler.
-- **v1.0** — Replay scrubber + fiber tree diff, intent-cluster
-  view of breadcrumb paths, iOS showcase as the open-source
-  front door. Done.
-- **v2.x** — Polyglot SDKs (React / Next / Vue / Svelte / Solid),
-  Sentry compat layer, cross-project user lookup with PII-safe
-  identity, single-domain consolidation. Done in v2.4.
-- **v3.0+** — Android showcase, distributed trace replay
-  RN → backend, AI-assisted root-cause hints.
-
----
-
-## Stack
-
-- **Backend** — Rust + axum 0.8 + PostgreSQL 18 + Valkey
-- **Dashboard** — React 19.1 + Vite + Tailwind v4 + jotai + react-query
-- **SDKs** — TypeScript core + per-framework bindings. Native
-  Swift / Kotlin reusable as a pod / Gradle module without the
-  Expo wrapper (see `apps/ios-showcase/`).
-- **CLI** — `sentori-cli` for source-map upload (Rust); Node CLI
-  in `sdk/cli/` for issue triage + Model Context Protocol server.
-- **Showcase** — SwiftUI 6, iOS 26 deployment, MeshGradient +
-  SF Symbol animations + Liquid Glass.
-
----
+- **Five kinds, one model.** The palette, the queue, the timeline
+  and the instruments panel all speak the same five words. Learn
+  eight verbs and you know the whole product.
+- **Issues are case files.** Replay (wireframe always-on; pixel
+  replay opt-in, with native-side masking so tagged views never
+  exist in any frame), the failing line with surrounding source,
+  the user's own actions with tap coordinates, and the minute
+  before — one screen, no digging.
+- **Asserts and probes.** Production assertions that never halt,
+  aggregated into a liveness ledger; regression tripwires planted
+  in the branch that used to break — a silent probe is proof the
+  fix holds.
+- **Objective importance.** Issues rank by breadth × depth (how
+  many users × how hard each was hit), not raw event counts.
+  Identity is hashed on-device; the server never sees a raw email.
+- **The zero-cost contract.** < 1% main-thread budget, quiet
+  network (nothing leaves until an error/warn fires), hard-bounded
+  buffers, and no Sentori failure can ever reach the host app.
+- **Slice by your own vocabulary.** `environment` is first-class;
+  every `context` key (tenant, QA mode, build type…) becomes a
+  queue dimension automatically — Sentori doesn't need to know
+  what your keys mean.
 
 ## What Sentori explicitly does NOT do
 
-- Sentry wire-protocol compatibility (the `/compat` API translates
-  Sentry **client SDK calls**, not the on-wire envelope format —
-  Sentori uses a single JSON event per request, no envelopes)
-- Raster session replay (we do wireframe instead — smaller, no
-  pixel-PII leak, RN-tree-native)
-- Native signal-based crashes (SIGSEGV outside `NSException`)
-- Multi-tenant SaaS billing (coming after v3.0)
+- Sentry compatibility — protocol and SDK were designed from zero
+- Web / browser platforms — mobile only, React Native first
+- Multi-tenant SaaS — one instance, one team, your infrastructure
 
----
+## Stack
+
+- **Server** — Rust + axum, PostgreSQL 18, single distroless image
+- **Dashboard** — React 19 + Vite + Tailwind v4, self-owned design
+  tokens, dark/light, EN·中文·日本語
+- **SDK** — TypeScript core + Swift / Kotlin natives as an Expo
+  module; CLI in Node with an MCP server for AI-assisted triage
 
 ## License
 
