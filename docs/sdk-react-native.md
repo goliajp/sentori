@@ -1,5 +1,12 @@
 # @goliapkg/sentori-react-native
 
+> **⚠️ Historical (v0.x).** This page describes the pre-v1 API and
+> is kept for archaeology only. The current SDK surface (five kinds,
+> eight verbs, staged launch measurement, custom breadcrumbs) is
+> documented in
+> [`sdk/react-native/README.md`](../sdk/react-native/README.md) —
+> the same document shown on npm.
+
 React Native SDK for Sentori. Captures JS errors, iOS `NSException`,
 Android uncaught Java/Kotlin exceptions, and ships them through a
 batched HTTP transport.
