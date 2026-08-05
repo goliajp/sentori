@@ -53,6 +53,15 @@ import QuartzCore
         }
     }
 
+    /// iOS 15+ pre-warms processes ahead of user intent; a launch
+    /// measured from a pre-warmed anchor is a phantom sample (the
+    /// same bug class Firebase Performance shipped and later
+    /// guarded). Apple's own discriminator: the ActivePrewarm
+    /// environment flag, set only in pre-warmed processes.
+    @objc public static func isColdStartPrewarmed() -> Bool {
+        return ProcessInfo.processInfo.environment["ActivePrewarm"] == "1"
+    }
+
     @objc public static func getColdStartMs() -> NSNumber? {
         if let ms = coldStartMs {
             return NSNumber(value: ms)

@@ -22,6 +22,7 @@ type SentoriNativeModule = {
    * Returns null when native side hasn't captured yet.
    */
   getColdStartMs?: () => null | number
+  isColdStartPrewarmed?: () => boolean
   /**
    * v0.9.4 #1 — call once at JS init() to finalize the cold-start
    * measurement. iOS subtracts from the app-delegate anchor;
@@ -346,6 +347,17 @@ export function getNativeColdStartMs(): null | number {
     return typeof v === 'number' && Number.isFinite(v) ? v : null
   } catch {
     return null
+  }
+}
+
+/** v5.6 — phantom-sample discriminator: the process was pre-warmed
+ *  (iOS ActivePrewarm; Android background start with the first
+ *  Activity arriving much later). Older binaries: false. */
+export function getNativeColdStartPrewarmed(): boolean {
+  try {
+    return native()?.isColdStartPrewarmed?.() === true
+  } catch {
+    return false
   }
 }
 

@@ -52,6 +52,12 @@ public class SentoriModule: Module {
         Function("getColdStartMs") { () -> Double? in
             return SentoriMobileVitals.getColdStartMs()?.doubleValue
         }
+
+        // v5.6 — phantom-sample discriminator (ActivePrewarm on iOS,
+        // process-to-first-Activity gap on Android).
+        Function("isColdStartPrewarmed") { () -> Bool in
+            return SentoriMobileVitals.isColdStartPrewarmed()
+        }
         Function("getFrameCounters") { () -> [String: Any]? in
             return SentoriMobileVitals.getFrameCounters() as? [String: Any]
         }

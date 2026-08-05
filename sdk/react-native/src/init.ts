@@ -14,6 +14,7 @@ import { installNetworkHandler } from './handlers/network';
 import { installPromiseHandler } from './handlers/promise';
 import { startLongTaskMonitor } from './long-task-monitor';
 import { checkColdStart } from './mobile-vitals';
+import { armLaunch } from './launch';
 import { markNativeJsBridgeReady, setNativeConfig } from './native';
 import { shipNativePending } from './native-pending';
 import { drainReplay, startReplay } from './replay';
@@ -107,6 +108,7 @@ export const init = safeFn('init', (config: InitConfig): void => {
 
   startTransport();
   checkColdStart(config.detect?.slowColdStart !== false);
+  armLaunch();
   void shipNativePending().catch(() => undefined);
   void drainOfflineQueue();
 });

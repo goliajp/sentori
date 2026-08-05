@@ -59,6 +59,39 @@ pub async fn get(
     .await
     .unwrap_or_default();
 
+    // Launch percentiles (QIP-8 #3): p50/p90/p95 of app.launch
+    // totalMs per release, last 30 days. Pre-warmed phantom samples
+    // are excluded from the percentiles but counted, so "median got
+    // worse" and "more background starts this week" stay separable.
+    let launch = sqlx::query(
+        "SELECT e.release, \
+                count(*) AS samples, \
+                count(*) FILTER (WHERE e.payload->'data'->>'prewarmed' = 'true') \
+                  AS prewarmed, \
+                percentile_cont(0.5) WITHIN GROUP \
+                  (ORDER BY (e.payload->'data'->>'totalMs')::float8) \
+                  FILTER (WHERE e.payload->'data'->>'prewarmed' IS DISTINCT FROM 'true') \
+                  AS p50, \
+                percentile_cont(0.9) WITHIN GROUP \
+                  (ORDER BY (e.payload->'data'->>'totalMs')::float8) \
+                  FILTER (WHERE e.payload->'data'->>'prewarmed' IS DISTINCT FROM 'true') \
+                  AS p90, \
+                percentile_cont(0.95) WITHIN GROUP \
+                  (ORDER BY (e.payload->'data'->>'totalMs')::float8) \
+                  FILTER (WHERE e.payload->'data'->>'prewarmed' IS DISTINCT FROM 'true') \
+                  AS p95 \
+         FROM events e JOIN issues i ON i.id = e.issue_id \
+         WHERE e.project_id = $1 AND e.kind = 'trace' \
+           AND i.group_title = 'app.launch' \
+           AND e.received_at > now() - interval '30 days' \
+           AND e.payload->'data'->>'totalMs' ~ '^[0-9]+(\\.[0-9]+)?$' \
+         GROUP BY e.release ORDER BY max(e.received_at) DESC LIMIT 30",
+    )
+    .bind(project_id)
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default();
+
     (
         StatusCode::OK,
         Json(json!({
@@ -84,6 +117,14 @@ pub async fn get(
                 "eventCount": r.get::<i64, _>("event_count"),
                 "usersCount": r.get::<i64, _>("users_count"),
                 "lastSeen": crate::wire_time::rfc3339(r.get("last_seen")),
+            })).collect::<Vec<_>>(),
+            "launch": launch.iter().map(|r| json!({
+                "release": r.get::<String, _>("release"),
+                "samples": r.get::<i64, _>("samples"),
+                "prewarmed": r.get::<i64, _>("prewarmed"),
+                "p50": r.get::<Option<f64>, _>("p50"),
+                "p90": r.get::<Option<f64>, _>("p90"),
+                "p95": r.get::<Option<f64>, _>("p95"),
             })).collect::<Vec<_>>(),
         })),
     )
