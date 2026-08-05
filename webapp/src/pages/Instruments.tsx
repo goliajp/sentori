@@ -41,11 +41,23 @@ type TraceRow = {
   usersCount: number;
   lastSeen: string;
 };
+type LaunchRow = {
+  release: string;
+  samples: number;
+  prewarmed: number;
+  p50: null | number;
+  p90: null | number;
+  p95: null | number;
+};
 type Instruments = {
   asserts: AssertRow[];
   probes: ProbeRow[];
   traces: TraceRow[];
+  launch?: LaunchRow[];
 };
+
+const fmtMs = (v: null | number) =>
+  v === null ? '—' : v >= 10_000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`;
 
 /** The green/red life sign in a table's first column. */
 function Dot({ ok }: { ok: boolean }) {
@@ -98,6 +110,62 @@ export default function InstrumentsPage() {
 
       {data && (
         <>
+          {/* Launch percentiles (QIP-8 #3): the regression gate the
+              >3s warn alone can't be — median-vs-devices separable,
+              prewarmed phantoms counted but excluded. */}
+          <Panel title={`${t('instruments.launch')}${data.launch?.length ? ` (${data.launch.length})` : ''}`}>
+            {!data.launch?.length ? (
+              <PanelEmpty>{t('instruments.launchEmpty')}</PanelEmpty>
+            ) : (
+              <DataTable<LaunchRow>
+                rows={data.launch}
+                rowKey={(l) => l.release}
+                columns={[
+                  {
+                    key: 'release',
+                    label: t('instruments.colRelease'),
+                    render: (l) => <ReleaseCell release={l.release} />,
+                  },
+                  {
+                    key: 'samples',
+                    label: t('instruments.colSamples'),
+                    width: '140px',
+                    align: 'right',
+                    render: (l) => (
+                      <span className="text-sm tabular-nums text-fg-muted">
+                        {l.samples - l.prewarmed}
+                        {l.prewarmed > 0 && (
+                          <span
+                            className="text-fg-subtle"
+                            title={t('instruments.prewarmedTip')}
+                          >
+                            {' '}
+                            (+{l.prewarmed})
+                          </span>
+                        )}
+                      </span>
+                    ),
+                  },
+                  ...(['p50', 'p90', 'p95'] as const).map((p) => ({
+                    key: p,
+                    label: p,
+                    width: '100px',
+                    align: 'right' as const,
+                    render: (l: LaunchRow) => (
+                      <span
+                        className={`text-sm tabular-nums ${
+                          (l[p] ?? 0) > 3000 ? 'text-kind-warn' : 'text-fg-muted'
+                        }`}
+                      >
+                        {fmtMs(l[p])}
+                      </span>
+                    ),
+                  })),
+                ]}
+              />
+            )}
+          </Panel>
+
           <Panel title={`${t('instruments.asserts')} (${data.asserts.length})`}>
             <DataTable<AssertRow>
               rows={data.asserts}

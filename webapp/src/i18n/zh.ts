@@ -64,6 +64,11 @@ export const zh: Messages = {
   'instruments.assertsEmpty':
     '还没有生产断言 —— sentori.assert(name, ok) 会建立存活台账。',
   'instruments.guardedIssue': '守护的 issue',
+  'instruments.colSamples': '样本',
+  'instruments.launch': '启动',
+  'instruments.launchEmpty':
+    '还没有启动分段数据 —— 在 app 可用时调用 sentori.launch.complete()(可选 sentori.launch.mark(name) 标记路标),每次启动会聚成一条 app.launch。',
+  'instruments.prewarmedTip': '预热进程的幻影样本,不计入分位数',
   'instruments.loadFailed': '监测面板加载失败。',
   'instruments.noProject': '还没有项目',
   'instruments.probeFired': '触发 {count} 次 · 最近 {last}',
