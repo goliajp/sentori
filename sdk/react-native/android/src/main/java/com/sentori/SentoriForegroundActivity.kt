@@ -82,6 +82,9 @@ object SentoriForegroundActivity {
     fun set(activity: Activity, source: String) {
         lastActivity = WeakReference(activity)
         lastPath = source
+        // First Activity sighting anchors the pre-warm discriminator
+        // (idempotent; reflection back-fill counts too).
+        SentoriMobileVitals.markFirstActivity()
     }
 
     fun current(): Activity? {

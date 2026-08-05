@@ -26,6 +26,14 @@ object SentoriMobileVitals {
 
     private val jsBridgeReadyAt = AtomicLong(0)
     private val coldStartMs = AtomicLong(-1)
+    private val firstActivityAt = AtomicLong(0)
+
+    /** A process started in the background (FCM data message,
+     *  JobScheduler, broadcast) and opened by the user minutes later
+     *  must not report the whole gap as "cold start" — the Firebase
+     *  Performance bug class. Discriminator: the first Activity was
+     *  created more than this long after the process start. */
+    private const val PREWARM_GAP_MS: Long = 5_000
 
     private val slowFrames = AtomicInteger(0)
     private val frozenFrames = AtomicInteger(0)
@@ -52,6 +60,29 @@ object SentoriMobileVitals {
     fun getColdStartMs(): Long? {
         val v = coldStartMs.get()
         return if (v < 0) null else v
+    }
+
+    /** Called by [SentoriForegroundActivity] on the first Activity
+     *  sighting (lifecycle or reflection back-fill). Idempotent. */
+    @JvmStatic
+    fun markFirstActivity() {
+        firstActivityAt.compareAndSet(0, SystemClock.elapsedRealtime())
+    }
+
+    /** True when the measured "cold start" is a phantom: the process
+     *  was pre-warmed in the background and the user arrived much
+     *  later (or no Activity exists at all — headless start). The
+     *  sample still ships, flagged, so the dashboard can exclude it;
+     *  the slow-start warn skips it entirely. */
+    @JvmStatic
+    fun isColdStartPrewarmed(): Boolean {
+        val first = firstActivityAt.get()
+        if (first == 0L) return true
+        return try {
+            first - Process.getStartElapsedRealtime() > PREWARM_GAP_MS
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     @JvmStatic
