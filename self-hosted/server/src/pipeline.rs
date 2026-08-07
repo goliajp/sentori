@@ -53,6 +53,18 @@ pub enum Kind {
 
 impl Kind {
     #[must_use]
+    pub fn from_db_str(s: &str) -> Option<Self> {
+        match s {
+            "error" => Some(Self::Error),
+            "warn" => Some(Self::Warn),
+            "trace" => Some(Self::Trace),
+            "assert" => Some(Self::Assert),
+            "probe" => Some(Self::Probe),
+            _ => None,
+        }
+    }
+
+    #[must_use]
     pub fn as_db_str(self) -> &'static str {
         match self {
             Self::Error => "error",
@@ -100,7 +112,7 @@ pub enum IngestError {
 }
 
 /// Group title + fingerprint input, derived per kind.
-fn group_identity(ev: &IncomingEvent) -> Result<(String, String, String), IngestError> {
+pub fn group_identity(ev: &IncomingEvent) -> Result<(String, String, String), IngestError> {
     match ev.kind {
         Kind::Error => {
             let err = ev.payload.get("error");
@@ -192,6 +204,24 @@ fn group_identity(ev: &IncomingEvent) -> Result<(String, String, String), Ingest
     }
 }
 
+/// The grouping key. Environment and platform split the
+/// aggregation: a staging occurrence is not the production case,
+/// and an iOS error is not the Android one. Release deliberately
+/// does NOT — the resolve/regression narrative is cross-release.
+/// Shared by ingest and the backfill-split tool so both derive the
+/// exact same key.
+pub fn compute_fingerprint(environment: &str, platform: &str, fp_input: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let mut h = Sha256::new();
+    h.update(environment.as_bytes());
+    h.update(b"\x1f");
+    h.update(platform.as_bytes());
+    h.update(b"\x1f");
+    h.update(fp_input.as_bytes());
+    // 16 bytes / 32 hex chars — grouping key, not a secret.
+    hex::encode(&h.finalize()[..16])
+}
+
 /// Replace every digit run with `#` so messages that differ only in
 /// volatile fragments (timestamps, ids, counts) group together.
 fn collapse_numbers(msg: &str) -> String {
@@ -219,21 +249,7 @@ fn collapse_numbers(msg: &str) -> String {
 #[allow(clippy::too_many_lines)]
 pub async fn ingest(pool: &PgPool, ev: IncomingEvent) -> Result<IngestOutcome, IngestError> {
     let (group_title, message_sample, fp_input) = group_identity(&ev)?;
-    let fingerprint = {
-        use sha2::{Digest, Sha256};
-        let mut h = Sha256::new();
-        // Environment and platform split the aggregation: a staging
-        // occurrence is not the production case, and an iOS error is
-        // not the Android one. Release deliberately does NOT — the
-        // resolve/regression narrative is cross-release.
-        h.update(ev.environment.as_bytes());
-        h.update(b"\x1f");
-        h.update(ev.platform.as_bytes());
-        h.update(b"\x1f");
-        h.update(fp_input.as_bytes());
-        // 16 bytes / 32 hex chars — grouping key, not a secret.
-        hex::encode(&h.finalize()[..16])
-    };
+    let fingerprint = compute_fingerprint(&ev.environment, &ev.platform, &fp_input);
 
     let mut tx = pool.begin().await?;
 

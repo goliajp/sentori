@@ -30,6 +30,7 @@ mod apns;
 mod archive_worker;
 mod audit;
 mod backend_check_worker;
+mod backfill_split;
 mod blob_store;
 mod bootstrap;
 mod bundle;
@@ -75,6 +76,14 @@ async fn main() -> anyhow::Result<()> {
             .context("usage: sentori-server reset-password <email>")?;
         let pool = PgPool::connect(&db_url).await.context("db connect")?;
         return bootstrap::reset_password(&pool, email).await;
+    }
+
+    // `sentori-server backfill-split` — one-shot: split pre-2.9.0
+    // mixed issues by environment × platform (see backfill_split.rs).
+    if args.get(1).map(String::as_str) == Some("backfill-split") {
+        return backfill_split::run(&db_url)
+            .await
+            .map_err(|e| anyhow::anyhow!("backfill-split: {e}"));
     }
 
     let bind = std::env::var("SENTORI_BIND").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
