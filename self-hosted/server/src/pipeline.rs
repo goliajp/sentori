@@ -222,6 +222,14 @@ pub async fn ingest(pool: &PgPool, ev: IncomingEvent) -> Result<IngestOutcome, I
     let fingerprint = {
         use sha2::{Digest, Sha256};
         let mut h = Sha256::new();
+        // Environment and platform split the aggregation: a staging
+        // occurrence is not the production case, and an iOS error is
+        // not the Android one. Release deliberately does NOT — the
+        // resolve/regression narrative is cross-release.
+        h.update(ev.environment.as_bytes());
+        h.update(b"\x1f");
+        h.update(ev.platform.as_bytes());
+        h.update(b"\x1f");
         h.update(fp_input.as_bytes());
         // 16 bytes / 32 hex chars — grouping key, not a secret.
         hex::encode(&h.finalize()[..16])
@@ -245,8 +253,9 @@ pub async fn ingest(pool: &PgPool, ev: IncomingEvent) -> Result<IngestOutcome, I
             sqlx::query(
                 "INSERT INTO issues \
                  (id, project_id, fingerprint, kind, group_title, message_sample, surface, \
-                  status, first_seen, last_seen, event_count, last_environment, last_release) \
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, 'open', $8, $8, 0, $9, $10)",
+                  status, first_seen, last_seen, event_count, last_environment, last_release, \
+                  environment, platform) \
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, 'open', $8, $8, 0, $9, $10, $9, $11)",
             )
             .bind(id)
             .bind(ev.project_id)
@@ -258,6 +267,7 @@ pub async fn ingest(pool: &PgPool, ev: IncomingEvent) -> Result<IngestOutcome, I
             .bind(ev.occurred_at)
             .bind(&ev.environment)
             .bind(&ev.release)
+            .bind(&ev.platform)
             .execute(&mut *tx)
             .await?;
             (id, true, false)

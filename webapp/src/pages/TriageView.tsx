@@ -33,6 +33,7 @@ export default function TriageView() {
   // nothing about what `qa` or `tenant` mean — it only slices.
   const ctxKey = search.get('ck');
   const ctxVal = search.get('cv');
+  const rel = search.get('rel');
   const projectId = activeProject?.id ?? null;
 
   // Deployment environments actually seen — the env filter's options.
@@ -60,6 +61,16 @@ export default function TriageView() {
     [projectId, ctxKey],
   );
   const contextValues = cvData?.values ?? [];
+  // Release options for the version filter (release stays out of
+  // aggregation; this slices the queue).
+  const { data: relData } = useAsyncData(
+    () =>
+      projectId
+        ? api.listReleases(projectId)
+        : Promise.resolve({ releases: [] }),
+    [projectId],
+  );
+  const releaseNames = (relData?.releases ?? []).map((r) => r.name);
 
   const setFilter = (key: string, value: string | null) => {
     const next = new URLSearchParams(search);
@@ -89,9 +100,10 @@ export default function TriageView() {
         environment: env ?? undefined,
         contextKey: ctxKey ?? undefined,
         contextValue: ctxVal ?? undefined,
+        release: rel ?? undefined,
         limit: 200,
       }),
-    [status, kind, env, ctxKey, ctxVal, projectId],
+    [status, kind, env, ctxKey, ctxVal, rel, projectId],
   );
 
   // Captured per render, not inside the memo (react-hooks/purity).
@@ -275,6 +287,21 @@ export default function TriageView() {
                 {contextValues.map((v) => (
                   <option key={v} value={v}>
                     {v}
+                  </option>
+                ))}
+              </select>
+            )}
+            {releaseNames.length > 0 && (
+              <select
+                value={rel ?? ''}
+                onChange={(e) => setFilter('rel', e.target.value || null)}
+                aria-label={t('inbox.releaseFilter')}
+                className="mr-1 h-[22px] max-w-40 rounded border border-border bg-surface px-1 text-xs text-fg-muted"
+              >
+                <option value="">{t('inbox.releaseAll')}</option>
+                {releaseNames.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
                   </option>
                 ))}
               </select>
@@ -514,7 +541,10 @@ function QueueRow({
             {where || issue.messageSample}
           </span>
         )}
-        <span className="ml-auto shrink-0">
+        <span className="ml-auto flex shrink-0 items-baseline gap-2">
+          {issue.platform && (
+            <span className="text-xs text-fg-subtle">{issue.platform}</span>
+          )}
           <ImpactCell
             users={issue.usersCount}
             maxPerUser={issue.maxPerUser}

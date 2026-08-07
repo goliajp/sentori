@@ -28,6 +28,7 @@ import { useT } from '../i18n';
 import {
   api,
   type EventDetail,
+  type IssueReleaseRow,
   type OccurrenceRow,
 } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
@@ -300,7 +301,8 @@ export function IssueDetailPane({
                 .join(' · ')}
             </span>
           )}
-          {current && <span>{current.environment}</span>}
+          <span>{issue.platform ?? current?.platform}</span>
+          <span>{issue.environment ?? current?.environment}</span>
         </div>
       </header>
 
@@ -392,6 +394,16 @@ export function IssueDetailPane({
                 />
               </Panel>
             )}
+
+            {issue.releases && issue.releases.length > 0 && (
+              <Panel title={`${t('issue.releasesTitle')} (${issue.releases.length})`}>
+                <ReleaseSpread
+                  rows={issue.releases}
+                  resolvedIn={issue.resolvedInRelease}
+                  regressedIn={issue.regressedInRelease}
+                />
+              </Panel>
+            )}
           </div>
         </div>
       </div>
@@ -473,6 +485,66 @@ function SignalList({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/** Which releases this case has appeared in, at what volume — the
+ *  version dimension read as a distribution instead of splitting
+ *  the issue. The resolve anchor and the regression release carry
+ *  their own markers. */
+function ReleaseSpread({
+  rows,
+  resolvedIn,
+  regressedIn,
+}: {
+  rows: IssueReleaseRow[];
+  resolvedIn: null | string;
+  regressedIn: null | string;
+}) {
+  const t = useT();
+  const max = Math.max(...rows.map((r) => r.events), 1);
+  return (
+    <div className="divide-y divide-border/60">
+      {rows.map((r) => (
+        <div key={r.release} className="flex items-center gap-3 px-3.5 py-1.5 text-xs">
+          <span
+            className="w-56 shrink-0 truncate font-mono text-fg"
+            title={r.release}
+          >
+            {formatRelease(r.release)}
+          </span>
+          {/* volume bar: share of this issue's events in that release */}
+          <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-sm bg-raised">
+            <span
+              className="block h-full rounded-sm"
+              style={{
+                width: `${Math.max(2, (r.events / max) * 100)}%`,
+                backgroundColor: 'var(--sn-accent)',
+                opacity: 0.55,
+              }}
+            />
+          </span>
+          <span className="w-14 shrink-0 text-right tabular-nums text-fg-muted">
+            {r.events}ev
+          </span>
+          <span className="w-16 shrink-0 text-right tabular-nums text-fg-subtle">
+            {formatRelative(r.lastAt)}
+          </span>
+          <span className="w-14 shrink-0 text-right">
+            {r.release === resolvedIn && (
+              <span className="text-ok" title={t('issue.releaseResolvedHere')}>
+                ✓ fix
+              </span>
+            )}
+            {r.release === regressedIn && (
+              <span className="text-kind-error" title={t('issue.releaseRegressedHere')}>
+                ↩
+              </span>
+            )}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

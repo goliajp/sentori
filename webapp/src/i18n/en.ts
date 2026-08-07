@@ -48,6 +48,8 @@ export const en = {
   'inbox.ctxValueFilter': 'Dimension value',
   'inbox.envAll': 'all environments',
   'inbox.envFilter': 'Environment',
+  'inbox.releaseAll': 'all releases',
+  'inbox.releaseFilter': 'Release',
   'inbox.groupNew': 'New · 24h',
   'inbox.groupRegressed': 'Regressed',
   'inbox.loadFailed': 'Could not load the inbox.',
@@ -112,6 +114,9 @@ export const en = {
   'issue.lastSeen': 'last',
   'issue.loadFailed': 'Could not load this issue.',
   'issue.occurrences': 'Occurrences',
+  'issue.releaseRegressedHere': 'regressed in this release',
+  'issue.releaseResolvedHere': 'marked fixed in this release',
+  'issue.releasesTitle': 'Release spread',
   'issue.reopen': 'Reopen',
   'issue.replayFrom': 'From the occurrence {when} — the newest event carried no replay.',
   'issue.replayNone':
