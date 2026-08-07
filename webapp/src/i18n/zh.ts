@@ -42,6 +42,8 @@ export const zh: Messages = {
   'inbox.ctxValueFilter': '维度取值',
   'inbox.envAll': '全部环境',
   'inbox.envFilter': '环境',
+  'inbox.releaseAll': '全部版本',
+  'inbox.releaseFilter': '版本',
   'inbox.groupNew': '新增 · 24h',
   'inbox.groupRegressed': '回归',
   'inbox.loadFailed': '收件箱加载失败。',
@@ -103,6 +105,9 @@ export const zh: Messages = {
   'issue.lastSeen': '最近',
   'issue.loadFailed': '该 issue 加载失败。',
   'issue.occurrences': '发生记录',
+  'issue.releaseRegressedHere': '在此版本回归',
+  'issue.releaseResolvedHere': '在此版本标记修复',
+  'issue.releasesTitle': '版本分布',
   'issue.reopen': '重新打开',
   'issue.replayFrom': '来自 {when} 的一次发生 —— 最新事件没有携带录屏。',
   'issue.replayNone':

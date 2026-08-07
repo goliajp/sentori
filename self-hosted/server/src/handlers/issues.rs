@@ -47,6 +47,11 @@ pub struct ListQuery {
     pub context_key: Option<String>,
     #[serde(default)]
     pub context_value: Option<String>,
+    /// Release filter: issues with at least one event in this
+    /// release (release stays out of the fingerprint — the
+    /// resolve/regression narrative is cross-release).
+    #[serde(default)]
+    pub release: Option<String>,
 }
 
 fn issue_row_json(r: &sqlx::postgres::PgRow) -> Value {
@@ -69,6 +74,10 @@ fn issue_row_json(r: &sqlx::postgres::PgRow) -> Value {
         "resolvedInRelease": r.get::<Option<String>, _>("resolved_in_release"),
         "regressedAt": crate::wire_time::rfc3339_opt(r.get("regressed_at")),
         "regressedInRelease": r.get::<Option<String>, _>("regressed_in_release"),
+        // NULL on pre-split historical issues (aggregated across
+        // environments/platforms before 2.9.0).
+        "environment": r.get::<Option<String>, _>("environment"),
+        "platform": r.get::<Option<String>, _>("platform"),
     })
 }
 
@@ -114,13 +123,18 @@ pub async fn list(
            AND ($2::uuid IS NULL OR project_id = $2) \
            AND ($3::text IS NULL OR kind = $3) \
            AND ($4::uuid[] IS NULL OR project_id = ANY($4)) \
-           AND ($6::text IS NULL OR EXISTS ( \
-                 SELECT 1 FROM events e \
-                 WHERE e.issue_id = issues.id AND e.environment = $6)) \
+           AND ($6::text IS NULL \
+                OR environment = $6 \
+                OR (environment IS NULL AND EXISTS ( \
+                      SELECT 1 FROM events e \
+                      WHERE e.issue_id = issues.id AND e.environment = $6))) \
            AND ($7::text IS NULL OR $8::text IS NULL OR EXISTS ( \
                  SELECT 1 FROM events e \
                  WHERE e.issue_id = issues.id \
                    AND e.payload->'context'->>$7 = $8)) \
+           AND ($9::text IS NULL OR EXISTS ( \
+                 SELECT 1 FROM events e \
+                 WHERE e.issue_id = issues.id AND e.release = $9)) \
          ORDER BY (regressed_at IS NOT NULL AND status = 'open') DESC, \
                   users_count DESC, max_per_user DESC, last_seen DESC \
          LIMIT $5",
@@ -133,6 +147,7 @@ pub async fn list(
     .bind(q.environment.as_deref())
     .bind(q.context_key.as_deref())
     .bind(q.context_value.as_deref())
+    .bind(q.release.as_deref())
     .fetch_all(&state.pool)
     .await;
     match rows {
@@ -206,8 +221,35 @@ pub async fn get(
                     })
                 })
                 .collect();
+            // Release distribution — which versions this case has
+            // appeared in, and at what volume. Release stays out of
+            // the fingerprint (the resolve/regression narrative is
+            // cross-release); this panel is how the version dimension
+            // reads instead.
+            let releases = sqlx::query(
+                "SELECT release, count(*) AS events, \
+                        min(occurred_at) AS first_at, max(occurred_at) AS last_at \
+                 FROM events WHERE issue_id = $1 \
+                 GROUP BY release ORDER BY max(occurred_at) DESC LIMIT 50",
+            )
+            .bind(issue_id)
+            .fetch_all(&state.pool)
+            .await
+            .unwrap_or_default();
+            let rels: Vec<Value> = releases
+                .iter()
+                .map(|r| {
+                    json!({
+                        "release": r.get::<String, _>("release"),
+                        "events": r.get::<i64, _>("events"),
+                        "firstAt": crate::wire_time::rfc3339(r.get("first_at")),
+                        "lastAt": crate::wire_time::rfc3339(r.get("last_at")),
+                    })
+                })
+                .collect();
             let mut body = issue_row_json(&row);
             body["activity"] = Value::Array(acts);
+            body["releases"] = Value::Array(rels);
             (StatusCode::OK, Json(body))
         }
         Err(e) => e,
