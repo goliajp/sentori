@@ -38,6 +38,17 @@ export type IssueSummary = {
   resolvedInRelease: string | null;
   regressedAt: string | null;
   regressedInRelease: string | null;
+  /** NULL on pre-split historical issues (aggregated across
+   *  environments/platforms before server 2.9). */
+  environment?: string | null;
+  platform?: string | null;
+};
+
+export type IssueReleaseRow = {
+  release: string;
+  events: number;
+  firstAt: string;
+  lastAt: string;
 };
 
 export type IssueActivity = {
@@ -49,7 +60,10 @@ export type IssueActivity = {
   actorEmail: string | null;
 };
 
-export type IssueDetail = IssueSummary & { activity: IssueActivity[] };
+export type IssueDetail = IssueSummary & {
+  activity: IssueActivity[];
+  releases?: IssueReleaseRow[];
+};
 
 export type OccurrenceRow = {
   id: string;
@@ -325,6 +339,7 @@ class Api {
     environment?: string;
     contextKey?: string;
     contextValue?: string;
+    release?: string;
   }) {
     const usp = new URLSearchParams();
     if (q.status) usp.set('status', q.status);
@@ -336,6 +351,7 @@ class Api {
       usp.set('context_key', q.contextKey);
       usp.set('context_value', q.contextValue);
     }
+    if (q.release) usp.set('release', q.release);
     const qs = usp.toString();
     return this.get<{ issues: IssueSummary[] }>(`/admin/api/issues${qs ? `?${qs}` : ''}`);
   }

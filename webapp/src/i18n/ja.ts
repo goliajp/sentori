@@ -43,6 +43,8 @@ export const ja: Messages = {
   'inbox.ctxValueFilter': 'ディメンションの値',
   'inbox.envAll': 'すべての環境',
   'inbox.envFilter': '環境',
+  'inbox.releaseAll': 'すべてのリリース',
+  'inbox.releaseFilter': 'リリース',
   'inbox.groupNew': '新規 · 24h',
   'inbox.groupRegressed': 'リグレッション',
   'inbox.loadFailed': '受信箱を読み込めませんでした。',
@@ -107,6 +109,9 @@ export const ja: Messages = {
   'issue.lastSeen': '直近',
   'issue.loadFailed': 'この issue を読み込めませんでした。',
   'issue.occurrences': '発生一覧',
+  'issue.releaseRegressedHere': 'このリリースでリグレッション',
+  'issue.releaseResolvedHere': 'このリリースで修正済みマーク',
+  'issue.releasesTitle': 'リリース分布',
   'issue.reopen': '再オープン',
   'issue.replayFrom': '{when}の発生時のリプレイです — 直近のイベントには付いていません。',
   'issue.replayNone':
