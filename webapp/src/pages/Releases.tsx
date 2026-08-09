@@ -4,20 +4,20 @@
 // Artifact gaps are most visible here, on purpose — the lights are
 // live on load, not hidden behind a click.
 
-import { ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { ChevronRight } from 'lucide-react';
+import { useState } from 'react';
 
-import { useShell } from "../App";
+import { useShell } from '../App';
 import {
   ErrorBanner,
   PageShell,
   Panel,
   PanelEmpty,
   formatRelative,
-} from "../components/ui";
-import { useT } from "../i18n";
-import { api, type ReleaseRow } from "../lib/api";
-import { useAsyncData } from "../lib/useAsyncData";
+} from '../components/ui';
+import { useT } from '../i18n';
+import { api, type ReleaseRow } from '../lib/api';
+import { useAsyncData } from '../lib/useAsyncData';
 
 export default function ReleasesPage() {
   const t = useT();
@@ -25,18 +25,17 @@ export default function ReleasesPage() {
   const active = activeProject?.id ?? null;
 
   const { data, error, loading, reload } = useAsyncData(
-    () =>
-      active ? api.listReleases(active) : Promise.resolve({ releases: [] }),
+    () => (active ? api.listReleases(active) : Promise.resolve({ releases: [] })),
     [active],
   );
 
   return (
-    <PageShell title={t("nav.releases")}>
+    <PageShell title={t('nav.releases')}>
       {error && (
         <ErrorBanner>
-          {t("releases.loadFailed")}{" "}
+          {t('releases.loadFailed')}{' '}
           <button type="button" className="underline" onClick={reload}>
-            {t("common.retry")}
+            {t('common.retry')}
           </button>
         </ErrorBanner>
       )}
@@ -44,15 +43,15 @@ export default function ReleasesPage() {
         <div className="py-16 text-center text-sm text-fg-subtle">…</div>
       )}
 
-      <Panel title={`${t("nav.releases")} (${data?.releases.length ?? 0})`}>
+      <Panel title={`${t('nav.releases')} (${data?.releases.length ?? 0})`}>
         {data && data.releases.length === 0 ? (
           <PanelEmpty>
-            {t("releases.emptyTitle")} — {t("releases.emptyHint")}
+            {t('releases.emptyTitle')} — {t('releases.emptyHint')}
           </PanelEmpty>
         ) : (
           <div className="divide-y divide-border/60">
             {(data?.releases ?? []).map((r) => (
-              <ReleaseRowView key={r.id} release={r} projectId={active ?? ""} />
+              <ReleaseRowView key={r.id} release={r} projectId={active ?? ''} />
             ))}
           </div>
         )}
@@ -92,23 +91,23 @@ function ReleaseRowView({
       >
         <ChevronRight
           aria-hidden
-          className={`h-3.5 w-3.5 shrink-0 text-fg-subtle transition-transform ${open ? "rotate-90" : ""}`}
+          className={`h-3.5 w-3.5 shrink-0 text-fg-subtle transition-transform ${open ? 'rotate-90' : ''}`}
         />
         <span className="min-w-0 flex-1 truncate font-mono text-sm text-fg">
           {release.name}
         </span>
         {/* A light is only a warning for a platform this release
             actually hears from; the rest stay quiet furniture. */}
-        <Light on={data ? kinds.has("sourcemap") : undefined} label="js" used />
+        <Light on={data ? kinds.has('sourcemap') : undefined} label="js" used />
         <Light
-          on={data ? kinds.has("dsym") : undefined}
+          on={data ? kinds.has('dsym') : undefined}
           label="ios"
-          used={used.has("ios")}
+          used={used.has('ios')}
         />
         <Light
-          on={data ? kinds.has("proguard") : undefined}
+          on={data ? kinds.has('proguard') : undefined}
           label="android"
-          used={used.has("android")}
+          used={used.has('android')}
         />
         {created && (
           <span className="w-16 text-right text-xs tabular-nums text-fg-subtle">
@@ -120,7 +119,7 @@ function ReleaseRowView({
         <div className="border-t border-border/60 bg-bg px-3.5 py-2.5 pl-10">
           {artifacts.length === 0 ? (
             <div className="text-xs text-fg-muted">
-              <p>{t("releases.noArtifacts")}</p>
+              <p>{t('releases.noArtifacts')}</p>
               <code className="mt-1.5 block rounded bg-surface p-2 font-mono text-xs">
                 sentori-cli upload sourcemap --release &quot;{release.name}
                 &quot; --token &lt;api-token&gt; &lt;map&gt;
@@ -131,9 +130,7 @@ function ReleaseRowView({
               {artifacts.map((a) => (
                 <div key={a.id} className="flex gap-3 font-mono text-xs">
                   <span className="w-20 text-fg-subtle">{a.kind}</span>
-                  <span className="min-w-0 flex-1 truncate text-fg-muted">
-                    {a.name}
-                  </span>
+                  <span className="min-w-0 flex-1 truncate text-fg-muted">{a.name}</span>
                   {a.size_bytes !== undefined && (
                     <span className="text-fg-subtle">
                       {Math.round(a.size_bytes / 1024)} KB
@@ -165,29 +162,26 @@ function Light({
   const t = useT();
   const colour =
     on === undefined
-      ? "color-mix(in srgb, var(--sn-fg-muted) 30%, transparent)"
+      ? 'color-mix(in srgb, var(--sn-fg-muted) 30%, transparent)'
       : on
-        ? "var(--s-kind-probe)"
+        ? 'var(--s-kind-probe)'
         : used
-          ? "var(--s-kind-error)"
-          : "color-mix(in srgb, var(--sn-fg-muted) 30%, transparent)";
+          ? 'var(--s-kind-error)'
+          : 'color-mix(in srgb, var(--sn-fg-muted) 30%, transparent)';
   return (
     <span
       className={`flex items-center gap-1.5 font-mono text-xs ${
-        used ? "text-fg-muted" : "text-fg-subtle/60"
+        used ? 'text-fg-muted' : 'text-fg-subtle/60'
       }`}
       title={
         on === false && used
-          ? t("releases.artifactMissing", { platform: label })
+          ? t('releases.artifactMissing', { platform: label })
           : on === false
-            ? t("releases.artifactUnused", { platform: label })
+            ? t('releases.artifactUnused', { platform: label })
             : undefined
       }
     >
-      <span
-        className="h-2 w-2 rounded-full"
-        style={{ backgroundColor: colour }}
-      />
+      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colour }} />
       {label}
     </span>
   );

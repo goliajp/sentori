@@ -12,18 +12,15 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const BASE = 'http://localhost:5599';
-const P = '019e358a-adac-7881-9f7e-fc92646fae4e';
 const I = '019f85ee-ae41-77f1-bbf9-97d310663c9a';
 
 const ROUTES = [
-  'main', 'projects', 'members', 'alerts', 'audit', 'health', 'notifications',
-  'saved-views', 'search', 'sessions', 'settings', 'settings/billing', 'saas',
-  'shortcuts', 'login', 'register', 'forgot-password',
-  `projects/${P}/issues`, `projects/${P}/issues/${I}`, `projects/${P}/events`,
-  `projects/${P}/traces`, `projects/${P}/metrics`, `projects/${P}/replays`,
-  `projects/${P}/tokens`, `projects/${P}/releases`, `projects/${P}/integrations`,
-  `projects/${P}/cert`, `projects/${P}/probes`, `projects/${P}/push`,
-  `projects/${P}/push-sends`,
+  '', `issues/${I}`, 'instruments', 'releases', 'projects',
+  // Settings sections are URL-driven, so each one is reachable here.
+  // They were not, and four admin screens went unrendered for months.
+  'settings?tab=tokens', 'settings?tab=users', 'settings?tab=notifications',
+  'settings?tab=audit', 'settings?tab=account',
+  'login', 'forgot-password',
 ];
 
 const out = process.argv[2] || 'tmp/sweep';
@@ -62,10 +59,10 @@ await cmd('Page.enable');
 await cmd('Runtime.enable');
 
 // Theme lives in localStorage; set it once on the origin, then reload.
-await cmd('Page.navigate', { url: `${BASE}/main` });
+await cmd('Page.navigate', { url: `${BASE}/` });
 await new Promise(r => setTimeout(r, 3500));
 await cmd('Runtime.evaluate', {
-  expression: `localStorage.setItem('gds-theme', JSON.stringify({...(JSON.parse(localStorage.getItem('gds-theme')||'{}')), mode:'${theme}'}))`,
+  expression: `localStorage.setItem('sentori-theme', '${theme}')`,
 });
 
 const report = [];
@@ -73,7 +70,7 @@ for (const r of ROUTES) {
   logs.length = 0;
   await cmd('Page.navigate', { url: `${BASE}/${r}` });
   await new Promise(res => setTimeout(res, 3200));
-  const name = r.replaceAll('/', '-').replace(P, 'P').replace(I, 'I');
+  const name = (r || 'triage').replace(I, 'I').replace(/[^\w.-]+/g, '-');
   const shot = await cmd('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
   if (shot?.data) writeFileSync(`${out}/${name}.png`, Buffer.from(shot.data, 'base64'));
   const text = await cmd('Runtime.evaluate', {
@@ -91,13 +88,40 @@ const bundle = await cmd('Runtime.evaluate', {
     "[...document.querySelectorAll('script[src]')].map(s => s.src.split('/').pop()).join(' ')",
   returnByValue: true,
 });
+// What the app asked the mock for and did not get. A page whose data
+// call fell through to `{}` renders its empty state, and an empty
+// state is indistinguishable from "nothing happened yet" in a
+// screenshot — so this is a failure, not a footnote.
+let unmocked = [];
+try {
+  const r = await fetch('http://localhost:8080/__unmocked');
+  ({ unmocked } = await r.json());
+} catch {
+  unmocked = ['<mock not reachable — is `bun run mock` running?>'];
+}
 writeFileSync(
   `${out}/report.json`,
   JSON.stringify(
-    { bundle: bundle?.result?.value ?? 'unknown', lang, theme, routes: report },
+    {
+      bundle: bundle?.result?.value ?? 'unknown',
+      lang,
+      theme,
+      unmocked,
+      routes: report,
+    },
     null,
     1,
   ),
 );
 chrome.kill();
+
+const broken = report.filter(r => r.errors.length);
+for (const u of unmocked) process.stdout.write(`UNMOCKED ${u}\n`);
+if (broken.length || unmocked.length) {
+  process.stdout.write(
+    `✗ ${broken.length} route(s) with console errors, ${unmocked.length} unmocked path(s)\n`,
+  );
+  process.exit(1);
+}
+process.stdout.write(`✓ ${report.length} routes clean\n`);
 process.exit(0);

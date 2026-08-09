@@ -33,6 +33,22 @@ const walk = dir =>
 const catalogues = Object.fromEntries(LOCALES.map(l => [l, keysOf(l)]));
 const problems = [];
 
+// 0 — the parser still parses. `keysOf` reads the catalogue with a
+// regex, so any reformatting it does not expect (a `bunx prettier`
+// run with no config in this repo rewrote every key to double
+// quotes) makes it match nothing — and a checker that finds nothing
+// reports success. It went green on an empty parse for one commit.
+// A catalogue this app cannot start without is never empty.
+for (const loc of LOCALES) {
+  if (catalogues[loc].size === 0) {
+    console.error(
+      `i18n: parsed 0 keys from ${loc}.ts — the checker is broken, not the ` +
+        `catalogue. Its key regex expects two-space indent and single quotes.`,
+    );
+    process.exit(1);
+  }
+}
+
 // 1 — same keys everywhere.
 const en = catalogues.en;
 for (const loc of LOCALES.slice(1)) {

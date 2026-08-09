@@ -4,6 +4,7 @@
 // tables with headers for every list, full width put to work.
 
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { useShell } from '../App';
 import {
@@ -37,7 +38,13 @@ export default function SettingsPage() {
   const tabs: Tab[] = owner
     ? ['tokens', 'users', 'notifications', 'audit', 'account']
     : ['tokens', 'notifications', 'account'];
-  const [tab, setTab] = useState<Tab>(tabs[0] ?? 'account');
+  // The tab lives in the URL, not in component state: a settings
+  // section you cannot link to is a section nobody can point a
+  // colleague at, and it is also one no screenshot sweep can reach.
+  const [params, setParams] = useSearchParams();
+  const asked = params.get('tab') as null | Tab;
+  const tab: Tab = asked && tabs.includes(asked) ? asked : tabs[0] ?? 'account';
+  const setTab = (x: Tab) => setParams({ tab: x }, { replace: true });
 
   return (
     <PageShell

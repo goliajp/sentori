@@ -25,6 +25,27 @@ type ReplayFrame = {
   h?: number;
 };
 
+/** NDJSON to frames, one line at a time. The upload is append-only,
+ *  so a half-written last line is the expected damage — and the
+ *  moment it is most likely is the one this player exists for: the
+ *  process died mid-flush. Mapping `JSON.parse` over the lines threw
+ *  the whole recording away for one bad byte, and the page said the
+ *  replay failed to load. The wireframe decoder has always been
+ *  per-line tolerant; this one now matches it. */
+function decodeFrames(text: string): ReplayFrame[] {
+  const out: ReplayFrame[] = [];
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const f = JSON.parse(line) as ReplayFrame;
+      if (typeof f.base64 === 'string') out.push(f);
+    } catch {
+      /* a partial last line is normal */
+    }
+  }
+  return out;
+}
+
 const PLAYBACK_SPEED = 4;
 
 export function ReplayPlayer({
@@ -62,11 +83,7 @@ export function ReplayPlayer({
       .fetchAttachmentText(attachmentRef)
       .then((text) => {
         if (!alive) return;
-        const parsed = text
-          .split('\n')
-          .filter((l) => l.trim().length > 0)
-          .map((l) => JSON.parse(l) as ReplayFrame)
-          .filter((f) => typeof f.base64 === 'string');
+        const parsed = decodeFrames(text);
         setFrames(parsed);
         setIdx(Math.max(0, parsed.length - 1));
       })
