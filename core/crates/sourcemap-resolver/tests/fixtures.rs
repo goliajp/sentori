@@ -93,3 +93,18 @@ fn decode_error_has_source() {
     let err = ParsedMap::parse(b"!!!").expect_err("garbage");
     assert!(std::error::Error::source(&err).is_some());
 }
+
+#[test]
+fn a_token_without_a_source_is_not_a_resolution() {
+    // Hermes maps carry tokens for the engine's own
+    // `InternalBytecode.js` frames with no source attached, and the
+    // upstream reports their source line as `u32::MAX`. Returning a
+    // Resolution for those put `InternalBytecode.js:4294967295` on
+    // sixty-six production crashes.
+    // A one-field segment maps a generated column and names no
+    // source — legal Source Map V3, and what a Hermes engine frame
+    // looks like.
+    let doc = r#"{"version":3,"file":"b.js","sources":["src/a.ts"],"names":[],"mappings":"A"}"#;
+    let map = ParsedMap::parse(doc.as_bytes()).expect("parse");
+    assert!(map.resolve(1, 0).is_none());
+}

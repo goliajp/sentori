@@ -191,6 +191,25 @@ fn rewrite_frame(map: &ParsedMap, frame: &mut Value) -> bool {
         return false;
     };
     let Some(res) = map.resolve(line, column) else {
+        // A frame this pass symbolicated before, that no longer
+        // resolves, is carrying coordinates from a resolution that
+        // should never have been one — sixty-six production crashes
+        // read `InternalBytecode.js:4294967295` before the resolver
+        // learned to refuse a source-less token. Put the minified
+        // position back and drop the claim.
+        if already {
+            let minified_line = obj.get("minifiedLine").cloned();
+            let minified_col = obj.get("minifiedColumn").cloned();
+            if let (Some(l), Some(c)) = (minified_line, minified_col) {
+                obj.insert("line".into(), l);
+                obj.insert("column".into(), c);
+                obj.remove("symbolicated");
+                obj.remove("minifiedLine");
+                obj.remove("minifiedColumn");
+                obj.remove("minifiedFile");
+                return true;
+            }
+        }
         return false;
     };
 
@@ -375,6 +394,29 @@ mod tests {
         // not a contract, and a frame the named map cannot resolve
         // must not be given up on.
         assert_eq!(order.len(), 2);
+    }
+
+    #[test]
+    fn a_frame_that_stops_resolving_gets_its_minified_position_back() {
+        // The repair path. A frame carrying a resolution the resolver
+        // would no longer make must not keep the coordinates from it:
+        // `InternalBytecode.js:4294967295` is worse than the honest
+        // bundle offset it replaced.
+        let map = empty_map();
+        let mut frame = json!({
+            "file": "index.android.bundle",
+            "line": 4_294_967_295u32,
+            "column": 0,
+            "symbolicated": true,
+            "minifiedFile": "index.android.bundle",
+            "minifiedLine": 1,
+            "minifiedColumn": 289_430,
+        });
+        assert!(rewrite_frame(&map, &mut frame), "the repair is a rewrite");
+        assert_eq!(frame["line"], 1);
+        assert_eq!(frame["column"], 289_430);
+        assert!(frame.get("symbolicated").is_none());
+        assert!(frame.get("minifiedLine").is_none());
     }
 
     #[test]
