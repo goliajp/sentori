@@ -71,6 +71,17 @@ sources = [
     for p in sorted(Path(root).rglob('*.rs'))
     if '/target/' not in str(p)
 ]
+# The roots are written here and the tree is somewhere else, so they
+# drift. They already did once: this scanned only the legacy `server/src`
+# while 62 fields rotted in the v0.2 stack. A run that reads no files
+# would print the same tick as a clean one.
+if not sources:
+    print(
+        '\u2717 no .rs files under ' + ', '.join(ROOTS) + '\n'
+        '  The roots moved. A scan of nothing is not a pass.',
+        file=sys.stderr,
+    )
+    sys.exit(1)
 # Pass 2 first: bare OffsetDateTime reads in a json! response body.
 for path in sources:
     lines = path.read_text().split('\n')
@@ -136,5 +147,5 @@ if violations:
     print('    "sent_at": crate::wire_time::rfc3339_opt(r.try_get(...).ok().flatten()),')
     sys.exit(1)
 
-print('✓ all OffsetDateTime fields in serde-derived structs carry the rfc3339 annotation')
+print(f'✓ {len(sources)} .rs files: every serialised OffsetDateTime carries rfc3339')
 PY
