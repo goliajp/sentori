@@ -60,9 +60,13 @@ const issues = [
     ...baseIssue,
     id: '019f85ee-0002-77f1-bbf9-97d310660002',
     kind: 'error',
-    title: 'NetworkError',
-    messageSample: 'Request timed out after 30000ms',
-    surface: { screen: 'Cart' },
+    // Production shape: the class name is the whole title and the
+    // surface is empty, so the message is the only thing that
+    // distinguishes this row. Five of nine real error issues in the
+    // dogfood project look exactly like this.
+    title: 'Error',
+    messageSample: 'pinning mismatch on identity.focusai.com (mode=report-only)',
+    surface: {},
     platform: 'android',
     eventCount: 88,
     usersCount: 41,
