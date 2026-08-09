@@ -129,7 +129,8 @@ pub fn router(state: Arc<AppState>) -> Router {
             // real-app upload died as "Error parsing multipart".
             // 256 MB on the wire; bigger artifacts arrive gzipped
             // (the handler inflates, capped at 512 MB decompressed).
-            post(artifacts_upload::upload_by_release_name)
+            get(artifacts_upload::list_by_release_name)
+                .post(artifacts_upload::upload_by_release_name)
                 .layer(axum::extract::DefaultBodyLimit::max(256 * 1024 * 1024)),
         )
         // ── push family (carried; outside v1 acceptance) ──
