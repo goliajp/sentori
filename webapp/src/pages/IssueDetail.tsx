@@ -31,6 +31,7 @@ import {
   type IssueReleaseRow,
   type OccurrenceRow,
 } from '../lib/api';
+import { isBareTypeTitle } from '../lib/issue-title';
 import { useAsyncData } from '../lib/useAsyncData';
 
 import { ReplayPlayer } from '../components/ReplayPlayer';
@@ -45,14 +46,6 @@ import {
 import { WireframePlayer } from '../components/WireframePlayer';
 
 type Signal = { t: number; kind: string; data?: Record<string, unknown> };
-
-/** A bare classname makes a poor headline. When the grouping title
- *  is a single TitleCase token ("Error", "SentoriTestException")
- *  and the sample message actually says something, the message
- *  leads and the type demotes to a chip-sized line. */
-function isBareTypeTitle(title: string): boolean {
-  return /^[A-Z][A-Za-z0-9]*$/.test(title);
-}
 
 export function IssueDetailPane({
   issueId,
