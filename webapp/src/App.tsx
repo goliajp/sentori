@@ -18,7 +18,7 @@ import { useT } from './i18n';
 import { api, type Me, type Project } from './lib/api';
 import { setThemeMode, useThemeMode, type ThemeMode } from './lib/theme';
 
-import goliaMark from './assets/golia-mark.svg';
+import { SentoriMark } from './components/brand';
 
 /// Shell context: who is logged in + which projects are visible.
 /// Pages read the project scope from here instead of re-fetching.
@@ -106,7 +106,7 @@ export function App() {
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-48 shrink-0 flex-col border-r border-border bg-bg p-2.5">
           <div className="mb-5 flex items-center gap-2 px-2.5 pt-1.5">
-            <img src={goliaMark} alt="GOLIA" className="h-4.5 w-4.5" />
+            <SentoriMark className="h-4.5 w-4.5 text-fg" />
             <span className="text-[15px] font-semibold tracking-tight">sentori</span>
           </div>
           <nav className="flex flex-col gap-0.5">
@@ -192,7 +192,7 @@ function StatusBar() {
   }, []);
   return (
     <footer className="flex h-6 shrink-0 items-center gap-2 border-t border-border bg-bg px-3 font-mono text-xs text-fg-subtle">
-      <img src={goliaMark} alt="" aria-hidden className="h-3 w-3 opacity-80" />
+      <SentoriMark className="h-3 w-3 opacity-80" />
       <span>GOLIA · sentori</span>
       <span className="ml-auto flex items-center gap-3 tabular-nums">
         <span>webapp v{__APP_VERSION__}</span>
