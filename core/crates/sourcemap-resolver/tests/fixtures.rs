@@ -56,25 +56,29 @@ fn parses_section_index_map() {
 }
 
 #[test]
-fn rejects_hermes_dialect_explicitly() {
-    // Hermes maps carry the `x_facebook_sources` extension and an
-    // empty `mappings` string at the top level alongside per-
-    // function bytecode-offset tables in a Hermes-specific shape.
-    // We craft the minimum shape that triggers `DecodedMap::Hermes`
-    // in the upstream decoder.
-    let doc = r#"{
-        "version": 3,
-        "file": "index.android.bundle",
-        "sources": ["index.js"],
-        "names": [],
-        "mappings": "",
-        "x_facebook_sources": [[{ "names": ["<global>"], "mappings": "AAA" }]]
-    }"#;
-    let err = ParsedMap::parse(doc.as_bytes()).expect_err("hermes refused");
-    assert!(
-        matches!(err, ParseError::UnsupportedFormat { kind: "hermes" }),
-        "expected UnsupportedFormat(hermes), got {err:?}",
+fn reads_a_hermes_dialect_map() {
+    // Every modern React Native build is Hermes, and
+    // `react-native compose-source-maps` emits a Source Map V3
+    // document carrying `x_facebook_sources` (and, for a real build,
+    // `x_hermes_function_offsets`). The upstream decoder classifies
+    // that as `DecodedMap::Hermes`, and this crate used to refuse it
+    // outright — which meant an RN-first product could not read the
+    // maps RN produces. insight's Android crashes sat unreadable with
+    // a valid 21 MB composed map in the same release.
+    //
+    // A Hermes frame reports line 1 and a bytecode offset as its
+    // column; the document's ordinary mappings are what resolve it.
+    let doc = format!(
+        r#"{{"version":3,"file":"index.android.bundle","sources":["src/a.ts"],"names":[],"mappings":"{}","sourcesContent":["const a = 1\nconst b = 2\n"],"x_facebook_sources":[[{{"names":["<global>"],"mappings":"AAA"}}]]}}"#,
+        "AAAA"
     );
+    let map = ParsedMap::parse(doc.as_bytes()).expect("a hermes map is a source map");
+    let r = map
+        .resolve(1, 0)
+        .expect("its ordinary mappings still resolve");
+    assert_eq!(r.file.as_deref(), Some("src/a.ts"));
+    // and sourcesContent still reaches the reading window
+    assert!(map.source_window(r.src_id, 0, 1).is_some());
 }
 
 #[test]

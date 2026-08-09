@@ -17,7 +17,7 @@
 //! does internally.
 
 use crate::error::{ParseError, ParseResult};
-use sourcemap::{DecodedMap, SourceMap, decode_slice};
+use sourcemap::{DecodedMap, SourceMap, SourceMapHermes, decode_slice};
 
 /// A parsed, immutable Source Map V3 document.
 ///
@@ -26,7 +26,36 @@ use sourcemap::{DecodedMap, SourceMap, decode_slice};
 /// type is read-only and safe to share across threads — wrap it in
 /// `Arc` to fan it out.
 pub struct ParsedMap {
-    inner: SourceMap,
+    inner: Inner,
+}
+
+/// A Hermes map is a Source Map V3 document plus a bytecode-offset
+/// table, and it is what every modern React Native build produces —
+/// `react-native compose-source-maps` emits exactly this. Rejecting
+/// it meant an RN-first product could not read the maps RN makes:
+/// insight's Android crashes sat unsymbolicated with a valid, fully
+/// composed 21 MB map in the same release, because the only thing
+/// this crate did with a Hermes document was refuse it.
+///
+/// Kept as its own variant rather than unwrapped to a plain
+/// `SourceMap` so the function-name table stays reachable: a Hermes
+/// frame reports `line 1, column = bytecode offset`, and the name of
+/// the function it was in lives only in that table.
+enum Inner {
+    // Boxed on both arms: `SourceMapHermes` wraps a `SourceMap` and
+    // adds the offset table, so leaving `Regular` unboxed makes the
+    // enum as large as the bigger variant for every map.
+    Regular(Box<SourceMap>),
+    Hermes(Box<SourceMapHermes>),
+}
+
+impl Inner {
+    fn map(&self) -> &SourceMap {
+        match self {
+            Self::Regular(m) => m,
+            Self::Hermes(h) => h,
+        }
+    }
 }
 
 impl ParsedMap {
@@ -41,18 +70,25 @@ impl ParsedMap {
     /// - [`ParseError::Decode`] — bytes are not a Source Map V3 doc.
     /// - [`ParseError::Flatten`] — the doc is an index but a section
     ///   could not be flattened.
-    /// - [`ParseError::UnsupportedFormat`] — the doc is a Hermes
-    ///   (RN bytecode) map; use the dedicated Hermes stone instead.
+    ///
+    /// A Hermes document (`x_facebook_sources`, what every React
+    /// Native build produces) is accepted: it is a Source Map V3
+    /// document with a bytecode-offset table alongside, and both
+    /// halves are used.
     pub fn parse(bytes: &[u8]) -> ParseResult<Self> {
         let decoded = decode_slice(bytes).map_err(ParseError::Decode)?;
         let inner = match decoded {
             DecodedMap::Regular(sm) => sm,
             DecodedMap::Index(idx) => idx.flatten().map_err(ParseError::Flatten)?,
-            DecodedMap::Hermes(_) => {
-                return Err(ParseError::UnsupportedFormat { kind: "hermes" });
+            DecodedMap::Hermes(h) => {
+                return Ok(Self {
+                    inner: Inner::Hermes(Box::new(h)),
+                });
             }
         };
-        Ok(Self { inner })
+        Ok(Self {
+            inner: Inner::Regular(Box::new(inner)),
+        })
     }
 
     /// Resolve a minified `(line, column)` back to its original
@@ -89,17 +125,27 @@ impl ParsedMap {
             return None;
         }
         let dst_line = line - 1;
-        let token = self.inner.lookup_token(dst_line, column)?;
+        let token = self.inner.map().lookup_token(dst_line, column)?;
         // Strict line match: reject the upstream's cross-line fallback
         // so we never invent a source position for a frame past EOF.
         if token.get_dst_line() != dst_line {
             return None;
         }
+        // A Hermes frame's column IS the bytecode offset, and the
+        // enclosing function's name is only in the offset table — the
+        // token's own `name` is usually absent for these.
+        let function = token
+            .get_name()
+            .map(str::to_owned)
+            .or_else(|| match &self.inner {
+                Inner::Hermes(h) => h.get_original_function_name(column).map(str::to_owned),
+                Inner::Regular(_) => None,
+            });
         Some(Resolution {
             file: token.get_source().map(str::to_owned),
             line: token.get_src_line().saturating_add(1),
             column: token.get_src_col(),
-            function: token.get_name().map(str::to_owned),
+            function,
             raw_line: line,
             raw_column: column,
             src_id: token.get_src_id(),
@@ -116,7 +162,7 @@ impl ParsedMap {
     /// will return fewer than five `before` lines without erroring.
     #[must_use]
     pub fn source_window(&self, src_id: u32, line0: usize, context: usize) -> Option<SourceWindow> {
-        let view = self.inner.get_source_view(src_id)?;
+        let view = self.inner.map().get_source_view(src_id)?;
         let rows: Vec<&str> = view.source().lines().collect();
         if line0 >= rows.len() {
             return None;
@@ -141,7 +187,7 @@ impl ParsedMap {
     /// check on uploaded artefacts.
     #[must_use]
     pub fn source_count(&self) -> u32 {
-        self.inner.get_source_count()
+        self.inner.map().get_source_count()
     }
 
     /// Whether the bundler embedded `sourcesContent` for every
@@ -150,7 +196,8 @@ impl ParsedMap {
     /// that lacks content.
     #[must_use]
     pub fn has_sources_content(&self) -> bool {
-        (0..self.inner.get_source_count()).all(|i| self.inner.get_source_view(i).is_some())
+        (0..self.inner.map().get_source_count())
+            .all(|i| self.inner.map().get_source_view(i).is_some())
     }
 }
 

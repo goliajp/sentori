@@ -22,13 +22,16 @@
 //!   or mutate any specific frame type. Those couplings live in the
 //!   钢筋 layer (`event-pipeline`); a stone has no business knowing
 //!   about HTTP or Postgres.
-//! - **Does not** — handle Hermes (React Native bytecode) source
-//!   maps. Hermes maps share the JSON envelope but use a different
-//!   lookup primitive (`bytecode_offset` rather than `line:column`)
-//!   and a dedicated stone alongside `dwarf-resolver` will cover
-//!   them. This crate refuses Hermes input at parse time via
-//!   [`error::ParseError::UnsupportedFormat`] rather than silently
-//!   degrading to wrong answers.
+//! - **Does** — handle Hermes (React Native) source maps. The plan
+//!   was a dedicated stone and a parse-time refusal in the meantime,
+//!   on the reading that Hermes needs a different lookup primitive.
+//!   It does not: `react-native compose-source-maps` emits an
+//!   ordinary Source Map V3 document, and a Hermes frame's column
+//!   *is* the offset its mappings are keyed by. The refusal meant an
+//!   RN-first product could not read the maps RN produces — 66 of
+//!   66 Android crashes on a customer's release, with a valid 21 MB
+//!   composed map sitting in the same release. The bytecode-offset
+//!   table is used too, for the enclosing function's name.
 //!
 //! ## Coordinate convention
 //!
