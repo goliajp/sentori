@@ -75,14 +75,56 @@ pub async fn symbolicate_payload(
     if release.is_empty() {
         return 0;
     }
-    let Some(map) = map_for_release(pool, attachments, cache, project_id, release).await else {
+    let maps = maps_for_release(pool, attachments, cache, project_id, release).await;
+    if maps.is_empty() {
         return 0;
-    };
+    }
     let mut rewritten = 0;
     if let Some(error) = payload.get_mut("error") {
-        rewritten += walk_causes(&map, error);
+        rewritten += walk_causes(&maps, error);
     }
     rewritten
+}
+
+/// One candidate map: the artifact's name, so a frame can be matched
+/// to the bundle it came from, and the parse.
+struct Candidate {
+    name: String,
+    map: Arc<ParsedMap>,
+}
+
+/// `index.android.bundle` out of `http://10.0.2.2:8081/index.android.bundle?platform=android`.
+fn bundle_basename(file: &str) -> &str {
+    let no_query = file.split(['?', '#']).next().unwrap_or(file);
+    no_query.rsplit('/').next().unwrap_or(no_query)
+}
+
+/// Candidates for a frame, best first.
+///
+/// A React Native app ships two bundles and therefore two maps, and
+/// before this the server took whichever artifact was uploaded last
+/// and used it for everything. In production that meant one platform
+/// resolved and the other silently did not: 3 of 3 iOS crashes on
+/// insight's release read as source while 66 of 66 Android ones
+/// stayed `index.android.bundle:1:289430`, with a matching map
+/// sitting in the same release.
+///
+/// Name match first — the artifact is usually uploaded under the
+/// bundle's own filename — then the rest by recency, because names
+/// are a convention and not a contract. A map that cannot resolve a
+/// frame simply reports nothing, so trying the next one is safe;
+/// what is not safe is trying only one and calling the result "no
+/// map covers this".
+fn ranked<'a>(maps: &'a [Candidate], frame_file: &str) -> Vec<&'a Arc<ParsedMap>> {
+    let want = bundle_basename(frame_file);
+    let matches = |c: &Candidate| {
+        let n = bundle_basename(&c.name);
+        n == want || n.strip_suffix(".map") == Some(want) || want.strip_suffix(".map") == Some(n)
+    };
+    let mut out: Vec<&Arc<ParsedMap>> =
+        maps.iter().filter(|c| matches(c)).map(|c| &c.map).collect();
+    out.extend(maps.iter().filter(|c| !matches(c)).map(|c| &c.map));
+    out
 }
 
 /// Symbolicate an error and every link in its `cause` chain.
@@ -91,12 +133,21 @@ pub async fn symbolicate_payload(
 /// the borrow checker follows it naturally that way; an explicit loop
 /// over `&mut` links needs the two borrows to overlap. Depth is bounded
 /// by what an SDK can construct, which is a handful.
-fn walk_causes(map: &ParsedMap, error: &mut Value) -> usize {
+fn walk_causes(maps: &[Candidate], error: &mut Value) -> usize {
     let mut n = 0;
     if let Some(frames) = error.get_mut("stack").and_then(Value::as_array_mut) {
         for frame in frames {
-            if rewrite_frame(map, frame) {
-                n += 1;
+            let file = frame
+                .get("minifiedFile")
+                .or_else(|| frame.get("file"))
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned();
+            for map in ranked(maps, &file) {
+                if rewrite_frame(map, frame) {
+                    n += 1;
+                    break;
+                }
             }
         }
     }
@@ -106,7 +157,7 @@ fn walk_causes(map: &ParsedMap, error: &mut Value) -> usize {
     if let Some(cause) = error.get_mut("cause")
         && !cause.is_null()
     {
-        n += walk_causes(map, cause);
+        n += walk_causes(maps, cause);
     }
     n
 }
@@ -206,42 +257,72 @@ fn context_lines_json(lines: &[String]) -> Value {
 }
 
 /// Load and parse the source map for a release, via the cache.
-async fn map_for_release(
+/// Every sourcemap artifact on the release, parsed, newest first.
+///
+/// Bounded: a release with a runaway number of uploaded maps should
+/// cost a bounded amount of work per event, and in practice a React
+/// Native app has two (one per platform) plus the occasional
+/// re-upload.
+const MAX_MAPS_PER_RELEASE: i64 = 8;
+
+async fn maps_for_release(
     pool: &PgPool,
     attachments: &crate::blob_store::AttachmentStore,
     cache: &MapCache,
     project_id: Uuid,
     release: &str,
-) -> Option<Arc<ParsedMap>> {
-    let row = sqlx::query(
-        "SELECT a.content_hash \
+) -> Vec<Candidate> {
+    let Ok(rows) = sqlx::query(
+        "SELECT a.name, a.content_hash \
          FROM release_artifacts a \
          JOIN releases r ON r.id = a.release_id \
          WHERE r.project_id = $1 AND r.name = $2 AND a.kind = 'sourcemap' \
-         ORDER BY a.created_at DESC LIMIT 1",
+         ORDER BY a.created_at DESC LIMIT $3",
     )
     .bind(project_id)
     .bind(release)
-    .fetch_optional(pool)
+    .bind(MAX_MAPS_PER_RELEASE)
+    .fetch_all(pool)
     .await
-    .ok()
-    .flatten()?;
-    let hash: String = row.get("content_hash");
+    else {
+        return Vec::new();
+    };
 
-    if let Some(hit) = cache.get(&hash) {
-        return Some(hit);
+    let mut out = Vec::with_capacity(rows.len());
+    for row in rows {
+        let name: String = row.get("name");
+        let hash: String = row.get("content_hash");
+        if let Some(hit) = cache.get(&hash) {
+            out.push(Candidate { name, map: hit });
+            continue;
+        }
+        let Some(parsed) = load_map(attachments, &hash, release).await else {
+            continue;
+        };
+        cache.insert(hash, Arc::clone(&parsed));
+        out.push(Candidate { name, map: parsed });
     }
+    out
+}
+
+async fn load_map(
+    attachments: &crate::blob_store::AttachmentStore,
+    hash: &str,
+    release: &str,
+) -> Option<Arc<ParsedMap>> {
     let bytes = attachments
         .get(&hash.parse().ok()?)
         .await
         .inspect_err(|e| warn!(error = %e, %release, "symbolicate: blob read failed"))
         .ok()?;
+    // Not every artifact filed as a sourcemap is one — a bundle
+    // uploaded under `kind=sourcemap` parses to nothing. Skipping it
+    // is right; before, being the newest upload made it the only
+    // candidate and the whole release went unsymbolicated.
     let parsed = ParsedMap::parse(&bytes)
         .inspect_err(|e| warn!(error = %e, %release, "symbolicate: map unparseable"))
         .ok()?;
-    let parsed = Arc::new(parsed);
-    cache.insert(hash, Arc::clone(&parsed));
-    Some(parsed)
+    Some(Arc::new(parsed))
 }
 
 #[cfg(test)]
@@ -259,6 +340,54 @@ mod tests {
             .expect("a minimal source map parses")
     }
 
+    /// The candidate list `walk_causes` now takes. One entry, so the
+    /// chain-walk tests keep testing the walk rather than the ranking.
+    fn one(map: ParsedMap) -> Vec<Candidate> {
+        vec![Candidate {
+            name: "index.android.bundle".into(),
+            map: Arc::new(map),
+        }]
+    }
+
+    #[test]
+    fn a_frame_picks_the_map_named_after_its_own_bundle() {
+        // The production failure, in miniature: a release carries a
+        // map per platform, and before this the newest upload was
+        // used for every frame. insight's Android crashes stayed
+        // `index.android.bundle:1:289430` with the matching map in
+        // the same release.
+        let maps = vec![
+            Candidate {
+                name: "main.jsbundle.map".into(),
+                map: Arc::new(empty_map()),
+            },
+            Candidate {
+                name: "index.android.bundle.map".into(),
+                map: Arc::new(empty_map()),
+            },
+        ];
+        let order = ranked(&maps, "index.android.bundle");
+        assert!(
+            Arc::ptr_eq(order[0], &maps[1].map),
+            "the android map must be tried first for an android frame",
+        );
+        // and the other one is still tried — names are a convention,
+        // not a contract, and a frame the named map cannot resolve
+        // must not be given up on.
+        assert_eq!(order.len(), 2);
+    }
+
+    #[test]
+    fn a_bundle_url_matches_the_bare_bundle_name() {
+        // Metro serves the bundle over http with a query string; the
+        // artifact is uploaded under the plain filename.
+        assert_eq!(
+            bundle_basename("http://10.0.2.2:8081/index.android.bundle?platform=android&dev=false"),
+            "index.android.bundle",
+        );
+        assert_eq!(bundle_basename("main.jsbundle"), "main.jsbundle");
+    }
+
     #[test]
     fn walks_the_whole_cause_chain() {
         let mut err = json!({
@@ -271,14 +400,14 @@ mod tests {
         // Nothing resolves against an empty map, but every frame must
         // be visited — a chain walk that stops at the first link would
         // also report zero.
-        assert_eq!(walk_causes(&empty_map(), &mut err), 0);
+        assert_eq!(walk_causes(&one(empty_map()), &mut err), 0);
         assert_eq!(err["cause"]["cause"]["stack"][0]["line"], 1);
     }
 
     #[test]
     fn a_null_cause_ends_the_chain() {
         let mut err = json!({ "type": "A", "cause": null });
-        assert_eq!(walk_causes(&empty_map(), &mut err), 0);
+        assert_eq!(walk_causes(&one(empty_map()), &mut err), 0);
     }
 
     /// A frame that already carries source context has been through
