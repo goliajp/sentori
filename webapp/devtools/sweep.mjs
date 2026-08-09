@@ -8,9 +8,19 @@
 // a throw looks fine in a screenshot, and that is exactly how the
 // RangeError survived a sweep.
 import { spawn } from 'node:child_process';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+// macOS keeps Chrome in a bundle; a Linux runner has it on PATH under
+// one of several names. Resolved rather than hardcoded so the same
+// sweep runs on a laptop and in CI — a gate that only exists on one
+// machine is a gate whoever is not at that machine does not have.
+const CHROME =
+  process.env.CHROME_PATH ??
+  ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+   '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable',
+   '/usr/bin/chromium-browser', '/usr/bin/chromium']
+    .find(p => existsSync(p)) ??
+  'google-chrome';
 const BASE = 'http://localhost:5599';
 const I = '019f85ee-ae41-77f1-bbf9-97d310663c9a';
 
@@ -34,14 +44,32 @@ const width = process.argv[5] || '1500';
 mkdirSync(out, { recursive: true });
 
 const chrome = spawn(CHROME, [
-  '--headless=new', '--disable-gpu', '--remote-debugging-port=9555',
+  '--headless=new', '--disable-gpu', '--no-sandbox', '--remote-debugging-port=9555',
   `--lang=${lang}`, `--accept-lang=${lang}`,
   `--window-size=${width},1000`, `--user-data-dir=/tmp/cd-sweep-${lang}-${theme}-${width}`,
   'about:blank',
 ], { stdio: 'ignore' });
-await new Promise(r => setTimeout(r, 3000));
 
-const list = await (await fetch('http://127.0.0.1:9555/json/list')).json();
+// Chrome's debugging port comes up a beat after the process does, and
+// on a cold CI runner that beat is longer than a laptop's. Poll for it
+// — a fixed sleep here failed as `list.find(...) of undefined`, which
+// reads like a bug in the sweep rather than "the browser is not up".
+let list = null;
+for (let i = 0; i < 40 && !list; i++) {
+  try {
+    const r = await fetch('http://127.0.0.1:9555/json/list');
+    const j = await r.json();
+    if (j.some(t => t.type === 'page')) list = j;
+  } catch {
+    /* not listening yet */
+  }
+  if (!list) await new Promise(r => setTimeout(r, 500));
+}
+if (!list) {
+  process.stderr.write(`chrome never opened a debugging port (${CHROME})\n`);
+  chrome.kill();
+  process.exit(1);
+}
 const sock = new WebSocket(list.find(t => t.type === 'page').webSocketDebuggerUrl);
 let id = 0;
 const pend = new Map();
