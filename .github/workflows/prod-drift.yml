@@ -12,6 +12,13 @@ name: prod-drift
 # nothing. It cannot catch a deploy that never started; there is no run
 # to fail. So this asks from outside, on a clock, with no dependency on
 # anything having been triggered.
+#
+# The second job asks the same question about the other shipped
+# surface: the self-hosted image. On 2026-08-09 GHCR's `latest` was
+# found frozen on a 2026-07-22 build — eight releases old — while every
+# master run stayed green, because `latest` was gated on a v-tag event
+# that a GITHUB_TOKEN push can never fire. Self-hosters pull `:latest`
+# by default, so that surface needs its own outside observer too.
 
 on:
   schedule:
@@ -61,4 +68,62 @@ jobs:
                "and master has been ahead for $(( age / 60 )) minutes."
           echo "::error::A deploy was missed or failed. Re-run it with:"
           echo "::error::  gh workflow run deploy.yml --ref master"
+          exit 1
+
+  image-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          sparse-checkout: VERSION
+          sparse-checkout-cone-mode: false
+
+      - name: master vs published image
+        run: |
+          set -euo pipefail
+
+          want=$(tr -d '[:space:]' < VERSION)
+          repo=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          img="ghcr.io/${repo}/sentori-server"
+
+          # Anonymous pull token — the package is public, so no secret
+          # is needed and this keeps working from a fork.
+          tok=$(curl -fsS "https://ghcr.io/token?scope=repository:${repo}/sentori-server:pull" \
+            | sed 's/.*"token":"\([^"]*\)".*/\1/')
+          digest() {
+            curl -fsSI -H "Authorization: Bearer $tok" \
+              -H 'Accept: application/vnd.oci.image.index.v1+json' \
+              -H 'Accept: application/vnd.docker.distribution.manifest.list.v2+json' \
+              "https://ghcr.io/v2/${repo}/sentori-server/manifests/$1" \
+              | tr -d '\r' | awk -F': ' '/^[Dd]ocker-[Cc]ontent-[Dd]igest/{print $2}'
+          }
+
+          latest=$(digest latest || true)
+          tagged=$(digest "$want" || true)
+
+          echo "master VERSION: $want"
+          echo "latest  digest: ${latest:-<missing>}"
+          echo "$want digest: ${tagged:-<missing>}"
+
+          if [ -n "$latest" ] && [ "$latest" = "$tagged" ]; then
+            echo "==> $img:latest is the current release"
+            exit 0
+          fi
+
+          # An image build takes ~10 minutes on the arm64 runner; a
+          # merge that just landed is not drift.
+          pushed=$(git log -1 --format=%ct master)
+          age=$(( $(date +%s) - pushed ))
+          if [ "$age" -lt 2700 ]; then
+            echo "==> master moved ${age}s ago; the image build may still be running"
+            exit 0
+          fi
+
+          echo "::error::$img:latest does not point at $want," \
+               "and master has been ahead for $(( age / 60 )) minutes."
+          echo "::error::Self-hosters pull :latest by default, so they are"
+          echo "::error::installing an older product. Re-run the build with:"
+          echo "::error::  gh workflow run selfhosted-image.yml --ref master"
           exit 1
