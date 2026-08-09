@@ -109,6 +109,13 @@ function ReleaseRowView({
           label="android"
           used={used.has('android')}
         />
+        {/* Source bundles are an enhancement — they put the failing
+            line next to a native frame — so an absent one is never
+            red. It is still worth showing: it was uploaded by the
+            same pipeline step as the dSYM, and when that step stops
+            being called this is the other half of what goes with
+            it. */}
+        <Light on={data ? kinds.has('srcbundle') : undefined} label="src" />
         {created && (
           <span className="w-16 text-right text-xs tabular-nums text-fg-subtle">
             {formatRelative(created)}

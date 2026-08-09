@@ -21,6 +21,7 @@ import {
   pushSend,
 } from './push.js'
 import { reactNativeUpload } from './react-native.js'
+import { fetchArtifacts } from './artifacts.js'
 import { uploadArtifact } from './upload.js'
 
 const HELP = `sentori-cli — Sentori command-line interface
@@ -36,6 +37,14 @@ build — exit 0 with a friendly note unless --strict):
                                 show the failing line; nothing touches git)
   sentori-cli react-native upload --release <r> --token <t> \\
       --metro-map <m> --hermes-map <h> [--bundle <b>]
+
+Release gate (the ONE command here that is allowed to fail):
+  sentori-cli artifacts check --release <r> --token <t> [--expect dsym,sourcemap]
+      Asks the server what actually landed for this release. With
+      --expect, exits 1 when one of those kinds is missing. Uploads
+      never block your build; this is the step that does, and it
+      catches the case a local "we ran the upload" ledger cannot:
+      the upload step that stopped being called at all.
 
 Regression tripwires (design: probes):
   sentori-cli probes sync --release <r> --token <t> [--dir .]
@@ -568,6 +577,70 @@ async function cmdMcpServe(argv: string[]): Promise<number> {
   }
 }
 
+// ── the release gate ──────────────────────────────────────────────
+
+async function cmdArtifactsCheck(argv: string[]): Promise<number> {
+  let parsed
+  try {
+    parsed = parseArgs({
+      allowPositionals: true,
+      args: argv,
+      options: { ...UPLOAD_OPTS, expect: { type: 'string' } },
+    })
+  } catch (e) {
+    console.error(`error: ${(e as Error).message}`)
+    return 2
+  }
+  const cfg = parseCommon(parsed.values)
+  if (!cfg) return 2
+
+  let res
+  try {
+    res = await fetchArtifacts(cfg)
+  } catch (e) {
+    console.error(`artifacts check failed: ${(e as Error).message}`)
+    return 1
+  }
+
+  if (!res.known) {
+    console.error(
+      `Sentori has never seen the release "${cfg.release}".\n` +
+        `  Either nothing was ever uploaded for it, or --release does not ` +
+        `match the string your SDK passes to init({ release }).`,
+    )
+  }
+  for (const [kind, n] of Object.entries(res.kinds)) {
+    const slices = res.artifacts.filter((a) => a.kind === kind)
+    const ids = slices
+      .map((a) => a.debugId)
+      .filter((d): d is string => d !== null)
+      .join(', ')
+    console.log(`  ${kind.padEnd(10)} ${String(n).padStart(3)}${ids ? `  ${ids}` : ''}`)
+  }
+
+  const expect =
+    typeof parsed.values.expect === 'string'
+      ? parsed.values.expect
+          .split(',')
+          .map((k) => k.trim())
+          .filter(Boolean)
+      : []
+  if (expect.length === 0) return 0
+
+  const absent = expect.filter((k) => (res.kinds[k] ?? 0) === 0)
+  if (absent.length === 0) {
+    console.log(`ok — ${cfg.release} has ${expect.join(', ')}`)
+    return 0
+  }
+  console.error(
+    `missing for ${cfg.release}: ${absent.join(', ')}\n` +
+      `  Stacks needing these stay unreadable for this release. Upload ` +
+      `them and this passes — retro-symbolication rewrites the events ` +
+      `already stored.`,
+  )
+  return 1
+}
+
 async function main(argv: string[]): Promise<number> {
   if (argv.length === 0 || argv[0] === '-h' || argv[0] === '--help') {
     console.log(HELP)
@@ -579,6 +652,7 @@ async function main(argv: string[]): Promise<number> {
   if (a === 'upload' && b === 'mapping') return cmdUploadMapping(rest)
   if (a === 'upload' && b === 'srcbundle') return cmdUploadSrcbundle(rest)
   if (a === 'react-native' && b === 'upload') return cmdReactNativeUpload(rest)
+  if (a === 'artifacts' && b === 'check') return cmdArtifactsCheck(rest)
   if (a === 'probes' && b === 'sync') return cmdProbesSync(rest)
   if (a === 'mcp' && b === 'serve') return cmdMcpServe(rest)
   if (a === 'issue' && b === 'list') return cmdIssueList(rest)

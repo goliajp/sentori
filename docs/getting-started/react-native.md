@@ -132,6 +132,30 @@ sentori-cli upload mapping \
   android/app/build/outputs/mapping/release/mapping.txt
 ```
 
+**Upload failures do not fail your build.** That is deliberate — a
+release should never be blocked because Sentori is having a bad day.
+It also means a broken upload step is silent, so check afterwards
+that what you expected actually landed:
+
+```bash
+sentori-cli artifacts check \
+  --release "myapp@1.0.0+123" \
+  --token "$SENTORI_TOKEN" \
+  --api-url "$SENTORI_API_URL" \
+  --expect sourcemap,dsym,proguard
+```
+
+This is the one command in the CLI that exits non-zero on purpose:
+put it at the end of the release job. It asks the server what is
+there rather than trusting that the upload ran — the failure it is
+built for is an upload step that stopped being called at all, which
+a local "we ran it" record cannot see. Restrict `--expect` to the
+platforms you actually ship (an iOS-only app has no `proguard`).
+
+Late uploads are not wasted: the server re-symbolicates the events it
+has already stored for that release, so fixing a gap recovers the
+stacks that came in while it was open.
+
 ## 6. Next steps
 
 - [SDK reference](../sdk-react-native.md) — `<ErrorBoundary>`,

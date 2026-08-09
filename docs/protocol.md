@@ -149,6 +149,92 @@ token auth has no user identity.
 
 Trailing slashes are not significant.
 
+### `POST /v1/releases/{release}/artifacts`
+Symbolication artifact upload — the source map, dSYM slice or R8 mapping that turns a
+minified or stripped frame back into source. Needs an **api-scope** token, not the
+public one shipped inside the app: whoever can replace a release's source map can make
+every stack in it symbolicate to whatever they choose.
+
+`multipart/form-data` with two fields:
+
+- `kind` — one of `sourcemap`, `dsym`, `proguard`, `srcbundle`.
+- `file` — the artifact. Gzip is inflated server-side, so `foo.map.gz` stores as
+  `foo.map`. The **filename is data**: dSYM slices are matched to a crashing frame by
+  the debug id embedded in it (`Insight.app-arm64-<uuid>`).
+
+The release row is created if it does not exist — maps are produced at build time,
+usually before the app has ever run and announced its deploy, so requiring the row
+first would make the ordering a trap.
+
+Response (`201 Created`):
+
+```json
+{
+  "id":              "019e10...",
+  "kind":            "dsym",
+  "name":            "Insight.app-arm64-E63A748C-3F0E-302D-95EC-8DA5B55C97D9",
+  "content_hash":    "990f6675...",
+  "size_bytes":      304857600,
+  "debug_id":        "E63A748C3F0E302D95EC8DA5B55C97D9",
+  "first_seen":      true,
+  "content_changed": true
+}
+```
+
+- `debug_id` — the id read back out of the stored name, `null` when the name carries
+  none (a source map has no debug id). This is the value a crashing frame is matched
+  against, so it is what answers "is this the build that shipped?".
+- `first_seen` — no artifact of this kind and name existed on the release before.
+- `content_changed` — the stored bytes differ from what was there.
+
+Both flags exist for the re-upload case: re-archiving a build does not guarantee the
+same debug id, and an uploader with no way to tell cannot know whether the re-upload
+accomplished anything. `first_seen: true` on a dSYM means the server had never held
+that slice.
+
+The unique key is `(release, kind, name)`, so a re-upload replaces rather than
+accumulating near-duplicates a symbolicator would have to choose between.
+
+### `GET /v1/releases/{release}/artifacts`
+What actually landed. Same api-scope token as the upload — reading back what your own
+token just wrote is strictly weaker than writing it, and it needs no dashboard session
+or project UUID, so a release job can ask.
+
+Response (`200 OK`):
+
+```json
+{
+  "release": "myapp@1.2.3+456",
+  "known":   true,
+  "kinds":   { "sourcemap": 1, "dsym": 2, "proguard": 0, "srcbundle": 0 },
+  "missing": ["proguard", "srcbundle"],
+  "artifacts": [
+    {
+      "kind":        "dsym",
+      "name":        "Insight.app-arm64-E63A748C-3F0E-302D-95EC-8DA5B55C97D9",
+      "debugId":     "E63A748C3F0E302D95EC8DA5B55C97D9",
+      "contentHash": "571e3b3d...",
+      "sizeBytes":   304857600,
+      "createdAt":   "2026-08-09T17:33:49.239248Z"
+    }
+  ]
+}
+```
+
+- `kinds` carries **every** kind with a count, zeros included: a gate wants to test a
+  number, not the absence of a key.
+- `known` is false when this instance has never heard the release name at all. A typo
+  in the release string and a release nobody uploaded to look identical otherwise, and
+  only one of them is fixed by uploading.
+
+Scoped to the token's project: two projects with a release of the same name see only
+their own.
+
+`sentori-cli artifacts check --release <r> --expect sourcemap,dsym` wraps this and is
+the one CLI command that exits non-zero on purpose — uploads stay lenient so Sentori
+can never block a release, which means a broken upload step is silent and something
+has to be allowed to notice.
+
 ## Authentication and headers
 
 | Header | Required | Example |
