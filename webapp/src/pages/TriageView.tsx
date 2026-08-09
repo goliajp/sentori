@@ -13,6 +13,7 @@ import { ImpactCell, KindBadge, kindColor } from '../components/kind';
 import { ErrorBanner, Kbd, clsx, formatRelative } from '../components/ui';
 import { useT } from '../i18n';
 import { api, type IssueSummary } from '../lib/api';
+import { issueHeadline } from '../lib/issue-title';
 import { useAsyncData } from '../lib/useAsyncData';
 
 import { IssueDetailPane } from './IssueDetail';
@@ -509,6 +510,10 @@ function QueueRow({
 }) {
   const surface = issue.surface as { screen?: string; element?: string };
   const where = [surface.screen, surface.element].filter(Boolean).join(' · ');
+  // Same demotion the crash view does: a row headed "Error" tells you
+  // nothing, and five of them tell you nothing five times. The class
+  // name keeps its place as a chip.
+  const { headline, type } = issueHeadline(issue);
   return (
     <div
       role="button"
@@ -535,7 +540,7 @@ function QueueRow({
           )}
         />
         <span className="min-w-0 flex-1 truncate text-sm font-medium text-fg">
-          {issue.title}
+          {headline}
         </span>
         <span className="shrink-0 text-xs tabular-nums text-fg-subtle">
           {formatRelative(issue.lastSeen)}
@@ -548,10 +553,15 @@ function QueueRow({
             regressed
           </span>
         )}
+        {/* the class name, once the message has taken the headline */}
+        {type && (
+          <span className="shrink-0 font-mono text-xs text-fg-muted">{type}</span>
+        )}
         {/* the second line's context slot: the surface when we have
-            one, else the message sample — a bare "Error" title row
-            should still say what the error said */}
-        {(where || issue.messageSample) && (
+            one, else the message — unless the message is already the
+            headline, in which case printing it twice says nothing
+            twice */}
+        {(where || (!type && issue.messageSample)) && (
           <span className="min-w-0 truncate text-xs text-fg-subtle">
             {where || issue.messageSample}
           </span>
