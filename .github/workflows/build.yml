@@ -170,6 +170,14 @@ jobs:
           bun test
           bun run build
 
+      # Iron-rule dimension 4 (bounded footprint). It ran only in local
+      # preflight, so the budget was enforced by whoever remembered to
+      # run it — which is not enforcement. Once per matrix is redundant
+      # and costs a second; a size budget nobody's machine has to
+      # remember is worth the second.
+      - name: SDK size budget
+        run: bash scripts/check-sdk-size.sh
+
   # `docker-build` lived here and pushed ghcr.io/goliajp/sentori-server
   # and ...-web from docker/Dockerfile.{server,web}. Both were the v0.1
   # build, decommissioned 2026-07-23. The v0.2 image is published by

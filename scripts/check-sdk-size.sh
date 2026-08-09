@@ -14,7 +14,17 @@ RN_BUDGET=200
 
 fail=0
 check() { # name path budget_kb
-  local kb
+  local kb count
+  # An unbuilt package has no .js at all, and `du` over nothing is an
+  # empty string — which compares as neither over nor under a budget.
+  # A size gate that passes because it measured nothing is the same
+  # kind of green as a test suite that ran zero tests.
+  count=$(find "$2" -name '*.js' 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$count" -eq 0 ]; then
+    echo "FAIL: $1 has no built .js under $2 — run \`bun run build:sdks\` first"
+    fail=1
+    return
+  fi
   kb=$(find "$2" -name '*.js' -exec du -ck {} + | tail -1 | cut -f1)
   if [ "$kb" -gt "$3" ]; then
     echo "FAIL: $1 lib/ is ${kb} KB (budget ${3} KB)"
