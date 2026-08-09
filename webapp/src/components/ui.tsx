@@ -17,7 +17,7 @@ import { Link } from 'react-router-dom';
 
 import { useT } from '../i18n';
 
-import goliaMark from '../assets/golia-mark.svg';
+import { SentoriMark } from './brand';
 
 // ── Card ───────────────────────────────────────────────────
 
@@ -334,7 +334,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
       <div className="w-full max-w-sm">
         <div className="mb-4 flex items-center justify-center gap-2">
-          <img src={goliaMark} alt="GOLIA" className="h-5 w-5" />
+          <SentoriMark className="h-5 w-5 text-fg" />
           <span className="text-lg font-semibold tracking-tight text-fg">sentori</span>
         </div>
         <div className="rounded-lg border border-border bg-surface p-6">{children}</div>
