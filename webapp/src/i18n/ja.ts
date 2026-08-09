@@ -48,7 +48,7 @@ export const ja: Messages = {
   'inbox.groupNew': '新規 · 24h',
   'inbox.groupRegressed': 'リグレッション',
   'inbox.loadFailed': '受信箱を読み込めませんでした。',
-  'inbox.pulse': '今日: 新規 {fresh} · リグレッション {regressed}',
+  'inbox.pulse': '新規 {fresh} · 再発 {regressed}',
   'inbox.status.ignored': '無視',
   'inbox.status.open': '未解決',
   'inbox.status.resolved': '解決済み',

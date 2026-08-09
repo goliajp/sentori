@@ -47,7 +47,7 @@ export const zh: Messages = {
   'inbox.groupNew': '新增 · 24h',
   'inbox.groupRegressed': '回归',
   'inbox.loadFailed': '收件箱加载失败。',
-  'inbox.pulse': '今日:新增 {fresh} · 回归 {regressed}',
+  'inbox.pulse': '新增 {fresh} · 回归 {regressed}',
   'inbox.status.ignored': '已忽略',
   'inbox.status.open': '未解决',
   'inbox.status.resolved': '已解决',

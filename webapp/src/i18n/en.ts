@@ -53,7 +53,7 @@ export const en = {
   'inbox.groupNew': 'New · 24h',
   'inbox.groupRegressed': 'Regressed',
   'inbox.loadFailed': 'Could not load the inbox.',
-  'inbox.pulse': 'today: {fresh} new · {regressed} regressed',
+  'inbox.pulse': '{fresh} new · {regressed} regressed',
   'inbox.status.ignored': 'ignored',
   'inbox.status.open': 'open',
   'inbox.status.resolved': 'resolved',
