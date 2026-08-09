@@ -121,17 +121,41 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # The VERSION file is the release line's own statement of what
+      # this commit is. Read it on master pushes so the image carries
+      # a version tag and `latest` even when no v-tag event fires —
+      # see the note below.
+      - name: Checkout (VERSION only)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: VERSION
+          sparse-checkout-cone-mode: false
+
+      - name: Read VERSION
+        id: ver
+        run: echo "value=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # `latest` and the version tag also come from a master push,
+          # not only from a v-tag event. The v tags are created by the
+          # deploy workflow using GITHUB_TOKEN, and GitHub does not
+          # trigger workflows from GITHUB_TOKEN pushes (recursion
+          # guard) — so this job never ran for them. `latest` sat on
+          # a 2026-07-22 build while eight releases shipped, and
+          # self-hosted/README.md tells people to pull `:latest`.
+          # master is the production line here (deploy runs from it),
+          # so tagging from master is the honest fix.
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha,format=short
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=${{ steps.ver.outputs.value }},enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/master' }}
 
       - name: Create manifest list + push
         working-directory: /tmp/digests
