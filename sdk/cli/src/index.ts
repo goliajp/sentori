@@ -635,8 +635,9 @@ async function cmdArtifactsCheck(argv: string[]): Promise<number> {
   console.error(
     `missing for ${cfg.release}: ${absent.join(', ')}\n` +
       `  Stacks needing these stay unreadable for this release. Upload ` +
-      `them and this passes — retro-symbolication rewrites the events ` +
-      `already stored.`,
+      `them and this passes — the upload re-reads the crashes already ` +
+      `stored for this release (server >= 2.12.0), so the gap is not ` +
+      `permanent.`,
   )
   return 1
 }

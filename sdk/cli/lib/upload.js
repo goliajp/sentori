@@ -1,9 +1,11 @@
 // Unified symbolication-artifact upload: sourcemap / dsym / proguard
 // all land on `POST /v1/releases/{release}/artifacts` (multipart
 // `kind` + `file`), authenticated with an api-scope token. A late
-// upload triggers retro-symbolication server-side, which is what
-// makes the lenient exit-0 contract honest — nothing is lost
-// forever.
+// upload re-reads the crashes already stored for that release
+// (server ≥ 2.12.0), which is what makes the lenient exit-0 contract
+// honest — a stack that arrived before its map is unreadable, not
+// lost. This comment claimed that behaviour for a long time before
+// the server had it; the pass exists now.
 //
 // Uploads are gzipped on the wire (server ≥ 2.1.0 inflates
 // transparently). Symbolication artifacts compress well — a plain
