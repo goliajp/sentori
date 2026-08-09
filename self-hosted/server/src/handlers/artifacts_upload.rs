@@ -121,6 +121,137 @@ pub async fn upload_by_release_name(
     store(&state, release_id, kind, name, &bytes).await
 }
 
+/// `GET /v1/releases/{release}/artifacts`
+///
+/// The read half of the upload route, on the same api-scope token.
+///
+/// insight's release pipeline lost its dSYM step for a year: the
+/// upload never ran, and because the CLI exits 0 on failure by
+/// design, nothing in their CI could tell. The fix they wanted was to
+/// ask the server what actually landed — but the only endpoint that
+/// answered needs a browser session and the project's UUID, and a
+/// laptop running `/pub` has neither and should not be handed an
+/// admin session to get one. Reading back what your own api token
+/// just wrote is strictly weaker than writing it.
+///
+/// `kinds` carries a count for every kind, zeros included: a gate
+/// wants to test a number, not the absence of a key. `missing` is
+/// that same fact stated once so the common case is a one-line
+/// check.
+pub async fn list_by_release_name(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<IngestContext>,
+    Path(release): Path<String>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    super::sdk::require_admin_token(&ctx)?;
+
+    let rows = sqlx::query(
+        "SELECT a.kind, a.name, a.content_hash, a.size_bytes, a.created_at \
+         FROM release_artifacts a \
+         JOIN releases r ON r.id = a.release_id \
+         WHERE r.project_id = $1 AND r.name = $2 \
+         ORDER BY a.kind, a.name",
+    )
+    .bind(ctx.project_id)
+    .bind(&release)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    // A release row can exist without artifacts (the deploy marker
+    // arrives on first launch), and artifacts can exist without a
+    // deploy marker (maps are built before the app ever runs). Both
+    // are normal; a name nobody has ever heard of is not, and a
+    // pipeline that typos the release string would otherwise read
+    // "artifacts missing" and never suspect the name.
+    let known: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM releases WHERE project_id = $1 AND name = $2)",
+    )
+    .bind(ctx.project_id)
+    .bind(&release)
+    .fetch_one(&state.pool)
+    .await
+    .unwrap_or(false);
+
+    let mut counts = serde_json::Map::new();
+    for k in KINDS {
+        counts.insert((*k).to_owned(), json!(0));
+    }
+    let artifacts: Vec<Value> = rows
+        .iter()
+        .map(|r| {
+            let kind: String = r.get("kind");
+            let name: String = r.get("name");
+            if let Some(n) = counts.get_mut(&kind) {
+                *n = json!(n.as_u64().unwrap_or(0) + 1);
+            }
+            json!({
+                "kind": kind,
+                "name": name,
+                // For dSYMs the slice's debug id lives in the file
+                // name — it is what a crashing frame is matched
+                // against, so it is the only field that answers "is
+                // this the build that shipped?".
+                "debugId": debug_id_from_name(&name),
+                "contentHash": r.get::<String, _>("content_hash"),
+                "sizeBytes": r.get::<i64, _>("size_bytes"),
+                "createdAt": crate::wire_time::rfc3339(r.get("created_at")),
+            })
+        })
+        .collect();
+
+    let missing: Vec<&str> = KINDS
+        .iter()
+        .copied()
+        .filter(|k| counts.get(*k).and_then(Value::as_u64).unwrap_or(0) == 0)
+        .collect();
+
+    Ok(Json(json!({
+        "release": release,
+        "known": known,
+        "kinds": Value::Object(counts),
+        "missing": missing,
+        "artifacts": artifacts,
+    })))
+}
+
+/// The 32-hex debug id embedded in an uploaded slice name, if there
+/// is one. `Insight.app-arm64-E63A748C-3F0E-302D-95EC-8DA5B55C97D9`
+/// and `e63a748c3f0e302d95ec8da5b55c97d9.dSYM` both carry
+/// `E63A748C3F0E302D95EC8DA5B55C97D9`; `index.android.bundle.map`
+/// carries nothing, and says so.
+///
+/// Read as tokens between the name's separators rather than as a run
+/// of hex characters: `arm64` ends in two hex digits and sits one
+/// dash away from the id, so a longest-run scan returns a 32-window
+/// shifted two places — a plausible-looking id that matches no frame.
+/// Anything this reports must be findable by the same normalisation
+/// the symbolicator matches with, which the tests assert.
+fn debug_id_from_name(name: &str) -> Option<String> {
+    let tokens: Vec<&str> = name
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|t| !t.is_empty())
+        .collect();
+    let hex = |t: &str, n: usize| t.len() == n && t.bytes().all(|b| b.is_ascii_hexdigit());
+
+    // The bare form: one token that is exactly a debug id.
+    if let Some(t) = tokens.iter().find(|t| hex(t, 32)) {
+        return Some(t.to_ascii_uppercase());
+    }
+    // The dashed form Apple and `sentori-cli` write: 8-4-4-4-12.
+    for w in tokens.windows(5) {
+        if hex(w[0], 8) && hex(w[1], 4) && hex(w[2], 4) && hex(w[3], 4) && hex(w[4], 12) {
+            return Some(w.concat().to_ascii_uppercase());
+        }
+    }
+    None
+}
+
 /// Blob + row. Shared so the two routes cannot drift into storing
 /// artifacts the symbolicator reads differently depending on who
 /// uploaded them.
@@ -141,15 +272,29 @@ async fn store(
     // The table's unique key is (release_id, kind, name), so a
     // re-upload after a failed ship replaces rather than accumulating
     // near-duplicates a symbolicator would have to choose between.
+    //
+    // `prev` reads the row as it was before this statement — CTEs see
+    // one snapshot — so the response can say whether anything about
+    // this artifact is actually new. Re-archiving a dSYM does not
+    // guarantee the same debug id as the build that shipped, and an
+    // uploader with no way to tell cannot know whether the re-upload
+    // was worth anything.
     let row = sqlx::query(
-        "INSERT INTO release_artifacts \
-           (id, release_id, kind, name, content_hash, size_bytes) \
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5) \
-         ON CONFLICT (release_id, kind, name) DO UPDATE \
-           SET content_hash = EXCLUDED.content_hash, \
-               size_bytes = EXCLUDED.size_bytes, \
-               created_at = now() \
-         RETURNING id",
+        "WITH prev AS ( \
+           SELECT content_hash FROM release_artifacts \
+           WHERE release_id = $1 AND kind = $2 AND name = $3 \
+         ), up AS ( \
+           INSERT INTO release_artifacts \
+             (id, release_id, kind, name, content_hash, size_bytes) \
+           VALUES (gen_random_uuid(), $1, $2, $3, $4, $5) \
+           ON CONFLICT (release_id, kind, name) DO UPDATE \
+             SET content_hash = EXCLUDED.content_hash, \
+                 size_bytes = EXCLUDED.size_bytes, \
+                 created_at = now() \
+           RETURNING id \
+         ) \
+         SELECT up.id, prev.content_hash AS prev_hash \
+         FROM up LEFT JOIN prev ON true",
     )
     .bind(release_id)
     .bind(&kind)
@@ -165,14 +310,24 @@ async fn store(
         )
     })?;
 
+    let prev_hash: Option<String> = row.get("prev_hash");
+    let hash_hex = hash.to_hex();
     Ok((
         StatusCode::CREATED,
         Json(json!({
             "id": row.get::<Uuid, _>("id"),
             "kind": kind,
             "name": name,
-            "content_hash": hash.to_hex(),
+            "content_hash": hash_hex,
             "size_bytes": bytes.len(),
+            // Was this slice already on the release, and did its
+            // bytes change? A re-archived dSYM whose debug id the
+            // server has never seen is a new slice; one that lands on
+            // an existing name with identical content changed
+            // nothing, and the uploader deserves to know which.
+            "debug_id": debug_id_from_name(&name),
+            "first_seen": prev_hash.is_none(),
+            "content_changed": prev_hash.as_deref() != Some(hash_hex.as_str()),
         })),
     ))
 }
@@ -250,6 +405,47 @@ fn maybe_gunzip(data: &[u8]) -> Result<Vec<u8>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_dsym_slice_name_yields_the_id_the_symbolicator_matches_on() {
+        // The exact shape `sentori-cli upload dsym` produces.
+        assert_eq!(
+            debug_id_from_name("Insight.app-arm64-E63A748C-3F0E-302D-95EC-8DA5B55C97D9"),
+            Some("E63A748C3F0E302D95EC8DA5B55C97D9".to_owned()),
+        );
+        // Same id, already bare and lowercase.
+        assert_eq!(
+            debug_id_from_name("e63a748c3f0e302d95ec8da5b55c97d9.dSYM"),
+            Some("E63A748C3F0E302D95EC8DA5B55C97D9".to_owned()),
+        );
+    }
+
+    #[test]
+    fn a_name_without_an_id_reports_none_rather_than_a_fragment() {
+        assert_eq!(debug_id_from_name("index.android.bundle.map"), None);
+        assert_eq!(debug_id_from_name("mapping.txt"), None);
+        // 31 hex digits is not a debug id, and half of one is worse
+        // than nothing: it would match no frame and read like a fact.
+        assert_eq!(
+            debug_id_from_name("abc-0123456789abcdef0123456789abcde"),
+            None
+        );
+    }
+
+    #[test]
+    fn the_reported_id_is_what_native_symbolicate_would_look_for() {
+        // The two normalisations must agree; a debug id we report but
+        // the symbolicator cannot find is a lie with a hex face.
+        let name = "Insight.app-arm64-E63A748C-3F0E-302D-95EC-8DA5B55C97D9";
+        let id = debug_id_from_name(name).unwrap_or_default();
+        assert!(!id.is_empty(), "expected a debug id in {name}");
+        let normalised: String = name
+            .chars()
+            .filter(char::is_ascii_alphanumeric)
+            .collect::<String>()
+            .to_ascii_uppercase();
+        assert!(normalised.contains(&id));
+    }
 
     fn gz(data: &[u8]) -> std::io::Result<Vec<u8>> {
         use std::io::Write;
