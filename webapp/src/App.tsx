@@ -82,7 +82,7 @@ export function App() {
 
   if (!me) {
     return (
-      <div className="flex h-screen items-center justify-center text-sm text-fg-subtle">
+      <div className="flex h-screen items-center justify-center bg-canvas text-sm text-fg-subtle">
         {t('shell.loading')}
       </div>
     );
