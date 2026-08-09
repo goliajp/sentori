@@ -15,7 +15,10 @@ cp .env.example .env
 #   SENTORI_OWNER_EMAIL — your sign-in address
 #   SENTORI_BASE_URL    — public origin (keep the default for a local try-out)
 
-docker compose up -d
+# --pull always matters if you ever tried Sentori before: `up` reuses
+# a cached `:latest` without asking the registry, so an old image
+# would start and look perfectly healthy.
+docker compose up -d --pull always
 ```
 
 If you didn't set `SENTORI_OWNER_PASSWORD`, the first boot
