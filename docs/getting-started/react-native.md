@@ -152,9 +152,11 @@ built for is an upload step that stopped being called at all, which
 a local "we ran it" record cannot see. Restrict `--expect` to the
 platforms you actually ship (an iOS-only app has no `proguard`).
 
-Late uploads are not wasted: the server re-symbolicates the events it
-has already stored for that release, so fixing a gap recovers the
-stacks that came in while it was open.
+Late uploads are not wasted: the server re-reads the events it has
+already stored for that release, so fixing a gap recovers the stacks
+that came in while it was open. It does not re-group them — an issue
+created from an unreadable stack and one created from the readable
+version stay two issues, both legible.
 
 ## 6. Next steps
 

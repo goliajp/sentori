@@ -95,7 +95,7 @@ Crate 处置:event-pipeline 重写(五 kind + fingerprint 规则 + 广度深度 
 - [ ] 2b 五 kind ingest:新 wire 协议、per-kind fingerprint、广度×深度、assert 聚合捎带、probe 注册消费 + 触发→regression、error-in-data
 - [ ] 2c issue 体系:三态 + regressed(resolve 锚定 release)、activity/note、api-scope AI 闭环 API(GET issues / GET bundle / POST notes / POST resolve)
 - [ ] 2d bundle 生成:markdown + bundle.json;LLM 段可选(ANTHROPIC key 未配则跳过)
-- [ ] 2e 符号化接线:sourcemap(已有)+ dwarf-resolver + proguard-resolver 进 ingest;retro-symbolication backfill
+- [x] 2e 符号化接线:sourcemap(已有)+ dwarf-resolver + proguard-resolver 进 ingest;retro-symbolication backfill(**2026-08-09 / server 2.12.0 才补上** —— ingest 侧的三个resolver 早就接了,但「补传后回填已存事件」这一步一直没有调用方,而 docs / CLI 注释 /给客户的回信都已经把它当成既有行为在说。`resymbolicate.rs`:上传成功后台触发 + `sentori-server resymbolicate [<release>]` 运维子命令;只重写 payload 让栈可读,**不重新分组**)
 - [ ] **gate**:fmt / clippy -D warnings / test(含 testcontainers)全绿;新 API curl 走查脚本通过
 
 gate 记录:(待)

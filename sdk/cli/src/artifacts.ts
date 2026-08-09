@@ -13,6 +13,11 @@
 // fail. Asking the server is the point — a local ledger of "we ran
 // the upload" cannot tell you the upload landed, and it is exactly
 // the "we ran it" assumption that was false.
+//
+// A gap found here is recoverable: from server 2.12.0 an upload
+// re-reads the crashes already stored for that release, so the
+// stacks that arrived while the artifact was missing become
+// readable. It does not re-group them.
 
 export type ArtifactRow = {
   kind: string

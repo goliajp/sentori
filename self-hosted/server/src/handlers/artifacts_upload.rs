@@ -256,7 +256,7 @@ fn debug_id_from_name(name: &str) -> Option<String> {
 /// artifacts the symbolicator reads differently depending on who
 /// uploaded them.
 async fn store(
-    state: &AppState,
+    state: &Arc<AppState>,
     release_id: Uuid,
     kind: String,
     name: String,
@@ -309,6 +309,23 @@ async fn store(
             Json(json!({ "error": e.to_string() })),
         )
     })?;
+
+    // The crashes that arrived before this artifact did are stored
+    // with unreadable stacks. Re-read them now — that recovery is the
+    // whole reason the upload CLI is allowed to fail without failing
+    // a build. Behind the response: the uploader asked whether the
+    // artifact landed, and it did.
+    if let Ok(r) = sqlx::query("SELECT project_id, name FROM releases WHERE id = $1")
+        .bind(release_id)
+        .fetch_one(&state.pool)
+        .await
+    {
+        crate::resymbolicate::spawn_for_release(
+            state,
+            r.get::<Uuid, _>("project_id"),
+            r.get::<String, _>("name"),
+        );
+    }
 
     let prev_hash: Option<String> = row.get("prev_hash");
     let hash_hex = hash.to_hex();
