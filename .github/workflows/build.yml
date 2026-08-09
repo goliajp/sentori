@@ -130,6 +130,48 @@ jobs:
           bun install --frozen-lockfile
           bun run check
           bun run build
+
+      # Render every route against canned data and read what happened.
+      #
+      # tsc and eslint cannot see a page that throws at runtime: the
+      # crash view mapped JSON.parse over a replay's lines inside one
+      # promise, so a single half-written line made the whole recording
+      # report "failed to load", and it shipped that way for months
+      # past every green gate. It took one honest sweep to find.
+      #
+      # The gate is console errors and paths the mock did not answer —
+      # both of which render as a plausible page. Screenshots go up as
+      # an artifact because layout, wrapping and contrast are not
+      # things a CI job can judge; a person still has to look, and this
+      # is what they look at.
+      - name: webapp — render sweep
+        working-directory: webapp
+        run: |
+          # Resolved rather than assumed: the sweep looks for Chrome in
+          # the usual places, and if the runner image ever drops it the
+          # message should say that instead of failing inside CDP.
+          command -v google-chrome >/dev/null 2>&1 ||
+            command -v chromium-browser >/dev/null 2>&1 || {
+              echo "no Chrome on this runner — set CHROME_PATH or install one"
+              exit 1
+            }
+          bun run mock > /tmp/mock.log 2>&1 &
+          bun run preview > /tmp/preview.log 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:5599/ >/dev/null && \
+            curl -sf http://localhost:8080/auth/me >/dev/null && break
+            sleep 1
+          done
+          bun run sweep /tmp/sweep zh-CN dark
+
+      - name: webapp — sweep artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webapp-sweep
+          path: /tmp/sweep
+          retention-days: 7
+
   sdk:
     needs: changes
     if: needs.changes.outputs.sdk == 'true' || needs.changes.outputs.infra == 'true'
