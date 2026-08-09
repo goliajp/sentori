@@ -147,7 +147,7 @@ export function TimelineStrip({
 
       <div className="relative min-h-0 flex-1 px-4 py-2">
         {/* lane labels */}
-        <div className="pointer-events-none absolute inset-y-2 left-4 z-10 flex w-12 flex-col justify-between py-0.5 font-mono text-xs text-fg-subtle">
+        <div className="pointer-events-none absolute inset-y-2 left-4 z-10 flex w-14 flex-col justify-between py-0.5 font-mono text-xs text-fg-subtle">
           <span>{t('strip.frames')}</span>
           <span>{t('strip.signals')}</span>
           <span>{t('strip.events')}</span>
@@ -157,7 +157,7 @@ export function TimelineStrip({
           ref={trackRef}
           role="presentation"
           onClick={seekFromTrack}
-          className={`relative ml-14 mr-1.5 h-full ${onSeek ? 'cursor-pointer' : ''}`}
+          className={`relative ml-[68px] mr-1.5 h-full ${onSeek ? 'cursor-pointer' : ''}`}
         >
           {/* the span before the earliest captured moment: nothing was
               captured there — dim it so it can't read as "quiet" */}
@@ -170,7 +170,7 @@ export function TimelineStrip({
           )}
 
           {/* gridlines on round seconds + the event line */}
-          {ticks.map((sec) => (
+          {ticks.map((sec, tickIdx) => (
             <div
               key={sec}
               className="absolute inset-y-0"
@@ -185,12 +185,17 @@ export function TimelineStrip({
                 style={sec === 0 ? { backgroundColor: kindColor(issueKind) } : undefined}
               />
               {/* the 0s label hangs left of its line so the track's
-                  right edge never clips it */}
+                  right edge never clips it; the earliest one hangs
+                  right for the same reason at the other end — a
+                  centred label there reaches back into the lane
+                  gutter, which in Japanese is full of 「イベント」 */}
               <span
                 className={`absolute bottom-0 whitespace-nowrap font-mono text-xs ${
                   sec === 0
                     ? '-translate-x-full pr-1.5 font-semibold'
-                    : '-translate-x-1/2 text-fg-subtle'
+                    : tickIdx === 0
+                      ? 'translate-x-0 pl-0.5 text-fg-subtle'
+                      : '-translate-x-1/2 text-fg-subtle'
                 }`}
                 style={sec === 0 ? { color: kindColor(issueKind) } : undefined}
               >

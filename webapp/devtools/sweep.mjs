@@ -26,12 +26,17 @@ const ROUTES = [
 const out = process.argv[2] || 'tmp/sweep';
 const lang = process.argv[3] || 'zh-CN';
 const theme = process.argv[4] || 'dark';
+// Width matters as much as language: the two-column split, the
+// toolbar filters and the settings tab strip all reflow, and a
+// dashboard only ever looked at on one monitor is a dashboard whose
+// breakpoints nobody has seen.
+const width = process.argv[5] || '1500';
 mkdirSync(out, { recursive: true });
 
 const chrome = spawn(CHROME, [
   '--headless=new', '--disable-gpu', '--remote-debugging-port=9555',
   `--lang=${lang}`, `--accept-lang=${lang}`,
-  '--window-size=1500,1000', `--user-data-dir=/tmp/cd-sweep-${lang}-${theme}`,
+  `--window-size=${width},1000`, `--user-data-dir=/tmp/cd-sweep-${lang}-${theme}-${width}`,
   'about:blank',
 ], { stdio: 'ignore' });
 await new Promise(r => setTimeout(r, 3000));
@@ -106,6 +111,7 @@ writeFileSync(
       bundle: bundle?.result?.value ?? 'unknown',
       lang,
       theme,
+      width,
       unmocked,
       routes: report,
     },

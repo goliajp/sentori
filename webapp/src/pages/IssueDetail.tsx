@@ -308,10 +308,15 @@ export function IssueDetailPane({
 
       {/* ── the evidence: what the user saw (primary), the code +
           the user's own actions + the occurrence set (secondary),
-          the minute itself pinned underneath ── */}
+          the minute itself pinned underneath ──
+
+          The split waits for 2xl, not xl. Behind a 190px rail and a
+          360px queue, 1280 left the stack column 222px wide: every
+          code line clipped, every signal truncated to "from=…". One
+          700px column beats two useless ones. */}
       <div className="min-h-0 flex-1 overflow-hidden">
-        <div className="grid h-full grid-cols-1 gap-4 overflow-y-auto p-4 xl:grid-cols-[minmax(360px,460px)_minmax(0,1fr)] xl:overflow-hidden">
-          <div className="min-w-0 space-y-4 xl:overflow-y-auto">
+        <div className="grid h-full grid-cols-1 gap-4 overflow-y-auto p-4 2xl:grid-cols-[minmax(360px,460px)_minmax(0,1fr)] 2xl:overflow-hidden">
+          <div className="min-w-0 space-y-4 2xl:overflow-y-auto">
             <Panel
               title={t('replay.title')}
               action={
@@ -366,7 +371,7 @@ export function IssueDetailPane({
             )}
           </div>
 
-          <div className="min-w-0 space-y-4 xl:overflow-y-auto">
+          <div className="min-w-0 space-y-4 2xl:overflow-y-auto">
             {hasStack && (
               <Panel title={t('issue.code')}>
                 <StackTrace frames={payload!.error!.stack!} />
@@ -438,7 +443,7 @@ function SignalList({
     // of reach. At xl the right column scrolls on its own, so a
     // second scrollbar inside it just hides the second half of the
     // journey behind an affordance nobody sees.
-    <div className="max-h-72 overflow-y-auto xl:max-h-none xl:overflow-visible">
+    <div className="max-h-72 overflow-y-auto 2xl:max-h-none 2xl:overflow-visible">
       {signals.map((s, i) => {
         const near = playhead !== null && Math.abs(s.t - playhead) < 2.5;
         // http rows read as a request line, not as k=v soup; a

@@ -225,7 +225,7 @@ export default function TriageView() {
                 type="button"
                 onClick={() => setFilter('status', s === 'open' ? null : s)}
                 className={clsx(
-                  'rounded px-2 py-1 text-xs transition-colors',
+                  'shrink-0 whitespace-nowrap rounded px-2 py-1 text-xs transition-colors',
                   status === s
                     ? 'bg-raised font-medium text-fg'
                     : 'text-fg-subtle hover:text-fg-muted',
@@ -234,7 +234,16 @@ export default function TriageView() {
                 {t(`inbox.status.${s}`)}
               </button>
             ))}
-            <span className="ml-auto text-xs tabular-nums text-fg-subtle">
+            {/* The count yields, the tabs do not: in Japanese this
+                line squeezed 未解決 into two lines rather than give up
+                a character of the summary beside it. */}
+            <span
+              className="ml-auto min-w-0 truncate text-xs tabular-nums text-fg-subtle"
+              title={t('inbox.pulse', {
+                fresh: String(todayNew),
+                regressed: String(todayRegressed),
+              })}
+            >
               {t('inbox.pulse', {
                 fresh: String(todayNew),
                 regressed: String(todayRegressed),
@@ -306,6 +315,12 @@ export default function TriageView() {
                 ))}
               </select>
             )}
+          </div>
+          {/* The five kinds are one control, not five more items in
+              the select flow: on their own line they read as a set
+              and stay a set in every language, instead of the last
+              two spilling under the first three. */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1">
             {KINDS.map((k) => (
               <button
                 key={k}
