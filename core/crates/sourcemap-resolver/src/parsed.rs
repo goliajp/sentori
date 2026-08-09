@@ -131,6 +131,17 @@ impl ParsedMap {
         if token.get_dst_line() != dst_line {
             return None;
         }
+        // A token with no source is not a resolution. Hermes maps
+        // carry these for frames inside the engine's own
+        // `InternalBytecode.js`, and the upstream reports their
+        // source line as `u32::MAX` — which reached production as a
+        // frame reading `InternalBytecode.js:4294967295`. A caller
+        // that overwrites coordinates from a Resolution has to be
+        // able to trust that one exists.
+        token.get_source()?;
+        if token.get_src_line() == u32::MAX {
+            return None;
+        }
         // A Hermes frame's column IS the bytecode offset, and the
         // enclosing function's name is only in the offset table — the
         // token's own `name` is usually absent for these.
