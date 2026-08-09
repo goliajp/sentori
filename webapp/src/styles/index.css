@@ -3,7 +3,7 @@
  *
  * No design-system dependency: two hand-tuned palettes (dark is the
  * native one; light is re-inked to Jira-calibre contrast), the
- * GOLIA brand purple as the single accent, and the five-kind hues
+ * GOLIA Lab blue as the single accent, and the five-kind hues
  * doing double duty as the status colours — one concept model,
  * everywhere. Type is the Jira posture: the platform's own UI
  * fonts, 14px base, dense but never cramped.
@@ -26,10 +26,13 @@
   --sn-border: #2a2a32;
   --sn-border-strong: #3d3d47;
 
-  /* GOLIA ink — the one accent (golia.jp / devops console purple),
-   * lifted slightly on dark so it carries on #17171c. */
-  --sn-accent: #8b45ff;
-  --sn-accent-hover: #9a5eff;
+  /* GOLIA Lab ink — the family blue (#155dfc, shared with the
+   * hourglass and tiktoken marks), lifted on dark so it carries on
+   * #17171c. Purple deliberately vacated the accent slot: it means
+   * `assert` in the five-kind palette, and an accent that shared
+   * that hue blurred the concept model. */
+  --sn-accent: #3d7dff;
+  --sn-accent-hover: #5b8cff;
   --sn-accent-fg: #ffffff;
 
   /* The five-kind hues. The signal timeline borrows them
@@ -66,8 +69,8 @@
   --sn-border: #d5d9e0;
   --sn-border-strong: #aab1bc;
 
-  --sn-accent: #7a2de0;
-  --sn-accent-hover: #6a1fd0;
+  --sn-accent: #155dfc;
+  --sn-accent-hover: #0a4ad9;
   --sn-accent-fg: #ffffff;
 
   /* the same five hues, re-inked for white paper */
