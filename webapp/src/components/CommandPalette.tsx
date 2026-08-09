@@ -59,7 +59,6 @@ export function CommandPalette() {
       window.removeEventListener('sentori:palette', onOpen);
     };
     // setOpenReset is identity-stable enough for a mount-lifetime listener
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch the open-issue set once per palette opening; filtering is
