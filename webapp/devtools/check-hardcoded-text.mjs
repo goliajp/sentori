@@ -16,7 +16,16 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const ROOTS = ['src/pages', 'src/components'];
+// Every directory that renders. It was `pages` + `components` only,
+// which left the app shell (App.tsx: the sidebar, the project
+// switcher, the footer) and everything under lib/ unread — chrome a
+// zh or ja user sees on every single screen.
+const ROOTS = ['src'];
+/** Not rendered. The catalogues are English by definition, and
+ *  `legal/` is hosted-offering copy that no route reaches — see the
+ *  entry for it in `check-unreferenced.mjs`, which is where that fact
+ *  is recorded rather than quietly assumed here. */
+const SKIP = /(^|\/)(i18n|legal)(\/|$)/;
 
 /** Props whose value is machinery, not something a person reads. */
 const CODE_PROPS =
@@ -44,8 +53,15 @@ function isProse(text) {
 }
 
 function walk(dir, out = []) {
-  for (const e of readdirSync(dir)) {
+  let entries;
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return out; // a root that moved — reported by the zero-file guard
+  }
+  for (const e of entries) {
     const p = join(dir, e);
+    if (SKIP.test(p)) continue;
     if (statSync(p).isDirectory()) walk(p, out);
     else if (p.endsWith('.tsx') || p.endsWith('.ts')) out.push(p);
   }
@@ -53,9 +69,11 @@ function walk(dir, out = []) {
 }
 
 const findings = [];
+let scanned = 0;
 
 for (const root of ROOTS) {
   for (const file of walk(root)) {
+    scanned += 1;
     const src = readFileSync(file, 'utf8');
     const lines = src.split('\n');
 
@@ -87,8 +105,16 @@ for (const root of ROOTS) {
   }
 }
 
+if (scanned === 0) {
+  console.error(
+    `✗ no .tsx/.ts under ${ROOTS.join(', ')} — this checker read nothing.\n` +
+      '  It scanned two directories for months while the app shell sat\n' +
+      '  outside them; a run that reads no files must not print a tick.',
+  );
+  process.exit(1);
+}
 if (findings.length === 0) {
-  console.log('✓ no hard-coded UI prose');
+  console.log(`✓ ${scanned} files: no hard-coded UI prose`);
   process.exit(0);
 }
 
