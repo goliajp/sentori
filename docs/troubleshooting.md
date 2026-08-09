@@ -77,6 +77,23 @@ the frames, click "Open release →" — the release detail page shows
 which artifacts are present and the upload command to use if any
 are missing.
 
+Uploading it now is not too late. A successful upload re-reads the
+crashes already stored for that release, so the stacks that came in
+while the artifact was missing become readable too — you do not have
+to wait for the bug to happen again. What it does **not** do is
+re-group: an issue created from an unreadable stack and one created
+from the readable version stay two issues, both now legible. If the
+pass did not run (an upload from before server 2.12.0, or a failure
+in the server log), run it by hand:
+
+```bash
+docker compose exec server sentori-server resymbolicate "myapp@1.2.3+456"
+# or, for every release: sentori-server resymbolicate
+```
+
+It is idempotent — a frame that already carries its source window is
+skipped — so running it again costs a read and changes nothing.
+
 ## 3. dSYM uploaded successfully but iOS frames still minified
 
 **Diagnose**

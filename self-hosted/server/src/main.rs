@@ -47,6 +47,7 @@ mod pipeline;
 mod push_quarantine;
 mod push_worker;
 mod rate_limit;
+mod resymbolicate;
 mod security_headers;
 mod session_mw;
 mod state;
@@ -84,6 +85,16 @@ async fn main() -> anyhow::Result<()> {
         return backfill_split::run(&db_url)
             .await
             .map_err(|e| anyhow::anyhow!("backfill-split: {e}"));
+    }
+
+    // `sentori-server resymbolicate [<release>]` — re-read stored
+    // crashes against the artifacts now on hand. Uploads trigger this
+    // themselves; the subcommand covers what they cannot (an upload
+    // that predates the trigger, a pass that failed, a replaced map).
+    if args.get(1).map(String::as_str) == Some("resymbolicate") {
+        return resymbolicate::run(&db_url, args.get(2).map(String::as_str))
+            .await
+            .map_err(|e| anyhow::anyhow!("resymbolicate: {e}"));
     }
 
     let bind = std::env::var("SENTORI_BIND").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
