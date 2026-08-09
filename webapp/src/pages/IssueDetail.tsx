@@ -433,7 +433,12 @@ function SignalList({
   onSeek?: (t: number) => void;
 }) {
   return (
-    <div className="max-h-72 overflow-y-auto">
+    // Capped only below the two-column split, where the whole page
+    // scrolls and an eighty-signal journey would push the stack out
+    // of reach. At xl the right column scrolls on its own, so a
+    // second scrollbar inside it just hides the second half of the
+    // journey behind an affordance nobody sees.
+    <div className="max-h-72 overflow-y-auto xl:max-h-none xl:overflow-visible">
       {signals.map((s, i) => {
         const near = playhead !== null && Math.abs(s.t - playhead) < 2.5;
         // http rows read as a request line, not as k=v soup; a
