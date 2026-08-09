@@ -213,7 +213,10 @@ function ProjectCard({
             <span className="min-w-0 flex-1 truncate font-mono" title={h.latestRelease}>
               {formatRelease(h.latestRelease)}
             </span>
-            <ArtifactLights kinds={h.latestReleaseArtifacts} />
+            <ArtifactLights
+              kinds={h.latestReleaseArtifacts}
+              used={h.platforms24h}
+            />
           </>
         ) : (
           <span className="flex-1">—</span>
@@ -259,26 +262,52 @@ function Num({ n, tone }: { n: number | undefined; tone?: 'error' | 'warn' }) {
   );
 }
 
-function ArtifactLights({ kinds }: { kinds: string[] }) {
-  const lights: [string, string][] = [
-    ['js', 'sourcemap'],
-    ['ios', 'dsym'],
-    ['android', 'proguard'],
+/** The three symbolication lights, same rule as the Releases page:
+ *  a missing artifact is only a problem for a platform this project
+ *  actually hears from. A pure-iOS app with a permanently red
+ *  proguard light teaches the reader to ignore all three. */
+function ArtifactLights({
+  kinds,
+  used,
+}: {
+  kinds: string[];
+  used: Record<string, number>;
+}) {
+  const t = useT();
+  // JS runs on every platform that reports at all, so a sourcemap is
+  // owed whenever anything is coming in.
+  const anyTraffic = Object.values(used).some((n) => n > 0);
+  const lights: [string, string, boolean][] = [
+    ['js', 'sourcemap', anyTraffic],
+    ['ios', 'dsym', (used.ios ?? 0) > 0],
+    ['android', 'proguard', (used.android ?? 0) > 0],
   ];
   return (
     <span className="flex shrink-0 gap-1.5 text-xs">
-      {lights.map(([label, kind]) => (
-        <span
-          key={label}
-          style={{
-            color: kinds.includes(kind)
-              ? 'var(--s-kind-probe)'
-              : 'var(--s-kind-error)',
-          }}
-        >
-          {label}
-        </span>
-      ))}
+      {lights.map(([label, kind, live]) => {
+        const have = kinds.includes(kind);
+        return (
+          <span
+            key={label}
+            title={
+              have
+                ? undefined
+                : live
+                  ? t('releases.artifactMissing', { platform: label })
+                  : t('releases.artifactUnused', { platform: label })
+            }
+            style={{
+              color: have
+                ? 'var(--s-kind-probe)'
+                : live
+                  ? 'var(--s-kind-error)'
+                  : 'var(--sn-fg-subtle)',
+            }}
+          >
+            {label}
+          </span>
+        );
+      })}
     </span>
   );
 }
