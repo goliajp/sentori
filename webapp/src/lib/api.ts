@@ -155,6 +155,9 @@ export type ReleaseRow = {
   name: string;
   created_at?: string;
   createdAt?: string;
+  /** Platforms that actually reported events in this release — a
+   *  missing artifact only matters for a platform that is sending. */
+  platforms?: string[];
 };
 
 export type ArtifactRow = {

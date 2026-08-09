@@ -24,9 +24,21 @@ use uuid::Uuid;
 use crate::state::AppState;
 
 pub async fn list(State(state): State<Arc<AppState>>, Path(project_id): Path<Uuid>) -> Json<Value> {
+    // Which platforms actually reported in each release. A missing
+    // symbolication artifact only matters for a platform that is
+    // sending events: three lights that go red regardless turn the
+    // real gap into noise — insight-mobile shipped a release with no
+    // dSYM while 100% of its traffic was iOS, and the android light
+    // beside it was just as red (2026-08-10).
     let rows = sqlx::query(
-        "SELECT id, name, created_at FROM releases \
-         WHERE project_id = $1 ORDER BY created_at DESC LIMIT 200",
+        "SELECT r.id, r.name, r.created_at, \
+                COALESCE(array_agg(DISTINCT e.platform) \
+                         FILTER (WHERE e.platform IS NOT NULL), '{}') AS platforms \
+         FROM releases r \
+         LEFT JOIN events e ON e.project_id = r.project_id AND e.release = r.name \
+         WHERE r.project_id = $1 \
+         GROUP BY r.id, r.name, r.created_at \
+         ORDER BY r.created_at DESC LIMIT 200",
     )
     .bind(project_id)
     .fetch_all(&state.pool)
@@ -40,6 +52,7 @@ pub async fn list(State(state): State<Arc<AppState>>, Path(project_id): Path<Uui
                 "id": r.get::<Uuid, _>("id").to_string(),
                 "name": r.get::<String, _>("name"),
                 "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
+                "platforms": r.get::<Vec<String>, _>("platforms"),
             })
         })
         .collect();
