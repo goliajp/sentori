@@ -318,4 +318,38 @@ API_STATUS="$(curl -fsS -b "$JAR" "${BASE}/admin/api/issues/${ISSUE_ID}" | jq -r
 [[ "$API_STATUS" == "resolved" ]] \
     || { echo "resolve over the api token left the issue ${API_STATUS}" >&2; exit 1; }
 
+# ── attachments: the evidence path ───────────────────────────────
+#
+# Replays, screenshots and view trees ride a separate request from the
+# event on purpose — the event is small and must land, the evidence is
+# large and may not. Nothing exercised that request, and it is how the
+# minute before a crash reaches the dashboard.
+echo "→ attach a replay to the event"
+ATT_DIR="$(mktemp -d)"
+printf '{"t":-2.0,"mediaType":"image/svg+xml","base64":"PHN2Zy8+"}\n' > "${ATT_DIR}/screens.ndjson"
+ATT="$(curl -fsS -X POST "${BASE}/v1/events/${EVENT_ID}/attachments/screens" \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -F "source=js" -F "file=@${ATT_DIR}/screens.ndjson;type=application/x-ndjson")"
+REF="$(echo "$ATT" | jq -r '.refId')"
+[[ -n "$REF" && "$REF" != "null" ]] || { echo "no refId from the attachment upload: $ATT" >&2; exit 1; }
+
+echo "→ the dashboard can read it back byte for byte"
+BACK="$(curl -fsS -b "$JAR" "${BASE}/admin/api/attachments/${REF}")"
+[[ "$BACK" == *'"mediaType":"image/svg+xml"'* ]] \
+    || { echo "attachment came back different: $(echo "$BACK" | head -c 120)" >&2; exit 1; }
+
+echo "→ the event lists it"
+LISTED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/events/${EVENT_ID}" \
+    | jq -r '.attachments[] | select(.kind == "screens") | .ref')"
+[[ "$LISTED" == "$REF" ]] \
+    || { echo "the event does not list the attachment it was given: '${LISTED}'" >&2; exit 1; }
+
+echo "→ an unknown kind is refused"
+BAD_KIND="$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+    "${BASE}/v1/events/${EVENT_ID}/attachments/definitely-not-a-kind" \
+    -H "Authorization: Bearer ${TOKEN}" -F "file=@${ATT_DIR}/screens.ndjson")"
+[[ "$BAD_KIND" == "400" ]] \
+    || { echo "an unknown attachment kind returned ${BAD_KIND}, want 400 — the database CHECK would refuse it anyway" >&2; exit 1; }
+rm -rf "$ATT_DIR"
+
 echo "✓ e2e smoke passed — project ${PROJECT_ID}, issue ${ISSUE_ID}"
