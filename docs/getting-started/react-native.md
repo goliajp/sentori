@@ -40,7 +40,7 @@ import 'react-native-gesture-handler' // any existing top imports
 import { sentori } from '@goliapkg/sentori-react-native'
 
 sentori.init({
-  token: 'st_pk_...',
+  token: 'st_...',
   release: 'myapp@1.0.0+123',          // your build number / commit
   environment: __DEV__ ? 'dev' : 'prod',
   ingestUrl: 'https://ingest.sentori.golia.jp',

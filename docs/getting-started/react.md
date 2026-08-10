@@ -12,7 +12,7 @@ error showing up in the Sentori dashboard.
 
 - A React 18+ app (Vite / CRA / any bundler). Sentori does not care
   what router or state library you use.
-- A Sentori **token** (`st_pk_...`) and an **ingest URL**, both from
+- A Sentori **token** (`st_...`) and an **ingest URL**, both from
   an instance you run: mint the token on the project's Settings page,
   and the ingest URL is that instance's origin. See
   [Self-hosting](../self-hosting.md) if you do not have one yet.
@@ -33,7 +33,7 @@ dep, so the JS SDK's window/process error hooks come along.
 Put credentials in your `.env.production` (Vite uses `VITE_*`):
 
 ```bash
-VITE_SENTORI_TOKEN=st_pk_...
+VITE_SENTORI_TOKEN=st_...
 VITE_SENTORI_RELEASE=myapp@1.0.0
 VITE_SENTORI_INGEST=https://sentori.example.com
 ```

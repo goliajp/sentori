@@ -110,6 +110,14 @@ jobs:
       - name: check for orphan modules
         run: bash scripts/check-orphan-modules.sh
 
+      # The SDK reference documented a v0.2-era `init()` for months:
+      # an option that did not exist, six that did and were unlisted,
+      # and a required field marked optional with a default pointing
+      # at someone else's server. None of it shows in a diff — the
+      # type changes in one file, the table stays put in another.
+      - name: SDK reference matches InitConfig
+        run: node scripts/check-sdk-doc-options.mjs
+
       - name: check cargo features (v2.20 P2 — anti-feature-drift)
         run: bash scripts/check-cargo-features.sh
   webapp:
