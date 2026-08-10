@@ -20,15 +20,13 @@ All four assume you already have:
 - a **token** (`st_pk_...`)
 - an **ingest URL**
 
-For SaaS: sign up at <https://sentori.golia.jp> and copy from
-project settings. For self-hosted: see [Self-hosting](./self-hosting.md).
+Both come from an instance you run: mint the token on the project's
+Settings page, and the ingest URL is that instance's origin.
 
-Don't have a backend yet?
-
-- [Self-hosting](./self-hosting.md) — one `docker compose up` on
-  your own VM
-- The SaaS at <https://sentori.golia.jp> is the same binary +
-  same schema, just multi-tenant
+Don't have one yet? [Self-hosting](./self-hosting.md) — one
+`docker compose up` on your own VM. There is no hosted signup;
+Sentori is self-hosted, and `sentori.golia.jp` is GOLIA's own
+instance rather than a service you can join.
 
 ## Working without an SDK
 

@@ -12,12 +12,10 @@ error showing up in the Sentori dashboard.
 
 - A React 18+ app (Vite / CRA / any bundler). Sentori does not care
   what router or state library you use.
-- A Sentori **token** (`st_pk_...`) and an **ingest URL**:
-  - SaaS: sign up at <https://sentori.golia.jp> and copy from
-    project settings.
-  - Self-hosted: see [Self-hosting](../self-hosting.md) — the token
-    is `SENTORI_DEV_TOKEN` and the ingest URL is the host you run
-    the server on.
+- A Sentori **token** (`st_pk_...`) and an **ingest URL**, both from
+  an instance you run: mint the token on the project's Settings page,
+  and the ingest URL is that instance's origin. See
+  [Self-hosting](../self-hosting.md) if you do not have one yet.
 
 ## 1. Install
 
@@ -37,7 +35,7 @@ Put credentials in your `.env.production` (Vite uses `VITE_*`):
 ```bash
 VITE_SENTORI_TOKEN=st_pk_...
 VITE_SENTORI_RELEASE=myapp@1.0.0
-VITE_SENTORI_INGEST=https://ingest.sentori.golia.jp
+VITE_SENTORI_INGEST=https://sentori.example.com
 ```
 
 ## 3. Wire `main.tsx`
@@ -115,8 +113,9 @@ function PayButton() {
 
 ## 5. View on the dashboard
 
-Open your dashboard (`https://sentori.golia.jp/main` for SaaS, or
-`http://localhost:8000/main` self-hosted). The new issue appears within a
+Open your dashboard — `http://localhost:8080` on the shipped
+self-hosted compose, or whatever `SENTORI_BASE_URL` says. The new
+issue appears within a
 few seconds on the Issues list.
 
 If you don't see it:
