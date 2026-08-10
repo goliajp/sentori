@@ -22,16 +22,15 @@ import { join, normalize, dirname } from 'node:path';
 const ENTRY = 'src/main.tsx';
 const ROOT = 'src';
 
-/** Paths that are legitimately unreachable from the entry, and why. */
-const ALLOWED = new Map([
-  [
-    'src/legal/documents.ts',
-    'Hosted-offering copy (terms, privacy, 特定商取引法). The pages that ' +
-      'rendered it went with the SaaS surface in the v1 redesign; the text ' +
-      'itself took several rounds to get right and is kept pending a ' +
-      'decision on whether the hosted offering returns.',
-  ],
-]);
+/** Paths that are legitimately unreachable from the entry, and why.
+ *
+ *  Empty, and that is the target state. `src/legal/documents.ts` sat
+ *  here for a day — terms, privacy and 特定商取引法 copy for a hosted
+ *  offering with no signup and no billing, rendered by pages that
+ *  went with the SaaS surface. Kept "pending a decision", which is
+ *  what an exemption always says. The decision was to delete it; the
+ *  history has the text if a hosted offering ever returns. */
+const ALLOWED = new Map([]);
 
 /** Ambient declarations are pulled in by tsconfig, not by an import. */
 const AMBIENT = /\.d\.ts$/;
