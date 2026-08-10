@@ -609,6 +609,19 @@ async function cmdArtifactsCheck(argv: string[]): Promise<number> {
         `match the string your SDK passes to init({ release }).`,
     )
   }
+  // An artifact the server could not parse is worse than a missing
+  // one: it looks like coverage. Name it before the counts, because
+  // the count already excludes it and the difference is otherwise
+  // invisible.
+  for (const a of res.artifacts.filter((x) => x.usable === false)) {
+    console.error(
+      `unreadable ${a.kind}: ${a.name}\n` +
+        `  Stored, but the server cannot parse it, so it symbolicates nothing.\n` +
+        `  For React Native, upload the composed map:\n` +
+        `    sentori-cli react-native upload --release "${cfg.release}" \\\n` +
+        `      --metro-map <metro.map> --hermes-map <hermes.map>`,
+    )
+  }
   for (const [kind, n] of Object.entries(res.kinds)) {
     const slices = res.artifacts.filter((a) => a.kind === kind)
     const ids = slices

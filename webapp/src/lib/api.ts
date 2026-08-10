@@ -167,6 +167,10 @@ export type ArtifactRow = {
   content_hash?: string;
   size_bytes?: number;
   created_at?: string;
+  /** Parsed at upload. `null`/absent on artifacts stored before the
+   *  check existed — never looked at, which is not the same claim as
+   *  looked at and fine. `false` symbolicates nothing. */
+  usable?: boolean | null;
 };
 
 export type AuditRow = {

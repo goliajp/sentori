@@ -148,6 +148,8 @@ export const ja: Messages = {
     'SDK がリリースを報告するか、CLI がアーティファクトをアップロードすると表示されます。',
   'releases.emptyTitle': 'リリースはまだありません',
   'releases.loadFailed': 'リリースを読み込めませんでした。',
+  'releases.unreadable':
+    '保存済みですが読めないため、シンボリケーションには使えません: {names}。React Native では合成済みの map をアップロードしてください(bundle ではなく)。',
   'replay.empty': 'このリプレイにはフレームがありません。',
   'replay.frameAlt': '{t} 秒時点のフレーム',
   'replay.loadFailed': 'リプレイを読み込めませんでした。',
