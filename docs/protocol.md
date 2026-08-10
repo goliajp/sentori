@@ -239,7 +239,7 @@ has to be allowed to notice.
 
 | Header | Required | Example |
 |---|---|---|
-| `Authorization: Bearer <token>` | yes | `Bearer st_pk_01j5y9z3vk8x4rmt2pcqjf7nw9` |
+| `Authorization: Bearer <token>` | yes | `Bearer st_01j5y9z3vk8x4rmt2pcqjf7nw9` |
 | `Sentori-Sdk` | yes | `react-native/0.1.0` |
 | `Content-Type: application/json` | yes | (multipart and form-encoded are not accepted) |
 | `Content-Encoding: gzip` | no | gzip body supported (recommended for batch) |
@@ -251,13 +251,13 @@ The `Sentori-Sdk` header identifies the reporting client. Format: `<sdk-name>/<s
 
 ### Token format
 
-`st_pk_<26 chars Crockford base32 of uuid-v7>`
+`st_<26 chars Crockford base32 of uuid-v7>`
 
 - `st_` — Sentori product namespace
 - `pk_` — project public key (may be embedded in client builds). The `sk_` prefix is reserved for server-only admin secret keys (post-v0.1).
 - 26 chars — Crockford base32 (lowercase, no padding) of the underlying 16-byte uuid-v7. Crockford base32 avoids visually ambiguous characters (`0/O`, `1/I/L`).
 
-Example: `st_pk_01j5y9z3vk8x4rmt2pcqjf7nw9`
+Example: `st_01j5y9z3vk8x4rmt2pcqjf7nw9`
 
 The token alone identifies a project — there is no separate project ID in URLs or headers.
 
@@ -267,7 +267,7 @@ The SDK takes two **independent** configuration fields, never combined into a si
 
 ```ts
 sentori.init({
-  token: 'st_pk_01j5y9z3vk8x4rmt2pcqjf7nw9',
+  token: 'st_01j5y9z3vk8x4rmt2pcqjf7nw9',
   release: 'myapp@1.2.3+456',
   ingestUrl: 'https://sentori.example.com', // required — your instance
 });
@@ -282,7 +282,7 @@ strangers.
 
 ```ts
 sentori.init({
-  token: 'st_pk_...',
+  token: 'st_...',
   release: 'myapp@1.2.3+456',
   ingestUrl: 'https://sentori.your-company.com',
 });
@@ -305,7 +305,7 @@ Documentation **must not** use the term "DSN". Always say "token + ingest URL".
 |---|---|---|
 | `202 Accepted` | Event(s) accepted (not necessarily persisted yet) | `{}` |
 | `400 Bad Request` | Schema validation failed | see below |
-| `401 Unauthorized` | Missing, malformed, or unknown token | `{ "error": "unauthorized", "hint": "<what's likely wrong>" }` — the `hint` distinguishes "no `Authorization: Bearer` header", "token has the wrong prefix (not `st_pk_`/`sk_`)", and "right shape but unrecognized (revoked / wrong project)" |
+| `401 Unauthorized` | Missing, malformed, or unknown token | `{ "error": "unauthorized", "hint": "<what's likely wrong>" }` — the `hint` distinguishes "no `Authorization: Bearer` header", "token has the wrong prefix (not `st_`/`sk_`)", and "right shape but unrecognized (revoked / wrong project)" |
 | `402 Payment Required` | Monthly plan quota exhausted for this counter (events / spans / replays) | `{ "error": "quota_exceeded", "counter": "events", "current": 100000, "limit": 100000 }` — the SDK MUST drop the payload (do **not** retry; the quota is monthly and will not recover until the period resets). Distinct from `429`, which is a short-term rate limit the SDK retries after `retryAfterMs`. |
 | `413 Payload Too Large` | Event > 1 MB or batch > 1 MB | `{ "error": "payloadTooLarge" }` |
 | `429 Too Many Requests` | Rate limit hit | see below; `Retry-After` header set |

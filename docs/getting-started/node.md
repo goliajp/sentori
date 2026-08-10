@@ -56,7 +56,7 @@ startServer()
 `.env`:
 
 ```bash
-SENTORI_TOKEN=st_pk_...
+SENTORI_TOKEN=st_...
 SENTORI_RELEASE=myapi@1.0.0
 SENTORI_INGEST_URL=https://sentori.example.com
 NODE_ENV=production
