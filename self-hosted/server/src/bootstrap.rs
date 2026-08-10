@@ -56,7 +56,14 @@ pub async fn ensure_owner(pool: &PgPool) -> anyhow::Result<()> {
                 // Printed exactly once, at first boot, to the
                 // container log — the operator copies it and can
                 // change it in the dashboard.
-                info!(email = %wanted, password = %generated, "owner created with generated password (change it after first login)");
+                //
+                // WARN, not INFO. It is the only route into a fresh
+                // instance, and an operator who runs with
+                // `RUST_LOG=warn` — a reasonable thing to want — got
+                // a server nobody could log into, with the one line
+                // that mattered filtered out. The auth-token mail
+                // fallback is at WARN for the same reason.
+                warn!(email = %wanted, password = %generated, "owner created with generated password (change it after first login)");
                 generated
             });
             let phc = sentori_argon2_password::PasswordHash::hash(&password)
