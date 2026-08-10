@@ -18,7 +18,12 @@ import { armLaunch } from './launch';
 import { markNativeJsBridgeReady, setNativeConfig } from './native';
 import { shipNativePending } from './native-pending';
 import { drainReplay, startReplay } from './replay';
-import { drainScreenReplay, startScreenReplay } from './replay-screens';
+import {
+  drainScreenReplay,
+  screenReplayArmed,
+  screenReplayCaptured,
+  startScreenReplay,
+} from './replay-screens';
 import { drainOfflineQueue, queueAttachment, startTransport } from './transport';
 
 let _initialized = false;
@@ -91,6 +96,19 @@ export const init = safeFn('init', (config: InitConfig): void => {
           text: frames,
           mediaType: 'application/x-sentori-screens',
         });
+      } else if (screenReplayArmed()) {
+        // Asked for, produced nothing. Without this the dashboard
+        // cannot tell that from "never enabled", and it was telling
+        // readers to switch on a setting that was already on. A
+        // handful of bytes on an event already going out — no extra
+        // request, and nothing at all when the feature is off.
+        event.payload = {
+          ...(event.payload ?? {}),
+          replay: {
+            screens: 'empty',
+            captured: screenReplayCaptured(),
+          },
+        };
       }
     });
   }
