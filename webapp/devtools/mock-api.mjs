@@ -719,6 +719,18 @@ const SUFFIX = [
           size_bytes: 4_194_304,
           created_at: iso(86_400_000),
         },
+        // Stored, unreadable: the Hermes bytecode bundle uploaded
+        // under `kind=sourcemap`, which is what insight had on two
+        // releases while the light above it stayed green.
+        {
+          id: 'ar3',
+          kind: 'sourcemap',
+          name: 'index.android.bundle',
+          content_hash: 'bad999',
+          size_bytes: 9_154_716,
+          created_at: iso(86_400_000),
+          usable: false,
+        },
         {
           id: 'ar2',
           kind: 'proguard',

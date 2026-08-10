@@ -52,6 +52,12 @@ pub async fn list(State(state): State<Arc<AppState>>, Path(project_id): Path<Uui
                 "id": r.get::<Uuid, _>("id").to_string(),
                 "name": r.get::<String, _>("name"),
                 "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
+                // Parsed at upload; NULL on anything stored before
+                // that check existed. A light that counts an
+                // unreadable artifact as coverage is the light that
+                // let a bytecode bundle pass as a source map for
+                // months.
+                "usable": r.get::<Option<bool>, _>("usable"),
                 "platforms": r.get::<Vec<String>, _>("platforms"),
             })
         })
@@ -69,7 +75,7 @@ pub async fn list_artifacts(
     // were sitting in the table. Errors now surface as errors; an
     // empty list has to mean empty.
     let rows = sqlx::query(
-        "SELECT id, kind, name, content_hash, size_bytes, created_at \
+        "SELECT id, kind, name, content_hash, size_bytes, created_at, usable \
          FROM release_artifacts WHERE release_id = $1 ORDER BY created_at DESC",
     )
     .bind(release_id)

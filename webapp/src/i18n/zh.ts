@@ -141,6 +141,8 @@ export const zh: Messages = {
   'releases.emptyHint': 'SDK 上报版本或 CLI 上传物料后会出现在这里。',
   'releases.emptyTitle': '还没有版本',
   'releases.loadFailed': '版本列表加载失败。',
+  'releases.unreadable':
+    '已存但读不了,符号化用不上:{names}。React Native 请上传合成后的 map,不是 bundle。',
   'replay.empty': '该录屏没有帧。',
   'replay.frameAlt': '{t} 秒时的帧',
   'replay.loadFailed': '录屏加载失败。',
