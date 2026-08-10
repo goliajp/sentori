@@ -142,6 +142,11 @@ export function IssueDetailPane({
         error?: { type?: string; message?: string; stack?: Frame[] };
         signals?: Signal[];
         device?: Record<string, unknown>;
+        /** Present when the SDK had pixel replay running and the
+         *  ring still came up empty — an older native binary, or a
+         *  capture that keeps failing. Its absence means the host
+         *  never asked for it. */
+        replay?: { screens?: string; captured?: number };
       }
     | undefined;
 
@@ -165,6 +170,10 @@ export function IssueDetailPane({
     );
   }
 
+  // The SDK says so when pixel replay was running and captured
+  // nothing. Telling a reader to switch on a setting that is already
+  // on is worse than saying nothing.
+  const screensArmed = payload?.replay?.screens === 'empty';
   const surface = issue.surface as { screen?: string; element?: string };
   const hasStack = !!payload?.error?.stack && payload.error.stack.length > 0;
   const device = payload?.device;
@@ -322,7 +331,11 @@ export function IssueDetailPane({
                 ) : !screensRef && wireframeLatest ? (
                   <span
                     className="text-xs normal-case tracking-normal text-fg-subtle"
-                    title={t('issue.replayWireframeTip')}
+                    title={
+                      screensArmed
+                        ? t('issue.replayScreensEmptyTip')
+                        : t('issue.replayWireframeTip')
+                    }
                   >
                     wireframe
                   </span>
@@ -338,15 +351,31 @@ export function IssueDetailPane({
                   taps={screensLatest ? taps : undefined}
                 />
               ) : wireframeLatest ? (
-                <WireframePlayer
-                  attachmentRef={wireframeLatest}
-                  seek={replaySeek}
-                  onFrames={reportFrames}
-                  onTime={reportTime}
-                  taps={taps}
-                />
+                <>
+                  <WireframePlayer
+                    attachmentRef={wireframeLatest}
+                    seek={replaySeek}
+                    onFrames={reportFrames}
+                    onTime={reportTime}
+                    taps={taps}
+                  />
+                  {/* Visible, not a tooltip. This build asked for
+                      pixels and got none, which is fixable — and a
+                      reader who does not hover would otherwise be
+                      told, elsewhere on this page, to turn on the
+                      setting they already turned on. */}
+                  {screensArmed && (
+                    <p className="border-t border-border/60 px-3.5 py-2 text-xs text-fg-subtle">
+                      {t('issue.replayScreensEmpty')}
+                    </p>
+                  )}
+                </>
               ) : (
-                <PanelEmpty>{t('issue.replayNone')}</PanelEmpty>
+                <PanelEmpty>
+                  {screensArmed
+                    ? t('issue.replayScreensEmpty')
+                    : t('issue.replayNone')}
+                </PanelEmpty>
               )}
             </Panel>
 

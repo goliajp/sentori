@@ -43,6 +43,7 @@ let _ring: ScreenFrame[] = [];
 let _capacity = 0;
 let _timer: ReturnType<typeof setInterval> | null = null;
 let _capturing = false;
+let _captured = 0;
 
 /** Start the ring. `windowSeconds` is how far back the replay
  *  reaches when an event fires. */
@@ -63,6 +64,7 @@ const tick = async (): Promise<void> => {
   try {
     const frame = await _capture(maskedNativeIds(), FRAME_LONG_EDGE_PX, FRAME_QUALITY);
     if (frame) {
+      _captured += 1;
       _ring.push({ t: Date.now(), ...frame });
       if (_ring.length > _capacity) _ring.splice(0, _ring.length - _capacity);
     }
@@ -76,6 +78,19 @@ const tick = async (): Promise<void> => {
  *  reads "-42.5s → 0s"). Returns null when empty. The ring is NOT
  *  cleared — a second error two seconds later should still see
  *  the minute before it. */
+/** Has the ring been asked to run this session? Distinguishes "the
+ *  host never turned pixel replay on" from "it is on and produced
+ *  nothing", which look identical from the server and which the
+ *  dashboard was guessing between — it told readers to enable a
+ *  setting that may already be enabled. */
+export const screenReplayArmed = (): boolean => _timer !== null;
+
+/** Frames captured since start. Zero while armed means every tick
+ *  returned nothing: an older native binary, or a capture that keeps
+ *  failing. Either way the host should hear it from the event rather
+ *  than from a console line on a device nobody is holding. */
+export const screenReplayCaptured = (): number => _captured;
+
 export const drainScreenReplay = (): null | string => {
   if (_ring.length === 0) return null;
   const now = Date.now();
@@ -96,6 +111,7 @@ export const drainScreenReplay = (): null | string => {
 export const __resetForTests = (): void => {
   if (_timer !== null) clearInterval(_timer);
   _timer = null;
+  _captured = 0;
   _ring = [];
   _capacity = 0;
   _capturing = false;

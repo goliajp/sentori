@@ -96,6 +96,10 @@ export const ja: Messages = {
   'issue.impactUsers': '{users} 人のユーザー · 計 {events} 件(最大 {max} 件/人)',
   'issue.signals': 'ユーザーイベント',
   'issue.signalsNone': 'このイベントには行動シグナルが付いていません。',
+  'issue.replayScreensEmpty':
+    'このビルドはピクセルリプレイが有効ですが、1 フレームも取得できていません —— ネイティブバイナリが JS SDK より古いか、キャプチャが失敗し続けています。ネイティブを再ビルドしてください。',
+  'issue.replayScreensEmptyTip':
+    'このビルドはピクセルリプレイを要求しましたが取得できていません —— ワイヤーフレームは常時オンの構造キャプチャによるものです。',
   'issue.replayWireframeTip':
     'このビルドは replayScreens が無効 — ワイヤーフレームは常時オンの構造キャプチャによるものです。',
   'issue.guardAnchored':

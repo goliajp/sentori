@@ -8,6 +8,8 @@ import {
   __resetForTests as resetRing,
   __setCaptureForTests,
   drainScreenReplay,
+  screenReplayArmed,
+  screenReplayCaptured,
   startScreenReplay,
 } from '../replay-screens';
 
@@ -68,4 +70,31 @@ describe('screens ring', () => {
     // drain does not clear: a second error still sees the window
     expect(drainScreenReplay()).not.toBeNull();
   }, 10_000);
+});
+
+describe('armed but empty', () => {
+  test('off: not armed, nothing captured', () => {
+    expect(screenReplayArmed()).toBe(false);
+    expect(screenReplayCaptured()).toBe(0);
+  });
+
+  test('armed with a native that captures nothing stays at zero', async () => {
+    // An older native binary returns null forever. The ring must
+    // report "on, and producing nothing" — the dashboard used to
+    // read that state as "the host never turned this on" and told
+    // people to enable a setting that was already enabled.
+    __setCaptureForTests(async () => null);
+    startScreenReplay(30);
+    expect(screenReplayArmed()).toBe(true);
+    await new Promise((r) => setTimeout(r, 10));
+    expect(screenReplayCaptured()).toBe(0);
+    expect(drainScreenReplay()).toBeNull();
+  });
+
+  test('reset disarms and clears the count', () => {
+    startScreenReplay(30);
+    resetRing();
+    expect(screenReplayArmed()).toBe(false);
+    expect(screenReplayCaptured()).toBe(0);
+  });
 });

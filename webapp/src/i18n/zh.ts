@@ -94,6 +94,10 @@ export const zh: Messages = {
   'issue.impactUsers': '{users} 位用户 · 共 {events} 次(单人最多 {max} 次)',
   'issue.signals': '用户事件',
   'issue.signalsNone': '该事件没有携带用户行为信号。',
+  'issue.replayScreensEmpty':
+    '该构建开启了像素录屏,但一帧都没抓到 —— 原生二进制比 JS SDK 旧,或者抓帧一直在失败。重新构建原生 app。',
+  'issue.replayScreensEmptyTip':
+    '该构建要了像素录屏但一帧没拿到 —— 线框回放来自 always-on 结构捕获。',
   'issue.replayWireframeTip':
     '该构建没开 replayScreens —— 线框回放来自 always-on 结构捕获。',
   'issue.guardAnchored': '已在 {release} 解决。只有该版本及更新版本的再现才会重新打开。',

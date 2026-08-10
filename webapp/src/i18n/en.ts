@@ -101,6 +101,10 @@ export const en = {
   'issue.impactUsers': '{users} users · {events} events (up to {max} per user)',
   'issue.signals': 'User events',
   'issue.signalsNone': 'No behaviour signals came with this event.',
+  'issue.replayScreensEmpty':
+    'Pixel replay is on for this build but captured nothing — the native binary is older than the JS SDK, or the capture is failing. Rebuild the native app.',
+  'issue.replayScreensEmptyTip':
+    'This build asked for pixel replay and got none — the wireframe comes from the always-on structural capture.',
   'issue.replayWireframeTip':
     'This build has replayScreens off — the wireframe comes from the always-on structural capture.',
   'issue.guardAnchored':
