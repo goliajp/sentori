@@ -155,4 +155,54 @@ BATCH="$(curl -fsS -X POST "${BASE}/v1/events:batch" -H "Authorization: Bearer $
 [[ "$(echo "$BATCH" | jq -r '.outcomes | length')" == "2" ]] \
     || { echo "batch did not report one outcome per event: $BATCH" >&2; exit 1; }
 
+# ── resolve → regression, the product's central mechanic ─────────
+#
+# "Fixed in release X" means only a recurrence in X or newer reopens
+# the case. An older release still crashing is the build you already
+# fixed, not a regression — and a fix that reopens on it teaches
+# people to ignore the signal. There is a lot of machinery behind
+# that sentence (release ordering, the anchor, the weak time
+# fallback) and no test outside this file.
+echo "→ two releases, oldest first"
+for r in "reg@1.0.0+1" "reg@1.0.0+2"; do
+    curl -fsS -X POST "${BASE}/v1/deploys" -H "Authorization: Bearer ${TOKEN}" \
+        -H 'content-type: application/json' -d "{\"release\":\"${r}\"}" >/dev/null
+    sleep 1   # created_at ordering is what the anchor compares
+done
+
+reg_event() {  # $1 = release
+    cat <<EOF
+{"kind":"error","occurredAt":"2026-08-10T06:02:00Z","platform":"ios",
+ "release":"$1","environment":"test",
+ "payload":{"error":{"type":"RangeError","message":"regression probe","stack":[]}}}
+EOF
+}
+
+echo "→ first sighting in the newer release"
+REG_ISSUE="$(curl -fsS -X POST "${BASE}/v1/events" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' -d "$(reg_event 'reg@1.0.0+2')" | jq -r '.issueId')"
+[[ -n "$REG_ISSUE" && "$REG_ISSUE" != "null" ]] || { echo "no issue for the regression probe" >&2; exit 1; }
+
+echo "→ resolve it, anchored to the newer release"
+curl -fsS -b "$JAR" -X POST "${BASE}/admin/api/issues/${REG_ISSUE}/resolve" \
+    -H 'content-type: application/json' -d '{"release":"reg@1.0.0+2"}' >/dev/null
+
+echo "→ the OLDER release crashing must not reopen it"
+OLD="$(curl -fsS -X POST "${BASE}/v1/events" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' -d "$(reg_event 'reg@1.0.0+1')")"
+[[ "$(echo "$OLD" | jq -r '.regressed')" == "false" ]] \
+    || { echo "an older release reopened a fix: $OLD" >&2; exit 1; }
+STATUS_NOW="$(curl -fsS -b "$JAR" "${BASE}/admin/api/issues/${REG_ISSUE}" | jq -r '.status')"
+[[ "$STATUS_NOW" == "resolved" ]] \
+    || { echo "issue left ${STATUS_NOW} after an older-release event, want resolved" >&2; exit 1; }
+
+echo "→ the anchored release crashing must reopen it"
+NEW="$(curl -fsS -X POST "${BASE}/v1/events" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' -d "$(reg_event 'reg@1.0.0+2')")"
+[[ "$(echo "$NEW" | jq -r '.regressed')" == "true" ]] \
+    || { echo "the fixed release crashed again and nothing reopened: $NEW" >&2; exit 1; }
+REOPENED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/issues/${REG_ISSUE}" | jq -r '.status + " " + (.regressedInRelease // "-")')"
+[[ "$REOPENED" == "open reg@1.0.0+2" ]] \
+    || { echo "reopened state is '${REOPENED}', want 'open reg@1.0.0+2'" >&2; exit 1; }
+
 echo "✓ e2e smoke passed — project ${PROJECT_ID}, issue ${ISSUE_ID}"
