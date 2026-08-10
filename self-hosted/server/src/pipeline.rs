@@ -371,11 +371,22 @@ pub async fn ingest(pool: &PgPool, ev: IncomingEvent) -> Result<IngestOutcome, I
     }
 
     // The event row itself.
-    sqlx::query(
+    //
+    // `DO NOTHING` rather than a plain insert, because a mobile SDK
+    // retrying a request whose response was lost sends the same event
+    // id again — and that is the ordinary case, not the pathological
+    // one. A primary-key violation surfaced as `500 ingest_failed`,
+    // which our own contract tells the SDK to retry with backoff: it
+    // failed identically three more times and logged a dropped batch,
+    // for an event the server had already stored. Every counter this
+    // transaction touched is rolled back below when the row was
+    // already there.
+    let inserted = sqlx::query(
         "INSERT INTO events \
          (id, project_id, issue_id, kind, platform, occurred_at, release, environment, \
           user_key, payload) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) \
+         ON CONFLICT (id) DO NOTHING",
     )
     .bind(ev.id)
     .bind(ev.project_id)
@@ -389,6 +400,23 @@ pub async fn ingest(pool: &PgPool, ev: IncomingEvent) -> Result<IngestOutcome, I
     .bind(&ev.payload)
     .execute(&mut *tx)
     .await?;
+
+    if inserted.rows_affected() == 0 {
+        // Already have it. Drop everything this transaction did — the
+        // issue's counters, the user hit, the assert tally — and
+        // report the event as accepted, because it is.
+        tx.rollback().await?;
+        let issue_id: Uuid = sqlx::query_scalar("SELECT issue_id FROM events WHERE id = $1")
+            .bind(ev.id)
+            .fetch_one(pool)
+            .await?;
+        return Ok(IngestOutcome {
+            event_id: ev.id,
+            issue_id,
+            is_new_issue: false,
+            regressed: false,
+        });
+    }
 
     // Probe registry: firing updates the tripwire row (creating it
     // if the CLI scan never saw this ref), and links the guarded
