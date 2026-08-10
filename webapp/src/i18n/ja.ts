@@ -144,6 +144,28 @@ export const ja: Messages = {
   'palette.placeholder': 'ページへ移動、または issue を検索…',
 
 
+  'push.config': '設定(JSON)',
+  'push.configNotJson': '有効な JSON ではありません。',
+  'push.configPlaceholder': '{"keyId":"ABC123","teamId":"DEF456","bundleId":"com.example.app"}',
+  'push.credentialsEmpty':
+    'プロバイダの認証情報がまだありません —— 上に APNs キーまたは FCM サービスアカウントを貼ってください。なくてもデバイスは登録できますが、配信はできません。',
+  'push.credentialsTitle': 'プロバイダ認証情報',
+  'push.deleteConfirm': '{kind} の認証情報を削除しますか？これを経由する配信は即座に止まります。',
+  'push.deliveryEmpty':
+    'まだ送信はありません。アプリ側で sentori.push.register() を呼ぶとデバイスが登録され、送信がここに出ます。',
+  'push.deliveryTitle': '配信',
+  'push.failed24h': '失敗',
+  'push.lastValidated': '最終確認 {when} —— {status}',
+  'push.neverValidated': '未確認',
+  'push.provider': 'プロバイダ',
+  'push.queued': '待機中',
+  'push.reason': '理由',
+  'push.retry': '再試行',
+  'push.retryAll': '失敗をすべて再試行',
+  'push.sendsEmpty': '送信はまだありません',
+  'push.sendsTitle': '最近の送信',
+  'push.sent24h': '24時間の送信',
+  'push.tokens': 'デバイス {live} 台 · 隔離 {quarantined} 台',
   'releases.artifactMissing':
     '{platform} はこのリリースでイベントを送っていますが、シンボリケーション用アーティファクトがありません — スタックを読めません',
   'releases.artifactUnused':
@@ -188,6 +210,7 @@ export const ja: Messages = {
   'settings.tab.account': 'アカウント',
   'settings.tab.audit': '監査',
   'settings.tab.notifications': '通知',
+  'settings.tab.push': 'プッシュ',
   'settings.tab.tokens': 'トークン',
   'settings.tab.users': '管理者',
   'settings.colAction': '操作',

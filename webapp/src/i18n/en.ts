@@ -150,6 +150,28 @@ export const en = {
   'palette.placeholder': 'Jump to a page or search issues…',
 
 
+  'push.config': 'Config (JSON)',
+  'push.configNotJson': 'That is not valid JSON.',
+  'push.configPlaceholder': '{"keyId":"ABC123","teamId":"DEF456","bundleId":"com.example.app"}',
+  'push.credentialsEmpty':
+    'No provider credentials yet — paste an APNs key or an FCM service account above. Devices can register without one; nothing can be delivered until it is here.',
+  'push.credentialsTitle': 'Provider credentials',
+  'push.deleteConfirm': 'Delete the {kind} credential? Delivery through it stops immediately.',
+  'push.deliveryEmpty':
+    'Nothing sent yet. Devices register from the app with sentori.push.register(); sends land here.',
+  'push.deliveryTitle': 'Delivery',
+  'push.failed24h': 'failed',
+  'push.lastValidated': 'last checked {when} — {status}',
+  'push.neverValidated': 'never checked',
+  'push.provider': 'Provider',
+  'push.queued': 'queued',
+  'push.reason': 'Reason',
+  'push.retry': 'retry',
+  'push.retryAll': 'Retry all failed',
+  'push.sendsEmpty': 'No sends yet',
+  'push.sendsTitle': 'Recent sends',
+  'push.sent24h': 'sent 24h',
+  'push.tokens': '{live} devices · {quarantined} quarantined',
   'releases.artifactMissing':
     '{platform} reports events in this release but has no symbolication artifact — its stacks cannot be read',
   'releases.artifactUnused':
@@ -193,6 +215,7 @@ export const en = {
   'settings.tab.account': 'Account',
   'settings.tab.audit': 'Audit',
   'settings.tab.notifications': 'Notifications',
+  'settings.tab.push': 'Push',
   'settings.tab.tokens': 'Tokens',
   'settings.tab.users': 'Admins',
   'settings.colAction': 'Action',

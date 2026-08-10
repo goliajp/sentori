@@ -352,4 +352,34 @@ BAD_KIND="$(curl -s -o /dev/null -w '%{http_code}' -X POST \
     || { echo "an unknown attachment kind returned ${BAD_KIND}, want 400 — the database CHECK would refuse it anyway" >&2; exit 1; }
 rm -rf "$ATT_DIR"
 
+# ── push: the dashboard's half ───────────────────────────────────
+#
+# Push has been a complete backend since v0.2 with no dashboard, which
+# is why it has no users: the only way to give Sentori an APNs key was
+# an admin API nobody could see. These are the routes the new Settings
+# ▸ Push tab drives.
+echo "→ push health on a project that has never sent"
+PH="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/health")"
+[[ "$(echo "$PH" | jq -r '.sent24h')" == "0" && "$(echo "$PH" | jq -r '.liveTokens')" == "0" ]] \
+    || { echo "a project with no push activity did not report zeros: $PH" >&2; exit 1; }
+echo "$PH" | jq -e 'has("reasons") and has("quarantinedTokens")' >/dev/null \
+    || { echo "health is missing the fields the card renders: $PH" >&2; exit 1; }
+
+echo "→ save and read back a provider credential"
+curl -fsS -b "$JAR" -X POST "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials" \
+    -H 'content-type: application/json' \
+    -d '{"provider":"apns","config":{"keyId":"ABC123","teamId":"DEF456"}}' >/dev/null
+CRED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials" \
+    | jq -r '.credentials[] | select(.kind == "apns") | .kind')"
+[[ "$CRED" == "apns" ]] || { echo "the credential did not read back: '${CRED}'" >&2; exit 1; }
+
+echo "→ register a device the way the SDK does"
+IPT="$(curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-native-token-0001"}' \
+    | jq -r '.token_id')"
+[[ -n "$IPT" && "$IPT" != "null" ]] || { echo "device registration returned no token id" >&2; exit 1; }
+LIVE="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/health" | jq -r '.liveTokens')"
+[[ "$LIVE" == "1" ]] || { echo "health says ${LIVE} live devices after one registration" >&2; exit 1; }
+
 echo "✓ e2e smoke passed — project ${PROJECT_ID}, issue ${ISSUE_ID}"

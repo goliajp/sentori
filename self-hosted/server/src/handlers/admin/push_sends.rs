@@ -8,6 +8,7 @@ use std::sync::Arc;
 use axum::{
     Json,
     extract::{Extension, Path, Query, State},
+    http::StatusCode,
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -168,4 +169,79 @@ pub async fn list(
         })
         .collect();
     Json(json!({ "sends": out }))
+}
+
+/// `GET /admin/api/projects/:project_id/push/health`
+///
+/// One request behind the delivery card. The dashboard used to have
+/// no way to see push at all; when it got one, aggregating a
+/// thousand-row send list in the browser to answer "is delivery
+/// working" would have been the wrong shape — the question is a
+/// count, and counts belong in the database.
+///
+/// `reasons` is the point: "12 failed" is an alarm, "12 failed,
+/// BadDeviceToken" is a fix.
+pub async fn health(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    Path(project_id): Path<Uuid>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    super::tokens::ensure_project_access(&state, &ctx, project_id).await?;
+
+    let row = sqlx::query(
+        "SELECT \
+           count(*) FILTER (WHERE status = 'sent'   AND created_at > now() - interval '24 hours') AS sent24h, \
+           count(*) FILTER (WHERE status = 'failed' AND created_at > now() - interval '24 hours') AS failed24h, \
+           count(*) FILTER (WHERE status = 'queued') AS queued, \
+           max(created_at) AS last_send_at \
+         FROM push_sends WHERE project_id = $1",
+    )
+    .bind(project_id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| internal(&e))?;
+
+    let reasons = sqlx::query(
+        "SELECT coalesce(nullif(error, ''), provider_outcome, 'unknown') AS reason, count(*) AS n \
+         FROM push_sends \
+         WHERE project_id = $1 AND status = 'failed' \
+           AND created_at > now() - interval '24 hours' \
+         GROUP BY 1 ORDER BY n DESC LIMIT 8",
+    )
+    .bind(project_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| internal(&e))?;
+
+    let tokens = sqlx::query(
+        "SELECT count(*) FILTER (WHERE quarantined_at IS NULL) AS live, \
+                count(*) FILTER (WHERE quarantined_at IS NOT NULL) AS quarantined \
+         FROM push_tokens WHERE project_id = $1",
+    )
+    .bind(project_id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| internal(&e))?;
+
+    Ok(Json(json!({
+        "sent24h": row.get::<i64, _>("sent24h"),
+        "failed24h": row.get::<i64, _>("failed24h"),
+        "queued": row.get::<i64, _>("queued"),
+        "lastSendAt": crate::wire_time::rfc3339_opt(
+            row.try_get::<Option<time::OffsetDateTime>, _>("last_send_at").ok().flatten()
+        ),
+        "liveTokens": tokens.get::<i64, _>("live"),
+        "quarantinedTokens": tokens.get::<i64, _>("quarantined"),
+        "reasons": reasons.iter().map(|r| json!({
+            "reason": r.get::<String, _>("reason"),
+            "count": r.get::<i64, _>("n"),
+        })).collect::<Vec<_>>(),
+    })))
+}
+
+fn internal(e: &sqlx::Error) -> (StatusCode, Json<Value>) {
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(json!({ "error": e.to_string() })),
+    )
 }

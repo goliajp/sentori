@@ -133,7 +133,7 @@ pub fn router(state: Arc<AppState>) -> Router {
                 .post(artifacts_upload::upload_by_release_name)
                 .layer(axum::extract::DefaultBodyLimit::max(256 * 1024 * 1024)),
         )
-        // ── push family (carried; outside v1 acceptance) ──
+        // ── push: device registration, topics, send, receipts ──
         .route("/v1/push/tokens", post(sdk::push::register_token::handle))
         .route(
             "/v1/push/tokens/{handle}",
@@ -278,7 +278,9 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/admin/api/notification-prefs",
             get(notify_admin::prefs_list).put(notify_admin::prefs_put),
         )
-        // push admin (carried)
+        // Push — a first-class capability of the product since v1.5,
+        // not a subsystem parked next to it. The dashboard reaches
+        // every one of these.
         .route(
             "/admin/api/projects/{project_id}/push/credentials",
             get(admin::push_credentials::list).post(admin::push_credentials::upsert),
@@ -290,6 +292,10 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(
             "/admin/api/projects/{project_id}/push/test",
             post(admin::test_push::handle),
+        )
+        .route(
+            "/admin/api/projects/{project_id}/push/health",
+            get(admin::push_sends::health),
         )
         .route(
             "/admin/api/projects/{project_id}/push/sends",

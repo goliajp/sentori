@@ -28,7 +28,8 @@ const ROUTES = [
   '', `issues/${I}`, 'instruments', 'releases', 'projects',
   // Settings sections are URL-driven, so each one is reachable here.
   // They were not, and four admin screens went unrendered for months.
-  'settings?tab=tokens', 'settings?tab=users', 'settings?tab=notifications',
+  'settings?tab=tokens', 'settings?tab=users', 'settings?tab=push',
+  'settings?tab=notifications',
   'settings?tab=audit', 'settings?tab=account',
   'login', 'forgot-password',
 ];

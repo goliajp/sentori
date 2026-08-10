@@ -702,6 +702,66 @@ const SUFFIX = [
   [/\/projects\/[^/]+\/environments$/, () => ({ environments: ['production', 'staging', 'development'] })],
   [/\/projects\/[^/]+\/context-keys$/, () => ({ keys: ['plan', 'tenant'] })],
   [/\/projects\/[^/]+\/context-values$/, () => ({ values: ['acme', 'globex', 'initech'] })],
+  // Push: a project mid-integration — one provider configured, one
+  // delivery failing for a nameable reason, devices quarantined.
+  // The empty case (no credential, no send) is the state a new user
+  // arrives in and the one the copy has to earn.
+  [
+    /\/push\/health$/,
+    () => ({
+      sent24h: 412,
+      failed24h: 7,
+      queued: 2,
+      lastSendAt: iso(600_000),
+      liveTokens: 388,
+      quarantinedTokens: 4,
+      reasons: [
+        { reason: 'BadDeviceToken', count: 5 },
+        { reason: 'Unregistered', count: 2 },
+      ],
+    }),
+  ],
+  [
+    /\/push\/credentials$/,
+    () => ({
+      credentials: [
+        {
+          id: 'pc1',
+          kind: 'apns',
+          config: { keyId: 'ABC123', teamId: 'DEF456', bundleId: 'com.example.app' },
+          created_at: iso(86_400_000 * 15),
+          last_validated_at: iso(86_400_000),
+          last_validate_status: 'ok',
+        },
+        // Never validated: the state a credential is in the moment it
+        // is pasted, and the one the copy must not call an error.
+        {
+          id: 'pc2',
+          kind: 'fcm',
+          config: { projectId: 'demo-app' },
+          created_at: iso(3_600_000),
+          last_validated_at: null,
+          last_validate_status: null,
+        },
+      ],
+    }),
+  ],
+  [
+    /\/push\/sends$/,
+    () => ({
+      sends: [
+        { id: 'ps1', token_id: 'dt1', provider: 'apns', status: 'failed',
+          provider_outcome: '410', error: 'BadDeviceToken', retry_count: 3,
+          created_at: iso(1_800_000), sent_at: null, next_attempt_at: iso(-600_000) },
+        { id: 'ps2', token_id: 'dt2', provider: 'apns', status: 'sent',
+          provider_outcome: '200', error: null, retry_count: 0,
+          created_at: iso(3_600_000), sent_at: iso(3_599_000), next_attempt_at: null },
+        { id: 'ps3', token_id: 'dt3', provider: 'fcm', status: 'queued',
+          provider_outcome: null, error: null, retry_count: 0,
+          created_at: iso(120_000), sent_at: null, next_attempt_at: iso(0) },
+      ],
+    }),
+  ],
   [
     /\/projects\/[^/]+\/tokens$/,
     () => ({

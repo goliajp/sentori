@@ -15,6 +15,7 @@ import {
   Input,
   PageShell,
   Panel,
+  PanelEmpty,
   Select,
   clsx,
   formatRelative,
@@ -29,15 +30,15 @@ import {
 } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 
-type Tab = 'account' | 'audit' | 'notifications' | 'tokens' | 'users';
+type Tab = 'account' | 'audit' | 'notifications' | 'push' | 'tokens' | 'users';
 
 export default function SettingsPage() {
   const t = useT();
   const { me } = useShell();
   const owner = me.role === 'superadmin';
   const tabs: Tab[] = owner
-    ? ['tokens', 'users', 'notifications', 'audit', 'account']
-    : ['tokens', 'notifications', 'account'];
+    ? ['tokens', 'users', 'push', 'notifications', 'audit', 'account']
+    : ['tokens', 'push', 'notifications', 'account'];
   // The tab lives in the URL, not in component state: a settings
   // section you cannot link to is a section nobody can point a
   // colleague at, and it is also one no screenshot sweep can reach.
@@ -71,6 +72,7 @@ export default function SettingsPage() {
     >
       {tab === 'tokens' && <TokensTab />}
       {tab === 'users' && <UsersTab />}
+      {tab === 'push' && <PushTab />}
       {tab === 'notifications' && <NotificationsTab />}
       {tab === 'audit' && <AuditTab />}
       {tab === 'account' && <AccountTab />}
@@ -558,6 +560,261 @@ function NotificationsTab() {
             </div>
           </>
         )}
+      </Panel>
+    </div>
+  );
+}
+
+/** Push — credentials, delivery health, and the sends behind it.
+ *
+ *  Push has been a complete backend since v0.2 and had no dashboard
+ *  at all, which is why it had no users: the only way to give Sentori
+ *  an APNs key was an admin API nobody could see. This tab is the
+ *  second step of a three-step integration; the other two already
+ *  worked. */
+function PushTab() {
+  const t = useT();
+  const { activeProject } = useShell();
+  const projectId = activeProject?.id ?? '';
+  const [busy, setBusy] = useState(false);
+
+  const health = useAsyncData(
+    () => (projectId ? api.pushHealth(projectId) : Promise.resolve(null)),
+    [projectId],
+  );
+  const creds = useAsyncData(
+    () => (projectId ? api.pushCredentials(projectId) : Promise.resolve({ credentials: [] })),
+    [projectId],
+  );
+  const sends = useAsyncData(
+    () => (projectId ? api.pushSends(projectId) : Promise.resolve({ sends: [] })),
+    [projectId],
+  );
+
+  const [provider, setProvider] = useState('apns');
+  const [config, setConfig] = useState('');
+  const [saveError, setSaveError] = useState<null | string>(null);
+
+  if (!projectId) return <PanelEmpty>{t('instruments.noProject')}</PanelEmpty>;
+
+  const h = health.data;
+  const rows = sends.data?.sends ?? [];
+  const configured = creds.data?.credentials ?? [];
+
+  const reload = () => {
+    health.reload();
+    creds.reload();
+    sends.reload();
+  };
+
+  return (
+    <div className="space-y-4">
+      <Panel title={t('push.deliveryTitle')}>
+        {!h || (h.sent24h === 0 && h.failed24h === 0 && h.queued === 0) ? (
+          <PanelEmpty>{t('push.deliveryEmpty')}</PanelEmpty>
+        ) : (
+          <div className="space-y-2 p-3.5">
+            <div className="flex items-baseline gap-6 text-sm tabular-nums">
+              <span>
+                <span className="text-ok">{h.sent24h}</span>{' '}
+                <span className="text-fg-subtle">{t('push.sent24h')}</span>
+              </span>
+              <span>
+                <span className={h.failed24h > 0 ? 'text-kind-error' : ''}>
+                  {h.failed24h}
+                </span>{' '}
+                <span className="text-fg-subtle">{t('push.failed24h')}</span>
+              </span>
+              <span>
+                {h.queued} <span className="text-fg-subtle">{t('push.queued')}</span>
+              </span>
+              <span className="ml-auto text-fg-subtle">
+                {t('push.tokens', {
+                  live: String(h.liveTokens),
+                  quarantined: String(h.quarantinedTokens),
+                })}
+              </span>
+            </div>
+            {/* A count is an alarm; a reason is a fix. */}
+            {h.reasons.length > 0 && (
+              <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-xs text-fg-muted">
+                {h.reasons.map((r) => (
+                  <span key={r.reason} className="font-mono">
+                    {r.reason} <span className="text-fg-subtle">×{r.count}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </Panel>
+
+      <Panel title={t('push.credentialsTitle')}>
+        <div className="flex flex-wrap items-end gap-3 p-3.5">
+          <Field label={t('push.provider')}>
+            <Select value={provider} onChange={(e) => setProvider(e.target.value)}>
+              <option value="apns">apns</option>
+              <option value="fcm">fcm</option>
+              <option value="webpush">webpush</option>
+            </Select>
+          </Field>
+          <Field label={t('push.config')} className="min-w-0 flex-1">
+            <Input
+              value={config}
+              onChange={(e) => setConfig(e.target.value)}
+              placeholder={t('push.configPlaceholder')}
+            />
+          </Field>
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={busy || config.trim().length === 0}
+            onClick={() => {
+              setBusy(true);
+              setSaveError(null);
+              let parsed: Record<string, unknown>;
+              try {
+                parsed = JSON.parse(config) as Record<string, unknown>;
+              } catch {
+                setSaveError(t('push.configNotJson'));
+                setBusy(false);
+                return;
+              }
+              void api
+                .savePushCredential(projectId, provider, parsed)
+                .then(() => {
+                  setConfig('');
+                  reload();
+                })
+                .catch((e: Error) => setSaveError(e.message))
+                .finally(() => setBusy(false));
+            }}
+          >
+            {t('settings.save')}
+          </Button>
+        </div>
+        {saveError && <ErrorBanner>{saveError}</ErrorBanner>}
+        {configured.length === 0 ? (
+          <PanelEmpty>{t('push.credentialsEmpty')}</PanelEmpty>
+        ) : (
+          <div className="divide-y divide-border/60">
+            {configured.map((c) => (
+              <div key={c.id} className="flex items-center gap-3 px-3.5 py-2 text-sm">
+                <span className="w-24 font-mono text-xs text-fg">{c.kind}</span>
+                <span className="text-xs text-fg-subtle">
+                  {c.last_validate_status
+                    ? t('push.lastValidated', {
+                        status: c.last_validate_status,
+                        when: c.last_validated_at
+                          ? formatRelative(c.last_validated_at)
+                          : '—',
+                      })
+                    : t('push.neverValidated')}
+                </span>
+                <button
+                  type="button"
+                  className="ml-auto text-xs text-fg-subtle hover:text-kind-error"
+                  onClick={() => {
+                    if (window.confirm(t('push.deleteConfirm', { kind: c.kind }))) {
+                      void api.deletePushCredential(projectId, c.kind).then(reload);
+                    }
+                  }}
+                >
+                  {t('common.delete')}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
+
+      <Panel
+        title={`${t('push.sendsTitle')} (${rows.length})`}
+        action={
+          rows.some((r) => r.status === 'failed') ? (
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={() => {
+                setBusy(true);
+                void api
+                  .retryAllFailedPushSends(projectId)
+                  .then(reload)
+                  .finally(() => setBusy(false));
+              }}
+            >
+              {t('push.retryAll')}
+            </Button>
+          ) : undefined
+        }
+      >
+        <DataTable
+          rows={rows}
+          rowKey={(r) => r.id}
+          empty={t('push.sendsEmpty')}
+          columns={[
+            {
+              key: 'provider',
+              label: t('push.provider'),
+              width: '110px',
+              render: (r) => <span className="font-mono text-xs">{r.provider}</span>,
+            },
+            {
+              key: 'status',
+              label: t('instruments.colStatus'),
+              width: '110px',
+              render: (r) => (
+                <span
+                  className={clsx(
+                    'font-mono text-xs',
+                    r.status === 'failed' && 'text-kind-error',
+                    r.status === 'sent' && 'text-ok',
+                  )}
+                >
+                  {r.status}
+                </span>
+              ),
+            },
+            {
+              key: 'error',
+              label: t('push.reason'),
+              render: (r) => (
+                <span className="text-xs text-fg-muted">
+                  {r.error ?? r.provider_outcome ?? '—'}
+                </span>
+              ),
+            },
+            {
+              key: 'created_at',
+              label: t('settings.colWhen'),
+              width: '110px',
+              align: 'right',
+              render: (r) => (
+                <span className="text-xs tabular-nums text-fg-subtle">
+                  {formatRelative(r.created_at)}
+                </span>
+              ),
+            },
+            {
+              key: 'retry',
+              label: '',
+              width: '70px',
+              align: 'right',
+              render: (r) =>
+                r.status === 'failed' ? (
+                  <button
+                    type="button"
+                    className="text-xs text-fg-subtle hover:text-fg"
+                    onClick={() => {
+                      void api.retryPushSend(projectId, r.id).then(reload);
+                    }}
+                  >
+                    {t('push.retry')}
+                  </button>
+                ) : null,
+            },
+          ]}
+        />
       </Panel>
     </div>
   );

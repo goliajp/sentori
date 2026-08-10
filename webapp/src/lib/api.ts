@@ -185,6 +185,43 @@ export type AuditRow = {
   createdAt: string;
 };
 
+/** A provider credential as the dashboard sees it — never the secret
+ *  itself, only whether one is there and whether it last worked. */
+export type PushCredential = {
+  id: string;
+  kind: string;
+  /** Redacted shape from the server; the secret never leaves it. */
+  config: Record<string, unknown>;
+  created_at?: string;
+  last_validated_at?: null | string;
+  last_validate_status?: null | string;
+};
+
+export type PushSend = {
+  id: string;
+  token_id: string;
+  provider: string;
+  status: string;
+  provider_outcome?: null | string;
+  error?: null | string;
+  retry_count: number;
+  created_at: string;
+  sent_at?: null | string;
+  next_attempt_at?: null | string;
+};
+
+export type PushHealth = {
+  sent24h: number;
+  failed24h: number;
+  queued: number;
+  lastSendAt: null | string;
+  liveTokens: number;
+  quarantinedTokens: number;
+  /** Why the failures failed. "12 failed" is an alarm; "12 failed,
+   *  BadDeviceToken" is a fix. */
+  reasons: { reason: string; count: number }[];
+};
+
 export type SmtpStatus =
   | { configured: true; host: string; from: string }
   | { configured: false };
@@ -428,6 +465,56 @@ class Api {
   listArtifacts(projectId: string, releaseId: string) {
     return this.get<{ artifacts: ArtifactRow[] }>(
       `/admin/api/projects/${projectId}/releases/${releaseId}/artifacts`,
+    );
+  }
+
+  // ── push ──
+  pushHealth(projectId: string) {
+    return this.get<PushHealth>(`/admin/api/projects/${projectId}/push/health`);
+  }
+  pushCredentials(projectId: string) {
+    return this.get<{ credentials: PushCredential[] }>(
+      `/admin/api/projects/${projectId}/push/credentials`,
+    );
+  }
+  savePushCredential(
+    projectId: string,
+    provider: string,
+    config: Record<string, unknown>,
+    secret?: string,
+  ) {
+    return this.post<{ id: string }>(
+      `/admin/api/projects/${projectId}/push/credentials`,
+      { provider, config, secret },
+    );
+  }
+  deletePushCredential(projectId: string, kind: string) {
+    return this.send<{ ok: boolean }>(
+      'DELETE',
+      `/admin/api/projects/${projectId}/push/credentials/${kind}`,
+    );
+  }
+  /** Needs a device to aim at — a test send with no registered
+   *  device is not a test, so the UI asks for one first. */
+  pushTest(projectId: string, deviceTokenId: string, title: string, body: string) {
+    return this.post<{ sendId?: string; error?: string }>(
+      `/admin/api/projects/${projectId}/push/test`,
+      { deviceTokenId, title, body },
+    );
+  }
+  pushSends(projectId: string, limit = 50) {
+    return this.get<{ sends: PushSend[] }>(
+      `/admin/api/projects/${projectId}/push/sends?limit=${limit}`,
+    );
+  }
+  retryPushSend(projectId: string, sendId: string) {
+    return this.post<{ status: string }>(
+      `/admin/api/projects/${projectId}/push/sends/${sendId}/retry`,
+    );
+  }
+  retryAllFailedPushSends(projectId: string) {
+    return this.post<{ requeued: number }>(
+      `/admin/api/projects/${projectId}/push/sends/_retry_all_failed`,
     );
   }
 

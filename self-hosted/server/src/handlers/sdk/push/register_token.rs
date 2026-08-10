@@ -47,9 +47,14 @@ pub async fn handle(
     // RETURNING id so client gets the actual device_tokens.id back.
     let new_id = uuid::Uuid::now_v7();
     let row = sqlx::query(
+        // Five columns, five placeholders. It said `$6` for a year:
+        // Postgres refuses the statement outright, so every device
+        // registration this SDK has ever attempted came back 500 and
+        // the product had zero push tokens for a reason that was
+        // never "nobody turned it on".
         "INSERT INTO device_tokens \
          (id, project_id, provider, env, native_token) \
-         VALUES ($1, $2, $3, $4, $5, $6) \
+         VALUES ($1, $2, $3, $4, $5) \
          ON CONFLICT (project_id, provider, native_token) DO UPDATE SET \
             env = COALESCE(EXCLUDED.env, device_tokens.env), \
             revoked_at = NULL, \
