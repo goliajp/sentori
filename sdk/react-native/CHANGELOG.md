@@ -990,7 +990,7 @@ data: { name, props } }` breadcrumb, so a later
   Native and compat share state (same scope, same transport, same
   identity layer). Mixing them in one app is supported.
 
-  Documented at [`docs/sentry-compat.md`](../docs-site/src/content/docs/sentry-compat.md).
+  Documented at `docs-site/src/content/docs/sentry-compat.md` (that site was removed in 2026-08).
 
 ## 1.2.0
 
@@ -1138,7 +1138,7 @@ data: { name, props } }` breadcrumb, so a later
   "免费的好处" — a free bonus must not pollute the host's runtime
   surface. Console warns from normal operation broke that contract.
 
-  Part of the [v2.3 SDK redesign](../docs/design/sdk-v2.3-redesign.md);
+  Part of the [v2.3 SDK redesign](../../docs/design/sdk-v2.3-redesign.md);
   identity layer + Sentry compat layer follow in W6.1+.
 
 ### Patch Changes

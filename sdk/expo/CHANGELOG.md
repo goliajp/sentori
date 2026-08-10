@@ -785,7 +785,7 @@ data: { name, props } }` breadcrumb, so a later
   "免费的好处" — a free bonus must not pollute the host's runtime
   surface. Console warns from normal operation broke that contract.
 
-  Part of the [v2.3 SDK redesign](../docs/design/sdk-v2.3-redesign.md);
+  Part of the [v2.3 SDK redesign](../../docs/design/sdk-v2.3-redesign.md);
   identity layer + Sentry compat layer follow in W6.1+.
 
 ### Patch Changes

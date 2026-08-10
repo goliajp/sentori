@@ -115,6 +115,13 @@ jobs:
       # and a required field marked optional with a default pointing
       # at someone else's server. None of it shows in a diff — the
       # type changes in one file, the table stays put in another.
+      # A link in a document is a claim that the page exists. Four of
+      # the SDK links in `docs/README.md` — the index of the
+      # documentation — were 404s pointing into a site that had been
+      # deleted.
+      - name: relative links in docs resolve
+        run: node scripts/check-doc-links.mjs
+
       - name: SDK reference matches InitConfig
         run: node scripts/check-sdk-doc-options.mjs
 

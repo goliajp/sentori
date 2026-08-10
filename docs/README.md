@@ -30,11 +30,15 @@ self-hoster ever saw them. Deleted; the history has them.
 
 ## SDKs
 
-- [`sdk-react-native.md`](sdk-react-native.md) (primary surface)
-- [`sdk-react.md`](sdk-react.md)
-- [`sdk-vue.md`](sdk-vue.md)
-- [`sdk-solid.md`](sdk-solid.md)
-- [`sdk-svelte.md`](sdk-svelte.md)
+- [`sdk-react-native.md`](sdk-react-native.md) — the surface. Sentori
+  watches mobile apps; there is no second SDK guide because there is
+  no second SDK.
+
+This section listed `sdk-react.md`, `sdk-vue.md`, `sdk-solid.md` and
+`sdk-svelte.md` until 2026-08-10. None of those files were in this
+directory — they lived in the deleted `docs-site/`, for packages whose
+source left with the v1 redesign. Four links, four 404s, in the index
+of the documentation.
 
 ## Insight upgrade notes (newest first)
 

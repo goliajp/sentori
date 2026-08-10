@@ -15,7 +15,7 @@ mobile error showing up in the Sentori dashboard.
   custom dev client (`expo prebuild`) or a bare RN project.
 - Xcode (macOS) or Android Studio if you need native debugging.
 - A Sentori **token** and **ingest URL** — see the [React
-  quickstart §Prerequisites](./react.md#prerequisites).
+  getting-started overview](../getting-started.md).
 
 ## 1. Install
 

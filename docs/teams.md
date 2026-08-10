@@ -137,7 +137,7 @@ org's history stays queryable for a retention period.
 
 - API: `/api/orgs/{slug}/teams[/...]` and
   `/admin/api/projects/{id}/teams/{team_slug}` — see the
-  [protocol reference](/protocol/).
+  [protocol reference](./protocol.md).
 - Dashboard route: `/org/{slug}/teams`, `/org/{slug}/teams/{team_slug}`,
   `/org/{slug}/audit`, `/org/{slug}/projects/{id}/settings/teams`.
 - Server-side schema lives in migration

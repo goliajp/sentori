@@ -129,4 +129,4 @@ steps and CI recipes (GitHub Actions / GitLab / Vercel / EAS).
   own SDK or just curious
 - [Self-hosting](./self-hosting.md) — production deploy, SMTP,
   backups, behind a reverse proxy
-- [SDK — React](./sdk-react.md) / [SDK — React Native](./sdk-react-native.md)
+- [SDK — React Native](./sdk-react-native.md)

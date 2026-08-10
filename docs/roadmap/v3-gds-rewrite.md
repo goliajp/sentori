@@ -45,6 +45,6 @@ We chose to document it here instead: the historical record sits alongside every
 
 ## Related
 
-- [`reference-gds-traps`](/Users/doracawl/.claude-profile-3/projects/-Users-doracawl-workspace-goliajp-sentori/memory/reference_gds_traps.md) — `--color-border-muted` undefined, vite dev prebundling chunk bug, Tailwind `@source` paths, light-mode override placement
-- [`feedback-gds-dark-native`](/Users/doracawl/.claude-profile-3/projects/-Users-doracawl-workspace-goliajp-sentori/memory/feedback_gds_dark_native.md) — dark is the canonical mode, light overrides are minimal
+- `reference-gds-traps` (session memory `reference_gds_traps.md`) — `--color-border-muted` undefined, vite dev prebundling chunk bug, Tailwind `@source` paths, light-mode override placement
+- `feedback-gds-dark-native` (session memory `feedback_gds_dark_native.md`) — dark is the canonical mode, light overrides are minimal
 - The v2.13–v2.16 roadmap docs — each carries the GDS-migration delta for one previously-hidden module

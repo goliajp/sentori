@@ -666,7 +666,7 @@ device fingerprint, or browser fingerprint by default.
 
 ## 6 — Performance budgets
 
-Per [CLAUDE.md](../../CLAUDE.md) "几乎不能造成 host app 的性能抖动" rule.
+Per [CLAUDE.md](../../.claude/CLAUDE.md) "几乎不能造成 host app 的性能抖动" rule.
 
 | Subsystem | Default | Main-thread budget | Network |
 |---|---|---|---|
