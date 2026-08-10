@@ -70,14 +70,34 @@ and regressions then mail the owner and assigned admins;
 test-email button. Without SMTP everything else works — the page
 just shows the channel as not configured.
 
-## Locked out?
+## Operator commands
+
+The server binary carries a handful of one-shot commands. All are
+idempotent and safe to re-run.
 
 ```bash
+# A locked-out owner: prints a fresh password and signs that account
+# out everywhere. No SMTP required.
 docker compose exec sentori sentori-server reset-password you@example.com
-```
 
-Prints a fresh password (and signs out that account everywhere).
-No SMTP required.
+# Re-read stored crashes against the artifacts now on hand. Uploads
+# trigger this themselves; run it by hand for uploads that predate
+# server 2.12.0, a pass that failed, or a map replaced after the
+# fact. Rewrites stacks, does not re-group.
+docker compose exec sentori sentori-server resymbolicate                 # every release
+docker compose exec sentori sentori-server resymbolicate "app@1.2.3+456" # one
+
+# Read the uploaded artifacts and record whether this server can
+# actually parse them. Artifacts stored before 2.15.0 were never
+# checked; `--all` re-checks everything, which matters after an
+# upgrade that teaches the reader a new format.
+docker compose exec sentori sentori-server verify-artifacts
+docker compose exec sentori sentori-server verify-artifacts --all
+
+# One-shot, pre-2.9.0 data only: split issues that were grouped
+# before environment and platform entered the fingerprint.
+docker compose exec sentori sentori-server backfill-split
+```
 
 ## Configuration
 

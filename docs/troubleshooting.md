@@ -87,8 +87,8 @@ pass did not run (an upload from before server 2.12.0, or a failure
 in the server log), run it by hand:
 
 ```bash
-docker compose exec server sentori-server resymbolicate "myapp@1.2.3+456"
-# or, for every release: sentori-server resymbolicate
+docker compose exec sentori sentori-server resymbolicate "myapp@1.2.3+456"
+# or, for every release: drop the argument
 ```
 
 It is idempotent — a frame that already carries its source window is

@@ -47,7 +47,7 @@ sentori.init({
 | `token` | string | yes | — (must start with `st_pk_`) |
 | `release` | string | yes | format `<name>@<version>+<build>` |
 | `environment` | string | no | `'dev'` if `__DEV__`, else `'prod'` |
-| `ingestUrl` | string | no | `https://ingest.sentori.golia.jp` |
+| `ingestUrl` | string | **yes** | — (the origin of the instance you run) |
 | `capture` | object | no | all sources on |
 
 `capture` toggles (all default true):
@@ -349,11 +349,12 @@ to prevent runaway render-loop crash storms from filling storage.
 ### What lands on the server
 
 Each captured screenshot becomes one row in `event_attachments`
-and one binary blob on disk under `$SENTORI_ATTACHMENT_DIR`. The
-dashboard surfaces them inline on the issue-detail page. Server
-retention sweep drops the rows + blobs on the events partition
-schedule (default 30 days). Self-hosted operators: see
-`SENTORI_ATTACHMENT_DIR` in `docs/self-hosting.md`.
+and one content-addressed blob in the store named by
+`SENTORI_ATTACHMENT_STORE` (`fs:/data/blobs` in the shipped compose).
+The dashboard surfaces them inline on the issue-detail page.
+Retention drops the rows and the blobs with their events —
+`SENTORI_EVENT_RETENTION_DAYS`, 90 by default; see
+[self-hosting](./self-hosting.md).
 
 ## Session trail (opt-in)
 

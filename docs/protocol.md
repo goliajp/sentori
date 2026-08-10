@@ -269,11 +269,16 @@ The SDK takes two **independent** configuration fields, never combined into a si
 sentori.init({
   token: 'st_pk_01j5y9z3vk8x4rmt2pcqjf7nw9',
   release: 'myapp@1.2.3+456',
-  ingestUrl: 'https://ingest.sentori.golia.jp', // optional, this is the default
+  ingestUrl: 'https://sentori.example.com', // required — your instance
 });
 ```
 
-Self-hosted users override `ingestUrl`:
+There is no default. `init()` without an `ingestUrl` logs one warning
+and leaves every verb a no-op, because the alternative — falling back
+to some other instance's host — would send an app's crashes to
+strangers.
+
+`ingestUrl` is the origin of the instance you run:
 
 ```ts
 sentori.init({
