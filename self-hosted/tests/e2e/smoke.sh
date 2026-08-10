@@ -205,4 +205,81 @@ REOPENED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/issues/${REG_ISSUE}" | jq -r 
 [[ "$REOPENED" == "open reg@1.0.0+2" ]] \
     || { echo "reopened state is '${REOPENED}', want 'open reg@1.0.0+2'" >&2; exit 1; }
 
+# ── symbolication, both directions ───────────────────────────────
+#
+# A stack the reader cannot read is the failure this product exists to
+# prevent, and both halves of the path have broken in production: the
+# resolver refused the source maps React Native actually produces, and
+# a map uploaded after the crash rewrote nothing because no pass ever
+# ran. Ad-hoc curl proved each fix once; this proves them every time.
+echo "→ api-scope token"
+API_TOKEN="$(curl -fsS -b "$JAR" -X POST "${BASE}/admin/api/projects/${PROJECT_ID}/tokens" \
+    -H 'content-type: application/json' \
+    -d '{"name":"e2e-ci","scope":"api"}' | jq -r '.token')"
+[[ "$API_TOKEN" == st_* ]] || { echo "no api token: $API_TOKEN" >&2; exit 1; }
+
+MAPDIR="$(mktemp -d)"
+# One mapping: generated column 20 on line 1 → src/checkout.ts line 3,
+# column 4. `oBAEI` is that segment in VLQ.
+cat > "${MAPDIR}/index.android.bundle.map" <<'MAP'
+{"version":3,"file":"index.android.bundle","sources":["src/checkout.ts"],
+ "sourcesContent":["export function charge(userId) {\n  const token = mintToken(userId)\n  return post('/pay', { token })\n}\n"],
+ "names":[],"mappings":"oBAEI"}
+MAP
+
+sym_event() {
+    cat <<EOF
+{"kind":"error","occurredAt":"2026-08-10T06:03:00Z","platform":"android",
+ "release":"sym@1.0.0+1","environment":"test",
+ "payload":{"error":{"type":"TypeError","message":"$1","stack":[
+   {"file":"index.android.bundle","line":1,"column":20,"function":"e","inApp":true}]}}}
+EOF
+}
+
+echo "→ a crash arrives before its map"
+EARLY_ID="$(curl -fsS -X POST "${BASE}/v1/events" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' -d "$(sym_event 'before the map')" | jq -r '.eventId')"
+EARLY_FILE="$(curl -fsS -b "$JAR" "${BASE}/admin/api/events/${EARLY_ID}" \
+    | jq -r '.payload.error.stack[0].file')"
+[[ "$EARLY_FILE" == "index.android.bundle" ]] \
+    || { echo "expected the raw bundle path with no map on hand, got ${EARLY_FILE}" >&2; exit 1; }
+
+echo "→ upload the map"
+UPLOAD="$(curl -fsS -X POST "${BASE}/v1/releases/sym%401.0.0%2B1/artifacts" \
+    -H "Authorization: Bearer ${API_TOKEN}" \
+    -F kind=sourcemap -F "file=@${MAPDIR}/index.android.bundle.map")"
+[[ "$(echo "$UPLOAD" | jq -r '.usable')" == "true" ]] \
+    || { echo "the server could not parse a plain source map: $UPLOAD" >&2; exit 1; }
+
+echo "→ retro pass rewrites the crash that predates it"
+for i in $(seq 1 20); do
+    LINE="$(curl -fsS -b "$JAR" "${BASE}/admin/api/events/${EARLY_ID}" \
+        | jq -r '.payload.error.stack[0].contextLine // empty')"
+    [[ -n "$LINE" ]] && break
+    sleep 1
+done
+[[ "$LINE" == *"return post('/pay'"* ]] \
+    || { echo "stored crash still unreadable after the upload: '${LINE}'" >&2; exit 1; }
+
+echo "→ and the next crash resolves at ingest"
+LATE_ID="$(curl -fsS -X POST "${BASE}/v1/events" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' -d "$(sym_event 'after the map')" | jq -r '.eventId')"
+LATE_FILE="$(curl -fsS -b "$JAR" "${BASE}/admin/api/events/${LATE_ID}" \
+    | jq -r '.payload.error.stack[0].file')"
+[[ "$LATE_FILE" == "src/checkout.ts" ]] \
+    || { echo "ingest-time symbolication did not run: ${LATE_FILE}" >&2; exit 1; }
+
+echo "→ a bundle filed as a source map is refused a green light"
+printf '\xc6\x1f\xbc\x03 not a map' > "${MAPDIR}/index.ios.bundle"
+BAD="$(curl -fsS -X POST "${BASE}/v1/releases/sym%401.0.0%2B1/artifacts" \
+    -H "Authorization: Bearer ${API_TOKEN}" \
+    -F kind=sourcemap -F "file=@${MAPDIR}/index.ios.bundle")"
+[[ "$(echo "$BAD" | jq -r '.usable')" == "false" ]] \
+    || { echo "an unparseable artifact reported usable: $BAD" >&2; exit 1; }
+KINDS="$(curl -fsS -H "Authorization: Bearer ${API_TOKEN}" \
+    "${BASE}/v1/releases/sym%401.0.0%2B1/artifacts" | jq -r '.kinds.sourcemap')"
+[[ "$KINDS" == "1" ]] \
+    || { echo "sourcemap count is ${KINDS}, want 1 — the unreadable one must not count" >&2; exit 1; }
+rm -rf "$MAPDIR"
+
 echo "✓ e2e smoke passed — project ${PROJECT_ID}, issue ${ISSUE_ID}"
