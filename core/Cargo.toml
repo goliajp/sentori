@@ -10,10 +10,19 @@
 
 [workspace]
 resolver = "3"
-# v1 members: only what the self-hosted server actually composes
-# (design.md §7-9). Retired-from-build crates keep their directories
-# until the S9 sweep; a crate no gate compiles is a crate that cannot
-# silently rot the build.
+# Every crate here is one the self-hosted server composes
+# (design.md §7-9), and every crate on disk is a member. The two used
+# to differ: sixteen crates sat in `crates/` outside the build,
+# "until the S9 sweep", on the reasoning that a crate no gate compiles
+# cannot rot the build.
+#
+# It cannot rot it, no — it rots on its own, out of sight. Twenty
+# thousand lines of Rust that nothing compiled, nothing linted and
+# nothing tested, referencing only each other, reading in review and
+# in search exactly like code that runs. That is the same shape as the
+# unreferenced TypeScript, the two unreachable Astro sites and the
+# rate limiter with no `mod` declaration. Swept 2026-08-10; the
+# history has them.
 members = [
     "crates/privacy-salt",
     "crates/issue-fingerprint",
