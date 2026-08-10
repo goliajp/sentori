@@ -185,7 +185,13 @@ export default function InstrumentsPage() {
                 {
                   key: 'release',
                   label: t('instruments.colRelease'),
-                  width: '220px',
+                  // Right-aligned and narrow so it sits next to the
+                  // numbers rather than stranded in the middle: the
+                  // name column absorbs every pixel of slack, and a
+                  // left-aligned column after it starts wherever that
+                  // slack ends — a river of white down the table.
+                  width: '160px',
+                  align: 'right',
                   render: (a) => <ReleaseCell release={a.release} />,
                 },
                 {
@@ -240,7 +246,8 @@ export default function InstrumentsPage() {
                 {
                   key: 'lastSeenRelease',
                   label: t('instruments.colRelease'),
-                  width: '220px',
+                  width: '160px',
+                  align: 'right',
                   render: (p) => <ReleaseCell release={p.lastSeenRelease} />,
                 },
                 {
