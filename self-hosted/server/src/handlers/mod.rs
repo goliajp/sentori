@@ -26,7 +26,7 @@ use crate::state::AppState;
 
 mod admin;
 mod api;
-mod artifacts_upload;
+pub mod artifacts_upload;
 mod attachments;
 mod audit;
 mod auth;
