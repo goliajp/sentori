@@ -90,9 +90,16 @@ pub async fn handle(
         // here stays on plain INSERT — operators who need dedup
         // should add the unique index out-of-band.
         let result = sqlx::query(
+            // Nine columns, nine values — `'queued'` sits in the
+            // `status` slot rather than shifting every placeholder
+            // after it by one. As written this statement had ten
+            // values for nine columns and Postgres refused it, so
+            // `POST /v1/push/send` had never delivered anything.
+            // Together with the register bug, the whole feature was
+            // two broken INSERTs, not an unused one.
             "INSERT INTO push_sends \
              (id, project_id, token_id, provider, payload, status, idempotency_key, campaign_id, template_id) \
-             VALUES ($1, $2, $3, $4, $5, $6, 'queued', $7, $8, $9) \
+             VALUES ($1, $2, $3, $4, $5, 'queued', $6, $7, $8) \
              RETURNING id",
         )
         .bind(id)

@@ -392,4 +392,19 @@ LINKED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/hea
 [[ "$LINKED" == "1" ]] \
     || { echo "the registered device is not addressable by user key: ${LINKED}" >&2; exit 1; }
 
+echo "→ a send actually queues"
+# `POST /v1/push/send` had ten values for nine columns and answered
+# 500 to everything. An endpoint that always 500s is
+# indistinguishable from a feature nobody uses, which is how this
+# read for a year.
+SEND="$(curl -fsS -X POST "${BASE}/v1/push/send" -H "Authorization: Bearer ${API_TOKEN}" \
+    -H 'content-type: application/json' \
+    -d "{\"tokenIds\":[\"${IPT}\"],\"payload\":{\"title\":\"e2e\",\"body\":\"hello\"}}")"
+echo "$SEND" | jq -e '.queued >= 1 and (.send_ids | length >= 1)' >/dev/null \
+    || { echo "send queued nothing: $SEND" >&2; exit 1; }
+QUEUED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/sends" \
+    | jq -r '.sends | length')"
+[[ "$QUEUED" -ge 1 ]] \
+    || { echo "the dashboard's send list is empty after a send" >&2; exit 1; }
+
 echo "✓ e2e smoke passed — project ${PROJECT_ID}, issue ${ISSUE_ID}"

@@ -75,8 +75,13 @@ pub async fn handle(
 
     let send_id = Uuid::now_v7();
     let result = sqlx::query(
+        // Six columns, six values. `'queued'` belongs in the
+        // `status` slot; as `$6, 'queued'` it made seven, Postgres
+        // refused the statement, and the dashboard's Test button
+        // would have answered 500 the first time anyone pressed it.
+        // Third instance of this exact fault in the push code.
         "INSERT INTO push_sends (id, project_id, token_id, provider, payload, status) \
-         VALUES ($1, $2, $3, $4, $5, $6, 'queued') RETURNING id",
+         VALUES ($1, $2, $3, $4, $5, 'queued') RETURNING id",
     )
     .bind(send_id)
     .bind(project_id)

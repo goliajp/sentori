@@ -104,6 +104,14 @@ jobs:
       - name: check rfc3339 serde annotations (phase 29 sub-C)
         run: bash scripts/check-rfc3339.sh
 
+      # Two load-bearing INSERTs had more values than columns.
+      # Postgres refuses such a statement at prepare time, so the
+      # endpoint always 500s — and from the outside that is
+      # indistinguishable from a feature nobody uses, which is exactly
+      # how push read for a year.
+      - name: INSERT columns and values balance
+        run: node scripts/check-sql-inserts.mjs
+
       # A file no `mod` reaches is never compiled, so nothing else in
       # this job would notice it. That is how the rate limiter sat
       # written-but-dead while ingest ran unlimited.
