@@ -5,17 +5,21 @@ description: Pick the 5-minute quickstart that matches your stack
 
 # Getting started
 
-Sentori is an error-tracking + APM platform. There's a 5-minute
-quickstart for each supported stack — pick yours:
+Sentori watches mobile apps. One quickstart, because there is one
+supported stack:
 
 | Stack | Quickstart |
 |---|---|
-| **React** (Vite / CRA / any bundler) | [getting-started/react](./getting-started/react.md) |
 | **React Native** (bare or Expo) | [getting-started/react-native](./getting-started/react-native.md) |
-| **Next.js** (App Router or Pages) | [getting-started/nextjs](./getting-started/nextjs.md) |
-| **Node.js / Bun** (Express, Hono, Fastify, scripts) | [getting-started/node](./getting-started/node.md) |
 
-All four assume you already have:
+There were guides here for React, Next.js and Node until 2026-08-10.
+They pointed at `@goliapkg/sentori-react` and friends — packages whose
+source left this repo with the v1 redesign and which speak the v0.2
+wire format, so following them produced an integration the current
+server answers with `400 invalid_payload`. `@goliapkg/sentori-node`
+never existed at all.
+
+It assumes you already have:
 
 - a **token** (`st_...`)
 - an **ingest URL**

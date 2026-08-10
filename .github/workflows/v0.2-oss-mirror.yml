@@ -83,9 +83,7 @@ jobs:
             --exclude='/server/' \
             --exclude='/web/' \
             --exclude='/docker/' \
-            --exclude='/marketing/' \
             --exclude='/docs/' \
-            --exclude='/docs-site/' \
             --exclude='/docs-v0.1/' \
             --exclude='/docs-v0.2/' \
             --exclude='ROADMAP.md' \
