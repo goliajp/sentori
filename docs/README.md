@@ -1,11 +1,19 @@
 # docs/
 
-Source markdown for protocol spec, getting-started, SDK guide,
-self-hosting, teams / RBAC, and design tokens. The `docs-site/` Astro
-Starlight project (Astro `base: '/docs'`) ships the published
-documentation at `sentori.golia.jp/docs/*`. The legacy host
-`docs.sentori.golia.jp` 301-redirects to the new path so old links
-keep working.
+Source markdown for the protocol spec, getting started, the SDK
+guide, self-hosting and troubleshooting. **These files are the
+documentation** — read them here or in the OSS mirror.
+
+There was an Astro Starlight site (`docs-site/`) and a marketing site
+(`marketing/`) in this repo until 2026-08-10. Nothing routed to
+either: `docs.sentori.golia.jp` redirects to the dashboard and
+`sentori.golia.jp/docs/` is the SPA's catch-all. Between them they
+documented a Sentry compatibility layer this product deliberately does
+not have, four web-framework SDKs whose source is not in this repo,
+and a Free / Pro / Enterprise pricing page for a product with no
+signup and no billing. Thirty thousand files, built by no gate and
+served to nobody — the OSS mirror excluded them, so not even a
+self-hoster ever saw them. Deleted; the history has them.
 
 ## Reference & getting started
 

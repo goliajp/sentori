@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://sentori.golia.jp/sitemap-index.xml

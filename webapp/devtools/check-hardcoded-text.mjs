@@ -21,11 +21,8 @@ import { join } from 'node:path';
 // switcher, the footer) and everything under lib/ unread — chrome a
 // zh or ja user sees on every single screen.
 const ROOTS = ['src'];
-/** Not rendered. The catalogues are English by definition, and
- *  `legal/` is hosted-offering copy that no route reaches — see the
- *  entry for it in `check-unreferenced.mjs`, which is where that fact
- *  is recorded rather than quietly assumed here. */
-const SKIP = /(^|\/)(i18n|legal)(\/|$)/;
+/** Not rendered: the catalogues are English by definition. */
+const SKIP = /(^|\/)(i18n)(\/|$)/;
 
 /** Props whose value is machinery, not something a person reads. */
 const CODE_PROPS =
