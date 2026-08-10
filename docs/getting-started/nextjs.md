@@ -28,7 +28,7 @@ pnpm add @goliapkg/sentori-next
 `.env.local`:
 
 ```bash
-NEXT_PUBLIC_SENTORI_TOKEN=st_pk_...
+NEXT_PUBLIC_SENTORI_TOKEN=st_...
 NEXT_PUBLIC_SENTORI_RELEASE=myapp@1.0.0
 NEXT_PUBLIC_SENTORI_ENVIRONMENT=prod
 ```

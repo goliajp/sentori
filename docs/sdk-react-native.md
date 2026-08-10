@@ -36,25 +36,37 @@ is supported, just without native crash capture.
 import { sentori } from '@goliapkg/sentori-react-native'
 
 sentori.init({
-  token: 'st_pk_<your project token>',
+  token: 'st_<your ingest token>',
+  ingestUrl: 'https://sentori.your-host.com',
   release: 'myapp@1.2.3+456',
-  ingestUrl: 'https://sentori.your-host.com', // optional
 })
 ```
 
 | Option | Type | Required | Default |
 |---|---|---|---|
-| `token` | string | yes | — (must start with `st_pk_`) |
-| `release` | string | yes | format `<name>@<version>+<build>` |
-| `environment` | string | no | `'dev'` if `__DEV__`, else `'prod'` |
-| `ingestUrl` | string | **yes** | — (the origin of the instance you run) |
-| `capture` | object | no | all sources on |
+| `token` | string | **yes** | — ingest-scope token (`st_…`) |
+| `ingestUrl` | string | **yes** | — the origin of the instance you run |
+| `release` | string | no | `''` — but set it: symbolication, regression anchoring and the release spread all key on it (`<name>@<version>+<build>`) |
+| `environment` | string | no | `'production'` |
+| `detect` | object | no | see below |
+| `replaySeconds` | number | no | `30` — wireframe replay window; `0` disables |
+| `replayScreens` | boolean | no | `false` — pixel replay; screenshots can carry user content, so pair it with `registerMaskQuery` |
+| `backendHealthUrl` | string | no | — a GET-able health endpoint of **your** backend. The server probes it once a minute; the app never pings it |
+| `logLevel` | `'silent' \| 'error' \| 'warn' \| 'info' \| 'debug'` | no | `'warn'` |
+| `beforeSend` | `(event) => event \| null` | no | — last-resort filter; a throwing hook falls back to sending the event |
 
-`capture` toggles (all default true):
+Missing `token` or `ingestUrl` is not an error: `init()` logs one
+warning and every verb becomes a no-op. Nothing your app does can
+fail because Sentori was misconfigured.
 
-- `globalErrors`: `ErrorUtils.setGlobalHandler`
-- `promiseRejections`: `HermesInternal.enablePromiseRejectionTracker`
-- `network`: fetch wrapper that adds `net` breadcrumbs (auth params auto-redacted)
+`detect` — the warn-scenario detectors:
+
+| Toggle | Default | Fires when |
+|---|---|---|
+| `rageTap` | `true` | repeated taps on the same spot with nothing changing |
+| `longFreeze` | `true` | the JS thread stops answering |
+| `slowColdStart` | `true` | launch crosses the slow threshold |
+| `slowApi` | `false` | a request the network wrapper saw runs long |
 
 ## Capture API
 
@@ -261,7 +273,7 @@ by default; flip it on in `init`:
 
 ```ts
 sentori.init({
-  token: 'st_pk_…',
+  token: 'st_…',
   release: 'myapp@1.2.3+456',
   capture: { screenshot: true },
 })
@@ -368,7 +380,7 @@ Off by default; flip it on in `init`:
 
 ```ts
 sentori.init({
-  token: 'st_pk_…',
+  token: 'st_…',
   release: 'myapp@1.2.3+456',
   capture: { sessionTrail: true },
 })
@@ -418,7 +430,7 @@ Off by default; flip on in `init`:
 
 ```ts
 sentori.init({
-  token: 'st_pk_…',
+  token: 'st_…',
   release: 'myapp@1.2.3+456',
   capture: { replay: { mode: 'wireframe', hz: 1 } },
 })

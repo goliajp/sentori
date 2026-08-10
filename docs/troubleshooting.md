@@ -27,7 +27,7 @@ Look at the status code:
   called, hooks are stripped by a router).
 - `400` — endpoint reachable, token OK, the test payload was just
   rejected for missing fields. Same conclusion as 202.
-- `401` — token mismatch. Check it starts with `st_pk_` and matches
+- `401` — token mismatch. Check it starts with `st_` and matches
   the project's token in Project settings → tokens.
 - `429` — rate limit. Default is 1000 req/min/token; bump via
   `SENTORI_RATE_LIMIT_PER_MIN` or wait a minute.
@@ -142,10 +142,10 @@ Possible hints:
 
 | Hint | Cause | Fix |
 |---|---|---|
-| `token format invalid` | Doesn't start with `st_pk_` (public) or `sk_` (admin) | Copy from project settings, not from a chat snippet |
+| `token format invalid` | Doesn't start with `st_` (public) or `sk_` (admin) | Copy from project settings, not from a chat snippet |
 | `token revoked` | Was rotated/deleted | Rotate yours to the new value |
 | `token mismatch` | Valid prefix but unknown to server | Wrong project? Cross-check `SENTORI_TOKEN` vs project id |
-| `admin token required` | You used `st_pk_` on an admin endpoint | Switch to the `sk_` token |
+| `admin token required` | You used `st_` on an admin endpoint | Switch to the `sk_` token |
 
 ## 5. Webhook signature doesn't validate
 
@@ -257,7 +257,7 @@ config:
 const PROVIDER = (
   <SentoriProvider
     config={{
-      token: 'st_pk_testtesttesttesttesttesttest',
+      token: 'st_testtesttesttesttesttesttest',
       release: 'test@0.0.0',
       environment: 'test',
       ingestUrl: 'http://127.0.0.1:0',

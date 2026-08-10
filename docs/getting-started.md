@@ -17,7 +17,7 @@ quickstart for each supported stack — pick yours:
 
 All four assume you already have:
 
-- a **token** (`st_pk_...`)
+- a **token** (`st_...`)
 - an **ingest URL**
 
 Both come from an instance you run: mint the token on the project's
