@@ -376,10 +376,20 @@ CRED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/crede
 echo "→ register a device the way the SDK does"
 IPT="$(curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
     -H 'content-type: application/json' \
-    -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-native-token-0001"}' \
+    -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-native-token-0001",
+         "userKey":"a91f3c02deadbeefa91f3c02deadbeef"}' \
     | jq -r '.token_id')"
 [[ -n "$IPT" && "$IPT" != "null" ]] || { echo "device registration returned no token id" >&2; exit 1; }
 LIVE="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/health" | jq -r '.liveTokens')"
 [[ "$LIVE" == "1" ]] || { echo "health says ${LIVE} live devices after one registration" >&2; exit 1; }
+
+echo "→ the device carries the same identity the events do"
+# The join S3 is built on: a device addressable by the user key an
+# event already carried. If these two columns ever stop matching in
+# type or value, "notify the people who hit this issue" quietly
+# reaches nobody.
+LINKED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/health" | jq -r '.identifiedTokens')"
+[[ "$LINKED" == "1" ]] \
+    || { echo "the registered device is not addressable by user key: ${LINKED}" >&2; exit 1; }
 
 echo "✓ e2e smoke passed — project ${PROJECT_ID}, issue ${ISSUE_ID}"

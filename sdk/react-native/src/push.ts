@@ -23,6 +23,8 @@
 
 import { logger, pushSignal } from '@goliapkg/sentori-core'
 
+import { currentUserKey } from './scope.js'
+
 // AppState is RN-only; we treat it dynamically so the SDK keeps
 // importing cleanly under Bun / web.
 type AppStateModule = {
@@ -225,11 +227,15 @@ async function registerWithServer(
     : typeof __DEV__ !== 'undefined' && __DEV__
       ? 'sandbox'
       : 'production'
+  // `kind`, not `provider` — the server's field name, which this
+  // sent for a year as `provider` and got a 422 for every time.
   const body: Record<string, unknown> = {
-    provider: isAndroid ? 'fcm' : 'apns',
+    kind: isAndroid ? 'fcm' : 'apns',
     nativeToken,
-    linkHash: opts.linkHash,
-    metadata: opts.metadata ?? {},
+    // The same salted identity hash every event carries, so the
+    // dashboard can address this device by the user who hit an
+    // issue. Absent until the host calls `sentori.user()`.
+    userKey: currentUserKey(),
   }
   if (env != null) body.env = env
   const res = await fetch(joinUrl(cfg.ingestUrl, '/v1/push/tokens'), {
@@ -241,11 +247,14 @@ async function registerWithServer(
     body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error(`/v1/push/tokens HTTP ${res.status}`)
-  const json = (await res.json()) as { id?: string }
-  if (typeof json.id !== 'string' || !json.id.startsWith('ipt_')) {
-    throw new Error('server did not return an ipt_* handle')
+  // The handle is the device_tokens row id — a uuid, which is what
+  // the revoke and send routes take. It was parsed here as an
+  // `ipt_*` string that no server has ever returned.
+  const json = (await res.json()) as { token_id?: string }
+  if (typeof json.token_id !== 'string' || json.token_id.length === 0) {
+    throw new Error('server did not return a device token id')
   }
-  return json.id
+  return json.token_id
 }
 
 function bindBufferDrain(

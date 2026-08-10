@@ -165,7 +165,7 @@ export const ja: Messages = {
   'push.sendsEmpty': '送信はまだありません',
   'push.sendsTitle': '最近の送信',
   'push.sent24h': '24時間の送信',
-  'push.tokens': 'デバイス {live} 台 · 隔離 {quarantined} 台',
+  'push.tokens': 'デバイス {live} 台 · 宛先指定可 {identified} 台 · 隔離 {quarantined} 台',
   'releases.artifactMissing':
     '{platform} はこのリリースでイベントを送っていますが、シンボリケーション用アーティファクトがありません — スタックを読めません',
   'releases.artifactUnused':

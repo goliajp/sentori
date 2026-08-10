@@ -217,6 +217,9 @@ export type PushHealth = {
   lastSendAt: null | string;
   liveTokens: number;
   quarantinedTokens: number;
+  /** Devices carrying a user key — the ones an issue can address.
+   *  The rest can only be broadcast to. */
+  identifiedTokens: number;
   /** Why the failures failed. "12 failed" is an alarm; "12 failed,
    *  BadDeviceToken" is a fix. */
   reasons: { reason: string; count: number }[];

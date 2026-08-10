@@ -213,10 +213,15 @@ pub async fn health(
     .await
     .map_err(|e| internal(&e))?;
 
+    // `device_tokens` is the canonical store — send, subscribe and
+    // preferences all query it, and it is the one carrying the
+    // identity an issue can address.
     let tokens = sqlx::query(
-        "SELECT count(*) FILTER (WHERE quarantined_at IS NULL) AS live, \
-                count(*) FILTER (WHERE quarantined_at IS NOT NULL) AS quarantined \
-         FROM push_tokens WHERE project_id = $1",
+        "SELECT count(*) FILTER (WHERE revoked_at IS NULL) AS live, \
+                count(*) FILTER (WHERE revoked_at IS NOT NULL) AS quarantined, \
+                count(*) FILTER (WHERE revoked_at IS NULL AND user_key IS NOT NULL) \
+                  AS identified \
+         FROM device_tokens WHERE project_id = $1",
     )
     .bind(project_id)
     .fetch_one(&state.pool)
@@ -232,6 +237,9 @@ pub async fn health(
         ),
         "liveTokens": tokens.get::<i64, _>("live"),
         "quarantinedTokens": tokens.get::<i64, _>("quarantined"),
+        // Devices a specific user's issue can reach. The rest can
+        // only be broadcast to.
+        "identifiedTokens": tokens.get::<i64, _>("identified"),
         "reasons": reasons.iter().map(|r| json!({
             "reason": r.get::<String, _>("reason"),
             "count": r.get::<i64, _>("n"),

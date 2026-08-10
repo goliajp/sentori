@@ -714,6 +714,7 @@ const SUFFIX = [
       queued: 2,
       lastSendAt: iso(600_000),
       liveTokens: 388,
+      identifiedTokens: 351,
       quarantinedTokens: 4,
       reasons: [
         { reason: 'BadDeviceToken', count: 5 },

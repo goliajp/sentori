@@ -25,9 +25,14 @@ pub struct RegisterBody {
     /// Optional environment hint (`production` / `sandbox` for APNs).
     #[serde(default)]
     pub env: Option<String>,
-    /// App-side user identifier for targeted dispatch.
+    /// The device's user, as the salted hash every event already
+    /// carries (`events.user_key`). One identity, so "notify the
+    /// people who hit this issue" is a join rather than a guess.
+    /// Absent when the app registers before calling
+    /// `sentori.user()` — such a device still receives broadcasts,
+    /// it just is not addressable by issue.
     #[serde(default)]
-    pub app_user_id: Option<String>,
+    pub user_key: Option<String>,
 }
 
 pub async fn handle(
@@ -53,10 +58,11 @@ pub async fn handle(
         // the product had zero push tokens for a reason that was
         // never "nobody turned it on".
         "INSERT INTO device_tokens \
-         (id, project_id, provider, env, native_token) \
-         VALUES ($1, $2, $3, $4, $5) \
+         (id, project_id, provider, env, native_token, user_key) \
+         VALUES ($1, $2, $3, $4, $5, $6) \
          ON CONFLICT (project_id, provider, native_token) DO UPDATE SET \
             env = COALESCE(EXCLUDED.env, device_tokens.env), \
+            user_key = COALESCE(EXCLUDED.user_key, device_tokens.user_key), \
             revoked_at = NULL, \
             last_seen_at = now(), \
             updated_at = now() \
@@ -67,6 +73,7 @@ pub async fn handle(
     .bind(&body.kind)
     .bind(body.env.as_deref())
     .bind(&body.native_token)
+    .bind(body.user_key.as_deref())
     .fetch_one(&state.pool)
     .await;
 
@@ -79,7 +86,10 @@ pub async fn handle(
             kind,
             &body.native_token,
             body.env.as_deref(),
-            body.app_user_id.as_deref(),
+            // The legacy store's `app_user_id` gets the same value:
+            // two tables, one identity, rather than a second concept
+            // to keep in sync.
+            body.user_key.as_deref(),
         )
         .await;
 

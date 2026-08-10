@@ -631,6 +631,7 @@ function PushTab() {
               <span className="ml-auto text-fg-subtle">
                 {t('push.tokens', {
                   live: String(h.liveTokens),
+                  identified: String(h.identifiedTokens),
                   quarantined: String(h.quarantinedTokens),
                 })}
               </span>

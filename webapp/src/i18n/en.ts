@@ -171,7 +171,7 @@ export const en = {
   'push.sendsEmpty': 'No sends yet',
   'push.sendsTitle': 'Recent sends',
   'push.sent24h': 'sent 24h',
-  'push.tokens': '{live} devices · {quarantined} quarantined',
+  'push.tokens': '{live} devices · {identified} addressable · {quarantined} quarantined',
   'releases.artifactMissing':
     '{platform} reports events in this release but has no symbolication artifact — its stacks cannot be read',
   'releases.artifactUnused':

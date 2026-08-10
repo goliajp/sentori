@@ -159,7 +159,7 @@ export const zh: Messages = {
   'push.sendsEmpty': '还没有发送',
   'push.sendsTitle': '最近发送',
   'push.sent24h': '24 小时送达',
-  'push.tokens': '{live} 台设备 · {quarantined} 台已隔离',
+  'push.tokens': '{live} 台设备 · {identified} 台可定向 · {quarantined} 台已隔离',
   'releases.artifactMissing':
     '{platform} 在此版本有事件,但缺符号化物料 —— 该平台的调用栈无法还原',
   'releases.artifactUnused': '{platform} 在此版本没有事件,缺物料不影响',
