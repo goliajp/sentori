@@ -282,4 +282,40 @@ KINDS="$(curl -fsS -H "Authorization: Bearer ${API_TOKEN}" \
     || { echo "sourcemap count is ${KINDS}, want 1 — the unreadable one must not count" >&2; exit 1; }
 rm -rf "$MAPDIR"
 
+# ── the /api surface an agent drives ─────────────────────────────
+#
+# `sentori-cli issue list|bundle|note|resolve` and the MCP server all
+# run on an api-scope token against these four routes. Nothing else
+# exercises them, and "the agent surface" is a claim worth being able
+# to check.
+echo "→ /api/issues"
+API_LIST="$(curl -fsS -H "Authorization: Bearer ${API_TOKEN}" "${BASE}/api/issues")"
+[[ "$(echo "$API_LIST" | jq -r '.issues | length')" -ge 1 ]] \
+    || { echo "/api/issues returned nothing: $API_LIST" >&2; exit 1; }
+
+echo "→ the ingest token must not reach it"
+ING_STATUS="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${TOKEN}" \
+    "${BASE}/api/issues")"
+[[ "$ING_STATUS" == "403" ]] \
+    || { echo "an app-embedded ingest token read the triage API: ${ING_STATUS}" >&2; exit 1; }
+
+echo "→ issue bundle (markdown + json)"
+BUNDLE_MD="$(curl -fsS -H "Authorization: Bearer ${API_TOKEN}" \
+    "${BASE}/api/issues/${ISSUE_ID}/bundle")"
+[[ "$BUNDLE_MD" == *"x is undefined"* ]] \
+    || { echo "the bundle does not carry the error message" >&2; exit 1; }
+BUNDLE_JSON="$(curl -fsS -H "Authorization: Bearer ${API_TOKEN}" \
+    "${BASE}/api/issues/${ISSUE_ID}/bundle?format=json")"
+echo "$BUNDLE_JSON" | jq -e '.issue' >/dev/null \
+    || { echo "json bundle has no issue object: $(echo "$BUNDLE_JSON" | head -c 200)" >&2; exit 1; }
+
+echo "→ note + resolve over the api token"
+curl -fsS -X POST -H "Authorization: Bearer ${API_TOKEN}" -H 'content-type: application/json' \
+    -d '{"body":"handled by the e2e"}' "${BASE}/api/issues/${ISSUE_ID}/notes" >/dev/null
+curl -fsS -X POST -H "Authorization: Bearer ${API_TOKEN}" -H 'content-type: application/json' \
+    -d '{"release":"e2e@1.0.0+1"}' "${BASE}/api/issues/${ISSUE_ID}/resolve" >/dev/null
+API_STATUS="$(curl -fsS -b "$JAR" "${BASE}/admin/api/issues/${ISSUE_ID}" | jq -r '.status')"
+[[ "$API_STATUS" == "resolved" ]] \
+    || { echo "resolve over the api token left the issue ${API_STATUS}" >&2; exit 1; }
+
 echo "✓ e2e smoke passed — project ${PROJECT_ID}, issue ${ISSUE_ID}"
