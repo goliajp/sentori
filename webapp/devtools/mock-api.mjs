@@ -328,9 +328,27 @@ const eventDetail = {
       orientation: 'portrait',
     },
     context: { tenant: 'acme', plan: 'pro', experiment: 'pay-v2' },
+    // The SDK sets this when pixel replay was running and the ring
+    // still came up empty. It cannot render on THIS event — a
+    // `screens` attachment is present, so the pixel player wins —
+    // and the rich fixture is worth more here than the empty branch.
+    // Verified by removing the attachment locally; see
+    // `issue.replayScreensEmpty`.
+    replay: { screens: 'empty', captured: 0 },
+    // Pixel replay was running and produced nothing — an older
+    // native binary. The page must say that rather than tell the
+    // reader to enable a setting that is already on.
+    replay: { screens: 'empty', captured: 0 },
     app: { version: '1.2.3', build: '456' },
   },
   attachments: [
+    {
+      ref: 'wireframe-demo',
+      kind: 'replay',
+      mediaType: 'application/x-ndjson',
+      sizeBytes: 12_288,
+      capturedAt: iso(t0),
+    },
     {
       ref: 'replay-demo',
       kind: 'screens',
