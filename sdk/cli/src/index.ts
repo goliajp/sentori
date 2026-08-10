@@ -579,6 +579,20 @@ async function cmdMcpServe(argv: string[]): Promise<number> {
 
 // ── the release gate ──────────────────────────────────────────────
 
+/** What to upload instead, per kind. The server sends the same
+ *  guidance in the upload response; a check run days later has only
+ *  the listing, so the advice lives on both sides. */
+const UNREADABLE_HINT: Record<string, string> = {
+  dsym:
+    'Upload the binary inside the .dSYM bundle ' +
+    '(Contents/Resources/DWARF/<name>), or point `sentori-cli upload dsym` ' +
+    'at the .dSYM and let it find the slices.',
+  proguard: 'Upload build/outputs/mapping/<variant>/mapping.txt.',
+  sourcemap:
+    'For React Native upload the composed map — ' +
+    '`sentori-cli react-native upload --metro-map <m> --hermes-map <h>` — not the bundle.',
+}
+
 async function cmdArtifactsCheck(argv: string[]): Promise<number> {
   let parsed
   try {
@@ -617,13 +631,13 @@ async function cmdArtifactsCheck(argv: string[]): Promise<number> {
     console.error(
       `unreadable ${a.kind}: ${a.name}\n` +
         `  Stored, but the server cannot parse it, so it symbolicates nothing.\n` +
-        `  For React Native, upload the composed map:\n` +
-        `    sentori-cli react-native upload --release "${cfg.release}" \\\n` +
-        `      --metro-map <metro.map> --hermes-map <hermes.map>`,
+        `  ${UNREADABLE_HINT[a.kind] ?? 'Check that this is the file the kind expects.'}`,
     )
   }
   for (const [kind, n] of Object.entries(res.kinds)) {
-    const slices = res.artifacts.filter((a) => a.kind === kind)
+    // Only the ones counted: printing a debug id beside a count of
+    // zero reads as "no slices, here is a slice".
+    const slices = res.artifacts.filter((a) => a.kind === kind && a.usable !== false)
     const ids = slices
       .map((a) => a.debugId)
       .filter((d): d is string => d !== null)
