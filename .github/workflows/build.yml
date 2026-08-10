@@ -187,6 +187,22 @@ jobs:
           path: /tmp/sweep
           retention-days: 7
 
+  # The shipped stack, from `docker compose up` to an event read back.
+  # Slower than the unit gates and worth it: it is the only thing that
+  # exercises the real image, the real compose file and the real
+  # migrations together, and every failure it asserts is one that has
+  # actually happened — a generated owner password filtered out of the
+  # log by a quieter RUST_LOG, an event resend answered with a 500 that
+  # our own contract tells the SDK to retry.
+  e2e:
+    needs: changes
+    if: needs.changes.outputs.server == 'true' || needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: smoke
+        run: bash self-hosted/tests/e2e/smoke.sh
+
   sdk:
     needs: changes
     if: needs.changes.outputs.sdk == 'true' || needs.changes.outputs.infra == 'true'
