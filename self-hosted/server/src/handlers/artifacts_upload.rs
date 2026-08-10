@@ -375,7 +375,7 @@ async fn store(
             "hint": usable.map_or(Value::Null, |ok| if ok {
                 Value::Null
             } else {
-                Value::from(UNUSABLE_HINT)
+                Value::from(unusable_hint(&kind))
             }),
         })),
     ))
@@ -383,18 +383,68 @@ async fn store(
 
 /// What to tell someone whose upload stored fine and will never
 /// symbolicate anything.
-const UNUSABLE_HINT: &str = "stored, but this file is not a source map this server can read \
-— for a React Native build, upload the composed map \
-(`sentori-cli react-native upload --metro-map <m> --hermes-map <h>`), not the bundle";
+/// Mach-O, or a fat/universal archive of them. Little- and
+/// big-endian, 32- and 64-bit — a dSYM slice is one of these six and
+/// nothing else is.
+fn looks_like_macho(bytes: &[u8]) -> bool {
+    // MH_MAGIC / MH_CIGAM / MH_MAGIC_64 / MH_CIGAM_64, then
+    // FAT_MAGIC / FAT_CIGAM.
+    const MAGICS: [[u8; 4]; 6] = [
+        [0xfe, 0xed, 0xfa, 0xce],
+        [0xce, 0xfa, 0xed, 0xfe],
+        [0xfe, 0xed, 0xfa, 0xcf],
+        [0xcf, 0xfa, 0xed, 0xfe],
+        [0xca, 0xfe, 0xba, 0xbe],
+        [0xbe, 0xba, 0xfe, 0xca],
+    ];
+    let Some(magic) = bytes.get(..4) else {
+        return false;
+    };
+    MAGICS.iter().any(|m| m == magic)
+}
 
-/// `Some(true|false)` for kinds parsed ahead of time, `None` for the
-/// rest. dSYM and proguard are matched by name and read lazily per
-/// frame, so there is nothing cheap and honest to assert about them
-/// here — claiming `true` for "we did not look" would be worse than
-/// saying nothing.
+fn unusable_hint(kind: &str) -> &'static str {
+    match kind {
+        "sourcemap" => {
+            "stored, but this is not a source map this server can read — for a React Native \
+             build upload the composed map (`sentori-cli react-native upload --metro-map <m> \
+             --hermes-map <h>`), not the bundle"
+        }
+        "proguard" => {
+            "stored, but this is not an R8/proguard mapping — upload \
+             build/outputs/mapping/<variant>/mapping.txt"
+        }
+        "dsym" => {
+            "stored, but this has no DWARF a symbolicator can read — upload the binary inside \
+             the .dSYM bundle (Contents/Resources/DWARF/<name>), or let `sentori-cli upload \
+             dsym <path.dSYM>` find the slices for you"
+        }
+        _ => "stored, but this server cannot read it",
+    }
+}
+
+/// `Some(true|false)` for the three kinds a symbolicator reads,
+/// `None` for the rest.
+///
+/// Each is answered with the same parser that will be asked for real
+/// later — the point is to fail here, once, in front of whoever
+/// uploaded it, rather than months later in a log nobody reads.
+/// `srcbundle` is a plain JSON blob the reader tolerates loosely, so
+/// there is nothing sharp to assert and it stays `None`; claiming
+/// `true` for "we did not look" is worse than saying nothing.
 fn usable_for_symbolication(kind: &str, bytes: &[u8]) -> Option<bool> {
     match kind {
         "sourcemap" => Some(sentori_sourcemap_resolver::ParsedMap::parse(bytes).is_ok()),
+        "proguard" => Some(sentori_proguard_resolver::ParsedMapping::parse(bytes.to_vec()).is_ok()),
+        // Header only. insight's main slice is 310 MB, and a full
+        // DWARF parse here would hold the upload's buffer plus a copy
+        // plus the parse — on a small self-hosted box that is how an
+        // artifact upload becomes an OOM. The magic catches the
+        // failure that actually happens (a zip, a plist, the .dSYM
+        // directory wrapper, a text file) at no cost; a Mach-O whose
+        // DWARF turns out to be unusable still surfaces later as an
+        // unresolved frame, which is where it always did.
+        "dsym" => Some(looks_like_macho(bytes)),
         _ => None,
     }
 }
@@ -472,6 +522,29 @@ fn maybe_gunzip(data: &[u8]) -> Result<Vec<u8>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_a_mach_o_passes_as_a_dsym() {
+        // The six magics a dSYM slice can start with.
+        for m in [
+            [0xfe, 0xed, 0xfa, 0xce],
+            [0xce, 0xfa, 0xed, 0xfe],
+            [0xfe, 0xed, 0xfa, 0xcf],
+            [0xcf, 0xfa, 0xed, 0xfe],
+            [0xca, 0xfe, 0xba, 0xbe],
+            [0xbe, 0xba, 0xfe, 0xca],
+        ] {
+            assert!(looks_like_macho(&m), "{m:?} is a Mach-O magic");
+        }
+        // What people actually upload by mistake.
+        assert!(!looks_like_macho(b"PK\x03\x04zip"), "a zip is not a dSYM");
+        assert!(!looks_like_macho(b"<?xml version"), "a plist is not a dSYM");
+        assert!(!looks_like_macho(b""), "nothing is not a dSYM");
+        assert!(
+            !looks_like_macho(b"\xfe\xed"),
+            "a truncated magic is not one"
+        );
+    }
 
     #[test]
     fn a_dsym_slice_name_yields_the_id_the_symbolicator_matches_on() {

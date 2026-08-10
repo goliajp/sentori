@@ -33,6 +33,12 @@ const ROUTES = [
   'login', 'forgot-password',
 ];
 
+/** Per-route script run after load, for state behind a click. */
+const OPEN_ALL = {
+  releases:
+    "[...document.querySelectorAll('button[aria-expanded=\"false\"]')].forEach(b => b.click())",
+};
+
 const out = process.argv[2] || 'tmp/sweep';
 const lang = process.argv[3] || 'zh-CN';
 const theme = process.argv[4] || 'dark';
@@ -103,6 +109,14 @@ for (const r of ROUTES) {
   logs.length = 0;
   await cmd('Page.navigate', { url: `${BASE}/${r}` });
   await new Promise(res => setTimeout(res, 3200));
+  // Some of the page only exists after a click. A sweep that only
+  // ever photographs the landing state cannot see an accordion's
+  // contents, and the artifact list — where an unreadable upload is
+  // named — lives inside one.
+  if (OPEN_ALL[r]) {
+    await cmd('Runtime.evaluate', { expression: OPEN_ALL[r] });
+    await new Promise(res => setTimeout(res, 700));
+  }
   const name = (r || 'triage').replace(I, 'I').replace(/[^\w.-]+/g, '-');
   const shot = await cmd('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
   if (shot?.data) writeFileSync(`${out}/${name}.png`, Buffer.from(shot.data, 'base64'));
