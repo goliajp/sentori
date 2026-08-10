@@ -432,7 +432,7 @@ fn unusable_hint(kind: &str) -> &'static str {
 /// `srcbundle` is a plain JSON blob the reader tolerates loosely, so
 /// there is nothing sharp to assert and it stays `None`; claiming
 /// `true` for "we did not look" is worse than saying nothing.
-fn usable_for_symbolication(kind: &str, bytes: &[u8]) -> Option<bool> {
+pub fn usable_for_symbolication(kind: &str, bytes: &[u8]) -> Option<bool> {
     match kind {
         "sourcemap" => Some(sentori_sourcemap_resolver::ParsedMap::parse(bytes).is_ok()),
         "proguard" => Some(sentori_proguard_resolver::ParsedMapping::parse(bytes.to_vec()).is_ok()),
