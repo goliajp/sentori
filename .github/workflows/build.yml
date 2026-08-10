@@ -118,6 +118,13 @@ jobs:
       - name: SDK reference matches InitConfig
         run: node scripts/check-sdk-doc-options.mjs
 
+      # EventKind ↔ enum Kind, AttachmentKind ↔ KINDS. Maintained by
+      # hand across a language boundary with nothing compiling them
+      # together; a mismatch surfaces as an event rejected at ingest,
+      # on a device, into a log.
+      - name: wire unions agree across the SDK/server boundary
+        run: node scripts/check-wire-contracts.mjs
+
       - name: check cargo features (v2.20 P2 — anti-feature-drift)
         run: bash scripts/check-cargo-features.sh
   webapp:
