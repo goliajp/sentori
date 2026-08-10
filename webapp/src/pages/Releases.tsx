@@ -77,7 +77,13 @@ function ReleaseRowView({
     [release.id],
   );
   const artifacts = data?.artifacts ?? [];
-  const kinds = new Set(artifacts.map((a) => a.kind));
+  // An artifact the server could not parse is not coverage. Counting
+  // it lit is how a Hermes bytecode bundle passed as a source map on
+  // two releases for months with a green light above it.
+  const kinds = new Set(
+    artifacts.filter((a) => a.usable !== false).map((a) => a.kind),
+  );
+  const unreadable = artifacts.filter((a) => a.usable === false);
   const used = new Set(release.platforms ?? []);
   const created = release.createdAt ?? release.created_at;
 
@@ -134,9 +140,19 @@ function ReleaseRowView({
             </div>
           ) : (
             <div className="space-y-1">
+              {unreadable.length > 0 && (
+                <p className="mb-1.5 text-xs text-kind-error">
+                  {t('releases.unreadable', {
+                    names: unreadable.map((a) => a.name).join(', '),
+                  })}
+                </p>
+              )}
               {artifacts.map((a) => (
                 <div key={a.id} className="flex gap-3 font-mono text-xs">
-                  <span className="w-20 text-fg-subtle">{a.kind}</span>
+                  <span className="w-20 text-fg-subtle">
+                    {a.kind}
+                    {a.usable === false && ' ✕'}
+                  </span>
                   <span className="min-w-0 flex-1 truncate text-fg-muted">{a.name}</span>
                   {a.size_bytes !== undefined && (
                     <span className="text-fg-subtle">

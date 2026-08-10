@@ -146,7 +146,7 @@ pub async fn list_by_release_name(
     super::sdk::require_admin_token(&ctx)?;
 
     let rows = sqlx::query(
-        "SELECT a.kind, a.name, a.content_hash, a.size_bytes, a.created_at \
+        "SELECT a.kind, a.name, a.content_hash, a.size_bytes, a.created_at, a.usable \
          FROM release_artifacts a \
          JOIN releases r ON r.id = a.release_id \
          WHERE r.project_id = $1 AND r.name = $2 \
@@ -187,7 +187,13 @@ pub async fn list_by_release_name(
         .map(|r| {
             let kind: String = r.get("kind");
             let name: String = r.get("name");
-            if let Some(n) = counts.get_mut(&kind) {
+            let usable: Option<bool> = r.get("usable");
+            // An artifact the reader cannot parse does not count
+            // towards its kind. Counting it green is how a release
+            // shows three lit lights and symbolicates nothing.
+            if usable != Some(false)
+                && let Some(n) = counts.get_mut(&kind)
+            {
                 *n = json!(n.as_u64().unwrap_or(0) + 1);
             }
             json!({
@@ -200,6 +206,10 @@ pub async fn list_by_release_name(
                 "debugId": debug_id_from_name(&name),
                 "contentHash": r.get::<String, _>("content_hash"),
                 "sizeBytes": r.get::<i64, _>("size_bytes"),
+                // null on artifacts uploaded before the check
+                // existed — "never looked at" is not the same claim
+                // as "looked at and fine".
+                "usable": usable,
                 "createdAt": crate::wire_time::rfc3339(r.get("created_at")),
             })
         })
@@ -269,6 +279,18 @@ async fn store(
         )
     })?;
 
+    // Can the symbolicator actually read this? Decided here, once,
+    // because the answer costs a parse of tens of megabytes and the
+    // alternative is deriving it on every list request — or, as it
+    // was, never.
+    //
+    // A wrong artifact is stored anyway. Refusing it would break the
+    // rule that Sentori cannot fail a release, and a file the reader
+    // did not expect is not necessarily worthless. But it stops being
+    // silent: the response says so, the listing says so, and
+    // `sentori-cli artifacts check` fails on it.
+    let usable = usable_for_symbolication(&kind, bytes);
+
     // The table's unique key is (release_id, kind, name), so a
     // re-upload after a failed ship replaces rather than accumulating
     // near-duplicates a symbolicator would have to choose between.
@@ -285,11 +307,12 @@ async fn store(
            WHERE release_id = $1 AND kind = $2 AND name = $3 \
          ), up AS ( \
            INSERT INTO release_artifacts \
-             (id, release_id, kind, name, content_hash, size_bytes) \
-           VALUES (gen_random_uuid(), $1, $2, $3, $4, $5) \
+             (id, release_id, kind, name, content_hash, size_bytes, usable) \
+           VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6) \
            ON CONFLICT (release_id, kind, name) DO UPDATE \
              SET content_hash = EXCLUDED.content_hash, \
                  size_bytes = EXCLUDED.size_bytes, \
+                 usable = EXCLUDED.usable, \
                  created_at = now() \
            RETURNING id \
          ) \
@@ -301,6 +324,7 @@ async fn store(
     .bind(&name)
     .bind(hash.to_hex())
     .bind(i64::try_from(bytes.len()).unwrap_or(i64::MAX))
+    .bind(usable)
     .fetch_one(&state.pool)
     .await
     .map_err(|e| {
@@ -345,8 +369,34 @@ async fn store(
             "debug_id": debug_id_from_name(&name),
             "first_seen": prev_hash.is_none(),
             "content_changed": prev_hash.as_deref() != Some(hash_hex.as_str()),
+            // null for kinds this server does not parse ahead of
+            // time; false means stored but unreadable.
+            "usable": usable,
+            "hint": usable.map_or(Value::Null, |ok| if ok {
+                Value::Null
+            } else {
+                Value::from(UNUSABLE_HINT)
+            }),
         })),
     ))
+}
+
+/// What to tell someone whose upload stored fine and will never
+/// symbolicate anything.
+const UNUSABLE_HINT: &str = "stored, but this file is not a source map this server can read \
+— for a React Native build, upload the composed map \
+(`sentori-cli react-native upload --metro-map <m> --hermes-map <h>`), not the bundle";
+
+/// `Some(true|false)` for kinds parsed ahead of time, `None` for the
+/// rest. dSYM and proguard are matched by name and read lazily per
+/// frame, so there is nothing cheap and honest to assert about them
+/// here — claiming `true` for "we did not look" would be worse than
+/// saying nothing.
+fn usable_for_symbolication(kind: &str, bytes: &[u8]) -> Option<bool> {
+    match kind {
+        "sourcemap" => Some(sentori_sourcemap_resolver::ParsedMap::parse(bytes).is_ok()),
+        _ => None,
+    }
 }
 
 async fn read_upload(mut multipart: Multipart) -> Result<(String, String, Vec<u8>), String> {

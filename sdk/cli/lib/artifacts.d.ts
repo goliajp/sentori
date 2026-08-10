@@ -6,6 +6,10 @@ export type ArtifactRow = {
     contentHash: string;
     sizeBytes: number;
     createdAt: string;
+    /** Did the server parse it? `null` on artifacts uploaded before
+     *  the check existed — "never looked at", not "looked at and
+     *  fine". `false` means it stored and will symbolicate nothing. */
+    usable?: boolean | null;
 };
 export type ArtifactsResponse = {
     release: string;

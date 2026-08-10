@@ -154,6 +154,8 @@ export const en = {
     'Releases appear when the SDK reports one or the CLI uploads artifacts.',
   'releases.emptyTitle': 'No releases yet',
   'releases.loadFailed': 'Could not load releases.',
+  'releases.unreadable':
+    'Stored but unreadable, so it symbolicates nothing: {names}. For React Native upload the composed map, not the bundle.',
   'replay.empty': 'No frames in this replay.',
   'replay.frameAlt': 'Replay frame at {t}s',
   'replay.loadFailed': 'Could not load the replay.',
