@@ -1,6 +1,6 @@
 {
   "name": "@goliapkg/sentori-react-native",
-  "version": "5.7.0",
+  "version": "5.7.1",
   "description": "Sentori SDK for React Native \u2014 JS-layer error capture, native crash handlers (iOS / Android), batched transport, fetch + react-navigation tracing.",
   "license": "Apache-2.0 OR MIT",
   "author": "GOLIA K.K. <takagi@golia.jp> (https://golia.jp)",
@@ -27,18 +27,6 @@
     ".": {
       "types": "./lib/index.d.ts",
       "default": "./lib/index.js"
-    },
-    "./compat": {
-      "types": "./lib/compat/sentry.d.ts",
-      "default": "./lib/compat/sentry.js"
-    },
-    "./expo-compat": {
-      "types": "./lib/expo-compat.d.ts",
-      "default": "./lib/expo-compat.js"
-    },
-    "./feedback": {
-      "types": "./lib/feedback.d.ts",
-      "default": "./lib/feedback.js"
     },
     "./package.json": "./package.json"
   },

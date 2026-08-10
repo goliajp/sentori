@@ -255,6 +255,13 @@ jobs:
       # run it — which is not enforcement. Once per matrix is redundant
       # and costs a second; a size budget nobody's machine has to
       # remember is worth the second.
+      # An export map is a promise about what an import resolves to.
+      # 5.7.0 advertised `./compat`, `./expo-compat` and `./feedback`
+      # with no such files in the tarball — a package that installs
+      # cleanly and fails at import.
+      - name: every advertised entry point exists
+        run: node scripts/check-package-entrypoints.mjs
+
       - name: SDK size budget
         run: bash scripts/check-sdk-size.sh
 
