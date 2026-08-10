@@ -53,6 +53,7 @@ mod session_mw;
 mod state;
 mod symbolicate;
 mod token_cache;
+mod verify_artifacts;
 mod webpush;
 mod webpush_encrypt;
 mod wire_time;
@@ -95,6 +96,16 @@ async fn main() -> anyhow::Result<()> {
         return resymbolicate::run(&db_url, args.get(2).map(String::as_str))
             .await
             .map_err(|e| anyhow::anyhow!("resymbolicate: {e}"));
+    }
+
+    // `sentori-server verify-artifacts [--all]` — read the artifacts
+    // stored before the upload-time check existed and record what
+    // they are.
+    if args.get(1).map(String::as_str) == Some("verify-artifacts") {
+        let all = args.iter().any(|a| a == "--all");
+        return verify_artifacts::run(&db_url, all)
+            .await
+            .map_err(|e| anyhow::anyhow!("verify-artifacts: {e}"));
     }
 
     let bind = std::env::var("SENTORI_BIND").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
