@@ -18,7 +18,21 @@ android {
     sourceSets {
         main {
             manifest.srcFile 'src/main/AndroidManifest.xml'
-            java.srcDirs = ['src/main/java']
+            // `java` holds the bridge — `SentoriModule.kt`, the one
+            // file here that knows Expo exists. `java-core` is a
+            // generated mirror of `sdk/native/android`, written by
+            // `scripts/sync-native-core.mjs` and gated byte-for-byte.
+            // Two roots rather than one directory because the sync
+            // deletes its target before writing, and the bridge must
+            // not live somewhere that gets wiped.
+            java.srcDirs = ['src/main/java', 'src/main/java-core']
+        }
+        test {
+            // The Robolectric suites cover the core, so they moved
+            // with it. Mirrored back so `android-unit` keeps running
+            // them — dropping them here would have left the job green
+            // while testing strictly less.
+            java.srcDirs = ['src/test/java', 'src/test/java-core']
         }
     }
 

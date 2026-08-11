@@ -35,6 +35,27 @@ const MIRRORS = [
     to: 'sdk/react-native/ios/core',
     ext: '.swift',
   },
+  // Android mirrors into its own source root rather than beside
+  // `SentoriModule.kt`: the sync owns its target directory outright
+  // (it deletes before writing, so a file removed upstream cannot
+  // survive), and the bridge must not live somewhere that gets wiped.
+  // Kotlin package names are declared in the file, not derived from
+  // the path, so `com.sentori` still resolves from a second root.
+  {
+    from: 'sdk/native/android/src/main/java/com/sentori',
+    to: 'sdk/react-native/android/src/main/java-core/com/sentori',
+    ext: '.kt',
+  },
+  // The tests move with the code they cover. Without this the two
+  // Robolectric suites would leave the RN module's test source set and
+  // `android-unit` would go on passing while running strictly less —
+  // which is how they spent their first two years, unable to compile
+  // and unnoticed.
+  {
+    from: 'sdk/native/android/src/test/java/com/sentori',
+    to: 'sdk/react-native/android/src/test/java-core/com/sentori',
+    ext: '.kt',
+  },
 ];
 
 const BANNER = (rel) =>

@@ -23,34 +23,70 @@ final class SentoriThreadSamplerTests: XCTestCase {
         SentoriThreadSampler.installMainThreadHandle()
     }
 
-    /// Background → sampler → main: should collect a non-trivial frame
-    /// chain on arm64 simulators.
-    func testCaptureFromBackgroundReturnsAtLeastFiveFrames() {
-        let exp = expectation(description: "background sample")
-        DispatchQueue.global(qos: .userInitiated).async {
-            let frames = SentoriThreadSampler.captureMainThreadFrames(maxFrames: 64)
-            #if arch(arm64)
-                XCTAssertGreaterThanOrEqual(
-                    frames.count, 5,
-                    "expected ≥ 5 main-thread frames on arm64; got \(frames.count)"
-                )
-                if !frames.isEmpty {
-                    XCTAssertGreaterThan(
-                        frames[0].uint64Value, 0,
-                        "first PC must be non-zero"
-                    )
-                }
-                XCTAssertLessThanOrEqual(
-                    frames.count, 64,
-                    "must respect maxFrames cap"
-                )
-            #else
-                // Intel simulator: sampler returns empty by design.
-                XCTAssertEqual(frames.count, 0)
-            #endif
-            exp.fulfill()
+    /// Recurse to a known depth and run `leaf` at the bottom, so the
+    /// main thread has a stack this test controls rather than whatever
+    /// the runner happened to be doing.
+    ///
+    /// `@inline(never)` and the `withExtendedLifetime` keep the frames
+    /// from being folded away; test targets build `-Onone`, so this is
+    /// belt and braces.
+    @inline(never)
+    private func recurse(_ depth: Int, _ leaf: () -> Void) {
+        if depth == 0 {
+            leaf()
+            return
         }
-        wait(for: [exp], timeout: 5.0)
+        recurse(depth - 1, leaf)
+        withExtendedLifetime(depth) {}
+    }
+
+    /// Background → sampler → main: walks a real chain off the main
+    /// thread.
+    ///
+    /// This asserted `≥ 5` frames against whatever depth the XCTest
+    /// runner's main thread happened to have at that instant — a
+    /// property the test did not control and does not own. Measured
+    /// over 12 runs it failed twice, returning 1 and 2 frames: the
+    /// sampler was working and the assertion was about the weather.
+    ///
+    /// A gate that reds one run in six is a gate people learn to
+    /// re-run, so the fix is to make the premise true rather than to
+    /// lower the bar. The main thread is parked 24 frames deep on a
+    /// semaphore while the sample is taken, so ≥ 5 is now a statement
+    /// about the sampler.
+    func testCaptureFromBackgroundWalksADeepMainStack() {
+        let ready = DispatchSemaphore(value: 0)
+        let sampled = DispatchSemaphore(value: 0)
+        var frames: [NSNumber] = []
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            ready.wait()
+            frames = SentoriThreadSampler.captureMainThreadFrames(maxFrames: 64)
+            sampled.signal()
+        }
+
+        recurse(24) {
+            ready.signal()
+            _ = sampled.wait(timeout: .now() + 5)
+        }
+
+        #if arch(arm64)
+            XCTAssertGreaterThanOrEqual(
+                frames.count, 5,
+                "24 frames were parked on the main thread; sampler returned \(frames.count)"
+            )
+            XCTAssertGreaterThan(
+                frames.first?.uint64Value ?? 0, 0,
+                "first PC must be non-zero"
+            )
+            XCTAssertLessThanOrEqual(
+                frames.count, 64,
+                "must respect maxFrames cap"
+            )
+        #else
+            // Intel simulator: sampler returns empty by design.
+            XCTAssertEqual(frames.count, 0)
+        #endif
     }
 
     /// Sampling from main itself must refuse — would race with our own
