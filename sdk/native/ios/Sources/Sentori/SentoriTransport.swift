@@ -40,6 +40,7 @@ public final class SentoriTransport: NSObject {
     private static var timer: DispatchSourceTimer?
     private static var started = false
     private static var dropped = 0
+    private static var delivered = 0
 
     private static let worker = DispatchQueue(label: "jp.golia.sentori.transport", qos: .utility)
 
@@ -122,7 +123,16 @@ public final class SentoriTransport: NSObject {
         if lost > 0 { envelope["droppedEvents"] = lost }
 
         worker.async {
-            if !sendWithRetry(envelope, config: config) {
+            switch sendWithRetry(envelope, config: config) {
+            case .delivered:
+                lock.lock()
+                delivered += events.count
+                lock.unlock()
+            case .dropped:
+                // Handled, but not accepted. Nothing to retry and
+                // nothing to count.
+                break
+            default:
                 persist(events)
             }
         }
@@ -130,28 +140,36 @@ public final class SentoriTransport: NSObject {
 
     // ── the network ───────────────────────────────────────────────
 
-    private static func sendWithRetry(_ envelope: [String: Any], config: SentoriConfig) -> Bool {
+    /// Returns the terminal outcome rather than a bool.
+    ///
+    /// It used to return "stop trying", which conflated *accepted*
+    /// with *rejected for good reason*: a 4xx is not worth retrying,
+    /// but it is also not delivery. With one bool, a wrong token
+    /// looked exactly like a successful send — the live suite passed
+    /// against a server that had stored nothing, and only a readback
+    /// through the admin API noticed.
+    private static func sendWithRetry(_ envelope: [String: Any], config: SentoriConfig) -> Outcome
+    {
         var delay: TimeInterval = 1
         for attempt in 1...maxRetry {
-            switch sendOnce(envelope, config: config) {
-            case .delivered:
-                return true
-            case .dropped:
+            let outcome = sendOnce(envelope, config: config)
+            switch outcome {
+            case .delivered, .dropped:
                 // A 4xx that is not 429 is our request being wrong.
-                // Retrying it produces the same 4xx forever, so it
-                // counts as handled rather than as a failure to
-                // persist and try again on every launch.
-                return true
+                // Retrying produces the same 4xx forever, so it ends
+                // here rather than spilling and trying again on every
+                // launch.
+                return outcome
             case .retryAfter(let wait):
-                if attempt == maxRetry { return false }
+                if attempt == maxRetry { return outcome }
                 Thread.sleep(forTimeInterval: wait)
             case .failed:
-                if attempt == maxRetry { return false }
+                if attempt == maxRetry { return outcome }
                 Thread.sleep(forTimeInterval: delay)
                 delay *= 2
             }
         }
-        return false
+        return .failed
     }
 
     private enum Outcome {
@@ -271,6 +289,7 @@ public final class SentoriTransport: NSObject {
         queue.removeAll()
         assertStats.removeAll()
         dropped = 0
+        delivered = 0
         started = false
         timer?.cancel()
         timer = nil
@@ -291,4 +310,14 @@ public final class SentoriTransport: NSObject {
     }
 
     static func __peekPersisted() -> [[String: Any]] { readPersisted() }
+
+    /// Events the server actually accepted. A test that checks only
+    /// for the *absence* of a spill passes while three retries are
+    /// still in flight — which is how the live suite went green on CI
+    /// against a server that had stored nothing.
+    static func __peekDelivered() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return delivered
+    }
 }

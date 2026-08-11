@@ -144,7 +144,7 @@ fi
 grep -E "Executed [0-9]+ test" "$XCLOG" | tail -1
 
 echo "→ and the events are readable back"
-python3 - "$BASE" "$JAR" "$PROJECT" <<'PY'
+python3 - "$BASE" "$JAR" "$PROJECT" "$LOG" <<'PY'
 import json, subprocess, sys
 base, jar, project = sys.argv[1], sys.argv[2], sys.argv[3]
 
@@ -157,6 +157,10 @@ issues = get(f"/admin/api/issues?projectId={project}&limit=20")["issues"]
 kinds = sorted(i["kind"] for i in issues)
 want = ["assert", "error", "probe", "warn"]
 if kinds != want:
+    # Whether the server saw the request at all is the first thing to
+    # know, and the only place it is written down is the server's log.
+    print("── server log ──", file=sys.stderr)
+    print(open(sys.argv[4]).read()[-3000:], file=sys.stderr)
     sys.exit(f"FAIL: server stored {kinds}, want {want}")
 
 err = next(i for i in issues if i["kind"] == "error")
