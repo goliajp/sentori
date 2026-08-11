@@ -131,7 +131,9 @@ GLOG="$(mktemp)"
 MODULE=":goliapkg-sentori-react-native"
 ( cd apps/rn-example/android && ./gradlew "${MODULE}:testDebugUnitTest" \
     --rerun-tasks --console=plain ) >"$GLOG" 2>&1 || {
-    grep -E "FAILED|^e: " "$GLOG" | head -20
+    grep -E "FAILED|^e: " "$GLOG" | head -20 || true
+    echo "── last 30 lines ──"
+    tail -30 "$GLOG" || true
     echo "FAIL: the Android suite did not pass" >&2
     exit 1
 }

@@ -34,6 +34,13 @@ public final class SentoriTransport: NSObject {
     /// minutes ago matters less than the one happening now.
     private static let maxQueued = 500
 
+    /// Per-attempt request timeout. A test seam: the spill test used
+    /// to rely on a closed port being refused instantly, which is true
+    /// on a laptop and false on a CI runner that drops the packet
+    /// instead — three 15 s attempts there, and the test timed out
+    /// waiting for a spill that was still 20 s away.
+    static var requestTimeout: TimeInterval = 15
+
     private static let lock = NSLock()
     private static var queue: [[String: Any]] = []
     private static var assertStats: [String: [String: Any]] = [:]
@@ -190,7 +197,7 @@ public final class SentoriTransport: NSObject {
         request.setValue("Bearer \(config.token)", forHTTPHeaderField: "Authorization")
         request.setValue("swift/\(SentoriVersion.current)", forHTTPHeaderField: "Sentori-Sdk")
         request.httpBody = body
-        request.timeoutInterval = 15
+        request.timeoutInterval = requestTimeout
 
         // The worker thread is ours and is not the caller's, so
         // blocking it is fine and keeps the retry loop readable.
@@ -291,6 +298,7 @@ public final class SentoriTransport: NSObject {
         dropped = 0
         delivered = 0
         started = false
+        requestTimeout = 15
         timer?.cancel()
         timer = nil
         lock.unlock()
