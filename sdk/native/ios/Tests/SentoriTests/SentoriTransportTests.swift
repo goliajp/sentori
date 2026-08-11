@@ -115,6 +115,11 @@ final class SentoriTransportTests: XCTestCase {
 
     func testAFailedSendSpillsToDiskAndDrainsOnTheNextStart() {
         configure()
+        // Bound how long one attempt can take. Without this the test
+        // measures the machine's TCP behaviour: a laptop refuses a
+        // closed port at once, a CI runner drops it and waits out the
+        // full timeout three times over.
+        SentoriTransport.requestTimeout = 1
         SentoriTransport.start()
         for i in 0..<3 { SentoriTransport.enqueue(["kind": "error", "seq": i]) }
         SentoriTransport.flush()

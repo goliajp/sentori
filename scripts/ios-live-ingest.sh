@@ -124,7 +124,9 @@ XCLOG="$(mktemp)"
 DEST="${SENTORI_LIVE_DESTINATION:-platform=iOS Simulator,name=iPhone 17 Pro}"
 ( cd sdk/native/ios && xcodebuild test -scheme Sentori -destination "$DEST" \
     -only-testing:SentoriTests/SentoriLiveServerTests ) >"$XCLOG" 2>&1 || {
-    grep -E "error: -\[|XCTAssert" "$XCLOG" | head -20
+    grep -E "error: -\[|XCTAssert" "$XCLOG" | head -20 || true
+    echo "── last 30 lines ──"
+    tail -30 "$XCLOG" || true
     echo "FAIL: the live suite did not pass" >&2
     exit 1
 }
@@ -137,11 +139,11 @@ DEST="${SENTORI_LIVE_DESTINATION:-platform=iOS Simulator,name=iPhone 17 Pro}"
 # every build on a machine with that tool emits — the check failed a
 # passing run the first time it was used for real.
 if grep -qE "Test Case .* skipped|: Test skipped" "$XCLOG"; then
-    grep -E "Test Case .* skipped|: Test skipped" "$XCLOG" | head -3
+    grep -E "Test Case .* skipped|: Test skipped" "$XCLOG" | head -3 || true
     echo "FAIL: the live test skipped — it proved nothing" >&2
     exit 1
 fi
-grep -E "Executed [0-9]+ test" "$XCLOG" | tail -1
+grep -E "Executed [0-9]+ test" "$XCLOG" | tail -1 || echo "      (no test summary in the log)"
 
 echo "→ and the events are readable back"
 python3 - "$BASE" "$JAR" "$PROJECT" "$LOG" <<'PY'
