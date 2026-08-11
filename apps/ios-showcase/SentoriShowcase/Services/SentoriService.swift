@@ -1,5 +1,6 @@
 import SwiftUI
 import Observation
+import Sentori
 
 /// Bridge between the SwiftUI app and the SDK's pure-Swift core.
 ///
