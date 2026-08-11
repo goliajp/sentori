@@ -28,9 +28,15 @@ FIXTURE="sdk/native/fixtures/live-server.json"
 LOG="$(mktemp)"
 SERVER_PID=""
 
+STARTED_BREW_PG=""
+
 cleanup() {
     [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null || true
     docker rm -f sentori-live-pg >/dev/null 2>&1 || true
+    # `brew services start` also registers the service to run at
+    # login. On a CI runner that is free; on someone's laptop it is a
+    # background daemon they did not ask for, so put it back.
+    [ -n "$STARTED_BREW_PG" ] && brew services stop "$STARTED_BREW_PG" >/dev/null 2>&1 || true
     rm -f "$FIXTURE"
 }
 trap cleanup EXIT
@@ -47,13 +53,39 @@ if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
     done
     DB="postgres://postgres:dev@127.0.0.1:${PGPORT}/sentori"
 else
-    # macOS runners have no Docker. Homebrew's Postgres listens on
-    # 5432 and trusts the local user, which is enough for a throwaway
-    # database that lives for one test run.
-    brew services start postgresql@18 >/dev/null 2>&1 || brew services start postgresql >/dev/null 2>&1
-    for _ in $(seq 1 60); do pg_isready -q && break; sleep 1; done
-    dropdb --if-exists sentori_live >/dev/null 2>&1 || true
-    createdb sentori_live
+    # macOS runners have no Docker, and no Postgres either — the image
+    # ships neither. Homebrew's trusts the local user on 5432, which
+    # is enough for a database that lives for one test run.
+    #
+    # Nothing here is silenced. The first version sent brew's output
+    # to /dev/null and failed four seconds in with `exit code 1` and
+    # no reason, which is the same defect this script exists to stop
+    # other gates from having.
+    FORMULA=""
+    for candidate in postgresql@18 postgresql@17 postgresql; do
+        if brew list --formula "$candidate" >/dev/null 2>&1; then FORMULA="$candidate"; break; fi
+    done
+    if [ -z "$FORMULA" ]; then
+        echo "  installing postgresql@17"
+        brew install postgresql@17
+        FORMULA=postgresql@17
+    fi
+    echo "  starting $FORMULA"
+    brew services start "$FORMULA"
+    STARTED_BREW_PG="$FORMULA"
+    # `brew services` returns before the socket is up.
+    READY=""
+    for _ in $(seq 1 60); do
+        if pg_isready -q -h 127.0.0.1 -p 5432; then READY=1; break; fi
+        sleep 1
+    done
+    if [ -z "$READY" ]; then
+        echo "postgres never accepted connections; brew services says:" >&2
+        brew services list >&2
+        exit 1
+    fi
+    dropdb --if-exists -h 127.0.0.1 sentori_live || true
+    createdb -h 127.0.0.1 sentori_live
     DB="postgres://$(whoami)@127.0.0.1:5432/sentori_live"
 fi
 
