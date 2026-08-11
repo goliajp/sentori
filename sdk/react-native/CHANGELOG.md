@@ -1,5 +1,34 @@
 # @goliapkg/sentori-react-native
 
+## 6.2.1
+
+### Patch Changes
+
+- Fix a crash when push is touched from a process that is not an app
+
+  `UNUserNotificationCenter.current()` raises
+  `NSInternalInconsistencyException` — "bundleProxyForCurrentProcess is
+  nil" — in any process without an app bundle: a unit-test target that
+  links this SDK, a command-line tool, some extension hosts. An
+  Objective-C exception cannot be caught in Swift, so it terminated the
+  host outright.
+
+  That is the SDK crashing the app rather than reporting the app's
+  crash. Any customer running unit tests with Sentori linked would have
+  hit it.
+
+  All three call sites are guarded now — the permission read, the
+  permission request, and the delegate installation — on whether the
+  main bundle is an `.app` or `.appex`. Anything else reports the
+  permission as `unavailable`, which the JS side already treats as
+  `no-transport`.
+
+  Found because the native package's own test target called it and the
+  runner died mid-suite. The first fix guarded on
+  `bundleIdentifier != nil`, which is true inside an xctest host and
+  raised anyway; the exception message named the real cause and it took
+  a second read to see it.
+
 ## 6.2.0
 
 ### Minor Changes

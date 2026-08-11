@@ -1,5 +1,12 @@
 # example
 
+## 1.0.13
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @goliapkg/sentori-react-native@6.2.1
+
 ## 1.0.12
 
 ### Patch Changes
