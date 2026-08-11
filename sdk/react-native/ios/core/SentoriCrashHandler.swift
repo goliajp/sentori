@@ -1,3 +1,6 @@
+// GENERATED MIRROR — do not edit.
+// Source of truth: sdk/native/ios/Sources/Sentori/SentoriCrashHandler.swift
+// Run `node scripts/sync-native-core.mjs` after editing it.
 import Foundation
 import MachO
 
@@ -62,6 +65,19 @@ import MachO
 
     private static func config() -> [String: Any] {
         return UserDefaults.standard.dictionary(forKey: configKey) ?? [:]
+    }
+
+    /// Test-only seam onto `write`, which the real path reaches from
+    /// an `@convention(c)` handler an XCTest cannot raise safely.
+    ///
+    /// The test that calls this was written against this name and has
+    /// never compiled: the sources were loose files in an Expo module
+    /// with no module to import, so nothing ever built the test target
+    /// and nothing reported that the member was missing. Internal
+    /// rather than public — `@testable import` reaches it, an app
+    /// does not.
+    internal static func persistForTesting(exception: NSException) {
+        write(exception: exception)
     }
 
     private static func write(exception: NSException) {
