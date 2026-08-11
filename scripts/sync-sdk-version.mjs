@@ -38,6 +38,11 @@ const MIRRORS = [
     file: 'sdk/native/ios/Sources/Sentori/SentoriConfig.swift',
     pattern: /^(    public static let current = ")([^"]+)(")$/m,
   },
+  {
+    pkg: 'sdk/react-native/package.json',
+    file: 'sdk/native/android/src/main/java/com/sentori/SentoriConfig.kt',
+    pattern: /^(    const val CURRENT = ")([^"]+)(")$/m,
+  },
 ]
 
 let changed = 0
