@@ -79,18 +79,30 @@ final class SentoriLiveServerTests: XCTestCase {
         Sentori.probe("SEN-482")
         SentoriTransport.flush()
 
-        // The batch goes out on the worker; give it the round trip.
-        let sent = expectation(description: "sent")
-        DispatchQueue.global().asyncAfter(deadline: .now() + 3) { sent.fulfill() }
-        wait(for: [sent], timeout: 10)
+        // Poll for delivery rather than sleeping and checking that
+        // nothing has failed *yet*.
+        //
+        // The first version waited three seconds and asserted the
+        // spill file was empty and the queue was drained. Both are
+        // true while three retries are still in flight, and both are
+        // true when the server answers 4xx — the transport treats a
+        // client error as handled rather than retrying it forever. So
+        // it passed on CI against a server that had stored nothing,
+        // and only the script's readback noticed.
+        let deadline = Date().addingTimeInterval(30)
+        while SentoriTransport.__peekDelivered() == 0, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.25)
+        }
 
-        XCTAssertTrue(
-            SentoriTransport.__peekPersisted().isEmpty,
-            "the server refused the batch — it spilled to disk instead of being accepted"
+        XCTAssertGreaterThan(
+            SentoriTransport.__peekDelivered(), 0,
+            "the server never accepted a batch — spilled: "
+                + "\(SentoriTransport.__peekPersisted().count), "
+                + "queued: \(SentoriTransport.__peekQueue().count)"
         )
         XCTAssertTrue(
-            SentoriTransport.__peekQueue().isEmpty,
-            "the batch never left the queue"
+            SentoriTransport.__peekPersisted().isEmpty,
+            "a batch spilled to disk, so the server refused it"
         )
         XCTAssertEqual(id.count, 36)
     }
