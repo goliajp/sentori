@@ -12,7 +12,7 @@
 // process), so we exercise the persistence helper directly instead.
 
 import XCTest
-@testable import SentoriCrashHandler
+@testable import Sentori
 
 final class SentoriCrashHandlerTests: XCTestCase {
     private var pendingDir: URL!

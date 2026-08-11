@@ -70,3 +70,7 @@ tmp/
 .keys
 .keys.*
 *.pem
+
+# Swift package build output
+sdk/native/ios/.build/
+sdk/native/ios/*.xcodeproj/

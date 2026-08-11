@@ -124,6 +124,39 @@ jobs:
             sdk/react-native/android/build/test-results/
           if-no-files-found: warn
 
+  # The iOS native core, built and tested as a Swift package.
+  #
+  # `sdk/react-native/ios` held 214 lines of XCTest that had never run
+  # once: the sources were loose files compiled only inside an Expo
+  # module, so there was no module to `@testable import` and no scheme
+  # for `xcodebuild` to name. Both tests that reached for an internal
+  # API named one that does not exist — `persistForTesting` and
+  # `viewTreeForTesting` — and nothing reported it, because nothing
+  # built them.
+  #
+  # This is also the platform about to ship as its own artifact, and
+  # the one with no automated gate of any kind until now.
+  ios-native:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # The mirror the React Native pod compiles is generated from
+      # this package. If they disagree, the pod ships something no
+      # test here covered.
+      - name: the RN mirror matches the package
+        run: node scripts/sync-native-core.mjs --check
+
+      - name: build + test
+        working-directory: sdk/native/ios
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -scheme Sentori \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            | tail -40
+
   # Round-trip symbolication against the v0.2 server: bundle a fixture,
   # upload its map, send a stack from the minified bundle, assert the
   # frames come back pointing at the original source.

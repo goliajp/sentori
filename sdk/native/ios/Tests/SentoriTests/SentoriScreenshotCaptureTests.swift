@@ -15,7 +15,7 @@
 
 import XCTest
 import UIKit
-@testable import SentoriScreenshotCapture
+@testable import Sentori
 
 final class SentoriScreenshotCaptureTests: XCTestCase {
 
@@ -49,11 +49,17 @@ final class SentoriScreenshotCaptureTests: XCTestCase {
             cursor.addSubview(child)
             cursor = child
         }
-        measure {
-            // private method — guarded by `@testable` access.
-            // We're not asserting the output, just the timing budget.
-            _ = SentoriScreenshotCapture.value(forKey: "viewTreeForTesting")
-                .map { _ in 0 } ?? 0
-        }
+        let tree = SentoriScreenshotCapture.viewTreeForTesting(root: root)
+        let nodes = tree["nodes"] as? [String: Any] ?? [:]
+
+        // 50 nested views, a cap of 10: the root plus ten levels, and
+        // nothing below. The previous version of this test measured a
+        // timing budget and asserted nothing at all — a walk that ran
+        // away to depth 50 would have passed it, which is the one
+        // outcome the cap exists to prevent.
+        XCTAssertEqual(
+            nodes.count, 11,
+            "depth cap should stop the walk at 10 levels below the root, got \(nodes.count) nodes"
+        )
     }
 }

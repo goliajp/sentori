@@ -1,3 +1,6 @@
+// GENERATED MIRROR — do not edit.
+// Source of truth: sdk/native/ios/Sources/Sentori/SentoriScreenshotCapture.swift
+// Run `node scripts/sync-native-core.mjs` after editing it.
 import Foundation
 import UIKit
 
@@ -307,6 +310,17 @@ import UIKit
         }
         walk(rootView)
         return found
+    }
+
+    /// Test-only seam onto the tree walk. The test that covers the
+    /// depth cap reached for it through
+    /// `value(forKey: "viewTreeForTesting")` — a name nothing defines,
+    /// and KVC cannot reach a Swift static method under any name. It
+    /// compiled because KVC is resolved at runtime, and it never ran
+    /// because the sources were loose files in an Expo module with no
+    /// test target to build.
+    internal static func viewTreeForTesting(root: UIView) -> [String: Any] {
+        return walkTree(root: root)
     }
 
     private static func walkTree(root: UIView) -> [String: Any] {
