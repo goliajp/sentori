@@ -23,7 +23,10 @@ use uuid::Uuid;
 
 use crate::state::AppState;
 
-pub async fn list(State(state): State<Arc<AppState>>, Path(project_id): Path<Uuid>) -> Json<Value> {
+pub async fn list(
+    State(state): State<Arc<AppState>>,
+    Path(project_id): Path<Uuid>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     // Which platforms actually reported in each release. A missing
     // symbolication artifact only matters for a platform that is
     // sending events: three lights that go red regardless turn the
@@ -43,7 +46,16 @@ pub async fn list(State(state): State<Arc<AppState>>, Path(project_id): Path<Uui
     .bind(project_id)
     .fetch_all(&state.pool)
     .await
-    .unwrap_or_default();
+    // Was `unwrap_or_default()`, which reports a broken query as a
+    // project with no releases — the same silence `list_artifacts`
+    // below already had to be talked out of.
+    .map_err(|e| {
+        warn!(error = %e, "admin.releases.list query failed");
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "internal" })),
+        )
+    })?;
 
     let out: Vec<Value> = rows
         .iter()
@@ -52,17 +64,19 @@ pub async fn list(State(state): State<Arc<AppState>>, Path(project_id): Path<Uui
                 "id": r.get::<Uuid, _>("id").to_string(),
                 "name": r.get::<String, _>("name"),
                 "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
-                // Parsed at upload; NULL on anything stored before
-                // that check existed. A light that counts an
-                // unreadable artifact as coverage is the light that
-                // let a bytecode bundle pass as a source map for
-                // months.
-                "usable": r.get::<Option<bool>, _>("usable"),
+                // No `usable` here. It is a property of an artifact —
+                // one release has several, each parsed or not — and
+                // `list_artifacts` returns it per row, which is what
+                // the releases page reads. Asking a `releases` row for
+                // it selected nothing and read it anyway: every call
+                // to this route panicked on `ColumnNotFound("usable")`
+                // from server 2.15.0 to 2.21.0, so the releases page
+                // got a dropped connection rather than a list.
                 "platforms": r.get::<Vec<String>, _>("platforms"),
             })
         })
         .collect();
-    Json(json!({ "releases": out }))
+    Ok(Json(json!({ "releases": out })))
 }
 
 pub async fn list_artifacts(
@@ -98,6 +112,22 @@ pub async fn list_artifacts(
                 "content_hash": r.get::<String, _>("content_hash"),
                 "size_bytes": r.try_get::<i64, _>("size_bytes").unwrap_or(0),
                 "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
+                // Selected since 2.15.0 and dropped here, which is the
+                // mirror of the bug in `list` above: that one read a
+                // column it had not selected, this one selected a
+                // column it did not read. Same commit, both halves
+                // wrong.
+                //
+                // The cost was the whole feature. `Releases.tsx` tests
+                // `a.usable === false` to draw the ✕ and to list the
+                // unreadable artifacts; against an absent field that is
+                // never true, so every artifact counted as coverage and
+                // "unreadable" was permanently empty — which is exactly
+                // the state the check was built to end.
+                //
+                // NULL means never checked. Not the same claim as
+                // checked and fine, so it stays distinct from `false`.
+                "usable": r.get::<Option<bool>, _>("usable"),
             })
         })
         .collect();
