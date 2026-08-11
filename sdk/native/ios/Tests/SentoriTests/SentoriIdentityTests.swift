@@ -23,20 +23,34 @@ final class SentoriIdentityTests: XCTestCase {
     }
 
     private func loadVectors() throws -> [Vector] {
-        // Up from Tests/SentoriTests/ to the package, then to the
-        // shared fixtures Kotlin reads too. `#filePath` rather than a
-        // bundle resource: SwiftPM would need the JSON declared as a
-        // target resource, and one copy shared with Android is the
-        // whole point.
-        let here = URL(fileURLWithPath: #filePath)
-        let fixture = here
-            .deletingLastPathComponent()  // SentoriTests
-            .deletingLastPathComponent()  // Tests
-            .deletingLastPathComponent()  // ios
-            .deletingLastPathComponent()  // native
-            .appendingPathComponent("fixtures/identity-vectors.json")
-        let data = try Data(contentsOf: fixture)
-        return try JSONDecoder().decode(Fixture.self, from: data).vectors
+        // `#filePath` rather than a bundle resource: SwiftPM would
+        // need the JSON declared as a target resource, and one copy
+        // shared with Android is the whole point.
+        //
+        // Two layouts, because this package lives in two places. In
+        // the monorepo the fixtures are shared with Android, four
+        // levels up. In the published mirror the package *is* the
+        // repository and they sit beside it.
+        //
+        // Hard-coding the monorepo shape made this test fail in the
+        // published package with a path pointing at `/tmp/fixtures` —
+        // the cross-language drift gate, broken in the artifact that
+        // ships. Found by building the mirror from a clean tree, which
+        // is the only place it could have been found.
+        var dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for _ in 0..<6 {
+            let candidate = dir.appendingPathComponent("fixtures/identity-vectors.json")
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                let data = try Data(contentsOf: candidate)
+                return try JSONDecoder().decode(Fixture.self, from: data).vectors
+            }
+            dir = dir.deletingLastPathComponent()
+        }
+        // Not a skip. A missing fixture means the cross-language
+        // gate is not running, and a gate that quietly stops running
+        // is the failure it exists to prevent.
+        XCTFail("identity-vectors.json is not above \(#filePath) — the mirror did not carry it")
+        return []
     }
 
     func testMatchesTheTypeScriptImplementation() throws {
