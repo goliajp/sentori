@@ -34,6 +34,20 @@ const MIRRORS = [
     from: 'sdk/native/ios/Sources/Sentori',
     to: 'sdk/react-native/ios/core',
     ext: '.swift',
+    // The standalone SDK's own transport, config, scope, signal ring
+    // and identity hashing. React Native already has all five in
+    // JavaScript and calls those, so mirroring these would compile a
+    // second unused copy into every RN app's binary — a cost the host
+    // did not ask for, which is the whole footprint half of the client
+    // zero-cost rule. When the bridge starts delegating to them
+    // (v1.6 S4), the exclusion goes.
+    exclude: [
+      'SentoriConfig.swift',
+      'SentoriIdentity.swift',
+      'SentoriScope.swift',
+      'SentoriSignalRing.swift',
+      'SentoriTransport.swift',
+    ],
   },
   // Android mirrors into its own source root rather than beside
   // `SentoriModule.kt`: the sync owns its target directory outright
@@ -74,7 +88,9 @@ for (const m of MIRRORS) {
     console.error(`✗ ${m.from} does not exist — this list is stale.`);
     process.exit(1);
   }
-  const names = readdirSync(src).filter((f) => f.endsWith(m.ext));
+  const names = readdirSync(src)
+    .filter((f) => f.endsWith(m.ext))
+    .filter((f) => !(m.exclude ?? []).includes(f));
   if (names.length === 0) {
     console.error(`✗ no ${m.ext} files under ${m.from} — this script would mirror nothing.`);
     process.exit(1);

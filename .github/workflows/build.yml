@@ -283,6 +283,15 @@ jobs:
       # `ok: true`, and never became addressable. `metadata` was
       # advertised, never sent, and had no field on the server to
       # receive it.
+      # `userKey` is computed in TypeScript, Swift and Kotlin, and a
+      # device that hashes differently stops matching the events from
+      # the same person — the push reaches nobody and nothing reports
+      # it. The native suites assert against vectors generated from
+      # the TypeScript; this fails when the TypeScript moved and the
+      # vectors did not.
+      - name: identity vectors match the source of truth
+        run: node scripts/gen-identity-vectors.mjs --check
+
       - name: public options are read by the code
         run: node scripts/check-dead-options.mjs
 

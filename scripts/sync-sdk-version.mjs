@@ -29,6 +29,15 @@ const MIRRORS = [
     file: 'sdk/react-native/src/transport.ts',
     pattern: /^(const SDK_VERSION = ')([^']+)(';)$/m,
   },
+  // The native SDK reports its own version in the same header. It
+  // takes the React Native package's number for now because the two
+  // ship together; S5 gives the native packages their own release and
+  // this row moves to it.
+  {
+    pkg: 'sdk/react-native/package.json',
+    file: 'sdk/native/ios/Sources/Sentori/SentoriConfig.swift',
+    pattern: /^(    public static let current = ")([^"]+)(")$/m,
+  },
 ]
 
 let changed = 0
