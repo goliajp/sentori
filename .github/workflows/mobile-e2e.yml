@@ -162,9 +162,15 @@ jobs:
       - name: build + test
         working-directory: sdk/native/ios
         run: |
+          # A device name is a moving target — see the note in
+          # swift-package-mirror.yml. Take whatever iPhone runtime the
+          # image ships.
+          DEST=$(xcrun simctl list devices available -j \
+            | python3 -c 'import sys,json;d=json.load(sys.stdin)["devices"];print(next(x["udid"] for rt in d for x in d[rt] if "iPhone" in x["name"]))')
+          echo "simulator $DEST"
           if ! xcodebuild test \
               -scheme Sentori \
-              -destination 'platform=iOS Simulator,name=iPhone 16' \
+              -destination "platform=iOS Simulator,id=$DEST" \
               > /tmp/xcodebuild.log 2>&1; then
             echo "── failures ──"
             grep -E "error: -\[|XCTAssert|' failed \(" /tmp/xcodebuild.log | head -40
@@ -278,12 +284,11 @@ jobs:
           workspaces: self-hosted/server
           key: macos-live-ingest
 
+      # The script picks a simulator from what is installed. Set
+      # SENTORI_LIVE_DESTINATION to pin one; naming a device here is
+      # how the mirror's verify job started failing because the image
+      # stopped shipping an iPhone 16.
       - name: swift SDK → real server → read the events back
-        env:
-          # The runner's newest simulator. `xcrun simctl list` names
-          # change with Xcode; the script takes it as a parameter so a
-          # rename is a one-line fix rather than a broken job.
-          SENTORI_LIVE_DESTINATION: 'platform=iOS Simulator,name=iPhone 16'
         run: bash scripts/ios-live-ingest.sh
 
   # Round-trip symbolication against the v0.2 server: bundle a fixture,
