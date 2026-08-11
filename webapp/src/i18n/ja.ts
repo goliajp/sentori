@@ -144,6 +144,7 @@ export const ja: Messages = {
   'palette.placeholder': 'ページへ移動、または issue を検索…',
 
 
+  'push.addressable': '宛先指定可',
   'push.config': '設定(JSON)',
   'push.configNotJson': '有効な JSON ではありません。',
   'push.configPlaceholder': '{"keyId":"ABC123","teamId":"DEF456","bundleId":"com.example.app"}',
@@ -154,18 +155,27 @@ export const ja: Messages = {
   'push.deliveryEmpty':
     'まだ送信はありません。アプリ側で sentori.push.register() を呼ぶとデバイスが登録され、送信がここに出ます。',
   'push.deliveryTitle': '配信',
+  'push.device': 'デバイス',
+  'push.devicesEmpty': '登録済みデバイスはありません。アプリで sentori.push.register() を呼んでください。',
+  'push.devicesTitle': 'デバイス',
   'push.failed24h': '失敗',
   'push.lastValidated': '最終確認 {when} —— {status}',
+  'push.metadata': 'メタデータ',
+  'push.metadataNone': '送信なし',
   'push.neverValidated': '未確認',
+  'push.no': 'いいえ',
+  'push.notAddressableHint': 'sentori.user() より前に登録されたため、一斉配信のみ。issue からは指定できません。',
   'push.provider': 'プロバイダ',
   'push.queued': '待機中',
   'push.reason': '理由',
   'push.retry': '再試行',
   'push.retryAll': '失敗をすべて再試行',
+  'push.revoked': '(失効)',
   'push.sendsEmpty': '送信はまだありません',
   'push.sendsTitle': '最近の送信',
   'push.sent24h': '24時間の送信',
   'push.tokens': 'デバイス {live} 台 · 宛先指定可 {identified} 台 · 隔離 {quarantined} 台',
+  'push.yes': 'はい',
   'releases.artifactMissing':
     '{platform} はこのリリースでイベントを送っていますが、シンボリケーション用アーティファクトがありません — スタックを読めません',
   'releases.artifactUnused':

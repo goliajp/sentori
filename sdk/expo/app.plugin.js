@@ -104,6 +104,8 @@ const withSentoriPushIos = (config) => {
  */
 const withSentoriPushAndroidManifest = (config) => {
   return withAndroidManifest(config, (cfg) => {
+    // Nothing to remove here — see `withSentoriPushDisabledAndroid`
+    // below for the opposite case.
     // addPermission expects the AndroidManifest object (cfg.modResults);
     // it dereferences `.manifest['uses-permission']` internally. Passing
     // `cfg.modResults.manifest` makes that read fail with `Cannot read
@@ -113,6 +115,46 @@ const withSentoriPushAndroidManifest = (config) => {
       cfg.modResults,
       'android.permission.POST_NOTIFICATIONS'
     )
+    return cfg
+  })
+}
+
+/** The service this SDK's own AndroidManifest declares. Kept here as
+ *  the single place that name appears outside the module itself. */
+const SENTORI_FCM_SERVICE = 'com.sentori.SentoriFirebaseMessagingService'
+
+/**
+ * `push: false` — let another library own FCM delivery.
+ *
+ * Android hands `onNewToken` / `onMessageReceived` to whichever
+ * service matching `com.google.firebase.MESSAGING_EVENT` manifest
+ * merging placed first. Two such services in one APK means one of
+ * them is deaf, and which one is decided at build time — no runtime
+ * flag can reach it. An app that wants `expo-notifications` to own
+ * push has to remove ours from the merged manifest.
+ *
+ * That is one line of `tools:node="remove"`, and integrators were
+ * writing it themselves against our internal class name — welding our
+ * implementation detail into their build config, so renaming the
+ * class would break them silently. It belongs here. (Asked for by
+ * insight, 2026-08-11, who had written exactly that plugin.)
+ *
+ * @param {import('@expo/config-plugins').ExpoConfig} config
+ */
+const withSentoriPushDisabledAndroid = (config) => {
+  return withAndroidManifest(config, (cfg) => {
+    const app = AndroidConfig.Manifest.getMainApplicationOrThrow(cfg.modResults)
+    app.service = (app.service || []).filter(
+      (s) => s.$['android:name'] !== SENTORI_FCM_SERVICE
+    )
+    app.service.push({
+      $: { 'android:name': SENTORI_FCM_SERVICE, 'tools:node': 'remove' },
+    })
+    // `tools:` is only meaningful if the namespace is declared on the
+    // root element; without it the merger treats the attribute as an
+    // unknown one and keeps the service.
+    cfg.modResults.manifest.$['xmlns:tools'] =
+      cfg.modResults.manifest.$['xmlns:tools'] || 'http://schemas.android.com/tools'
     return cfg
   })
 }
@@ -375,19 +417,36 @@ const withSentoriNSETarget = (config) =>
  * @param {{ sdkVersion?: string, ios?: boolean, android?: boolean, nse?: boolean, googleServicesFile?: string }} [props]
  */
 const withSentori = (config, props = {}) => {
+  // `push: false` keeps error and performance capture — which is most
+  // of this SDK and has nothing to do with notifications — and hands
+  // delivery to whatever else the app installed. Set it per EAS
+  // profile when only some environments use Sentori push.
+  const push = props.push !== false
   const plugins = [[withSentoriVersion, props]]
   if (props.ios !== false) {
-    plugins.push([withSentoriPushIos, props])
-    if (props.nse !== false) {
-      plugins.push([withSentoriNSE, props], [withSentoriNSETarget, props])
+    // iOS needs nothing removed: our AppDelegate swizzle installs only
+    // when the app calls `sentori.push.register()`, so an app that
+    // never calls it leaves the other library sole owner. The entries
+    // below are what make push possible, not what claims it.
+    if (push) {
+      plugins.push([withSentoriPushIos, props])
+      if (props.nse !== false) {
+        plugins.push([withSentoriNSE, props], [withSentoriNSETarget, props])
+      }
     }
   }
   if (props.android !== false) {
     plugins.push(
-      [withSentoriPushAndroidManifest, props],
-      [withSentoriPushAndroidGradle, props],
-      [withSentoriGoogleServicesJson, props]
+      push
+        ? [withSentoriPushAndroidManifest, props]
+        : [withSentoriPushDisabledAndroid, props]
     )
+    if (push) {
+      plugins.push(
+        [withSentoriPushAndroidGradle, props],
+        [withSentoriGoogleServicesJson, props]
+      )
+    }
   }
   return withPlugins(config, plugins)
 }

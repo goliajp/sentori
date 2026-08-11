@@ -33,6 +33,16 @@ pub struct RegisterBody {
     /// it just is not addressable by issue.
     #[serde(default)]
     pub user_key: Option<String>,
+    /// Host-supplied facts about the device — app version, locale,
+    /// build channel. Shown on the device row in Settings ▸ Push so
+    /// an integrator can confirm what they sent without asking us.
+    ///
+    /// `device_tokens.metadata` has existed since the table was
+    /// created and nothing ever wrote to it: the SDK advertised the
+    /// option, never sent it, and this struct had no field to receive
+    /// it. Every row read `'{}'`.
+    #[serde(default)]
+    pub metadata: Option<Value>,
 }
 
 pub async fn handle(
@@ -58,11 +68,13 @@ pub async fn handle(
         // the product had zero push tokens for a reason that was
         // never "nobody turned it on".
         "INSERT INTO device_tokens \
-         (id, project_id, provider, env, native_token, user_key) \
-         VALUES ($1, $2, $3, $4, $5, $6) \
+         (id, project_id, provider, env, native_token, user_key, metadata) \
+         VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, '{}'::jsonb)) \
          ON CONFLICT (project_id, provider, native_token) DO UPDATE SET \
             env = COALESCE(EXCLUDED.env, device_tokens.env), \
             user_key = COALESCE(EXCLUDED.user_key, device_tokens.user_key), \
+            metadata = CASE WHEN EXCLUDED.metadata = '{}'::jsonb \
+                            THEN device_tokens.metadata ELSE EXCLUDED.metadata END, \
             revoked_at = NULL, \
             last_seen_at = now(), \
             updated_at = now() \
@@ -74,6 +86,11 @@ pub async fn handle(
     .bind(body.env.as_deref())
     .bind(&body.native_token)
     .bind(body.user_key.as_deref())
+    // A re-register that omits metadata keeps what is already there
+    // rather than blanking it — the same shape as `env` and
+    // `user_key` above, so calling `register()` on every launch never
+    // loses what an earlier launch reported.
+    .bind(body.metadata.as_ref())
     .fetch_one(&state.pool)
     .await;
 

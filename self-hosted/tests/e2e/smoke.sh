@@ -400,11 +400,29 @@ echo "→ register a device the way the SDK does"
 IPT="$(curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
     -H 'content-type: application/json' \
     -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-native-token-0001",
-         "userKey":"a91f3c02deadbeefa91f3c02deadbeef"}' \
+         "userKey":"a91f3c02deadbeefa91f3c02deadbeef",
+         "metadata":{"appVersion":"1.4.0","channel":"e2e"}}' \
     | jq -r '.token_id')"
 [[ -n "$IPT" && "$IPT" != "null" ]] || { echo "device registration returned no token id" >&2; exit 1; }
 LIVE="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/health" | jq -r '.liveTokens')"
 [[ "$LIVE" == "1" ]] || { echo "health says ${LIVE} live devices after one registration" >&2; exit 1; }
+
+# `metadata` was an advertised SDK option that reached neither the
+# request body nor the server struct, while the column it names has
+# existed since the table was created. Every device row read '{}' and
+# the integrator who passed it had no way to find out (insight,
+# 2026-08-11). The device list is where they check; assert it carries
+# what was sent.
+echo "→ what the device reported about itself comes back"
+DEV="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/devices")"
+[[ "$(echo "$DEV" | jq -r '.devices[0].metadata.appVersion')" == "1.4.0" ]] \
+    || { echo "metadata did not survive registration: $DEV" >&2; exit 1; }
+[[ "$(echo "$DEV" | jq -r '.devices[0].addressable')" == "true" ]] \
+    || { echo "a device registered with a userKey is not addressable: $DEV" >&2; exit 1; }
+# The token itself must not come back — a push token is a capability,
+# and the row exists to say which device, not to hand one out.
+[[ "$(echo "$DEV" | jq -r '.devices[0] | has("nativeToken")')" == "false" ]] \
+    || { echo "the device list returned a usable push token" >&2; exit 1; }
 
 echo "→ the device carries the same identity the events do"
 # The join S3 is built on: a device addressable by the user key an

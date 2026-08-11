@@ -63,12 +63,13 @@ let _ackFlushInterval: ReturnType<typeof setInterval> | null = null
 let _sessionId: null | string = null
 
 export type PushRegisterOptions = {
-  /** Identity-link hash. Pass `hashIdentities({ email }).email` if
-   *  the host has run the v2.3 identity flow. Lets the server-side
-   *  push routing target a specific user across all their devices. */
-  linkHash?: string
-  /** Extra metadata to attach to the device_tokens row (e.g. app
-   *  version, locale). Optional. */
+  /** Extra metadata stored on the device row and shown in
+   *  Settings ▸ Push (e.g. app version, locale, build channel).
+   *
+   *  Not an identity mechanism. What makes a device addressable is
+   *  `sentori.user()`, whose salted hash goes up as `userKey` —
+   *  putting a raw user id in here instead sends the real identity
+   *  to the server and still leaves the device unaddressable. */
   metadata?: Record<string, unknown>
   /** Foreground notification arrival. Fires once per notification
    *  the SW or iOS native delegate hands us. */
@@ -302,6 +303,13 @@ async function registerWithServer(
     userKey: currentUserKey(),
   }
   if (env != null) body.env = env
+  // `metadata` was an advertised option that no line of this file
+  // read: it never reached the body, and `RegisterBody` had no field
+  // for it, while `device_tokens.metadata` sat at `'{}'` since the
+  // table was created. An integrator who passed it had no way to find
+  // out it went nowhere. (Insight asked whether it was stored; it was
+  // not — 2026-08-11.)
+  if (opts.metadata != null) body.metadata = opts.metadata
   const res = await fetch(joinUrl(cfg.ingestUrl, '/v1/push/tokens'), {
     method: 'POST',
     headers: {

@@ -590,6 +590,10 @@ function PushTab() {
     () => (projectId ? api.pushSends(projectId) : Promise.resolve({ sends: [] })),
     [projectId],
   );
+  const devices = useAsyncData(
+    () => (projectId ? api.pushDevices(projectId) : Promise.resolve({ devices: [] })),
+    [projectId],
+  );
 
   const [provider, setProvider] = useState('apns');
   const [config, setConfig] = useState('');
@@ -601,10 +605,13 @@ function PushTab() {
   const rows = sends.data?.sends ?? [];
   const configured = creds.data?.credentials ?? [];
 
+  const deviceRows = devices.data?.devices ?? [];
+
   const reload = () => {
     health.reload();
     creds.reload();
     sends.reload();
+    devices.reload();
   };
 
   return (
@@ -648,6 +655,69 @@ function PushTab() {
             )}
           </div>
         )}
+      </Panel>
+
+      {/* The devices themselves. Counts on the card above answer "how
+          many"; this answers "which, and what did it tell us" — the
+          only way an integrator can confirm their `metadata` arrived
+          without asking us, and the place a device that registered
+          before `sentori.user()` shows up as not addressable. */}
+      <Panel title={`${t('push.devicesTitle')} (${deviceRows.length})`}>
+        <DataTable
+          rows={deviceRows}
+          rowKey={(d) => d.id}
+          empty={t('push.devicesEmpty')}
+          columns={[
+            {
+              key: 'device',
+              label: t('push.device'),
+              render: (d) => (
+                <span className="font-mono text-xs">
+                  {d.provider}
+                  {d.env ? `/${d.env}` : ''}
+                  <span className="text-fg-subtle"> ···{d.tokenTail ?? ''}</span>
+                  {d.revokedAt && <span className="text-fg-subtle"> {t('push.revoked')}</span>}
+                </span>
+              ),
+            },
+            {
+              key: 'addressable',
+              label: t('push.addressable'),
+              width: '130px',
+              render: (d) =>
+                d.addressable ? (
+                  <span className="text-xs text-ok">{t('push.yes')}</span>
+                ) : (
+                  <span className="text-xs text-fg-subtle" title={t('push.notAddressableHint')}>
+                    {t('push.no')}
+                  </span>
+                ),
+            },
+            {
+              key: 'metadata',
+              label: t('push.metadata'),
+              render: (d) =>
+                Object.keys(d.metadata ?? {}).length === 0 ? (
+                  <span className="text-xs text-fg-subtle">{t('push.metadataNone')}</span>
+                ) : (
+                  <span className="font-mono text-xs text-fg-muted">
+                    {JSON.stringify(d.metadata)}
+                  </span>
+                ),
+            },
+            {
+              key: 'lastSeenAt',
+              label: t('settings.colWhen'),
+              width: '110px',
+              align: 'right',
+              render: (d) => (
+                <span className="text-xs tabular-nums text-fg-subtle">
+                  {formatRelative(d.lastSeenAt)}
+                </span>
+              ),
+            },
+          ]}
+        />
       </Panel>
 
       <Panel title={t('push.credentialsTitle')}>
