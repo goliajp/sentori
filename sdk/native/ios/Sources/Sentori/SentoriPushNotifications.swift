@@ -52,10 +52,19 @@ import ObjectiveC.runtime
     /// the app crashing. Found when this package's own test target
     /// called it and the runner died mid-suite.
     ///
-    /// `bundleIdentifier` is the same precondition, readable without
-    /// raising.
+    /// The precondition is whether this process *is* an app bundle,
+    /// not whether it has an identifier. `bundleIdentifier` is
+    /// non-nil in an xctest host and the call raised anyway: the
+    /// message names the real cause — `mainBundle.bundleURL` pointing
+    /// at Xcode's `Agents/` directory, which LaunchServices has no
+    /// bundle proxy for.
+    ///
+    /// An app is `…/Foo.app`; a notification service extension is
+    /// `…/Bar.appex` and legitimately uses this API. Anything else —
+    /// a test runner, a command-line tool — gets "unavailable" and a
+    /// `no-transport` result rather than a terminated process.
     private var notificationCentreIsUsable: Bool {
-        Bundle.main.bundleIdentifier != nil
+        ["app", "appex"].contains(Bundle.main.bundleURL.pathExtension)
     }
 
     /// Returns the current permission status as a JS-friendly string.
@@ -97,6 +106,10 @@ import ObjectiveC.runtime
     /// method, which routes the token into our buffer.
     @objc public func registerForRemoteNotifications() {
         ensureSwizzleInstalled()
+        // Same guard as the permission calls: installing the
+        // delegate touches the notification centre, which raises in a
+        // process that is not an app bundle.
+        guard notificationCentreIsUsable else { return }
         UNUserNotificationCenter.current().delegate = self
         DispatchQueue.main.async {
             UIApplication.shared.registerForRemoteNotifications()
