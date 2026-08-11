@@ -46,6 +46,8 @@ const MIRRORS = [
       'SentoriConfig.swift',
       'SentoriIdentity.swift',
       'SentoriDevice.swift',
+      'SentoriPendingCrash.swift',
+      'SentoriPush.swift',
       'SentoriScope.swift',
       'SentoriSignalRing.swift',
       'SentoriTransport.swift',

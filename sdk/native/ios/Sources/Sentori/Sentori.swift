@@ -31,6 +31,23 @@ public final class Sentori: NSObject {
     @objc public static func start(_ config: SentoriConfig) {
         SentoriConfig.set(config)
         SentoriTransport.start()
+
+        // The crash handler runs from inside an uncaught-exception
+        // handler where almost nothing is safe, so it reads its
+        // release and environment from `UserDefaults` rather than
+        // from a live object. Without this a crash ships as
+        // `unknown` / `prod` and matches no release, which means no
+        // symbolication.
+        SentoriCrashHandler.setConfig([
+            "release": config.release,
+            "environment": config.environment,
+        ])
+        SentoriCrashHandler.register()
+
+        // The crash that killed the last launch. Until now the
+        // handler wrote files into a directory nothing emptied — a
+        // crash reporter that captured crashes and never sent one.
+        SentoriPendingCrash.ship()
     }
 
     /// Identify the person using the app. Only a hash of `id` (or
