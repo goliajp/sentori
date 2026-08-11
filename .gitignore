@@ -81,3 +81,8 @@ sdk/native/fixtures/live-server.json
 # Gradle build output for the standalone Android package
 sdk/native/android/build/
 sdk/native/android/.gradle/
+
+# Gradle output for the Android consumer gate
+apps/android-consumer/build/
+apps/android-consumer/app/build/
+apps/android-consumer/.gradle/
