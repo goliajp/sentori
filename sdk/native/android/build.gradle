@@ -18,7 +18,11 @@ group = 'jp.golia.sentori'
 // together and share one constant; an iOS or Android app has no
 // opinion about the RN SDK's major, and a version that moves for
 // reasons the consumer cannot see is worse than a separate one.
-version = project.findProperty('sentoriVersion') ?: '1.0.0'
+// One file, shared with the Swift constant and gated by
+// scripts/sync-sdk-version.mjs, so the AAR's version and the string
+// the SDK reports cannot disagree.
+version = project.findProperty('sentoriVersion')
+    ?: file('../VERSION').text.trim()
 
 android {
     namespace 'com.sentori'

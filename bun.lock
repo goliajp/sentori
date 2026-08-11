@@ -11,7 +11,7 @@
     },
     "apps/rn-example": {
       "name": "example",
-      "version": "1.0.12",
+      "version": "1.0.13",
       "dependencies": {
         "@goliapkg/sentori-react-native": "workspace:*",
         "expo": "~57.0.12",
@@ -60,14 +60,14 @@
         "typescript": "^7",
       },
       "peerDependencies": {
-        "@goliapkg/sentori-react-native": ">=6.2.0",
+        "@goliapkg/sentori-react-native": ">=6.2.1",
         "expo": ">=57.0.0",
         "react-native": ">=0.86.0",
       },
     },
     "sdk/react-native": {
       "name": "@goliapkg/sentori-react-native",
-      "version": "6.2.0",
+      "version": "6.2.1",
       "bin": {
         "sentori-rn-upload-source-bundle": "bin/sentori-rn-upload-source-bundle.cjs",
       },
