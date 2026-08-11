@@ -66,13 +66,16 @@ object SentoriIdentity {
     /**
      * What the other two implementations strip.
      *
-     * Kotlin's `trim()` uses `Character.isWhitespace`, which does not
-     * consider U+00A0 (no-break space) or U+FEFF (byte-order mark)
-     * whitespace. JavaScript's `String.prototype.trim` and Swift's
-     * `.whitespacesAndNewlines` remove both. A value pasted from a web
-     * page routinely carries them, and the default would have made
-     * this device hash differently from its own events — for one
-     * user, silently, on the path nobody watches.
+     * Kotlin's `trim()` uses `Character.isWhitespace`, which counts
+     * neither U+00A0 (no-break space) nor U+FEFF (byte-order mark).
+     * ECMAScript's `WhiteSpace` production counts both, so JavaScript
+     * strips them. Swift's `.whitespacesAndNewlines` counts the first
+     * and not the second, so it needed a fix of its own.
+     *
+     * Three languages, three definitions of blank. A value pasted from
+     * a web page routinely carries these, and any of the defaults
+     * would have made one device hash differently from its own events
+     * — for one user, silently, on the path nobody watches.
      *
      * Caught by the shared vectors before it shipped, which is what
      * they are for.

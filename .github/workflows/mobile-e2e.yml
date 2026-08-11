@@ -148,14 +148,32 @@ jobs:
       - name: the RN mirror matches the package
         run: node scripts/sync-native-core.mjs --check
 
+      # `| tail -40` here meant the first failure of this gate arrived
+      # with the reason cut off: xcodebuild prints the assertion in the
+      # middle of its output and several hundred lines of URLSession
+      # noise after it. A gate that hides why it went red is one more
+      # thing to reproduce locally before it can be read.
       - name: build + test
         working-directory: sdk/native/ios
         run: |
-          set -o pipefail
-          xcodebuild test \
-            -scheme Sentori \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
-            | tail -40
+          if ! xcodebuild test \
+              -scheme Sentori \
+              -destination 'platform=iOS Simulator,name=iPhone 16' \
+              > /tmp/xcodebuild.log 2>&1; then
+            echo "── failures ──"
+            grep -E "error: -\[|XCTAssert|' failed \(" /tmp/xcodebuild.log | head -40
+            echo "── summary ──"
+            grep -E "Executed [0-9]+ tests?" /tmp/xcodebuild.log | tail -2
+            exit 1
+          fi
+          grep -E "Executed [0-9]+ tests?" /tmp/xcodebuild.log | tail -1
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ios-xcodebuild-log
+          path: /tmp/xcodebuild.log
+          if-no-files-found: warn
 
   # Round-trip symbolication against the v0.2 server: bundle a fixture,
   # upload its map, send a stack from the minified bundle, assert the

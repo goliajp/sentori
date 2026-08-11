@@ -46,10 +46,29 @@ public final class SentoriIdentity: NSObject {
     /// Well-known normalisations, mirroring `normalise` in
     /// `identity.ts`. A type this does not know about gets a plain
     /// trim, which is that function's `default` branch.
+    /// What JavaScript's `String.prototype.trim` removes.
+    ///
+    /// Not `.whitespacesAndNewlines`. That set contains U+00A0 but not
+    /// U+FEFF, which Unicode classifies as a format character rather
+    /// than whitespace — while ECMAScript's `WhiteSpace` production
+    /// lists it explicitly. A value pasted from a web page carries
+    /// either, and a device that trimmed differently would stop
+    /// matching its own events for that one user.
+    ///
+    /// Kotlin needs its own version of this for a different reason:
+    /// `Character.isWhitespace` excludes both. Three languages, three
+    /// definitions of "blank", one value that has to come out the
+    /// same.
+    private static let trimmed: CharacterSet = {
+        var set = CharacterSet.whitespacesAndNewlines
+        set.insert(charactersIn: "\u{feff}")
+        return set
+    }()
+
     static func normalise(keyType: String, raw: String) -> String {
         switch keyType {
         case "email", "username":
-            return raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return raw.trimmingCharacters(in: trimmed).lowercased()
         case "phone":
             // Everything that is not `+` or a digit goes, so
             // "+81 (90) 1234-5678" and "+819012345678" agree. This is
@@ -61,7 +80,7 @@ public final class SentoriIdentity: NSObject {
             // change an identifier the provider defined.
             return raw
         default:
-            return raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            return raw.trimmingCharacters(in: trimmed)
         }
     }
 }
