@@ -74,3 +74,6 @@ tmp/
 # Swift package build output
 sdk/native/ios/.build/
 sdk/native/ios/*.xcodeproj/
+
+# Written by scripts/ios-live-ingest.sh for one test run
+sdk/native/fixtures/live-server.json

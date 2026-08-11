@@ -42,8 +42,10 @@ const MIRRORS = [
     // zero-cost rule. When the bridge starts delegating to them
     // (v1.6 S4), the exclusion goes.
     exclude: [
+      'Sentori.swift',
       'SentoriConfig.swift',
       'SentoriIdentity.swift',
+      'SentoriDevice.swift',
       'SentoriScope.swift',
       'SentoriSignalRing.swift',
       'SentoriTransport.swift',
