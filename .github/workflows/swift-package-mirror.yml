@@ -14,8 +14,11 @@ name: swift package — mirror to goliajp/sentori-swift
 # Same mechanism as the self-hosted mirror, which is understood here.
 #
 # Required:
-#   vars.SENTORI_SWIFT_MIRROR_REPO    — e.g. goliajp/sentori-swift
-#   secrets.SENTORI_SWIFT_MIRROR_TOKEN — PAT with write access to it
+#   vars.SENTORI_SWIFT_MIRROR_REPO   — e.g. goliajp/sentori-swift
+#   secrets.SENTORI_SELFHOSTED_MIRROR_TOKEN — the PAT the self-hosted
+#     mirror already uses. It carries repo write across this account,
+#     so a second credential would be one more thing to rotate for no
+#     additional access.
 #
 # Triggers on a `swift/x.y.z` tag, and on develop pushes that touch
 # the package so the mirror does not drift between releases.
@@ -93,11 +96,11 @@ jobs:
 
       - name: push it
         env:
-          TOKEN: ${{ secrets.SENTORI_SWIFT_MIRROR_TOKEN }}
+          TOKEN: ${{ secrets.SENTORI_SELFHOSTED_MIRROR_TOKEN }}
           REPO: ${{ vars.SENTORI_SWIFT_MIRROR_REPO }}
         run: |
           if [ -z "$TOKEN" ]; then
-            echo "::error::SENTORI_SWIFT_MIRROR_TOKEN is unset — nothing was mirrored."
+            echo "::error::SENTORI_SELFHOSTED_MIRROR_TOKEN is unset — nothing was mirrored."
             echo "::error::A mirror job that skips silently is how a package goes stale."
             exit 1
           fi
