@@ -121,7 +121,16 @@ PY
 
 echo "→ xctest against it"
 XCLOG="$(mktemp)"
-DEST="${SENTORI_LIVE_DESTINATION:-platform=iOS Simulator,name=iPhone 17 Pro}"
+# A device name is a moving target: the runner image's simulator list
+# changes with Xcode, and a gate that names one starts failing because
+# Apple renamed a phone. Take whatever iPhone runtime is installed.
+if [ -n "${SENTORI_LIVE_DESTINATION:-}" ]; then
+    DEST="$SENTORI_LIVE_DESTINATION"
+else
+    UDID="$(xcrun simctl list devices available -j \
+        | python3 -c 'import sys,json;d=json.load(sys.stdin)["devices"];print(next(x["udid"] for rt in d for x in d[rt] if "iPhone" in x["name"]))')"
+    DEST="platform=iOS Simulator,id=$UDID"
+fi
 ( cd sdk/native/ios && xcodebuild test -scheme Sentori -destination "$DEST" \
     -only-testing:SentoriTests/SentoriLiveServerTests ) >"$XCLOG" 2>&1 || {
     grep -E "error: -\[|XCTAssert" "$XCLOG" | head -20 || true
