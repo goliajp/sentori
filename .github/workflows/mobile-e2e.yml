@@ -181,6 +181,50 @@ jobs:
           path: /tmp/xcodebuild.log
           if-no-files-found: warn
 
+  # The Android artifact an app would actually depend on.
+  #
+  # These sources had no build of their own: they compiled inside the
+  # React Native module and their tests ran by building the example
+  # app. So the AAR an Android app depends on had never been
+  # assembled, and the tests belonged to a module that exists for a
+  # different reason.
+  android-artifact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: tests, in their own build
+        working-directory: sdk/native/android
+        run: ./gradlew testReleaseUnitTest --console=plain
+
+      # Staging writes the exact files an upload would send. Central
+      # validates the POM on receipt and rejects the whole bundle, so
+      # a missing `<scm>` block is otherwise learned by re-staging a
+      # release rather than by fixing one.
+      - name: the artifact is complete enough for Maven Central
+        working-directory: sdk/native/android
+        run: ./gradlew publishReleasePublicationToBuildDirRepository --console=plain
+
+      - run: node scripts/check-maven-artifact.mjs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-artifact-reports
+          path: |
+            sdk/native/android/build/reports/tests/
+            sdk/native/android/build/staging-repo/
+          if-no-files-found: warn
+
   # The Kotlin SDK against a real server, for the same reason as the
   # iOS job below — and cheaper: Robolectric runs on the JVM, so this
   # needs no emulator, and Linux runners have Docker for Postgres.

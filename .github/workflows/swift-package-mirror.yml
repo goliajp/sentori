@@ -1,0 +1,121 @@
+name: swift package — mirror to goliajp/sentori-swift
+
+# A Swift package's manifest must sit at a repository root: SwiftPM
+# cannot be pointed at a subdirectory of a git dependency. Ours lives
+# at `sdk/native/ios`.
+#
+# The alternative was a `Package.swift` at this repo's root with
+# `path:` into the subdirectory, which works — and makes every
+# integrator's `swift package resolve` clone 112 MB of server,
+# dashboard and example app to obtain twenty Swift files. That is a
+# cost paid forever by everyone else to save this workflow.
+#
+# So the package gets a repository of its own, holding only itself.
+# Same mechanism as the self-hosted mirror, which is understood here.
+#
+# Required:
+#   vars.SENTORI_SWIFT_MIRROR_REPO    — e.g. goliajp/sentori-swift
+#   secrets.SENTORI_SWIFT_MIRROR_TOKEN — PAT with write access to it
+#
+# Triggers on a `swift/x.y.z` tag, and on develop pushes that touch
+# the package so the mirror does not drift between releases.
+
+on:
+  push:
+    branches: [develop, master]
+    paths:
+      - 'sdk/native/ios/**'
+      - '.github/workflows/swift-package-mirror.yml'
+    tags: ['swift/[0-9]+.[0-9]+.[0-9]+']
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # The package is verified from a *clean checkout of what would be
+  # published*, not from this repo. A package that only compiles inside
+  # the monorepo is not published, it is described — and the way that
+  # happens is a source file the mirror does not copy.
+  verify:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: assemble exactly what the mirror would publish
+        run: |
+          mkdir -p /tmp/pkg
+          cp -R sdk/native/ios/Package.swift sdk/native/ios/Sources sdk/native/ios/Tests /tmp/pkg/
+          # The identity vectors live outside the package and are read
+          # by a test through a relative path. A mirror that does not
+          # carry them turns that test into a skip nobody notices.
+          mkdir -p /tmp/pkg/fixtures
+          cp sdk/native/fixtures/identity-vectors.json /tmp/pkg/fixtures/
+          echo "── what a consumer would get ──"
+          find /tmp/pkg -type f | sed 's|/tmp/pkg/||' | sort
+
+      - name: it builds and tests there
+        working-directory: /tmp/pkg
+        run: |
+          if ! xcodebuild test \
+              -scheme Sentori \
+              -destination 'platform=iOS Simulator,name=iPhone 16' \
+              > /tmp/xcodebuild.log 2>&1; then
+            echo "── failures ──"
+            grep -E "error: -\[|XCTAssert|error:|' failed \(" /tmp/xcodebuild.log | head -40 || true
+            echo "── last 30 lines ──"
+            tail -30 /tmp/xcodebuild.log || true
+            exit 1
+          fi
+          grep -E "Executed [0-9]+ tests?" /tmp/xcodebuild.log | tail -1 || true
+
+  mirror:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: ${{ vars.SENTORI_SWIFT_MIRROR_REPO != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: build the mirror tree
+        run: |
+          mkdir -p /tmp/mirror/fixtures
+          cp -R sdk/native/ios/Package.swift sdk/native/ios/Sources sdk/native/ios/Tests /tmp/mirror/
+          cp sdk/native/fixtures/identity-vectors.json /tmp/mirror/fixtures/
+          cp LICENSE-APACHE LICENSE-MIT /tmp/mirror/ 2>/dev/null || true
+          cp docs/sdk-swift.md /tmp/mirror/README.md 2>/dev/null \
+            || echo "# Sentori for Swift" > /tmp/mirror/README.md
+          cat > /tmp/mirror/.gitignore <<'IGNORE'
+          .build/
+          *.xcodeproj/
+          IGNORE
+
+      - name: push it
+        env:
+          TOKEN: ${{ secrets.SENTORI_SWIFT_MIRROR_TOKEN }}
+          REPO: ${{ vars.SENTORI_SWIFT_MIRROR_REPO }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::SENTORI_SWIFT_MIRROR_TOKEN is unset — nothing was mirrored."
+            echo "::error::A mirror job that skips silently is how a package goes stale."
+            exit 1
+          fi
+          cd /tmp/mirror
+          git init -q
+          git config user.name  "sentori-mirror-bot"
+          git config user.email "takagi@golia.jp"
+          git add -A
+          git commit -q -m "sync from goliajp/sentori@${GITHUB_SHA::7}"
+          git branch -M main
+          git push --force "https://x-access-token:${TOKEN}@github.com/${REPO}.git" main
+
+          # A version tag is what `from: "1.0.0"` resolves against. No
+          # tag, no resolvable package — the mirror would exist and be
+          # unusable.
+          if [[ "$GITHUB_REF" == refs/tags/swift/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/swift/}"
+            git tag "$VERSION"
+            git push --force "https://x-access-token:${TOKEN}@github.com/${REPO}.git" "$VERSION"
+            echo "tagged $VERSION"
+          fi
