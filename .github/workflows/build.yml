@@ -276,6 +276,16 @@ jobs:
       # window nothing occupied. `npm install @goliapkg/sentori-expo`
       # answered ERESOLVE, which is the hardest way to fail the one
       # thing this SDK has to be.
+      # An option the public types advertise must be read by the code.
+      # `PushRegisterOptions.linkHash` was left over from an identity
+      # design that had been removed, with a doc comment still calling
+      # it the way to target a user — so an integrator set it, got
+      # `ok: true`, and never became addressable. `metadata` was
+      # advertised, never sent, and had no field on the server to
+      # receive it.
+      - name: public options are read by the code
+        run: node scripts/check-dead-options.mjs
+
       - name: peer ranges contain the versions we build against
         run: node scripts/check-peer-ranges.mjs
 

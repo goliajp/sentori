@@ -298,6 +298,10 @@ pub fn router(state: Arc<AppState>) -> Router {
             get(admin::push_sends::health),
         )
         .route(
+            "/admin/api/projects/{project_id}/push/devices",
+            get(admin::push_devices::list),
+        )
+        .route(
             "/admin/api/projects/{project_id}/push/sends",
             get(admin::push_sends::list),
         )

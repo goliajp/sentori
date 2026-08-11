@@ -150,6 +150,7 @@ export const en = {
   'palette.placeholder': 'Jump to a page or search issues…',
 
 
+  'push.addressable': 'Addressable',
   'push.config': 'Config (JSON)',
   'push.configNotJson': 'That is not valid JSON.',
   'push.configPlaceholder': '{"keyId":"ABC123","teamId":"DEF456","bundleId":"com.example.app"}',
@@ -160,18 +161,27 @@ export const en = {
   'push.deliveryEmpty':
     'Nothing sent yet. Devices register from the app with sentori.push.register(); sends land here.',
   'push.deliveryTitle': 'Delivery',
+  'push.device': 'Device',
+  'push.devicesEmpty': 'No devices registered. Call sentori.push.register() from the app.',
+  'push.devicesTitle': 'Devices',
   'push.failed24h': 'failed',
   'push.lastValidated': 'last checked {when} — {status}',
+  'push.metadata': 'Metadata',
+  'push.metadataNone': 'none sent',
   'push.neverValidated': 'never checked',
+  'push.no': 'no',
+  'push.notAddressableHint': 'Registered before sentori.user() ran — reachable by broadcast only, not from an issue.',
   'push.provider': 'Provider',
   'push.queued': 'queued',
   'push.reason': 'Reason',
   'push.retry': 'retry',
   'push.retryAll': 'Retry all failed',
+  'push.revoked': '(revoked)',
   'push.sendsEmpty': 'No sends yet',
   'push.sendsTitle': 'Recent sends',
   'push.sent24h': 'sent 24h',
   'push.tokens': '{live} devices · {identified} addressable · {quarantined} quarantined',
+  'push.yes': 'yes',
   'releases.artifactMissing':
     '{platform} reports events in this release but has no symbolication artifact — its stacks cannot be read',
   'releases.artifactUnused':

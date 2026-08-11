@@ -225,6 +225,27 @@ export type PushHealth = {
   reasons: { reason: string; count: number }[];
 };
 
+export type PushDevice = {
+  id: string;
+  provider: string;
+  env: null | string;
+  /** What the host passed to `sentori.push.register({ metadata })`,
+   *  verbatim. `{}` means it sent none — which is the answer to
+   *  "did my metadata arrive", and until server 2.22.0 it was `{}`
+   *  for every device because nothing carried the field. */
+  metadata: Record<string, unknown>;
+  /** `sentori.user()` ran before `register()`. Without it the device
+   *  gets broadcasts and cannot be reached from an issue. */
+  addressable: boolean;
+  badStreak: number;
+  revokedAt: null | string;
+  lastSeenAt: string;
+  createdAt: string;
+  /** Last six characters. Enough to tell two devices apart, not
+   *  enough to push to one. */
+  tokenTail: null | string;
+};
+
 export type SmtpStatus =
   | { configured: true; host: string; from: string }
   | { configured: false };
@@ -503,6 +524,11 @@ class Api {
     return this.post<{ sendId?: string; error?: string }>(
       `/admin/api/projects/${projectId}/push/test`,
       { deviceTokenId, title, body },
+    );
+  }
+  pushDevices(projectId: string, limit = 100) {
+    return this.get<{ devices: PushDevice[] }>(
+      `/admin/api/projects/${projectId}/push/devices?limit=${limit}`,
     );
   }
   pushSends(projectId: string, limit = 50) {
