@@ -77,3 +77,7 @@ sdk/native/ios/*.xcodeproj/
 
 # Written by scripts/ios-live-ingest.sh for one test run
 sdk/native/fixtures/live-server.json
+
+# Gradle build output for the standalone Android package
+sdk/native/android/build/
+sdk/native/android/.gradle/
