@@ -115,10 +115,14 @@ final class SentoriTransportTests: XCTestCase {
 
     func testAFailedSendSpillsToDiskAndDrainsOnTheNextStart() {
         configure()
-        // Bound how long one attempt can take. Without this the test
-        // measures the machine's TCP behaviour: a laptop refuses a
-        // closed port at once, a CI runner drops it and waits out the
-        // full timeout three times over.
+        // Force the send to fail instead of arranging for it. Two
+        // attempts to provoke a real failure — a closed port, then a
+        // one-second timeout — each behaved differently on CI than
+        // here, and both times the test reported a broken transport
+        // when the transport was fine. This test is about the spill
+        // and the drain; `ios-live-ingest` is what exercises the
+        // network.
+        SentoriTransport.forcedOutcomeForTests = 2  // .failed
         SentoriTransport.requestTimeout = 1
         SentoriTransport.start()
         for i in 0..<3 { SentoriTransport.enqueue(["kind": "error", "seq": i]) }

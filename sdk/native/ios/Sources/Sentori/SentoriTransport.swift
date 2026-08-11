@@ -34,12 +34,22 @@ public final class SentoriTransport: NSObject {
     /// minutes ago matters less than the one happening now.
     private static let maxQueued = 500
 
-    /// Per-attempt request timeout. A test seam: the spill test used
-    /// to rely on a closed port being refused instantly, which is true
-    /// on a laptop and false on a CI runner that drops the packet
-    /// instead — three 15 s attempts there, and the test timed out
-    /// waiting for a spill that was still 20 s away.
+    /// Per-attempt request timeout.
     static var requestTimeout: TimeInterval = 15
+
+    /// Test seam: skip the network and return this outcome.
+    ///
+    /// The spill test tried twice to provoke a real failure by sending
+    /// to a closed port. A laptop refuses it instantly; one CI runner
+    /// dropped the packet and waited out the timeout three times over,
+    /// and another answered in a way that read as a 4xx — which this
+    /// transport treats as handled, so nothing spilled and the test
+    /// failed on logic that was correct.
+    ///
+    /// What that test is about is the spill and the drain, not TCP.
+    /// The network path has its own gate: `ios-live-ingest` sends to a
+    /// real server and reads the events back.
+    static var forcedOutcomeForTests: Int?
 
     private static let lock = NSLock()
     private static var queue: [[String: Any]] = []
@@ -187,6 +197,9 @@ public final class SentoriTransport: NSObject {
     }
 
     private static func sendOnce(_ envelope: [String: Any], config: SentoriConfig) -> Outcome {
+        if let forced = forcedOutcomeForTests {
+            return forced == 0 ? .delivered : (forced == 1 ? .dropped : .failed)
+        }
         guard let url = URL(string: "\(config.ingestUrl)/v1/events:batch"),
             let body = try? JSONSerialization.data(withJSONObject: envelope)
         else { return .dropped }
@@ -299,6 +312,7 @@ public final class SentoriTransport: NSObject {
         delivered = 0
         started = false
         requestTimeout = 15
+        forcedOutcomeForTests = nil
         timer?.cancel()
         timer = nil
         lock.unlock()
