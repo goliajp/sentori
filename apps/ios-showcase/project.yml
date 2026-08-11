@@ -16,6 +16,10 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: NO
     SWIFT_STRICT_CONCURRENCY: minimal
 
+packages:
+  Sentori:
+    path: ../../sdk/native/ios
+
 targets:
   SentoriShowcase:
     type: application
@@ -23,17 +27,20 @@ targets:
     deploymentTarget: "18.0"
     sources:
       - path: SentoriShowcase
-      # Pure-Swift Sentori classes linked directly (skip the
-      # ExpoModulesCore JS bridge — this showcase is a native iOS
-      # demo, not an RN host). SentoriModule.swift is intentionally
-      # excluded since it's the Expo wrapper.
-      - path: ../../sdk/react-native/ios/SentoriCrashHandler.swift
-      - path: ../../sdk/react-native/ios/SentoriHangWatchdog.swift
-      - path: ../../sdk/react-native/ios/SentoriMobileVitals.swift
-      - path: ../../sdk/react-native/ios/SentoriNativeExceptionBridge.swift
-      - path: ../../sdk/react-native/ios/SentoriReplayCapture.swift
-      - path: ../../sdk/react-native/ios/SentoriScreenshotCapture.swift
-      - path: ../../sdk/react-native/ios/SentoriThreadSampler.swift
+    # The published package, by path — not a list of source files.
+    #
+    # This used to name seven files under `sdk/react-native/ios`, and
+    # they moved when the native core became a package of its own. The
+    # showcase had been broken since, and nothing noticed because no
+    # CI job built it: a demo that does not compile is worse than no
+    # demo, because it is the front door.
+    #
+    # A local path rather than the git URL so a change to the SDK is
+    # visible here in the same commit. The published artifact has its
+    # own gate — the mirror workflow builds it from a clean checkout.
+    dependencies:
+      - package: Sentori
+        product: Sentori
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: jp.golia.sentori.showcase
