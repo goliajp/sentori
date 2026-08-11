@@ -134,6 +134,8 @@ MODULE=":goliapkg-sentori-react-native"
     grep -E "FAILED|^e: " "$GLOG" | head -20 || true
     echo "── last 30 lines ──"
     tail -30 "$GLOG" || true
+    echo "── server log ──"
+    tail -40 "$LOG" || true
     echo "FAIL: the Android suite did not pass" >&2
     exit 1
 }

@@ -136,6 +136,12 @@ fi
     grep -E "error: -\[|XCTAssert" "$XCLOG" | head -20 || true
     echo "── last 30 lines ──"
     tail -30 "$XCLOG" || true
+    # Whether the server saw the request, and what it answered, is
+    # only written down here. The readback path already prints it; a
+    # suite that fails before the readback needs it just as much —
+    # "the server never accepted a batch" says nothing about why.
+    echo "── server log ──"
+    tail -40 "$LOG" || true
     echo "FAIL: the live suite did not pass" >&2
     exit 1
 }
