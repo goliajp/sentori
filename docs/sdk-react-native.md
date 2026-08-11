@@ -529,6 +529,97 @@ stopReplay()
   the sampler tick. Fixed in the SDK in v1.0.0-rc.1; consumer apps
   on Hermes 0.83+ are unaffected.
 
+## Push notifications (opt-in)
+
+Sentori delivers push itself, so the devices that hit an issue are
+addressable from the issue. iOS goes over APNs, Android over FCM, and
+the host app writes one call for both.
+
+```ts
+import { sentori } from '@goliapkg/sentori-react-native'
+
+sentori.user({ id: currentUser.id })   // before register — see below
+
+const r = await sentori.push.register({
+  onMessage: (n) => console.log('arrived', n.title),
+  onTap: (data) => navigateFrom(data),
+})
+
+if (!r.ok) {
+  // r.reason is one of: 'permission-denied' | 'no-transport'
+  //                   | 'token-timeout' | 'server-rejected'
+  //                   | 'not-initialised'
+}
+```
+
+**`register()` never throws.** A denied permission is an ordinary
+answer, not an exception — an opt-in that throws inside a `useEffect`
+is exactly the failure this SDK's contract with its host app is
+written against. Every outcome comes back as `{ ok: false, reason }`,
+and each reason asks for something different:
+
+| `reason` | What happened | What to do |
+|---|---|---|
+| `permission-denied` | The user declined | Nothing now. Offer it again from a settings screen — do **not** retry on a timer |
+| `no-transport` | No native push module in this binary (Expo Go, a simulator with no entitlement) | Nothing at runtime; check the build |
+| `token-timeout` | The OS never returned a token in the window | Usually provisioning. Retrying later is reasonable; raise `tokenTimeoutMs` |
+| `server-rejected` | Sentori answered non-2xx | Look at Settings ▸ Push in the dashboard |
+| `not-initialised` | `sentori.init()` has not run | A wiring bug |
+
+`register()` is safe to call on every launch: the OS returns its
+cached permission decision without re-prompting, and the server
+upserts on `(project, provider, token)`.
+
+### Call `sentori.user()` first
+
+Registration sends the same salted identity hash every event carries.
+With it, the device is **addressable** — the dashboard can reach the
+people who hit a particular issue. Without it the device is registered
+but can only receive broadcasts. The raw identity never leaves the
+device either way.
+
+Settings ▸ Push shows both numbers. Devices climbing while addressable
+stays at zero means `sentori.user()` is running after
+`sentori.push.register()`, or not at all.
+
+### Setup
+
+1. `app.json` → `plugins: ["@goliapkg/sentori-expo"]`. At prebuild the
+   config plugin adds the iOS `remote-notification` background mode
+   and `aps-environment` entitlement, the Android `POST_NOTIFICATIONS`
+   permission, the google-services plugin and `firebase-messaging`,
+   and copies `google-services.json`.
+2. Dashboard → Settings ▸ Push → paste the APNs key or the FCM service
+   account, press Test.
+3. `await sentori.push.register()`.
+
+You do not import `expo-notifications`, request permissions, or touch
+the `AppDelegate` yourself.
+
+### If the app already uses `expo-notifications`
+
+On **iOS** the two coexist: Sentori installs its `AppDelegate` swizzle
+only when `register()` is called, so an app that never calls it is
+untouched.
+
+On **Android** they do not, and no runtime flag can make them. This
+SDK's manifest declares a `FirebaseMessagingService` for
+`com.google.firebase.MESSAGING_EVENT`; `expo-notifications` declares
+its own. FCM delivers `onNewToken` / `onMessageReceived` to whichever
+one manifest merging put first — a build-time fact, not something JS
+can choose. Two such services in one APK means one of them is deaf.
+Pick one per build (an EAS profile that omits the other plugin, or
+`tools:node="remove"` on the loser's service).
+
+### Other calls
+
+| Call | Does |
+|---|---|
+| `sentori.push.getStatus()` | Current permission, no prompt. `null` when there is no native module |
+| `sentori.push.requestPermission()` | Prompt only, without registering |
+| `sentori.push.getCachedIpt()` | The device handle from an earlier `register()`, no network |
+| `sentori.push.unregister()` | Revoke the handle server-side and stop local delivery. Idempotent |
+
 ## What this SDK does NOT do (v0.1)
 
 - Native signal-based crashes (SIGSEGV / SIGABRT) — only `NSException`
