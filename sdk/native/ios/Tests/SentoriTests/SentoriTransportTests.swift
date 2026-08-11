@@ -23,6 +23,26 @@ final class SentoriTransportTests: XCTestCase {
         super.tearDown()
     }
 
+
+    /// Poll a condition to a deadline, failing with the reason rather
+    /// than sleeping a guessed interval and asserting afterwards.
+    private func waitUntil(
+        _ what: String,
+        timeout: TimeInterval = 30,
+        _ condition: () -> Bool
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition(), Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        XCTAssertTrue(
+            condition(),
+            "\(what) — not after \(Int(timeout))s; persisted: "
+                + "\(SentoriTransport.__peekPersisted().count), "
+                + "queued: \(SentoriTransport.__peekQueue().count)"
+        )
+    }
+
     private func configure(url: String = "http://127.0.0.1:9") {
         SentoriConfig.set(
             SentoriConfig(
@@ -99,26 +119,23 @@ final class SentoriTransportTests: XCTestCase {
         for i in 0..<3 { SentoriTransport.enqueue(["kind": "error", "seq": i]) }
         SentoriTransport.flush()
 
-        // The send is to a closed port; give the retries their three
-        // attempts before looking.
-        let spilled = expectation(description: "spilled")
-        DispatchQueue.global().asyncAfter(deadline: .now() + 8) { spilled.fulfill() }
-        wait(for: [spilled], timeout: 12)
-
-        XCTAssertEqual(
-            SentoriTransport.__peekPersisted().count, 3,
-            "events must survive being offline"
-        )
+        // Poll rather than sleep. A fixed wait encodes a guess about
+        // how fast the machine is, and the guess was wrong on a CI
+        // runner roughly half the speed of this one: the drain had not
+        // reached the worker after a second, and the test failed on a
+        // transport that was working.
+        waitUntil("events spill when the send fails") {
+            SentoriTransport.__peekPersisted().count == 3
+        }
 
         // A fresh process: the spill goes back through the normal path
         // and the file is cleared, so a second failure spills once
         // rather than doubling.
         SentoriConfig.__resetForTests()
         SentoriTransport.start()
-        let drained = expectation(description: "drained")
-        DispatchQueue.global().asyncAfter(deadline: .now() + 1) { drained.fulfill() }
-        wait(for: [drained], timeout: 5)
-        XCTAssertEqual(SentoriTransport.__peekQueue().count, 3, "the spill came back")
+        waitUntil("the spill comes back on the next start") {
+            SentoriTransport.__peekQueue().count == 3
+        }
         XCTAssertTrue(SentoriTransport.__peekPersisted().isEmpty, "and the file was cleared")
     }
 
