@@ -270,6 +270,15 @@ jobs:
       - name: every advertised entry point exists
         run: node scripts/check-package-entrypoints.mjs
 
+      # And a peer range is a promise about what it installs alongside.
+      # 6.0.0 shipped `expo-modules-core >=56.0.0 <57.0.0` while this
+      # repo built against 55 and the current Expo SDK ships 57 — a
+      # window nothing occupied. `npm install @goliapkg/sentori-expo`
+      # answered ERESOLVE, which is the hardest way to fail the one
+      # thing this SDK has to be.
+      - name: peer ranges contain the versions we build against
+        run: node scripts/check-peer-ranges.mjs
+
       - name: SDK size budget
         run: bash scripts/check-sdk-size.sh
 

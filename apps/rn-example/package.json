@@ -12,13 +12,13 @@
   },
   "dependencies": {
     "@goliapkg/sentori-react-native": "workspace:*",
-    "expo": "~55.0.24",
-    "expo-dev-client": "~55.0.34",
-    "expo-linking": "~55.0.15",
-    "expo-status-bar": "~55.0.6",
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
-    "react-native": "0.83.6"
+    "expo": "~57.0.12",
+    "expo-dev-client": "~57.0.11",
+    "expo-linking": "~57.0.5",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
