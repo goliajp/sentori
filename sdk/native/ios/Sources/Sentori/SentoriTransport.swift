@@ -200,8 +200,20 @@ public final class SentoriTransport: NSObject {
         if let forced = forcedOutcomeForTests {
             return forced == 0 ? .delivered : (forced == 1 ? .dropped : .failed)
         }
+        // `JSONSerialization` raises `NSInvalidArgumentException` for a
+        // NaN or an infinity — an Objective-C exception, which `try?`
+        // does not catch and Swift cannot. One `Double.nan` in one
+        // event's data would terminate the host app: the SDK crashing
+        // the app instead of reporting the app's crash, which is the
+        // failure-isolation rule broken as completely as it can be.
+        //
+        // `isValidJSONObject` answers the same question without
+        // raising, and `scrubbed` replaces what it objects to so a
+        // single bad value costs one field rather than the batch.
+        let safe = JSONSerialization.isValidJSONObject(envelope) ? envelope : scrubbed(envelope)
         guard let url = URL(string: "\(config.ingestUrl)/v1/events:batch"),
-            let body = try? JSONSerialization.data(withJSONObject: envelope)
+            JSONSerialization.isValidJSONObject(safe),
+            let body = try? JSONSerialization.data(withJSONObject: safe)
         else { return .dropped }
 
         var request = URLRequest(url: url)
@@ -242,6 +254,34 @@ public final class SentoriTransport: NSObject {
         return outcome
     }
 
+    /// Replace anything `JSONSerialization` refuses with something it
+    /// accepts, keeping the field so the reader can see what happened
+    /// rather than finding a hole.
+    ///
+    /// Non-finite numbers become their names; a type with no JSON
+    /// equivalent — a `Date`, a `URL`, a host's own struct — becomes
+    /// its description, which is more use than dropping the event.
+    private static func scrubbed(_ value: Any) -> Any {
+        switch value {
+        case let dict as [String: Any]:
+            return dict.mapValues { scrubbed($0) }
+        case let array as [Any]:
+            return array.map { scrubbed($0) }
+        case let number as Double:
+            if number.isNaN { return "NaN" }
+            if number.isInfinite { return number > 0 ? "Infinity" : "-Infinity" }
+            return number
+        case let number as Float:
+            return scrubbed(Double(number))
+        case is String, is Int, is Bool, is NSNull:
+            return value
+        case let number as NSNumber:
+            return scrubbed(number.doubleValue)
+        default:
+            return String(describing: value)
+        }
+    }
+
     // ── the offline queue ─────────────────────────────────────────
 
     private static var spillURL: URL? {
@@ -262,7 +302,13 @@ public final class SentoriTransport: NSObject {
         // the file has to stop growing on a device that is offline for
         // a week.
         if all.count > maxPersisted { all.removeFirst(all.count - maxPersisted) }
-        guard let data = try? JSONSerialization.data(withJSONObject: all) else { return }
+        // Same raise as the send path: a NaN here would terminate the
+        // app while writing the file whose whole job is to survive a
+        // failure. `try?` does not catch an Objective-C exception.
+        let safe = scrubbed(all)
+        guard JSONSerialization.isValidJSONObject(safe),
+            let data = try? JSONSerialization.data(withJSONObject: safe)
+        else { return }
         try? data.write(to: url, options: .atomic)
     }
 
@@ -305,6 +351,23 @@ public final class SentoriTransport: NSObject {
     // ── test seams ────────────────────────────────────────────────
 
     static func __resetForTests() {
+        // Wait for the worker before clearing anything. A flush
+        // dispatched by the previous test can still be in
+        // `sendWithRetry`, and its `persist` then writes the spill
+        // file *after* this deleted it — so the next test's `start`
+        // drains that file, flushes, and carries off assert counters
+        // that belonged to it. That is what turned `passDelta` into 1
+        // on CI while it stayed 2 here.
+        //
+        // `worker.sync {}` deadlocks: `drainPersisted` and the send
+        // both run *on* this queue and can reach here, and a
+        // same-queue sync waits for itself. A semaphore posted from an
+        // async block waits from either side, and gives up rather than
+        // hanging a suite if the worker is wedged.
+        let drained = DispatchSemaphore(value: 0)
+        worker.async { drained.signal() }
+        _ = drained.wait(timeout: .now() + 10)
+
         lock.lock()
         queue.removeAll()
         assertStats.removeAll()
