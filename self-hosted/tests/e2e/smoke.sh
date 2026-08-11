@@ -280,6 +280,29 @@ KINDS="$(curl -fsS -H "Authorization: Bearer ${API_TOKEN}" \
     "${BASE}/v1/releases/sym%401.0.0%2B1/artifacts" | jq -r '.kinds.sourcemap')"
 [[ "$KINDS" == "1" ]] \
     || { echo "sourcemap count is ${KINDS}, want 1 — the unreadable one must not count" >&2; exit 1; }
+
+# The two routes the dashboard's releases page actually calls. Every
+# call to the list panicked on `ColumnNotFound("usable")` from server
+# 2.15.0 to 2.21.1 — it read a column it had not selected, so the
+# page got a dropped connection instead of a list. The one job that
+# would have caught it triggers on `apps/rn-example/**`, so it did not
+# run for six server releases. This is in the smoke because the smoke
+# runs on all of them.
+echo "→ the releases page has something to render"
+RELEASES="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/releases")"
+REL_ID="$(echo "$RELEASES" | jq -r '.releases[] | select(.name == "sym@1.0.0+1") | .id')"
+[[ -n "$REL_ID" && "$REL_ID" != "null" ]] \
+    || { echo "the uploaded release is missing from the list: $RELEASES" >&2; exit 1; }
+[[ "$(echo "$RELEASES" | jq -r '.releases[] | select(.name == "sym@1.0.0+1") | .platforms | length')" != "0" ]] \
+    || { echo "the release reports no platforms though events carry one: $RELEASES" >&2; exit 1; }
+
+# Both artifacts, and `usable` telling them apart — this is where the
+# flag lives, one per artifact rather than one per release.
+ARTS="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/releases/${REL_ID}/artifacts")"
+[[ "$(echo "$ARTS" | jq '[.artifacts[] | select(.usable == true)] | length')" == "1" ]] \
+    || { echo "want exactly one usable artifact: $ARTS" >&2; exit 1; }
+[[ "$(echo "$ARTS" | jq '[.artifacts[] | select(.usable == false)] | length')" == "1" ]] \
+    || { echo "the unreadable artifact is not marked unusable: $ARTS" >&2; exit 1; }
 rm -rf "$MAPDIR"
 
 # ── the /api surface an agent drives ─────────────────────────────

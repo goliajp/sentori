@@ -22,18 +22,32 @@ name: mobile-e2e
 #
 # What is left runs, and runs on the code that ships.
 
+# The path filters listed only the Android module and the example app.
+# That fits `android-unit`, but `sourcemap-e2e` below builds and drives
+# the *server*, and nothing in its path list is a server path. So it
+# skipped every server release, and `GET .../releases` panicked from
+# 2.15.0 to 2.21.1 with the one job that exercises it never running.
+#
+# A gate wired to the wrong paths is worse than no gate: it is green
+# on the changes it cannot see.
 on:
   push:
     branches: [develop, master]
     paths:
       - 'sdk/react-native/android/**'
       - 'apps/rn-example/**'
+      - 'self-hosted/server/**'
+      - 'core/migrations/**'
+      - 'scripts/sourcemap-e2e/**'
       - '.github/workflows/mobile-e2e.yml'
   pull_request:
     branches: [develop, master]
     paths:
       - 'sdk/react-native/android/**'
       - 'apps/rn-example/**'
+      - 'self-hosted/server/**'
+      - 'core/migrations/**'
+      - 'scripts/sourcemap-e2e/**'
   workflow_dispatch:
 
 env:
@@ -161,7 +175,14 @@ jobs:
           cargo build
           # Migrations run at boot, so starting the binary is the whole
           # setup step.
-          ./target/debug/sentori-server &
+          #
+          # Keep the output. Without this the server's stdout went to
+          # the job log interleaved with nothing to attribute it to,
+          # and a panic mid-run showed up only as `curl: (52) Empty
+          # reply from server` — the shape of the failure, never the
+          # cause. The panic that closed this hole had to be
+          # reproduced locally to be read at all.
+          ./target/debug/sentori-server > /tmp/sentori-server.log 2>&1 &
           for _ in $(seq 1 60); do
             curl -sf http://localhost:8080/healthz && break
             sleep 1
@@ -174,3 +195,7 @@ jobs:
           SENTORI_OWNER_EMAIL: ci@example.com
           SENTORI_OWNER_PASSWORD: ci-password-long-enough
         run: bash scripts/sourcemap-e2e/run-v1.sh
+
+      - name: server log
+        if: failure()
+        run: cat /tmp/sentori-server.log
