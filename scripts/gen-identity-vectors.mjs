@@ -44,12 +44,14 @@ const CASES = [
   ['custom', '  trimmed  '],
   ['id', '日本語ユーザー'],
   ['id', 'e'.repeat(512)],
-  // Whitespace the three languages do not agree on by default.
-  // JavaScript's `trim` and Swift's `.whitespacesAndNewlines` both
-  // remove U+00A0 and U+FEFF; Kotlin's `trim()` uses
-  // `Character.isWhitespace`, which removes neither. A user pasted
-  // from a web page carries these, and a device that trimmed
-  // differently would quietly stop matching its own events.
+  // Whitespace no two of the three languages agree on by default.
+  // ECMAScript's `WhiteSpace` production lists both U+00A0 and
+  // U+FEFF. Swift's `.whitespacesAndNewlines` has the first and not
+  // the second — Unicode calls a byte-order mark a format character.
+  // Kotlin's `Character.isWhitespace` has neither. All three needed
+  // an explicit set, and these two vectors are the only reason anyone
+  // found that out: both native implementations were written, read
+  // and believed correct first.
   ['id', '\u00a0usr_123\u00a0'],
   ['email', '\ufeff  A@B.com \u00a0'],
 ];
