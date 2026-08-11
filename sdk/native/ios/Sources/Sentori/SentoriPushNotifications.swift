@@ -40,9 +40,31 @@ import ObjectiveC.runtime
 
     // MARK: Permission
 
+    /// `UNUserNotificationCenter.current()` raises
+    /// `NSInternalInconsistencyException` — "bundleProxyForCurrentProcess
+    /// is nil" — in any process without an app bundle: a unit-test
+    /// target that links this SDK, a command-line tool, some extension
+    /// hosts. An Objective-C exception cannot be caught in Swift, so
+    /// it terminates the host outright.
+    ///
+    /// That is the failure-isolation rule broken in the loudest
+    /// possible way, and it is the SDK crashing the app rather than
+    /// the app crashing. Found when this package's own test target
+    /// called it and the runner died mid-suite.
+    ///
+    /// `bundleIdentifier` is the same precondition, readable without
+    /// raising.
+    private var notificationCentreIsUsable: Bool {
+        Bundle.main.bundleIdentifier != nil
+    }
+
     /// Returns the current permission status as a JS-friendly string.
     /// Does NOT prompt.
     @objc public func currentPermission(completion: @escaping (String) -> Void) {
+        guard notificationCentreIsUsable else {
+            completion("unavailable")
+            return
+        }
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             completion(authString(settings.authorizationStatus))
         }
@@ -51,6 +73,10 @@ import ObjectiveC.runtime
     /// Requests authorization. Triggers the OS prompt the first time;
     /// subsequent calls return the cached decision.
     @objc public func requestPermission(completion: @escaping (String) -> Void) {
+        guard notificationCentreIsUsable else {
+            completion("unavailable")
+            return
+        }
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
             if let error = error {
