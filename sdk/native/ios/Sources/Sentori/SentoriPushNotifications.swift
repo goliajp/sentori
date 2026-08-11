@@ -40,9 +40,40 @@ import ObjectiveC.runtime
 
     // MARK: Permission
 
+    /// `UNUserNotificationCenter.current()` raises
+    /// `NSInternalInconsistencyException` — "bundleProxyForCurrentProcess
+    /// is nil" — in any process without an app bundle: a unit-test
+    /// target that links this SDK, a command-line tool, some extension
+    /// hosts. An Objective-C exception cannot be caught in Swift, so
+    /// it terminates the host outright.
+    ///
+    /// That is the failure-isolation rule broken in the loudest
+    /// possible way, and it is the SDK crashing the app rather than
+    /// the app crashing. Found when this package's own test target
+    /// called it and the runner died mid-suite.
+    ///
+    /// The precondition is whether this process *is* an app bundle,
+    /// not whether it has an identifier. `bundleIdentifier` is
+    /// non-nil in an xctest host and the call raised anyway: the
+    /// message names the real cause — `mainBundle.bundleURL` pointing
+    /// at Xcode's `Agents/` directory, which LaunchServices has no
+    /// bundle proxy for.
+    ///
+    /// An app is `…/Foo.app`; a notification service extension is
+    /// `…/Bar.appex` and legitimately uses this API. Anything else —
+    /// a test runner, a command-line tool — gets "unavailable" and a
+    /// `no-transport` result rather than a terminated process.
+    private var notificationCentreIsUsable: Bool {
+        ["app", "appex"].contains(Bundle.main.bundleURL.pathExtension)
+    }
+
     /// Returns the current permission status as a JS-friendly string.
     /// Does NOT prompt.
     @objc public func currentPermission(completion: @escaping (String) -> Void) {
+        guard notificationCentreIsUsable else {
+            completion("unavailable")
+            return
+        }
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             completion(authString(settings.authorizationStatus))
         }
@@ -51,6 +82,10 @@ import ObjectiveC.runtime
     /// Requests authorization. Triggers the OS prompt the first time;
     /// subsequent calls return the cached decision.
     @objc public func requestPermission(completion: @escaping (String) -> Void) {
+        guard notificationCentreIsUsable else {
+            completion("unavailable")
+            return
+        }
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
             if let error = error {
@@ -71,6 +106,10 @@ import ObjectiveC.runtime
     /// method, which routes the token into our buffer.
     @objc public func registerForRemoteNotifications() {
         ensureSwizzleInstalled()
+        // Same guard as the permission calls: installing the
+        // delegate touches the notification centre, which raises in a
+        // process that is not an app bundle.
+        guard notificationCentreIsUsable else { return }
         UNUserNotificationCenter.current().delegate = self
         DispatchQueue.main.async {
             UIApplication.shared.registerForRemoteNotifications()

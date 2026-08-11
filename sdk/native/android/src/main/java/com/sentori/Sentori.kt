@@ -74,6 +74,12 @@ object Sentori {
     fun pushSignal(kind: String, data: Map<String, Any?>? = null) =
         SentoriSignalRing.push(kind, data)
 
+    /**
+     * `Sentori.push.register(...)`, matching `sentori.push.register()`
+     * in the React Native SDK and `Sentori.push` in Swift.
+     */
+    @JvmStatic val push: SentoriPush get() = SentoriPush
+
     // ── the verbs ─────────────────────────────────────────────────
 
     /** Something went wrong. */
