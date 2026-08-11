@@ -132,8 +132,12 @@ DEST="${SENTORI_LIVE_DESTINATION:-platform=iOS Simulator,name=iPhone 17 Pro}"
 # The whole point. `XCTSkip` is reported as a pass, so without this a
 # missing fixture, a renamed test or a simulator that never launched
 # all read as success.
-if grep -q "skipped" "$XCLOG"; then
-    grep -E "skipped" "$XCLOG" | head -3
+# Anchored on XCTest's own wording. A bare `skipped` also matches
+# `appintentsmetadataprocessor: Metadata extraction skipped.`, which
+# every build on a machine with that tool emits — the check failed a
+# passing run the first time it was used for real.
+if grep -qE "Test Case .* skipped|: Test skipped" "$XCLOG"; then
+    grep -E "Test Case .* skipped|: Test skipped" "$XCLOG" | head -3
     echo "FAIL: the live test skipped — it proved nothing" >&2
     exit 1
 fi
