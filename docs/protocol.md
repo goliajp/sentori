@@ -230,6 +230,84 @@ the one CLI command that exits non-zero on purpose — uploads stay lenient so S
 can never block a release, which means a broken upload step is silent and something
 has to be allowed to notice.
 
+### `POST /v1/push/tokens`
+Register this device so Sentori can reach it. Ingest-scope token — the same one the
+app already ships with.
+
+```json
+{
+  "kind":        "apns",
+  "nativeToken": "9f2c…",
+  "env":         "sandbox",
+  "userKey":     "ca010ec7…",
+  "metadata":    { "appVersion": "4.2.1", "channel": "store" }
+}
+```
+
+- `kind` is `apns` | `fcm` | `webpush` | `hcm` | `mipush`. **Not `provider`** — the
+  React Native SDK sent that name for a year and earned a 422 for every registration
+  it ever attempted.
+- `env` is `sandbox` | `production`, and only APNs has the distinction: a token minted
+  against one host is rejected by the other. FCM is a single host, so an `env` there
+  would be a claim about a split that does not exist.
+- `userKey` is the same salted-nothing identity hash every event carries
+  (`SHA-256` of the normalised id, computed on the device). With it, an issue can
+  reach the people it happened to; without it the device receives broadcasts only.
+  The dashboard shows the difference as "N devices, M addressable".
+- `metadata` is yours, stored verbatim and shown per device in Settings ▸ Push.
+  Needs server ≥ 2.22.0 — before that the field reached neither the SDK's request nor
+  the server's struct, and every row read `{}`.
+
+Response (`202 Accepted`):
+
+```json
+{ "token_id": "019ff080-2aeb-7e30-aba1-4431b296d120", "is_new": true }
+```
+
+`token_id` is the `device_tokens` row id — a **bare uuid**. It carried an `ipt_`
+prefix in v0.2. Anything routing on that prefix silently sends to the wrong place
+after upgrading, so accept both while old devices are still registered.
+
+Re-registering the same `(project, kind, nativeToken)` updates in place and un-revokes;
+`env`, `userKey` and `metadata` are kept when the new call omits them. Calling this on
+every launch is the intended usage.
+
+### `DELETE /v1/push/tokens/{token_id}`
+Revoke. Ingest-scope. `202 Accepted` with `{"status":"revoked"}`, and idempotent — a
+handle that is already revoked or was never yours is not an error worth failing a
+sign-out over.
+
+### `POST /v1/push/send`
+Send. **api-scope** token: an ingest token is in every copy of your app, and a
+credential that can send notifications to your users is not one to hand out.
+
+```json
+{
+  "tokenIds": ["019ff080-…"],
+  "payload":  { "title": "Back in stock", "body": "…" },
+  "idempotencyKey": "restock-2026-08-11-u123"
+}
+```
+
+Target with exactly one of `tokenIds`, `nativeTokens` or `topic`. `payload` is passed
+to the vendor verbatim. Response (`202 Accepted`) is
+`{"send_ids": [...], "queued": n}`; a background worker drains the queue every 5 s,
+retries, and quarantines a token the vendor rejects permanently.
+
+### `GET /v1/push/receipts/{send_id}` · `POST /v1/push/sends/{send_id}/ack`
+What the vendor said, and what the device did. The ack takes an optional
+`{"ackSessionId": "…"}` so opening the same notification twice records once.
+
+### `POST /v1/push/expo-compat/send` · `GET /v1/push/expo-compat/receipts/{send_id}`
+Expo's server wire shape, in and out, in front of the same pipeline. A backend written
+against `expo-server-sdk` can point at Sentori without changing its call sites. This
+is the *server* shape only — the client side is `sentori.push.register()`.
+
+### Topics and preferences
+`POST` / `DELETE /v1/push/tokens/{token_id}/topics[/{topic}]` subscribe and
+unsubscribe; `GET` / `PUT /v1/push/users/{user_key}/preferences[/{category}]` read and
+set per-category opt-outs. Both ingest-scope.
+
 ## Authentication and headers
 
 | Header | Required | Example |
