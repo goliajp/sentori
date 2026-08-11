@@ -1,21 +1,21 @@
-// v2.9 — React Native push notification opt-in (iOS in this release).
-//
-// Mirrors `@goliapkg/sentori-javascript`'s `registerWeb` ergonomics
-// so a cross-platform host app reasons about both flows the same way.
+// React Native push notification opt-in. Both platforms: iOS via
+// APNs, Android via FCM.
 //
 // Flow:
 //   1. `pushRequestPermission()` — OS prompt the first time, or
 //      returns the cached decision.
-//   2. `pushRegister()` — kicks off
-//      `UIApplication.registerForRemoteNotifications`. The token
-//      arrives asynchronously via the AppDelegate swizzle and lands
-//      in the native buffer.
+//   2. `pushRegister()` — on iOS kicks off
+//      `UIApplication.registerForRemoteNotifications`; on Android
+//      asks FCM for the instance token. Either way the token arrives
+//      asynchronously and lands in the native buffer.
 //   3. Poll `pushDrainState()` at 200 ms ticks for up to 8 s waiting
 //      for the token.
-//   4. POST `/v1/push/tokens` with
-//      `provider: 'apns'`, `env: __DEV__ ? 'sandbox' : 'production'`,
-//      `nativeToken: <hex>`, `linkHash?`, `metadata`.
-//   5. Cache the returned `ipt_*` handle (AsyncStorage when
+//   4. POST `/v1/push/tokens` with `kind: 'apns' | 'fcm'` — the
+//      server's field name; sending `provider` here earned a 422 for
+//      every registration this SDK ever attempted — plus
+//      `nativeToken`, `userKey`, and `env` on iOS only (FCM is a
+//      single host and has no sandbox/production split).
+//   5. Cache the returned device handle (AsyncStorage when
 //      available, otherwise module-scoped).
 //   6. Start a 1 Hz drain loop that fires `onMessage` / `onTap` from
 //      buffered events while the app is foreground. Pauses on
@@ -78,8 +78,9 @@ export type PushRegisterOptions = {
   /** Token registration completed — useful when the host wants the
    *  ipt handle in real time without awaiting `register()`. */
   onToken?: (ipt: string) => void
-  /** Any failure in the registration flow. The promise also
-   *  rejects; this callback is convenience. */
+  /** Any failure in the registration flow. Convenience only — the
+   *  promise resolves to `{ ok: false, reason }` either way and
+   *  never rejects. */
   onError?: (err: Error) => void
   /** Override the timeout when waiting for the native token to
    *  arrive after `registerForRemoteNotifications`. Defaults to
@@ -88,10 +89,42 @@ export type PushRegisterOptions = {
   tokenTimeoutMs?: number
 }
 
-export type PushRegisterResult = {
-  /** Stable device handle (`ipt_<uuid>`). */
-  ipt: string
-}
+/** Why a registration did not produce a device handle. Each value is
+ *  a different thing for the host to do, which is the only reason to
+ *  distinguish them:
+ *
+ *  - `not-initialised` — `sentori.init()` has not run. A wiring bug.
+ *  - `permission-denied` — the user said no. Not an error. Do not
+ *    retry on a timer; offer it again from a settings screen.
+ *  - `no-transport` — no native push module in this binary (Expo Go,
+ *    a simulator without a push entitlement). Nothing to do at
+ *    runtime.
+ *  - `token-timeout` — the OS never handed back a token inside the
+ *    window. Usually provisioning; retrying later is reasonable.
+ *  - `server-rejected` — Sentori answered non-2xx. Settings ▸ Push
+ *    is where to look.
+ */
+export type PushRegisterFailure =
+  | 'not-initialised'
+  | 'no-transport'
+  | 'permission-denied'
+  | 'server-rejected'
+  | 'token-timeout'
+
+/** Registration outcome. `register()` never throws and there is no
+ *  `catch` branch to forget: a denied permission is an ordinary
+ *  answer, not an exception. An opt-in that throws inside someone's
+ *  `useEffect` is precisely the failure this SDK's contract with its
+ *  host app is written against. */
+export type PushRegisterResult =
+  | {
+      ok: true
+      /** Stable device handle: the `device_tokens` row id, a bare
+       *  uuid. Named `ipt` for the handle format this once returned;
+       *  the revoke and send routes take the uuid. */
+      ipt: string
+    }
+  | { ok: false; message: string; reason: PushRegisterFailure }
 
 export type PushNotificationPayload = {
   id?: string
@@ -104,12 +137,22 @@ export type PushNotificationPayload = {
 }
 
 /**
- * Run the iOS push opt-in flow. Returns the cached `ipt_*` handle
- * on subsequent calls when permission is still granted.
+ * Run the push opt-in flow on either platform. Safe to call on every
+ * launch: the OS returns its cached permission decision without
+ * re-prompting, and the server upserts on
+ * `(project_id, provider, native_token)`. Use `getCachedIpt()` if you
+ * want the handle without a round trip.
+ *
+ * Never throws. Every way this can fail comes back as
+ * `{ ok: false, reason }` — see `PushRegisterFailure` for what each
+ * one asks the host to do.
  */
 export async function register(opts: PushRegisterOptions = {}): Promise<PushRegisterResult> {
   try {
-    const cfg = getRuntimeConfig()
+    const cfg = tryGetRuntimeConfig()
+    if (!cfg) {
+      return fail(opts, 'not-initialised', 'sentori.init() has not run')
+    }
     // Bind callbacks up front so the buffer drain inside
     // waitForToken can fire onMessage / onTap for events that arrive
     // alongside or before the device token (e.g. user taps a push
@@ -118,8 +161,15 @@ export async function register(opts: PushRegisterOptions = {}): Promise<PushRegi
     _onMessage = opts.onMessage
     _onTap = opts.onTap
     const status = await pushRequestPermission()
+    // `null` means there is no native push module in this binary —
+    // a different thing from the user declining, and a different
+    // thing for the host to do about it. These were one branch and
+    // one message until now.
+    if (status == null) {
+      return fail(opts, 'no-transport', 'no native push module in this build')
+    }
     if (status !== 'granted' && status !== 'provisional' && status !== 'ephemeral') {
-      throw new Error(`Push permission '${status ?? 'unavailable'}'; cannot register`)
+      return fail(opts, 'permission-denied', `push permission '${status}'`)
     }
     nativePushRegister()
     const token = await waitForToken(opts.tokenTimeoutMs ?? 8000)
@@ -128,12 +178,34 @@ export async function register(opts: PushRegisterOptions = {}): Promise<PushRegi
     void persistIpt(ipt)
     opts.onToken?.(ipt)
     bindBufferDrain(opts.onMessage, opts.onTap)
-    return { ipt }
+    return { ok: true, ipt }
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e))
-    logger.warn('push', 'register failed:', err.message)
-    opts.onError?.(err)
-    throw err
+    const reason = e instanceof PushRegisterError ? e.reason : 'server-rejected'
+    return fail(opts, reason, err.message)
+  }
+}
+
+/** One exit for every failure: warn once, tell `onError` if the host
+ *  wants a callback, hand back the reason. */
+function fail(
+  opts: PushRegisterOptions,
+  reason: PushRegisterFailure,
+  message: string,
+): PushRegisterResult {
+  logger.warn('push', `register failed (${reason}):`, message)
+  opts.onError?.(new Error(message))
+  return { ok: false, message, reason }
+}
+
+/** Internal carrier so the helpers below can name which failure they
+ *  are without every one of them returning a result object. */
+class PushRegisterError extends Error {
+  readonly reason: PushRegisterFailure
+  constructor(reason: PushRegisterFailure, message: string) {
+    super(message)
+    this.name = 'PushRegisterError'
+    this.reason = reason
   }
 }
 
@@ -173,14 +245,6 @@ export { pushGetStatus as getStatus, pushRequestPermission as requestPermission 
 
 type RuntimeConfig = { ingestUrl: string; token: string }
 
-function getRuntimeConfig(): RuntimeConfig {
-  const cfg = tryGetRuntimeConfig()
-  if (!cfg) {
-    throw new Error('sentori is not initialised; call sentori.init() first')
-  }
-  return cfg
-}
-
 function tryGetRuntimeConfig(): RuntimeConfig | null {
   // Dynamic require avoids a circular import — `./init` already
   // depends on `./push` via the top-level barrel re-export.
@@ -197,7 +261,7 @@ async function waitForToken(timeoutMs: number): Promise<string> {
   while (Date.now() - start < timeoutMs) {
     const state = await pushDrainState()
     if (state.error) {
-      throw new Error(`APNs registration failed: ${state.error}`)
+      throw new PushRegisterError('no-transport', `OS registration failed: ${state.error}`)
     }
     if (state.token) {
       // Push any buffered events that arrived alongside the token
@@ -208,7 +272,7 @@ async function waitForToken(timeoutMs: number): Promise<string> {
     flushBuffered(state.notifications, state.taps)
     await new Promise((resolve) => setTimeout(resolve, 200))
   }
-  throw new Error(`APNs token not received within ${timeoutMs} ms`)
+  throw new PushRegisterError('token-timeout', `no device token within ${timeoutMs} ms`)
 }
 
 async function registerWithServer(
@@ -246,13 +310,15 @@ async function registerWithServer(
     },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`/v1/push/tokens HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new PushRegisterError('server-rejected', `/v1/push/tokens HTTP ${res.status}`)
+  }
   // The handle is the device_tokens row id — a uuid, which is what
   // the revoke and send routes take. It was parsed here as an
   // `ipt_*` string that no server has ever returned.
   const json = (await res.json()) as { token_id?: string }
   if (typeof json.token_id !== 'string' || json.token_id.length === 0) {
-    throw new Error('server did not return a device token id')
+    throw new PushRegisterError('server-rejected', 'server did not return a device token id')
   }
   return json.token_id
 }
@@ -461,6 +527,17 @@ async function tryAsyncStorage(): Promise<AsyncStorageLike | null> {
 
 function joinUrl(base: string, path: string): string {
   return `${base.replace(/\/+$/, '')}${path}`
+}
+
+/** Test-only: drop the cached handle and stop both timers, so one
+ *  test's successful registration does not leave an interval running
+ *  into the next. Production code paths must not call this. */
+export function __resetForTests(): void {
+  _cachedIpt = null
+  _onMessage = undefined
+  _onTap = undefined
+  _ackQueue = []
+  teardownBufferDrain()
 }
 
 let _platformOverride: 'ios' | 'android' | 'unknown' | null = null

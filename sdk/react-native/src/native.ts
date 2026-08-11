@@ -174,6 +174,14 @@ type SentoriNativeModule = {
 
 let _native: SentoriNativeModule | null | undefined
 
+/** Test-only: stand in for the native module so the paths that only
+ *  exist when one is bound — a denied permission, a token that never
+ *  arrives — can be exercised off-device. `undefined` restores real
+ *  resolution. Production never calls this. */
+export function __setNativeForTests(m: Partial<SentoriNativeModule> | null | undefined): void {
+  _native = m === undefined ? undefined : (m as SentoriNativeModule | null)
+}
+
 function native(): SentoriNativeModule | null {
   if (_native !== undefined) return _native
   try {
