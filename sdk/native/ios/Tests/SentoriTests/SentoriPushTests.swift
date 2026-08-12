@@ -97,4 +97,38 @@ final class SentoriPushTests: XCTestCase {
             "the device must carry the key its events carry, or it is unreachable from an issue"
         )
     }
+    /// The failure log must not be able to kill the app it reports
+    /// for.
+    ///
+    /// Its first version did. `Failure` is an `@objc enum … : Int`,
+    /// the log passed `reason.rawValue` to `%@`, and NSLog
+    /// dereferenced an integer as an object — a line added to make
+    /// failures visible, crashing the host on the first failure it
+    /// saw. The suite caught it only because something happened to
+    /// call it.
+    ///
+    /// `message` is server text and may contain a `%`, which is the
+    /// other way a log line becomes a crash.
+    func testTheFailureLogSurvivesEveryReasonAndAPercentSign() async {
+        SentoriConfig.__resetForTests()
+
+        // No config: every verb is a no-op and `register` reports
+        // notInitialised — through the log path, on this thread.
+        let result = await Sentori.push.register()
+        guard case .failure(let reason, _) = result else {
+            return XCTFail("expected a failure without a config, got \(result)")
+        }
+        XCTAssertEqual(reason, .notInitialised)
+
+        // Every reason has a name to log. An Int reaching a `%@` is
+        // what crashed; a missing name would be the same shape.
+        for reason in [
+            SentoriPush.Failure.notInitialised, .permissionDenied, .noTransport,
+            .tokenTimeout, .serverRejected,
+        ] {
+            XCTAssertFalse(reason.name.isEmpty)
+            NSLog("%@", "[sentori-test] \(reason.name): 100%% of nothing %@ %d")
+        }
+    }
+
 }
