@@ -193,6 +193,25 @@ object SentoriCrashHandler {
         }
     }
 
+    /**
+     * Test-only seam that writes a crash file verbatim.
+     *
+     * `persistForTesting(throwable)` goes through `write`, which
+     * composes the file from a live throwable and a live window —
+     * neither of which a Robolectric test can arrange. Delivery tests
+     * need to state the file they are about to deliver, particularly
+     * the pre-death attachments, which only exist when there was a
+     * window to capture.
+     */
+    internal fun persistRawForTesting(event: JSONObject) {
+        val dir = pendingDir() ?: return
+        try {
+            File(dir, "${uuidLower()}.json").writeText(event.toString())
+        } catch (_: Throwable) {
+            // best-effort
+        }
+    }
+
     private fun attachPending(event: JSONObject) {
         val snap = try {
             SentoriScreenshotCapture.captureKeyWindow()

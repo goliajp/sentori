@@ -77,6 +77,19 @@ const version = /<version>([^<]+)<\/version>/.exec(pom)?.[1] ?? '';
 if (version.endsWith('-SNAPSHOT')) problems.push(`version ${version} is a snapshot`);
 if (!/^\d+\.\d+\.\d+/.test(version)) problems.push(`version ${version} is not semver`);
 
+// The staged artifact is whatever was last built, and nothing expires
+// it. This gate reported `1.0.0` green while the tree said 1.2.0 — it
+// was validating a POM from a release two versions old, which is a
+// gate answering a question about a file nobody is going to publish.
+const declared = readFileSync(join(root, 'sdk/native/VERSION'), 'utf8').trim();
+if (version && !version.startsWith(declared)) {
+  problems.push(
+    `the staged artifact is ${version} but sdk/native/VERSION says ${declared} — ` +
+      'this is stale output from an earlier build. Re-stage with\n' +
+      '    (cd sdk/native/android && ./gradlew publishReleasePublicationToBuildDirRepository)',
+  );
+}
+
 const group = /<groupId>([^<]+)<\/groupId>/.exec(pom)?.[1] ?? '';
 if (!group.startsWith('jp.golia')) {
   problems.push(`groupId ${group} is outside the namespace we can verify (jp.golia)`);

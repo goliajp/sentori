@@ -32,6 +32,8 @@ internal object SentoriPendingCrash {
         val files = SentoriCrashHandler.consumePending()
         if (files.isEmpty()) return
 
+        val attachments = mutableListOf<Pair<String, JSONArray>>()
+
         for (text in files) {
             val raw =
                 try {
@@ -40,9 +42,46 @@ internal object SentoriPendingCrash {
                     // One corrupt file must not cost the others.
                     continue
                 }
-            SentoriTransport.enqueue(toWire(raw))
+            // The screenshot and view tree the handler captured as the
+            // app died. They travel in the file and never on the wire —
+            // the server takes them separately, keyed on an event it
+            // must already have.
+            val blobs = raw.optJSONArray("_pendingAttachments")
+            raw.remove("_pendingAttachments")
+            val wire = toWire(raw)
+            SentoriTransport.enqueue(wire)
+            val id = wire["id"] as? String
+            if (blobs != null && blobs.length() > 0 && id != null) {
+                attachments.add(id to blobs)
+            }
         }
         SentoriTransport.flush()
+
+        // After the flush, not before. The server keys an attachment on
+        // an event id it must already know, so an upload that races the
+        // batch 404s — and it wins that race every time, because the
+        // batch waits and the upload does not.
+        if (attachments.isEmpty()) return
+        SentoriTransport.afterNextDelivery {
+            for ((id, blobs) in attachments) {
+                for (i in 0 until blobs.length()) {
+                    val blob = blobs.optJSONObject(i) ?: continue
+                    val kind = blob.optString("kind", "")
+                    val base64 = blob.optString("base64", "")
+                    if (kind.isEmpty() || base64.isEmpty()) continue
+                    SentoriAttachment.upload(
+                        eventId = id,
+                        kind = kind,
+                        base64 = base64,
+                        mediaType =
+                            blob.optString("mediaType", "").ifEmpty {
+                                "application/octet-stream"
+                            },
+                        source = blob.optString("source", "").ifEmpty { "android" },
+                    )
+                }
+            }
+        }
     }
 
     /**
