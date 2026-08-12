@@ -1,0 +1,64 @@
+# Publish the Android SDK to Maven Central.
+#
+# There was no workflow for this. The Gradle side existed, the docs
+# said the publishing path was ready, and the one thing that would
+# have shown otherwise — running it — had never happened. The first
+# real attempt found that the repository block could not have worked
+# at all: the Portal takes a zipped bundle by POST, and Gradle's maven
+# publisher PUTs files.
+#
+# Manual on purpose. Publishing to Central cannot be undone, so it is
+# not something a merge should do by itself.
+name: maven central — publish the Android SDK
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Actually publish (irreversible). Unchecked = validate only.'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: oven-sh/setup-bun@v2
+
+      # The version in the tree must be one that was tagged here, or
+      # Central gets sources that no tag describes — the same drift
+      # `check-native-version-tag` exists to stop, one step further
+      # out.
+      - name: the version is tagged at this commit
+        run: |
+          git fetch --tags --force
+          node scripts/check-native-version-tag.mjs
+          VERSION="$(cat sdk/native/VERSION)"
+          if ! git rev-parse -q --verify "refs/tags/swift/${VERSION}" > /dev/null; then
+            echo "::error::sdk/native/VERSION is ${VERSION} and swift/${VERSION} does not exist;"
+            echo "::error::tag the release commit before publishing it"
+            exit 1
+          fi
+
+      - name: publish
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          if [ "${{ inputs.publish }}" = "true" ]; then
+            bash scripts/publish-maven-central.sh --publish
+          else
+            bash scripts/publish-maven-central.sh
+          fi
