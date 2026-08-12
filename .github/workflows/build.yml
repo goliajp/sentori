@@ -133,6 +133,14 @@ jobs:
       - name: SDK reference matches InitConfig
         run: node scripts/check-sdk-doc-options.mjs
 
+      # The Kotlin doc showed a Gradle coordinate and no import. The
+      # groupId is `jp.golia.sentori`, the package is `com.sentori`,
+      # and an integrator guessed the obvious thing — then spent the
+      # afternoon on repository config, because a resolution failure
+      # and an import failure look nothing alike.
+      - name: imports shown in the native docs resolve to real code
+        run: node scripts/check-doc-imports.mjs
+
       # EventKind ↔ enum Kind, AttachmentKind ↔ KINDS. Maintained by
       # hand across a language boundary with nothing compiling them
       # together; a mismatch surfaces as an event rejected at ingest,
