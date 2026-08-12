@@ -50,6 +50,25 @@ object SentoriTransport {
     private const val MAX_QUEUED = 500
 
     private val lock = Any()
+
+    /**
+     * Work that may only run once the server has taken a batch.
+     *
+     * Attachments are the reason: the server keys one on an event id
+     * it must already know, so uploading before the batch lands is a
+     * guaranteed 404. Queued here rather than timed, because "wait a
+     * bit" is a guess about the network.
+     */
+    private val afterDelivery = mutableListOf<() -> Unit>()
+
+    /**
+     * Run [block] after the next batch the server accepts. If the
+     * batch is refused or spilled, the block never runs — the events
+     * it belongs to are not there to attach to.
+     */
+    internal fun afterNextDelivery(block: () -> Unit) {
+        synchronized(lock) { afterDelivery.add(block) }
+    }
     private val queue = ArrayDeque<Map<String, Any?>>()
     private val assertStats = mutableMapOf<String, MutableMap<String, Any?>>()
     private var started = false
@@ -146,7 +165,14 @@ object SentoriTransport {
 
         worker.execute {
             when (sendWithRetry(envelope, config)) {
-                Outcome.DELIVERED -> synchronized(lock) { delivered += events.size }
+                Outcome.DELIVERED -> {
+                    val waiting =
+                        synchronized(lock) {
+                            delivered += events.size
+                            afterDelivery.toList().also { afterDelivery.clear() }
+                        }
+                    waiting.forEach { it() }
+                }
                 // Handled, but not accepted. Nothing to retry and
                 // nothing to count.
                 Outcome.DROPPED -> Unit
@@ -192,7 +218,28 @@ object SentoriTransport {
         return Outcome.FAILED
     }
 
+    /**
+     * Test seam: skip the network and return this outcome.
+     * `0` delivered, `1` dropped, anything else failed.
+     *
+     * The iOS suite arrived here after two attempts to provoke a real
+     * failure by sending to a closed port: one CI runner dropped the
+     * packet and waited out the timeout, another answered in a way
+     * that read as a 4xx — and both times a working transport was
+     * reported broken. What these tests are about is the spill, the
+     * drain and the ordering, not TCP; `android-live-ingest` is what
+     * exercises the wire.
+     */
+    internal var forcedOutcomeForTests: Int? = null
+
     private fun sendOnce(envelope: Map<String, Any?>, config: SentoriConfig): Outcome {
+        forcedOutcomeForTests?.let {
+            return when (it) {
+                0 -> Outcome.DELIVERED
+                1 -> Outcome.DROPPED
+                else -> Outcome.FAILED
+            }
+        }
         val body =
             try {
                 toJson(envelope).toString()
@@ -359,6 +406,8 @@ object SentoriTransport {
             assertStats.clear()
             dropped = 0
             delivered = 0
+            afterDelivery.clear()
+            forcedOutcomeForTests = null
             started = false
             pending?.cancel(false)
             pending = null

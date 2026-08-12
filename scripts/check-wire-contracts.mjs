@@ -13,6 +13,8 @@ import { readFileSync } from 'node:fs';
 const TYPES = 'sdk/core/src/types.ts';
 const PIPELINE = 'self-hosted/server/src/pipeline.rs';
 const ATTACHMENTS = 'self-hosted/server/src/handlers/sdk/events_attachments.rs';
+const SWIFT_ATT = 'sdk/native/ios/Sources/Sentori/SentoriAttachment.swift';
+const KOTLIN_ATT = 'sdk/native/android/src/main/java/com/sentori/SentoriAttachment.kt';
 
 const problems = [];
 
@@ -87,6 +89,42 @@ if (!attachmentKinds || !serverAttachmentKinds) {
       problems.push(
         `AttachmentKind has '${k}'; ${ATTACHMENTS} KINDS does not — the upload ` +
           'is refused, and the CHECK constraint behind it would refuse the row too',
+      );
+    }
+  }
+}
+
+// ── the native allowlists ─────────────────────────────────────────
+//
+// The native SDKs filter before posting, which saves a round trip and
+// costs an attachment when the two lists disagree. The first version
+// of the Swift list held three kinds; the crash handler on both
+// platforms writes `viewTree`, which was not one of them — so the
+// delivery path would have dropped, silently and on the way out, the
+// evidence it exists to deliver. The event still arrives, so nothing
+// looks wrong; the viewport is just empty.
+//
+// Checked in both directions. Missing a kind loses evidence; carrying
+// one the server refuses spends a device's bandwidth on a 400.
+for (const [label, path] of [
+  ['Swift', SWIFT_ATT],
+  ['Kotlin', KOTLIN_ATT],
+]) {
+  const src = readFileSync(path, 'utf8');
+  const listed = [...src.matchAll(/"([a-zA-Z]+)"/g)]
+    .map((m) => m[1])
+    .filter((v) => serverAttachmentKinds?.includes(v));
+  const native = [...new Set(listed)].sort();
+  if (native.length === 0) {
+    problems.push(`could not read an attachment allowlist out of ${path}`);
+    continue;
+  }
+  for (const k of serverAttachmentKinds ?? []) {
+    if (!native.includes(k)) {
+      problems.push(
+        `${ATTACHMENTS} accepts '${k}'; the ${label} allowlist (${path}) does ` +
+          'not — that attachment is dropped by the SDK before it is sent, and ' +
+          'the event arrives looking as though nothing was captured',
       );
     }
   }

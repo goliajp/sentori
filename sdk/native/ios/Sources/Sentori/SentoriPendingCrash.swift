@@ -28,16 +28,49 @@ enum SentoriPendingCrash {
         let files = SentoriCrashHandler.consumePending()
         guard !files.isEmpty else { return }
 
+        var attachments: [(id: String, blobs: [[String: Any]])] = []
+
         for text in files {
             guard let data = text.data(using: .utf8),
-                let raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                var raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
             else {
                 // One corrupt file must not cost the others.
                 continue
             }
-            SentoriTransport.enqueue(toWire(raw))
+            // The screenshot and replay ring the handler captured as
+            // the app died. They travel in the file and never on the
+            // wire — the server takes them separately, keyed on an
+            // event it must already have.
+            let blobs = raw.removeValue(forKey: "_pendingAttachments") as? [[String: Any]] ?? []
+            let wire = toWire(raw)
+            SentoriTransport.enqueue(wire)
+            if !blobs.isEmpty, let id = wire["id"] as? String {
+                attachments.append((id: id, blobs: blobs))
+            }
         }
         SentoriTransport.flush()
+
+        // After the flush, not before. The server keys an attachment
+        // on an event id it must already know, so an upload that
+        // races the batch 404s — and it wins that race every time,
+        // because the batch waits and the upload does not.
+        guard !attachments.isEmpty else { return }
+        SentoriTransport.afterNextDelivery {
+            for entry in attachments {
+                for blob in entry.blobs {
+                    guard let kind = blob["kind"] as? String,
+                        let base64 = blob["base64"] as? String
+                    else { continue }
+                    SentoriAttachment.upload(
+                        eventId: entry.id,
+                        kind: kind,
+                        base64: base64,
+                        mediaType: blob["mediaType"] as? String ?? "application/octet-stream",
+                        source: blob["source"] as? String ?? "ios"
+                    )
+                }
+            }
+        }
     }
 
     /// The flat on-disk shape into the nested wire one. Mirrors

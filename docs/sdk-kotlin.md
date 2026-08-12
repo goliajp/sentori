@@ -184,7 +184,12 @@ feel, that is a bug worth reporting as a P0.
 
 ## Also in the box
 
-Crash handling, an ANR watchdog, mobile vitals and screenshot capture
-are compiled in and used by the React Native SDK today. They are not
-yet part of this public surface — they need an attachment upload path
-that lands next.
+An uncaught exception is written to disk as the app dies, along with a
+screenshot of the last frame and the view tree behind it. The next
+`Sentori.start` sends the crash, and once the server has taken it,
+uploads the two blobs against it — in that order, because an
+attachment keyed on an event the server has not seen is a 404.
+
+Nothing here needs configuring. The ANR watchdog and mobile vitals are
+compiled in and driven by the React Native SDK today; they are not yet
+part of this public surface.

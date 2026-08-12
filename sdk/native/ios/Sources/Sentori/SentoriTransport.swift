@@ -61,6 +61,23 @@ public final class SentoriTransport: NSObject {
 
     private static let worker = DispatchQueue(label: "jp.golia.sentori.transport", qos: .utility)
 
+    /// Work that may only run once the server has taken a batch.
+    ///
+    /// Attachments are the reason: the server keys one on an event id
+    /// it must already know, so uploading before the batch lands is a
+    /// guaranteed 404. Queued here rather than timed, because "wait a
+    /// bit" is a guess about the network.
+    private static var afterDelivery: [() -> Void] = []
+
+    /// Run `block` after the next batch the server accepts. If the
+    /// batch is refused or spilled, the block never runs — the events
+    /// it belongs to are not there to attach to.
+    static func afterNextDelivery(_ block: @escaping () -> Void) {
+        lock.lock()
+        afterDelivery.append(block)
+        lock.unlock()
+    }
+
     /// O(1) on the calling thread: append, maybe schedule. Everything
     /// else is the worker's problem.
     @objc public static func enqueue(_ event: [String: Any]) {
@@ -144,7 +161,10 @@ public final class SentoriTransport: NSObject {
             case .delivered:
                 lock.lock()
                 delivered += events.count
+                let waiting = afterDelivery
+                afterDelivery.removeAll()
                 lock.unlock()
+                waiting.forEach { $0() }
             case .dropped:
                 // Handled, but not accepted. Nothing to retry and
                 // nothing to count.
@@ -373,6 +393,7 @@ public final class SentoriTransport: NSObject {
         assertStats.removeAll()
         dropped = 0
         delivered = 0
+        afterDelivery.removeAll()
         started = false
         requestTimeout = 15
         forcedOutcomeForTests = nil
