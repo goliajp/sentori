@@ -37,8 +37,17 @@ pub(crate) fn require_admin_token(
     Err((
         axum::http::StatusCode::FORBIDDEN,
         axum::Json(serde_json::json!({
+            // The code stays as it is: `docs/protocol.md` documents
+            // it and the CLI's tests match on it. The hint is the
+            // part that misled — it named a "kind `admin`" and a
+            // token that is "`public`", and neither word appears
+            // anywhere a reader can act on. The scopes are `ingest`
+            // and `api`, which is what the UI offers.
             "error": "admin_token_required",
-            "hint": "this endpoint needs a token of kind `admin`; the token used is `public` and is shipped inside your application",
+            "hint": "this endpoint needs a token whose scope is `api`. The token \
+                     used has scope `ingest` — the one that ships inside your \
+                     application, which is why it cannot send. Mint one at \
+                     Settings ▸ Tokens with scope `api`.",
         })),
     ))
 }
