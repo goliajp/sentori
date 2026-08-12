@@ -43,6 +43,27 @@ object Sentori {
         SentoriConfig.set(config)
         SentoriDevice.bind(context)
         SentoriTransport.start(context?.let { java.io.File(it.filesDir, "sentori") })
+
+        // Crash capture needs a Context for its storage, so an app
+        // that starts without one gets everything except this.
+        if (context != null) {
+            // The handler runs inside an uncaught-exception handler
+            // where almost nothing is safe, so it reads its release
+            // and environment from SharedPreferences rather than from
+            // a live object. Without this call every crash ships as
+            // `unknown` / `prod` — matching no release, so
+            // symbolicating against nothing.
+            SentoriCrashHandler.setConfig(
+                mapOf("release" to config.release, "environment" to config.environment)
+            )
+            SentoriCrashHandler.register(context)
+
+            // The crash that killed the last launch. Until now the
+            // handler wrote files into a directory nothing emptied —
+            // a crash reporter that captured crashes and never sent
+            // one.
+            SentoriPendingCrash.ship()
+        }
     }
 
     /**
