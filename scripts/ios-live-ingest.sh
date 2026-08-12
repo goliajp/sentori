@@ -21,8 +21,34 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-PORT="${SENTORI_LIVE_PORT:-8392}"
-PGPORT="${SENTORI_LIVE_PGPORT:-55433}"
+# Pick a port nothing is holding.
+#
+# These ran on fixed ports with a fixed container name, which is fine
+# on a throwaway VM and wrong on the self-hosted runners this repo
+# uses: two jobs on one machine fought over 55434, and one lost with
+# "address already in use". Worse, they shared a container name, so
+# `docker rm -f` at startup would have deleted the other run's
+# database — a green job quietly destroying a red one's evidence.
+free_port() {
+    python3 - "$1" <<'PORTPY'
+import socket, sys
+preferred = int(sys.argv[1])
+for candidate in [preferred] + [0]:
+    s = socket.socket()
+    try:
+        s.bind(("127.0.0.1", candidate))
+        print(s.getsockname()[1])
+        s.close()
+        break
+    except OSError:
+        s.close()
+PORTPY
+}
+
+PORT="${SENTORI_LIVE_PORT:-$(free_port 8392)}"
+PGPORT="${SENTORI_LIVE_PGPORT:-$(free_port 55433)}"
+# Unique per run, so concurrent jobs cannot delete each other.
+PG_CONTAINER="sentori-live-pg-$$"
 BASE="http://127.0.0.1:${PORT}"
 FIXTURE="sdk/native/fixtures/live-server.json"
 LOG="$(mktemp)"
@@ -32,7 +58,7 @@ STARTED_BREW_PG=""
 
 cleanup() {
     [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null || true
-    docker rm -f sentori-live-pg >/dev/null 2>&1 || true
+    docker rm -f "$PG_CONTAINER" >/dev/null 2>&1 || true
     # `brew services start` also registers the service to run at
     # login. On a CI runner that is free; on someone's laptop it is a
     # background daemon they did not ask for, so put it back.
@@ -43,12 +69,12 @@ trap cleanup EXIT
 
 echo "→ postgres"
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-    docker rm -f sentori-live-pg >/dev/null 2>&1 || true
-    docker run -d --name sentori-live-pg \
+    docker rm -f "$PG_CONTAINER" >/dev/null 2>&1 || true
+    docker run -d --name "$PG_CONTAINER" \
         -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=sentori \
         -p "${PGPORT}:5432" postgres:18-alpine >/dev/null
     for _ in $(seq 1 60); do
-        docker exec sentori-live-pg pg_isready -U postgres >/dev/null 2>&1 && break
+        docker exec "$PG_CONTAINER" pg_isready -U postgres >/dev/null 2>&1 && break
         sleep 1
     done
     DB="postgres://postgres:dev@127.0.0.1:${PGPORT}/sentori"
