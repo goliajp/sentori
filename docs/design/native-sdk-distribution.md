@@ -75,6 +75,35 @@ today and says `com.github` in every integrator's build file.
 Recommendation: Maven Central, with JitPack named in the docs as the
 interim so insight is not blocked while the namespace verifies.
 
+**Decided, and done.** `jp.golia` is verified and
+`jp.golia.sentori:sentori` resolves from repo1. JitPack was never
+needed.
+
+One thing this table got wrong, and it cost a release cycle to find:
+"then automatic" assumed Gradle could publish to the Portal the way it
+publishes to any Maven repository. It cannot. Gradle's publisher PUTs
+files in repository layout; the Portal's endpoint takes one zipped
+bundle by POST. A `maven { url = '…/api/v1/publisher/upload' }` block
+sat in `build.gradle` looking like the answer, and every gate around
+it passed, because the gates staged to a directory and nothing ever
+attempted the upload.
+
+Publishing is `scripts/publish-maven-central.sh`, run by the
+`maven central` workflow on manual dispatch. It stages, checks the
+POM, **verifies the signature against a keyring holding only what a
+stranger can fetch from a keyserver** — signing locally proves the
+file was signed here, not that Central can check it — bundles,
+uploads, waits for validation, and on `--publish` waits for repo1 to
+serve the POM before calling it done. The portal's own word for a
+finished deployment is `PUBLISHED`; what decides whether anyone can
+depend on it is repo1.
+
+The public key must be on a keyserver **with its user ID intact**.
+keys.openpgp.org strips the UID until the address is verified by
+email, and GnuPG refuses to import a key with no UID — so a key that
+is only there cannot be checked by anyone.
+keyserver.ubuntu.com serves it whole.
+
 ## Versioning
 
 The native packages take their own version, starting at **1.0.0**.

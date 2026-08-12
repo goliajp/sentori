@@ -125,14 +125,20 @@ afterEvaluate {
             }
         }
         repositories {
-            maven {
-                name = 'central'
-                url = 'https://central.sonatype.com/api/v1/publisher/upload'
-                credentials {
-                    username = System.getenv('CENTRAL_USERNAME')
-                    password = System.getenv('CENTRAL_PASSWORD')
-                }
-            }
+            // There is deliberately no `central` repository here.
+            //
+            // There used to be one, pointed at
+            // `https://central.sonatype.com/api/v1/publisher/upload`,
+            // and it could never have worked: Gradle's maven publisher
+            // PUTs each file in repository layout, and that endpoint
+            // takes a single zipped bundle by POST. Nothing ran it, so
+            // nothing said so — the repo carried a publishing path
+            // that was documented as ready and had never been tried.
+            //
+            // Publishing is `scripts/publish-maven-central.sh`, which
+            // assembles the bundle from the staged directory below and
+            // is what the release workflow runs.
+            //
             // Used by CI to prove the artifact assembles and its POM is
             // complete without needing credentials — publishing to a
             // directory exercises everything except the upload.
