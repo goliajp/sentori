@@ -94,7 +94,7 @@ public final class SentoriPush: NSObject {
         onTap: (([String: Any]) -> Void)? = nil
     ) async -> Result {
         guard let config = SentoriConfig.current else {
-            return .failure(reason: .notInitialised, message: "Sentori.start has not run")
+            return report(.failure(reason: .notInitialised, message: "Sentori.start has not run"))
         }
 
         // Bind before asking for anything: iOS replays a tap that
@@ -110,18 +110,21 @@ public final class SentoriPush: NSObject {
         // bundle to ask on behalf of — a test host, a CLI, some
         // extensions. Not a decision the user made.
         guard let status, status != "unavailable" else {
-            return .failure(reason: .noTransport, message: "no push support in this build")
+            return report(
+                .failure(reason: .noTransport, message: "no push support in this build"))
         }
         guard ["granted", "provisional", "ephemeral"].contains(status) else {
-            return .failure(reason: .permissionDenied, message: "push permission '\(status)'")
+            return report(
+                .failure(reason: .permissionDenied, message: "push permission '\(status)'"))
         }
 
         SentoriPushNotifications.shared.registerForRemoteNotifications()
         guard let token = await waitForToken(timeout: timeout) else {
-            return .failure(
-                reason: .tokenTimeout,
-                message: "no device token within \(Int(timeout))s"
-            )
+            return report(
+                .failure(
+                    reason: .tokenTimeout,
+                    message: "no device token within \(Int(timeout))s"
+                ))
         }
 
         switch await registerWithServer(token: token, config: config) {
@@ -133,8 +136,40 @@ public final class SentoriPush: NSObject {
             startDrain()
             return .success(handle: handle)
         case .failure(let reason, let message):
-            return .failure(reason: reason, message: message)
+            return report(.failure(reason: reason, message: message))
         }
+    }
+
+    /// Say it out loud, once, where the person wiring this up is
+    /// looking.
+    ///
+    /// A failed `register` reported only to the server is invisible
+    /// on the machine where the mistake was made: the integrator has
+    /// to finish connecting the dashboard before it can tell them
+    /// they have not finished connecting the dashboard. insight found
+    /// their first-launch failure by adding a `Log.w` of their own
+    /// and taking it out again.
+    ///
+    /// Warning, never error. A red line in someone else's console
+    /// reads as "your app is broken", and a host team that believes
+    /// that pulls the SDK out.
+    private func report(_ result: Result) -> Result {
+        if case .failure(let reason, let message) = result {
+            // One `%@` and one already-built string, on purpose.
+            //
+            // The first version was `NSLog("… (%@): %@", reason.rawValue, message)`
+            // and it killed the test host on the first call: `Failure`
+            // is an `@objc enum … : Int`, so `rawValue` is an Int, and
+            // `%@` dereferenced it as an object pointer. A logging
+            // line, added to make failures visible, crashing the app
+            // it reports for — the isolation rule broken as completely
+            // as it can be.
+            //
+            // `message` is not a format string either. It can carry
+            // server text, and server text can contain a `%`.
+            NSLog("%@", "[sentori] push register failed (\(reason.name)): \(message)")
+        }
+        return result
     }
 
     /// The handle from an earlier `register`, without a round trip.

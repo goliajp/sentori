@@ -122,7 +122,7 @@ object SentoriPush {
     ) {
         val config = SentoriConfig.current
         if (config == null) {
-            completion(Result.Failure(Failure.NOT_INITIALISED, "Sentori.start has not run"))
+            deliver(completion, Result.Failure(Failure.NOT_INITIALISED, "Sentori.start has not run"))
             return
         }
 
@@ -137,16 +137,59 @@ object SentoriPush {
         val appContext = context.applicationContext
         val proceed = { status: String ->
             worker.execute {
-                completion(finishRegister(appContext, config, status, timeoutMs))
+                deliver(completion, finishRegister(appContext, config, status, timeoutMs))
             }
         }
 
         val current = SentoriPushNotifications.currentPermission(appContext)
         if (current == "notDetermined" && activity != null) {
-            SentoriPushNotifications.requestPermission(activity) { proceed(it) }
+            // `timeoutMs` is a network budget — how long to wait for a
+            // device token. Spending it on a person reading a dialog
+            // is a category error: the default is eight seconds, and
+            // nobody answers a permission prompt in eight seconds.
+            SentoriPushNotifications.requestPermission(
+                activity,
+                timeoutMs = permissionTimeoutMs,
+            ) { proceed(it) }
         } else {
             proceed(current)
         }
+    }
+
+    /**
+     * How long to wait for someone to answer the permission dialog.
+     *
+     * Separate from `timeoutMs`, which is about the network. A person
+     * may be reading, or may have put the phone down; two minutes
+     * covers the first and gives up on the second rather than leaving
+     * a registration that never reports anything.
+     */
+    @JvmStatic
+    var permissionTimeoutMs: Long = 120_000
+
+    /**
+     * Say it out loud, once, where the person wiring this up is
+     * looking.
+     *
+     * A failed `register` reported only to the server is invisible on
+     * the machine where the mistake was made: the integrator has to
+     * finish connecting the dashboard before it can tell them they
+     * have not finished connecting the dashboard. insight found their
+     * first-launch failure by adding a `Log.w` of their own and
+     * taking it out again.
+     *
+     * Warning, never error. A red line in someone else's logcat reads
+     * as "your app is broken", and a host team that believes that
+     * pulls the SDK out.
+     */
+    private fun deliver(completion: (Result) -> Unit, result: Result) {
+        if (result is Result.Failure) {
+            android.util.Log.w(
+                "sentori",
+                "push register failed (${result.reason.reason}): ${result.message}",
+            )
+        }
+        completion(result)
     }
 
     private fun finishRegister(
