@@ -306,6 +306,78 @@ class SentoriAttachmentTest {
         )
     }
 
+    // ── the hook itself ───────────────────────────────────────────
+
+    /** Registered for events that are still queued, it waits. */
+    @Test
+    fun aHookWaitsUntilItsOwnEventsLand() {
+        configure()
+        SentoriTransport.start(spillDir())
+        SentoriTransport.forcedOutcomeForTests = 0 // DELIVERED
+
+        var fired = 0
+        SentoriTransport.afterDelivery(setOf("a", "b")) { fired += 1 }
+
+        SentoriTransport.enqueue(mapOf("id" to "a", "kind" to "error"))
+        SentoriTransport.flush()
+        waitUntil("the first batch lands") { SentoriTransport.peekDelivered() >= 1 }
+        assertEquals("half its events have landed — it is not due yet", 0, fired)
+
+        SentoriTransport.enqueue(mapOf("id" to "b", "kind" to "error"))
+        SentoriTransport.flush()
+        waitUntil("the hook fires once both have landed") { fired == 1 }
+    }
+
+    /**
+     * Registered for events the server refuses outright, it is
+     * dropped: there is nothing on the server to attach to, and
+     * uploading anyway spends a device's bandwidth on a 404.
+     */
+    @Test
+    fun aHookIsDiscardedWhenTheServerRefusesItsEvents() {
+        configure()
+        SentoriTransport.start(spillDir())
+        SentoriTransport.forcedOutcomeForTests = 1 // DROPPED
+
+        var fired = false
+        SentoriTransport.afterDelivery(setOf("a")) { fired = true }
+        assertEquals(1, SentoriTransport.peekWaiting())
+
+        SentoriTransport.enqueue(mapOf("id" to "a", "kind" to "error"))
+        SentoriTransport.flush()
+
+        waitUntil("the refusal discards the waiter") { SentoriTransport.peekWaiting() == 0 }
+        assertFalse("the events it waited on were refused", fired)
+    }
+
+    /**
+     * The shape of the bug CI caught. A hook registered after its
+     * batch has already been accepted never fires — which is why
+     * `ship` registers before it enqueues, not after it flushes.
+     */
+    @Test
+    fun aHookRegisteredTooLateNeverFires() {
+        configure()
+        SentoriTransport.start(spillDir())
+        SentoriTransport.forcedOutcomeForTests = 0
+
+        SentoriTransport.enqueue(mapOf("id" to "a", "kind" to "error"))
+        SentoriTransport.flush()
+        waitUntil("the batch lands") { SentoriTransport.peekDelivered() >= 1 }
+
+        var fired = false
+        SentoriTransport.afterDelivery(setOf("a")) { fired = true }
+        SentoriTransport.enqueue(mapOf("id" to "z", "kind" to "error"))
+        SentoriTransport.flush()
+        waitUntil("a later batch lands") { SentoriTransport.peekDelivered() >= 2 }
+
+        assertFalse(
+            "it fired on someone else's batch — an upload keyed on an event that " +
+                "batch never carried is a 404",
+            fired,
+        )
+    }
+
     /**
      * The blobs travel in the file and never on the wire. An event
      * carrying a base64 screenshot inside its JSON is a megabyte in a
