@@ -28,8 +28,6 @@ enum SentoriPendingCrash {
         let files = SentoriCrashHandler.consumePending()
         guard !files.isEmpty else { return }
 
-        var attachments: [(id: String, blobs: [[String: Any]])] = []
-
         for text in files {
             guard let data = text.data(using: .utf8),
                 var raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -43,34 +41,35 @@ enum SentoriPendingCrash {
             // event it must already have.
             let blobs = raw.removeValue(forKey: "_pendingAttachments") as? [[String: Any]] ?? []
             let wire = toWire(raw)
-            SentoriTransport.enqueue(wire)
-            if !blobs.isEmpty, let id = wire["id"] as? String {
-                attachments.append((id: id, blobs: blobs))
-            }
-        }
-        SentoriTransport.flush()
 
-        // After the flush, not before. The server keys an attachment
-        // on an event id it must already know, so an upload that
-        // races the batch 404s — and it wins that race every time,
-        // because the batch waits and the upload does not.
-        guard !attachments.isEmpty else { return }
-        SentoriTransport.afterNextDelivery {
-            for entry in attachments {
-                for blob in entry.blobs {
-                    guard let kind = blob["kind"] as? String,
-                        let base64 = blob["base64"] as? String
-                    else { continue }
-                    SentoriAttachment.upload(
-                        eventId: entry.id,
-                        kind: kind,
-                        base64: base64,
-                        mediaType: blob["mediaType"] as? String ?? "application/octet-stream",
-                        source: blob["source"] as? String ?? "ios"
-                    )
+            // Registered before this event is queued, and keyed on its
+            // id. Two races close here, and one of them was real: the
+            // first version registered after `flush`, which hands the
+            // send to a worker and returns — so on a fast network the
+            // batch was accepted before the block existed and the
+            // attachments never uploaded at all. Registering before
+            // the loop's flush is not enough either, since `enqueue`
+            // sends of its own accord once ten events are queued, and
+            // a run with ten crash files would flush mid-loop.
+            if !blobs.isEmpty, let id = wire["id"] as? String {
+                SentoriTransport.afterDelivery(of: [id]) {
+                    for blob in blobs {
+                        guard let kind = blob["kind"] as? String,
+                            let base64 = blob["base64"] as? String
+                        else { continue }
+                        SentoriAttachment.upload(
+                            eventId: id,
+                            kind: kind,
+                            base64: base64,
+                            mediaType: blob["mediaType"] as? String ?? "application/octet-stream",
+                            source: blob["source"] as? String ?? "ios"
+                        )
+                    }
                 }
             }
+            SentoriTransport.enqueue(wire)
         }
+        SentoriTransport.flush()
     }
 
     /// The flat on-disk shape into the nested wire one. Mirrors

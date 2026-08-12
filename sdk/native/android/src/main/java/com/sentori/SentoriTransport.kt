@@ -49,22 +49,58 @@ object SentoriTransport {
     private val lock = Any()
 
     /**
-     * Work that may only run once the server has taken a batch.
+     * Work that may only run once the server has taken particular
+     * events.
      *
      * Attachments are the reason: the server keys one on an event id
-     * it must already know, so uploading before the batch lands is a
-     * guaranteed 404. Queued here rather than timed, because "wait a
-     * bit" is a guess about the network.
+     * it must already know, so uploading before that event lands is a
+     * guaranteed 404.
+     *
+     * Keyed on ids rather than "the next delivery", which was the
+     * first version and had a race at each end. `flush` hands the send
+     * to a worker and returns, so registering afterwards can miss a
+     * batch that has already come back — on a fast network the uploads
+     * then never happen at all, silently, which is the bug this exists
+     * to prevent. Registering beforehand instead lets an unrelated
+     * batch already in flight fire the block early, into a 404.
+     * Matching on ids has neither end.
      */
-    private val afterDelivery = mutableListOf<() -> Unit>()
+    private val afterDelivery = mutableListOf<Pair<Set<String>, () -> Unit>>()
 
     /**
-     * Run [block] after the next batch the server accepts. If the
-     * batch is refused or spilled, the block never runs — the events
-     * it belongs to are not there to attach to.
+     * Run [block] once the server has accepted every event in [ids].
+     * If the server refuses them outright the block is discarded — they
+     * are not there to attach to. A batch that merely spilled keeps its
+     * waiters, since the drain retries it under the same ids.
      */
-    internal fun afterNextDelivery(block: () -> Unit) {
-        synchronized(lock) { afterDelivery.add(block) }
+    internal fun afterDelivery(ids: Set<String>, block: () -> Unit) {
+        if (ids.isEmpty()) return
+        synchronized(lock) { afterDelivery.add(ids to block) }
+    }
+
+    private fun settle(events: List<Map<String, Any?>>, accepted: Boolean) {
+        val ids = events.mapNotNull { it["id"] as? String }.toSet()
+        if (ids.isEmpty()) return
+        val ready = mutableListOf<() -> Unit>()
+        synchronized(lock) {
+            val kept = mutableListOf<Pair<Set<String>, () -> Unit>>()
+            for ((waiting, block) in afterDelivery) {
+                if (waiting.none { id -> id in ids }) {
+                    kept.add(waiting to block)
+                    continue
+                }
+                if (!accepted) continue // refused: drop the waiter
+                // Subtract what landed rather than asking whether this
+                // one batch carried everything. A waiter on two events
+                // whose events go out in two batches is otherwise never
+                // due — it is a subset of neither.
+                val left = waiting - ids
+                if (left.isEmpty()) ready.add(block) else kept.add(left to block)
+            }
+            afterDelivery.clear()
+            afterDelivery.addAll(kept)
+        }
+        ready.forEach { it() }
     }
     private val queue = ArrayDeque<Map<String, Any?>>()
     private val assertStats = mutableMapOf<String, MutableMap<String, Any?>>()
@@ -163,16 +199,15 @@ object SentoriTransport {
         worker.execute {
             when (sendWithRetry(envelope, config)) {
                 Outcome.DELIVERED -> {
-                    val waiting =
-                        synchronized(lock) {
-                            delivered += events.size
-                            afterDelivery.toList().also { afterDelivery.clear() }
-                        }
-                    waiting.forEach { it() }
+                    synchronized(lock) { delivered += events.size }
+                    settle(events, accepted = true)
                 }
                 // Handled, but not accepted. Nothing to retry and
                 // nothing to count.
-                Outcome.DROPPED -> Unit
+                Outcome.DROPPED -> settle(events, accepted = false)
+                // Spilled, not lost: `drainPersisted` puts these back
+                // through this path on the next start with the same
+                // ids, so anything waiting on them keeps waiting.
                 else -> persist(events)
             }
         }
@@ -426,4 +461,13 @@ object SentoriTransport {
      * that had stored nothing.
      */
     internal fun peekDelivered(): Int = synchronized(lock) { delivered }
+
+    /**
+     * How many blocks are still waiting on events. Without this a test
+     * cannot tell "discarded because the server refused it" from "has
+     * not been reached yet", and the version that tried instead
+     * flipped the forced outcome mid-send — measuring the race rather
+     * than the rule.
+     */
+    internal fun peekWaiting(): Int = synchronized(lock) { afterDelivery.size }
 }
