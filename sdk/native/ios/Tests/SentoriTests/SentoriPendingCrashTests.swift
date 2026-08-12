@@ -177,13 +177,40 @@ final class SentoriPendingCrashTests: XCTestCase {
         // so the event is in the spill file, not the queue. Looking
         // in the queue is looking where it has already left, which is
         // how this test failed the first time it ran.
-        let deadline = Date().addingTimeInterval(10)
-        while SentoriTransport.__peekPersisted().isEmpty, Date() < deadline {
+        //
+        // Wait for *this* crash, not for the file to stop being
+        // empty, and wait long enough for a busy worker.
+        //
+        // This failed once on CI — one run in twelve, with the same
+        // commit green on two others — and it has not been reproduced
+        // here, including by running the suites in the order that
+        // would collide. So this is a guard against two plausible
+        // causes rather than a fix for a diagnosed one, and both are
+        // things the test should not have depended on anyway:
+        //
+        //   1. The spill is one file the whole process shares, so
+        //      another test's events satisfy "not empty" and this one
+        //      then reads before its own has landed.
+        //   2. The send runs on a serial worker. A previous test that
+        //      left a real network attempt on it — three tries with a
+        //      fifteen-second timeout each, on a runner where a closed
+        //      port hangs rather than refuses — delays this one well
+        //      past ten seconds without anything being wrong.
+        //
+        // Asking for the event it wrote, with room for the queue in
+        // front of it, depends on neither.
+        func ourCrash() -> [String: Any]? {
+            SentoriTransport.__peekPersisted().first { ev in
+                ((ev["payload"] as? [String: Any])?["nativeCrash"] as? Bool) == true
+                    && (((ev["payload"] as? [String: Any])?["error"] as? [String: Any])?["type"]
+                        as? String) == "Boom"
+            }
+        }
+        let deadline = Date().addingTimeInterval(60)
+        while ourCrash() == nil, Date() < deadline {
             Thread.sleep(forTimeInterval: 0.1)
         }
-        let crash = SentoriTransport.__peekPersisted().first { ev in
-            ((ev["payload"] as? [String: Any])?["nativeCrash"] as? Bool) == true
-        }
+        let crash = ourCrash()
         XCTAssertNotNil(crash, "the crash the handler wrote never reached the queue")
         XCTAssertEqual(
             ((crash?["payload"] as? [String: Any])?["error"] as? [String: Any])?["type"] as? String,
