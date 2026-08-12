@@ -99,5 +99,45 @@ class SentoriLiveServerTest {
             SentoriTransport.peekDelivered() > 0,
         )
         assertEquals(36, id.length)
+
+        // The multipart body against a real parser.
+        //
+        // Everything else about attachments is asserted as a string,
+        // and a string that looks right is exactly what React Native
+        // shipped for a release while every upload failed on the
+        // device. The body is hand-built; the only proof it is
+        // well-formed is a server that read it.
+        val uploaded = java.util.concurrent.CountDownLatch(1)
+        var ok = false
+        SentoriAttachment.upload(
+            eventId = id,
+            kind = "screenshot",
+            base64 = ONE_PIXEL_JPEG_BASE64,
+            mediaType = "image/jpeg",
+        ) { result ->
+            ok = result
+            uploaded.countDown()
+        }
+        assertTrue(
+            "the attachment upload never came back",
+            uploaded.await(30, java.util.concurrent.TimeUnit.SECONDS),
+        )
+        assertTrue(
+            "the server refused the multipart body — it parses this, or attachments " +
+                "die silently on every device",
+            ok,
+        )
+    }
+
+    companion object {
+        /**
+         * The smallest valid JPEG, base64. Content matters: the server
+         * stores what it decodes, and a payload that is not an image
+         * would pass the upload and fail the viewer.
+         */
+        private const val ONE_PIXEL_JPEG_BASE64 =
+            "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0a" +
+                "HBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAA" +
+                "AAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q=="
     }
 }

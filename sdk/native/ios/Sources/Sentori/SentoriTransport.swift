@@ -61,21 +61,61 @@ public final class SentoriTransport: NSObject {
 
     private static let worker = DispatchQueue(label: "jp.golia.sentori.transport", qos: .utility)
 
-    /// Work that may only run once the server has taken a batch.
+    /// Work that may only run once the server has taken particular
+    /// events.
     ///
     /// Attachments are the reason: the server keys one on an event id
-    /// it must already know, so uploading before the batch lands is a
-    /// guaranteed 404. Queued here rather than timed, because "wait a
-    /// bit" is a guess about the network.
-    private static var afterDelivery: [() -> Void] = []
+    /// it must already know, so uploading before that event lands is a
+    /// guaranteed 404.
+    ///
+    /// Keyed on ids rather than "the next delivery", which was the
+    /// first version and had a race at each end. `flush` hands the
+    /// send to a worker and returns, so registering afterwards can
+    /// miss a batch that has already come back — on a fast network the
+    /// uploads then never happen at all, silently, which is the bug
+    /// this exists to prevent. Registering beforehand instead lets an
+    /// unrelated batch already in flight fire the block early, into a
+    /// 404. Matching on ids has neither end.
+    private static var afterDelivery: [(ids: Set<String>, block: () -> Void)] = []
 
-    /// Run `block` after the next batch the server accepts. If the
-    /// batch is refused or spilled, the block never runs — the events
-    /// it belongs to are not there to attach to.
-    static func afterNextDelivery(_ block: @escaping () -> Void) {
+    /// Run `block` once the server has accepted every event in `ids`.
+    /// If the server refuses them outright the block is discarded —
+    /// they are not there to attach to. A batch that merely spilled
+    /// keeps its waiters, since the drain retries it under the same
+    /// ids.
+    static func afterDelivery(of ids: Set<String>, _ block: @escaping () -> Void) {
+        guard !ids.isEmpty else { return }
         lock.lock()
-        afterDelivery.append(block)
+        afterDelivery.append((ids: ids, block: block))
         lock.unlock()
+    }
+
+    private static func settle(_ events: [[String: Any]], accepted: Bool) {
+        let ids = Set(events.compactMap { $0["id"] as? String })
+        guard !ids.isEmpty else { return }
+        lock.lock()
+        var ready: [() -> Void] = []
+        var kept: [(ids: Set<String>, block: () -> Void)] = []
+        for var entry in afterDelivery {
+            if entry.ids.isDisjoint(with: ids) {
+                kept.append(entry)
+                continue
+            }
+            guard accepted else { continue }  // refused: drop the waiter
+            // Subtract what landed rather than asking whether this one
+            // batch carried everything. A waiter on two events whose
+            // events go out in two batches is otherwise never due — it
+            // is not a subset of either.
+            entry.ids.subtract(ids)
+            if entry.ids.isEmpty {
+                ready.append(entry.block)
+            } else {
+                kept.append(entry)
+            }
+        }
+        afterDelivery = kept
+        lock.unlock()
+        ready.forEach { $0() }
     }
 
     /// O(1) on the calling thread: append, maybe schedule. Everything
@@ -161,15 +201,17 @@ public final class SentoriTransport: NSObject {
             case .delivered:
                 lock.lock()
                 delivered += events.count
-                let waiting = afterDelivery
-                afterDelivery.removeAll()
                 lock.unlock()
-                waiting.forEach { $0() }
+                settle(events, accepted: true)
             case .dropped:
                 // Handled, but not accepted. Nothing to retry and
                 // nothing to count.
-                break
+                settle(events, accepted: false)
             default:
+                // Spilled, not lost: `drainPersisted` puts these back
+                // through this path on the next start with the same
+                // ids, so anything waiting on them keeps waiting
+                // rather than being discarded here.
                 persist(events)
             }
         }
@@ -421,6 +463,17 @@ public final class SentoriTransport: NSObject {
     /// for the *absence* of a spill passes while three retries are
     /// still in flight — which is how the live suite went green on CI
     /// against a server that had stored nothing.
+    /// How many blocks are still waiting on events. Without this a
+    /// test cannot tell "discarded because the server refused it" from
+    /// "has not been reached yet", and the version that tried instead
+    /// flipped the forced outcome mid-send — measuring the race rather
+    /// than the rule.
+    static func __peekWaiting() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return afterDelivery.count
+    }
+
     static func __peekDelivered() -> Int {
         lock.lock()
         defer { lock.unlock() }

@@ -75,20 +75,26 @@ internal object SentoriAttachment {
         base64: String,
         mediaType: String,
         source: String = "android",
+        completion: ((Boolean) -> Unit)? = null,
     ) {
-        val config = SentoriConfig.current ?: return
-        if (kind !in KNOWN || source !in KNOWN_SOURCES) return
+        val config = SentoriConfig.current
+        if (config == null || kind !in KNOWN || source !in KNOWN_SOURCES) {
+            completion?.invoke(false)
+            return
+        }
 
         val boundary = "----sentori-$eventId"
         val body = multipartBody(boundary, kind, mediaType, base64, source)
 
         recorderForTests?.let {
             it(eventId, kind, body)
+            completion?.invoke(true)
             return
         }
 
         worker.execute {
             var conn: HttpURLConnection? = null
+            var ok = false
             try {
                 val url =
                     "${config.ingestUrl}/v1/events/" +
@@ -104,12 +110,13 @@ internal object SentoriAttachment {
                 conn.readTimeout = 30_000
                 conn.doOutput = true
                 conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-                conn.responseCode
+                ok = conn.responseCode in 200..299
             } catch (_: Throwable) {
                 // An attachment that will not go is an attachment lost,
                 // and never the host app's problem.
             } finally {
                 conn?.disconnect()
+                completion?.invoke(ok)
             }
         }
     }

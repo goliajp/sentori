@@ -210,6 +210,72 @@ final class SentoriAttachmentTests: XCTestCase {
         XCTAssertTrue(uploads.isEmpty, "a spilled batch has no event on the server to attach to")
     }
 
+    // ── the hook itself ───────────────────────────────────────────
+
+    /// Registered for events that are still queued, it waits.
+    func testAHookWaitsUntilItsOwnEventsLand() {
+        configure()
+        SentoriTransport.start()
+        SentoriTransport.forcedOutcomeForTests = 0  // .delivered
+
+        var fired = 0
+        SentoriTransport.afterDelivery(of: ["a", "b"]) { fired += 1 }
+
+        SentoriTransport.enqueue(["id": "a", "kind": "error"])
+        SentoriTransport.flush()
+        waitUntil("the first batch lands") { SentoriTransport.__peekDelivered() >= 1 }
+        XCTAssertEqual(fired, 0, "half its events have landed — it is not due yet")
+
+        SentoriTransport.enqueue(["id": "b", "kind": "error"])
+        SentoriTransport.flush()
+        waitUntil("the hook fires once both have landed") { fired == 1 }
+    }
+
+    /// Registered for events the server refuses outright, it is
+    /// dropped: there is nothing on the server to attach to, and
+    /// uploading anyway spends a device's bandwidth on a 404.
+    func testAHookIsDiscardedWhenTheServerRefusesItsEvents() {
+        configure()
+        SentoriTransport.start()
+        SentoriTransport.forcedOutcomeForTests = 1  // .dropped
+
+        var fired = false
+        SentoriTransport.afterDelivery(of: ["a"]) { fired = true }
+        XCTAssertEqual(SentoriTransport.__peekWaiting(), 1)
+
+        SentoriTransport.enqueue(["id": "a", "kind": "error"])
+        SentoriTransport.flush()
+
+        waitUntil("the refusal discards the waiter") {
+            SentoriTransport.__peekWaiting() == 0
+        }
+        XCTAssertFalse(fired, "the events it waited on were refused")
+    }
+
+    /// The shape of the bug CI caught. A hook registered after its
+    /// batch has already been accepted never fires — which is why
+    /// `ship` registers before it enqueues, not after it flushes.
+    func testAHookRegisteredTooLateNeverFires() {
+        configure()
+        SentoriTransport.start()
+        SentoriTransport.forcedOutcomeForTests = 0
+
+        SentoriTransport.enqueue(["id": "a", "kind": "error"])
+        SentoriTransport.flush()
+        waitUntil("the batch lands") { SentoriTransport.__peekDelivered() >= 1 }
+
+        var fired = false
+        SentoriTransport.afterDelivery(of: ["a"]) { fired = true }
+        SentoriTransport.enqueue(["id": "z", "kind": "error"])
+        SentoriTransport.flush()
+        waitUntil("a later batch lands") { SentoriTransport.__peekDelivered() >= 2 }
+
+        XCTAssertFalse(
+            fired,
+            "it fired on someone else's batch — an upload keyed on an event that "
+                + "batch never carried is a 404")
+    }
+
     /// The blobs travel in the file and never on the wire. An event
     /// carrying a base64 screenshot inside its JSON is a megabyte in
     /// a batch that is meant to be a few kilobytes.
@@ -237,7 +303,13 @@ final class SentoriAttachmentTests: XCTestCase {
         file.removeValue(forKey: "_pendingAttachments")
         SentoriCrashHandler.persistRawForTesting(file)
         SentoriPendingCrash.ship()
-        waitUntil("the crash is delivered") { SentoriTransport.__peekDelivered() == 1 }
+
+        // `>= 1`, not `== 1`. An earlier test spills a batch to the
+        // one Documents directory the whole process shares, `start`
+        // drains it, and the count this test reads is then two — a
+        // test failing on what another test left behind rather than on
+        // anything it did. CI found that; this machine did not.
+        waitUntil("the crash is delivered") { SentoriTransport.__peekDelivered() >= 1 }
 
         XCTAssertTrue(uploads.isEmpty)
     }
