@@ -57,6 +57,32 @@ pub async fn upsert(
         );
     }
 
+    // An FCM credential is a service-account JSON, and the thing an
+    // operator has to hand is usually a legacy server key — the thing
+    // that worked until Google switched the endpoint off. Saving one
+    // succeeds, and the failure surfaces later as a push that never
+    // arrived, on somebody else's device.
+    if body.provider == "fcm" {
+        let cfg = crate::fcm::FcmConfig {
+            service_account_json: body.secret.clone().unwrap_or_default(),
+        };
+        match crate::fcm::project_id(&cfg) {
+            Ok(project) => {
+                tracing::info!(%project, "fcm credential accepted");
+            }
+            Err(e) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({
+                        "error": "invalid_fcm_credential",
+                        "detail": e.to_string(),
+                        "expected": "the service-account JSON from Firebase                                      (Project settings ▸ Service accounts ▸                                      Generate new private key). A legacy server                                      key no longer works: Google switched off                                      the endpoint it authenticated against.",
+                    })),
+                );
+            }
+        }
+    }
+
     // Tenant guard: the project must belong to the caller's
     // workspace. The INSERT derives workspace_id from the project
     // row, so without this a caller could plant credentials on
