@@ -426,6 +426,51 @@ class SentoriPushTest {
     }
 
     /**
+     * A host with no `android:icon` still gets its tray entry.
+     *
+     * `applicationInfo.icon` is `0` for an app that declares none —
+     * insight's drew its logo from a launch theme — and `notify`
+     * throws on an icon of 0. That throw went into a catch written
+     * for a different reason and disappeared: the channel existed,
+     * the callback fired, the tray was empty, and logcat said
+     * nothing. They found it by reasoning backwards from the channel.
+     *
+     * Robolectric accepts an icon of 0 without complaint, so the
+     * first version of this test — post one, assert one arrived —
+     * passed with the bug still in place and proved nothing. What is
+     * asserted instead is the icon this code hands the framework,
+     * which is the part that is ours. That a real device rejects a 0
+     * is a fact about Android, and the fix is to never hand it one.
+     */
+    @Test
+    @Config(sdk = [33])
+    fun aHostWithNoIconStillGetsItsTrayEntry() {
+        val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+        shadowOf(app).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        val mgr = app.getSystemService(android.content.Context.NOTIFICATION_SERVICE)
+            as android.app.NotificationManager
+        mgr.cancelAll()
+
+        val declared = app.applicationInfo.icon
+        app.applicationInfo.icon = 0
+        try {
+            SentoriPushNotifications.postNotification(
+                app,
+                mapOf("google.message_id" to "0:no-icon", "title" to "Crash in checkout"),
+            )
+            val posted = shadowOf(mgr).allNotifications
+            assertEquals(1, posted.size)
+            assertTrue(
+                "a small icon of 0 is what a device throws on, and the throw lands " +
+                    "in a catch — no tray entry, no log, nothing to go on",
+                posted[0].smallIcon.resId != 0,
+            )
+        } finally {
+            app.applicationInfo.icon = declared
+        }
+    }
+
+    /**
      * A silent data message stays silent. An app that uses data
      * messages to tell itself something would not thank us for
      * turning each one into a notification to dismiss.
