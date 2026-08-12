@@ -4,7 +4,7 @@ Error, warning and push capture for Android apps, with no React Native.
 
 ```kotlin
 dependencies {
-    implementation("jp.golia.sentori:sentori:1.4.0")
+    implementation("jp.golia.sentori:sentori:1.4.1")
 }
 ```
 
@@ -37,7 +37,7 @@ class App : Application() {
             SentoriConfig(
                 token = "st_…",                          // Settings ▸ Tokens, ingest scope
                 ingestUrl = "https://sentori.golia.jp",
-                release = "com.example.app@1.4.0+220",
+                release = "com.example.app@1.4.1+220",
                 environment = "production",
             ),
             context = this,

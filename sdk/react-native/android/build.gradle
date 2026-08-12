@@ -77,6 +77,12 @@ dependencies {
     // unresolved reference. Nothing noticed because nothing ran them —
     // the CI job that was supposed to had been failing for months on a
     // missing Gradle wrapper.
+    // The mirrored tests move with the code they cover, and one of
+    // them drives a real `RemoteMessage` through the messaging
+    // service. `compileOnly` above does not reach the test source
+    // set, so without this the mirror compiles and its tests do not —
+    // which is how this module went red while `sdk/native` was green.
+    testImplementation 'com.google.firebase:firebase-messaging:24.0.3'
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.robolectric:robolectric:4.13'
     testImplementation 'androidx.test:core:1.6.1'

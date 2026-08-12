@@ -3,7 +3,7 @@
 Error, warning and push capture for iOS apps, with no React Native.
 
 ```swift
-.package(url: "https://github.com/goliajp/sentori-swift", from: "1.4.0")
+.package(url: "https://github.com/goliajp/sentori-swift", from: "1.4.1")
 ```
 
 iOS 14+. Apache-2.0 OR MIT.
@@ -17,7 +17,7 @@ Sentori.start(
     SentoriConfig(
         token: "st_…",                       // Settings ▸ Tokens, ingest scope
         ingestUrl: "https://sentori.golia.jp",
-        release: "com.example.app@1.4.0+220",
+        release: "com.example.app@1.4.1+220",
         environment: "production"
     )
 )
