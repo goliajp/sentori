@@ -128,6 +128,40 @@ for (const m of MIRRORS) {
   }
 }
 
+// The mirror moves sources. It does not move what they need to
+// compile — and the tests move too, so a test dependency that exists
+// only in `sdk/native` leaves the mirror compiling and its tests not.
+// That is exactly what happened when a test started driving a real
+// `RemoteMessage`: `sdk/native` went green and CI went red on a
+// module whose only difference was one line of Gradle.
+const GRADLE_PAIR = [
+  'sdk/native/android/build.gradle',
+  'sdk/react-native/android/build.gradle',
+];
+function testDeps(path) {
+  return new Set(
+    [...readFileSync(join(root, path), 'utf8').matchAll(/testImplementation\s+['"]([^'"]+)['"]/g)]
+      // The Kotlin one is interpolated on one side and literal on the
+      // other; the version is not what this is about.
+      .map((m) => m[1].split(':').slice(0, 2).join(':')),
+  );
+}
+const [homeDeps, mirrorDeps] = GRADLE_PAIR.map(testDeps);
+const missing = [...homeDeps].filter((d) => !mirrorDeps.has(d));
+if (homeDeps.size === 0) {
+  console.error(`✗ read no testImplementation lines out of ${GRADLE_PAIR[0]}`);
+  process.exit(1);
+}
+if (missing.length > 0) {
+  for (const d of missing) {
+    console.error(
+      `✗ ${GRADLE_PAIR[0]} tests against '${d}' and ${GRADLE_PAIR[1]} does not — ` +
+        'the mirrored tests will not compile there',
+    );
+  }
+  process.exit(1);
+}
+
 if (!check) {
   console.log(`✓ mirrored ${written} native source(s) into the React Native package`);
   process.exit(0);
