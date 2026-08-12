@@ -4,7 +4,7 @@ Error, warning and push capture for Android apps, with no React Native.
 
 ```kotlin
 dependencies {
-    implementation("jp.golia.sentori:sentori:1.3.0")
+    implementation("jp.golia.sentori:sentori:1.4.0")
 }
 ```
 
@@ -186,6 +186,26 @@ server upserts the token. Each failure asks for something different:
 | `TOKEN_TIMEOUT` | FCM never returned a token | retrying later is reasonable |
 | `SERVER_REJECTED` | Sentori answered non-2xx | look at Settings ▸ Push |
 | `NOT_INITIALISED` | `Sentori.start` has not run | a wiring bug |
+
+### Taps, and what still needs you
+
+A notification Sentori posted carries a pending intent of its own, so
+`onTap` fires on its own — cold start or warm, nothing to wire up.
+That is the path the Sentori server produces: it sends `data`
+messages, and the SDK draws the tray entry itself.
+
+Two cases are not ours to close:
+
+- **A `notification` message from another sender.** The system draws
+  it and never calls our service. A cold start still works — `register`
+  reads the intent the Activity was launched with — but a tap while
+  the app is already running goes to your `onNewIntent`, and only you
+  can see it. If you want those, call `setIntent(intent)` there;
+  `register` picks it up on the next call, or forward it directly with
+  `SentoriPushNotifications.handleNotificationTap(extras)`.
+- **A data message with no `title` and no `body`.** Nothing is drawn,
+  on purpose: an app that uses silent data messages should not get a
+  notification per message. `onMessage` still fires.
 
 `Sentori.push.unregister(context)` revokes it.
 `cachedDeviceHandle(context)` returns the handle without a round trip.

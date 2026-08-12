@@ -49,6 +49,16 @@ class SentoriFirebaseMessagingService : FirebaseMessagingService() {
                 notif.channelId?.let { payload["channelId"] = it }
             }
             SentoriPushNotifications.handleIncomingNotification(payload)
+
+            // A `data` message is invisible until somebody draws it,
+            // and the Sentori server sends `data` on purpose so that
+            // the tap comes back through a pending intent we own. If
+            // the system already drew this one — a `notification`
+            // message from some other sender — leave it alone rather
+            // than showing it twice.
+            if (message.notification == null) {
+                SentoriPushNotifications.postNotification(applicationContext, message.data)
+            }
         } catch (_: Throwable) {
             // never crash a Firebase callback
         }
