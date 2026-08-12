@@ -10,9 +10,26 @@ dependencies {
 
 `minSdk 24`, JVM target 17. Apache-2.0 OR MIT.
 
+The package is `com.sentori`, which is **not** the groupId:
+
+```kotlin
+import com.sentori.Sentori
+import com.sentori.SentoriConfig
+```
+
+`jp.golia.sentori` identifies the artifact on Maven Central and
+appears nowhere in the code. Guessing an import from it gives
+`Unresolved reference 'jp'` on a dependency that resolved perfectly —
+a combination that sends people looking at `mavenCentral()` and
+transitive dependencies when the problem is one line. This section
+exists because that happened.
+
 ## Start
 
 ```kotlin
+import com.sentori.Sentori
+import com.sentori.SentoriConfig
+
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
