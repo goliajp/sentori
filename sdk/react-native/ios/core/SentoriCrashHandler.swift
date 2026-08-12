@@ -80,6 +80,21 @@ import MachO
         write(exception: exception)
     }
 
+    /// Test-only seam that writes a crash file verbatim.
+    ///
+    /// `persistForTesting(exception:)` goes through `write`, which
+    /// composes the file from a live exception and a live screen —
+    /// neither of which an XCTest can arrange. Delivery tests need to
+    /// state the file they are about to deliver, particularly the
+    /// pre-death attachments, which only exist when there was a
+    /// window to capture.
+    internal static func persistRawForTesting(_ event: [String: Any]) {
+        guard let dir = pendingDir(),
+            let data = try? JSONSerialization.data(withJSONObject: event)
+        else { return }
+        try? data.write(to: dir.appendingPathComponent("\(UUID().uuidString.lowercased()).json"))
+    }
+
     private static func write(exception: NSException) {
         let cfg = config()
         let release = (cfg["release"] as? String) ?? "unknown"

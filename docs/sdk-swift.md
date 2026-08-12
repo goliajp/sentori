@@ -3,7 +3,7 @@
 Error, warning and push capture for iOS apps, with no React Native.
 
 ```swift
-.package(url: "https://github.com/goliajp/sentori-swift", from: "1.0.0")
+.package(url: "https://github.com/goliajp/sentori-swift", from: "1.2.0")
 ```
 
 iOS 14+. Apache-2.0 OR MIT.
@@ -145,7 +145,12 @@ feel, that is a bug worth reporting as a P0.
 
 ## Also in the box
 
-Crash handling (`NSException`), a hang watchdog, thread sampling,
-mobile vitals and screenshot capture are compiled in and used by the
-React Native SDK today. They are not yet part of this public surface —
-they need an attachment upload path that lands next.
+An uncaught `NSException` is written to disk as the app dies, along
+with a screenshot of the last frame and the view tree behind it. The
+next `Sentori.start` sends the crash, and once the server has taken
+it, uploads the two blobs against it — in that order, because an
+attachment keyed on an event the server has not seen is a 404.
+
+Nothing here needs configuring. The hang watchdog, thread sampler and
+mobile vitals are compiled in and driven by the React Native SDK
+today; they are not yet part of this public surface.
