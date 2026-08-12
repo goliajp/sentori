@@ -246,6 +246,19 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
 
+      # `swift/1.0.0` was tagged and mirrored, and then crash
+      # delivery landed on the same version number — so anyone
+      # resolving `from: "1.0.0"` got an SDK that captured crashes and
+      # sent none, while the repo said the feature had shipped. The
+      # tag is a git object and the version is a file; neither knows
+      # about the other.
+      #
+      # Needs full history: a shallow clone has no tags to compare.
+      - name: the native version is not one already published
+        run: |
+          git fetch --tags --force --depth=1000 || git fetch --tags --force
+          node scripts/check-native-version-tag.mjs
+
       - name: tests, in their own build
         working-directory: sdk/native/android
         run: ./gradlew testReleaseUnitTest --console=plain
