@@ -40,7 +40,7 @@ import android.os.Bundle
  * still needs the host, and the documentation says so rather than
  * pretending otherwise.
  */
-internal object SentoriNotificationTap {
+object SentoriNotificationTap {
 
     /** Extras on our own pending intent. */
     const val EXTRA_MARKER = "com.sentori.tap"
@@ -108,6 +108,20 @@ internal object SentoriNotificationTap {
         consume(activity?.intent?.extras)
     }
 
+    /**
+     * Report a tap from intent extras, if that is what they are.
+     *
+     * Public because the documentation asks hosts to call it. A tap
+     * arriving while the app is already running reaches the host's
+     * `onNewIntent` and nowhere else, and the docs said so — while
+     * this object was `internal`, so the only reachable alternative
+     * was `handleNotificationTap`, which records whatever it is
+     * given. insight ended up copying the two-key test out of here by
+     * hand, including a constant that exists only in this file.
+     *
+     * Safe to call with any intent's extras: an ordinary launch is
+     * not a tap and is ignored, and the same tap is reported once.
+     */
     fun consume(extras: Bundle?) {
         val bundle = extras ?: return
         val ours = bundle.getBoolean(EXTRA_MARKER, false)

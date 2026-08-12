@@ -4,7 +4,7 @@ Error, warning and push capture for Android apps, with no React Native.
 
 ```kotlin
 dependencies {
-    implementation("jp.golia.sentori:sentori:1.4.1")
+    implementation("jp.golia.sentori:sentori:1.5.0")
 }
 ```
 
@@ -37,7 +37,7 @@ class App : Application() {
             SentoriConfig(
                 token = "st_…",                          // Settings ▸ Tokens, ingest scope
                 ingestUrl = "https://sentori.golia.jp",
-                release = "com.example.app@1.4.1+220",
+                release = "com.example.app@1.5.0+220",
                 environment = "production",
             ),
             context = this,
@@ -200,9 +200,21 @@ Two cases are not ours to close:
   it and never calls our service. A cold start still works — `register`
   reads the intent the Activity was launched with — but a tap while
   the app is already running goes to your `onNewIntent`, and only you
-  can see it. If you want those, call `setIntent(intent)` there;
-  `register` picks it up on the next call, or forward it directly with
-  `SentoriPushNotifications.handleNotificationTap(extras)`.
+  can see it. One line closes it:
+
+  ```kotlin
+  override fun onNewIntent(intent: Intent) {
+      super.onNewIntent(intent)
+      SentoriNotificationTap.consume(intent.extras)
+  }
+  ```
+
+  Safe with any intent: an ordinary launch is not a tap and is
+  ignored, and the same tap is never reported twice. This paragraph
+  used to end at "only you can see it", while the object it names was
+  `internal` and could not be called at all — leaving
+  `handleNotificationTap`, which records whatever it is handed,
+  including launches that were never taps.
 - **A data message with no `title` and no `body`.** Nothing is drawn,
   on purpose: an app that uses silent data messages should not get a
   notification per message. `onMessage` still fires.
