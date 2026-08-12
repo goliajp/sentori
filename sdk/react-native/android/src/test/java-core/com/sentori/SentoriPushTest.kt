@@ -14,7 +14,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 
 /**
  * Push registration, as far as Robolectric can go.
@@ -107,6 +110,100 @@ class SentoriPushTest {
                 ),
         )
         assertNull("a failure must cache nothing", SentoriPush.cachedDeviceHandle(context))
+    }
+
+    /**
+     * The one that was missing, and the reason a whole class of user
+     * never got push.
+     *
+     * `requestPermission` parked its callback in a field and left it
+     * to `handlePermissionResult` — a hook the host has to forward
+     * from its own `onRequestPermissionsResult`, which the docs never
+     * mentioned and a native host has no reason to know about. So the
+     * callback was never called, `finishRegister` never ran, and a
+     * first launch registered nothing: the dialog appeared, the user
+     * tapped Allow, and the SDK did not continue. It worked on the
+     * *next* launch, because the permission was granted by then and
+     * the flow never suspended at all.
+     *
+     * Every test in this file passed throughout, because every one of
+     * them passes `activity = null` and skips the prompt entirely.
+     *
+     * This one takes an Activity, never forwards the result — exactly
+     * what a host that has not read the source does — and grants the
+     * permission the way the framework does. What is asserted is only
+     * that `register` comes back at all. Whether it then succeeds
+     * needs an FCM that is not on this classpath.
+     */
+    @Test
+    @Config(sdk = [33])
+    fun registerContinuesWhenPermissionIsGrantedWithoutTheHostForwardingIt() {
+        SentoriConfig.set(
+            SentoriConfig(
+                token = "st_test",
+                ingestUrl = "http://127.0.0.1:9",
+                release = "app@1.0.0",
+                environment = "test",
+            ),
+        )
+        val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+        shadowOf(app).denyPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        val activity = Robolectric.buildActivity(android.app.Activity::class.java).setup().get()
+
+        val latch = CountDownLatch(1)
+        var result: SentoriPush.Result? = null
+        SentoriPush.permissionTimeoutMs = 20_000
+        SentoriPush.register(app, activity = activity, timeoutMs = 500) {
+            result = it
+            latch.countDown()
+        }
+
+        // Not registered yet: the dialog is up and nobody has answered.
+        assertNull("register reported before the permission was answered", result)
+
+        // The user taps Allow. Nothing forwards the result — this is
+        // the whole point.
+        shadowOf(app).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+
+        assertTrue(
+            "register never came back after the permission was granted — the first " +
+                "launch after a fresh install registers nothing and says nothing",
+            latch.await(30, TimeUnit.SECONDS),
+        )
+        assertNotNull(result)
+    }
+
+    /**
+     * And when nobody ever answers, it still reports rather than
+     * leaving the caller with a callback that never fires.
+     */
+    @Test
+    @Config(sdk = [33])
+    fun registerReportsWhenThePermissionDialogIsIgnored() {
+        SentoriConfig.set(
+            SentoriConfig(
+                token = "st_test",
+                ingestUrl = "http://127.0.0.1:9",
+                release = "app@1.0.0",
+                environment = "test",
+            ),
+        )
+        val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+        shadowOf(app).denyPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        val activity = Robolectric.buildActivity(android.app.Activity::class.java).setup().get()
+
+        val latch = CountDownLatch(1)
+        var result: SentoriPush.Result? = null
+        SentoriPush.permissionTimeoutMs = 1_500
+        SentoriPush.register(app, activity = activity, timeoutMs = 500) {
+            result = it
+            latch.countDown()
+        }
+
+        assertTrue("register never gave up", latch.await(30, TimeUnit.SECONDS))
+        val failure = result as? SentoriPush.Result.Failure
+        assertNotNull("expected a failure, got $result", failure)
+        assertEquals(SentoriPush.Failure.PERMISSION_DENIED, failure!!.reason)
     }
 
     @Test

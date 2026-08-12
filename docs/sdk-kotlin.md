@@ -4,7 +4,7 @@ Error, warning and push capture for Android apps, with no React Native.
 
 ```kotlin
 dependencies {
-    implementation("jp.golia.sentori:sentori:1.2.4")
+    implementation("jp.golia.sentori:sentori:1.3.0")
 }
 ```
 
@@ -130,6 +130,33 @@ registered device receives broadcasts only, and Settings ▸ Push shows
 that as "N devices, 0 addressable".
 
 ## Push
+
+The full signature, because it is a different shape from the Swift
+one — two parameters, and a callback rather than a return value:
+
+```kotlin
+SentoriPush.register(
+    context: Context,
+    activity: Activity? = null,   // null skips the prompt and uses what is granted
+    timeoutMs: Long = 8_000,      // how long to wait for a token, not for the user
+    onMessage: ((Map<String, Any?>) -> Unit)? = null,
+    onTap: ((Map<String, Any?>) -> Unit)? = null,
+    completion: (Result) -> Unit,
+)
+```
+
+Swift's is `await Sentori.push.register(onMessage:onTap:) -> Result`.
+Android needs the `Context` for storage and the `Activity` to show the
+Android 13+ prompt on, and reports through a callback because the
+work spans a dialog.
+
+`timeoutMs` is a network budget. Waiting for someone to read a
+permission dialog is a different question and has its own budget,
+`SentoriPush.permissionTimeoutMs` (two minutes by default) — a person
+does not answer a prompt in the eight seconds it is reasonable to
+wait for FCM.
+
+In use:
 
 ```kotlin
 Sentori.push.register(

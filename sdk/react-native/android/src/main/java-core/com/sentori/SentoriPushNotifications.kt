@@ -50,6 +50,10 @@ object SentoriPushNotifications {
 
     private var pendingPermissionCallback: ((String) -> Unit)? = null
 
+    private val watcher = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+        Thread(r, "sentori-push-permission").apply { isDaemon = true }
+    }
+
     // ── status / permission ─────────────────────────────────────
 
     /** Returns `granted` / `denied` / `notDetermined` without
@@ -82,7 +86,12 @@ object SentoriPushNotifications {
      * Callbacks run on the main thread.
      */
     @JvmStatic
-    fun requestPermission(activity: Activity?, completion: (String) -> Unit) {
+    @JvmOverloads
+    fun requestPermission(
+        activity: Activity?,
+        timeoutMs: Long = 60_000,
+        completion: (String) -> Unit,
+    ) {
         val ctx = activity ?: run {
             completion("error:no-activity")
             return
@@ -99,35 +108,89 @@ object SentoriPushNotifications {
             completion("granted")
             return
         }
-        pendingPermissionCallback = completion
+        synchronized(lock) { pendingPermissionCallback = completion }
         ActivityCompat.requestPermissions(
             ctx,
             arrayOf(Manifest.permission.POST_NOTIFICATIONS),
             PERMISSION_REQUEST_CODE,
         )
+        watchForPermission(ctx.applicationContext, timeoutMs)
     }
 
     /**
-     * Hook for the host Activity's `onRequestPermissionsResult`. Not
-     * mandatory — Android dispatches the result back to the same
-     * Activity that requested it, but ActivityCompat's flow doesn't
-     * give us a callback API on older devices. Hosts that want
-     * deterministic delivery can call this from their override.
+     * Fast path for hosts that forward `onRequestPermissionsResult`.
      *
-     * The Activity-based ActivityResultLauncher pattern would be
-     * cleaner but requires the Activity to be a ComponentActivity;
-     * we stick with ActivityCompat for broader RN host compat and
-     * accept that the callback may not fire on every device — the
-     * JS drain loop will still pick up the `granted` state next tick.
+     * It used to be the *only* path, and the comment here said the
+     * callback might not fire because "the JS drain loop will still
+     * pick up the granted state next tick". That is true of React
+     * Native and of nothing else. A native host calls `register` and
+     * never hears of this method, so the callback was never invoked,
+     * `finishRegister` never ran, and a first launch registered
+     * nothing at all — silently, with the user having tapped Allow.
+     * The next launch worked, because by then the permission was
+     * already granted and the flow never suspended. New users simply
+     * did not get push until they happened to reopen the app.
+     *
+     * Nothing needs to call this now. It stays because forwarding the
+     * result resolves in milliseconds instead of on the next poll,
+     * and because hosts that already call it should keep working.
      */
     @JvmStatic
     fun handlePermissionResult(requestCode: Int, grantResults: IntArray) {
         if (requestCode != PERMISSION_REQUEST_CODE) return
-        val cb = pendingPermissionCallback ?: return
-        pendingPermissionCallback = null
         val granted = grantResults.isNotEmpty() &&
             grantResults[0] == PackageManager.PERMISSION_GRANTED
-        cb(if (granted) "granted" else "denied")
+        settlePermission(if (granted) "granted" else "denied")
+    }
+
+    /** Deliver a pending permission outcome exactly once. */
+    private fun settlePermission(status: String) {
+        val cb = synchronized(lock) {
+            pendingPermissionCallback.also { pendingPermissionCallback = null }
+        } ?: return
+        cb(status)
+    }
+
+    /**
+     * Watch the permission the framework actually holds, and settle
+     * when it changes.
+     *
+     * `checkSelfPermission` flips the moment the user answers the
+     * dialog, whether or not anyone forwarded the result — so this
+     * needs no cooperation from the host, works on any Activity
+     * rather than only a `ComponentActivity`, and cannot be defeated
+     * by a host that does not know the hook exists.
+     *
+     * On a background thread, because the caller's thread is never
+     * ours to block. If the user never answers, this settles as
+     * `notDetermined` at the deadline rather than hanging: a
+     * registration that reports nothing is the failure this whole
+     * change is about.
+     */
+    private fun watchForPermission(ctx: Context, timeoutMs: Long) {
+        watcher.execute {
+            val deadline = System.currentTimeMillis() + timeoutMs
+            while (System.currentTimeMillis() < deadline) {
+                if (synchronized(lock) { pendingPermissionCallback } == null) return@execute
+                if (ContextCompat.checkSelfPermission(
+                        ctx,
+                        Manifest.permission.POST_NOTIFICATIONS,
+                    ) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    settlePermission("granted")
+                    return@execute
+                }
+                try {
+                    Thread.sleep(250)
+                } catch (_: InterruptedException) {
+                    return@execute
+                }
+            }
+            // Denied and never-answered are the same observation from
+            // here: the framework only tells them apart through an
+            // Activity that may be gone by now. Say what was seen.
+            settlePermission("notDetermined")
+        }
     }
 
     // ── register / unregister ───────────────────────────────────
