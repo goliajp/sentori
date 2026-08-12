@@ -105,5 +105,40 @@ final class SentoriLiveServerTests: XCTestCase {
             "a batch spilled to disk, so the server refused it"
         )
         XCTAssertEqual(id.count, 36)
+
+        // The multipart body against a real parser.
+        //
+        // Everything else about attachments is asserted as a string,
+        // and a string that looks right is exactly what React Native
+        // shipped for a release while every upload failed on the
+        // device. The body is hand-built; the only proof it is
+        // well-formed is a server that read it.
+        let uploaded = expectation(description: "attachment upload")
+        var status = false
+        SentoriAttachment.upload(
+            eventId: id,
+            kind: "screenshot",
+            // A one-pixel JPEG, so the server stores an image rather
+            // than bytes that merely decode.
+            base64: onePixelJpegBase64,
+            mediaType: "image/jpeg"
+        ) { ok in
+            status = ok
+            uploaded.fulfill()
+        }
+        wait(for: [uploaded], timeout: 30)
+        XCTAssertTrue(
+            status,
+            "the server refused the multipart body — it parses this, or attachments "
+                + "die silently on every device"
+        )
     }
+
+    /// The smallest valid JPEG, base64. Content matters here: the
+    /// server stores what it decodes, and a payload that is not an
+    /// image would pass the upload and fail the viewer.
+    private let onePixelJpegBase64 =
+        "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0a"
+        + "HBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAA"
+        + "AAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q=="
 }
