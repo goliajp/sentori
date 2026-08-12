@@ -138,6 +138,12 @@ object SentoriPush {
         }
 
         val appContext = context.applicationContext
+
+        // Whatever launched this Activity, before anything else can
+        // replace it. A cold start from a notification arrives here
+        // and nowhere else, and `onTap` used to need the host to
+        // forward it by hand — which nothing told the host to do.
+        SentoriNotificationTap.consume(activity)
         val proceed = { status: String ->
             worker.execute {
                 deliver(completion, finishRegister(appContext, config, status, timeoutMs))

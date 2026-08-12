@@ -293,8 +293,17 @@ object SentoriPushNotifications {
         }
     }
 
-    /** Called when the user taps a notification (host wires this in
-     *  Activity.onCreate to forward the intent extras). */
+    /**
+     * Record a tap.
+     *
+     * This used to be the only route to `register(onTap:)`, and its
+     * comment said the host wires it in `Activity.onCreate`. Nothing
+     * in the SDK called it and the docs never mentioned it, so a
+     * native host's `onTap` could not fire at all. `SentoriNotificationTap`
+     * now reaches this on its own, from a pending intent the SDK owns
+     * or from the intent an Activity was launched with; this stays
+     * public because a host that already forwards should keep working.
+     */
     @JvmStatic
     fun handleNotificationTap(extras: Map<String, Any?>) {
         synchronized(lock) {
@@ -344,6 +353,53 @@ object SentoriPushNotifications {
             NotificationManager.IMPORTANCE_DEFAULT,
         )
         mgr.createNotificationChannel(channel)
+    }
+
+    /**
+     * Put a data message in the tray, with a pending intent of ours.
+     *
+     * Nothing here posted a notification before, which left both
+     * kinds of message broken in a different way. A `data` message
+     * reached `onMessage` and the user saw nothing — insight's device
+     * said "No notifications" while the callback had fired. A
+     * `notification` message was drawn by the system, which never
+     * calls this service, so the tap had no way home. Posting it here
+     * is what makes one path work end to end.
+     *
+     * Only messages that carry something to display are posted. A
+     * data message without a title or a body is a silent instruction
+     * to the app, and an app that uses those would not thank us for
+     * turning each one into a notification the user has to dismiss.
+     */
+    @JvmStatic
+    fun postNotification(ctx: Context, data: Map<String, String>) {
+        val title = data["title"]?.takeIf { it.isNotBlank() }
+        val body = data["body"]?.takeIf { it.isNotBlank() }
+        if (title == null && body == null) return
+        if (!NotificationManagerCompat.from(ctx).areNotificationsEnabled()) return
+
+        ensureChannel(ctx)
+        val id = (data["google.message_id"] ?: data["id"] ?: title ?: "").hashCode()
+        val builder = androidx.core.app.NotificationCompat.Builder(
+            ctx,
+            data["channelId"]?.takeIf { it.isNotBlank() } ?: DEFAULT_CHANNEL_ID,
+        )
+            // The host's own icon. A push SDK that ships its own
+            // artwork puts a stranger's mark in someone else's tray.
+            .setSmallIcon(ctx.applicationInfo.icon)
+            .setAutoCancel(true)
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
+        title?.let { builder.setContentTitle(it) }
+        body?.let { builder.setContentText(it) }
+        SentoriNotificationTap.pendingIntent(ctx, data, id)?.let { builder.setContentIntent(it) }
+
+        try {
+            NotificationManagerCompat.from(ctx).notify(id, builder.build())
+        } catch (_: Throwable) {
+            // A missing POST_NOTIFICATIONS grant throws on some
+            // devices rather than dropping the post. Losing the tray
+            // entry is not worth taking the host down for.
+        }
     }
 
     private fun isFirebaseAvailable(): Boolean {

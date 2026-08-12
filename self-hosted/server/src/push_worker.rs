@@ -358,7 +358,7 @@ async fn try_fcm(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
     .ok_or_else(|| "credentials_missing".to_string())?;
     let device_token: String = row.get("native_token");
     let payload: serde_json::Value = row.get("payload");
-    let server_key = String::from_utf8(row.get::<Vec<u8>, _>("secret_blob"))
+    let service_account_json = String::from_utf8(row.get::<Vec<u8>, _>("secret_blob"))
         .map_err(|e| e.to_string())?
         .trim()
         .to_string();
@@ -367,7 +367,9 @@ async fn try_fcm(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
         .and_then(|v| v.as_str())
         .unwrap_or("Sentori");
     let body_text = payload.get("body").and_then(|v| v.as_str()).unwrap_or("");
-    let cfg = crate::fcm::FcmConfig { server_key };
+    let cfg = crate::fcm::FcmConfig {
+        service_account_json,
+    };
     let start = Instant::now();
     let status = crate::fcm::send(&cfg, &device_token, title, body_text)
         .await
