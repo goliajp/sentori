@@ -384,9 +384,7 @@ object SentoriPushNotifications {
             ctx,
             data["channelId"]?.takeIf { it.isNotBlank() } ?: DEFAULT_CHANNEL_ID,
         )
-            // The host's own icon. A push SDK that ships its own
-            // artwork puts a stranger's mark in someone else's tray.
-            .setSmallIcon(ctx.applicationInfo.icon)
+            .setSmallIcon(smallIcon(ctx))
             .setAutoCancel(true)
             .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
         title?.let { builder.setContentTitle(it) }
@@ -395,11 +393,45 @@ object SentoriPushNotifications {
 
         try {
             NotificationManagerCompat.from(ctx).notify(id, builder.build())
-        } catch (_: Throwable) {
-            // A missing POST_NOTIFICATIONS grant throws on some
-            // devices rather than dropping the post. Losing the tray
-            // entry is not worth taking the host down for.
+        } catch (t: Throwable) {
+            // Losing the tray entry is not worth taking the host down
+            // for — but losing it in silence is what made this cost
+            // insight an afternoon. The channel got created, so they
+            // knew the code had reached `notify`; the tray was empty,
+            // `dumpsys notification` had nothing, and logcat had not
+            // one word. They worked backwards from the channel's
+            // existence to a throw nobody had reported.
+            //
+            // The argument for this line is the same one made when
+            // registration failures started logging, one release
+            // earlier — and then this catch was written silent in the
+            // same release. A failure the host cannot see is the
+            // hardest kind there is.
+            android.util.Log.w("sentori", "push notification not shown: $t")
         }
+    }
+
+    /**
+     * A small icon that will not throw.
+     *
+     * The host's own, because a push SDK that ships its own artwork
+     * puts a stranger's mark in someone else's tray. But
+     * `applicationInfo.icon` is `0` for an app that declares no
+     * `android:icon` — insight's did not, it drew its logo from a
+     * launch theme — and `notify` throws on an icon of 0 rather than
+     * drawing something ugly. The result was a notification that
+     * silently never appeared.
+     *
+     * A system icon in that case: unbranded and plain, but visible,
+     * and visible is the whole point of the tray.
+     */
+    private fun smallIcon(ctx: Context): Int {
+        val declared = try {
+            ctx.applicationInfo.icon
+        } catch (_: Throwable) {
+            0
+        }
+        return if (declared != 0) declared else android.R.drawable.ic_dialog_info
     }
 
     private fun isFirebaseAvailable(): Boolean {
