@@ -83,8 +83,12 @@ class SentoriAttachmentTest {
     /**
      * Poll rather than sleep: a fixed wait encodes a guess about how
      * fast the machine is, and CI is slower than this one.
+     *
+     * The default is generous because a passing wait returns
+     * immediately and only a failing one spends the budget. Five
+     * seconds bought nothing and cost two red builds on the iOS side.
      */
-    private fun waitUntil(what: String, timeoutMs: Long = 5_000, cond: () -> Boolean) {
+    private fun waitUntil(what: String, timeoutMs: Long = 30_000, cond: () -> Boolean) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (cond()) return
@@ -293,12 +297,19 @@ class SentoriAttachmentTest {
         SentoriTransport.start(spillDir())
         SentoriTransport.forcedOutcomeForTests = 2 // FAILED
 
-        SentoriCrashHandler.persistRawForTesting(crashFile("019ff080-2aeb-7e30-aba1-4431b296d121"))
+        val spilledId = "019ff080-2aeb-7e30-aba1-4431b296d121"
+        SentoriCrashHandler.persistRawForTesting(crashFile(spilledId))
         SentoriPendingCrash.ship()
 
         // The event has to reach the spill before the absence of an
         // upload means anything — otherwise this passes by being early.
-        waitUntil("the failed batch spills") { SentoriTransport.peekPersisted().size == 1 }
+        //
+        // Ask for this crash, not for a count: the spill is one file
+        // the whole process shares, so a size check is an assertion
+        // about what every other test left behind.
+        waitUntil("the failed batch spills", 60_000) {
+            SentoriTransport.peekPersisted().any { it["id"] as? String == spilledId }
+        }
 
         assertTrue(
             "a spilled batch has no event on the server to attach to",

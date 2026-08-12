@@ -46,8 +46,12 @@ final class SentoriAttachmentTests: XCTestCase {
 
     /// Poll rather than sleep: a fixed wait encodes a guess about how
     /// fast the machine is, and CI is slower than this one.
+    ///
+    /// The default is generous because a passing wait returns
+    /// immediately and only a failing one spends the budget. Five
+    /// seconds bought nothing and cost two red builds.
     private func waitUntil(
-        _ what: String, timeout: TimeInterval = 5, _ cond: () -> Bool,
+        _ what: String, timeout: TimeInterval = 30, _ cond: () -> Bool,
         file: StaticString = #filePath, line: UInt = #line
     ) {
         let deadline = Date().addingTimeInterval(timeout)
@@ -179,7 +183,9 @@ final class SentoriAttachmentTests: XCTestCase {
 
         // `ship` enqueues and flushes on a worker, and the uploads
         // only run once that send comes back delivered.
-        waitUntil("both blobs upload after the batch lands") { self.uploads.count == 2 }
+        waitUntil("both blobs upload after the batch lands", timeout: 60) {
+            self.uploads.count == 2
+        }
 
         XCTAssertEqual(uploads.count, 2, "both blobs in the file should have gone up")
         XCTAssertEqual(Set(uploads.map { $0.kind }), ["screenshot", "viewTree"])
@@ -199,13 +205,23 @@ final class SentoriAttachmentTests: XCTestCase {
         SentoriTransport.start()
         SentoriTransport.forcedOutcomeForTests = 2  // .failed
 
-        SentoriCrashHandler.persistRawForTesting(
-            crashFile(id: "019ff080-2aeb-7e30-aba1-4431b296d121"))
+        let spilledId = "019ff080-2aeb-7e30-aba1-4431b296d121"
+        SentoriCrashHandler.persistRawForTesting(crashFile(id: spilledId))
         SentoriPendingCrash.ship()
 
         // The event has to reach the spill before the absence of an
         // upload means anything — otherwise this passes by being early.
-        waitUntil("the failed batch spills") { SentoriTransport.__peekPersisted().count == 1 }
+        //
+        // Ask for this crash, not for a count. The spill is one file
+        // the whole process shares, so `== 1` is an assertion about
+        // what every other test left behind; and the send retries
+        // three times with a doubling sleep on a serial worker, which
+        // on a loaded runner is nowhere near five seconds. Both of
+        // those failed on CI while passing here, twice, in different
+        // tests — the same mistake wearing two hats.
+        waitUntil("the failed batch spills", timeout: 60) {
+            SentoriTransport.__peekPersisted().contains { $0["id"] as? String == spilledId }
+        }
 
         XCTAssertTrue(uploads.isEmpty, "a spilled batch has no event on the server to attach to")
     }
@@ -309,7 +325,9 @@ final class SentoriAttachmentTests: XCTestCase {
         // drains it, and the count this test reads is then two — a
         // test failing on what another test left behind rather than on
         // anything it did. CI found that; this machine did not.
-        waitUntil("the crash is delivered") { SentoriTransport.__peekDelivered() >= 1 }
+        waitUntil("the crash is delivered", timeout: 60) {
+            SentoriTransport.__peekDelivered() >= 1
+        }
 
         XCTAssertTrue(uploads.isEmpty)
     }
