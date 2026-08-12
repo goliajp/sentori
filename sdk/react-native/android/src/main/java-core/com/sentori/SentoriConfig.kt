@@ -57,5 +57,5 @@ constructor(
  * direction of a lie.
  */
 object SentoriVersion {
-    const val CURRENT = "1.0.0"
+    const val CURRENT = "1.1.0"
 }
