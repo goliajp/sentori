@@ -182,9 +182,45 @@ for (const f of files) {
   }
 }
 
+// ── the shadow table ──────────────────────────────────────────────
+//
+// `push_tokens` is the push-provider crate's own store, kept up to
+// date by a dual write and read by nothing in the live path. Send
+// targeting, quarantine and the worker all use `device_tokens`.
+//
+// `DELETE /v1/push/tokens/{handle}` deleted from `push_tokens`,
+// answered 202 `{"status":"revoked"}`, and left the device perfectly
+// deliverable. A host called `unregister`, was told it worked, and
+// the next send went out. Nothing catches that: both tables exist,
+// both statements are valid, and the wrong one succeeds.
+//
+// So: the server's own SQL names `device_tokens`. The crate may keep
+// its table; a handler that reaches for it is reaching for a copy.
+const SHADOW = 'push_tokens';
+let shadowHits = 0;
+for (const file of walk('self-hosted/server/src')) {
+  if (!file.endsWith('.rs')) continue;
+  const src = readFileSync(file, 'utf8');
+  for (const line of src.split('\n')) {
+    const code = line.trim();
+    if (code.startsWith('//')) continue;
+    // Only SQL. `state.push_tokens` is the crate's store by another
+    // name and is not what this is about.
+    if (!/\b(FROM|INTO|UPDATE|JOIN)\s+push_tokens\b/i.test(code)) continue;
+    shadowHits += 1;
+    problems.push(
+      `${file}: SQL naming '${SHADOW}'. The live path reads 'device_tokens' — ` +
+        'targeting filters it, quarantine writes it, the worker joins it. A ' +
+        'statement against the other table succeeds and changes nothing anyone ' +
+        `reads: \`${code.slice(0, 70)}\``,
+    );
+  }
+}
+
 if (problems.length === 0) {
   console.log(
-    `✓ ${checked} INSERT statements balance; ${readsChecked} column reads are selected`,
+    `✓ ${checked} INSERT statements balance; ${readsChecked} column reads are ` +
+      `selected; no handler reaches for '${SHADOW}' (${shadowHits} found)`,
   );
   process.exit(0);
 }
