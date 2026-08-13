@@ -219,8 +219,23 @@ Two cases are not ours to close:
   on purpose: an app that uses silent data messages should not get a
   notification per message. `onMessage` still fires.
 
-`Sentori.push.unregister(context)` revokes it.
+`Sentori.push.unregister(context)` revokes it: the local handle is
+cleared, the provider token is deleted, and the server marks the
+device revoked so nothing more is sent to it.
+
 `cachedDeviceHandle(context)` returns the handle without a round trip.
+
+### The handle changes
+
+Registering again after an `unregister` produces a **new** handle. The
+old one is revoked, not resumed — a rotation is a retirement and a new
+row, so anything you stored keyed on the old handle is stale from that
+moment.
+
+Calling `register` on every launch, which is safe and cheap, means the
+callback always hands you the current one. If you store it instead,
+overwrite on every `Result.Success` rather than only when you have
+none.
 
 Push needs Firebase in your app. The SDK declares
 `firebase-messaging` as `compileOnly`, so an app that does not use
