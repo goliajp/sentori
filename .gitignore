@@ -27,6 +27,10 @@ local.properties
 .env
 .env.local
 .env.*.local
+# Key material that has to outlive a session. `tmp/` is swept and
+# was never the place for the only copy of a signing key — the one
+# that signs `jp.golia.sentori:sentori` lived there for a day.
+.secrets/
 *.pem
 
 # editor
