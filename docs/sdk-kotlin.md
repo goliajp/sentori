@@ -187,6 +187,25 @@ server upserts the token. Each failure asks for something different:
 | `SERVER_REJECTED` | Sentori answered non-2xx | look at Settings ▸ Push |
 | `NOT_INITIALISED` | `Sentori.start` has not run | a wiring bug |
 
+### A revocation is not a tombstone
+
+Registering again with the same provider token brings the same row
+back, and the handle does not change. That is on purpose: the two
+things that revoke a device are the provider reporting its token dead
+and the device revoking itself, and a device that registers again is
+answering both — it is here, with a token the provider has just
+issued it. Nothing an operator decided is being undone; there is no
+third way to revoke.
+
+What changes is the trail. The reason a device was quarantined is
+dropped when it comes back, and `revived_at` is stamped instead — a
+live device should not be described by the failure that killed a
+token it no longer has.
+
+The one case where the handle *does* change is `unregister`, which
+clears the local handle too, so the next `register` arrives with a
+fresh provider token and starts a new row.
+
 ### Taps, and what still needs you
 
 A notification Sentori posted carries a pending intent of its own, so
