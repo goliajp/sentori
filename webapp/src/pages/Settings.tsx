@@ -597,6 +597,13 @@ function PushTab() {
 
   const [provider, setProvider] = useState('apns');
   const [config, setConfig] = useState('');
+  // The secret was never collected. `config` holds non-secret
+  // metadata and the worker reads the key out of `secret_blob`, so
+  // every credential ever saved through this form stored an empty
+  // secret — for every provider, not only FCM. The panel's own empty
+  // state says to paste an APNs key or an FCM service account, and
+  // there was nowhere to paste it.
+  const [secret, setSecret] = useState('');
   const [saveError, setSaveError] = useState<null | string>(null);
 
   if (!projectId) return <PanelEmpty>{t('instruments.noProject')}</PanelEmpty>;
@@ -733,28 +740,44 @@ function PushTab() {
             <Input
               value={config}
               onChange={(e) => setConfig(e.target.value)}
-              placeholder={t('push.configPlaceholder')}
+              placeholder={
+                provider === 'fcm' ? t('push.configOptionalFcm') : t('push.configPlaceholder')
+              }
+            />
+          </Field>
+          <Field label={t('push.secret')} className="min-w-0 flex-1">
+            <Input
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+              placeholder={
+                provider === 'fcm' ? t('push.secretPlaceholderFcm') : t('push.secretPlaceholder')
+              }
             />
           </Field>
           <Button
             variant="primary"
             size="sm"
-            disabled={busy || config.trim().length === 0}
+            disabled={busy || secret.trim().length === 0}
             onClick={() => {
               setBusy(true);
               setSaveError(null);
-              let parsed: Record<string, unknown>;
-              try {
-                parsed = JSON.parse(config) as Record<string, unknown>;
-              } catch {
-                setSaveError(t('push.configNotJson'));
-                setBusy(false);
-                return;
+              // FCM derives everything it shows from the credential
+              // itself, so an empty config is the normal case there.
+              let parsed: Record<string, unknown> = {};
+              if (config.trim().length > 0) {
+                try {
+                  parsed = JSON.parse(config) as Record<string, unknown>;
+                } catch {
+                  setSaveError(t('push.configNotJson'));
+                  setBusy(false);
+                  return;
+                }
               }
               void api
-                .savePushCredential(projectId, provider, parsed)
+                .savePushCredential(projectId, provider, parsed, secret)
                 .then(() => {
                   setConfig('');
+                  setSecret('');
                   reload();
                 })
                 .catch((e: Error) => setSaveError(e.message))
