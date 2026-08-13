@@ -9,6 +9,7 @@ import Instruments from './pages/Instruments';
 import ProjectsPage from './pages/Projects';
 import TriageView from './pages/TriageView';
 import { LoginPage } from './pages/Login';
+import PushPage from './pages/Push';
 import Releases from './pages/Releases';
 import ResetPassword from './pages/ResetPassword';
 import Settings from './pages/Settings';
@@ -35,6 +36,7 @@ if (root) {
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/instruments" element={<Instruments />} />
               <Route path="/releases" element={<Releases />} />
+              <Route path="/push" element={<PushPage />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
