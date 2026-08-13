@@ -6,6 +6,7 @@ import {
   Monitor,
   Package,
   Search,
+  Send,
   Settings,
   Sun,
 } from 'lucide-react';
@@ -131,6 +132,13 @@ export function App() {
                 <NavLink to="/releases" className={navCls}>
                   <Package className={navIcon} aria-hidden />
                   {t('nav.releases')}
+                </NavLink>
+                {/* Its own entry, not a settings tab. Whether last
+                    night's alert reached anyone is not the same
+                    question as what your password is. */}
+                <NavLink to="/push" className={navCls}>
+                  <Send className={navIcon} aria-hidden />
+                  {t('nav.push')}
                 </NavLink>
               </>
             )}

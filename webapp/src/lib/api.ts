@@ -526,9 +526,13 @@ class Api {
       { deviceTokenId, title, body },
     );
   }
-  pushDevices(projectId: string, limit = 100) {
+  /** `scope` is the server's own parameter — `live` hides revoked
+   *  rows, `all` shows them. It existed unused: a device that stopped
+   *  receiving is exactly what someone opens this page to find, and
+   *  the default view is the one view that cannot show it. */
+  pushDevices(projectId: string, limit = 100, scope: 'all' | 'live' = 'live') {
     return this.get<{ devices: PushDevice[] }>(
-      `/admin/api/projects/${projectId}/push/devices?limit=${limit}`,
+      `/admin/api/projects/${projectId}/push/devices?limit=${limit}&scope=${scope}`,
     );
   }
   pushSends(projectId: string, limit = 50) {
