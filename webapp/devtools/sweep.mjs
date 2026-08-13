@@ -28,8 +28,12 @@ const ROUTES = [
   '', `issues/${I}`, 'instruments', 'releases', 'projects',
   // Settings sections are URL-driven, so each one is reachable here.
   // They were not, and four admin screens went unrendered for months.
-  'settings?tab=tokens', 'settings?tab=users', 'settings?tab=push',
+  'settings?tab=tokens', 'settings?tab=users',
   'settings?tab=notifications',
+  // Push is its own module now. Its sections are URL-driven for the
+  // same reason the settings ones are — a screen the sweep cannot
+  // reach is a screen nobody photographs until a user complains.
+  'push', 'push?tab=devices', 'push?tab=credentials',
   'settings?tab=audit', 'settings?tab=account',
   'login', 'forgot-password',
 ];
