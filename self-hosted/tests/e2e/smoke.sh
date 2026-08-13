@@ -462,8 +462,14 @@ IPT2="$(curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${T
 [[ "$IPT2" == "$IPT" ]] \
     || { echo "the same native token produced a different row: ${IPT2} vs ${IPT}" >&2; exit 1; }
 DEV="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/devices")"
+# This row was revoked by the DELETE, not by quarantine, so it never
+# had a `quarantine_reason` to lose — insight pointed out that its
+# absence here proves nothing, and they are right. The assertion
+# stays as a floor (the revival must not *invent* one) and the real
+# coverage of the strip is the unit test on the classifier, which is
+# what decides whether a reason is ever written.
 [[ "$(echo "$DEV" | jq -r '.devices[0].metadata | has("quarantine_reason")')" == "false" ]] \
-    || { echo "a revived device still carries why it was revoked: $DEV" >&2; exit 1; }
+    || { echo "a revived device carries a quarantine reason it never had: $DEV" >&2; exit 1; }
 [[ "$(echo "$DEV" | jq -r '.devices[0].metadata | has("revived_at")')" == "true" ]] \
     || { echo "a revived device does not say it was revived: $DEV" >&2; exit 1; }
 [[ "$(echo "$DEV" | jq -r '.devices[0].metadata.appVersion')" == "1.4.0" ]] \

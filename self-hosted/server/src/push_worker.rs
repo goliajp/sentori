@@ -126,7 +126,11 @@ async fn dispatch_one(
         Err(reason) => {
             let http_status = extract_http_status(&reason).unwrap_or(0);
             let is_perm = http_status > 0
-                && crate::push_quarantine::is_permanent_token_failure(provider, http_status);
+                && crate::push_quarantine::is_permanent_token_failure(
+                    provider,
+                    http_status,
+                    &reason,
+                );
             if let Some(t) = token_id {
                 if is_perm {
                     crate::push_quarantine::quarantine_token(
