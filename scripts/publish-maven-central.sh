@@ -15,6 +15,20 @@
 #   CENTRAL_USERNAME / CENTRAL_PASSWORD  — a Portal user token
 #   SIGNING_KEY / SIGNING_PASSWORD       — an armoured private key
 #
+# CI reads all four from repository secrets, so a release needs
+# nothing from anyone's machine. Running this by hand needs the key,
+# which lives in `.secrets/gpg/` (gitignored, never committed):
+#
+#   export GNUPGHOME="$PWD/.secrets/gpg"
+#   export SIGNING_KEY="$(cat .secrets/gpg/private.asc)"
+#   export SIGNING_PASSWORD="$(cat .secrets/gpg/passphrase.txt)"
+#
+# The key that signed 1.2.2 onwards is 22BD3D63FE94A270, and it is
+# not in the default keyring — `gpg --export-secret-keys` without
+# GNUPGHOME reports no such key and sends you looking for it
+# somewhere else. It was generated into its own home because the
+# machine's keyboxd had corrupted itself at the time.
+#
 # The signing key's public half must be on a keyserver Central reads,
 # **with its user ID intact**. keys.openpgp.org strips the UID until
 # the address is verified by email, and GnuPG will not import a key
