@@ -152,13 +152,13 @@ async fn dispatch_one(
                 0,
             )
             .await?;
-            if is_perm || retry_count >= MAX_RETRIES {
+            if is_perm || is_configuration_failure(&reason) || retry_count >= MAX_RETRIES {
                 mark_failed(pool, send_id, http_status, &reason).await?;
             } else {
                 // Schedule retry with exponential backoff (30s, 60s,
                 // 120s, 240s, 480s — cap 30min).
                 let backoff = (30u64 * (1 << retry_count.min(6))).min(1800);
-                requeue(pool, send_id, retry_count + 1, backoff).await?;
+                requeue(pool, send_id, retry_count + 1, backoff, &reason).await?;
             }
         }
     }
@@ -218,20 +218,48 @@ async fn mark_failed(
     Ok(())
 }
 
+/// A failure that waiting cannot fix.
+///
+/// Retrying one of these five times over half an hour spends the
+/// delay and arrives at the same place. Worse, insight watched a send
+/// sit at `queued` with `error: null` for twenty minutes and had no
+/// way to learn that the credential was the problem — a push that
+/// could never go out is indistinguishable, from outside, from one
+/// still on its way.
+///
+/// Matched on the text because that is what the adapters return.
+/// Each of these is produced in exactly one place, and the test below
+/// pins them to the strings those places emit.
+fn is_configuration_failure(reason: &str) -> bool {
+    reason == "credentials_missing"
+        || reason == "provider_not_wired"
+        // `FcmError::Credentials` — the JSON is not a service account.
+        || reason.starts_with("service account json:")
+        // `FcmError::OAuth` with a 4xx — Google refused the assertion,
+        // which is the key or the clock, not the network.
+        || reason.starts_with("oauth: status=4")
+}
+
 async fn requeue(
     pool: &PgPool,
     send_id: Uuid,
     new_retry_count: i32,
     backoff_sec: u64,
+    reason: &str,
 ) -> Result<(), sqlx::Error> {
+    // The reason travels with the retry. It used to be written only
+    // when the send finally failed, so a receipt read during the
+    // retries said `queued` and `error: null` — true, and useless.
     sqlx::query(
         "UPDATE push_sends SET status = 'queued', retry_count = $1, \
-            next_attempt_at = now() + ($2 || ' seconds')::interval \
+            next_attempt_at = now() + ($2 || ' seconds')::interval, \
+            error = $4 \
          WHERE id = $3",
     )
     .bind(new_retry_count)
     .bind(backoff_sec.to_string())
     .bind(send_id)
+    .bind(reason.chars().take(500).collect::<String>())
     .execute(pool)
     .await?;
     Ok(())
@@ -548,4 +576,55 @@ fn env_batch() -> usize {
         .ok()
         .and_then(|s| s.parse::<usize>().ok())
         .unwrap_or(100)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The classifier matches text, so the text has to be the text.
+    ///
+    /// Each string here is produced in exactly one place, and this
+    /// pins the classifier to it: `FcmError`'s `#[error(...)]`
+    /// attributes in `fcm.rs`, and the two literals this file returns
+    /// when there is no credential row and no adapter.
+    #[test]
+    fn the_strings_it_matches_are_the_strings_that_are_produced() {
+        let credentials = crate::fcm::FcmError::Credentials("expected value".into());
+        assert!(
+            is_configuration_failure(&credentials.to_string()),
+            "a service-account paste that will not parse must fail at once, not \
+             five times over half an hour: {credentials}"
+        );
+
+        let oauth = crate::fcm::FcmError::OAuth {
+            status: 401,
+            body: "invalid_grant".into(),
+        };
+        assert!(
+            is_configuration_failure(&oauth.to_string()),
+            "Google refusing the assertion is the key or the clock, not the \
+             network: {oauth}"
+        );
+
+        assert!(is_configuration_failure("credentials_missing"));
+        assert!(is_configuration_failure("provider_not_wired"));
+    }
+
+    /// And a real outage still retries. Classifying too much as
+    /// permanent turns a blip into a lost notification.
+    #[test]
+    fn a_transient_failure_is_still_retried() {
+        for reason in [
+            "http: error sending request",
+            "fcm rejected: status=503 body=backend unavailable",
+            "oauth: status=500 body=internal",
+            "fcm rejected: status=429 body=quota",
+        ] {
+            assert!(
+                !is_configuration_failure(reason),
+                "'{reason}' is worth retrying and this would have given up on it"
+            );
+        }
+    }
 }
