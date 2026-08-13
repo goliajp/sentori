@@ -433,6 +433,42 @@ LINKED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/hea
 [[ "$LINKED" == "1" ]] \
     || { echo "the registered device is not addressable by user key: ${LINKED}" >&2; exit 1; }
 
+# Revoking and coming back. Neither had ever been exercised until
+# insight ran them by hand: the revoke endpoint was deleting from a
+# table nothing reads, so a device kept receiving after `unregister`
+# reported success. And a revoked row is revived by the next
+# registration, which is intended — but it used to carry the
+# quarantine reason back with it, so the device list described a live
+# device with the words of the failure that killed its old token.
+echo "→ revoking a device takes it out of the send set"
+curl -fsS -X DELETE "${BASE}/v1/push/tokens/${IPT}" -H "Authorization: Bearer ${TOKEN}" \
+    | jq -e '.status == "revoked"' > /dev/null \
+    || { echo "revoke did not report revoking" >&2; exit 1; }
+LIVE="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/health" | jq -r '.liveTokens')"
+[[ "$LIVE" == "0" ]] \
+    || { echo "health says ${LIVE} live devices after revoking the only one" >&2; exit 1; }
+
+echo "→ revoking twice says so the second time"
+curl -fsS -X DELETE "${BASE}/v1/push/tokens/${IPT}" -H "Authorization: Bearer ${TOKEN}" \
+    | jq -e '.status == "not_found"' > /dev/null \
+    || { echo "a revoke that changed nothing reported success" >&2; exit 1; }
+
+echo "→ registering again brings it back, without the old failure attached"
+IPT2="$(curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-native-token-0001",
+         "userKey":"a91f3c02deadbeefa91f3c02deadbeef"}' \
+    | jq -r '.token_id')"
+[[ "$IPT2" == "$IPT" ]] \
+    || { echo "the same native token produced a different row: ${IPT2} vs ${IPT}" >&2; exit 1; }
+DEV="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/devices")"
+[[ "$(echo "$DEV" | jq -r '.devices[0].metadata | has("quarantine_reason")')" == "false" ]] \
+    || { echo "a revived device still carries why it was revoked: $DEV" >&2; exit 1; }
+[[ "$(echo "$DEV" | jq -r '.devices[0].metadata | has("revived_at")')" == "true" ]] \
+    || { echo "a revived device does not say it was revived: $DEV" >&2; exit 1; }
+[[ "$(echo "$DEV" | jq -r '.devices[0].metadata.appVersion')" == "1.4.0" ]] \
+    || { echo "reviving lost what the device had reported: $DEV" >&2; exit 1; }
+
 echo "→ a send actually queues"
 # `POST /v1/push/send` had ten values for nine columns and answered
 # 500 to everything. An endpoint that always 500s is
