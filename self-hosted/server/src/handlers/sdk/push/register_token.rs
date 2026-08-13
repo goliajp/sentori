@@ -67,14 +67,33 @@ pub async fn handle(
         // registration this SDK has ever attempted came back 500 and
         // the product had zero push tokens for a reason that was
         // never "nobody turned it on".
+        //
+        // `revoked_at = NULL` is deliberate, and insight asked
+        // whether it is: a device that registers again is a device
+        // saying it is here, with a token the provider just issued
+        // it. Both things that revoke a row — a provider reporting
+        // the token dead, and the device revoking itself — are
+        // answered by that. There is no third writer; nothing an
+        // operator did is being undone.
+        //
+        // What was wrong was the trail it left. `quarantine_reason`
+        // stayed in the metadata after the row came back, so the
+        // device list showed a live device carrying "HTTP 404
+        // UNREGISTERED" — a sentence about a token that has since
+        // been replaced. It is dropped on the way back, and the
+        // revival is stamped instead, because "this row was dead and
+        // is not any more" is worth keeping.
         "INSERT INTO device_tokens \
          (id, project_id, provider, env, native_token, user_key, metadata) \
          VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, '{}'::jsonb)) \
          ON CONFLICT (project_id, provider, native_token) DO UPDATE SET \
             env = COALESCE(EXCLUDED.env, device_tokens.env), \
             user_key = COALESCE(EXCLUDED.user_key, device_tokens.user_key), \
-            metadata = CASE WHEN EXCLUDED.metadata = '{}'::jsonb \
-                            THEN device_tokens.metadata ELSE EXCLUDED.metadata END, \
+            metadata = (CASE WHEN EXCLUDED.metadata = '{}'::jsonb \
+                             THEN device_tokens.metadata ELSE EXCLUDED.metadata END \
+                        - 'quarantine_reason') \
+                       || CASE WHEN device_tokens.revoked_at IS NULL THEN '{}'::jsonb \
+                               ELSE jsonb_build_object('revived_at', now()) END, \
             revoked_at = NULL, \
             last_seen_at = now(), \
             updated_at = now() \
