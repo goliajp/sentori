@@ -62,6 +62,7 @@ pub async fn upsert(
     // that worked until Google switched the endpoint off. Saving one
     // succeeds, and the failure surfaces later as a push that never
     // arrived, on somebody else's device.
+    let mut config = body.config.clone();
     if body.provider == "fcm" {
         let cfg = crate::fcm::FcmConfig {
             service_account_json: body.secret.clone().unwrap_or_default(),
@@ -69,6 +70,14 @@ pub async fn upsert(
         match crate::fcm::project_id(&cfg) {
             Ok(project) => {
                 tracing::info!(%project, "fcm credential accepted");
+                // The list view shows `config`, and an operator with
+                // two Firebase projects has no other way to tell which
+                // one they pasted. Derived rather than asked for: it
+                // is already in the file, and a field filled in by
+                // hand is a field that can be wrong.
+                if let Some(map) = config.as_object_mut() {
+                    map.insert("fcmProjectId".into(), json!(project));
+                }
             }
             Err(e) => {
                 return (
@@ -110,7 +119,7 @@ pub async fn upsert(
     .bind(id)
     .bind(project_id)
     .bind(&body.provider)
-    .bind(&body.config)
+    .bind(&config)
     .bind(&secret_bytes)
     .fetch_optional(&state.pool)
     .await;
