@@ -122,8 +122,16 @@ server upserts the token. Each failure asks for something different:
 | `serverRejected` | Sentori answered non-2xx | look at Settings ▸ Push |
 | `notInitialised` | `Sentori.start` has not run | a wiring bug |
 
-`Sentori.push.unregister()` revokes it. `cachedDeviceHandle()` returns
-the handle without a round trip.
+`Sentori.push.unregister()` revokes it: the local handle is cleared,
+the device is unregistered with APNs, and the server marks it revoked
+so nothing more is sent to it. `cachedDeviceHandle()` returns the
+handle without a round trip.
+
+Registering again produces a **new** handle. The old one is revoked,
+not resumed — a rotation is a retirement and a new row, so anything
+stored against the old handle is stale from that moment. Calling
+`register` on every launch, which is safe and cheap, means you always
+hold the current one.
 
 Your app still needs the `aps-environment` entitlement and the
 `remote-notification` background mode; the SDK does not add
