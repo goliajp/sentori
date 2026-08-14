@@ -28,6 +28,7 @@ use tracing::info;
 
 mod apns;
 mod archive_worker;
+mod audience;
 mod audit;
 mod backend_check_worker;
 mod backfill_split;
@@ -39,6 +40,7 @@ mod env_config;
 mod fcm;
 mod handlers;
 mod hcm;
+mod identity;
 mod mailer;
 mod mipush;
 mod native_symbolicate;
