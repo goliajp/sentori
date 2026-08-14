@@ -196,7 +196,11 @@ export async function register(opts: PushRegisterOptions = {}): Promise<PushRegi
     _lastNativeToken = token
     _lastOptions = opts
     void persistIpt(ipt)
-    opts.onToken?.(ipt)
+    // The registration reached the server and came back with a handle.
+    // What the host does with it afterwards is not our outcome — this
+    // used to sit inside the try, so a throwing `onToken` reported a
+    // successful registration as `server-rejected`.
+    safely('onToken', () => opts.onToken?.(ipt))
     bindBufferDrain(opts.onMessage, opts.onTap)
     // From here on, signing in or out updates the row by itself.
     onIdentityChange(reRegisterAfterIdentityChange)
@@ -216,7 +220,10 @@ function fail(
   message: string,
 ): PushRegisterResult {
   logger.warn('push', `register failed (${reason}):`, message)
-  opts.onError?.(new Error(message))
+  // `register()` never throws is the contract, and this is the one
+  // path that hands the host an error to look at — so it is also the
+  // one place where the host's own code could have broken it.
+  safely('onError', () => opts.onError?.(new Error(message)))
   return { ok: false, message, reason }
 }
 
@@ -417,9 +424,17 @@ function teardownBufferDrain(): void {
 }
 
 async function pumpOnce(): Promise<void> {
-  const state = await pushDrainState()
-  flushBuffered(state.notifications, state.taps)
-  await reportRotationIfAny(state.token)
+  // Nothing in a tick may reject. The caller is `void pumpOnce()` on
+  // an interval, so a rejection here is an unhandled rejection in the
+  // host's process — a red box in development, and on some setups
+  // worse — for something the host is entitled to have fail quietly.
+  try {
+    const state = await pushDrainState()
+    flushBuffered(state.notifications, state.taps)
+    await reportRotationIfAny(state.token)
+  } catch (e) {
+    logger.warn('push', 'a drain tick failed — the next one still runs', e)
+  }
 }
 
 /// Tell the server when the vendor has handed the app a different
@@ -460,6 +475,22 @@ async function reportRotationIfAny(token: string | undefined): Promise<void> {
   }
 }
 
+/// Run the host's own code without letting it reach back into ours.
+///
+/// A push that does not arrive is a product decision the host can live
+/// with. An exception out of an SDK it merely opted into is not — and
+/// the host's handlers are the sharp edge here: they are its code,
+/// they run inside our loop, and JavaScript throws for a living. One
+/// throwing handler used to take the rest of the batch with it, then
+/// the tick, then every later tick as an unhandled rejection.
+function safely(what: string, fn: () => void): void {
+  try {
+    fn()
+  } catch (e) {
+    logger.warn('push', `${what} threw — carrying on`, e)
+  }
+}
+
 function flushBuffered(
   notifications: Array<Record<string, unknown>>,
   taps: Array<Record<string, unknown>>,
@@ -468,12 +499,12 @@ function flushBuffered(
     // v2.26 — Observability link-through (rule #4). If the server
     // injected `_sentori.msgId` in v2.25+, drop a `push` breadcrumb,
     // emit `sentori.push.received` track, and queue the ack.
-    autoCorrelate(raw, 'received')
-    _onMessage?.(coerceNotification(raw))
+    safely('autoCorrelate', () => autoCorrelate(raw, 'received'))
+    safely('onMessage', () => _onMessage?.(coerceNotification(raw)))
   }
   for (const raw of taps) {
-    autoCorrelate(raw, 'opened')
-    _onTap?.(raw.userInfo ?? raw)
+    safely('autoCorrelate', () => autoCorrelate(raw, 'opened'))
+    safely('onTap', () => _onTap?.(raw.userInfo ?? raw))
   }
 }
 

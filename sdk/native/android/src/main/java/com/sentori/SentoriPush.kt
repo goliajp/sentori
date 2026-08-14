@@ -270,17 +270,24 @@ object SentoriPush {
      */
     private fun identityChanged(appContext: Context) {
         val config = SentoriConfig.current ?: return
-        val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val token = prefs.getString(TOKEN_KEY, null) ?: return
-        if (prefs.getString(HANDLE_KEY, null) == null) return
-
-        // `Sentori.user` is a verb an app may call on every screen,
-        // and one request per call is not free to a host.
-        val identity = "${SentoriScope.userKey}\u0000${SentoriScope.traits}"
-        if (identity == lastSentIdentity) return
-        lastSentIdentity = identity
-
+        // Everything, including the preference reads, on the worker.
+        // `Sentori.user` is synchronous and is called from wherever
+        // the host signs someone in — usually the main thread — and
+        // reading preferences there is disk I/O on the thread that
+        // draws frames. Warm in practice, since this listener is only
+        // installed after a registration has already touched them; on
+        // the worker it cannot be anything else.
         worker.execute {
+            val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val token = prefs.getString(TOKEN_KEY, null) ?: return@execute
+            if (prefs.getString(HANDLE_KEY, null) == null) return@execute
+
+            // `Sentori.user` is a verb an app may call on every screen,
+            // and one request per call is not free to a host.
+            val identity = "${SentoriScope.userKey}\u0000${SentoriScope.traits}"
+            if (identity == lastSentIdentity) return@execute
+            lastSentIdentity = identity
+
             when (val r = registerWithServer(appContext, token, config)) {
                 is Result.Success -> rememberHandle(appContext, r.handle, token)
                 is Result.Failure -> {
@@ -316,6 +323,9 @@ object SentoriPush {
         }
     }
 
+    /** Hand one drained batch to the host's callbacks, for tests. */
+    internal fun drainForTests(state: Map<String, Any?>) = flush(state)
+
     /** This installation's id, minted on first use and kept after. */
     internal fun installId(ctx: Context): String {
         val prefs = ctx.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -347,7 +357,12 @@ object SentoriPush {
                 "push register failed (${result.reason.reason}): ${result.message}",
             )
         }
-        completion(result)
+        // The host's callback is the host's code. A registration that
+        // succeeded must not be undone by what the host does with the
+        // news, and this runs on the single worker thread — an
+        // exception here takes the thread, and with it every push
+        // request the process makes afterwards.
+        safely("register callback") { completion(result) }
     }
 
     private fun finishRegister(
@@ -555,7 +570,11 @@ object SentoriPush {
             if (drainTask != null) return
             drainTask =
                 worker.scheduleWithFixedDelay(
-                    { flush(SentoriPushNotifications.drainState()) },
+                    // Belt as well as braces: `flush` contains the
+                    // host's code, and this contains everything else,
+                    // because a task that throws is a task the
+                    // executor never runs again.
+                    { safely("drain") { flush(SentoriPushNotifications.drainState()) } },
                     1,
                     1,
                     TimeUnit.SECONDS,
@@ -564,11 +583,36 @@ object SentoriPush {
     }
 
     @Suppress("UNCHECKED_CAST")
+    /**
+     * Hand a drained batch to the host, without letting the host reach
+     * back.
+     *
+     * Push is allowed to fail silently; it is never allowed to make
+     * the host app fail. The handlers are the host's own code running
+     * inside our loop, and the loop is a `scheduleWithFixedDelay` —
+     * where an exception out of the task makes the executor **cancel
+     * every future run**, silently. One throwing `onMessage` ended
+     * push delivery for the life of the process, and nothing anywhere
+     * said so.
+     */
     private fun flush(state: Map<String, Any?>) {
         val (message, tap) = synchronized(lock) { onMessage to onTap }
         if (message == null && tap == null) return
-        (state["notifications"] as? List<Map<String, Any?>>)?.forEach { message?.invoke(it) }
-        (state["taps"] as? List<Map<String, Any?>>)?.forEach { tap?.invoke(it) }
+        (state["notifications"] as? List<Map<String, Any?>>)?.forEach {
+            safely("onMessage") { message?.invoke(it) }
+        }
+        (state["taps"] as? List<Map<String, Any?>>)?.forEach {
+            safely("onTap") { tap?.invoke(it) }
+        }
+    }
+
+    /** Run the host's own code without letting it reach back into ours. */
+    private inline fun safely(what: String, body: () -> Unit) {
+        try {
+            body()
+        } catch (t: Throwable) {
+            android.util.Log.w("sentori", "push $what threw — carrying on", t)
+        }
     }
 
     internal fun resetForTests() {

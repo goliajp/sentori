@@ -704,4 +704,73 @@ class SentoriPushTest {
             assertEquals(0, rec.bodies.size)
         }
     }
+
+    /**
+     * Push is allowed to fail silently. It is never allowed to make
+     * the host app fail.
+     *
+     * The host's own handlers are the sharp edge: they are its code
+     * and they run inside our loop. Worse here than anywhere — the
+     * drain is a `scheduleWithFixedDelay`, and an exception out of a
+     * scheduled task makes the executor **cancel every future run**,
+     * silently. One throwing `onMessage` used to end push delivery for
+     * the life of the process, with nothing anywhere to say so.
+     */
+    @Test
+    fun aThrowingHandlerDoesNotStopDelivery() {
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        SentoriConfig.set(
+            SentoriConfig(token = "st_test", ingestUrl = "http://127.0.0.1:9",
+                release = "app@1.0.0", environment = "test"),
+        )
+        val seen = mutableListOf<String>()
+        val latch = CountDownLatch(1)
+        SentoriPush.register(
+            ctx,
+            activity = null,
+            timeoutMs = 200,
+            onMessage = {
+                seen.add(it["title"] as? String ?: "?")
+                if (it["title"] == "one") error("the host threw")
+            },
+            onTap = { seen.add("tap") },
+        ) { latch.countDown() }
+        assertTrue(latch.await(30, TimeUnit.SECONDS))
+
+        // One bad handler must not swallow the rest of the batch.
+        SentoriPush.drainForTests(
+            mapOf(
+                "notifications" to listOf(
+                    mapOf("title" to "one"),
+                    mapOf("title" to "two"),
+                ),
+                "taps" to listOf(mapOf<String, Any?>("tapped" to true)),
+            ),
+        )
+        assertEquals(listOf("one", "two", "tap"), seen)
+
+        // And the next batch still arrives, which is what would have
+        // been lost when the executor cancelled the task.
+        SentoriPush.drainForTests(
+            mapOf("notifications" to listOf(mapOf("title" to "three")), "taps" to null),
+        )
+        assertEquals(listOf("one", "two", "tap", "three"), seen)
+    }
+
+    /** A host whose completion throws must not take the worker with it. */
+    @Test
+    fun aThrowingCompletionIsContained() {
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        SentoriConfig.set(
+            SentoriConfig(token = "st_test", ingestUrl = "http://127.0.0.1:9",
+                release = "app@1.0.0", environment = "test"),
+        )
+        val second = CountDownLatch(1)
+        SentoriPush.register(ctx, activity = null, timeoutMs = 200) { error("the host threw") }
+        Thread.sleep(300)
+        // The worker is a single thread. If the first completion took
+        // it down, nothing after it ever runs.
+        SentoriPush.register(ctx, activity = null, timeoutMs = 200) { second.countDown() }
+        assertTrue("the worker did not survive a throwing completion", second.await(30, TimeUnit.SECONDS))
+    }
 }
