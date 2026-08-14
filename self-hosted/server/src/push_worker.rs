@@ -409,6 +409,28 @@ async fn try_fcm(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
     Ok((status, start.elapsed().as_millis()))
 }
 
+/// Which of Apple's two hosts this send goes to.
+///
+/// The device knows: it registered with the env its build was signed
+/// for, and a token minted against one host is refused by the other.
+/// This read the *credential* instead, so a project with both a debug
+/// build and a store build could only ever reach one of them — the
+/// other half of the fleet came back `BadDeviceToken` and was
+/// quarantined, each row keeping a reason that was never about it.
+///
+/// The credential's own setting is the fallback, for devices that
+/// registered before the SDK sent an env.
+fn apns_is_production(device_env: Option<&str>, config: &serde_json::Value) -> bool {
+    match device_env {
+        Some("sandbox") => false,
+        Some("production") => true,
+        _ => config
+            .get("production")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(true),
+    }
+}
+
 async fn try_apns(
     pool: &PgPool,
     cache: &Arc<TokenCache>,
@@ -416,7 +438,7 @@ async fn try_apns(
 ) -> Result<(u16, u128), String> {
     use std::time::Instant;
     let row = sqlx::query(
-        "SELECT dt.native_token, ps.payload, ps.project_id, pc.config, pc.secret_blob \
+        "SELECT dt.native_token, dt.env, ps.payload, ps.project_id, pc.config, pc.secret_blob \
          FROM push_sends ps \
          JOIN device_tokens dt ON dt.id = ps.token_id \
          JOIN push_credentials pc ON pc.project_id = ps.project_id AND pc.kind = 'apns' \
@@ -449,10 +471,13 @@ async fn try_apns(
         .and_then(|v| v.as_str())
         .ok_or_else(|| "topic missing".to_string())?
         .to_string();
-    let production = config
-        .get("production")
-        .and_then(serde_json::Value::as_bool)
-        .unwrap_or(true);
+    let production = apns_is_production(
+        row.try_get::<Option<String>, _>("env")
+            .ok()
+            .flatten()
+            .as_deref(),
+        &config,
+    );
 
     let title = payload
         .get("title")
@@ -584,6 +609,28 @@ fn env_batch() -> usize {
 
 #[cfg(test)]
 mod tests {
+    /// The device's env decides the host, not the credential's.
+    ///
+    /// A project with a debug build and a store build registers both
+    /// kinds. Reading the credential meant one of them was always sent
+    /// to the wrong host, refused as `BadDeviceToken`, and quarantined
+    /// for a reason that was about the host rather than the token.
+    #[test]
+    fn the_device_decides_which_apple_host_it_is_on() {
+        let prod_cred = serde_json::json!({ "production": true });
+        let sandbox_cred = serde_json::json!({ "production": false });
+
+        assert!(!super::apns_is_production(Some("sandbox"), &prod_cred));
+        assert!(super::apns_is_production(Some("production"), &sandbox_cred));
+
+        // A device that registered before the SDK sent an env leaves
+        // the choice where it was.
+        assert!(super::apns_is_production(None, &prod_cred));
+        assert!(!super::apns_is_production(None, &sandbox_cred));
+        assert!(super::apns_is_production(None, &serde_json::json!({})));
+        assert!(!super::apns_is_production(Some("odd"), &sandbox_cred));
+    }
+
     use super::*;
 
     /// The classifier matches text, so the text has to be the text.

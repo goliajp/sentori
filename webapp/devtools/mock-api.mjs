@@ -706,6 +706,22 @@ const SUFFIX = [
   // delivery failing for a nameable reason, devices quarantined.
   // The empty case (no credential, no send) is the state a new user
   // arrives in and the one the copy has to earn.
+  // A project that is most of the way there: devices on a provider
+  // with no credential, and nothing has ever called user().
+  [
+    /\/push\/readiness$/,
+    () => ({
+      live: 388,
+      ready: false,
+      checks: [
+        { id: 'no-credential', level: 'blocked', data: { provider: 'fcm', devices: 300 } },
+        { id: 'no-identity', level: 'warn', data: { live: 388 } },
+        { id: 'no-traits', level: 'warn', data: { live: 388 } },
+        { id: 'mass-quarantine', level: 'warn', data: { quarantined: 412, live: 388 } },
+        { id: 'apns-mixed-env', level: 'info', data: { sandbox: 12, live: 388 } },
+      ],
+    }),
+  ],
   [
     /\/push\/health$/,
     () => ({
@@ -829,6 +845,7 @@ const SUFFIX = [
       sends: [
         { id: 'ps1', token_id: 'dt1', provider: 'apns', status: 'failed',
           provider_outcome: '410', error: 'BadDeviceToken', retry_count: 3,
+          payload: { title: '结账页已修复', body: '更新到 4.2.1 就好了' },
           payload: { title: '结账页已修复', body: '更新到 4.2.1 就好了' },
           created_at: iso(1_800_000), sent_at: null, next_attempt_at: iso(-600_000) },
         { id: 'ps2', token_id: 'dt2', provider: 'apns', status: 'sent',

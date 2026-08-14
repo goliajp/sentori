@@ -88,7 +88,7 @@ export default function PushPage() {
       {!projectId ? (
         <PanelEmpty>{t('instruments.noProject')}</PanelEmpty>
       ) : section === 'delivery' ? (
-        <DeliverySection projectId={projectId} />
+        <DeliverySection projectId={projectId} onGo={setSection} />
       ) : section === 'audience' ? (
         <AudienceSection projectId={projectId} />
       ) : section === 'devices' ? (
@@ -149,7 +149,13 @@ function Pager({
 
 const PAGE = 50;
 
-function DeliverySection({ projectId }: { projectId: string }) {
+function DeliverySection({
+  projectId,
+  onGo,
+}: {
+  onGo: (s: Section) => void;
+  projectId: string;
+}) {
   const t = useT();
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
@@ -181,6 +187,10 @@ function DeliverySection({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-4">
+      {/* First, because it answers the question someone came here
+          with. The numbers below say what happened; this says whether
+          anything could have. */}
+      <ReadinessPanel projectId={projectId} onGo={onGo} />
       <Panel title={t('push.deliveryTitle')}>
         {!h || (h.sent24h === 0 && h.failed24h === 0 && h.queued === 0) ? (
           <PanelEmpty>{t('push.deliveryEmpty')}</PanelEmpty>
@@ -488,6 +498,100 @@ function TestSend({
   );
 }
 
+
+
+// ── readiness ───────────────────────────────────────────────────────
+
+/// What is set up, what is missing, and what to do about it.
+///
+/// Push has a lot of ways to be almost configured, and from the
+/// console they all look the same: devices arrive, sends queue,
+/// nothing lands. Every line here was somebody asking us why —
+/// a project with three hundred FCM devices and no FCM credential, a
+/// project whose devices never called `user()` so every send aimed at
+/// a person reached nobody and reported success.
+///
+/// The server sends codes and numbers. The words are here, because
+/// this is where they get translated.
+
+/// Where to go to fix it, when there is somewhere to go.
+const FIX_SECTION: Record<string, Section> = {
+  'all-failing': 'delivery',
+  'credential-unused': 'credentials',
+  'mass-quarantine': 'devices',
+  'no-credential': 'credentials',
+  'queue-stalled': 'delivery',
+};
+
+function ReadinessPanel({
+  projectId,
+  onGo,
+}: {
+  onGo: (s: Section) => void;
+  projectId: string;
+}) {
+  const t = useT();
+  const r = useAsyncData(() => api.pushReadiness(projectId), [projectId]);
+  const checks = r.data?.checks ?? [];
+
+  if (r.loading || r.error) return null;
+
+  return (
+    <Panel title={t('push.readinessTitle')}>
+      {checks.length === 0 ? (
+        <div className="flex items-center gap-2 px-3.5 py-3 text-sm">
+          <span className="text-ok">✓</span>
+          <span className="text-fg-muted">
+            {r.data && r.data.live > 0
+              ? t('push.readyWithDevices').replace('{n}', String(r.data.live))
+              : t('push.ready')}
+          </span>
+        </div>
+      ) : (
+        <ul className="flex flex-col divide-y divide-border/60">
+          {checks.map((c) => {
+            const where = FIX_SECTION[c.id];
+            return (
+              <li key={c.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-3.5 py-2.5">
+                <span
+                  className={clsx(
+                    'font-mono text-[11px] uppercase tracking-wide',
+                    c.level === 'blocked' && 'text-kind-error',
+                    c.level === 'warn' && 'text-kind-warn',
+                    c.level === 'info' && 'text-fg-subtle',
+                  )}
+                >
+                  {t(`push.level.${c.level}` as MessageKey)}
+                </span>
+                <span className="text-sm">{fill(t(`push.check.${c.id}` as MessageKey), c.data)}</span>
+                <span className="w-full text-xs text-fg-muted">
+                  {fill(t(`push.fix.${c.id}` as MessageKey), c.data)}
+                  {where && (
+                    <button
+                      type="button"
+                      className="ml-1.5 text-accent hover:underline"
+                      onClick={() => onGo(where)}
+                    >
+                      {t(`push.section.${where}`)} →
+                    </button>
+                  )}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Panel>
+  );
+}
+
+/// Put the server's numbers into the console's sentence.
+function fill(text: string, data: Record<string, unknown>): string {
+  return text.replace(/\{(\w+)\}/g, (whole, key: string) => {
+    const v = data[key];
+    return v === undefined || v === null ? whole : String(v);
+  });
+}
 
 // ── audience ────────────────────────────────────────────────────────
 

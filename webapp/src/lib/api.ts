@@ -219,6 +219,17 @@ export type PushSend = {
   next_attempt_at?: null | string;
 };
 
+/** One thing that is set up, missing, or worth knowing.
+ *
+ *  `blocked` means nothing can arrive until it is dealt with; `warn`
+ *  means it can send but some way of aiming reaches nobody; `info` is
+ *  a fact, not a fault. */
+export type PushCheck = {
+  data: Record<string, unknown>;
+  id: string;
+  level: 'blocked' | 'info' | 'warn';
+};
+
 export type PushHealth = {
   sent24h: number;
   failed24h: number;
@@ -543,6 +554,16 @@ class Api {
   }
 
   // ── push ──
+  /** What is configured, what is missing, and what that costs.
+   *
+   *  Codes and numbers, never sentences: the words live here, where
+   *  they are translated and where the gate that keeps them
+   *  translated runs. */
+  pushReadiness(projectId: string) {
+    return this.get<{ checks: PushCheck[]; live: number; ready: boolean }>(
+      `/admin/api/projects/${projectId}/push/readiness`,
+    );
+  }
   pushHealth(projectId: string) {
     return this.get<PushHealth>(`/admin/api/projects/${projectId}/push/health`);
   }

@@ -9,6 +9,7 @@ pub mod projects;
 pub mod push_audience;
 pub mod push_credentials;
 pub mod push_devices;
+pub mod push_readiness;
 pub mod push_sends;
 pub mod releases;
 pub mod test_push;
