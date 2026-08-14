@@ -752,6 +752,51 @@ NOTITLE="$(curl -sS -o /dev/null -w '%{http_code}' -b "$JAR" -X POST \
 [[ "$NOTITLE" == "400" ]] \
     || { echo "a titleless notification answered ${NOTITLE}, not 400" >&2; exit 1; }
 
+# "Notify the people who hit this issue" is the thing the whole design
+# points at, and the join had never run. `issue_user_hits` is written
+# at ingest and carries the same hash the device row does.
+echo "→ an issue selects the people it happened to"
+HITKEY="$(printf 'usr_e2e_hit' | shasum -a 256 | cut -d' ' -f1)"
+curl -fsS -X POST "${BASE}/v1/events" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -d '{"id":"019fe900-0000-7000-8000-0000000e2e77","kind":"error",
+         "occurredAt":"2026-08-10T06:05:00Z","platform":"javascript",
+         "release":"e2e@1.0.0+1","environment":"test",
+         "userKey":"'"$HITKEY"'",
+         "payload":{"error":{"type":"IssueAudience","message":"hit","stack":[]}}}' \
+    > /tmp/hit.json
+HITISSUE="$(jq -r '.issueId' /tmp/hit.json)"
+[[ -n "$HITISSUE" && "$HITISSUE" != "null" ]] \
+    || { echo "no issue for the identified event: $(cat /tmp/hit.json)" >&2; exit 1; }
+
+# Two devices: one held by the person who hit it, one not.
+curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-issue-hit",
+         "installId":"e2e-issue-hit","userKey":"'"$HITKEY"'"}' >/dev/null
+curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-issue-miss",
+         "installId":"e2e-issue-miss","userKey":"'"$(printf 'usr_e2e_other' | shasum -a 256 | cut -d' ' -f1)"'"}' \
+    >/dev/null
+
+N="$(send_count "{\"audience\":{\"issue\":\"${HITISSUE}\"},\"payload\":{\"title\":\"fixed\"}}")"
+[[ "$N" == "1" ]] \
+    || { echo "targeting by issue reached ${N} devices, not 1" >&2; exit 1; }
+
+# An issue nobody hit is not everybody.
+echo "→ an issue with no identified hits reaches nobody"
+N="$(send_count "{\"audience\":{\"issue\":\"${ISSUE_ID}\"},\"payload\":{\"title\":\"t\"}}")"
+[[ "$N" == "0" ]] \
+    || { echo "an issue with no identified users reached ${N} devices" >&2; exit 1; }
+
+echo "→ an issue id that is not an id is refused"
+BADI="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${BASE}/v1/push/send" \
+    -H "Authorization: Bearer ${API_TOKEN}" -H 'content-type: application/json' \
+    -d '{"audience":{"issue":"the login crash"},"payload":{}}')"
+[[ "$BADI" == "400" ]] \
+    || { echo "a non-id issue answered ${BADI}, not 400" >&2; exit 1; }
+
 echo "→ a preview of an audience that cannot be parsed says so"
 BAD="$(curl -sS -o /dev/null -w '%{http_code}' -b "$JAR" -X POST \
     "${BASE}/admin/api/projects/${PROJECT_ID}/push/audience/preview" \

@@ -488,7 +488,7 @@ function TestSend({
 /// find out what a condition matches is to send to it, and a
 /// notification cannot be recalled.
 
-type Source = 'device' | 'trait' | 'user';
+type Source = 'device' | 'issue' | 'trait' | 'user';
 type Op = 'exists' | 'gte' | 'in' | 'is' | 'isNot' | 'lte' | 'prefix' | 'versionGte' | 'versionLte';
 
 type Condition = { key: string; op: Op; source: Source; value: string };
@@ -506,6 +506,10 @@ const OPS: { label: MessageKey; value: Op }[] = [
 ];
 
 const blank = (): Condition => ({ key: '', op: 'is', source: 'trait', value: '' });
+
+/// Sources that name a thing rather than an attribute of one, so the
+/// row is one field wide instead of three.
+const valueOnly = (r: Condition) => r.source === 'user' || r.source === 'issue';
 
 /// A written value, as the type the server compares with.
 ///
@@ -529,11 +533,15 @@ function typed(op: Op, raw: string): unknown {
 /// that quietly compiles matches something nobody asked for, and the
 /// count next to it would look like an answer.
 function toRequest(join: 'all' | 'any', rows: Condition[]): AudienceRequest | null {
-  const usable = rows.filter((r) => (r.source === 'user' ? r.value.trim() : r.key.trim()));
+  const usable = rows.filter((r) => (valueOnly(r) ? r.value.trim() : r.key.trim()));
   if (usable.length === 0) return null;
 
   const leaves = usable.map((r) => {
     if (r.source === 'user') return { user: r.value.trim() };
+    // Everyone an issue happened to. The server joins it against the
+    // same identity hash the events carry, so this is the condition
+    // behind "tell the people who hit this that it is fixed".
+    if (r.source === 'issue') return { issue: r.value.trim() };
     const where = r.source === 'trait' ? { trait: r.key.trim() } : { device: r.key.trim() };
     if (r.op === 'exists') return { ...where, exists: true };
     if (r.op === 'in') {
@@ -554,8 +562,16 @@ function toRequest(join: 'all' | 'any', rows: Condition[]): AudienceRequest | nu
 
 function AudienceSection({ projectId }: { projectId: string }) {
   const t = useT();
+  const [params] = useSearchParams();
   const [join, setJoin] = useState<'all' | 'any'>('all');
-  const [rows, setRows] = useState<Condition[]>([blank()]);
+  // Seeded from the URL when the issue page sent you here, so the
+  // trip from "this is fixed" to "tell the people it happened to" is
+  // a click rather than a copied uuid. Read once: it is a starting
+  // value, not state the address bar keeps owning.
+  const [rows, setRows] = useState<Condition[]>(() => {
+    const issue = params.get('issue');
+    return issue ? [{ key: '', op: 'is', source: 'issue', value: issue }] : [blank()];
+  });
   const [raw, setRaw] = useState<null | string>(null);
   const [preview, setPreview] = useState<null | { matched: number; sample: AudienceSample[] }>(
     null,
@@ -668,12 +684,17 @@ function AudienceSection({ projectId }: { projectId: string }) {
                   <option value="trait">{t('push.sourceTrait')}</option>
                   <option value="device">{t('push.sourceDevice')}</option>
                   <option value="user">{t('push.sourceUser')}</option>
+                  <option value="issue">{t('push.sourceIssue')}</option>
                 </Select>
-                {r.source === 'user' ? (
+                {valueOnly(r) ? (
                   <div className="sm:col-span-3">
                     <Input
                       value={r.value}
-                      placeholder={t('push.appUserIdPlaceholder')}
+                      placeholder={
+                        r.source === 'issue'
+                          ? t('push.issueIdPlaceholder')
+                          : t('push.appUserIdPlaceholder')
+                      }
                       onChange={(e) =>
                         edit(() =>
                           setRows(
