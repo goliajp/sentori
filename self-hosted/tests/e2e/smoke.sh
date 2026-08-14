@@ -388,13 +388,57 @@ PH="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/health"
 echo "$PH" | jq -e 'has("reasons") and has("quarantinedTokens")' >/dev/null \
     || { echo "health is missing the fields the card renders: $PH" >&2; exit 1; }
 
+# A real EC key, so the credential this saves is one that could
+# actually sign. The step used to post `{"keyId":"ABC123","teamId":
+# "DEF456"}` — no topic, no key at all — and assert that it read
+# back. It did read back. It could not have sent anything: the worker
+# needs `topic` and a PEM, and a test that checks the row exists
+# rather than that the thing works is how the form shipped for a year
+# unable to accept a private key.
+P8='-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgevZzL1gdAFr88hb2
+OF/2NxApJCzGCEDdfSp6VQO30hyhRANCAAQRWz+jn65BtOMvdyHKcvjBeBSDZH2r
+1RTwjmYSi9R/zpBnuQ4EiMnCqfMPWiZqB4QdbAd0E7oH50VpuZ1P087G
+-----END PRIVATE KEY-----'
+
+echo "→ a key with its line breaks stripped is refused"
+# What a single-line text field does to a pasted `.p8`, which is what
+# the form used to be. The save succeeded and the key failed hours
+# later on a device; now it fails here, with a sentence naming the
+# problem.
+FLAT="$(printf '%s' "$P8" | tr -d '\n')"
+REFUSAL="$(jq -n --arg s "$FLAT" \
+    '{provider:"apns",config:{keyId:"ABC1234567",teamId:"DEF7654321",topic:"com.example.app"},secret:$s}' \
+    | curl -sS -b "$JAR" -X POST "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials" \
+        -H 'content-type: application/json' --data @-)"
+echo "$REFUSAL" | jq -e '.error == "invalid_apns_credential"' > /dev/null \
+    || { echo "a flattened key was accepted: $REFUSAL" >&2; exit 1; }
+echo "$REFUSAL" | jq -e '.detail | test("one line")' > /dev/null \
+    || { echo "the refusal does not say why: $REFUSAL" >&2; exit 1; }
+
+echo "→ a credential missing the field the worker reads is refused"
+# The form's own placeholder said `bundleId`; the worker reads
+# `topic`. Following the example exactly produced a credential that
+# saved and then failed on the first send.
+BAD="$(jq -n --arg s "$P8" \
+    '{provider:"apns",config:{keyId:"ABC1234567",teamId:"DEF7654321",bundleId:"com.example.app"},secret:$s}' \
+    | curl -sS -b "$JAR" -X POST "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials" \
+        -H 'content-type: application/json' --data @-)"
+echo "$BAD" | jq -e '.detail | test("topic")' > /dev/null \
+    || { echo "bundleId was accepted in place of topic: $BAD" >&2; exit 1; }
+
 echo "→ save and read back a provider credential"
-curl -fsS -b "$JAR" -X POST "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials" \
-    -H 'content-type: application/json' \
-    -d '{"provider":"apns","config":{"keyId":"ABC123","teamId":"DEF456"}}' >/dev/null
-CRED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials" \
-    | jq -r '.credentials[] | select(.kind == "apns") | .kind')"
+jq -n --arg s "$P8" \
+    '{provider:"apns",config:{keyId:"ABC1234567",teamId:"DEF7654321",topic:"com.example.app"},secret:$s}' \
+    | curl -fsS -b "$JAR" -X POST "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials" \
+        -H 'content-type: application/json' --data @- >/dev/null
+CREDS="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials")"
+CRED="$(echo "$CREDS" | jq -r '.credentials[] | select(.kind == "apns") | .kind')"
 [[ "$CRED" == "apns" ]] || { echo "the credential did not read back: '${CRED}'" >&2; exit 1; }
+# And the list says it can be used, which is the part a dashboard
+# shows and the part that was never true before.
+echo "$CREDS" | jq -e '.credentials[] | select(.kind == "apns") | .problem == null' > /dev/null \
+    || { echo "the saved credential reads back as unusable: $CREDS" >&2; exit 1; }
 
 echo "→ register a device the way the SDK does"
 IPT="$(curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
