@@ -300,3 +300,107 @@ describe('push registration follows the person', () => {
     expect(seen).toHaveLength(0);
   });
 });
+
+// A vendor token is not an address. It rotates — on a reinstall, a
+// restore, cleared app data — and the server keys the row on it, so a
+// rotation wrote a *new* row under a *new* spToken and every backend
+// holding the old one was addressing nothing.
+//
+// The native SDKs were given an installId and a rotation report. This
+// package was not: its registration goes through JS, and the native
+// rotation hook it does have refuses to act on a device the *native*
+// side never registered — which, for a React Native app, is every
+// device.
+describe('push survives the vendor rotating its token', () => {
+  function recordingFetch(): Array<Record<string, unknown>> {
+    const seen: Array<Record<string, unknown>> = [];
+    globalThis.fetch = ((_url: string, init?: { body?: string }) => {
+      if (init?.body != null) {
+        seen.push(JSON.parse(init.body) as Record<string, unknown>);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 202,
+        json: () => Promise.resolve({ spToken: 'dev-1', token_id: 'dev-1' }),
+      });
+    }) as unknown as typeof fetch;
+    return seen;
+  }
+
+  beforeEach(() => {
+    resetPush();
+    resetConfig();
+    resetScope();
+    setPlatform('ios');
+    setConfig(baseConfig);
+  });
+  afterEach(() => {
+    resetPush();
+    resetConfig();
+    resetScope();
+    setPlatform(null);
+    __setNativeForTests(undefined);
+    globalThis.fetch = realFetch;
+  });
+
+  it('tells the server which installation this is', async () => {
+    __setNativeForTests(grantingNative());
+    const seen = recordingFetch();
+    await register();
+    const installId = seen[0]?.installId;
+    expect(typeof installId).toBe('string');
+    expect(String(installId).length).toBeGreaterThan(8);
+  });
+
+  it('keeps the same installation across registrations', async () => {
+    __setNativeForTests(grantingNative());
+    const seen = recordingFetch();
+    await register();
+    await register();
+    expect(seen).toHaveLength(2);
+    // Asserting equality alone passes when neither call sent one —
+    // `undefined === undefined` — which is the state this test
+    // exists to reject. So: a string, and the same string.
+    expect(typeof seen[0]?.installId).toBe('string');
+    expect(seen[1]?.installId).toBe(seen[0]?.installId);
+  });
+
+  it('reports a token that rotated while the app was running', async () => {
+    // The vendor hands back a different token on the second drain,
+    // which is what a rotation looks like from here.
+    let handed = 0;
+    __setNativeForTests(
+      grantingNative({
+        pushDrainState: () => {
+          handed += 1;
+          return Promise.resolve({
+            notifications: [],
+            taps: [],
+            token: handed <= 1 ? 'abc123' : 'rotated456',
+          });
+        },
+      }),
+    );
+    const seen = recordingFetch();
+    await register();
+    expect(seen).toHaveLength(1);
+
+    // One turn of the drain loop, which already runs at 1 Hz and
+    // already reads the token — it just threw it away.
+    await new Promise((r) => setTimeout(r, 1400));
+
+    expect(seen).toHaveLength(2);
+    expect(seen[1]?.nativeToken).toBe('rotated456');
+    // Same installation, or the server writes a second row and the
+    // rotation has achieved exactly what it used to.
+    expect(seen[1]?.installId).toBe(seen[0]?.installId);
+  });
+
+  it('does not report the same token twice', async () => {
+    __setNativeForTests(grantingNative());
+    const seen = recordingFetch();
+    await register();
+    await new Promise((r) => setTimeout(r, 2400));
+    expect(seen).toHaveLength(1);
+  });
+});
