@@ -701,6 +701,36 @@ BOTH="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${BASE}/v1/push/send" \
 [[ "$BOTH" == "400" ]] \
     || { echo "appUserId together with traits answered ${BOTH}, not 400" >&2; exit 1; }
 
+# A preview that is an estimate is a preview nobody can act on: the
+# only other way to find out what an expression matches is to send to
+# it, and that cannot be undone.
+echo "→ the preview counts exactly what a send would reach"
+AUD='{"all":[{"trait":"e2e","is":"aud"},{"trait":"plan","in":["pro","team"]},
+              {"device":"appVersion","versionGte":"4.2"}]}'
+PREV="$(curl -fsS -b "$JAR" -X POST \
+    "${BASE}/admin/api/projects/${PROJECT_ID}/push/audience/preview" \
+    -H 'content-type: application/json' -d "{\"audience\":${AUD}}")"
+MATCHED="$(echo "$PREV" | jq -r '.matched')"
+SENT="$(send_count "{\"audience\":${AUD},\"payload\":{\"title\":\"t12\"}}")"
+[[ "$MATCHED" == "$SENT" ]] \
+    || { echo "the preview said ${MATCHED} and the send reached ${SENT}" >&2; exit 1; }
+[[ "$MATCHED" -ge 1 ]] \
+    || { echo "the preview and the send agreed on nothing, which agrees on nothing" >&2; exit 1; }
+
+# A preview is not a way around what the device list refuses to show.
+echo "→ the preview does not hand back a push token"
+echo "$PREV" | jq -e '[.sample[] | select(has("native_token") or has("nativeToken"))] | length == 0' \
+    > /dev/null || { echo "the preview returned a usable push token: $PREV" >&2; exit 1; }
+echo "$PREV" | jq -e '.sample[0].traits.plan != null' > /dev/null \
+    || { echo "the sample says nothing about why it matched: $PREV" >&2; exit 1; }
+
+echo "→ a preview of an audience that cannot be parsed says so"
+BAD="$(curl -sS -o /dev/null -w '%{http_code}' -b "$JAR" -X POST \
+    "${BASE}/admin/api/projects/${PROJECT_ID}/push/audience/preview" \
+    -H 'content-type: application/json' -d '{"audience":{"trait":"plan","equals":"pro"}}')"
+[[ "$BAD" == "400" ]] \
+    || { echo "an unparseable audience previewed as ${BAD}, not 400" >&2; exit 1; }
+
 echo "→ signing out clears the traits a send selects on"
 curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
     -H 'content-type: application/json' \
