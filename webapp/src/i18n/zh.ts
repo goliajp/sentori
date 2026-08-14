@@ -185,7 +185,6 @@ export const zh: Messages = {
   'push.placeholder.webpush.secretKey': '-----BEGIN PRIVATE KEY-----\n…\n-----END PRIVATE KEY-----',
   'push.placeholder.webpush.subject': 'mailto:alerts@example.com',
   'push.placeholder.webpush.vapidPublicKey': 'BEl62iUYgUiv…',
-  'push.addressable': '可定向',
   'push.credentialsEmpty':
     '还没有厂商凭证 —— 在上面贴 APNs key 或 FCM service account。没有它设备也能注册,但什么都投递不出去。',
   'push.credentialsTitle': '厂商凭证',
@@ -199,8 +198,6 @@ export const zh: Messages = {
   'push.lastValidated': '最近校验 {when} —— {status}',
   'push.metadata': '元数据',
   'push.metadataNone': '未发送',
-  'push.no': '否',
-  'push.notAddressableHint': '注册时 sentori.user() 还没跑——只能收广播，无法从 issue 定向。',
   'push.provider': '厂商',
   'push.queued': '排队中',
   'push.reason': '原因',
@@ -213,7 +210,9 @@ export const zh: Messages = {
   'push.tokens': '{live} 台设备 · {identified} 台可定向 · {quarantined} 台已隔离',
   'push.unusable': '用不了:',
   'push.usable': '已校验 —— 能签名。',
-  'push.yes': '是',
+  'push.noUser': '未识别',
+  'push.noUserHint': '这台设备注册时 sentori.user() 还没跑,所以没有任何东西把它和某个人关联起来。它仍然能收广播,但没法从某个 issue 定向推给它。',
+  'push.user': '用户',
   'releases.artifactMissing':
     '{platform} 在此版本有事件,但缺符号化物料 —— 该平台的调用栈无法还原',
   'releases.artifactUnused': '{platform} 在此版本没有事件,缺物料不影响',

@@ -190,7 +190,6 @@ export const ja: Messages = {
   'push.placeholder.webpush.secretKey': '-----BEGIN PRIVATE KEY-----\n…\n-----END PRIVATE KEY-----',
   'push.placeholder.webpush.subject': 'mailto:alerts@example.com',
   'push.placeholder.webpush.vapidPublicKey': 'BEl62iUYgUiv…',
-  'push.addressable': '宛先指定可',
   'push.credentialsEmpty':
     'プロバイダの認証情報がまだありません —— 上に APNs キーまたは FCM サービスアカウントを貼ってください。なくてもデバイスは登録できますが、配信はできません。',
   'push.credentialsTitle': 'プロバイダ認証情報',
@@ -205,8 +204,6 @@ export const ja: Messages = {
   'push.lastValidated': '最終確認 {when} —— {status}',
   'push.metadata': 'メタデータ',
   'push.metadataNone': '送信なし',
-  'push.no': 'いいえ',
-  'push.notAddressableHint': 'sentori.user() より前に登録されたため、一斉配信のみ。issue からは指定できません。',
   'push.provider': 'プロバイダ',
   'push.queued': '待機中',
   'push.reason': '理由',
@@ -219,7 +216,9 @@ export const ja: Messages = {
   'push.tokens': 'デバイス {live} 台 · 宛先指定可 {identified} 台 · 隔離 {quarantined} 台',
   'push.unusable': '使用できません:',
   'push.usable': '検証済み — 署名できます。',
-  'push.yes': 'はい',
+  'push.noUser': '未識別',
+  'push.noUserHint': 'このデバイスの登録時に sentori.user() が実行されていないため、人と結び付いていません。ブロードキャストは届きますが、issue から個別に送ることはできません。',
+  'push.user': 'ユーザー',
   'releases.artifactMissing':
     '{platform} はこのリリースでイベントを送っていますが、シンボリケーション用アーティファクトがありません — スタックを読めません',
   'releases.artifactUnused':

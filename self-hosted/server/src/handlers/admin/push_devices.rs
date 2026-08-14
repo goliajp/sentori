@@ -50,6 +50,7 @@ pub async fn list(
         "SELECT id, provider, env, metadata, bad_streak, revoked_at, \
                 last_seen_at, created_at, \
                 user_key IS NOT NULL AS addressable, \
+                right(user_key, 6) AS user_key_tail, \
                 right(native_token, 6) AS token_tail \
          FROM device_tokens \
          WHERE project_id = $1 AND ($2 OR revoked_at IS NULL) \
@@ -82,7 +83,15 @@ pub async fn list(
                 // The raw key is never returned — this row exists to
                 // answer "can this device be reached", not to hand
                 // back identity material.
+                // Both, on purpose. The boolean is what the send
+                // path cares about; the tail is what a person needs
+                // to believe it. A column reading only "addressable /
+                // not" has now sent two readers to the source to find
+                // out what it meant — it asks whether `sentori.user()`
+                // ran before `register()`, which is not what the word
+                // suggests. Showing the key itself needs no word.
                 "addressable": r.get::<bool, _>("addressable"),
+                "userKeyTail": r.get::<Option<String>, _>("user_key_tail"),
                 "badStreak": r.get::<i32, _>("bad_streak"),
                 "revokedAt": r.get::<Option<time::OffsetDateTime>, _>("revoked_at")
                     .map(crate::wire_time::rfc3339),
