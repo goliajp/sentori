@@ -195,6 +195,11 @@ export type PushCredential = {
   created_at?: string;
   last_validated_at?: null | string;
   last_validate_status?: null | string;
+  /** Why the worker could not use this credential, from the same
+   *  check the save runs. Null when it is fine. A credential stored
+   *  before anything was checked is still stored, and used to
+   *  announce itself only as a notification that never arrived. */
+  problem?: null | string;
 };
 
 export type PushSend = {
@@ -284,8 +289,14 @@ class Api {
     if (!resp.ok) {
       let detail = '';
       try {
-        const j = (await resp.json()) as { error?: string };
-        detail = j.error ?? '';
+        // The server answers a rejected credential with three fields:
+        // a code, what was wrong, and what it expected instead. Only
+        // the code was read, so the screen said
+        // `invalid_apns_credential` and threw away the sentence that
+        // named the field. Both of the others are what the person
+        // pasting the key needs.
+        const j = (await resp.json()) as { detail?: string; error?: string; expected?: string };
+        detail = [j.error, j.detail, j.expected].filter(Boolean).join(' — ');
       } catch {
         // non-JSON error body
       }

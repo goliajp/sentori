@@ -44,6 +44,7 @@ mod mipush;
 mod native_symbolicate;
 mod notify;
 mod pipeline;
+mod push_credential_check;
 mod push_quarantine;
 mod push_worker;
 mod rate_limit;

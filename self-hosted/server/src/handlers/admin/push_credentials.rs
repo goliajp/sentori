@@ -57,39 +57,23 @@ pub async fn upsert(
         );
     }
 
-    // An FCM credential is a service-account JSON, and the thing an
-    // operator has to hand is usually a legacy server key — the thing
-    // that worked until Google switched the endpoint off. Saving one
-    // succeeds, and the failure surfaces later as a push that never
-    // arrived, on somebody else's device.
+    // Every provider is checked here now, not just FCM. The two
+    // ways this form produced a broken credential were both
+    // invisible from it: a `.p8` pasted into a single-line field
+    // arrives with its line breaks stripped, and the placeholder
+    // named `bundleId` while the worker reads `topic`. Both saved
+    // fine and failed on a device hours later.
     let mut config = body.config.clone();
-    if body.provider == "fcm" {
-        let cfg = crate::fcm::FcmConfig {
-            service_account_json: body.secret.clone().unwrap_or_default(),
-        };
-        match crate::fcm::project_id(&cfg) {
-            Ok(project) => {
-                tracing::info!(%project, "fcm credential accepted");
-                // The list view shows `config`, and an operator with
-                // two Firebase projects has no other way to tell which
-                // one they pasted. Derived rather than asked for: it
-                // is already in the file, and a field filled in by
-                // hand is a field that can be wrong.
-                if let Some(map) = config.as_object_mut() {
-                    map.insert("fcmProjectId".into(), json!(project));
-                }
-            }
-            Err(e) => {
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(json!({
-                        "error": "invalid_fcm_credential",
-                        "detail": e.to_string(),
-                        "expected": "the service-account JSON from Firebase                                      (Project settings ▸ Service accounts ▸                                      Generate new private key). A legacy server                                      key no longer works: Google switched off                                      the endpoint it authenticated against.",
-                    })),
-                );
-            }
-        }
+    let secret = body.secret.clone().unwrap_or_default();
+    if let Err(r) = crate::push_credential_check::check(&body.provider, &mut config, &secret) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": r.error,
+                "detail": r.detail,
+                "expected": r.expected,
+            })),
+        );
     }
 
     // Tenant guard: the project must belong to the caller's
@@ -172,8 +156,14 @@ pub async fn list(
     {
         return Json(json!({ "credentials": [] }));
     }
+    // `secret_blob` is read and never returned. A credential stored
+    // before the form checked anything is still stored, and the only
+    // way anyone learns it is unusable today is a notification that
+    // does not arrive — so the same check the save runs is run over
+    // what is already there, and the answer travels with the row.
     let rows = sqlx::query(
-        "SELECT id, kind, config, created_at, last_validated_at, last_validate_status \
+        "SELECT id, kind, config, secret_blob, created_at, last_validated_at, \
+                last_validate_status \
          FROM push_credentials WHERE project_id = $1 ORDER BY kind",
     )
     .bind(project_id)
@@ -184,10 +174,17 @@ pub async fn list(
     let out: Vec<Value> = rows
         .iter()
         .map(|r| {
+            let kind = r.get::<String, _>("kind");
+            let mut config = r.get::<Value, _>("config");
+            let secret = String::from_utf8(r.get::<Vec<u8>, _>("secret_blob")).unwrap_or_default();
+            let problem = crate::push_credential_check::check(&kind, &mut config, &secret)
+                .err()
+                .map(|e| format!("{} — {}", e.detail, e.expected));
             json!({
                 "id": r.get::<Uuid, _>("id").to_string(),
-                "kind": r.get::<String, _>("kind"),
-                "config": r.get::<Value, _>("config"),
+                "kind": kind,
+                "config": config,
+                "problem": problem,
                 "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
                 "last_validated_at": crate::wire_time::rfc3339_opt(r.get::<Option<time::OffsetDateTime>, _>("last_validated_at")),
                 "last_validate_status": r.get::<Option<String>, _>("last_validate_status"),
