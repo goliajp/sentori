@@ -358,9 +358,17 @@ public final class SentoriPush: NSObject {
                 // The handle is the `device_tokens` row id, a bare
                 // uuid. The RN SDK parsed it as an `ipt_*` string no
                 // server has ever returned.
+                // `spToken` is the name; `token_id` is the name the
+                // server shipped under. Reading the new one first and
+                // falling back matters in one direction that is easy
+                // to miss: a self-hosted deployment upgrades on its
+                // own schedule, so an SDK newer than its server is an
+                // ordinary state, and an SDK that only knew the new
+                // name would fail every registration against it.
                 guard let data,
                     let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                    let handle = j["token_id"] as? String, !handle.isEmpty
+                    let handle = (j["spToken"] as? String) ?? (j["token_id"] as? String),
+                    !handle.isEmpty
                 else {
                     cont.resume(
                         returning: .failure(
