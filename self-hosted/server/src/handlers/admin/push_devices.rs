@@ -33,6 +33,11 @@ pub struct ListQuery {
     /// `live` (default) hides revoked rows; `all` shows them.
     pub scope: Option<String>,
     pub limit: Option<u32>,
+    /// How many to skip. There was no way to skip any, so a project
+    /// with more devices than the cap had rows nobody could reach —
+    /// the console showed the first hundred and gave no sign there
+    /// were others.
+    pub offset: Option<u32>,
 }
 
 pub async fn list(
@@ -44,7 +49,22 @@ pub async fn list(
     super::tokens::ensure_project_access(&state, &ctx, project_id).await?;
 
     let include_revoked = q.scope.as_deref() == Some("all");
-    let limit = i64::from(q.limit.unwrap_or(100).min(500));
+    let limit = i64::from(q.limit.unwrap_or(50).min(500));
+    let offset = i64::from(q.offset.unwrap_or(0));
+
+    // The count comes back with the page. A table that says "50" when
+    // there are four hundred is not a smaller truth, it is a
+    // different one, and the number is what tells a reader whether
+    // what they are looking at is all of it.
+    let total: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM device_tokens \
+         WHERE project_id = $1 AND ($2 OR revoked_at IS NULL)",
+    )
+    .bind(project_id)
+    .bind(include_revoked)
+    .fetch_one(&state.pool)
+    .await
+    .unwrap_or(0);
 
     let rows = sqlx::query(
         "SELECT id, provider, env, metadata, bad_streak, revoked_at, \
@@ -54,11 +74,12 @@ pub async fn list(
                 right(native_token, 6) AS token_tail \
          FROM device_tokens \
          WHERE project_id = $1 AND ($2 OR revoked_at IS NULL) \
-         ORDER BY last_seen_at DESC LIMIT $3",
+         ORDER BY last_seen_at DESC LIMIT $3 OFFSET $4",
     )
     .bind(project_id)
     .bind(include_revoked)
     .bind(limit)
+    .bind(offset)
     .fetch_all(&state.pool)
     .await
     .map_err(|e| {
@@ -104,5 +125,54 @@ pub async fn list(
         })
         .collect();
 
-    Ok(Json(json!({ "devices": devices })))
+    Ok(Json(
+        json!({ "devices": devices, "total": total, "offset": offset }),
+    ))
+}
+
+/// Retire a device from the console.
+///
+/// The SDK can revoke its own registration, and quarantine retires a
+/// token a provider has declared dead — but an operator looking at a
+/// device that should stop receiving had nowhere to click. The only
+/// routes to `revoked_at` needed either the app or a failed delivery.
+///
+/// Sets the same column the send path filters on and quarantine
+/// writes, so a device retired here is retired the same way as one
+/// retired any other way. A later `register` from the same device
+/// revives it, which is the documented behaviour and the reason this
+/// is a revocation rather than a delete: the row keeps its history.
+pub async fn revoke(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    Path((project_id, token_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    super::tokens::ensure_project_access(&state, &ctx, project_id).await?;
+
+    // `AND project_id` ties the token to the guarded project, so an
+    // id from another project cannot be retired through this one's
+    // URL.
+    let affected = sqlx::query(
+        "UPDATE device_tokens SET revoked_at = now() \
+         WHERE project_id = $1 AND id = $2 AND revoked_at IS NULL",
+    )
+    .bind(project_id)
+    .bind(token_id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| {
+        warn!(error = %e, "admin.push.devices revoke failed");
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "internal" })),
+        )
+    })?
+    .rows_affected();
+
+    // Says which. An id that matched nothing — already revoked, or
+    // another project's — answering exactly like a revocation is how
+    // the SDK's own endpoint hid a bug for a year.
+    Ok(Json(json!({
+        "status": if affected > 0 { "revoked" } else { "not_found" },
+    })))
 }

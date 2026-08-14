@@ -22,6 +22,7 @@ use crate::state::AppState;
 pub struct ListQuery {
     pub status: Option<String>,
     pub limit: Option<u32>,
+    pub offset: Option<u32>,
 }
 
 pub async fn retry(
@@ -123,33 +124,37 @@ pub async fn list(
     {
         return Json(json!({ "sends": [] }));
     }
-    let limit = i64::from(q.limit.unwrap_or(100).clamp(1, 1000));
-    let rows = if let Some(status) = q.status.as_deref() {
-        sqlx::query(
-            "SELECT id, token_id, provider, status, provider_outcome, error, retry_count, \
-                    created_at, sent_at, next_attempt_at \
-             FROM push_sends \
-             WHERE project_id = $1 AND status = $2 \
-             ORDER BY created_at DESC LIMIT $3",
-        )
-        .bind(project_id)
-        .bind(status)
-        .bind(limit)
-        .fetch_all(&state.pool)
-        .await
-    } else {
-        sqlx::query(
-            "SELECT id, token_id, provider, status, provider_outcome, error, retry_count, \
-                    created_at, sent_at, next_attempt_at \
-             FROM push_sends \
-             WHERE project_id = $1 \
-             ORDER BY created_at DESC LIMIT $2",
-        )
-        .bind(project_id)
-        .bind(limit)
-        .fetch_all(&state.pool)
-        .await
-    }
+    let limit = i64::from(q.limit.unwrap_or(50).clamp(1, 1000));
+    let offset = i64::from(q.offset.unwrap_or(0));
+    // One statement with a nullable filter, rather than two that had
+    // to be kept identical by hand. They already differed by a
+    // placeholder number, which is the kind of divergence that ends
+    // with one branch selecting a column the other does not.
+    let status = q.status.as_deref().filter(|s| !s.is_empty());
+
+    let total: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM push_sends \
+         WHERE project_id = $1 AND ($2::text IS NULL OR status = $2)",
+    )
+    .bind(project_id)
+    .bind(status)
+    .fetch_one(&state.pool)
+    .await
+    .unwrap_or(0);
+
+    let rows = sqlx::query(
+        "SELECT id, token_id, provider, status, provider_outcome, error, retry_count, \
+                created_at, sent_at, next_attempt_at \
+         FROM push_sends \
+         WHERE project_id = $1 AND ($2::text IS NULL OR status = $2) \
+         ORDER BY created_at DESC LIMIT $3 OFFSET $4",
+    )
+    .bind(project_id)
+    .bind(status)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&state.pool)
+    .await
     .unwrap_or_default();
     let out: Vec<Value> = rows
         .iter()
@@ -168,7 +173,7 @@ pub async fn list(
             })
         })
         .collect();
-    Json(json!({ "sends": out }))
+    Json(json!({ "sends": out, "total": total, "offset": offset }))
 }
 
 /// `GET /admin/api/projects/:project_id/push/health`

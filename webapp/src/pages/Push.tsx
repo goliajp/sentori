@@ -96,24 +96,83 @@ export default function PushPage() {
   );
 }
 
+/// Where you are in a list, and how to move.
+///
+/// Both tables capped at a hundred rows and said nothing about it, so
+/// a project with four hundred devices showed a hundred and looked
+/// complete. The count is the part that matters: a table headed
+/// "50" when there are four hundred is not a smaller truth, it is a
+/// different one.
+function Pager({
+  offset,
+  onOffset,
+  page,
+  shown,
+  total,
+}: {
+  offset: number;
+  onOffset: (n: number) => void;
+  page: number;
+  shown: number;
+  total: number;
+}) {
+  const t = useT();
+  if (total <= page && offset === 0) return null;
+  const from = total === 0 ? 0 : offset + 1;
+  const to = offset + shown;
+  return (
+    <div className="flex items-center gap-2 border-t border-border/60 px-3.5 py-2">
+      <span className="text-xs tabular-nums text-fg-subtle">
+        {t('push.range', { from: String(from), to: String(to), total: String(total) })}
+      </span>
+      <div className="ml-auto flex items-center gap-1">
+        <Button
+          size="sm"
+          disabled={offset === 0}
+          onClick={() => onOffset(Math.max(0, offset - page))}
+        >
+          {t('push.prev')}
+        </Button>
+        <Button size="sm" disabled={to >= total} onClick={() => onOffset(offset + page)}>
+          {t('push.next')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ── delivery ────────────────────────────────────────────────────────
+
+const PAGE = 50;
 
 function DeliverySection({ projectId }: { projectId: string }) {
   const t = useT();
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
+  const [offset, setOffset] = useState(0);
 
   const health = useAsyncData(() => api.pushHealth(projectId), [projectId]);
-  const sends = useAsyncData(() => api.pushSends(projectId), [projectId]);
+  // Filtered and paged by the server. Filtering a page in the browser
+  // filters the page, not the data: with fifty of four hundred rows
+  // in hand, "failed" showed the failures among the fifty.
+  const sends = useAsyncData(
+    () => api.pushSends(projectId, PAGE, status, offset),
+    [projectId, status, offset],
+  );
   const devices = useAsyncData(() => api.pushDevices(projectId), [projectId]);
 
   const h = health.data;
-  const all = sends.data?.sends ?? [];
-  const rows = status ? all.filter((r) => r.status === status) : all;
+  const rows = sends.data?.sends ?? [];
+  const total = sends.data?.total ?? rows.length;
 
   const reload = () => {
     health.reload();
     sends.reload();
+  };
+  const refilter = (next: string) => {
+    setStatus(next);
+    // Page one of the new question, not page four of the old one.
+    setOffset(0);
   };
 
   return (
@@ -160,12 +219,12 @@ function DeliverySection({ projectId }: { projectId: string }) {
       <TestSend projectId={projectId} devices={devices.data?.devices ?? []} onSent={reload} />
 
       <Panel
-        title={`${t('push.sendsTitle')} (${rows.length})`}
+        title={`${t('push.sendsTitle')} (${total})`}
         action={
           <div className="flex items-center gap-2">
             <Select
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
+              onChange={(e) => refilter(e.target.value)}
               aria-label={t('push.filterStatus')}
             >
               <option value="">{t('push.statusAny')}</option>
@@ -173,7 +232,7 @@ function DeliverySection({ projectId }: { projectId: string }) {
               <option value="failed">failed</option>
               <option value="queued">queued</option>
             </Select>
-            {all.some((r) => r.status === 'failed') && (
+            {rows.some((r) => r.status === 'failed') && (
               <Button
                 size="sm"
                 disabled={busy}
@@ -260,6 +319,13 @@ function DeliverySection({ projectId }: { projectId: string }) {
             },
           ]}
         />
+        <Pager
+          offset={offset}
+          onOffset={setOffset}
+          page={PAGE}
+          shown={rows.length}
+          total={total}
+        />
       </Panel>
     </div>
   );
@@ -288,7 +354,9 @@ function TestSend({
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<null | string>(null);
+  const [result, setResult] = useState<null | { id: string; reason?: string; status: string }>(
+    null,
+  );
   const [error, setError] = useState<null | string>(null);
 
   const target = deviceId || reachable[0]?.id || '';
@@ -334,14 +402,37 @@ function TestSend({
                 setError(null);
                 void api
                   .pushTest(projectId, target, title, body)
-                  .then((r) => {
+                  .then(async (r) => {
                     // The server answers with an id, not an outcome:
                     // the worker has not tried yet. Saying "sent"
                     // here would be the same lie the receipts used to
-                    // tell.
-                    if (r.error) setError(r.error);
-                    else setResult(r.sendId ?? '');
+                    // tell — so it says queued, and then waits.
+                    if (r.error || !r.sendId) {
+                      setError(r.error ?? 'no send id');
+                      return;
+                    }
+                    setResult({ id: r.sendId, status: 'queued' });
                     onSent();
+                    // A test whose answer is "it is on its way" is
+                    // not a test. The worker takes seconds; watch
+                    // until it is done, then say what happened —
+                    // including the provider's own words when it
+                    // failed, which is the whole reason to press this
+                    // button rather than send from a terminal.
+                    const deadline = Date.now() + 60_000;
+                    while (Date.now() < deadline) {
+                      await new Promise((res) => setTimeout(res, 1500));
+                      const page = await api.pushSends(projectId, 20);
+                      const row = page.sends.find((x) => x.id === r.sendId);
+                      if (!row) continue;
+                      setResult({
+                        id: r.sendId,
+                        reason: row.error ?? row.provider_outcome ?? undefined,
+                        status: row.status,
+                      });
+                      onSent();
+                      if (row.status !== 'queued') return;
+                    }
                   })
                   .catch((e: Error) => setError(e.message))
                   .finally(() => setBusy(false));
@@ -352,9 +443,24 @@ function TestSend({
           </div>
           {error && <ErrorBanner>{error}</ErrorBanner>}
           {result !== null && (
-            <div className="border-t border-border/60 px-3.5 py-2 text-xs text-fg-muted">
-              {t('push.testQueued')}{' '}
-              <span className="font-mono text-fg-subtle">{result}</span>
+            <div className="border-t border-border/60 px-3.5 py-2 text-xs">
+              <span
+                className={clsx(
+                  'font-mono',
+                  result.status === 'failed' && 'text-kind-error',
+                  result.status === 'sent' && 'text-ok',
+                  result.status === 'queued' && 'text-fg-muted',
+                )}
+              >
+                {result.status}
+              </span>{' '}
+              <span className="text-fg-muted">
+                {result.status === 'queued' ? t('push.testWaiting') : ''}
+              </span>
+              {result.reason && (
+                <span className="text-fg-muted"> — {result.reason}</span>
+              )}
+              <span className="ml-2 font-mono text-fg-subtle">{result.id}</span>
             </div>
           )}
         </>
@@ -372,16 +478,24 @@ function DevicesSection({ projectId }: { projectId: string }) {
   // someone comes to this page to find, and `live` alone cannot show
   // it.
   const [scope, setScope] = useState<'all' | 'live'>('live');
-  const devices = useAsyncData(() => api.pushDevices(projectId, 100, scope), [projectId, scope]);
+  const [offset, setOffset] = useState(0);
+  const devices = useAsyncData(
+    () => api.pushDevices(projectId, PAGE, scope, offset),
+    [projectId, scope, offset],
+  );
   const rows = devices.data?.devices ?? [];
+  const total = devices.data?.total ?? rows.length;
 
   return (
     <Panel
-      title={`${t('push.devicesTitle')} (${rows.length})`}
+      title={`${t('push.devicesTitle')} (${total})`}
       action={
         <Select
           value={scope}
-          onChange={(e) => setScope(e.target.value as 'all' | 'live')}
+          onChange={(e) => {
+            setScope(e.target.value as 'all' | 'live');
+            setOffset(0);
+          }}
           aria-label={t('push.filterScope')}
         >
           <option value="live">{t('push.scopeLive')}</option>
@@ -445,8 +559,32 @@ function DevicesSection({ projectId }: { projectId: string }) {
               </span>
             ),
           },
+          {
+            // Retiring a device needed either the app or a failed
+            // delivery. Someone looking at one that should stop
+            // receiving had nowhere to click.
+            key: 'revoke',
+            label: '',
+            width: '70px',
+            align: 'right',
+            render: (d) =>
+              d.revokedAt ? null : (
+                <button
+                  type="button"
+                  className="text-xs text-fg-subtle hover:text-kind-error"
+                  onClick={() => {
+                    if (window.confirm(t('push.revokeConfirm'))) {
+                      void api.revokePushDevice(projectId, d.id).then(devices.reload);
+                    }
+                  }}
+                >
+                  {t('push.revokeAction')}
+                </button>
+              ),
+          },
         ]}
       />
+      <Pager offset={offset} onOffset={setOffset} page={PAGE} shown={rows.length} total={total} />
     </Panel>
   );
 }
