@@ -249,12 +249,41 @@ export type PushDevice = {
   /** Last six characters. Enough to tell two devices apart, not
    *  enough to push to one. */
   tokenTail: null | string;
+  /** What `sentori.user()` was told about the person — plan, cohort,
+   *  org. Selectable by a send, unlike the identity itself, which is
+   *  only ever a hash. `{}` until the host passes any. */
+  traits?: Record<string, unknown>;
   /** The last six of the identity key, when one is known. The
    *  column used to show only a yes/no called "addressable", which
    *  asks whether `sentori.user()` ran before `register()` — not what
    *  the word suggests, and two readers went to the source to find
    *  out. A key or a dash needs no explaining. */
   userKeyTail?: null | string;
+};
+
+/** One of the three ways to name an audience.
+ *
+ *  They are not three features: `appUserId` is one leaf of an
+ *  expression and `traits` is a conjunction of them, so the server
+ *  compiles all three into the same query. Exactly one is set.
+ */
+export type AudienceRequest = {
+  appUserId?: string;
+  audience?: unknown;
+  traits?: Record<string, unknown>;
+};
+
+/** A device the audience selected, with why it did.
+ *
+ *  Never the push token — the device list refuses to hand one back
+ *  and a preview must not become the way around that. */
+export type AudienceSample = {
+  addressable: boolean;
+  id: string;
+  metadata: Record<string, unknown>;
+  provider: string;
+  traits: Record<string, unknown>;
+  userKeyTail: null | string;
 };
 
 export type SmtpStatus =
@@ -560,6 +589,35 @@ class Api {
     return this.post<{ status: string }>(
       `/admin/api/projects/${projectId}/push/devices/${tokenId}/revoke`,
       {},
+    );
+  }
+  /** How many devices an audience selects, and a few of them.
+   *
+   *  The same compiled query the send runs, with a count in front, so
+   *  the number is what a send would do rather than an estimate of
+   *  it. */
+  previewAudience(projectId: string, audience: AudienceRequest) {
+    return this.post<{ matched: number; sample: AudienceSample[] }>(
+      `/admin/api/projects/${projectId}/push/audience/preview`,
+      audience,
+    );
+  }
+  /** Send to everyone an audience selects.
+   *
+   *  `expectedMatched` is what the preview said. The server refuses
+   *  with a 409 when it no longer holds — devices register between
+   *  reading a number and pressing a button, and a notification
+   *  cannot be recalled. */
+  sendToAudience(
+    projectId: string,
+    audience: AudienceRequest,
+    title: string,
+    body: string,
+    expectedMatched: number,
+  ) {
+    return this.post<{ queued: number }>(
+      `/admin/api/projects/${projectId}/push/audience/send`,
+      { ...audience, body, expectedMatched, title },
     );
   }
   pushSends(projectId: string, limit = 50, status = '', offset = 0) {

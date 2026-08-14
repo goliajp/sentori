@@ -67,7 +67,7 @@ pub async fn list(
     .unwrap_or(0);
 
     let rows = sqlx::query(
-        "SELECT id, provider, env, metadata, bad_streak, revoked_at, \
+        "SELECT id, provider, env, metadata, traits, bad_streak, revoked_at, \
                 last_seen_at, created_at, \
                 user_key IS NOT NULL AS addressable, \
                 right(user_key, 6) AS user_key_tail, \
@@ -100,6 +100,12 @@ pub async fn list(
                 // The metadata the host sent, verbatim. Whether it is
                 // `{}` is the answer to "did my metadata arrive".
                 "metadata": r.get::<Value, _>("metadata"),
+                // What the host said about the *person*. Selectable by
+                // a send, unlike the identity, which is only ever a
+                // hash — so this is the column that answers "will my
+                // campaign's condition match this device", and there
+                // was nowhere to check that before sending.
+                "traits": r.get::<Value, _>("traits"),
                 // Whether `sentori.user()` ran before `register()`.
                 // The raw key is never returned — this row exists to
                 // answer "can this device be reached", not to hand
