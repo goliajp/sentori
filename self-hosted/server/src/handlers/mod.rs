@@ -148,6 +148,7 @@ pub fn router(state: Arc<AppState>) -> Router {
             delete(sdk::push::unsubscribe_topic::handle),
         )
         .route("/v1/push/send", post(sdk::push::send::handle))
+        .route("/v1/push/count", post(sdk::push::count::handle))
         .route(
             "/v1/push/receipts/{send_id}",
             get(sdk::push::receipt::handle),

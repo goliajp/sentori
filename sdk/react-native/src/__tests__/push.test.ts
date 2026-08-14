@@ -13,6 +13,7 @@ import {
   __resetForTests as resetPush,
   __setPlatformForTests as setPlatform,
   register,
+  unregister,
 } from '../push';
 import { __resetForTests as resetConfig, setConfig } from '../config';
 import { __resetForTests as resetScope, setUser } from '../scope';
@@ -402,5 +403,149 @@ describe('push survives the vendor rotating its token', () => {
     await register();
     await new Promise((r) => setTimeout(r, 2400));
     expect(seen).toHaveLength(1);
+  });
+});
+
+// Push is allowed to fail silently. It is never allowed to make the
+// host app fail — a notification that does not arrive is a product
+// decision the host can live with; an exception out of an SDK the host
+// merely opted into is not.
+//
+// The host's own handlers are the sharp edge: they are its code, they
+// run inside our loop, and JavaScript throws for a living.
+describe('nothing the host does can reach back into the app', () => {
+  const boom = () => {
+    throw new Error('the host threw');
+  };
+
+  /** Hands the batch over once and is empty after, the way the real
+   *  native drain is — a stub that keeps re-delivering makes a second
+   *  tick look like a bug in the SDK. */
+  function drainingNative(notifications: unknown[], taps: unknown[]) {
+    let drained = false;
+    return grantingNative({
+      pushDrainState: () => {
+        const batch = drained
+          ? { notifications: [], taps: [] }
+          : { notifications, taps };
+        drained = true;
+        return Promise.resolve({ ...batch, token: 'abc123' });
+      },
+    });
+  }
+
+  function okFetch(): void {
+    globalThis.fetch = (() =>
+      Promise.resolve({
+        ok: true,
+        status: 202,
+        json: () => Promise.resolve({ spToken: 'dev-1', token_id: 'dev-1' }),
+      })) as unknown as typeof fetch;
+  }
+
+  beforeEach(() => {
+    resetPush();
+    resetConfig();
+    resetScope();
+    setPlatform('ios');
+    setConfig(baseConfig);
+    okFetch();
+  });
+  afterEach(() => {
+    resetPush();
+    resetConfig();
+    resetScope();
+    setPlatform(null);
+    __setNativeForTests(undefined);
+    globalThis.fetch = realFetch;
+  });
+
+  it('keeps delivering after a handler throws', async () => {
+    const seen: string[] = [];
+    __setNativeForTests(
+      drainingNative(
+        [{ title: 'one' }, { title: 'two' }],
+        [{ tapped: true }],
+      ),
+    );
+    const r = await register({
+      onMessage: (n) => {
+        seen.push(String(n.title));
+        // The first one throws. The second one, and the tap after it,
+        // still have to arrive: one bad handler must not swallow the
+        // rest of the batch.
+        if (n.title === 'one') boom();
+      },
+      onTap: () => seen.push('tap'),
+    });
+    expect(r.ok).toBe(true);
+    await new Promise((res) => setTimeout(res, 1400));
+    expect(seen).toEqual(['one', 'two', 'tap']);
+  });
+
+  it('keeps ticking after a handler throws', async () => {
+    let ticks = 0;
+    __setNativeForTests(
+      grantingNative({
+        pushDrainState: () => {
+          ticks += 1;
+          return Promise.resolve({
+            notifications: [{ title: 'n' }],
+            taps: [],
+            token: 'abc123',
+          });
+        },
+      }),
+    );
+    await register({ onMessage: boom });
+    const first = ticks;
+    await new Promise((res) => setTimeout(res, 2400));
+    // A throwing handler that stops the loop is worse than one that
+    // drops a notification: every later push is gone too, silently.
+    expect(ticks).toBeGreaterThan(first + 1);
+  });
+
+  it('survives a native module that rejects', async () => {
+    let ticks = 0;
+    __setNativeForTests(
+      grantingNative({
+        pushDrainState: () => {
+          ticks += 1;
+          return ticks === 1
+            ? Promise.resolve({ notifications: [], taps: [], token: 'abc123' })
+            : Promise.reject(new Error('bridge died'));
+        },
+      }),
+    );
+    await register();
+    await new Promise((res) => setTimeout(res, 2400));
+    expect(ticks).toBeGreaterThan(2);
+  });
+
+  it('does not report a failure because onToken threw', async () => {
+    __setNativeForTests(grantingNative());
+    const r = await register({ onToken: boom });
+    // The registration reached the server and came back with a handle.
+    // What the host did with it afterwards is not our outcome.
+    expect(r).toEqual({ ok: true, ipt: 'dev-1' });
+  });
+
+  it('still resolves when onError throws', async () => {
+    // `register()` never throws is the documented contract, and the
+    // one path that reports failure is the one that hands the host an
+    // error to look at.
+    __setNativeForTests(
+      grantingNative({ pushRequestPermission: () => Promise.resolve('denied') }),
+    );
+    const r = await register({ onError: boom });
+    expect(r.ok).toBe(false);
+  });
+
+  it('unregister does not throw when the server is unreachable', async () => {
+    __setNativeForTests(grantingNative());
+    await register();
+    globalThis.fetch = (() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;
+    // Signing out must not be something that can fail.
+    await unregister();
   });
 });

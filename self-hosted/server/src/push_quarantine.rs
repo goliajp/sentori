@@ -3,10 +3,24 @@
 //! When a vendor returns a "permanent token failure" code (APNs
 //! BadDeviceToken, FCM NotRegistered, MiPush invalid regid),
 //! mark the device_tokens row revoked so subsequent sends skip
-//! it. Transient failures (5xx, 429) leave the token alone but
-//! bump a streak counter for L1 backoff; >3 strikes also
-//! quarantines the token so a chronically-bad token doesn't
-//! waste retry budget.
+//! it. Transient failures (5xx, 429) leave the token alone and bump a
+//! streak on the device.
+//!
+//! The streak drives nothing, and that is deliberate. This comment
+//! used to say it fed the backoff and that four strikes quarantined
+//! the token; neither was true — the backoff is computed from
+//! `push_sends.retry_count`, and nothing read the streak at all.
+//!
+//! It should stay that way. A transient failure is usually the
+//! vendor's, and the vendor fails for every device at once, so
+//! "quarantine at four in a row" is the fleet-wide rule this module
+//! warns about below wearing a per-device disguise: one bad hour at
+//! APNs and every device in the project is retired, each row keeping a
+//! reason that was never about it.
+//!
+//! What the streak is for is a person: "this one device has failed
+//! seven times running" is worth seeing next to it in the console, and
+//! that is where it is shown.
 
 use sqlx::PgPool;
 use uuid::Uuid;

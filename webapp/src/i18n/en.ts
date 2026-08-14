@@ -245,6 +245,7 @@ export const en = {
   'push.deliveryEmpty':
     'Nothing sent yet. Devices register from the app with sentori.push.register(); sends land here.',
   'push.deliveryTitle': 'Delivery',
+  'push.badStreak': '{n} failures in a row',
   'push.device': 'Device',
   'push.devicesEmpty': 'No devices registered. Call sentori.push.register() from the app.',
   'push.devicesTitle': 'Devices',

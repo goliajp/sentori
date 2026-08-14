@@ -964,6 +964,16 @@ function DevicesSection({ projectId }: { projectId: string }) {
                 {d.env ? `/${d.env}` : ''}
                 <span className="text-fg-subtle"> ···{d.tokenTail ?? ''}</span>
                 {d.revokedAt && <span className="text-fg-subtle"> {t('push.revoked')}</span>}
+                {/* The counter existed, was written on every transient
+                    failure, and nothing anywhere read it — the module
+                    that keeps it claimed a quarantine rule that did not
+                    exist. It is a fact about one device, so it belongs
+                    next to that device. */}
+                {!d.revokedAt && d.badStreak > 0 && (
+                  <span className="ml-1.5 text-kind-warn">
+                    {t('push.badStreak').replace('{n}', String(d.badStreak))}
+                  </span>
+                )}
               </span>
             ),
           },
