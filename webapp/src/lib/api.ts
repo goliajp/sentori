@@ -249,6 +249,12 @@ export type PushDevice = {
   /** Last six characters. Enough to tell two devices apart, not
    *  enough to push to one. */
   tokenTail: null | string;
+  /** The last six of the identity key, when one is known. The
+   *  column used to show only a yes/no called "addressable", which
+   *  asks whether `sentori.user()` ran before `register()` — not what
+   *  the word suggests, and two readers went to the source to find
+   *  out. A key or a dash needs no explaining. */
+  userKeyTail?: null | string;
 };
 
 export type SmtpStatus =

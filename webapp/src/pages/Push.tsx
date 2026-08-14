@@ -407,15 +407,20 @@ function DevicesSection({ projectId }: { projectId: string }) {
             ),
           },
           {
-            key: 'addressable',
-            label: t('push.addressable'),
-            width: '130px',
+            // The identity key, not a word for whether there is one.
+            // This column said "addressable / not", which asks
+            // whether `sentori.user()` ran before `register()` — and
+            // two people read the source to find that out. A key or a
+            // dash says it without a word.
+            key: 'user',
+            label: t('push.user'),
+            width: '150px',
             render: (d) =>
               d.addressable ? (
-                <span className="text-xs text-ok">{t('push.yes')}</span>
+                <span className="font-mono text-xs text-fg-muted">···{d.userKeyTail ?? ''}</span>
               ) : (
-                <span className="text-xs text-fg-subtle" title={t('push.notAddressableHint')}>
-                  {t('push.no')}
+                <span className="text-xs text-fg-subtle" title={t('push.noUserHint')}>
+                  {t('push.noUser')}
                 </span>
               ),
           },
