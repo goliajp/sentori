@@ -139,6 +139,17 @@ export type User = {
     id?: string;
     name?: string;
     email?: string;
+    /** Attributes a push campaign can select on: plan, cohort, org.
+     *
+     *  These travel raw, unlike `id` and `email`, which only ever leave
+     *  as a hash. That pairing is the point — the identity stays
+     *  unreadable and the attributes stay selectable — so put nothing
+     *  here that identifies the person. A plan name is a trait; an email
+     *  address is not.
+     *
+     *  They reach the device row on the next push registration, and
+     *  registering happens again by itself when this changes. */
+    traits?: Record<string, string | number | boolean | null>;
 };
 export type EventData = Record<string, unknown>;
 export type TraceOptions = {

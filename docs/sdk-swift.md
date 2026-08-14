@@ -21,7 +21,7 @@ Sentori.start(
         environment: "production"
     )
 )
-Sentori.user(id: currentUser.id, email: nil)
+Sentori.user(id: currentUser.id, email: nil, traits: ["plan": "pro"])
 ```
 
 Nothing here reaches the network — the first request happens when
@@ -85,7 +85,7 @@ signal from your own interceptor if you want it.
 
 ## Identity
 
-`Sentori.user(id:email:)` sends a SHA-256 of the id (or of the email
+`Sentori.user(id:email:traits:)` sends a SHA-256 of the id (or of the email
 when there is no id). The raw values never leave the device.
 
 It is what makes a device reachable from an issue: with it, "notify

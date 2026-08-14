@@ -726,6 +726,32 @@ const SUFFIX = [
   // apart: metadata present and addressable, metadata present but
   // registered before `sentori.user()` ran, and a device that sent
   // none at all — which is what every row read until server 2.22.0.
+  // The audience preview. The sweep opens this section with a
+  // condition already in it, because an empty editor photographs as an
+  // empty editor — the part worth looking at is a counted audience
+  // next to the devices it picked.
+  [
+    /\/push\/audience\/preview$/,
+    () => ({
+      matched: 128,
+      sample: [
+        {
+          id: 'dt1', provider: 'apns', addressable: true, userKeyTail: 'a91f3c',
+          traits: { plan: 'pro', locale: 'ja-JP' },
+          metadata: { appVersion: '4.10.0', channel: 'store' },
+        },
+        {
+          id: 'dt2', provider: 'fcm', addressable: true, userKeyTail: '7d2e04',
+          traits: { plan: 'team', locale: 'ja-JP' },
+          metadata: { appVersion: '4.2.0', channel: 'beta' },
+        },
+      ],
+    }),
+  ],
+  [
+    /\/push\/audience\/send$/,
+    () => ({ queued: 128 }),
+  ],
   [
     /\/push\/devices$/,
     () => ({
@@ -739,6 +765,7 @@ const SUFFIX = [
         {
           id: 'dt1', provider: 'apns', env: 'production',
           metadata: { appVersion: '4.2.1', channel: 'store', locale: 'ja-JP' },
+          traits: { plan: 'pro', org: 'acme' },
           addressable: true,
           userKeyTail: 'a91f3c', badStreak: 0, revokedAt: null,
           lastSeenAt: iso(300_000), createdAt: iso(86_400_000 * 30),
@@ -747,6 +774,7 @@ const SUFFIX = [
         {
           id: 'dt2', provider: 'fcm', env: null,
           metadata: { appVersion: '4.2.0', channel: 'beta' },
+          traits: {},
           addressable: false, badStreak: 0, revokedAt: null,
           lastSeenAt: iso(3_600_000), createdAt: iso(86_400_000 * 3),
           tokenTail: '7d2e04',

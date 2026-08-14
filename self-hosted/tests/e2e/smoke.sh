@@ -578,4 +578,194 @@ QUEUED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/sen
 [[ "$QUEUED" -ge 1 ]] \
     || { echo "the dashboard's send list is empty after a send" >&2; exit 1; }
 
+
+# ── push: who a send is for ──────────────────────────────────────
+#
+# The audience engine's SQL had never run against a database. Every
+# assertion below is one the unit tests structurally cannot make:
+# they check that a fragment is *shaped* right, and these check that
+# Postgres agrees about what it selects.
+
+echo "→ a send with no target is refused rather than sent to everyone"
+NOTGT="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${BASE}/v1/push/send" \
+    -H "Authorization: Bearer ${API_TOKEN}" -H 'content-type: application/json' \
+    -d '{"payload":{"title":"e2e"}}')"
+[[ "$NOTGT" == "400" ]] \
+    || { echo "a send naming no target answered ${NOTGT}, not 400" >&2; exit 1; }
+
+# The hash is computed here by sha256sum, not by our own code. If the
+# server's hash and the SDK's ever drift, one of them stops agreeing
+# with this line — which is the point of computing it outside.
+UKEY="$(printf 'usr_e2e_alice' | shasum -a 256 | cut -d' ' -f1)"
+
+curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-aud-alice",
+         "installId":"e2e-aud-alice","userKey":"'"$UKEY"'",
+         "traits":{"plan":"pro","locale":"ja-JP","e2e":"aud"},
+         "metadata":{"appVersion":"4.10.0"}}' >/dev/null
+
+curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-aud-bob",
+         "installId":"e2e-aud-bob",
+         "traits":{"plan":"free","locale":"ja-JP","e2e":"aud"},
+         "metadata":{"appVersion":"4.2.0"}}' >/dev/null
+
+curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-aud-carol",
+         "installId":"e2e-aud-carol",
+         "traits":{"plan":"pro","locale":"en-US","e2e":"aud"},
+         "metadata":{"appVersion":"nightly"}}' >/dev/null
+
+send_count() {
+    curl -fsS -X POST "${BASE}/v1/push/send" -H "Authorization: Bearer ${API_TOKEN}" \
+        -H 'content-type: application/json' -d "$1" | jq -r '.queued'
+}
+
+echo "→ appUserId reaches the device that registered under it, and only that one"
+N="$(send_count '{"appUserId":"usr_e2e_alice","payload":{"title":"t1"}}')"
+[[ "$N" == "1" ]] \
+    || { echo "targeting by appUserId reached ${N} devices, not 1" >&2; exit 1; }
+
+echo "→ an appUserId nobody registered reaches nobody"
+N="$(send_count '{"appUserId":"usr_e2e_nobody","payload":{"title":"t2"}}')"
+[[ "$N" == "0" ]] \
+    || { echo "an unknown appUserId reached ${N} devices" >&2; exit 1; }
+
+echo "→ traits select on the person, not on the device"
+N="$(send_count '{"traits":{"plan":"pro","e2e":"aud"},"payload":{"title":"t3"}}')"
+[[ "$N" == "2" ]] \
+    || { echo "traits {plan:pro} reached ${N} devices, not 2" >&2; exit 1; }
+N="$(send_count '{"traits":{"plan":"pro","locale":"ja-JP","e2e":"aud"},
+                       "payload":{"title":"t4"}}')"
+[[ "$N" == "1" ]] \
+    || { echo "two traits reached ${N} devices, not 1" >&2; exit 1; }
+
+# The assertion this whole file exists for. Compared as text, "4.10.0"
+# sorts *below* "4.2", so a text comparison answers 1 here and does it
+# for the first time on the day a project ships its tenth minor
+# release — in production, aimed at the users a fix was meant for.
+echo "→ 4.10.0 is a later version than 4.2, not an earlier one"
+N="$(send_count '{"audience":{"all":[{"trait":"e2e","is":"aud"},
+                    {"device":"appVersion","versionGte":"4.2"}]},
+                  "payload":{"title":"t5"}}')"
+[[ "$N" == "2" ]] \
+    || { echo "versionGte 4.2 reached ${N} devices, not 2 (4.10.0 and 4.2.0)" >&2; exit 1; }
+
+echo "→ 4.2 and 4.2.0 are the same version"
+N="$(send_count '{"audience":{"all":[{"trait":"e2e","is":"aud"},
+                    {"device":"appVersion","versionLte":"4.2"}]},
+                  "payload":{"title":"t6"}}')"
+[[ "$N" == "1" ]] \
+    || { echo "versionLte 4.2 reached ${N} devices, not 1" >&2; exit 1; }
+
+echo "→ a version nothing can parse is left out, not swept in"
+N="$(send_count '{"audience":{"all":[{"trait":"e2e","is":"aud"},
+                    {"device":"appVersion","versionGte":"0.0.1"}]},
+                  "payload":{"title":"t7"}}')"
+[[ "$N" == "2" ]] \
+    || { echo "a device reporting \"nightly\" was included by a version test: ${N}" >&2; exit 1; }
+
+echo "→ the whole expression: and, or, in, not"
+N="$(send_count '{"audience":{"all":[
+        {"trait":"e2e","is":"aud"},
+        {"trait":"plan","in":["pro","team"]},
+        {"device":"appVersion","versionGte":"4.2"},
+        {"any":[{"trait":"locale","is":"ja-JP"},{"trait":"org","is":"acme"}]},
+        {"not":{"trait":"churned","is":true}}]},
+      "payload":{"title":"t8"}}')"
+[[ "$N" == "1" ]] \
+    || { echo "the worked example reached ${N} devices, not 1" >&2; exit 1; }
+
+# A negation must keep the rows that have no such key at all —
+# otherwise "not churned" quietly means "known not to be churned",
+# and everyone who never had the trait drops out.
+echo "→ not on a trait nobody has keeps everybody"
+N="$(send_count '{"audience":{"all":[{"trait":"e2e","is":"aud"},
+                    {"not":{"trait":"churned","is":true}}]},
+                  "payload":{"title":"t9"}}')"
+[[ "$N" == "3" ]] \
+    || { echo "a negation on an absent trait dropped devices: ${N}" >&2; exit 1; }
+
+echo "→ an empty or-group matches nothing rather than everything"
+N="$(send_count '{"audience":{"any":[]},"payload":{"title":"t10"}}')"
+[[ "$N" == "0" ]] \
+    || { echo "an empty any reached ${N} devices" >&2; exit 1; }
+
+echo "→ two targeting modes at once is refused, not guessed at"
+BOTH="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${BASE}/v1/push/send" \
+    -H "Authorization: Bearer ${API_TOKEN}" -H 'content-type: application/json' \
+    -d '{"appUserId":"usr_e2e_alice","traits":{"plan":"pro"},"payload":{}}')"
+[[ "$BOTH" == "400" ]] \
+    || { echo "appUserId together with traits answered ${BOTH}, not 400" >&2; exit 1; }
+
+# A preview that is an estimate is a preview nobody can act on: the
+# only other way to find out what an expression matches is to send to
+# it, and that cannot be undone.
+echo "→ the preview counts exactly what a send would reach"
+AUD='{"all":[{"trait":"e2e","is":"aud"},{"trait":"plan","in":["pro","team"]},
+              {"device":"appVersion","versionGte":"4.2"}]}'
+PREV="$(curl -fsS -b "$JAR" -X POST \
+    "${BASE}/admin/api/projects/${PROJECT_ID}/push/audience/preview" \
+    -H 'content-type: application/json' -d "{\"audience\":${AUD}}")"
+MATCHED="$(echo "$PREV" | jq -r '.matched')"
+SENT="$(send_count "{\"audience\":${AUD},\"payload\":{\"title\":\"t12\"}}")"
+[[ "$MATCHED" == "$SENT" ]] \
+    || { echo "the preview said ${MATCHED} and the send reached ${SENT}" >&2; exit 1; }
+[[ "$MATCHED" -ge 1 ]] \
+    || { echo "the preview and the send agreed on nothing, which agrees on nothing" >&2; exit 1; }
+
+# A preview is not a way around what the device list refuses to show.
+echo "→ the preview does not hand back a push token"
+echo "$PREV" | jq -e '[.sample[] | select(has("native_token") or has("nativeToken"))] | length == 0' \
+    > /dev/null || { echo "the preview returned a usable push token: $PREV" >&2; exit 1; }
+echo "$PREV" | jq -e '.sample[0].traits.plan != null' > /dev/null \
+    || { echo "the sample says nothing about why it matched: $PREV" >&2; exit 1; }
+
+# The console can send to an audience, and only to the one the
+# operator was looking at. Devices register between reading a number
+# and pressing a button, and nothing here can be undone.
+echo "→ the console will not send to a number nobody read"
+STALE="$(curl -sS -o /dev/null -w '%{http_code}' -b "$JAR" -X POST \
+    "${BASE}/admin/api/projects/${PROJECT_ID}/push/audience/send" \
+    -H 'content-type: application/json' \
+    -d "{\"audience\":${AUD},\"title\":\"e2e\",\"expectedMatched\":99}")"
+[[ "$STALE" == "409" ]] \
+    || { echo "a send against a stale count answered ${STALE}, not 409" >&2; exit 1; }
+
+echo "→ and sends to exactly that number when it still holds"
+CONSOLE="$(curl -fsS -b "$JAR" -X POST \
+    "${BASE}/admin/api/projects/${PROJECT_ID}/push/audience/send" \
+    -H 'content-type: application/json' \
+    -d "{\"audience\":${AUD},\"title\":\"e2e\",\"body\":\"console\",
+         \"expectedMatched\":${MATCHED}}" | jq -r '.queued')"
+[[ "$CONSOLE" == "$MATCHED" ]] \
+    || { echo "the console queued ${CONSOLE} for an audience of ${MATCHED}" >&2; exit 1; }
+
+echo "→ a notification with no title is refused"
+NOTITLE="$(curl -sS -o /dev/null -w '%{http_code}' -b "$JAR" -X POST \
+    "${BASE}/admin/api/projects/${PROJECT_ID}/push/audience/send" \
+    -H 'content-type: application/json' \
+    -d "{\"audience\":${AUD},\"title\":\"  \",\"expectedMatched\":${MATCHED}}")"
+[[ "$NOTITLE" == "400" ]] \
+    || { echo "a titleless notification answered ${NOTITLE}, not 400" >&2; exit 1; }
+
+echo "→ a preview of an audience that cannot be parsed says so"
+BAD="$(curl -sS -o /dev/null -w '%{http_code}' -b "$JAR" -X POST \
+    "${BASE}/admin/api/projects/${PROJECT_ID}/push/audience/preview" \
+    -H 'content-type: application/json' -d '{"audience":{"trait":"plan","equals":"pro"}}')"
+[[ "$BAD" == "400" ]] \
+    || { echo "an unparseable audience previewed as ${BAD}, not 400" >&2; exit 1; }
+
+echo "→ signing out clears the traits a send selects on"
+curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-aud-carol",
+         "installId":"e2e-aud-carol","traits":{}}' >/dev/null
+N="$(send_count '{"traits":{"plan":"pro","e2e":"aud"},"payload":{"title":"t11"}}')"
+[[ "$N" == "1" ]] \
+    || { echo "clearing traits left the device selectable: ${N}" >&2; exit 1; }
+
 echo "✓ e2e smoke passed — project ${PROJECT_ID}, issue ${ISSUE_ID}"

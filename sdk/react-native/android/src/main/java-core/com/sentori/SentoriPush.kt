@@ -107,6 +107,19 @@ object SentoriPush {
      */
     private const val INSTALL_KEY = "install_id"
 
+    /**
+     * The last token the vendor issued, so a sign-in can send the
+     * registration again without asking FCM for a token first.
+     *
+     * It is already in this app's private storage — FCM keeps its own
+     * copy there — so keeping it costs nothing new. The handle stays
+     * the capability; this is only an input to producing one.
+     */
+    private const val TOKEN_KEY = "native_token"
+
+    /** What the server was last told, so a repeat is not sent. */
+    @Volatile private var lastSentIdentity: String? = null
+
     private val worker =
         Executors.newSingleThreadScheduledExecutor { r ->
             Thread(r, "sentori-push").apply { isDaemon = true }
@@ -216,7 +229,7 @@ object SentoriPush {
         if (cachedDeviceHandle(appContext) == null) return
         worker.execute {
             when (val r = registerWithServer(appContext, token, config)) {
-                is Result.Success -> rememberHandle(appContext, r.handle)
+                is Result.Success -> rememberHandle(appContext, r.handle, token)
                 is Result.Failure ->
                     android.util.Log.w(
                         "sentori",
@@ -234,13 +247,57 @@ object SentoriPush {
      * live test — and three copies of four lines is how two of them
      * end up writing different keys.
      */
-    private fun rememberHandle(context: Context, handle: String) {
+    private fun rememberHandle(context: Context, handle: String, token: String? = null) {
         synchronized(lock) { cachedHandle = handle }
-        context.applicationContext
+        val appContext = context.applicationContext
+        appContext
             .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putString(HANDLE_KEY, handle)
+            .apply {
+                // Kept for the sign-in path below, which has no other
+                // way back to a token.
+                if (token != null) putString(TOKEN_KEY, token)
+            }
             .apply()
+        // From here on, signing in or out updates the row by itself.
+        SentoriScope.setIdentityListener { identityChanged(appContext) }
+    }
+
+    /**
+     * Send the registration again because the person changed.
+     *
+     * Only for a device that has already registered — a stored token
+     * is the evidence, the same rule [handleRotatedToken] uses. Runs
+     * on the worker: `Sentori.user` is synchronous and stays that way.
+     */
+    private fun identityChanged(appContext: Context) {
+        val config = SentoriConfig.current ?: return
+        val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val token = prefs.getString(TOKEN_KEY, null) ?: return
+        if (prefs.getString(HANDLE_KEY, null) == null) return
+
+        // `Sentori.user` is a verb an app may call on every screen,
+        // and one request per call is not free to a host.
+        val identity = "${SentoriScope.userKey}\u0000${SentoriScope.traits}"
+        if (identity == lastSentIdentity) return
+        lastSentIdentity = identity
+
+        worker.execute {
+            when (val r = registerWithServer(appContext, token, config)) {
+                is Result.Success -> rememberHandle(appContext, r.handle, token)
+                is Result.Failure -> {
+                    // The row still names the previous person, so the
+                    // next change has to be allowed to try again.
+                    lastSentIdentity = null
+                    android.util.Log.w(
+                        "sentori",
+                        "updating the device after a sign-in failed " +
+                            "(${r.reason.reason}): ${r.message}",
+                    )
+                }
+            }
+        }
     }
 
     /**
@@ -255,7 +312,7 @@ object SentoriPush {
         val config = SentoriConfig.current ?: return null
         return when (val r = registerWithServer(context.applicationContext, token, config)) {
             is Result.Success -> {
-                rememberHandle(context, r.handle)
+                rememberHandle(context, r.handle, token)
                 r.handle
             }
             else -> null
@@ -323,7 +380,7 @@ object SentoriPush {
 
         return when (val r = registerWithServer(context, token, config)) {
             is Result.Success -> {
-                rememberHandle(context, r.handle)
+                rememberHandle(context, r.handle, token)
                 startDrain()
                 r
             }
@@ -360,7 +417,16 @@ object SentoriPush {
             drainTask?.cancel(false)
             drainTask = null
         }
-        appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(HANDLE_KEY).apply()
+        appContext
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .remove(HANDLE_KEY)
+            .remove(TOKEN_KEY)
+            .apply()
+        // Nothing to follow the person to any more; a later sign-in
+        // must not resurrect a device the host just revoked.
+        SentoriScope.setIdentityListener(null)
+        lastSentIdentity = null
         SentoriPushNotifications.unregisterForRemoteNotifications(appContext)
 
         val config = SentoriConfig.current
@@ -432,6 +498,11 @@ object SentoriPush {
         // can address this device by the person who hit an issue.
         // Absent until the host calls `Sentori.user`.
         SentoriScope.userKey?.let { body["userKey"] = it }
+        // Attributes of the person rather than of the device, kept
+        // apart so a build channel called "pro" cannot answer a send
+        // aimed at the pro plan. Null leaves the row's traits alone;
+        // an empty map clears them, which is what signing out sends.
+        SentoriScope.traits?.let { body["traits"] = it }
 
         var conn: HttpURLConnection? = null
         return try {
@@ -504,6 +575,8 @@ object SentoriPush {
     }
 
     internal fun resetForTests() {
+        lastSentIdentity = null
+        SentoriScope.setIdentityListener(null)
         synchronized(lock) {
             cachedHandle = null
             onMessage = null
