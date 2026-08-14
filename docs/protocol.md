@@ -308,6 +308,12 @@ credential that can send notifications to your users is not one to hand out.
 }
 ```
 
+`idempotencyKey` dedups **per device per key**: retrying the same send with the same
+key queues nothing extra, and `queued` comes back as the number actually added. It had
+the wrong grain until server 2.30.0 — the index was per project per key, so one send to
+more than one device collided with itself and the whole call answered 500. A key was
+only ever safe for an audience of exactly one.
+
 `payload` is passed to the vendor verbatim. Response (`202 Accepted`) is
 `{"send_ids": [...], "queued": n, "capped": false}`; a background worker drains the
 queue every 5 s, retries, and quarantines a token the vendor rejects permanently.

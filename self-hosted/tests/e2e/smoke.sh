@@ -744,6 +744,41 @@ CONSOLE="$(curl -fsS -b "$JAR" -X POST \
 [[ "$CONSOLE" == "$MATCHED" ]] \
     || { echo "the console queued ${CONSOLE} for an audience of ${MATCHED}" >&2; exit 1; }
 
+# The count guard does not catch a double press: sending does not
+# change the audience, so the second press finds the same number and
+# passes. A key does.
+# Counting the rows says nothing about what is in them. This send
+# went out with a title, and the queued row has to carry that title —
+# not whatever else happened to be bound at that position.
+echo "→ the console's send carries the message, not something else"
+curl -fsS -b "$JAR" -X POST \
+    "${BASE}/admin/api/projects/${PROJECT_ID}/push/audience/send" \
+    -H 'content-type: application/json' \
+    -d "{\"audience\":${AUD},\"title\":\"console-payload-probe\",
+         \"body\":\"hello\",\"expectedMatched\":${MATCHED}}" > /dev/null
+curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/sends?limit=50" \
+    | jq -e '[.sends[] | select(.payload.title == "console-payload-probe")] | length >= 1' \
+    > /dev/null \
+    || { echo "the console's send did not carry its own title" >&2; exit 1; }
+
+echo "→ pressing the console's send twice queues once"
+KEY="e2e-console-$RANDOM"
+Q1="$(curl -fsS -b "$JAR" -X POST \
+    "${BASE}/admin/api/projects/${PROJECT_ID}/push/audience/send" \
+    -H 'content-type: application/json' \
+    -d "{\"audience\":${AUD},\"title\":\"twice\",
+         \"idempotencyKey\":\"${KEY}\",\"expectedMatched\":${MATCHED}}")"
+[[ "$(echo "$Q1" | jq -r '.queued')" == "$MATCHED" ]] \
+    || { echo "the first press queued $(echo "$Q1" | jq -r '.queued')" >&2; exit 1; }
+
+Q2="$(curl -fsS -b "$JAR" -X POST \
+    "${BASE}/admin/api/projects/${PROJECT_ID}/push/audience/send" \
+    -H 'content-type: application/json' \
+    -d "{\"audience\":${AUD},\"title\":\"twice\",
+         \"idempotencyKey\":\"${KEY}\",\"expectedMatched\":${MATCHED}}")"
+echo "$Q2" | jq -e '.queued == 0 and .alreadySent == true' > /dev/null \
+    || { echo "the second press sent again: $Q2" >&2; exit 1; }
+
 echo "→ a notification with no title is refused"
 NOTITLE="$(curl -sS -o /dev/null -w '%{http_code}' -b "$JAR" -X POST \
     "${BASE}/admin/api/projects/${PROJECT_ID}/push/audience/send" \
@@ -760,6 +795,31 @@ NOTITLE="$(curl -sS -o /dev/null -w '%{http_code}' -b "$JAR" -X POST \
 # Sentori knows. The three shorthands cannot be combined, which reads
 # as if this were impossible — the restriction is on the sugar, not on
 # the expression.
+# `idempotencyKey` is documented as a dedup key. The unique index
+# behind it is on (project_id, idempotency_key) — but one send to N
+# devices writes N rows carrying the same key, so the second row
+# collides with the first and the whole statement is refused. The
+# field only ever worked for an audience of exactly one.
+echo "→ a keyed send reaches everyone it matched, not just the first"
+KEYED='{"audience":{"all":[{"trait":"e2e","is":"aud"},{"trait":"plan","is":"pro"}]},
+        "idempotencyKey":"e2e-idem-1","payload":{"title":"idem"}}'
+N="$(send_count "$KEYED")"
+[[ "$N" == "2" ]] \
+    || { echo "a keyed send to 2 devices queued ${N}" >&2; exit 1; }
+
+# And sending it again with the same key adds nothing, which is what
+# the word means.
+echo "→ the same key twice queues nothing the second time"
+N="$(send_count "$KEYED")"
+[[ "$N" == "0" ]] \
+    || { echo "the same idempotency key queued ${N} more" >&2; exit 1; }
+
+# A different key is a different send.
+echo "→ a different key is a different send"
+N="$(send_count "${KEYED/e2e-idem-1/e2e-idem-2}")"
+[[ "$N" == "2" ]] \
+    || { echo "a fresh key queued ${N}, not 2" >&2; exit 1; }
+
 echo "→ a backend's list can be narrowed by a device condition"
 N="$(send_count '{"audience":{"all":[
         {"any":[{"user":"usr_e2e_alice"},{"user":"usr_e2e_nobody"}]},

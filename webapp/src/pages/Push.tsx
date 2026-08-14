@@ -260,6 +260,21 @@ function DeliverySection({ projectId }: { projectId: string }) {
           empty={t('push.sendsEmpty')}
           columns={[
             {
+              // Which notification this row is. Without it a failed
+              // row is an outcome with nothing attached to it.
+              key: 'message',
+              label: t('push.message'),
+              render: (r) => (
+                <span className="truncate text-xs">
+                  {typeof r.payload?.title === 'string' && r.payload.title.length > 0 ? (
+                    r.payload.title
+                  ) : (
+                    <span className="text-fg-subtle">{t('push.messageNone')}</span>
+                  )}
+                </span>
+              ),
+            },
+            {
               key: 'provider',
               label: t('push.provider'),
               width: '110px',
@@ -507,6 +522,14 @@ const OPS: { label: MessageKey; value: Op }[] = [
 
 const blank = (): Condition => ({ key: '', op: 'is', source: 'trait', value: '' });
 
+/// A key for one send. `crypto.randomUUID` needs a secure context,
+/// which the dashboard is; the fallback is for the one that is not.
+function mintKey(): string {
+  const c = globalThis.crypto as undefined | { randomUUID?: () => string };
+  if (typeof c?.randomUUID === 'function') return c.randomUUID();
+  return `k-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 /// Sources that name a thing rather than an attribute of one, so the
 /// row is one field wide instead of three.
 const valueOnly = (r: Condition) => r.source === 'user' || r.source === 'issue';
@@ -576,6 +599,10 @@ function AudienceSection({ projectId }: { projectId: string }) {
   const [preview, setPreview] = useState<null | { matched: number; sample: AudienceSample[] }>(
     null,
   );
+  // Minted with the count and sent with the send, so pressing the
+  // button twice queues once. Counting again mints a new one, which is
+  // the only way to deliberately send the same thing twice.
+  const [sendKey, setSendKey] = useState('');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
@@ -614,7 +641,10 @@ function AudienceSection({ projectId }: { projectId: string }) {
     setError(null);
     void api
       .previewAudience(projectId, request)
-      .then(setPreview)
+      .then((p) => {
+        setPreview(p);
+        setSendKey(mintKey());
+      })
       .catch((e: Error) => {
         setPreview(null);
         setError(e.message);
@@ -859,8 +889,8 @@ function AudienceSection({ projectId }: { projectId: string }) {
               setBusy(true);
               setError(null);
               void api
-                .sendToAudience(projectId, request, title, body, preview.matched)
-                .then((r) => setSent(r.queued))
+                .sendToAudience(projectId, request, title, body, preview.matched, sendKey)
+                .then((r) => setSent(r.alreadySent ? -1 : r.queued))
                 .catch((e: Error) => {
                   setError(e.message);
                   setPreview(null);
@@ -876,7 +906,9 @@ function AudienceSection({ projectId }: { projectId: string }) {
         {error && <ErrorBanner>{error}</ErrorBanner>}
         {sent !== null && (
           <div className="border-t border-border/60 px-3.5 py-2 text-xs text-fg-muted">
-            {t('push.audienceQueued').replace('{n}', String(sent))}
+            {sent < 0
+              ? t('push.audienceAlreadySent')
+              : t('push.audienceQueued').replace('{n}', String(sent))}
           </div>
         )}
       </Panel>

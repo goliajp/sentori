@@ -76,6 +76,7 @@ pub async fn preview(
     };
 
     // `$1` is the project; the audience numbers from `$2`.
+    // `$1` is the project; the audience numbers from `$2`.
     let (frag, binds) = audience.to_sql(2);
     let where_clause = format!("dt.project_id = $1 AND dt.revoked_at IS NULL AND ({frag})");
 
@@ -152,6 +153,16 @@ pub struct SendBody {
     /// to everyone. Nothing here can be undone, so the console is not
     /// allowed to send to a number nobody read.
     pub expected_matched: i64,
+    /// Minted by the console when it took the count, so pressing send
+    /// twice queues once.
+    ///
+    /// The count guard does not catch this: sending does not change
+    /// the audience, so a second press finds the same number and
+    /// passes. A key does — the unique index behind it is per device
+    /// per key, so the second insert is skipped and `queued` comes
+    /// back zero.
+    #[serde(default)]
+    pub idempotency_key: Option<String>,
 }
 
 /// Queue a send to everyone an audience selects.
@@ -220,19 +231,36 @@ pub async fn send(
         ));
     }
 
+    // Compiled a second time, at the offset this statement needs,
+    // rather than renumbering the first one. The renumbering pass
+    // moved every placeholder above `$1` — including the payload's,
+    // which this statement writes by hand — so the payload and the
+    // audience's first bind collided on one number, and every queued
+    // row went out carrying a fragment of the condition as its
+    // message. Counting the rows had said nothing about what was in
+    // them.
+    //
+    // Two calls on the same value give the same clause with different
+    // numbers and the same bind order, so the count and the send
+    // cannot come to disagree about what they select.
+    //
+    // `$1` project, `$2` payload, `$3` the key, so the audience starts
+    // at `$4` and is told so.
+    let (send_frag, send_binds) = audience.to_sql(4);
+    let send_where = format!("dt.project_id = $1 AND dt.revoked_at IS NULL AND ({send_frag})");
     let insert_sql = format!(
-        "INSERT INTO push_sends (id, project_id, token_id, provider, payload, status) \
-         SELECT gen_random_uuid(), $1, dt.id, dt.provider, $2, 'queued' \
-         FROM device_tokens dt WHERE {where_clause} \
+        "INSERT INTO push_sends \
+           (id, project_id, token_id, provider, payload, status, idempotency_key) \
+         SELECT gen_random_uuid(), $1, dt.id, dt.provider, $2, 'queued', $3 \
+         FROM device_tokens dt WHERE {send_where} \
+         ON CONFLICT DO NOTHING \
          RETURNING id"
     );
-    // `$1` project, `$2` payload, then the audience — which numbered
-    // itself from 2, so its own binds shift by one here.
-    let insert_sql = shift_placeholders(&insert_sql);
     let mut q = sqlx::query(&insert_sql)
         .bind(project_id)
-        .bind(json!({ "title": body.title, "body": body.body }));
-    for b in &binds {
+        .bind(json!({ "title": body.title, "body": body.body }))
+        .bind(body.idempotency_key.as_deref());
+    for b in &send_binds {
         q = b.attach(q);
     }
     let rows = q.fetch_all(&state.pool).await.map_err(|e| {
@@ -243,61 +271,65 @@ pub async fn send(
         )
     })?;
 
-    Ok(Json(json!({ "queued": rows.len() })))
-}
-
-/// Move every placeholder above `$1` up by one.
-///
-/// The audience compiler is told where to start, and here it is asked
-/// twice with different offsets — once for the count, once for the
-/// insert, which has a payload in between. Rather than compile it
-/// twice and risk the two disagreeing about what they select, the one
-/// fragment is renumbered.
-fn shift_placeholders(sql: &str) -> String {
-    let mut out = String::with_capacity(sql.len() + 8);
-    let mut rest = sql;
-    while let Some(i) = rest.find('$') {
-        out.push_str(&rest[..i]);
-        let digits: String = rest[i + 1..]
-            .chars()
-            .take_while(char::is_ascii_digit)
-            .collect();
-        match digits.parse::<usize>() {
-            Ok(n) if n > 1 => {
-                out.push('$');
-                out.push_str(&(n + 1).to_string());
-            }
-            _ => {
-                out.push('$');
-                out.push_str(&digits);
-            }
-        }
-        rest = &rest[i + 1 + digits.len()..];
-    }
-    out.push_str(rest);
-    out
+    // Zero rows against a non-empty audience means every one of them
+    // was already queued under this key — a second press of the
+    // button, not an empty send. The console has to tell those apart,
+    // so it is said here rather than inferred from a number that reads
+    // like failure.
+    Ok(Json(json!({
+        "queued": rows.len(),
+        "matched": matched,
+        "alreadySent": rows.is_empty() && matched > 0,
+    })))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// The renumbering leaves `$1` alone and moves the rest up one, so
-    /// the payload can sit at `$2` without the audience being compiled
-    /// a second time.
+    /// The same audience, compiled at two offsets, selects the same
+    /// thing and binds the same values in the same order.
+    ///
+    /// This is what lets the count and the send be two statements
+    /// rather than one renumbered one — and renumbering is what put a
+    /// fragment of the condition into the notification's payload.
     #[test]
-    fn renumbering_makes_room_for_the_payload() {
+    fn two_offsets_of_one_audience_agree_on_everything_but_the_numbers() {
+        let v = json!({ "all": [
+            { "trait": "plan", "is": "pro" },
+            { "device": "appVersion", "versionGte": "4.2" } ] });
+        let parsed = crate::audience::from_request(None, None, Some(&v));
+        assert!(parsed.is_ok(), "the audience did not parse");
+        let Ok(Some(a)) = parsed else { return };
+        let (at2, b2) = a.to_sql(2);
+        let (at4, b4) = a.to_sql(4);
         assert_eq!(
-            shift_placeholders("WHERE dt.project_id = $1 AND (a = $2 OR b = $10)"),
-            "WHERE dt.project_id = $1 AND (a = $3 OR b = $11)"
+            b2.len(),
+            b4.len(),
+            "the two offsets bound different amounts"
         );
-    }
-
-    /// A statement with nothing to move comes back unchanged, rather
-    /// than losing its last character to an off-by-one in the walk.
-    #[test]
-    fn a_statement_with_no_placeholders_survives() {
-        assert_eq!(shift_placeholders("SELECT 1 FROM t"), "SELECT 1 FROM t");
-        assert_eq!(shift_placeholders("x = $1"), "x = $1");
+        assert_eq!(
+            format!("{b2:?}"),
+            format!("{b4:?}"),
+            "the two offsets bound different values, or in a different order"
+        );
+        let renumbered: String = at2
+            .split('$')
+            .enumerate()
+            .map(|(i, part)| {
+                if i == 0 {
+                    return part.to_string();
+                }
+                let digits: String = part.chars().take_while(char::is_ascii_digit).collect();
+                match digits.parse::<usize>() {
+                    Ok(n) => format!("${}{}", n + 2, &part[digits.len()..]),
+                    Err(_) => format!("${part}"),
+                }
+            })
+            .collect();
+        assert_eq!(
+            renumbered, at4,
+            "the two offsets produced different clauses"
+        );
     }
 }

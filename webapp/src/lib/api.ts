@@ -210,6 +210,10 @@ export type PushSend = {
   provider_outcome?: null | string;
   error?: null | string;
   retry_count: number;
+  /** What was sent. The table listed outcomes and never said which
+   *  notification they belonged to, so a failed row could not be
+   *  matched to the send that produced it. */
+  payload?: { body?: string; title?: string } & Record<string, unknown>;
   created_at: string;
   sent_at?: null | string;
   next_attempt_at?: null | string;
@@ -607,17 +611,23 @@ class Api {
    *  `expectedMatched` is what the preview said. The server refuses
    *  with a 409 when it no longer holds — devices register between
    *  reading a number and pressing a button, and a notification
-   *  cannot be recalled. */
+   *  cannot be recalled.
+   *
+   *  `idempotencyKey` is minted when the count is taken, so pressing
+   *  send twice queues once. The count guard does not catch that on
+   *  its own: sending does not change the audience, so the second
+   *  press finds the same number and passes. */
   sendToAudience(
     projectId: string,
     audience: AudienceRequest,
     title: string,
     body: string,
     expectedMatched: number,
+    idempotencyKey: string,
   ) {
-    return this.post<{ queued: number }>(
+    return this.post<{ alreadySent: boolean; matched: number; queued: number }>(
       `/admin/api/projects/${projectId}/push/audience/send`,
-      { ...audience, body, expectedMatched, title },
+      { ...audience, body, expectedMatched, idempotencyKey, title },
     );
   }
   pushSends(projectId: string, limit = 50, status = '', offset = 0) {

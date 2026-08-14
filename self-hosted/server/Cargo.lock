@@ -2653,7 +2653,7 @@ dependencies = [
 
 [[package]]
 name = "sentori-server"
-version = "2.29.0"
+version = "2.30.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
