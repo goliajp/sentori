@@ -11,6 +11,7 @@
 // furniture.
 
 import { useCallback, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { useShell } from '../App';
 import { KindBadge, RegressedBadge } from '../components/kind';
@@ -283,6 +284,21 @@ export function IssueDetailPane({
                 })
               : t('issue.impactAnon', { events: String(issue.eventCount) })}
           </span>
+          {/* The trip from "this is fixed" to "tell the people it
+              happened to" was a person copying a uuid, if they knew
+              the audience could name an issue at all. It is a link
+              now — to the place that counts the audience first, not to
+              a send: nothing here should be one click from a
+              notification. Hidden when nobody identified hit it,
+              because then it targets nobody. */}
+          {issue.usersCount > 0 && (
+            <Link
+              to={`/push?tab=audience&issue=${issue.id}`}
+              className="text-accent hover:underline"
+            >
+              {t('issue.notifyAffected')}
+            </Link>
+          )}
           <span>
             {t('issue.firstSeen')} {formatRelative(issue.firstSeen)}
           </span>

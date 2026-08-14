@@ -124,6 +124,13 @@ enum Node {
     Not(Box<Node>),
     /// A raw app user id, hashed the way the device hashed it.
     UserKey(String),
+    /// Everyone this issue happened to.
+    ///
+    /// `issue_user_hits` is written at ingest and carries the same
+    /// hash the device row does, so "notify the people who hit this"
+    /// is a join rather than a list somebody has to assemble. It was
+    /// the one thing the whole design pointed at and could not do.
+    Issue(uuid::Uuid),
     /// The key is present at all, whatever its value.
     Exists {
         source: Source,
@@ -287,6 +294,13 @@ fn parse(v: &Value, depth: usize, budget: &mut usize) -> Result<Node, String> {
         };
         return Ok(Node::UserKey(key));
     }
+    if let Some(id) = obj.get("issue") {
+        let parsed = id.as_str().and_then(|s| s.parse::<uuid::Uuid>().ok());
+        let Some(parsed) = parsed else {
+            return Err("issue must be an issue id".to_string());
+        };
+        return Ok(Node::Issue(parsed));
+    }
     if let Some(k) = obj.get("userKey") {
         let Some(k) = k.as_str().filter(|s| !s.is_empty()) else {
             return Err("userKey must be a non-empty string".to_string());
@@ -322,7 +336,8 @@ fn parse_leaf(obj: &Map<String, Value>, depth: usize, budget: &mut usize) -> Res
         (None, None) => {
             let named: Vec<&str> = obj.keys().map(String::as_str).collect();
             return Err(format!(
-                "condition names none of all, any, not, user, trait or device — got {named:?}"
+                "condition names none of all, any, not, user, issue, trait or device — \
+             got {named:?}"
             ));
         }
     };
@@ -463,6 +478,17 @@ fn compile(node: &Node, n: &mut usize, binds: &mut Vec<Bind>) -> String {
         Node::UserKey(key) => {
             let p = take(n, binds, Bind::Text(key.clone()));
             format!("dt.user_key = ({p})::text")
+        }
+
+        // Joined through `issues` rather than straight to the hits, so
+        // an issue id from another project selects nothing. Without
+        // that the id is the only thing checked, and two apps that
+        // share a person would share an audience.
+        Node::Issue(id) => {
+            let p = take(n, binds, Bind::Uuid(*id));
+            format!(
+                "EXISTS (SELECT 1 FROM issue_user_hits ih                  JOIN issues i ON i.id = ih.issue_id                  WHERE ih.issue_id = ({p})::uuid                  AND i.project_id = dt.project_id                  AND ih.user_key = dt.user_key)"
+            )
         }
 
         Node::Exists { source, key } => {
@@ -739,6 +765,37 @@ mod tests {
             sql_of(&json!({ "all": wide })).is_err(),
             "an over-wide audience compiled"
         );
+    }
+
+    /// The join that "notify everyone who hit this" needs, and the
+    /// one thing the design pointed at and could not do.
+    #[test]
+    fn an_issue_selects_the_people_it_happened_to() {
+        let id = "019ff080-2aeb-7e30-aba1-4431b296d120";
+        let probe = sql_of(&json!({ "issue": id }));
+        assert!(
+            probe.is_ok(),
+            "an issue audience did not compile: {probe:?}"
+        );
+        let Ok((sql, count)) = probe else { return };
+        assert_eq!(count, 1, "the issue id has to be bound, not pasted");
+        assert!(
+            sql.contains("issue_user_hits") && sql.contains("i.project_id = dt.project_id"),
+            "an issue audience must join through issues, or an id from another \
+             project selects devices here: {sql}"
+        );
+        assert!(
+            !sql.contains(id),
+            "the id reached the statement text: {sql}"
+        );
+    }
+
+    /// Anything that is not an id is refused rather than compiled into
+    /// a condition that matches nobody and looks like it worked.
+    #[test]
+    fn an_issue_that_is_not_an_id_is_refused() {
+        assert!(sql_of(&json!({ "issue": "the login crash" })).is_err());
+        assert!(sql_of(&json!({ "issue": 12 })).is_err());
     }
 
     /// A number where a version belongs is the mistake worth naming:

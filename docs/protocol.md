@@ -354,7 +354,12 @@ and a grammar would mean writing a parser and then the same structure behind it.
 - **Groups** — `all`, `any`, `not`. An `any` with no branches matches nothing, which
   is what an editor holds the moment someone adds an or-group before filling it in.
 - **Leaves** name one of `trait` (the person, from `user()`), `device` (the build,
-  from `register()`), or `user` / `userKey` (the identity).
+  from `register()`), `user` / `userKey` (the identity), or `issue`.
+- `{"issue": "<issue id>"}` selects everyone that issue happened to — the devices
+  whose identity matches a row in the issue's hit table, which ingest writes. It is
+  what "tell the people who hit this that it is fixed" compiles to, and the dashboard
+  links to it from the issue's impact line. An id from another project selects
+  nothing.
 - **Comparisons** — `is`, `isNot`, `in`, `exists`, `prefix`, `gte` / `gt` / `lte` /
   `lt` (numbers), and `versionGte` / `versionGt` / `versionLte` / `versionLt`.
 - **Use the version operators for versions.** As text `4.10.0` sorts *below* `4.2`,
