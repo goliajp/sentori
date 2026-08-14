@@ -131,4 +131,131 @@ final class SentoriPushTests: XCTestCase {
         }
     }
 
+    // ── rotation ──────────────────────────────────────────────────
+
+    /// A rotation must reach the server, and the only thing that
+    /// proves it is a request arriving.
+    ///
+    /// The Android version of this test was first written to assert
+    /// that the address had not changed — which is also what happens
+    /// when the SDK does nothing at all, so it passed against the
+    /// code it was written to catch. `handleRegisteredToken` used to
+    /// write the value into a field and send it to nobody.
+    ///
+    /// `URLProtocol` rather than a stub of our own code: the seam is
+    /// at the URL loading system, so what is exercised is the request
+    /// the SDK really builds.
+    func testARotatedTokenIsReportedToTheServer() {
+        RotationProbe.reset()
+        URLProtocol.registerClass(RotationProbe.self)
+        defer { URLProtocol.unregisterClass(RotationProbe.self) }
+
+        SentoriConfig.set(
+            SentoriConfig(
+                token: "st_test",
+                ingestUrl: "http://127.0.0.1:9",
+                release: "app@1.0.0",
+                environment: "test"
+            ))
+        UserDefaults.standard.set("019ff000-0000-7000-8000-000000000001", forKey: handleKeyForTests)
+        defer { UserDefaults.standard.removeObject(forKey: handleKeyForTests) }
+
+        Sentori.push.handleRotatedToken("token-after")
+
+        let deadline = Date().addingTimeInterval(10)
+        while RotationProbe.bodies.isEmpty, Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        }
+
+        XCTAssertEqual(
+            RotationProbe.bodies.count, 1,
+            "the rotation reached nobody — the server keeps the dead token until the "
+                + "host next calls register, and the device receives nothing")
+        let body = RotationProbe.bodies.first ?? ""
+        XCTAssertTrue(body.contains("token-after"), "the rotation did not carry the new token")
+        XCTAssertTrue(
+            body.contains("installId"),
+            "the rotation did not carry the installation, so the server would have "
+                + "written a second row")
+    }
+
+    /// A device the host never registered is not registered behind
+    /// its back.
+    func testARotationForAnUnregisteredDeviceIsIgnored() {
+        RotationProbe.reset()
+        URLProtocol.registerClass(RotationProbe.self)
+        defer { URLProtocol.unregisterClass(RotationProbe.self) }
+
+        SentoriConfig.set(
+            SentoriConfig(
+                token: "st_test",
+                ingestUrl: "http://127.0.0.1:9",
+                release: "app@1.0.0",
+                environment: "test"
+            ))
+        UserDefaults.standard.removeObject(forKey: handleKeyForTests)
+
+        Sentori.push.handleRotatedToken("token-nobody-asked-for")
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+
+        XCTAssertTrue(
+            RotationProbe.bodies.isEmpty,
+            "a device that never registered was registered by a vendor callback")
+    }
+
+    private var handleKeyForTests: String { "com.sentori.push.handle" }
+}
+
+/// Records what the SDK posts, without replacing anything the SDK
+/// calls: the interception is at the URL loading system, so the
+/// request under test is the one that would have gone out.
+private final class RotationProbe: URLProtocol {
+    nonisolated(unsafe) static var bodies: [String] = []
+    private static let lock = NSLock()
+
+    static func reset() {
+        lock.lock()
+        bodies = []
+        lock.unlock()
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        request.url?.path == "/v1/push/tokens"
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        // `httpBody` is nil for a body handed over as a stream, which
+        // is what URLSession does with an upload — read both.
+        var body = ""
+        if let data = request.httpBody {
+            body = String(data: data, encoding: .utf8) ?? ""
+        } else if let stream = request.httpBodyStream {
+            stream.open()
+            var buf = [UInt8](repeating: 0, count: 4096)
+            var out = Data()
+            while stream.hasBytesAvailable {
+                let n = stream.read(&buf, maxLength: buf.count)
+                if n <= 0 { break }
+                out.append(contentsOf: buf[0..<n])
+            }
+            stream.close()
+            body = String(data: out, encoding: .utf8) ?? ""
+        }
+        Self.lock.lock()
+        Self.bodies.append(body)
+        Self.lock.unlock()
+
+        let payload = Data(
+            #"{"spToken":"019ff000-0000-7000-8000-000000000001","is_new":false}"#.utf8)
+        let resp = HTTPURLResponse(
+            url: request.url!, statusCode: 202, httpVersion: "HTTP/1.1", headerFields: nil)!
+        client?.urlProtocol(self, didReceive: resp, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: payload)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+
 }

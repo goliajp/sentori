@@ -486,4 +486,141 @@ class SentoriPushTest {
         assertTrue(shadowOf(mgr).allNotifications.isEmpty())
     }
 
+    // ── rotation ──────────────────────────────────────────────────
+
+    /**
+     * A listener that records what was posted to it.
+     *
+     * `com.sun.net.httpserver` is not on the Android compile
+     * classpath, and a mocked HTTP client would only prove that the
+     * SDK called the thing the test replaced. A socket is what the
+     * SDK will actually write to.
+     */
+    private class Recorder : AutoCloseable {
+        val bodies = java.util.Collections.synchronizedList(mutableListOf<String>())
+        private val socket = java.net.ServerSocket(0, 4, java.net.InetAddress.getLoopbackAddress())
+        val port: Int get() = socket.localPort
+        private val thread = Thread {
+            while (!socket.isClosed) {
+                try {
+                    socket.accept().use { c ->
+                        val input = c.getInputStream()
+                        val head = StringBuilder()
+                        while (!head.endsWith("\r\n\r\n")) {
+                            val b = input.read()
+                            if (b < 0) return@use
+                            head.append(b.toChar())
+                        }
+                        val len = Regex("(?i)content-length: *(\\d+)")
+                            .find(head)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                        val body = ByteArray(len)
+                        var read = 0
+                        while (read < len) {
+                            val n = input.read(body, read, len - read)
+                            if (n < 0) break
+                            read += n
+                        }
+                        bodies.add(String(body, 0, read, Charsets.UTF_8))
+                        val payload =
+                            """{"spToken":"019ff000-0000-7000-8000-000000000001","is_new":false}"""
+                        c.getOutputStream().write(
+                            ("HTTP/1.1 202 Accepted\r\nContent-Type: application/json\r\n" +
+                                "Content-Length: ${payload.toByteArray().size}\r\n" +
+                                "Connection: close\r\n\r\n" + payload).toByteArray()
+                        )
+                        c.getOutputStream().flush()
+                    }
+                } catch (_: Throwable) {
+                    // the close below is what ends this loop
+                }
+            }
+        }.apply { isDaemon = true; start() }
+
+        override fun close() {
+            socket.close()
+            thread.interrupt()
+        }
+    }
+
+    private fun configureAt(port: Int) {
+        SentoriConfig.set(
+            SentoriConfig(
+                token = "st_test",
+                ingestUrl = "http://127.0.0.1:$port",
+                release = "app@1.0.0",
+                environment = "test",
+            ),
+        )
+    }
+
+    /**
+     * A vendor rotating its token has to reach the server, and the
+     * only thing that proves it is a request arriving.
+     *
+     * The first version of this asserted that the spToken had not
+     * changed — which is exactly what happens when the SDK does
+     * nothing at all, so it passed against the code it was written to
+     * catch. `onNewToken` used to write the value into a field and
+     * send it to nobody; a test that cannot tell that apart from
+     * working is not a test.
+     */
+    @Test
+    @Config(sdk = [33])
+    fun aRotatedTokenIsReportedToTheServer() {
+        Recorder().use { rec ->
+            val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+            configureAt(rec.port)
+
+            // A device that has registered, which is the only kind a
+            // rotation should act on.
+            val first = SentoriPush.registerNativeTokenForTests(ctx, "token-before")
+            assertNotNull("the first registration did not return an spToken", first)
+
+            // The vendor rotates. This is what `onNewToken` calls.
+            SentoriPush.handleRotatedToken(ctx, "token-after")
+
+            val deadline = System.currentTimeMillis() + 15_000
+            while (rec.bodies.size < 2 && System.currentTimeMillis() < deadline) Thread.sleep(50)
+
+            assertEquals(
+                "the rotation reached nobody — the server keeps the dead token until " +
+                    "the host next calls register, and the device receives nothing",
+                2,
+                rec.bodies.size,
+            )
+            assertTrue(
+                "the rotation did not carry the new token: ${rec.bodies[1]}",
+                rec.bodies[1].contains("token-after"),
+            )
+            // Same installation both times, which is what keeps the
+            // address still rather than writing a second row.
+            val install = Regex("\"installId\":\"([^\"]+)\"")
+            val a = install.find(rec.bodies[0])?.groupValues?.get(1)
+            val b = install.find(rec.bodies[1])?.groupValues?.get(1)
+            assertNotNull("the registration carried no installId: ${rec.bodies[0]}", a)
+            assertEquals("the rotation reported a different installation", a, b)
+        }
+    }
+
+    /** A device the host never registered is not registered behind its back. */
+    @Test
+    @Config(sdk = [33])
+    fun aRotationForAnUnregisteredDeviceIsIgnored() {
+        Recorder().use { rec ->
+            val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+            ctx.getSharedPreferences("com.sentori.push", android.content.Context.MODE_PRIVATE)
+                .edit().clear().apply()
+            SentoriPush.resetForTests()
+            configureAt(rec.port)
+
+            SentoriPush.handleRotatedToken(ctx, "token-nobody-asked-for")
+            Thread.sleep(1_000)
+
+            assertTrue(
+                "a device that never registered was registered by a vendor callback",
+                rec.bodies.isEmpty(),
+            )
+        }
+    }
+
 }
