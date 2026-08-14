@@ -105,6 +105,14 @@ pub async fn handle(
     // It used to be two SELECTs and an INSERT per target — four
     // hundred round trips to notify two hundred devices, and there was
     // no shape of audience that did not make that worse.
+    //
+    // `ON CONFLICT DO NOTHING` is what makes `idempotencyKey` mean
+    // anything. The unique index behind it is per device per key, so a
+    // retry inserts nothing and `RETURNING` hands back only the rows
+    // that were really queued — which is what `queued` should say. The
+    // conflict target is left off deliberately: the only other unique
+    // constraint here is the primary key, and naming the index couples
+    // this statement to its exact shape.
     let sql = format!(
         "INSERT INTO push_sends \
            (id, project_id, token_id, provider, payload, status, \
@@ -115,6 +123,7 @@ pub async fn handle(
            WHERE dt.project_id = $1 AND dt.revoked_at IS NULL AND ({}) \
            ORDER BY dt.id LIMIT $6 \
          ) dt \
+         ON CONFLICT DO NOTHING \
          RETURNING id",
         selector.sql
     );

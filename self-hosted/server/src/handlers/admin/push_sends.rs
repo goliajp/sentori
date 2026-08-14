@@ -144,7 +144,7 @@ pub async fn list(
 
     let rows = sqlx::query(
         "SELECT id, token_id, provider, status, provider_outcome, error, retry_count, \
-                created_at, sent_at, next_attempt_at \
+                payload, created_at, sent_at, next_attempt_at \
          FROM push_sends \
          WHERE project_id = $1 AND ($2::text IS NULL OR status = $2) \
          ORDER BY created_at DESC LIMIT $3 OFFSET $4",
@@ -167,6 +167,13 @@ pub async fn list(
                 "provider_outcome": r.try_get::<Option<String>, _>("provider_outcome").ok().flatten(),
                 "error": r.try_get::<Option<String>, _>("error").ok().flatten(),
                 "retry_count": r.try_get::<i32, _>("retry_count").unwrap_or(0),
+                // What was actually sent. The table listed rows and
+                // their outcomes and never said which notification
+                // they were, so a failed row could not be matched to
+                // the send that produced it — and nothing anywhere
+                // could observe that a queued row carried the right
+                // message at all.
+                "payload": r.try_get::<Value, _>("payload").unwrap_or_else(|_| json!({})),
                 "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
                 "sent_at": crate::wire_time::rfc3339_opt(r.try_get::<Option<time::OffsetDateTime>, _>("sent_at").ok().flatten()),
                 "next_attempt_at": crate::wire_time::rfc3339_opt(r.try_get::<Option<time::OffsetDateTime>, _>("next_attempt_at").ok().flatten()),
