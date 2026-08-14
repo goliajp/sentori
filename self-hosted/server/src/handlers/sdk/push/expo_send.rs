@@ -51,6 +51,7 @@ pub async fn handle(
 
         let body_obj = SendBody {
             token_ids: vec![],
+            sp_tokens: vec![],
             native_tokens: to,
             topic: None,
             app_user_id: None,

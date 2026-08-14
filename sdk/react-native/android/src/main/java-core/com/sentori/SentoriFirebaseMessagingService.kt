@@ -33,6 +33,11 @@ class SentoriFirebaseMessagingService : FirebaseMessagingService() {
         super.onNewToken(token)
         try {
             SentoriPushNotifications.handleRegisteredToken(token)
+            // And tell the server, now. Buffering it in a field was
+            // the whole of what happened here before, so a rotation
+            // was invisible until the host next called `register` —
+            // and the device received nothing in between.
+            SentoriPush.handleRotatedToken(applicationContext, token)
         } catch (_: Throwable) {
             // never crash a Firebase callback
         }

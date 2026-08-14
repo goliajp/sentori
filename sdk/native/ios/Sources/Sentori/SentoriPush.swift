@@ -76,6 +76,31 @@ public final class SentoriPush: NSObject {
 
     private static let handleKey = "com.sentori.push.handle"
 
+    /// Which installation this is, kept for as long as the app is
+    /// installed.
+    ///
+    /// The server keys the device row on it, so APNs issuing a new
+    /// token — a reinstall, a restore from backup — becomes an update
+    /// of the row that already exists rather than a new row with a
+    /// new address. Before this, a rotation silently retired whatever
+    /// `spToken` a backend was holding.
+    ///
+    /// Minted here rather than issued by the server because it has to
+    /// exist before the first registration, and it never leaves the
+    /// device except in that registration: it is not the address, and
+    /// an identifier that can claim a row must not be one that
+    /// travels through logs and other people's databases.
+    private static let installKey = "com.sentori.push.install"
+
+    static var installId: String {
+        if let existing = UserDefaults.standard.string(forKey: installKey) {
+            return existing
+        }
+        let fresh = UUID().uuidString.lowercased()
+        UserDefaults.standard.set(fresh, forKey: installKey)
+        return fresh
+    }
+
     /// Ask for permission, get a token, register it.
     ///
     /// Safe to call on every launch: the OS returns its cached
@@ -172,6 +197,40 @@ public final class SentoriPush: NSObject {
         return result
     }
 
+    /// APNs has issued this device a new token; tell the server now
+    /// rather than at the next launch.
+    ///
+    /// The swizzled AppDelegate callback wrote the value into a field
+    /// and nothing sent it. So from the moment a token rotated until
+    /// the host next called `register`, the server held a dead token:
+    /// sends went out, APNs answered with an unregistered device,
+    /// quarantine retired the row, and it came back at the next launch
+    /// under a different address. For an app that stays resident,
+    /// "the next launch" is not a bounded wait.
+    ///
+    /// Only re-registers a device that has registered before — a
+    /// stored `spToken` is the evidence. A token arriving for a device
+    /// the host never registered is not something to act on unasked.
+    func handleRotatedToken(_ token: String) {
+        guard let config = SentoriConfig.current,
+            UserDefaults.standard.string(forKey: Self.handleKey) != nil
+        else { return }
+        Task {
+            switch await registerWithServer(token: token, config: config) {
+            case .success(let handle):
+                lock.lock()
+                cachedHandle = handle
+                lock.unlock()
+                UserDefaults.standard.set(handle, forKey: Self.handleKey)
+            case .failure(let reason, let message):
+                NSLog(
+                    "%@",
+                    "[sentori] push re-register after token rotation failed "
+                        + "(\(reason.name)): \(message)")
+            }
+        }
+    }
+
     /// The handle from an earlier `register`, without a round trip.
     @objc public func cachedDeviceHandle() -> String? {
         lock.lock()
@@ -265,6 +324,10 @@ public final class SentoriPush: NSObject {
             // Sandbox and production APNs are different hosts, and a
             // token minted against one is rejected by the other.
             "env": isDebugBuild ? "sandbox" : "production",
+            // Which installation this is. The server keys the row on
+            // it, so a rotated token updates this device rather than
+            // creating a second one under a new address.
+            "installId": Self.installId,
         ]
         // The same salted-nothing hash every event carries, so the
         // dashboard can address this device by the person who hit an
