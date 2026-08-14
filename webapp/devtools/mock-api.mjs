@@ -761,7 +761,13 @@ const SUFFIX = [
         {
           id: 'pc1',
           kind: 'apns',
+          // Deliberately the shape the old form produced: the
+          // placeholder said `bundleId` and the worker reads `topic`,
+          // so a credential filled in by following the example
+          // exactly cannot be used. The server now says so on the
+          // row; this is the fixture that renders it.
           config: { keyId: 'ABC123', teamId: 'DEF456', bundleId: 'com.example.app' },
+          problem: 'topic is missing — keyId and teamId come from the Apple developer portal, and topic is your bundle id.',
           created_at: iso(86_400_000 * 15),
           last_validated_at: iso(86_400_000),
           last_validate_status: 'ok',

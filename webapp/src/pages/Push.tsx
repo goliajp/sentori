@@ -38,10 +38,12 @@ import {
   Panel,
   PanelEmpty,
   Select,
+  Textarea,
   clsx,
   formatRelative,
 } from '../components/ui';
 import { useT } from '../i18n';
+import type { MessageKey } from '../i18n/en';
 import { api } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 
@@ -446,115 +448,309 @@ function DevicesSection({ projectId }: { projectId: string }) {
 
 // ── credentials ─────────────────────────────────────────────────────
 
+/// What each provider actually needs, as fields rather than as JSON
+/// somebody types by hand.
+///
+/// The form used to be one text box labelled "Config (JSON)" and one
+/// labelled "Secret", and it was wrong in three ways at once. The
+/// secret was an `<input>`, which strips line breaks — so a pasted
+/// `.p8` arrived as one long line and stopped being a PEM. The JSON
+/// example named `bundleId`, and the worker reads `topic`, so
+/// following the example exactly produced `topic missing` on the
+/// first send. And nothing was checked at save, so both surfaced
+/// hours later as a notification that did not arrive.
+///
+/// `secretKey` is the field whose value goes to `secret_blob`;
+/// everything else is merged into the non-secret `config` the worker
+/// reads by these exact names.
+// Every string is a literal, not a template. `t` takes a union of
+// the keys that exist, so a key assembled at runtime does not
+// typecheck — which is the compiler catching a label that would have
+// rendered as its own key on a screen nobody had opened yet.
+type FieldSpec = {
+  hint: MessageKey;
+  key: string;
+  label: MessageKey;
+  multiline?: boolean;
+  options?: { label: MessageKey; value: string }[];
+  placeholder?: MessageKey;
+  required?: boolean;
+};
+
+const PROVIDER_FIELDS: Record<string, FieldSpec[]> = {
+  apns: [
+    {
+      key: 'keyId',
+      label: 'push.field.keyId',
+      hint: 'push.hint.apns.keyId',
+      placeholder: 'push.placeholder.apns.keyId',
+      required: true,
+    },
+    {
+      key: 'teamId',
+      label: 'push.field.teamId',
+      hint: 'push.hint.apns.teamId',
+      placeholder: 'push.placeholder.apns.teamId',
+      required: true,
+    },
+    {
+      // Sent as `topic`, because that is the name the worker reads.
+      // The label says bundle id, which is what Apple calls it — and
+      // the old placeholder said `bundleId`, which is what nothing
+      // reads.
+      key: 'topic',
+      label: 'push.field.topic',
+      hint: 'push.hint.apns.topic',
+      placeholder: 'push.placeholder.apns.topic',
+      required: true,
+    },
+    {
+      key: 'production',
+      label: 'push.field.production',
+      hint: 'push.hint.apns.production',
+      options: [
+        { label: 'push.option.production', value: 'production' },
+        { label: 'push.option.sandbox', value: 'sandbox' },
+      ],
+    },
+    {
+      key: 'secretKey',
+      label: 'push.field.secretKey',
+      hint: 'push.hint.apns.secretKey',
+      placeholder: 'push.placeholder.apns.secretKey',
+      multiline: true,
+      required: true,
+    },
+  ],
+  fcm: [
+    {
+      // Everything else is read out of the file itself.
+      key: 'secretKey',
+      label: 'push.field.secretKey',
+      hint: 'push.hint.fcm.secretKey',
+      placeholder: 'push.placeholder.fcm.secretKey',
+      multiline: true,
+      required: true,
+    },
+  ],
+  webpush: [
+    {
+      key: 'subject',
+      label: 'push.field.subject',
+      hint: 'push.hint.webpush.subject',
+      placeholder: 'push.placeholder.webpush.subject',
+    },
+    {
+      key: 'vapidPublicKey',
+      label: 'push.field.vapidPublicKey',
+      hint: 'push.hint.webpush.vapidPublicKey',
+      placeholder: 'push.placeholder.webpush.vapidPublicKey',
+      required: true,
+    },
+    {
+      key: 'secretKey',
+      label: 'push.field.secretKey',
+      hint: 'push.hint.webpush.secretKey',
+      placeholder: 'push.placeholder.webpush.secretKey',
+      multiline: true,
+      required: true,
+    },
+  ],
+};
+
 function CredentialsSection({ projectId }: { projectId: string }) {
   const t = useT();
   const creds = useAsyncData(() => api.pushCredentials(projectId), [projectId]);
   const [provider, setProvider] = useState('apns');
-  const [config, setConfig] = useState('');
-  // The secret was never collected. `config` holds non-secret
-  // metadata and every adapter reads the key out of `secret_blob`, so
-  // each credential saved through this form stored an empty secret —
-  // for every provider, not only FCM. The panel's own empty state
-  // said to paste an APNs key or an FCM service account, and there
-  // was nowhere to paste it.
-  const [secret, setSecret] = useState('');
+  const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<null | string>(null);
+  const [saved, setSaved] = useState<null | string>(null);
 
+  const fields = PROVIDER_FIELDS[provider] ?? [];
   const configured = creds.data?.credentials ?? [];
+  const val = (k: string) => values[k] ?? '';
+  const missing = fields.filter((f) => f.required && val(f.key).trim().length === 0);
+
+  const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }));
+  const switchProvider = (p: string) => {
+    setProvider(p);
+    setValues({});
+    setSaveError(null);
+    setSaved(null);
+  };
 
   return (
-    <Panel title={t('push.credentialsTitle')}>
-      <div className="flex flex-wrap items-end gap-3 p-3.5">
-        <Field label={t('push.provider')}>
-          <Select value={provider} onChange={(e) => setProvider(e.target.value)}>
-            <option value="apns">apns</option>
-            <option value="fcm">fcm</option>
-            <option value="webpush">webpush</option>
-          </Select>
-        </Field>
-        <Field label={t('push.config')} className="min-w-0 flex-1">
-          <Input
-            value={config}
-            onChange={(e) => setConfig(e.target.value)}
-            placeholder={
-              provider === 'fcm' ? t('push.configOptionalFcm') : t('push.configPlaceholder')
-            }
-          />
-        </Field>
-        <Field label={t('push.secret')} className="min-w-0 flex-1">
-          <Input
-            value={secret}
-            onChange={(e) => setSecret(e.target.value)}
-            placeholder={
-              provider === 'fcm' ? t('push.secretPlaceholderFcm') : t('push.secretPlaceholder')
-            }
-          />
-        </Field>
-        <Button
-          variant="primary"
-          size="sm"
-          disabled={busy || secret.trim().length === 0}
-          onClick={() => {
-            setBusy(true);
-            setSaveError(null);
-            // FCM derives everything it shows from the credential
-            // itself, so an empty config is the normal case there.
-            let parsed: Record<string, unknown> = {};
-            if (config.trim().length > 0) {
-              try {
-                parsed = JSON.parse(config) as Record<string, unknown>;
-              } catch {
-                setSaveError(t('push.configNotJson'));
-                setBusy(false);
-                return;
-              }
-            }
-            void api
-              .savePushCredential(projectId, provider, parsed, secret)
-              .then(() => {
-                setConfig('');
-                setSecret('');
-                creds.reload();
-              })
-              .catch((e: Error) => setSaveError(e.message))
-              .finally(() => setBusy(false));
-          }}
-        >
-          {t('settings.save')}
-        </Button>
-      </div>
-      {saveError && <ErrorBanner>{saveError}</ErrorBanner>}
-      {configured.length === 0 ? (
-        <PanelEmpty>{t('push.credentialsEmpty')}</PanelEmpty>
-      ) : (
-        <div className="divide-y divide-border/60">
-          {configured.map((c) => (
-            <div key={c.id} className="flex items-center gap-3 px-3.5 py-2 text-sm">
-              <span className="w-24 font-mono text-xs text-fg">{c.kind}</span>
-              <span className="text-xs text-fg-subtle">
-                {c.last_validate_status
-                  ? t('push.lastValidated', {
-                      status: c.last_validate_status,
-                      when: c.last_validated_at ? formatRelative(c.last_validated_at) : '—',
-                    })
-                  : t('push.neverValidated')}
-              </span>
-              <button
-                type="button"
-                className="ml-auto text-xs text-fg-subtle hover:text-kind-error"
-                onClick={() => {
-                  if (window.confirm(t('push.deleteConfirm', { kind: c.kind }))) {
-                    void api.deletePushCredential(projectId, c.kind).then(creds.reload);
-                  }
-                }}
-              >
-                {t('common.delete')}
-              </button>
-            </div>
+    <div className="space-y-4">
+      <Panel title={t('push.credentialsAdd')}>
+        <div className="space-y-3 p-3.5">
+          <Field label={t('push.provider')}>
+            <Select value={provider} onChange={(e) => switchProvider(e.target.value)}>
+              <option value="apns">apns</option>
+              <option value="fcm">fcm</option>
+              <option value="webpush">webpush</option>
+            </Select>
+          </Field>
+
+          {/* The short facts sit together on one line, because they
+              are short: a ten-character Key ID in a full-width box
+              reads as though something longer belongs there, and the
+              form grew tall enough to push the list of what is
+              already configured off the screen. Only the key gets the
+              full width — it needs it. */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {fields
+              .filter((f) => !f.multiline)
+              .map((f) => (
+                <Field key={f.key} label={t(f.label)}>
+                  {f.options ? (
+                    <Select
+                      value={val(f.key) || f.options[0]?.value}
+                      onChange={(e) => set(f.key, e.target.value)}
+                    >
+                      {f.options.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {t(o.label)}
+                        </option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <Input
+                      value={val(f.key)}
+                      onChange={(e) => set(f.key, e.target.value)}
+                      placeholder={f.placeholder ? t(f.placeholder) : undefined}
+                    />
+                  )}
+                  <p className="mt-1 text-xs leading-snug text-fg-subtle">{t(f.hint)}</p>
+                </Field>
+              ))}
+          </div>
+
+          {fields
+            .filter((f) => f.multiline)
+            .map((f) => (
+            <Field key={f.key} label={t(f.label)}>
+              {/* A textarea, because a PEM and a service-account
+                  file both have line breaks and an `<input>` deletes
+                  them. */}
+              <Textarea
+                value={val(f.key)}
+                onChange={(e) => set(f.key, e.target.value)}
+                rows={provider === 'fcm' ? 8 : 6}
+                placeholder={f.placeholder ? t(f.placeholder) : undefined}
+              />
+              <p className="mt-1 text-xs leading-snug text-fg-subtle">{t(f.hint)}</p>
+            </Field>
           ))}
+
+          <div className="flex items-center gap-3">
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={busy || missing.length > 0}
+              onClick={() => {
+                setBusy(true);
+                setSaveError(null);
+                setSaved(null);
+                const config: Record<string, unknown> = {};
+                for (const f of fields) {
+                  if (f.key === 'secretKey') continue;
+                  const v = val(f.key).trim();
+                  if (v.length === 0) continue;
+                  // The one field that is not a string: the worker
+                  // reads `production` as a boolean.
+                  config[f.key] = f.key === 'production' ? v === 'production' : v;
+                }
+                void api
+                  .savePushCredential(projectId, provider, config, values.secretKey ?? '')
+                  .then(() => {
+                    setValues({});
+                    setSaved(provider);
+                    creds.reload();
+                  })
+                  .catch((e: Error) => setSaveError(e.message))
+                  .finally(() => setBusy(false));
+              }}
+            >
+              {t('settings.save')}
+            </Button>
+            {missing.length > 0 && (
+              <span className="text-xs text-fg-subtle">
+                {t('push.missingFields', {
+                  fields: missing.map((f) => t(f.label)).join(', '),
+                })}
+              </span>
+            )}
+          </div>
         </div>
-      )}
-    </Panel>
+        {saveError && <ErrorBanner>{saveError}</ErrorBanner>}
+        {saved && (
+          <div className="border-t border-border/60 px-3.5 py-2 text-xs text-ok">
+            {t('push.credentialSaved', { provider: saved })}
+          </div>
+        )}
+      </Panel>
+
+      <Panel title={`${t('push.credentialsTitle')} (${configured.length})`}>
+        {configured.length === 0 ? (
+          <PanelEmpty>{t('push.credentialsEmpty')}</PanelEmpty>
+        ) : (
+          <div className="divide-y divide-border/60">
+            {configured.map((c) => (
+              <div key={c.id} className="flex items-start gap-3 px-3.5 py-2.5 text-sm">
+                <span className="w-20 shrink-0 font-mono text-xs text-fg">{c.kind}</span>
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  {/* What the server understood, not what was typed.
+                      An operator with two Firebase projects or two
+                      Apple teams has no other way to see which one
+                      they pasted. */}
+                  <div className="font-mono text-xs text-fg-muted">
+                    {summarise(c.config) || t('push.metadataNone')}
+                  </div>
+                  {/* The row says whether the worker can use this,
+                      rather than leaving it to be discovered as a
+                      notification that never arrived. */}
+                  {c.problem ? (
+                    <div className="text-xs text-kind-error">
+                      {t('push.unusable')} {c.problem}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-fg-subtle">
+                      {c.last_validate_status
+                        ? t('push.lastValidated', {
+                            status: c.last_validate_status,
+                            when: c.last_validated_at ? formatRelative(c.last_validated_at) : '—',
+                          })
+                        : t('push.usable')}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="shrink-0 text-xs text-fg-subtle hover:text-kind-error"
+                  onClick={() => {
+                    if (window.confirm(t('push.deleteConfirm', { kind: c.kind }))) {
+                      void api.deletePushCredential(projectId, c.kind).then(creds.reload);
+                    }
+                  }}
+                >
+                  {t('common.delete')}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
+    </div>
   );
+}
+
+/** The non-secret facts, as `key=value`, in the order they were
+ *  stored. Raw JSON with braces reads as debug output; this is the
+ *  same information a person can scan. */
+function summarise(config: unknown): string {
+  if (!config || typeof config !== 'object') return '';
+  return Object.entries(config as Record<string, unknown>)
+    .map(([k, v]) => `${k}=${String(v)}`)
+    .join('  ');
 }

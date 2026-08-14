@@ -81,6 +81,29 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   );
 }
 
+/** Multi-line input, for values that have line breaks in them.
+ *
+ *  There was none, so a PEM private key went into an `<input>` — and
+ *  the HTML value sanitiser strips line breaks, silently. Measured:
+ *
+ *    input.value    = "-----BEGIN PRIVATE KEY-----MIIEv…-----END…"
+ *    textarea.value = "-----BEGIN PRIVATE KEY-----\nMIIEv…\n-----END…"
+ *
+ *  A PEM without line breaks is not a PEM. The field accepted the
+ *  paste, the save succeeded, and delivery failed later with a JWT
+ *  error that named nothing anyone had touched. */
+export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const { className = '', rows = 4, ...rest } = props;
+  return (
+    <textarea
+      {...rest}
+      rows={rows}
+      spellCheck={false}
+      className={`w-full rounded border border-border bg-surface px-2.5 py-1.5 font-mono text-xs leading-relaxed text-fg placeholder:text-fg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-accent ${className}`}
+    />
+  );
+}
+
 /** Select at the shared control height. */
 export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   const { className = '', children, ...rest } = props;
