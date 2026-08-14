@@ -196,7 +196,6 @@ export const en = {
   'push.placeholder.webpush.secretKey': '-----BEGIN PRIVATE KEY-----\n…\n-----END PRIVATE KEY-----',
   'push.placeholder.webpush.subject': 'mailto:alerts@example.com',
   'push.placeholder.webpush.vapidPublicKey': 'BEl62iUYgUiv…',
-  'push.addressable': 'Addressable',
   'push.credentialsEmpty':
     'No provider credentials yet — paste an APNs key or an FCM service account above. Devices can register without one; nothing can be delivered until it is here.',
   'push.credentialsTitle': 'Provider credentials',
@@ -211,8 +210,6 @@ export const en = {
   'push.lastValidated': 'last checked {when} — {status}',
   'push.metadata': 'Metadata',
   'push.metadataNone': 'none sent',
-  'push.no': 'no',
-  'push.notAddressableHint': 'Registered before sentori.user() ran — reachable by broadcast only, not from an issue.',
   'push.provider': 'Provider',
   'push.queued': 'queued',
   'push.reason': 'Reason',
@@ -225,7 +222,9 @@ export const en = {
   'push.tokens': '{live} devices · {identified} addressable · {quarantined} quarantined',
   'push.unusable': 'Cannot be used:',
   'push.usable': 'Checked — it signs.',
-  'push.yes': 'yes',
+  'push.noUser': 'not identified',
+  'push.noUserHint': 'sentori.user() had not run when this device registered, so nothing links it to a person. It can still receive a broadcast; it cannot be reached from an issue.',
+  'push.user': 'User',
   'releases.artifactMissing':
     '{platform} reports events in this release but has no symbolication artifact — its stacks cannot be read',
   'releases.artifactUnused':

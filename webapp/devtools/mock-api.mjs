@@ -733,7 +733,8 @@ const SUFFIX = [
         {
           id: 'dt1', provider: 'apns', env: 'production',
           metadata: { appVersion: '4.2.1', channel: 'store', locale: 'ja-JP' },
-          addressable: true, badStreak: 0, revokedAt: null,
+          addressable: true,
+          userKeyTail: 'a91f3c', badStreak: 0, revokedAt: null,
           lastSeenAt: iso(300_000), createdAt: iso(86_400_000 * 30),
           tokenTail: 'a91f3c',
         },
@@ -747,7 +748,8 @@ const SUFFIX = [
         {
           id: 'dt3', provider: 'apns', env: 'sandbox',
           metadata: {},
-          addressable: true, badStreak: 2, revokedAt: null,
+          addressable: true,
+          userKeyTail: 'a91f3c', badStreak: 2, revokedAt: null,
           lastSeenAt: iso(86_400_000), createdAt: iso(86_400_000 * 9),
           tokenTail: 'ff10b8',
         },
