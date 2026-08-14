@@ -547,14 +547,30 @@ class Api {
    *  rows, `all` shows them. It existed unused: a device that stopped
    *  receiving is exactly what someone opens this page to find, and
    *  the default view is the one view that cannot show it. */
-  pushDevices(projectId: string, limit = 100, scope: 'all' | 'live' = 'live') {
-    return this.get<{ devices: PushDevice[] }>(
-      `/admin/api/projects/${projectId}/push/devices?limit=${limit}&scope=${scope}`,
+  pushDevices(projectId: string, limit = 50, scope: 'all' | 'live' = 'live', offset = 0) {
+    return this.get<{ devices: PushDevice[]; offset: number; total: number }>(
+      `/admin/api/projects/${projectId}/push/devices?limit=${limit}&scope=${scope}&offset=${offset}`,
     );
   }
-  pushSends(projectId: string, limit = 50) {
-    return this.get<{ sends: PushSend[] }>(
-      `/admin/api/projects/${projectId}/push/sends?limit=${limit}`,
+  /** Retire a device from the console. The SDK can revoke its own
+   *  registration and quarantine retires a dead token, but an
+   *  operator looking at a device that should stop receiving had
+   *  nowhere to click. */
+  revokePushDevice(projectId: string, tokenId: string) {
+    return this.post<{ status: string }>(
+      `/admin/api/projects/${projectId}/push/devices/${tokenId}/revoke`,
+      {},
+    );
+  }
+  pushSends(projectId: string, limit = 50, status = '', offset = 0) {
+    // The status filter goes to the server. Filtering a page in the
+    // browser filters the page, not the data — with fifty of four
+    // hundred rows in hand, "failed" showed the failures among the
+    // fifty and called it the answer.
+    const q = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (status) q.set('status', status);
+    return this.get<{ offset: number; sends: PushSend[]; total: number }>(
+      `/admin/api/projects/${projectId}/push/sends?${q.toString()}`,
     );
   }
   retryPushSend(projectId: string, sendId: string) {

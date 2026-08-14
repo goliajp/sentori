@@ -729,6 +729,12 @@ const SUFFIX = [
   [
     /\/push\/devices$/,
     () => ({
+      // `total` is larger than the rows returned on purpose: the
+      // pager only exists because a project can have more devices
+      // than a page, and a fixture that never exceeds one page
+      // renders a control nobody can see.
+      total: 388,
+      offset: 0,
       devices: [
         {
           id: 'dt1', provider: 'apns', env: 'production',
@@ -790,6 +796,8 @@ const SUFFIX = [
   [
     /\/push\/sends$/,
     () => ({
+      total: 412,
+      offset: 0,
       sends: [
         { id: 'ps1', token_id: 'dt1', provider: 'apns', status: 'failed',
           provider_outcome: '410', error: 'BadDeviceToken', retry_count: 3,

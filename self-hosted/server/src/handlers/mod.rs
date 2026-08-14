@@ -302,6 +302,10 @@ pub fn router(state: Arc<AppState>) -> Router {
             get(admin::push_devices::list),
         )
         .route(
+            "/admin/api/projects/{project_id}/push/devices/{token_id}/revoke",
+            post(admin::push_devices::revoke),
+        )
+        .route(
             "/admin/api/projects/{project_id}/push/sends",
             get(admin::push_sends::list),
         )
