@@ -23,7 +23,7 @@
 
 import { logger, pushSignal } from '@goliapkg/sentori-core'
 
-import { currentUserKey } from './scope.js'
+import { currentUserKey, currentUserTraits, onIdentityChange } from './scope.js'
 
 // AppState is RN-only; we treat it dynamically so the SDK keeps
 // importing cleanly under Bun / web.
@@ -46,6 +46,14 @@ import {
 const STORAGE_KEY = 'sentori.push.ipt'
 
 let _cachedIpt: null | string = null
+// The last token the vendor handed us, kept so a sign-in can re-send
+// the registration without asking the OS for a token again.
+let _lastNativeToken: null | string = null
+let _lastOptions: PushRegisterOptions = {}
+// What the server was last told. A re-registration that would send
+// the same thing is not sent: `user()` is a verb an app may call on
+// every screen, and one HTTP request per call is not free to a host.
+let _lastSentIdentity: string | null = null
 let _drainInterval: ReturnType<typeof setInterval> | null = null
 let _appStateSubscription: { remove: () => void } | null = null
 let _backgrounded = false
@@ -176,9 +184,13 @@ export async function register(opts: PushRegisterOptions = {}): Promise<PushRegi
     const token = await waitForToken(opts.tokenTimeoutMs ?? 8000)
     const ipt = await registerWithServer(cfg, token, opts)
     _cachedIpt = ipt
+    _lastNativeToken = token
+    _lastOptions = opts
     void persistIpt(ipt)
     opts.onToken?.(ipt)
     bindBufferDrain(opts.onMessage, opts.onTap)
+    // From here on, signing in or out updates the row by itself.
+    onIdentityChange(reRegisterAfterIdentityChange)
     return { ok: true, ipt }
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e))
@@ -197,6 +209,29 @@ function fail(
   logger.warn('push', `register failed (${reason}):`, message)
   opts.onError?.(new Error(message))
   return { ok: false, message, reason }
+}
+
+/**
+ * Send the registration again because the person changed.
+ *
+ * Only for a device that has already registered — the vendor token is
+ * the evidence, the same rule the native SDKs use for a rotated
+ * token. Nothing here throws and nothing here is awaited by the host:
+ * `user()` is synchronous and stays that way.
+ */
+function reRegisterAfterIdentityChange(): void {
+  const token = _lastNativeToken
+  const cfg = tryGetRuntimeConfig()
+  if (token == null || cfg == null) return
+  const identity = JSON.stringify([currentUserKey() ?? null, currentUserTraits() ?? null])
+  if (identity === _lastSentIdentity) return
+  _lastSentIdentity = identity
+  void registerWithServer(cfg, token, _lastOptions).catch((e: unknown) => {
+    // A failed update leaves the row pointing at the previous person,
+    // so the next change must be allowed to try again.
+    _lastSentIdentity = null
+    logger.warn('push', 'updating the device after a sign-in failed', e)
+  })
 }
 
 /** Internal carrier so the helpers below can name which failure they
@@ -228,6 +263,9 @@ export async function unregister(): Promise<void> {
     }
   }
   nativePushUnregister()
+  onIdentityChange(undefined)
+  _lastNativeToken = null
+  _lastSentIdentity = null
   _cachedIpt = null
   void clearPersistedIpt()
   teardownBufferDrain()
@@ -310,6 +348,12 @@ async function registerWithServer(
   // out it went nowhere. (Insight asked whether it was stored; it was
   // not — 2026-08-11.)
   if (opts.metadata != null) body.metadata = opts.metadata
+  // Attributes of the person rather than of the device, kept apart so
+  // a build channel called "pro" cannot answer a send aimed at the pro
+  // plan. Absent leaves whatever the row already had; `{}` clears it,
+  // which is what signing out sends.
+  const traits = currentUserTraits()
+  if (traits != null) body.traits = traits
   const res = await fetch(joinUrl(cfg.ingestUrl, '/v1/push/tokens'), {
     method: 'POST',
     headers: {
@@ -545,6 +589,10 @@ export function __resetForTests(): void {
   _onMessage = undefined
   _onTap = undefined
   _ackQueue = []
+  _lastNativeToken = null
+  _lastOptions = {}
+  _lastSentIdentity = null
+  onIdentityChange(undefined)
   teardownBufferDrain()
 }
 

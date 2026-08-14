@@ -70,12 +70,20 @@ object Sentori {
      * Identify the person using the app. Only a hash of [id] (or
      * [email] when there is no id) travels; the raw values stay here.
      *
-     * Call this before registering for push if you want the device to
-     * be reachable from an issue — a device with no user key receives
-     * broadcasts and nothing else.
+     * Order does not matter with push: a device that has registered
+     * updates itself when this changes, so signing in after
+     * registering makes the device reachable straight away. It said to
+     * call this first, which was advice for a defect rather than a
+     * design — most apps learn who the user is well after launch.
+     *
+     * [traits] are attributes a push campaign can select on: plan,
+     * cohort, org. They travel raw, unlike [id] and [email], so put
+     * nothing there that identifies the person.
      */
     @JvmStatic
-    fun user(id: String?, email: String?) = SentoriScope.setUser(id, email)
+    @JvmOverloads
+    fun user(id: String?, email: String?, traits: Map<String, Any?>? = null) =
+        SentoriScope.setUser(id, email, traits)
 
     /** Merge keys into the ambient context that rides every event. */
     @JvmStatic
