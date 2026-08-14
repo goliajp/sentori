@@ -28,6 +28,13 @@ pub struct SendBody {
     /// - OR `appUserId`: app-side user id (all devices)
     #[serde(default)]
     pub token_ids: Vec<Uuid>,
+    /// The same thing under the name it should have had. `spToken`
+    /// is what `register` returns and what a backend stores; both
+    /// names are accepted until the old one is retired, because
+    /// renaming a field out from under a live integration is how a
+    /// working push stops working for a reason nobody can see.
+    #[serde(default)]
+    pub sp_tokens: Vec<Uuid>,
     #[serde(default)]
     pub native_tokens: Vec<String>,
     #[serde(default)]
@@ -150,6 +157,7 @@ async fn resolve_targets(
     // instead of letting the notification vanish.
     if body.app_user_id.is_some()
         && body.token_ids.is_empty()
+        && body.sp_tokens.is_empty()
         && body.native_tokens.is_empty()
         && body.topic.is_none()
     {
@@ -163,7 +171,7 @@ async fn resolve_targets(
 
     // Loop per-id; sqlx-postgres UUID[] array binding is fragile.
     // token_ids are usually 1-N per send call.
-    for tid in &body.token_ids {
+    for tid in body.token_ids.iter().chain(body.sp_tokens.iter()) {
         let row = sqlx::query(
             "SELECT id, provider FROM device_tokens \
              WHERE project_id = $1 AND revoked_at IS NULL AND id = $2",

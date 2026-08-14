@@ -127,11 +127,21 @@ the device is unregistered with APNs, and the server marks it revoked
 so nothing more is sent to it. `cachedDeviceHandle()` returns the
 handle without a round trip.
 
-Registering again produces a **new** handle. The old one is revoked,
-not resumed — a rotation is a retirement and a new row, so anything
-stored against the old handle is stale from that moment. Calling
-`register` on every launch, which is safe and cheap, means you always
-hold the current one.
+`register` returns an **spToken** — the address a backend sends to.
+It belongs to the installation, not to the vendor's token, so APNs
+issuing a new one (a reinstall, a restore from backup) updates the
+same device rather than creating another. Whatever holds that spToken
+keeps working.
+
+The SDK reports a rotation as it happens rather than at the next
+launch. Before that it stored the new token in a field and sent it to
+nobody, so a rotated device received nothing until the app was next
+started — which for a resident app is not a bounded wait.
+
+`unregister` is the one thing that does change the address: it clears
+the installation's local state, so the next `register` starts a new
+one. A revoked device coming back should be a new registration, not a
+resumed one.
 
 Your app still needs the `aps-environment` entitlement and the
 `remote-notification` background mode; the SDK does not add

@@ -244,39 +244,23 @@ device revoked so nothing more is sent to it.
 
 `cachedDeviceHandle(context)` returns the handle without a round trip.
 
-### The handle changes
+### The address survives a rotated token
 
-Registering again after an `unregister` produces a **new** handle. The
-old one is revoked, not resumed — a rotation is a retirement and a new
-row, so anything you stored keyed on the old handle is stale from that
-moment.
+`register` returns an **spToken** — the address a backend sends to.
+It belongs to the installation, not to the vendor's token, so APNs or
+FCM issuing a new one (a reinstall, a restore from backup, cleared
+app data) updates the same device rather than creating another.
+Whatever holds that spToken keeps working.
 
-Calling `register` on every launch, which is safe and cheap, means the
-callback always hands you the current one. If you store it instead,
-overwrite on every `Result.Success` rather than only when you have
-none.
+The SDK reports a rotation as it happens rather than at the next
+launch. Before that it stored the new token in a field and sent it to
+nobody, so a rotated device received nothing until the app was next
+started — which for a resident app is not a bounded wait.
 
-Push needs Firebase in your app. The SDK declares
-`firebase-messaging` as `compileOnly`, so an app that does not use
-push does not ship it; an app that does adds the dependency, the
-Google Services plugin and `google-services.json` as it would anyway.
-
-### If your app also uses another FCM library
-
-Android delivers `onNewToken` and `onMessageReceived` to whichever
-service matching `com.google.firebase.MESSAGING_EVENT` manifest
-merging placed first. Two such services in one APK means one of them
-is deaf, and which one is decided at build time — no runtime flag can
-reach it.
-
-This SDK declares `com.sentori.SentoriFirebaseMessagingService`. If
-another library should own delivery, remove ours from the merged
-manifest:
-
-```xml
-<service android:name="com.sentori.SentoriFirebaseMessagingService"
-         tools:node="remove" />
-```
+`unregister` is the one thing that does change the address: it clears
+the installation's local state, so the next `register` starts a new
+one. That is deliberate — a revoked device coming back should be a
+new registration, not a resumed one.
 
 ## What it costs you
 
