@@ -46,7 +46,7 @@
     "prepack": "bun run build"
   },
   "peerDependencies": {
-    "@goliapkg/sentori-react-native": ">=6.4.0",
+    "@goliapkg/sentori-react-native": ">=6.4.1",
     "expo": ">=57.0.0",
     "react-native": ">=0.86.0"
   },
