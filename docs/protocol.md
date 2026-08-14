@@ -380,6 +380,16 @@ that registered before `sentori.user()` ran carries none. The SDKs re-register b
 themselves when the person changes, so ordering `user()` and `register()` no longer
 matters (native ≥ 1.7.0).
 
+### `POST /v1/push/count`
+How many devices an audience selects, without sending to it. **api-scope**, same body
+as a send's targeting (`appUserId` / `traits` / `audience`), answers `{"matched": n}`.
+
+The same compiled query the send runs with `count(*)` in front, so it is not an
+estimate of what a send would do. The dashboard has counted before sending since
+audiences existed and refuses to send to a number nobody read; a backend had no way
+to — the preview is behind a browser session — so the one caller that sends on a timer
+was the one that could not find out how large a condition had grown. Added in 2.31.0.
+
 ### `GET /v1/push/receipts/{send_id}` · `POST /v1/push/sends/{send_id}/ack`
 What the vendor said, and what the device did. The ack takes an optional
 `{"ackSessionId": "…"}` so opening the same notification twice records once.

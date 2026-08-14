@@ -783,7 +783,7 @@ const SUFFIX = [
           id: 'dt3', provider: 'apns', env: 'sandbox',
           metadata: {},
           addressable: true,
-          userKeyTail: 'a91f3c', badStreak: 2, revokedAt: null,
+          userKeyTail: 'a91f3c', badStreak: 4, revokedAt: null,
           lastSeenAt: iso(86_400_000), createdAt: iso(86_400_000 * 9),
           tokenTail: 'ff10b8',
         },

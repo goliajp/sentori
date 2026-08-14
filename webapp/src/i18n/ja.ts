@@ -239,6 +239,7 @@ export const ja: Messages = {
   'push.deliveryEmpty':
     'まだ送信はありません。アプリ側で sentori.push.register() を呼ぶとデバイスが登録され、送信がここに出ます。',
   'push.deliveryTitle': '配信',
+  'push.badStreak': '{n} 回連続で失敗',
   'push.device': 'デバイス',
   'push.devicesEmpty': '登録済みデバイスはありません。アプリで sentori.push.register() を呼んでください。',
   'push.devicesTitle': 'デバイス',

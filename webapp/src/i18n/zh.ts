@@ -233,6 +233,7 @@ export const zh: Messages = {
   'push.deleteConfirm': '删除 {kind} 凭证?经由它的投递会立即停止。',
   'push.deliveryEmpty': '还没有发送。设备在 app 里用 sentori.push.register() 注册,发送记录会出现在这里。',
   'push.deliveryTitle': '投递',
+  'push.badStreak': '连续失败 {n} 次',
   'push.device': '设备',
   'push.devicesEmpty': '还没有设备注册。在 app 里调用 sentori.push.register()。',
   'push.devicesTitle': '设备',

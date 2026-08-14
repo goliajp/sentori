@@ -820,6 +820,36 @@ N="$(send_count "${KEYED/e2e-idem-1/e2e-idem-2}")"
 [[ "$N" == "2" ]] \
     || { echo "a fresh key queued ${N}, not 2" >&2; exit 1; }
 
+# The console has counted before sending since audiences existed. A
+# backend had no way to — the preview is behind a browser session — so
+# the one caller that sends automatically was the one that could not
+# find out how large a condition was first.
+echo "→ a backend can count an audience without sending to it"
+CNT="$(curl -fsS -X POST "${BASE}/v1/push/count" -H "Authorization: Bearer ${API_TOKEN}" \
+    -H 'content-type: application/json' \
+    -d '{"traits":{"plan":"pro","e2e":"aud"}}' | jq -r '.matched')"
+SENT="$(send_count '{"traits":{"plan":"pro","e2e":"aud"},"payload":{"title":"c"}}')"
+[[ "$CNT" == "$SENT" ]] \
+    || { echo "count said ${CNT} and the send reached ${SENT}" >&2; exit 1; }
+[[ "$CNT" -ge 1 ]] || { echo "count and send agreed on nothing" >&2; exit 1; }
+
+echo "→ counting does not send"
+BEFORE="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/sends?limit=1" \
+    | jq -r '.total')"
+curl -fsS -X POST "${BASE}/v1/push/count" -H "Authorization: Bearer ${API_TOKEN}" \
+    -H 'content-type: application/json' -d '{"traits":{"e2e":"aud"}}' > /dev/null
+AFTER="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/sends?limit=1" \
+    | jq -r '.total')"
+[[ "$BEFORE" == "$AFTER" ]] \
+    || { echo "counting queued something: ${BEFORE} → ${AFTER}" >&2; exit 1; }
+
+echo "→ the app's own token cannot count the customer's users"
+FORB="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${BASE}/v1/push/count" \
+    -H "Authorization: Bearer ${TOKEN}" -H 'content-type: application/json' \
+    -d '{"traits":{"e2e":"aud"}}')"
+[[ "$FORB" == "403" ]] \
+    || { echo "an ingest token counted, answering ${FORB}" >&2; exit 1; }
+
 echo "→ a backend's list can be narrowed by a device condition"
 N="$(send_count '{"audience":{"all":[
         {"any":[{"user":"usr_e2e_alice"},{"user":"usr_e2e_nobody"}]},
