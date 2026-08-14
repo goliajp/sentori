@@ -140,7 +140,13 @@ final class SentoriPendingCrashTests: XCTestCase {
                 environment: "test"
             ))
 
-        let deadline = Date().addingTimeInterval(10)
+        // Generous on purpose. This asserts that draining happens at
+        // all, not that it happens quickly — and a ten-second budget
+        // for a cold transport, a file read and a queue write is a
+        // budget a loaded CI runner loses. It did, twice, and passed
+        // on a re-run of the same commit. A liveness test that fails
+        // on a slow machine reports the machine.
+        let deadline = Date().addingTimeInterval(60)
         while SentoriTransport.__peekPersisted().isEmpty,
             SentoriTransport.__peekQueue().isEmpty,
             Date() < deadline
