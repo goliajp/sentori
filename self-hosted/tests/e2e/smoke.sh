@@ -401,6 +401,17 @@ OF/2NxApJCzGCEDdfSp6VQO30hyhRANCAAQRWz+jn65BtOMvdyHKcvjBeBSDZH2r
 1RTwjmYSi9R/zpBnuQ4EiMnCqfMPWiZqB4QdbAd0E7oH50VpuZ1P087G
 -----END PRIVATE KEY-----'
 
+# A project with nothing set up has to say so, and say it in codes the
+# console can translate rather than sentences it cannot.
+echo "→ readiness names what is missing on an empty project"
+RD="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/readiness")"
+echo "$RD" | jq -e '.ready == false' > /dev/null \
+    || { echo "an empty project reported ready: $RD" >&2; exit 1; }
+echo "$RD" | jq -e '[.checks[] | select(.id == "no-device")] | length == 1' > /dev/null \
+    || { echo "readiness did not notice there are no devices: $RD" >&2; exit 1; }
+echo "$RD" | jq -e '[.checks[] | select(.data | type != "object")] | length == 0' > /dev/null \
+    || { echo "a check carried something other than data: $RD" >&2; exit 1; }
+
 echo "→ a key with its line breaks stripped is refused"
 # What a single-line text field does to a pasted `.p8`, which is what
 # the form used to be. The save succeeded and the key failed hours
@@ -824,6 +835,18 @@ N="$(send_count "${KEYED/e2e-idem-1/e2e-idem-2}")"
 # backend had no way to — the preview is behind a browser session — so
 # the one caller that sends automatically was the one that could not
 # find out how large a condition was first.
+# And by now the project is set up — a credential, devices, identities,
+# traits, metadata. A checklist that always has something on it is a
+# checklist nobody reads, so this asserts it goes quiet.
+echo "→ readiness goes quiet once the project is actually set up"
+RD="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/readiness")"
+echo "$RD" | jq -e '.ready == true' > /dev/null \
+    || { echo "a set-up project still reported blocked: $RD" >&2; exit 1; }
+echo "$RD" | jq -e '[.checks[] | select(.level == "blocked" or .level == "warn")] | length == 0' \
+    > /dev/null || { echo "a set-up project still has gaps: $RD" >&2; exit 1; }
+echo "$RD" | jq -e '.live > 0' > /dev/null \
+    || { echo "readiness counted no devices: $RD" >&2; exit 1; }
+
 echo "→ a backend can count an audience without sending to it"
 CNT="$(curl -fsS -X POST "${BASE}/v1/push/count" -H "Authorization: Bearer ${API_TOKEN}" \
     -H 'content-type: application/json' \

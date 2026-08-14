@@ -295,6 +295,10 @@ pub fn router(state: Arc<AppState>) -> Router {
             post(admin::test_push::handle),
         )
         .route(
+            "/admin/api/projects/{project_id}/push/readiness",
+            get(admin::push_readiness::handle),
+        )
+        .route(
             "/admin/api/projects/{project_id}/push/health",
             get(admin::push_sends::health),
         )
