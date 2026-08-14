@@ -138,9 +138,17 @@ import ObjectiveC.runtime
     @objc public func handleRegisteredToken(_ deviceToken: Data) {
         let hex = deviceToken.map { String(format: "%02x", $0) }.joined()
         bufferLock.lock()
+        let changed = tokenHex != nil && tokenHex != hex
         tokenHex = hex
         registrationError = nil
         bufferLock.unlock()
+
+        // A token that replaced a different one is a rotation, and the
+        // server has to hear about it now. Buffering it in a field was
+        // the whole of what happened here before, so a rotation stayed
+        // invisible until the host next called `register` — and the
+        // device received nothing in between.
+        if changed { Sentori.push.handleRotatedToken(hex) }
     }
 
     /// Host-callable counterpart for the failure path.

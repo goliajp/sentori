@@ -91,6 +91,22 @@ object SentoriPush {
     private const val PREFS = "com.sentori.push"
     private const val HANDLE_KEY = "handle"
 
+    /**
+     * Which installation this is, kept for as long as the app is
+     * installed.
+     *
+     * The server keys the device row on it, so a vendor rotating its
+     * token becomes an update of the row that already exists rather
+     * than a new row with a new address. Before this, a rotation
+     * silently retired whatever `spToken` a backend was holding.
+     *
+     * Generated here rather than issued by the server because it has
+     * to exist before the first registration, and it never leaves the
+     * device except in that registration — it is not the address, and
+     * an identifier that can claim a row must not be one that travels.
+     */
+    private const val INSTALL_KEY = "install_id"
+
     private val worker =
         Executors.newSingleThreadScheduledExecutor { r ->
             Thread(r, "sentori-push").apply { isDaemon = true }
@@ -177,6 +193,57 @@ object SentoriPush {
     var permissionTimeoutMs: Long = 120_000
 
     /**
+     * A vendor has issued this device a new token; tell the server
+     * now rather than at the next launch.
+     *
+     * `onNewToken` fired and the SDK wrote the value into a field.
+     * Nothing sent it. So from the moment a token rotated until the
+     * host next called `register`, the server held a dead token: the
+     * sends went out, the vendor answered UNREGISTERED, quarantine
+     * retired the device, and it came back at the next launch under a
+     * different address. For an app that stays resident, "the next
+     * launch" is not a bounded wait.
+     *
+     * Only re-registers a device that has registered before —
+     * `spToken` on disk is the evidence. A token arriving for a
+     * device the host never registered is not something to act on
+     * unasked.
+     */
+    @JvmStatic
+    fun handleRotatedToken(context: Context, token: String) {
+        val appContext = context.applicationContext
+        val config = SentoriConfig.current ?: return
+        if (cachedDeviceHandle(appContext) == null) return
+        worker.execute {
+            when (val r = registerWithServer(appContext, token, config)) {
+                is Result.Success -> {
+                    synchronized(lock) { cachedHandle = r.handle }
+                    appContext
+                        .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                        .edit()
+                        .putString(HANDLE_KEY, r.handle)
+                        .apply()
+                }
+                is Result.Failure ->
+                    android.util.Log.w(
+                        "sentori",
+                        "push re-register after token rotation failed " +
+                            "(${r.reason.reason}): ${r.message}",
+                    )
+            }
+        }
+    }
+
+    /** This installation's id, minted on first use and kept after. */
+    internal fun installId(ctx: Context): String {
+        val prefs = ctx.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs.getString(INSTALL_KEY, null)?.let { return it }
+        val fresh = java.util.UUID.randomUUID().toString()
+        prefs.edit().putString(INSTALL_KEY, fresh).apply()
+        return fresh
+    }
+
+    /**
      * Say it out loud, once, where the person wiring this up is
      * looking.
      *
@@ -226,7 +293,7 @@ object SentoriPush {
             }
         }
 
-        return when (val r = registerWithServer(token, config)) {
+        return when (val r = registerWithServer(context, token, config)) {
             is Result.Success -> {
                 synchronized(lock) { cachedHandle = r.handle }
                 context
@@ -318,7 +385,11 @@ object SentoriPush {
         return null
     }
 
-    private fun registerWithServer(token: String, config: SentoriConfig): Result {
+    private fun registerWithServer(
+        context: Context,
+        token: String,
+        config: SentoriConfig,
+    ): Result {
         val body =
             mutableMapOf<String, Any?>(
                 // `kind`, not `provider`. The React Native SDK sent
@@ -326,6 +397,11 @@ object SentoriPush {
                 // registration it ever attempted.
                 "kind" to "fcm",
                 "nativeToken" to token,
+                // Which installation this is. The server keys the row
+                // on it, so a rotated token updates this device
+                // rather than creating a second one under a new
+                // address.
+                "installId" to installId(context),
                 // No `env`: FCM is one host, with no sandbox and
                 // production split for a token to be wrong about.
             )

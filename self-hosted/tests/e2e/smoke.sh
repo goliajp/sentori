@@ -519,6 +519,50 @@ DEV="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/device
 [[ "$(echo "$DEV" | jq -r '.devices[0].metadata.appVersion')" == "1.4.0" ]] \
     || { echo "reviving lost what the device had reported: $DEV" >&2; exit 1; }
 
+# The address has to survive the vendor rotating its token. It did
+# not: the row was unique on (project, provider, native_token), so a
+# new token wrote a new row with a new id, and every backend holding
+# the old one was addressing nothing — with nothing to tell it.
+echo "→ a rotated token keeps the same spToken"
+SP1="$(curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-rotate-before",
+         "installId":"e2e-install-0001"}' | jq -r '.spToken')"
+[[ -n "$SP1" && "$SP1" != "null" ]] || { echo "no spToken in the response" >&2; exit 1; }
+
+SP2="$(curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-rotate-after",
+         "installId":"e2e-install-0001"}' | jq -r '.spToken')"
+[[ "$SP1" == "$SP2" ]] \
+    || { echo "the address changed when the token rotated: ${SP1} → ${SP2}" >&2; exit 1; }
+
+# And it is one device afterwards, not two.
+ROTATED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/devices?limit=100" \
+    | jq '[.devices[] | select(.id == "'"$SP1"'")] | length')"
+[[ "$ROTATED" == "1" ]] || { echo "the rotated device is not a single row" >&2; exit 1; }
+
+# A device that registered before install ids existed still upserts
+# the way it always did, and picks one up when it next registers.
+echo "→ a device with no installId still registers"
+SPOLD="$(curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-legacy-token"}' | jq -r '.spToken')"
+SPADOPT="$(curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-legacy-token",
+         "installId":"e2e-install-adopt"}' | jq -r '.spToken')"
+[[ "$SPOLD" == "$SPADOPT" ]] \
+    || { echo "adopting an install id moved the device: ${SPOLD} → ${SPADOPT}" >&2; exit 1; }
+
+# `spTokens` is the name a caller sends to; `tokenIds` still works.
+echo "→ a send accepts spTokens"
+curl -fsS -X POST "${BASE}/v1/push/send" -H "Authorization: Bearer ${API_TOKEN}" \
+    -H 'content-type: application/json' \
+    -d '{"spTokens":["'"$SP1"'"],"payload":{"title":"e2e","body":"spTokens"}}' \
+    | jq -e '.queued == 1' > /dev/null \
+    || { echo "a send addressed by spTokens queued nothing" >&2; exit 1; }
+
 echo "→ a send actually queues"
 # `POST /v1/push/send` had ten values for nine columns and answered
 # 500 to everything. An endpoint that always 500s is
