@@ -798,6 +798,34 @@ mod tests {
         assert!(sql_of(&json!({ "issue": 12 })).is_err());
     }
 
+    /// A named list and a device condition in one expression.
+    ///
+    /// The three shorthands cannot be combined — `appUserId` with
+    /// `traits` is refused — and that led at least one reader to
+    /// believe "these forty people, but only the ones on 4.2" was not
+    /// expressible. It is: the restriction is on the sugar, not on the
+    /// expression, and `user` is a leaf like any other.
+    #[test]
+    fn a_backend_list_can_be_narrowed_by_a_device_condition() {
+        let v = json!({ "all": [
+            { "any": [ { "user": "usr_1" }, { "user": "usr_2" } ] },
+            { "device": "appVersion", "versionGte": "4.2" },
+            { "trait": "plan", "is": "pro" } ] });
+        let probe = sql_of(&v);
+        assert!(
+            probe.is_ok(),
+            "a list narrowed by a condition did not compile: {probe:?}"
+        );
+        let Ok((sql, count)) = probe else { return };
+        // Two ids, then the version leaf binds both its key and its
+        // value, then the trait binds one object for containment.
+        assert_eq!(count, 5, "the leaves did not bind what they compile to");
+        assert!(
+            sql.contains("dt.user_key") && sql.contains("sentori_version_key"),
+            "the identity and the version are not both in the clause: {sql}"
+        );
+    }
+
     /// A number where a version belongs is the mistake worth naming:
     /// `gte: 4.2` on "4.10.0" reads 4.10 as four-point-one.
     #[test]

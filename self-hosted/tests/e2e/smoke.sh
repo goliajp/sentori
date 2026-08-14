@@ -755,6 +755,27 @@ NOTITLE="$(curl -sS -o /dev/null -w '%{http_code}' -b "$JAR" -X POST \
 # "Notify the people who hit this issue" is the thing the whole design
 # points at, and the join had never run. `issue_user_hits` is written
 # at ingest and carries the same hash the device row does.
+# The shape a backend actually writes: it computed the list from its
+# own database, and still wants Sentori to apply the conditions only
+# Sentori knows. The three shorthands cannot be combined, which reads
+# as if this were impossible — the restriction is on the sugar, not on
+# the expression.
+echo "→ a backend's list can be narrowed by a device condition"
+N="$(send_count '{"audience":{"all":[
+        {"any":[{"user":"usr_e2e_alice"},{"user":"usr_e2e_nobody"}]},
+        {"device":"appVersion","versionGte":"4.2"}]},
+      "payload":{"title":"mixed"}}')"
+[[ "$N" == "1" ]] \
+    || { echo "a list narrowed by a version reached ${N} devices, not 1" >&2; exit 1; }
+
+# And the condition really is applied, rather than the list winning.
+N="$(send_count '{"audience":{"all":[
+        {"any":[{"user":"usr_e2e_alice"},{"user":"usr_e2e_nobody"}]},
+        {"device":"appVersion","versionGte":"9.0"}]},
+      "payload":{"title":"mixed"}}')"
+[[ "$N" == "0" ]] \
+    || { echo "the device condition was ignored: ${N} devices" >&2; exit 1; }
+
 echo "→ an issue selects the people it happened to"
 HITKEY="$(printf 'usr_e2e_hit' | shasum -a 256 | cut -d' ' -f1)"
 curl -fsS -X POST "${BASE}/v1/events" -H "Authorization: Bearer ${TOKEN}" \
