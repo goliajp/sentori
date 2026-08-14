@@ -44,6 +44,14 @@ import {
 } from './native.js'
 
 const STORAGE_KEY = 'sentori.push.ipt'
+/// Which installation this is.
+///
+/// Minted once and kept, so the server can key the device row on it
+/// rather than on the vendor's token. Without one a rotation writes a
+/// *new* row under a *new* spToken, and every backend holding the old
+/// one is addressing nothing — with nothing to tell it. The native
+/// SDKs were given this; this package registers from JS and was not.
+const INSTALL_KEY = 'sentori.push.install'
 
 let _cachedIpt: null | string = null
 // The last token the vendor handed us, kept so a sign-in can re-send
@@ -54,6 +62,7 @@ let _lastOptions: PushRegisterOptions = {}
 // the same thing is not sent: `user()` is a verb an app may call on
 // every screen, and one HTTP request per call is not free to a host.
 let _lastSentIdentity: string | null = null
+let _installId: null | string = null
 let _drainInterval: ReturnType<typeof setInterval> | null = null
 let _appStateSubscription: { remove: () => void } | null = null
 let _backgrounded = false
@@ -333,6 +342,10 @@ async function registerWithServer(
   // `kind`, not `provider` — the server's field name, which this
   // sent for a year as `provider` and got a 422 for every time.
   const body: Record<string, unknown> = {
+    // Which installation this is. The server keys the row on it, so a
+    // rotated token updates this device rather than creating a second
+    // one under a new address.
+    installId: await installId(),
     kind: isAndroid ? 'fcm' : 'apns',
     nativeToken,
     // The same salted identity hash every event carries, so the
@@ -406,6 +419,45 @@ function teardownBufferDrain(): void {
 async function pumpOnce(): Promise<void> {
   const state = await pushDrainState()
   flushBuffered(state.notifications, state.taps)
+  await reportRotationIfAny(state.token)
+}
+
+/// Tell the server when the vendor has handed the app a different
+/// token from the one it registered with.
+///
+/// Both native layers already route a rotation into the *native*
+/// `SentoriPush.handleRotatedToken`, and that refuses to act on a
+/// device the native side never registered — which, for a React
+/// Native app, is every device: registration goes through JS and the
+/// handle lives in AsyncStorage. So the rotation arrived nowhere, and
+/// the server held a dead token until the host next called
+/// `register()`. For an app that stays resident that is not a bounded
+/// wait.
+///
+/// This is the drain loop that already runs at 1 Hz and already reads
+/// the token; it threw it away. Foreground only, like the rest of the
+/// loop — a rotation while backgrounded is reported on the next tick
+/// after the app comes back, which is bounded.
+async function reportRotationIfAny(token: string | undefined): Promise<void> {
+  if (token == null || token === '' || token === _lastNativeToken) return
+  // Only a device that has registered: a token arriving for one that
+  // never did is not something to act on unasked, which is the rule
+  // both native SDKs follow.
+  if (_lastNativeToken == null) return
+  const cfg = tryGetRuntimeConfig()
+  if (cfg == null) return
+  const previous = _lastNativeToken
+  _lastNativeToken = token
+  try {
+    const ipt = await registerWithServer(cfg, token, _lastOptions)
+    _cachedIpt = ipt
+    void persistIpt(ipt)
+  } catch (e) {
+    // Put it back, or one failed report means the rotation is never
+    // mentioned again and the device is unreachable for good.
+    _lastNativeToken = previous
+    logger.warn('push', 'reporting a rotated token failed', e)
+  }
 }
 
 function flushBuffered(
@@ -531,6 +583,51 @@ function startAppStateWatch(): void {
   }
 }
 
+/// This installation's id, minted on first use and kept after.
+///
+/// Falls back to a module-scoped value when there is no AsyncStorage,
+/// which is the same fallback the handle uses: worse than persistent,
+/// better than nothing, and it still keeps one launch's rotations
+/// pointed at one row.
+async function installId(): Promise<string> {
+  if (_installId != null) return _installId
+  const storage = await tryAsyncStorage()
+  if (storage) {
+    try {
+      const seen = await storage.getItem(INSTALL_KEY)
+      if (typeof seen === 'string' && seen.length > 0) {
+        _installId = seen
+        return seen
+      }
+    } catch {
+      // An unreadable store is a store with nothing in it.
+    }
+  }
+  const fresh = randomId()
+  _installId = fresh
+  if (storage) {
+    try {
+      await storage.setItem(INSTALL_KEY, fresh)
+    } catch (e) {
+      logger.warn('push', 'AsyncStorage.setItem failed', e)
+    }
+  }
+  return fresh
+}
+
+/// A uuid, without requiring one to exist.
+///
+/// `crypto.randomUUID` is present on newer Hermes and absent on older
+/// ones, and this must not be the line that decides whether push
+/// works on an older engine.
+function randomId(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto
+  if (typeof c?.randomUUID === 'function') return c.randomUUID()
+  let out = ''
+  for (let i = 0; i < 32; i++) out += Math.floor(Math.random() * 16).toString(16)
+  return out
+}
+
 async function persistIpt(ipt: string): Promise<void> {
   const storage = await tryAsyncStorage()
   if (!storage) return
@@ -586,6 +683,7 @@ function joinUrl(base: string, path: string): string {
  *  into the next. Production code paths must not call this. */
 export function __resetForTests(): void {
   _cachedIpt = null
+  _installId = null
   _onMessage = undefined
   _onTap = undefined
   _ackQueue = []

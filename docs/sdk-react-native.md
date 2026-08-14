@@ -623,6 +623,24 @@ can choose. Two such services in one APK means one of them is deaf.
 Pick one per build (an EAS profile that omits the other plugin, or
 `tools:node="remove"` on the loser's service).
 
+### The handle is the address, and it holds still
+
+`register()` resolves to `{ ok: true, ipt }`, and that value is the
+`spToken` the send API takes — the thing your backend stores against
+its own user. It is not the vendor's token, and it is not derived from
+it.
+
+That distinction is the reason it holds still. Vendor tokens rotate —
+a reinstall, a restore, cleared app data — and the SDK reports the new
+one against the same installation, so the row keeps its id and
+whatever you stored still reaches this device. It did not: a rotation
+wrote a second row under a new address and the old one went quiet with
+nothing to say why. Fixed in 6.4.0.
+
+Reporting happens on the foreground drain the SDK already runs, so a
+rotation while the app is backgrounded is sent on the next tick after
+it comes back. Nothing is required of the host.
+
 ### Other calls
 
 | Call | Does |
