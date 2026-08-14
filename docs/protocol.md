@@ -240,7 +240,9 @@ app already ships with.
   "nativeToken": "9f2c…",
   "env":         "sandbox",
   "userKey":     "ca010ec7…",
-  "metadata":    { "appVersion": "4.2.1", "channel": "store" }
+  "installId":   "6b1f…",
+  "metadata":    { "appVersion": "4.2.1", "channel": "store" },
+  "traits":      { "plan": "pro", "locale": "ja-JP" }
 }
 ```
 
@@ -254,17 +256,34 @@ app already ships with.
   (`SHA-256` of the normalised id, computed on the device). With it, an issue can
   reach the people it happened to; without it the device receives broadcasts only.
   The dashboard shows the difference as "N devices, M addressable".
-- `metadata` is yours, stored verbatim and shown per device in Settings ▸ Push.
+- `metadata` is yours, stored verbatim and shown per device in Push ▸ Devices.
   Needs server ≥ 2.22.0 — before that the field reached neither the SDK's request nor
   the server's struct, and every row read `{}`.
+- `traits` is what you know about the **person**, and what a send selects on: plan,
+  cohort, org. Kept apart from `metadata`, which is about the build — otherwise a
+  channel called `pro` answers a send aimed at the pro plan. Unlike `userKey` these
+  travel raw, which is the point of the pair: the identity stays unreadable and the
+  attributes stay selectable. Put nothing identifying here.
+  Omitting `traits` keeps what the row has; sending `{}` clears them, which is what
+  signing out sends. Needs server ≥ 2.28.0.
+- `installId` is yours to mint once per install and keep. It is the upsert key, so a
+  rotated vendor token updates this device instead of creating a second one under a
+  new address. Never echoed back — the address a caller sends to is the row id, and an
+  identifier that can claim a row must not be one that travels through logs.
 
 Response (`202 Accepted`):
 
 ```json
-{ "token_id": "019ff080-2aeb-7e30-aba1-4431b296d120", "is_new": true }
+{
+  "spToken":  "019ff080-2aeb-7e30-aba1-4431b296d120",
+  "token_id": "019ff080-2aeb-7e30-aba1-4431b296d120",
+  "is_new":   true
+}
 ```
 
-`token_id` is the `device_tokens` row id — a **bare uuid**. It carried an `ipt_`
+`spToken` is the name; `token_id` is the name it shipped under, and both carry the
+same value until the old one is retired. It is the `device_tokens` row id — a
+**bare uuid**. It carried an `ipt_`
 prefix in v0.2. Anything routing on that prefix silently sends to the wrong place
 after upgrading, so accept both while old devices are still registered.
 
@@ -283,16 +302,72 @@ credential that can send notifications to your users is not one to hand out.
 
 ```json
 {
-  "tokenIds": ["019ff080-…"],
+  "spTokens": ["019ff080-…"],
   "payload":  { "title": "Back in stock", "body": "…" },
   "idempotencyKey": "restock-2026-08-11-u123"
 }
 ```
 
-Target with exactly one of `tokenIds`, `nativeTokens` or `topic`. `payload` is passed
-to the vendor verbatim. Response (`202 Accepted`) is
-`{"send_ids": [...], "queued": n}`; a background worker drains the queue every 5 s,
-retries, and quarantines a token the vendor rejects permanently.
+`payload` is passed to the vendor verbatim. Response (`202 Accepted`) is
+`{"send_ids": [...], "queued": n, "capped": false}`; a background worker drains the
+queue every 5 s, retries, and quarantines a token the vendor rejects permanently.
+`capped` is true when the audience was larger than one call will take (100 000), so
+somebody did not get it.
+
+#### Who it goes to
+
+Six ways, and they are one mechanism. `spTokens` / `tokenIds` / `nativeTokens` /
+`topic` name devices; `appUserId` / `traits` / `audience` name people. Several device
+modes together are a union. Only one of the three people modes may be given at a
+time — a caller who sets two meant one of them, and guessing produces a send that
+goes somewhere plausible and wrong; write them as one `audience` instead.
+
+```json
+{ "appUserId": "usr_123", "payload": { … } }
+```
+
+The id is hashed here the way the device hashed it, so it is compared against the
+same value. Shorthand for `{"audience": {"user": "usr_123"}}`.
+
+```json
+{ "traits": { "plan": "pro", "locale": "ja-JP" }, "payload": { … } }
+```
+
+Every trait must match. Shorthand for an `audience` of equalities.
+
+```json
+{
+  "audience": { "all": [
+    { "trait":  "plan",       "in": ["pro", "team"] },
+    { "device": "appVersion", "versionGte": "4.2" },
+    { "any": [ { "trait": "locale", "is": "ja-JP" },
+               { "trait": "org",    "is": "acme"  } ] },
+    { "not": { "trait": "churned", "is": true } }
+  ] },
+  "payload": { … }
+}
+```
+
+A tree, not a string: the dashboard's condition editor builds and reads a structure,
+and a grammar would mean writing a parser and then the same structure behind it.
+
+- **Groups** — `all`, `any`, `not`. An `any` with no branches matches nothing, which
+  is what an editor holds the moment someone adds an or-group before filling it in.
+- **Leaves** name one of `trait` (the person, from `user()`), `device` (the build,
+  from `register()`), or `user` / `userKey` (the identity).
+- **Comparisons** — `is`, `isNot`, `in`, `exists`, `prefix`, `gte` / `gt` / `lte` /
+  `lt` (numbers), and `versionGte` / `versionGt` / `versionLte` / `versionLt`.
+- **Use the version operators for versions.** As text `4.10.0` sorts *below* `4.2`,
+  which is wrong for the first time on the day you ship your tenth minor release.
+  `4.2` and `4.2.0` are the same version; a build suffix is ignored; anything
+  unparseable is left out rather than swept in.
+- At most 64 conditions, nested at most 8 deep. Explicit id lists are capped at 1 000
+  — more than that is an audience, not a list.
+
+An audience selects only live devices, and only ones whose `traits` were set: a device
+that registered before `sentori.user()` ran carries none. The SDKs re-register by
+themselves when the person changes, so ordering `user()` and `register()` no longer
+matters (native ≥ 1.7.0).
 
 ### `GET /v1/push/receipts/{send_id}` · `POST /v1/push/sends/{send_id}/ack`
 What the vendor said, and what the device did. The ack takes an optional

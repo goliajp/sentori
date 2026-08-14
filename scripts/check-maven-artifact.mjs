@@ -86,7 +86,14 @@ if (version && !version.startsWith(declared)) {
   problems.push(
     `the staged artifact is ${version} but sdk/native/VERSION says ${declared} — ` +
       'this is stale output from an earlier build. Re-stage with\n' +
-      '    (cd sdk/native/android && ./gradlew publishReleasePublicationToBuildDirRepository)',
+      '    rm -rf sdk/native/android/build/staging-repo\n' +
+      '    (cd sdk/native/android && ./gradlew publishReleasePublicationToBuildDirRepository)\n' +
+      // Publishing without clearing leaves both versions in the tree,
+      // and this check reads whichever POM it walks into first — so
+      // following the old wording produced the same message again.
+      // The release script has always cleared first; the advice here
+      // had not.\n' +
+      '    (the release script already does both)',
   );
 }
 

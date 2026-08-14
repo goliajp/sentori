@@ -538,7 +538,7 @@ the host app writes one call for both.
 ```ts
 import { sentori } from '@goliapkg/sentori-react-native'
 
-sentori.user({ id: currentUser.id })   // before register — see below
+sentori.user({ id: currentUser.id, traits: { plan: 'pro' } })
 
 const r = await sentori.push.register({
   onMessage: (n) => console.log('arrived', n.title),
@@ -570,17 +570,29 @@ and each reason asks for something different:
 cached permission decision without re-prompting, and the server
 upserts on `(project, provider, token)`.
 
-### Call `sentori.user()` first
+### Who the device belongs to
 
-Registration sends the same salted identity hash every event carries.
-With it, the device is **addressable** — the dashboard can reach the
-people who hit a particular issue. Without it the device is registered
-but can only receive broadcasts. The raw identity never leaves the
-device either way.
+Registration sends the same identity hash every event carries. With it
+the device is **addressable** — the dashboard can reach the people who
+hit a particular issue, and a send can name a user rather than a
+device. The raw identity never leaves the device either way.
 
-Settings ▸ Push shows both numbers. Devices climbing while addressable
-stays at zero means `sentori.user()` is running after
-`sentori.push.register()`, or not at all.
+Order does not matter. A registered device re-registers by itself when
+`sentori.user()` changes, so signing in ten seconds after launch — the
+usual order — reaches the server straight away. It used to say to call
+`user()` first, which was advice for a defect: nothing updated the row
+in between, so a device that registered before sign-in carried no user
+for the life of the install, and a send aimed at that person matched
+nothing and reported success.
+
+`traits` ride along: attributes a campaign selects on, such as plan,
+cohort or org. They travel raw, unlike the id and email, which only
+ever leave as a hash — so put nothing identifying in them. A call
+describes the person completely, so `sentori.user(null)` clears them
+and a signed-out device stops being selectable as whoever just left.
+
+Push ▸ Devices shows both, per device, and Push ▸ Audience counts how
+many a condition selects before anything is sent.
 
 ### Setup
 
