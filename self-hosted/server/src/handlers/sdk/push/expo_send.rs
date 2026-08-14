@@ -50,6 +50,8 @@ pub async fn handle(
             .unwrap_or_default();
 
         let body_obj = SendBody {
+            traits: None,
+            audience: None,
             token_ids: vec![],
             sp_tokens: vec![],
             native_tokens: to,

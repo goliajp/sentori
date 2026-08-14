@@ -92,6 +92,17 @@ public final class SentoriPush: NSObject {
     /// travels through logs and other people's databases.
     private static let installKey = "com.sentori.push.install"
 
+    /// The last token APNs issued, so a sign-in can send the
+    /// registration again without waiting on the OS for another.
+    ///
+    /// It is already in this app's container; keeping it costs nothing
+    /// new. The handle stays the capability — this is only an input to
+    /// producing one.
+    private static let tokenKey = "com.sentori.push.native"
+
+    /// What the server was last told, so a repeat is not sent.
+    private var lastSentIdentity: String?
+
     static var installId: String {
         if let existing = UserDefaults.standard.string(forKey: installKey) {
             return existing
@@ -154,10 +165,7 @@ public final class SentoriPush: NSObject {
 
         switch await registerWithServer(token: token, config: config) {
         case .success(let handle):
-            lock.lock()
-            cachedHandle = handle
-            lock.unlock()
-            UserDefaults.standard.set(handle, forKey: Self.handleKey)
+            remember(handle: handle, token: token)
             startDrain()
             return .success(handle: handle)
         case .failure(let reason, let message):
@@ -218,14 +226,65 @@ public final class SentoriPush: NSObject {
         Task {
             switch await registerWithServer(token: token, config: config) {
             case .success(let handle):
-                lock.lock()
-                cachedHandle = handle
-                lock.unlock()
-                UserDefaults.standard.set(handle, forKey: Self.handleKey)
+                remember(handle: handle, token: token)
             case .failure(let reason, let message):
                 NSLog(
                     "%@",
                     "[sentori] push re-register after token rotation failed "
+                        + "(\(reason.name)): \(message)")
+            }
+        }
+    }
+
+    /// Keep the address and the token it came from, and start
+    /// following the person.
+    ///
+    /// Three callers — the first registration, a rotation, and a
+    /// sign-in — and three copies of four lines is how two of them end
+    /// up writing different keys.
+    private func remember(handle: String, token: String) {
+        lock.lock()
+        cachedHandle = handle
+        lock.unlock()
+        UserDefaults.standard.set(handle, forKey: Self.handleKey)
+        UserDefaults.standard.set(token, forKey: Self.tokenKey)
+        SentoriScope.setIdentityListener { [weak self] in self?.identityChanged() }
+    }
+
+    /// Send the registration again because the person changed.
+    ///
+    /// Only for a device that has already registered — a stored token
+    /// is the evidence, the same rule `handleRotatedToken` uses.
+    /// Returns immediately: `Sentori.user` is synchronous and stays
+    /// that way.
+    private func identityChanged() {
+        guard let config = SentoriConfig.current,
+            let token = UserDefaults.standard.string(forKey: Self.tokenKey),
+            UserDefaults.standard.string(forKey: Self.handleKey) != nil
+        else { return }
+
+        // `Sentori.user` is a verb an app may call on every screen,
+        // and one request per call is not free to a host.
+        let identity = "\(SentoriScope.userKey ?? "-")\u{0}\(SentoriScope.traits ?? [:])"
+        lock.lock()
+        let repeated = identity == lastSentIdentity
+        if !repeated { lastSentIdentity = identity }
+        lock.unlock()
+        if repeated { return }
+
+        Task {
+            switch await registerWithServer(token: token, config: config) {
+            case .success(let handle):
+                remember(handle: handle, token: token)
+            case .failure(let reason, let message):
+                // The row still names the previous person, so the next
+                // change has to be allowed to try again.
+                lock.lock()
+                lastSentIdentity = nil
+                lock.unlock()
+                NSLog(
+                    "%@",
+                    "[sentori] updating the device after a sign-in failed "
                         + "(\(reason.name)): \(message)")
             }
         }
@@ -260,6 +319,13 @@ public final class SentoriPush: NSObject {
         drainTimer = nil
         lock.unlock()
         UserDefaults.standard.removeObject(forKey: Self.handleKey)
+        UserDefaults.standard.removeObject(forKey: Self.tokenKey)
+        // Nothing to follow the person to any more; a later sign-in
+        // must not resurrect a device the host just revoked.
+        SentoriScope.setIdentityListener(nil)
+        lock.lock()
+        lastSentIdentity = nil
+        lock.unlock()
         SentoriPushNotifications.shared.unregisterForRemoteNotifications()
 
         guard let handle, let config = SentoriConfig.current,
@@ -333,6 +399,11 @@ public final class SentoriPush: NSObject {
         // dashboard can address this device by the person who hit an
         // issue. Absent until the host calls `Sentori.user`.
         if let userKey = SentoriScope.userKey { body["userKey"] = userKey }
+        // Attributes of the person rather than of the device, kept
+        // apart so a build channel called "pro" cannot answer a send
+        // aimed at the pro plan. Absent leaves the row's traits alone;
+        // an empty object clears them, which is what signing out sends.
+        if let traits = SentoriScope.traits { body["traits"] = traits }
 
         guard let payload = try? JSONSerialization.data(withJSONObject: body) else {
             return .failure(reason: .serverRejected, message: "could not encode registration")
@@ -433,6 +504,13 @@ public final class SentoriPush: NSObject {
         drainTimer = nil
         lock.unlock()
         UserDefaults.standard.removeObject(forKey: Self.handleKey)
+        UserDefaults.standard.removeObject(forKey: Self.tokenKey)
+        // Nothing to follow the person to any more; a later sign-in
+        // must not resurrect a device the host just revoked.
+        SentoriScope.setIdentityListener(nil)
+        lock.lock()
+        lastSentIdentity = nil
+        lock.unlock()
     }
 }
 

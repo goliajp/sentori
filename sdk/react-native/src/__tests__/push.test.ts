@@ -15,7 +15,7 @@ import {
   register,
 } from '../push';
 import { __resetForTests as resetConfig, setConfig } from '../config';
-import { __resetForTests as resetScope } from '../scope';
+import { __resetForTests as resetScope, setUser } from '../scope';
 
 const baseConfig = {
   token: 'st_test',
@@ -200,5 +200,103 @@ describe('push.register', () => {
 
     expect(r.ok).toBe(false);
     expect(seen).not.toBeNull();
+  });
+});
+
+// A device registers at launch; the person signs in ten seconds
+// later. Until now nothing updated the row, so it carried no user for
+// the life of the install — and a send aimed at that user reached
+// nobody and reported success.
+describe('push registration follows the person', () => {
+  /** Record every /v1/push/tokens body, so a test can say what the
+   *  server was told rather than that it was told something. */
+  function recordingFetch(): Array<Record<string, unknown>> {
+    const seen: Array<Record<string, unknown>> = [];
+    globalThis.fetch = ((_url: string, init?: { body?: string }) => {
+      if (init?.body != null) {
+        seen.push(JSON.parse(init.body) as Record<string, unknown>);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 202,
+        json: () => Promise.resolve({ spToken: 'dev-1', token_id: 'dev-1' }),
+      });
+    }) as unknown as typeof fetch;
+    return seen;
+  }
+
+  /** `user()` hashes on a promise, so the key lands a tick later and
+   *  the re-registration is sent after that. */
+  const settle = () => new Promise((r) => setTimeout(r, 10));
+
+  beforeEach(() => {
+    resetPush();
+    resetConfig();
+    resetScope();
+    setPlatform('ios');
+    setConfig(baseConfig);
+    __setNativeForTests(grantingNative());
+  });
+  afterEach(() => {
+    resetPush();
+    resetConfig();
+    resetScope();
+    setPlatform(null);
+    __setNativeForTests(undefined);
+    globalThis.fetch = realFetch;
+  });
+
+  it('sends the identity when the person signs in after registering', async () => {
+    const seen = recordingFetch();
+    await register();
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.userKey).toBeUndefined();
+
+    setUser({ id: 'usr_123', traits: { plan: 'pro' } });
+    await settle();
+
+    // Two assertions, because either alone passes on a mistake: a
+    // count alone passes if the update carries nothing, and a key
+    // alone passes if the update never happened and this is still the
+    // first request.
+    expect(seen).toHaveLength(2);
+    expect(typeof seen[1]?.userKey).toBe('string');
+    expect(seen[1]?.traits).toEqual({ plan: 'pro' });
+  });
+
+  it('does not send anything when the same person is set again', async () => {
+    const seen = recordingFetch();
+    await register();
+    setUser({ id: 'usr_123', traits: { plan: 'pro' } });
+    await settle();
+    const after = seen.length;
+
+    // `user()` is a verb an app may call on every screen. One request
+    // per call is not free to a host, and the iron rule is that we are.
+    setUser({ id: 'usr_123', traits: { plan: 'pro' } });
+    await settle();
+    expect(seen).toHaveLength(after);
+  });
+
+  it('clears the traits when the person signs out', async () => {
+    const seen = recordingFetch();
+    await register();
+    setUser({ id: 'usr_123', traits: { plan: 'pro' } });
+    await settle();
+    setUser(null);
+    await settle();
+
+    const last = seen[seen.length - 1];
+    expect(last?.userKey).toBeUndefined();
+    // `{}` rather than absent: absent means "keep what is there", so
+    // a signed-out device would stay selectable as a pro user.
+    expect(last?.traits).toEqual({});
+  });
+
+  it('does not register a device that never registered', async () => {
+    const seen = recordingFetch();
+    setUser({ id: 'usr_123' });
+    await settle();
+    expect(seen).toHaveLength(0);
   });
 });

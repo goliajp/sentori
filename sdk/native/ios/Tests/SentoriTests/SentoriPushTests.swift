@@ -209,6 +209,116 @@ final class SentoriPushTests: XCTestCase {
 /// Records what the SDK posts, without replacing anything the SDK
 /// calls: the interception is at the URL loading system, so the
 /// request under test is the one that would have gone out.
+extension SentoriPushTests {
+
+    /// A device registers at launch; the person signs in ten seconds
+    /// later. Nothing updated the row, so it carried no user for the
+    /// life of the install — and a send aimed at that person reached
+    /// nobody and reported success.
+    ///
+    /// Deliberately the same assertions as
+    /// `signingInAfterRegisteringUpdatesTheDevice` in Kotlin.
+    func testSigningInAfterRegisteringUpdatesTheDevice() {
+        RotationProbe.reset()
+        URLProtocol.registerClass(RotationProbe.self)
+        defer {
+            URLProtocol.unregisterClass(RotationProbe.self)
+            SentoriScope.clear()
+        }
+
+        SentoriConfig.set(
+            SentoriConfig(
+                token: "st_test",
+                ingestUrl: "http://127.0.0.1:9",
+                release: "app@1.0.0",
+                environment: "test"
+            ))
+        // A device that has registered, which is the only kind a
+        // sign-in should act on. The rotation path is what puts both
+        // the handle and the token where the sign-in path reads them.
+        UserDefaults.standard.set("019ff000-0000-7000-8000-000000000001", forKey: handleKeyForTests)
+        defer { UserDefaults.standard.removeObject(forKey: handleKeyForTests) }
+        Sentori.push.handleRotatedToken("token-1")
+        waitForBodies(1)
+        XCTAssertEqual(RotationProbe.bodies.count, 1, "the device never registered")
+        XCTAssertFalse(
+            RotationProbe.bodies[0].contains("userKey"),
+            "the first registration already carried a user")
+
+        SentoriScope.setUser(id: "usr_123", email: nil, traits: ["plan": "pro"])
+        waitForBodies(2)
+
+        // Both halves matter: a count alone passes when the update
+        // carries nothing, and a key alone passes when no update
+        // happened and this is still the first request.
+        XCTAssertEqual(
+            RotationProbe.bodies.count, 2,
+            "signing in reached nobody — the device row keeps no user, so a send aimed "
+                + "at that person matches no device and reports success")
+        let update = RotationProbe.bodies.count > 1 ? RotationProbe.bodies[1] : ""
+        XCTAssertTrue(update.contains("userKey"), "the update carried no identity: \(update)")
+        XCTAssertTrue(update.contains("plan"), "the update carried no traits: \(update)")
+    }
+
+    /// `Sentori.user` is a verb an app may call on every screen. One
+    /// request per call is not free to a host, and the iron rule is
+    /// that this SDK is.
+    func testSettingTheSamePersonAgainSendsNothing() {
+        RotationProbe.reset()
+        URLProtocol.registerClass(RotationProbe.self)
+        defer {
+            URLProtocol.unregisterClass(RotationProbe.self)
+            SentoriScope.clear()
+        }
+        SentoriConfig.set(
+            SentoriConfig(
+                token: "st_test",
+                ingestUrl: "http://127.0.0.1:9",
+                release: "app@1.0.0",
+                environment: "test"
+            ))
+        UserDefaults.standard.set("019ff000-0000-7000-8000-000000000001", forKey: handleKeyForTests)
+        defer { UserDefaults.standard.removeObject(forKey: handleKeyForTests) }
+        Sentori.push.handleRotatedToken("token-1")
+        waitForBodies(1)
+
+        SentoriScope.setUser(id: "usr_123", email: nil, traits: ["plan": "pro"])
+        waitForBodies(2)
+        let after = RotationProbe.bodies.count
+
+        SentoriScope.setUser(id: "usr_123", email: nil, traits: ["plan": "pro"])
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        XCTAssertEqual(RotationProbe.bodies.count, after, "the same person was sent twice")
+    }
+
+    /// A device that never registered is not registered by a sign-in.
+    func testSigningInOnADeviceThatNeverRegisteredSendsNothing() {
+        RotationProbe.reset()
+        URLProtocol.registerClass(RotationProbe.self)
+        defer {
+            URLProtocol.unregisterClass(RotationProbe.self)
+            SentoriScope.clear()
+        }
+        SentoriConfig.set(
+            SentoriConfig(
+                token: "st_test",
+                ingestUrl: "http://127.0.0.1:9",
+                release: "app@1.0.0",
+                environment: "test"
+            ))
+        SentoriScope.setUser(id: "usr_123", email: nil, traits: ["plan": "pro"])
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        XCTAssertEqual(RotationProbe.bodies.count, 0)
+    }
+
+    private func waitForBodies(_ n: Int) {
+        let deadline = Date().addingTimeInterval(10)
+        while RotationProbe.bodies.count < n, Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        }
+    }
+}
+
 private final class RotationProbe: URLProtocol {
     nonisolated(unsafe) static var bodies: [String] = []
     private static let lock = NSLock()

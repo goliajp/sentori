@@ -623,4 +623,82 @@ class SentoriPushTest {
         }
     }
 
+
+    /**
+     * A device registers at launch; the person signs in ten seconds
+     * later. Nothing updated the row, so it carried no user for the
+     * life of the install — and a send aimed at that person reached
+     * nobody and reported success.
+     */
+    @Test
+    fun signingInAfterRegisteringUpdatesTheDevice() {
+        Recorder().use { rec ->
+            val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+            configureAt(rec.port)
+
+            assertNotNull(SentoriPush.registerNativeTokenForTests(ctx, "token-1"))
+            assertEquals(1, rec.bodies.size)
+            assertTrue(
+                "the first registration already carried a user: ${rec.bodies[0]}",
+                !rec.bodies[0].contains("userKey"),
+            )
+
+            Sentori.user("usr_123", null, mapOf("plan" to "pro"))
+
+            val deadline = System.currentTimeMillis() + 15_000
+            while (rec.bodies.size < 2 && System.currentTimeMillis() < deadline) Thread.sleep(50)
+
+            // Both halves matter: a count alone passes when the update
+            // carries nothing, and a key alone passes when no update
+            // happened and this is still the first request.
+            assertEquals(
+                "signing in reached nobody — the device row keeps no user, so a send " +
+                    "aimed at that person matches no device and reports success",
+                2,
+                rec.bodies.size,
+            )
+            assertTrue(
+                "the update carried no identity: ${rec.bodies[1]}",
+                rec.bodies[1].contains("\"userKey\""),
+            )
+            assertTrue(
+                "the update carried no traits: ${rec.bodies[1]}",
+                rec.bodies[1].contains("\"plan\""),
+            )
+        }
+    }
+
+    /**
+     * `Sentori.user` is a verb an app may call on every screen. One
+     * request per call is not free to a host, and the iron rule is
+     * that this SDK is.
+     */
+    @Test
+    fun settingTheSamePersonAgainSendsNothing() {
+        Recorder().use { rec ->
+            val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+            configureAt(rec.port)
+            assertNotNull(SentoriPush.registerNativeTokenForTests(ctx, "token-1"))
+
+            Sentori.user("usr_123", null, mapOf("plan" to "pro"))
+            val deadline = System.currentTimeMillis() + 15_000
+            while (rec.bodies.size < 2 && System.currentTimeMillis() < deadline) Thread.sleep(50)
+            val after = rec.bodies.size
+
+            Sentori.user("usr_123", null, mapOf("plan" to "pro"))
+            Thread.sleep(500)
+            assertEquals("the same person was sent twice", after, rec.bodies.size)
+        }
+    }
+
+    /** A device that never registered is not registered by a sign-in. */
+    @Test
+    fun signingInOnADeviceThatNeverRegisteredSendsNothing() {
+        Recorder().use { rec ->
+            configureAt(rec.port)
+            Sentori.user("usr_123", null, mapOf("plan" to "pro"))
+            Thread.sleep(500)
+            assertEquals(0, rec.bodies.size)
+        }
+    }
 }

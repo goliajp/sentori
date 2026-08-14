@@ -12,7 +12,28 @@ object SentoriScope {
 
     private val lock = Any()
     private var _userKey: String? = null
+    private var _traits: Map<String, Any?>? = null
     private val _context = mutableMapOf<String, Any?>()
+
+    /**
+     * What to tell when the person changes.
+     *
+     * The push device row carries the identity, and nothing updated it
+     * after registration: an app that registers at launch and signs in
+     * ten seconds later — which is every app with a login screen —
+     * held a row with no user on it for the life of the install. A
+     * send aimed at that person reached nobody and said it had worked.
+     *
+     * A callback rather than a call into [SentoriPush], so this file
+     * keeps knowing nothing about push.
+     */
+    @Volatile private var onIdentityChange: (() -> Unit)? = null
+
+    /** Register interest in identity changes. Only push does. */
+    @JvmStatic
+    fun setIdentityListener(listener: (() -> Unit)?) {
+        onIdentityChange = listener
+    }
 
     /**
      * Identify the person using the app. Only the hash goes on the
@@ -27,9 +48,22 @@ object SentoriScope {
      * Pass null for both to forget the user on sign-out.
      */
     @JvmStatic
-    fun setUser(id: String?, email: String?) {
+    @JvmOverloads
+    fun setUser(id: String?, email: String?, traits: Map<String, Any?>? = null) {
         val key = SentoriIdentity.userKey(id, email)
-        synchronized(lock) { _userKey = key }
+        synchronized(lock) {
+            _userKey = key
+            // A call describes the person completely, so one made
+            // without traits means they have none rather than "leave
+            // the last ones". Absent and empty differ on the wire —
+            // absent keeps what the row has, and a signed-out device
+            // that kept them would still be selectable as whoever
+            // just left.
+            _traits = traits?.toMap() ?: emptyMap()
+        }
+        // Outside the lock: a listener that registers a device must
+        // not be holding this while it makes a request.
+        runCatching { onIdentityChange?.invoke() }
     }
 
     /** Merge keys into the ambient context. Later calls win per key. */
@@ -43,6 +77,17 @@ object SentoriScope {
         get() = synchronized(lock) { _userKey }
 
     /**
+     * The person's attributes, for the push device row.
+     *
+     * Null until the host has called [setUser] at all, which is
+     * different from an empty map: null leaves the row's traits alone,
+     * empty clears them.
+     */
+    @JvmStatic
+    val traits: Map<String, Any?>?
+        get() = synchronized(lock) { _traits }
+
+    /**
      * Null rather than an empty map, so an event with no context omits
      * the field instead of carrying `{}`.
      */
@@ -54,7 +99,9 @@ object SentoriScope {
     fun clear() {
         synchronized(lock) {
             _userKey = null
+            _traits = null
             _context.clear()
         }
+        onIdentityChange = null
     }
 }

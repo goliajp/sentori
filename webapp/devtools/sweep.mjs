@@ -33,13 +33,36 @@ const ROUTES = [
   // Push is its own module now. Its sections are URL-driven for the
   // same reason the settings ones are — a screen the sweep cannot
   // reach is a screen nobody photographs until a user complains.
-  'push', 'push?tab=devices', 'push?tab=credentials',
+  'push', 'push?tab=audience', 'push?tab=devices', 'push?tab=credentials',
   'settings?tab=audit', 'settings?tab=account',
   'login', 'forgot-password',
 ];
 
 /** Per-route script run after load, for state behind a click. */
 const OPEN_ALL = {
+  // An empty condition editor photographs as an empty condition
+  // editor. The part worth looking at is a counted audience next to
+  // the devices it picked, which is two fields and a click away.
+  'push?tab=audience': `
+    (() => {
+      const set = (el, v) => {
+        const p = Object.getPrototypeOf(el);
+        Object.getOwnPropertyDescriptor(p, 'value').set.call(el, v);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      };
+      // Scoped to the editor. The first \`input\` on the page is the
+      // global search box, and typing into that opened the command
+      // palette over the thing being photographed.
+      const editor = document.querySelector('[data-audience-editor]');
+      const inputs = editor ? [...editor.querySelectorAll('input')] : [];
+      if (inputs[0]) set(inputs[0], 'plan');
+      if (inputs[1]) set(inputs[1], 'pro');
+      const count = [...document.querySelectorAll('button')]
+        .find(b => !b.disabled && /\\d|[A-Za-z\\u4e00-\\u9fff]/.test(b.textContent || '') &&
+                   b.closest('[data-audience-panel]'));
+      if (count) count.click();
+    })()
+  `,
   releases:
     "[...document.querySelectorAll('button[aria-expanded=\"false\"]')].forEach(b => b.click())",
 };

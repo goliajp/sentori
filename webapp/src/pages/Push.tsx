@@ -7,8 +7,9 @@
 // come back to when something did not arrive, and it has its own
 // nouns — devices, credentials, sends, receipts.
 //
-// Three sections, because the questions are three:
+// Four sections, because the questions are four:
 //   delivery    — did it go out, and if not, why
+//   audience    — who the next one is for, and how many that is
 //   devices     — who can be reached, and what did they tell us
 //   credentials — what we send with
 //
@@ -45,10 +46,11 @@ import {
 import { useT } from '../i18n';
 import type { MessageKey } from '../i18n/en';
 import { api } from '../lib/api';
+import type { AudienceRequest, AudienceSample } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 
-type Section = 'credentials' | 'delivery' | 'devices';
-const SECTIONS: Section[] = ['delivery', 'devices', 'credentials'];
+type Section = 'audience' | 'credentials' | 'delivery' | 'devices';
+const SECTIONS: Section[] = ['delivery', 'audience', 'devices', 'credentials'];
 
 export default function PushPage() {
   const t = useT();
@@ -87,6 +89,8 @@ export default function PushPage() {
         <PanelEmpty>{t('instruments.noProject')}</PanelEmpty>
       ) : section === 'delivery' ? (
         <DeliverySection projectId={projectId} />
+      ) : section === 'audience' ? (
+        <AudienceSection projectId={projectId} />
       ) : section === 'devices' ? (
         <DevicesSection projectId={projectId} />
       ) : (
@@ -469,6 +473,396 @@ function TestSend({
   );
 }
 
+
+// ── audience ────────────────────────────────────────────────────────
+
+/// Who a send is for.
+///
+/// The server takes three shapes — one user, a set of attributes, or
+/// an expression — and compiles all three into the same query, so this
+/// is one editor rather than three tabs. A row naming a user is the
+/// first shape; several rows of equalities are the second; anything
+/// else is the third.
+///
+/// Nothing here sends without a count first. The only other way to
+/// find out what a condition matches is to send to it, and a
+/// notification cannot be recalled.
+
+type Source = 'device' | 'trait' | 'user';
+type Op = 'exists' | 'gte' | 'in' | 'is' | 'isNot' | 'lte' | 'prefix' | 'versionGte' | 'versionLte';
+
+type Condition = { key: string; op: Op; source: Source; value: string };
+
+const OPS: { label: MessageKey; value: Op }[] = [
+  { label: 'push.opIs', value: 'is' },
+  { label: 'push.opIsNot', value: 'isNot' },
+  { label: 'push.opIn', value: 'in' },
+  { label: 'push.opPrefix', value: 'prefix' },
+  { label: 'push.opExists', value: 'exists' },
+  { label: 'push.opVersionGte', value: 'versionGte' },
+  { label: 'push.opVersionLte', value: 'versionLte' },
+  { label: 'push.opGte', value: 'gte' },
+  { label: 'push.opLte', value: 'lte' },
+];
+
+const blank = (): Condition => ({ key: '', op: 'is', source: 'trait', value: '' });
+
+/// A written value, as the type the server compares with.
+///
+/// `"true"` and `"42"` come out of a text field as strings, and a
+/// trait stored as a boolean would then never match one. Version and
+/// prefix comparisons are the exception — those are strings by
+/// definition, and "4.20" must not become the number 4.2.
+function typed(op: Op, raw: string): unknown {
+  const s = raw.trim();
+  if (op === 'prefix' || op === 'versionGte' || op === 'versionLte') return s;
+  if (s === 'true') return true;
+  if (s === 'false') return false;
+  if (s === 'null') return null;
+  if (s !== '' && !Number.isNaN(Number(s))) return Number(s);
+  return s;
+}
+
+/// The rows as the server's shape, or null when a row is unfinished.
+///
+/// Null rather than a partial expression: a half-written condition
+/// that quietly compiles matches something nobody asked for, and the
+/// count next to it would look like an answer.
+function toRequest(join: 'all' | 'any', rows: Condition[]): AudienceRequest | null {
+  const usable = rows.filter((r) => (r.source === 'user' ? r.value.trim() : r.key.trim()));
+  if (usable.length === 0) return null;
+
+  const leaves = usable.map((r) => {
+    if (r.source === 'user') return { user: r.value.trim() };
+    const where = r.source === 'trait' ? { trait: r.key.trim() } : { device: r.key.trim() };
+    if (r.op === 'exists') return { ...where, exists: true };
+    if (r.op === 'in') {
+      return {
+        ...where,
+        in: r.value
+          .split(',')
+          .map((v) => v.trim())
+          .filter((v) => v !== '')
+          .map((v) => typed('is', v)),
+      };
+    }
+    return { ...where, [r.op]: typed(r.op, r.value) };
+  });
+
+  return { audience: leaves.length === 1 && join === 'all' ? leaves[0] : { [join]: leaves } };
+}
+
+function AudienceSection({ projectId }: { projectId: string }) {
+  const t = useT();
+  const [join, setJoin] = useState<'all' | 'any'>('all');
+  const [rows, setRows] = useState<Condition[]>([blank()]);
+  const [raw, setRaw] = useState<null | string>(null);
+  const [preview, setPreview] = useState<null | { matched: number; sample: AudienceSample[] }>(
+    null,
+  );
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<null | string>(null);
+  const [sent, setSent] = useState<null | number>(null);
+
+  // The expression as the server will read it: the rows, unless
+  // someone has opened the JSON view, in which case what they typed
+  // wins — the escape hatch is only an escape if it is authoritative.
+  let request: AudienceRequest | null = null;
+  let rawError: null | string = null;
+  if (raw === null) {
+    request = toRequest(join, rows);
+  } else {
+    try {
+      request = { audience: JSON.parse(raw) as unknown };
+    } catch {
+      rawError = t('push.audienceBadJson');
+    }
+  }
+
+  // Any edit invalidates the count, and the count is what the send is
+  // allowed to use. Leaving a stale number on screen next to a Send
+  // button is how someone sends to an audience they last saw an hour
+  // ago.
+  const edit = (fn: () => void) => {
+    fn();
+    setPreview(null);
+    setSent(null);
+    setError(null);
+  };
+
+  const runPreview = () => {
+    if (!request) return;
+    setBusy(true);
+    setError(null);
+    void api
+      .previewAudience(projectId, request)
+      .then(setPreview)
+      .catch((e: Error) => {
+        setPreview(null);
+        setError(e.message);
+      })
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Panel
+        title={t('push.audienceTitle')}
+        action={
+          <button
+            type="button"
+            className="text-xs text-fg-subtle hover:text-fg-muted"
+            onClick={() =>
+              edit(() => setRaw(raw === null ? JSON.stringify(request?.audience ?? {}, null, 2) : null))
+            }
+          >
+            {raw === null ? t('push.audienceEditJson') : t('push.audienceEditRows')}
+          </button>
+        }
+      >
+        {raw !== null ? (
+          <div className="p-3.5" data-audience-editor>
+            <Textarea
+              rows={10}
+              value={raw}
+              onChange={(e) => edit(() => setRaw(e.target.value))}
+              className="font-mono text-xs"
+            />
+            <p className="mt-2 text-xs text-fg-subtle">{t('push.audienceJsonHint')}</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 p-3.5" data-audience-editor>
+            <div className="flex items-center gap-2 text-xs text-fg-muted">
+              <Select
+                value={join}
+                onChange={(e) => edit(() => setJoin(e.target.value as 'all' | 'any'))}
+              >
+                <option value="all">{t('push.joinAll')}</option>
+                <option value="any">{t('push.joinAny')}</option>
+              </Select>
+            </div>
+            {rows.map((r, i) => (
+              // A grid rather than a wrapping flex row: `Input` sets
+              // `w-full` itself, so a width class on it is a coin toss
+              // over which utility Tailwind emits last — and the loser
+              // was the layout, which put every field on its own line.
+              // The track sizes belong to the row, not to the fields.
+              <div
+                key={i}
+                className="grid grid-cols-[auto_1fr_auto] items-center gap-2 sm:grid-cols-[auto_10rem_auto_minmax(0,1fr)_auto]"
+              >
+                <Select
+                  value={r.source}
+                  onChange={(e) =>
+                    edit(() =>
+                      setRows(
+                        rows.map((x, j) =>
+                          j === i ? { ...x, source: e.target.value as Source } : x,
+                        ),
+                      ),
+                    )
+                  }
+                >
+                  <option value="trait">{t('push.sourceTrait')}</option>
+                  <option value="device">{t('push.sourceDevice')}</option>
+                  <option value="user">{t('push.sourceUser')}</option>
+                </Select>
+                {r.source === 'user' ? (
+                  <div className="sm:col-span-3">
+                    <Input
+                      value={r.value}
+                      placeholder={t('push.appUserIdPlaceholder')}
+                      onChange={(e) =>
+                        edit(() =>
+                          setRows(
+                            rows.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)),
+                          ),
+                        )
+                      }
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <Input
+                      value={r.key}
+                      placeholder={t('push.attributePlaceholder')}
+                      onChange={(e) =>
+                        edit(() =>
+                          setRows(rows.map((x, j) => (j === i ? { ...x, key: e.target.value } : x))),
+                        )
+                      }
+                    />
+                    <Select
+                      value={r.op}
+                      onChange={(e) =>
+                        edit(() =>
+                          setRows(
+                            rows.map((x, j) => (j === i ? { ...x, op: e.target.value as Op } : x)),
+                          ),
+                        )
+                      }
+                    >
+                      {OPS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {t(o.label)}
+                        </option>
+                      ))}
+                    </Select>
+                    {r.op === 'exists' ? (
+                      // The cell still has to exist, or the remove
+                      // button slides under the operator.
+                      <span />
+                    ) : (
+                      <Input
+                        value={r.value}
+                        placeholder={
+                          r.op === 'in' ? t('push.valueListPlaceholder') : t('push.valuePlaceholder')
+                        }
+                        onChange={(e) =>
+                          edit(() =>
+                            setRows(
+                              rows.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)),
+                            ),
+                          )
+                        }
+                      />
+                    )}
+                  </>
+                )}
+                <button
+                  type="button"
+                  aria-label={t('push.removeCondition')}
+                  className="px-1 text-fg-subtle hover:text-kind-error"
+                  onClick={() => edit(() => setRows(rows.filter((_, j) => j !== i)))}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <div>
+              <Button size="sm" onClick={() => edit(() => setRows([...rows, blank()]))}>
+                {t('push.addCondition')}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div
+          data-audience-panel
+          className="flex flex-wrap items-center gap-3 border-t border-border/60 px-3.5 py-2.5"
+        >
+          <Button size="sm" disabled={busy || !request} onClick={runPreview}>
+            {t('push.previewAudience')}
+          </Button>
+          {rawError && <span className="text-xs text-kind-error">{rawError}</span>}
+          {preview && (
+            <span className="text-xs text-fg-muted">
+              {t('push.audienceMatched').replace('{n}', String(preview.matched))}
+            </span>
+          )}
+          {preview === null && !rawError && (
+            <span className="text-xs text-fg-subtle">{t('push.audienceNotCounted')}</span>
+          )}
+        </div>
+      </Panel>
+
+      {preview && preview.sample.length > 0 && (
+        <Panel title={t('push.audienceSample')}>
+          <DataTable
+            rowKey={(d) => d.id}
+            columns={[
+              {
+                key: 'provider',
+                label: t('push.provider'),
+                width: '110px',
+                render: (d) => <span className="font-mono text-xs">{d.provider}</span>,
+              },
+              {
+                key: 'traits',
+                label: t('push.traits'),
+                render: (d) => <span className="font-mono text-xs">{summarise(d.traits)}</span>,
+              },
+              {
+                key: 'metadata',
+                label: t('push.deviceFacts'),
+                render: (d) => <span className="font-mono text-xs">{summarise(d.metadata)}</span>,
+              },
+              {
+                key: 'user',
+                label: t('push.identity'),
+                width: '120px',
+                render: (d) => (
+                  <span className="font-mono text-xs text-fg-subtle">
+                    {d.userKeyTail ? `···${d.userKeyTail}` : '—'}
+                  </span>
+                ),
+              },
+            ]}
+            rows={preview.sample}
+          />
+        </Panel>
+      )}
+
+      <Panel title={t('push.audienceMessage')}>
+        <div className="flex flex-wrap items-end gap-3 p-3.5">
+          <Field label={t('push.testSubject')} className="min-w-0 flex-1">
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={t('push.testSubjectPlaceholder')}
+            />
+          </Field>
+          <Field label={t('push.testBody')} className="min-w-0 flex-1">
+            <Input
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder={t('push.testBodyPlaceholder')}
+            />
+          </Field>
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={busy || !request || preview === null || preview.matched === 0 || title.trim() === ''}
+            onClick={() => {
+              if (!request || preview === null) return;
+              // The number in the confirmation is the number the send
+              // carries. If the audience has grown since, the server
+              // refuses rather than reaching more people than this
+              // sentence promised.
+              const ok = window.confirm(
+                t('push.confirmSend').replace('{n}', String(preview.matched)),
+              );
+              if (!ok) return;
+              setBusy(true);
+              setError(null);
+              void api
+                .sendToAudience(projectId, request, title, body, preview.matched)
+                .then((r) => setSent(r.queued))
+                .catch((e: Error) => {
+                  setError(e.message);
+                  setPreview(null);
+                })
+                .finally(() => setBusy(false));
+            }}
+          >
+            {preview === null
+              ? t('push.previewFirst')
+              : t('push.sendToAudience').replace('{n}', String(preview.matched))}
+          </Button>
+        </div>
+        {error && <ErrorBanner>{error}</ErrorBanner>}
+        {sent !== null && (
+          <div className="border-t border-border/60 px-3.5 py-2 text-xs text-fg-muted">
+            {t('push.audienceQueued').replace('{n}', String(sent))}
+          </div>
+        )}
+      </Panel>
+    </div>
+  );
+}
+
 // ── devices ─────────────────────────────────────────────────────────
 
 function DevicesSection({ projectId }: { projectId: string }) {
@@ -545,7 +939,26 @@ function DevicesSection({ projectId }: { projectId: string }) {
               Object.keys(d.metadata ?? {}).length === 0 ? (
                 <span className="text-xs text-fg-subtle">{t('push.metadataNone')}</span>
               ) : (
-                <span className="font-mono text-xs text-fg-muted">{JSON.stringify(d.metadata)}</span>
+                // `k=v  k=v`, the same as the column beside it. Raw
+                // JSON next to a summarised column reads as two kinds
+                // of data rather than two sources of the same kind.
+                <span className="font-mono text-xs text-fg-muted">{summarise(d.metadata)}</span>
+              ),
+          },
+          {
+            // What a campaign's conditions are matched against. The
+            // server started returning it and nothing showed it, which
+            // is the same defect as `metadata` before 2.22.0: an
+            // integrator passing traits had no way to see them arrive,
+            // and no way to tell a condition that matches nothing from
+            // one whose data never came.
+            key: 'traits',
+            label: t('push.traits'),
+            render: (d) =>
+              Object.keys(d.traits ?? {}).length === 0 ? (
+                <span className="text-xs text-fg-subtle">{t('push.traitsNone')}</span>
+              ) : (
+                <span className="font-mono text-xs text-fg-muted">{summarise(d.traits)}</span>
               ),
           },
           {

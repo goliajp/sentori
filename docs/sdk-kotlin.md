@@ -42,7 +42,7 @@ class App : Application() {
             ),
             context = this,
         )
-        Sentori.user(id = currentUser.id, email = null)
+        Sentori.user(id = currentUser.id, email = null, traits = mapOf("plan" to "pro"))
     }
 }
 ```
@@ -118,7 +118,7 @@ blocked by rules written for something else.
 
 ## Identity
 
-`Sentori.user(id, email)` sends a SHA-256 of the id (or of the email
+`Sentori.user(id, email, traits)` sends a SHA-256 of the id (or of the email
 when there is no id). The raw values never leave the device, and the
 hash is byte-identical to the one the iOS and React Native SDKs
 compute — the three are pinned to shared vectors, because a device
@@ -126,8 +126,19 @@ that hashed differently would stop matching its own events and nothing
 would report it.
 
 It is what makes a device reachable from an issue. Without it a
-registered device receives broadcasts only, and Settings ▸ Push shows
+registered device receives broadcasts only, and Push ▸ Devices shows
 that as "N devices, 0 addressable".
+
+`traits` are what a push campaign selects on — plan, cohort, org. They
+travel raw, unlike the id and email, so put nothing identifying there.
+A call describes the person completely: one made without traits means
+they have none, and signing out stops a device being selectable as
+whoever just left.
+
+A registered device sends this again by itself when it changes, so
+calling `user` after `push.register` is fine. It was not: nothing
+updated the row in between, and a device that registered before
+sign-in carried no user for the life of the install.
 
 ## Push
 

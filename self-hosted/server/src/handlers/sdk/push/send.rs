@@ -39,12 +39,19 @@ pub struct SendBody {
     pub native_tokens: Vec<String>,
     #[serde(default)]
     pub topic: Option<String>,
-    /// Advertised as a targeting mode but not implemented. A send
-    /// that sets only this is refused with a 400 rather than
-    /// resolving zero devices and reporting success — see
-    /// `resolve_targets`.
+    /// The app's own id for a person, as passed to `sentori.user()`.
+    ///
+    /// Hashed here before it is compared, because the column holds a
+    /// hash. Shorthand for `audience: { user: "..." }`.
     #[serde(default)]
     pub app_user_id: Option<String>,
+    /// Attributes every target must have, as an object. Shorthand for
+    /// an `audience` whose conditions are all equalities on traits.
+    #[serde(default)]
+    pub traits: Option<Value>,
+    /// The audience as an expression. See `crate::audience`.
+    #[serde(default)]
+    pub audience: Option<Value>,
     /// Vendor payload (passed through verbatim to vendor adapter).
     pub payload: Value,
     /// Caller-supplied dedup key.
@@ -55,6 +62,21 @@ pub struct SendBody {
     #[serde(default)]
     pub template_id: Option<String>,
 }
+
+/// How many devices one call may queue for.
+///
+/// A cap that silently truncated a broadcast would be worse than no
+/// cap: the caller would believe they had reached everyone. It is
+/// reported back as `capped`, and the preview endpoint answers how
+/// large an audience is before anything is queued.
+const MAX_TARGETS: i64 = 100_000;
+
+/// How many explicit ids one call may name.
+///
+/// Each becomes its own placeholder, and a statement with a hundred
+/// thousand of them is a parser problem rather than a query. Callers
+/// with more than this are describing an audience, not a list.
+const MAX_EXPLICIT: usize = 1_000;
 
 pub async fn handle(
     Extension(ctx): Extension<IngestContext>,
@@ -68,9 +90,8 @@ pub async fn handle(
         return (code, body);
     }
 
-    // Resolve target → list of (device_token_id, provider).
-    let targets = match resolve_targets(&state, &ctx, &body).await {
-        Ok(t) => t,
+    let selector = match Selector::build(&body) {
+        Ok(s) => s,
         Err(msg) => {
             return (
                 StatusCode::BAD_REQUEST,
@@ -79,60 +100,52 @@ pub async fn handle(
         }
     };
 
-    if targets.is_empty() {
-        return (
-            StatusCode::ACCEPTED,
-            Json(json!({ "send_ids": [], "queued": 0 })),
-        );
-    }
+    // One statement: the rows are chosen and queued in the same pass.
+    //
+    // It used to be two SELECTs and an INSERT per target — four
+    // hundred round trips to notify two hundred devices, and there was
+    // no shape of audience that did not make that worse.
+    let sql = format!(
+        "INSERT INTO push_sends \
+           (id, project_id, token_id, provider, payload, status, \
+            idempotency_key, campaign_id, template_id) \
+         SELECT gen_random_uuid(), $1, dt.id, dt.provider, $2, 'queued', $3, $4, $5 \
+         FROM ( \
+           SELECT dt.id, dt.provider FROM device_tokens dt \
+           WHERE dt.project_id = $1 AND dt.revoked_at IS NULL AND ({}) \
+           ORDER BY dt.id LIMIT $6 \
+         ) dt \
+         RETURNING id",
+        selector.sql
+    );
 
-    // Enqueue one push_sends row per target.
-    let mut send_ids: Vec<String> = Vec::with_capacity(targets.len());
-    let mut queued = 0u32;
-    for (token_id, provider) in targets {
-        let id = Uuid::now_v7();
-        // Only attempt idempotency dedup when an idempotency_key
-        // is provided AND the unique constraint exists. v0.2 schema
-        // doesn't ship that constraint, so the conditional branch
-        // here stays on plain INSERT — operators who need dedup
-        // should add the unique index out-of-band.
-        let result = sqlx::query(
-            // Nine columns, nine values — `'queued'` sits in the
-            // `status` slot rather than shifting every placeholder
-            // after it by one. As written this statement had ten
-            // values for nine columns and Postgres refused it, so
-            // `POST /v1/push/send` had never delivered anything.
-            // Together with the register bug, the whole feature was
-            // two broken INSERTs, not an unused one.
-            "INSERT INTO push_sends \
-             (id, project_id, token_id, provider, payload, status, idempotency_key, campaign_id, template_id) \
-             VALUES ($1, $2, $3, $4, $5, 'queued', $6, $7, $8) \
-             RETURNING id",
-        )
-        .bind(id)
+    let mut q = sqlx::query(&sql)
         .bind(ctx.project_id)
-        .bind(token_id)
-        .bind(&provider)
         .bind(&body.payload)
         .bind(body.idempotency_key.as_deref())
         .bind(body.campaign_id.as_deref())
         .bind(body.template_id.as_deref())
-        .fetch_optional(&state.pool)
-        .await;
-        match result {
-            Ok(Some(_)) => {
-                send_ids.push(id.to_string());
-                queued += 1;
-            }
-            Ok(None) => {
-                // ON CONFLICT path retained for when operator adds
-                // the (project_id, idempotency_key) unique index.
-            }
-            Err(e) => {
-                warn!(error = %e, "push.send insert_failed");
-            }
-        }
+        .bind(MAX_TARGETS);
+    for b in &selector.binds {
+        q = b.attach(q);
     }
+
+    let rows = match q.fetch_all(&state.pool).await {
+        Ok(r) => r,
+        Err(e) => {
+            warn!(error = %e, "push.send insert_failed");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "internal" })),
+            );
+        }
+    };
+
+    let send_ids: Vec<String> = rows
+        .iter()
+        .map(|r| r.get::<Uuid, _>("id").to_string())
+        .collect();
+    let queued = send_ids.len();
 
     info!(
         project_id = %ctx.project_id,
@@ -141,84 +154,223 @@ pub async fn handle(
     );
     (
         StatusCode::ACCEPTED,
-        Json(json!({ "send_ids": send_ids, "queued": queued })),
+        Json(json!({
+            "send_ids": send_ids,
+            "queued": queued,
+            // True means there were more devices than this call would
+            // take, so somebody did not get it. Never omitted, so a
+            // caller can check for it without knowing it exists.
+            "capped": i64::try_from(queued).unwrap_or(i64::MAX) >= MAX_TARGETS,
+        })),
     )
 }
 
-async fn resolve_targets(
-    state: &Arc<AppState>,
-    ctx: &IngestContext,
-    body: &SendBody,
-) -> Result<Vec<(Uuid, String)>, String> {
-    // Refuse rather than resolve nothing. `appUserId` is advertised as
-    // a targeting mode but was never implemented, so a caller relying
-    // on it got a 200 and no delivery — the failure mode that looks
-    // like success. An explicit 400 tells them the mode is unavailable
-    // instead of letting the notification vanish.
-    if body.app_user_id.is_some()
-        && body.token_ids.is_empty()
-        && body.sp_tokens.is_empty()
-        && body.native_tokens.is_empty()
-        && body.topic.is_none()
-    {
-        return Err(
-            "appUserId targeting is not implemented; send to tokenIds, nativeTokens or topic"
-                .to_string(),
+/// The `WHERE` clause naming the devices, and its binds.
+///
+/// Every targeting mode compiles into this one thing, so the parts
+/// that must be true of all of them — the project, the revocation
+/// check, the cap — are written once and cannot be true of only some.
+#[derive(Debug)]
+pub struct Selector {
+    pub sql: String,
+    pub binds: Vec<crate::audience::Bind>,
+}
+
+impl Selector {
+    /// Compile whatever the body named, or say why it named nothing.
+    ///
+    /// Modes given together are a union: `tokenIds` plus `topic` means
+    /// both. An audience is one of the modes rather than a filter over
+    /// the others — "these ids, but only the pro ones" is a question
+    /// nobody has asked, and reading it that way silently would drop
+    /// devices a caller listed explicitly.
+    pub fn build(body: &SendBody) -> Result<Self, String> {
+        let mut binds: Vec<crate::audience::Bind> = Vec::new();
+        let mut parts: Vec<String> = Vec::new();
+
+        // `spToken` is the name; `tokenIds` is the name it shipped
+        // under. Both are accepted and mean the same column.
+        let ids: Vec<&Uuid> = body.token_ids.iter().chain(body.sp_tokens.iter()).collect();
+        if !ids.is_empty() {
+            if ids.len() > MAX_EXPLICIT {
+                return Err(format!(
+                    "{} device ids in one call, which is more than the {MAX_EXPLICIT} \
+                     allowed; describe them with `audience` instead",
+                    ids.len()
+                ));
+            }
+            let placeholders: Vec<String> = ids
+                .iter()
+                .map(|id| {
+                    binds.push(crate::audience::Bind::Uuid(**id));
+                    format!("${}", binds.len() + FIXED_BINDS)
+                })
+                .collect();
+            parts.push(format!("dt.id IN ({})", placeholders.join(", ")));
+        }
+
+        if !body.native_tokens.is_empty() {
+            if body.native_tokens.len() > MAX_EXPLICIT {
+                return Err(format!(
+                    "{} native tokens in one call, which is more than the \
+                     {MAX_EXPLICIT} allowed",
+                    body.native_tokens.len()
+                ));
+            }
+            let placeholders: Vec<String> = body
+                .native_tokens
+                .iter()
+                .map(|t| {
+                    binds.push(crate::audience::Bind::Text(t.clone()));
+                    format!("${}", binds.len() + FIXED_BINDS)
+                })
+                .collect();
+            parts.push(format!("dt.native_token IN ({})", placeholders.join(", ")));
+        }
+
+        if let Some(topic) = body.topic.as_deref() {
+            binds.push(crate::audience::Bind::Text(topic.to_string()));
+            parts.push(format!(
+                "EXISTS (SELECT 1 FROM device_topics tt \
+                 WHERE tt.device_token_id = dt.id AND tt.topic = (${})::text)",
+                binds.len() + FIXED_BINDS
+            ));
+        }
+
+        if let Some(audience) = crate::audience::from_request(
+            body.app_user_id.as_deref(),
+            body.traits.as_ref(),
+            body.audience.as_ref(),
+        )? {
+            let (frag, mut more) = audience.to_sql(binds.len() + FIXED_BINDS + 1);
+            binds.append(&mut more);
+            parts.push(frag);
+        }
+
+        if parts.is_empty() {
+            // Without this the `WHERE` would be empty and the send
+            // would go to the entire project — the one failure this
+            // endpoint must not have.
+            return Err("no target: give spTokens, nativeTokens, topic, appUserId, \
+                        traits or audience"
+                .to_string());
+        }
+
+        Ok(Selector {
+            sql: parts.join(" OR "),
+            binds,
+        })
+    }
+}
+
+/// Placeholders the statement uses before the selector's own: the
+/// project, the payload, three optional labels and the cap.
+///
+/// The audience compiler is told where to start numbering rather than
+/// assuming, so this constant is the only place the offset is known.
+const FIXED_BINDS: usize = 6;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn body() -> SendBody {
+        SendBody {
+            token_ids: Vec::new(),
+            sp_tokens: Vec::new(),
+            native_tokens: Vec::new(),
+            topic: None,
+            app_user_id: None,
+            traits: None,
+            audience: None,
+            payload: json!({}),
+            idempotency_key: None,
+            campaign_id: None,
+            template_id: None,
+        }
+    }
+
+    /// The placeholders the selector emits are exactly the binds it
+    /// produced, offset past the fixed ones.
+    ///
+    /// Every mode at once, because the numbering is shared state
+    /// across them: the bug this catches is a mode that counts its own
+    /// binds rather than the running total, which only shows up when
+    /// something else came first.
+    #[test]
+    fn every_mode_at_once_numbers_its_placeholders_correctly() {
+        let mut b = body();
+        b.sp_tokens = vec![Uuid::nil(), Uuid::max()];
+        b.native_tokens = vec!["a".into(), "b".into()];
+        b.topic = Some("news".into());
+        b.audience = Some(json!({ "all": [
+            { "trait": "plan", "is": "pro" },
+            { "device": "appVersion", "versionGte": "4.2" } ] }));
+
+        let probe = Selector::build(&b);
+        assert!(
+            probe.is_ok(),
+            "a body naming every mode did not compile: {probe:?}"
+        );
+        let Ok(sel) = probe else { return };
+        let mut seen: Vec<usize> = sel
+            .sql
+            .split('$')
+            .skip(1)
+            .filter_map(|s| {
+                s.chars()
+                    .take_while(char::is_ascii_digit)
+                    .collect::<String>()
+                    .parse()
+                    .ok()
+            })
+            .collect();
+        seen.sort_unstable();
+        seen.dedup();
+        assert_eq!(
+            seen,
+            (FIXED_BINDS + 1..=FIXED_BINDS + sel.binds.len()).collect::<Vec<_>>(),
+            "placeholders do not line up with binds: {}",
+            sel.sql
         );
     }
 
-    let mut out: Vec<(Uuid, String)> = Vec::new();
-
-    // Loop per-id; sqlx-postgres UUID[] array binding is fragile.
-    // token_ids are usually 1-N per send call.
-    for tid in body.token_ids.iter().chain(body.sp_tokens.iter()) {
-        let row = sqlx::query(
-            "SELECT id, provider FROM device_tokens \
-             WHERE project_id = $1 AND revoked_at IS NULL AND id = $2",
-        )
-        .bind(ctx.project_id)
-        .bind(tid)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|e| e.to_string())?;
-        if let Some(r) = row {
-            out.push((r.get("id"), r.get("provider")));
-        }
+    /// A body that names nothing is refused rather than compiled into
+    /// a clause that matches the whole project.
+    #[test]
+    fn a_body_with_no_target_is_refused() {
+        let err = Selector::build(&body()).err();
+        assert!(
+            err.as_ref().is_some_and(|e| e.contains("no target")),
+            "got {err:?}"
+        );
     }
 
-    for nt in &body.native_tokens {
-        let row = sqlx::query(
-            "SELECT id, provider FROM device_tokens \
-             WHERE project_id = $1 AND revoked_at IS NULL AND native_token = $2",
-        )
-        .bind(ctx.project_id)
-        .bind(nt)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|e| e.to_string())?;
-        if let Some(r) = row {
-            out.push((r.get("id"), r.get("provider")));
-        }
+    /// The mode that used to answer 400 now answers with a clause.
+    #[test]
+    fn app_user_id_resolves_to_a_condition_on_the_identity_column() {
+        let mut b = body();
+        b.app_user_id = Some("usr_123".into());
+        let probe = Selector::build(&b);
+        assert!(probe.is_ok(), "appUserId did not compile: {probe:?}");
+        let Ok(sel) = probe else { return };
+        assert!(
+            sel.sql.contains("dt.user_key"),
+            "appUserId compiled to something that does not look at the identity \
+             column: {}",
+            sel.sql
+        );
     }
 
-    if let Some(ref topic) = body.topic {
-        let rows = sqlx::query(
-            "SELECT dt.id, dt.provider FROM device_tokens dt \
-             JOIN device_topics tt ON tt.device_token_id = dt.id \
-             WHERE dt.project_id = $1 AND dt.revoked_at IS NULL AND tt.topic = $2",
-        )
-        .bind(ctx.project_id)
-        .bind(topic)
-        .fetch_all(&state.pool)
-        .await
-        .map_err(|e| e.to_string())?;
-        for r in rows {
-            out.push((r.get("id"), r.get("provider")));
-        }
+    /// Explicit ids stay a list, not an audience.
+    #[test]
+    fn too_many_explicit_ids_are_refused_rather_than_truncated() {
+        let mut b = body();
+        b.sp_tokens = (0..=MAX_EXPLICIT).map(|_| Uuid::nil()).collect();
+        let err = Selector::build(&b).err();
+        assert!(
+            err.as_ref().is_some_and(|e| e.contains("audience")),
+            "got {err:?}"
+        );
     }
-
-    // De-duplicate by token_id.
-    out.sort_by_key(|a| a.0);
-    out.dedup_by_key(|t| t.0);
-    Ok(out)
 }
