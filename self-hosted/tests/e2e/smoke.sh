@@ -724,6 +724,34 @@ echo "$PREV" | jq -e '[.sample[] | select(has("native_token") or has("nativeToke
 echo "$PREV" | jq -e '.sample[0].traits.plan != null' > /dev/null \
     || { echo "the sample says nothing about why it matched: $PREV" >&2; exit 1; }
 
+# The console can send to an audience, and only to the one the
+# operator was looking at. Devices register between reading a number
+# and pressing a button, and nothing here can be undone.
+echo "→ the console will not send to a number nobody read"
+STALE="$(curl -sS -o /dev/null -w '%{http_code}' -b "$JAR" -X POST \
+    "${BASE}/admin/api/projects/${PROJECT_ID}/push/audience/send" \
+    -H 'content-type: application/json' \
+    -d "{\"audience\":${AUD},\"title\":\"e2e\",\"expectedMatched\":99}")"
+[[ "$STALE" == "409" ]] \
+    || { echo "a send against a stale count answered ${STALE}, not 409" >&2; exit 1; }
+
+echo "→ and sends to exactly that number when it still holds"
+CONSOLE="$(curl -fsS -b "$JAR" -X POST \
+    "${BASE}/admin/api/projects/${PROJECT_ID}/push/audience/send" \
+    -H 'content-type: application/json' \
+    -d "{\"audience\":${AUD},\"title\":\"e2e\",\"body\":\"console\",
+         \"expectedMatched\":${MATCHED}}" | jq -r '.queued')"
+[[ "$CONSOLE" == "$MATCHED" ]] \
+    || { echo "the console queued ${CONSOLE} for an audience of ${MATCHED}" >&2; exit 1; }
+
+echo "→ a notification with no title is refused"
+NOTITLE="$(curl -sS -o /dev/null -w '%{http_code}' -b "$JAR" -X POST \
+    "${BASE}/admin/api/projects/${PROJECT_ID}/push/audience/send" \
+    -H 'content-type: application/json' \
+    -d "{\"audience\":${AUD},\"title\":\"  \",\"expectedMatched\":${MATCHED}}")"
+[[ "$NOTITLE" == "400" ]] \
+    || { echo "a titleless notification answered ${NOTITLE}, not 400" >&2; exit 1; }
+
 echo "→ a preview of an audience that cannot be parsed says so"
 BAD="$(curl -sS -o /dev/null -w '%{http_code}' -b "$JAR" -X POST \
     "${BASE}/admin/api/projects/${PROJECT_ID}/push/audience/preview" \
