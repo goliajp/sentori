@@ -216,14 +216,7 @@ object SentoriPush {
         if (cachedDeviceHandle(appContext) == null) return
         worker.execute {
             when (val r = registerWithServer(appContext, token, config)) {
-                is Result.Success -> {
-                    synchronized(lock) { cachedHandle = r.handle }
-                    appContext
-                        .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                        .edit()
-                        .putString(HANDLE_KEY, r.handle)
-                        .apply()
-                }
+                is Result.Success -> rememberHandle(appContext, r.handle)
                 is Result.Failure ->
                     android.util.Log.w(
                         "sentori",
@@ -231,6 +224,41 @@ object SentoriPush {
                             "(${r.reason.reason}): ${r.message}",
                     )
             }
+        }
+    }
+
+    /**
+     * Keep the address, in memory and on disk.
+     *
+     * Three callers now — the first registration, a rotation, and the
+     * live test — and three copies of four lines is how two of them
+     * end up writing different keys.
+     */
+    private fun rememberHandle(context: Context, handle: String) {
+        synchronized(lock) { cachedHandle = handle }
+        context.applicationContext
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(HANDLE_KEY, handle)
+            .apply()
+    }
+
+    /**
+     * Register a vendor token directly, for the live test.
+     *
+     * The rotation path can only be exercised against a device that
+     * has registered, and there is no FCM in a test host to get a
+     * first token from. This is the same call `finishRegister` makes
+     * once it has one.
+     */
+    internal fun registerNativeTokenForTests(context: Context, token: String): String? {
+        val config = SentoriConfig.current ?: return null
+        return when (val r = registerWithServer(context.applicationContext, token, config)) {
+            is Result.Success -> {
+                rememberHandle(context, r.handle)
+                r.handle
+            }
+            else -> null
         }
     }
 
@@ -295,12 +323,7 @@ object SentoriPush {
 
         return when (val r = registerWithServer(context, token, config)) {
             is Result.Success -> {
-                synchronized(lock) { cachedHandle = r.handle }
-                context
-                    .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .edit()
-                    .putString(HANDLE_KEY, r.handle)
-                    .apply()
+                rememberHandle(context, r.handle)
                 startDrain()
                 r
             }
@@ -433,7 +456,15 @@ object SentoriPush {
                 // The handle is the `device_tokens` row id, a bare
                 // uuid. The RN SDK parsed it as an `ipt_*` string no
                 // server has ever returned.
-                val handle = JSONObject(text).optString("token_id")
+                // `spToken` is the name; `token_id` is the name the
+                // server shipped under. Reading the new one first and
+                // falling back matters in one direction that is easy
+                // to miss: a self-hosted deployment upgrades on its
+                // own schedule, so an SDK newer than its server is an
+                // ordinary state, and an SDK that only knew the new
+                // name would fail every registration against it.
+                val json = JSONObject(text)
+                val handle = json.optString("spToken").ifEmpty { json.optString("token_id") }
                 if (handle.isNullOrEmpty()) {
                     Result.Failure(Failure.SERVER_REJECTED, "server returned no device token id")
                 } else {
