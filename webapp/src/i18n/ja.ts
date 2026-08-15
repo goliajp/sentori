@@ -264,11 +264,6 @@ export const ja: Messages = {
   'push.specFirstLine': '先頭行',
   'push.specSize': 'サイズ',
   'push.specMarker': '目印',
-  'push.specNotThis': '紛らわしいファイル',
-  'push.specApnsNotThis':
-    'App Store Connect API キーは同名・同形式で、「ユーザとアクセス → 内部連携」から取得するもの。ここでは判別不可 —— Apple だけが区別でき、検証は key-not-accepted を返す。',
-  'push.specFcmNotThis':
-    'google-services.json は同じコンソールから取得するアプリ側の設定。private_key を含まず、貼り付け時にここで検出される。',
   'push.chooseFile': 'ファイルを選択',
   'push.secretIssue.google-services-json':
     'google-services.json —— アプリ側の設定であり、サービスアカウント鍵ではない。Firebase コンソール → プロジェクトの設定 → サービスアカウント → 新しい秘密鍵を生成。',

@@ -1633,17 +1633,6 @@ function ProviderGuide({ provider }: { provider: Provider }) {
             </Fragment>
           ))}
         </div>
-
-        {spec.notThis !== undefined && (
-          <div className="flex gap-2 border-t border-border/60 pt-3 text-xs leading-relaxed">
-            <TriangleAlert
-              aria-label={t('push.specNotThis')}
-              role="img"
-              className="size-3.5 shrink-0 translate-y-0.5 text-kind-warn"
-            />
-            <span className="text-fg-muted">{t(spec.notThis as MessageKey)}</span>
-          </div>
-        )}
       </div>
     </Panel>
   );

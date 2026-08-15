@@ -270,11 +270,6 @@ export const en = {
   'push.specFirstLine': 'First line',
   'push.specSize': 'Size',
   'push.specMarker': 'Marker',
-  'push.specNotThis': 'Not this file',
-  'push.specApnsNotThis':
-    'An App Store Connect API key has the same name and the same format, from Users and Access → Integrations. Nothing here can tell them apart — only Apple can, and the probe reports key-not-accepted.',
-  'push.specFcmNotThis':
-    'google-services.json is the app-side config from the same console. It has no private_key, and pasting it is caught here.',
   'push.chooseFile': 'Choose file',
   'push.secretIssue.google-services-json':
     'google-services.json — the app-side config, not a service account key. Firebase console → Project settings → Service accounts → Generate new private key.',

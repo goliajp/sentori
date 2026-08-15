@@ -12,6 +12,13 @@
 //     JSON downloaded from the Firebase console. This one *is*
 //     distinguishable, so it is caught here, before the round trip.
 //
+// Neither is written out as a warning in the guide. A warning is read
+// before the mistake and cannot be acted on at that moment; both are
+// said by the thing that catches them, at the moment it catches them —
+// `recognise` names google-services.json on paste with the fix, and
+// the probe's refusal names the App Store Connect key. Saying it twice
+// puts the weaker copy where someone reads it first.
+//
 // The facts below are deliberately not translated. `AuthKey_*.p8` is
 // the same string in every language, and a translated file name is a
 // file name somebody will fail to find.
@@ -119,9 +126,6 @@ export type ProviderSpec = {
   /** File name, size, first line — the things that let someone
    *  recognise the download before pasting it. */
   spec: SpecRow[];
-  /** i18n key naming the file that is not it. Absent when the
-   *  provider has no twin. */
-  notThis?: string;
 };
 
 export const PROVIDER_SPECS: ProviderSpec[] = [
@@ -135,7 +139,6 @@ export const PROVIDER_SPECS: ProviderSpec[] = [
       { label: 'push.specFirstLine', value: '-----BEGIN PRIVATE KEY-----' },
       { label: 'push.specSize', value: '~250 B' },
     ],
-    notThis: 'push.specApnsNotThis',
   },
   {
     provider: 'fcm',
@@ -147,7 +150,6 @@ export const PROVIDER_SPECS: ProviderSpec[] = [
       { label: 'push.specMarker', value: '"type": "service_account"' },
       { label: 'push.specSize', value: '~2.3 KB' },
     ],
-    notThis: 'push.specFcmNotThis',
   },
   {
     provider: 'webpush',
