@@ -1125,15 +1125,27 @@ function IntegrateSection() {
   return (
     <div className="flex flex-col gap-3">
       <Panel title={t('push.integrateEndpoint')}>
-        <div className="flex flex-col gap-2.5 p-3.5">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="font-mono text-[11px] uppercase tracking-wide text-fg-subtle">
-              POST
-            </span>
+        {/* Two rows of one spec, not a paragraph about a spec. The
+            method and the scope are both constraints on the same call,
+            so they read as the same shape: a mono label in the gutter,
+            the value beside it. */}
+        <div className="grid grid-cols-[auto_1fr] items-baseline gap-x-3 gap-y-2 p-3.5">
+          <span className="font-mono text-[11px] uppercase tracking-wide text-fg-subtle">
+            POST
+          </span>
+          <div className="min-w-0">
             <Copyable text={`${base}${SEND_PATH}`} />
           </div>
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-fg-muted">
-            <span>{t('push.integrateScope')}</span>
+
+          <span className="font-mono text-[11px] uppercase tracking-wide text-fg-subtle">
+            SCOPE
+          </span>
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-1 text-xs">
+            <code className="font-mono text-fg">api</code>
+            {/* The likely mistake is reaching for the token the app
+                already ships with. It authenticates and then 403s on
+                this route, which reads as an outage. */}
+            <span className="text-fg-subtle">{t('push.integrateScopeNote')}</span>
             {/* Settings ▸ Tokens, not Push ▸ Credentials. Those are
                 the vendor's keys; this is the token that authorises
                 the call, and sending someone to the wrong one is
