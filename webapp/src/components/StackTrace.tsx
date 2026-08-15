@@ -13,9 +13,10 @@
 // a UI bug, not a data property.
 
 import { ChevronRight } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 
 import { useT } from '../i18n';
+import { highlightLines, languageForPath } from '../lib/highlight';
 
 export type StackFrame = {
   file?: string;
@@ -166,74 +167,15 @@ function AppFrame({
 
 // ── syntax tint ────────────────────────────────────────────
 //
-// A deliberately tiny per-line tokenizer, not a grammar: strings,
-// comments, numbers and a shared keyword set covering the languages
-// that actually reach this window (TS/JS from the sourcemap, Swift
-// and Kotlin from the srcbundle). Zero dependencies — a real
-// highlighter ships more grammar than this whole dashboard. Hues
-// come from the five-kind palette, so both themes are already
-// re-inked.
-
-const KEYWORDS = new Set(
-  (
-    'const let var function return if else for while do try catch finally ' +
-    'throw new class extends import export from default await async switch ' +
-    'case break continue typeof instanceof in of delete void yield ' +
-    'null undefined true false this super static readonly interface type ' +
-    'enum implements declare public private protected abstract ' +
-    // Swift / Kotlin
-    'func val fun guard defer struct protocol extension where when object ' +
-    'companion override open data sealed internal lazy weak init self nil ' +
-    'package'
-  ).split(' '),
-);
-
-const TOKEN_RE =
-  /(\/\/.*$)|("(?:[^"\\]|\\.)*"?|'(?:[^'\\]|\\.)*'?|`(?:[^`\\]|\\.)*`?)|(\b\d[\d_]*(?:\.\d+)?\b)|([A-Za-z_$][\w$]*)/g;
-
-const TOKEN_INK: Record<string, string> = {
-  comment: 'var(--sn-fg-subtle)',
-  keyword: 'var(--s-kind-assert)',
-  number: 'var(--s-kind-warn)',
-  string: 'var(--s-kind-probe)',
-};
-
-function highlightLine(text: string): ReactNode {
-  // A line living inside a block comment (leading * or /*) reads as
-  // one — the per-line scan can't track /* … */ across rows.
-  if (/^\s*(\*|\/\*)/.test(text)) {
-    return <span style={{ color: TOKEN_INK.comment }}>{text}</span>;
-  }
-  const out: ReactNode[] = [];
-  let last = 0;
-  let k = 0;
-  TOKEN_RE.lastIndex = 0;
-  for (let m = TOKEN_RE.exec(text); m; m = TOKEN_RE.exec(text)) {
-    if (m.index > last) out.push(text.slice(last, m.index));
-    const [tok, comment, str, num, word] = m;
-    const ink = comment
-      ? TOKEN_INK.comment
-      : str
-        ? TOKEN_INK.string
-        : num
-          ? TOKEN_INK.number
-          : word && KEYWORDS.has(word)
-            ? TOKEN_INK.keyword
-            : null;
-    out.push(
-      ink ? (
-        <span key={k++} style={{ color: ink }}>
-          {tok}
-        </span>
-      ) : (
-        tok
-      ),
-    );
-    last = m.index + tok.length;
-  }
-  if (last < text.length) out.push(text.slice(last));
-  return out;
-}
+// A grammar, not a scan. What stood here was a per-line tokenizer
+// whose own comment named what it could not do — "the per-line scan
+// can't track /* … */ across rows" — so a block comment in the middle
+// of a source window came out as code. The window is highlighted
+// whole and then cut into rows, which is the only way that case works.
+//
+// The language comes from the frame's path: an unknown extension gets
+// no colour rather than a guess, because mis-lighting a source window
+// invites a reader to trust the wrong token.
 
 /** The reading window around the failing line, numbered from the
  *  resolved position. The hit line carries the tint + red gutter. */
@@ -242,11 +184,17 @@ function SourceWindow({ frame }: { frame: StackFrame }) {
   const post = frame.postContext ?? [];
   const hitLine = frame.line ?? 0;
   const start = hitLine - pre.length;
-  const rows: { n: number; text: string; hit: boolean }[] = [
-    ...pre.map((text, i) => ({ n: start + i, text, hit: false })),
-    { n: hitLine, text: frame.contextLine ?? '', hit: true },
-    ...post.map((text, i) => ({ n: hitLine + 1 + i, text, hit: false })),
-  ];
+  const texts = [...pre, frame.contextLine ?? '', ...post];
+  // Highlighted as one block, then cut — a comment or a template
+  // literal spanning rows is one thing, and cutting first is what
+  // made it several.
+  const lit = highlightLines(texts.join('\n'), languageForPath(frame.file));
+  const rows = texts.map((text, i) => ({
+    hit: i === pre.length,
+    html: lit[i] ?? '',
+    n: start + i,
+    text,
+  }));
 
   return (
     <div className="overflow-x-auto border-t border-border bg-bg">
@@ -272,9 +220,14 @@ function SourceWindow({ frame }: { frame: StackFrame }) {
               >
                 {r.n}
               </td>
-              <td className="whitespace-pre py-0 pl-3.5 pr-4 text-fg">
-                {r.text ? highlightLine(r.text) : ' '}
-              </td>
+              {/* The grammar's own escaped output. The input is a
+                  source window the server read out of a sourcemap, and
+                  highlight.js escapes everything it does not colour —
+                  the check in devtools proves the round trip. */}
+              <td
+                className="whitespace-pre py-0 pl-3.5 pr-4 text-fg"
+                dangerouslySetInnerHTML={{ __html: r.text ? r.html : ' ' }}
+              />
             </tr>
           ))}
         </tbody>

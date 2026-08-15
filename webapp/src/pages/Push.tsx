@@ -48,6 +48,7 @@ import { useT } from '../i18n';
 import type { MessageKey } from '../i18n/en';
 import { ApiError, api } from '../lib/api';
 import type { AudienceRequest, AudienceSample, PushCheck } from '../lib/api';
+import { highlightBlock } from '../lib/highlight';
 import { useAsyncData } from '../lib/useAsyncData';
 import {
   SEND_PATH,
@@ -558,6 +559,20 @@ function TestSend({
 ///
 /// The server sends codes and numbers. The words are here, because
 /// this is where they get translated.
+
+/// Which grammar lights which snippet.
+///
+/// `node` is the odd one: the snippet is TypeScript, which is what a
+/// Bun or Deno backend writes and what Node reads with types stripped.
+const HLJS_LANG: Record<SnippetLang, string> = {
+  cpp: 'cpp',
+  csharp: 'csharp',
+  go: 'go',
+  java: 'java',
+  node: 'typescript',
+  python: 'python',
+  rust: 'rust',
+};
 
 /// Where to go to fix it, when there is somewhere to go.
 const FIX_SECTION: Record<string, Section> = {
@@ -1152,31 +1167,35 @@ function IntegrateSection() {
           </div>
         }
       >
-        <CodeBlock text={snippet(lang, base)} />
+        <CodeBlock text={snippet(lang, base)} language={HLJS_LANG[lang]} />
       </Panel>
 
       <Panel title={t('push.integratePoll')}>
         <p className="px-3.5 pt-3 text-xs text-fg-muted">{t('push.integratePollWhy')}</p>
-        <CodeBlock text={pollSnippet(base)} />
+        <CodeBlock text={pollSnippet(base)} language="bash" />
       </Panel>
 
       <Panel title={t('push.integrateCount')}>
         <p className="px-3.5 pt-3 text-xs text-fg-muted">{t('push.integrateCountWhy')}</p>
-        <CodeBlock text={countSnippet(base)} />
+        <CodeBlock text={countSnippet(base)} language="bash" />
       </Panel>
     </div>
   );
 }
 
-/// A block of code, and a way to take it.
-function CodeBlock({ text }: { text: string }) {
+/// A block of code, lit by its own grammar, and a way to take it.
+function CodeBlock({ text, language }: { language: string; text: string }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
   return (
     <div className="relative">
-      <pre className="overflow-x-auto px-3.5 py-3 font-mono text-xs leading-relaxed text-fg-muted">
-        {text}
-      </pre>
+      {/* The grammar's own escaped output, over text this module
+          holds as a constant. `devtools/check-highlight.mjs` strips
+          the tags back off and compares. */}
+      <pre
+        className="overflow-x-auto px-3.5 py-3 font-mono text-xs leading-relaxed text-fg"
+        dangerouslySetInnerHTML={{ __html: highlightBlock(text, language) }}
+      />
       <button
         type="button"
         title={copied ? t('identity.copied') : t('identity.copyHint')}

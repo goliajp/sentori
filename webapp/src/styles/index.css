@@ -198,3 +198,61 @@ time {
     scroll-behavior: auto !important;
   }
 }
+
+/* Syntax colour.
+ *
+ * highlight.js emits class names; the hues are ours. The five kind
+ * colours already have a light and a dark ink and are already
+ * borrowed by the signal timeline and the status roles, so a snippet
+ * costs no new colour and inherits the light/dark/system trio the
+ * whole app is themed with.
+ *
+ * Deliberately few. A grammar can label thirty things; a reader of a
+ * stack frame needs to tell a comment from a string from a name, and
+ * thirty colours tell them nothing. Everything unlisted stays the
+ * body colour.
+ */
+.hljs-comment,
+.hljs-quote {
+  color: var(--sn-fg-subtle);
+  font-style: italic;
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-meta .hljs-string {
+  color: var(--s-kind-probe);
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-doctag,
+.hljs-built_in {
+  color: var(--s-kind-assert);
+}
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet {
+  color: var(--s-kind-warn);
+}
+.hljs-title,
+.hljs-title.function_,
+.hljs-section,
+.hljs-name {
+  color: var(--s-kind-trace);
+}
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-attr,
+.hljs-attribute,
+.hljs-variable,
+.hljs-params {
+  color: var(--sn-fg);
+}
+.hljs-meta,
+.hljs-punctuation,
+.hljs-operator {
+  color: var(--sn-fg-muted);
+}
+.hljs-deletion {
+  color: var(--s-kind-error);
+}
