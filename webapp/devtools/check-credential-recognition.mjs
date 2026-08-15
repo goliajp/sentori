@@ -112,7 +112,7 @@ for (const s of PROVIDER_SPECS) {
   checked += 1;
   if (s.steps.length === 0) problems.push(`${s.provider}: no steps`);
   if (s.spec.length === 0) problems.push(`${s.provider}: nothing to recognise the file by`);
-  for (const key of [s.title, ...s.steps, ...s.spec.map((r) => r.label), s.notThis ?? s.title]) {
+  for (const key of [s.title, ...s.steps, ...s.spec.map((r) => r.label)]) {
     if (!key.startsWith('push.')) problems.push(`${s.provider}: ${key} is not an i18n key`);
   }
   // The facts must NOT be i18n keys — a translated file name is a
@@ -121,11 +121,17 @@ for (const s of PROVIDER_SPECS) {
     if (row.value.startsWith('push.')) problems.push(`${s.provider}: ${row.value} must be a literal`);
   }
 }
-// Both twins have to be called out by name.
-for (const p of ['apns', 'fcm']) {
+// The twins are named by the thing that catches them, not by a
+// warning in the guide — google-services.json by `recognise`, above,
+// and the App Store Connect key by the probe's refusal, which
+// `push_credential_probe.rs` asserts contains "App Store Connect".
+// So what the guide must not do is grow a second copy: a warning read
+// before the mistake is the weaker one, and it is the one someone
+// reads first.
+for (const s of PROVIDER_SPECS) {
   checked += 1;
-  if (PROVIDER_SPECS.find((s) => s.provider === p)?.notThis === undefined) {
-    problems.push(`${p} has a lookalike file and does not name it`);
+  if ('notThis' in s) {
+    problems.push(`${s.provider}: the guide is explaining a failure the machine already names`);
   }
 }
 
@@ -139,4 +145,4 @@ if (problems.length > 0) {
   for (const p of problems) console.error(`    ${p}`);
   process.exit(1);
 }
-console.log(`✓ ${checked} recognition assertions, both lookalike files named`);
+console.log(`✓ ${checked} recognition assertions; the twins are named where they are caught`);

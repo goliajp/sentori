@@ -263,11 +263,6 @@ export const zh: Messages = {
   'push.specFirstLine': '首行',
   'push.specSize': '大小',
   'push.specMarker': '标识',
-  'push.specNotThis': '易混文件',
-  'push.specApnsNotThis':
-    'App Store Connect API 密钥同名同格式,来自「用户和访问 → 集成」。本地无法分辨,只有 Apple 分得清 —— 探测会返回 key-not-accepted。',
-  'push.specFcmNotThis':
-    'google-services.json 是 app 端配置,同一控制台下载,不含 private_key。粘贴后当场识别并拒绝。',
   'push.chooseFile': '选择文件',
   'push.secretIssue.google-services-json':
     'google-services.json —— app 端配置,不是服务账号密钥。回 Firebase 控制台 → 项目设置 → 服务账号 → 生成新的私钥。',
