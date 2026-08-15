@@ -280,6 +280,7 @@ async fn try_hcm(
          FROM push_sends ps \
          JOIN device_tokens dt ON dt.id = ps.token_id \
          JOIN push_credentials pc ON pc.project_id = ps.project_id AND pc.kind = 'hcm' \
+           AND pc.active \
          WHERE ps.id = $1",
     )
     .bind(send_id)
@@ -339,6 +340,7 @@ async fn try_mipush(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String>
          FROM push_sends ps \
          JOIN device_tokens dt ON dt.id = ps.token_id \
          JOIN push_credentials pc ON pc.project_id = ps.project_id AND pc.kind = 'mipush' \
+           AND pc.active \
          WHERE ps.id = $1",
     )
     .bind(send_id)
@@ -381,6 +383,7 @@ async fn try_fcm(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String> {
          FROM push_sends ps \
          JOIN device_tokens dt ON dt.id = ps.token_id \
          JOIN push_credentials pc ON pc.project_id = ps.project_id AND pc.kind = 'fcm' \
+           AND pc.active \
          WHERE ps.id = $1",
     )
     .bind(send_id)
@@ -442,6 +445,7 @@ async fn try_apns(
          FROM push_sends ps \
          JOIN device_tokens dt ON dt.id = ps.token_id \
          JOIN push_credentials pc ON pc.project_id = ps.project_id AND pc.kind = 'apns' \
+           AND pc.active \
          WHERE ps.id = $1",
     )
     .bind(send_id)
@@ -519,6 +523,7 @@ async fn try_webpush(pool: &PgPool, send_id: Uuid) -> Result<(u16, u128), String
          FROM push_sends ps \
          JOIN device_tokens dt ON dt.id = ps.token_id \
          JOIN push_credentials pc ON pc.project_id = ps.project_id AND pc.kind = 'webpush' \
+           AND pc.active \
          WHERE ps.id = $1",
     )
     .bind(send_id)

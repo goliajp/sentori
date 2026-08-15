@@ -74,6 +74,20 @@ for (const f of walk(SRC)) {
   // Keys carried in a table rather than called directly:
   //   const KIND_KEYS = { quota: 'notifications.kindQuota' }
   for (const m of text.matchAll(/:\s*'([\w.]+\.[\w.]+)'/g)) used.add(m[1]);
+  // …or in a list, which is how an ordered procedure is held:
+  //   steps: ['push.specApnsStep1', 'push.specApnsStep2']
+  // Anchored on a bracket or comma either side, so this stays a
+  // rule about array elements rather than "any quoted string".
+  // The trailing delimiter is a lookahead: consuming it would make
+  // the comma unavailable to the next element, and every second
+  // key in a list would read as unused.
+  for (const m of text.matchAll(/[[,]\s*'([\w.]+\.[\w.]+)'\s*(?=[,\]])/g)) used.add(m[1]);
+  // Picked before the call rather than inside it:
+  //   const key = active ? 'push.deleteActiveConfirm' : 'push.deleteConfirm'
+  for (const m of text.matchAll(/\?\s*'([\w.]+\.[\w.]+)'\s*:\s*'([\w.]+\.[\w.]+)'/g)) {
+    used.add(m[1]);
+    used.add(m[2]);
+  }
   // Built at the call site: t(`status.${row.status}`)
   for (const m of text.matchAll(/t\(`([\w.]+)\.\$\{/g)) prefixes.add(m[1]);
 }

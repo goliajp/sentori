@@ -34,6 +34,15 @@ const SKIP = /(^|\/)(i18n)(\/|$)/;
  *  design note warns about; translating it would be worse. */
 const CODE_SAMPLES = new Set(['src/lib/push-snippets.ts']);
 
+/** Calls whose argument is compared against, never rendered.
+ *
+ *  `body.includes('BEGIN PUBLIC KEY')` is a PEM band marker. A string
+ *  on the right of a comparison is data being matched, and a
+ *  translated one would break the match — the opposite of the bug
+ *  this checker exists for. Narrow on purpose: these four calls, and
+ *  only when the literal is their first argument. */
+const CODE_CALLS = /\.(?:includes|startsWith|endsWith|split)\(\s*$/;
+
 /** Props whose value is machinery, not something a person reads. */
 const CODE_PROPS =
   /(?:className|class|href|src|to|id|key|type|role|name|htmlFor|rel|target|charSet|viewBox|d|fill|stroke|xmlns|data-[\w-]+|aria-controls|aria-labelledby)\s*=\s*$/;
@@ -103,6 +112,7 @@ for (const root of ROOTS) {
       // A key being *defined*, not rendered.
       if (/^\s*['"][\w.]+['"]\s*:/.test(lineText)) continue;
       if (CODE_PROPS.test(before.slice(-60))) continue;
+      if (CODE_CALLS.test(before.slice(-40))) continue;
       if (/^\s*(import|export)\b/.test(lineText)) continue;
       if (/\/\/|https?:\/\//.test(lineText)) continue;
       // A comment block explaining something.
