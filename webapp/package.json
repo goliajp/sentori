@@ -1,6 +1,6 @@
 {
   "name": "@sentori/webapp",
-  "version": "3.37.0",
+  "version": "3.38.0",
   "private": true,
   "description": "Sentori v0.1 minimal dashboard shell. Imports from self-hosted/web + saas/web.",
   "type": "module",
@@ -10,17 +10,18 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",
-    "check": "tsc -b --noEmit && eslint . && node devtools/check-i18n.mjs && node devtools/check-hardcoded-text.mjs && node devtools/check-unreferenced.mjs",
+    "check": "tsc -b --noEmit && eslint . && node devtools/check-i18n.mjs && node devtools/check-hardcoded-text.mjs && node devtools/check-unreferenced.mjs && bun devtools/check-highlight.mjs",
     "mock": "node devtools/mock-api.mjs",
     "sweep": "node devtools/sweep.mjs",
     "check:i18n": "node devtools/check-i18n.mjs",
     "check:text": "node devtools/check-hardcoded-text.mjs"
   },
   "dependencies": {
+    "highlight.js": "^11.12.0",
+    "lucide-react": "^1.25.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-router-dom": "^7.18.1",
-    "lucide-react": "^1.25.0"
+    "react-router-dom": "^7.18.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
