@@ -857,6 +857,57 @@ SENTORI_BASE="${BASE}" SENTORI_API_TOKEN="${API_TOKEN}" \
     node "${ROOT}/../scripts/check-push-snippets.mjs" \
     || { echo "a snippet the console hands out does not work" >&2; exit 1; }
 
+# One call, one id, one poll. The caller used to be handed one id per
+# device and had to poll each — and for a large send the response was
+# megabytes of uuid before it was anything else.
+echo "→ a send answers with one id for the call"
+BATCH="$(curl -fsS -X POST "${BASE}/v1/push/send" -H "Authorization: Bearer ${API_TOKEN}" \
+    -H 'content-type: application/json' \
+    -d '{"traits":{"e2e":"aud"},"payload":{"title":"batch"}}')"
+SID="$(echo "$BATCH" | jq -r '.sendId')"
+[[ "$SID" != "null" && -n "$SID" ]] \
+    || { echo "no sendId came back: $BATCH" >&2; exit 1; }
+NDEV="$(echo "$BATCH" | jq -r '.queued')"
+
+echo "→ the id answers what happened to the whole call"
+SUM="$(curl -fsS "${BASE}/v1/push/sends/${SID}" -H "Authorization: Bearer ${API_TOKEN}")"
+echo "$SUM" | jq -e --argjson n "$NDEV" '.counts.total == $n' > /dev/null \
+    || { echo "the summary does not count what the send queued: $SUM" >&2; exit 1; }
+echo "$SUM" | jq -e '.counts | (.queued + .sent + .failed) == .total' > /dev/null \
+    || { echo "the counts do not add up to the total: $SUM" >&2; exit 1; }
+# `delivered` is what a device reported, and no device reported here.
+echo "$SUM" | jq -e '.counts.delivered == 0 and (.state | test("in_flight|done"))' > /dev/null \
+    || { echo "the summary is not a state and a count: $SUM" >&2; exit 1; }
+
+echo "→ and the rows behind it, one per device"
+DEL="$(curl -fsS "${BASE}/v1/push/sends/${SID}/deliveries" -H "Authorization: Bearer ${API_TOKEN}")"
+echo "$DEL" | jq -e --argjson n "$NDEV" '(.deliveries | length) == $n' > /dev/null \
+    || { echo "the deliveries do not match the count: $DEL" >&2; exit 1; }
+echo "$DEL" | jq -e '.deliveries[0] | has("spToken") and has("status") and has("deliveredAt")' \
+    > /dev/null || { echo "a delivery row says too little: $DEL" >&2; exit 1; }
+
+echo "→ the listing pages by cursor, not by offset"
+P1="$(curl -fsS "${BASE}/v1/push/sends/${SID}/deliveries?limit=1" \
+    -H "Authorization: Bearer ${API_TOKEN}")"
+CUR="$(echo "$P1" | jq -r '.nextCursor')"
+[[ "$CUR" != "null" ]] || { echo "a full page handed back no cursor: $P1" >&2; exit 1; }
+P2="$(curl -fsS "${BASE}/v1/push/sends/${SID}/deliveries?limit=1&cursor=${CUR}" \
+    -H "Authorization: Bearer ${API_TOKEN}")"
+[[ "$(echo "$P1" | jq -r '.deliveries[0].deliveryId')" \
+   != "$(echo "$P2" | jq -r '.deliveries[0].deliveryId')" ]] \
+    || { echo "the cursor did not move: $P2" >&2; exit 1; }
+
+echo "→ an id nobody minted is a 404, not a 200 saying so"
+MISS="$(curl -sS -o /dev/null -w '%{http_code}' \
+    "${BASE}/v1/push/sends/019ff080-2aeb-7e30-aba1-4431b296dfff" \
+    -H "Authorization: Bearer ${API_TOKEN}")"
+[[ "$MISS" == "404" ]] || { echo "an unknown sendId answered ${MISS}" >&2; exit 1; }
+
+echo "→ the app's own token cannot read what was sent to whom"
+FORB="$(curl -sS -o /dev/null -w '%{http_code}' "${BASE}/v1/push/sends/${SID}" \
+    -H "Authorization: Bearer ${TOKEN}")"
+[[ "$FORB" == "403" ]] || { echo "an ingest token read a send, answering ${FORB}" >&2; exit 1; }
+
 echo "→ a backend can count an audience without sending to it"
 CNT="$(curl -fsS -X POST "${BASE}/v1/push/count" -H "Authorization: Bearer ${API_TOKEN}" \
     -H 'content-type: application/json' \

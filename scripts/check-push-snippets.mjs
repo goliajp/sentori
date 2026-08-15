@@ -87,20 +87,26 @@ if (base && token) {
   const dir = mkdtempSync(join(tmpdir(), 'sentori-snippets-'));
 
   // Extracted the way a reader would: take the snippet, put the real
-  // base and token in, call the function it defines.
+  // base and token in, call the function it defines. Run by bun as
+  // TypeScript rather than stripped down to JavaScript first — the
+  // stripping was two regexes that knew about `: string` and
+  // `Promise<void>`, and the first change to a return type left the
+  // runner handing itself a file that could not parse.
   const nodeSrc = renderFor('node', base).replace("'st_…'", JSON.stringify(token));
   writeFileSync(
-    join(dir, 'notify.mjs'),
-    `${nodeSrc.replace(/: string/g, '').replace(/: Promise<void>/, '')}\n` +
-      `await notify('snippet-check', 'snippet', 'from the checker')\n` +
-      `console.log('node ok')\n`,
+    join(dir, 'notify.ts'),
+    `${nodeSrc}\n` +
+      `const id = await notify('snippet-check', 'snippet', 'from the checker')\n` +
+      `if (typeof id !== 'string' || id.length === 0) throw new Error('no sendId')\n`,
   );
-  run('node', ['node', join(dir, 'notify.mjs')]);
+  run('node', ['bun', join(dir, 'notify.ts')]);
 
   const pySrc = renderFor('python', base).replace('"st_…"', JSON.stringify(token));
   writeFileSync(
     join(dir, 'notify.py'),
-    `${pySrc}\n\nnotify("snippet-check", "snippet", "from the checker")\nprint("python ok")\n`,
+    `${pySrc}\n\n` +
+      `send_id = notify("snippet-check", "snippet", "from the checker")\n` +
+      `assert isinstance(send_id, str) and send_id, "no sendId"\n`,
   );
   run('python', ['python3', join(dir, 'notify.py')]);
 }

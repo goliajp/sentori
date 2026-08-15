@@ -314,11 +314,21 @@ the wrong grain until server 2.30.0 — the index was per project per key, so on
 more than one device collided with itself and the whole call answered 500. A key was
 only ever safe for an audience of exactly one.
 
-`payload` is passed to the vendor verbatim. Response (`202 Accepted`) is
-`{"send_ids": [...], "queued": n, "capped": false}`; a background worker drains the
-queue every 5 s, retries, and quarantines a token the vendor rejects permanently.
+`payload` is passed to the vendor verbatim. Response (`202 Accepted`):
+
+```json
+{ "sendId": "01a0…", "queued": 128, "capped": false, "send_ids": ["…"] }
+```
+
+`sendId` is the id **for this call** — one id however large the audience — and what
+`GET /v1/push/sends/{sendId}` reports on. A background worker drains the queue every
+5 s, retries, and quarantines a token the vendor rejects permanently.
+
 `capped` is true when the audience was larger than one call will take (100 000), so
-somebody did not get it.
+somebody did not get it. `send_ids` is the older per-device list, kept for callers
+that read it; above 100 devices it is omitted and `sendIdsOmitted` is true, because
+unbounded it is megabytes of uuid before it is anything else. New integrations should
+use `sendId`.
 
 #### Who it goes to
 
@@ -390,9 +400,57 @@ audiences existed and refuses to send to a number nobody read; a backend had no 
 to — the preview is behind a browser session — so the one caller that sends on a timer
 was the one that could not find out how large a condition had grown. Added in 2.31.0.
 
-### `GET /v1/push/receipts/{send_id}` · `POST /v1/push/sends/{send_id}/ack`
-What the vendor said, and what the device did. The ack takes an optional
-`{"ackSessionId": "…"}` so opening the same notification twice records once.
+### `GET /v1/push/sends/{sendId}`
+What happened to one call. **api-scope.** One poll answers it, whatever the size.
+
+```json
+{
+  "sendId":  "01a0…",
+  "state":   "in_flight",
+  "createdAt": "2026-08-15T04:00:00Z",
+  "lastSentAt": "2026-08-15T04:00:07Z",
+  "counts":  { "total": 128, "queued": 12, "sent": 110, "failed": 6, "delivered": 74 },
+  "reasons": [ { "reason": "BadDeviceToken", "count": 5 } ]
+}
+```
+
+- **`state`** is `in_flight` while anything is still queued, `done` when nothing is.
+  It says whether to keep polling — not whether everything arrived.
+- **`sent` is not `delivered`.** `sent` means the vendor accepted it; `delivered`
+  means the device told us, which only happens for apps whose SDK acks. Reading one
+  as the other is how an integrator concludes a notification arrived while the phone
+  was off. `delivered` is a subset of `sent`, and a zero there is not evidence of
+  non-delivery.
+- `404` for an id nobody minted.
+
+### `GET /v1/push/sends/{sendId}/deliveries`
+The rows behind the aggregate, one per device. **api-scope.**
+
+`?status=failed` narrows to one state, `?limit=` (≤ 1000) sizes the page, and
+`?cursor=` takes the previous page's `nextCursor`. Keyset, not offset: walking a
+hundred thousand rows with an offset makes the last page cost a hundred thousand rows
+to skip. `nextCursor` is absent on the last page rather than present-and-empty, so a
+caller never asks for a page to find out there is none.
+
+```json
+{
+  "deliveries": [
+    { "deliveryId": "…", "spToken": "…", "status": "failed", "provider": "apns",
+      "providerOutcome": "410", "error": "BadDeviceToken",
+      "sentAt": "…", "deliveredAt": null, "retryCount": 3 }
+  ],
+  "nextCursor": "…"
+}
+```
+
+### `GET /v1/push/receipts/{delivery_id}` · `POST /v1/push/sends/{send_id}/ack`
+One device's row, by the id from `send_ids` or `deliveries[].deliveryId`. `404` when
+there is no such row — it answered `200 {"status":"not_found"}` until 2.35.0, so a
+typo and a send that had not been attempted read the same.
+
+The ack is what makes `delivered` mean anything: the SDK posts it when a notification
+arrives, with an optional `{"ackSessionId": "…"}` so opening the same one twice
+records once.
 
 ### `POST /v1/push/expo-compat/send` · `GET /v1/push/expo-compat/receipts/{send_id}`
 Expo's server wire shape, in and out, in front of the same pipeline. A backend written

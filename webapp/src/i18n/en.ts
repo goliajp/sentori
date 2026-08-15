@@ -273,6 +273,8 @@ export const en = {
   'push.integrateSend': 'Send from your backend',
   'push.integrateCount': 'Count first',
   'push.integrateCountWhy': 'Same query, without the consequence. A condition that grew from 400 to 40,000 looks the same to a cron job either way.',
+  'push.integratePoll': 'Check what happened',
+  'push.integratePollWhy': 'One id per call. sent means the vendor accepted it. delivered means the device said so.',
   'push.provider': 'Provider',
   'push.queued': 'Queued',
   'push.next': 'Next',

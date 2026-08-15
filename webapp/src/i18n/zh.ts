@@ -261,6 +261,8 @@ export const zh: Messages = {
   'push.integrateSend': '从你的后端发送',
   'push.integrateCount': '先数一遍',
   'push.integrateCountWhy': '同一条查询,不发出去。条件从 400 涨到 40000,定时任务看不出区别。',
+  'push.integratePoll': '查这一次的结果',
+  'push.integratePollWhy': '一次调用一个 id。sent 是厂商收下了。delivered 是设备回报了。',
   'push.provider': '厂商',
   'push.queued': '排队',
   'push.next': '下一页',

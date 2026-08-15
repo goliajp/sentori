@@ -154,6 +154,11 @@ pub fn router(state: Arc<AppState>) -> Router {
             get(sdk::push::receipt::handle),
         )
         .route("/v1/push/sends/{send_id}/ack", post(sdk::push::ack::handle))
+        .route("/v1/push/sends/{send_id}", get(sdk::push::batch::summary))
+        .route(
+            "/v1/push/sends/{send_id}/deliveries",
+            get(sdk::push::batch::deliveries),
+        )
         .route(
             "/v1/push/expo-compat/send",
             post(sdk::push::expo_send::handle),

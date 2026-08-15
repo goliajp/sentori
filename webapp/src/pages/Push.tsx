@@ -54,6 +54,7 @@ import {
   SNIPPET_LANGS,
   type SnippetLang,
   countSnippet,
+  pollSnippet,
   snippet,
 } from '../lib/push-snippets';
 
@@ -1152,6 +1153,11 @@ function IntegrateSection() {
         }
       >
         <CodeBlock text={snippet(lang, base)} />
+      </Panel>
+
+      <Panel title={t('push.integratePoll')}>
+        <p className="px-3.5 pt-3 text-xs text-fg-muted">{t('push.integratePollWhy')}</p>
+        <CodeBlock text={pollSnippet(base)} />
       </Panel>
 
       <Panel title={t('push.integrateCount')}>
