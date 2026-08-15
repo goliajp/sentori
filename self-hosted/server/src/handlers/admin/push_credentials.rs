@@ -1,13 +1,25 @@
-//! Push credentials admin endpoints (vendor secrets for APNs /
-//! FCM / WebPush / HCM / MiPush).
+//! Vendor credentials, staged rather than swapped.
 //!
-//! - `POST   /admin/api/projects/:project_id/push/credentials` — upsert
-//! - `GET    /admin/api/projects/:project_id/push/credentials` — list
-//! - `DELETE /admin/api/projects/:project_id/push/credentials/:kind`
+//! ```text
+//! POST   …/push/credentials              add one (never replaces)
+//! GET    …/push/credentials              list, with what we know of each
+//! POST   …/push/credentials/{id}/probe   ask the vendor
+//! POST   …/push/credentials/{id}/activate  make it the one that sends
+//! DELETE …/push/credentials/{id}
+//! ```
 //!
-//! Without these credentials, the push_send queue cannot deliver.
-//! Phase D step 5+ wires the dispatcher worker that reads from
-//! push_credentials before calling vendor APIs.
+//! ## Why adding one no longer replaces one
+//!
+//! This used to be an upsert on `(project_id, kind)`: pasting a key
+//! destroyed the working one in the statement that saved the new one.
+//! Both ways of holding it wrong are invisible from the file — an App
+//! Store Connect `.p8` is the same shape as an APNs `.p8`, and
+//! `google-services.json` reads a lot like a service account — so the
+//! usual sequence was: paste, save, and find out that night.
+//!
+//! Now a new credential lands beside the working one, inert. It gets
+//! asked of Apple or Google. Someone promotes it. Until they do, the
+//! send path does not know it exists.
 
 use std::sync::Arc;
 
@@ -17,6 +29,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
 };
 
+use crate::push_credential_probe::Verdict;
 use crate::session_mw::SessionContext;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -26,51 +39,45 @@ use uuid::Uuid;
 
 use crate::state::AppState;
 
+const PROVIDERS: [&str; 5] = ["apns", "fcm", "webpush", "hcm", "mipush"];
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct UpsertBody {
+pub struct CreateBody {
     /// Provider: `apns` / `fcm` / `webpush` / `hcm` / `mipush`.
     pub provider: String,
-    /// Free-form vendor config (APNs key id + team id, FCM
-    /// service-account json, WebPush vapid keys, etc.). Stored
-    /// as JSONB.
+    /// Vendor config — APNs key id + team id + topic, WebPush VAPID
+    /// public key, and so on. Stored as JSONB.
     pub config: Value,
-    /// Secret material — encrypted at rest in a follow-up commit;
-    /// for v0.2 step 1 stored as bytea verbatim.
+    /// Secret material: the PEM, or the service-account JSON.
     pub secret: Option<String>,
+    /// What the operator calls it. Two Apple teams, or the old key
+    /// kept through a rotation, are otherwise two identical rows.
+    pub label: Option<String>,
 }
 
-pub async fn upsert(
+/// Add a credential. Never replaces one.
+pub async fn create(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
     _headers: HeaderMap,
-    Json(body): Json<UpsertBody>,
+    Json(body): Json<CreateBody>,
 ) -> (StatusCode, Json<Value>) {
-    if !matches!(
-        body.provider.as_str(),
-        "apns" | "fcm" | "webpush" | "hcm" | "mipush"
-    ) {
+    if !PROVIDERS.contains(&body.provider.as_str()) {
         return (
             StatusCode::BAD_REQUEST,
             Json(json!({ "error": "invalid_provider" })),
         );
     }
 
-    // Every provider is checked here now, not just FCM. The two
-    // ways this form produced a broken credential were both
-    // invisible from it: a `.p8` pasted into a single-line field
-    // arrives with its line breaks stripped, and the placeholder
-    // named `bundleId` while the worker reads `topic`. Both saved
-    // fine and failed on a device hours later.
+    // The local check, still first: it is free, it is certain, and a
+    // credential that cannot sign here will not sign anywhere.
     let mut config = body.config.clone();
     let secret = body.secret.clone().unwrap_or_default();
     if let Err(r) = crate::push_credential_check::check(&body.provider, &mut config, &secret) {
         return (
             StatusCode::BAD_REQUEST,
-            // A code and a field name. The console says it in the
-            // language the console is in — this used to be English
-            // prose printed under a Chinese label.
             Json(json!({
                 "error": "invalid_credential",
                 "code": r.code,
@@ -80,59 +87,64 @@ pub async fn upsert(
         );
     }
 
-    // Tenant guard: the project must belong to the caller's
-    // workspace. The INSERT derives workspace_id from the project
-    // row, so without this a caller could plant credentials on
-    // another tenant's project.
     if let Err(e) = super::tokens::ensure_project_access(&state, &ctx, project_id).await {
         return e;
     }
 
-    // Use device_tokens-side push_credentials table from migration 0024.
-    // workspace_id derived via projects FK subquery (matches pattern in
-    // migrations 0016+).
+    // The first credential of its kind takes over immediately —
+    // there is nothing to protect, and making someone add and then
+    // promote to get started is ceremony. Every one after that is
+    // staged.
+    let has_active: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM push_credentials \
+         WHERE project_id = $1 AND kind = $2 AND active)",
+    )
+    .bind(project_id)
+    .bind(&body.provider)
+    .fetch_one(&state.pool)
+    .await
+    .unwrap_or(false);
+
     let id = Uuid::now_v7();
-    let secret_bytes = body.secret.unwrap_or_default().into_bytes();
     let result = sqlx::query(
         "INSERT INTO push_credentials \
-         (id, project_id, kind, config, secret_blob) \
-         SELECT $1, $2, $3, $4, $5 FROM projects p WHERE p.id = $2 \
-         ON CONFLICT (project_id, kind) DO UPDATE SET \
-            config = EXCLUDED.config, \
-            secret_blob = EXCLUDED.secret_blob, \
-            last_validated_at = NULL, \
-            last_validate_status = NULL \
+         (id, project_id, kind, config, secret_blob, active, label) \
+         SELECT $1, $2, $3, $4, $5, $6, $7 FROM projects p WHERE p.id = $2 \
          RETURNING id",
     )
     .bind(id)
     .bind(project_id)
     .bind(&body.provider)
     .bind(&config)
-    .bind(&secret_bytes)
+    .bind(secret.into_bytes())
+    .bind(!has_active)
+    .bind(body.label.as_deref())
     .fetch_optional(&state.pool)
     .await;
 
     match result {
-        Ok(Some(row)) => {
-            let id: Uuid = row.get("id");
-            info!(
-                %project_id,
-                provider = %body.provider,
-                "admin.push_credentials upserted",
-            );
+        Ok(Some(_)) => {
+            info!(%project_id, provider = %body.provider, staged = has_active,
+                  "admin.push_credentials created");
             crate::audit::record(
                 &state.pool,
                 Some(project_id),
                 ctx.user_id,
-                "push_credentials.upsert",
+                "push_credentials.create",
                 "push_credentials",
                 &id.to_string(),
-                json!({ "provider": body.provider }),
+                json!({ "provider": body.provider, "active": !has_active }),
             )
             .await;
             (
                 StatusCode::CREATED,
-                Json(json!({ "id": id.to_string(), "provider": body.provider })),
+                Json(json!({
+                    "id": id.to_string(),
+                    "provider": body.provider,
+                    // Say which of the two things just happened. The
+                    // console shows a different next step for each.
+                    "active": !has_active,
+                })),
             )
         }
         Ok(None) => (
@@ -140,7 +152,7 @@ pub async fn upsert(
             Json(json!({ "error": "project_not_found" })),
         ),
         Err(e) => {
-            warn!(error = %e, "admin.push_credentials upsert_failed");
+            warn!(error = %e, "admin.push_credentials create_failed");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({ "error": "internal" })),
@@ -160,15 +172,16 @@ pub async fn list(
     {
         return Json(json!({ "credentials": [] }));
     }
-    // `secret_blob` is read and never returned. A credential stored
+    // `secret_blob` is read and never returned. The local check runs
+    // again over what is already stored, because a credential saved
     // before the form checked anything is still stored, and the only
-    // way anyone learns it is unusable today is a notification that
-    // does not arrive — so the same check the save runs is run over
-    // what is already there, and the answer travels with the row.
+    // other way anyone learns it is unusable is a notification that
+    // does not arrive.
     let rows = sqlx::query(
-        "SELECT id, kind, config, secret_blob, created_at, last_validated_at, \
-                last_validate_status \
-         FROM push_credentials WHERE project_id = $1 ORDER BY kind",
+        "SELECT id, kind, config, secret_blob, created_at, active, label, \
+                last_validated_at, last_validate_status, last_validate_detail \
+         FROM push_credentials WHERE project_id = $1 \
+         ORDER BY kind, active DESC, created_at DESC",
     )
     .bind(project_id)
     .fetch_all(&state.pool)
@@ -188,31 +201,284 @@ pub async fn list(
                 "id": r.get::<Uuid, _>("id").to_string(),
                 "kind": kind,
                 "config": config,
+                "label": r.get::<Option<String>, _>("label"),
+                "active": r.get::<bool, _>("active"),
                 "problem": problem,
                 "created_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("created_at")),
                 "last_validated_at": crate::wire_time::rfc3339_opt(r.get::<Option<time::OffsetDateTime>, _>("last_validated_at")),
                 "last_validate_status": r.get::<Option<String>, _>("last_validate_status"),
+                "last_validate_detail": r.get::<Option<String>, _>("last_validate_detail"),
             })
         })
         .collect();
     Json(json!({ "credentials": out }))
 }
 
+/// One credential's kind, config and secret, if it is this project's.
+async fn load(
+    state: &AppState,
+    project_id: Uuid,
+    id: Uuid,
+) -> Result<(String, Value, String), (StatusCode, Json<Value>)> {
+    let row = sqlx::query(
+        "SELECT kind, config, secret_blob FROM push_credentials \
+         WHERE id = $1 AND project_id = $2",
+    )
+    .bind(id)
+    .bind(project_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| {
+        warn!(error = %e, "admin.push_credentials load_failed");
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "internal" })),
+        )
+    })?;
+
+    let row = row.ok_or((
+        StatusCode::NOT_FOUND,
+        Json(json!({ "error": "credential_not_found" })),
+    ))?;
+
+    Ok((
+        row.get::<String, _>("kind"),
+        row.get::<Value, _>("config"),
+        String::from_utf8(row.get::<Vec<u8>, _>("secret_blob")).unwrap_or_default(),
+    ))
+}
+
+fn verdict_json(v: &Verdict) -> Value {
+    let (code, field, detail) = match v {
+        Verdict::Ok => (None, None, None),
+        Verdict::Limited {
+            code,
+            field,
+            detail,
+        }
+        | Verdict::Rejected {
+            code,
+            field,
+            detail,
+        } => (Some(*code), *field, Some(detail.clone())),
+        Verdict::Unreachable { detail } | Verdict::NotImplemented { detail } => {
+            (None, None, Some(detail.clone()))
+        }
+    };
+    json!({
+        "status": v.status(),
+        "code": code,
+        "field": field,
+        "detail": detail,
+        // Whether the console may offer the promote button.
+        "safeToActivate": v.safe_to_activate(),
+    })
+}
+
+/// Ask the vendor about this credential. Delivers nothing.
+pub async fn probe(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    Path((project_id, id)): Path<(Uuid, Uuid)>,
+) -> (StatusCode, Json<Value>) {
+    if let Err(e) = super::tokens::ensure_project_access(&state, &ctx, project_id).await {
+        return e;
+    }
+    let (kind, config, secret) = match load(&state, project_id, id).await {
+        Ok(v) => v,
+        Err(e) => return e,
+    };
+
+    let verdict = crate::push_credential_probe::probe(&kind, &config, &secret).await;
+
+    let detail = match &verdict {
+        Verdict::Ok => None,
+        Verdict::Limited { detail, .. }
+        | Verdict::Rejected { detail, .. }
+        | Verdict::Unreachable { detail }
+        | Verdict::NotImplemented { detail } => Some(detail.clone()),
+    };
+
+    if let Err(e) = sqlx::query(
+        "UPDATE push_credentials \
+            SET last_validated_at = now(), last_validate_status = $3, \
+                last_validate_detail = $4 \
+          WHERE id = $1 AND project_id = $2",
+    )
+    .bind(id)
+    .bind(project_id)
+    .bind(verdict.status())
+    .bind(detail.as_deref())
+    .execute(&state.pool)
+    .await
+    {
+        warn!(error = %e, "admin.push_credentials probe_store_failed");
+    }
+
+    (StatusCode::OK, Json(verdict_json(&verdict)))
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivateBody {
+    /// Promote in spite of a bad verdict.
+    ///
+    /// The probe mapping is new and has never been exercised against
+    /// a real Apple or Google refusal, so an operator who knows more
+    /// than it does needs a way past. The console only sends this
+    /// from a checkbox that names the verdict being overridden.
+    #[serde(default)]
+    pub force: bool,
+}
+
+/// Make this the credential that sends.
+pub async fn activate(
+    State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
+    Path((project_id, id)): Path<(Uuid, Uuid)>,
+    Json(body): Json<ActivateBody>,
+) -> (StatusCode, Json<Value>) {
+    if let Err(e) = super::tokens::ensure_project_access(&state, &ctx, project_id).await {
+        return e;
+    }
+
+    let row = match sqlx::query(
+        "SELECT kind, last_validate_status FROM push_credentials \
+         WHERE id = $1 AND project_id = $2",
+    )
+    .bind(id)
+    .bind(project_id)
+    .fetch_optional(&state.pool)
+    .await
+    {
+        Ok(Some(r)) => r,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "credential_not_found" })),
+            );
+        }
+        Err(e) => {
+            warn!(error = %e, "admin.push_credentials activate_load_failed");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "internal" })),
+            );
+        }
+    };
+    let kind: String = row.get("kind");
+    let status: Option<String> = row.get("last_validate_status");
+
+    // Refused only for the two verdicts that mean the vendor told us
+    // it will not work. `unreachable` and a provider with no probe
+    // are unknowns, not failures — blocking on those would make an
+    // Apple outage, or a provider we have never probed, a reason
+    // nobody can rotate a key.
+    let known_bad = matches!(status.as_deref(), Some("rejected" | "limited"));
+    if known_bad && !body.force {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": "verdict_says_no",
+                "status": status,
+                "detail": "the vendor refused this credential — probe it again, or force",
+            })),
+        );
+    }
+
+    // Two statements, one transaction. The partial unique index
+    // permits one active row per (project, kind), so the old one has
+    // to stand down before the new one stands up; a crash between
+    // them would otherwise leave the project with none.
+    let mut tx = match state.pool.begin().await {
+        Ok(t) => t,
+        Err(e) => {
+            warn!(error = %e, "admin.push_credentials activate_tx_failed");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "internal" })),
+            );
+        }
+    };
+
+    let swapped = async {
+        sqlx::query(
+            "UPDATE push_credentials SET active = false \
+             WHERE project_id = $1 AND kind = $2 AND active AND id <> $3",
+        )
+        .bind(project_id)
+        .bind(&kind)
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query("UPDATE push_credentials SET active = true WHERE id = $1")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await
+    }
+    .await;
+
+    if let Err(e) = swapped {
+        warn!(error = %e, "admin.push_credentials activate_failed");
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "internal" })),
+        );
+    }
+
+    crate::audit::record(
+        &state.pool,
+        Some(project_id),
+        ctx.user_id,
+        "push_credentials.activate",
+        "push_credentials",
+        &id.to_string(),
+        json!({ "kind": kind, "forced": body.force, "verdict": status }),
+    )
+    .await;
+    info!(%project_id, %kind, forced = body.force, "admin.push_credentials activated");
+
+    (StatusCode::OK, Json(json!({ "ok": true })))
+}
+
 pub async fn delete(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
-    Path((project_id, kind)): Path<(Uuid, String)>,
-) -> StatusCode {
+    Path((project_id, id)): Path<(Uuid, Uuid)>,
+) -> (StatusCode, Json<Value>) {
     if let Err(e) = super::tokens::ensure_project_access(&state, &ctx, project_id).await {
-        return e.0;
+        return e;
     }
-    let result = sqlx::query("DELETE FROM push_credentials WHERE project_id = $1 AND kind = $2")
+    let result = sqlx::query("DELETE FROM push_credentials WHERE project_id = $1 AND id = $2")
         .bind(project_id)
-        .bind(&kind)
+        .bind(id)
         .execute(&state.pool)
         .await;
     match result {
-        Ok(_) => StatusCode::NO_CONTENT,
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        Ok(r) if r.rows_affected() == 0 => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "credential_not_found" })),
+        ),
+        Ok(_) => {
+            crate::audit::record(
+                &state.pool,
+                Some(project_id),
+                ctx.user_id,
+                "push_credentials.delete",
+                "push_credentials",
+                &id.to_string(),
+                json!({}),
+            )
+            .await;
+            (StatusCode::NO_CONTENT, Json(json!({})))
+        }
+        Err(e) => {
+            warn!(error = %e, "admin.push_credentials delete_failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "internal" })),
+            )
+        }
     }
 }

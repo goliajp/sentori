@@ -452,6 +452,81 @@ CRED="$(echo "$CREDS" | jq -r '.credentials[] | select(.kind == "apns") | .kind'
 echo "$CREDS" | jq -e '.credentials[] | select(.kind == "apns") | .problem == null' > /dev/null \
     || { echo "the saved credential reads back as unusable: $CREDS" >&2; exit 1; }
 
+echo "→ a second credential of the same kind does not replace the first"
+# This used to be an upsert. Pasting a key destroyed the working one
+# in the statement that saved the new one, and both ways of holding
+# the wrong file are invisible from the file: an App Store Connect
+# .p8 is the same shape as an APNs .p8. So the new one is staged, and
+# the one that sends keeps sending until somebody says otherwise.
+FIRST_ID="$(echo "$CREDS" | jq -r '.credentials[] | select(.kind == "apns") | .id')"
+SECOND="$(jq -n --arg s "$P8" \
+    '{provider:"apns",config:{keyId:"ZZZ9999999",teamId:"DEF7654321",topic:"com.example.app"},secret:$s,label:"rotation"}' \
+    | curl -fsS -b "$JAR" -X POST "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials" \
+        -H 'content-type: application/json' --data @-)"
+echo "$SECOND" | jq -e '.active == false' > /dev/null \
+    || { echo "the second credential took over instead of staging: $SECOND" >&2; exit 1; }
+SECOND_ID="$(echo "$SECOND" | jq -r '.id')"
+
+AFTER="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials")"
+echo "$AFTER" | jq -e '[.credentials[] | select(.kind == "apns")] | length == 2' > /dev/null \
+    || { echo "the second credential replaced the first: $AFTER" >&2; exit 1; }
+# Exactly one sends. The partial unique index is the guarantee; this
+# is the assertion that the guarantee is the one in force.
+echo "$AFTER" | jq -e '[.credentials[] | select(.kind == "apns" and .active)] | length == 1' > /dev/null \
+    || { echo "not exactly one active apns credential: $AFTER" >&2; exit 1; }
+echo "$AFTER" | jq --arg id "$FIRST_ID" -e '.credentials[] | select(.id == $id) | .active == true' > /dev/null \
+    || { echo "the credential that was sending stopped: $AFTER" >&2; exit 1; }
+
+echo "→ the probe returns a verdict from the vendor's vocabulary"
+# The credential is a locally-generated key Apple has never seen, so
+# the honest answers are `rejected` (Apple said InvalidProviderToken,
+# which is what it returned when this was checked by hand against
+# api.push.apple.com) or `unreachable` (no egress from this runner).
+# Asserting one of the two keeps a network-less CI from failing on a
+# fact about Apple.
+VERDICT="$(curl -fsS -b "$JAR" -X POST \
+    "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials/${SECOND_ID}/probe" \
+    -H 'content-type: application/json' -d '{}')"
+echo "$VERDICT" | jq -e '.status == "rejected" or .status == "unreachable"' > /dev/null \
+    || { echo "the probe said something else entirely: $VERDICT" >&2; exit 1; }
+# Whatever it said, it must have been written down — the column has
+# held three legal values since 0007 and nothing had ever written one.
+STORED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials" \
+    | jq -r --arg id "$SECOND_ID" '.credentials[] | select(.id == $id) | .last_validate_status')"
+[[ "$STORED" == "rejected" || "$STORED" == "unreachable" ]] \
+    || { echo "the verdict was not stored: '${STORED}'" >&2; exit 1; }
+
+echo "→ promoting a credential the vendor refused needs saying so twice"
+if [[ "$STORED" == "rejected" ]]; then
+    CODE="$(curl -sS -o /dev/null -w '%{http_code}' -b "$JAR" -X POST \
+        "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials/${SECOND_ID}/activate" \
+        -H 'content-type: application/json' -d '{}')"
+    [[ "$CODE" == "409" ]] \
+        || { echo "a refused credential was promoted on the first ask: ${CODE}" >&2; exit 1; }
+fi
+
+echo "→ and then it swaps, exactly one still sending"
+curl -fsS -b "$JAR" -X POST \
+    "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials/${SECOND_ID}/activate" \
+    -H 'content-type: application/json' -d '{"force":true}' >/dev/null
+SWAPPED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials")"
+echo "$SWAPPED" | jq -e '[.credentials[] | select(.kind == "apns" and .active)] | length == 1' > /dev/null \
+    || { echo "the swap left more or fewer than one active: $SWAPPED" >&2; exit 1; }
+echo "$SWAPPED" | jq --arg id "$SECOND_ID" -e '.credentials[] | select(.id == $id) | .active == true' > /dev/null \
+    || { echo "the promoted credential is not the one sending: $SWAPPED" >&2; exit 1; }
+
+echo "→ delete addresses one row, not every credential of a kind"
+curl -fsS -b "$JAR" -X DELETE \
+    "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials/${SECOND_ID}" >/dev/null
+LEFT="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials")"
+echo "$LEFT" | jq -e '[.credentials[] | select(.kind == "apns")] | length == 1' > /dev/null \
+    || { echo "deleting one credential took the other: $LEFT" >&2; exit 1; }
+# Put the survivor back in charge so the sends below have a
+# credential: deleting the active one leaves the kind with none.
+curl -fsS -b "$JAR" -X POST \
+    "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials/${FIRST_ID}/activate" \
+    -H 'content-type: application/json' -d '{}' >/dev/null
+
 echo "→ register a device the way the SDK does"
 IPT="$(curl -fsS -X POST "${BASE}/v1/push/devices" -H "Authorization: Bearer ${TOKEN}" \
     -H 'content-type: application/json' \

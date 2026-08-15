@@ -25,13 +25,23 @@
 // that the test-send endpoint had never been wired to anything. Both
 // are here now.
 
-import { Check, CircleCheck, CircleX, Copy, Info, TriangleAlert } from 'lucide-react';
-import { useState } from 'react';
+import {
+  Check,
+  CircleCheck,
+  CircleX,
+  Copy,
+  ExternalLink,
+  Info,
+  TriangleAlert,
+  Upload,
+} from 'lucide-react';
+import { Fragment, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { useShell } from '../App';
 import {
   Button,
+  buttonClass,
   DataTable,
   ErrorBanner,
   Field,
@@ -47,7 +57,15 @@ import {
 import { useT } from '../i18n';
 import type { MessageKey } from '../i18n/en';
 import { ApiError, api } from '../lib/api';
-import type { AudienceRequest, AudienceSample, PushCheck } from '../lib/api';
+import type {
+  AudienceRequest,
+  AudienceSample,
+  ProbeVerdict,
+  PushCheck,
+  PushCredential,
+} from '../lib/api';
+import type { Provider } from '../lib/push-credentials';
+import { PROVIDER_SPECS, recognise, verdictTone } from '../lib/push-credentials';
 import { highlightBlock } from '../lib/highlight';
 import { useAsyncData } from '../lib/useAsyncData';
 import {
@@ -1513,159 +1531,41 @@ const PROVIDER_FIELDS: Record<string, FieldSpec[]> = {
   ],
 };
 
+/// Getting a credential in, for someone who has never done it.
+///
+/// The old form assumed you arrived holding the right file and
+/// knowing what a Team ID was. Both assumptions fail in the same
+/// direction: you paste something plausible, it saves, and you learn
+/// that night. So this section is four things in order — where to get
+/// it, how to recognise it, what we made of what you pasted, and what
+/// the vendor said about it.
 function CredentialsSection({ projectId }: { projectId: string }) {
   const t = useT();
   const creds = useAsyncData(() => api.pushCredentials(projectId), [projectId]);
-  const [provider, setProvider] = useState('apns');
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
-  const [saveError, setSaveError] = useState<null | string>(null);
-  const [saved, setSaved] = useState<null | string>(null);
-
-  const fields = PROVIDER_FIELDS[provider] ?? [];
+  const [provider, setProvider] = useState<Provider>('apns');
   const configured = creds.data?.credentials ?? [];
-  const val = (k: string) => values[k] ?? '';
-  const missing = fields.filter((f) => f.required && val(f.key).trim().length === 0);
-
-  const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }));
-  const switchProvider = (p: string) => {
-    setProvider(p);
-    setValues({});
-    setSaveError(null);
-    setSaved(null);
-  };
 
   return (
-    <div className="space-y-4">
-      <Panel title={t('push.credentialsAdd')}>
-        <div className="space-y-3 p-3.5">
-          <Field label={t('push.provider')}>
-            <Select value={provider} onChange={(e) => switchProvider(e.target.value)}>
-              <option value="apns">apns</option>
-              <option value="fcm">fcm</option>
-              <option value="webpush">webpush</option>
-            </Select>
-          </Field>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap gap-1.5">
+        {PROVIDER_SPECS.map((s) => (
+          <button
+            key={s.provider}
+            type="button"
+            onClick={() => setProvider(s.provider)}
+            className={`h-7 rounded border px-2.5 font-mono text-xs transition-colors ${
+              provider === s.provider
+                ? 'border-accent/60 bg-accent/10 text-accent'
+                : 'border-border/60 text-fg-muted hover:text-fg'
+            }`}
+          >
+            {t(s.title as MessageKey)}
+          </button>
+        ))}
+      </div>
 
-          {/* The short facts sit together on one line, because they
-              are short: a ten-character Key ID in a full-width box
-              reads as though something longer belongs there, and the
-              form grew tall enough to push the list of what is
-              already configured off the screen. Only the key gets the
-              full width — it needs it. */}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {fields
-              .filter((f) => !f.multiline)
-              .map((f) => (
-                <Field
-                  key={f.key}
-                  label={
-                    f.required ? (
-                      <>
-                        {t(f.label)}
-                        <span
-                          aria-label={t('push.required')}
-                          title={t('push.required')}
-                          className="ml-1 text-kind-warn"
-                        >
-                          •
-                        </span>
-                      </>
-                    ) : (
-                      t(f.label)
-                    )
-                  }
-                >
-                  {f.options ? (
-                    <Select
-                      value={val(f.key) || f.options[0]?.value}
-                      onChange={(e) => set(f.key, e.target.value)}
-                    >
-                      {f.options.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {t(o.label)}
-                        </option>
-                      ))}
-                    </Select>
-                  ) : (
-                    <Input
-                      value={val(f.key)}
-                      onChange={(e) => set(f.key, e.target.value)}
-                      placeholder={f.placeholder ? t(f.placeholder) : undefined}
-                    />
-                  )}
-                </Field>
-              ))}
-          </div>
-
-          {fields
-            .filter((f) => f.multiline)
-            .map((f) => (
-            <Field key={f.key} label={t(f.label)}>
-              {/* A textarea, because a PEM and a service-account
-                  file both have line breaks and an `<input>` deletes
-                  them. */}
-              <Textarea
-                value={val(f.key)}
-                onChange={(e) => set(f.key, e.target.value)}
-                rows={provider === 'fcm' ? 8 : 6}
-                placeholder={f.placeholder ? t(f.placeholder) : undefined}
-              />
-              <p className="mt-1 text-xs leading-snug text-fg-subtle">{t(f.hint)}</p>
-            </Field>
-          ))}
-
-          <div className="flex items-center gap-3">
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={busy || missing.length > 0}
-              onClick={() => {
-                setBusy(true);
-                setSaveError(null);
-                setSaved(null);
-                const config: Record<string, unknown> = {};
-                for (const f of fields) {
-                  if (f.key === 'secretKey') continue;
-                  const v = val(f.key).trim();
-                  if (v.length === 0) continue;
-                  // The one field that is not a string: the worker
-                  // reads `production` as a boolean.
-                  config[f.key] = f.key === 'production' ? v === 'production' : v;
-                }
-                void api
-                  .savePushCredential(projectId, provider, config, values.secretKey ?? '')
-                  .then(() => {
-                    setValues({});
-                    setSaved(provider);
-                    creds.reload();
-                  })
-                  .catch((e: Error) =>
-                    setSaveError(
-                      e instanceof ApiError && e.code
-                        ? credentialProblem(t, { code: e.code, field: e.field ?? null })
-                        : e.message,
-                    ),
-                  )
-                  .finally(() => setBusy(false));
-              }}
-            >
-              {t('settings.save')}
-            </Button>
-            {missing.length > 0 && (
-              <span className="font-mono text-xs tabular-nums text-fg-subtle">
-                {t('push.missingCount').replace('{n}', String(missing.length))}
-              </span>
-            )}
-          </div>
-        </div>
-        {saveError && <ErrorBanner>{saveError}</ErrorBanner>}
-        {saved && (
-          <div className="border-t border-border/60 px-3.5 py-2 text-xs text-ok">
-            {t('push.credentialSaved', { provider: saved })}
-          </div>
-        )}
-      </Panel>
+      <ProviderGuide provider={provider} />
+      <AddCredential projectId={projectId} provider={provider} onSaved={creds.reload} />
 
       <Panel title={`${t('push.credentialsTitle')} (${configured.length})`}>
         {configured.length === 0 ? (
@@ -1673,54 +1573,456 @@ function CredentialsSection({ projectId }: { projectId: string }) {
         ) : (
           <div className="divide-y divide-border/60">
             {configured.map((c) => (
-              <div key={c.id} className="flex items-start gap-3 px-3.5 py-2.5 text-sm">
-                <span className="w-20 shrink-0 font-mono text-xs text-fg">{c.kind}</span>
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  {/* What the server understood, not what was typed.
-                      An operator with two Firebase projects or two
-                      Apple teams has no other way to see which one
-                      they pasted. */}
-                  <div className="font-mono text-xs text-fg-muted">
-                    {summarise(c.config) || t('push.metadataNone')}
-                  </div>
-                  {/* The row says whether the worker can use this,
-                      rather than leaving it to be discovered as a
-                      notification that never arrived. */}
-                  {c.problem ? (
-                    <div className="flex items-baseline gap-1.5 text-xs text-kind-error">
-                      <CircleX aria-label={t('push.unusable')} role="img" className="size-3 shrink-0 translate-y-0.5" />
-                      <span>{credentialProblem(t, c.problem)}</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-baseline gap-1.5 text-xs text-fg-subtle">
-                      <CircleCheck aria-label={t('push.usable')} role="img" className="size-3 shrink-0 translate-y-0.5 text-ok" />
-                      <span>
-                        {c.last_validate_status
-                          ? t('push.lastValidated', {
-                              status: c.last_validate_status,
-                              when: c.last_validated_at ? formatRelative(c.last_validated_at) : '—',
-                            })
-                          : t('push.usable')}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="shrink-0 text-xs text-fg-subtle hover:text-kind-error"
-                  onClick={() => {
-                    if (window.confirm(t('push.deleteConfirm', { kind: c.kind }))) {
-                      void api.deletePushCredential(projectId, c.kind).then(creds.reload);
-                    }
-                  }}
-                >
-                  {t('common.delete')}
-                </button>
-              </div>
+              <CredentialRow key={c.id} cred={c} projectId={projectId} onChange={creds.reload} />
             ))}
           </div>
         )}
       </Panel>
+    </div>
+  );
+}
+
+/// Where the file comes from and how to tell it from its twin.
+///
+/// The twin is the point. Apple's two `.p8` files are the same shape
+/// and the same name; Firebase's two JSON downloads sit one screen
+/// apart. Naming the wrong file is most of what this panel is for —
+/// "invalid credential" sends someone back to the button they already
+/// pressed.
+function ProviderGuide({ provider }: { provider: Provider }) {
+  const t = useT();
+  const spec = PROVIDER_SPECS.find((s) => s.provider === provider);
+  if (!spec) return null;
+
+  return (
+    <Panel title={t('push.specHowTo')}>
+      <div className="flex flex-col gap-3 p-3.5">
+        <ol className="flex flex-col gap-1.5">
+          {spec.steps.map((step, i) => (
+            <li key={step} className="flex gap-2.5 text-xs leading-relaxed">
+              <span className="w-3 shrink-0 pt-px text-right font-mono tabular-nums text-fg-subtle">
+                {i + 1}
+              </span>
+              <span className="text-fg-muted">{t(step as MessageKey)}</span>
+            </li>
+          ))}
+        </ol>
+
+        {spec.href !== undefined && (
+          <a
+            href={spec.href}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="flex items-center gap-1.5 self-start font-mono text-xs text-accent hover:underline"
+          >
+            <ExternalLink aria-hidden className="size-3" />
+            {spec.href}
+          </a>
+        )}
+
+        {/* What the download looks like, so it can be recognised
+            before it is pasted. Not translated: a localised file name
+            is a file name nobody finds. */}
+        <div className="grid grid-cols-[auto_1fr] items-baseline gap-x-3 gap-y-1 border-t border-border/60 pt-3">
+          {spec.spec.map((row) => (
+            <Fragment key={row.label + row.value}>
+              <span className="font-mono text-[11px] uppercase tracking-wide text-fg-subtle">
+                {t(row.label as MessageKey)}
+              </span>
+              <code className="min-w-0 break-all font-mono text-xs text-fg">{row.value}</code>
+            </Fragment>
+          ))}
+        </div>
+
+        {spec.notThis !== undefined && (
+          <div className="flex gap-2 border-t border-border/60 pt-3 text-xs leading-relaxed">
+            <TriangleAlert
+              aria-label={t('push.specNotThis')}
+              role="img"
+              className="size-3.5 shrink-0 translate-y-0.5 text-kind-warn"
+            />
+            <span className="text-fg-muted">{t(spec.notThis as MessageKey)}</span>
+          </div>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+/// The form, with the file read for you.
+///
+/// Two of the four APNs fields are typed by hand off a web page,
+/// which is where transposed characters come from. The Key ID is in
+/// the file name; Firebase's project is in the file. Both are lifted
+/// rather than asked for.
+function AddCredential({
+  onSaved,
+  projectId,
+  provider,
+}: {
+  onSaved: () => void;
+  projectId: string;
+  provider: Provider;
+}) {
+  const t = useT();
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [filename, setFilename] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<null | string>(null);
+  const [verdict, setVerdict] = useState<null | ProbeVerdict>(null);
+
+  const fields = PROVIDER_FIELDS[provider] ?? [];
+  const val = (k: string) => values[k] ?? '';
+  const missing = fields.filter((f) => f.required && val(f.key).trim().length === 0);
+  const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }));
+
+  // Runs on every change of the secret. Pure, so it costs nothing and
+  // cannot be out of date with what is in the box.
+  const seen = recognise(val('secretKey'), filename);
+
+  const reset = () => {
+    setValues({});
+    setFilename('');
+    setSaveError(null);
+    setVerdict(null);
+  };
+
+  const take = (name: string, text: string) => {
+    const r = recognise(text, name);
+    setFilename(name);
+    setVerdict(null);
+    setSaveError(null);
+    setValues((prev) => ({
+      ...prev,
+      secretKey: text,
+      // Only ever fills a blank. Overwriting something typed would be
+      // the console arguing with the operator.
+      ...(r.keyId !== undefined && (prev.keyId ?? '') === '' ? { keyId: r.keyId } : {}),
+    }));
+  };
+
+  return (
+    <Panel title={t('push.credentialsAdd')}>
+      <div className="flex flex-col gap-3 p-3.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <label className={`${buttonClass('secondary', 'sm')} cursor-pointer`}>
+            <Upload aria-hidden className="size-3.5" />
+            {t('push.chooseFile')}
+            <input
+              type="file"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                void file.text().then((text) => take(file.name, text));
+                // So choosing the same file twice still fires.
+                e.target.value = '';
+              }}
+            />
+          </label>
+          {filename !== '' && (
+            <code className="min-w-0 break-all font-mono text-xs text-fg-muted">{filename}</code>
+          )}
+        </div>
+
+        {/* What we made of it, before anything is saved. The wrong
+            file is named here rather than becoming a validation error
+            that points at the right field for the wrong reason. */}
+        {seen.issue !== undefined && (
+          <div className="flex gap-2 text-xs leading-relaxed text-kind-error">
+            <CircleX aria-hidden className="size-3.5 shrink-0 translate-y-0.5" />
+            <span>{t(`push.secretIssue.${seen.issue}` as MessageKey)}</span>
+          </div>
+        )}
+        {seen.issue === undefined && seen.provider !== undefined && (
+          <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 text-xs">
+            <span className="flex items-baseline gap-1.5 text-kind-probe">
+              <CircleCheck aria-hidden className="size-3 shrink-0 translate-y-0.5" />
+              {t(`push.secretSeen.${seen.provider}` as MessageKey)}
+            </span>
+            {seen.provider !== provider && (
+              <span className="text-kind-warn">{t('push.secretWrongTab')}</span>
+            )}
+            {seen.keyId !== undefined && (
+              <span className="font-mono text-fg-subtle">{t('push.keyIdFromFilename')}</span>
+            )}
+            {seen.projectId !== undefined && (
+              <code className="font-mono text-fg-subtle">{seen.projectId}</code>
+            )}
+          </div>
+        )}
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {fields
+            .filter((f) => !f.multiline)
+            .map((f) => (
+              <Field
+                key={f.key}
+                label={
+                  f.required ? (
+                    <>
+                      {t(f.label)}
+                      <span
+                        aria-label={t('push.required')}
+                        title={t('push.required')}
+                        className="ml-1 text-kind-warn"
+                      >
+                        •
+                      </span>
+                    </>
+                  ) : (
+                    t(f.label)
+                  )
+                }
+              >
+                {f.options ? (
+                  <Select
+                    value={val(f.key) || f.options[0]?.value}
+                    onChange={(e) => set(f.key, e.target.value)}
+                  >
+                    {f.options.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {t(o.label)}
+                      </option>
+                    ))}
+                  </Select>
+                ) : (
+                  <Input
+                    value={val(f.key)}
+                    onChange={(e) => set(f.key, e.target.value)}
+                    placeholder={f.placeholder ? t(f.placeholder) : undefined}
+                  />
+                )}
+              </Field>
+            ))}
+          <Field label={t('push.credentialLabel')}>
+            <Input
+              value={val('label')}
+              onChange={(e) => set('label', e.target.value)}
+              placeholder={t('push.credentialLabelPlaceholder')}
+            />
+          </Field>
+        </div>
+
+        {fields
+          .filter((f) => f.multiline)
+          .map((f) => (
+            <Field key={f.key} label={t(f.label)}>
+              {/* A textarea, because a PEM and a service-account file
+                  both have line breaks and an `<input>` deletes them. */}
+              <Textarea
+                value={val(f.key)}
+                onChange={(e) => {
+                  set(f.key, e.target.value);
+                  setVerdict(null);
+                }}
+                rows={provider === 'fcm' ? 8 : 6}
+                placeholder={f.placeholder ? t(f.placeholder) : undefined}
+              />
+              <p className="mt-1 text-xs leading-snug text-fg-subtle">{t(f.hint)}</p>
+            </Field>
+          ))}
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={busy || missing.length > 0}
+            onClick={() => {
+              setBusy(true);
+              setSaveError(null);
+              setVerdict(null);
+              const config: Record<string, unknown> = {};
+              for (const f of fields) {
+                if (f.key === 'secretKey') continue;
+                const v = val(f.key).trim();
+                if (v.length === 0) continue;
+                // The one field that is not a string: the worker
+                // reads `production` as a boolean.
+                config[f.key] = f.key === 'production' ? v === 'production' : v;
+              }
+              void api
+                .addPushCredential(
+                  projectId,
+                  provider,
+                  config,
+                  val('secretKey'),
+                  val('label').trim() || undefined,
+                )
+                // Saving and asking are one action. A credential that
+                // saved and was never probed is exactly the state
+                // this section exists to abolish.
+                .then((r) => api.probePushCredential(projectId, r.id))
+                .then((v) => {
+                  setVerdict(v);
+                  if (v.status === 'ok') reset();
+                  onSaved();
+                })
+                .catch((e: Error) =>
+                  setSaveError(
+                    e instanceof ApiError && e.code
+                      ? credentialProblem(t, { code: e.code, field: e.field ?? null })
+                      : e.message,
+                  ),
+                )
+                .finally(() => setBusy(false));
+            }}
+          >
+            {t('push.saveAndProbe')}
+          </Button>
+          {missing.length > 0 && (
+            <span className="font-mono text-xs tabular-nums text-fg-subtle">
+              {t('push.missingCount').replace('{n}', String(missing.length))}
+            </span>
+          )}
+        </div>
+      </div>
+      {saveError !== null && <ErrorBanner>{saveError}</ErrorBanner>}
+      {verdict !== null && (
+        <div className="border-t border-border/60 px-3.5 py-2.5">
+          <VerdictLine verdict={verdict} />
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+/// What the vendor said, in one line plus its own words.
+function VerdictLine({ verdict }: { verdict: ProbeVerdict }) {
+  const t = useT();
+  const Icon =
+    verdict.status === 'ok' ? CircleCheck : verdict.status === 'rejected' ? CircleX : Info;
+  return (
+    <div className={`flex gap-2 text-xs leading-relaxed ${verdictTone(verdict.status)}`}>
+      <Icon aria-hidden className="size-3.5 shrink-0 translate-y-0.5" />
+      <div className="min-w-0 space-y-0.5">
+        <div>{t(`push.verdict.${verdict.status}` as MessageKey)}</div>
+        {/* The vendor's own words. A verdict of "limited" with no
+            reason is a worse answer than no verdict. */}
+        {verdict.detail !== null && verdict.detail !== '' && (
+          <div className="break-words text-fg-subtle">{verdict.detail}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/// One stored credential: whether it sends, what we last heard, and
+/// the two things that can be done to it.
+function CredentialRow({
+  cred,
+  onChange,
+  projectId,
+}: {
+  cred: PushCredential;
+  onChange: () => void;
+  projectId: string;
+}) {
+  const t = useT();
+  const [busy, setBusy] = useState(false);
+  const [verdict, setVerdict] = useState<null | ProbeVerdict>(null);
+  const status = verdict?.status ?? cred.last_validate_status ?? null;
+  const detail = verdict?.detail ?? cred.last_validate_detail ?? null;
+  const active = cred.active !== false;
+
+  const run = (p: Promise<unknown>) => {
+    setBusy(true);
+    void p.then(onChange).finally(() => setBusy(false));
+  };
+
+  return (
+    <div className="flex flex-wrap items-start gap-x-3 gap-y-2 px-3.5 py-2.5 text-sm">
+      {/* Sending or staged, as a state rather than a sentence. */}
+      <span
+        className={`w-16 shrink-0 font-mono text-[11px] uppercase tracking-wide ${
+          active ? 'text-kind-probe' : 'text-fg-subtle'
+        }`}
+      >
+        {t(active ? 'push.credActive' : 'push.credStaged')}
+      </span>
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+          <span className="font-mono text-xs text-fg">{cred.kind}</span>
+          {cred.label !== null && cred.label !== undefined && cred.label !== '' && (
+            <span className="text-xs text-fg-muted">{cred.label}</span>
+          )}
+        </div>
+        {/* What the server understood, not what was typed. An
+            operator with two Firebase projects or two Apple teams has
+            no other way to see which one they pasted. */}
+        <div className="break-all font-mono text-xs text-fg-muted">
+          {summarise(cred.config) || t('push.metadataNone')}
+        </div>
+        {cred.problem ? (
+          <div className="flex items-baseline gap-1.5 text-xs text-kind-error">
+            <CircleX
+              aria-label={t('push.unusable')}
+              role="img"
+              className="size-3 shrink-0 translate-y-0.5"
+            />
+            <span>{credentialProblem(t, cred.problem)}</span>
+          </div>
+        ) : status !== null ? (
+          <VerdictLine
+            verdict={{
+              status: status as ProbeVerdict['status'],
+              code: null,
+              field: null,
+              detail,
+              safeToActivate: status === 'ok',
+            }}
+          />
+        ) : (
+          <div className="text-xs text-fg-subtle">{t('push.neverProbed')}</div>
+        )}
+      </div>
+      <div className="flex shrink-0 items-center gap-2.5 text-xs">
+        <button
+          type="button"
+          disabled={busy}
+          className="text-fg-subtle hover:text-fg disabled:opacity-50"
+          onClick={() =>
+            run(api.probePushCredential(projectId, cred.id).then((v) => setVerdict(v)))
+          }
+        >
+          {t('push.reprobe')}
+        </button>
+        {!active && (
+          <button
+            type="button"
+            disabled={busy}
+            className="text-accent hover:underline disabled:opacity-50"
+            onClick={() => {
+              // The server refuses a known-bad verdict without
+              // `force`; the confirm is where the operator sees which
+              // verdict they are overriding, rather than a checkbox
+              // that gets ticked out of habit.
+              const bad = status === 'rejected' || status === 'limited';
+              if (bad && !window.confirm(t('push.activateAnyway', { status: status ?? '' }))) {
+                return;
+              }
+              run(api.activatePushCredential(projectId, cred.id, bad));
+            }}
+          >
+            {t('push.activate')}
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={busy}
+          className="text-fg-subtle hover:text-kind-error disabled:opacity-50"
+          onClick={() => {
+            // Deleting the one that sends stops push. Say so, rather
+            // than asking the generic question.
+            const key = active ? 'push.deleteActiveConfirm' : 'push.deleteConfirm';
+            if (window.confirm(t(key, { kind: cred.kind }))) {
+              run(api.deletePushCredential(projectId, cred.id));
+            }
+          }}
+        >
+          {t('common.delete')}
+        </button>
+      </div>
     </div>
   );
 }

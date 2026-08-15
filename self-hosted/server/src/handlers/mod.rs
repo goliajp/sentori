@@ -306,11 +306,22 @@ pub fn router(state: Arc<AppState>) -> Router {
         // every one of these.
         .route(
             "/admin/api/projects/{project_id}/push/credentials",
-            get(admin::push_credentials::list).post(admin::push_credentials::upsert),
+            get(admin::push_credentials::list).post(admin::push_credentials::create),
+        )
+        // By id, not by kind: a project may now hold several of the
+        // same kind — the one that sends, and the ones being tried.
+        .route(
+            "/admin/api/projects/{project_id}/push/credentials/{credential_id}",
+            delete(admin::push_credentials::delete),
+        )
+        // Ask the vendor. Delivers nothing; see push_credential_probe.
+        .route(
+            "/admin/api/projects/{project_id}/push/credentials/{credential_id}/probe",
+            post(admin::push_credentials::probe),
         )
         .route(
-            "/admin/api/projects/{project_id}/push/credentials/{kind}",
-            delete(admin::push_credentials::delete),
+            "/admin/api/projects/{project_id}/push/credentials/{credential_id}/activate",
+            post(admin::push_credentials::activate),
         )
         .route(
             "/admin/api/projects/{project_id}/push/test",

@@ -203,6 +203,25 @@ export type PushCredential = {
    *  own language. It used to be an English sentence printed under a
    *  Chinese label. */
   problem?: null | { code: string; field: null | string };
+  /** Whether the send path uses this one. Exactly one per kind. */
+  active?: boolean;
+  /** What the operator calls it — two Apple teams are otherwise two
+   *  identical rows. */
+  label?: null | string;
+  /** The vendor's own words behind `last_validate_status`. A verdict
+   *  of `limited` with no reason is worse than no verdict. */
+  last_validate_detail?: null | string;
+};
+
+/** What the vendor said when we asked. Three states, not two:
+ *  `limited` means the credential is real and still cannot do this
+ *  job, which is a different repair from `rejected`. */
+export type ProbeVerdict = {
+  status: 'limited' | 'not_implemented' | 'ok' | 'rejected' | 'unreachable';
+  code: null | string;
+  field: null | string;
+  detail: null | string;
+  safeToActivate: boolean;
 };
 
 export type PushSend = {
@@ -592,21 +611,40 @@ class Api {
       `/admin/api/projects/${projectId}/push/credentials`,
     );
   }
-  savePushCredential(
+  /** Adds one. Never replaces one — see migration 0017. `active`
+   *  in the reply says whether it took over (nothing else of its
+   *  kind was configured) or is staged awaiting promotion. */
+  addPushCredential(
     projectId: string,
     provider: string,
     config: Record<string, unknown>,
     secret?: string,
+    label?: string,
   ) {
-    return this.post<{ id: string }>(
+    return this.post<{ id: string; active: boolean }>(
       `/admin/api/projects/${projectId}/push/credentials`,
-      { provider, config, secret },
+      { provider, config, secret, label },
     );
   }
-  deletePushCredential(projectId: string, kind: string) {
+  /** Asks Apple or Google. Delivers nothing. */
+  probePushCredential(projectId: string, credentialId: string) {
+    return this.post<ProbeVerdict>(
+      `/admin/api/projects/${projectId}/push/credentials/${credentialId}/probe`,
+      {},
+    );
+  }
+  /** Makes it the one that sends. Refused for a `rejected` or
+   *  `limited` verdict unless forced. */
+  activatePushCredential(projectId: string, credentialId: string, force = false) {
+    return this.post<{ error?: string; ok?: boolean }>(
+      `/admin/api/projects/${projectId}/push/credentials/${credentialId}/activate`,
+      { force },
+    );
+  }
+  deletePushCredential(projectId: string, credentialId: string) {
     return this.send<{ ok: boolean }>(
       'DELETE',
-      `/admin/api/projects/${projectId}/push/credentials/${kind}`,
+      `/admin/api/projects/${projectId}/push/credentials/${credentialId}`,
     );
   }
   /** Needs a device to aim at — a test send with no registered

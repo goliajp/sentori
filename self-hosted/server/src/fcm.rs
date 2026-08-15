@@ -138,6 +138,15 @@ pub fn project_id(cfg: &FcmConfig) -> Result<String, FcmError> {
     Ok(parse(cfg)?.project_id)
 }
 
+/// An OAuth access token minted from this credential.
+///
+/// Exposed for the credential probe, which needs to know whether
+/// Google will mint one at all — that question is answered by this
+/// call and by nothing the worker does before it starts sending.
+pub async fn token_for(cfg: &FcmConfig) -> Result<String, FcmError> {
+    access_token(&parse(cfg)?).await
+}
+
 async fn access_token(sa: &ServiceAccount) -> Result<String, FcmError> {
     if let Some(token) = cached_token(&sa.client_email) {
         return Ok(token);
