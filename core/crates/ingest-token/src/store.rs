@@ -134,9 +134,9 @@ fn row_to_token(row: &sqlx::postgres::PgRow) -> Result<Token, TokenError> {
 /// crypto-random entropy as 26 unpadded base32 chars.
 fn mint_random_token() -> String {
     use data_encoding::BASE32_NOPAD;
-    use rand::RngCore;
+    use rand::Rng;
     let mut bytes = [0u8; 16];
-    rand::thread_rng().fill_bytes(&mut bytes);
+    rand::rng().fill_bytes(&mut bytes);
     let encoded = BASE32_NOPAD.encode(&bytes).to_ascii_lowercase();
     format!("{}{}", crate::parse::TOKEN_PREFIX, encoded)
 }

@@ -20,7 +20,7 @@
 //! key; key rotation is the caller's concern (try the old key on
 //! `Decrypt` failure, swap).
 
-use aes_gcm::aead::{Aead, KeyInit, generic_array::GenericArray};
+use aes_gcm::aead::{Aead, KeyInit, array::Array};
 use aes_gcm::{Aes256Gcm, Nonce};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -53,7 +53,7 @@ impl EncryptedCookie {
     ///   only failure path is OOM (in which case the allocator
     ///   panics first), so this is effectively infallible.
     pub fn seal(key: &SecretKey, payload: &[u8]) -> EncryptedCookieResult<String> {
-        let cipher = Aes256Gcm::new(GenericArray::from_slice(key.as_bytes()));
+        let cipher = Aes256Gcm::new(Array::from_slice(key.as_bytes()));
 
         let mut nonce_bytes = [0u8; NONCE_LEN];
         // OS CSPRNG; healthy systems return Ok always. On the
@@ -94,7 +94,7 @@ impl EncryptedCookie {
         let (nonce_bytes, ciphertext) = raw.split_at(NONCE_LEN);
         let nonce = Nonce::from_slice(nonce_bytes);
 
-        let cipher = Aes256Gcm::new(GenericArray::from_slice(key.as_bytes()));
+        let cipher = Aes256Gcm::new(Array::from_slice(key.as_bytes()));
         cipher
             .decrypt(nonce, ciphertext)
             .map_err(|_| EncryptedCookieError::Decrypt)

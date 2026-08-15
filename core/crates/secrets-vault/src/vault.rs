@@ -1,7 +1,7 @@
 //! [`Vault`] — composes a `MasterKey` + `KeyId` into the
 //! `seal` / `open` API.
 
-use aes_gcm::aead::{Aead, KeyInit, generic_array::GenericArray};
+use aes_gcm::aead::{Aead, KeyInit, array::Array};
 use aes_gcm::{Aes256Gcm, Nonce};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -60,14 +60,14 @@ impl Vault {
         getrandom::getrandom(&mut payload_nonce).map_err(|_| SealError::EntropyFailure)?;
 
         // 2. Wrap the DEK under the master.
-        let master_cipher = Aes256Gcm::new(GenericArray::from_slice(self.master.as_bytes()));
+        let master_cipher = Aes256Gcm::new(Array::from_slice(self.master.as_bytes()));
         let wrapped_dek = master_cipher
             .encrypt(Nonce::from_slice(&wrapped_dek_nonce), dek.as_slice())
             .map_err(|_| SealError::EncryptFailed)?;
         debug_assert_eq!(wrapped_dek.len(), WRAPPED_DEK_LEN);
 
         // 3. Encrypt the payload under the fresh DEK.
-        let payload_cipher = Aes256Gcm::new(GenericArray::from_slice(&dek));
+        let payload_cipher = Aes256Gcm::new(Array::from_slice(&dek));
         let payload_ciphertext = payload_cipher
             .encrypt(Nonce::from_slice(&payload_nonce), plaintext)
             .map_err(|_| SealError::EncryptFailed)?;
@@ -131,7 +131,7 @@ impl Vault {
         }
 
         // 1. Unwrap the DEK.
-        let master_cipher = Aes256Gcm::new(GenericArray::from_slice(self.master.as_bytes()));
+        let master_cipher = Aes256Gcm::new(Array::from_slice(self.master.as_bytes()));
         let mut dek = master_cipher
             .decrypt(
                 Nonce::from_slice(view.wrapped_dek_nonce),
@@ -140,7 +140,7 @@ impl Vault {
             .map_err(|_| OpenError::WrappedDekDecryptFailed)?;
 
         // 2. Decrypt the payload with the unwrapped DEK.
-        let payload_cipher = Aes256Gcm::new(GenericArray::from_slice(&dek));
+        let payload_cipher = Aes256Gcm::new(Array::from_slice(&dek));
         let plaintext = payload_cipher
             .decrypt(
                 Nonce::from_slice(view.payload_nonce),

@@ -12,6 +12,7 @@ use axum::{Extension, Json, extract::State, http::StatusCode};
 use sentori_ingest_token::IngestContext;
 use serde::Deserialize;
 use serde_json::{Value, json};
+use sqlx::AssertSqlSafe;
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -120,7 +121,7 @@ pub async fn handle(
 
     let sql = INSERT_TEMPLATE.replace("{selector}", &selector.sql);
 
-    let mut q = sqlx::query(&sql)
+    let mut q = sqlx::query(AssertSqlSafe(sql.clone()))
         .bind(ctx.project_id)
         .bind(&body.payload)
         .bind(body.idempotency_key.as_deref())

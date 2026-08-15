@@ -103,7 +103,11 @@ async fn main() -> anyhow::Result<()> {
         Cmd::Restore { from, overwrite } => {
             commands::restore::run(&pool, &from, overwrite, cli.quiet).await?;
         }
-        Cmd::Export { out, tables, project } => {
+        Cmd::Export {
+            out,
+            tables,
+            project,
+        } => {
             commands::export::run(&pool, &out, tables.as_deref(), project, cli.quiet).await?;
         }
         Cmd::Import { input } => commands::import::run(&pool, &input, cli.quiet).await?,

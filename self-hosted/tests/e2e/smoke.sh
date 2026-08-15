@@ -489,6 +489,13 @@ VERDICT="$(curl -fsS -b "$JAR" -X POST \
     -H 'content-type: application/json' -d '{}')"
 echo "$VERDICT" | jq -e '.status == "rejected" or .status == "unreachable"' > /dev/null \
     || { echo "the probe said something else entirely: $VERDICT" >&2; exit 1; }
+# Print which of the two, because they mean different things about the
+# image: `rejected` is Apple answering, which means TLS trust roots
+# work inside the container. reqwest 0.13.4 dropped the `webpki-roots`
+# dependency for `rustls-platform-verifier`, and a distroless image
+# with no OS trust store is exactly where that would show up — as
+# `unreachable`, silently, on every outbound call the product makes.
+echo "   probe verdict: $(echo "$VERDICT" | jq -r .status)"
 # Whatever it said, it must have been written down — the column has
 # held three legal values since 0007 and nothing had ever written one.
 STORED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials" \

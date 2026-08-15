@@ -7,6 +7,7 @@
 
 use anyhow::Context;
 use serde::Deserialize;
+use sqlx::AssertSqlSafe;
 use sqlx::PgPool;
 use tokio::io::{AsyncBufReadExt, BufReader, stdin};
 
@@ -35,7 +36,10 @@ pub async fn run(pool: &PgPool, input: &str, quiet: bool) -> anyhow::Result<()> 
              ON CONFLICT DO NOTHING",
             env.table, env.table,
         );
-        sqlx::query(&sql)
+        // Audited: the only interpolation is a table name from
+        // `commands::TABLES`, a compile-time list. Nothing a caller
+        // types reaches the statement.
+        sqlx::query(AssertSqlSafe(sql.clone()))
             .bind(env.row.to_string())
             .execute(pool)
             .await

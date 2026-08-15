@@ -1,7 +1,7 @@
 //! [`Hasher`] — per-tenant per-purpose PII hasher.
 
 use hkdf::Hkdf;
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
 use uuid::Uuid;
 use zeroize::{Zeroize, Zeroizing};
@@ -114,7 +114,7 @@ impl Hasher {
     #[allow(clippy::expect_used)]
     pub fn hash(&self, tenant_id: Uuid, purpose: &str, value: &[u8]) -> Hash {
         let subkey = self.derive_subkey(tenant_id, purpose);
-        let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(subkey.as_slice())
+        let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(subkey.as_slice())
             .expect("HMAC-SHA256 accepts any key length");
         mac.update(value);
         let tag = mac.finalize().into_bytes();

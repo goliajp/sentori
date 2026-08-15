@@ -14,6 +14,7 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
 use super::TABLES;
+use sqlx::AssertSqlSafe;
 
 pub async fn run(pool: &PgPool, out: &Path, quiet: bool) -> anyhow::Result<()> {
     fs::create_dir_all(out).await.context("create dump dir")?;
@@ -37,22 +38,24 @@ pub async fn run(pool: &PgPool, out: &Path, quiet: bool) -> anyhow::Result<()> {
         .await
         .context("write manifest")?;
     if !quiet {
-        println!("✅ dump complete: {} tables → {}", TABLES.len(), out.display());
+        println!(
+            "✅ dump complete: {} tables → {}",
+            TABLES.len(),
+            out.display()
+        );
     }
     Ok(())
 }
 
-async fn dump_one(
-    pool: &PgPool,
-    table: &str,
-    out: &Path,
-    quiet: bool,
-) -> anyhow::Result<i64> {
+async fn dump_one(pool: &PgPool, table: &str, out: &Path, quiet: bool) -> anyhow::Result<i64> {
     // Use row_to_json so caller doesn't need per-table
     // typed mapping. The full row JSON includes every
     // column verbatim.
     let sql = format!("SELECT row_to_json(t) FROM {table} t");
-    let rows = sqlx::query(&sql)
+    // Audited: the only interpolation is a table name from
+    // `commands::TABLES`, a compile-time list. Nothing a caller
+    // types reaches the statement.
+    let rows = sqlx::query(AssertSqlSafe(sql))
         .fetch_all(pool)
         .await
         .with_context(|| format!("scan {table}"))?;

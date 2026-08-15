@@ -88,3 +88,23 @@ fn csrf_token_constants_match_doc() {
 fn nonce_len_constant_is_aes_gcm_standard() {
     assert_eq!(NONCE_LEN, 12);
 }
+
+/// Sealed by aes-gcm 0.10.3 on 2026-08-15, under `[7u8; KEY_LEN]`.
+///
+/// Session cookies live in browsers, not in the database, so a
+/// framing change does not corrupt anything — it signs every logged-in
+/// user out at once, on deploy, with no error anyone would connect to
+/// a dependency bump. Round-tripping inside one build cannot see that.
+const SEALED_BY_0_10: &str =
+    "up1dutg822jW7dfUR0sBxuEP4C7C_q-ugoq8iC8y4pBFFqfISAOmwbKw6lnLWSOg3gw0VAfIglR7i6IADNdKBoaek1Q";
+
+#[test]
+fn a_cookie_sealed_by_the_previous_release_still_opens() {
+    let key = SecretKey::from_bytes([7u8; KEY_LEN]);
+    let opened = EncryptedCookie::open(&key, SEALED_BY_0_10).unwrap();
+    assert_eq!(
+        opened, b"sid=01a00000-0000-7000-8000-000000000001",
+        "a session cookie from the previous release no longer opens — \
+         this deploy signs every user out"
+    );
+}

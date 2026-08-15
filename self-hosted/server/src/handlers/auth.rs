@@ -311,7 +311,7 @@ pub async fn reset_password(
 
 /// 32 random bytes, base32 — same entropy family as ingest tokens.
 fn mint_session_token() -> String {
-    use rand::RngCore;
+    use rand::Rng;
     let mut bytes = [0u8; 32];
     rand::rng().fill_bytes(&mut bytes);
     data_encoding::BASE32_NOPAD

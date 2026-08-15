@@ -73,7 +73,8 @@ async fn fresh_pool() -> PgPool {
         .await
         .expect("admin");
     let db = format!("t_{}", Uuid::now_v7().simple());
-    sqlx::query(&format!("CREATE DATABASE \"{db}\""))
+    // Audited: `db` is this test's own generated name, never input.
+    sqlx::query(sqlx::AssertSqlSafe(format!("CREATE DATABASE \"{db}\"")))
         .execute(&admin)
         .await
         .expect("create");

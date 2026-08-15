@@ -20,7 +20,7 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
-use sqlx::Row;
+use sqlx::{AssertSqlSafe, Row};
 use tracing::warn;
 use uuid::Uuid;
 
@@ -81,7 +81,12 @@ pub async fn preview(
     let where_clause = format!("dt.project_id = $1 AND dt.revoked_at IS NULL AND ({frag})");
 
     let count_sql = format!("SELECT count(*) AS n FROM device_tokens dt WHERE {where_clause}");
-    let mut q = sqlx::query(&count_sql).bind(project_id);
+    // Audited for injection: the fragment `to_sql` returns contains only
+    // `$n` placeholders and column names from a two-variant enum
+    // (`Source::column` returns `&'static str`). Every value an
+    // operator supplied travels as a bind — see `audience.rs`, where
+    // this is the property the unit tests are about.
+    let mut q = sqlx::query(AssertSqlSafe(count_sql.clone())).bind(project_id);
     for b in &binds {
         q = b.attach(q);
     }
@@ -109,7 +114,12 @@ pub async fn preview(
          FROM device_tokens dt WHERE {where_clause} \
          ORDER BY dt.last_seen_at DESC LIMIT {SAMPLE}"
     );
-    let mut q = sqlx::query(&sample_sql).bind(project_id);
+    // Audited for injection: the fragment `to_sql` returns contains only
+    // `$n` placeholders and column names from a two-variant enum
+    // (`Source::column` returns `&'static str`). Every value an
+    // operator supplied travels as a bind — see `audience.rs`, where
+    // this is the property the unit tests are about.
+    let mut q = sqlx::query(AssertSqlSafe(sample_sql.clone())).bind(project_id);
     for b in &binds {
         q = b.attach(q);
     }
@@ -202,7 +212,12 @@ pub async fn send(
     // one between a human reading a number and clicking, not the
     // milliseconds inside the request.
     let count_sql = format!("SELECT count(*) AS n FROM device_tokens dt WHERE {where_clause}");
-    let mut q = sqlx::query(&count_sql).bind(project_id);
+    // Audited for injection: the fragment `to_sql` returns contains only
+    // `$n` placeholders and column names from a two-variant enum
+    // (`Source::column` returns `&'static str`). Every value an
+    // operator supplied travels as a bind — see `audience.rs`, where
+    // this is the property the unit tests are about.
+    let mut q = sqlx::query(AssertSqlSafe(count_sql.clone())).bind(project_id);
     for b in &binds {
         q = b.attach(q);
     }
@@ -256,7 +271,12 @@ pub async fn send(
          ON CONFLICT DO NOTHING \
          RETURNING id"
     );
-    let mut q = sqlx::query(&insert_sql)
+    // Audited for injection: the fragment `to_sql` returns contains only
+    // `$n` placeholders and column names from a two-variant enum
+    // (`Source::column` returns `&'static str`). Every value an
+    // operator supplied travels as a bind — see `audience.rs`, where
+    // this is the property the unit tests are about.
+    let mut q = sqlx::query(AssertSqlSafe(insert_sql.clone()))
         .bind(project_id)
         .bind(json!({ "title": body.title, "body": body.body }))
         .bind(body.idempotency_key.as_deref());
