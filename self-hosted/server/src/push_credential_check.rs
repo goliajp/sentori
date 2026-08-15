@@ -20,19 +20,36 @@
 
 use serde_json::{Value, json};
 
-/// Rejected, with something the operator can act on.
+/// Rejected, as something the console can say in its own language.
+///
+/// This carried English prose — a detail and a paragraph of guidance —
+/// which the dashboard printed under a Chinese label. Half a sentence
+/// in each language, in the one place an operator has already got
+/// something wrong. Codes and a field name; the words live where they
+/// are translated.
 pub struct Rejection {
-    pub error: &'static str,
+    /// What is wrong, as something to look up.
+    pub code: &'static str,
+    /// Which field, when the code is about one.
+    pub field: Option<&'static str>,
+    /// For the log, not for a person.
     pub detail: String,
-    pub expected: &'static str,
 }
 
 impl Rejection {
-    fn new(error: &'static str, detail: impl Into<String>, expected: &'static str) -> Self {
+    fn new(code: &'static str, detail: impl Into<String>) -> Self {
         Self {
-            error,
+            code,
+            field: None,
             detail: detail.into(),
-            expected,
+        }
+    }
+
+    fn about(code: &'static str, field: &'static str, detail: impl Into<String>) -> Self {
+        Self {
+            code,
+            field: Some(field),
+            detail: detail.into(),
         }
     }
 }
@@ -49,20 +66,16 @@ fn required<'a>(config: &'a Value, key: &str) -> Option<&'a str> {
 /// The header and footer survive an `<input>`; only the line breaks
 /// between them do not. So a check that just looks for `BEGIN` would
 /// pass exactly the paste this exists to catch.
-fn looks_like_pem(secret: &str) -> Result<(), String> {
+fn looks_like_pem(secret: &str) -> Result<(), &'static str> {
     let trimmed = secret.trim();
     if !trimmed.starts_with("-----BEGIN") {
-        return Err("does not start with a PEM header".into());
+        return Err("pem-no-header");
     }
     if !trimmed.contains("-----END") {
-        return Err("has no PEM footer".into());
+        return Err("pem-no-footer");
     }
     if trimmed.lines().nth(1).is_none_or(|l| l.trim().is_empty()) {
-        return Err(
-            "is all on one line — the line breaks are gone, which is what a \
-             single-line text field does to a pasted key"
-                .into(),
-        );
+        return Err("pem-one-line");
     }
     Ok(())
 }
@@ -79,16 +92,8 @@ pub fn check(provider: &str, config: &mut Value, secret: &str) -> Result<(), Rej
             let cfg = crate::fcm::FcmConfig {
                 service_account_json: secret.to_string(),
             };
-            let project = crate::fcm::project_id(&cfg).map_err(|e| {
-                Rejection::new(
-                    "invalid_fcm_credential",
-                    e.to_string(),
-                    "the service-account JSON from Firebase (Project settings ▸ \
-                     Service accounts ▸ Generate new private key). A legacy \
-                     server key no longer works: Google switched off the \
-                     endpoint it authenticated against.",
-                )
-            })?;
+            let project = crate::fcm::project_id(&cfg)
+                .map_err(|e| Rejection::new("fcm-bad-json", e.to_string()))?;
             if let Some(map) = config.as_object_mut() {
                 map.insert("fcmProjectId".into(), json!(project));
             }
@@ -97,23 +102,15 @@ pub fn check(provider: &str, config: &mut Value, secret: &str) -> Result<(), Rej
         "apns" => {
             for key in ["keyId", "teamId", "topic"] {
                 if required(config, key).is_none() {
-                    return Err(Rejection::new(
-                        "invalid_apns_credential",
+                    return Err(Rejection::about(
+                        "field-missing",
+                        key,
                         format!("{key} is missing"),
-                        "keyId and teamId come from the Apple developer portal, \
-                         and topic is your bundle id — the worker reads it as \
-                         `topic`, whatever the field is labelled.",
                     ));
                 }
             }
-            looks_like_pem(secret).map_err(|why| {
-                Rejection::new(
-                    "invalid_apns_credential",
-                    format!("the key {why}"),
-                    "the contents of the .p8 file from the Apple developer \
-                     portal, line breaks and all.",
-                )
-            })?;
+            looks_like_pem(secret)
+                .map_err(|code| Rejection::about(code, "secret", "the pasted key is not a PEM"))?;
             crate::apns::mint_jwt(&crate::apns::ApnsConfig {
                 team_id: required(config, "teamId").unwrap_or_default().to_string(),
                 key_id: required(config, "keyId").unwrap_or_default().to_string(),
@@ -121,34 +118,21 @@ pub fn check(provider: &str, config: &mut Value, secret: &str) -> Result<(), Rej
                 private_pem: secret.to_string(),
                 production: true,
             })
-            .map_err(|e| {
-                Rejection::new(
-                    "invalid_apns_credential",
-                    // The same signing the worker does, done now. A key
-                    // that cannot sign here will not sign tonight.
-                    format!("the key did not sign: {e}"),
-                    "an EC private key (.p8) from Apple. A key for a different \
-                     algorithm, or a truncated paste, fails here.",
-                )
-            })?;
+            // The same signing the worker does, done now. A key that
+            // cannot sign here will not sign tonight.
+            .map_err(|e| Rejection::about("key-does-not-sign", "secret", e.to_string()))?;
             Ok(())
         }
         "webpush" => {
             if required(config, "vapidPublicKey").is_none() {
-                return Err(Rejection::new(
-                    "invalid_webpush_credential",
+                return Err(Rejection::about(
+                    "field-missing",
+                    "vapidPublicKey",
                     "vapidPublicKey is missing",
-                    "the VAPID public key, base64url, paired with the private \
-                     key below.",
                 ));
             }
-            looks_like_pem(secret).map_err(|why| {
-                Rejection::new(
-                    "invalid_webpush_credential",
-                    format!("the key {why}"),
-                    "the VAPID private key in PEM form.",
-                )
-            })?;
+            looks_like_pem(secret)
+                .map_err(|code| Rejection::about(code, "secret", "the pasted key is not a PEM"))?;
             Ok(())
         }
         // HCM and MiPush have never run against a real account here.
@@ -181,12 +165,10 @@ mod tests {
         let mut config = apns_config();
         let rejection = check("apns", &mut config, &flattened).err();
         assert!(
-            rejection.as_ref().is_some_and(
-                |r| r.error == "invalid_apns_credential" && r.detail.contains("one line")
-            ),
-            "a PEM with no line breaks has to be refused, and the message has to \
+            rejection.as_ref().is_some_and(|r| r.code == "pem-one-line"),
+            "a PEM with no line breaks has to be refused, and the code has to \
              name the actual problem — got {:?}",
-            rejection.map(|r| r.detail)
+            rejection.map(|r| r.code)
         );
     }
 
@@ -208,10 +190,10 @@ mod tests {
         assert!(
             rejection
                 .as_ref()
-                .is_some_and(|r| r.detail.contains("topic")),
+                .is_some_and(|r| r.code == "field-missing" && r.field == Some("topic")),
             "a credential naming bundleId rather than topic has to be refused — \
              got {:?}",
-            rejection.map(|r| r.detail)
+            rejection.map(|r| (r.code, r.field))
         );
     }
 

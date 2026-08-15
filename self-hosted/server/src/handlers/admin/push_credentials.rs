@@ -68,10 +68,14 @@ pub async fn upsert(
     if let Err(r) = crate::push_credential_check::check(&body.provider, &mut config, &secret) {
         return (
             StatusCode::BAD_REQUEST,
+            // A code and a field name. The console says it in the
+            // language the console is in — this used to be English
+            // prose printed under a Chinese label.
             Json(json!({
-                "error": r.error,
+                "error": "invalid_credential",
+                "code": r.code,
+                "field": r.field,
                 "detail": r.detail,
-                "expected": r.expected,
             })),
         );
     }
@@ -179,7 +183,7 @@ pub async fn list(
             let secret = String::from_utf8(r.get::<Vec<u8>, _>("secret_blob")).unwrap_or_default();
             let problem = crate::push_credential_check::check(&kind, &mut config, &secret)
                 .err()
-                .map(|e| format!("{} — {}", e.detail, e.expected));
+                .map(|e| json!({ "code": e.code, "field": e.field }));
             json!({
                 "id": r.get::<Uuid, _>("id").to_string(),
                 "kind": kind,

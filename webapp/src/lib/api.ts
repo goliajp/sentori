@@ -199,7 +199,10 @@ export type PushCredential = {
    *  check the save runs. Null when it is fine. A credential stored
    *  before anything was checked is still stored, and used to
    *  announce itself only as a notification that never arrived. */
-  problem?: null | string;
+  /** Why the worker cannot use it, as a code the console says in its
+   *  own language. It used to be an English sentence printed under a
+   *  Chinese label. */
+  problem?: null | { code: string; field: null | string };
 };
 
 export type PushSend = {
@@ -315,6 +318,11 @@ export type NotificationPref = {
 const DEFAULT_BASE = '';
 
 class ApiError extends Error {
+  /** What is wrong, when the server named it. The console owns the
+   *  sentence; this is what it looks the sentence up by. */
+  code?: string;
+  /** Which field the code is about, when it is about one. */
+  field?: string;
   constructor(
     public status: number,
     message: string,
@@ -338,19 +346,31 @@ class Api {
     }
     if (!resp.ok) {
       let detail = '';
+      let code: string | undefined;
+      let field: string | undefined;
       try {
-        // The server answers a rejected credential with three fields:
-        // a code, what was wrong, and what it expected instead. Only
-        // the code was read, so the screen said
-        // `invalid_apns_credential` and threw away the sentence that
-        // named the field. Both of the others are what the person
-        // pasting the key needs.
-        const j = (await resp.json()) as { detail?: string; error?: string; expected?: string };
-        detail = [j.error, j.detail, j.expected].filter(Boolean).join(' — ');
+        // A rejected credential answers with a code and the field it
+        // is about. It used to answer with English prose, which the
+        // console printed under a Chinese label — half a sentence in
+        // each language, in the one place someone has already got
+        // something wrong. The words are ours now; these are for
+        // looking them up.
+        const j = (await resp.json()) as {
+          code?: string;
+          detail?: string;
+          error?: string;
+          field?: string;
+        };
+        code = j.code;
+        field = j.field;
+        detail = [j.error, j.detail].filter(Boolean).join(' — ');
       } catch {
         // non-JSON error body
       }
-      throw new ApiError(resp.status, detail || `${resp.status}`);
+      const err = new ApiError(resp.status, detail || `${resp.status}`);
+      err.code = code;
+      err.field = field;
+      throw err;
     }
     return (await resp.json()) as T;
   }

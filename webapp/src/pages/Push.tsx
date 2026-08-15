@@ -46,7 +46,7 @@ import {
 } from '../components/ui';
 import { useT } from '../i18n';
 import type { MessageKey } from '../i18n/en';
-import { api } from '../lib/api';
+import { ApiError, api } from '../lib/api';
 import type { AudienceRequest, AudienceSample, PushCheck } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 
@@ -98,6 +98,38 @@ export default function PushPage() {
         <CredentialsSection projectId={projectId} />
       )}
     </PageShell>
+  );
+}
+
+/// One reading: the number, then what it is.
+///
+/// Value over label, tabular, so a column of them lines up and the
+/// eye can tell a number from the words either side of it. Tone is
+/// semantic and sparing — a zero failure count is not green news, it
+/// is the absence of news.
+function Stat({
+  label,
+  tone,
+  value,
+}: {
+  label: string;
+  tone?: 'bad' | 'ok' | 'warn';
+  value: number | string;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span
+        className={clsx(
+          'font-mono text-[17px] leading-none tabular-nums',
+          tone === 'ok' && 'text-ok',
+          tone === 'bad' && 'text-kind-error',
+          tone === 'warn' && 'text-kind-warn',
+        )}
+      >
+        {value}
+      </span>
+      <span className="text-[11px] uppercase tracking-wide text-fg-subtle">{label}</span>
+    </div>
   );
 }
 
@@ -196,26 +228,28 @@ function DeliverySection({
         {!h || (h.sent24h === 0 && h.failed24h === 0 && h.queued === 0) ? (
           <PanelEmpty>{t('push.deliveryEmpty')}</PanelEmpty>
         ) : (
-          <div className="space-y-2 p-3.5">
-            <div className="flex items-baseline gap-6 text-sm tabular-nums">
-              <span>
-                <span className="text-ok">{h.sent24h}</span>{' '}
-                <span className="text-fg-subtle">{t('push.sent24h')}</span>
-              </span>
-              <span>
-                <span className={h.failed24h > 0 ? 'text-kind-error' : ''}>{h.failed24h}</span>{' '}
-                <span className="text-fg-subtle">{t('push.failed24h')}</span>
-              </span>
-              <span>
-                {h.queued} <span className="text-fg-subtle">{t('push.queued')}</span>
-              </span>
-              <span className="ml-auto text-fg-subtle">
-                {t('push.tokens', {
-                  identified: String(h.identifiedTokens),
-                  live: String(h.liveTokens),
-                  quarantined: String(h.quarantinedTokens),
-                })}
-              </span>
+          <div className="space-y-2.5 p-3.5">
+            {/* Six readings on one rail, value over label. They used to
+                run together inline — `412 24 小时送达 7 失败` — where
+                the eye cannot tell a number from the words either side
+                of it. */}
+            <div className="flex flex-wrap items-start gap-x-8 gap-y-3">
+              <Stat value={h.sent24h} label={t('push.sent24h')} tone={h.sent24h > 0 ? 'ok' : undefined} />
+              <Stat
+                value={h.failed24h}
+                label={t('push.failed24h')}
+                tone={h.failed24h > 0 ? 'bad' : undefined}
+              />
+              <Stat value={h.queued} label={t('push.queued')} />
+              <div className="ml-auto flex items-start gap-x-8">
+                <Stat value={h.liveTokens} label={t('push.statLive')} />
+                <Stat value={h.identifiedTokens} label={t('push.statIdentified')} />
+                <Stat
+                  value={h.quarantinedTokens}
+                  label={t('push.statQuarantined')}
+                  tone={h.quarantinedTokens > 0 ? 'warn' : undefined}
+                />
+              </div>
             </div>
             {/* A count is an alarm; a reason is a fix. */}
             {h.reasons.length > 0 && (
@@ -599,6 +633,23 @@ function LevelIcon({ label, level }: { label: string; level: PushCheck['level'] 
   );
 }
 
+/// What is wrong with a credential, in the language the console is in.
+///
+/// The server sends a code and the field it is about. It used to send
+/// English prose, which this printed under a Chinese label.
+function credentialProblem(
+  t: (k: MessageKey) => string,
+  p: { code: string; field: null | string },
+): string {
+  const key = `push.credError.${p.code}` as MessageKey;
+  const text = t(key);
+  // A code this build does not know still has to say something. The
+  // server and the console ship together, so this is the gap between
+  // an upgraded server and a cached bundle.
+  if (text === key) return p.field ?? p.code;
+  return p.field ? text.replace('{field}', p.field) : text;
+}
+
 /// Put the server's numbers into the console's sentence.
 function fill(text: string, data: Record<string, unknown>): string {
   return text.replace(/\{(\w+)\}/g, (whole, key: string) => {
@@ -926,11 +977,7 @@ function AudienceSection({ projectId }: { projectId: string }) {
             {t('push.previewAudience')}
           </Button>
           {rawError && <span className="text-xs text-kind-error">{rawError}</span>}
-          {preview && (
-            <span className="text-xs text-fg-muted">
-              {t('push.audienceMatched').replace('{n}', String(preview.matched))}
-            </span>
-          )}
+          {preview && <Stat value={preview.matched} label={t('push.audienceMatched')} />}
           {preview === null && !rawError && (
             <span className="text-xs text-fg-subtle">{t('push.audienceNotCounted')}</span>
           )}
@@ -1088,7 +1135,10 @@ function DevicesSection({ projectId }: { projectId: string }) {
                     exist. It is a fact about one device, so it belongs
                     next to that device. */}
                 {!d.revokedAt && d.badStreak > 0 && (
-                  <span className="ml-1.5 text-kind-warn">
+                  <span
+                    title={t('push.badStreakTitle').replace('{n}', String(d.badStreak))}
+                    className="ml-1.5 rounded-sm bg-kind-warn/15 px-1 text-kind-warn tabular-nums"
+                  >
                     {t('push.badStreak').replace('{n}', String(d.badStreak))}
                   </span>
                 )}
@@ -1339,7 +1389,25 @@ function CredentialsSection({ projectId }: { projectId: string }) {
             {fields
               .filter((f) => !f.multiline)
               .map((f) => (
-                <Field key={f.key} label={t(f.label)}>
+                <Field
+                  key={f.key}
+                  label={
+                    f.required ? (
+                      <>
+                        {t(f.label)}
+                        <span
+                          aria-label={t('push.required')}
+                          title={t('push.required')}
+                          className="ml-1 text-kind-warn"
+                        >
+                          •
+                        </span>
+                      </>
+                    ) : (
+                      t(f.label)
+                    )
+                  }
+                >
                   {f.options ? (
                     <Select
                       value={val(f.key) || f.options[0]?.value}
@@ -1358,7 +1426,6 @@ function CredentialsSection({ projectId }: { projectId: string }) {
                       placeholder={f.placeholder ? t(f.placeholder) : undefined}
                     />
                   )}
-                  <p className="mt-1 text-xs leading-snug text-fg-subtle">{t(f.hint)}</p>
                 </Field>
               ))}
           </div>
@@ -1405,17 +1472,21 @@ function CredentialsSection({ projectId }: { projectId: string }) {
                     setSaved(provider);
                     creds.reload();
                   })
-                  .catch((e: Error) => setSaveError(e.message))
+                  .catch((e: Error) =>
+                    setSaveError(
+                      e instanceof ApiError && e.code
+                        ? credentialProblem(t, { code: e.code, field: e.field ?? null })
+                        : e.message,
+                    ),
+                  )
                   .finally(() => setBusy(false));
               }}
             >
               {t('settings.save')}
             </Button>
             {missing.length > 0 && (
-              <span className="text-xs text-fg-subtle">
-                {t('push.missingFields', {
-                  fields: missing.map((f) => t(f.label)).join(', '),
-                })}
+              <span className="font-mono text-xs tabular-nums text-fg-subtle">
+                {t('push.missingCount').replace('{n}', String(missing.length))}
               </span>
             )}
           </div>
@@ -1448,17 +1519,21 @@ function CredentialsSection({ projectId }: { projectId: string }) {
                       rather than leaving it to be discovered as a
                       notification that never arrived. */}
                   {c.problem ? (
-                    <div className="text-xs text-kind-error">
-                      {t('push.unusable')} {c.problem}
+                    <div className="flex items-baseline gap-1.5 text-xs text-kind-error">
+                      <CircleX aria-label={t('push.unusable')} role="img" className="size-3 shrink-0 translate-y-0.5" />
+                      <span>{credentialProblem(t, c.problem)}</span>
                     </div>
                   ) : (
-                    <div className="text-xs text-fg-subtle">
-                      {c.last_validate_status
-                        ? t('push.lastValidated', {
-                            status: c.last_validate_status,
-                            when: c.last_validated_at ? formatRelative(c.last_validated_at) : '—',
-                          })
-                        : t('push.usable')}
+                    <div className="flex items-baseline gap-1.5 text-xs text-fg-subtle">
+                      <CircleCheck aria-label={t('push.usable')} role="img" className="size-3 shrink-0 translate-y-0.5 text-ok" />
+                      <span>
+                        {c.last_validate_status
+                          ? t('push.lastValidated', {
+                              status: c.last_validate_status,
+                              when: c.last_validated_at ? formatRelative(c.last_validated_at) : '—',
+                            })
+                          : t('push.usable')}
+                      </span>
                     </div>
                   )}
                 </div>
