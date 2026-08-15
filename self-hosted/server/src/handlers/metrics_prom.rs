@@ -151,7 +151,9 @@ pub async fn handle(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     (StatusCode::OK, headers, out)
 }
 
-async fn scalar_i64(pool: &sqlx::PgPool, sql: &str) -> i64 {
+// `'static`: every caller passes a literal, and sqlx 0.9 makes
+// that a type-level fact rather than a convention.
+async fn scalar_i64(pool: &sqlx::PgPool, sql: &'static str) -> i64 {
     sqlx::query(sql)
         .fetch_optional(pool)
         .await

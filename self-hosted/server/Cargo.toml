@@ -13,7 +13,7 @@
 
 [package]
 name = "sentori-server"
-version = "3.1.0"
+version = "3.2.0"
 edition = "2024"
 authors = ["GOLIA K.K. <takagi@golia.jp>"]
 license = "Apache-2.0 OR MIT"
@@ -54,12 +54,12 @@ sentori-ingest-token       = { path = "../../core/crates/ingest-token" }
 sentori-push-provider      = { path = "../../core/crates/push-provider" }
 
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "multipart", "query", "tokio", "tower-log", "tracing", "macros"] }
-axum-extra = { version = "0.10", default-features = false, features = ["cookie"] }
+axum-extra = { version = "0.12", default-features = false, features = ["cookie"] }
 tokio = { version = "1", features = ["full"] }
 tower = { version = "0.5", default-features = false }
-tower-http = { version = "0.6", default-features = false, features = ["fs"] }
-sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "time", "json", "migrate"] }
-rand = "0.9"
+tower-http = { version = "0.7", default-features = false, features = ["fs"] }
+sqlx = { version = "0.9", features = ["runtime-tokio", "postgres", "uuid", "time", "json", "migrate"] }
+rand = "0.10"
 uuid = { version = "1", features = ["v7", "serde"] }
 time = { version = "0.3", features = ["serde-well-known", "macros"] }
 serde = { version = "1", features = ["derive"] }
@@ -71,17 +71,16 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 http = "1"
 hex = "0.4"
 data-encoding = "2"
-hmac = "0.12"
-sha2 = "0.10"
-hkdf = "0.12"
-aes-gcm = "0.10"
-p256 = { version = "0.13", features = ["ecdh"] }
-rand_core = { version = "0.6", features = ["getrandom"] }
+hmac = "0.13"
+sha2 = "0.11"
+hkdf = "0.13"
+aes-gcm = "0.11"
+p256 = { version = "0.14", features = ["ecdh"] }
 futures = { version = "0.3", default-features = false }
 tokio-stream = { version = "0.1", features = ["sync"] }
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "http2", "form"] }
-jsonwebtoken = { version = "10", default-features = false, features = ["aws_lc_rs", "use_pem"] }
-base64 = "0.22"
+jsonwebtoken = { version = "11", default-features = false, features = ["aws_lc_rs", "use_pem"] }
+base64 = "0.23"
 url = "2"
 
 [profile.release]

@@ -250,7 +250,10 @@ async fn backend_block(state: &Arc<AppState>, project_id: Uuid) -> Value {
 async fn count_by(
     state: &Arc<AppState>,
     project_id: Uuid,
-    sql: &str,
+    // `'static`, so only a literal can reach it. sqlx 0.9 refuses a
+    // runtime-built string here, and the honest answer is that this
+    // helper never wanted one — every caller passes a literal.
+    sql: &'static str,
 ) -> serde_json::Map<String, Value> {
     let rows = sqlx::query(sql)
         .bind(project_id)

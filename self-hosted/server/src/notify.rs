@@ -98,7 +98,9 @@ async fn notify(
     } else {
         "on_regression"
     };
-    let recipients: Vec<(Uuid, String)> = sqlx::query_as(&format!(
+    // Audited for injection: `pref_col` is one of two literals chosen
+    // by a bool three lines up. Nothing else is interpolated.
+    let recipients: Vec<(Uuid, String)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT DISTINCT u.id, u.email FROM users u \
          LEFT JOIN project_assignments pa \
                 ON pa.user_id = u.id AND pa.project_id = $1 \
@@ -106,7 +108,7 @@ async fn notify(
                 ON np.user_id = u.id AND np.project_id = $1 \
          WHERE (u.role = 'superadmin' OR pa.user_id IS NOT NULL) \
            AND COALESCE(np.{pref_col}, TRUE)"
-    ))
+    )))
     .bind(project_id)
     .fetch_all(pool)
     .await?;

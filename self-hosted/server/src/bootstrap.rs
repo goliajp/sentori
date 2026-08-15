@@ -86,7 +86,7 @@ pub async fn ensure_owner(pool: &PgPool) -> anyhow::Result<()> {
 /// 24 random alphanumerics from the OS RNG — long enough that
 /// printing it to a private container log is the weakest link.
 fn random_password() -> String {
-    use rand::Rng;
+    use rand::RngExt;
     const CHARS: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
     let mut rng = rand::rng();
     (0..24)

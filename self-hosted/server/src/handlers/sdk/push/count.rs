@@ -21,7 +21,7 @@ use axum::{Extension, Json, extract::State, http::StatusCode};
 use sentori_ingest_token::IngestContext;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use sqlx::Row;
+use sqlx::{AssertSqlSafe, Row};
 use tracing::warn;
 
 use crate::state::AppState;
@@ -78,7 +78,10 @@ pub async fn handle(
         "SELECT count(*) AS n FROM device_tokens dt \
          WHERE dt.project_id = $1 AND dt.revoked_at IS NULL AND ({frag})"
     );
-    let mut q = sqlx::query(&sql).bind(ctx.project_id);
+    // Audited for injection: the selector is `audience.rs` output —
+    // `$n` placeholders and enum-supplied column names only. Operator
+    // values are binds.
+    let mut q = sqlx::query(AssertSqlSafe(sql.clone())).bind(ctx.project_id);
     for b in &binds {
         q = b.attach(q);
     }

@@ -25,7 +25,7 @@
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
 use subtle::ConstantTimeEq;
 
@@ -92,7 +92,11 @@ impl SignedCookie {
         mac.update(payload);
         let expected = mac.finalize().into_bytes();
 
-        if !bool::from(expected.ct_eq(tag)) {
+        // `as_slice`: hmac 0.13 finalises to an `Array`, and whether
+        // that derefs to `[u8]` for `ct_eq` depends on which `subtle`
+        // the workspace resolved. Comparing slices is the same
+        // constant-time impl and does not depend on the resolution.
+        if !bool::from(expected.as_slice().ct_eq(tag)) {
             return Err(SignedCookieError::BadSignature);
         }
         Ok(payload.to_vec())

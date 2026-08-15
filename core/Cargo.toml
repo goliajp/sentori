@@ -95,7 +95,7 @@ tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 uuid = { version = "1", features = ["v7", "serde"] }
 time = { version = "0.3", features = ["serde-well-known", "macros"] }
-sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "time", "json"] }
+sqlx = { version = "0.9", features = ["runtime-tokio", "postgres", "uuid", "time", "json"] }
 
 # Concurrency primitives — battle-tested lock-free queues. Keeps our
 # crates `forbid(unsafe_code)` while the underlying atomics live inside
@@ -108,14 +108,14 @@ crossbeam-utils = "0.8"
 # only use EdDSA) and dodges RUSTSEC-2023-0071 (Marvin attack timing
 # sidechannel in the rsa crate). aws-lc-rs builds across linux/glibc,
 # linux/musl, macOS, and Windows via the upstream sys crate.
-jsonwebtoken = { version = "10", default-features = false, features = ["aws_lc_rs", "use_pem"] }
+jsonwebtoken = { version = "11", default-features = false, features = ["aws_lc_rs", "use_pem"] }
 ed25519-dalek = { version = "2", features = ["rand_core", "pkcs8", "pem"] }
-sha2 = "0.10"
-hkdf = "0.12"
-hmac = "0.12"
-aes-gcm = "0.10"
+sha2 = "0.11"
+hkdf = "0.13"
+hmac = "0.13"
+aes-gcm = "0.11"
 hex = "0.4"
-base64 = "0.22"
+base64 = "0.23"
 zeroize = { version = "1", features = ["derive"] }
 subtle = "2"
 
@@ -189,9 +189,9 @@ password-hash = { version = "0.5", default-features = false }
 # middleware. `tower` is the request/response service abstraction
 # every axum middleware composes through.
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "tower-log", "tracing", "macros"] }
-axum-extra = { version = "0.10", default-features = false, features = ["cookie", "typed-header"] }
+axum-extra = { version = "0.12", default-features = false, features = ["cookie", "typed-header"] }
 tower = { version = "0.5", default-features = false, features = ["util"] }
-tower-http = { version = "0.6", default-features = false }
+tower-http = { version = "0.7", default-features = false }
 http = "1"
 http-body-util = "0.1"
 
@@ -209,7 +209,7 @@ criterion = { version = "0.5", features = ["html_reports"] }
 # hand-rolled `GenericImage` recipe per K crate.
 testcontainers = "0.27"
 testcontainers-modules = { version = "0.15" }
-rand = "0.8"
+rand = "0.10"
 # tempfile — used by K3 attachment-store integration tests for
 # isolated filesystem fixtures (each test creates its own
 # tempdir, dropped at scope end).
@@ -234,7 +234,13 @@ flate2 = { version = "1", default-features = false, features = ["rust_backend"] 
 # system OpenSSL); `json` parses crt.sh's response inline;
 # `gzip` because crt.sh's payloads can be > 1 MB on common
 # domains. async-Tokio runtime per K10 design lock.
-reqwest = { version = "0.13", default-features = false, features = ["rustls", "webpki-roots", "json", "gzip", "http2", "charset"] }
+# reqwest 0.13.4 dropped the `webpki-roots` optional dependency
+# outright; `rustls` brings `rustls-platform-verifier`, which is
+# what upstream settled on. The thing that has to keep working is
+# TLS from inside the shipped image, and the e2e proves it: the
+# credential probe reaches api.push.apple.com and comes back with
+# Apple's refusal rather than `unreachable`.
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "gzip", "http2", "charset"] }
 # urlencoding — RFC 3986 percent-encoding helper for query
 # strings. Tiny dep, no transitives.
 urlencoding = "2"

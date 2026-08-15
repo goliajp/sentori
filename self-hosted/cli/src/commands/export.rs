@@ -8,6 +8,7 @@ use sqlx::{PgPool, Row};
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 use super::TABLES;
+use sqlx::AssertSqlSafe;
 
 pub async fn run(
     pool: &PgPool,
@@ -48,20 +49,26 @@ async fn export_one(
     project: Option<uuid::Uuid>,
 ) -> anyhow::Result<u64> {
     let sql = match project {
-        Some(_) if has_project_id(table) => format!(
-            "SELECT row_to_json(t) FROM {table} t WHERE project_id = $1"
-        ),
+        Some(_) if has_project_id(table) => {
+            format!("SELECT row_to_json(t) FROM {table} t WHERE project_id = $1")
+        }
         _ => format!("SELECT row_to_json(t) FROM {table} t"),
     };
 
     let rows = if project.is_some() && has_project_id(table) {
-        sqlx::query(&sql)
+        // Audited: the only interpolation is a table name from
+        // `commands::TABLES`, a compile-time list. Nothing a caller
+        // types reaches the statement.
+        sqlx::query(AssertSqlSafe(sql.clone()))
             .bind(project)
             .fetch_all(pool)
             .await
             .with_context(|| format!("scan {table}"))?
     } else {
-        sqlx::query(&sql)
+        // Audited: the only interpolation is a table name from
+        // `commands::TABLES`, a compile-time list. Nothing a caller
+        // types reaches the statement.
+        sqlx::query(AssertSqlSafe(sql.clone()))
             .fetch_all(pool)
             .await
             .with_context(|| format!("scan {table}"))?

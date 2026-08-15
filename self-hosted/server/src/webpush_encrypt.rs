@@ -31,8 +31,21 @@ use aes_gcm::{
 };
 use base64::Engine;
 use hkdf::Hkdf;
-use p256::{PublicKey, SecretKey, ecdh::diffie_hellman, elliptic_curve::sec1::ToEncodedPoint};
-use rand_core::{OsRng, RngCore};
+use p256::{
+    PublicKey,
+    SecretKey,
+    ecdh::diffie_hellman,
+    // p256 0.14: `ToEncodedPoint`/`to_encoded_point` became
+    // `ToSec1Point`/`to_sec1_point`, and key generation moved from
+    // an inherent `random` to the `Generate` trait. Same bytes, new
+    // names.
+    elliptic_curve::{Generate, sec1::ToSec1Point},
+};
+// rand_core 0.10 dropped `OsRng`. `rand::rng()` is the
+// replacement the crate points at: per-thread ChaCha12, seeded
+// from the OS and reseeded, and `CryptoRng` — which is the
+// bound p256 0.14 asks for.
+use rand::Rng;
 use sha2::Sha256;
 
 pub struct EncryptedPayload {
@@ -75,9 +88,9 @@ pub fn encrypt(
     }
 
     // 2. Generate ephemeral server key pair.
-    let ephemeral_priv = SecretKey::random(&mut OsRng);
+    let ephemeral_priv = SecretKey::generate_from_rng(&mut rand::rng());
     let ephemeral_pub = ephemeral_priv.public_key();
-    let ephemeral_pub_sec1 = ephemeral_pub.to_encoded_point(false);
+    let ephemeral_pub_sec1 = ephemeral_pub.to_sec1_point(false);
     let server_pub_bytes = ephemeral_pub_sec1.as_bytes(); // 65 bytes: 0x04 || X || Y
 
     // 3. ECDH shared secret (32 bytes).
@@ -100,7 +113,7 @@ pub fn encrypt(
 
     // 5. salt = 16 random bytes.
     let mut salt = [0u8; 16];
-    OsRng.fill_bytes(&mut salt);
+    rand::rng().fill_bytes(&mut salt);
 
     // 6+7. HKDF-Extract+Expand to derive CEK (16) and nonce (12).
     let hkdf = Hkdf::<Sha256>::new(Some(&salt), &ikm);
@@ -153,4 +166,68 @@ pub fn encrypt(
 
 fn b64url_decode(s: &str) -> Result<Vec<u8>, base64::DecodeError> {
     base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(s)
+}
+
+#[cfg(test)]
+// Same as `symbolicate`: a test that cannot build its own input
+// has nothing to say, and the panic is the failure report.
+#[allow(clippy::expect_used)]
+mod tests {
+    use super::*;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    use p256::elliptic_curve::Generate;
+
+    /// A subscription, the way a browser hands one over.
+    fn subscriber() -> (String, String) {
+        let key = SecretKey::generate_from_rng(&mut rand::rng());
+        let p256dh = URL_SAFE_NO_PAD.encode(key.public_key().to_sec1_point(false).as_bytes());
+        (p256dh, URL_SAFE_NO_PAD.encode([9u8; 16]))
+    }
+
+    /// RFC 8152 §5: the aes128gcm header is
+    /// `salt(16) || rs(4) || idlen(1) || keyid(idlen)`, and for Web
+    /// Push the key id is the server's uncompressed P-256 point.
+    ///
+    /// This file had no tests at all when p256 0.13 → 0.14 renamed
+    /// `to_encoded_point` to `to_sec1_point`. The rename carries a
+    /// `compress` flag, and a compressed point is 33 bytes rather
+    /// than 65 — the same call, silently half the key, and a push
+    /// every browser rejects. Nothing here would have noticed.
+    #[test]
+    fn the_header_carries_a_full_uncompressed_p256_point() {
+        let (p256dh, auth) = subscriber();
+        let out = encrypt(b"hello", &p256dh, &auth).expect("encrypts");
+
+        assert_eq!(out.content_encoding, "aes128gcm");
+        let idlen = usize::from(out.body[20]);
+        assert_eq!(idlen, 65, "the key id must be an uncompressed point");
+        assert_eq!(
+            out.body[21], 0x04,
+            "0x04 is the SEC1 tag for uncompressed; 0x02/0x03 mean it got compressed"
+        );
+        // salt + rs + idlen + keyid + at least a tag's worth of body.
+        assert!(out.body.len() > 16 + 4 + 1 + 65 + 16);
+    }
+
+    /// Two sends must not share a salt or an ephemeral key. Both come
+    /// from the RNG that `rand_core` 0.10 removed and this file now
+    /// reaches through `rand::rng()`.
+    #[test]
+    fn every_send_is_freshly_keyed() {
+        let (p256dh, auth) = subscriber();
+        let a = encrypt(b"hello", &p256dh, &auth).expect("encrypts");
+        let b = encrypt(b"hello", &p256dh, &auth).expect("encrypts");
+        assert_ne!(a.body[..16], b.body[..16], "the salt repeated");
+        assert_ne!(a.body[21..86], b.body[21..86], "the ephemeral key repeated");
+    }
+
+    #[test]
+    fn a_short_auth_secret_is_refused_rather_than_padded() {
+        let (p256dh, _) = subscriber();
+        let short = URL_SAFE_NO_PAD.encode([9u8; 8]);
+        assert!(matches!(
+            encrypt(b"hello", &p256dh, &short),
+            Err(EncryptError::InvalidAuthLen(8))
+        ));
+    }
 }
