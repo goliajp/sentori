@@ -1,5 +1,12 @@
 # @goliapkg/sentori-expo
 
+## 16.0.0
+
+### Patch Changes
+
+- Updated dependencies [[`f1f1543`](https://github.com/goliajp/sentori/commit/f1f154344d7ff3ca07ba94cde21fa7c944eea3af)]:
+  - @goliapkg/sentori-react-native@7.0.0
+
 ## 15.0.0
 
 ### Patch Changes
