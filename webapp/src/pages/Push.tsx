@@ -25,6 +25,7 @@
 // that the test-send endpoint had never been wired to anything. Both
 // are here now.
 
+import { CircleCheck, CircleX, Info, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -46,7 +47,7 @@ import {
 import { useT } from '../i18n';
 import type { MessageKey } from '../i18n/en';
 import { api } from '../lib/api';
-import type { AudienceRequest, AudienceSample } from '../lib/api';
+import type { AudienceRequest, AudienceSample, PushCheck } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 
 type Section = 'audience' | 'credentials' | 'delivery' | 'devices';
@@ -540,7 +541,7 @@ function ReadinessPanel({
     <Panel title={t('push.readinessTitle')}>
       {checks.length === 0 ? (
         <div className="flex items-center gap-2 px-3.5 py-3 text-sm">
-          <span className="text-ok">✓</span>
+          <CircleCheck aria-hidden className="size-3.5 shrink-0 text-ok" />
           <span className="text-fg-muted">
             {r.data && r.data.live > 0
               ? t('push.readyWithDevices').replace('{n}', String(r.data.live))
@@ -553,16 +554,7 @@ function ReadinessPanel({
             const where = FIX_SECTION[c.id];
             return (
               <li key={c.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-3.5 py-2.5">
-                <span
-                  className={clsx(
-                    'font-mono text-[11px] uppercase tracking-wide',
-                    c.level === 'blocked' && 'text-kind-error',
-                    c.level === 'warn' && 'text-kind-warn',
-                    c.level === 'info' && 'text-fg-subtle',
-                  )}
-                >
-                  {t(`push.level.${c.level}` as MessageKey)}
-                </span>
+                <LevelIcon level={c.level} label={t(`push.level.${c.level}` as MessageKey)} />
                 <span className="text-sm">{fill(t(`push.check.${c.id}` as MessageKey), c.data)}</span>
                 <span className="w-full text-xs text-fg-muted">
                   {fill(t(`push.fix.${c.id}` as MessageKey), c.data)}
@@ -582,6 +574,28 @@ function ReadinessPanel({
         </ul>
       )}
     </Panel>
+  );
+}
+
+/// The level, as a mark rather than a word.
+///
+/// Three of these stack up per project and the words for them were
+/// wider than the facts they qualified. The name stays as the
+/// accessible label — an icon-only severity is a severity a screen
+/// reader cannot read.
+function LevelIcon({ label, level }: { label: string; level: PushCheck['level'] }) {
+  const Icon = level === 'blocked' ? CircleX : level === 'warn' ? TriangleAlert : Info;
+  return (
+    <Icon
+      aria-label={label}
+      role="img"
+      className={clsx(
+        'size-3.5 shrink-0 translate-y-0.5',
+        level === 'blocked' && 'text-kind-error',
+        level === 'warn' && 'text-kind-warn',
+        level === 'info' && 'text-fg-subtle',
+      )}
+    />
   );
 }
 
