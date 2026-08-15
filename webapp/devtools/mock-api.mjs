@@ -819,7 +819,7 @@ const SUFFIX = [
           // exactly cannot be used. The server now says so on the
           // row; this is the fixture that renders it.
           config: { keyId: 'ABC123', teamId: 'DEF456', bundleId: 'com.example.app' },
-          problem: 'topic is missing — keyId and teamId come from the Apple developer portal, and topic is your bundle id.',
+          problem: { code: 'field-missing', field: 'topic' },
           created_at: iso(86_400_000 * 15),
           last_validated_at: iso(86_400_000),
           last_validate_status: 'ok',
