@@ -24,6 +24,16 @@ const ROOTS = ['src'];
 /** Not rendered: the catalogues are English by definition. */
 const SKIP = /(^|\/)(i18n)(\/|$)/;
 
+/** Code samples, which are compiled by whoever pastes them.
+ *
+ *  One file, named exactly, rather than a directory — an exemption
+ *  wide enough to hide a screen behind is the same as no gate. What
+ *  lives here is server code in seven languages, where
+ *  `Content-Type: application/json` is a header and not something a
+ *  person reads. Flagging it is the crying-wolf this checker's own
+ *  design note warns about; translating it would be worse. */
+const CODE_SAMPLES = new Set(['src/lib/push-snippets.ts']);
+
 /** Props whose value is machinery, not something a person reads. */
 const CODE_PROPS =
   /(?:className|class|href|src|to|id|key|type|role|name|htmlFor|rel|target|charSet|viewBox|d|fill|stroke|xmlns|data-[\w-]+|aria-controls|aria-labelledby)\s*=\s*$/;
@@ -59,6 +69,7 @@ function walk(dir, out = []) {
   for (const e of entries) {
     const p = join(dir, e);
     if (SKIP.test(p)) continue;
+    if (CODE_SAMPLES.has(p.replace(/^.*?webapp\//, ''))) continue;
     if (statSync(p).isDirectory()) walk(p, out);
     else if (p.endsWith('.tsx') || p.endsWith('.ts')) out.push(p);
   }

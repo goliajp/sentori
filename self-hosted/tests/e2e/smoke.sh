@@ -848,6 +848,15 @@ echo "$RD" | jq -e '[.checks[] | select(.level == "blocked" or .level == "warn")
 echo "$RD" | jq -e '.live > 0' > /dev/null \
     || { echo "readiness counted no devices: $RD" >&2; exit 1; }
 
+# The snippets the console hands a backend, run as a backend would run
+# them. A snippet is documentation somebody compiles, and the last time
+# this repo shipped a command it had not run, the command POSTed to a
+# route no server had ever served.
+echo "→ the Node and Python snippets the console hands out actually send"
+SENTORI_BASE="${BASE}" SENTORI_API_TOKEN="${API_TOKEN}" \
+    node "${ROOT}/../scripts/check-push-snippets.mjs" \
+    || { echo "a snippet the console hands out does not work" >&2; exit 1; }
+
 echo "→ a backend can count an audience without sending to it"
 CNT="$(curl -fsS -X POST "${BASE}/v1/push/count" -H "Authorization: Bearer ${API_TOKEN}" \
     -H 'content-type: application/json' \
