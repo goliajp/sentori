@@ -34,6 +34,7 @@ const ROUTES = [
   // same reason the settings ones are — a screen the sweep cannot
   // reach is a screen nobody photographs until a user complains.
   'push', 'push?tab=audience', 'push?tab=devices', 'push?tab=credentials',
+  'push?tab=integrate',
   // Seeded from the issue page — the row arrives filled in, so the
   // screenshot shows what someone actually lands on.
   `push?tab=audience&issue=${I}`,

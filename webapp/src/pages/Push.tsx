@@ -25,9 +25,9 @@
 // that the test-send endpoint had never been wired to anything. Both
 // are here now.
 
-import { CircleCheck, CircleX, Info, TriangleAlert } from 'lucide-react';
+import { Check, CircleCheck, CircleX, Copy, Info, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { useShell } from '../App';
 import {
@@ -49,9 +49,16 @@ import type { MessageKey } from '../i18n/en';
 import { ApiError, api } from '../lib/api';
 import type { AudienceRequest, AudienceSample, PushCheck } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
+import {
+  SEND_PATH,
+  SNIPPET_LANGS,
+  type SnippetLang,
+  countSnippet,
+  snippet,
+} from '../lib/push-snippets';
 
-type Section = 'audience' | 'credentials' | 'delivery' | 'devices';
-const SECTIONS: Section[] = ['delivery', 'audience', 'devices', 'credentials'];
+type Section = 'audience' | 'credentials' | 'delivery' | 'devices' | 'integrate';
+const SECTIONS: Section[] = ['delivery', 'audience', 'devices', 'credentials', 'integrate'];
 
 export default function PushPage() {
   const t = useT();
@@ -92,6 +99,8 @@ export default function PushPage() {
         <DeliverySection projectId={projectId} onGo={setSection} />
       ) : section === 'audience' ? (
         <AudienceSection projectId={projectId} />
+      ) : section === 'integrate' ? (
+        <IntegrateSection />
       ) : section === 'devices' ? (
         <DevicesSection projectId={projectId} />
       ) : (
@@ -1078,6 +1087,128 @@ function AudienceSection({ projectId }: { projectId: string }) {
         )}
       </Panel>
     </div>
+  );
+}
+
+
+// ── integrate ───────────────────────────────────────────────────────
+
+/// The exact call, with this deployment's URL already in it.
+///
+/// The whole API is one POST with three fields, which is why there is
+/// no server SDK to install. What an integrator needs is not a
+/// dependency — it is the call, and to know which of the two token
+/// scopes it takes, because the one their app already ships with is
+/// the wrong one and the failure is a 403 they read as an outage.
+
+function IntegrateSection() {
+  const t = useT();
+  const [lang, setLang] = useState<SnippetLang>('go');
+  const base = window.location.origin;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Panel title={t('push.integrateEndpoint')}>
+        <div className="flex flex-col gap-2.5 p-3.5">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="font-mono text-[11px] uppercase tracking-wide text-fg-subtle">
+              POST
+            </span>
+            <Copyable text={`${base}${SEND_PATH}`} />
+          </div>
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-fg-muted">
+            <span>{t('push.integrateScope')}</span>
+            {/* Settings ▸ Tokens, not Push ▸ Credentials. Those are
+                the vendor's keys; this is the token that authorises
+                the call, and sending someone to the wrong one is
+                worse than sending them nowhere. */}
+            <Link to="/settings?tab=tokens" className="text-accent hover:underline">
+              {t('push.integrateMint')} →
+            </Link>
+          </div>
+        </div>
+      </Panel>
+
+      <Panel
+        title={t('push.integrateSend')}
+        action={
+          <div className="flex flex-wrap gap-1">
+            {SNIPPET_LANGS.map((l) => (
+              <button
+                key={l.id}
+                type="button"
+                onClick={() => setLang(l.id)}
+                className={clsx(
+                  'rounded px-1.5 py-0.5 font-mono text-[11px] transition-colors',
+                  lang === l.id
+                    ? 'bg-raised text-fg'
+                    : 'text-fg-subtle hover:text-fg-muted',
+                )}
+              >
+                {l.label}
+              </button>
+            ))}
+          </div>
+        }
+      >
+        <CodeBlock text={snippet(lang, base)} />
+      </Panel>
+
+      <Panel title={t('push.integrateCount')}>
+        <p className="px-3.5 pt-3 text-xs text-fg-muted">{t('push.integrateCountWhy')}</p>
+        <CodeBlock text={countSnippet(base)} />
+      </Panel>
+    </div>
+  );
+}
+
+/// A block of code, and a way to take it.
+function CodeBlock({ text }: { text: string }) {
+  const t = useT();
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="relative">
+      <pre className="overflow-x-auto px-3.5 py-3 font-mono text-xs leading-relaxed text-fg-muted">
+        {text}
+      </pre>
+      <button
+        type="button"
+        title={copied ? t('identity.copied') : t('identity.copyHint')}
+        className="absolute right-2 top-2 rounded border border-border bg-surface p-1 text-fg-subtle hover:text-fg"
+        onClick={() => {
+          void navigator.clipboard.writeText(text);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1200);
+        }}
+      >
+        {copied ? <Check className="size-3.5 text-ok" /> : <Copy className="size-3.5" />}
+      </button>
+    </div>
+  );
+}
+
+/// One value, and a way to take it.
+function Copyable({ text }: { text: string }) {
+  const t = useT();
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      title={copied ? t('identity.copied') : t('identity.copyHint')}
+      className="group inline-flex items-center gap-1.5 font-mono text-sm text-fg"
+      onClick={() => {
+        void navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1200);
+      }}
+    >
+      {text}
+      {copied ? (
+        <Check className="size-3 text-ok" />
+      ) : (
+        <Copy className="size-3 text-fg-subtle opacity-0 transition-opacity group-hover:opacity-100" />
+      )}
+    </button>
   );
 }
 
