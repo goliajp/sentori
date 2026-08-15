@@ -422,10 +422,11 @@ REFUSAL="$(jq -n --arg s "$FLAT" \
     '{provider:"apns",config:{keyId:"ABC1234567",teamId:"DEF7654321",topic:"com.example.app"},secret:$s}' \
     | curl -sS -b "$JAR" -X POST "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials" \
         -H 'content-type: application/json' --data @-)"
-echo "$REFUSAL" | jq -e '.error == "invalid_apns_credential"' > /dev/null \
+# A code and the field it is about, not a sentence: the console says
+# it in the language the console is in, and this asserts the code
+# rather than words that are no longer the server's to choose.
+echo "$REFUSAL" | jq -e '.code == "pem-one-line" and .field == "secret"' > /dev/null \
     || { echo "a flattened key was accepted: $REFUSAL" >&2; exit 1; }
-echo "$REFUSAL" | jq -e '.detail | test("one line")' > /dev/null \
-    || { echo "the refusal does not say why: $REFUSAL" >&2; exit 1; }
 
 echo "→ a credential missing the field the worker reads is refused"
 # The form's own placeholder said `bundleId`; the worker reads
@@ -435,7 +436,7 @@ BAD="$(jq -n --arg s "$P8" \
     '{provider:"apns",config:{keyId:"ABC1234567",teamId:"DEF7654321",bundleId:"com.example.app"},secret:$s}' \
     | curl -sS -b "$JAR" -X POST "${BASE}/admin/api/projects/${PROJECT_ID}/push/credentials" \
         -H 'content-type: application/json' --data @-)"
-echo "$BAD" | jq -e '.detail | test("topic")' > /dev/null \
+echo "$BAD" | jq -e '.code == "field-missing" and .field == "topic"' > /dev/null \
     || { echo "bundleId was accepted in place of topic: $BAD" >&2; exit 1; }
 
 echo "→ save and read back a provider credential"
