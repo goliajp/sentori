@@ -1,4 +1,4 @@
-//! PUT `/v1/push/users/{fp_hex}/preferences/{category}`
+//! PUT `/v1/push/users/{user_key}/preferences/{category}`
 
 use std::sync::Arc;
 
@@ -23,10 +23,10 @@ pub struct PreferenceBody {
 pub async fn handle(
     Extension(ctx): Extension<IngestContext>,
     State(state): State<Arc<AppState>>,
-    Path((fp_hex, category)): Path<(String, String)>,
+    Path((user_key, category)): Path<(String, String)>,
     Json(body): Json<PreferenceBody>,
 ) -> (StatusCode, Json<Value>) {
-    let fp_bytes = match hex::decode(&fp_hex) {
+    let fp_bytes = match hex::decode(&user_key) {
         Ok(b) if b.len() == 32 => b,
         _ => {
             return (
@@ -67,7 +67,7 @@ pub async fn handle(
             (
                 StatusCode::ACCEPTED,
                 Json(
-                    json!({ "status": "updated", "category": category, "opted_out": body.opted_out }),
+                    json!({ "status": "updated", "category": category, "optedOut": body.opted_out }),
                 ),
             )
         }

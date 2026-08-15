@@ -44,7 +44,7 @@ function grantingNative(over: Record<string, unknown> = {}) {
 
 const realFetch = globalThis.fetch;
 
-/** Answer /v1/push/tokens with `body` under `status`. */
+/** Answer /v1/push/devices with `body` under `status`. */
 function stubFetch(status: number, body: unknown): void {
   globalThis.fetch = (() =>
     Promise.resolve({
@@ -73,7 +73,7 @@ describe('push.register', () => {
 
   it('returns the device handle when the whole flow works', async () => {
     __setNativeForTests(grantingNative());
-    stubFetch(200, { token_id: '018f0000-0000-7000-8000-000000000001', is_new: true });
+    stubFetch(200, { spToken: '018f0000-0000-7000-8000-000000000001', isNew: true });
 
     const r = await register();
 
@@ -89,7 +89,7 @@ describe('push.register', () => {
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({ token_id: 'id-1' }),
+        json: () => Promise.resolve({ spToken: 'id-1' }),
       });
     }) as unknown as typeof fetch;
 
@@ -108,7 +108,7 @@ describe('push.register', () => {
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({ token_id: 'id-1' }),
+        json: () => Promise.resolve({ spToken: 'id-1' }),
       });
     }) as unknown as typeof fetch;
 
@@ -209,7 +209,7 @@ describe('push.register', () => {
 // the life of the install — and a send aimed at that user reached
 // nobody and reported success.
 describe('push registration follows the person', () => {
-  /** Record every /v1/push/tokens body, so a test can say what the
+  /** Record every /v1/push/devices body, so a test can say what the
    *  server was told rather than that it was told something. */
   function recordingFetch(): Array<Record<string, unknown>> {
     const seen: Array<Record<string, unknown>> = [];
@@ -220,7 +220,7 @@ describe('push registration follows the person', () => {
       return Promise.resolve({
         ok: true,
         status: 202,
-        json: () => Promise.resolve({ spToken: 'dev-1', token_id: 'dev-1' }),
+        json: () => Promise.resolve({ spToken: 'dev-1' }),
       });
     }) as unknown as typeof fetch;
     return seen;
@@ -322,7 +322,7 @@ describe('push survives the vendor rotating its token', () => {
       return Promise.resolve({
         ok: true,
         status: 202,
-        json: () => Promise.resolve({ spToken: 'dev-1', token_id: 'dev-1' }),
+        json: () => Promise.resolve({ spToken: 'dev-1' }),
       });
     }) as unknown as typeof fetch;
     return seen;
@@ -439,7 +439,7 @@ describe('nothing the host does can reach back into the app', () => {
       Promise.resolve({
         ok: true,
         status: 202,
-        json: () => Promise.resolve({ spToken: 'dev-1', token_id: 'dev-1' }),
+        json: () => Promise.resolve({ spToken: 'dev-1' }),
       })) as unknown as typeof fetch;
   }
 

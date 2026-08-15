@@ -10,7 +10,7 @@
 //      asynchronously and lands in the native buffer.
 //   3. Poll `pushDrainState()` at 200 ms ticks for up to 8 s waiting
 //      for the token.
-//   4. POST `/v1/push/tokens` with `kind: 'apns' | 'fcm'` — the
+//   4. POST `/v1/push/devices` with `kind: 'apns' | 'fcm'` — the
 //      server's field name; sending `provider` here earned a 422 for
 //      every registration this SDK ever attempted — plus
 //      `nativeToken`, `userKey`, and `env` on iOS only (FCM is a
@@ -262,7 +262,7 @@ class PushRegisterError extends Error {
 }
 
 /**
- * Revoke the cached handle (DELETE /v1/push/tokens/{ipt}) +
+ * Revoke the cached handle (DELETE /v1/push/devices/{ipt}) +
  * unregister locally. Idempotent — repeat calls are no-ops.
  */
 export async function unregister(): Promise<void> {
@@ -270,7 +270,7 @@ export async function unregister(): Promise<void> {
   const ipt = _cachedIpt ?? (await readPersistedIpt())
   if (cfg && ipt) {
     try {
-      await fetch(joinUrl(cfg.ingestUrl, `/v1/push/tokens/${ipt}`), {
+      await fetch(joinUrl(cfg.ingestUrl, `/v1/push/devices/${ipt}`), {
         method: 'DELETE',
         headers: { authorization: `Bearer ${cfg.token}` },
       })
@@ -374,7 +374,7 @@ async function registerWithServer(
   // which is what signing out sends.
   const traits = currentUserTraits()
   if (traits != null) body.traits = traits
-  const res = await fetch(joinUrl(cfg.ingestUrl, '/v1/push/tokens'), {
+  const res = await fetch(joinUrl(cfg.ingestUrl, '/v1/push/devices'), {
     method: 'POST',
     headers: {
       authorization: `Bearer ${cfg.token}`,
@@ -383,16 +383,16 @@ async function registerWithServer(
     body: JSON.stringify(body),
   })
   if (!res.ok) {
-    throw new PushRegisterError('server-rejected', `/v1/push/tokens HTTP ${res.status}`)
+    throw new PushRegisterError('server-rejected', `/v1/push/devices HTTP ${res.status}`)
   }
   // The handle is the device_tokens row id — a uuid, which is what
   // the revoke and send routes take. It was parsed here as an
   // `ipt_*` string that no server has ever returned.
-  const json = (await res.json()) as { token_id?: string }
-  if (typeof json.token_id !== 'string' || json.token_id.length === 0) {
+  const json = (await res.json()) as { spToken?: string }
+  if (typeof json.spToken !== 'string' || json.spToken.length === 0) {
     throw new PushRegisterError('server-rejected', 'server did not return a device token id')
   }
-  return json.token_id
+  return json.spToken
 }
 
 function bindBufferDrain(
@@ -567,7 +567,7 @@ async function drainAckQueue(): Promise<void> {
   // the user flow.
   for (const msgId of batch) {
     try {
-      await fetch(joinUrl(cfg.ingestUrl, `/v1/push/sends/${msgId}/ack`), {
+      await fetch(joinUrl(cfg.ingestUrl, `/v1/push/deliveries/${msgId}/ack`), {
         body: JSON.stringify({ eventType: 'received', sessionId: _sessionId }),
         headers: {
           authorization: `Bearer ${cfg.token}`,

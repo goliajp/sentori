@@ -1,4 +1,9 @@
-//! GET `/v1/push/receipts/{send_id}` — poll delivery receipt status.
+//! GET `/v1/push/deliveries/{deliveryId}` — one device's row.
+//!
+//! Was `/v1/push/receipts/{send_id}`, which named a per-device row
+//! with the same word as the call that produced it. Two ids at two
+//! levels sharing one word meant passing the wrong one got a 404 and
+//! no hint which.
 
 use std::sync::Arc;
 
@@ -18,13 +23,14 @@ use crate::state::AppState;
 pub async fn handle(
     Extension(ctx): Extension<IngestContext>,
     State(state): State<Arc<AppState>>,
-    Path(send_id): Path<Uuid>,
+    Path(delivery_id): Path<Uuid>,
 ) -> (StatusCode, Json<Value>) {
     let row = sqlx::query(
-        "SELECT id, status, provider, provider_outcome, error, sent_at, acked_at, retry_count \
+        "SELECT id, batch_id, token_id, status, provider, provider_outcome, error, \
+                sent_at, acked_at, retry_count \
          FROM push_sends WHERE id = $1 AND project_id = $2",
     )
-    .bind(send_id)
+    .bind(delivery_id)
     .bind(ctx.project_id)
     .fetch_optional(&state.pool)
     .await;
@@ -32,15 +38,20 @@ pub async fn handle(
     match row {
         Ok(Some(r)) => (
             StatusCode::OK,
+            // The shape `/sends/{sendId}/deliveries` returns, because
+            // it is the same row. Two routes onto one row used to
+            // answer with two different sets of field names.
             Json(json!({
-                "send_id": send_id.to_string(),
+                "deliveryId": delivery_id.to_string(),
+                "sendId": r.get::<Option<Uuid>, _>("batch_id").map(|b| b.to_string()),
+                "spToken": r.get::<Uuid, _>("token_id").to_string(),
                 "status": r.get::<String, _>("status"),
                 "provider": r.get::<String, _>("provider"),
-                "provider_outcome": r.get::<Option<String>, _>("provider_outcome"),
+                "providerOutcome": r.get::<Option<String>, _>("provider_outcome"),
                 "error": r.get::<Option<String>, _>("error"),
-                "sent_at": crate::wire_time::rfc3339_opt(r.get::<Option<time::OffsetDateTime>, _>("sent_at")),
-                "acked_at": crate::wire_time::rfc3339_opt(r.get::<Option<time::OffsetDateTime>, _>("acked_at")),
-                "retry_count": r.get::<i32, _>("retry_count"),
+                "sentAt": crate::wire_time::rfc3339_opt(r.get::<Option<time::OffsetDateTime>, _>("sent_at")),
+                "deliveredAt": crate::wire_time::rfc3339_opt(r.get::<Option<time::OffsetDateTime>, _>("acked_at")),
+                "retryCount": r.get::<i32, _>("retry_count"),
             })),
         ),
         // A 404 and a 500, not two more values in `status`. An id that

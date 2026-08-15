@@ -12,7 +12,6 @@ use axum::{Extension, Json, extract::State, http::StatusCode};
 use sentori_ingest_token::IngestContext;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use sqlx::Row;
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -77,13 +76,6 @@ const MAX_TARGETS: i64 = 100_000;
 /// thousand of them is a parser problem rather than a query. Callers
 /// with more than this are describing an audience, not a list.
 const MAX_EXPLICIT: usize = 1_000;
-
-/// How many per-delivery ids the response will carry.
-///
-/// Above this the caller wants `sendId` and the deliveries listing,
-/// not an array. A hundred covers every one-to-one and small-batch
-/// call, which is every use this endpoint has had.
-const MAX_LISTED_IDS: usize = 100;
 
 pub async fn handle(
     Extension(ctx): Extension<IngestContext>,
@@ -151,20 +143,11 @@ pub async fn handle(
         }
     };
 
+    // The rows are counted, not listed. `GET /v1/push/sends/{sendId}`
+    // reports on the call and `/deliveries` walks the rows, so an
+    // array of ids in this response was three megabytes of uuid for a
+    // large send and homework for a small one.
     let queued = rows.len();
-
-    // `send_ids` predates `sendId` and something is reading it, so it
-    // stays — but unbounded it is three megabytes of uuid for a large
-    // send, and a caller who wanted the list would not want it that
-    // way. Above the cap it is omitted and said to be omitted, rather
-    // than silently shortened into a list that looks complete.
-    let send_ids: Vec<String> = if queued <= MAX_LISTED_IDS {
-        rows.iter()
-            .map(|r| r.get::<Uuid, _>("id").to_string())
-            .collect()
-    } else {
-        Vec::new()
-    };
 
     info!(
         project_id = %ctx.project_id,
@@ -178,8 +161,6 @@ pub async fn handle(
             // `GET /v1/push/sends/{sendId}` answers "did it go out",
             // whatever the size of the audience.
             "sendId": batch_id.to_string(),
-            "send_ids": send_ids,
-            "sendIdsOmitted": queued > MAX_LISTED_IDS,
             "queued": queued,
             // True means there were more devices than this call would
             // take, so somebody did not get it. Never omitted, so a

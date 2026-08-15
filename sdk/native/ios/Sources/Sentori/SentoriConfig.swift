@@ -67,5 +67,5 @@ public final class SentoriConfig: NSObject {
 /// the same reason: a version string nothing writes goes stale, and it
 /// only ever goes stale in the direction of a lie.
 public enum SentoriVersion {
-    public static let current = "1.7.2"
+    public static let current = "2.0.0"
 }

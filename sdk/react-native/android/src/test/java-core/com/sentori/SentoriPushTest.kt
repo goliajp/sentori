@@ -525,7 +525,7 @@ class SentoriPushTest {
                         }
                         bodies.add(String(body, 0, read, Charsets.UTF_8))
                         val payload =
-                            """{"spToken":"019ff000-0000-7000-8000-000000000001","is_new":false}"""
+                            """{"spToken":"019ff000-0000-7000-8000-000000000001","isNew":false}"""
                         c.getOutputStream().write(
                             ("HTTP/1.1 202 Accepted\r\nContent-Type: application/json\r\n" +
                                 "Content-Length: ${payload.toByteArray().size}\r\n" +

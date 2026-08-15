@@ -32,7 +32,7 @@ const problems = [];
 // Read them out of the server rather than restating them here: a
 // constant copied into a checker drifts with the thing it checks.
 const routes = readFileSync(join(root, 'self-hosted/server/src/handlers/mod.rs'), 'utf8');
-for (const path of ['/v1/push/send', '/v1/push/count']) {
+for (const path of ['/v1/push/sends', '/v1/push/audience/count']) {
   if (!routes.includes(`"${path}"`)) {
     problems.push(`the server does not register ${path} — the snippets teach a 404`);
   }
@@ -132,7 +132,7 @@ function renderFor(lang, url) {
   return bodies
     .slice(open + 1, close)
     .replaceAll('${base}', url)
-    .replaceAll('${SEND_PATH}', '/v1/push/send')
+    .replaceAll('${SEND_PATH}', '/v1/push/sends')
     .replaceAll('\\`', '`')
     .replaceAll('\\${', '${');
 }
