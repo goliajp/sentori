@@ -2,6 +2,7 @@
 //! same as the other SDK ingest endpoints.
 
 pub mod ack;
+pub mod batch;
 pub mod count;
 pub mod expo_receipt;
 pub mod expo_send;

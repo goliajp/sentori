@@ -78,6 +78,13 @@ const MAX_TARGETS: i64 = 100_000;
 /// with more than this are describing an audience, not a list.
 const MAX_EXPLICIT: usize = 1_000;
 
+/// How many per-delivery ids the response will carry.
+///
+/// Above this the caller wants `sendId` and the deliveries listing,
+/// not an array. A hundred covers every one-to-one and small-batch
+/// call, which is every use this endpoint has had.
+const MAX_LISTED_IDS: usize = 100;
+
 pub async fn handle(
     Extension(ctx): Extension<IngestContext>,
     State(state): State<Arc<AppState>>,
@@ -113,20 +120,13 @@ pub async fn handle(
     // conflict target is left off deliberately: the only other unique
     // constraint here is the primary key, and naming the index couples
     // this statement to its exact shape.
-    let sql = format!(
-        "INSERT INTO push_sends \
-           (id, project_id, token_id, provider, payload, status, \
-            idempotency_key, campaign_id, template_id) \
-         SELECT gen_random_uuid(), $1, dt.id, dt.provider, $2, 'queued', $3, $4, $5 \
-         FROM ( \
-           SELECT dt.id, dt.provider FROM device_tokens dt \
-           WHERE dt.project_id = $1 AND dt.revoked_at IS NULL AND ({}) \
-           ORDER BY dt.id LIMIT $6 \
-         ) dt \
-         ON CONFLICT DO NOTHING \
-         RETURNING id",
-        selector.sql
-    );
+    // One id for this call, stamped on every row it writes. It is what
+    // the caller gets back and what the aggregate groups on — a
+    // hundred and twenty-eight ids for one send was homework, not an
+    // API.
+    let batch_id = Uuid::now_v7();
+
+    let sql = INSERT_TEMPLATE.replace("{selector}", &selector.sql);
 
     let mut q = sqlx::query(&sql)
         .bind(ctx.project_id)
@@ -134,6 +134,7 @@ pub async fn handle(
         .bind(body.idempotency_key.as_deref())
         .bind(body.campaign_id.as_deref())
         .bind(body.template_id.as_deref())
+        .bind(batch_id)
         .bind(MAX_TARGETS);
     for b in &selector.binds {
         q = b.attach(q);
@@ -150,11 +151,20 @@ pub async fn handle(
         }
     };
 
-    let send_ids: Vec<String> = rows
-        .iter()
-        .map(|r| r.get::<Uuid, _>("id").to_string())
-        .collect();
-    let queued = send_ids.len();
+    let queued = rows.len();
+
+    // `send_ids` predates `sendId` and something is reading it, so it
+    // stays — but unbounded it is three megabytes of uuid for a large
+    // send, and a caller who wanted the list would not want it that
+    // way. Above the cap it is omitted and said to be omitted, rather
+    // than silently shortened into a list that looks complete.
+    let send_ids: Vec<String> = if queued <= MAX_LISTED_IDS {
+        rows.iter()
+            .map(|r| r.get::<Uuid, _>("id").to_string())
+            .collect()
+    } else {
+        Vec::new()
+    };
 
     info!(
         project_id = %ctx.project_id,
@@ -164,7 +174,12 @@ pub async fn handle(
     (
         StatusCode::ACCEPTED,
         Json(json!({
+            // The id for this call. One poll of
+            // `GET /v1/push/sends/{sendId}` answers "did it go out",
+            // whatever the size of the audience.
+            "sendId": batch_id.to_string(),
             "send_ids": send_ids,
+            "sendIdsOmitted": queued > MAX_LISTED_IDS,
             "queued": queued,
             // True means there were more devices than this call would
             // take, so somebody did not get it. Never omitted, so a
@@ -272,12 +287,32 @@ impl Selector {
     }
 }
 
-/// Placeholders the statement uses before the selector's own: the
-/// project, the payload, three optional labels and the cap.
+/// The statement, with the selector left as a hole.
 ///
-/// The audience compiler is told where to start numbering rather than
-/// assuming, so this constant is the only place the offset is known.
-const FIXED_BINDS: usize = 6;
+/// A `const` rather than an inline `format!` so a test can read the
+/// placeholders back out of it. Adding `batch_id` as `$7` put it on
+/// the same number as the selector's first bind, and the whole send
+/// silently queued nothing — the same collision that had already sent
+/// a fragment of a targeting condition out as a notification's
+/// payload. A constant nobody can inspect is a constant that drifts.
+const INSERT_TEMPLATE: &str = "INSERT INTO push_sends \
+     (id, project_id, token_id, provider, payload, status, \
+      idempotency_key, campaign_id, template_id, batch_id) \
+   SELECT gen_random_uuid(), $1, dt.id, dt.provider, $2, 'queued', $3, $4, $5, $6 \
+   FROM ( \
+     SELECT dt.id, dt.provider FROM device_tokens dt \
+     WHERE dt.project_id = $1 AND dt.revoked_at IS NULL AND ({selector}) \
+     ORDER BY dt.id LIMIT $7 \
+   ) dt \
+   ON CONFLICT DO NOTHING \
+   RETURNING id";
+
+/// Placeholders the statement uses before the selector's own.
+///
+/// Checked against `INSERT_TEMPLATE` by a test rather than trusted:
+/// this number and that statement have to move together, and the last
+/// time they did not the endpoint queued nothing at all.
+const FIXED_BINDS: usize = 7;
 
 #[cfg(test)]
 mod tests {
@@ -341,6 +376,36 @@ mod tests {
             (FIXED_BINDS + 1..=FIXED_BINDS + sel.binds.len()).collect::<Vec<_>>(),
             "placeholders do not line up with binds: {}",
             sel.sql
+        );
+    }
+
+    /// `FIXED_BINDS` is what the statement actually uses.
+    ///
+    /// The selector numbers its own placeholders from this, so if the
+    /// statement grows one and this does not, the new column and the
+    /// selector's first bind land on the same number. That happened —
+    /// `batch_id` took `$7`, which was the audience's — and the
+    /// endpoint queued nothing, silently, for every shape of target.
+    #[test]
+    fn the_fixed_placeholders_are_the_ones_the_statement_uses() {
+        let highest = INSERT_TEMPLATE
+            .split('$')
+            .skip(1)
+            .filter_map(|s| {
+                s.chars()
+                    .take_while(char::is_ascii_digit)
+                    .collect::<String>()
+                    .parse::<usize>()
+                    .ok()
+            })
+            .max()
+            .unwrap_or(0);
+        assert_eq!(
+            highest,
+            FIXED_BINDS,
+            "the statement uses ${highest} but the selector is told to start at \
+             ${}, so one of them writes over the other",
+            FIXED_BINDS + 1
         );
     }
 

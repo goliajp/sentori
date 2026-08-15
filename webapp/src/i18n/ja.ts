@@ -267,6 +267,8 @@ export const ja: Messages = {
   'push.integrateSend': 'バックエンドから送信',
   'push.integrateCount': '先に件数',
   'push.integrateCountWhy': '同じ問い合わせを、送信せずに。400 が 40,000 になっても、cron からは同じに見える。',
+  'push.integratePoll': '結果を確認',
+  'push.integratePollWhy': '送信は 1 件の ID を返す。sent はベンダーが受理。delivered は端末が報告。',
   'push.provider': 'プロバイダ',
   'push.queued': 'キュー',
   'push.next': '次へ',
