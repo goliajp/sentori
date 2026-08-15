@@ -329,7 +329,7 @@ public final class SentoriPush: NSObject {
         SentoriPushNotifications.shared.unregisterForRemoteNotifications()
 
         guard let handle, let config = SentoriConfig.current,
-            let url = URL(string: "\(config.ingestUrl)/v1/push/tokens/\(handle)")
+            let url = URL(string: "\(config.ingestUrl)/v1/push/devices/\(handle)")
         else { return false }
 
         var request = URLRequest(url: url)
@@ -378,7 +378,7 @@ public final class SentoriPush: NSObject {
     }
 
     private func registerWithServer(token: String, config: SentoriConfig) async -> Result {
-        guard let url = URL(string: "\(config.ingestUrl)/v1/push/tokens") else {
+        guard let url = URL(string: "\(config.ingestUrl)/v1/push/devices") else {
             return .failure(reason: .serverRejected, message: "bad ingest url")
         }
         var body: [String: Any] = [
@@ -429,16 +429,10 @@ public final class SentoriPush: NSObject {
                 // The handle is the `device_tokens` row id, a bare
                 // uuid. The RN SDK parsed it as an `ipt_*` string no
                 // server has ever returned.
-                // `spToken` is the name; `token_id` is the name the
-                // server shipped under. Reading the new one first and
-                // falling back matters in one direction that is easy
-                // to miss: a self-hosted deployment upgrades on its
-                // own schedule, so an SDK newer than its server is an
-                // ordinary state, and an SDK that only knew the new
-                // name would fail every registration against it.
+                // The address, by its one name.
                 guard let data,
                     let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                    let handle = (j["spToken"] as? String) ?? (j["token_id"] as? String),
+                    let handle = j["spToken"] as? String,
                     !handle.isEmpty
                 else {
                     cont.resume(

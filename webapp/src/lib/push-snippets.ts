@@ -34,9 +34,9 @@ export const SNIPPET_LANGS: { id: SnippetLang; label: string }[] = [
 ];
 
 /** The one route a backend needs. */
-export const SEND_PATH = '/v1/push/send';
+export const SEND_PATH = '/v1/push/sends';
 /** And the one it should call first, to find out how many it is about to reach. */
-export const COUNT_PATH = '/v1/push/count';
+export const COUNT_PATH = '/v1/push/audience/count';
 
 const BODIES: Record<SnippetLang, (base: string) => string> = {
   go: (base) => `package sentori

@@ -330,7 +330,7 @@ private final class RotationProbe: URLProtocol {
     }
 
     override class func canInit(with request: URLRequest) -> Bool {
-        request.url?.path == "/v1/push/tokens"
+        request.url?.path == "/v1/push/devices"
     }
 
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -358,7 +358,7 @@ private final class RotationProbe: URLProtocol {
         Self.lock.unlock()
 
         let payload = Data(
-            #"{"spToken":"019ff000-0000-7000-8000-000000000001","is_new":false}"#.utf8)
+            #"{"spToken":"019ff000-0000-7000-8000-000000000001","isNew":false}"#.utf8)
         let resp = HTTPURLResponse(
             url: request.url!, statusCode: 202, httpVersion: "HTTP/1.1", headerFields: nil)!
         client?.urlProtocol(self, didReceive: resp, cacheStoragePolicy: .notAllowed)

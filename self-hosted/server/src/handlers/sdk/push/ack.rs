@@ -1,4 +1,8 @@
-//! POST `/v1/push/sends/{send_id}/ack` — mark push as user-confirmed.
+//! POST `/v1/push/deliveries/{deliveryId}/ack` — the device says it
+//! arrived.
+//!
+//! This is what makes `delivered` mean anything: everything else in
+//! the pipeline knows only that a vendor accepted the request.
 
 use std::sync::Arc;
 
@@ -27,7 +31,7 @@ pub struct AckBody {
 pub async fn handle(
     Extension(ctx): Extension<IngestContext>,
     State(state): State<Arc<AppState>>,
-    Path(send_id): Path<Uuid>,
+    Path(delivery_id): Path<Uuid>,
     Json(body): Json<AckBody>,
 ) -> (StatusCode, Json<Value>) {
     let result = sqlx::query(
@@ -35,7 +39,7 @@ pub async fn handle(
          WHERE id = $2 AND project_id = $3 AND acked_at IS NULL",
     )
     .bind(body.ack_session_id.as_deref())
-    .bind(send_id)
+    .bind(delivery_id)
     .bind(ctx.project_id)
     .execute(&state.pool)
     .await;

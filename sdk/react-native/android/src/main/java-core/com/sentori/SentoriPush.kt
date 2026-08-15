@@ -454,7 +454,7 @@ object SentoriPush {
             val ok =
                 try {
                     conn =
-                        URL("${config.ingestUrl}/v1/push/tokens/$handle").openConnection()
+                        URL("${config.ingestUrl}/v1/push/devices/$handle").openConnection()
                             as HttpURLConnection
                     conn.requestMethod = "DELETE"
                     conn.setRequestProperty("Authorization", "Bearer ${config.token}")
@@ -522,7 +522,7 @@ object SentoriPush {
         var conn: HttpURLConnection? = null
         return try {
             conn =
-                URL("${config.ingestUrl}/v1/push/tokens").openConnection() as HttpURLConnection
+                URL("${config.ingestUrl}/v1/push/devices").openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
             conn.setRequestProperty("Content-Type", "application/json")
             conn.setRequestProperty("Authorization", "Bearer ${config.token}")
@@ -542,15 +542,9 @@ object SentoriPush {
                 // The handle is the `device_tokens` row id, a bare
                 // uuid. The RN SDK parsed it as an `ipt_*` string no
                 // server has ever returned.
-                // `spToken` is the name; `token_id` is the name the
-                // server shipped under. Reading the new one first and
-                // falling back matters in one direction that is easy
-                // to miss: a self-hosted deployment upgrades on its
-                // own schedule, so an SDK newer than its server is an
-                // ordinary state, and an SDK that only knew the new
-                // name would fail every registration against it.
+                // The address, by its one name.
                 val json = JSONObject(text)
-                val handle = json.optString("spToken").ifEmpty { json.optString("token_id") }
+                val handle = json.optString("spToken")
                 if (handle.isNullOrEmpty()) {
                     Result.Failure(Failure.SERVER_REJECTED, "server returned no device token id")
                 } else {

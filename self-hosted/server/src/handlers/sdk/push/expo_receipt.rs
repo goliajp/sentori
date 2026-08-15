@@ -21,12 +21,12 @@ use crate::state::AppState;
 pub async fn handle(
     Extension(ctx): Extension<IngestContext>,
     State(state): State<Arc<AppState>>,
-    Path(send_id): Path<Uuid>,
+    Path(delivery_id): Path<Uuid>,
 ) -> (StatusCode, Json<Value>) {
     // The status code travels with it now: the inner handler answers
     // 404 for an id that does not exist, and an Expo client reading
     // `data.status` off a 200 could not tell that from a delivery
     // that had not been attempted yet.
-    let (code, Json(inner)) = receipt_handle(Extension(ctx), State(state), Path(send_id)).await;
+    let (code, Json(inner)) = receipt_handle(Extension(ctx), State(state), Path(delivery_id)).await;
     (code, Json(json!({ "data": inner })))
 }

@@ -1,4 +1,4 @@
-//! GET `/v1/push/users/{fp_hex}/preferences`
+//! GET `/v1/push/users/{user_key}/preferences`
 
 use std::sync::Arc;
 
@@ -16,9 +16,9 @@ use crate::state::AppState;
 pub async fn handle(
     Extension(ctx): Extension<IngestContext>,
     State(state): State<Arc<AppState>>,
-    Path(fp_hex): Path<String>,
+    Path(user_key): Path<String>,
 ) -> Json<Value> {
-    let fp_bytes = match hex::decode(&fp_hex) {
+    let fp_bytes = match hex::decode(&user_key) {
         Ok(b) if b.len() == 32 => b,
         _ => return Json(json!({ "error": "invalid_fp_hex" })),
     };
@@ -45,8 +45,8 @@ pub async fn handle(
         .map(|r| {
             json!({
                 "category": r.get::<String, _>("category"),
-                "opted_out": r.get::<bool, _>("opted_out"),
-                "updated_at": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("updated_at")),
+                "optedOut": r.get::<bool, _>("opted_out"),
+                "updatedAt": crate::wire_time::rfc3339(r.get::<time::OffsetDateTime, _>("updated_at")),
             })
         })
         .collect();

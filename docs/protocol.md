@@ -230,7 +230,18 @@ the one CLI command that exits non-zero on purpose — uploads stay lenient so S
 can never block a release, which means a broken upload step is silent and something
 has to be allowed to notice.
 
-### `POST /v1/push/tokens`
+### Conventions
+
+Every field on `/v1`, in both directions, is **camelCase** — `appUserId`, `spToken`,
+`sentAt`, `providerOutcome`. Paths are lowercase with hyphens where a segment needs
+two words (`expo-compat`). Timestamps are RFC3339 and end in `At`. Errors are
+`{"error": "<code>"}`, plus `detail` and `field` where there is one.
+
+Two ids, two words: **`sendId`** is one call to `POST /v1/push/sends`; **`deliveryId`**
+is one device's row inside it. They shared the word `send` until 3.0.0, and passing
+one where the other belonged was a 404 with no hint which.
+
+### `POST /v1/push/devices`
 Register this device so Sentori can reach it. Ingest-scope token — the same one the
 app already ships with.
 
@@ -274,16 +285,10 @@ app already ships with.
 Response (`202 Accepted`):
 
 ```json
-{
-  "spToken":  "019ff080-2aeb-7e30-aba1-4431b296d120",
-  "token_id": "019ff080-2aeb-7e30-aba1-4431b296d120",
-  "is_new":   true
-}
+{ "spToken": "019ff080-2aeb-7e30-aba1-4431b296d120", "isNew": true }
 ```
 
-`spToken` is the name; `token_id` is the name it shipped under, and both carry the
-same value until the old one is retired. It is the `device_tokens` row id — a
-**bare uuid**. It carried an `ipt_`
+`spToken` is the `device_tokens` row id — a **bare uuid**. It carried an `ipt_`
 prefix in v0.2. Anything routing on that prefix silently sends to the wrong place
 after upgrading, so accept both while old devices are still registered.
 
@@ -291,12 +296,12 @@ Re-registering the same `(project, kind, nativeToken)` updates in place and un-r
 `env`, `userKey` and `metadata` are kept when the new call omits them. Calling this on
 every launch is the intended usage.
 
-### `DELETE /v1/push/tokens/{token_id}`
+### `DELETE /v1/push/devices/{spToken}`
 Revoke. Ingest-scope. `202 Accepted` with `{"status":"revoked"}`, and idempotent — a
 handle that is already revoked or was never yours is not an error worth failing a
 sign-out over.
 
-### `POST /v1/push/send`
+### `POST /v1/push/sends`
 Send. **api-scope** token: an ingest token is in every copy of your app, and a
 credential that can send notifications to your users is not one to hand out.
 
@@ -317,7 +322,7 @@ only ever safe for an audience of exactly one.
 `payload` is passed to the vendor verbatim. Response (`202 Accepted`):
 
 ```json
-{ "sendId": "01a0…", "queued": 128, "capped": false, "send_ids": ["…"] }
+{ "sendId": "01a0…", "queued": 128, "capped": false }
 ```
 
 `sendId` is the id **for this call** — one id however large the audience — and what
@@ -325,10 +330,8 @@ only ever safe for an audience of exactly one.
 5 s, retries, and quarantines a token the vendor rejects permanently.
 
 `capped` is true when the audience was larger than one call will take (100 000), so
-somebody did not get it. `send_ids` is the older per-device list, kept for callers
-that read it; above 100 devices it is omitted and `sendIdsOmitted` is true, because
-unbounded it is megabytes of uuid before it is anything else. New integrations should
-use `sendId`.
+somebody did not get it. There is no array of per-device ids: `/deliveries` walks
+those, and returning them inline was megabytes of uuid for a large send.
 
 #### Who it goes to
 
@@ -390,7 +393,7 @@ that registered before `sentori.user()` ran carries none. The SDKs re-register b
 themselves when the person changes, so ordering `user()` and `register()` no longer
 matters (native ≥ 1.7.0).
 
-### `POST /v1/push/count`
+### `POST /v1/push/audience/count`
 How many devices an audience selects, without sending to it. **api-scope**, same body
 as a send's targeting (`appUserId` / `traits` / `audience`), answers `{"matched": n}`.
 
@@ -443,10 +446,9 @@ caller never asks for a page to find out there is none.
 }
 ```
 
-### `GET /v1/push/receipts/{delivery_id}` · `POST /v1/push/sends/{send_id}/ack`
-One device's row, by the id from `send_ids` or `deliveries[].deliveryId`. `404` when
-there is no such row — it answered `200 {"status":"not_found"}` until 2.35.0, so a
-typo and a send that had not been attempted read the same.
+### `GET /v1/push/deliveries/{deliveryId}` · `POST /v1/push/deliveries/{deliveryId}/ack`
+One device's row, by the id from `deliveries[].deliveryId` — the same fields the
+listing returns, because it is the same row. `404` when there is no such row.
 
 The ack is what makes `delivered` mean anything: the SDK posts it when a notification
 arrives, with an optional `{"ackSessionId": "…"}` so opening the same one twice
@@ -458,7 +460,7 @@ against `expo-server-sdk` can point at Sentori without changing its call sites. 
 is the *server* shape only — the client side is `sentori.push.register()`.
 
 ### Topics and preferences
-`POST` / `DELETE /v1/push/tokens/{token_id}/topics[/{topic}]` subscribe and
+`POST` / `DELETE /v1/push/devices/{spToken}/topics[/{topic}]` subscribe and
 unsubscribe; `GET` / `PUT /v1/push/users/{user_key}/preferences[/{category}]` read and
 set per-category opt-outs. Both ingest-scope.
 

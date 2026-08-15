@@ -133,46 +133,63 @@ pub fn router(state: Arc<AppState>) -> Router {
                 .post(artifacts_upload::upload_by_release_name)
                 .layer(axum::extract::DefaultBodyLimit::max(256 * 1024 * 1024)),
         )
-        // ── push: device registration, topics, send, receipts ──
-        .route("/v1/push/tokens", post(sdk::push::register_token::handle))
+        // ── push ──
+        //
+        // Plural resource nouns, ids in the path, one custom action.
+        // The two id levels have two words: `sendId` is one call to
+        // `POST /v1/push/sends`, `deliveryId` is one device's row
+        // inside it. They used to share the word `send`, and passing
+        // one where the other belonged was a 404 with no hint.
+        //
+        // `devices`, not `tokens`: four things in this system are
+        // called a token — the ingest one, the api one, the vendor's,
+        // and the spToken — and the thing being registered is a
+        // device.
+        .route("/v1/push/devices", post(sdk::push::register_token::handle))
         .route(
-            "/v1/push/tokens/{handle}",
+            "/v1/push/devices/{sp_token}",
             delete(sdk::push::revoke_token::handle),
         )
         .route(
-            "/v1/push/tokens/{handle}/topics",
+            "/v1/push/devices/{sp_token}/topics",
             post(sdk::push::subscribe_topic::handle),
         )
         .route(
-            "/v1/push/tokens/{handle}/topics/{topic}",
+            "/v1/push/devices/{sp_token}/topics/{topic}",
             delete(sdk::push::unsubscribe_topic::handle),
         )
-        .route("/v1/push/send", post(sdk::push::send::handle))
-        .route("/v1/push/count", post(sdk::push::count::handle))
-        .route(
-            "/v1/push/receipts/{send_id}",
-            get(sdk::push::receipt::handle),
-        )
-        .route("/v1/push/sends/{send_id}/ack", post(sdk::push::ack::handle))
+        // Counting is its own path rather than a flag on the send. A
+        // mistyped flag sends to forty thousand people; a mistyped
+        // path is a 404, and a push cannot be recalled.
+        .route("/v1/push/audience/count", post(sdk::push::count::handle))
+        .route("/v1/push/sends", post(sdk::push::send::handle))
         .route("/v1/push/sends/{send_id}", get(sdk::push::batch::summary))
         .route(
             "/v1/push/sends/{send_id}/deliveries",
             get(sdk::push::batch::deliveries),
         )
         .route(
+            "/v1/push/deliveries/{delivery_id}",
+            get(sdk::push::receipt::handle),
+        )
+        .route(
+            "/v1/push/deliveries/{delivery_id}/ack",
+            post(sdk::push::ack::handle),
+        )
+        .route(
             "/v1/push/expo-compat/send",
             post(sdk::push::expo_send::handle),
         )
         .route(
-            "/v1/push/expo-compat/receipts/{send_id}",
+            "/v1/push/expo-compat/receipts/{delivery_id}",
             get(sdk::push::expo_receipt::handle),
         )
         .route(
-            "/v1/push/users/{fp_hex}/preferences",
+            "/v1/push/users/{user_key}/preferences",
             get(sdk::push::get_preferences::handle),
         )
         .route(
-            "/v1/push/users/{fp_hex}/preferences/{category}",
+            "/v1/push/users/{user_key}/preferences/{category}",
             axum::routing::put(sdk::push::put_preference::handle),
         )
         // Order matters: the limiter runs *after* the bearer check, so

@@ -202,16 +202,12 @@ pub async fn handle(
             );
             (
                 StatusCode::ACCEPTED,
+                // One name for the address. It shipped as `token_id`
+                // and gained `spToken` beside it; carrying both was a
+                // kindness to integrations that did not exist yet.
                 Json(json!({
-                    // `spToken` is the name; `token_id` is the name it
-                    // shipped under and an integrator is using today.
-                    // Both carry the same value until the old one is
-                    // removed — renaming a field out from under a live
-                    // integration is how a working push stops working
-                    // for a reason nobody can see.
                     "spToken": device_id.to_string(),
-                    "token_id": device_id.to_string(),
-                    "is_new": is_new,
+                    "isNew": is_new,
                 })),
             )
         }

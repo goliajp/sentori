@@ -453,12 +453,12 @@ echo "$CREDS" | jq -e '.credentials[] | select(.kind == "apns") | .problem == nu
     || { echo "the saved credential reads back as unusable: $CREDS" >&2; exit 1; }
 
 echo "→ register a device the way the SDK does"
-IPT="$(curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+IPT="$(curl -fsS -X POST "${BASE}/v1/push/devices" -H "Authorization: Bearer ${TOKEN}" \
     -H 'content-type: application/json' \
     -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-native-token-0001",
          "userKey":"a91f3c02deadbeefa91f3c02deadbeef",
          "metadata":{"appVersion":"1.4.0","channel":"e2e"}}' \
-    | jq -r '.token_id')"
+    | jq -r '.spToken')"
 [[ -n "$IPT" && "$IPT" != "null" ]] || { echo "device registration returned no token id" >&2; exit 1; }
 LIVE="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/health" | jq -r '.liveTokens')"
 [[ "$LIVE" == "1" ]] || { echo "health says ${LIVE} live devices after one registration" >&2; exit 1; }
@@ -497,7 +497,7 @@ LINKED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/hea
 # quarantine reason back with it, so the device list described a live
 # device with the words of the failure that killed its old token.
 echo "→ revoking a device takes it out of the send set"
-curl -fsS -X DELETE "${BASE}/v1/push/tokens/${IPT}" -H "Authorization: Bearer ${TOKEN}" \
+curl -fsS -X DELETE "${BASE}/v1/push/devices/${IPT}" -H "Authorization: Bearer ${TOKEN}" \
     | jq -e '.status == "revoked"' > /dev/null \
     || { echo "revoke did not report revoking" >&2; exit 1; }
 LIVE="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/health" | jq -r '.liveTokens')"
@@ -505,16 +505,16 @@ LIVE="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/healt
     || { echo "health says ${LIVE} live devices after revoking the only one" >&2; exit 1; }
 
 echo "→ revoking twice says so the second time"
-curl -fsS -X DELETE "${BASE}/v1/push/tokens/${IPT}" -H "Authorization: Bearer ${TOKEN}" \
+curl -fsS -X DELETE "${BASE}/v1/push/devices/${IPT}" -H "Authorization: Bearer ${TOKEN}" \
     | jq -e '.status == "not_found"' > /dev/null \
     || { echo "a revoke that changed nothing reported success" >&2; exit 1; }
 
 echo "→ registering again brings it back, without the old failure attached"
-IPT2="$(curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+IPT2="$(curl -fsS -X POST "${BASE}/v1/push/devices" -H "Authorization: Bearer ${TOKEN}" \
     -H 'content-type: application/json' \
     -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-native-token-0001",
          "userKey":"a91f3c02deadbeefa91f3c02deadbeef"}' \
-    | jq -r '.token_id')"
+    | jq -r '.spToken')"
 [[ "$IPT2" == "$IPT" ]] \
     || { echo "the same native token produced a different row: ${IPT2} vs ${IPT}" >&2; exit 1; }
 DEV="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/devices")"
@@ -536,13 +536,13 @@ DEV="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/device
 # new token wrote a new row with a new id, and every backend holding
 # the old one was addressing nothing — with nothing to tell it.
 echo "→ a rotated token keeps the same spToken"
-SP1="$(curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+SP1="$(curl -fsS -X POST "${BASE}/v1/push/devices" -H "Authorization: Bearer ${TOKEN}" \
     -H 'content-type: application/json' \
     -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-rotate-before",
          "installId":"e2e-install-0001"}' | jq -r '.spToken')"
 [[ -n "$SP1" && "$SP1" != "null" ]] || { echo "no spToken in the response" >&2; exit 1; }
 
-SP2="$(curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+SP2="$(curl -fsS -X POST "${BASE}/v1/push/devices" -H "Authorization: Bearer ${TOKEN}" \
     -H 'content-type: application/json' \
     -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-rotate-after",
          "installId":"e2e-install-0001"}' | jq -r '.spToken')"
@@ -557,10 +557,10 @@ ROTATED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/de
 # A device that registered before install ids existed still upserts
 # the way it always did, and picks one up when it next registers.
 echo "→ a device with no installId still registers"
-SPOLD="$(curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+SPOLD="$(curl -fsS -X POST "${BASE}/v1/push/devices" -H "Authorization: Bearer ${TOKEN}" \
     -H 'content-type: application/json' \
     -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-legacy-token"}' | jq -r '.spToken')"
-SPADOPT="$(curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+SPADOPT="$(curl -fsS -X POST "${BASE}/v1/push/devices" -H "Authorization: Bearer ${TOKEN}" \
     -H 'content-type: application/json' \
     -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-legacy-token",
          "installId":"e2e-install-adopt"}' | jq -r '.spToken')"
@@ -569,21 +569,21 @@ SPADOPT="$(curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer 
 
 # `spTokens` is the name a caller sends to; `tokenIds` still works.
 echo "→ a send accepts spTokens"
-curl -fsS -X POST "${BASE}/v1/push/send" -H "Authorization: Bearer ${API_TOKEN}" \
+curl -fsS -X POST "${BASE}/v1/push/sends" -H "Authorization: Bearer ${API_TOKEN}" \
     -H 'content-type: application/json' \
     -d '{"spTokens":["'"$SP1"'"],"payload":{"title":"e2e","body":"spTokens"}}' \
     | jq -e '.queued == 1' > /dev/null \
     || { echo "a send addressed by spTokens queued nothing" >&2; exit 1; }
 
 echo "→ a send actually queues"
-# `POST /v1/push/send` had ten values for nine columns and answered
+# `POST /v1/push/sends` had ten values for nine columns and answered
 # 500 to everything. An endpoint that always 500s is
 # indistinguishable from a feature nobody uses, which is how this
 # read for a year.
-SEND="$(curl -fsS -X POST "${BASE}/v1/push/send" -H "Authorization: Bearer ${API_TOKEN}" \
+SEND="$(curl -fsS -X POST "${BASE}/v1/push/sends" -H "Authorization: Bearer ${API_TOKEN}" \
     -H 'content-type: application/json' \
     -d "{\"tokenIds\":[\"${IPT}\"],\"payload\":{\"title\":\"e2e\",\"body\":\"hello\"}}")"
-echo "$SEND" | jq -e '.queued >= 1 and (.send_ids | length >= 1)' >/dev/null \
+echo "$SEND" | jq -e '.queued >= 1 and (.sendId | length == 36)' >/dev/null \
     || { echo "send queued nothing: $SEND" >&2; exit 1; }
 QUEUED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/sends" \
     | jq -r '.sends | length')"
@@ -599,7 +599,7 @@ QUEUED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/sen
 # Postgres agrees about what it selects.
 
 echo "→ a send with no target is refused rather than sent to everyone"
-NOTGT="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${BASE}/v1/push/send" \
+NOTGT="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${BASE}/v1/push/sends" \
     -H "Authorization: Bearer ${API_TOKEN}" -H 'content-type: application/json' \
     -d '{"payload":{"title":"e2e"}}')"
 [[ "$NOTGT" == "400" ]] \
@@ -610,21 +610,21 @@ NOTGT="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${BASE}/v1/push/send" 
 # with this line — which is the point of computing it outside.
 UKEY="$(printf 'usr_e2e_alice' | shasum -a 256 | cut -d' ' -f1)"
 
-curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+curl -fsS -X POST "${BASE}/v1/push/devices" -H "Authorization: Bearer ${TOKEN}" \
     -H 'content-type: application/json' \
     -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-aud-alice",
          "installId":"e2e-aud-alice","userKey":"'"$UKEY"'",
          "traits":{"plan":"pro","locale":"ja-JP","e2e":"aud"},
          "metadata":{"appVersion":"4.10.0"}}' >/dev/null
 
-curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+curl -fsS -X POST "${BASE}/v1/push/devices" -H "Authorization: Bearer ${TOKEN}" \
     -H 'content-type: application/json' \
     -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-aud-bob",
          "installId":"e2e-aud-bob",
          "traits":{"plan":"free","locale":"ja-JP","e2e":"aud"},
          "metadata":{"appVersion":"4.2.0"}}' >/dev/null
 
-curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+curl -fsS -X POST "${BASE}/v1/push/devices" -H "Authorization: Bearer ${TOKEN}" \
     -H 'content-type: application/json' \
     -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-aud-carol",
          "installId":"e2e-aud-carol",
@@ -632,7 +632,7 @@ curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
          "metadata":{"appVersion":"nightly"}}' >/dev/null
 
 send_count() {
-    curl -fsS -X POST "${BASE}/v1/push/send" -H "Authorization: Bearer ${API_TOKEN}" \
+    curl -fsS -X POST "${BASE}/v1/push/sends" -H "Authorization: Bearer ${API_TOKEN}" \
         -H 'content-type: application/json' -d "$1" | jq -r '.queued'
 }
 
@@ -707,7 +707,7 @@ N="$(send_count '{"audience":{"any":[]},"payload":{"title":"t10"}}')"
     || { echo "an empty any reached ${N} devices" >&2; exit 1; }
 
 echo "→ two targeting modes at once is refused, not guessed at"
-BOTH="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${BASE}/v1/push/send" \
+BOTH="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${BASE}/v1/push/sends" \
     -H "Authorization: Bearer ${API_TOKEN}" -H 'content-type: application/json' \
     -d '{"appUserId":"usr_e2e_alice","traits":{"plan":"pro"},"payload":{}}')"
 [[ "$BOTH" == "400" ]] \
@@ -861,7 +861,7 @@ SENTORI_BASE="${BASE}" SENTORI_API_TOKEN="${API_TOKEN}" \
 # device and had to poll each — and for a large send the response was
 # megabytes of uuid before it was anything else.
 echo "→ a send answers with one id for the call"
-BATCH="$(curl -fsS -X POST "${BASE}/v1/push/send" -H "Authorization: Bearer ${API_TOKEN}" \
+BATCH="$(curl -fsS -X POST "${BASE}/v1/push/sends" -H "Authorization: Bearer ${API_TOKEN}" \
     -H 'content-type: application/json' \
     -d '{"traits":{"e2e":"aud"},"payload":{"title":"batch"}}')"
 SID="$(echo "$BATCH" | jq -r '.sendId')"
@@ -909,7 +909,7 @@ FORB="$(curl -sS -o /dev/null -w '%{http_code}' "${BASE}/v1/push/sends/${SID}" \
 [[ "$FORB" == "403" ]] || { echo "an ingest token read a send, answering ${FORB}" >&2; exit 1; }
 
 echo "→ a backend can count an audience without sending to it"
-CNT="$(curl -fsS -X POST "${BASE}/v1/push/count" -H "Authorization: Bearer ${API_TOKEN}" \
+CNT="$(curl -fsS -X POST "${BASE}/v1/push/audience/count" -H "Authorization: Bearer ${API_TOKEN}" \
     -H 'content-type: application/json' \
     -d '{"traits":{"plan":"pro","e2e":"aud"}}' | jq -r '.matched')"
 SENT="$(send_count '{"traits":{"plan":"pro","e2e":"aud"},"payload":{"title":"c"}}')"
@@ -920,7 +920,7 @@ SENT="$(send_count '{"traits":{"plan":"pro","e2e":"aud"},"payload":{"title":"c"}
 echo "→ counting does not send"
 BEFORE="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/sends?limit=1" \
     | jq -r '.total')"
-curl -fsS -X POST "${BASE}/v1/push/count" -H "Authorization: Bearer ${API_TOKEN}" \
+curl -fsS -X POST "${BASE}/v1/push/audience/count" -H "Authorization: Bearer ${API_TOKEN}" \
     -H 'content-type: application/json' -d '{"traits":{"e2e":"aud"}}' > /dev/null
 AFTER="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/sends?limit=1" \
     | jq -r '.total')"
@@ -928,7 +928,7 @@ AFTER="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/push/send
     || { echo "counting queued something: ${BEFORE} → ${AFTER}" >&2; exit 1; }
 
 echo "→ the app's own token cannot count the customer's users"
-FORB="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${BASE}/v1/push/count" \
+FORB="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${BASE}/v1/push/audience/count" \
     -H "Authorization: Bearer ${TOKEN}" -H 'content-type: application/json' \
     -d '{"traits":{"e2e":"aud"}}')"
 [[ "$FORB" == "403" ]] \
@@ -965,11 +965,11 @@ HITISSUE="$(jq -r '.issueId' /tmp/hit.json)"
     || { echo "no issue for the identified event: $(cat /tmp/hit.json)" >&2; exit 1; }
 
 # Two devices: one held by the person who hit it, one not.
-curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+curl -fsS -X POST "${BASE}/v1/push/devices" -H "Authorization: Bearer ${TOKEN}" \
     -H 'content-type: application/json' \
     -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-issue-hit",
          "installId":"e2e-issue-hit","userKey":"'"$HITKEY"'"}' >/dev/null
-curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+curl -fsS -X POST "${BASE}/v1/push/devices" -H "Authorization: Bearer ${TOKEN}" \
     -H 'content-type: application/json' \
     -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-issue-miss",
          "installId":"e2e-issue-miss","userKey":"'"$(printf 'usr_e2e_other' | shasum -a 256 | cut -d' ' -f1)"'"}' \
@@ -986,7 +986,7 @@ N="$(send_count "{\"audience\":{\"issue\":\"${ISSUE_ID}\"},\"payload\":{\"title\
     || { echo "an issue with no identified users reached ${N} devices" >&2; exit 1; }
 
 echo "→ an issue id that is not an id is refused"
-BADI="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${BASE}/v1/push/send" \
+BADI="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${BASE}/v1/push/sends" \
     -H "Authorization: Bearer ${API_TOKEN}" -H 'content-type: application/json' \
     -d '{"audience":{"issue":"the login crash"},"payload":{}}')"
 [[ "$BADI" == "400" ]] \
@@ -1000,7 +1000,7 @@ BAD="$(curl -sS -o /dev/null -w '%{http_code}' -b "$JAR" -X POST \
     || { echo "an unparseable audience previewed as ${BAD}, not 400" >&2; exit 1; }
 
 echo "→ signing out clears the traits a send selects on"
-curl -fsS -X POST "${BASE}/v1/push/tokens" -H "Authorization: Bearer ${TOKEN}" \
+curl -fsS -X POST "${BASE}/v1/push/devices" -H "Authorization: Bearer ${TOKEN}" \
     -H 'content-type: application/json' \
     -d '{"kind":"apns","env":"sandbox","nativeToken":"e2e-aud-carol",
          "installId":"e2e-aud-carol","traits":{}}' >/dev/null
