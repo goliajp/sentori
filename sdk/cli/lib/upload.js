@@ -38,6 +38,16 @@ export function gzipForWire(bytes, name) {
 export function wireArrayBuffer(wire) {
     return wire.buffer.slice(wire.byteOffset, wire.byteOffset + wire.byteLength);
 }
+/** Say it once, at the only place every upload passes through. */
+export function warnIfUnusable(name, v) {
+    if (v.usable !== false)
+        return false;
+    // `warn`, not `error`: red text makes a host team believe their
+    // build broke, and this one did not.
+    console.warn(`[sentori-cli] ${name} stored, but the server cannot read it — ` +
+        `it will symbolicate nothing.${v.hint ? ` ${v.hint}` : ''}`);
+    return true;
+}
 export async function uploadArtifact(opts) {
     const bytes = readFileSync(opts.path);
     if (bytes.length === 0)
@@ -70,6 +80,8 @@ export async function uploadArtifact(opts) {
         const detail = await resp.text().catch(() => '');
         throw new Error(`${resp.status} ${resp.statusText}${detail ? ` — ${detail.slice(0, 200)}` : ''}`);
     }
-    return (await resp.json());
+    const verdict = (await resp.json());
+    warnIfUnusable(opts.name ?? basename(opts.path), verdict);
+    return verdict;
 }
 //# sourceMappingURL=upload.js.map

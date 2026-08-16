@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { statSync, readdirSync } from 'node:fs';
 import { gzipForWire, wireArrayBuffer } from './upload.js';
+import { warnIfUnusable } from './upload.js';
 async function uploadBytes(opts) {
     // Gzip on the wire — DWARF ~3:1, R8 mapping ~10:1; a real app's
     // main dSYM only fits the server's transport cap compressed.
@@ -23,6 +24,10 @@ async function uploadBytes(opts) {
         const detail = await resp.text().catch(() => '');
         throw new Error(`${resp.status} ${resp.statusText}${detail ? ` — ${detail.slice(0, 300)}` : ''}`);
     }
+    // The dSYM path posts its own request rather than going through
+    // `uploadArtifact`, so it needs the same read — this is the half
+    // that would have gone quiet again.
+    warnIfUnusable(opts.name, (await resp.json().catch(() => ({}))));
 }
 const ARCHES = new Set([
     'arm64',

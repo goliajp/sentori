@@ -8,6 +8,7 @@ import { basename, extname, join } from 'node:path'
 import { statSync, readdirSync } from 'node:fs'
 
 import { gzipForWire, wireArrayBuffer } from './upload.js'
+import { type UploadVerdict, warnIfUnusable } from './upload.js'
 
 export type AdminUpload = {
   apiUrl: string
@@ -41,6 +42,10 @@ async function uploadBytes(opts: {
       `${resp.status} ${resp.statusText}${detail ? ` — ${detail.slice(0, 300)}` : ''}`,
     )
   }
+  // The dSYM path posts its own request rather than going through
+  // `uploadArtifact`, so it needs the same read — this is the half
+  // that would have gone quiet again.
+  warnIfUnusable(opts.name, (await resp.json().catch(() => ({}))) as UploadVerdict)
 }
 
 // ── dSYM ──────────────────────────────────────────────────────────
