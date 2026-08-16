@@ -276,6 +276,12 @@ BAD="$(curl -fsS -X POST "${BASE}/v1/releases/sym%401.0.0%2B1/artifacts" \
     -F kind=sourcemap -F "file=@${MAPDIR}/index.ios.bundle")"
 [[ "$(echo "$BAD" | jq -r '.usable')" == "false" ]] \
     || { echo "an unparseable artifact reported usable: $BAD" >&2; exit 1; }
+# And it says what to upload instead. The CLI prints this verbatim at
+# the moment of upload — for months it read `{ id }` off this response
+# and dropped the rest, so the first anyone heard was a release page
+# with the file sitting under a green light.
+echo "$BAD" | jq -e '.hint | type == "string" and length > 0' > /dev/null \
+    || { echo "a refused artifact came back with no hint: $BAD" >&2; exit 1; }
 KINDS="$(curl -fsS -H "Authorization: Bearer ${API_TOKEN}" \
     "${BASE}/v1/releases/sym%401.0.0%2B1/artifacts" | jq -r '.kinds.sourcemap')"
 [[ "$KINDS" == "1" ]] \

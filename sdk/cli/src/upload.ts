@@ -58,7 +58,40 @@ export function wireArrayBuffer(wire: Uint8Array): ArrayBuffer {
   return wire.buffer.slice(wire.byteOffset, wire.byteOffset + wire.byteLength) as ArrayBuffer
 }
 
-export async function uploadArtifact(opts: UploadOpts): Promise<{ id: string }> {
+/** What the server said about the file it just stored.
+ *
+ *  `usable: false` means it landed and will symbolicate nothing —
+ *  a Hermes bundle passed off as a source map, a zip where a Mach-O
+ *  was expected. The server has answered this since 2.15.0 and its
+ *  own comment says "the response says so"; nothing read it, so the
+ *  first anyone heard was a release page months later with the file
+ *  sitting under a green light.
+ *
+ *  Warned, never thrown. An artifact upload may not fail a
+ *  customer's build — see the zero-cost rule — and this one did
+ *  store. `--strict` is where a caller opts into a hard stop.
+ */
+export type UploadVerdict = {
+  id: string
+  /** `null` for kinds the server does not parse ahead of time. */
+  usable?: boolean | null
+  /** What to upload instead. Present only when `usable === false`. */
+  hint?: null | string
+}
+
+/** Say it once, at the only place every upload passes through. */
+export function warnIfUnusable(name: string, v: UploadVerdict): boolean {
+  if (v.usable !== false) return false
+  // `warn`, not `error`: red text makes a host team believe their
+  // build broke, and this one did not.
+  console.warn(
+    `[sentori-cli] ${name} stored, but the server cannot read it — ` +
+      `it will symbolicate nothing.${v.hint ? ` ${v.hint}` : ''}`,
+  )
+  return true
+}
+
+export async function uploadArtifact(opts: UploadOpts): Promise<UploadVerdict> {
   const bytes = readFileSync(opts.path)
   if (bytes.length === 0) throw new Error(`empty file: ${opts.path}`)
 
@@ -93,5 +126,7 @@ export async function uploadArtifact(opts: UploadOpts): Promise<{ id: string }> 
     const detail = await resp.text().catch(() => '')
     throw new Error(`${resp.status} ${resp.statusText}${detail ? ` — ${detail.slice(0, 200)}` : ''}`)
   }
-  return (await resp.json()) as { id: string }
+  const verdict = (await resp.json()) as UploadVerdict
+  warnIfUnusable(opts.name ?? basename(opts.path), verdict)
+  return verdict
 }

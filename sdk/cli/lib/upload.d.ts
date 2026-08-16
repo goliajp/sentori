@@ -19,7 +19,27 @@ export declare function gzipForWire(bytes: Buffer | Uint8Array, name: string): {
  *  be 16 KB of pool (offset view) — a Blob built on it would ship
  *  garbage bytes around the payload. */
 export declare function wireArrayBuffer(wire: Uint8Array): ArrayBuffer;
-export declare function uploadArtifact(opts: UploadOpts): Promise<{
+/** What the server said about the file it just stored.
+ *
+ *  `usable: false` means it landed and will symbolicate nothing —
+ *  a Hermes bundle passed off as a source map, a zip where a Mach-O
+ *  was expected. The server has answered this since 2.15.0 and its
+ *  own comment says "the response says so"; nothing read it, so the
+ *  first anyone heard was a release page months later with the file
+ *  sitting under a green light.
+ *
+ *  Warned, never thrown. An artifact upload may not fail a
+ *  customer's build — see the zero-cost rule — and this one did
+ *  store. `--strict` is where a caller opts into a hard stop.
+ */
+export type UploadVerdict = {
     id: string;
-}>;
+    /** `null` for kinds the server does not parse ahead of time. */
+    usable?: boolean | null;
+    /** What to upload instead. Present only when `usable === false`. */
+    hint?: null | string;
+};
+/** Say it once, at the only place every upload passes through. */
+export declare function warnIfUnusable(name: string, v: UploadVerdict): boolean;
+export declare function uploadArtifact(opts: UploadOpts): Promise<UploadVerdict>;
 //# sourceMappingURL=upload.d.ts.map

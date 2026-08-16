@@ -351,6 +351,7 @@ export const zh: Messages = {
   'push.noUser': '未识别',
   'push.noUserHint': '注册时 sentori.user() 未运行。可收广播,无法从 issue 定向。',
   'push.user': '用户',
+  'releases.artifactBroken': '{platform} 有已上传但读不到的物料 —— 展开查看是哪个。',
   'releases.artifactMissing':
     '{platform} 在此版本有事件,但缺符号化物料 —— 该平台的调用栈无法还原',
   'releases.artifactUnused': '{platform} 在此版本没有事件,缺物料不影响',

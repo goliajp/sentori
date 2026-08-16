@@ -18,6 +18,7 @@ import {
 import { useT } from '../i18n';
 import { api, type ReleaseRow } from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
+import { lightColour, lightState } from '../lib/release-lights';
 
 export default function ReleasesPage() {
   const t = useT();
@@ -84,6 +85,12 @@ function ReleaseRowView({
     artifacts.filter((a) => a.usable !== false).map((a) => a.kind),
   );
   const unreadable = artifacts.filter((a) => a.usable === false);
+  // A kind can hold a good artifact and a broken one at once — which
+  // is exactly the shape that hid: the good map lights the row green
+  // and the bundle somebody uploaded beside it says nothing until the
+  // row is expanded. The light is the whole point of this screen, so
+  // it carries both facts.
+  const broken = new Set(unreadable.map((a) => a.kind));
   const used = new Set(release.platforms ?? []);
   const created = release.createdAt ?? release.created_at;
 
@@ -104,14 +111,19 @@ function ReleaseRowView({
         </span>
         {/* A light is only a warning for a platform this release
             actually hears from; the rest stay quiet furniture. */}
-        <Light on={data ? kinds.has('sourcemap') : undefined} label="js" used />
+        <Light
+          on={data ? kinds.has('sourcemap') : undefined}
+          warn={broken.has('sourcemap')}
+          label="js" used />
         <Light
           on={data ? kinds.has('dsym') : undefined}
+          warn={broken.has('dsym')}
           label="ios"
           used={used.has('ios')}
         />
         <Light
           on={data ? kinds.has('proguard') : undefined}
+          warn={broken.has('proguard')}
           label="android"
           used={used.has('android')}
         />
@@ -121,7 +133,10 @@ function ReleaseRowView({
             same pipeline step as the dSYM, and when that step stops
             being called this is the other half of what goes with
             it. */}
-        <Light on={data ? kinds.has('srcbundle') : undefined} label="src" />
+        <Light
+          on={data ? kinds.has('srcbundle') : undefined}
+          warn={broken.has('srcbundle')}
+          label="src" />
         {created && (
           <span className="w-16 text-right text-xs tabular-nums text-fg-subtle">
             {formatRelative(created)}
@@ -177,31 +192,35 @@ function Light({
   on,
   label,
   used = false,
+  warn = false,
 }: {
   on: boolean | undefined;
   label: string;
   used?: boolean;
+  /** This kind holds at least one artifact the reader could not
+   *  parse. Green would be a lie even when a good one sits beside
+   *  it — somebody uploaded a file believing it did something. */
+  warn?: boolean;
 }) {
   const t = useT();
-  const colour =
-    on === undefined
-      ? 'color-mix(in srgb, var(--sn-fg-muted) 30%, transparent)'
-      : on
-        ? 'var(--s-kind-probe)'
-        : used
-          ? 'var(--s-kind-error)'
-          : 'color-mix(in srgb, var(--sn-fg-muted) 30%, transparent)';
+  // The decision lives in `lib/release-lights` so a gate can see it:
+  // this dot is the only thing most people read on this page, and it
+  // rendered green over a broken artifact for months.
+  const state = lightState({ broken: warn, on, used });
+  const colour = lightColour(state);
   return (
     <span
       className={`flex items-center gap-1.5 font-mono text-xs ${
         used ? 'text-fg-muted' : 'text-fg-subtle/60'
       }`}
       title={
-        on === false && used
-          ? t('releases.artifactMissing', { platform: label })
-          : on === false
-            ? t('releases.artifactUnused', { platform: label })
-            : undefined
+        warn
+          ? t('releases.artifactBroken', { platform: label })
+          : on === false && used
+            ? t('releases.artifactMissing', { platform: label })
+            : on === false
+              ? t('releases.artifactUnused', { platform: label })
+              : undefined
       }
     >
       <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colour }} />
