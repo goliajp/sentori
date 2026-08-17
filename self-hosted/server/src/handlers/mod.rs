@@ -23,6 +23,7 @@ use serde_json::json;
 
 use crate::session_mw::session_middleware;
 use crate::state::AppState;
+use tower_http::catch_panic::CatchPanicLayer;
 
 mod admin;
 mod api;
@@ -409,6 +410,34 @@ pub fn router(state: Arc<AppState>) -> Router {
         .merge(api_routes)
         .merge(sdk_routes)
         .fallback(spa_or_api_404)
+        // Outermost, so it wraps every route above. A panic inside a
+        // handler otherwise takes the tokio worker with it and the
+        // client sees a dropped socket — no status, no body. That is
+        // not a hypothetical: a backend whose Describe under-reported
+        // columns turned `Row::get` into a panic on the artifact
+        // upload and again on push readiness, and both times the
+        // uploader got `curl: (52) Empty reply from server`.
+        //
+        // The panic is still a bug and still logged. This only decides
+        // whether the caller can read what happened.
+        .layer(CatchPanicLayer::custom(panic_as_500))
+}
+
+/// Turn a caught panic into a 500 the caller can branch on, and a log
+/// line whoever runs this can find.
+#[allow(clippy::needless_pass_by_value)] // the layer's callback signature
+fn panic_as_500(err: Box<dyn std::any::Any + Send + 'static>) -> axum::response::Response {
+    let detail = err
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| err.downcast_ref::<&str>().copied())
+        .unwrap_or("panic");
+    tracing::error!(panic = detail, "handler panicked — returning 500");
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(json!({ "error": "internal" })),
+    )
+        .into_response()
 }
 
 /// Path prefixes that belong to the HTTP API, not to the SPA.
@@ -600,5 +629,35 @@ mod fallback_tests {
         for p in ["/v1", "/apidocs", "/authors", "/administration"] {
             assert!(!is_api_path(p), "{p} must not be treated as API");
         }
+    }
+}
+
+#[cfg(test)]
+mod router_tests {
+    /// The layer that turns a handler panic into an answerable 500.
+    ///
+    /// Without it a panic kills the tokio worker and the client gets a
+    /// dropped socket — no status, no body. That happened twice in one
+    /// week, on two endpoints, from the same cause. A layer nobody
+    /// notices is removed by the next person tidying the stack, so it
+    /// is pinned here rather than trusted to survive review.
+    #[test]
+    fn every_route_is_wrapped_against_a_handler_panic() {
+        let src = include_str!("mod.rs");
+        assert!(
+            src.contains("CatchPanicLayer"),
+            "the panic-catching layer is gone — a handler panic is a dropped socket again"
+        );
+        // Outermost, or the routes merged after it are uncovered.
+        assert!(
+            matches!(
+                (
+                    src.rfind("CatchPanicLayer::custom"),
+                    src.find(".fallback(spa_or_api_404)"),
+                ),
+                (Some(at), Some(fallback)) if at > fallback
+            ),
+            "the layer must sit outside every merge, or the routes below it are unwrapped"
+        );
     }
 }

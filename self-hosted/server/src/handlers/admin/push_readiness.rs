@@ -144,6 +144,7 @@ pub fn checks_for(f: &Facts) -> Vec<Value> {
     out
 }
 
+#[allow(clippy::too_many_lines)] // one query per fact, each named
 pub async fn handle(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
@@ -222,22 +223,59 @@ pub async fn handle(
     .await
     .map_err(internal)?;
 
+    // `try_get`, and a missing column is an error rather than a zero.
+    //
+    // `Row::get` panics on a column the result does not carry, which
+    // is how this endpoint took a tokio worker down against a backend
+    // whose Describe under-reported a SELECT list containing a
+    // subquery. Falling back to `0` would have been worse than the
+    // panic in one way: readiness would then report "nothing sent in
+    // 24h" — a claim about the customer's push traffic that we could
+    // not support — and the console would draw it as a healthy zero.
+    let col =
+        |r: &sqlx::postgres::PgRow, name: &'static str| -> Result<i64, (StatusCode, Json<Value>)> {
+            r.try_get::<i64, _>(name).map_err(|e| {
+                tracing::warn!(column = name, error = %e,
+                "push readiness: column missing from the result");
+                internal(e)
+            })
+        };
     let facts = Facts {
-        live: fleet.iter().map(|r| r.get::<i64, _>("live")).sum(),
+        live: fleet
+            .iter()
+            .filter_map(|r| r.try_get::<i64, _>("live").ok())
+            .sum(),
         per_provider: fleet
             .iter()
-            .map(|r| (r.get::<String, _>("provider"), r.get::<i64, _>("live")))
+            .filter_map(|r| {
+                Some((
+                    r.try_get::<String, _>("provider").ok()?,
+                    r.try_get::<i64, _>("live").ok()?,
+                ))
+            })
             .collect(),
-        identified: fleet.iter().map(|r| r.get::<i64, _>("identified")).sum(),
-        with_traits: fleet.iter().map(|r| r.get::<i64, _>("with_traits")).sum(),
-        with_metadata: fleet.iter().map(|r| r.get::<i64, _>("with_metadata")).sum(),
-        sandbox: fleet.iter().map(|r| r.get::<i64, _>("sandbox")).sum(),
+        identified: fleet
+            .iter()
+            .filter_map(|r| r.try_get::<i64, _>("identified").ok())
+            .sum(),
+        with_traits: fleet
+            .iter()
+            .filter_map(|r| r.try_get::<i64, _>("with_traits").ok())
+            .sum(),
+        with_metadata: fleet
+            .iter()
+            .filter_map(|r| r.try_get::<i64, _>("with_metadata").ok())
+            .sum(),
+        sandbox: fleet
+            .iter()
+            .filter_map(|r| r.try_get::<i64, _>("sandbox").ok())
+            .sum(),
         quarantined,
         credentials,
-        queued: queue.get("queued"),
-        oldest_queued_minutes: queue.get("oldest_minutes"),
-        sent24h: recent.get("sent"),
-        failed24h: recent.get("failed"),
+        queued: col(&queue, "queued")?,
+        oldest_queued_minutes: col(&queue, "oldest_minutes")?,
+        sent24h: col(&recent, "sent")?,
+        failed24h: col(&recent, "failed")?,
         top_reason: recent
             .try_get::<Option<String>, _>("top_reason")
             .ok()
