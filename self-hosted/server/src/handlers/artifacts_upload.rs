@@ -32,6 +32,7 @@ use sentori_ingest_token::IngestContext;
 
 use crate::session_mw::SessionContext;
 use crate::state::AppState;
+use tracing::warn;
 
 /// What a symbolicator can consume. Anything else is a typo, and
 /// storing it would mean an artifact that silently never matches.
@@ -182,12 +183,16 @@ pub async fn list_by_release_name(
     for k in KINDS {
         counts.insert((*k).to_owned(), json!(0));
     }
+    // Same rule as the upload: a row this handler cannot read is a
+    // row it skips, not a panic. The listing is what the release page
+    // and `sentori-cli artifacts check` both call, and neither can do
+    // anything with a worker that died.
     let artifacts: Vec<Value> = rows
         .iter()
-        .map(|r| {
-            let kind: String = r.get("kind");
-            let name: String = r.get("name");
-            let usable: Option<bool> = r.get("usable");
+        .filter_map(|r| {
+            let kind: String = r.try_get("kind").ok()?;
+            let name: String = r.try_get("name").ok()?;
+            let usable: Option<bool> = r.try_get("usable").unwrap_or(None);
             // An artifact the reader cannot parse does not count
             // towards its kind. Counting it green is how a release
             // shows three lit lights and symbolicates nothing.
@@ -196,7 +201,7 @@ pub async fn list_by_release_name(
             {
                 *n = json!(n.as_u64().unwrap_or(0) + 1);
             }
-            json!({
+            Some(json!({
                 "kind": kind,
                 "name": name,
                 // For dSYMs the slice's debug id lives in the file
@@ -204,14 +209,17 @@ pub async fn list_by_release_name(
                 // against, so it is the only field that answers "is
                 // this the build that shipped?".
                 "debugId": debug_id_from_name(&name),
-                "contentHash": r.get::<String, _>("content_hash"),
-                "sizeBytes": r.get::<i64, _>("size_bytes"),
+                "contentHash": r.try_get::<String, _>("content_hash").unwrap_or_default(),
+                "sizeBytes": r.try_get::<i64, _>("size_bytes").unwrap_or(0),
                 // null on artifacts uploaded before the check
                 // existed — "never looked at" is not the same claim
                 // as "looked at and fine".
                 "usable": usable,
-                "createdAt": crate::wire_time::rfc3339(r.get("created_at")),
-            })
+                "createdAt": r
+                    .try_get("created_at")
+                    .ok()
+                    .map(crate::wire_time::rfc3339),
+            }))
         })
         .collect();
 
@@ -344,19 +352,46 @@ async fn store(
         .fetch_one(&state.pool)
         .await
     {
-        crate::resymbolicate::spawn_for_release(
-            state,
-            r.get::<Uuid, _>("project_id"),
-            r.get::<String, _>("name"),
-        );
+        // Best-effort by design — this re-reads crashes that arrived
+        // before the artifact. Failing to read the row means no
+        // re-symbolication, which is what happened anyway before the
+        // upload; it is not worth a panic.
+        if let (Ok(pid), Ok(rel)) = (
+            r.try_get::<Uuid, _>("project_id"),
+            r.try_get::<String, _>("name"),
+        ) {
+            crate::resymbolicate::spawn_for_release(state, pid, rel);
+        }
     }
 
-    let prev_hash: Option<String> = row.get("prev_hash");
+    // `try_get`, not `get`. `Row::get` panics on a column the result
+    // does not carry, and a panic here takes a tokio worker down over
+    // an artifact upload — the one thing this endpoint is not allowed
+    // to do. It happened: a backend whose Describe reported no columns
+    // for a data-modifying CTE turned a map upload into
+    // `ColumnNotFound("prev_hash")` mid-request, and the client saw an
+    // empty reply rather than an error it could read.
+    //
+    // `prev_hash` is informational — it answers "did these bytes
+    // change" — so losing it costs a field, not the upload.
+    let prev_hash: Option<String> = row.try_get("prev_hash").unwrap_or_else(|e| {
+        warn!(error = %e, "artifact upload: no prev_hash column in the result");
+        None
+    });
+    // `id` is not informational; without it the response is a lie.
+    // Still an error rather than a panic.
+    let Ok(id) = row.try_get::<Uuid, _>("id") else {
+        warn!("artifact upload: the insert returned no id column");
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "artifact stored but the insert returned no id" })),
+        ));
+    };
     let hash_hex = hash.to_hex();
     Ok((
         StatusCode::CREATED,
         Json(json!({
-            "id": row.get::<Uuid, _>("id"),
+            "id": id,
             "kind": kind,
             "name": name,
             "content_hash": hash_hex,
@@ -627,5 +662,39 @@ mod tests {
         assert!(KINDS.contains(&"srcbundle"));
         assert!(!KINDS.contains(&"source-map"));
         assert!(!KINDS.contains(&"symbols"));
+    }
+
+    /// This endpoint may not panic, and the reason is a contract
+    /// rather than taste: an artifact upload runs inside a customer's
+    /// release pipeline, and Sentori is not allowed to fail it.
+    ///
+    /// `sqlx::Row::get` panics when the result does not carry the
+    /// column. That is not hypothetical — a backend whose Describe
+    /// reported no columns for this handler's data-modifying CTE
+    /// turned a map upload into `ColumnNotFound("prev_hash")` on a
+    /// tokio worker, and the uploader saw an empty reply instead of
+    /// an error it could act on.
+    ///
+    /// Scoped to this one file on purpose. The rest of the server
+    /// still reads columns the panicking way in ~300 places; widening
+    /// this is a separate decision about what a missing column means
+    /// at each of them, and a check that quietly covered all of them
+    /// would be a check nobody could keep green.
+    #[test]
+    fn nothing_in_this_handler_reads_a_column_the_panicking_way() {
+        let src = include_str!("artifacts_upload.rs");
+        let offenders: Vec<&str> = src
+            .lines()
+            .filter(|l| !l.trim_start().starts_with("//"))
+            // `.get("name")` / `.get::<T, _>("name")` — the panicking
+            // pair. `try_get` contains `_get` and is excluded by the
+            // dot immediately before `get`.
+            .filter(|l| l.contains(".get(\"") || l.contains("_>(\"") && l.contains(".get::<"))
+            .collect();
+        assert!(
+            offenders.is_empty(),
+            "a panicking column read is back in the upload handler:\n{}",
+            offenders.join("\n")
+        );
     }
 }
