@@ -2514,7 +2514,7 @@ dependencies = [
 
 [[package]]
 name = "sentori-server"
-version = "3.2.1"
+version = "3.3.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -3293,6 +3293,7 @@ dependencies = [
  "tokio-util",
  "tower-layer",
  "tower-service",
+ "tracing",
 ]
 
 [[package]]
