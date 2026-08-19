@@ -277,6 +277,17 @@ impl Selector {
 /// silently queued nothing — the same collision that had already sent
 /// a fragment of a targeting condition out as a notification's
 /// payload. A constant nobody can inspect is a constant that drifts.
+// The conflict target is named, not left to "any unique index".
+// `push_sends` carries two: the primary key, and the partial
+// idempotency index. An untargeted `DO NOTHING` swallows both, so a
+// primary-key collision — a uuid generator gone wrong, the thing we
+// would most want to hear about — would be indistinguishable from
+// the retry this clause exists to absorb.
+//
+// It also happens to be the form a backend can act on: SPG 7.38.4
+// honours an untargeted `DO NOTHING` for a plain unique index and
+// raises for a partial one. Naming the index is right on its own and
+// portable as a side effect.
 const INSERT_TEMPLATE: &str = "INSERT INTO push_sends \
      (id, project_id, token_id, provider, payload, status, \
       idempotency_key, campaign_id, template_id, batch_id) \
@@ -286,7 +297,8 @@ const INSERT_TEMPLATE: &str = "INSERT INTO push_sends \
      WHERE dt.project_id = $1 AND dt.revoked_at IS NULL AND ({selector}) \
      ORDER BY dt.id LIMIT $7 \
    ) dt \
-   ON CONFLICT DO NOTHING \
+   ON CONFLICT (project_id, token_id, idempotency_key) \
+     WHERE idempotency_key IS NOT NULL DO NOTHING \
    RETURNING id";
 
 /// Placeholders the statement uses before the selector's own.

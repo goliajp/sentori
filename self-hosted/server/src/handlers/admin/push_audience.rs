@@ -268,7 +268,8 @@ pub async fn send(
            (id, project_id, token_id, provider, payload, status, idempotency_key) \
          SELECT gen_random_uuid(), $1, dt.id, dt.provider, $2, 'queued', $3 \
          FROM device_tokens dt WHERE {send_where} \
-         ON CONFLICT DO NOTHING \
+         ON CONFLICT (project_id, token_id, idempotency_key) \
+           WHERE idempotency_key IS NOT NULL DO NOTHING \
          RETURNING id"
     );
     // Audited for injection: the fragment `to_sql` returns contains only
