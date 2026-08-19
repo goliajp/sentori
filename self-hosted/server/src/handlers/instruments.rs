@@ -30,7 +30,8 @@ pub async fn get(
     let asserts = sqlx::query(
         "SELECT name, release, pass_count, fail_count, last_pass_at, last_fail_at \
          FROM assert_stats WHERE project_id = $1 \
-         ORDER BY fail_count DESC, name, release DESC LIMIT 200",
+         ORDER BY fail_count DESC, name COLLATE \"C\", release COLLATE \"C\" DESC \
+         LIMIT 200",
     )
     .bind(project_id)
     .fetch_all(&state.pool)

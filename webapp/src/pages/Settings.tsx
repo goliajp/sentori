@@ -7,7 +7,7 @@
 // Jira posture throughout: visible labels on every control, real
 // tables with headers for every list, full width put to work.
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { useShell } from '../App';
@@ -453,6 +453,7 @@ function AccountTab() {
 }
 
 function NotificationsTab() {
+  const locale = useLocale();
   const t = useT();
   const [testState, setTestState] = useState<'error' | 'idle' | 'sending' | 'sent'>(
     'idle',
@@ -461,7 +462,31 @@ function NotificationsTab() {
   const prefs = useAsyncData(() => api.listNotificationPrefs(), []);
   const [local, setLocal] = useState<Record<string, NotificationPref>>({});
 
-  const rows = (prefs.data?.prefs ?? []).map((p) => local[p.projectId] ?? p);
+  // Sorted here, in the viewer's language, rather than by the
+  // database.
+  //
+  // `ORDER BY p.name` orders by the *database's* collation, which is
+  // whichever the operator's image happens to have — and those differ:
+  // our own compose ships postgres:18-alpine, which is musl, declares
+  // en_US.utf8 and behaves as C. So the same Sentori listed these
+  // projects in one order on our compose and another against a
+  // customer's own Postgres, and neither order was the reader's.
+  //
+  // Locale-aware ordering belongs where the locale is known. This
+  // console is trilingual; the database never knows which language is
+  // on screen.
+  const collator = useMemo(
+    () => new Intl.Collator(locale, { numeric: true, sensitivity: 'base' }),
+    [locale],
+  );
+  const rows = (prefs.data?.prefs ?? [])
+    .map((p) => local[p.projectId] ?? p)
+    // `projectId` breaks the tie, so equal names never reorder between
+    // renders.
+    .sort((a, b) =>
+      collator.compare(a.projectName, b.projectName) ||
+      a.projectId.localeCompare(b.projectId),
+    );
 
   const flip = (p: NotificationPref, field: 'onNewIssue' | 'onRegression') => {
     const next = { ...p, [field]: !p[field] };
