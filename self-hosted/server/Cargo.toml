@@ -13,7 +13,7 @@
 
 [package]
 name = "sentori-server"
-version = "3.3.1"
+version = "3.3.2"
 edition = "2024"
 authors = ["GOLIA K.K. <takagi@golia.jp>"]
 license = "Apache-2.0 OR MIT"
@@ -95,4 +95,16 @@ opt-level = 3
 lto = "fat"
 codegen-units = 1
 strip = true
-panic = "abort"
+# NOT `panic = "abort"`.
+#
+# It was, and that made `CatchPanicLayer` inert in the only build
+# anyone runs. The layer was added in 3.3.0 with a commit message
+# saying a handler panic is answerable; in the shipped binary it was
+# not — abort kills the process before any unwinding handler sees it,
+# so a panic stayed what it had been: a dropped socket, `curl: (52)
+# Empty reply from server`, and a container restart.
+#
+# The cost of unwinding is a slightly larger binary. The thing bought
+# is that one bad request cannot take down a self-hosted customer's
+# whole instance. `check-panic-strategy` in the server's tests fails
+# if this line comes back.
