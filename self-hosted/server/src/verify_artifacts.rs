@@ -30,15 +30,20 @@ pub async fn run(database_url: &str, all: bool) -> Result<(), Box<dyn std::error
     let attachments = crate::blob_store::AttachmentStore::from_env().await?;
     let state = Arc::new(AppState::new(pool.clone(), attachments));
 
+    // `COLLATE "C"` on the release name: byte order, so two
+    // deployments print the same sequence. Without it this orders by
+    // whatever collation the operator's image has, and those differ —
+    // our own compose ships postgres:18-alpine, which is musl and
+    // behaves as C while declaring en_US.utf8. This output gets diffed.
     let sql = if all {
         "SELECT a.id, a.kind, a.name, a.content_hash, r.name AS release \
          FROM release_artifacts a JOIN releases r ON r.id = a.release_id \
-         ORDER BY r.name, a.kind, a.name"
+         ORDER BY r.name COLLATE \"C\", a.kind, a.name COLLATE \"C\""
     } else {
         "SELECT a.id, a.kind, a.name, a.content_hash, r.name AS release \
          FROM release_artifacts a JOIN releases r ON r.id = a.release_id \
          WHERE a.usable IS NULL \
-         ORDER BY r.name, a.kind, a.name"
+         ORDER BY r.name COLLATE \"C\", a.kind, a.name COLLATE \"C\""
     };
     let rows = sqlx::query(sql).fetch_all(&pool).await?;
     if rows.is_empty() {

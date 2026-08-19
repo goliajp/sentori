@@ -151,7 +151,7 @@ pub async fn list_by_release_name(
          FROM release_artifacts a \
          JOIN releases r ON r.id = a.release_id \
          WHERE r.project_id = $1 AND r.name = $2 \
-         ORDER BY a.kind, a.name",
+         ORDER BY a.kind COLLATE \"C\", a.name COLLATE \"C\"",
     )
     .bind(ctx.project_id)
     .bind(&release)

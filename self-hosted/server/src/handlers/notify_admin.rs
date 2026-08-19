@@ -76,6 +76,13 @@ pub async fn prefs_list(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
 ) -> (StatusCode, Json<Value>) {
+    // Stable, not pretty. The console re-sorts this in the viewer's
+    // language — locale-aware ordering belongs where the locale is
+    // known, and a database never knows which of the three languages
+    // is on screen. `COLLATE "C"` only keeps the fallback order
+    // identical across deployments, because ours are not one thing:
+    // the shipped compose is postgres:18-alpine, which is musl and
+    // behaves as C while declaring en_US.utf8.
     let rows = sqlx::query(
         "SELECT p.id AS project_id, p.name, \
                 COALESCE(np.on_new_issue, TRUE) AS on_new_issue, \
@@ -83,7 +90,7 @@ pub async fn prefs_list(
          FROM projects p \
          LEFT JOIN notification_prefs np \
                 ON np.project_id = p.id AND np.user_id = $1 \
-         ORDER BY p.name",
+         ORDER BY p.name COLLATE \"C\"",
     )
     .bind(ctx.user_id)
     .fetch_all(&state.pool)
