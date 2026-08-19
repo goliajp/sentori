@@ -641,6 +641,53 @@ mod router_tests {
     /// week, on two endpoints, from the same cause. A layer nobody
     /// notices is removed by the next person tidying the stack, so it
     /// is pinned here rather than trusted to survive review.
+    /// The layer only works if panics unwind.
+    ///
+    /// `[profile.release] panic = "abort"` makes `CatchPanicLayer`
+    /// inert: the process dies before any handler sees the unwind. It
+    /// was set, and the layer shipped in 3.3.0 doing nothing in the
+    /// only build anyone runs — the test above passed the whole time,
+    /// because the layer was present and correctly placed. Presence is
+    /// not the property; catching is.
+    ///
+    /// This test reads a manifest, which is the weaker half. The real
+    /// check needs a release binary and was run by hand on 2026-08-19:
+    /// add a route that panics, `cargo build --release`, request it.
+    /// The answer must be `500` with the process still serving
+    /// afterwards; under `abort` it is a dropped socket and a restart.
+    /// The probe route is not committed — a handler that panics on
+    /// request has no business in a shipped binary — so re-run it the
+    /// same way if this ever needs proving again.
+    ///
+    /// Unwinding costs 1.88 MB of binary (8.98 → 10.86), measured the
+    /// same day.
+    #[test]
+    fn panics_unwind_so_the_layer_can_catch_them() {
+        let manifest = include_str!("../../Cargo.toml");
+        let release = manifest
+            .split("[profile.release]")
+            .nth(1)
+            .unwrap_or("")
+            // Stop at the next section, or `panic` set in a later
+            // profile would read as this one's.
+            .split("\n[")
+            .next()
+            .unwrap_or("");
+        // Comments stripped first: the note explaining why the line is
+        // absent contains the line, and the first version of this test
+        // failed on its own explanation.
+        let effective: String = release
+            .lines()
+            .map(|l| l.split('#').next().unwrap_or(""))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            !effective.contains("panic = \"abort\""),
+            "release builds abort on panic — CatchPanicLayer cannot catch an abort, \
+             and one bad request takes the whole instance down"
+        );
+    }
+
     #[test]
     fn every_route_is_wrapped_against_a_handler_panic() {
         let src = include_str!("mod.rs");
