@@ -155,6 +155,33 @@ BATCH="$(curl -fsS -X POST "${BASE}/v1/events:batch" -H "Authorization: Bearer $
 [[ "$(echo "$BATCH" | jq -r '.outcomes | length')" == "2" ]] \
     || { echo "batch did not report one outcome per event: $BATCH" >&2; exit 1; }
 
+echo "→ assertStats piggybacked on the batch reach the instruments panel"
+# The batch step sent none of these until 2026-08-19, so nothing on
+# this path had ever been exercised end to end — and the call site
+# logs a failure as a warning rather than failing the batch, so a
+# broken store here would have shown up as an empty panel and nothing
+# else. Sending twice also pins the accumulate-and-stamp half of the
+# upsert, which is where an overwrite would hide.
+for pass_fail in "4 0" "3 1"; do
+    set -- $pass_fail
+    curl -fsS -X POST "${BASE}/v1/events:batch" -H "Authorization: Bearer ${TOKEN}" \
+        -H 'content-type: application/json' \
+        -d "{\"events\":[],\"assertStats\":[{\"name\":\"pay.token-fresh\",
+             \"release\":\"e2e@1.0.0+1\",\"passDelta\":$1,\"failDelta\":$2}]}" >/dev/null
+done
+INSTR="$(curl -fsS -b "$JAR" "${BASE}/admin/api/projects/${PROJECT_ID}/instruments")"
+echo "$INSTR" | jq -e '[.asserts[] | select(.name == "pay.token-fresh")] | length == 1' > /dev/null \
+    || { echo "the assert never reached the panel: $INSTR" >&2; exit 1; }
+# 4+3 and 0+1: the upsert accumulates rather than overwriting.
+echo "$INSTR" | jq -e '.asserts[] | select(.name == "pay.token-fresh")
+                       | .passCount == 7 and .failCount == 1' > /dev/null \
+    || { echo "assert counts did not accumulate: $INSTR" >&2; exit 1; }
+# And the conditional stamps fired — both, because both deltas were
+# nonzero across the two batches.
+echo "$INSTR" | jq -e '.asserts[] | select(.name == "pay.token-fresh")
+                       | (.lastPassAt != null) and (.lastFailAt != null)' > /dev/null \
+    || { echo "the CASE WHEN stamps did not fire: $INSTR" >&2; exit 1; }
+
 # ── resolve → regression, the product's central mechanic ─────────
 #
 # "Fixed in release X" means only a recurrence in X or newer reopens

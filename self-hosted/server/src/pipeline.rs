@@ -545,16 +545,39 @@ pub async fn record_assert_stats(
 ) -> Result<(), sqlx::Error> {
     for s in stats {
         sqlx::query(
+            // The casts are not fixing a bug — they are removing a
+            // dependency on the driver.
+            //
+            // `$4` appears both as a `bigint` column value and inside
+            // `$4 > 0`, where the literal is an `integer`. Asked to
+            // *deduce* the parameter, PostgreSQL refuses the
+            // statement outright: "inconsistent types deduced …
+            // integer versus bigint". Asked to *accept* a declared
+            // type it is fine, and sqlx declares one — it sends
+            // `int8` in Parse because the bound value is an `i64`. So
+            // this has always worked here, and a bare `PREPARE` of the
+            // same text has always failed.
+            //
+            // Made explicit because that difference is invisible from
+            // the statement. Anything that reads it without binding —
+            // psql, a migration tool, a schema linter, another
+            // driver's inference — sees a statement PostgreSQL will
+            // not take. spg's harness Described all 211 of ours
+            // against PG18 and this was one of two it flagged; the
+            // flag was right about the text even though nothing was
+            // broken.
             "INSERT INTO assert_stats \
              (project_id, name, release, pass_count, fail_count, last_pass_at, last_fail_at) \
-             VALUES ($1, $2, $3, $4, $5, \
-                     CASE WHEN $4 > 0 THEN now() END, \
-                     CASE WHEN $5 > 0 THEN now() END) \
+             VALUES ($1, $2, $3, $4::bigint, $5::bigint, \
+                     CASE WHEN $4::bigint > 0 THEN now() END, \
+                     CASE WHEN $5::bigint > 0 THEN now() END) \
              ON CONFLICT (project_id, name, release) DO UPDATE SET \
-             pass_count = assert_stats.pass_count + $4, \
-             fail_count = assert_stats.fail_count + $5, \
-             last_pass_at = CASE WHEN $4 > 0 THEN now() ELSE assert_stats.last_pass_at END, \
-             last_fail_at = CASE WHEN $5 > 0 THEN now() ELSE assert_stats.last_fail_at END",
+             pass_count = assert_stats.pass_count + $4::bigint, \
+             fail_count = assert_stats.fail_count + $5::bigint, \
+             last_pass_at = CASE WHEN $4::bigint > 0 THEN now() \
+                                 ELSE assert_stats.last_pass_at END, \
+             last_fail_at = CASE WHEN $5::bigint > 0 THEN now() \
+                                 ELSE assert_stats.last_fail_at END",
         )
         .bind(project_id)
         .bind(&s.name)
