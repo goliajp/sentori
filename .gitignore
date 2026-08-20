@@ -90,3 +90,8 @@ sdk/native/android/.gradle/
 apps/android-consumer/build/
 apps/android-consumer/app/build/
 apps/android-consumer/.gradle/
+
+# e2e writes one per run and removes it on a clean exit; an
+# interrupted run leaves it behind.
+.env.e2e.*
+self-hosted/docker/.env.e2e.*
