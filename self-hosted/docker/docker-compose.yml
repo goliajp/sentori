@@ -44,7 +44,11 @@ services:
     restart: unless-stopped
 
   db:
-    image: postgres:18-alpine
+    # Overridable so the stack can be pointed at another build of
+    # Postgres — a distribution package, a managed image, or a
+    # drop-in — without editing this file. The default is what we
+    # test and ship.
+    image: ${SENTORI_PG_IMAGE:-postgres:18-alpine}
     environment:
       POSTGRES_USER: sentori
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
@@ -54,7 +58,11 @@ services:
       # subdirectory) — /var/lib/postgresql/data refuses to init.
       - sentori-db:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sentori"]
+      # Exec form, not CMD-SHELL: an image built on scratch has
+      # pg_isready but no /bin/sh, and CMD-SHELL needs a shell. The
+      # stack then never starts, because the server waits on a
+      # health condition the database cannot answer.
+      test: ["CMD", "pg_isready", "-U", "sentori"]
       interval: 5s
       timeout: 3s
       retries: 10

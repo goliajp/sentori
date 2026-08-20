@@ -42,6 +42,20 @@ ENV_FILE=".env.e2e.$$"
 JAR="$(mktemp)"
 
 cleanup() {
+    # SENTORI_E2E_KEEP leaves the stack up so a passing run can be
+    # inspected — logs read, the database dumped, a request replayed
+    # by hand. It prints how to reach it and how to remove it, because
+    # a stack left running that nobody knows the name of is litter.
+    if [ -n "${SENTORI_E2E_KEEP:-}" ]; then
+        echo
+        echo "→ stack kept: ${COMPOSE_PROJECT_NAME}  (${BASE})"
+        echo "  remove it with:"
+        echo "    COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME} \\"
+        echo "      docker compose --env-file ${ENV_FILE} down -v --remove-orphans"
+        echo "    rm -f ${ENV_FILE}"
+        rm -f "$JAR"
+        return
+    fi
     docker compose --env-file "$ENV_FILE" down -v --remove-orphans >/dev/null 2>&1 || true
     rm -f "$ENV_FILE" "$JAR"
 }
@@ -53,6 +67,7 @@ SENTORI_OWNER_EMAIL=e2e@example.com
 SENTORI_BASE_URL=${BASE}
 SENTORI_PORT=${PORT}
 RUST_LOG=warn
+SENTORI_PG_IMAGE=${SENTORI_PG_IMAGE:-postgres:18-alpine}
 EOF
 
 echo "→ up (${COMPOSE_PROJECT_NAME})"
