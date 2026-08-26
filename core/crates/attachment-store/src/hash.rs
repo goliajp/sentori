@@ -82,7 +82,11 @@ impl BlobHash {
             });
         }
         let mut out = [0u8; BLOB_HASH_BYTES];
-        for (i, chunk) in s.as_bytes().chunks_exact(2).enumerate() {
+        // as_chunks over chunks_exact: the pair is a fixed-size array,
+        // so the two indexings below are checked once by the type
+        // rather than on every byte.
+        let (pairs, _) = s.as_bytes().as_chunks::<2>();
+        for (i, chunk) in pairs.iter().enumerate() {
             let hi = decode_nibble(chunk[0])?;
             let lo = decode_nibble(chunk[1])?;
             out[i] = (hi << 4) | lo;
