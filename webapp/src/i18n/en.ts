@@ -35,6 +35,10 @@ export const en = {
   'common.delete': 'Delete',
   'common.retry': 'Retry',
 
+  'inbox.emptyNoProjectTitle': 'Nothing to triage yet',
+  'inbox.awaitingFirstTitle': 'Waiting for the first event',
+  'inbox.awaitingFirstHint': 'This project has never received one. Point the SDK at this instance with an ingest token, and issues appear here.',
+  'inbox.awaitingFirstAction': 'Issue an ingest token →',
   'inbox.emptyHint': 'No open issues. Events group into issues here.',
   'inbox.emptyNoProject': 'Create a project, generate an ingest token, point the SDK at this instance.',
   'inbox.emptyTitle': 'Inbox zero',
@@ -296,6 +300,9 @@ export const en = {
   'push.neverProbed': 'Never probed',
   'push.reprobe': 'Probe',
   'push.activate': 'Activate',
+  'projects.emptyTitle': 'No projects yet',
+  'projects.emptyHint': 'A project is what events, releases and push devices belong to. Name one above to start.',
+  'settings.createProjectFailed': 'Could not create the project.',
   'push.activateAnyway': 'The last probe said {status}. Activate anyway?',
   'push.deleteActiveConfirm':
     'Delete the {kind} credential? It is the one sending — this channel stops immediately.',
