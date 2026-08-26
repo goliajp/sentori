@@ -6,6 +6,73 @@
 
 ---
 
+## v3.4.0(2026-08-23 — 自查:一个找故障的产品,把自己的故障显示成了「还没有数据」)
+
+对功能完整性、专业性、用户体验做了一遍完整自查。工具是仓库自带的
+`webapp/devtools`(mock + 18 条路由 × 三语 × 双主题的 headless 渲染)——
+但它只看 console 报错,而这次找到的东西**一个都不会报 console 错**。
+
+### 越权:三个 admin 端点不检查调用者能不能碰这个项目
+
+`admin/releases.rs` 的三个 handler 从来没调用过 `ensure_project_access`:
+
+- `GET /admin/api/projects/{project_id}/releases` —— 列任意项目的版本
+- `GET …/releases/{release_id}/artifacts` —— 列任意项目的符号化物料
+- `DELETE /admin/api/releases/{release_id}` —— **删任意项目的版本**
+
+第三条最重:路径里连 project 都不带,handler 连 `SessionContext` 都不取,
+而 `release_artifacts` 是 `ON DELETE CASCADE`。任何登录账号都能让另一个项目的
+崩溃栈永久无法还原。`list_artifacts` 甚至把路径参数写成 `_project_id` ——
+作用域就在 URL 里,没人读。
+
+三个都补上了检查;`delete` 先由 release_id 查出 project_id 再判定,
+查不到和无权看返回同一个 404,所以不能用来探测 id 是否存在。
+`scripts/check-admin-authorisation.mjs` 进 preflight,验过会红。
+
+### 故障被显示成正常
+
+- **`App.tsx` 两处 `() => undefined`。** `authMe` 失败 → `me` 永远是 null →
+  每条路由永久停在「加载中…」,没有原因也没有重试。`listProjects` 失败 →
+  项目列表空 → 侧边栏丢掉项目导航,每个按项目取数的页面走 fallback,
+  显示「还没有版本」「还没有项目」。**后端全 500 时,版本页说的是
+  「版本 (0) · 还没有版本 — SDK 上报版本后出现」**,运维会去查 SDK。
+- **`formatApiError` 返回 `": "`。** 模板字面量的两个洞是空的
+  (历史里是 `${e.status}: ${e.body}`,`body` 改名成 `message` 时没跟上)。
+  **24 个 `useAsyncData` 调用点全部吃这个默认值** —— 整个 dashboard 的
+  API 错误提示就是一个冒号加空格。
+
+三处都修了,并且是拿渲染验的:现在显示
+「会话加载失败。 500: upstream_unavailable — the database refused the connection · 重试」。
+
+配套:`devtools/mock-api.mjs` 加 `MOCK_FAIL=<路径子串>`,让**错误态**能被
+渲染出来看。每个页面的加载态和空态天天有人看见,错误态没有任何东西会渲染它
+—— 这就是 `": "` 能活这么久的原因。
+
+### 功能完整性
+
+`DELETE /admin/api/releases/{id}` 有 API 无 UI。补上,放在展开面板里而不是
+列表行上(它级联删符号化物料,列表行是误点会落到的地方),确认文案说明后果。
+顺带把它的返回从 204 改成 200 带 body —— 控制台的 fetch 一律 `resp.json()`,
+无 body 的成功会被读成失败。
+
+### 专业性
+
+`i18n/zh.ts` 里 44 处半角标点紧贴汉字,而 `ja.ts` 只有 5 处;
+且同一句里混用(「已存但读不了,符号化用不上:…。」)。全部改全角,
+`devtools/check-cjk-punctuation.mjs` 进 webapp check —— 它第一件事就是抓住了
+我自己刚写的那条删除确认文案。
+
+### 两处环境漂移,与本次改动无关但会让 CI 红
+
+- `bun.lock` 记着 `sdk/cli@1.4.1`,package.json 已经是 1.5.0(8-17 那次 bump
+  漏了 lockfile)。干净 HEAD 上 `--frozen-lockfile` 就失败,CI 同一条命令。
+- rustc/clippy 1.98.0(8-18)新增 `unused_async_trait_impl` 和
+  `chunks_exact` 两条 lint,`core` 里 8 个既有错误。修了;`MemoryBlobStore`
+  的 async 是 trait 契约要求的,加 allow 并写明理由 —— 第一次 allow 写成了
+  `unused_async`,而 clippy 不会因为未知 lint 名报警,看起来像做了事。
+
+---
+
 ## v3.3.5(2026-08-20 — 一个绿色的门可能已经不在看那件事了)
 
 上一版把 push 的冲突目标写明,end-to-end 87 步随之全绿,我据此在给 spg 的账本上
