@@ -17,6 +17,7 @@ import { CommandPalette, openPalette } from './components/CommandPalette';
 import { Kbd } from './components/ui';
 import { useT } from './i18n';
 import { api, type Me, type Project } from './lib/api';
+import { formatApiError } from './lib/useAsyncData';
 import { setThemeMode, useThemeMode, type ThemeMode } from './lib/theme';
 
 import { SentoriMark } from './components/brand';
@@ -48,17 +49,42 @@ export function App() {
   const t = useT();
   const [me, setMe] = useState<Me | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
+  // Both boot calls used to discard their failure with `() => undefined`,
+  // and both failures then looked like ordinary states of a healthy app:
+  // a failed authMe left `me` null forever, so every route rendered
+  // "Loading…" and never stopped; a failed listProjects left the list
+  // empty, so the rail lost its project and every page that scopes by
+  // project fell through to its own empty state. A dashboard for
+  // finding faults must not present its own as an absence of data.
+  const [bootError, setBootError] = useState<null | string>(null);
+  const [projectsError, setProjectsError] = useState<null | string>(null);
 
-  useEffect(() => {
-    // Boot probe: a 401 inside api.authMe() redirects to /login.
-    api.authMe().then(setMe, () => undefined);
-  }, []);
+  // Clearing the previous error belongs to the retry button rather than
+  // to these, so that neither sets state synchronously inside an effect.
+  // A 401 inside api.authMe() redirects to /login, so anything arriving
+  // here is a real failure and not a signed-out session.
+  const runAuth = () =>
+    api.authMe().then(setMe, (e: unknown) => setBootError(formatApiError(e)));
+  const runProjects = () =>
+    api.listProjects().then(
+      (r) => setProjects(r.projects),
+      (e: unknown) => setProjectsError(formatApiError(e)),
+    );
 
-  const reloadProjects = () => {
-    api.listProjects().then((r) => setProjects(r.projects), () => undefined);
+  const loadMe = () => {
+    setBootError(null);
+    void runAuth();
   };
+  const reloadProjects = () => {
+    setProjectsError(null);
+    void runProjects();
+  };
+
   useEffect(() => {
-    if (me) reloadProjects();
+    void runAuth();
+  }, []);
+  useEffect(() => {
+    if (me) void runProjects();
   }, [me]);
 
   // Project scope: persisted, defaulting to the first project. The
@@ -83,8 +109,23 @@ export function App() {
 
   if (!me) {
     return (
-      <div className="flex h-screen items-center justify-center bg-canvas text-sm text-fg-subtle">
-        {t('shell.loading')}
+      <div className="flex h-screen flex-col items-center justify-center gap-3 bg-canvas text-sm">
+        {bootError ? (
+          <>
+            <div className="text-danger">
+              {t('shell.bootFailed')} {bootError}
+            </div>
+            <button
+              type="button"
+              className="text-fg-muted underline hover:text-fg"
+              onClick={loadMe}
+            >
+              {t('common.retry')}
+            </button>
+          </>
+        ) : (
+          <span className="text-fg-subtle">{t('shell.loading')}</span>
+        )}
       </div>
     );
   }
@@ -115,6 +156,20 @@ export function App() {
               <FolderKanban className={navIcon} aria-hidden />
               {t('nav.projects')}
             </NavLink>
+            {projectsError && (
+              /* Without this the rail simply loses its project links and
+                 reads as an instance with no projects yet. */
+              <div className="mt-3 rounded border border-danger/40 px-2.5 py-2 text-xs text-danger">
+                <div>{t('shell.projectsFailed')}</div>
+                <button
+                  type="button"
+                  className="mt-1 underline"
+                  onClick={reloadProjects}
+                >
+                  {t('common.retry')}
+                </button>
+              </div>
+            )}
             {activeProject && (
               <>
                 {/* the chosen project's own workspace */}

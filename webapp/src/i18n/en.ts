@@ -365,6 +365,9 @@ export const en = {
     '{platform} reports events in this release but has no symbolication artifact — its stacks cannot be read',
   'releases.artifactUnused':
     'no {platform} events in this release, so the missing artifact is harmless',
+  'releases.delete': 'Delete release',
+  'releases.deleteConfirm': 'Delete {name}? Its symbolication artifacts go with it, and this release\u2019s stacks cannot be symbolicated again until they are re-uploaded.',
+  'releases.deleteFailed': 'Could not delete the release.',
   'releases.emptyHint': 'Populated by SDK release reports and CLI artifact uploads.',
   'releases.emptyTitle': 'No releases yet',
   'releases.loadFailed': 'Could not load releases.',
@@ -430,6 +433,8 @@ export const en = {
   'triage.hintSearch': 'search',
   'triage.pickTitle': 'Pick an issue from the queue',
 
+  'shell.bootFailed': 'Could not load your session.',
+  'shell.projectsFailed': 'Could not load projects.',
   'shell.loading': 'Loading…',
 
   'strip.events': 'events',

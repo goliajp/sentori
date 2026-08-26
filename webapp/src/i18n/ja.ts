@@ -357,6 +357,9 @@ export const ja: Messages = {
     '{platform} はこのリリースでイベントを送っていますが、シンボリケーション用アーティファクトがありません — スタックを読めません',
   'releases.artifactUnused':
     'このリリースに {platform} のイベントはないため、欠落は無害です',
+  'releases.delete': 'リリースを削除',
+  'releases.deleteConfirm': '{name} を削除しますか？シンボリケーション成果物も一緒に削除され、再アップロードするまでこのリリースのスタックは復元できません。',
+  'releases.deleteFailed': 'リリースを削除できませんでした。',
   'releases.emptyHint': 'SDK のリリース報告と CLI の成果物アップロードで表示される。',
   'releases.emptyTitle': 'リリースはまだありません',
   'releases.loadFailed': 'リリースを読み込めませんでした。',
@@ -423,6 +426,8 @@ export const ja: Messages = {
   'triage.hintSearch': '検索',
   'triage.pickTitle': '左のキューから issue を選択',
 
+  'shell.bootFailed': 'セッションを読み込めませんでした。',
+  'shell.projectsFailed': 'プロジェクトを読み込めませんでした。',
   'shell.loading': '読み込み中…',
 
   'strip.events': 'イベント',

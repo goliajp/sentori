@@ -57,6 +57,12 @@ impl Default for MemoryBlobStore {
     }
 }
 
+// Every method here completes without awaiting: the map is in memory
+// and the lock is synchronous. The trait is async because the stores
+// that matter in production are (S3, a filesystem), and an impl cannot
+// narrow its trait's signature. clippy::unused_async reads each method
+// on its own and cannot see the contract that forces the shape.
+#[allow(clippy::unused_async_trait_impl)]
 impl BlobStore for MemoryBlobStore {
     async fn put(&self, bytes: &[u8]) -> BlobResult<BlobHash> {
         let hash = BlobHash::of(bytes);
