@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { useShell } from '../App';
 import {
   Button,
+  ErrorBanner,
   Input,
   PageShell,
   clsx,
@@ -19,7 +20,7 @@ import {
 } from '../components/ui';
 import { useT } from '../i18n';
 import { api, type Project, type ProjectHealth } from '../lib/api';
-import { useAsyncData } from '../lib/useAsyncData';
+import { formatApiError, useAsyncData } from '../lib/useAsyncData';
 
 type Row = Project & { health: ProjectHealth | null };
 
@@ -30,10 +31,11 @@ export default function ProjectsPage() {
   const navigate = useNavigate();
   const owner = me.role === 'superadmin';
   const [name, setName] = useState('');
+  const [createError, setCreateError] = useState<null | string>(null);
 
   // Captured per render, not called in render (react-hooks/purity).
   const [now] = useState(() => Date.now());
-  const { data } = useAsyncData<Row[]>(
+  const { data, loading } = useAsyncData<Row[]>(
     () =>
       Promise.all(
         projects.map(async (p) => ({
@@ -67,10 +69,16 @@ export default function ProjectsPage() {
               variant="primary"
               disabled={name.trim().length === 0}
               onClick={() => {
-                void api.createProject(name.trim()).then(() => {
-                  setName('');
-                  reloadProjects();
-                });
+                setCreateError(null);
+                void api.createProject(name.trim()).then(
+                  () => {
+                    setName('');
+                    reloadProjects();
+                  },
+                  // Without this a rejected create — a duplicate name,
+                  // a 500 — left the button looking unpressed.
+                  (e: unknown) => setCreateError(formatApiError(e)),
+                );
               }}
             >
               {t('settings.createProject')}
@@ -79,6 +87,25 @@ export default function ProjectsPage() {
         ) : undefined
       }
     >
+      {createError && (
+        <div className="mb-4">
+          <ErrorBanner>
+            {t('settings.createProjectFailed')} {createError}
+          </ErrorBanner>
+        </div>
+      )}
+      {/* An instance with no projects is where every operator starts,
+          and the grid rendered nothing at all there — a blank page with
+          a form in the corner, on the one screen that has to explain
+          itself. */}
+      {rows.length === 0 && !loading && (
+        <div className="px-4 py-16 text-center">
+          <p className="text-sm text-fg-muted">{t('projects.emptyTitle')}</p>
+          <p className="mt-1.5 text-xs text-fg-subtle">
+            {t('projects.emptyHint')}
+          </p>
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {rows.map((r) => (
           <ProjectCard
@@ -166,7 +193,9 @@ function ProjectCard({
           <span className="text-fg-subtle">warn</span>
         </span>
         <span>
-          <Num n={h?.users24h} /> <span className="text-fg-subtle">u</span>
+          {/* `u` beside `err` and `warn` read as a truncated word rather
+              than an abbreviation — the card has the width for it. */}
+          <Num n={h?.users24h} /> <span className="text-fg-subtle">users</span>
         </span>
         {h && h.replay24h.eligible > 0 && (
           <span className="ml-auto text-fg-muted">

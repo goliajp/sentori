@@ -7,6 +7,7 @@
 // Jira posture throughout: visible labels on every control, real
 // tables with headers for every list, full width put to work.
 
+import { Check, Copy } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -93,6 +94,7 @@ function TokensTab() {
   const [name, setName] = useState('');
   const [scope, setScope] = useState<'api' | 'ingest'>('ingest');
   const [minted, setMinted] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const { data, reload } = useAsyncData(
     () => (projectId ? api.listTokens(projectId) : Promise.resolve({ tokens: [] })),
     [projectId],
@@ -144,9 +146,30 @@ function TokensTab() {
         {minted && (
           <div className="border-t border-border p-3.5 text-xs">
             <p className="mb-1.5 text-fg-muted">{t('settings.tokenOnce')}</p>
-            <code className="block break-all rounded bg-bg p-2 font-mono text-fg">
-              {minted}
-            </code>
+            {/* The one value in the product shown once and never again,
+                and it was the one without a copy button — while the
+                sentence above it tells you to copy it. */}
+            <div className="relative">
+              <code className="block break-all rounded bg-bg p-2 pr-10 font-mono text-fg">
+                {minted}
+              </code>
+              <button
+                type="button"
+                title={copied ? t('identity.copied') : t('identity.copyHint')}
+                className="absolute right-1.5 top-1.5 rounded border border-border bg-surface p-1 text-fg-subtle hover:text-fg"
+                onClick={() => {
+                  void navigator.clipboard.writeText(minted);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1200);
+                }}
+              >
+                {copied ? (
+                  <Check className="size-3.5 text-ok" />
+                ) : (
+                  <Copy className="size-3.5" />
+                )}
+              </button>
+            </div>
           </div>
         )}
       </Panel>

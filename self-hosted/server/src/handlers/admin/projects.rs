@@ -377,7 +377,7 @@ pub async fn health(
             .fetch_one(&state.pool)
             .await
             .unwrap_or(None);
-    let counts = count_by(
+    let mut counts = count_by(
         &state,
         project_id,
         "SELECT kind AS k, count(*) AS n FROM events \
@@ -385,6 +385,14 @@ pub async fn health(
          GROUP BY kind",
     )
     .await;
+    // GROUP BY returns no row for a kind with no events, so a quiet
+    // project answered `{}` — and the console, reading a missing key as
+    // "unknown", drew a dash where the true answer is zero. It sat next
+    // to users24h, which is a plain count and did say 0, so one card
+    // showed two different renderings of the same fact.
+    for kind in ["error", "warn", "trace", "assert", "probe"] {
+        counts.entry(kind.to_string()).or_insert(json!(0));
+    }
     let users_24h: i64 = sqlx::query_scalar(
         "SELECT count(DISTINCT user_key) FROM events \
          WHERE project_id = $1 AND received_at > now() - interval '24 hours' \

@@ -6,7 +6,7 @@
 // reload or a shared link lands on the same view.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { useShell } from '../App';
 import { ImpactCell, KindBadge, kindColor } from '../components/kind';
@@ -46,6 +46,16 @@ export default function TriageView() {
     [projectId],
   );
   const environments = envData?.environments ?? [];
+  // `lastEventAt === null` is the only way to tell a project that has
+  // never been connected from one whose queue is simply clear. Without
+  // it both read as "Inbox zero", which congratulates an operator who
+  // has not finished setting up and drops the guidance at the exact
+  // moment it is needed.
+  const { data: healthData } = useAsyncData(
+    () => (projectId ? api.projectHealth(projectId) : Promise.resolve(null)),
+    [projectId],
+  );
+  const neverReceived = Boolean(projectId) && healthData?.lastEventAt == null;
   const { data: ckData } = useAsyncData(
     () =>
       projectId
@@ -394,10 +404,28 @@ export default function TriageView() {
           )}
           {data && flat.length === 0 && (
             <div className="px-4 py-16 text-center">
-              <p className="text-sm text-fg-muted">{t('inbox.emptyTitle')}</p>
-              <p className="mt-1.5 text-xs text-fg-subtle">
-                {activeProject ? t('inbox.emptyHint') : t('inbox.emptyNoProject')}
+              <p className="text-sm text-fg-muted">
+                {!activeProject
+                  ? t('inbox.emptyNoProjectTitle')
+                  : neverReceived
+                    ? t('inbox.awaitingFirstTitle')
+                    : t('inbox.emptyTitle')}
               </p>
+              <p className="mt-1.5 text-xs text-fg-subtle">
+                {!activeProject
+                  ? t('inbox.emptyNoProject')
+                  : neverReceived
+                    ? t('inbox.awaitingFirstHint')
+                    : t('inbox.emptyHint')}
+              </p>
+              {neverReceived && (
+                <Link
+                  to="/settings?tab=tokens"
+                  className="mt-3 inline-block text-xs text-accent underline"
+                >
+                  {t('inbox.awaitingFirstAction')}
+                </Link>
+              )}
             </div>
           )}
           {groups.regressed.length > 0 && (
