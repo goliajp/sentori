@@ -990,8 +990,26 @@ const SUFFIX = [
 // show, which is the most convincing way to miss a bug.
 const unmocked = new Set();
 
+// MOCK_FAIL=<substring> makes every matching path answer 500 with the
+// shape the real server sends, so the error state of a page can be
+// looked at rather than reasoned about. Every page has a loading and
+// an empty state that a sweep renders by default; the error state is
+// the one nothing ever renders, which is how the dashboard shipped
+// with every API error displaying as ": ".
+const FAIL = process.env.MOCK_FAIL || '';
+
 createServer((req, res) => {
   const p = new URL(req.url, 'http://x').pathname;
+  if (FAIL && p.includes(FAIL)) {
+    res.statusCode = 500;
+    res.setHeader('content-type', 'application/json');
+    return res.end(
+      JSON.stringify({
+        error: 'upstream_unavailable',
+        detail: 'the database refused the connection',
+      }),
+    );
+  }
   if (p === '/__unmocked') {
     res.setHeader('content-type', 'application/json');
     return res.end(JSON.stringify({ unmocked: [...unmocked] }));

@@ -9,8 +9,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ApiError } from './api';
 
+// Every page's default error text. It read `` `: ` `` for as long as
+// anyone can find in the history — a template literal whose two holes
+// had been emptied, most likely when ApiError's `body` was renamed to
+// `message`. All 24 useAsyncData call sites take this default, so an
+// API failure anywhere in the dashboard rendered as a bare ": ".
+// devtools/check-error-format.mjs now holds it to naming both parts.
 export function formatApiError(e: unknown): string {
-  return e instanceof ApiError ? `: ` : String(e);
+  return e instanceof ApiError ? `${e.status}: ${e.message}` : String(e);
 }
 
 export interface AsyncData<T> {

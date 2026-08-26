@@ -17,7 +17,7 @@ import {
 } from '../components/ui';
 import { useT } from '../i18n';
 import { api, type ReleaseRow } from '../lib/api';
-import { useAsyncData } from '../lib/useAsyncData';
+import { formatApiError, useAsyncData } from '../lib/useAsyncData';
 import { lightColour, lightState } from '../lib/release-lights';
 
 export default function ReleasesPage() {
@@ -52,7 +52,12 @@ export default function ReleasesPage() {
         ) : (
           <div className="divide-y divide-border/60">
             {(data?.releases ?? []).map((r) => (
-              <ReleaseRowView key={r.id} release={r} projectId={active ?? ''} />
+              <ReleaseRowView
+                key={r.id}
+                release={r}
+                projectId={active ?? ''}
+                onDeleted={reload}
+              />
             ))}
           </div>
         )}
@@ -64,12 +69,15 @@ export default function ReleasesPage() {
 function ReleaseRowView({
   release,
   projectId,
+  onDeleted,
 }: {
   release: ReleaseRow;
   projectId: string;
+  onDeleted: () => void;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<null | string>(null);
   // Artifacts load with the row: the lights ARE the page — greying
   // them out until a click would hide exactly the gap this screen
   // exists to show.
@@ -178,6 +186,35 @@ function ReleaseRowView({
               ))}
             </div>
           )}
+          {/* Deleting lives inside the expanded panel rather than on the
+              row: it cascades to every artifact above it, and a row in a
+              list is somewhere a click lands by accident. */}
+          <div className="mt-3 flex items-center gap-3 border-t border-border/60 pt-2.5">
+            <button
+              type="button"
+              className="text-xs text-danger underline hover:opacity-80"
+              onClick={() => {
+                if (
+                  !window.confirm(
+                    t('releases.deleteConfirm', { name: release.name }),
+                  )
+                ) {
+                  return;
+                }
+                setDeleteError(null);
+                void api.deleteRelease(release.id).then(onDeleted, (e: unknown) =>
+                  setDeleteError(formatApiError(e)),
+                );
+              }}
+            >
+              {t('releases.delete')}
+            </button>
+            {deleteError && (
+              <span className="text-xs text-danger">
+                {t('releases.deleteFailed')} {deleteError}
+              </span>
+            )}
+          </div>
         </div>
       )}
     </div>

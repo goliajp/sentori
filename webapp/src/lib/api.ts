@@ -452,6 +452,16 @@ class Api {
     return this.send<{ ok: boolean }>('DELETE', `/admin/api/projects/${id}`);
   }
 
+  /** Deletes the release and, by cascade, its symbolication
+   *  artifacts — after which that release's stacks cannot be
+   *  symbolicated again until they are re-uploaded. */
+  deleteRelease(releaseId: string) {
+    return this.send<{ ok: boolean }>(
+      'DELETE',
+      `/admin/api/releases/${releaseId}`,
+    );
+  }
+
   // ── tokens ──
   listTokens(projectId: string) {
     return this.get<{ tokens: TokenRow[] }>(`/admin/api/projects/${projectId}/tokens`);
