@@ -12,7 +12,7 @@
 use std::sync::Arc;
 
 use axum::{
-    Json,
+    Extension, Json,
     extract::{Path, State},
     http::StatusCode,
 };
@@ -21,12 +21,16 @@ use sqlx::Row;
 use tracing::warn;
 use uuid::Uuid;
 
+use crate::handlers::admin::tokens::ensure_project_access;
+use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
 pub async fn list(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    ensure_project_access(&state, &ctx, project_id).await?;
     // Which platforms actually reported in each release. A missing
     // symbolication artifact only matters for a platform that is
     // sending events: three lights that go red regardless turn the
@@ -81,8 +85,10 @@ pub async fn list(
 
 pub async fn list_artifacts(
     State(state): State<Arc<AppState>>,
-    Path((_project_id, release_id)): Path<(Uuid, Uuid)>,
+    Extension(ctx): Extension<SessionContext>,
+    Path((project_id, release_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    ensure_project_access(&state, &ctx, project_id).await?;
     // been called that. The query failed on every call, and
     // `unwrap_or_default()` turned the failure into an empty list — so
     // the releases page reported "no symbol files" for artifacts that
@@ -134,19 +140,58 @@ pub async fn list_artifacts(
     Ok(Json(json!({ "artifacts": out })))
 }
 
+/// The route carries no project in its path, so the project has to be
+/// read from the row before the caller can be judged against it —
+/// without that, any signed-in account could delete any project's
+/// release, and `release_artifacts` cascades with it, which is how a
+/// release's stacks stop being symbolicable.
 pub async fn delete(
     State(state): State<Arc<AppState>>,
+    Extension(ctx): Extension<SessionContext>,
     Path(release_id): Path<Uuid>,
-) -> StatusCode {
+) -> (StatusCode, Json<Value>) {
+    let owner: Option<(Uuid,)> =
+        match sqlx::query_as("SELECT project_id FROM releases WHERE id = $1")
+            .bind(release_id)
+            .fetch_optional(&state.pool)
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                warn!(error = %e, "admin.releases delete_lookup_failed");
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "delete_failed" })),
+                );
+            }
+        };
+    // A release nobody may see and a release that does not exist answer
+    // the same way, so this cannot be used to probe for ids.
+    let Some((project_id,)) = owner else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "release_not_found" })),
+        );
+    };
+    if let Err((code, body)) = ensure_project_access(&state, &ctx, project_id).await {
+        return (code, body);
+    }
+
     match sqlx::query("DELETE FROM releases WHERE id = $1")
         .bind(release_id)
         .execute(&state.pool)
         .await
     {
-        Ok(_) => StatusCode::NO_CONTENT,
+        // 200 with a body rather than 204: the console's fetch wrapper
+        // parses every response as JSON, so a bodyless success reads to
+        // it as a failed delete. Matches admin::projects::delete.
+        Ok(_) => (StatusCode::OK, Json(json!({ "ok": true }))),
         Err(e) => {
             warn!(error = %e, "admin.releases delete_failed");
-            StatusCode::INTERNAL_SERVER_ERROR
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "delete_failed" })),
+            )
         }
     }
 }
