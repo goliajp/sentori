@@ -89,14 +89,20 @@ final class SentoriLiveServerTests: XCTestCase {
         // client error as handled rather than retrying it forever. So
         // it passed on CI against a server that had stored nothing,
         // and only the script's readback noticed.
-        let deadline = Date().addingTimeInterval(30)
+        // 30s was not enough on a cold macOS runner: one CI run failed
+        // here with an empty queue AND an empty spill file — nothing
+        // had been handed to the transport yet, which is the shape of
+        // "still starting up", not of "refused". A rerun of the same
+        // commit passed. 90s costs nothing on a healthy run, since the
+        // loop exits on the first delivery.
+        let deadline = Date().addingTimeInterval(90)
         while SentoriTransport.__peekDelivered() == 0, Date() < deadline {
             Thread.sleep(forTimeInterval: 0.25)
         }
 
         XCTAssertGreaterThan(
             SentoriTransport.__peekDelivered(), 0,
-            "the server never accepted a batch — spilled: "
+            "no batch was delivered within 90s — spilled: "
                 + "\(SentoriTransport.__peekPersisted().count), "
                 + "queued: \(SentoriTransport.__peekQueue().count)"
         )
