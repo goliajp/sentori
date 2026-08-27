@@ -24,6 +24,7 @@ import {
   clsx,
   formatRelative,
   formatRelease,
+  formatReleaseIn,
 } from '../components/ui';
 import { useT } from '../i18n';
 import {
@@ -221,12 +222,16 @@ export function IssueDetailPane({
               {surface.element ? ` · ${surface.element}` : ''}
             </span>
           )}
-          <span className="ml-auto flex items-center gap-2">
+          {/* `flex-wrap` and a shrinkable release box: at a 900px window
+              this pane is about 350px, and a fixed w-52 input pushed
+              Resolve to the edge and Ignore off it entirely. The
+              actions must never be the part that overflows. */}
+          <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
             {issue.status === 'open' ? (
               <>
                 {/* labelled, so the release box reads as "anchor the
                     fix to this release", not a mystery filter (A12) */}
-                <label className="flex items-center gap-1.5">
+                <label className="flex min-w-0 flex-1 items-center gap-1.5">
                   <span className="shrink-0 text-xs text-fg-muted">
                     {t('issue.resolveInRelease')}
                   </span>
@@ -236,7 +241,7 @@ export function IssueDetailPane({
                     placeholder={
                       issue.lastRelease ? formatRelease(issue.lastRelease) : 'app@x.y.z'
                     }
-                    className="h-7 w-52 font-mono text-xs"
+                    className="h-7 w-full min-w-24 max-w-52 font-mono text-xs"
                   />
                 </label>
                 <Button
@@ -560,7 +565,10 @@ function ReleaseSpread({
             className="w-56 shrink-0 truncate font-mono text-fg"
             title={r.release}
           >
-            {formatRelease(r.release)}
+            {formatReleaseIn(
+              r.release,
+              rows.map((x) => x.release),
+            )}
           </span>
           {/* volume bar: share of this issue's events in that release */}
           <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-sm bg-raised">
@@ -652,7 +660,10 @@ function OccurrenceList({
             className={clsx('min-w-0 truncate font-mono text-xs', dim(varies.release))}
             title={r.release}
           >
-            {formatRelease(r.release)}
+            {formatReleaseIn(
+              r.release,
+              rows.map((x) => x.release),
+            )}
           </span>
           <span className={dim(varies.environment)}>{r.environment}</span>
           <span className="ml-auto shrink-0">

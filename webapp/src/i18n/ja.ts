@@ -87,6 +87,7 @@ export const ja: Messages = {
   'instruments.colName': '名前',
   'instruments.colRelease': 'リリース',
   'instruments.colStatus': 'ステータス',
+  'instruments.volume': '{events} 件 · {users} 人',
   'instruments.colVolume': 'ボリューム',
   'instruments.traces': 'トレースポイント',
   'instruments.tracesEmpty': '観測点なし。sentori.trace(name) で経路到達を記録。',

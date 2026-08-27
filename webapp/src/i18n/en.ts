@@ -92,6 +92,7 @@ export const en = {
   'instruments.colName': 'Name',
   'instruments.colRelease': 'Release',
   'instruments.colStatus': 'Status',
+  'instruments.volume': '{events} events · {users} users',
   'instruments.colVolume': 'Volume',
   'instruments.traces': 'Trace points',
   'instruments.tracesEmpty': 'No trace points. sentori.trace(name) marks a path as reached.',

@@ -434,7 +434,8 @@ pub async fn health(
         "SELECT count(*) AS eligible, \
                 count(*) FILTER (WHERE EXISTS ( \
                     SELECT 1 FROM event_attachments a \
-                    WHERE a.event_id = e.id AND a.kind = 'screens')) AS with_screens \
+                    WHERE a.event_id = e.id AND a.project_id = e.project_id \
+                      AND a.kind = 'screens')) AS with_screens \
          FROM events e \
          WHERE e.project_id = $1 AND e.received_at > now() - interval '24 hours' \
            AND e.kind IN ('error', 'warn')",

@@ -12,7 +12,7 @@
 // OTHER events this user's app reported in the window as flags.
 // Everything seeks the replay on click.
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useT } from '../i18n';
 import type { IssueSummary } from '../lib/api';
@@ -69,12 +69,23 @@ function niceSpan(coverS: number): number {
   return Math.ceil(coverS / 60) * 60;
 }
 
-/** A tick step that yields 4–8 round labels. */
-function tickStep(span: number): number {
+/** Roughly the width of a `-60s` label plus breathing room. */
+const LABEL_PX = 64;
+
+/**
+ * A tick step that yields round labels which fit.
+ *
+ * `maxLabels` used to be the constant 8, chosen for a wide viewport.
+ * The strip lives in the issue detail pane, which is about 330px at a
+ * 900px window — seven labels then overlapped into `-60s50s -40s`, and
+ * the event marker collided with the last tick. The step now has to
+ * clear the measured width as well as the span.
+ */
+function tickStep(span: number, maxLabels: number): number {
   for (const step of [1, 2, 5, 10, 15, 30, 60, 120]) {
-    if (span / step <= 8) return step;
+    if (span / step <= maxLabels) return step;
   }
-  return Math.ceil(span / 6 / 60) * 60;
+  return Math.ceil(span / Math.max(2, maxLabels - 2) / 60) * 60;
 }
 
 export function TimelineStrip({
@@ -97,6 +108,19 @@ export function TimelineStrip({
 
   // Fit the axis to the data: earliest captured moment across all
   // three sources decides the span (min 5s, round numbers only).
+  // Measured, not assumed: the pane this sits in is resizable and the
+  // window is not the constraint.
+  const [trackW, setTrackW] = useState(0);
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(([entry]) => {
+      setTrackW(entry.contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const { spanS, coverStart, ticks } = useMemo(() => {
     const all = [
       ...signals.map((s) => s.t),
@@ -105,12 +129,15 @@ export function TimelineStrip({
     ].filter((v) => v <= 0);
     const earliest = all.length ? Math.min(...all) : -60;
     const span = niceSpan(Math.max(5, -earliest));
-    const step = tickStep(span);
+    // Before the first measurement, assume a narrow pane: too few
+    // labels reads as sparse, too many reads as broken.
+    const maxLabels = trackW > 0 ? Math.max(2, Math.floor(trackW / LABEL_PX)) : 4;
+    const step = tickStep(span, maxLabels);
     const marks: number[] = [];
     for (let s = -span; s < 0; s += step) marks.push(s);
     marks.push(0);
     return { spanS: span, coverStart: all.length ? earliest : null, ticks: marks };
-  }, [signals, frameTimes, context]);
+  }, [signals, frameTimes, context, trackW]);
 
   const pct = (tv: number): number =>
     Math.min(100, Math.max(0, ((tv + spanS) / spanS) * (100 - RIGHT_PAD_PCT)));

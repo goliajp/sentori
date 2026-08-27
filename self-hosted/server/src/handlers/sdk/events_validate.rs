@@ -115,6 +115,15 @@ pub async fn handle(
         );
     }
 
+    // Ingest scrubs NUL bytes rather than refusing them, so the
+    // validator must not report a body as unacceptable for carrying
+    // one — but it must say the value will change, since a caller
+    // comparing what it sent to what comes back would otherwise be
+    // surprised by U+FFFD.
+    let mut probe = serde_json::to_value(&wire.payload).unwrap_or(Value::Null);
+    super::events::scrub_nuls(&mut probe);
+    let scrubbed = probe != wire.payload;
+
     if !VALID_PLATFORMS.contains(&wire.platform.as_str()) {
         return (
             StatusCode::BAD_REQUEST,
@@ -143,6 +152,7 @@ pub async fn handle(
                     && wire.payload != json!({}),
             },
             "ignored": ignored,
+            "nulScrubbed": scrubbed,
             "note": if ignored.is_empty() {
                 "parsed only — no token was checked and nothing was stored"
             } else {

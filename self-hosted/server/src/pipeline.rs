@@ -406,10 +406,30 @@ pub async fn ingest(pool: &PgPool, ev: IncomingEvent) -> Result<IngestOutcome, I
         // issue's counters, the user hit, the assert tally — and
         // report the event as accepted, because it is.
         tx.rollback().await?;
-        let issue_id: Uuid = sqlx::query_scalar("SELECT issue_id FROM events WHERE id = $1")
-            .bind(ev.id)
-            .fetch_one(pool)
-            .await?;
+        // Scoped to the project. `events.id` is globally unique, so a
+        // client-chosen id that happens to belong to a DIFFERENT
+        // project also lands in DO NOTHING — and this read, when it
+        // carried no project predicate, handed that other project's
+        // `issue_id` back in a 202 while the caller's event was never
+        // stored. Silent data loss for them, and a probe for anyone
+        // willing to guess uuids.
+        let issue_id: Option<Uuid> =
+            sqlx::query_scalar("SELECT issue_id FROM events WHERE id = $1 AND project_id = $2")
+                .bind(ev.id)
+                .bind(ev.project_id)
+                .fetch_optional(pool)
+                .await?;
+        let Some(issue_id) = issue_id else {
+            // The id exists, but not here. Refusing is the honest
+            // answer: we did not store it, so we must not answer 202.
+            // The message names no project and confirms nothing about
+            // what the id belongs to — a caller who guessed learns
+            // only that this id is unusable, which is also true of an
+            // id it collided with inside its own project.
+            return Err(IngestError::Invalid(
+                "event id is already in use; omit `id` and let the server assign one",
+            ));
+        };
         return Ok(IngestOutcome {
             event_id: ev.id,
             issue_id,
