@@ -6,6 +6,55 @@
 
 ---
 
+## v3.9.0(2026-08-28 — issue 的历史记的是决定,不是请求)
+
+继续 agent 列的未覆盖面:issue 状态变更的并发,以及计数器在并发下的正确性 ——
+后者是上一版改过的路径,该自己验一遍。
+
+### 两件核实后是对的
+
+- **并发计数器正确**:120 条同 fingerprint 的事件并发打进去,`eventCount`
+  正好 120,零 5xx。3.8.0 那次去重回读的改动没伤到计数。
+- **并发状态变更不会损坏状态**:30 个 resolve/ignore/reopen 同时打,最终状态
+  始终是三个合法值之一。
+
+### 一件不对的:审计轨迹被请求淹没
+
+同样那 30 次调用留下 **30 条 activity**。两个 handler 都是无条件 UPDATE +
+无条件写记录,所以「已经 resolved 又 resolve」也算一条。
+
+issue 详情页那块面板存在的意义就是让人看懂这个 issue 经历过什么,而它变成了
+一份点击日志。
+
+改成让数据库判断:`UPDATE … WHERE id = $1 AND status <> $2`,用
+`rows_affected` 决定要不要记。同样 30 次调用现在留下 **10 条** —— 而那 10 条是
+真实发生过的状态转换(open×4 / ignored×3 / resolved×3,三种操作确实来回切了
+10 次)。重复的 20 次静默 no-op,仍返回 200。
+
+两个例外保留:**换一个 release 重新 resolve 是真变更**,照记;**带 note 的
+resolve 照记**,因为那是有人主动写了字。
+
+条件写在 SQL 里而不是先读后写,所以它同时是并发安全的 —— 两个人同时点「解决」,
+只有一个的 `rows_affected` 是 1。
+
+`scripts/check-issue-activity.mjs` 进 e2e,四条断言:开着的 issue resolve 记 1 条、
+重复两次记 0 条、换 release 记 1 条、十个并发 ignore 记 1 条。
+
+**门自己先坏了一次**:并发那段我用 `fetch` 手拼 Cookie 头,拼错了,十个请求全
+401,于是「新增 0 条」—— 和断言通过长得一模一样。改成走和前面同一条 curl 路径,
+并且**先断言十个请求都是 200**。零条记录只有在写入确实发生过时才有意义。
+
+### 首次 `docker compose up` 会因为 initdb 太慢而失败
+
+healthcheck 是 `interval 5s × retries 10` = 50 秒,而第一次启动要跑 initdb。
+超时后 compose 报 `container db-1 is unhealthy` —— 一个只是还在被创建的数据库,
+而这是自建用户看到的第一件事。我自己这轮就撞上了。
+
+加 `start_period: 120s`。在这个窗口内失败的检查不计入 retries,所以只有数据库
+真的坏了时才会花掉这段时间。
+
+---
+
 ## v3.8.1(2026-08-27 — 内容寻址的字节可以被重新引用,而 GC 拿的是旧快照)
 
 继续 agent 列的未覆盖面,这轮看 retention / archive worker —— 它删数据,错了是
