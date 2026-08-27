@@ -982,6 +982,16 @@ echo "$RD" | jq -e '.live > 0' > /dev/null \
 # them. A snippet is documentation somebody compiles, and the last time
 # this repo shipped a command it had not run, the command POSTed to a
 # route no server had ever served.
+# One fingerprint, many senders, all at once — the shape that exists
+# exactly when a new fault first fires across every device running the
+# broken build. `SELECT … FOR UPDATE` cannot lock a row that does not
+# exist yet, so both callers inserted and one died on the unique
+# constraint as a 500 the SDK is told to retry.
+echo "→ concurrent sends of one new fingerprint do not 5xx"
+SENTORI_BASE="${BASE}" SENTORI_TOKEN="${TOKEN}" \
+    node "${ROOT}/../scripts/check-ingest-concurrency.mjs" \
+    || { echo "concurrent ingest of one fingerprint failed" >&2; exit 1; }
+
 # The unauthenticated validator must reach the same verdict as ingest
 # on the same body. If it does not, it is a second source of truth that
 # reads as authoritative and teaches the wrong shape.

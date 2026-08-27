@@ -30,7 +30,8 @@ Look at the status code:
 - `401` — token mismatch. Check it starts with `st_` and matches
   the project's token in Project settings → tokens.
 - `429` — rate limit. Default is 1000 req/min/token; bump via
-  `SENTORI_RATE_LIMIT_PER_MIN` or wait a minute.
+  `SENTORI_RATELIMIT_PER_TOKEN_RPS` (100/sec by default, over
+  `SENTORI_RATELIMIT_WINDOW_SEC`), or wait for the window to pass.
 - Connection refused / timeout — network. Confirm `SENTORI_INGEST_URL`
   is reachable from the app's network (not just your laptop).
 
