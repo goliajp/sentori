@@ -1,6 +1,7 @@
 // Does the SDK reference document the options the SDK actually has?
 //
-// `docs/sdk-react-native.md` is the page an integrator reads. It
+// `sdk/react-native/README.md` is the page an integrator reads —
+// it ships with the package and is what npm renders. It
 // carried a table describing a v0.2-era API for months: `capture`
 // with `globalErrors` / `promiseRejections` / `network` (no such
 // option), `release` marked required (it is optional), `environment`
@@ -22,7 +23,10 @@
 import { readFileSync } from 'node:fs';
 
 const TYPES = 'sdk/core/src/types.ts';
-const DOC = 'docs/sdk-react-native.md';
+// Was docs/sdk-react-native.md until 2026-08-27, when that page was
+// archived: it described the pre-v1 API and said so in its own first
+// line, while this gate held it to the current InitConfig.
+const DOC = 'sdk/react-native/README.md';
 
 /** Field names of `export type InitConfig = { ... }`, top level only. */
 function initConfigFields(src) {

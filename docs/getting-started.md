@@ -43,21 +43,42 @@ curl -X POST "$SENTORI_INGEST_URL/v1/events" \
   -H "Sentori-Sdk: curl/0.0.0" \
   -H "Content-Type: application/json" \
   -d '{
-    "id": "01000000-0000-7000-8000-000000000001",
-    "timestamp": "'"$(date -u +%FT%T.000Z)"'",
     "kind": "error",
+    "occurredAt": "'"$(date -u +%FT%T.000Z)"'",
     "platform": "javascript",
     "release": "myapp@0.1.0+1",
     "environment": "dev",
-    "device": {"os": "other", "osVersion": "0"},
-    "app": {"version": "0.1.0"},
-    "error": {
-      "type": "TypeError",
-      "message": "hello sentori",
-      "stack": [{"file": "shell.ts", "line": 1, "inApp": true}]
+    "payload": {
+      "error": {
+        "type": "TypeError",
+        "message": "hello sentori",
+        "stack": [{"file": "shell.ts", "line": 1, "inApp": true}]
+      }
     }
   }'
 ```
+
+A success is `202` with the ids the server assigned:
+
+```json
+{"eventId":"01a0…","issueId":"01a0…","isNewIssue":true,"regressed":false}
+```
+
+`issueId` is the machine-readable receipt — it is what to assert on in
+a script, rather than opening the dashboard to look.
+
+Three things this body gets right that are easy to get wrong, because
+this page had all three wrong until 2026-08-27:
+
+- **`occurredAt`, not `timestamp`.** It is required and has no alias.
+  Sending `timestamp` drops it as an unknown field and the request
+  fails deserialisation with `422 missing field occurredAt` — not the
+  `400` you might expect, and not a message about the field you sent.
+- **`error` goes inside `payload`.** So do `device` and `app`. Only
+  `kind`, `occurredAt`, `platform`, `release`, `environment`,
+  `userKey`, `name` and `surface` are top-level.
+- **`id` is optional.** Send one only if you are deduplicating retries
+  yourself.
 
 See the [Protocol reference](./protocol.md) for the full schema.
 
@@ -129,4 +150,4 @@ steps and CI recipes (GitHub Actions / GitLab / Vercel / EAS).
   own SDK or just curious
 - [Self-hosting](./self-hosting.md) — production deploy, SMTP,
   backups, behind a reverse proxy
-- [SDK — React Native](./sdk-react-native.md)
+- [SDK — React Native](../sdk/react-native/README.md)

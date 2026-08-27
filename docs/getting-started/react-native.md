@@ -72,11 +72,13 @@ export default function Home() {
         title="Boom"
       />
       <Button
-        onPress={() =>
-          sentori.captureError(new Error('manual capture'), {
-            tags: { feature: 'checkout' },
+        onPress={() => {
+          // Returns the event id the server will file this under.
+          const id = sentori.error(new Error('manual capture'), {
+            feature: 'checkout',
           })
-        }
+          console.log('[sentori] reported', id)
+        }}
         title="Capture manually"
       />
     </View>
@@ -87,10 +89,23 @@ export default function Home() {
 Tap **Boom** to trigger a render-phase throw; tap **Capture
 manually** for an imperative report.
 
-## 4. View on the dashboard
+## 4. Confirm it arrived
 
-Open your dashboard. The new issue appears within a few seconds on
-the Issues list.
+Every verb returns the event id it filed under, so a script does not
+have to open the dashboard to know whether the report landed:
+
+```tsx
+const id = sentori.error(new Error('smoke'))
+// '01a0…' — the id the server will use for this event
+```
+
+The dashboard shows the issue on the Issues list within a few seconds.
+
+If you would rather test the endpoint before wiring the SDK, the curl
+in [getting-started](../getting-started.md#working-without-an-sdk)
+answers `202` with `eventId` and `issueId`. Those two ids are the only
+machine-readable receipt; an ingest-scope token cannot read anything
+back, so a token that can also *query* issues has to be `api` scope.
 
 If you don't see it:
 
@@ -160,7 +175,7 @@ version stay two issues, both legible.
 
 ## 6. Next steps
 
-- [SDK reference](../sdk-react-native.md) — `<ErrorBoundary>`,
+- [SDK reference](../../sdk/react-native/README.md) — `<ErrorBoundary>`,
   breadcrumbs, navigation hook, hang/ANR detection knobs
 - [Self-hosting](../self-hosting.md) — production deploy, SMTP
 - [Protocol](../protocol.md) — wire format reference

@@ -155,7 +155,7 @@ every stack in it symbolicate to whatever they choose.
 - `kind` — one of `sourcemap`, `dsym`, `proguard`, `srcbundle`.
 - `file` — the artifact. Gzip is inflated server-side, so `foo.map.gz` stores as
   `foo.map`. The **filename is data**: dSYM slices are matched to a crashing frame by
-  the debug id embedded in it (`Insight.app-arm64-<uuid>`).
+  the debug id embedded in it (`MyApp.app-arm64-<uuid>`).
 
 The release row is created if it does not exist — maps are produced at build time,
 usually before the app has ever run and announced its deploy, so requiring the row
@@ -167,7 +167,7 @@ Response (`201 Created`):
 {
   "id":              "019e10...",
   "kind":            "dsym",
-  "name":            "Insight.app-arm64-E63A748C-3F0E-302D-95EC-8DA5B55C97D9",
+  "name":            "MyApp.app-arm64-E63A748C-3F0E-302D-95EC-8DA5B55C97D9",
   "content_hash":    "990f6675...",
   "size_bytes":      304857600,
   "debug_id":        "E63A748C3F0E302D95EC8DA5B55C97D9",
@@ -206,7 +206,7 @@ Response (`200 OK`):
   "artifacts": [
     {
       "kind":        "dsym",
-      "name":        "Insight.app-arm64-E63A748C-3F0E-302D-95EC-8DA5B55C97D9",
+      "name":        "MyApp.app-arm64-E63A748C-3F0E-302D-95EC-8DA5B55C97D9",
       "debugId":     "E63A748C3F0E302D95EC8DA5B55C97D9",
       "contentHash": "571e3b3d...",
       "sizeBytes":   304857600,

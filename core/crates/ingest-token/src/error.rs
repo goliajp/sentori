@@ -13,6 +13,14 @@ pub enum TokenError {
     #[error("token must start with `st_`")]
     WrongPrefix,
 
+    /// Prefix is right, length is not. Split out from `WrongPrefix`
+    /// because the syntactic check tests two things and used to report
+    /// only one of them: `st_bogus` was told to "start with `st_`",
+    /// which it does. A reader — human or agent — then goes looking at
+    /// the prefix, which is the one part that was correct.
+    #[error("token has the right prefix but the wrong length")]
+    WrongLength,
+
     #[error("token not found or revoked")]
     NotFound,
 
@@ -36,6 +44,10 @@ impl TokenError {
             Self::MissingHeader => "send `Authorization: Bearer st_<token>` header",
             Self::MalformedHeader => "Authorization header must be `Bearer st_<token>`",
             Self::WrongPrefix => "token must start with `st_`",
+            Self::WrongLength => {
+                "token starts with `st_` but is the wrong length — it was \
+                 probably truncated when copied"
+            }
             Self::NotFound => "token unknown or revoked",
             Self::KindMismatch { .. } => "token has wrong scope for this endpoint",
             Self::Db(_) => "internal error",

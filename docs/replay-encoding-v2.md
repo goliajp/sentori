@@ -4,7 +4,7 @@ Ship target: `@goliapkg/sentori-react-native@1.0.0-rc.9` + dashboard (deploys to
 
 ## Why v2
 
-Pre-rc.9 every replay tick captured a full wireframe snapshot. For Insight's typical 200-node dense UI at 1 Hz × 60 s, that produced ~300 KB NDJSON. Most adjacent frames had near-identical content, so most of the bytes were redundant.
+Pre-rc.9 every replay tick captured a full wireframe snapshot. For a typical 200-node dense UI at 1 Hz × 60 s, that produced ~300 KB NDJSON. Most adjacent frames had near-identical content, so most of the bytes were redundant.
 
 v2 replaces "one full snapshot per tick" with "one full snapshot every ~4 seconds (a *keyframe*) plus small deltas in between". Same temporal coverage, 50–70 % less wire bytes, and the headroom lets us **lift the native tick rate from 1 Hz to 4 Hz** so the playback timeline reads as motion rather than a stuttery slideshow. The dashboard player tweens between captured states at 24 fps via cross-fade, so the perceived smoothness exceeds the capture rate without spending more bytes.
 
@@ -102,7 +102,7 @@ Cross-fade renders **two** `<g>` SVG layers stacked. Render time `T` finds brack
 
 **Position interpolation** (linear-tween x/y for "moving" nodes) is **not in scope for rc.9** — without stable node IDs from the walker, we can't reliably correlate two fingerprints that differ only by position. Cross-fade is the honest visualization for this data shape.
 
-## Size budget (Insight dense-UI baseline)
+## Size budget (dense-UI baseline)
 
 - rc.8: 60 s × 1 Hz × ~5 KB/snapshot = **~300 KB**
 - rc.9 @ 4 Hz, 4 s keyframe: 15 keyframes × 5 KB + 225 deltas × ~0.5 KB = **~190 KB** at **4× temporal resolution**

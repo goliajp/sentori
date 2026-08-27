@@ -4,7 +4,7 @@
 > is kept for archaeology only. The current SDK surface (five kinds,
 > eight verbs, staged launch measurement, custom breadcrumbs) is
 > documented in
-> [`sdk/react-native/README.md`](../sdk/react-native/README.md) —
+> [`sdk/react-native/README.md`](../../sdk/react-native/README.md) —
 > the same document shown on npm.
 
 React Native SDK for Sentori. Captures JS errors, iOS `NSException`,
@@ -366,7 +366,7 @@ and one content-addressed blob in the store named by
 The dashboard surfaces them inline on the issue-detail page.
 Retention drops the rows and the blobs with their events —
 `SENTORI_EVENT_RETENTION_DAYS`, 90 by default; see
-[self-hosting](./self-hosting.md).
+[self-hosting](../self-hosting.md).
 
 ## Session trail (opt-in)
 
