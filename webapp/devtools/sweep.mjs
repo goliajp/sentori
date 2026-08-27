@@ -81,12 +81,24 @@ const theme = process.argv[4] || 'dark';
 const width = process.argv[5] || '1500';
 mkdirSync(out, { recursive: true });
 
+// `--disable-dev-shm-usage`: a containerised runner gives /dev/shm
+// 64MB, and Chrome's renderer dies on it without a word. `stdio` is
+// captured rather than discarded because when the port never opens,
+// the reason is on Chrome's stderr and this script used to throw it
+// away — "chrome never opened a debugging port" was every failure,
+// whatever the cause.
 const chrome = spawn(CHROME, [
-  '--headless=new', '--disable-gpu', '--no-sandbox', '--remote-debugging-port=9555',
+  '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
+  '--remote-debugging-port=9555',
   `--lang=${lang}`, `--accept-lang=${lang}`,
   `--window-size=${width},1000`, `--user-data-dir=/tmp/cd-sweep-${lang}-${theme}-${width}`,
   'about:blank',
-], { stdio: 'ignore' });
+], { stdio: ['ignore', 'pipe', 'pipe'] });
+
+let chromeSaid = '';
+chrome.stdout?.on('data', (b) => { chromeSaid += b.toString(); });
+chrome.stderr?.on('data', (b) => { chromeSaid += b.toString(); });
+chrome.on('error', (e) => { chromeSaid += `spawn failed: ${e.message}\n`; });
 
 // Chrome's debugging port comes up a beat after the process does, and
 // on a cold CI runner that beat is longer than a laptop's. Poll for it
@@ -105,6 +117,12 @@ for (let i = 0; i < 40 && !list; i++) {
 }
 if (!list) {
   process.stderr.write(`chrome never opened a debugging port (${CHROME})\n`);
+  process.stderr.write(
+    chromeSaid.trim()
+      ? `\n── what chrome said ──\n${chromeSaid.trim()}\n`
+      : '\nchrome printed nothing at all — it may not have started.\n',
+  );
+  process.stderr.write(`exited: ${chrome.exitCode ?? 'still running'}\n`);
   chrome.kill();
   process.exit(1);
 }
