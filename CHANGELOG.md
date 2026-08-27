@@ -6,6 +6,44 @@
 
 ---
 
+## v3.9.1(2026-08-28 — 200 里带着 error 的四个 handler)
+
+这轮看 push 投递,那是清单上最大的一块。
+
+### 两件核实后是对的,写下来因为「没发现」也是结论
+
+- **worker 用 `FOR UPDATE SKIP LOCKED` 拉取待投递的 send** —— 多副本部署不会
+  重复投递。
+- **单条 retry 和 `_retry_all_failed` 都带 `AND status = 'failed'`**,并发调用
+  第二个查不到,不会重复入队。单条那个还带 `AND project_id`,跨项目 retry 不了。
+
+push 投递这块的并发设计是扎实的。
+
+### 但四个 handler 用 200 报告失败
+
+它们的返回类型是裸 `Json<Value>` —— 没有状态码,axum 一律发 200 —— 而 body 里
+放了 `error`。
+
+最重的是 `GET /v1/push/users/{key}/preferences`:查询失败时返回
+**`200 {"preferences": [], "error": "internal"}`**。一个只读 `preferences`
+字段的调用方看到的是「这个人什么都没退订」,而真相是「我们不知道」——
+**然后它就会给一个可能已经退订的人发推送**。
+
+另外三个:`push_sends::list` 和 `push_credentials::list` 在授权失败时返回
+`200 {"sends": []}` / `200 {"credentials": []}`,而同一个项目下**十一条兄弟路由
+都返回 403**;`retry_all_failed` 返回 `200 {"requeued": 0, "error": "not found"}`。
+「你没权限看」和「一条都没有」变成同一个响应 —— 而那正是推送配置页在问的问题。
+
+四个全部改成带状态码:400 / 403 / 500。
+
+`scripts/check-error-status.mjs` 进 preflight,扫全部 92 个 handler:返回类型是
+裸 `Json<...>` 的,body 里不许出现 `error` 键。验过会红。
+
+`get_preferences` 的 400 也顺带修了一处不一致:同一个 key 形状,PUT 兄弟路由
+早就返回 400,只有 GET 返回 200。
+
+---
+
 ## v3.9.0(2026-08-28 — issue 的历史记的是决定,不是请求)
 
 继续 agent 列的未覆盖面:issue 状态变更的并发,以及计数器在并发下的正确性 ——
