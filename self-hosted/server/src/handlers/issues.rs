@@ -315,30 +315,48 @@ pub async fn resolve(
     if let Err(e) = load_issue(&state, &ctx, issue_id).await {
         return e;
     }
+    // The predicate makes the write a no-op when nothing would change,
+    // and `rows_affected` then says whether it was one. Thirty
+    // concurrent status calls used to leave thirty activity rows for
+    // what an operator experienced as a handful of decisions — the
+    // history of an issue is the thing this panel is for, and it read
+    // as noise. Two people resolving at once is still two facts; the
+    // same person's retry is not.
+    //
+    // Re-resolving into a *different* release is a real change and
+    // still records.
     let r = sqlx::query(
         "UPDATE issues SET status = 'resolved', resolved_at = now(), \
          resolved_in_release = $2, regressed_at = NULL, regressed_in_release = NULL \
-         WHERE id = $1",
+         WHERE id = $1 \
+           AND (status <> 'resolved' OR resolved_in_release IS DISTINCT FROM $2)",
     )
     .bind(issue_id)
     .bind(body.release.as_deref())
     .execute(&state.pool)
     .await;
-    if let Err(e) = r {
-        warn!(error = %e, "resolve failed");
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": "internal" })),
-        );
+    let changed = match r {
+        Ok(res) => res.rows_affected() > 0,
+        Err(e) => {
+            warn!(error = %e, "resolve failed");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "internal" })),
+            );
+        }
+    };
+    // A note is somebody typing something; record it even when the
+    // status was already what they asked for.
+    if changed || body.note.is_some() {
+        record_activity(
+            &state,
+            issue_id,
+            Some(ctx.user_id),
+            "status",
+            json!({ "to": "resolved", "inRelease": body.release, "note": body.note }),
+        )
+        .await;
     }
-    record_activity(
-        &state,
-        issue_id,
-        Some(ctx.user_id),
-        "status",
-        json!({ "to": "resolved", "inRelease": body.release, "note": body.note }),
-    )
-    .await;
     (StatusCode::OK, Json(json!({ "ok": true })))
 }
 
@@ -367,26 +385,33 @@ async fn set_status(
     if let Err(e) = load_issue(state, ctx, issue_id).await {
         return e;
     }
-    let r = sqlx::query("UPDATE issues SET status = $2 WHERE id = $1")
+    // See `resolve`: the predicate decides, so a repeat is a no-op and
+    // leaves no row behind it.
+    let r = sqlx::query("UPDATE issues SET status = $2 WHERE id = $1 AND status <> $2")
         .bind(issue_id)
         .bind(to)
         .execute(&state.pool)
         .await;
-    if let Err(e) = r {
-        warn!(error = %e, "status change failed");
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": "internal" })),
-        );
+    let changed = match r {
+        Ok(res) => res.rows_affected() > 0,
+        Err(e) => {
+            warn!(error = %e, "status change failed");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "internal" })),
+            );
+        }
+    };
+    if changed {
+        record_activity(
+            state,
+            issue_id,
+            Some(ctx.user_id),
+            "status",
+            json!({ "to": to }),
+        )
+        .await;
     }
-    record_activity(
-        state,
-        issue_id,
-        Some(ctx.user_id),
-        "status",
-        json!({ "to": to }),
-    )
-    .await;
     (StatusCode::OK, Json(json!({ "ok": true })))
 }
 
