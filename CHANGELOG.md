@@ -6,6 +6,79 @@
 
 ---
 
+## v3.5.0(2026-08-27 — 文档描述的是上一代产品,而这件事只有机器会当真)
+
+起一个**干净 ctx 的 agent**,只许用公网信息(WebFetch / curl / 搜索,不许读本地
+仓库),扮演「帮开发者把 Sentori 接进 RN app」。它的结论:照着两个公开入口
+(`sentori.golia.jp` 和 OSS mirror)走完全程,**得到的是一个坏集成**。
+
+每一条我都独立复验过,没有照单全收。
+
+### 文档教的 API 不存在
+
+`scripts/check-docs-api-truth.mjs` 首次运行报 **103 处**。最重的三处:
+
+- `docs/getting-started/react-native.md` 教 `sentori.captureError(...)` ——
+  已发布的 7.0.0 里它**只是内部别名,没有导出**。照抄会在 onPress 抛
+  TypeError,直接违反本产品「失败零传染」的铁律。
+- `docs/getting-started.md` 那条「不用 SDK 也能试」的 curl 发的是 `timestamp`
+  和顶层 `error/device/app`。实测 **HTTP 422 `missing field occurredAt`** ——
+  必填、无 alias,而 `error` 必须在 `payload` 里。同一个 `docs/` 下的
+  `protocol.md` 给的是对的形状(实测 202)。**两份官方文档对同一条 curl 互斥。**
+- `docs/errors/` 是**一整套虚构的错误码目录**,14 个文件自 initial commit
+  起没动过,描述 `sentori.track()`、`POST /v1/track:batch`、`st_pk_`/`sk_`
+  分裂 —— 服务器一个 code 都不会发。
+
+修法不是逐条改文案:
+
+- **`docs/errors.md` 改成生成的** —— `scripts/gen-error-reference.mjs` 从
+  handlers 提取,17 个 code、6 条 401 hint,`--check` 进 preflight。它不可能
+  再漂移,因为源头就是服务器。
+- **`docs/archive/`** 收纳 43 个描述已消失产品面的页面:v0 错误目录、web SDK
+  指南(包不在 npm)、两个「设计了没造」的 recipe、一个客户的升级记录、
+  pre-v1 的 SDK 参考。**目录即元数据** —— 门按路径跳过,比文件里一行警告
+  对机器可靠。
+- `troubleshooting.md` 删掉三节:Webhook 签名(路由 0、源码 0)、crash-free
+  sessions(server/webapp 里都不存在)、React hook(`SentoriProvider` 不存在)。
+  401 hint 对照表换成**实测的六条**,原来那四条一条都不存在。
+
+### `/llms.txt`,以及为什么它必须自足
+
+agent 的原话:「域名对任何路径都回 200 HTML」——`/llms.txt`、`/robots.txt`、
+`/openapi.json` 全是 SPA 外壳,md5 与 `/` 完全相同。**一个只看状态码的 agent
+会认为 llms.txt 存在且已读取。**
+
+`webapp/public/llms.txt` 现在是真文件。它不只是链接目录:包名、init 必填字段、
+六个动词、wire 形状、202 收据、401 hint、以及一节明写「这个实例对未知路径回
+200,别把 200 当成资源存在」。**agent 拿到它就能完成接入,不必再跳转。**
+
+### mirror 里根本没有文档
+
+`docs/README.md` 写着「read them here or in the OSS mirror」。实测 mirror 里
+`docs/` **整个不存在** —— 它是别人拿来自建的地方,却只发了服务器不发说明书。
+
+白名单放开 15 个面向用户的页面。第一版**漏了终止用的
+`--exclude='/docs/**'`,154 个文件全泄露**,包括 archive 和内部设计文档 ——
+`scripts/check-mirror-docs.mjs` 跑真实 rsync 参数验证,验过会红。
+
+### 服务端:一个 hint 主动指错方向
+
+`st_bogus000000` 明明以 `st_` 开头,却被告知「token must start with `st_`」。
+`looks_like_token` 检查**前缀和长度两件事,只报告其中一件**。拆成
+`WrongPrefix` / `WrongLength`,后者说「probably truncated when copied」。
+
+### 其余
+
+- `sdk/react-native/README.md` 加 `init()` 选项表(10 项),
+  `check-sdk-doc-options.mjs` 改指它 —— 之前它盯着的是那份自称
+  「Historical (v0.x)」的页面。
+- `protocol.md` / `replay-encoding-v2.md` 里的客户 app 名脱敏。
+- 门自身的两次修正值得记:它第一版不认识 `sentori` 对象字面量的键,把
+  `sentori.user()` / `sentori.context()` 这两个**真实 API** 报成不存在 ——
+  一个朝这个方向错的门比没有门更糟,它会说服你改坏正确的文档。
+
+---
+
 ## v3.4.1(2026-08-27 — 当自己的用户走一遍:引导在最需要它的那一刻消失)
 
 用 CDP 驱动真实栈(真 server、真 Postgres、空数据库)走一遍第一次使用者的路:
