@@ -982,6 +982,13 @@ echo "$RD" | jq -e '.live > 0' > /dev/null \
 # them. A snippet is documentation somebody compiles, and the last time
 # this repo shipped a command it had not run, the command POSTed to a
 # route no server had ever served.
+# An issue's history is a list of decisions. A retry is not one, and
+# ten simultaneous clicks of Ignore are one.
+echo "→ repeated and concurrent status writes record once"
+SENTORI_BASE="${BASE}" SENTORI_JAR="${JAR}" SENTORI_ISSUE="${ISSUE_ID}" \
+    node "${ROOT}/../scripts/check-issue-activity.mjs" \
+    || { echo "status writes record requests rather than decisions" >&2; exit 1; }
+
 # One fingerprint, many senders, all at once — the shape that exists
 # exactly when a new fault first fires across every device running the
 # broken build. `SELECT … FOR UPDATE` cannot lock a row that does not
