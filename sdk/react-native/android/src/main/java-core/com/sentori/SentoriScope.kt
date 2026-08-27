@@ -29,10 +29,24 @@ object SentoriScope {
      */
     @Volatile private var onIdentityChange: (() -> Unit)? = null
 
+    /** An identity change announced with no listener installed. */
+    @Volatile private var missedAnnounce = false
+
     /** Register interest in identity changes. Only push does. */
     @JvmStatic
     fun setIdentityListener(listener: (() -> Unit)?) {
         onIdentityChange = listener
+        // A change announced while nobody was listening was dropped,
+        // and nothing announces it again. Push installs this listener
+        // only once a registration has landed, so a host that signs
+        // someone in while that request is in flight reached nobody.
+        //
+        // A flag, not a queue: identity is a current value rather than
+        // a stream, so replaying the latest is the whole of it.
+        if (listener != null && missedAnnounce) {
+            missedAnnounce = false
+            runCatching { listener.invoke() }
+        }
     }
 
     /**
@@ -63,7 +77,8 @@ object SentoriScope {
         }
         // Outside the lock: a listener that registers a device must
         // not be holding this while it makes a request.
-        runCatching { onIdentityChange?.invoke() }
+        val listener = onIdentityChange
+        if (listener == null) missedAnnounce = true else runCatching { listener.invoke() }
     }
 
     /** Merge keys into the ambient context. Later calls win per key. */
@@ -103,5 +118,6 @@ object SentoriScope {
             _context.clear()
         }
         onIdentityChange = null
+        missedAnnounce = false
     }
 }

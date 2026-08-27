@@ -248,7 +248,27 @@ public final class SentoriPush: NSObject {
         lock.unlock()
         UserDefaults.standard.set(handle, forKey: Self.handleKey)
         UserDefaults.standard.set(token, forKey: Self.tokenKey)
+        // Installing this replays a sign-in that happened while the
+        // registration was in flight — it announced to nobody, and
+        // `SentoriScope` holds it until someone is listening.
         SentoriScope.setIdentityListener { [weak self] in self?.identityChanged() }
+    }
+
+    /// One string standing for "who this device belongs to", used
+    /// only to answer "has it changed since the last request".
+    ///
+    /// Keys sorted: a `[String: Any]` prints in hash order, and two
+    /// dictionaries holding the same pairs can print them in different
+    /// orders. Comparing those descriptions would report a change that
+    /// did not happen and send a registration per call of a verb a
+    /// host may call on every screen — which is the cost this
+    /// comparison exists to avoid.
+    private static func identityString(userKey: String?, traits: [String: Any]?) -> String {
+        let rendered = (traits ?? [:])
+            .keys.sorted()
+            .map { "\($0)=\(String(describing: traits?[$0] ?? ""))" }
+            .joined(separator: "\u{1}")
+        return "\(userKey ?? "-")\u{0}\(rendered)"
     }
 
     /// Send the registration again because the person changed.
@@ -265,7 +285,8 @@ public final class SentoriPush: NSObject {
 
         // `Sentori.user` is a verb an app may call on every screen,
         // and one request per call is not free to a host.
-        let identity = "\(SentoriScope.userKey ?? "-")\u{0}\(SentoriScope.traits ?? [:])"
+        let identity = Self.identityString(
+            userKey: SentoriScope.userKey, traits: SentoriScope.traits)
         lock.lock()
         let repeated = identity == lastSentIdentity
         if !repeated { lastSentIdentity = identity }
@@ -395,15 +416,28 @@ public final class SentoriPush: NSObject {
             // creating a second one under a new address.
             "installId": Self.installId,
         ]
+        // Read once. The body and the record of what the body carried
+        // have to describe the same person, and two reads of a value
+        // the host can change from any thread do not.
+        let userKey = SentoriScope.userKey
+        let traits = SentoriScope.traits
         // The same salted-nothing hash every event carries, so the
         // dashboard can address this device by the person who hit an
         // issue. Absent until the host calls `Sentori.user`.
-        if let userKey = SentoriScope.userKey { body["userKey"] = userKey }
+        if let userKey { body["userKey"] = userKey }
         // Attributes of the person rather than of the device, kept
         // apart so a build channel called "pro" cannot answer a send
         // aimed at the pro plan. Absent leaves the row's traits alone;
         // an empty object clears them, which is what signing out sends.
-        if let traits = SentoriScope.traits { body["traits"] = traits }
+        if let traits { body["traits"] = traits }
+        // What this request puts on the wire, recorded before it goes.
+        // `identityChanged` reads it back to decide whether the person
+        // has changed since — including while this very request was in
+        // flight, which is the window a host hits by calling
+        // `Sentori.user` right after starting push registration.
+        lock.lock()
+        lastSentIdentity = Self.identityString(userKey: userKey, traits: traits)
+        lock.unlock()
 
         guard let payload = try? JSONSerialization.data(withJSONObject: body) else {
             return .failure(reason: .serverRejected, message: "could not encode registration")

@@ -202,7 +202,13 @@ export async function register(opts: PushRegisterOptions = {}): Promise<PushRegi
     // successful registration as `server-rejected`.
     safely('onToken', () => opts.onToken?.(ipt))
     bindBufferDrain(opts.onMessage, opts.onTap)
-    // From here on, signing in or out updates the row by itself.
+    // From here on, signing in or out updates the row by itself —
+    // including a sign-in that happened while this registration was
+    // still in flight, which announced to nobody and which `scope`
+    // replays as this listener is installed. It is replayed rather
+    // than read here because `user()` publishes its key a tick after
+    // the call, and a read at an arbitrary moment can catch a person
+    // half-described.
     onIdentityChange(reRegisterAfterIdentityChange)
     return { ok: true, ipt }
   } catch (e) {
@@ -235,11 +241,31 @@ function fail(
  * token. Nothing here throws and nothing here is awaited by the host:
  * `user()` is synchronous and stays that way.
  */
+/** One string standing for "who this device belongs to", used only to
+ *  answer "has it changed since the last request".
+ *
+ *  Keys sorted: two objects holding the same pairs stringify in
+ *  insertion order, so the same person described by two differently
+ *  built objects would compare unequal — reporting a change that did
+ *  not happen and sending a registration per call of a verb a host may
+ *  call on every screen, which is the cost this comparison exists to
+ *  avoid. Matches `identityString` in the Swift and Kotlin SDKs. */
+function identityKey(
+  userKey: string | null | undefined,
+  traits: Record<string, unknown> | null | undefined,
+): string {
+  const rendered = Object.keys(traits ?? {})
+    .sort()
+    .map((k) => `${k}=${String((traits as Record<string, unknown>)[k])}`)
+    .join('\u0001')
+  return `${userKey ?? '-'}\u0000${rendered}`
+}
+
 function reRegisterAfterIdentityChange(): void {
   const token = _lastNativeToken
   const cfg = tryGetRuntimeConfig()
   if (token == null || cfg == null) return
-  const identity = JSON.stringify([currentUserKey() ?? null, currentUserTraits() ?? null])
+  const identity = identityKey(currentUserKey(), currentUserTraits())
   if (identity === _lastSentIdentity) return
   _lastSentIdentity = identity
   void registerWithServer(cfg, token, _lastOptions).catch((e: unknown) => {
@@ -346,6 +372,11 @@ async function registerWithServer(
     : typeof __DEV__ !== 'undefined' && __DEV__
       ? 'sandbox'
       : 'production'
+  // Read once. The body and the record of what the body carried have
+  // to describe the same person, and two reads of a value the host
+  // can change between them do not.
+  const userKeyNow = currentUserKey()
+  const traitsNow = currentUserTraits()
   // `kind`, not `provider` — the server's field name, which this
   // sent for a year as `provider` and got a 422 for every time.
   const body: Record<string, unknown> = {
@@ -358,7 +389,7 @@ async function registerWithServer(
     // The same salted identity hash every event carries, so the
     // dashboard can address this device by the user who hit an
     // issue. Absent until the host calls `sentori.user()`.
-    userKey: currentUserKey(),
+    userKey: userKeyNow,
   }
   if (env != null) body.env = env
   // `metadata` was an advertised option that no line of this file
@@ -372,8 +403,13 @@ async function registerWithServer(
   // a build channel called "pro" cannot answer a send aimed at the pro
   // plan. Absent leaves whatever the row already had; `{}` clears it,
   // which is what signing out sends.
-  const traits = currentUserTraits()
-  if (traits != null) body.traits = traits
+  if (traitsNow != null) body.traits = traitsNow
+  // What this request puts on the wire, recorded before it goes.
+  // `reRegisterAfterIdentityChange` reads it back to decide whether
+  // the person has changed since — including while this very request
+  // was in flight, which is the window a host hits by calling
+  // `sentori.user()` right after `register()`.
+  _lastSentIdentity = identityKey(userKeyNow, traitsNow)
   const res = await fetch(joinUrl(cfg.ingestUrl, '/v1/push/devices'), {
     method: 'POST',
     headers: {

@@ -23,12 +23,24 @@ public final class SentoriScope: NSObject {
     /// A callback rather than a call into `SentoriPush`, so this file
     /// keeps knowing nothing about push.
     private static var _onIdentityChange: (() -> Void)?
+    /// An identity change announced with no listener installed.
+    private static var missedAnnounce = false
 
     /// Register interest in identity changes. Only push does.
     public static func setIdentityListener(_ listener: (() -> Void)?) {
         lock.lock()
         _onIdentityChange = listener
+        // A change announced while nobody was listening was dropped,
+        // and nothing announces it again. Push installs this listener
+        // only once a registration has landed, so a host that signs
+        // someone in while that request is in flight reached nobody.
+        //
+        // A flag, not a queue: identity is a current value rather than
+        // a stream, so replaying the latest is the whole of it.
+        let replay = listener != nil && missedAnnounce
+        if replay { missedAnnounce = false }
         lock.unlock()
+        if replay { listener?() }
     }
 
     /// Identify the person using the app. Only the hash goes on the
@@ -59,6 +71,7 @@ public final class SentoriScope: NSObject {
         _userKey = key
         _traits = traits ?? [:]
         let listener = _onIdentityChange
+        if listener == nil { missedAnnounce = true }
         lock.unlock()
         // Outside the lock: a listener that registers a device must
         // not be holding this while it makes a request.
@@ -104,6 +117,7 @@ public final class SentoriScope: NSObject {
         _traits = nil
         _context = [:]
         _onIdentityChange = nil
+        missedAnnounce = false
         lock.unlock()
     }
 }

@@ -258,7 +258,29 @@ object SentoriPush {
             }
             .apply()
         // From here on, signing in or out updates the row by itself.
+        // Installing this replays a sign-in that happened while the
+        // registration was in flight — it announced to nobody, and
+        // [SentoriScope] holds it until someone is listening.
         SentoriScope.setIdentityListener { identityChanged(appContext) }
+    }
+
+    /**
+     * One string standing for "who this device belongs to", used only
+     * to answer "has it changed since the last request".
+     *
+     * Keys sorted so that two maps holding the same pairs cannot
+     * compare unequal on iteration order alone — that would report a
+     * change that did not happen and send a registration per call of a
+     * verb a host may call on every screen, which is the cost this
+     * comparison exists to avoid. Matches `identityString` in the
+     * Swift SDK.
+     */
+    private fun identityString(userKey: String?, traits: Map<String, Any?>?): String {
+        val rendered =
+            (traits ?: emptyMap()).entries
+                .sortedBy { it.key }
+                .joinToString("\u0001") { "${it.key}=${it.value}" }
+        return "${userKey ?: "-"}\u0000$rendered"
     }
 
     /**
@@ -284,7 +306,7 @@ object SentoriPush {
 
             // `Sentori.user` is a verb an app may call on every screen,
             // and one request per call is not free to a host.
-            val identity = "${SentoriScope.userKey}\u0000${SentoriScope.traits}"
+            val identity = identityString(SentoriScope.userKey, SentoriScope.traits)
             if (identity == lastSentIdentity) return@execute
             lastSentIdentity = identity
 
@@ -506,15 +528,26 @@ object SentoriPush {
                 // No `env`: FCM is one host, with no sandbox and
                 // production split for a token to be wrong about.
             )
+        // Read once. The body and the record of what the body carried
+        // have to describe the same person, and two reads of a value
+        // the host can change from any thread do not.
+        val userKey = SentoriScope.userKey
+        val traits = SentoriScope.traits
         // The same identity hash every event carries, so the dashboard
         // can address this device by the person who hit an issue.
         // Absent until the host calls `Sentori.user`.
-        SentoriScope.userKey?.let { body["userKey"] = it }
+        userKey?.let { body["userKey"] = it }
         // Attributes of the person rather than of the device, kept
         // apart so a build channel called "pro" cannot answer a send
         // aimed at the pro plan. Null leaves the row's traits alone;
         // an empty map clears them, which is what signing out sends.
-        SentoriScope.traits?.let { body["traits"] = it }
+        traits?.let { body["traits"] = it }
+        // What this request puts on the wire, recorded before it goes.
+        // [identityChanged] reads it back to decide whether the person
+        // has changed since — including while this very request was in
+        // flight, which is the window a host hits by calling
+        // `Sentori.user` right after starting push registration.
+        lastSentIdentity = identityString(userKey, traits)
 
         var conn: HttpURLConnection? = null
         return try {
