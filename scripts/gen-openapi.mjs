@@ -135,6 +135,21 @@ const DESCRIBED = {
       },
     },
   },
+  '/api/probes:sync': {
+    post: {
+      summary: 'Register the probes a static scan found',
+      description:
+        'Every `sentori.probe(ref)` in the source at release time, so a silent probe is visibly alive rather than indistinguishable from deleted code. Needs an `api`-scope token. Duplicates within one call are collapsed and reported.',
+      security: [{ bearer: [] }],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['release', 'refs'], properties: { release: { type: 'string' }, refs: { type: 'array', maxItems: 1000, items: { type: 'string' } } } } } } },
+      responses: {
+        200: { description: 'Registered', content: { 'application/json': { schema: { type: 'object', properties: { registered: { type: 'integer', description: 'Distinct refs written.' }, duplicatesIgnored: { type: 'integer' }, release: { type: 'string' } } } } } },
+        401: unauthorized,
+        403: { description: '`api_token_required` — an `ingest` token was used.', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+        413: { description: '`too_many_refs` — more than 1000 in one call.', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+      },
+    },
+  },
   '/healthz': {
     get: {
       summary: 'Liveness and version. No auth.',

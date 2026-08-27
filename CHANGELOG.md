@@ -6,6 +6,47 @@
 
 ---
 
+## v3.10.0(2026-08-28 — 最后一条从没被跑过的路由)
+
+`/api/probes:sync` 是 agent 清单上最后一个完全空白的端点 —— 它当时卡在 body
+形状上没测成。形状是 `{release, refs[]}`,需要 api scope。
+
+三个问题:
+
+- **`refs` 没有上限**。一次可以送一百万个 ref,就是一百万次数据库往返。
+  `/v1/events:batch` 为同样的理由封顶 200,而这里什么都没有。
+- **失败被静默吞掉**。`if res.is_ok() { registered += 1 }` —— 数据库出错既不
+  上报也不记日志,调用方拿到「registered: 3」而它发了五个,没有任何可依据的
+  东西。
+- 逐条 INSERT,N 个 ref 就是 N 次往返。
+
+改成一条 `unnest` 语句、封顶 1000、失败返回 500 并记日志。
+
+### 去重是批量化的前提,不是顺手
+
+一次静态扫描在两个文件里找到同一个 `sentori.probe(ref)` 就会发两遍。**逐条循环
+碰巧能容忍**(每条是独立语句),而单条语句不行 —— Postgres 明确拒绝一条命令的
+`ON CONFLICT DO UPDATE` 影响同一行两次。
+
+我推理到了这一点并先去了重,然后**去数据库验证这个推理**:
+
+```
+ERROR:  ON CONFLICT DO UPDATE command cannot affect row a second time
+HINT:  Ensure that no rows proposed for insertion within the same command
+       have duplicate constrained values.
+```
+
+响应里现在带 `duplicatesIgnored`,因为「你发了 5 个我写了 2 个」是调用方该知道
+的事。
+
+`scripts/check-probes-sync.mjs` 进 e2e,六条断言:三个新 ref、重复注册、
+**一次调用内的重复**、空扫描、超限 413、未知 token 401。
+
+顺带把它补进 `openapi.json` 的完整 schema(此前只是个列出方法的 stub)——
+带 schema 的路径从 4 条到 5 条。
+
+---
+
 ## v3.9.1(2026-08-28 — 200 里带着 error 的四个 handler)
 
 这轮看 push 投递,那是清单上最大的一块。
