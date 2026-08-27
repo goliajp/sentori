@@ -241,6 +241,14 @@ fn collapse_numbers(msg: &str) -> String {
     out
 }
 
+/// The issue row as the ingest path reads it, locked for update.
+type IssueRow = (Uuid, String, Option<String>, Option<OffsetDateTime>);
+
+/// Read the issue for a fingerprint and hold it. Used twice: once
+/// optimistically, and once after losing the race to create it.
+const SELECT_ISSUE: &str = "SELECT id, status, resolved_in_release, resolved_at \
+     FROM issues WHERE project_id = $1 AND fingerprint = $2 FOR UPDATE";
+
 /// Persist one event: find-or-create its issue (with atomic
 /// regression detection), bump the importance counters, insert the
 /// event row, and — for probes — update the tripwire registry.
@@ -254,41 +262,78 @@ pub async fn ingest(pool: &PgPool, ev: IncomingEvent) -> Result<IngestOutcome, I
     let mut tx = pool.begin().await?;
 
     // Lock-or-create the issue row.
-    let existing: Option<(Uuid, String, Option<String>, Option<OffsetDateTime>)> = sqlx::query_as(
-        "SELECT id, status, resolved_in_release, resolved_at FROM issues \
-             WHERE project_id = $1 AND fingerprint = $2 FOR UPDATE",
-    )
-    .bind(ev.project_id)
-    .bind(&fingerprint)
-    .fetch_optional(&mut *tx)
-    .await?;
+    //
+    // `FOR UPDATE` locks rows that exist; it cannot stop a concurrent
+    // insert of a row that does not. So two requests carrying the same
+    // fingerprint both read None and both INSERT, and one of them dies
+    // on `issues_project_id_fingerprint_key` as a 500 — which the SDK
+    // is told to retry. Measured at 9 failures in 200 concurrent
+    // sends, and the timing is the worst possible: an issue is created
+    // exactly once, at the moment a new fault first fires across many
+    // devices at once.
+    //
+    // The database arbitrates instead. The loser of the race reads the
+    // winner's row, takes the lock on it, and continues down the
+    // ordinary "issue already exists" path — including regression
+    // detection, which is why this cannot simply be an upsert that
+    // returns an id.
+    let mut existing: Option<IssueRow> = sqlx::query_as(SELECT_ISSUE)
+        .bind(ev.project_id)
+        .bind(&fingerprint)
+        .fetch_optional(&mut *tx)
+        .await?;
 
-    let (issue_id, is_new_issue, regressed) = match existing {
-        None => {
-            let id = Uuid::now_v7();
-            sqlx::query(
-                "INSERT INTO issues \
-                 (id, project_id, fingerprint, kind, group_title, message_sample, surface, \
-                  status, first_seen, last_seen, event_count, last_environment, last_release, \
-                  environment, platform) \
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, 'open', $8, $8, 0, $9, $10, $9, $11)",
-            )
-            .bind(id)
-            .bind(ev.project_id)
-            .bind(&fingerprint)
-            .bind(ev.kind.as_db_str())
-            .bind(&group_title)
-            .bind(&message_sample)
-            .bind(&ev.surface)
-            .bind(ev.occurred_at)
-            .bind(&ev.environment)
-            .bind(&ev.release)
-            .bind(&ev.platform)
-            .execute(&mut *tx)
-            .await?;
-            (id, true, false)
+    let mut created: Option<Uuid> = None;
+    if existing.is_none() {
+        let id = Uuid::now_v7();
+        let won: Option<(Uuid,)> = sqlx::query_as(
+            "INSERT INTO issues \
+             (id, project_id, fingerprint, kind, group_title, message_sample, surface, \
+              status, first_seen, last_seen, event_count, last_environment, last_release, \
+              environment, platform) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'open', $8, $8, 0, $9, $10, $9, $11) \
+             ON CONFLICT (project_id, fingerprint) DO NOTHING \
+             RETURNING id",
+        )
+        .bind(id)
+        .bind(ev.project_id)
+        .bind(&fingerprint)
+        .bind(ev.kind.as_db_str())
+        .bind(&group_title)
+        .bind(&message_sample)
+        .bind(&ev.surface)
+        .bind(ev.occurred_at)
+        .bind(&ev.environment)
+        .bind(&ev.release)
+        .bind(&ev.platform)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        if won.is_some() {
+            created = Some(id);
+        } else {
+            // Somebody else created it between our read and our write.
+            // It is committed by now — DO NOTHING only yields nothing
+            // when the conflicting row is visible — so this read finds
+            // it and takes the lock the first one could not.
+            existing = sqlx::query_as(SELECT_ISSUE)
+                .bind(ev.project_id)
+                .bind(&fingerprint)
+                .fetch_optional(&mut *tx)
+                .await?;
         }
-        Some((id, status, resolved_in, resolved_at)) => {
+    }
+
+    let (issue_id, is_new_issue, regressed) = match (created, existing) {
+        (Some(id), _) => (id, true, false),
+        (None, None) => {
+            // Neither inserted nor found: the row was created and then
+            // deleted inside our window. Nothing to attach to.
+            return Err(IngestError::Invalid(
+                "the issue this event groups into disappeared mid-write; retry",
+            ));
+        }
+        (None, Some((id, status, resolved_in, resolved_at))) => {
             let regress = status == "resolved"
                 && is_regression(
                     &mut tx,

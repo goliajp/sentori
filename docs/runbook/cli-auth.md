@@ -48,10 +48,14 @@ one — which is what you want, since CLI ops live on the admin path.
 `sentori-cli` looks up its API base URL in this exact order:
 
 1. `--api-url <value>` flag (also accepts `--ingest-url` as alias)
-2. `SENTORI_ADMIN_URL` env
-3. `SENTORI_INGEST_URL` env with `ingest.` → `` (host strip)
-   substitution
-4. default `https://sentori.golia.jp`
+2. `SENTORI_API_URL` env
+3. default `https://sentori.golia.jp`
+
+Until 2026-08-27 this list had `SENTORI_ADMIN_URL` at step 2 and a
+host-stripping `SENTORI_INGEST_URL` at step 3. Neither exists in
+`sdk/cli/src/index.ts`; setting the first did nothing and the second
+was never read. `scripts/check-env-vars-real.mjs` now holds every
+`SENTORI_*` a document names to one the code reads.
 
 v2.4 consolidation collapsed the dashboard / admin-api / docs hosts
 into one root. The CLI now hits `https://sentori.golia.jp/admin/api/...`

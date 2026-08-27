@@ -76,7 +76,7 @@ npm view @goliapkg/sentori-react-native versions --json | tail -5
 npm view @goliapkg/sentori-core versions --json | tail -5
 ```
 
-Then run the [post-publish smoke test](./v1.0-fresh-deploy.md) on
+Then run the [post-publish smoke test](../archive/v1.0-fresh-deploy.md) on
 `apps/rn-example/` to confirm the published packages install + boot
 cleanly.
 

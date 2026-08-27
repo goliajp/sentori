@@ -36,6 +36,14 @@ services:
       SENTORI_SMTP_PASS: ${SENTORI_SMTP_PASS:-}
       SENTORI_SMTP_FROM: ${SENTORI_SMTP_FROM:-}
       SENTORI_SMTP_TLS: ${SENTORI_SMTP_TLS:-starttls}
+      # Documented in docs/protocol.md and previously unreachable from
+      # here: a self-hoster could neither tune the limiter nor turn it
+      # off, whatever the reference said.
+      SENTORI_RATELIMIT_PER_TOKEN_RPS: ${SENTORI_RATELIMIT_PER_TOKEN_RPS:-100}
+      SENTORI_RATELIMIT_WINDOW_SEC: ${SENTORI_RATELIMIT_WINDOW_SEC:-1}
+      SENTORI_RATELIMIT_DISABLED: ${SENTORI_RATELIMIT_DISABLED:-}
+      SENTORI_AUTH_RATELIMIT_PER_IP: ${SENTORI_AUTH_RATELIMIT_PER_IP:-10}
+      SENTORI_AUTH_RATELIMIT_WINDOW_SEC: ${SENTORI_AUTH_RATELIMIT_WINDOW_SEC:-300}
       RUST_LOG: ${RUST_LOG:-info,sqlx=warn}
     volumes:
       - sentori-data:/data
