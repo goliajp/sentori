@@ -5,6 +5,7 @@ use std::sync::Arc;
 use axum::{
     Extension, Json,
     extract::{Path, State},
+    http::StatusCode,
 };
 use sentori_ingest_token::IngestContext;
 use serde_json::{Value, json};
@@ -17,10 +18,17 @@ pub async fn handle(
     Extension(ctx): Extension<IngestContext>,
     State(state): State<Arc<AppState>>,
     Path(user_key): Path<String>,
-) -> Json<Value> {
+) -> (StatusCode, Json<Value>) {
+    // Both of these answered 200. The sibling PUT on the same key
+    // shape answers 400, so a client saw the same mistake two ways.
     let fp_bytes = match hex::decode(&user_key) {
         Ok(b) if b.len() == 32 => b,
-        _ => return Json(json!({ "error": "invalid_fp_hex" })),
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "invalid_fp_hex" })),
+            );
+        }
     };
 
     let rows = match sqlx::query(
@@ -36,7 +44,14 @@ pub async fn handle(
         Ok(rs) => rs,
         Err(e) => {
             warn!(error = %e, "push.get_preferences db_error");
-            return Json(json!({ "preferences": [], "error": "internal" }));
+            // Emphatically not `200 {"preferences": []}`. A caller
+            // reading that field sees "this person has opted out of
+            // nothing" where the truth is "we do not know" — and then
+            // sends to somebody who may have opted out.
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "internal" })),
+            );
         }
     };
 
@@ -51,5 +66,5 @@ pub async fn handle(
         })
         .collect();
 
-    Json(json!({ "preferences": prefs }))
+    (StatusCode::OK, Json(json!({ "preferences": prefs })))
 }

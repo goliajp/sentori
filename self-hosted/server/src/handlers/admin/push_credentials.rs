@@ -165,12 +165,13 @@ pub async fn list(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
-) -> Json<Value> {
-    if super::tokens::ensure_project_access(&state, &ctx, project_id)
-        .await
-        .is_err()
-    {
-        return Json(json!({ "credentials": [] }));
+) -> (axum::http::StatusCode, Json<Value>) {
+    // 403, like the eleven sibling routes on this project.
+    // Answering `[]` made "you may not look" indistinguishable
+    // from "there are none", which is the exact question a
+    // setup screen is asking.
+    if let Err(e) = super::tokens::ensure_project_access(&state, &ctx, project_id).await {
+        return e;
     }
     // `secret_blob` is read and never returned. The local check runs
     // again over what is already stored, because a credential saved
@@ -211,7 +212,10 @@ pub async fn list(
             })
         })
         .collect();
-    Json(json!({ "credentials": out }))
+    (
+        axum::http::StatusCode::OK,
+        Json(json!({ "credentials": out })),
+    )
 }
 
 /// One credential's kind, config and secret, if it is this project's.

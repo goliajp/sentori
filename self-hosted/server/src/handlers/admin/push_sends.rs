@@ -82,12 +82,13 @@ pub async fn retry_all_failed(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
-) -> Json<Value> {
-    if super::tokens::ensure_project_access(&state, &ctx, project_id)
-        .await
-        .is_err()
-    {
-        return Json(json!({ "requeued": 0, "error": "not found" }));
+) -> (axum::http::StatusCode, Json<Value>) {
+    // 403, like the eleven sibling routes on this project.
+    // Answering `[]` made "you may not look" indistinguishable
+    // from "there are none", which is the exact question a
+    // setup screen is asking.
+    if let Err(e) = super::tokens::ensure_project_access(&state, &ctx, project_id).await {
+        return e;
     }
     let res = sqlx::query(
         "UPDATE push_sends SET status = 'queued', next_attempt_at = now(), \
@@ -109,7 +110,10 @@ pub async fn retry_all_failed(
         json!({ "count": count }),
     )
     .await;
-    Json(json!({ "requeued": count }))
+    (
+        axum::http::StatusCode::OK,
+        Json(json!({ "requeued": count })),
+    )
 }
 
 pub async fn list(
@@ -117,12 +121,13 @@ pub async fn list(
     Extension(ctx): Extension<SessionContext>,
     Path(project_id): Path<Uuid>,
     Query(q): Query<ListQuery>,
-) -> Json<Value> {
-    if super::tokens::ensure_project_access(&state, &ctx, project_id)
-        .await
-        .is_err()
-    {
-        return Json(json!({ "sends": [] }));
+) -> (axum::http::StatusCode, Json<Value>) {
+    // 403, like the eleven sibling routes on this project.
+    // Answering `[]` made "you may not look" indistinguishable
+    // from "there are none", which is the exact question a
+    // setup screen is asking.
+    if let Err(e) = super::tokens::ensure_project_access(&state, &ctx, project_id).await {
+        return e;
     }
     let limit = i64::from(q.limit.unwrap_or(50).clamp(1, 1000));
     let offset = i64::from(q.offset.unwrap_or(0));
@@ -180,7 +185,10 @@ pub async fn list(
             })
         })
         .collect();
-    Json(json!({ "sends": out, "total": total, "offset": offset }))
+    (
+        axum::http::StatusCode::OK,
+        Json(json!({ "sends": out, "total": total, "offset": offset })),
+    )
 }
 
 /// `GET /admin/api/projects/:project_id/push/health`
