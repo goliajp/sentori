@@ -13,6 +13,7 @@ import {
   PageShell,
   Panel,
   PanelEmpty,
+  formatBytes,
   formatRelative,
 } from '../components/ui';
 import { useT } from '../i18n';
@@ -178,9 +179,7 @@ function ReleaseRowView({
                   </span>
                   <span className="min-w-0 flex-1 truncate text-fg-muted">{a.name}</span>
                   {a.size_bytes !== undefined && (
-                    <span className="text-fg-subtle">
-                      {Math.round(a.size_bytes / 1024)} KB
-                    </span>
+                    <span className="text-fg-subtle">{formatBytes(a.size_bytes)}</span>
                   )}
                 </div>
               ))}

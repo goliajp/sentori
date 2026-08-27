@@ -273,7 +273,7 @@ fn fill_context(bundle: Option<&SrcBundle>, frame: &mut Value) {
     );
 }
 
-fn normalize_uuid(s: &str) -> String {
+pub(crate) fn normalize_uuid(s: &str) -> String {
     s.chars()
         .filter(char::is_ascii_alphanumeric)
         .collect::<String>()

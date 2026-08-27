@@ -17,7 +17,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const ROOT = join(root, 'self-hosted/server/src/handlers/sdk');
+const HANDLERS = join(root, 'self-hosted/server/src/handlers');
+const ROOT = join(HANDLERS, 'sdk');
+const MOD = join(HANDLERS, 'mod.rs');
 
 /** Not field names: SQL fragments, log targets, error codes. */
 const NOT_A_FIELD = new Set([
@@ -44,9 +46,61 @@ function walk(dir, out = []) {
   return out;
 }
 
-const files = walk(ROOT);
+// Everything under `sdk/` serves v1 — but not everything that serves
+// v1 lives under `sdk/`. Reading only that directory is how this
+// checker reported "all camelCase" for years while
+// `/v1/releases/{release}/artifacts`, which lives one level up,
+// answered content_hash / size_bytes / debug_id / first_seen /
+// content_changed. So take the routes as the source of truth: any
+// handler reachable from a `/v1/` route is in scope, wherever it sits.
+function v1HandlerFiles() {
+  const src = readFileSync(MOD, 'utf8');
+  const out = new Set();
+  const unresolved = [];
+  // One `.route(` call at a time, so a path found inside it belongs
+  // to that route's own URL rather than a neighbour's.
+  for (const call of src.split('.route(').slice(1)) {
+    // Trailing chain calls (`.layer(…)`, `.with_state(…)`) after the
+    // last route in a chain are not part of it. `indexOf` answering
+    // -1 must mean "all of it", not `slice(0, -1)`.
+    const cut = call.indexOf('\n        .');
+    const block = cut === -1 ? call : call.slice(0, cut);
+    if (!/"\/v1\//.test(block)) continue;
+    for (const [, path] of block.matchAll(/\b((?:[a-z][a-z0-9_]*::)+)[a-z_]+\s*\)/g)) {
+      const segs = path.split('::').filter(Boolean);
+      // `a::b::c` is handlers/a/b/c.rs or handlers/a/b.rs — try the
+      // longest first, since a directory and a module can share a name.
+      let found = null;
+      for (let n = segs.length; n > 0 && !found; n--) {
+        const cand = join(HANDLERS, ...segs.slice(0, n)) + '.rs';
+        try {
+          if (statSync(cand).isFile()) found = cand;
+        } catch {
+          /* try a shorter path */
+        }
+      }
+      if (found) out.add(found);
+      else unresolved.push(segs.join('::'));
+    }
+  }
+  return { files: [...out], unresolved };
+}
+
+const { files: routed, unresolved } = v1HandlerFiles();
+if (unresolved.length) {
+  // Silently skipping a handler is the failure this rewrite exists to
+  // stop repeating, so an unreadable route is loud.
+  console.error(`✗ could not locate the handler for: ${unresolved.join(', ')}`);
+  process.exit(1);
+}
+const files = [...new Set([...walk(ROOT), ...routed])];
 if (files.length === 0) {
   console.error('✗ no handlers found — this checker read nothing and passed');
+  process.exit(1);
+}
+const outsideSdk = routed.filter((f) => !f.startsWith(ROOT));
+if (outsideSdk.length === 0) {
+  console.error('✗ the route scan found nothing outside sdk/ — it is not reading the router');
   process.exit(1);
 }
 

@@ -168,19 +168,27 @@ Response (`201 Created`):
   "id":              "019e10...",
   "kind":            "dsym",
   "name":            "MyApp.app-arm64-E63A748C-3F0E-302D-95EC-8DA5B55C97D9",
-  "content_hash":    "990f6675...",
-  "size_bytes":      304857600,
-  "debug_id":        "E63A748C3F0E302D95EC8DA5B55C97D9",
-  "first_seen":      true,
-  "content_changed": true
+  "contentHash":     "990f6675...",
+  "sizeBytes":       304857600,
+  "debugId":         "E63A748C3F0E302D95EC8DA5B55C97D9",
+  "debugIds":        ["E63A748C3F0E302D95EC8DA5B55C97D9"],
+  "firstSeen":       true,
+  "contentChanged":  true
 }
 ```
 
-- `debug_id` — the id read back out of the stored name, `null` when the name carries
-  none (a source map has no debug id). This is the value a crashing frame is matched
-  against, so it is what answers "is this the build that shipped?".
-- `first_seen` — no artifact of this kind and name existed on the release before.
-- `content_changed` — the stored bytes differ from what was there.
+- `debugIds` — every debug id (`LC_UUID`) actually present in the uploaded file, read
+  from the bytes. A crashing frame carries one of these as its `imageUuid`, and it is
+  what decides whether this artifact can serve that stack.
+- `debugId` — the first of them, kept for callers that read a single value.
+- `firstSeen` — no artifact of this kind and name existed on the release before.
+- `contentChanged` — the stored bytes differ from what was there.
+
+The stored `name` is the uploaded filename with any debug id the file carries appended
+if it was not there already. Lookup matches a frame's `imageUuid` against the name, so
+a dSYM uploaded as plain `MyApp` would otherwise be unreachable — stored, readable, and
+matched by nothing. A dSYM carrying no `LC_UUID` at all is reported `usable: false` for
+the same reason.
 
 Both flags exist for the re-upload case: re-archiving a build does not guarantee the
 same debug id, and an uploader with no way to tell cannot know whether the re-upload

@@ -91,6 +91,13 @@ docker compose exec sentori sentori-server resymbolicate "app@1.2.3+456" # one
 # actually parse them. Artifacts stored before 2.15.0 were never
 # checked; `--all` re-checks everything, which matters after an
 # upgrade that teaches the reader a new format.
+#
+# Run `--all` once after upgrading to 3.11.0. A dSYM is found by the
+# debug id in its stored name, and before 3.11.0 that name was
+# whatever the uploader called the file — so one uploaded by hand
+# rather than by `sentori-cli` resolved nothing while reading as
+# perfectly fine. This renames those rows from the id inside the file
+# and re-reads the crashes that were waiting on them.
 docker compose exec sentori sentori-server verify-artifacts
 docker compose exec sentori sentori-server verify-artifacts --all
 

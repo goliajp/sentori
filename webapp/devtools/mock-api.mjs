@@ -906,6 +906,18 @@ const SUFFIX = [
           created_at: iso(86_400_000),
           usable: false,
         },
+        // What the server stores for iOS: the uploaded filename with
+        // the debug id appended, because a frame finds its dSYM by the
+        // id and the id lives in the file rather than in what the
+        // uploader called it. The identifying half is the tail.
+        {
+          id: 'ar4',
+          kind: 'dsym',
+          name: 'MyApp-arm64-E63A748C3F0E302D95EC8DA5B55C97D9',
+          content_hash: 'e63a74',
+          size_bytes: 304_857_600,
+          created_at: iso(86_400_000),
+        },
         {
           id: 'ar2',
           kind: 'proguard',
