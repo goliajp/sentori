@@ -17,44 +17,16 @@ import {
   formatRelease,
 } from '../components/ui';
 import { useT } from '../i18n';
+import {
+  api,
+  type AssertRow,
+  type InstrumentsPanel,
+  type LaunchRow,
+  type ProbeRow,
+  type TraceRow,
+} from '../lib/api';
 import { useAsyncData } from '../lib/useAsyncData';
 
-type AssertRow = {
-  name: string;
-  release: string;
-  passCount: number;
-  failCount: number;
-  lastPassAt: string | null;
-  lastFailAt: string | null;
-};
-type ProbeRow = {
-  ref: string;
-  issueId: string | null;
-  lastSeenRelease: string | null;
-  registeredAt: string;
-  lastFiredAt: string | null;
-  fireCount: number;
-};
-type TraceRow = {
-  name: string;
-  eventCount: number;
-  usersCount: number;
-  lastSeen: string;
-};
-type LaunchRow = {
-  release: string;
-  samples: number;
-  prewarmed: number;
-  p50: null | number;
-  p90: null | number;
-  p95: null | number;
-};
-type Instruments = {
-  asserts: AssertRow[];
-  probes: ProbeRow[];
-  traces: TraceRow[];
-  launch?: LaunchRow[];
-};
 
 const fmtMs = (v: null | number) =>
   v === null ? '—' : v >= 10_000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`;
@@ -86,8 +58,8 @@ export default function InstrumentsPage() {
   const { activeProject } = useShell();
   const active = activeProject?.id ?? null;
 
-  const { data, error, loading, reload } = useAsyncData<Instruments | null>(
-    () => (active ? fetchInstruments(active) : Promise.resolve(null)),
+  const { data, error, loading, reload } = useAsyncData<InstrumentsPanel | null>(
+    () => (active ? api.instruments(active) : Promise.resolve(null)),
     [active],
   );
 
@@ -96,7 +68,7 @@ export default function InstrumentsPage() {
       title={t('nav.instruments')}
     >
       {error && (
-        <ErrorBanner>
+        <ErrorBanner reason={error}>
           {t('instruments.loadFailed')}{' '}
           <button type="button" className="underline" onClick={reload}>
             {t('common.retry')}
@@ -353,10 +325,4 @@ export default function InstrumentsPage() {
   );
 }
 
-async function fetchInstruments(projectId: string): Promise<Instruments> {
-  const resp = await fetch(`/admin/api/projects/${projectId}/instruments`, {
-    credentials: 'include',
-  });
-  if (!resp.ok) throw new Error(String(resp.status));
-  return (await resp.json()) as Instruments;
-}
+

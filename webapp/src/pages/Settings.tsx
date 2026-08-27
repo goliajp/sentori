@@ -251,7 +251,7 @@ function UsersTab() {
 
   return (
     <div className="space-y-4">
-      {error && <ErrorBanner>{t('settings.usersLoadFailed')}</ErrorBanner>}
+      {error && <ErrorBanner reason={error}>{t('settings.usersLoadFailed')}</ErrorBanner>}
       <Panel title={t('settings.createAdmin')}>
         <div className="flex flex-wrap items-end gap-3 p-3.5">
           <Field label={t('settings.adminEmail')} className="w-72">
@@ -368,7 +368,7 @@ function AuditTab() {
   const entries = data?.entries ?? [];
   return (
     <div className="space-y-4">
-      {error && <ErrorBanner>{t('settings.auditLoadFailed')}</ErrorBanner>}
+      {error && <ErrorBanner reason={error}>{t('settings.auditLoadFailed')}</ErrorBanner>}
       <Panel title={`${t('settings.tab.audit')} (${entries.length})`}>
         <DataTable<AuditRow>
           rows={entries}
@@ -569,7 +569,7 @@ function NotificationsTab() {
       <Panel title={t('notify.prefsTitle')}>
         {prefs.error && (
           <div className="p-3.5">
-            <ErrorBanner>{t('notify.loadFailed')}</ErrorBanner>
+            <ErrorBanner reason={prefs.error}>{t('notify.loadFailed')}</ErrorBanner>
           </div>
         )}
         {rows.length === 0 && !prefs.loading && !prefs.error && (

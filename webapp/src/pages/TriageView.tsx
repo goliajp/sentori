@@ -391,7 +391,7 @@ export default function TriageView() {
         <div className="min-h-0 flex-1 overflow-y-auto">
           {error && (
             <div className="p-3">
-              <ErrorBanner>
+              <ErrorBanner reason={error}>
                 {t('inbox.loadFailed')}{' '}
                 <button type="button" className="underline" onClick={reload}>
                   {t('common.retry')}
