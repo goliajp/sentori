@@ -23,14 +23,31 @@ let _traits: Record<string, unknown> | undefined;
 // this file; the arrow has to point one way.
 let _onIdentityChange: (() => void) | undefined;
 
+/** An identity change that happened while nobody was listening.
+ *  Push installs its listener only once a registration has landed, so
+ *  a host that signs someone in while that request is in flight
+ *  announced to an empty room — and nothing announces it again. */
+let _missedAnnounce = false;
+
 /** Register interest in identity changes. Only push does. */
 export const onIdentityChange = (fn: (() => void) | undefined): void => {
   _onIdentityChange = fn;
+  if (fn != null && _missedAnnounce) {
+    _missedAnnounce = false;
+    announce();
+  }
 };
 
 const announce = (): void => {
+  if (_onIdentityChange == null) {
+    // Replayed by `onIdentityChange` when someone starts listening.
+    // Deliberately not a queue: identity is a current value, not a
+    // stream, so one flag replays the latest and no more.
+    _missedAnnounce = true;
+    return;
+  }
   try {
-    _onIdentityChange?.();
+    _onIdentityChange();
   } catch {
     // NEVER rule: whatever the listener does, user() returns.
   }
@@ -95,5 +112,6 @@ export const __resetForTests = (): void => {
   _traits = undefined;
   _context = {};
   _onIdentityChange = undefined;
+  _missedAnnounce = false;
   _hashGeneration++;
 };

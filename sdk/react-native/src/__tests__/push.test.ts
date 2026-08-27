@@ -265,6 +265,44 @@ describe('push registration follows the person', () => {
     expect(seen[1]?.traits).toEqual({ plan: 'pro' });
   });
 
+  it('sends the identity when the person signs in while the registration is in flight', async () => {
+    // The window the test above cannot see. `register()` builds its
+    // body — with whoever is signed in at that moment, which is
+    // nobody — and only installs the identity listener once the
+    // response lands. A host that calls `user()` in between fired a
+    // listener that was not there yet, and nothing asked again: the
+    // device row kept no user, so a send aimed at that person matched
+    // no device and reported success.
+    //
+    // Registering push at launch and identifying the user right after
+    // is a few hundred milliseconds apart in a real app.
+    const seen: Array<Record<string, unknown>> = [];
+    globalThis.fetch = ((_url: string, init?: { body?: string }) => {
+      if (init?.body != null) {
+        seen.push(JSON.parse(init.body) as Record<string, unknown>);
+        // Sign in at the exact moment the first request goes out.
+        if (seen.length === 1) setUser({ id: 'usr_123', traits: { plan: 'pro' } });
+      }
+      // A request takes longer than hashing an id does, so the
+      // sign-in completes — and announces — while this is still in
+      // flight. That is the window, and a resolved promise skips it.
+      return new Promise((r) =>
+        setTimeout(
+          () => r({ ok: true, status: 202, json: () => Promise.resolve({ spToken: 'dev-1' }) }),
+          5,
+        ),
+      );
+    }) as unknown as typeof fetch;
+
+    await register();
+    await settle();
+
+    expect(seen[0]?.userKey).toBeUndefined();
+    expect(seen).toHaveLength(2);
+    expect(typeof seen[1]?.userKey).toBe('string');
+    expect(seen[1]?.traits).toEqual({ plan: 'pro' });
+  });
+
   it('does not send anything when the same person is set again', async () => {
     const seen = recordingFetch();
     await register();
