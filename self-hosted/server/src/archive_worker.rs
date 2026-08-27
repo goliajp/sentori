@@ -159,9 +159,36 @@ async fn gc_orphan_blobs(
             kept += 1;
             continue;
         }
+        // Re-check this one hash against the live table before
+        // deleting it.
+        //
+        // The set above is a snapshot. Blobs are content-addressed, so
+        // a blob whose last reference was deleted can be referenced
+        // again by a fresh upload of the same bytes — `put` finds it
+        // already on disk and returns without rewriting, leaving the
+        // mtime from whenever it was first stored, often months back.
+        // A reference that lands after the snapshot therefore clears
+        // neither guard, and the GC deletes a blob a row now points
+        // at: the user's upload succeeded and reads back 404.
+        //
+        // One query per deletion candidate, and candidates are by
+        // definition the rare case.
+        let hex = hash.to_hex();
+        let still_orphan: Option<(i32,)> = sqlx::query_as(
+            "SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM event_attachments WHERE blob_hash = $1) \
+                       AND NOT EXISTS (SELECT 1 FROM release_artifacts WHERE content_hash = $1)",
+        )
+        .bind(&hex)
+        .fetch_optional(pool)
+        .await?;
+        if still_orphan.is_none() {
+            kept += 1;
+            continue;
+        }
+
         match attachments.delete(&hash).await {
             Ok(()) => deleted += 1,
-            Err(e) => warn!(hash = %hash.to_hex(), error = %e, "orphan blob delete failed"),
+            Err(e) => warn!(hash = %hex, error = %e, "orphan blob delete failed"),
         }
     }
     Ok((deleted, kept))

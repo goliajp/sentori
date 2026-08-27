@@ -39,6 +39,11 @@ services:
       # Documented in docs/protocol.md and previously unreachable from
       # here: a self-hoster could neither tune the limiter nor turn it
       # off, whatever the reference said.
+      # Retention. Documented in self-hosting.md, and its checklist
+      # tells an operator to set the first one — which they could not.
+      SENTORI_EVENT_RETENTION_DAYS: ${SENTORI_EVENT_RETENTION_DAYS:-90}
+      SENTORI_ARTIFACT_KEEP_RELEASES: ${SENTORI_ARTIFACT_KEEP_RELEASES:-20}
+      SENTORI_ARCHIVE_INTERVAL_SEC: ${SENTORI_ARCHIVE_INTERVAL_SEC:-86400}
       SENTORI_RATELIMIT_PER_TOKEN_RPS: ${SENTORI_RATELIMIT_PER_TOKEN_RPS:-100}
       SENTORI_RATELIMIT_WINDOW_SEC: ${SENTORI_RATELIMIT_WINDOW_SEC:-1}
       SENTORI_RATELIMIT_DISABLED: ${SENTORI_RATELIMIT_DISABLED:-}

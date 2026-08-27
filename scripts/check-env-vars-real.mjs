@@ -104,12 +104,31 @@ for (const rel of docs) {
 
 // ── the compose file must offer what the docs tell people to set ───
 const compose = readFileSync(join(ROOT, COMPOSE), 'utf8');
+// Anything self-hosting.md presents in a table is something an
+// operator is being told they can set. Two of them — the retention
+// knobs, one of which the same file's checklist tells you to set —
+// were absent from compose, so the instruction could not be followed.
+// Reading the reference rather than restating it: a new row in that
+// table is a new obligation here.
+const selfHosting = readFileSync(join(ROOT, 'docs/self-hosting.md'), 'utf8');
+const tabled = [
+  ...new Set([...selfHosting.matchAll(/\|\s*`(SENTORI_[A-Z0-9_]+)`\s*\|/g)]
+    .map((m) => m[1])),
+];
+if (tabled.length < 3) {
+  console.error(
+    `✗ parsed ${tabled.length} variables out of self-hosting.md's tables. ` +
+      `Broken checker.`,
+  );
+  process.exit(1);
+}
 const MUST_REACH = [
+  ...tabled,
   'SENTORI_RATELIMIT_PER_TOKEN_RPS',
   'SENTORI_RATELIMIT_WINDOW_SEC',
   'SENTORI_RATELIMIT_DISABLED',
 ];
-const missing = MUST_REACH.filter((v) => !compose.includes(v));
+const missing = [...new Set(MUST_REACH)].filter((v) => !compose.includes(v));
 
 if (unknown.length || missing.length) {
   for (const u of unknown)
