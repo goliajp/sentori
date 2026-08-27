@@ -80,6 +80,26 @@ this page had all three wrong until 2026-08-27:
 - **`id` is optional.** Send one only if you are deduplicating retries
   yourself.
 
+### Check a body before you have a token
+
+`POST /v1/events/validate` needs no credential. It parses exactly what
+ingest parses and says whether the body would have been accepted:
+
+```bash
+curl -X POST "$SENTORI_INGEST_URL/v1/events/validate" \
+  -H "Content-Type: application/json" \
+  -d '{"kind":"error","occurredAt":"2026-01-01T00:00:00Z","platform":"ios"}'
+```
+
+`ok: true` with an `ignored` list means it parsed but some keys were
+dropped as unknown — the usual cause being `error`, `device` or `app`
+left at the top level instead of inside `payload`. `ok: false` names
+the offending key in `field`.
+
+The machine-readable contract is at
+[`/openapi.json`](./protocol.md) on any running instance — OpenAPI
+3.1, generated from the router, versioned with the binary serving it.
+
 See the [Protocol reference](./protocol.md) for the full schema.
 
 ## After you have events flowing

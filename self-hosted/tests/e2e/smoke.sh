@@ -982,6 +982,14 @@ echo "$RD" | jq -e '.live > 0' > /dev/null \
 # them. A snippet is documentation somebody compiles, and the last time
 # this repo shipped a command it had not run, the command POSTed to a
 # route no server had ever served.
+# The unauthenticated validator must reach the same verdict as ingest
+# on the same body. If it does not, it is a second source of truth that
+# reads as authoritative and teaches the wrong shape.
+echo "→ /v1/events/validate agrees with /v1/events"
+SENTORI_BASE="${BASE}" SENTORI_TOKEN="${TOKEN}" \
+    node "${ROOT}/../scripts/check-validate-agrees.mjs" \
+    || { echo "the validator disagrees with ingest" >&2; exit 1; }
+
 # The curl on the getting-started page, executed exactly as printed.
 # It sent `timestamp` instead of `occurredAt` until 2026-08-27 and had
 # answered 422 for as long as the file existed — the first request a

@@ -50,6 +50,34 @@ eight *methods* on `sentori`, the other three being `init`, `user` and
 Every verb returns the event id and never throws: a failure inside
 Sentori must never reach the host app.
 
+## Machine-readable
+
+- `GET {instance}/openapi.json` — OpenAPI 3.1, generated from the
+  router and served by the server, so its `info.version` is the
+  version of the binary answering. Full schemas for `/v1/events`,
+  `/v1/events:batch`, `/v1/events/validate` and `/healthz`; every other
+  live path is listed with its methods.
+- `POST {instance}/v1/events/validate` — **no token required.** Send
+  the body you intend to send and it tells you whether ingest would
+  parse it. It touches no database, names no project and stores
+  nothing.
+
+```
+$ curl -sX POST $INSTANCE/v1/events/validate -H 'content-type: application/json' \
+    -d '{"kind":"error","occurredAt":"2026-08-27T00:00:00Z","platform":"ios",
+         "error":{"message":"x"}}'
+
+{"ok":true,
+ "parsed":{"kind":"error","platform":"ios","hasPayload":false,…},
+ "ignored":["error"],
+ "note":"parsed, but the keys in `ignored` were dropped …"}
+```
+
+`ignored` is the useful part: `error` at the top level parses fine and
+arrives empty, and nothing else would ever tell you. A body that does
+not parse comes back with `field` naming the key — `occurredAt` for the
+`timestamp` mistake — so a client can branch on it.
+
 ## Send an event without the SDK
 
 ```

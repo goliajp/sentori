@@ -6,6 +6,66 @@
 
 ---
 
+## v3.6.0(2026-08-27 — 补上 agent 点名要的三件)
+
+复评 agent 在「还缺什么」一节点了三件,全部补上,每件都有门。
+
+### 1. `GET /openapi.json`
+
+OpenAPI 3.1,**由服务端提供**而不是丢进 SPA 的静态目录 —— 那样
+`info.version` 才是正在回答你的那个二进制的版本。描述一个不同构建的文档,
+跟描述一个不同产品的文档是同一种失败。
+
+路径表**从 router 生成**(`scripts/gen-openapi.mjs`),29 条,其中 4 条带完整
+schema。`--check` 进 preflight,所以路径列表不可能与服务端漂移。生成器还会拒绝
+描述一条 router 不服务的路径。
+
+### 2. `POST /v1/events/validate` —— 无 token 校验请求体
+
+agent 的原话:auth 在反序列化之前跑,所以拿不到 token 时,**四种故意写错的
+body 和一个正确的 body 返回一模一样的 401**,它「从实测里学不到任何关于 body
+校验的东西」。
+
+wire 格式本来就是公开的(`protocol.md` 印着),拒绝告诉别人 body 对不对
+保护不了任何东西,只是吃掉每次集成的第一个小时。
+
+这个端点不碰数据库、不指名项目、不说明 token 是否有效、不存任何东西,走
+per-IP 限流(与登录端点同一个)。它还**用 JSON 回答** —— ingest 自己的 422 是
+axum 的 plain text,客户端没法分支。
+
+最有用的是 `ignored`:
+
+```
+{"ok":true,"parsed":{…,"hasPayload":false},"ignored":["app","device","error"]}
+```
+
+`error` 放在顶层能干净地解析,然后**带着空内容到达**,而这件事没有任何别的
+东西会告诉你 —— 请求是成功的。那正是旧文档那条 curl 的病。
+
+### 3. 已发布 README 与仓库分叉的门
+
+`scripts/check-published-readme.mjs` 拉 npm registry 上的 README 与仓库比对。
+第一次跑就抓到真的:`@goliapkg/sentori-react-native@7.0.0` 的 README **少 22
+行**,正是 3.5.0 加的 `init()` 选项表。需要网络,所以进 CI 而不是 preflight,
+而且报告不阻断 —— 漂移是「该发版了」的理由,不是「该拦住这次构建」的理由。
+
+npm 尚未重新发布(RN patch bump 会连带推 expo 一个 major,单独评估)。**误导
+本身已经消除**:llms.txt 改指仓库 README 并说明 npm 可能滞后。
+
+### 一道门当场抓到的真缺陷
+
+`check-validate-agrees.mjs`(进 e2e):同一批 body 分别发给 validate 和 ingest,
+两边的接受/拒绝判定必须一致 —— 一个会认证 ingest 拒绝的 body 的校验器,比没有
+校验器更糟,它是第二个读起来权威的真相源。
+
+**它第一次跑就红了**:`trace` / `warn` / `probe` 要求 `name`,而校验端点第一版
+没检查,于是认证了一条 ingest 答 400 的 body。规则补上,用例扩到 13 条。
+
+门自身也补了护栏:一个失效的 token 对每个 body 都答 401,长得跟「ingest 拒绝
+一切」一模一样 —— 先用一条已知合法的 body 证明 token 能用,否则 exit 2。
+
+---
+
 ## v3.5.1(2026-08-27 — 第二个干净 agent 说 Yes,并指出我把表格塞进了代码块)
 
 3.5.0 之后起第二个干净 ctx 的 agent 复评,同样只许用公网。结论从 **Partly 变成

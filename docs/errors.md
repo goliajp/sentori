@@ -31,7 +31,7 @@ change without notice.
 | `invalid_fp_hex` | get_preferences.rs, put_preference.rs |
 | `invalid_kind` | events_attachments.rs, register_token.rs |
 | `invalid_multipart` | events_attachments.rs |
-| `invalid_payload` | events.rs, events_batch.rs |
+| `invalid_payload` | events.rs, events_batch.rs, events_validate.rs |
 | `invalid_source` | events_attachments.rs |
 | `send_not_found` | batch.rs |
 | `too_large` | events_attachments.rs |
