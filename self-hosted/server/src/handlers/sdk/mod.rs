@@ -15,6 +15,7 @@ pub mod deploys;
 pub mod events;
 pub mod events_attachments;
 pub mod events_batch;
+pub mod events_validate;
 pub mod push;
 
 /// Reject a public token on an endpoint a shipped application has no

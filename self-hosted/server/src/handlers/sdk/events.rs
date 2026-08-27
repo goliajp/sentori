@@ -59,7 +59,10 @@ pub struct WireEvent {
     pub payload: Value,
 }
 
-const VALID_PLATFORMS: [&str; 3] = ["javascript", "ios", "android"];
+/// Public so the unauthenticated validator checks the same list. Two
+/// copies of this would let `/v1/events/validate` certify a platform
+/// ingest rejects, which is worse than having no validator.
+pub const VALID_PLATFORMS: [&str; 3] = ["javascript", "ios", "android"];
 
 /// Wire → pipeline shape, with symbolication for error payloads.
 pub async fn prepare(

@@ -28,9 +28,19 @@ const DOC = 'docs/getting-started.md';
 const text = readFileSync(ROOT + DOC, 'utf8');
 
 // every ```bash fence holding a curl to the ingest endpoint
-const commands = [...text.matchAll(/```bash\n([\s\S]*?)\n```/g)]
-  .map((m) => m[1])
-  .filter((c) => /^curl /.test(c) && c.includes('/v1/events'));
+// Two shapes, two verdicts. The validate endpoint answers 200 with
+// `ok: true`; ingest answers 202 with a receipt. Filtering on
+// "/v1/events" alone caught both and then failed the validate one for
+// not being 202 — which is the checker being wrong, not the page.
+const all = [...text.matchAll(/```bash\n([\s\S]*?)\n```/g)].map((m) => m[1]);
+const commands = all
+  .filter((c) => /^curl /.test(c) && /\/v1\/events(?!\/validate)/.test(c))
+  .map((c) => ({ cmd: c, want: 202, kind: 'ingest' }))
+  .concat(
+    all
+      .filter((c) => /^curl /.test(c) && c.includes('/v1/events/validate'))
+      .map((c) => ({ cmd: c, want: 200, kind: 'validate' })),
+  );
 
 if (commands.length === 0) {
   console.error(
@@ -41,7 +51,7 @@ if (commands.length === 0) {
 }
 
 let failed = 0;
-for (const [i, cmd] of commands.entries()) {
+for (const [i, { cmd, want, kind }] of commands.entries()) {
   // `-o /dev/null -w %{http_code}` so the assertion is on the status,
   // and the command otherwise runs exactly as written on the page.
   const runnable = cmd.replace(
@@ -69,8 +79,10 @@ for (const [i, cmd] of commands.entries()) {
     body = readFileSync('/tmp/sentori-docs-curl.out', 'utf8');
   } catch { /* no body */ }
 
-  if (status !== '202') {
-    console.error(`✗ ${DOC}: the curl on this page answers ${status}, not 202`);
+  if (status !== String(want)) {
+    console.error(
+      `✗ ${DOC}: the ${kind} curl on this page answers ${status}, not ${want}`,
+    );
     console.error(`    ${body.slice(0, 200)}`);
     console.error(`  The command, as the page prints it:\n${cmd.replace(/^/gm, '    ')}`);
     failed++;
@@ -84,16 +96,21 @@ for (const [i, cmd] of commands.entries()) {
     failed++;
     continue;
   }
-  // The page tells the reader to assert on these two.
-  for (const k of ['eventId', 'issueId']) {
-    if (!parsed[k]) {
-      console.error(`✗ ${DOC}: the 202 body has no \`${k}\`, which the page says is the receipt`);
-      failed++;
+  if (kind === 'ingest') {
+    // The page tells the reader to assert on these two.
+    for (const k of ['eventId', 'issueId']) {
+      if (!parsed[k]) {
+        console.error(`✗ ${DOC}: the 202 body has no \`${k}\`, which the page says is the receipt`);
+        failed++;
+      }
     }
+  } else if (parsed.ok !== true) {
+    console.error(`✗ ${DOC}: the validate curl parsed but answered ok=${parsed.ok}`);
+    failed++;
   }
 }
 
 if (failed > 0) process.exit(1);
 console.log(
-  `✓ ${commands.length} documented ingest curl(s) answer 202 with a receipt`,
+  `✓ ${commands.length} documented curl(s) answer as the page says`,
 );

@@ -376,6 +376,10 @@ pub fn router(state: Arc<AppState>) -> Router {
 
     // ── Credentialed auth endpoints with their own per-IP limiter ──
     let auth_bruteforce_routes = Router::new()
+        // Unauthenticated on purpose — see the module docs. It shares
+        // the per-IP limiter with the login endpoints because it is
+        // the other route on this server anybody can reach.
+        .route("/v1/events/validate", post(sdk::events_validate::handle))
         .route("/auth/login", post(auth::login))
         .route("/auth/forgot-password", post(auth::forgot_password))
         .route("/auth/reset-password", post(auth::reset_password))
@@ -400,6 +404,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .with_state(state.clone());
 
     Router::new()
+        .route("/openapi.json", get(health::openapi))
         .route("/healthz", get(health::healthz))
         .route("/livez", get(health::livez))
         .route("/readyz", get(health::readyz))

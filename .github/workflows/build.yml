@@ -253,6 +253,12 @@ jobs:
       - name: install workspace
         run: bun install --frozen-lockfile
 
+      # Needs the network, so it cannot live in preflight. Reports
+      # rather than fails: a drifted README is a reason to publish,
+      # not a reason to block the build that would let you.
+      - name: published READMEs match the repo
+        run: node scripts/check-published-readme.mjs
+
       # Build every SDK's lib/ first. Each matrix cell is isolated — without
       # this, packages that import a sibling SDK can't resolve the
       # workspace symlink to a `.d.ts`.
