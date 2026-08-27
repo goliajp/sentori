@@ -76,6 +76,7 @@ export const en = {
     'No production assertions yet — sentori.assert(name, ok) creates the liveness ledger.',
   'instruments.guardedIssue': 'guarded issue',
   'instruments.colSamples': 'Samples',
+  'instruments.colPrewarmed': 'Pre-warmed',
   'instruments.launch': 'Launch',
   'instruments.launchEmpty':
     'No staged launch data yet — call sentori.launch.complete() when the app becomes usable (optionally sentori.launch.mark(name) for waypoints); every start aggregates into app.launch.',
