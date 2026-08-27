@@ -36,11 +36,19 @@ sentori.warn('slow-checkout', { ms: 1200 })
 sentori.trace('cart.opened')
 sentori.assert('cart.total-matches', total === expected)
 sentori.probe('checkout-double-charge')
+
+sentori.user({ id, email, name })          // or null to clear
+sentori.context({ tenant: 'acme' })        // ambient tags on every event
 ```
 
-The five kinds are `error`, `warn`, `trace`, `assert`, `probe`. Every
-verb returns the event id and never throws: a failure inside Sentori
-must never reach the host app.
+Five *kinds* of event (`error`, `warn`, `trace`, `assert`, `probe`);
+eight *methods* on `sentori`, the other three being `init`, `user` and
+`context`. The package also exports `ErrorBoundary`, `launch`,
+`pushSignal`, `registerMaskQuery`, `useTraceNavigation` and
+`triggerNativeCrash`.
+
+Every verb returns the event id and never throws: a failure inside
+Sentori must never reach the host app.
 
 ## Send an event without the SDK
 
@@ -97,12 +105,18 @@ unknown path with the app's HTML shell and `200`. `/openapi.json`,
 treat a `200` as proof a resource is there — check the content type,
 or that the body is not `<!doctype html>`.
 
-The paths that are real:
+Some paths that are real — not a complete list; `protocol.md` has the
+rest, and `/v1/deploys` and the `/v1/push/*` family are also live:
 
-- `GET /healthz` — `{"status":"ok","version":"3.4.1",…}`, no auth
+- `GET /healthz` — `{"status":"ok","version":"…",…}`, no auth
 - `GET /llms.txt` — this file
 - `POST /v1/events`, `POST /v1/events:batch` — ingest
 - `GET /api/issues` — read issues, needs an `api`-scope token
+
+A useful asymmetry: the catch-all is GET-only. A mistyped **POST**
+fails loudly — `POST /v1/event` answers
+`404 {"error":"not_found","detail":"no route for POST /v1/event"}` —
+so a wrong ingest path will not silently look like success.
 
 ## Docs
 
@@ -112,7 +126,7 @@ The paths that are real:
 - [Error reference](https://github.com/goliajp/sentori/blob/master/docs/errors.md): every code this server sends, generated from the handlers
 - [Self-hosting](https://github.com/goliajp/sentori/blob/master/docs/self-hosting.md): environment variables, backup, restore
 - [Troubleshooting](https://github.com/goliajp/sentori/blob/master/docs/troubleshooting.md): the failure modes people actually hit
-- [SDK reference](https://www.npmjs.com/package/@goliapkg/sentori-react-native): the current API surface, shipped with the package
+- [SDK reference](https://github.com/goliajp/sentori/blob/master/sdk/react-native/README.md): the current API surface, including the `init()` options table with defaults. The npm page renders the copy from the last publish, which may lag this one.
 
 ## Optional
 

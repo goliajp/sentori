@@ -6,6 +6,47 @@
 
 ---
 
+## v3.5.1(2026-08-27 — 第二个干净 agent 说 Yes,并指出我把表格塞进了代码块)
+
+3.5.0 之后起第二个干净 ctx 的 agent 复评,同样只许用公网。结论从 **Partly 变成
+Yes**:`/llms.txt` 一跳解决七个问题里的六个,十来分钟,而且它说「大部分时间花在
+**验证**而不是**寻找**,这是对的比例,也不是我通常拿到的比例」。
+
+它抓到的东西里,最重的一条是我自己造成的:
+
+- **`sdk/react-native/README.md` 的 ```tsx 围栏没闭合**,我 3.5.0 加的
+  `init()` 选项表整个落在代码块里 —— GitHub 和 npm 上渲染成字面文本。
+  两个门都读得很开心,因为它们把文件当纯文本 grep。**只有看渲染的人会发现。**
+  `scripts/check-md-fences.mjs` 进 preflight,验过会红。
+
+其余按它的清单:
+
+- **`getting-started.md` 说 admin token 是 `sk_` 前缀、环境变量叫
+  `SENTORI_ADMIN_TOKEN`** —— 前者被 `protocol.md` 记为 v0 已删除,后者服务端
+  根本没有。改成实际的:一个前缀 `st_`,scope 是服务端属性,用 `ingest` token
+  会被 `403 admin_token_required` 拒绝。
+- **`errors.md` 现在说清 scope 拒绝有两种形状**:中间件层 401 `KindMismatch`,
+  handler 层 403 `admin_token_required`。它们不是同一个检查,而 agent 只能从
+  文档看出矛盾。
+- **`llms.txt` 补上 `user()` 和 `context()`** —— 我前面明明验证过它们是真的,
+  却没写进去,agent 于是判断「一个 agent 因此永远不会调用它们」。
+- **`llms.txt` 的「真实路径」列表原本读起来像封闭清单**,漏了 `/v1/deploys` 和
+  `/v1/push/*`。改成开放,并补一条它自己发现的有用不对称:**catch-all 只吃
+  GET,POST 到打错的路径会真的 404** —— 所以 ingest 路径写错不会静默成功。
+- **`llms.txt` 指向 npm 页当「当前 API 面」是错的**:那份 README 是上次发布时
+  的副本,没有选项表。改指仓库里的,并说明 npm 可能滞后。
+
+以及一个新的门,`scripts/check-docs-curl.mjs`(进 e2e):**把
+`getting-started.md` 里的 curl 逐字提取出来对活实例执行**,要求 202 且带
+`eventId`/`issueId`。文档里印的那条命令就是被测对象 —— 它不可能在页面是错的
+时候通过。
+
+两条 agent 的判断我核实后**不采信**:它说包导出 `push`/`feature-flags` 子路径
+(`exports` map 里只有 `.`),说「Eight verbs」不准(`sentori` 对象正好八个
+方法)。后者措辞确实会绕人,改成说清「八个方法是上报 API,其余导出是接线」。
+
+---
+
 ## v3.5.0(2026-08-27 — 文档描述的是上一代产品,而这件事只有机器会当真)
 
 起一个**干净 ctx 的 agent**,只许用公网信息(WebFetch / curl / 搜索,不许读本地

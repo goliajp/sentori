@@ -982,6 +982,15 @@ echo "$RD" | jq -e '.live > 0' > /dev/null \
 # them. A snippet is documentation somebody compiles, and the last time
 # this repo shipped a command it had not run, the command POSTed to a
 # route no server had ever served.
+# The curl on the getting-started page, executed exactly as printed.
+# It sent `timestamp` instead of `occurredAt` until 2026-08-27 and had
+# answered 422 for as long as the file existed — the first request a
+# reader makes, and the first one an agent copies.
+echo "→ the curl on the getting-started page answers 202"
+SENTORI_BASE="${BASE}" SENTORI_TOKEN="${TOKEN}" \
+    node "${ROOT}/../scripts/check-docs-curl.mjs" \
+    || { echo "the curl the docs print does not work" >&2; exit 1; }
+
 echo "→ the Node and Python snippets the console hands out actually send"
 SENTORI_BASE="${BASE}" SENTORI_API_TOKEN="${API_TOKEN}" \
     node "${ROOT}/../scripts/check-push-snippets.mjs" \

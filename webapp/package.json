@@ -1,6 +1,6 @@
 {
   "name": "@sentori/webapp",
-  "version": "3.44.0",
+  "version": "3.45.0",
   "private": true,
   "description": "Sentori v0.1 minimal dashboard shell. Imports from self-hosted/web + saas/web.",
   "type": "module",
