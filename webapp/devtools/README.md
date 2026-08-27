@@ -19,6 +19,12 @@ bun run preview &                   # :5599, serves dist/ with the proxy
 bun run sweep out zh-CN dark        # <outdir> <lang> <theme>
 ```
 
+To photograph the error states instead of the happy path, run the mock
+with `bun run mock:fail`: every request under the demo project answers
+500 with the shape the real server sends. Nothing else renders those
+screens, which is how six pages came to show "could not load" and drop
+the status and message the server had actually returned.
+
 `sweep.mjs` walks all 12 routes in one Chrome over CDP, writes a PNG per
 route into `out/`, and writes `out/report.json` with each route's console
 errors and rendered text, under a `bundle` field naming the script it

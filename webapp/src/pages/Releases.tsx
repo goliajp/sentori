@@ -26,15 +26,19 @@ export default function ReleasesPage() {
   const { activeProject } = useShell();
   const active = activeProject?.id ?? null;
 
-  const { data, error, loading, reload } = useAsyncData(
-    () => (active ? api.listReleases(active) : Promise.resolve({ releases: [] })),
+  // `null` rather than `{ releases: [] }` when there is no project
+  // yet. The fabricated payload survived into the next render, so a
+  // failed load showed its error banner above a panel titled `(0)` —
+  // a count nothing had counted.
+  const { data, error, loading, reload } = useAsyncData<{ releases: ReleaseRow[] } | null>(
+    () => (active ? api.listReleases(active) : Promise.resolve(null)),
     [active],
   );
 
   return (
     <PageShell title={t('nav.releases')}>
       {error && (
-        <ErrorBanner>
+        <ErrorBanner reason={error}>
           {t('releases.loadFailed')}{' '}
           <button type="button" className="underline" onClick={reload}>
             {t('common.retry')}
@@ -45,14 +49,19 @@ export default function ReleasesPage() {
         <div className="py-16 text-center text-sm text-fg-subtle">…</div>
       )}
 
-      <Panel title={`${t('nav.releases')} (${data?.releases.length ?? 0})`}>
-        {data && data.releases.length === 0 ? (
+      {/* Only once there is an answer. Rendering the panel while
+          `data` is null put `(0)` in the title beside "could not
+          load" — a count is a claim, and "none" is not the same
+          statement as "we could not find out". */}
+      {data && (
+      <Panel title={`${t('nav.releases')} (${data.releases.length})`}>
+        {data.releases.length === 0 ? (
           <PanelEmpty>
             {t('releases.emptyTitle')} — {t('releases.emptyHint')}
           </PanelEmpty>
         ) : (
           <div className="divide-y divide-border/60">
-            {(data?.releases ?? []).map((r) => (
+            {data.releases.map((r) => (
               <ReleaseRowView
                 key={r.id}
                 release={r}
@@ -63,6 +72,7 @@ export default function ReleasesPage() {
           </div>
         )}
       </Panel>
+      )}
     </PageShell>
   );
 }

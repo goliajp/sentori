@@ -594,10 +594,32 @@ export function EmptyState({
 
 // ── Error banner ───────────────────────────────────────────
 
-export function ErrorBanner({ children }: { children: ReactNode }) {
+/**
+ * A failure, and what the server said about it.
+ *
+ * `reason` is the second half and it is not optional in spirit: a
+ * banner reading only "could not load" cannot separate a session that
+ * expired (log in again) from a project you cannot see (ask someone)
+ * from a database that is down (wait). Six of the read paths dropped
+ * it, so `formatApiError` — whose whole job is to name the status and
+ * the message — was being computed and thrown away on most screens.
+ *
+ * Kept visually quieter than the sentence: an operator reads the
+ * sentence first and the code when the sentence is not enough.
+ */
+export function ErrorBanner({
+  children,
+  reason,
+}: {
+  children: ReactNode;
+  reason?: string | null;
+}) {
   return (
     <div className="rounded border border-danger/40 bg-danger/50 p-3 text-sm text-danger">
       {children}
+      {reason != null && reason !== '' && (
+        <div className="mt-1 font-mono text-xs opacity-75">{reason}</div>
+      )}
     </div>
   );
 }

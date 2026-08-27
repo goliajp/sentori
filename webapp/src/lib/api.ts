@@ -336,6 +336,44 @@ export type NotificationPref = {
 
 const DEFAULT_BASE = '';
 
+// ── instruments ──
+export type AssertRow = {
+  name: string;
+  release: string;
+  passCount: number;
+  failCount: number;
+  lastPassAt: string | null;
+  lastFailAt: string | null;
+};
+export type ProbeRow = {
+  ref: string;
+  issueId: string | null;
+  lastSeenRelease: string | null;
+  registeredAt: string;
+  lastFiredAt: string | null;
+  fireCount: number;
+};
+export type TraceRow = {
+  name: string;
+  eventCount: number;
+  usersCount: number;
+  lastSeen: string;
+};
+export type LaunchRow = {
+  release: string;
+  samples: number;
+  prewarmed: number;
+  p50: null | number;
+  p90: null | number;
+  p95: null | number;
+};
+export type InstrumentsPanel = {
+  asserts: AssertRow[];
+  probes: ProbeRow[];
+  traces: TraceRow[];
+  launch?: LaunchRow[];
+};
+
 class ApiError extends Error {
   /** What is wrong, when the server named it. The console owns the
    *  sentence; this is what it looks the sentence up by. */
@@ -600,6 +638,15 @@ class Api {
     return this.get<{ artifacts: ArtifactRow[] }>(
       `/admin/api/projects/${projectId}/releases/${releaseId}/artifacts`,
     );
+  }
+  /** The instruments panel. It used to call `fetch` by hand and throw
+   *  `new Error(String(resp.status))`, so its failure carried a bare
+   *  number: no body read, no `ApiError`, and `formatApiError` — which
+   *  exists to name the status and the message — had nothing to name.
+   *  The banner said `Error: 500` while the server had answered with
+   *  `upstream_unavailable — the database refused the connection`. */
+  instruments(projectId: string) {
+    return this.get<InstrumentsPanel>(`/admin/api/projects/${projectId}/instruments`);
   }
 
   // ── push ──
