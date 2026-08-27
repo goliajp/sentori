@@ -1021,10 +1021,15 @@ STRIPPED="$(docker compose --env-file "$ENV_FILE" exec -T db \
 [[ "$STRIPPED" == "1" ]] \
     || { echo "could not stage the pre-3.11.0 row (found ${STRIPPED})" >&2; exit 1; }
 
+# `mktemp`, not a path under the repo: `tmp/` is gitignored, so it
+# exists on the machine this was written on and on no CI runner —
+# which is how a gate that passed locally failed the first time it
+# ran anywhere else.
+VERIFY_OUT="$(mktemp)"
 docker compose --env-file "$ENV_FILE" run --rm --no-deps \
     --entrypoint /usr/local/bin/sentori-server sentori verify-artifacts --all \
-    > "${ROOT}/../tmp/verify-artifacts.out" 2>&1 \
-    || { echo "verify-artifacts failed:" >&2; cat "${ROOT}/../tmp/verify-artifacts.out" >&2; exit 1; }
+    > "$VERIFY_OUT" 2>&1 \
+    || { echo "verify-artifacts failed:" >&2; cat "$VERIFY_OUT" >&2; exit 1; }
 
 # Counted by exact name rather than matched by prefix: the same
 # release also holds the correctly-named upload, and `LIKE 'MyApp%'`
@@ -1038,9 +1043,10 @@ LEFTOVER="$(docker compose --env-file "$ENV_FILE" exec -T db \
     "SELECT count(*) FROM release_artifacts WHERE name = 'MyApp'" | tr -d '[:space:]')"
 [[ "$REPAIRED" == "1" && "$LEFTOVER" == "0" ]] \
     || { echo "the row was not repaired (renamed=${REPAIRED}, left as MyApp=${LEFTOVER})" >&2
-         cat "${ROOT}/../tmp/verify-artifacts.out" >&2; exit 1; }
-grep -q "renamed to" "${ROOT}/../tmp/verify-artifacts.out" \
+         cat "$VERIFY_OUT" >&2; exit 1; }
+grep -q "renamed to" "$VERIFY_OUT" \
     || { echo "verify-artifacts repaired the row without saying so" >&2; exit 1; }
+rm -f "$VERIFY_OUT"
 
 # An issue's history is a list of decisions. A retry is not one, and
 # ten simultaneous clicks of Ignore are one.
