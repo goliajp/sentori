@@ -123,8 +123,15 @@ npx @goliapkg/sentori-cli issue silence <issue-uuid> \
   --project "$PROJECT_ID"
 ```
 
-The admin token (`SENTORI_ADMIN_TOKEN`, `sk_` prefix) is in project
-settings → tokens.
+These need a token whose **scope is `api`**, minted at Settings ▸
+Tokens. There is one prefix — `st_` — and the scope is a property the
+server holds, not something you can read off the token. The `sk_`
+prefix this paragraph named until 2026-08-27 was from v0 and
+`protocol.md` records it as removed; there is no
+`SENTORI_ADMIN_TOKEN`.
+
+Using an `ingest` token here is refused with `403 admin_token_required`
+and a hint naming the scope to mint instead.
 
 ### Source maps
 

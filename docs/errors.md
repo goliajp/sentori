@@ -51,6 +51,18 @@ names which of the checks failed, in the order they run:
 | <code>token unknown or revoked</code> | `NotFound` |
 | <code>token has wrong scope for this endpoint</code> | `KindMismatch` |
 
+## Scope refusals come in two shapes
+
+Both exist and they are not the same check:
+
+- **`401` `unauthorized`** with hint `token has wrong scope for this
+  endpoint` — the token middleware, before any handler runs.
+- **`403` `admin_token_required`** — a handler that needs an
+  `api`-scope token and was given an `ingest` one. Its hint names the
+  scope to mint.
+
+Branch on the code, not the status.
+
 ## Not error codes
 
 `422` comes from the JSON layer before any handler runs, and its body

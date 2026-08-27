@@ -5,7 +5,12 @@ self-hosted crash + warning monitor for mobile apps. JS layer +
 iOS Swift + Android Kotlin native, distributed as an Expo module
 (works on bare RN too).
 
-Eight verbs are the whole API.
+Eight methods on `sentori` are the whole reporting API — `init`,
+`user`, `context`, and the five kinds `error` / `warn` / `trace` /
+`assert` / `probe`. The package also exports `ErrorBoundary`,
+`launch`, `pushSignal`, `registerMaskQuery`, `useTraceNavigation`,
+`RageTapCapture` and `triggerNativeCrash`, which are wiring rather
+than reporting.
 
 Upgrading from 4.x? See [MIGRATION.md](./MIGRATION.md).
 
@@ -44,6 +49,18 @@ sentori.init({
   backendHealthUrl: 'https://api.example.com/healthz', // v5.2, see below
 })
 
+sentori.user({ id, email, name })        // drives breadth × depth stats
+sentori.context({ build: 'release', tenant: 'acme' }) // ambient tags;
+                                         // every key becomes a queue
+                                         // slicing dimension on the board
+
+sentori.error(new Error('boom'))         // what broke
+sentori.warn('pay.gateway-retry', data)  // where users hurt
+sentori.trace('checkout.start', data)    // what happened
+sentori.assert('total-positive', ok)     // what should hold (never halts)
+sentori.probe('BUG-123', data)           // did that bug come back
+```
+
 ### `init()` options
 
 Every field of `InitConfig`, checked against the type by
@@ -62,18 +79,6 @@ undocumented.
 | `backendHealthUrl` | `string` | no | — |
 | `logLevel` | `'debug' \| 'error' \| 'info' \| 'silent' \| 'warn'` | no | `'warn'` |
 | `beforeSend` | `(event) => event \| null` | no | — return `null` to drop |
-
-sentori.user({ id, email, name })        // drives breadth × depth stats
-sentori.context({ build: 'release', tenant: 'acme' }) // ambient tags;
-                                         // every key becomes a queue
-                                         // slicing dimension on the board
-
-sentori.error(new Error('boom'))         // what broke
-sentori.warn('pay.gateway-retry', data)  // where users hurt
-sentori.trace('checkout.start', data)    // what happened
-sentori.assert('total-positive', ok)     // what should hold (never halts)
-sentori.probe('BUG-123', data)           // did that bug come back
-```
 
 Auto-wired (no configuration):
 
