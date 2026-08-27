@@ -309,7 +309,14 @@ export default function InstrumentsPage() {
                   align: 'right',
                   render: (tr) => (
                     <span className="text-sm tabular-nums text-fg-muted">
-                      {tr.eventCount}ev · {tr.usersCount}u
+                      {/* Spelled out: this column is 180px wide, and `0u`
+                          beside `2ev` reads as a truncated word. The
+                          queue rows in kind.tsx keep the compact form —
+                          there the space really is the constraint. */}
+                      {t('instruments.volume', {
+                        events: String(tr.eventCount),
+                        users: String(tr.usersCount),
+                      })}
                     </span>
                   ),
                 },

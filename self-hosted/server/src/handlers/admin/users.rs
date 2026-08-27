@@ -92,6 +92,20 @@ pub async fn create(
     if let Err(e) = superadmin_only(&ctx) {
         return e;
     }
+    // Email is the login identity. `{"email": ""}` created an account
+    // that logged in as an admin with a blank username — the password
+    // length was the only thing checked, and case-folding and
+    // duplicate detection below made the omission look deliberate.
+    let email = body.email.trim();
+    if email.is_empty() || !email.contains('@') || email.starts_with('@') || email.ends_with('@') {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": "invalid_email",
+                "detail": "an admin signs in with this address; it must contain a local part and a domain",
+            })),
+        );
+    }
     if body.password.len() < 8 {
         return (
             StatusCode::BAD_REQUEST,

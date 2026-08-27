@@ -44,6 +44,30 @@ const CASES = [
   ['occurredAt not rfc3339', { kind: 'trace', occurredAt: 'yesterday', platform: 'ios' }],
   ['missing platform', { kind: 'trace', occurredAt: now() }],
   ['empty object', {}],
+  // A device with a broken clock still deserves to have its report
+  // kept; the server clamps forward skew rather than refusing it.
+  ['occurredAt far in the future', {
+    kind: 'trace', occurredAt: '2099-01-01T00:00:00Z', platform: 'ios',
+    name: 'clock.future',
+  }],
+  // A NUL byte is valid JSON and invalid in Postgres text. Ingest
+  // scrubs it rather than refusing, so both must accept.
+  ['NUL in a payload string', {
+    kind: 'error', occurredAt: now(), platform: 'ios',
+    payload: { error: { type: 'NulProbe', message: 'a\u0000b' } },
+  }],
+  ['NUL in a payload key', {
+    kind: 'error', occurredAt: now(), platform: 'ios',
+    payload: { error: { type: 'NulKey', message: 'k' }, 'a\u0000b': 1 },
+  }],
+  ['NUL in a top-level field', {
+    kind: 'trace', occurredAt: now(), platform: 'ios',
+    name: 'nul.top', release: 'app@1.0\u00000',
+  }],
+  ['occurredAt far in the past', {
+    kind: 'trace', occurredAt: '2001-01-01T00:00:00Z', platform: 'ios',
+    name: 'clock.past',
+  }],
 ];
 
 const post = (path, body, auth) =>

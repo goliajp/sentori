@@ -702,6 +702,12 @@ export function formatRelative(
             : sec < 86_400 * 365
               ? [Math.round(sec / 86_400 / 30), 'month']
               : [Math.round(sec / 86_400 / 365), 'year'];
+  // A device with a broken clock produced a queue row reading
+  // "7,979 years ago". The number is arithmetically right and tells
+  // the reader nothing except that something is wrong somewhere else.
+  // Past a decade, say that instead — the exact timestamp is in the
+  // title attribute wherever this is rendered.
+  if (unit === 'year' && value > 10) return '—';
   const locale =
     typeof document === 'undefined' ? 'en' : document.documentElement.lang || 'en';
   return new Intl.RelativeTimeFormat(locale, { numeric: 'always', style: 'narrow' })
@@ -717,6 +723,22 @@ export function formatRelative(
  */
 export function formatRelease(release: string): string {
   return release.replace(/\+\d+$/, '');
+}
+
+/**
+ * The same, for a list. Dropping the build suffix is right until two
+ * rows differ only by it — then it is not noise, it is the entire
+ * distinction, and the list renders as the same release twice.
+ *
+ * An issue's release breakdown showed `reg@1.0.0` on two rows with
+ * different event counts, one of them marked fixed. They were
+ * `reg@1.0.0+1` and `reg@1.0.0+2`, which is precisely the question
+ * that panel exists to answer: which build.
+ */
+export function formatReleaseIn(release: string, all: string[]): string {
+  const short = formatRelease(release);
+  const collides = all.some((r) => r !== release && formatRelease(r) === short);
+  return collides ? release : short;
 }
 
 export function formatNumber(n: number): string {

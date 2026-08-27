@@ -87,6 +87,7 @@ export const zh: Messages = {
   'instruments.colName': '名称',
   'instruments.colRelease': '版本',
   'instruments.colStatus': '状态',
+  'instruments.volume': '{events} 次 · {users} 人',
   'instruments.colVolume': '量级',
   'instruments.traces': '观察点',
   'instruments.tracesEmpty': '无观察点。sentori.trace(name) 标记代码路径被走到。',

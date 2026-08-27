@@ -24,6 +24,9 @@ use uuid::Uuid;
 use crate::session_mw::SessionContext;
 use crate::state::AppState;
 
+/// The statuses an issue can be filtered by.
+const STATUSES: [&str; 3] = ["open", "resolved", "ignored"];
+
 #[derive(Deserialize)]
 pub struct ListQuery {
     #[serde(default)]
@@ -115,8 +118,46 @@ pub async fn list(
             );
         }
     };
-    let limit = q.limit.unwrap_or(100).clamp(1, 500);
+    // `clamp(1, 500)` turned `limit=0` into one row, so a caller
+    // paging with a computed limit that reached zero got a phantom
+    // record instead of an empty page. Zero means zero; a negative
+    // limit is a caller bug and says so.
+    let limit = match q.limit {
+        Some(n) if n < 0 => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "invalid_limit", "detail": "limit must not be negative" })),
+            );
+        }
+        Some(n) => n.min(500),
+        None => 100,
+    };
+    // An unrecognised status returned an empty list at 200, and
+    // `status=all` — the obvious guess for "show me everything" — was
+    // indistinguishable from a project with nothing in it.
     let status = q.status.unwrap_or_else(|| "open".to_string());
+    if !STATUSES.contains(&status.as_str()) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": "invalid_status",
+                "detail": format!("status must be one of {}", STATUSES.join(", ")),
+                "field": "status",
+            })),
+        );
+    }
+    if let Some(k) = q.kind.as_deref()
+        && !["error", "warn", "trace", "assert", "probe"].contains(&k)
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": "invalid_kind",
+                "detail": "kind must be one of error, warn, trace, assert, probe",
+                "field": "kind",
+            })),
+        );
+    }
     let rows = sqlx::query(
         "SELECT * FROM issues \
          WHERE status = $1 \
@@ -432,7 +473,8 @@ pub async fn occurrences(
          FROM events e \
          LEFT JOIN LATERAL ( \
              SELECT a.ref FROM event_attachments a \
-             WHERE a.event_id = e.id AND a.kind = 'screens' LIMIT 1 \
+             WHERE a.event_id = e.id AND a.project_id = e.project_id \
+               AND a.kind = 'screens' LIMIT 1 \
          ) sc ON TRUE \
          WHERE e.issue_id = $1 ORDER BY e.received_at DESC LIMIT 100",
     )

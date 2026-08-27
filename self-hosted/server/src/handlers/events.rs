@@ -39,11 +39,19 @@ pub async fn get(
     if let Err(e) = super::admin::tokens::ensure_project_access(&state, &ctx, project_id).await {
         return e;
     }
+    // Scoped to the event's project as well as its id. An attachment
+    // is stamped with the *uploader's* project, and the upload handler
+    // deliberately does not require the event to exist yet — evidence
+    // legitimately arrives first. Selecting on `event_id` alone
+    // therefore let any project's ingest token plant a row in another
+    // project's crash detail, where it rendered as that project's own
+    // evidence.
     let attachments = sqlx::query(
         "SELECT ref, kind, media_type, size_bytes, captured_at FROM event_attachments \
-         WHERE event_id = $1 ORDER BY captured_at",
+         WHERE event_id = $1 AND project_id = $2 ORDER BY captured_at",
     )
     .bind(event_id)
+    .bind(project_id)
     .fetch_all(&state.pool)
     .await
     .unwrap_or_default();
