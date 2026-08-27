@@ -104,14 +104,33 @@ export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
   );
 }
 
-/** Select at the shared control height. */
-export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+/** The one class list every `<select>` in the app wears.
+ *
+ *  `appearance-none` is the whole point. A native select on macOS
+ *  paints its own control over whatever background it is given, so
+ *  `bg-surface` had no effect and the dark forms each grew one
+ *  light-grey box that matched nothing beside it — visible on the
+ *  credentials form and on the triage filters, which is the screen
+ *  people are on all day. Taking the appearance away means drawing
+ *  the chevron ourselves, hence the token and the right padding. */
+export const SELECT_CLASS =
+  'appearance-none rounded border border-border bg-surface bg-[image:var(--sn-select-chevron)] ' +
+  'bg-[length:12px_12px] bg-[right_0.5rem_center] bg-no-repeat text-fg ' +
+  'focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 ' +
+  'focus-visible:outline-accent';
+
+/** Select at a shared control height. */
+export function Select({
+  size = 'md',
+  ...props
+}: // `size` on a native select is a row count nothing here sets, and
+// keeping it would intersect with ours to `never`.
+Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> & { size?: 'sm' | 'md' }) {
   const { className = '', children, ...rest } = props;
+  const metrics =
+    size === 'sm' ? `${CONTROL_H.sm} pl-2 pr-6 text-xs` : `${CONTROL_H.md} pl-2 pr-7 text-sm`;
   return (
-    <select
-      {...rest}
-      className={`${CONTROL_H.md} rounded border border-border bg-surface px-2 text-sm text-fg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-accent ${className}`}
-    >
+    <select {...rest} className={`${SELECT_CLASS} ${metrics} ${className}`}>
       {children}
     </select>
   );

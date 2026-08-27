@@ -10,7 +10,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { useShell } from '../App';
 import { ImpactCell, KindBadge, kindColor } from '../components/kind';
-import { ErrorBanner, Kbd, clsx, formatRelative } from '../components/ui';
+import { ErrorBanner, Kbd, SELECT_CLASS, clsx, formatRelative } from '../components/ui';
 import { useT } from '../i18n';
 import { api, type IssueSummary } from '../lib/api';
 import { issueHeadline } from '../lib/issue-title';
@@ -269,7 +269,7 @@ export default function TriageView() {
                 value={env ?? ''}
                 onChange={(e) => setFilter('env', e.target.value || null)}
                 aria-label={t('inbox.envFilter')}
-                className="mr-1 h-[22px] rounded border border-border bg-surface px-1 text-xs text-fg-muted"
+                className={`${SELECT_CLASS} mr-1 h-[22px] pl-1 pr-5 text-xs text-fg-muted`}
               >
                 <option value="">{t('inbox.envAll')}</option>
                 {environments.map((e) => (
@@ -286,7 +286,7 @@ export default function TriageView() {
                 value={ctxKey ?? ''}
                 onChange={(e) => setCtx(e.target.value || null, null)}
                 aria-label={t('inbox.ctxKeyFilter')}
-                className="h-[22px] rounded border border-border bg-surface px-1 text-xs text-fg-muted"
+                className={`${SELECT_CLASS} h-[22px] pl-1 pr-5 text-xs text-fg-muted`}
               >
                 <option value="">{t('inbox.ctxKeyNone')}</option>
                 {contextKeys.map((k) => (
@@ -301,7 +301,7 @@ export default function TriageView() {
                 value={ctxVal ?? ''}
                 onChange={(e) => setCtx(ctxKey, e.target.value || null)}
                 aria-label={t('inbox.ctxValueFilter')}
-                className="mr-1 h-[22px] rounded border border-border bg-surface px-1 text-xs text-fg-muted"
+                className={`${SELECT_CLASS} mr-1 h-[22px] pl-1 pr-5 text-xs text-fg-muted`}
               >
                 <option value="">{t('inbox.ctxValueAll')}</option>
                 {contextValues.map((v) => (
@@ -316,7 +316,7 @@ export default function TriageView() {
                 value={rel ?? ''}
                 onChange={(e) => setFilter('rel', e.target.value || null)}
                 aria-label={t('inbox.releaseFilter')}
-                className="mr-1 h-[22px] max-w-40 rounded border border-border bg-surface px-1 text-xs text-fg-muted"
+                className={`${SELECT_CLASS} mr-1 h-[22px] max-w-40 pl-1 pr-5 text-xs text-fg-muted`}
               >
                 <option value="">{t('inbox.releaseAll')}</option>
                 {releaseNames.map((r) => (

@@ -23,6 +23,12 @@
   --sn-fg: #e7e7ec;
   --sn-fg-muted: #a3a3ae;
   --sn-fg-subtle: #767681;
+  /* Drawn rather than left to the browser: a native <select> paints
+   * its own control on macOS, so a dark form grew one light-grey box
+   * that matched nothing beside it. Two literals rather than one
+   * var-in-a-data-URI, because a data URI is a string and cannot
+   * interpolate a custom property. */
+  --sn-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23767681' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
   --sn-border: #2a2a32;
   --sn-border-strong: #3d3d47;
 
@@ -66,6 +72,7 @@
   --sn-fg: #1c2128;
   --sn-fg-muted: #404854;
   --sn-fg-subtle: #68707e;
+  --sn-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%2368707e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
   --sn-border: #d5d9e0;
   --sn-border-strong: #aab1bc;
 

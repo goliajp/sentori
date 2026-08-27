@@ -71,6 +71,7 @@ export const ja: Messages = {
     '本番アサーションはまだありません — sentori.assert(name, ok) が生存台帳を作ります。',
   'instruments.guardedIssue': '保護対象 issue',
   'instruments.colSamples': 'サンプル',
+  'instruments.colPrewarmed': 'プリウォーム',
   'instruments.launch': '起動',
   'instruments.launchEmpty':
     'ステージ別起動データはまだありません — アプリが使用可能になった時点で sentori.launch.complete() を呼んでください(任意で sentori.launch.mark(name) のウェイポイント)。起動ごとに app.launch として集計されます。',

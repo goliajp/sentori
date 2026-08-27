@@ -126,23 +126,36 @@ export default function InstrumentsPage() {
                     label: t('instruments.colRelease'),
                     render: (l) => <ReleaseCell release={l.release} />,
                   },
+                  // Two columns, not `4906 (+214)` in one. `(+N)` is
+                  // how every other number on every other screen
+                  // writes a change, so a reader has no reason to
+                  // hover the tooltip that said otherwise — and read
+                  // 1.2.2's `0 (+3)` as a release that gained three
+                  // launches rather than one with no real samples and
+                  // three phantom ones. A header cannot be misread
+                  // the way a punctuation convention can.
                   {
                     key: 'samples',
                     label: t('instruments.colSamples'),
-                    width: '140px',
+                    width: '110px',
                     align: 'right',
                     render: (l) => (
                       <span className="text-sm tabular-nums text-fg-muted">
                         {l.samples - l.prewarmed}
-                        {l.prewarmed > 0 && (
-                          <span
-                            className="text-fg-subtle"
-                            title={t('instruments.prewarmedTip')}
-                          >
-                            {' '}
-                            (+{l.prewarmed})
-                          </span>
-                        )}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'prewarmed',
+                    label: t('instruments.colPrewarmed'),
+                    width: '110px',
+                    align: 'right',
+                    render: (l) => (
+                      <span
+                        className="text-sm tabular-nums text-fg-subtle"
+                        title={t('instruments.prewarmedTip')}
+                      >
+                        {l.prewarmed > 0 ? l.prewarmed : '—'}
                       </span>
                     ),
                   },
