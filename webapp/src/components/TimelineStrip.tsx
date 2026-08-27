@@ -60,6 +60,9 @@ export function summarizeSignal(s: StripSignal): string {
 /** The event moment sits at 95%, not the edge — the most important
  *  point on the axis gets breathing room. */
 const RIGHT_PAD_PCT = 5;
+/** Room kept clear to the left of the event line for its own label,
+ *  which is a phrase in three languages rather than a number. */
+const EVENT_LABEL_PX = 96;
 
 /** Round axis spans (s). Beyond the table, multiples of 60. */
 const NICE_SPANS = [5, 10, 15, 30, 60, 120, 300];
@@ -81,6 +84,29 @@ const LABEL_PX = 64;
  * the event marker collided with the last tick. The step now has to
  * clear the measured width as well as the span.
  */
+/** Is there room to print this tick's label without the event
+ *  line's own label landing on it?
+ *
+ *  The label at 0s is words rather than a number — `error 触发`,
+ *  `error fired`, `error 発生` — and it hangs left from the event
+ *  line, straight into the tick before it. At a 60s span with a 5s
+ *  step that tick is 8% of the track away, and `-5s` shipped with the
+ *  word `error` struck through it.
+ *
+ *  Reserved in pixels, because that is the unit text occupies: a
+ *  percentage that clears the word on a 1400px pane does not on a
+ *  500px one. Before the first measurement `trackW` is 0 — assume the
+ *  narrow case and drop the label, since a missing tick reads as
+ *  spacing and two words on top of each other read as broken.
+ *
+ *  Exported for `devtools/check-timeline-labels.mjs`. */
+export function tickLabelFits(sec: number, spanS: number, trackW: number): boolean {
+  if (sec === 0) return true;
+  if (trackW <= 0 || spanS <= 0) return false;
+  const scale = (100 - RIGHT_PAD_PCT) / 100;
+  return ((-sec / spanS) * scale) * trackW >= EVENT_LABEL_PX;
+}
+
 function tickStep(span: number, maxLabels: number): number {
   for (const step of [1, 2, 5, 10, 15, 30, 60, 120]) {
     if (span / step <= maxLabels) return step;
@@ -141,6 +167,9 @@ export function TimelineStrip({
 
   const pct = (tv: number): number =>
     Math.min(100, Math.max(0, ((tv + spanS) / spanS) * (100 - RIGHT_PAD_PCT)));
+
+  const clearsEventLabel = (sec: number): boolean =>
+    tickLabelFits(sec, spanS, trackW);
 
   const inWindow = useMemo(
     () => ({
@@ -226,7 +255,11 @@ export function TimelineStrip({
                 }`}
                 style={sec === 0 ? { color: kindColor(issueKind) } : undefined}
               >
-                {sec === 0 ? t('issue.eventMoment', { kind: issueKind }) : `${sec}s`}
+                {sec === 0
+                  ? t('issue.eventMoment', { kind: issueKind })
+                  : clearsEventLabel(sec)
+                    ? `${sec}s`
+                    : ''}
               </span>
             </div>
           ))}

@@ -989,6 +989,59 @@ SENTORI_BASE="${BASE}" SENTORI_API_TOKEN="${API_TOKEN}" \
     node "${ROOT}/../scripts/check-probes-sync.mjs" \
     || { echo "probes:sync does not hold" >&2; exit 1; }
 
+# Upload → store → find by release → rewrite the stored payload. The
+# resolver crates have had unit tests since before the v0.2 cutover;
+# the chain that carries a file to a frame had none, and all four bugs
+# fixed on 2026-08-10 lived in it with those tests green.
+echo "→ a mapping uploaded after the crash still rescues the crash"
+SENTORI_BASE="${BASE}" SENTORI_TOKEN="${TOKEN}" SENTORI_API_TOKEN="${API_TOKEN}" \
+    SENTORI_JAR="${JAR}" \
+    node "${ROOT}/../scripts/check-symbolication.mjs" \
+    || { echo "symbolication does not hold end to end" >&2; exit 1; }
+
+# The dSYMs already on disk. A row stored before 3.11.0 carries
+# whatever name the uploader gave the file, and lookup matches a
+# frame's imageUuid against that name — so one uploaded by hand as
+# `MyApp` resolves nothing while its bytes read perfectly, which is
+# why nothing ever reported it. New uploads get the id appended at the
+# door; the rows already there only get it from `verify-artifacts`.
+#
+# There is no API that produces the old shape any more, so the row is
+# put back into it directly. That is the point: this checks the
+# recovery path for data that predates the fix, which is the only way
+# the fix reaches anyone who already hit the bug.
+echo "→ a dSYM stored under a name with no debug id is repaired in place"
+docker compose --env-file "$ENV_FILE" exec -T db \
+    psql -U sentori -d sentori -qtAc \
+    "UPDATE release_artifacts SET name = 'MyApp' WHERE name LIKE 'MyApp-A1B2%'" \
+    > /dev/null
+STRIPPED="$(docker compose --env-file "$ENV_FILE" exec -T db \
+    psql -U sentori -d sentori -qtAc \
+    "SELECT count(*) FROM release_artifacts WHERE name = 'MyApp'" | tr -d '[:space:]')"
+[[ "$STRIPPED" == "1" ]] \
+    || { echo "could not stage the pre-3.11.0 row (found ${STRIPPED})" >&2; exit 1; }
+
+docker compose --env-file "$ENV_FILE" run --rm --no-deps \
+    --entrypoint /usr/local/bin/sentori-server sentori verify-artifacts --all \
+    > "${ROOT}/../tmp/verify-artifacts.out" 2>&1 \
+    || { echo "verify-artifacts failed:" >&2; cat "${ROOT}/../tmp/verify-artifacts.out" >&2; exit 1; }
+
+# Counted by exact name rather than matched by prefix: the same
+# release also holds the correctly-named upload, and `LIKE 'MyApp%'`
+# returns both — two rows psql prints as one string.
+REPAIRED="$(docker compose --env-file "$ENV_FILE" exec -T db \
+    psql -U sentori -d sentori -qtAc \
+    "SELECT count(*) FROM release_artifacts \
+     WHERE name = 'MyApp-A1B2C3D4E5F60718293A4B5C6D7E8F90'" | tr -d '[:space:]')"
+LEFTOVER="$(docker compose --env-file "$ENV_FILE" exec -T db \
+    psql -U sentori -d sentori -qtAc \
+    "SELECT count(*) FROM release_artifacts WHERE name = 'MyApp'" | tr -d '[:space:]')"
+[[ "$REPAIRED" == "1" && "$LEFTOVER" == "0" ]] \
+    || { echo "the row was not repaired (renamed=${REPAIRED}, left as MyApp=${LEFTOVER})" >&2
+         cat "${ROOT}/../tmp/verify-artifacts.out" >&2; exit 1; }
+grep -q "renamed to" "${ROOT}/../tmp/verify-artifacts.out" \
+    || { echo "verify-artifacts repaired the row without saying so" >&2; exit 1; }
+
 # An issue's history is a list of decisions. A retry is not one, and
 # ten simultaneous clicks of Ignore are one.
 echo "→ repeated and concurrent status writes record once"

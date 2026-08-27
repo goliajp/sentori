@@ -676,6 +676,27 @@ export function Tabs({
  * renderers where threading a locale down would mean touching every
  * column definition to fix a suffix.
  */
+/** Bytes at a scale a person reads. A dSYM is the reason: a real
+ *  iOS one runs to hundreds of megabytes, and the releases panel
+ *  rendered insight-mobile's as `297713 KB` — a number nobody
+ *  converts in their head, in the column whose whole job is telling
+ *  an operator at a glance what landed. Binary units, because that
+ *  is what every other tool reporting a build artifact uses. */
+export function formatBytes(n: number | undefined): string {
+  if (n === undefined || !Number.isFinite(n) || n < 0) return '—';
+  if (n < 1024) return `${n} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let v = n / 1024;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i += 1;
+  }
+  // One decimal below 10 so 1.4 MB and 9.8 MB stay distinguishable;
+  // none above, where the digit is noise against the magnitude.
+  return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${units[i]}`;
+}
+
 export function formatRelative(
   iso: string | null | undefined,
   now: number = Date.now(),

@@ -19,6 +19,7 @@
 //!   ("dSYM upload missing arm64e slice").
 
 use object::macho::{FAT_MAGIC, FAT_MAGIC_64, MH_CIGAM, MH_CIGAM_64, MH_MAGIC, MH_MAGIC_64};
+use object::{Object as _, read::File};
 
 use crate::arch::Arch;
 use crate::error::{SliceError, SliceResult};
@@ -67,6 +68,69 @@ impl MachoSlicer {
             Magic::Single => Err(SliceError::NotFat),
         }
     }
+
+    /// Every slice's debug id (`LC_UUID`), uppercase hex without
+    /// dashes — the identity a crashing frame carries as its
+    /// `imageUuid`, and therefore the only thing that says whether a
+    /// stored dSYM can serve a given stack.
+    ///
+    /// Until this existed the answer came from the uploaded
+    /// *filename*. `sentori-cli` builds one that embeds the id, so
+    /// the CLI path worked; a file uploaded by hand did not, and
+    /// nothing anywhere could tell — the bytes parse, the artifact
+    /// lists as usable, and no frame ever resolves against it.
+    ///
+    /// Load commands only. `object` parses lazily over the borrowed
+    /// buffer and the fat slices are borrowed, not copied, so a
+    /// 300 MB universal dSYM costs no allocation beyond the ids.
+    ///
+    /// Returns empty rather than erroring: a file with no `LC_UUID`
+    /// is a fact about the file, not a failure to read it, and the
+    /// caller's next move is the same either way.
+    #[must_use]
+    pub fn debug_ids(bytes: &[u8]) -> Vec<String> {
+        let entries = match read_magic(bytes) {
+            Ok(Magic::Fat32) => iter_fat32(bytes).unwrap_or_default(),
+            Ok(Magic::Fat64) => iter_fat64(bytes).unwrap_or_default(),
+            Ok(Magic::Single) => return uuid_of(bytes).into_iter().collect(),
+            Err(_) => return Vec::new(),
+        };
+        let mut out: Vec<String> = Vec::new();
+        for e in entries {
+            let (Ok(off), Ok(sz)) = (usize::try_from(e.offset), usize::try_from(e.size)) else {
+                continue;
+            };
+            let Some(end) = off.checked_add(sz) else {
+                continue;
+            };
+            let Some(slice) = bytes.get(off..end) else {
+                continue;
+            };
+            // A universal binary's slices are separate builds of the
+            // same source and carry different ids. Duplicates would
+            // still mean one file, so keep the set.
+            if let Some(id) = uuid_of(slice)
+                && !out.contains(&id)
+            {
+                out.push(id);
+            }
+        }
+        out
+    }
+}
+
+/// `LC_UUID` of a single (thin) Mach-O.
+fn uuid_of(slice: &[u8]) -> Option<String> {
+    let parsed = File::parse(slice).ok()?;
+    let raw = parsed.mach_uuid().ok().flatten()?;
+    let mut hex = String::with_capacity(32);
+    for byte in raw {
+        for nibble in [byte >> 4, byte & 0x0f] {
+            let digit = char::from_digit(u32::from(nibble), 16)?;
+            hex.push(digit.to_ascii_uppercase());
+        }
+    }
+    Some(hex)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -205,6 +269,87 @@ fn slice_common(
 mod tests {
     use super::*;
     use crate::test_fixtures::{build_fat32, synthetic_macho_with_dwarf, synthetic_macho_x86_64};
+
+    /// A thin arm64 Mach-O carrying nothing but a header and the
+    /// `LC_UUID` load command. Written by hand rather than by
+    /// `object::write`, which emits no `LC_UUID` at all — so the
+    /// encoder here and the decoder under test are two different
+    /// pieces of code, and a shared misreading cannot pass.
+    fn thin_with_uuid(uuid: [u8; 16]) -> Vec<u8> {
+        const LC_UUID: u32 = 0x1b;
+        let mut out = Vec::with_capacity(56);
+        out.extend_from_slice(&MH_MAGIC_64.to_le_bytes());
+        out.extend_from_slice(&0x0100_000cu32.to_le_bytes()); // CPU_TYPE_ARM64
+        out.extend_from_slice(&0u32.to_le_bytes()); // cpusubtype
+        out.extend_from_slice(&10u32.to_le_bytes()); // MH_DSYM
+        out.extend_from_slice(&1u32.to_le_bytes()); // ncmds
+        out.extend_from_slice(&24u32.to_le_bytes()); // sizeofcmds
+        out.extend_from_slice(&0u32.to_le_bytes()); // flags
+        out.extend_from_slice(&0u32.to_le_bytes()); // reserved
+        out.extend_from_slice(&LC_UUID.to_le_bytes());
+        out.extend_from_slice(&24u32.to_le_bytes()); // cmdsize
+        out.extend_from_slice(&uuid);
+        out
+    }
+
+    #[test]
+    fn thin_macho_reports_its_debug_id() {
+        let bytes = thin_with_uuid([
+            0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54,
+            0x32, 0x10,
+        ]);
+        assert_eq!(
+            MachoSlicer::debug_ids(&bytes),
+            vec!["0123456789ABCDEFFEDCBA9876543210".to_owned()]
+        );
+    }
+
+    #[test]
+    fn fat_reports_one_debug_id_per_slice() {
+        let a = thin_with_uuid([0xaa; 16]);
+        let b = thin_with_uuid([0xbb; 16]);
+        let fat = build_fat32(&[(Arch::Arm64, &a), (Arch::X86_64, &b)]);
+        let ids = MachoSlicer::debug_ids(&fat);
+        assert_eq!(ids.len(), 2, "one id per slice, got {ids:?}");
+        assert!(ids.contains(&"AA".repeat(16)));
+        assert!(ids.contains(&"BB".repeat(16)));
+    }
+
+    /// The witness that this is reading the file rather than
+    /// inventing an answer: `object::write` emits no `LC_UUID`, so a
+    /// fixture built by it must come back with nothing.
+    #[test]
+    fn a_macho_without_lc_uuid_reports_nothing() {
+        let f = synthetic_macho_with_dwarf();
+        assert!(
+            MachoSlicer::debug_ids(&f.bytes).is_empty(),
+            "invented a debug id for a Mach-O that carries none"
+        );
+    }
+
+    #[test]
+    fn junk_reports_nothing_rather_than_panicking() {
+        assert!(MachoSlicer::debug_ids(b"not a mach-o at all").is_empty());
+        assert!(MachoSlicer::debug_ids(&[]).is_empty());
+    }
+
+    /// A real linker's output, not ours. Only where one is to hand.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_real_system_binary_reports_one_debug_id() {
+        let Ok(bytes) = std::fs::read("/bin/ls") else {
+            return;
+        };
+        let ids = MachoSlicer::debug_ids(&bytes);
+        assert!(!ids.is_empty(), "/bin/ls carries an LC_UUID; we read none");
+        for id in &ids {
+            assert_eq!(id.len(), 32, "not a 16-byte uuid: {id}");
+            assert!(
+                id.chars()
+                    .all(|c| c.is_ascii_hexdigit() && !c.is_lowercase())
+            );
+        }
+    }
 
     #[test]
     fn rejects_too_short_input() {

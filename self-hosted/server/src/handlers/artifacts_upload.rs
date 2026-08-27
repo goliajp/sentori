@@ -270,6 +270,20 @@ fn debug_id_from_name(name: &str) -> Option<String> {
     None
 }
 
+/// Append any debug id the uploaded name does not already carry, so
+/// that lookup — which matches the frame's `imageUuid` against the
+/// stored name — can find this file whatever the uploader called it.
+pub fn name_carrying(name: String, ids: &[String]) -> String {
+    let mut out = name;
+    for id in ids {
+        if !crate::native_symbolicate::normalize_uuid(&out).contains(id.as_str()) {
+            out.push('-');
+            out.push_str(id);
+        }
+    }
+    out
+}
+
 /// Blob + row. Shared so the two routes cannot drift into storing
 /// artifacts the symbolicator reads differently depending on who
 /// uploaded them.
@@ -286,6 +300,26 @@ async fn store(
             Json(json!({ "error": e.to_string() })),
         )
     })?;
+
+    // A stack finds its dSYM by the debug id embedded in the stored
+    // *name*, and the id lives in the file, not the filename.
+    // `sentori-cli` builds a name that carries it. The manual path
+    // this endpoint's own hint offers — "upload the binary inside the
+    // .dSYM bundle (Contents/Resources/DWARF/<name>)" — does not:
+    // that file is named after the product. It uploads, it parses, it
+    // lists as usable, and no frame ever resolves against it, with
+    // nothing anywhere saying why.
+    //
+    // So read the ids out of the bytes and make sure the name carries
+    // them. Load commands only, for the same reason `usable` is a
+    // header check rather than a DWARF parse: a fat dSYM is hundreds
+    // of megabytes and this runs inside the upload.
+    let debug_ids = if kind == "dsym" {
+        sentori_dwarf_resolver::MachoSlicer::debug_ids(bytes)
+    } else {
+        Vec::new()
+    };
+    let name = name_carrying(name, &debug_ids);
 
     // Can the symbolicator actually read this? Decided here, once,
     // because the answer costs a parse of tens of megabytes and the
@@ -394,16 +428,20 @@ async fn store(
             "id": id,
             "kind": kind,
             "name": name,
-            "content_hash": hash_hex,
-            "size_bytes": bytes.len(),
+            "contentHash": hash_hex,
+            "sizeBytes": bytes.len(),
             // Was this slice already on the release, and did its
             // bytes change? A re-archived dSYM whose debug id the
             // server has never seen is a new slice; one that lands on
             // an existing name with identical content changed
             // nothing, and the uploader deserves to know which.
-            "debug_id": debug_id_from_name(&name),
-            "first_seen": prev_hash.is_none(),
-            "content_changed": prev_hash.as_deref() != Some(hash_hex.as_str()),
+            "debugId": debug_id_from_name(&name),
+            // Every slice of a universal binary, which is what a
+            // real iOS dSYM is. `debugId` reports the first and
+            // is kept for the CLI that reads it.
+            "debugIds": debug_ids,
+            "firstSeen": prev_hash.is_none(),
+            "contentChanged": prev_hash.as_deref() != Some(hash_hex.as_str()),
             // null for kinds this server does not parse ahead of
             // time; false means stored but unreadable.
             "usable": usable,
@@ -450,9 +488,11 @@ fn unusable_hint(kind: &str) -> &'static str {
              build/outputs/mapping/<variant>/mapping.txt"
         }
         "dsym" => {
-            "stored, but this has no DWARF a symbolicator can read — upload the binary inside \
-             the .dSYM bundle (Contents/Resources/DWARF/<name>), or let `sentori-cli upload \
-             dsym <path.dSYM>` find the slices for you"
+            "stored, but no frame can ever resolve against it: it is either not a Mach-O \
+             carrying DWARF, or it carries no LC_UUID, and a dSYM is selected by the debug \
+             id in it — upload the binary inside the .dSYM bundle \
+             (Contents/Resources/DWARF/<name>), or let `sentori-cli upload dsym <path.dSYM>` \
+             find the slices for you"
         }
         _ => "stored, but this server cannot read it",
     }
@@ -471,15 +511,26 @@ pub fn usable_for_symbolication(kind: &str, bytes: &[u8]) -> Option<bool> {
     match kind {
         "sourcemap" => Some(sentori_sourcemap_resolver::ParsedMap::parse(bytes).is_ok()),
         "proguard" => Some(sentori_proguard_resolver::ParsedMapping::parse(bytes.to_vec()).is_ok()),
-        // Header only. insight's main slice is 310 MB, and a full
-        // DWARF parse here would hold the upload's buffer plus a copy
-        // plus the parse — on a small self-hosted box that is how an
-        // artifact upload becomes an OOM. The magic catches the
-        // failure that actually happens (a zip, a plist, the .dSYM
-        // directory wrapper, a text file) at no cost; a Mach-O whose
-        // DWARF turns out to be unusable still surfaces later as an
-        // unresolved frame, which is where it always did.
-        "dsym" => Some(looks_like_macho(bytes)),
+        // Header and load commands only. insight's main slice is
+        // 310 MB, and a full DWARF parse here would hold the upload's
+        // buffer plus a copy plus the parse — on a small self-hosted
+        // box that is how an artifact upload becomes an OOM. The
+        // magic catches the failure that actually happens (a zip, a
+        // plist, the .dSYM directory wrapper, a text file) at no
+        // cost; a Mach-O whose DWARF turns out to be unusable still
+        // surfaces later as an unresolved frame, which is where it
+        // always did.
+        //
+        // The debug id is part of the same question rather than a
+        // second one: a dSYM is selected for a frame by the id it
+        // carries, so one carrying none can never be selected however
+        // cleanly it parses. It lives here and not in `store` so that
+        // `sentori-server verify-artifacts`, which re-decides `usable`
+        // for stored rows, cannot reach the opposite answer.
+        "dsym" => Some(
+            looks_like_macho(bytes)
+                && !sentori_dwarf_resolver::MachoSlicer::debug_ids(bytes).is_empty(),
+        ),
         _ => None,
     }
 }
