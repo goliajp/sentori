@@ -49,7 +49,19 @@ if (!tagged) {
 // A tag exists. It is only honest if the sources it points at are the
 // ones in the tree; otherwise the published package is missing
 // whatever landed since.
-const changedSince = git('diff', '--name-only', `${tag}..HEAD`, '--', 'sdk/native');
+// A consumer resolving `from: "x.y.z"` gets the tagged tree, but it
+// only ever compiles the library targets — `Tests/` is never built by
+// anyone downstream. Requiring a native release for a change to a test
+// file spends a Maven Central publish (the org is over its monthly
+// quota) on something no consumer can observe.
+//
+// Anything outside Tests/ still counts, including fixtures the library
+// reads at runtime.
+const IGNORED = /(^|\/)(Tests|__tests__|androidTest|src\/test)\//;
+const changedSince = git('diff', '--name-only', `${tag}..HEAD`, '--', 'sdk/native')
+  .split('\n')
+  .filter((f) => f.trim() && !IGNORED.test(f))
+  .join('\n');
 if (!changedSince) {
   console.log(`✓ native ${version} is tagged and sdk/native has not moved since`);
   process.exit(0);
