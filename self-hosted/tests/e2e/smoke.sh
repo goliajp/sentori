@@ -982,6 +982,13 @@ echo "$RD" | jq -e '.live > 0' > /dev/null \
 # them. A snippet is documentation somebody compiles, and the last time
 # this repo shipped a command it had not run, the command POSTed to a
 # route no server had ever served.
+# The CLI's probe registration, at its edges — the last route in this
+# server that nothing had ever exercised.
+echo "→ probes:sync holds at its edges"
+SENTORI_BASE="${BASE}" SENTORI_API_TOKEN="${API_TOKEN}" \
+    node "${ROOT}/../scripts/check-probes-sync.mjs" \
+    || { echo "probes:sync does not hold" >&2; exit 1; }
+
 # An issue's history is a list of decisions. A retry is not one, and
 # ten simultaneous clicks of Ignore are one.
 echo "→ repeated and concurrent status writes record once"

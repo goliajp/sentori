@@ -22,6 +22,7 @@ use sentori_ingest_token::{IngestContext, Scope};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlx::Row;
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::state::AppState;
@@ -242,6 +243,11 @@ pub async fn resolve(
     (StatusCode::OK, Json(json!({ "ok": true })))
 }
 
+/// Matches `/v1/events:batch`'s ceiling in spirit: a scan of a large
+/// codebase is still a bounded thing, and an unbounded one is a way to
+/// hold a connection open indefinitely.
+const MAX_PROBE_REFS: usize = 1000;
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProbeSyncBody {
@@ -261,26 +267,66 @@ pub async fn probes_sync(
     if let Err(e) = require_api_scope(&ctx) {
         return e;
     }
-    let mut registered = 0usize;
-    for r in &body.refs {
-        let res = sqlx::query(
-            "INSERT INTO probes (id, project_id, ref, first_registered_release, last_seen_release) \
-             VALUES ($1, $2, $3, $4, $4) \
-             ON CONFLICT (project_id, ref) \
-             DO UPDATE SET last_seen_release = EXCLUDED.last_seen_release",
-        )
-        .bind(Uuid::now_v7())
-        .bind(ctx.project_id)
-        .bind(r)
-        .bind(&body.release)
-        .execute(&state.pool)
-        .await;
-        if res.is_ok() {
-            registered += 1;
-        }
+    // A CLI scanning a large codebase sends what it finds, and there
+    // was no ceiling at all — one request could carry a million refs
+    // and a million round trips with it. `/v1/events:batch` caps at
+    // 200 for the same reason; this is the same shape of endpoint.
+    if body.refs.len() > MAX_PROBE_REFS {
+        return (
+            StatusCode::PAYLOAD_TOO_LARGE,
+            Json(json!({
+                "error": "too_many_refs",
+                "detail": format!("at most {MAX_PROBE_REFS} refs per call"),
+                "sent": body.refs.len(),
+            })),
+        );
     }
+
+    // Deduplicate before the insert. Postgres refuses to let one
+    // statement's ON CONFLICT DO UPDATE touch the same row twice, and
+    // a static scan that finds the same `sentori.probe(ref)` in two
+    // files sends it twice — which the old row-at-a-time loop
+    // tolerated by accident and a single statement does not.
+    let mut seen = std::collections::HashSet::new();
+    let refs: Vec<String> = body
+        .refs
+        .iter()
+        .filter(|r| seen.insert(r.as_str()))
+        .cloned()
+        .collect();
+    let ids: Vec<Uuid> = refs.iter().map(|_| Uuid::now_v7()).collect();
+
+    // One statement. The loop counted only successes and reported the
+    // number, so a database error left the caller with
+    // `registered: 3` for five refs and nothing to act on — not even
+    // a log line.
+    let inserted = sqlx::query(
+        "INSERT INTO probes (id, project_id, ref, first_registered_release, last_seen_release) \
+         SELECT i, $2, r, $3, $3 FROM unnest($1::uuid[], $4::text[]) AS t(i, r) \
+         ON CONFLICT (project_id, ref) \
+         DO UPDATE SET last_seen_release = EXCLUDED.last_seen_release",
+    )
+    .bind(&ids)
+    .bind(ctx.project_id)
+    .bind(&body.release)
+    .bind(&refs)
+    .execute(&state.pool)
+    .await;
+
+    if let Err(e) = inserted {
+        warn!(project_id = %ctx.project_id, error = %e, "probes.sync failed");
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "internal" })),
+        );
+    }
+
     (
         StatusCode::OK,
-        Json(json!({ "registered": registered, "release": body.release })),
+        Json(json!({
+            "registered": refs.len(),
+            "duplicatesIgnored": body.refs.len() - refs.len(),
+            "release": body.release,
+        })),
     )
 }
