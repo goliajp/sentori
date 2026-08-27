@@ -1,6 +1,6 @@
 # Insight 升级笔记 — `sentori-react-native` 0.9.11 → 1.0.0-rc.1
 
-接续 [`docs/runbook/insight-followup-2026-05-17.md`](runbook/insight-followup-2026-05-17.md)
+接续 [`docs/./insight-followup-2026-05-17.md`](./insight-followup-2026-05-17.md)
 （0.9.11 verify path + dashboard v0.9）。本文涵盖：
 
 - 一行升级 + 验证步骤
@@ -321,7 +321,7 @@ Fresh boot + 1 captureException 应该看到：
 - [`docs/insight-upgrade-0.8.md`](insight-upgrade-0.8.md) — GraphQL
   operation 命名、Rage tap、Feature flags、measureFn、Velocity 告警、
   Moments / 流失追踪、OTA bundle 感知
-- [`docs/runbook/insight-followup-2026-05-17.md`](runbook/insight-followup-2026-05-17.md)
+- [`docs/./insight-followup-2026-05-17.md`](./insight-followup-2026-05-17.md)
   — Insight findings 1–6 的修复说明、`pod install --repo-update`
   注意事项
 

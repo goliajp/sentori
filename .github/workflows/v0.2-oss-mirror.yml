@@ -78,12 +78,42 @@ jobs:
           # when v0.1 was decommissioned on 2026-07-23. A reader
           # following it hit a 404 on the first COPY. The v0.2
           # equivalents are in `self-hosted/docker/` and are mirrored.
+          #
+          # `/docs/` was excluded wholesale, and `docs/README.md` said
+          # the files could be read "here or in the OSS mirror" — they
+          # could not: the mirror is where somebody goes to run this,
+          # and it shipped the server with no instructions for it.
+          # The user-facing pages are included back by an allowlist,
+          # ahead of the directory exclude. An allowlist because the
+          # blacklist in this same block has already misfired once (the
+          # unanchored `server/` above), and because a new internal doc
+          # must not become public by being written.
+          #
+          # rsync needs the parent directories included before the
+          # files inside them, hence the bare `/docs/` include.
           rsync -a --delete \
+            --include='/docs/' \
+            --include='/docs/README.md' \
+            --include='/docs/getting-started.md' \
+            --include='/docs/getting-started/' \
+            --include='/docs/getting-started/**' \
+            --include='/docs/self-hosting.md' \
+            --include='/docs/protocol.md' \
+            --include='/docs/errors.md' \
+            --include='/docs/troubleshooting.md' \
+            --include='/docs/teams.md' \
+            --include='/docs/replay-encoding-v2.md' \
+            --include='/docs/sdk-kotlin.md' \
+            --include='/docs/sdk-swift.md' \
+            --include='/docs/recipes/' \
+            --include='/docs/recipes/**' \
+            --include='/docs/legal/' \
+            --include='/docs/legal/**' \
+            --exclude='/docs/**' \
             --exclude='/saas/' \
             --exclude='/server/' \
             --exclude='/web/' \
             --exclude='/docker/' \
-            --exclude='/docs/' \
             --exclude='/docs-v0.1/' \
             --exclude='/docs-v0.2/' \
             --exclude='ROADMAP.md' \

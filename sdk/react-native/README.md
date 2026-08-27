@@ -44,6 +44,25 @@ sentori.init({
   backendHealthUrl: 'https://api.example.com/healthz', // v5.2, see below
 })
 
+### `init()` options
+
+Every field of `InitConfig`, checked against the type by
+`scripts/check-sdk-doc-options.mjs` — a new option cannot ship
+undocumented.
+
+| Option | Type | Required | Default |
+|---|---|---|---|
+| `token` | `string` | yes | — |
+| `ingestUrl` | `string` | yes | — |
+| `release` | `string` | no | `''` — set it, or stacks cannot symbolicate |
+| `environment` | `string` | no | `''` |
+| `detect` | `{ rageTap?, longFreeze?, slowColdStart?, slowApi? }` | no | rageTap / longFreeze / slowColdStart on, `slowApi` off |
+| `replaySeconds` | `number` | no | 60 |
+| `replayScreens` | `boolean` | no | `false` — opt-in; frames may hold user content |
+| `backendHealthUrl` | `string` | no | — |
+| `logLevel` | `'debug' \| 'error' \| 'info' \| 'silent' \| 'warn'` | no | `'warn'` |
+| `beforeSend` | `(event) => event \| null` | no | — return `null` to drop |
+
 sentori.user({ id, email, name })        // drives breadth × depth stats
 sentori.context({ build: 'release', tenant: 'acme' }) // ambient tags;
                                          // every key becomes a queue

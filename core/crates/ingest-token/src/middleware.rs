@@ -61,8 +61,11 @@ async fn resolve_token(
         .ok_or(TokenError::MalformedHeader)?
         .trim();
 
-    if !looks_like_token(plaintext) {
+    if !plaintext.starts_with(crate::TOKEN_PREFIX) {
         return Err(TokenError::WrongPrefix);
+    }
+    if !looks_like_token(plaintext) {
+        return Err(TokenError::WrongLength);
     }
 
     let token = store

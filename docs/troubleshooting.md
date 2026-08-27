@@ -140,68 +140,22 @@ curl -i -X POST "$SENTORI_INGEST_URL/v1/events" \
 
 Possible hints:
 
+These are every hint the server sends, measured against a running
+instance rather than written from memory. The four in this table
+before 2026-08-27 were invented: none of those strings existed, and
+two of them named an `sk_` token, a concept `protocol.md` records as
+removed.
+
 | Hint | Cause | Fix |
 |---|---|---|
-| `token format invalid` | Doesn't start with `st_` (public) or `sk_` (admin) | Copy from project settings, not from a chat snippet |
-| `token revoked` | Was rotated/deleted | Rotate yours to the new value |
-| `token mismatch` | Valid prefix but unknown to server | Wrong project? Cross-check `SENTORI_TOKEN` vs project id |
-| `admin token required` | You used `st_` on an admin endpoint | Switch to the `sk_` token |
+| `send \`Authorization: Bearer st_<token>\` header` | No Authorization header at all | Add the header |
+| `Authorization header must be \`Bearer st_<token>\`` | Header present, `Bearer ` prefix missing | Include `Bearer ` and one space |
+| `token must start with \`st_\`` | The value is not a Sentori token | Copy from Settings → Tokens, not from a chat snippet |
+| `token starts with \`st_\` but is the wrong length …` | Truncated in transit | Copy the whole value; it is `st_` plus 26 characters |
+| `token unknown or revoked` | Well-formed, not in this instance's table | Wrong instance, or the token was revoked. Mint a new one |
+| `token has wrong scope for this endpoint` | `ingest` token on an endpoint needing `api` | Mint an `api`-scope token |
 
-## 5. Webhook signature doesn't validate
-
-**Diagnose**
-
-Sentori signs every webhook with HMAC-SHA-256 of the raw body using
-the webhook's secret. Header: `X-Sentori-Signature: sha256=<hex>`.
-
-Common signature failures:
-
-- **Re-serialising the body** before HMAC — even minimal whitespace
-  changes break the hash. Validate against the raw bytes.
-- **Wrong secret** — webhook secrets are per-rule, not per-project.
-  Check Alert rule → webhook → secret.
-- **Constant-time comparison missing** — if you `===` strings,
-  upstream timing-attack tests in the receiver will flag you. Use
-  `crypto.timingSafeEqual` (Node) or the equivalent.
-
-**Fix**
-
-```ts
-import crypto from 'node:crypto'
-
-function verify(rawBody: Buffer, header: string, secret: string): boolean {
-  const expected = `sha256=${crypto.createHmac('sha256', secret).update(rawBody).digest('hex')}`
-  const a = Buffer.from(header)
-  const b = Buffer.from(expected)
-  return a.length === b.length && crypto.timingSafeEqual(a, b)
-}
-```
-
-## 6. crash-free sessions is stuck at 0%
-
-The Overview page shows `crash-free sessions: 0%` even though some
-events are flowing. Diagnose by checking the SDK is calling
-`sentori.startSession()` (RN does this in `init`; web does not).
-
-For web: sessions are not currently emitted by the JS SDK. The
-crash-free metric only renders on projects that have at least one
-session ping. If you only have web apps, the metric is correctly
-zero (zero sessions → zero non-crashed → 0%). Hide the widget or
-ignore it.
-
-For RN: the SDK pings on every `init` and again on app foreground.
-If the metric is stuck at 0%, watch the logs:
-
-```bash
-adb logcat -s sentori     # Android
-xcrun simctl spawn booted log stream --predicate 'process == "MyApp"' | grep sentori   # iOS
-```
-
-Look for `session: started` lines. Missing → init ran but
-`startSession` failed (usually a permissions or network issue on
-boot).
-
-## 7. Regression didn't fire when I expected
+## 5. Regression didn't fire when I expected
 
 **Diagnose**
 
@@ -235,42 +189,7 @@ events from a newer release: the regression evaluator runs on a
 1-minute cron; wait a minute and refresh. Persistent miss = bug,
 file an issue.
 
-## 8. Hook errors not captured (React)
-
-**Diagnose**
-
-`useSentori()` / `useCaptureError()` throw if called outside a
-`<SentoriProvider>`. That's deliberate — a silent no-op would be
-worse than a clear error.
-
-Symptoms:
-
-- Component test fails with `[sentori-react] hook used outside <SentoriProvider>`
-- Storybook renders complain on every story
-
-**Fix**
-
-In tests: wrap the render with the Provider, even with a dummy
-config:
-
-```tsx
-const PROVIDER = (
-  <SentoriProvider
-    config={{
-      token: 'st_testtesttesttesttesttesttest',
-      release: 'test@0.0.0',
-      environment: 'test',
-      ingestUrl: 'http://127.0.0.1:0',
-    }}
-  >
-    {/* ... */}
-  </SentoriProvider>
-)
-```
-
-In Storybook: add the Provider to `.storybook/preview.tsx` decorators.
-
-## 9. CI builds are slow because of source-map upload
+## 6. CI builds are slow because of source-map upload
 
 The `sentori-cli upload sourcemap` step is sequential and uploads
 the entire directory. For very large bundles (10+ MB) it can take
@@ -287,7 +206,7 @@ the entire directory. For very large bundles (10+ MB) it can take
 - Increase the CI runner's network bandwidth (GitHub `ubuntu-latest`
   is usually 1 Gbps; `runs-on: ubuntu-22.04` is similar).
 
-## 10. Local dev floods the dashboard
+## 7. Local dev floods the dashboard
 
 You're seeing 1000+ events from `environment: dev` in production
 dashboard.
@@ -310,7 +229,7 @@ if (!__DEV__) {
 
 Or set up a separate `dev` project with its own token, and switch
 between them via `.env.local` (untracked) vs `.env.production`
-(tracked). See [Multi-environment](./recipes/multi-environment.md)
+(tracked). See [Multi-environment](./archive/web-sdk/multi-environment.md)
 for the full strategy.
 
 ## Still stuck?
