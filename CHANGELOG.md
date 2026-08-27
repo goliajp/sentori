@@ -6,6 +6,55 @@
 
 ---
 
+## v3.8.0(2026-08-27 — 一个新错误爆发的那一刻,正是它最可能 500 的那一刻)
+
+上一轮的黑盒 agent 自己列了没覆盖的面:限流、符号化、push 投递、并发写、
+retention。挑限流开始 —— 这个仓库有过「限流器写了但从没在跑」的前科。
+
+### 限流是在跑的,但压测顺手炸出一个更重的东西
+
+默认 100/sec,1 秒内打 200 个:**100 个 429**(限流生效),外加 **9 个 500**。
+
+日志:`duplicate key value violates unique constraint
+"issues_project_id_fingerprint_key"`。
+
+`SELECT … FOR UPDATE` 只能锁**已存在**的行,行不存在时挡不住并发插入。两个请求
+带同一 fingerprint 同时读到 None,同时 INSERT,一个撞唯一约束 → 500 → 而我们
+自己的契约叫 SDK **对 5xx 重试**。
+
+**时机是最坏的**:一个 issue 一生只被创建一次,而那一刻正是一个新故障第一次在
+所有设备上同时爆发的时刻 —— 并发最高、最需要它工作的时刻。
+
+改成让数据库仲裁:`ON CONFLICT (project_id, fingerprint) DO NOTHING RETURNING id`,
+抢输的一方重新读到赢家的行、拿到锁、走原本的「issue 已存在」路径(包括回归检测,
+所以不能简单写成一个返回 id 的 upsert)。
+
+`scripts/check-ingest-concurrency.mjs` 进 e2e:一个从没见过的 fingerprint,
+60 个并发发送,任何 5xx 都红。**验过它会红** —— stash 掉修复重建镜像,80 个并发
+里 6 个 500。
+
+### 文档说的环境变量,一半是假的
+
+- **`troubleshooting.md` 叫人调 `SENTORI_RATE_LIMIT_PER_MIN`** —— 不存在。真名是
+  `SENTORI_RATELIMIT_PER_TOKEN_RPS`,单位不同、数量级不同。
+- **`cli-auth.md` 把 `SENTORI_ADMIN_URL` 列为 CLI 查找 base URL 的第 2 顺位** ——
+  也不存在;CLI 读的是 `SENTORI_API_URL`。
+- **compose 一个限流变量都不透传**。`protocol.md` 记录了 5 个,自建用户一个都
+  设不了 —— 既不能调也不能关。
+
+`scripts/check-env-vars-real.mjs`:文档里每个 `SENTORI_*` 必须是代码真读的,
+且叫人设的那几个必须能从 compose 透传。它理解 `_FILE` 是 `env(key + "_FILE")`
+的通用机制(第一版把两个真变量报成虚构)。
+
+**这道门的第一版有个我自己开的后门**:我把 `SENTORI_RATE_LIMIT_PER_MIN` 放进了
+豁免名单,于是一道为抓它而写的门抓不到它。豁免名单是给「服务端确实不读的变量」
+用的,不是用来把红门变绿的。
+
+`docs/runbook/v1.0-fresh-deploy.md` 归档 —— 标题就是「OAuth wiring」,而 OAuth
+在 v1 重构里删了。
+
+---
+
 ## v3.7.1(2026-08-27 — iOS live 测试的 30 秒在冷 runner 上不够)
 
 3.7.0 之后 `mobile-e2e` 的 `ios-live-ingest` 红了一次。诊断顺序留在这里,因为
