@@ -6,6 +6,18 @@
 
 ---
 
+## v3.15.2(2026-09-06 — 那道门被我放进了一个没有 bun 的 job)
+
+3.15.1 要修的东西都绿了(四个 sdk job、webapp、e2e),唯一红的是新加的那个 checker
+本身:它被我放进 `server-test`,那个 job 不装 bun,于是 `spawnSync bun ENOENT` 加一段
+Node 堆栈。
+
+挪到 `workflows` —— 那个 job 管的就是 CI 配置,现在给它装了 bun。脚本在 PATH 上找不到
+bun 时也不再抛异常,而是把「为什么跑不了」印出来:**跑不起来的门不是门**,而它跑不起来
+的原因必须是它自己说的那句话。
+
+验过会红:PATH 上留 node、去掉 bun。
+
 ## v3.15.1(2026-09-06 — CI 跑的 bun 比写 lockfile 的那个旧)
 
 `build` 和 `mobile-e2e` 在 master 上红了,而这个仓库里没有任何依赖变过。CI pin 的是
