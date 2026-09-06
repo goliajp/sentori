@@ -6,6 +6,31 @@
 
 ---
 
+## v3.15.1(2026-09-06 — CI 跑的 bun 比写 lockfile 的那个旧)
+
+`build` 和 `mobile-e2e` 在 master 上红了,而这个仓库里没有任何依赖变过。CI pin 的是
+bun 1.3.13;我们的 lockfile 是 1.4.x 写的,1.3.13 读不了就重新解析 ——
+`error: lockfile had changes, but lockfile is frozen`,而同一棵树上本地
+`bun install --frozen-lockfile` 刚刚通过。**preflight 看不见,因为 preflight 跑的是
+开发机上的 bun。**
+
+实测(root 和 apps/rn-example,frozen install):1.4.2 干净 / 1.4.1 干净 /
+1.3.13 报 lockfile had changes。
+
+版本号写在四个 workflow 文件里,其中两个写的是 `latest` —— 那根本不是 pin,上游发一个
+新版本就够把它推走。现在只写在 `.bun-version`,每个 workflow 用 `bun-version-file` 读。
+
+删掉两个从 initial commit 起就没动过的孤儿 lockfile,它们都在 workspace member 里面
+(那里由根 lockfile 说了算):`apps/rn-example/bun.lock` 记的是 Expo 55 /
+react-native 0.83.6,而它的 package.json 从 2026-08-16 起要的是 Expo 57 / 0.86.2;
+`sdk/react-native/bun.lock` 同理。bun 1.4 忽略它们读根 lockfile,1.3.13 读的是那份陈的。
+没有任何东西在写它们,所以也没有任何东西纠正过它们。
+
+门:`scripts/check-bun-version.mjs` —— 这个 shell 的 bun 就是 CI 装的那个、没有 workflow
+自己写版本号、没有 workspace member 带自己的 lockfile。三条都验过会红。preflight 现在
+也在 `apps/rn-example` 里跑一次 frozen install,那正是 mobile-e2e 做的、而 preflight
+一直没做的事。
+
 ## v3.15.0(2026-09-06 — 三个 gauge 读 0、一个 dump 覆盖 7/26、一个从来没人验的时区)
 
 给 spg 写的 corpus 第一次跑起来,四个发现里有两个是我们自己的;补最后一个欠了四轮的
