@@ -3,9 +3,9 @@
 //!
 //! Uses `INSERT … SELECT json_populate_record(...)`
 //! pattern per table. On PK conflict:
-//!   - `--overwrite`  → `ON CONFLICT DO UPDATE` (every
-//!                       column from the source row).
-//!   - default        → `ON CONFLICT DO NOTHING`.
+//!   - `--overwrite` → `ON CONFLICT DO UPDATE` (every column from
+//!     the source row).
+//!   - default → `ON CONFLICT DO NOTHING`.
 
 use std::path::Path;
 

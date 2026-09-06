@@ -86,26 +86,41 @@ async fn export_one(
 }
 
 /// Tables that carry a `project_id` column we can filter on.
+///
+/// Read from `core/migrations` rather than remembered: the previous
+/// list named eighteen tables and sixteen of them no longer existed,
+/// so `export --project` filtered two and silently exported nothing
+/// for the rest.
 const PROJECT_SCOPED: &[&str] = &[
+    "audit_logs",
+    "project_assignments",
+    "tokens",
     "issues",
     "events",
-    "identity_fingerprints",
-    "spans",
-    "replay_sessions",
-    "runtime_metrics_raw",
-    "runtime_metrics_1m",
-    "runtime_metrics_1h",
-    "runtime_metrics_1d",
-    "runtime_metrics_dropped",
-    "cert_watch_domains",
-    "cert_observations",
-    "integrations",
-    "alert_rules",
-    "saved_views",
-    "usage_counters",
-    "project_user_visibility",
-    "project_dropped",
+    "event_attachments",
+    "releases",
+    "probes",
+    "assert_stats",
+    "notification_prefs",
+    "delivery_log",
+    "push_tokens",
+    "push_credentials",
+    "device_tokens",
+    "push_sends",
+    "push_preferences",
+    "backend_checks",
 ];
+
+/// `PROJECT_SCOPED`, for the schema-agreement test in `commands::mod`.
+///
+/// The list stays private — nothing outside this module should filter
+/// by it — but a test one module up has to be able to compare it
+/// against `core/migrations`, because the list going stale is exactly
+/// what happened and nothing else can see it.
+#[cfg(test)]
+pub(super) fn project_scoped_for_test() -> &'static [&'static str] {
+    PROJECT_SCOPED
+}
 
 fn has_project_id(table: &str) -> bool {
     PROJECT_SCOPED.contains(&table)
