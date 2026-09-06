@@ -120,6 +120,16 @@ jobs:
       - name: every table our SQL names exists in the migrations
         run: node scripts/check-sql-tables-exist.mjs
 
+      # 185 sites of ours evaluate `now()`, an `interval` or an
+      # `extract` in the *session's* time zone, and none of them names
+      # one. Two deployments of this image could mean different things
+      # by the same query with nothing in the result to say so. Both
+      # binaries pin UTC in the startup packet and read it back; this
+      # checks nothing else opens a connection and the two copies of
+      # the pinning module have not drifted.
+      - name: every connection pins the session TimeZone
+        run: node scripts/check-timezone-pinned.mjs
+
       # `sentori-server dump/export/import/restore/status` ships as a
       # binary and had no gate at all — no fmt, no clippy, no test. Its
       # table list was the pre-v1 kernel's: it reached seven of our

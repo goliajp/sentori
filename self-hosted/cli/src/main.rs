@@ -28,9 +28,8 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
-use sqlx::PgPool;
-
 mod commands;
+mod db;
 
 #[derive(Parser, Debug)]
 #[command(name = "sentorictl", version, about, long_about = None)]
@@ -96,7 +95,7 @@ async fn main() -> anyhow::Result<()> {
         .clone()
         .or_else(|| std::env::var("DATABASE_URL").ok())
         .context("Postgres URL required (--db or DATABASE_URL env)")?;
-    let pool = PgPool::connect(&db_url).await.context("db connect")?;
+    let pool = db::connect(&db_url).await.context("db connect")?;
 
     match cli.cmd {
         Cmd::Dump { out } => commands::dump::run(&pool, &out, cli.quiet).await?,

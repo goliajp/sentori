@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use sqlx::{PgPool, Row};
+use sqlx::Row;
 use uuid::Uuid;
 
 use crate::state::AppState;
@@ -26,7 +26,7 @@ use crate::state::AppState;
 /// artifact — for after a resolver learns a format it used to refuse,
 /// which is exactly what happened to Hermes maps in 2.14.0.
 pub async fn run(database_url: &str, all: bool) -> Result<(), Box<dyn std::error::Error>> {
-    let pool = PgPool::connect(database_url).await?;
+    let pool = crate::db::connect(database_url).await?;
     let attachments = crate::blob_store::AttachmentStore::from_env().await?;
     let state = Arc::new(AppState::new(pool.clone(), attachments));
 
