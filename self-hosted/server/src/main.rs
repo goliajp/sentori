@@ -36,6 +36,7 @@ mod blob_store;
 mod bootstrap;
 mod bundle;
 mod client_ip;
+mod db;
 mod env_config;
 mod fcm;
 mod handlers;
@@ -80,7 +81,7 @@ async fn main() -> anyhow::Result<()> {
         let email = args
             .get(2)
             .context("usage: sentori-server reset-password <email>")?;
-        let pool = PgPool::connect(&db_url).await.context("db connect")?;
+        let pool = db::connect(&db_url).await.context("db connect")?;
         return bootstrap::reset_password(&pool, email).await;
     }
 
@@ -116,7 +117,7 @@ async fn main() -> anyhow::Result<()> {
 
     info!(%bind, "sentori self-hosted server boot");
 
-    let pool = PgPool::connect(&db_url).await.context("db connect")?;
+    let pool = db::connect(&db_url).await.context("db connect")?;
     run_migrations(&pool).await.context("migrate")?;
 
     // Env-declared owner reconcile (idempotent, declarative).

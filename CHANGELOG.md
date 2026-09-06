@@ -6,6 +6,60 @@
 
 ---
 
+## v3.15.0(2026-09-06 — 三个 gauge 读 0、一个 dump 覆盖 7/26、一个从来没人验的时区)
+
+给 spg 写的 corpus 第一次跑起来,四个发现里有两个是我们自己的;补最后一个欠了四轮的
+门时,又撞出三个 spg 的协议缺陷。这一版是前两个的修复 + 那个门。
+
+### 三个 `/metrics` gauge 问了没人能回答的问题,三个都发布 `0`
+
+`alert_rules` 被 v1 重写删了;`sessions` 从 `0001_identity.sql` 起就叫
+`auth_sessions`;`sentori_issues_open` 过滤 `status = 'unresolved'`,而这个列的 CHECK
+从来不允许这个值。前两个报错,helper 把每个错误变成 `0`。第三个**成功了,只是什么都
+没匹配上** —— 再好的错误处理也抓不到它,只有读那一列自己的约束能。
+
+gauge 读 0 是健康 gauge 大多数时候的读数,所以它活过了整个 v1 schema 的生命周期。
+
+`sentori_alerts_active` 直接删掉而不是改指向:v1 里没有任何东西是 alert rule,而一个
+分不清「没有」和「坏了」的 gauge 比没有更糟。helper 现在返回 `Option`,调用方直接不
+输出那一行 —— Prometheus 本来就有「没测到」的表示法,scraper 能对缺失的 series 告警,
+对一个没有含义的 0 不能。
+
+门:`scripts/check-sql-tables-exist.mjs`,我们 SQL 里点名的每一张表都必须在 migration
+里存在。260 处引用。
+
+### `dump` 覆盖了我们 26 张表里的 7 张
+
+`commands::TABLES` 驱动 `dump` / `status` / `export` / `restore`,而它还是 v1 之前那个
+内核的列表:34 条里有 27 条点名的表重写时就删了。`restore` 静默跳过缺失的文件而且这是
+设计使然(快照可能是增量的)—— 于是往返在两个方向上都报成功,同时漏掉 `tokens`、
+`releases`、`release_artifacts`、每一张 push 表和每一个附件。
+
+两个列表都按外键拓扑序从 `core/migrations` 重建,不再靠手工维护。
+
+门:`commands::schema_agreement` 四个测试,读 `core/migrations` 现场比对。
+
+**两个都能活这么久,是因为 `self-hosted/cli` 一道门都没有** —— 没有 fmt、没有 clippy、
+没有测试。preflight 和 CI 覆盖 `core` 和 `self-hosted/server`,而这个 crate 是作为二进制
+发布的。现在接上了,接上的时候里面躺着两个 clippy error。
+
+### 会话时区:欠了四轮,补的时候发现 pin 一直在,缺的是门
+
+`now()`、我们渲染的每个 `timestamptz`、retention 删除里的 interval 运算、worker 里的
+`extract(epoch FROM …)`,都在**会话的**时区里求值。185 处依赖它,没有一处点名时区。
+
+`sqlx` 一直在 startup packet 里要 `TimeZone=UTC`,所以在 PostgreSQL 上 pin 本来就在。
+真正缺的是**有没有人验过** —— 本仓库最高频的那个缺陷,又一次。
+
+`db.rs` 现在是唯一开连接的地方:要 UTC,然后**读回来**。第一条连接手工开,因为连接池
+把 `after_connect` 的失败报成 acquire 超时,那条消息指着错误的组件。之后每一条物理连接
+都再验一次。读回用 `current_setting` 而不是 `SHOW`:扩展协议上函数调用才是正常形状。
+
+门:`scripts/check-timezone-pinned.mjs` —— 别的文件不许自己开连接,server 和 CLI 的两份
+`db.rs` 不许漂移(CLI 是独立 workspace,共享不了)。红过才信:去掉 `.options()` 的单测、
+新加一个 `PgPool::connect` 的门、两份副本漂移的门,以及拿一台服务器默认时区是 Asia/Tokyo
+的真 PostgreSQL 验读回本身。
+
 ## v3.14.0(2026-08-28 — 我修好了错误文案,却从没看过一张错误截图)
 
 这轮早前我修了 `formatApiError`(它一直渲染成一个裸冒号)。今天把 mock 的失败开关

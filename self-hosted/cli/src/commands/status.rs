@@ -15,9 +15,7 @@ pub async fn run(pool: &PgPool) -> anyhow::Result<()> {
             .context("read _sqlx_migrations")?;
     println!(
         "schema version: {}",
-        latest
-            .map(|(v,)| v.to_string())
-            .unwrap_or_else(|| "none".into())
+        latest.map_or_else(|| "none".into(), |(v,)| v.to_string())
     );
     println!();
     println!("row counts:");

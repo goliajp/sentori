@@ -15,7 +15,6 @@
 
 use serde_json::Value;
 use sqlx::PgPool;
-use sqlx::postgres::PgPoolOptions;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -25,10 +24,7 @@ use crate::pipeline::{IncomingEvent, Kind, compute_fingerprint, group_identity};
 // as `ingest`.
 #[allow(clippy::too_many_lines)]
 pub async fn run(database_url: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let pool = PgPoolOptions::new()
-        .max_connections(2)
-        .connect(database_url)
-        .await?;
+    let pool = crate::db::connect_with_max(database_url, 2).await?;
 
     let mixed: Vec<(Uuid, Uuid, String, String, String, Value)> = sqlx::query_as(
         "SELECT id, project_id, kind, group_title, message_sample, surface \

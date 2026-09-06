@@ -112,6 +112,36 @@ jobs:
       - name: SQL columns balance, and reads are selected
         run: node scripts/check-sql-inserts.mjs
 
+      # Three /metrics gauges queried something that could not answer —
+      # two named tables the v1 rewrite deleted, one a `status` value
+      # the column's CHECK forbids — and all three published `0`, which
+      # is what a healthy gauge reads most of the time. Nothing raised
+      # and nobody looked, for the life of the v1 schema.
+      - name: every table our SQL names exists in the migrations
+        run: node scripts/check-sql-tables-exist.mjs
+
+      # 185 sites of ours evaluate `now()`, an `interval` or an
+      # `extract` in the *session's* time zone, and none of them names
+      # one. Two deployments of this image could mean different things
+      # by the same query with nothing in the result to say so. Both
+      # binaries pin UTC in the startup packet and read it back; this
+      # checks nothing else opens a connection and the two copies of
+      # the pinning module have not drifted.
+      - name: every connection pins the session TimeZone
+        run: node scripts/check-timezone-pinned.mjs
+
+      # `sentori-server dump/export/import/restore/status` ships as a
+      # binary and had no gate at all — no fmt, no clippy, no test. Its
+      # table list was the pre-v1 kernel's: it reached seven of our
+      # twenty-six tables and named twenty-seven that no longer exist,
+      # and it survived a whole major rewrite that way.
+      - name: cli fmt, clippy and tests
+        run: |
+          cd self-hosted/cli
+          cargo fmt --check
+          cargo clippy --all-targets --quiet -- -D warnings
+          cargo test --quiet
+
       # A file no `mod` reaches is never compiled, so nothing else in
       # this job would notice it. That is how the rate limiter sat
       # written-but-dead while ingest ran unlimited.

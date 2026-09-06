@@ -28,7 +28,7 @@
 
 use std::sync::Arc;
 
-use sqlx::{PgPool, Row};
+use sqlx::Row;
 use uuid::Uuid;
 
 use crate::state::AppState;
@@ -150,7 +150,7 @@ pub fn spawn_for_release(state: &Arc<AppState>, project_id: Uuid, release_name: 
 /// upload that predates this code, a pass that failed, or a map
 /// replaced after the fact.
 pub async fn run(database_url: &str, only: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
-    let pool = PgPool::connect(database_url).await?;
+    let pool = crate::db::connect(database_url).await?;
     let attachments = crate::blob_store::AttachmentStore::from_env().await?;
     let state = Arc::new(AppState::new(pool.clone(), attachments));
 
