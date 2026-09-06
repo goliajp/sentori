@@ -84,6 +84,22 @@ jobs:
           bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
           ./actionlint -color
 
+      # The toolchain these files pin is part of what they are. CI ran
+      # bun 1.3.13 while the lockfiles here are written by 1.4.x, and
+      # 1.3.13 re-resolves rather than reading them — `build` and
+      # `mobile-e2e` went red on master with no dependency change, on a
+      # tree where preflight had just passed with the developer's bun.
+      #
+      # It lives in this job because this job is about CI config, and
+      # because it needs a bun to ask. The first version of this step
+      # was in `server-test`, which has no bun, and failed with
+      # `spawnSync bun ENOENT` — a gate that cannot run is not a gate.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: bun is the version CI installs, and no member has its own lockfile
+        run: node scripts/check-bun-version.mjs
+
   server-test:
     needs: changes
     if: needs.changes.outputs.server == 'true' || needs.changes.outputs.infra == 'true'
@@ -109,15 +125,6 @@ jobs:
       # endpoint always 500s — and from the outside that is
       # indistinguishable from a feature nobody uses, which is exactly
       # how push read for a year.
-      # CI pinned bun 1.3.13 in four files, two of them as `latest`,
-      # while the lockfiles here are written by 1.4.x. On 2026-09-06
-      # `build` and `mobile-e2e` went red on master with no change to
-      # any dependency: 1.3.13 re-resolves a lockfile 1.4 wrote and
-      # reports `lockfile had changes` under --frozen-lockfile.
-      # Preflight could not see it — it ran the developer's bun.
-      - name: bun is the version CI installs, and no member has its own lockfile
-        run: node scripts/check-bun-version.mjs
-
       - name: SQL columns balance, and reads are selected
         run: node scripts/check-sql-inserts.mjs
 

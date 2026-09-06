@@ -27,7 +27,21 @@ if (!/^\d+\.\d+\.\d+$/.test(want)) {
   process.exit(1);
 }
 
-const got = execFileSync('bun', ['--version'], { encoding: 'utf8' }).trim();
+let got;
+try {
+  got = execFileSync('bun', ['--version'], { encoding: 'utf8' }).trim();
+} catch {
+  // A gate that cannot run is not a gate. The first CI placement of
+  // this script was a job with no bun in it, and the failure read
+  // `spawnSync bun ENOENT` with a Node stack, which says nothing
+  // about what is wrong or where.
+  console.error(
+    '✗ no `bun` on PATH, so this checker cannot ask what version it is.\n\n' +
+      '    In CI: this job needs `oven-sh/setup-bun` with\n' +
+      '    `bun-version-file: .bun-version` before this step.',
+  );
+  process.exit(1);
+}
 if (got !== want) {
   console.error(
     `✗ this shell runs bun ${got}; .bun-version says ${want}.\n\n` +
