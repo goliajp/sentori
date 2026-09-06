@@ -54,94 +54,80 @@ pub async fn handle(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     );
 
     // ── push queue depth ────────────────────────────────────
-    let push_queued = scalar_i64(
+    gauge(
+        &mut out,
         &state.pool,
+        "sentori_push_queued",
+        "Push sends currently queued",
         "SELECT COUNT(*)::bigint FROM push_sends WHERE status = 'queued'",
     )
     .await;
-    let push_failed_24h = scalar_i64(
+    gauge(
+        &mut out,
         &state.pool,
+        "sentori_push_failed_24h",
+        "Push sends with status=failed in last 24h",
         "SELECT COUNT(*)::bigint FROM push_sends \
          WHERE status = 'failed' AND created_at >= now() - INTERVAL '24 hours'",
     )
     .await;
-    let push_sent_24h = scalar_i64(
+    gauge(
+        &mut out,
         &state.pool,
+        "sentori_push_sent_24h",
+        "Push sends with status=sent in last 24h",
         "SELECT COUNT(*)::bigint FROM push_sends \
          WHERE status = 'sent' AND created_at >= now() - INTERVAL '24 hours'",
     )
     .await;
-    line(
-        &mut out,
-        "sentori_push_queued",
-        "Push sends currently queued",
-        push_queued,
-    );
-    line(
-        &mut out,
-        "sentori_push_failed_24h",
-        "Push sends with status=failed in last 24h",
-        push_failed_24h,
-    );
-    line(
-        &mut out,
-        "sentori_push_sent_24h",
-        "Push sends with status=sent in last 24h",
-        push_sent_24h,
-    );
 
     // ── ingest volume 24h ───────────────────────────────────
-    let events_24h = scalar_i64(
+    gauge(
+        &mut out,
         &state.pool,
+        "sentori_events_24h",
+        "Total events ingested in last 24h",
         "SELECT COUNT(*)::bigint FROM events \
          WHERE received_at >= now() - INTERVAL '24 hours'",
     )
     .await;
-    let issues_open = scalar_i64(
-        &state.pool,
-        "SELECT COUNT(*)::bigint FROM issues WHERE status = 'unresolved'",
-    )
-    .await;
-    line(
-        &mut out,
-        "sentori_events_24h",
-        "Total events ingested in last 24h",
-        events_24h,
-    );
-    line(
-        &mut out,
-        "sentori_issues_open",
-        "Issues currently in unresolved state",
-        issues_open,
-    );
 
-    // ── alerts ──────────────────────────────────────────────
-    let alerts_enabled = scalar_i64(
+    // `status = 'open'`. It read `'unresolved'`, which the column's
+    // CHECK constraint has never allowed — `('open','resolved',
+    // 'ignored')` since 0003_events.sql. That query succeeded and
+    // matched nothing, so this gauge has read 0 for the life of the v1
+    // schema. Note the shape: unlike the two below it, no error was
+    // ever raised, so no amount of error handling would have caught
+    // it. Only reading the column's own constraint does.
+    gauge(
+        &mut out,
         &state.pool,
-        "SELECT COUNT(*)::bigint FROM alert_rules \
-         WHERE enabled = TRUE AND COALESCE(muted, FALSE) = FALSE",
+        "sentori_issues_open",
+        "Issues currently in open state",
+        "SELECT COUNT(*)::bigint FROM issues WHERE status = 'open'",
     )
     .await;
-    line(
-        &mut out,
-        "sentori_alerts_active",
-        "Alert rules currently enabled and not muted",
-        alerts_enabled,
-    );
+
+    // `sentori_alerts_active` stood here and counted `alert_rules`.
+    // There is no such table: it belonged to the pre-v1 schema and the
+    // v1 rewrite removed it. The query has failed ever since, and the
+    // old `scalar_i64` turned every failure into 0 — so the metric read
+    // "no alerts are active", which is also what it would read if the
+    // feature existed and nothing was firing. A gauge that cannot
+    // distinguish "none" from "broken" is worse than no gauge, so it is
+    // gone rather than repointed: nothing in v1 is an alert rule.
 
     // ── sessions ────────────────────────────────────────────
-    let sessions_active = scalar_i64(
+    // `auth_sessions`, not `sessions` — the table has been called that
+    // since 0001_identity.sql and this query never matched it.
+    gauge(
+        &mut out,
         &state.pool,
-        "SELECT COUNT(*)::bigint FROM sessions \
-         WHERE expires_at > now()",
+        "sentori_user_sessions_active",
+        "Active dashboard sessions (auth_sessions.expires_at > now())",
+        "SELECT COUNT(*)::bigint FROM auth_sessions WHERE expires_at > now()",
     )
     .await;
-    line(
-        &mut out,
-        "sentori_user_sessions_active",
-        "Active dashboard sessions (sessions.expires_at > now())",
-        sessions_active,
-    );
 
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -153,14 +139,39 @@ pub async fn handle(State(state): State<Arc<AppState>>) -> impl IntoResponse {
 
 // `'static`: every caller passes a literal, and sqlx 0.9 makes
 // that a type-level fact rather than a convention.
-async fn scalar_i64(pool: &sqlx::PgPool, sql: &'static str) -> i64 {
-    sqlx::query(sql)
-        .fetch_optional(pool)
-        .await
-        .ok()
-        .flatten()
-        .and_then(|r| r.try_get::<i64, _>(0).ok())
-        .unwrap_or(0)
+/// Emit one gauge, or emit nothing.
+///
+/// Nothing is the point. Three of the metrics in this file queried
+/// something that could not answer — two named tables the v1 rewrite
+/// removed, one a `status` value the column's CHECK has never
+/// allowed — and all three published `0`, which is what a healthy
+/// counter reads most of the time. Prometheus already has a
+/// representation for "not measured": the series is absent. A scraper
+/// can alert on absent. It cannot alert on a zero that means nothing.
+async fn gauge(out: &mut String, pool: &sqlx::PgPool, name: &str, help: &str, sql: &'static str) {
+    if let Some(v) = scalar_i64(pool, sql).await {
+        line(out, name, help, v);
+    }
+}
+
+/// Run a scalar count, or return `None` if it could not be run.
+///
+/// It used to return `i64` and `unwrap_or(0)`. That is why two of these
+/// metrics queried tables that do not exist for the whole life of the
+/// v1 schema without anyone noticing: a failed query and an empty table
+/// both read `0`, and 0 is exactly what a healthy counter looks like
+/// most of the time. Prometheus has a representation for "I could not
+/// measure this" — the absence of the series — and it is not the same
+/// as zero. Callers omit the line rather than publish a number they did
+/// not measure.
+async fn scalar_i64(pool: &sqlx::PgPool, sql: &'static str) -> Option<i64> {
+    match sqlx::query(sql).fetch_optional(pool).await {
+        Ok(row) => row.and_then(|r| r.try_get::<i64, _>(0).ok()),
+        Err(e) => {
+            tracing::warn!(error = %e, sql, "metrics: scalar query failed");
+            None
+        }
+    }
 }
 
 fn line(out: &mut String, name: &str, help: &str, value: i64) {

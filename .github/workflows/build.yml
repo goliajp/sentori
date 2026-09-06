@@ -112,6 +112,14 @@ jobs:
       - name: SQL columns balance, and reads are selected
         run: node scripts/check-sql-inserts.mjs
 
+      # Three /metrics gauges queried something that could not answer —
+      # two named tables the v1 rewrite deleted, one a `status` value
+      # the column's CHECK forbids — and all three published `0`, which
+      # is what a healthy gauge reads most of the time. Nothing raised
+      # and nobody looked, for the life of the v1 schema.
+      - name: every table our SQL names exists in the migrations
+        run: node scripts/check-sql-tables-exist.mjs
+
       # A file no `mod` reaches is never compiled, so nothing else in
       # this job would notice it. That is how the rate limiter sat
       # written-but-dead while ingest ran unlimited.
