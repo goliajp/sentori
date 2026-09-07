@@ -3,6 +3,13 @@
 // Dimension 3 (failure isolation): no Sentori failure may ever
 // throw into, block, or alter the host app. These tests inject the
 // failures; a single uncaught throw fails the suite.
+//
+// Dimension 2 (network): quiet when nothing is wrong, bounded when
+// something is. Of the rule's four dimensions this was the one with
+// no gate at all — failure isolation had this file, footprint had
+// check-sdk-size.sh, perf had sdk-perf.yml and the init budget
+// below, and the traffic budget had a number in CLAUDE.md and
+// nothing checking it.
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
@@ -242,5 +249,76 @@ describe('iron rule: push never reaches the host', () => {
       throw new Error('offline');
     }) as typeof fetch;
     await pushUnregister();
+  });
+});
+
+
+// Dimension 2 — network. The budget an integrator actually feels:
+// what does one bad minute cost them.
+describe('iron rule: the network stays quiet', () => {
+  let sentBytes = 0;
+  let requests = 0;
+
+  const countingFetch = (async (_url: unknown, init?: { body?: unknown }) => {
+    requests++;
+    const body = init?.body;
+    if (typeof body === 'string') sentBytes += Buffer.byteLength(body, 'utf8');
+    return new Response('{}', { status: 202 });
+  }) as unknown as typeof fetch;
+
+  beforeEach(() => {
+    sentBytes = 0;
+    requests = 0;
+    resetAll();
+    setConfig(baseConfig);
+    globalThis.fetch = countingFetch;
+    startTransport();
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    resetAll();
+  });
+
+  it('an app that never reports sends nothing at all', async () => {
+    // No verb called. A flush on an empty queue must not become a
+    // heartbeat: an SDK that talks to its server on a timer is one an
+    // integrator can see in their own network panel, and "only free
+    // things get installed" is the whole product position.
+    await flush();
+    expect(requests).toBe(0);
+    expect(sentBytes).toBe(0);
+  });
+
+  it('one bad minute costs the host under 500 KB', async () => {
+    // The shape of a minute that has gone wrong: a crash, the
+    // detected-anomaly signals around it, and the breadcrumb trail a
+    // host pushes. Well past a realistic minute, and still inside
+    // the budget CLAUDE.md sets.
+    for (let i = 0; i < 20; i++) {
+      patchContext({ screen: `Checkout/step-${i}`, attempt: i });
+      verbs.trace(`checkout.step.${i}`, { index: i, note: 'x'.repeat(200) });
+    }
+    setUser({ id: 'u-1', email: 'someone@example.com' });
+    verbs.warn('rage_tap');
+    verbs.error(new Error('Cannot read property of undefined'), {
+      context: { cart: { items: 12, total: 4820 } },
+    });
+    await flush();
+
+    const KB = sentBytes / 1024;
+    expect(requests).toBeGreaterThan(0);
+    // Reported on failure so the number is visible rather than
+    // inferred from a red assertion.
+    if (KB >= 500) throw new Error(`one bad minute sent ${KB.toFixed(1)} KB, budget is 500 KB`);
+    expect(KB).toBeLessThan(500);
+  });
+
+  it('the events go out batched, not one request per event', async () => {
+    // Twenty events must not be twenty round trips. Batching is what
+    // keeps a burst from reading as a network problem in the host's
+    // own instrumentation.
+    for (let i = 0; i < 20; i++) verbs.trace(`step.${i}`);
+    await flush();
+    expect(requests).toBeLessThan(20);
   });
 });
