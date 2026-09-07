@@ -1,7 +1,9 @@
 //! FCM (Firebase Cloud Messaging) vendor adapter — HTTP v1.
 //!
-//!   POST https://fcm.googleapis.com/v1/projects/<project_id>/messages:send
-//!   Authorization: Bearer <oauth2 access token>
+//! ```text
+//! POST https://fcm.googleapis.com/v1/projects/<project_id>/messages:send
+//! Authorization: Bearer <oauth2 access token>
+//! ```
 //!
 //! The access token is minted from a service-account JSON: sign a
 //! short-lived RS256 assertion, exchange it at Google's token

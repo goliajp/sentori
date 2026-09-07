@@ -43,7 +43,7 @@ pub struct ListQuery {
     #[serde(default)]
     pub environment: Option<String>,
     /// Context-dimension filter (key + value together): only issues
-    /// with at least one event whose payload.context[key] equals the
+    /// with at least one event whose `payload.context[key]` equals the
     /// value (text form). Sentori attaches no meaning to the key —
     /// the reader does.
     #[serde(default)]
