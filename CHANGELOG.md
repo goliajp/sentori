@@ -6,6 +6,95 @@
 
 ---
 
+## v3.16.0(2026-09-08 — 腐烂长在没有门的地方)
+
+一次全仓库盘点。确凿的问题**全部**落在三个零 checker 覆盖的面上:`ops/`、
+`docs/runbook/`、`core/Cargo.toml` 的 exclude 列表。而有门看着的面 —— docs API 真实性、
+env var、SQL 表名、doc link、i18n —— 一个问题都没有。这不是巧合:这仓库有三十来个
+checker,**它们看的地方不会烂**。
+
+### /metrics 答不出「有多少事件被拒了」
+
+`sentori_ingest_total` 被告警规则按 rate 报警、被 dashboard 画两个 panel、被
+`deploy.md` 要求「滚动时盯 `{status="rejected"}` 五分钟」。**没有任何代码发过它。**
+
+数据库能被问「存了多少事件」,不能被问「拒了多少」—— 被拒的事件从来不入库。所以这是
+`/metrics` 里唯一不来自查询的指标:四个进程内计数器,按终态计 —— accepted(202)/
+rejected(400,payload 坏,客户端的锅)/ failed(500,流水线出错,我们的锅)/
+rate_limited(429,限流器在干活)。batch 按事件计数不按请求计数;超大 batch 算一次拒绝,
+因为那就是一次拒绝。
+
+counter 不是 gauge:重启归零正是 Prometheus counter 的语义,`rate()` 会处理。四个 status
+永远都发,包括 0 —— 对 counter 来说 0 是一次测量,而序列缺失不是。
+
+### 告警触发后运维无路可走
+
+`PgPoolNearSaturation` 按 `db_pool_in_use / db_pool_size > 0.80` 报警,`scaling.md` 让你
+调 `SQLX_MAX_CONNECTIONS`。**没有任何代码读那个变量,也没有别的旋钮** —— 池就是 sqlx 默认
+大小。补 `SENTORI_DB_MAX_CONNECTIONS`。不设=行为不变;设 0 或乱填按警告忽略,因为
+`max_connections(0)` 建出的池永远发不出连接,一个笔误不该读作「把服务器焊死」的指令。
+
+### 六个指标引用,没有一个是活的
+
+`sentori_pg_pool_in_use` / `sentori_pg_pool_max`(真名是 `db_pool_in_use` /
+`db_pool_size`)、`sentori_ingest_duration_seconds_bucket`(没有 histogram)、
+`sentori_quota_drops_total`(quota 随 SaaS 面走了)。全部对齐,latency panel 换成池利用率
+(对应还活着的那条告警),quota panel 换成 rate_limited。
+
+**门才是重点。** `scripts/check-metric-names.mjs` 只解析 `expr` 字段 —— YAML 的
+`rules[].expr` 和 dashboard 的 `panels[].targets[].expr`,引用了 `metrics_prom.rs` 没发的
+指标就红。只看表达式是刻意的:两份文件的散文现在都会提到被删掉的指标名来解释它为什么没了,
+而文档不是查询。验过会红:把 `sentori_pg_pool_*` 改回去 exit 1、把 histogram panel 改回去
+exit 1、当前树 exit 0。
+
+### runbook 在教人重启一个七月就删掉的容器
+
+三份都是凌晨三点被脑子不清醒的人照着做的东西,而里面每条具体命令都是错的。
+
+`incident-response.md` 唯一的止血步骤是
+`docker compose -f production-compose.yml restart valkey` —— 重启一个 2026-07-23 删掉的服务,
+通过一个那个路径上从不存在的 compose 文件。周围还有 Better Stack 双人轮值、已经不解析的
+`status.sentori.golia.jp`、`#sentori-ops` 频道、按 marketing/docs 挂掉判 P2(八月删的容器)、
+free-tier org quota(SaaS,已删)、以及一个不存在的 postmortem 目录。跟用户确认过 on-call
+那套已经全没了,重写成单人运维。
+
+`deploy.md` 写着在 `main` 上打 tag、pull GHCR 镜像、`lb_policy ip_hash` 后面轮换
+`server-blue` / `server-green`。分支是 master,镜像在 runner 上 build,容器只有一个。照
+deploy.yml 重写,并补上这个 session 亲自撞到的两件事:**`release/*` 部署生产前一道检查都不
+跑**,本地 preflight 就是全部;以及 release finish **不要打 tag** —— deploy.yml 已经打了,
+再打会在 `&&` 链中间失败并吞掉后面的 `git push origin master`,master 停在本地,看起来像
+做完了。
+
+`scaling.md` 在给从没开过的 Hetzner VM 定规格、往只有一个 upstream 的 Caddy pool 里加机器、
+调一张不存在的 `org_quotas` 表。三个诊断步骤分别查:一个画不出东西的 Grafana panel、一个
+server 不发的指标名、一个从没建过的 events 分区树(retention 是 archive_worker 里的
+DELETE)。重写成真实架构,并直说没有横向扩展路径 —— 第二个 server 容器需要限流器和 ingest
+计数器这两个进程内状态变成共享状态,而那个设计不存在。
+
+### 四份文档在描述一个七月起就不存在的系统
+
+`core/Cargo.toml` 的 exclude 列着十六个 crate「等 S9 sweep」——sweep 在 `94bd8758`
+(2026-08-01)做了,十六个目录全没了,这份列表多活了五周。`members` 是显式列表,没有自动
+发现,也就没有什么要 exclude。
+
+`core/README.md` 列了二十七个 crate:十六个已删,三个存在的没列,`rate-limiter` 被描述成
+「sliding window with valkey」(它是内存的),结尾指向一个不存在的 `v0.1-core.yml`。照真实
+目录重建,每个 crate 的分类取自它自己 Cargo.toml 的声明而不是猜。
+
+`ROADMAP.md` 头部写着 Valkey 和 `web/` 前端目录(是 `webapp/`),而**当前状态**那节是
+2026-06-23 v0.2 pivot 的快照 —— SaaS 双 binary、一个「待你拍板」的 cutover(2026-07-20
+执行了)。没有换一份新的功能清单:手写清单会用和代码一样的速度腐烂,而且腐烂时看不出来。
+改成指向 VERSION、CHANGELOG 和那两个目录。
+
+`docs/design/architecture-standards.md` §4 开篇「Sentori already uses Valkey for rate
+limits, recent-events ring, quotas, and live presence」,然后为这四个消费者规定 key 命名、
+TTL 分级、Lua pipelining 和 fail-open 分支。**四个一个都不存在。** 一份描述系统没有的基础
+设施的标准文档,比不提它更糟 —— 下一个功能会把它读成许可。顺带删掉一个没有代码定义的
+`internal.valkeyDown` 错误码和一个没有路由的 `/admin/api/self-test`。
+
+**没动,而且是有意的**:CHANGELOG.md、docs-v0.*、docs/roadmap/v*.md、docs/archive/。它们
+记录的是写下时的事实,改它们不叫修文档。
+
 ## v3.15.4(2026-09-07 — fix/ 分支从来没跑过 CI)
 
 3.15.3 那两个分支都是 `fix/` 开头,合进 develop 之前一次 CI 都没跑。查 workflow 才发现
