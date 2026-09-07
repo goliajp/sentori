@@ -54,6 +54,7 @@ pub async fn handle(
     Json(envelope): Json<BatchEnvelope>,
 ) -> (StatusCode, Json<Value>) {
     if envelope.events.len() > MAX_BATCH {
+        state.ingest_counters.rejected();
         return (
             StatusCode::PAYLOAD_TOO_LARGE,
             Json(json!({
@@ -108,6 +109,7 @@ pub async fn handle(
                 match pipeline::ingest(&state.pool, ev).await {
                     Ok(o) => {
                         accepted += 1;
+                        state.ingest_counters.accepted();
                         let _ = state.events_bus.send(crate::state::RecentEventTick {
                             issue_id: o.issue_id,
                             ..tick
@@ -127,15 +129,20 @@ pub async fn handle(
                         }));
                     }
                     Err(pipeline::IngestError::Invalid(msg)) => {
+                        state.ingest_counters.rejected();
                         outcomes.push(json!({ "error": "invalid_payload", "detail": msg }));
                     }
                     Err(e) => {
+                        state.ingest_counters.failed();
                         warn!(project_id = %ctx.project_id, error = %e, "batch ingest item failed");
                         outcomes.push(json!({ "error": "ingest_failed" }));
                     }
                 }
             }
-            Err(msg) => outcomes.push(json!({ "error": "invalid_payload", "detail": msg })),
+            Err(msg) => {
+                state.ingest_counters.rejected();
+                outcomes.push(json!({ "error": "invalid_payload", "detail": msg }));
+            }
         }
     }
 

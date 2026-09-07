@@ -51,6 +51,11 @@ pub struct AppState {
     /// Push device-token store (push family is carried, not part of
     /// the v1 acceptance surface).
     pub push_tokens: sentori_push_provider::DeviceTokenStore,
+    /// Ingest outcome counters. Process-local and reset by a restart,
+    /// which is what a Prometheus counter means. The database can say
+    /// how many events were stored; only this can say how many were
+    /// turned away, because those are never stored.
+    pub ingest_counters: std::sync::Arc<crate::ingest_metrics::IngestCounters>,
 }
 
 impl AppState {
@@ -67,6 +72,7 @@ impl AppState {
             events_bus,
             mailer: crate::mailer::Mailer::from_env(),
             push_tokens: sentori_push_provider::DeviceTokenStore::new(pool_for_push),
+            ingest_counters: std::sync::Arc::new(crate::ingest_metrics::IngestCounters::default()),
         }
     }
 }

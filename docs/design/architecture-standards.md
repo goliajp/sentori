@@ -49,8 +49,8 @@ L2  Persistent local store
         - RN SDK + RN dashboard: MMKV
         - Web dashboard: localStorage / IndexedDB
         - Web Worker scope: Cache API
-L3  Server-side Valkey / KV (per-project hot data, sub-ms reads)
-L4  Postgres (cold authoritative store)
+L3  Server-side KV (per-project hot data, sub-ms reads) — EMPTY, see §4
+L4  Postgres (authoritative store)
 ```
 
 ### Rules
@@ -59,7 +59,7 @@ L4  Postgres (cold authoritative store)
 - **Persistent store key naming**: `sentori:<scope>:<feature>:<v>` (e.g. `sentori:org:GOLIA:live:v1`). Versioned so a schema change invalidates safely.
 - **Eviction discipline**: L2 caps at 5 MB total per origin. Each feature owns ≤ 1 MB of L2 and self-evicts oldest-first.
 - **Don't persist secrets**: tokens stay in HttpOnly cookies. L2 only ever holds non-secret data.
-- **Server-side L3**: every Valkey key MUST carry a TTL. Implicit-TTL is a code-review reject.
+- **Server-side L3**: there is no L3. Reads that miss L2 go to Postgres. If a KV layer is ever added, §4 is its contract.
 
 ### Worked example — Live page
 
@@ -91,57 +91,20 @@ WASM is the right tool when the work is **CPU-bound, isolatable, ≥ 100 ms in p
 
 **Anti-pattern**: do NOT WASM-ify code that's already < 10 ms or that's IO-bound. JS→WASM boundary crossing costs ~5 µs/call; spending it on cheap work is worse than not bothering. Each WASM module must justify its existence with a measurement.
 
-## 4. Valkey discipline (server hot path)
+## 4. Server-side KV — there isn't one
 
-Sentori already uses Valkey for rate limits, recent-events ring, quotas, and (analytics v1) live presence. Establish a single house style.
+**Sentori has no KV layer.** Valkey was removed with the v0.1 stack on 2026-07-23 and nothing replaced it. Rate limiting is in-process (`sentori-rate-limiter`'s `MemoryBackend`), ingest counters are process-local atomics, and everything else is Postgres.
 
-### 4.1 Key naming
+This section used to open "Sentori already uses Valkey for rate limits, recent-events ring, quotas, and live presence" and then specify key naming, TTL categories, Lua pipelining and fail-open branches for all of it. None of those four consumers exists: quotas and live presence left with the SaaS surface, the recent-events ring is a `tokio::broadcast` channel in `AppState`, and the limiter is a `Mutex<HashMap>`. A standards doc that describes infrastructure the system does not have is worse than one that omits it — the next feature reads it as permission.
 
-```
-<feature>:<scope>[:<sub-scope>]:<v>
-  ^^^^^^^^^                 ^
-  | feature group           | schema version
+What survives is the contract a KV layer would have to meet, kept because the reasoning is sound and someone will eventually propose one:
 
-Examples:
-  live:<project_uuid>                       (zset, presence)
-  live:<project_uuid>:dims                  (hash, presence dims)
-  ratelimit:<token_hash>:<minute_bucket>    (counter)
-  trust:<project_uuid>:<env>:<user_id>      (hash, security posture)
-```
+- **Key naming** `<feature>:<scope>[:<sub-scope>]:<v>`, lower-case, colon-delimited, kebab inside a segment.
+- **TTL is mandatory.** Every write sets an expiry in the same operation. A key with no TTL is a leak with a long fuse. Anything needing persistence beyond hot lives in Postgres — a cache is not a source of truth.
+- **Atomicity via script, not sequence.** Multi-step writes that need atomicity go in one server-side script; ones that don't get pipelined. Never round-trip-after-round-trip in a user-blocking path.
+- **Fail-open, always.** Every KV-backed path needs a branch for "the store is unreachable" that lets the request through: allow the rate-limited call, render the empty dashboard, drop the best-effort signal. Log it through `tracing::warn!` so the degradation is visible rather than silent.
 
-- Lower-case, colon-delimited, no `_` (kebab-only inside a segment).
-- Schema version on the *feature* prefix only when we need parallel-write migration; otherwise the value is JSON-shaped and self-describing.
-
-### 4.2 TTL is mandatory
-
-Every `SET` / `ZADD` / `HSET` writes a `EXPIRE` immediately. There is no key without a TTL. We pick a TTL category per feature:
-
-| Category | Default TTL | Examples |
-|---|---|---|
-| Hot session | 300 s | live presence, current trust score cache |
-| Rate-limit window | 70 s | per-token / per-IP buckets |
-| Materialised aggregate | 1 h | hourly rollups feeding dashboards |
-| Idempotency / dedup | 24 h | event-id dedup keys |
-| Pre-computed hot | 7 d | release artifact metadata |
-
-If a feature needs persistence beyond hot, it lives in Postgres, not Valkey. Valkey is the cache, not the source of truth.
-
-### 4.3 Pipelining + Lua
-
-Multi-step writes that need atomicity → Lua script. Multi-step writes that don't → pipeline. Never sequence Round-Trip-after-Round-Trip in user-blocking paths.
-
-Existing examples to extract patterns from:
-- `rate_limit.rs` uses INCR + EXPIRE pipelining (good).
-- `live_presence::register` does ZADD + EXPIRE + HSET + EXPIRE four-call (acceptable now; pipeline when it shows up in flame).
-
-### 4.4 Failure mode = fail-open
-
-Every Valkey-backed code path has a fail-open branch when the connection manager errors:
-- Heartbeat: drop the call silently. Best-effort signal.
-- Rate-limit: allow the request. Better to over-serve than 503 on transient Valkey blip.
-- Live snapshot: render the dashboard with empty data + a "valkey degraded" pill.
-
-We log fail-open events through `tracing::warn!` so observability catches them.
+The seam already exists on the one path that would want it: `sentori-rate-limiter`'s `RateBackend` trait. Nothing implements a cross-process backend, and `docs/plans/kevy-migration.md` holds a parked evaluation of what would.
 
 ## 5. Error model — typed, traced, actionable
 
@@ -170,7 +133,7 @@ Fields:
 - `hint`: what the caller can DO. Always actionable.
 - `docUrl`: deep link to a per-code doc page on the marketing site (200-word explainer).
 - `correlationId`: uuid-v7 set by the server's tracing middleware. Mirrors `X-Sentori-Correlation-Id` response header so the operator can grep server logs.
-- `layer`: which subsystem rejected (`auth`, `ratelimit`, `axum.body_limit`, `db`, `valkey`, `domain.<feature>`). Tells you where to look.
+- `layer`: which subsystem rejected (`auth`, `ratelimit`, `axum.body_limit`, `db`, `domain.<feature>`). Tells you where to look.
 
 Server-side `Error` enum per feature module → uniform conversion to the JSON above via `IntoResponse`. Builds on `anyhow::Error` for unstructured paths and converts at the boundary.
 
@@ -220,7 +183,6 @@ SDK errors today log to `console.warn` only. Promote:
 | `domain.notFound` | domain.<feature> | "no such entity" |
 | `domain.conflict` | domain.<feature> | "another writer modified this" |
 | `internal.dbDown` | db | "service degraded, retry in 30 s" |
-| `internal.valkeyDown` | valkey | "presence/rate-limit degraded; data path still serving" |
 
 Per-code doc pages on the marketing site (writing those is a separate small project; the codes are the contract regardless).
 
@@ -256,7 +218,7 @@ These all flow through the existing `/v1/metrics:batch` endpoint.
 
 ### 6.3 The "self-test" page
 
-`/admin/api/self-test` returns a JSON report: ingest latency p50/p95, valkey rt, db rt, last cert-monitor poll, last digest run. Dashboard surfaces it on the Overview as a green/amber/red strip — operators see "platform is healthy" without digging into Grafana.
+*Not built.* This described an `/admin/api/self-test` endpoint reporting ingest latency, KV and db round-trips, last cert poll and last digest run, surfaced as a health strip on the Overview. No such route exists. What does exist is `/healthz` (status, db, version, pool counts) and `/metrics` (Prometheus exposition; see `ops/prometheus-alerts.yml`).
 
 ## 7. Code quality discipline (server)
 
@@ -306,7 +268,7 @@ CLAUDE.md states the rule. Every SDK addition checks back to:
 ## 11. Deployment + migration discipline
 
 - **Migrations are forward-only and idempotent.** `IF NOT EXISTS` everywhere; never `DROP`.
-- **No code change that requires manual ops.** Schema migration on boot, Valkey keys self-expire, secrets via env.
+- **No code change that requires manual ops.** Schema migration on boot, secrets via env.
 - **Feature flags via `project_settings` table**, NOT via dashboard env vars. New features default to off; operator opts in per project.
 - **Rollback story for every release**. Each chunk's ship plan documents what gets rolled back if the post-deploy verify fails. Today we ride on git-revert + redeploy; that's our story until proven painful.
 
@@ -339,7 +301,7 @@ This is a standards document; landing it doesn't change code. The rollout looks 
 
 - A user opens the dashboard. Live page paints from L2 within 20 ms; SSE stream catches up missed deltas within 500 ms. They've never seen a loading spinner.
 - They make a mistake (paste a bad release name). The dashboard shows: `"Bad release name 'fo-1234'. Releases look like '<app>@<version>+<build>'. (code: domain.invalidField · cid: 01JEXY9Q…)"`. They paste cid into a chat to support; we grep server logs to that exact request.
-- The dashboard's own perf strip shows `ingest p95 32 ms · valkey 1 ms · db 9 ms`. Operator senses "everything is healthy" without leaving the app.
-- A new feature ships: its design doc references this standards doc, applies cache hierarchy, uses typed errors, fail-open Valkey, observability spans wired. Code review enforces the standards.
+- The dashboard's own perf strip shows `ingest p95 32 ms · db 9 ms`. Operator senses "everything is healthy" without leaving the app.
+- A new feature ships: its design doc references this standards doc, applies cache hierarchy, uses typed errors, wires observability spans. Code review enforces the standards.
 
 That's what "极专业" means here: discipline made invisible.

@@ -1,6 +1,6 @@
 {
   "annotations": { "list": [] },
-  "description": "Sentori — ops overview. Ingestion throughput, latency, error rate, quota drops.",
+  "description": "Sentori — ops overview. Every expression here names a metric that self-hosted/server/src/handlers/metrics_prom.rs actually emits; scripts/check-metric-names.mjs fails the build if that stops being true.",
   "editable": true,
   "panels": [
     {
@@ -14,25 +14,29 @@
     },
     {
       "type": "timeseries",
-      "title": "Ingest latency (p50 / p99)",
+      "title": "DB pool in use",
+      "description": "Active connections against the configured max. The PgPoolNearSaturation alert fires at 0.80 of this ratio. Replaced an ingest-latency panel that queried sentori_ingest_duration_seconds_bucket — the server exposes no histogram, so it drew nothing.",
       "datasource": "Prometheus",
       "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
       "targets": [
-        { "expr": "histogram_quantile(0.50, sum by (le) (rate(sentori_ingest_duration_seconds_bucket[5m])))", "legendFormat": "p50" },
-        { "expr": "histogram_quantile(0.99, sum by (le) (rate(sentori_ingest_duration_seconds_bucket[5m])))", "legendFormat": "p99" }
+        { "expr": "sentori_db_pool_in_use", "legendFormat": "in use" },
+        { "expr": "sentori_db_pool_size", "legendFormat": "max" }
       ]
     },
     {
       "type": "timeseries",
-      "title": "Quota drops (events / sec)",
+      "title": "Rate limited (events / sec)",
+      "description": "Requests turned away by the per-token limiter. Replaced a quota-drops panel: quotas were a SaaS concept and left with it.",
       "datasource": "Prometheus",
       "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
-      "targets": [{ "expr": "rate(sentori_quota_drops_total[1m])", "legendFormat": "drops" }]
+      "targets": [
+        { "expr": "rate(sentori_ingest_total{status=\"rate_limited\"}[1m])", "legendFormat": "throttled" }
+      ]
     },
     {
       "type": "stat",
       "title": "Ingest error rate (5m)",
-      "description": "rejected + quota_exceeded as a fraction of all ingest attempts",
+      "description": "rejected (bad payload, client's bug) + failed (pipeline error, ours) as a fraction of all ingest attempts. rate_limited is excluded — a throttled burst is the limiter working.",
       "datasource": "Prometheus",
       "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
       "fieldConfig": {
@@ -50,7 +54,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(sentori_ingest_total{status=~\"rejected|quota_exceeded\"}[5m])) / clamp_min(sum(rate(sentori_ingest_total[5m])), 1)"
+          "expr": "sum(rate(sentori_ingest_total{status=~\"rejected|failed\"}[5m])) / clamp_min(sum(rate(sentori_ingest_total[5m])), 1)"
         }
       ]
     }
@@ -61,5 +65,5 @@
   "time": { "from": "now-1h", "to": "now" },
   "title": "Sentori — Overview",
   "uid": "sentori-overview",
-  "version": 1
+  "version": 2
 }

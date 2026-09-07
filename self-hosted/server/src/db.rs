@@ -95,11 +95,51 @@ async fn preflight(opts: &PgConnectOptions) -> Result<(), sqlx::Error> {
     verdict
 }
 
-/// A pool with sqlx's default sizing, matching `PgPool::connect`.
+/// The server's pool, sized by `SENTORI_DB_MAX_CONNECTIONS`.
+///
+/// Defaults to sqlx's own default (10) when unset or unparseable, so
+/// an operator who never touches it gets exactly the previous
+/// behaviour. It exists because the `PgPoolNearSaturation` alert used
+/// to have no answer: it fired on `sentori_db_pool_in_use /
+/// sentori_db_pool_size > 0.80`, `docs/runbook/scaling.md` told the
+/// reader to raise `SQLX_MAX_CONNECTIONS`, and no such variable was
+/// read by anything. An alert whose runbook step does not exist is a
+/// page with nowhere to go.
 pub async fn connect(url: &str) -> Result<PgPool, sqlx::Error> {
     let opts = options(url)?;
     preflight(&opts).await?;
-    pinned(PgPoolOptions::new()).connect_with(opts).await
+    let mut builder = PgPoolOptions::new();
+    if let Some(max) = env_max_connections() {
+        builder = builder.max_connections(max);
+    }
+    pinned(builder).connect_with(opts).await
+}
+
+/// `SENTORI_DB_MAX_CONNECTIONS`, or `None` to keep sqlx's default.
+///
+/// A zero or unparseable value is ignored with a warning rather than
+/// honoured: `max_connections(0)` builds a pool that can never hand
+/// out a connection, which would turn a typo into an outage that
+/// looks like a database failure.
+fn env_max_connections() -> Option<u32> {
+    let raw = crate::env_config::env_or_file("SENTORI_DB_MAX_CONNECTIONS")?;
+    let parsed = parse_max_connections(&raw);
+    if parsed.is_none() {
+        tracing::warn!(
+            value = %raw,
+            "SENTORI_DB_MAX_CONNECTIONS is not a positive integer — using the default pool size"
+        );
+    }
+    parsed
+}
+
+/// The pure half, so the rule is testable without touching the
+/// process environment.
+fn parse_max_connections(raw: &str) -> Option<u32> {
+    match raw.trim().parse::<u32>() {
+        Ok(n) if n > 0 => Some(n),
+        _ => None,
+    }
 }
 
 /// A pool sized by the caller — one-shot subcommands want two, not ten.
@@ -115,6 +155,20 @@ pub async fn connect_with_max(url: &str, max_connections: u32) -> Result<PgPool,
 #[allow(clippy::expect_used, reason = "a test asserting on a fixed URL")]
 mod tests {
     use super::{TIME_ZONE, options};
+
+    #[test]
+    fn pool_size_takes_positive_integers_and_refuses_the_rest() {
+        use super::parse_max_connections;
+        assert_eq!(parse_max_connections("25"), Some(25));
+        assert_eq!(parse_max_connections("  25 "), Some(25));
+        // Zero would build a pool that can never hand out a
+        // connection — a typo must not read as an instruction to
+        // wedge the server.
+        assert_eq!(parse_max_connections("0"), None);
+        assert_eq!(parse_max_connections("-4"), None);
+        assert_eq!(parse_max_connections("ten"), None);
+        assert_eq!(parse_max_connections(""), None);
+    }
 
     // The pin has to survive parsing a real URL, and it has to be the
     // zone the module documents rather than whatever was typed twice.

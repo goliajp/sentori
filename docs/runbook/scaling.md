@@ -1,71 +1,49 @@
 # Scaling
 
-What to do when traffic doubles, or when a single org's burst threatens to swamp the host.
+Sentori runs as one server container and one Postgres container on one host. That is the whole topology, and most of what follows is about staying inside it rather than growing out of it.
 
-## Capacity assumptions (v0.2 baseline)
+> Rewritten 2026-09-08. The previous version sized Hetzner VMs that were never provisioned, added app VMs to a Caddy upstream pool that has one upstream, and tuned `org_quotas` — a SaaS table removed with the SaaS surface. Its three diagnostic steps queried a Grafana panel that drew nothing, a metric name the server does not emit, and an `events` partition tree that does not exist. Every number below is either read off the running system or named as an assumption.
 
-- 1 app VM (Hetzner CCX23: 4 vCPU, 16 GB RAM) handles **~2 k events/sec** sustained based on synthetic load (single thread per connection, P99 ingest < 50 ms).
-- 1 PG VM (Hetzner CPX21: 3 vCPU, 8 GB RAM) handles **~3 k inserts/sec** with the partitioned `events` table.
-- Free-tier monthly quota = 100 k events / org → comfortably headroom for ~ 5 000 active orgs at the 5% concurrency rule.
+## What you are actually running
 
-If you breach any of these by 1.5×, scale **before** you break SLA, not after.
+`postgres-v1` + `server-v1`, `docker compose` on the app host, one Caddy upstream. No partitions on `events` — retention is a `DELETE` pass in `archive_worker`, not a partition drop. No queue in front of ingest; the per-token limiter and a 429 are the backpressure.
 
-## Pre-scaling checks
+## Before adding anything
 
-Run through these before adding any iron:
+1. **Read `/metrics`.** `curl -s https://sentori.golia.jp/metrics | grep sentori_`. The four numbers that matter:
+   - `sentori_ingest_total{status="accepted"}` — is traffic actually up?
+   - `sentori_ingest_total{status="rejected"}` — a spike here **looks** like load and is usually an SDK regression sending malformed events. Do not add capacity to absorb broken clients.
+   - `sentori_ingest_total{status="rate_limited"}` — the limiter is doing its job. This is not a capacity signal.
+   - `sentori_db_pool_in_use` against `sentori_db_pool_size` — the one that leads somewhere (below).
+2. **Check retention is real.** `SELECT count(*), min(received_at) FROM events;` — if the oldest row is older than `SENTORI_EVENT_RETENTION_DAYS`, the archive worker is not running and you have a retention bug, not a capacity problem. Check for `archive worker disabled` in the logs, and for `retention pass failed` warnings.
+3. **Check the disk.** Attachments (replay frames especially) dominate volume, not rows.
 
-1. **Look at the Grafana overview dashboard.** Is the bottleneck CPU, RAM, PG pool, Valkey, or disk? Don't add the wrong axis.
-2. **Check `sentori_ingest_total{status="rejected"}`.** A spike in `rejected` looks like load but is probably a SDK regression sending malformed events. Don't add servers to absorb broken clients.
-3. **Check the partition count** (`SELECT count(*) FROM pg_inherits WHERE inhparent = 'events'::regclass;`). If it's growing > 12 per month, retention is broken — fix that before adding compute.
+## The pool
 
-## Horizontal: more app VMs
-
-Cheap and reversible. Use this first.
+`sentori_db_pool_in_use / sentori_db_pool_size > 0.80` sustained is the `PgPoolNearSaturation` alert. The response:
 
 ```sh
-# 1. Provision a new VM with the same image as the existing one.
-# 2. Install docker + the production compose.
-# 3. Bring it up pointing at the same PG and Valkey:
-SENTORI_DOMAIN=sentori.golia.jp \
-  docker compose -f docker/production-compose.yml --env-file /etc/sentori/.env up -d
+# In /apps/sentori/.env, or the compose environment:
+SENTORI_DB_MAX_CONNECTIONS=25
+docker compose --env-file .env -f docker-compose.yml up -d server-v1
 ```
 
-Then update the Caddy upstream pool on **all** app VMs:
+Confirm Postgres has the headroom first (`SHOW max_connections;` — default 100, shared with anything else on that instance). Unset it and the pool goes back to sqlx's default of 10.
 
-```caddy
-import server_upstreams  # add the new VM hostname/IP to server_upstreams snippet
-```
+A saturated pool is more often a slow query holding connections than genuine concurrency. `SELECT pid, now()-query_start AS age, left(query,80) FROM pg_stat_activity WHERE state='active' ORDER BY age DESC;` before raising the ceiling — a bigger pool against a slow query buys minutes.
 
-Reload Caddy (`docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile`).
+## Vertical, then honestly
 
-You can keep going horizontally up to ~ 10 VMs before cross-region latency starts dominating; at that point split into regions, with one PG per region and async replication.
+More RAM and faster disk on the Postgres side is the whole scaling story at this size, and it goes further than it sounds: no partitions, one primary, no replication to keep consistent.
 
-## Vertical: bigger PG
+Retention is the other lever, and it is the cheaper one. `SENTORI_EVENT_RETENTION_DAYS` at 90 with replay attachments is what fills disks. Halving it costs you evidence older than 45 days and nothing else — issue counters, first/last seen and the regression anchor are denormalized onto the issue row and survive the event deletion.
 
-Postgres is the harder axis. Plan ahead.
+## What is not built
 
-| Symptom | Action |
-|---------|--------|
-| `sentori_pg_pool_in_use / max > 0.80` (Phase 16+ alert) for ≥ 5 min | Bump `SQLX_MAX_CONNECTIONS` to 1.5×, redeploy server (no PG change yet) |
-| Latency p99 > 100 ms; `pg_stat_activity` shows long-running `INSERT INTO events` | Resize the PG VM one tier up (CPX21 → CPX31 → CPX41). Vertical resize on Hetzner is downtime ~5 min — schedule it and announce. |
-| Disk free < 20% (`HostDiskFreeLow` alert) | Audit `events` partitions — retention should already drop the oldest. If a partition is huge (org with bursty traffic), tighten that org's `org_quotas.retention_days`. Resize the disk only after retention is provably correct. |
-| WAL build-up because R2 archive is failing | Check `archive_command` log; usually it's an expired Cloudflare token. Fix that first; don't shrink WAL while archive is broken. |
+These are honest gaps, not planned work:
 
-We deliberately stay on a **single primary PG** until traffic justifies streaming replication. That keeps the operational story simple. The trigger to add a replica is the first time vertical resizing runs out of headroom (~CPX51), not earlier.
+- **No horizontal path.** A second server container would need the rate limiter and ingest counters — both process-local — to become shared state, and there is no design for that. The limiter's own crate documents the seam (`RateBackend`); nothing implements a cross-process backend.
+- **No autoscaler, no multi-region, no queue.**
+- **No read replica.** One primary. Adding one is a real project, not a runbook step.
 
-## Hot orgs
-
-A single org sending 10× their plan's traffic doesn't take down the system (the quota gate drops events at the edge with 429), but they can blow through their monthly budget in hours and degrade signal-to-noise:
-
-1. Pull the org_id from the Grafana dashboard's "top quota drops" panel (Phase 16+).
-2. `psql` and bump `org_quotas.event_limit_monthly` to a hand-set ceiling so they're not pinned at 0 for the rest of the period.
-3. Email the owner via the existing quota-warning notifier (the bump triggers a fresh threshold check).
-4. File a follow-up to discuss a paid plan once you have one.
-
-Don't scale infrastructure to accommodate one runaway client. Quota first; compute later.
-
-## What we don't do (yet)
-
-- **No autoscaler.** v0.2 is small enough that human-in-the-loop horizontal scaling is faster than wiring up an autoscaler that misfires under bursts.
-- **No multi-region active-active.** PG is a single primary; cross-region writes would need conflict resolution we haven't designed.
-- **No queue between SDK and server.** Quota gates + 429 are the backpressure. Adding Kafka for "Phase 17" lands when we have a billing case for retained-on-overflow.
+If you are hitting the ceiling of one host, that is a design conversation, and this file is not it.

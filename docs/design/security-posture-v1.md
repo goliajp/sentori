@@ -1,6 +1,12 @@
 # Sentori security posture v1 — design proposal
 
 Status: **DRAFT — for review, not yet broken into work units.**
+
+> **2026-09-08:** written while Valkey was part of the stack. It was removed with
+> the v0.1 stack on 2026-07-23 and nothing replaced it, so every KV-backed piece
+> below (presence sets, hot caches, Lua coalescing) needs a new home before this
+> design could be built. `architecture-standards.md` §4 now records that there is
+> no KV layer, and its old §4.1–4.4 subsection numbers no longer exist.
 Companion to `analytics-v1.md`; sits as the next-major design after analytics-v1 chunk A.
 Owner: claude + takagi
 Date: 2026-05-19
