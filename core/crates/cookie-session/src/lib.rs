@@ -39,7 +39,7 @@
 //! - **No session storage.** This crate does not know that
 //!   sessions exist. A "session" emerges when the 钢筋 layer
 //!   combines `SignedCookie` (carrying a session id) with a
-//!   session store (Postgres, valkey, ...).
+//!   session store — Postgres, in Sentori's case.
 //! - **No key rotation policy.** Both `SignedCookie::open` and
 //!   `EncryptedCookie::open` take a single key. Callers
 //!   implement rotation by trying the current key first, then

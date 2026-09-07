@@ -70,7 +70,7 @@ fn policy_construction_rejects_zero() {
 #[test]
 fn backend_trait_object_works() {
     // A caller wiring this up dynamically (e.g. a Limiter built
-    // from a config file that picks "memory" vs "valkey") needs
+    // from a config file that picks between backends) needs
     // `Box<dyn RateBackend>` to work. Lock that here.
     let backend: Box<dyn RateBackend> = Box::new(MemoryBackend::new());
     let now = Instant::now();

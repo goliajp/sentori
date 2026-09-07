@@ -16,11 +16,10 @@
 //! window of `policy.window()` length is guaranteed ≤ `policy.max()`.
 //! The downside is O(max) memory per key. For the v0.1 dashboard's
 //! ~30 req/min per token, that's 30 timestamps × 16 bytes = 480
-//! bytes / key — trivial. For the K-tier Valkey backend handling
-//! 1000s req/min, the implementation will trade precision for
-//! O(1) memory via the "fixed-window-counter with weighted
-//! carryover" technique; this is why the trait abstracts the
-//! storage shape.
+//! bytes / key — trivial. A backend handling 1000s req/min would
+//! trade precision for O(1) memory via the "fixed-window-counter
+//! with weighted carryover" technique; this is why the trait
+//! abstracts the storage shape.
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
@@ -33,9 +32,9 @@ use crate::policy::{Policy, Verdict};
 ///
 /// Internal `Mutex<HashMap<…>>`: every `check_and_consume`
 /// acquires the lock briefly. For 1000s of concurrent callers
-/// against distinct keys this can become a contention point;
-/// the Valkey backend in the K-tier is the alternative when
-/// scale demands it.
+/// against distinct keys this can become a contention point,
+/// which is the point at which a cross-process backend behind
+/// [`RateBackend`] would earn its keep.
 #[derive(Default, Debug)]
 pub struct MemoryBackend {
     inner: Mutex<HashMap<String, VecDeque<Instant>>>,
@@ -73,8 +72,8 @@ impl RateBackend for MemoryBackend {
     fn check_and_consume(&self, key: &str, policy: Policy, now: Instant) -> Verdict {
         let Ok(mut g) = self.inner.lock() else {
             // Poisoned mutex: fail open (allow) rather than wedge
-            // the limiter forever. The legacy `server/src/rate_limit
-            // .rs` did the same on Valkey-unavailable.
+            // the limiter forever — a limiter that cannot read its
+            // own state must not become an outage.
             return Verdict::Allowed {
                 remaining: policy.max(),
             };

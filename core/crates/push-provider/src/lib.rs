@@ -2,7 +2,8 @@
 //!
 //! Steel-tier (钢筋) crate #7. Composes:
 //!
-//! - K1 [`sentori_workspace_identity`] for `Uuid`.
+//! - `uuid` for `Uuid`. (This read `K1 sentori_workspace_identity`
+//!   until that crate was retired in the v1 redesign.)
 //! - S10 [`sentori_rate_limiter`] for per-(project, provider)
 //!   send-rate enforcement.
 //! - S12 [`sentori_secrets_vault`] for at-rest encryption of
