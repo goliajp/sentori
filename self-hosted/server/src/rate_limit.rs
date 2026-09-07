@@ -3,9 +3,10 @@
 //! Sliding window: token_id → ring-buffer of N timestamps. Reject
 //! when buffer is full AND oldest timestamp is < window seconds old.
 //!
-//! v0.2 ships per-process (single-instance self-hosted). Horizontal
-//! scale would need Redis/Valkey backing — v0.3+ if SaaS demand
-//! pushes us there.
+//! Per-process, matching the single-instance self-hosted topology
+//! (one server container + Postgres). Horizontal scale would need
+//! a shared store behind the counters; nothing is planned, and the
+//! candidate evaluation is parked in `docs/plans/kevy-migration.md`.
 //!
 //! Tunables (env-vars):
 //! - `SENTORI_RATELIMIT_DISABLED` default off (set to "1" or "true"
