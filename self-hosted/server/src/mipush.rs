@@ -1,9 +1,11 @@
 //! MiPush (Xiaomi) vendor adapter.
 //!
 //! Uses app-secret-based auth header:
-//!   Authorization: key=<app_secret>
 //!
-//! POST to https://api.xmpush.xiaomi.com/v3/message/regid
+//! ```text
+//! POST https://api.xmpush.xiaomi.com/v3/message/regid
+//! Authorization: key=<app_secret>
+//! ```
 
 #![allow(dead_code)]
 

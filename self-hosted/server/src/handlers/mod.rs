@@ -1,7 +1,7 @@
 //! HTTP handler aggregation.
 //!
 //! Two route groups:
-//! - **SDK ingest** (`/v1/*`): Bearer st_pk_<token> authenticated
+//! - **SDK ingest** (`/v1/*`): Bearer `st_pk_<token>` authenticated
 //!   via `sentori-ingest-token`'s `bearer_middleware`. Each handler
 //!   receives `Extension<IngestContext>` with the resolved
 //!   `(workspace_id, project_id, token_kind)`.
