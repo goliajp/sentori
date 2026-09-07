@@ -6,6 +6,36 @@
 
 ---
 
+## v3.15.3(2026-09-07 — Valkey 两个月前就走了,注释没跟上)
+
+问的是「kevy 升 6.3」。查下来这仓库既没有 kevy 也没有 Valkey:Valkey 2026-07-23 随
+v0.1 栈一起删了,之后没有东西接替。留下的是八个文件里的描述,其中两处把它写成待办。
+
+最锋利的是告警。`sentori-valkey` 组查 `sentori_valkey_command_duration_seconds_bucket`,
+一个从没有任何构建发出过的指标,监控一个不运行的服务。**永远不会触发的规则,在 review
+里读起来和有覆盖一模一样。** 删。ingest-stalled runbook 里「去看 Valkey」那句一并删——
+半夜被叫起来的人会去找一个不在的容器。
+
+其余是 `rate-limiter` / `cookie-session` 里承诺「v0.2 会有 ValkeyBackend」的注释。这些
+句子挂的两个锚点也没了:K-tier `auth-session` crate(已退到 `core/Cargo.toml` 的
+exclude)和顶层 `server/` 树(v1 重构删除)。改成事实:`MemoryBackend` 是唯一存在的
+backend。
+
+**`cargo doc` 从来不在 preflight 也不在 CI 里。** 跑一次就查出 push-provider 的模块文档
+还在把 `Uuid` 归功于 `K1 sentori_workspace_identity`——同一种病,活下来是因为没人看。所以
+修的是门:三棵 Rust 树现在都跑 `RUSTDOCFLAGS='-D warnings' cargo doc --no-deps`。断掉的
+intra-doc link 是「文档在指一个不存在的东西」的廉价探测器。
+
+开门让 server 红在五处,全是格式不是腐烂:两个裸 URL、`<oauth2 access token>` 和
+`st_pk_<token>` 被当成未闭合 HTML 标签、`payload.context[key]` 被当成链接。两段请求块改
+成 text 围栏——标签必须写,doc 注释里不带标签的围栏会被当 Rust doctest 收走。
+
+验过会红:断链改回去跑 core 那条门线 exit 101,改回来 exit 0。
+
+devops 侧同步修 `services/sentori/README.md`。它写的运行时是 postgres + valkey + server
++ web,路由表列四个端口;live t01 Caddy(今天只读拿的)只有一个 upstream,server-v1
+`:18092`。
+
 ## v3.15.2(2026-09-06 — 那道门被我放进了一个没有 bun 的 job)
 
 3.15.1 要修的东西都绿了(四个 sdk job、webapp、e2e),唯一红的是新加的那个 checker
