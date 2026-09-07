@@ -2,7 +2,12 @@ name: v0.2 core — fmt + clippy + check
 
 on:
   push:
-    branches: [feature/**, develop, master]
+    # `fix/**` and `hotfix/**` were missing. git-flow.md makes fix/ and
+    # feature/ equivalent — same start point, same merge target — so a
+    # fix/ branch touching core/ or self-hosted/server/ simply had no CI
+    # until it reached develop, which is exactly the delay this workflow
+    # exists to prevent.
+    branches: [feature/**, fix/**, hotfix/**, develop, master]
     paths:
       - 'core/**'
       - 'self-hosted/server/**'

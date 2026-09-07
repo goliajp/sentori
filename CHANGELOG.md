@@ -6,6 +6,30 @@
 
 ---
 
+## v3.15.4(2026-09-07 — fix/ 分支从来没跑过 CI)
+
+3.15.3 那两个分支都是 `fix/` 开头,合进 develop 之前一次 CI 都没跑。查 workflow 才发现
+`v0.2-core-check` 的 branches 写的是 `[feature/**, develop, master]`——**没有 `fix/**`**。
+
+git-flow 里 fix/ 和 feature/ 是等价的:同一个起点、同一个合并目标,前缀只标「新功能还是
+修补」。所以一个动了 `core/**` 或 `self-hosted/server/**` 的 fix/ 分支,要一直等到进
+develop 才有人看。这正是这道 workflow 存在的理由。补上 `fix/**` 和 `hotfix/**`——后者
+理由更硬:它从 master 拉、往 master 合,是唯一一个错误可以不经过 develop 就进生产的前缀。
+
+自验:改动本身就在一个 fix/ 分支上,改的又正好是这个 workflow(它的 paths 盯着自己),
+push 后 `v0.2 core` 真的跑起来了,green。旧的 branches 列表做不到这件事。
+
+同时改了 `.claude/git-flow.md`——它的 CI 触发表只列了 build + deploy 两个 workflow,并
+断言 develop push 完全没 CI。实际有十个 workflow,develop 上跑三个。按每个文件的 `on:`
+块重写,并标出 paths 过滤(表里的 ✓ 是「路径命中才跑」)。另修三处:release finish 让你
+手动 `git tag -a`,但 deploy workflow 在 release/* push 时已经打好推好了,再打会失败——
+而且它在 `&&` 链中间,会把后面的 `git push origin master` 一起吞掉,master 停在本地
+(发 3.15.3 时就撞了);release start 让你走 changeset,但纯 server 版本根本不碰它;
+"master 是唯一 CI 入口"应为「覆盖面最全」。
+
+**这份 git-flow.md 不在这个 commit 里** —— `.gitignore` 排除了整个 `.claude/`,那份修正
+只在本机生效。
+
 ## v3.15.3(2026-09-07 — Valkey 两个月前就走了,注释没跟上)
 
 问的是「kevy 升 6.3」。查下来这仓库既没有 kevy 也没有 Valkey:Valkey 2026-07-23 随
