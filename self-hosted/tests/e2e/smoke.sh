@@ -1065,6 +1065,45 @@ SENTORI_BASE="${BASE}" SENTORI_TOKEN="${TOKEN}" \
     node "${ROOT}/../scripts/check-ingest-concurrency.mjs" \
     || { echo "concurrent ingest of one fingerprint failed" >&2; exit 1; }
 
+# `sentori_ingest_total` is queried by ops/prometheus-alerts.yml and by
+# two dashboard panels, and for months it was queried while no code
+# path published it — a rule alerting on the rate of a series that did
+# not exist. It exists now, and this is what keeps it existing: the
+# counters must move in response to real traffic, not merely appear in
+# the exposition at zero. A metric nobody asserts on is the state it
+# was in before.
+echo "→ /metrics counted the ingest that just happened"
+ingest_counter() {
+    curl -fsS "${BASE}/metrics" \
+        | awk -v k="sentori_ingest_total{status=\"$1\"}" '$1==k {print $2}'
+}
+
+ACCEPTED="$(ingest_counter accepted)"
+[[ -n "$ACCEPTED" ]] \
+    || { echo "no sentori_ingest_total{status=\"accepted\"} in /metrics" >&2; exit 1; }
+[[ "$ACCEPTED" -gt 0 ]] \
+    || { echo "accepted reads 0 after a suite that ingested many events" >&2; exit 1; }
+
+# A rejection has to be visible as a rejection. `platform` is validated
+# in the handler, so this reaches the counter — unlike a body that
+# fails to deserialise, which axum answers 422 before any handler runs
+# and which these counters deliberately cannot see.
+REJECTED_BEFORE="$(ingest_counter rejected)"
+REJ_STATUS="$(curl -s -o /dev/null -w '%{http_code}' -X POST "${BASE}/v1/events" \
+    -H "Authorization: Bearer ${TOKEN}" -H 'content-type: application/json' \
+    -d '{"id":"019fe900-0000-7000-8000-0000000e2e99","kind":"error",
+         "occurredAt":"2026-08-10T06:00:00Z","platform":"commodore-64",
+         "release":"e2e@1.0.0+1","environment":"test",
+         "payload":{"error":{"type":"E","message":"m","stack":[]}}}')"
+[[ "$REJ_STATUS" == "400" ]] \
+    || { echo "an invalid platform returned ${REJ_STATUS}, want 400" >&2; exit 1; }
+REJECTED_AFTER="$(ingest_counter rejected)"
+[[ "$REJECTED_AFTER" -gt "$REJECTED_BEFORE" ]] \
+    || { echo "a 400 did not move rejected (${REJECTED_BEFORE} -> ${REJECTED_AFTER})" >&2; exit 1; }
+
+# The database cannot answer this: rejected events are never stored.
+echo "==> ingest counters move (accepted=${ACCEPTED}, rejected ${REJECTED_BEFORE}->${REJECTED_AFTER})"
+
 # The unauthenticated validator must reach the same verdict as ingest
 # on the same body. If it does not, it is a second source of truth that
 # reads as authoritative and teaches the wrong shape.

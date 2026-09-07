@@ -29,7 +29,7 @@ groups:
           team: sentori
         annotations:
           summary: "Sentori ingest error rate above 1% for 5 minutes"
-          description: "`rejected` is the client's payload failing validation; `failed` is our pipeline erroring. Split them by the `status` label before deciding whose bug it is. `rate_limited` is deliberately excluded — a throttled burst is the limiter working."
+          description: "`rejected` is the client's payload failing validation; `failed` is our pipeline erroring. Split them by the `status` label before deciding whose bug it is. `rate_limited` is deliberately excluded — a throttled burst is the limiter working. Blind spot: a body that fails to deserialise is rejected by the JSON layer as 422 before any handler runs, so it appears in neither the numerator nor the denominator — a client sending structurally wrong JSON reads here as silence, not as errors."
 
       - alert: SentoriIngestStalled
         # Counters reset to 0 on restart; `rate()` handles that, so a
