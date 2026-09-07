@@ -18,6 +18,26 @@ on:
     branches: [master]
   pull_request:
   workflow_dispatch:
+  # Called by deploy.yml as the gate in front of a `release/*` deploy.
+  # `release/*` pushes straight to production and used to run no checks
+  # at all — local preflight was the entire gate, which is a discipline
+  # rather than a guarantee, on the one path whose mistakes are live.
+  #
+  # `workflow_call` and not a second `push:` trigger plus `workflow_run`:
+  # workflow_run fires asynchronously and has silently failed to fire
+  # here before, which is survivable for the master line (it redeploys
+  # what is already live) and not for the release line (it would let a
+  # deploy proceed with no gate having run).
+  workflow_call:
+    inputs:
+      force_all:
+        description: >-
+          Run every job regardless of which paths changed. A release
+          commit touches five version files, so path filtering would
+          skip the webapp and sdk jobs entirely — but a deploy ships
+          the whole tree, not the diff.
+        type: boolean
+        default: false
 
 # v2.1 — opt into Node.js 24 ahead of GitHub Actions' 2026-06-02
 # forced cutover. Several pinned action versions in this file
@@ -36,10 +56,10 @@ jobs:
     # individual build jobs read these outputs to decide whether to run.
     runs-on: ubuntu-latest
     outputs:
-      server: ${{ steps.filter.outputs.server }}
-      webapp: ${{ steps.filter.outputs.webapp }}
-      sdk: ${{ steps.filter.outputs.sdk }}
-      infra: ${{ steps.filter.outputs.infra }}
+      server: ${{ inputs.force_all && 'true' || steps.filter.outputs.server }}
+      webapp: ${{ inputs.force_all && 'true' || steps.filter.outputs.webapp }}
+      sdk: ${{ inputs.force_all && 'true' || steps.filter.outputs.sdk }}
+      infra: ${{ inputs.force_all && 'true' || steps.filter.outputs.infra }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3

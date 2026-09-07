@@ -33,12 +33,41 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # The gate in front of a release deploy.
+  #
+  # `release/*` used to deploy production having run no checks at all:
+  # build.yml does not trigger on it, neither does v0.2-core-check, so
+  # the only thing standing between a laptop and production was whether
+  # the person remembered to run `bun run preflight`. Every other path
+  # into production is gated; the one that ships explicit versions was
+  # not.
+  #
+  # `force_all: true` because a release commit touches VERSION,
+  # CHANGELOG, two Cargo files and openapi.json — path filtering would
+  # skip the webapp and sdk jobs on exactly the commit that ships them.
+  # A deploy publishes the tree, not the diff.
+  #
+  # Skipped on the master line: build.yml has already run and gone
+  # green there, which is what `workflow_run` waited for.
+  gate:
+    if: startsWith(github.ref, 'refs/heads/release/')
+    uses: ./.github/workflows/build.yml
+    with:
+      force_all: true
+    secrets: inherit
+
   deploy:
+    needs: [gate]
     runs-on: [self-hosted, lx64]
     timeout-minutes: 45
+    # `always()` so the master line — where `gate` is skipped — still
+    # deploys; `skipped` and `success` pass, anything else does not.
+    # Without `always()` a skipped dependency cancels this job.
     if: >-
-      github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion == 'success'
+      always() &&
+      (needs.gate.result == 'success' || needs.gate.result == 'skipped') &&
+      (github.event_name != 'workflow_run' ||
+       github.event.workflow_run.conclusion == 'success')
 
     env:
       REMOTE_DIR: /apps/sentori
