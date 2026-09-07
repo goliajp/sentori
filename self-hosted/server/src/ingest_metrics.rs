@@ -14,6 +14,18 @@
 //! the database; this answers "how much of it was turned away", which
 //! the database cannot, because rejected events are never stored.
 //!
+//! **What it does not count.** A body that fails to deserialise never
+//! reaches a handler — axum's `Json` extractor rejects it with `422`
+//! and plain text, which `docs/errors.md` documents as deliberately
+//! outside the error-code contract. So a `422` is invisible here, and
+//! the error rate computed from these counters has it in neither the
+//! numerator nor the denominator. That is the right call for a
+//! per-event counter (a batch counts once per event, and a body that
+//! did not parse has no events to count), but it means a client
+//! sending structurally wrong JSON shows up as silence rather than as
+//! errors. If that becomes a real failure mode, it needs its own
+//! counter at the extractor, not a widening of this one.
+//!
 //! `Relaxed` ordering throughout: each counter is independent and
 //! publishes no other memory, so there is nothing for a stronger
 //! ordering to protect.
