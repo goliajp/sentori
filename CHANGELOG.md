@@ -6,6 +6,61 @@
 
 ---
 
+## v3.17.0(2026-09-08 — 通往生产的那条路上没有门)
+
+两件事,同一个形状:**说了但做不到**。
+
+### release/* 直接部署生产,而且不跑任何检查
+
+`build.yml` 不在它上面触发,`v0.2-core-check` 也不在。所以一台笔记本和线上实例之间,唯一
+站着的东西是「这个人记不记得跑 `bun run preflight`」——一种纪律,而不是一种保证,偏偏在
+唯一一条错误会直接对外服务的路径上。**其它每条进生产的路都有门,只有发版这条没有。**
+
+`deploy.yml` 现在把 `build.yml` 当 `workflow_call` 调用,deploy job `needs` 它。三个选择:
+
+- **用 `workflow_call`,不用「加个 push 触发 + workflow_run」。** workflow_run 是异步的,
+  在这个仓库里静默漏触发过。对 master 线那是可以承受的(它重新部署的是已经在线的东西),
+  对 release 线不行——那会让一次部署在「门根本没跑」的情况下放行,比它要堵的洞更糟。
+- **`force_all: true`。** 一个 release commit 只碰 VERSION、CHANGELOG、两个 Cargo 文件和
+  openapi.json。按路径过滤会**恰好在发布它们的那个 commit 上**跳过 webapp 和 sdk job ——
+  跑了的门和看了的门不是一回事。部署发布的是整棵树,不是 diff。
+- **deploy job 上的 `always()`。** master 线上 `gate` 是 skipped(build.yml 已经绿过),
+  而没有 `always()` 的话,一个被跳过的依赖会把它守护的 job 一起取消。
+
+**验过它真的挡得住。** 推了一个 `release/3.16.1` 分支,里面带一条故意失败的 SDK 断言:
+
+```
+gate / sdk (sdk/react-native)   FAILURE   ← 注入的故障
+deploy                          SKIPPED
+```
+
+生产停在 3.16.1,一次都没重建。分支名特意选了与 Cargo.toml 相同的版本号:万一门没挡住,
+最坏结果是重新部署同一个版本,而不是把没过检查的东西送上线。
+
+那张表的另一半同样重要:webapp、e2e 和四个 sdk job **都在一个只改了一个测试文件的 commit
+上跑了** —— 那就是 `force_all` 在起作用。默认路径过滤下它们会被跳过,而**会跳过的门不是
+门**。
+
+### 公开镜像承诺了一件它机制上做不到的事
+
+mirror workflow 的头部注释写着它存在是为了让社区 "fork / inspect / **contribute**"。而它
+执行的推送是 `git init` + `git push -f` —— 公开 master 每次发版都被从零重建。**在那边合并
+的 PR 会在下一次发版时被抹掉,连同作者署名。** 前两个动词是真的,第三个从来不可能。
+
+注释改了,并且新增一份根 `CONTRIBUTING.md` 进入镜像,把这件事直说,同时给出真正走得通的
+路径:开 issue、把 patch 放在 issue 里、由上游应用并在 changelog 里署名——你的 PR 会被
+close 而不是 merge,那是机制在诚实,不是 patch 被拒。
+
+它也告诉贡献者**在公开 repo 里跑不了 `bun run preflight`**(它有几个检查要读镜像配置和
+workflow 文件,而那些不在那边),换成一组在那边真能跑的命令。`.github/CONTRIBUTING.md`
+仍然排除在镜像外:那份是内部的,写的分支和发版流程在镜像那边并不存在。
+
+### 顺带,我自己又踩了一次
+
+给 rsync 的参数列表中间插了注释行,shellcheck 立刻 SC2215 —— **反斜杠续行里的 `#` 会让
+shell 吞掉它后面所有参数**。记忆里这条写着「一周三犯」。注释搬到命令上方,并在那里写明了
+为什么不能往下搬。
+
 ## v3.16.1(2026-09-08 — 给昨天新造的东西配上门)
 
 3.16.0 把六个死指标引用改活、加了 `sentori_ingest_total`。这一版是它的后半程:
