@@ -41,27 +41,11 @@ members = [
     "crates/push-provider",
     "crates/notifier",
 ]
-# Retired from the build (v1 redesign). Directories stay until the S9
-# sweep; excluding them keeps cargo from claiming they belong to this
-# workspace.
-exclude = [
-    "crates/auth-session",
-    "crates/event-pipeline",
-    "crates/issue-store",
-    "crates/span-store",
-    "crates/replay-store",
-    "crates/runtime-metrics",
-    "crates/cert-monitor",
-    "crates/integration-traits",
-    "crates/audit-event",
-    "crates/alert-rule",
-    "crates/saved-view",
-    "crates/analytics-store",
-    "crates/security-engine",
-    "crates/session-store",
-    "crates/privacy-scrubber",
-    "crates/release-store",
-]
+# No `exclude`. It listed sixteen crates "until the S9 sweep" — the
+# sweep happened (94bd8758, 2026-08-01), all sixteen directories are
+# gone, and the list outlived them by five weeks while still reading
+# like a description of what is on disk. `members` is an explicit
+# list, so nothing is auto-discovered and there is nothing to exclude.
 
 [workspace.package]
 edition = "2024"
