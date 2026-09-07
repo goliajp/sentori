@@ -2,9 +2,18 @@ name: v0.2 OSS — mirror to sentori-selfhosted public repo
 
 # Syncs self-hosted + core + sdk + docker assets to the public
 # sentori-selfhosted repo (goliajp/sentori-selfhosted) so the
-# community can fork / inspect / contribute. The public repo's
-# own CI (v0.2-self-hosted-image.yml, also synced) builds the
-# docker image users pull.
+# community can fork, inspect and run it.
+#
+# Not "contribute", which this comment claimed for months: the push
+# below is `git init` + `git push -f`, so the public master is
+# rebuilt from nothing every run. A pull request merged over there
+# would be erased by the next release, along with its author's name.
+# The mirror cannot accept contributions, and the root
+# CONTRIBUTING.md — which does ship — now says so and gives the path
+# that does work.
+#
+# The public repo's own CI (v0.2-self-hosted-image.yml, also synced)
+# builds the docker image users pull.
 #
 # Required secrets:
 #   SENTORI_SELFHOSTED_MIRROR_REPO   — e.g. goliajp/sentori-selfhosted
@@ -91,6 +100,18 @@ jobs:
           #
           # rsync needs the parent directories included before the
           # files inside them, hence the bare `/docs/` include.
+          #
+          # The root CONTRIBUTING.md ships; `.github/CONTRIBUTING.md`
+          # does not. They address different readers: the public file
+          # explains that this mirror rebuilds its own history and
+          # gives the path that does work, while the internal one
+          # names branches and a release flow that do not exist over
+          # there.
+          #
+          # No comments inside the argument list below: a `#` on its
+          # own line between backslash continuations makes the shell
+          # swallow every argument after it, and shellcheck reads the
+          # next `--exclude` as a command name (SC2215).
           rsync -a --delete \
             --include='/docs/' \
             --include='/docs/README.md' \
@@ -120,7 +141,6 @@ jobs:
             --exclude='ROADMAP-PHASE-50.md' \
             --exclude='ops/secrets.md' \
             --exclude='CHANGELOG.md' \
-            --exclude='CONTRIBUTING.md' \
             --exclude='CODE_OF_CONDUCT.md' \
             --exclude='SECURITY.md' \
             --exclude='.github/ISSUE_TEMPLATE/' \
