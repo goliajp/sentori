@@ -99,6 +99,7 @@ async fn rate_limit_mw(
     if admitted {
         return next.run(req).await;
     }
+    state.ingest_counters.rate_limited();
     (
         StatusCode::TOO_MANY_REQUESTS,
         Json(json!({

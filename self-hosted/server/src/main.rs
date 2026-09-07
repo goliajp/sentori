@@ -42,6 +42,7 @@ mod fcm;
 mod handlers;
 mod hcm;
 mod identity;
+mod ingest_metrics;
 mod mailer;
 mod mipush;
 mod native_symbolicate;

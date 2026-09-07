@@ -1,53 +1,68 @@
 # Incident response
 
-## Severity ladder
+One operator, no paging system. Nothing wakes you up — you find out because you looked, or because someone tells you. This file is what to do once you know.
 
-| Sev | Trigger | First response |
-|-----|---------|---------------|
-| **P1** | Ingest down for **everyone** (all SDKs see 5xx / connection refused) for ≥ 2 minutes; or PG unreachable; or unauthorized data exfiltration suspected | Page on-call **immediately** |
-| **P2** | Ingest error rate ≥ 1% for ≥ 5 minutes (Prometheus `SentoriIngestErrorRateHigh`); or one of {dashboard, marketing, docs} is down; or backups failing for two consecutive nights | Page on-call within 15 minutes |
-| **P3** | Background degradation (slow latency, single-org quota false-positive, broken UI in one browser, partial nav anomaly) | File a GitHub issue, fix during business hours |
+> Rewritten 2026-09-08. The previous version had a two-person weekly on-call rotation acking pages in Better Stack, a public status page at `status.sentori.golia.jp` (which no longer resolves), a `#sentori-ops` Slack channel, and a P2 trigger that fired on marketing and docs being down — containers removed in 2026-08. Its one concrete remediation step was `docker compose -f production-compose.yml restart valkey`: a restart of a service deleted in July, through a compose file that does not exist. A runbook is read at 3am by someone who is not thinking clearly. Every step below has been checked against the running system.
 
-P1 and P2 page; P3 doesn't.
+## Is it actually broken?
 
-## On-call rotation
+```sh
+curl -s https://sentori.golia.jp/healthz
+```
 
-- Page via **Better Stack** (`status.sentori.golia.jp` is the public face; the private status page is the on-call source of truth).
-- Primary + secondary rotate weekly on Monday 09:00 JST. Schedule lives in Better Stack.
-- The current primary is the only person who acks pages. Secondary backstops if primary is unreachable for 10 minutes.
+`{"status":"ok","db":"ok","version":"...","pool_size":N,"pool_idle":M, ...}`
 
-## P1 playbook (60-second checklist)
+- No response / connection refused → the server or Caddy is down. Straight to **Stop the bleeding**.
+- `"db":"error"` → Postgres. The server is up and answering, which means the dashboard loads and every write fails.
+- `200` with an **old** `version` → a deploy silently did not ship. A stale binary answers this endpoint exactly like a fresh one; the version field is the only thing that tells them apart.
 
-1. **Ack the page** in Better Stack so the timer stops.
-2. Open three tabs:
-   - Better Stack uptime dashboard (`https://uptime.betterstack.com/...`)
-   - Grafana **Sentori — Overview** dashboard (`ops/grafana-sentori-overview.json`)
-   - Caddy logs on the app VM (`docker logs caddy --tail=200 -f`)
-3. **Stop the bleeding before debugging:**
-   - If the most recent deploy is < 30 min old → roll back per `deploy.md` ("Rollback").
-   - Else if PG is unreachable → check the PG VM (`systemctl status postgresql`); if it's the disk, free space and restart; if it's process death, restart and start the [backup-restore](backup-restore.md) flow as a safety net.
-   - Else if Valkey is unreachable → restart it (`docker compose -f production-compose.yml restart valkey`); the server fails open on quota / rate limits, so this is a yellow alert, not a red one.
-4. **Communicate** in this order:
-   - Update Better Stack status page (templates: "investigating ingest 5xx", "fix in progress", "monitoring").
-   - Post in `#sentori-ops` Slack with what's broken + your timestamp.
-   - If user-visible for > 15 min, send a brief email to org owners using the same wording.
-5. Once ingest is healthy → spend ≥ 15 minutes watching dashboards before declaring resolved. Premature "all clear" is the most common P1 followup.
+Then the edge:
 
-## P2 playbook
+```sh
+curl -s https://sentori.golia.jp/metrics | grep sentori_ingest_total
+```
 
-Same shape as P1 but with looser timing:
+`rejected` climbing without `accepted` climbing is an SDK sending malformed events — customer-visible as "my errors aren't showing up", not as an outage. `rate_limited` climbing is the limiter working. `failed` climbing is ours.
 
-- Ack within 15 min.
-- Diagnose, then fix or open a documented mitigation (e.g. "raised free-tier limit for org X by hand pending a real fix"). Don't roll forward without rollback being available.
-- Postmortem is optional unless the same alert fires twice in a week.
+## How bad
 
-## After the fact (any sev)
+| | Looks like | Do |
+|---|---|---|
+| **Ingest down** | `/healthz` unreachable, or `accepted` flat at zero while apps are live | Stop the bleeding now. Every SDK is dropping events, and they do not all buffer forever. |
+| **Writes failing** | `"db":"error"`, or `failed` climbing | Same urgency. The dashboard still loads, which makes this easy to under-react to. |
+| **Degraded** | `rejected` spiking, one page broken, slow queries | Diagnose properly. Do not roll back on a hunch. |
 
-Within 48 hours, write a postmortem in `docs/postmortems/<YYYY-MM-DD>-<short-tag>.md`. Cover: timeline, root cause, contributing factors, what worked, what didn't, action items with owners. Five action items max — more than that and nothing gets done.
+## Stop the bleeding
 
-## Things that explicitly do NOT page
+Diagnose second. In order of likelihood:
 
-- Free-tier orgs hitting 100% of their quota (sub-E warning email handles this).
-- A single project's recipient list bouncing on bad-email errors.
-- Editor warnings in CI.
-- Marketing-only build failures (CF Pages handles its own deploy state; sub-G covers retries).
+1. **Was there a deploy in the last 30 minutes?** `gh run list --branch master --limit 5`. If yes, roll back per [deploy.md](./deploy.md) — do not debug forward on a suspicion.
+2. **Is the container up?**
+   ```sh
+   ssh <app host>
+   cd /apps/sentori
+   docker compose -f docker-compose.yml ps
+   docker compose -f docker-compose.yml logs --tail=200 server-v1
+   ```
+   A boot loop is usually a failed migration or a bad `.env`. The logs say which, and migrations run before the server binds a port — a container that never reaches "server boot" did not get past them.
+3. **Is Postgres up?**
+   ```sh
+   docker compose -f docker-compose.yml ps postgres-v1
+   docker compose -f docker-compose.yml logs --tail=100 postgres-v1
+   ```
+   Out of disk is the common one. Check the host: `df -h`. Attachments dominate, not rows.
+4. **Is it Caddy rather than us?** `/healthz` from the app host itself (`curl -s http://127.0.0.1:18092/healthz`) answering while the public URL does not means the problem is in front of the server, not in it. See the Caddy notes in the devops repo — **never** overwrite the t01 Caddyfile from a repo copy; edit live, then import.
+
+## After
+
+There is no status page to update and no channel to post in. What is worth doing:
+
+- If it was user-visible and you have customers on that instance, tell them directly.
+- If the same thing happens twice, write it down. `docs/postmortems/` does not exist — create it when you have the first one rather than leaving a pointer to an empty idea.
+- If the failure was invisible until you happened to look, that is the finding. Ask what would have shown it: an alert rule in `ops/prometheus-alerts.yml` (which needs a Prometheus scraping `/metrics` — there is none today), or a check in `bun run preflight`.
+
+## What does not warrant panic
+
+- A burst of `rate_limited` — the limiter working as designed.
+- `rejected` from one project after an SDK release — a client bug, and rolling back the server will not fix it.
+- Push send failures. They queue and retry; `sentori_push_queued` and `sentori_push_failed_24h` are on `/metrics`.

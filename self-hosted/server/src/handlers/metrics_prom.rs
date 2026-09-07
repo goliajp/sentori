@@ -129,6 +129,20 @@ pub async fn handle(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     )
     .await;
 
+    // ── ingest outcomes ─────────────────────────────────────
+    // A counter, and the only metric here that does not come from a
+    // query: rejected events are never stored, so the database cannot
+    // be asked how many there were.
+    out.push_str("# HELP sentori_ingest_total Ingest requests by terminal outcome.\n");
+    out.push_str("# TYPE sentori_ingest_total counter\n");
+    for (status, count) in state.ingest_counters.snapshot() {
+        out.push_str("sentori_ingest_total{status=\"");
+        out.push_str(status);
+        out.push_str("\"} ");
+        out.push_str(&count.to_string());
+        out.push('\n');
+    }
+
     let mut headers = HeaderMap::new();
     headers.insert(
         "content-type",

@@ -75,6 +75,7 @@ mounted file (`SENTORI_SMTP_PASS_FILE`, `SENTORI_DATABASE_URL_FILE`,
 | `SENTORI_SMTP_HOST` | *(empty)* | Empty runs without email — everything else works and Settings shows the channel as not configured. See `SENTORI_SMTP_{PORT,USER,PASS,FROM,TLS}`. |
 | `SENTORI_ARTIFACT_KEEP_RELEASES` | `20` | Keep symbolication artifacts for the newest N releases per project. `0` disables. |
 | `SENTORI_EVENT_RETENTION_DAYS` | `90` | Delete raw events and their attachments after N days. `0` disables. |
+| `SENTORI_DB_MAX_CONNECTIONS` | sqlx default (`10`) | Max Postgres connections the server pool opens. Raise it if `/metrics` shows `sentori_db_pool_in_use` pinned near `sentori_db_pool_size`; make sure Postgres' own `max_connections` has the headroom first. A zero or non-numeric value is ignored with a warning rather than honoured — a pool of 0 hands out no connections and would read as a database outage. |
 | `RUST_LOG` | `info,sqlx=warn` | Log filter. |
 
 ### What retention does and does not delete

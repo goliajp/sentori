@@ -198,6 +198,7 @@ pub async fn handle(
     let ev = match prepare(&state, ctx.project_id, wire).await {
         Ok(e) => e,
         Err(msg) => {
+            state.ingest_counters.rejected();
             return (
                 StatusCode::BAD_REQUEST,
                 Json(json!({ "error": "invalid_payload", "detail": msg })),
@@ -229,6 +230,7 @@ pub async fn handle(
                 outcome.is_new_issue,
                 outcome.regressed,
             );
+            state.ingest_counters.accepted();
             (
                 StatusCode::ACCEPTED,
                 Json(json!({
@@ -239,11 +241,15 @@ pub async fn handle(
                 })),
             )
         }
-        Err(pipeline::IngestError::Invalid(msg)) => (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "invalid_payload", "detail": msg })),
-        ),
+        Err(pipeline::IngestError::Invalid(msg)) => {
+            state.ingest_counters.rejected();
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "invalid_payload", "detail": msg })),
+            )
+        }
         Err(e) => {
+            state.ingest_counters.failed();
             warn!(project_id = %ctx.project_id, error = %e, "ingest failed");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,

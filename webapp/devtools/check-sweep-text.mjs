@@ -36,7 +36,7 @@ const ALLOWED = new RegExp(
     // The health page lists workers, env vars and auth schemes by their
     // real names on purpose — an operator greps for `Bearer`, not for
     // its translation.
-    'Bearer|HttpOnly|Cookie|ES256|RS256|JWT|TLS|HTTP|TCP|Postgres|Valkey',
+    'Bearer|HttpOnly|Cookie|ES256|RS256|JWT|TLS|HTTP|TCP|Postgres',
     // fixture values from devtools/mock-api.mjs
     'insight|myapp|TypeError|NetworkError|RangeError|Cannot read|Request timed',
     'Maximum call|production|staging|Checkout|Cart|Home|Pay now|Unresolved',
