@@ -1,8 +1,8 @@
 # Prometheus alert rules for Sentori (Phase 16 sub-B).
 #
 # Routes via Alertmanager → Better Stack on-call. Thresholds match the
-# ROADMAP "告警规则" section. PG pool / Valkey latency rules are stubs
-# that fire only when the corresponding metrics are added in Phase 16+.
+# ROADMAP "告警规则" section. The PG pool rule is a stub that fires only
+# once the corresponding metric is added in Phase 16+.
 
 groups:
   - name: sentori-ingest
@@ -30,7 +30,7 @@ groups:
           team: sentori
         annotations:
           summary: "Sentori has accepted zero events for 15 minutes"
-          description: "Either the SDK is broken at the edge or the server is wedged. Check `sentori.golia.jp/main` health, Valkey, and recent deploys."
+          description: "Either the SDK is broken at the edge or the server is wedged. Check `sentori.golia.jp/main` health, Postgres, and recent deploys."
 
   - name: sentori-host
     interval: 60s
@@ -57,16 +57,3 @@ groups:
           team: sentori
         annotations:
           summary: "PG pool above 80% in use for 5 minutes"
-
-  - name: sentori-valkey
-    interval: 60s
-    rules:
-      - alert: ValkeyP99HighLatency
-        # Valkey latency histogram likewise to be added in a follow-up.
-        expr: histogram_quantile(0.99, rate(sentori_valkey_command_duration_seconds_bucket[5m])) > 0.010
-        for: 5m
-        labels:
-          severity: warning
-          team: sentori
-        annotations:
-          summary: "Valkey p99 latency above 10ms for 5 minutes"

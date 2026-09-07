@@ -1,11 +1,11 @@
 //! Storage abstraction for the limiter.
 //!
-//! Stones can't take a network dep, so the Valkey / Redis
-//! backend lives in the 钢筋 `auth-session` crate above. This
-//! trait is the seam; in the stone we ship [`MemoryBackend`]
-//! (sliding-window log, single-process). In v0.2 a
-//! `ValkeyBackend` implementing the same trait will let callers
-//! swap without touching `Limiter` call sites.
+//! Stones can't take a network dep, so a network-backed impl
+//! would live in a 钢筋 crate above. This trait is the seam, and
+//! it currently has exactly one implementation: [`MemoryBackend`]
+//! (sliding-window log, single-process). The seam is what would
+//! let a cross-process backend land without touching `Limiter`
+//! call sites.
 
 use std::time::Instant;
 
@@ -40,7 +40,7 @@ pub trait RateBackend: Send + Sync {
 
     /// Approximate count of keys currently tracking state.
     /// Implementations may return 0 if the backend doesn't
-    /// internally count (e.g. a Valkey backend that wouldn't
-    /// `KEYS *` to count — that's an O(N) Redis no-go).
+    /// internally count (a network backend would not scan its
+    /// whole keyspace just to answer this).
     fn approx_key_count(&self) -> usize;
 }

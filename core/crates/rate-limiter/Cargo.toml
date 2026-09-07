@@ -10,19 +10,21 @@
 #      write deterministic tests against `Limiter` without a
 #      `criterion::black_box`-style hack.
 #   3. `RateBackend` trait — storage abstraction. Stones can't
-#      take a network dep, so a Valkey / Redis backend lives in
-#      the 钢筋 `auth-session` crate. The stone ships
-#      `MemoryBackend` (sliding-window log, single-process).
+#      take a network dep, so a network-backed impl would live in
+#      a 钢筋 crate above. None exists: the stone ships
+#      `MemoryBackend` (sliding-window log, single-process) and
+#      that is the only backend anything composes today.
 #   4. `Limiter<B, C>` — composes a backend + clock + policy
 #      into a one-call API `check(key) -> Verdict`.
 #
-# Design ref:
-#  - `server/src/rate_limit.rs` — legacy fixed-window-minute
-#    impl over Valkey. The stone goes ceiling-first with
-#    **sliding window log** (precise, not approximate; pays
-#    O(N) memory per key where N = window's max throughput) and
-#    abstracts the backend so the Valkey path can share the
-#    `Policy` + `Verdict` + `Limiter` types in v0.2.
+# Design ref: the pre-v1 top-level `server/src/rate_limit.rs`
+# was fixed-window-minute over Valkey. Both are gone — Valkey
+# left with the v0.1 stack on 2026-07-23, that server tree with
+# the v1 redesign. The stone goes ceiling-first with **sliding
+# window log** (precise, not approximate; pays O(N) memory per
+# key where N = window's max throughput) and keeps the backend
+# abstract so a cross-process impl can reuse the `Policy` +
+# `Verdict` + `Limiter` types without touching call sites.
 #
 # 工艺 ceiling-first (per refactor-standards.md §2):
 #  - build / test / clippy / fmt / doc green
