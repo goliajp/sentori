@@ -61,14 +61,34 @@ cleanup() {
 }
 trap cleanup EXIT
 
+DB_PASSWORD=e2e-pass
+
 cat > "$ENV_FILE" <<EOF
-POSTGRES_PASSWORD=e2e-pass
+POSTGRES_PASSWORD=${DB_PASSWORD}
 SENTORI_OWNER_EMAIL=e2e@example.com
 SENTORI_BASE_URL=${BASE}
 SENTORI_PORT=${PORT}
 RUST_LOG=warn
 SENTORI_PG_IMAGE=${SENTORI_PG_IMAGE:-postgres:18-alpine}
 EOF
+
+# The database, asked from a client container on the stack's network
+# rather than from inside `db`. `exec db psql` assumes the database
+# image carries psql; a drop-in built without a shell or a client does
+# not, and the suite then stops with exit 127 at the first step that
+# reads a row directly — for a reason that says nothing about the
+# engine under test. That is how it failed against spg 8.0.2, four
+# steps before the defect it went on to find.
+#
+# The client image is pinned to postgres:18-alpine rather than taken
+# from SENTORI_PG_IMAGE on purpose: the point of this suite is to run
+# against another engine, so the client must not be the thing under
+# test.
+dbq() {
+    docker run --rm --network "${COMPOSE_PROJECT_NAME}_default" \
+        -e PGPASSWORD="${DB_PASSWORD}" postgres:18-alpine \
+        psql -h db -U sentori -d sentori -qtAc "$1"
+}
 
 echo "→ up (${COMPOSE_PROJECT_NAME})"
 docker compose --env-file "$ENV_FILE" up -d --build --quiet-pull
@@ -1011,13 +1031,8 @@ SENTORI_BASE="${BASE}" SENTORI_TOKEN="${TOKEN}" SENTORI_API_TOKEN="${API_TOKEN}"
 # recovery path for data that predates the fix, which is the only way
 # the fix reaches anyone who already hit the bug.
 echo "→ a dSYM stored under a name with no debug id is repaired in place"
-docker compose --env-file "$ENV_FILE" exec -T db \
-    psql -U sentori -d sentori -qtAc \
-    "UPDATE release_artifacts SET name = 'MyApp' WHERE name LIKE 'MyApp-A1B2%'" \
-    > /dev/null
-STRIPPED="$(docker compose --env-file "$ENV_FILE" exec -T db \
-    psql -U sentori -d sentori -qtAc \
-    "SELECT count(*) FROM release_artifacts WHERE name = 'MyApp'" | tr -d '[:space:]')"
+dbq "UPDATE release_artifacts SET name = 'MyApp' WHERE name LIKE 'MyApp-A1B2%'" > /dev/null
+STRIPPED="$(dbq "SELECT count(*) FROM release_artifacts WHERE name = 'MyApp'" | tr -d '[:space:]')"
 [[ "$STRIPPED" == "1" ]] \
     || { echo "could not stage the pre-3.11.0 row (found ${STRIPPED})" >&2; exit 1; }
 
@@ -1034,13 +1049,9 @@ docker compose --env-file "$ENV_FILE" run --rm --no-deps \
 # Counted by exact name rather than matched by prefix: the same
 # release also holds the correctly-named upload, and `LIKE 'MyApp%'`
 # returns both — two rows psql prints as one string.
-REPAIRED="$(docker compose --env-file "$ENV_FILE" exec -T db \
-    psql -U sentori -d sentori -qtAc \
-    "SELECT count(*) FROM release_artifacts \
+REPAIRED="$(dbq "SELECT count(*) FROM release_artifacts \
      WHERE name = 'MyApp-A1B2C3D4E5F60718293A4B5C6D7E8F90'" | tr -d '[:space:]')"
-LEFTOVER="$(docker compose --env-file "$ENV_FILE" exec -T db \
-    psql -U sentori -d sentori -qtAc \
-    "SELECT count(*) FROM release_artifacts WHERE name = 'MyApp'" | tr -d '[:space:]')"
+LEFTOVER="$(dbq "SELECT count(*) FROM release_artifacts WHERE name = 'MyApp'" | tr -d '[:space:]')"
 [[ "$REPAIRED" == "1" && "$LEFTOVER" == "0" ]] \
     || { echo "the row was not repaired (renamed=${REPAIRED}, left as MyApp=${LEFTOVER})" >&2
          cat "$VERIFY_OUT" >&2; exit 1; }
