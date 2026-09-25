@@ -507,7 +507,7 @@ getReceipt, isSentoriPushToken }` client that wraps `/v1/push/send`
     Hosts that stay on v2.0 skip runtime-metric reporting; their
     errors / traces / breadcrumbs land on the same server unchanged.
 
-  **Performance bedrock** (per `.claude/CLAUDE.md`)
+  **Performance bedrock** (the client zero-cost rule)
 
   - Per-tick budget < 0.5 ms on a Pixel-5-equivalent bench
     (stop-ship gate; CI workflow lands in W2 part 5).
@@ -591,9 +591,8 @@ data: { name, props } }` breadcrumb, so a later
   `safeAsync` (`sdk/core/src/safe.ts`); internal errors silently
   fail and optionally self-report via the circuit breaker. The host
   app never sees a thrown error, a rejected promise, a frame drop,
-  a network failure, or anything else attributable to Sentori — per
-  `.claude/CLAUDE.md` performance budgets (< 1 % main-thread
-  sustained, < 5 ms per tick).
+  a network failure, or anything else attributable to Sentori —
+  the budgets are < 1 % main-thread sustained and < 5 ms per tick.
 
   **Server compatibility**
 

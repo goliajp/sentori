@@ -135,7 +135,6 @@ jobs:
             --exclude='target/' \
             --exclude='node_modules/' \
             --exclude='.github/workflows/**' \
-            --exclude='.claude/' \
             --exclude='/.git/' \
             ./ /tmp/mirror/
           find /tmp/mirror/ -maxdepth 1 -printf '%f\n' | sort | head -20

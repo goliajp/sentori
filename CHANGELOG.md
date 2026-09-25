@@ -219,7 +219,7 @@ develop 才有人看。这正是这道 workflow 存在的理由。补上 `fix/**
 自验:改动本身就在一个 fix/ 分支上,改的又正好是这个 workflow(它的 paths 盯着自己),
 push 后 `v0.2 core` 真的跑起来了,green。旧的 branches 列表做不到这件事。
 
-同时改了 `.claude/git-flow.md`——它的 CI 触发表只列了 build + deploy 两个 workflow,并
+同时修正了分支流程手册的 CI 触发表——它只列了 build + deploy 两个 workflow,并
 断言 develop push 完全没 CI。实际有十个 workflow,develop 上跑三个。按每个文件的 `on:`
 块重写,并标出 paths 过滤(表里的 ✓ 是「路径命中才跑」)。另修三处:release finish 让你
 手动 `git tag -a`,但 deploy workflow 在 release/* push 时已经打好推好了,再打会失败——
@@ -227,8 +227,7 @@ push 后 `v0.2 core` 真的跑起来了,green。旧的 branches 列表做不到�
 (发 3.15.3 时就撞了);release start 让你走 changeset,但纯 server 版本根本不碰它;
 "master 是唯一 CI 入口"应为「覆盖面最全」。
 
-**这份 git-flow.md 不在这个 commit 里** —— `.gitignore` 排除了整个 `.claude/`,那份修正
-只在本机生效。
+**那份手册不在这个 commit 里** —— 它不进版本管理,那份修正只在本机生效。
 
 ## v3.15.3(2026-09-07 — Valkey 两个月前就走了,注释没跟上)
 
@@ -3765,8 +3764,7 @@ self-hosted v0.1.0 之后的 SaaS arc：DNS/TLS（11）→ marketing + docs site
 - [x] **决策**：token 格式 `st_pk_<26 字符 base32 of uuid-v7>`（`pk` 项目公钥；保留 `sk_` 给后续 admin secret key）
 - [x] **决策**：UI 栈不改——React 19 + Vite + Tailwind v4 + jotai + react-router 继续
 - [x] **决策**：SDK 包名 `@sentori/react-native`（与 `@sentori/web` 同 namespace）
-- [x] 删除 `.claude/commands/newlab.md`（labs 残留，对 sentori 无意义）
-- [x] 写顶层 `.gitignore`：覆盖 Rust `target/`、Node `node_modules/`、Vite `dist/`、Xcode `build/` & `*.xcuserdata`、Android `build/` & `.gradle/`、`.env`、macOS `.DS_Store` + `.claude/handoff.md`
+- [x] 写顶层 `.gitignore`：覆盖 Rust `target/`、Node `node_modules/`、Vite `dist/`、Xcode `build/` & `*.xcuserdata`、Android `build/` & `.gradle/`、`.env`、macOS `.DS_Store`
 - [x] 写顶层 `README.md` 占位：项目目标 + 状态 + 链接到 ROADMAP.md
 - [x] `git init`
 - [x] 第一个 commit：`chore: bootstrap sentori monorepo`（51b6ae0）
