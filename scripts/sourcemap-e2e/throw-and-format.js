@@ -53,7 +53,7 @@ const frames = stack
   }))
 
 // v1 five-kind wire: camelCase envelope, error payload nested under
-// `payload.error` (see docs/plans/roadmap.md wire contract anchor).
+// `payload.error`. The wire contract is `docs/protocol.md`.
 const id = crypto.randomUUID()
 const event = {
   id,

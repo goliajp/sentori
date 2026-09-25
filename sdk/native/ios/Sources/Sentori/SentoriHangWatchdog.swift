@@ -105,9 +105,9 @@ import Foundation
         let release = (cfg["release"] as? String) ?? "unknown"
         let environment = (cfg["environment"] as? String) ?? "prod"
 
-        // Phase 29 sub-A: try the Mach-based main-thread sampler first.
-        // It walks main's frame pointer chain via thread_get_state +
-        // vm_read_overwrite (see PRIVACY_AND_REVIEW.md). Returns [] on
+        // Try the Mach-based main-thread sampler first. It walks
+        // main's frame pointer chain via thread_get_state +
+        // vm_read_overwrite. Returns [] on
         // non-arm64 platforms or if installMainThreadHandle was never
         // called from main; we then fall back to this thread's own
         // stack — biased toward dispatch machinery but better than

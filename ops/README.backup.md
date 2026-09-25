@@ -1,4 +1,4 @@
-# Sentori PG backup + log pipeline (Phase 16 sub-C)
+# Sentori PG backup + log pipeline
 
 ## What's here
 
@@ -57,5 +57,5 @@ The drill only counts if you actually rebuild a fresh VM end-to-end:
    dashboard (orgs, projects, recent issues). Time the whole thing —
    anything over 30 minutes is too slow for our RTO.
 
-Update `docs/runbook/backup-restore.md` with the actual minutes you
-measured (Phase 16 sub-F).
+Write down the minutes it actually took; an untimed restore
+procedure is a guess.

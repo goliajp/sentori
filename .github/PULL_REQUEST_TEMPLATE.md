@@ -1,6 +1,6 @@
 <!--
-Phase 33 sub-E. Checklist for the reviewer (and the author —
-self-check before requesting review):
+Checklist for the reviewer, and for the author before requesting
+review.
 -->
 
 ## Summary
@@ -10,19 +10,17 @@ self-check before requesting review):
 ## Reviewer checklist
 
 - [ ] **Performance**: if this PR touches any SQL query, ingest
-      endpoint, or dashboard hot path, did you re-run the baselines
-      in [`docs/performance.md`](../docs/performance.md)? Any number
-      regressing > 20 % needs an explanation in this PR or a
-      follow-up commit. Plan-shape changes (new Seq Scan / Sort /
-      Hash Join / partition pruning loss) are tight: explain or
-      revert.
+      endpoint, or dashboard hot path, did you measure it before and
+      after? A number regressing > 20 % needs an explanation in this
+      PR or a follow-up commit. Plan-shape changes (new Seq Scan /
+      Sort / Hash Join) are tight: explain or revert.
 - [ ] **Tests**: new behaviour has a test. `cargo test --lib`
       (server) and `bun run --filter '@goliapkg/sentori-*' test`
       (SDKs) both pass locally.
-- [ ] **Docs**: if you added a new SDK surface or changed wire
-      protocol, the matching `docs-site/` page and `docs/`
-      mirror are updated.
-- [ ] **Migrations**: if you added a `server/migrations/NNNN_*.sql`,
+- [ ] **Docs**: if you added a new SDK surface or changed the wire
+      protocol, the pages under `docs/` and the SDK README are
+      updated.
+- [ ] **Migrations**: if you added a `core/migrations/NNNN_*.sql`,
       it runs forward cleanly and there's a known-safe rollback
       (or "rollback not supported" stated explicitly).
 

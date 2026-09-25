@@ -230,8 +230,9 @@ if (!__DEV__) {
 
 Or set up a separate `dev` project with its own token, and switch
 between them via `.env.local` (untracked) vs `.env.production`
-(tracked). See [Multi-environment](./archive/web-sdk/multi-environment.md)
-for the full strategy.
+(tracked). Two projects also keep the issue list for a release clean:
+a crash a developer caused while iterating does not land in the same
+place as one a user hit.
 
 ## Still stuck?
 

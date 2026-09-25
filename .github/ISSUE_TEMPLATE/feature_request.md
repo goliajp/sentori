@@ -33,9 +33,9 @@ your reasoning.)
 
 ## Compat impact
 
-- Does it change any `/v1/*` SDK ingest shape? (If yes,
-  describe deprecation window per
-  `docs-v0.1/reference/api-compat.md`.)
+- Does it change any `/v1/*` SDK ingest shape? (If yes, say what
+  the deprecation window would be — SDKs in the field keep sending
+  the old shape.)
 - Does it require a DB migration? (If yes, append-only
   forward-compatible only — no destructive changes.)
 - Does it raise the minimum Rust version?

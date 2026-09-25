@@ -1,6 +1,6 @@
 # Sentori CHANGELOG
 
-> v0.1 + v0.2 已完成 phase 的详细记录（含每条 sub 的中文 summary）。新规划见 [ROADMAP.md](./ROADMAP.md) + [docs/roadmap/v1.0.md](./docs/roadmap/v1.0.md)。
+> v0.1 + v0.2 已完成 phase 的详细记录（含每条 sub 的中文 summary）。新规划见 `ROADMAP.md` + `docs/roadmap/v1.0.md`。
 
 > 本文件由 ROADMAP.md 历史段拆分而来，每条记录的真实落地凭证以 git log + commit message 为准。
 
@@ -2047,7 +2047,7 @@ Login / Register / ForgotPassword / Overview / SaasAdmin / Projects / Members / 
 
 ## v2.3 — SDK redesign + identity layer + DSR + Sentry compat
 
-**Shipped:** 2026-06-03. See [`docs/roadmap/v2.3.md`](./docs/roadmap/v2.3.md).
+**Shipped:** 2026-06-03. See `docs/roadmap/v2.3.md`.
 
 **Package bumps:**
 

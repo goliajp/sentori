@@ -6,8 +6,7 @@ package com.sentori
  * Pure-Kotlin heuristics to tag a Throwable as "originated in native
  * code" so the dashboard can show NDK crashes separately from JVM
  * crashes. Real breakpad/crashpad integration (with minidump +
- * dump_syms symbolicator) is queued for v1.1 — see
- * `docs/design/v1-roadmap.md` #7.
+ * dump_syms symbolicator) is not implemented.
  */
 object SentoriNativeOrigin {
 

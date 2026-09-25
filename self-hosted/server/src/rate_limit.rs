@@ -5,8 +5,8 @@
 //!
 //! Per-process, matching the single-instance self-hosted topology
 //! (one server container + Postgres). Horizontal scale would need
-//! a shared store behind the counters; nothing is planned, and the
-//! candidate evaluation is parked in `docs/plans/kevy-migration.md`.
+//! a shared store behind the counters; nothing is planned. The seam
+//! is `RateBackend` in the `rate-limiter` crate.
 //!
 //! Tunables (env-vars):
 //! - `SENTORI_RATELIMIT_DISABLED` default off (set to "1" or "true"

@@ -30,7 +30,7 @@ const MUST_SHIP = [
   'docs/troubleshooting.md',
   'docs/self-hosting.md',
 ];
-const MUST_NOT = /^docs\/(archive|design|plans|roadmap|dogfood|performance|perf-baselines|runbook|infrastructure)\//;
+const MUST_NOT = /^docs\/runbook\//;
 
 const wf = readFileSync(join(ROOT, WF), 'utf8');
 const m = wf.match(/rsync -a --delete \\\n([\s\S]*?)\n\s+\.\/ \/tmp\/mirror\//);

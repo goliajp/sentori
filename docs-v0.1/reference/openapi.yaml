@@ -126,8 +126,7 @@ paths:
       description: |
         Returns 501 in v0.1 — the token middleware (K2) is
         not wired yet. SDKs should POST to
-        `/v1/events/{project_id}` until v0.1.x. Documented
-        in `docs-v0.1/reference/api-compat.md`.
+        `/v1/events/{project_id}` until v0.1.x.
       responses:
         '501':
           description: Not Implemented

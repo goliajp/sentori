@@ -14,7 +14,6 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
-const DOC_SKIP = /^docs\/(archive|design|plans|roadmap|dogfood|performance|perf-baselines)\//;
 const COMPOSE = 'self-hosted/docker/docker-compose.yml';
 
 // ── names the code actually reads ──────────────────────────────────
@@ -75,7 +74,6 @@ const docs = [];
 const walkMd = (d) => {
   for (const e of readdirSync(join(ROOT, d))) {
     const rel = `${d}/${e}`;
-    if (DOC_SKIP.test(rel)) continue;
     if (statSync(join(ROOT, rel)).isDirectory()) walkMd(rel);
     else if (e.endsWith('.md')) docs.push(rel);
   }

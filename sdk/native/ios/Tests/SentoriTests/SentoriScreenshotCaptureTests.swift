@@ -34,8 +34,8 @@ final class SentoriScreenshotCaptureTests: XCTestCase {
     }
 
     /// Performance gate: capture-on-a-known-size-view-hierarchy
-    /// must complete in <30 ms on a synthesized tree, matching the
-    /// budget in `ROADMAP.md` (sub-E.10 perf bench).
+    /// must complete in <30 ms on a synthesized tree, which is the
+    /// budget a capture gets on the host's main thread.
     ///
     /// The hierarchy under test is 50 nested UIView levels — much
     /// deeper than any real app. The depth cap inside the helper

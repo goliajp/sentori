@@ -56,7 +56,7 @@ bash self-hosted/tests/e2e/smoke.sh   # needs docker compose v2, jq, curl
 
 ## Architecture
 
-Every change should sit in one of three tiers ([cement-stone](https://github.com/goliajp/global-config/blob/master/methodology/steel-cement-stone.md)):
+Every change should sit in one of three tiers, and each crate declares which one it is at the top of its `Cargo.toml`:
 
 1. **石头 (stone)** — no business coupling, would work in another project. `core/crates/{privacy-salt, issue-fingerprint, rate-limiter, …}`. Bench, fuzz, proptest, high coverage.
 2. **钢筋 (steel)** — knows the domain, not the flow. `core/crates/{ingest-token, attachment-store, push-provider, notifier}`.

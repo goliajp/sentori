@@ -3,7 +3,7 @@
 //! `/metrics` could report how many events are in the database and
 //! how many connections the pool held, but not how many events were
 //! *refused* — the one number an operator needs to answer "is the
-//! edge healthy?". `docs/runbook/deploy.md` told you to watch
+//! edge healthy?". A deploy checklist told you to watch
 //! `sentori_ingest_total{status="rejected"}` during a roll, and
 //! `ops/prometheus-alerts.yml` alerted on its rate, for a series the
 //! server has never emitted.

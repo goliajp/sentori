@@ -95,3 +95,6 @@ apps/android-consumer/.gradle/
 # interrupted run leaves it behind.
 .env.e2e.*
 self-hosted/docker/.env.e2e.*
+
+# smix session state (local device driver)
+.smix/
