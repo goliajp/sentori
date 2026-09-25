@@ -8,9 +8,8 @@ name: v0.2 OSS — mirror to sentori-selfhosted public repo
 # below is `git init` + `git push -f`, so the public master is
 # rebuilt from nothing every run. A pull request merged over there
 # would be erased by the next release, along with its author's name.
-# The mirror cannot accept contributions, and the root
-# CONTRIBUTING.md — which does ship — now says so and gives the path
-# that does work.
+# The mirror cannot accept contributions; an issue is the path that
+# works, and it is the one to point people at.
 #
 # The public repo's own CI (v0.2-self-hosted-image.yml, also synced)
 # builds the docker image users pull.
@@ -101,11 +100,6 @@ jobs:
           # rsync needs the parent directories included before the
           # files inside them, hence the bare `/docs/` include.
           #
-          # CONTRIBUTING.md ships. It explains that this mirror
-          # rebuilds its own history on every release, so a merged
-          # pull request would not survive, and gives the path that
-          # does work.
-          #
           # No comments inside the argument list below: a `#` on its
           # own line between backslash continuations makes the shell
           # swallow every argument after it, and shellcheck reads the
@@ -136,10 +130,7 @@ jobs:
             --exclude='/docs-v0.1/' \
             --exclude='/docs-v0.2/' \
             --exclude='CHANGELOG.md' \
-            --exclude='CODE_OF_CONDUCT.md' \
             --exclude='SECURITY.md' \
-            --exclude='.github/ISSUE_TEMPLATE/' \
-            --exclude='.github/PULL_REQUEST_TEMPLATE.md' \
             --exclude='.github/SECURITY.md' \
             --exclude='target/' \
             --exclude='node_modules/' \
