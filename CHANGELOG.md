@@ -68,10 +68,9 @@ shell 吞掉它后面所有参数**。记忆里这条写着「一周三犯」。
 
 ### 铁律的第四维一直没有门
 
-CLAUDE.md 把 client 零成本铁律写成四维,然后说每一条都必须有门,「没门的铁律等于没写」。
-三条有:失败零传染是 `iron-rule.test.ts`,footprint 是 `check-sdk-size.sh`,perf 是
-`sdk-perf.yml` 加 init 预算。**net(零可感)那条只有 CLAUDE.md 里的一个数字,全仓库没有
-任何东西在检查它。**
+client 零成本铁律有四维,而没有门的那一维等于没写。三条有:失败零传染是
+`iron-rule.test.ts`,footprint 是 `check-sdk-size.sh`,perf 是 `sdk-perf.yml` 加 init
+预算。**net(零可感)那条只有一个写下来的数字,全仓库没有任何东西在检查它。**
 
 三条断言,用一个计数 fetch:
 
@@ -2075,7 +2074,7 @@ Login / Register / ForgotPassword / Overview / SaasAdmin / Projects / Members / 
 
 ## v1.0.0-rc.10 — default capture rate 4 Hz → 2 Hz per perf rule
 
-**Theme:** iOS sim measured 0.99 ms / tick at 4 Hz on a thin (11-node) dev panel, well within budget — but extrapolation to a 200-node Insight-class dense UI puts JS-thread occupancy at ~1.2–1.6 % on iOS and ~3.6–4.8 % on Android (reflective Drawable colour extraction amplifies cost there). That crosses the project's "几乎不能造成性能抖动" rule (CLAUDE.md). Roll the default back; keep the encoding gains.
+**Theme:** iOS sim measured 0.99 ms / tick at 4 Hz on a thin (11-node) dev panel, well within budget — but extrapolation to a 200-node Insight-class dense UI puts JS-thread occupancy at ~1.2–1.6 % on iOS and ~3.6–4.8 % on Android (reflective Drawable colour extraction amplifies cost there). That crosses the rule that Sentori must not make the host app stutter. Roll the default back; keep the encoding gains.
 
 **Package bumps：**
 
@@ -2095,7 +2094,7 @@ Login / Register / ForgotPassword / Overview / SaasAdmin / Projects / Members / 
 
 ## v1.0.0-rc.9 — keyframe + delta replay encoding (v2 wire format)
 
-**Theme:** rc.8 stabilised the Android wireframe walker but each replay tick still emitted a full snapshot. Sustained capture at the rc.8 default rate produced > 200 KB / 60 s on dense dashboards — close enough to the "60 s replay attachment < 200 KB" target (CLAUDE.md performance rule) that the next product feature would push us over. Need a real on-wire compactor.
+**Theme:** rc.8 stabilised the Android wireframe walker but each replay tick still emitted a full snapshot. Sustained capture at the rc.8 default rate produced > 200 KB / 60 s on dense dashboards — close enough to the 60 s replay attachment budget of 200 KB that the next product feature would push us over. Need a real on-wire compactor.
 
 **Package bumps：**
 
