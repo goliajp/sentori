@@ -23,10 +23,10 @@ import { join } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const DOC_DIRS = ['docs'];
-// `archive/` is where pages that name a vanished API are allowed to
-// live — see docs/archive/README.md. The other trees are internal
-// notes that were never a contract with anyone.
-const SKIP = /^docs\/(archive|design|plans|roadmap|dogfood|performance|perf-baselines|runbook)\//;
+// `runbook/` addresses an operator rather than an integrator: it
+// names metrics, env vars and SQL, not the SDK surface this file
+// checks.
+const SKIP = /^docs\/runbook\//;
 
 // ── what actually exists ────────────────────────────────────────────
 const rn = (p) => readFileSync(join(ROOT, 'sdk/react-native/src', p), 'utf8');

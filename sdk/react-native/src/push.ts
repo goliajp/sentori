@@ -73,7 +73,7 @@ let _onTap: PushRegisterOptions['onTap'] = undefined
 // v2.26 — confirmed delivery ack pipeline. msgIds extracted from
 // received pushes are queued here and flushed to the server every
 // 5 s. Server-side `push_sends.acked_at` flips from NULL to
-// wall-clock on first ack. See docs/roadmap/v2.26.md.
+// wall-clock on first ack.
 const ACK_FLUSH_INTERVAL_MS = 5000
 let _ackQueue: string[] = []
 let _ackFlushInterval: ReturnType<typeof setInterval> | null = null

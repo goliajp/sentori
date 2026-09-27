@@ -8,7 +8,7 @@
 // something is. Of the rule's four dimensions this was the one with
 // no gate at all — failure isolation had this file, footprint had
 // check-sdk-size.sh, perf had sdk-perf.yml and the init budget
-// below, and the traffic budget had a number in CLAUDE.md and
+// below, and the traffic budget was a written-down number with
 // nothing checking it.
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
@@ -293,7 +293,7 @@ describe('iron rule: the network stays quiet', () => {
     // The shape of a minute that has gone wrong: a crash, the
     // detected-anomaly signals around it, and the breadcrumb trail a
     // host pushes. Well past a realistic minute, and still inside
-    // the budget CLAUDE.md sets.
+    // the 500 KB budget.
     for (let i = 0; i < 20; i++) {
       patchContext({ screen: `Checkout/step-${i}`, attempt: i });
       verbs.trace(`checkout.step.${i}`, { index: i, note: 'x'.repeat(200) });

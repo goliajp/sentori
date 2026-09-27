@@ -13,10 +13,10 @@ import { join, dirname, normalize } from 'node:path';
 const ROOTS = ['docs', 'self-hosted', 'sdk'];
 
 // Run it against a fresh checkout, not a working copy: two links
-// repointed at `.claude/CLAUDE.md` passed here and failed in CI,
-// because that path is gitignored — it exists on the machine that
-// wrote it and nowhere else. A link only its author can follow is
-// exactly what this checker is for, and it caught its own author.
+// pointed at an ignored path, passed here and failed in CI, because
+// the file existed on the machine that wrote it and nowhere else. A
+// link only its author can follow is exactly what this checker is
+// for, and it caught its own author.
 const LINK = /\]\(([^)#\s]+)(?:#[^)\s]*)?\)/g;
 
 function walk(dir, out = []) {

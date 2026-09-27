@@ -57,7 +57,6 @@ to `POST /v1/events/<project_id>` as JSON. Auth is via a
 public DSN-equivalent token; rate limiting is K-tier
 sliding window keyed by token.
 
-Per the铁律 in `.claude/CLAUDE.md`, the SDK must add
-< 1% main-thread CPU + < 1% frame drops on a mid-tier
-device. v0.1 ships only the data-plane backend; SDKs
+The SDK must add < 1% main-thread CPU + < 1% frame drops
+on a mid-tier device. v0.1 ships only the data-plane backend; SDKs
 ride v2 cadence.

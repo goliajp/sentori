@@ -29,8 +29,7 @@ In scope:
 - Public docker images on `ghcr.io/goliajp/sentori-*`.
 
 Out of scope:
-- The legacy `server/` + `web/` tree pending retirement
-  (`SH6` in `.claude/state/v0.1-execution-plan.md`).
+- The legacy `server/` + `web/` tree pending retirement.
 - The SaaS dashboard's JS bundles (separate issue
   channel; coordinate with `app-security@golia.jp`).
 - Customer-managed deployments — we provide best-effort

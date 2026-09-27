@@ -144,9 +144,10 @@ The blob volume is worth backing up too, but it degrades gracefully:
 symbolication artifacts are re-uploadable from CI, and a lost replay
 costs one issue's evidence rather than the issue.
 
-For the operational side — schedules, offsite copies, and the drill
-that proves a restore actually works — see
-[`runbook/backup-restore.md`](./runbook/backup-restore.md).
+The operational side — a schedule, an offsite copy, and a drill that
+proves a restore actually works — is yours to decide. `ops/backup.sh`
+and `ops/restore.sh` are the scripts this project uses;
+`ops/README.backup.md` says what they expect.
 
 ## Before you call it production
 

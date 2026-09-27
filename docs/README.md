@@ -46,30 +46,16 @@ mobile apps.
 - [`self-hosting.md`](self-hosting.md) — environment variables,
   backup / restore, Postgres upgrade notes.
 - [`teams.md`](teams.md) — accounts, roles, project assignment.
-- [`runbook/backup-restore.md`](runbook/backup-restore.md)
-- [`runbook/scaling.md`](runbook/scaling.md)
+- [`runbook/scaling.md`](runbook/scaling.md) — what to read before
+  adding capacity, and what this topology does not do.
 
 ## Recipes
 
 - [`recipes/sourcemap-upload.md`](recipes/sourcemap-upload.md)
 - [`recipes/release-versioning.md`](recipes/release-versioning.md)
 
-## Internal
+## What is not here
 
-Not published to the OSS mirror: `design/`, `plans/`, `roadmap/`,
-`dogfood/`, `performance/`, `perf-baselines/`, and the rest of
-`runbook/`.
-
-## Archive
-
-[`archive/`](archive/) holds pages that describe versions and features
-that no longer exist — the pre-v1 SDK reference, guides for web
-packages that are not on npm, an error catalogue for an API that was
-never built, and one integrator's upgrade notes. Its own README says
-what each tree was.
-
-Nothing in `archive/` is documentation. It is kept because deleting
-history makes the next person repeat it, and it is a directory rather
-than a banner because
-[`scripts/check-docs-api-truth.mjs`](../scripts/check-docs-api-truth.mjs)
-has to be able to tell the difference mechanically.
+Pages describing versions that no longer exist — the pre-v1 SDK
+reference, the web packages that never reached npm — are not kept in
+this repository. The CHANGELOG is the history; `git log` is the record.

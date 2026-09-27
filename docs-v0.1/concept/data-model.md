@@ -7,8 +7,7 @@ in SaaS is achieved by a `workspace_id UUID NOT NULL` column
 on every tenant-bearing table + Postgres RLS policies that
 filter rows by a session GUC (`app.current_workspace`).
 
-See `docs-v0.1/internal/single-db-pivot-decomposition.md` for
-the full design; this page is the user-facing summary.
+This page is the user-facing summary of that design.
 
 ## Migration order
 

@@ -12,9 +12,9 @@
  *   3. returns `undefined` (sync) or a resolved `Promise<undefined>`
  *      (async)
  *
- * See `docs/design/manual-instrumentation-v2.md` — principle −1
- * ("NEVER harm the host app"). This module is the *load-bearing*
- * primitive for that rule.
+ * The rule it exists for: never harm the host app. This module is
+ * the load-bearing primitive for that — nothing an SDK callback does
+ * may reach the application.
  */
 /**
  * Wrap a sync function so it can never throw.

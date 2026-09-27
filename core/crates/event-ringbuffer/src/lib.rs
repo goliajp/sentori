@@ -27,8 +27,7 @@
 //!    accessible without locking the producer path, so observability
 //!    code can plot drops over time without backpressure on the
 //!    ingest hot path. This is load-bearing for the project's
-//!    "Sentori must not perturb the host app" guarantee
-//!    (`.claude/CLAUDE.md` section on performance).
+//!    "Sentori must not perturb the host app" guarantee.
 //!
 //! ## Semantics in one paragraph
 //!

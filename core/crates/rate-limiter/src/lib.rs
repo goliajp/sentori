@@ -54,7 +54,7 @@
 //! concurrent callers against distinct keys this can become a
 //! contention point, and single-process state does not survive a
 //! second instance. Both would want a cross-process backend; none
-//! is planned (see `docs/plans/kevy-migration.md`, parked). Both
+//! is planned; the seam is [`RateBackend`]. Both
 //! [`MemoryBackend`] and [`Limiter`] are `Send + Sync`, meant to
 //! be shared via `Arc`.
 //!

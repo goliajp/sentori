@@ -1,8 +1,60 @@
 # Sentori CHANGELOG
 
-> v0.1 + v0.2 已完成 phase 的详细记录（含每条 sub 的中文 summary）。新规划见 [ROADMAP.md](./ROADMAP.md) + [docs/roadmap/v1.0.md](./docs/roadmap/v1.0.md)。
+> v0.1 + v0.2 已完成 phase 的详细记录（含每条 sub 的中文 summary）。
 
-> 本文件由 ROADMAP.md 历史段拆分而来，每条记录的真实落地凭证以 git log + commit message 为准。
+> 每条记录的真实落地凭证以 git log + commit message 为准。
+
+---
+
+## v3.17.1（2026-09-27 — 仓库里只剩交付物）
+
+一个公开仓库跟踪了 158 个没人从外面读的文件，而定义生产的那个文件不在任何仓库里。两件事
+方向相反，根因一样：**没有人问过「这东西的读者是谁」**。
+
+### 移出去的：158 个过程文件
+
+roadmap、设计提案、plan、性能基线、决策记录、给自己生产写的 runbook、给某个客户团队的交接
+沟通，全部被跟踪在一个谁都能读的仓库里。它们不是文档，是开发材料：描述在做一半的事，点名
+我们自己的主机、一个模拟器序列号和一个私人邮箱。其中 `sdk/react-native/ios/PRIVACY_AND_REVIEW.md`
+还在 npm 包的 `files` 范围内，**每个安装 SDK 的人都收到了它**。
+
+留下的是外面的人真需要的：使用指南、SDK 与协议参考、cookbook、自托管和扩容两页、CHANGELOG、
+LICENSE、SECURITY，以及 `ops/` 那几个脚本和讲它们的 README。
+
+贡献者文档也一起移出：这个仓库不收 PR——公开 master 每次发版被 `git init` + `git push -f`
+重建，合并进去的 PR 下一版就没了（v3.17.0 那条说的正是这件事）。一份讲怎么提 PR 的指南、
+一份行为准则、一个 PR 模板和两个 issue 模板，描述的是一种从不发生的协作。
+
+同一个提交里修好了所有指向被移出文件的引用：留下的文档不再链一个不存在的页，而是直接把话
+说完；各 CHANGELOG 里的 markdown 链接改成纯文本（changelog 记录的是发生过的事，它点的路径
+是记录的一部分）；源码注释改成说规则本身，不说规则写在哪。
+
+### 收回来的：定义生产的那个 compose
+
+部署一直从 runner 上另一个仓库的 checkout 里安装 `/apps/sentori/docker-compose.yml`，
+fallback 指向本仓库里一个并不存在的路径。那个仓库已经不再跟踪它，于是生产运行的拓扑——
+容器、镜像、卷、端口、dashboard 靠的那个 bind mount——只存在于一台主机上的一个文件，和一台
+笔记本上一份不进 git 的副本。主机重建就没了。
+
+它现在是 `deploy/docker-compose.t01.yml`，与线上逐字节相同（sha256 `26866dd4…`），部署从
+它所发布的那个 release 里安装它。主机那份不一样时，先把 diff 打进日志再覆盖——事故中手改过
+的内容留下记录，而不是静默消失。自托管用户拿的仍然是 `self-hosted/docker/docker-compose.yml`，
+镜像排除 `deploy/`：它只描述一台主机，发出去只会误导。
+
+### 顺带补了两道门
+
+- `check-env-vars-real` 现在也读生产 compose：它交给容器的每个 `SENTORI_*` 键必须是服务器
+  真读的名字，否则那个设置已经静默失效。插值（`${SENTORI_PG_PASSWORD}` 这类）是 compose
+  自己的输入，不算。拿一个编造的键实测过它会红。这个检查原来只在 preflight 跑——**生产的门
+  放在 preflight 里是放错了地方**，现在是 CI 的一步。
+- 同一个检查原先跳过 `docs/runbook/`，恰好把留下来的两页排除在外。现在覆盖它们，同样实测
+  过会红。
+
+### 一个不能碰的地方
+
+`core/migrations/0001_identity.sql` 里的一句注释指向已经移出的文档，**故意没改**。
+`sqlx::migrate!` 的校验和覆盖整个文件内容，注释字节也算，改了它所有已有数据库——包括生产
+——会在启动时迁移校验失败。
 
 ---
 
@@ -68,10 +120,9 @@ shell 吞掉它后面所有参数**。记忆里这条写着「一周三犯」。
 
 ### 铁律的第四维一直没有门
 
-CLAUDE.md 把 client 零成本铁律写成四维,然后说每一条都必须有门,「没门的铁律等于没写」。
-三条有:失败零传染是 `iron-rule.test.ts`,footprint 是 `check-sdk-size.sh`,perf 是
-`sdk-perf.yml` 加 init 预算。**net(零可感)那条只有 CLAUDE.md 里的一个数字,全仓库没有
-任何东西在检查它。**
+client 零成本铁律有四维,而没有门的那一维等于没写。三条有:失败零传染是
+`iron-rule.test.ts`,footprint 是 `check-sdk-size.sh`,perf 是 `sdk-perf.yml` 加 init
+预算。**net(零可感)那条只有一个写下来的数字,全仓库没有任何东西在检查它。**
 
 三条断言,用一个计数 fetch:
 
@@ -219,7 +270,7 @@ develop 才有人看。这正是这道 workflow 存在的理由。补上 `fix/**
 自验:改动本身就在一个 fix/ 分支上,改的又正好是这个 workflow(它的 paths 盯着自己),
 push 后 `v0.2 core` 真的跑起来了,green。旧的 branches 列表做不到这件事。
 
-同时改了 `.claude/git-flow.md`——它的 CI 触发表只列了 build + deploy 两个 workflow,并
+同时修正了分支流程手册的 CI 触发表——它只列了 build + deploy 两个 workflow,并
 断言 develop push 完全没 CI。实际有十个 workflow,develop 上跑三个。按每个文件的 `on:`
 块重写,并标出 paths 过滤(表里的 ✓ 是「路径命中才跑」)。另修三处:release finish 让你
 手动 `git tag -a`,但 deploy workflow 在 release/* push 时已经打好推好了,再打会失败——
@@ -227,8 +278,7 @@ push 后 `v0.2 core` 真的跑起来了,green。旧的 branches 列表做不到�
 (发 3.15.3 时就撞了);release start 让你走 changeset,但纯 server 版本根本不碰它;
 "master 是唯一 CI 入口"应为「覆盖面最全」。
 
-**这份 git-flow.md 不在这个 commit 里** —— `.gitignore` 排除了整个 `.claude/`,那份修正
-只在本机生效。
+**那份手册不在这个 commit 里** —— 它不进版本管理,那份修正只在本机生效。
 
 ## v3.15.3(2026-09-07 — Valkey 两个月前就走了,注释没跟上)
 
@@ -2047,7 +2097,7 @@ Login / Register / ForgotPassword / Overview / SaasAdmin / Projects / Members / 
 
 ## v2.3 — SDK redesign + identity layer + DSR + Sentry compat
 
-**Shipped:** 2026-06-03. See [`docs/roadmap/v2.3.md`](./docs/roadmap/v2.3.md).
+**Shipped:** 2026-06-03. See `docs/roadmap/v2.3.md`.
 
 **Package bumps:**
 
@@ -2076,7 +2126,7 @@ Login / Register / ForgotPassword / Overview / SaasAdmin / Projects / Members / 
 
 ## v1.0.0-rc.10 — default capture rate 4 Hz → 2 Hz per perf rule
 
-**Theme:** iOS sim measured 0.99 ms / tick at 4 Hz on a thin (11-node) dev panel, well within budget — but extrapolation to a 200-node Insight-class dense UI puts JS-thread occupancy at ~1.2–1.6 % on iOS and ~3.6–4.8 % on Android (reflective Drawable colour extraction amplifies cost there). That crosses the project's "几乎不能造成性能抖动" rule (CLAUDE.md). Roll the default back; keep the encoding gains.
+**Theme:** iOS sim measured 0.99 ms / tick at 4 Hz on a thin (11-node) dev panel, well within budget — but extrapolation to a 200-node Insight-class dense UI puts JS-thread occupancy at ~1.2–1.6 % on iOS and ~3.6–4.8 % on Android (reflective Drawable colour extraction amplifies cost there). That crosses the rule that Sentori must not make the host app stutter. Roll the default back; keep the encoding gains.
 
 **Package bumps：**
 
@@ -2096,7 +2146,7 @@ Login / Register / ForgotPassword / Overview / SaasAdmin / Projects / Members / 
 
 ## v1.0.0-rc.9 — keyframe + delta replay encoding (v2 wire format)
 
-**Theme:** rc.8 stabilised the Android wireframe walker but each replay tick still emitted a full snapshot. Sustained capture at the rc.8 default rate produced > 200 KB / 60 s on dense dashboards — close enough to the "60 s replay attachment < 200 KB" target (CLAUDE.md performance rule) that the next product feature would push us over. Need a real on-wire compactor.
+**Theme:** rc.8 stabilised the Android wireframe walker but each replay tick still emitted a full snapshot. Sustained capture at the rc.8 default rate produced > 200 KB / 60 s on dense dashboards — close enough to the 60 s replay attachment budget of 200 KB that the next product feature would push us over. Need a real on-wire compactor.
 
 **Package bumps：**
 
@@ -3765,8 +3815,7 @@ self-hosted v0.1.0 之后的 SaaS arc：DNS/TLS（11）→ marketing + docs site
 - [x] **决策**：token 格式 `st_pk_<26 字符 base32 of uuid-v7>`（`pk` 项目公钥；保留 `sk_` 给后续 admin secret key）
 - [x] **决策**：UI 栈不改——React 19 + Vite + Tailwind v4 + jotai + react-router 继续
 - [x] **决策**：SDK 包名 `@sentori/react-native`（与 `@sentori/web` 同 namespace）
-- [x] 删除 `.claude/commands/newlab.md`（labs 残留，对 sentori 无意义）
-- [x] 写顶层 `.gitignore`：覆盖 Rust `target/`、Node `node_modules/`、Vite `dist/`、Xcode `build/` & `*.xcuserdata`、Android `build/` & `.gradle/`、`.env`、macOS `.DS_Store` + `.claude/handoff.md`
+- [x] 写顶层 `.gitignore`：覆盖 Rust `target/`、Node `node_modules/`、Vite `dist/`、Xcode `build/` & `*.xcuserdata`、Android `build/` & `.gradle/`、`.env`、macOS `.DS_Store`
 - [x] 写顶层 `README.md` 占位：项目目标 + 状态 + 链接到 ROADMAP.md
 - [x] `git init`
 - [x] 第一个 commit：`chore: bootstrap sentori monorepo`（51b6ae0）

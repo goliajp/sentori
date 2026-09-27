@@ -1,7 +1,7 @@
 # v0.1 Fresh Start — core/ workspace root.
 #
 # 跨 saas + self-hosted 共享的 石头 + 钢筋 crate。
-# Per `.claude/state/refactor-standards.md` §1 cement-stone:
+# 两层分类:
 #   - 石头: 业务无关, 跨项目可用, semver 严格 (license-jwt, privacy-salt 等)
 #   - 钢筋: 业务领域感知不绑死业务流 (workspace-identity, event-pipeline 等)
 #

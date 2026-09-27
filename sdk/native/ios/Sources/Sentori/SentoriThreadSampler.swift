@@ -2,10 +2,10 @@ import Foundation
 
 /// Captures the main thread's program-counter chain for hang reporting.
 ///
-/// Phase 29 sub-A. Used by `SentoriHangWatchdog` to fill an `anr` event's
+/// Used by `SentoriHangWatchdog` to fill an `anr` event's
 /// `frames[].instructionAddress`. Server-side symbolicates against the
-/// uploaded dSYM (Phase 22 sub-B). API surface and App Store review notes
-/// are in `PRIVACY_AND_REVIEW.md`.
+/// uploaded dSYM. Only public, documented Mach APIs are used, and no
+/// frame is read from any thread but main.
 ///
 /// arm64-only. On non-arm64 (Intel Mac simulators) `captureMainThreadFrames`
 /// returns an empty array; the watchdog falls back to its previous

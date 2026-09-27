@@ -2,7 +2,7 @@
 
 `self-hosted/server` 组合的共享 Rust workspace。
 
-按 [cement-stone methodology](https://github.com/goliajp/global-config/blob/master/methodology/steel-cement-stone.md) 分类。下面这份清单和 `core/crates/` 里真实存在的目录一一对应,分类取自每个 crate 自己 `Cargo.toml` 顶部的声明 —— 这份 README 上一版列了 27 个 crate,其中 16 个在 v1 重构里已经删掉,读起来却和真实目录结构一模一样。
+按三层分类(石头 / 钢筋 / 水泥)。下面这份清单和 `core/crates/` 里真实存在的目录一一对应,分类取自每个 crate 自己 `Cargo.toml` 顶部的声明 —— 这份 README 上一版列了 27 个 crate,其中 16 个在 v1 重构里已经删掉,读起来却和真实目录结构一模一样。
 
 - **石头 (stone)** — 业务无关、跨项目可用、semver 严格
   - `crates/privacy-salt/` — HKDF-SHA256 + HMAC-SHA256 per-tenant per-purpose PII hasher

@@ -158,5 +158,5 @@ Structured logs go to stdout — pipe to your log shipper of choice.
 
 ## Cutover from legacy SaaS
 
-See [CUTOVER.md](./CUTOVER.md) for the step-by-step plan +
+See `CUTOVER.md` for the step-by-step plan +
 data preservation guarantees.

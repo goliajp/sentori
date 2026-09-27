@@ -16,9 +16,10 @@
 #    eviction is best-effort: under heavy contention another producer
 #    can fill the just-freed slot, in which case we drop the new item
 #    instead. Either path increments the drop counter.
-#  - Drop counter is `AtomicU64` so observability code (CLAUDE.md
-#    "Sentori 几乎不能造成 host app 的性能抖动" — drop semantics
-#    must be visible) can read it without locking the producer path.
+#  - Drop counter is `AtomicU64` so observability code can read it
+#    without locking the producer path: Sentori must not make the
+#    host app stutter, and a drop nobody can see is worse than one
+#    that shows up on a graph.
 #
 # Used by:
 #  - sentori-saas / sentori-selfhosted ingest pipeline (planned
