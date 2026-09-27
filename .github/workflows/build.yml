@@ -290,6 +290,49 @@ jobs:
   # actually happened — a generated owner password filtered out of the
   # log by a quieter RUST_LOG, an event resend answered with a 500 that
   # our own contract tells the SDK to retry.
+  # Fourteen checks whose only enforcement was a developer remembering
+  # to run preflight. Several guard a published surface: the mirror's
+  # allowlist, the authorisation on every project-scoped admin
+  # endpoint, the project scoping on every attachment read, and the
+  # agreement between the generated OpenAPI / error reference and the
+  # code. No path filter and no `needs` — a docs-only change skips
+  # server-test, which is where most of them used to live, and these
+  # are exactly the changes that break them. They need node and
+  # nothing installed.
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: the mirror ships the docs and none of the internal ones
+        run: node scripts/check-mirror-docs.mjs
+      - name: docs name only APIs and packages that exist
+        run: node scripts/check-docs-api-truth.mjs
+      - name: every markdown code fence closes
+        run: node scripts/check-md-fences.mjs
+      - name: the OpenAPI document matches the router
+        run: node scripts/gen-openapi.mjs --check
+      - name: the error reference matches the handlers
+        run: node scripts/gen-error-reference.mjs --check
+      - name: every project-scoped admin endpoint authorises the caller
+        run: node scripts/check-admin-authorisation.mjs
+      - name: every read of event_attachments is project-scoped
+        run: node scripts/check-attachment-scoping.mjs
+      - name: no 200 carries an error body
+        run: node scripts/check-error-status.mjs
+      - name: one casing on the v1 wire
+        run: node scripts/check-wire-case.mjs
+      - name: alert + dashboard expressions name metrics that exist
+        run: node scripts/check-metric-names.mjs
+      - name: the server snippets name the route the server serves
+        run: node scripts/check-push-snippets.mjs
+      - name: compose healthchecks are exec form
+        run: node scripts/check-compose-healthchecks.mjs
+      - name: no text ordering the operators image decides
+        run: node scripts/check-text-ordering.mjs
+      - name: the RN native mirror matches sdk/native
+        run: node scripts/sync-native-core.mjs --check
+
   e2e:
     needs: changes
     if: needs.changes.outputs.server == 'true' || needs.changes.outputs.infra == 'true'

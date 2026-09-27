@@ -6,6 +6,34 @@
 
 ---
 
+## v3.17.4（2026-09-27 — 十四道门只在有人记得的时候才跑）
+
+`bun run preflight` 里有 33 个检查，其中 18 个在 CI 里也跑。剩下 14 个的执行保障只是一个
+习惯，而这批里包含守已发布面的那几道：镜像的 allowlist（上一版那条死链就是它本该拦下
+的——CI 里没人问它）、每个按项目授权的 admin 端点是否真的鉴权、每次读 `event_attachments`
+是否带项目谓词、生成的 OpenAPI 文档与 router 是否一致。
+
+现在它们是一个 job，不带 paths 过滤、不 `needs` 任何东西。大部分原先挂在 `server-test`
+里，而只改文档的提交会跳过那个 job——偏偏只改文档正是最容易弄坏文档类门的提交。它们只要
+node，不装任何依赖，所以这个 job 就是一次 checkout 加十四行。
+
+没收进去的两个：Maven artifact 和 native 版本标签检查，它们要已构建的 Android 产物和注册表
+状态，属于 CI 有意不承载的 native 发布路径。
+
+### build context 里装着「不是构建」的那些目录
+
+`.dockerignore` 逐个点名了缓存和构建产物，却没说点目录，于是本地 `docker build` 把 harness
+状态、开发材料、139 MB 丢弃输出和凭证目录一起送进 context。没有东西泄进镜像层——Dockerfile
+只按名字取 `webapp/`、`core/`、`self-hosted/`——但凭证目录不该被送到任何地方，而这份传输是
+纯粹的浪费。一条通配覆盖全部；仓库里被跟踪的点目录只有 `.github/` 和 `.changeset/`，没有
+任何构建阶段拷它们。改完实际构建了 webapp 那一层验证 context 没缺东西。
+
+顺带：一处模块注释点名 `core/migrations/0006_push_tokens.sql`。建那两张表的迁移是
+`0007_push.sql`，0006 是 notifications。文件名是删掉而不是改对的——它正是因为被写下来才会
+过期，那句话不带它也说得完整。
+
+---
+
 ## v3.17.3（2026-09-27 — 镜像发了一份索引，指向它没发的页）
 
 `docs/README.md` 会进公开镜像，里面指着 `runbook/scaling.md`。镜像的 allowlist 到
