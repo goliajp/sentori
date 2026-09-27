@@ -148,6 +148,29 @@ final class SentoriTransportTests: XCTestCase {
         XCTAssertTrue(SentoriTransport.__peekPersisted().isEmpty, "and the file was cleared")
     }
 
+    /// The spill is the last place a failed batch can go. When it
+    /// cannot be written the events are gone, and the only honest
+    /// record of that is the counter the next envelope carries — the
+    /// same one the in-memory cap uses. Three bare `return`s used to
+    /// leave the batch nowhere with the counter untouched, so a
+    /// delivery gap read as quiet.
+    func testASpillThatCannotBeWrittenIsCountedRatherThanLost() {
+        configure()
+        SentoriTransport.forcedOutcomeForTests = 2  // .failed
+        SentoriTransport.spillDisabledForTests = true
+        SentoriTransport.start()
+        for i in 0..<3 { SentoriTransport.enqueue(["kind": "error", "seq": i]) }
+        SentoriTransport.flush()
+
+        waitUntil("the batch the spill could not take is counted") {
+            SentoriTransport.__peekDropped() == 3
+        }
+        XCTAssertTrue(
+            SentoriTransport.__peekPersisted().isEmpty,
+            "and nothing was written, which is the premise"
+        )
+    }
+
     func testGarbageNeverThrows() {
         configure()
         SentoriTransport.start()
