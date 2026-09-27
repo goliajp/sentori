@@ -120,6 +120,8 @@ jobs:
             --include='/docs/sdk-swift.md' \
             --include='/docs/recipes/' \
             --include='/docs/recipes/**' \
+            --include='/docs/runbook/' \
+            --include='/docs/runbook/**' \
             --exclude='/docs/**' \
             --exclude='/saas/' \
             --exclude='/server/' \

@@ -29,8 +29,18 @@ const MUST_SHIP = [
   'docs/errors.md',
   'docs/troubleshooting.md',
   'docs/self-hosting.md',
+  // `docs/README.md` links scaling.md, and the mirror is where someone
+  // reads that README while running the thing. It shipped the README
+  // and not the page, so the link 404'd for every reader of the public
+  // repo — the failure this file's header describes, in the other
+  // direction.
+  'docs/runbook/scaling.md',
+  'docs/runbook/cli-auth.md',
 ];
-const MUST_NOT = /^docs\/runbook\//;
+// Trees that have held internal material. They are gone from the repo,
+// so this is a tripwire rather than a filter: bring one back and the
+// mirror must not carry it.
+const MUST_NOT = /^docs\/(roadmap|design|plans|performance|perf-baselines|dogfood|infrastructure|archive|legal)\//;
 
 const wf = readFileSync(join(ROOT, WF), 'utf8');
 const m = wf.match(/rsync -a --delete \\\n([\s\S]*?)\n\s+\.\/ \/tmp\/mirror\//);
