@@ -10,7 +10,7 @@
 //!   vendor credentials (APNs p8, FCM service-account JSON,
 //!   VAPID private key, …).
 //!
-//! Owns two tables (`core/migrations/0006_push_tokens.sql`):
+//! Owns two tables:
 //! `push_tokens` (one row per device token) and
 //! `push_credentials` (one row per (project, provider) with
 //! S12-sealed `secret_blob`).

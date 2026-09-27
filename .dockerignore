@@ -1,3 +1,9 @@
+# Dot-directories are local or CI-side and never part of a build:
+# editor and tool caches, VCS, scratch output, credentials. Nothing
+# the Dockerfile copies lives in one — it takes webapp/, core/ and
+# self-hosted/ by name.
+**/.*/
+
 **/node_modules/
 **/.git/
 **/target/
