@@ -364,18 +364,42 @@ object SentoriTransport {
         return File(dir, "pending-events.json")
     }
 
+    /**
+     * The spill is the last place a failed batch can go, so every way it
+     * can fail counts the batch instead of returning.
+     *
+     * Both used to be silent: no spill directory — which is the
+     * documented in-memory-only mode, where every failed send loses its
+     * batch — and a write that throws, a full disk being the ordinary
+     * cause. The events had already left the queue, so they existed
+     * nowhere, and `dropped` stayed put: the next envelope reported the
+     * gap as quiet. A full disk still must not become the host's
+     * problem, and now it is not silent either.
+     */
     private fun persist(events: List<Map<String, Any?>>) {
-        val file = spillFile() ?: return
+        val file = spillFile() ?: return countDropped(events.size)
         try {
             val all = readPersisted().toMutableList()
             all.addAll(events)
             // Newest wins: the file has to stop growing on a device
-            // that is offline for a week.
-            while (all.size > MAX_PERSISTED) all.removeAt(0)
+            // that is offline for a week. What goes counts, the same as
+            // the in-memory cap.
+            var trimmed = 0
+            while (all.size > MAX_PERSISTED) {
+                all.removeAt(0)
+                trimmed += 1
+            }
             file.writeText(toJson(all).toString())
+            countDropped(trimmed)
         } catch (_: Throwable) {
-            // A full disk must not become the host's problem.
+            countDropped(events.size)
         }
+    }
+
+    /** Count a loss so the next envelope carries it as `droppedEvents`. */
+    private fun countDropped(n: Int) {
+        if (n <= 0) return
+        synchronized(lock) { dropped += n }
     }
 
     private fun readPersisted(): List<Map<String, Any?>> {
@@ -464,6 +488,8 @@ object SentoriTransport {
      * that had stored nothing.
      */
     internal fun peekDelivered(): Int = synchronized(lock) { delivered }
+
+    internal fun peekDropped(): Int = synchronized(lock) { dropped }
 
     /**
      * How many blocks are still waiting on events. Without this a test
