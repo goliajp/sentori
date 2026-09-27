@@ -127,6 +127,7 @@ jobs:
             --exclude='/server/' \
             --exclude='/web/' \
             --exclude='/docker/' \
+            --exclude='/deploy/' \
             --exclude='/docs-v0.1/' \
             --exclude='/docs-v0.2/' \
             --exclude='CHANGELOG.md' \

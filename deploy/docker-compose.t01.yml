@@ -1,0 +1,103 @@
+# Sentori — sentori.golia.jp (mobile error tracking).
+# Live path on lx64: /apps/sentori/docker-compose.yml
+# Deployed by goliajp/sentori .github/workflows/deploy.yml.
+#
+# One public hostname, one upstream:
+#
+#   sentori.golia.jp/*        → server-v1 (18092) — dashboard SPA,
+#                               /admin/api/*, /auth/*, /api/*
+#   ingest.sentori.golia.jp/* → server-v1 (18092) — separate host so
+#                               existing SDK tokens keep working
+#
+# Legacy `app.` / `api.` / `docs.` subdomains are 301-redirected by
+# the t01 Caddyfile; bookmarks silently follow.
+#
+# The v0.1 stack (postgres / valkey / server / web) was removed on
+# 2026-07-23. It had served no traffic since the 2026-07-20 cutover —
+# nothing in the Caddyfile pointed at it and its only log output was
+# its own background tasks idling — while holding a full copy of
+# customer data. Dump: /apps/sentori/archive/legacy-v01-2026-07-23.dump.
+#
+# The v0.2 stack (postgres-v2 / blobs-init / server-v2), the marketing
+# and docs nginx containers, the saas-control plane and the one-shot
+# migrate tool were removed on 2026-08-10, for the same reason and a
+# few sharper ones:
+#
+#   - v1 had been live for three weeks and had taken seventeen server
+#     releases; a rollback target whose schema predates the
+#     environment × platform issue split is not a rollback target, it
+#     is a second copy of customer data with a login page.
+#   - marketing and docs were unreachable — `docs.sentori.golia.jp`
+#     redirects to the dashboard and `sentori.golia.jp/docs/` is the
+#     SPA's catch-all — and served a Free/Pro/Enterprise pricing page
+#     for a product with no signup and a Sentry-compatibility guide
+#     for a product built to not be Sentry-compatible.
+#   - saas-control pointed at postgres-v2, carried a Stripe webhook
+#     secret in its environment, bound 0.0.0.0:18091, and had no
+#     source left in the sentori repo.
+#
+# Dump: /apps/sentori/v0.2-final-20260810.dump (custom format, 89
+# tables with data).
+services:
+  postgres-v1:
+    container_name: sentori-postgres-v1
+    image: postgres:18-bookworm
+    environment:
+      POSTGRES_DB: sentori
+      POSTGRES_USER: sentori
+      POSTGRES_PASSWORD: ${SENTORI_PG_PASSWORD:?SENTORI_PG_PASSWORD required}
+    volumes:
+      # postgres:18 images mount the parent dir; the old /data
+      # subpath refuses to init.
+      - sentori-pg-v1:/var/lib/postgresql
+    ports:
+      # host-local only — psql sanity checks from lx64
+      - "127.0.0.1:15434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentori -d sentori"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  server-v1:
+    container_name: sentori-server-v1
+    image: sentori-server-v1:latest
+    build:
+      context: /apps/sentori/src
+      dockerfile: self-hosted/docker/Dockerfile
+    depends_on:
+      postgres-v1:
+        condition: service_healthy
+    environment:
+      SENTORI_DATABASE_URL: postgres://sentori:${SENTORI_PG_PASSWORD}@postgres-v1:5432/sentori
+      SENTORI_BIND: 0.0.0.0:8080
+      # Declarative owner (v1 bootstrap): email reconciles on every
+      # boot; no password env — first boot generates one and prints
+      # it to the container log exactly once. Recovery path:
+      #   docker compose exec server-v1 sentori-server reset-password takagi@golia.jp
+      SENTORI_OWNER_EMAIL: takagi@golia.jp
+      SENTORI_BASE_URL: https://sentori.golia.jp
+      SENTORI_ATTACHMENT_STORE: fs:/data/blobs
+      SENTORI_SMTP_HOST: ${SENTORI_SMTP_HOST:-}
+      SENTORI_SMTP_PORT: ${SENTORI_SMTP_PORT:-587}
+      SENTORI_SMTP_USER: ${SENTORI_SMTP_USER:-}
+      SENTORI_SMTP_PASS: ${SENTORI_SMTP_PASS:-}
+      SENTORI_SMTP_FROM: ${SENTORI_SMTP_FROM:-sentori@golia.jp}
+      SENTORI_SMTP_TLS: ${SENTORI_SMTP_TLS:-starttls}
+      RUST_LOG: ${RUST_LOG:-info,sqlx=warn}
+    volumes:
+      # /data ownership is baked into the image (distroless nonroot);
+      # no blobs-init chown dance needed on a fresh volume.
+      - sentori-data-v1:/data
+      # Production serves the SPA from this bind mount — dashboard
+      # changes ship by rsync, no image rebuild.
+      - /apps/sentori/webapp-dist:/app/webapp:ro
+    ports:
+      - "18092:8080"
+    restart: unless-stopped
+
+volumes:
+  sentori-pg-v1:
+  sentori-data-v1:

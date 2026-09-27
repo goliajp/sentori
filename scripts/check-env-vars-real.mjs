@@ -15,6 +15,7 @@ import { join } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const COMPOSE = 'self-hosted/docker/docker-compose.yml';
+const PROD_COMPOSE = 'deploy/docker-compose.t01.yml';
 
 // ── names the code actually reads ──────────────────────────────────
 const read = new Set();
@@ -128,14 +129,34 @@ const MUST_REACH = [
 ];
 const missing = [...new Set(MUST_REACH)].filter((v) => !compose.includes(v));
 
-if (unknown.length || missing.length) {
+// The production compose is what the deploy installs. A variable it
+// hands the container that the server no longer reads is set for
+// nothing, and the symptom is a setting that silently stops taking
+// effect. Only the keys count: a `${SENTORI_*}` on the right is
+// compose's own input, read from .env, not something the server sees.
+const prod = readFileSync(join(ROOT, PROD_COMPOSE), 'utf8');
+const prodNames = [...new Set([...prod.matchAll(/^\s*(SENTORI_[A-Z0-9_]+):/gm)]
+  .map((m) => m[1]))];
+if (prodNames.length < 5) {
+  console.error(
+    `✗ found ${prodNames.length} SENTORI_* names in ${PROD_COMPOSE}. ` +
+      `Broken checker, or the wrong file.`,
+  );
+  process.exit(1);
+}
+const prodUnread = prodNames.filter((v) => !read.has(v));
+
+if (unknown.length || missing.length || prodUnread.length) {
   for (const u of unknown)
     console.error(`✗ ${u.rel}:${u.line} names \`${u.name}\`, which nothing reads`);
   for (const v of missing)
     console.error(`✗ ${COMPOSE} does not pass \`${v}\` through, so a self-hoster cannot set it`);
+  for (const v of prodUnread)
+    console.error(`✗ ${PROD_COMPOSE} sets \`${v}\`, which nothing reads`);
   process.exit(1);
 }
 console.log(
   `✓ ${docs.length} docs name only SENTORI_* variables the code reads; ` +
-    `compose passes the tunable ones`,
+    `compose passes the tunable ones; ${prodNames.length} names in ` +
+    `${PROD_COMPOSE} are all read`,
 );

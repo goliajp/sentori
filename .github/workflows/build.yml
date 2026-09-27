@@ -214,6 +214,13 @@ jobs:
       - name: wire unions agree across the SDK/server boundary
         run: node scripts/check-wire-contracts.mjs
 
+      # Ran in preflight only until the deploy's compose file moved
+      # into this repo. A knob the compose hands the container that
+      # the server no longer reads is a setting that silently stops
+      # taking effect, and production is where that is expensive.
+      - name: docs and compose name only env vars the code reads
+        run: node scripts/check-env-vars-real.mjs
+
       - name: check cargo features (v2.20 P2 — anti-feature-drift)
         run: bash scripts/check-cargo-features.sh
   webapp:

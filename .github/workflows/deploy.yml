@@ -5,7 +5,7 @@ name: deploy
 #
 # Lands on the self-hosted lx64 runner: build the webapp, rsync it
 # to the bind-mounted dist dir, rsync source, install the compose
-# file from a fresh devops checkout, write .env from repo secrets,
+# file from this repo, write .env from repo secrets,
 # build + up the v1 services, then smoke against the version field
 # (a 200 from an old binary answers "healthy?" exactly like a new
 # one — only the version proves the deploy shipped).
@@ -130,15 +130,12 @@ jobs:
             --exclude 'webapp/dist' \
             ./ "${REMOTE_DIR}/src/"
 
-      - name: Install compose file from devops/services/sentori
+      - name: Install the compose file
         run: |
-          DEVOPS_DIR="$HOME/workspace/goliajp/devops"
-          if [ -d "$DEVOPS_DIR/.git" ]; then
-            git -C "$DEVOPS_DIR" pull --ff-only origin develop \
-              || echo "warning: devops pull failed; using existing checkout"
-            SRC_COMPOSE="$DEVOPS_DIR/services/sentori/docker-compose.yml"
-          else
-            SRC_COMPOSE="${REMOTE_DIR}/src/devops/services/sentori/docker-compose.yml"
+          SRC_COMPOSE="${REMOTE_DIR}/src/deploy/docker-compose.t01.yml"
+          if [ -f "${COMPOSE_FILE}" ] && ! diff -q "$SRC_COMPOSE" "${COMPOSE_FILE}" >/dev/null; then
+            echo "the file on the host differs from this release; installing this one:"
+            diff -u "${COMPOSE_FILE}" "$SRC_COMPOSE" || true
           fi
           install -m 0644 "$SRC_COMPOSE" "${COMPOSE_FILE}"
 
