@@ -1,5 +1,5 @@
-// rage_tap — the first detected warn scenario (design.md §3,
-// category A: 「我按了没反应/反复按」).
+// rage_tap — the first detected warn scenario (category A:
+// 「我按了没反应/反复按」).
 //
 // Wrap the app root (next to ErrorBoundary) with
 // `<RageTapCapture>{children}</RageTapCapture>`. Bubble-phase

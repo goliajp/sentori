@@ -10,9 +10,9 @@
 
 [workspace]
 resolver = "3"
-# Every crate here is one the self-hosted server composes
-# (design.md §7-9), and every crate on disk is a member. The two used
-# to differ: sixteen crates sat in `crates/` outside the build,
+# Every crate here is one the self-hosted server composes, and every
+# crate on disk is a member. The two used to differ: sixteen crates
+# sat in `crates/` outside the build,
 # "until the S9 sweep", on the reasoning that a crate no gate compiles
 # cannot rot the build.
 #

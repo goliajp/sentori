@@ -29,7 +29,7 @@ use uuid::Uuid;
 
 use crate::state::AppState;
 
-/// The two roles that exist (design.md §9). Superadmin sees and
+/// The two roles that exist. Superadmin sees and
 /// manages everything; admin sees assigned projects.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Role {

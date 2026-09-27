@@ -1,4 +1,4 @@
-// The iron rule reaches build-time (design.md §6 dim 3): an upload
+// The iron rule reaches build-time: an upload
 // failure must never break the customer's build or release. Every
 // upload-family command runs through this wrapper — on failure it
 // prints a friendly, actionable note and exits 0. `--strict` opts

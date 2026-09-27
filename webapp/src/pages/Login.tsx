@@ -1,5 +1,5 @@
-// Sign-in — the only public entrance. No self-signup, no OAuth
-// (design.md §9): accounts come from the owner or the env bootstrap.
+// Sign-in — the only public entrance. No self-signup, no OAuth;
+// accounts come from the owner or the env bootstrap.
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';

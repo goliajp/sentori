@@ -75,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
         .context("SENTORI_DATABASE_URL (or DATABASE_URL) env var required")?;
 
     // `sentori-server reset-password <email>` — the operator path
-    // for a locked-out owner (design.md §10): no SMTP dependency,
+    // for a locked-out owner: no SMTP dependency,
     // prints a fresh password to stdout and exits.
     let args: Vec<String> = std::env::args().collect();
     if args.get(1).map(String::as_str) == Some("reset-password") {

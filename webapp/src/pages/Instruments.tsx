@@ -1,5 +1,5 @@
-// Instruments — "how are the devices I planted doing?" (design.md
-// §11). Three tables: asserts (alive + failure rate, "ran 45k,
+// Instruments — "how are the devices I planted doing?". Three
+// tables: asserts (alive + failure rate, "ran 45k,
 // failed 3"), probes (silent = fix holding), traces (did it run,
 // what magnitude). A status surface, not a data browser — but a
 // status surface with real columns, headers, and one baseline.

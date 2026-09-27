@@ -1,6 +1,6 @@
 // Event transport — the only place the SDK talks to the network.
 //
-// Quiet by default, complete when it matters (design.md §4): events
+// Quiet by default, complete when it matters: events
 // batch on a 5 s timer or a 10-deep queue, whichever first; assert
 // pass-counts piggyback on whatever batch goes out next (never their
 // own request); failures back off and finally persist to an offline

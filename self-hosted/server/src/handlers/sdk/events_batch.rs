@@ -12,7 +12,7 @@
 //! ```
 //!
 //! `assertStats` is how assertion liveness ships without a
-//! heartbeat flood (design.md §2): passes aggregate client-side and
+//! heartbeat flood: passes aggregate client-side and
 //! piggyback here; only failures are real events in `events`.
 //!
 //! Per-event failures don't fail the batch — the SDK gets a

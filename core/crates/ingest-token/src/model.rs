@@ -27,7 +27,7 @@ impl Token {
     }
 }
 
-/// `tokens.scope` enum (design.md §9).
+/// `tokens.scope` enum.
 ///
 /// The scopes answer one concrete question per endpoint: would it
 /// be acceptable for a stranger holding a copy of the customer's

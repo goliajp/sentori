@@ -1,7 +1,7 @@
 //! Dashboard auth: login / logout / me / change-password /
 //! forgot-password / reset-password.
 //!
-//! No register, no verify, no OAuth (design.md §9): accounts are
+//! No register, no verify, no OAuth: accounts are
 //! created by the owner (or the env bootstrap), so the only public
 //! entrances are login and the password-reset pair. Sessions are
 //! opaque random tokens; the DB stores SHA-256 (see session_mw).

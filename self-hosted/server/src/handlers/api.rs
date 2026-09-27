@@ -1,4 +1,4 @@
-//! `/api/*` — the AI closed loop (design.md §9).
+//! `/api/*` — the AI closed loop.
 //!
 //! Bearer api-scope token; every route is bound to the token's
 //! project. The loop an agent runs without any human or Jira:
@@ -255,9 +255,9 @@ pub struct ProbeSyncBody {
     pub refs: Vec<String>,
 }
 
-/// POST /api/probes:sync — the CLI's static-scan registration
-/// (design.md §2): every `sentori.probe(ref)` found in the source at
-/// release-upload time lands here, so a silent probe is visibly
+/// POST /api/probes:sync — the CLI's static-scan registration: every
+/// `sentori.probe(ref)` found in the source at release-upload time
+/// lands here, so a silent probe is visibly
 /// alive — distinguishable from deleted code.
 pub async fn probes_sync(
     Extension(ctx): Extension<IngestContext>,

@@ -1,5 +1,4 @@
-//! Bundle assembly — the product's actual deliverable (design.md §1,
-//! bundle-schema.md).
+//! Bundle assembly — the product's actual deliverable.
 //!
 //! A bundle is one issue rendered as a "read it and fix it" report:
 //! markdown for LLM consumption, with a JSON twin for tool-driven

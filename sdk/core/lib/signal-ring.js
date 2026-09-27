@@ -1,6 +1,6 @@
 // The signal ring — "what the user was doing" for the last N
 // seconds, shipped inside payload.signals when an error/warn event
-// goes out (design.md §4: the breadcrumb concept's successor).
+// goes out — the breadcrumb concept's successor.
 //
 // Bounded, overwrite-oldest, zero allocation on the hot path beyond
 // the entry object itself. Auto signals (nav / tap / http /

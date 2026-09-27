@@ -1,6 +1,6 @@
 // Network instrumentation — v1 role: feed the signal ring (`http`
-// signals) and detect the slow_api warn scenario (design.md §3,
-// category C: 「转圈不完」server-side flavour). The span/breadcrumb
+// signals) and detect the slow_api warn scenario (category C:
+// 「转圈不完」server-side flavour). The span/breadcrumb
 // machinery this file used to drive is gone with the APM vocabulary.
 //
 // Mini-spec (slow_api): a completed request slower than 3 s emits

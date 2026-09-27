@@ -1,8 +1,8 @@
 //! Env-declared owner bootstrap.
 //!
-//! The owner (superadmin) is configuration, not registration
-//! (design.md §9-10): every boot reconciles the `users` table
-//! against `SENTORI_OWNER_EMAIL` / `SENTORI_OWNER_PASSWORD`.
+//! The owner (superadmin) is configuration, not registration: every
+//! boot reconciles the `users` table against `SENTORI_OWNER_EMAIL` /
+//! `SENTORI_OWNER_PASSWORD`.
 //!
 //! Reconciliation rules:
 //! - No superadmin exists → create one from env. If the password

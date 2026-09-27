@@ -1,5 +1,5 @@
 //! Issue email notifications — the first channel subscribed to the
-//! issue system (design.md §9): a new issue or a regression mails
+//! issue system: a new issue or a regression mails
 //! the people responsible for the project.
 //!
 //! Recipients = the owner plus every admin assigned to the project,
@@ -33,8 +33,8 @@ pub fn spawn_issue_notification(
         return;
     }
     let Some(transport) = state.mailer.transport() else {
-        // No SMTP — the channel is simply absent (design.md §9:
-        // channels are optional subscribers, never load-bearing).
+        // No SMTP — the channel is simply absent; channels are
+        // optional subscribers, never load-bearing.
         return;
     };
     let pool = state.pool.clone();
