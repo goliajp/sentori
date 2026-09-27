@@ -1,8 +1,60 @@
 # Sentori CHANGELOG
 
-> v0.1 + v0.2 已完成 phase 的详细记录（含每条 sub 的中文 summary）。新规划见 `ROADMAP.md` + `docs/roadmap/v1.0.md`。
+> v0.1 + v0.2 已完成 phase 的详细记录（含每条 sub 的中文 summary）。
 
-> 本文件由 ROADMAP.md 历史段拆分而来，每条记录的真实落地凭证以 git log + commit message 为准。
+> 每条记录的真实落地凭证以 git log + commit message 为准。
+
+---
+
+## v3.17.1（2026-09-27 — 仓库里只剩交付物）
+
+一个公开仓库跟踪了 158 个没人从外面读的文件，而定义生产的那个文件不在任何仓库里。两件事
+方向相反，根因一样：**没有人问过「这东西的读者是谁」**。
+
+### 移出去的：158 个过程文件
+
+roadmap、设计提案、plan、性能基线、决策记录、给自己生产写的 runbook、给某个客户团队的交接
+沟通，全部被跟踪在一个谁都能读的仓库里。它们不是文档，是开发材料：描述在做一半的事，点名
+我们自己的主机、一个模拟器序列号和一个私人邮箱。其中 `sdk/react-native/ios/PRIVACY_AND_REVIEW.md`
+还在 npm 包的 `files` 范围内，**每个安装 SDK 的人都收到了它**。
+
+留下的是外面的人真需要的：使用指南、SDK 与协议参考、cookbook、自托管和扩容两页、CHANGELOG、
+LICENSE、SECURITY，以及 `ops/` 那几个脚本和讲它们的 README。
+
+贡献者文档也一起移出：这个仓库不收 PR——公开 master 每次发版被 `git init` + `git push -f`
+重建，合并进去的 PR 下一版就没了（v3.17.0 那条说的正是这件事）。一份讲怎么提 PR 的指南、
+一份行为准则、一个 PR 模板和两个 issue 模板，描述的是一种从不发生的协作。
+
+同一个提交里修好了所有指向被移出文件的引用：留下的文档不再链一个不存在的页，而是直接把话
+说完；各 CHANGELOG 里的 markdown 链接改成纯文本（changelog 记录的是发生过的事，它点的路径
+是记录的一部分）；源码注释改成说规则本身，不说规则写在哪。
+
+### 收回来的：定义生产的那个 compose
+
+部署一直从 runner 上另一个仓库的 checkout 里安装 `/apps/sentori/docker-compose.yml`，
+fallback 指向本仓库里一个并不存在的路径。那个仓库已经不再跟踪它，于是生产运行的拓扑——
+容器、镜像、卷、端口、dashboard 靠的那个 bind mount——只存在于一台主机上的一个文件，和一台
+笔记本上一份不进 git 的副本。主机重建就没了。
+
+它现在是 `deploy/docker-compose.t01.yml`，与线上逐字节相同（sha256 `26866dd4…`），部署从
+它所发布的那个 release 里安装它。主机那份不一样时，先把 diff 打进日志再覆盖——事故中手改过
+的内容留下记录，而不是静默消失。自托管用户拿的仍然是 `self-hosted/docker/docker-compose.yml`，
+镜像排除 `deploy/`：它只描述一台主机，发出去只会误导。
+
+### 顺带补了两道门
+
+- `check-env-vars-real` 现在也读生产 compose：它交给容器的每个 `SENTORI_*` 键必须是服务器
+  真读的名字，否则那个设置已经静默失效。插值（`${SENTORI_PG_PASSWORD}` 这类）是 compose
+  自己的输入，不算。拿一个编造的键实测过它会红。这个检查原来只在 preflight 跑——**生产的门
+  放在 preflight 里是放错了地方**，现在是 CI 的一步。
+- 同一个检查原先跳过 `docs/runbook/`，恰好把留下来的两页排除在外。现在覆盖它们，同样实测
+  过会红。
+
+### 一个不能碰的地方
+
+`core/migrations/0001_identity.sql` 里的一句注释指向已经移出的文档，**故意没改**。
+`sqlx::migrate!` 的校验和覆盖整个文件内容，注释字节也算，改了它所有已有数据库——包括生产
+——会在启动时迁移校验失败。
 
 ---
 
