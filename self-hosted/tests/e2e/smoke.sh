@@ -1036,7 +1036,7 @@ STRIPPED="$(dbq "SELECT count(*) FROM release_artifacts WHERE name = 'MyApp'" | 
 [[ "$STRIPPED" == "1" ]] \
     || { echo "could not stage the pre-3.11.0 row (found ${STRIPPED})" >&2; exit 1; }
 
-# `mktemp`, not a path under the repo: `tmp/` is gitignored, so it
+# `mktemp`, not a path under the repo: a scratch dir that is ignored
 # exists on the machine this was written on and on no CI runner —
 # which is how a gate that passed locally failed the first time it
 # ran anywhere else.

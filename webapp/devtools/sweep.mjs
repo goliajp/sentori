@@ -71,7 +71,7 @@ const OPEN_ALL = {
     "[...document.querySelectorAll('button[aria-expanded=\"false\"]')].forEach(b => b.click())",
 };
 
-const out = process.argv[2] || 'tmp/sweep';
+const out = process.argv[2] || '.tmp/sweep';
 const lang = process.argv[3] || 'zh-CN';
 const theme = process.argv[4] || 'dark';
 // Width matters as much as language: the two-column split, the

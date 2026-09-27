@@ -57,8 +57,8 @@ done
 VERSION="$(cat sdk/native/VERSION)"
 COORD="jp.golia.sentori:sentori:${VERSION}"
 STAGING="sdk/native/android/build/staging-repo"
-WORK="tmp/central-${VERSION}"
-BUNDLE="tmp/sentori-${VERSION}-bundle.zip"
+WORK=".tmp/central-${VERSION}"
+BUNDLE=".tmp/sentori-${VERSION}-bundle.zip"
 
 echo "→ staging ${COORD} (signed)"
 rm -rf "$STAGING"
