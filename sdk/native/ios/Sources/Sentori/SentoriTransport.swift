@@ -437,7 +437,15 @@ public final class SentoriTransport: NSObject {
         delivered = 0
         afterDelivery.removeAll()
         started = false
-        requestTimeout = 15
+        // One second, not the production fifteen. `worker` is serial
+        // and a send that reaches the network holds it for
+        // maxRetry × requestTimeout plus the backoff; the wait above
+        // gives up after ten seconds, so that batch — and the spill it
+        // writes when it finally fails — lands in whichever test is
+        // running by then. A CI runner that drops the packet instead
+        // of refusing it turned that into a red spill test on a
+        // transport that was working.
+        requestTimeout = 1
         forcedOutcomeForTests = nil
         timer?.cancel()
         timer = nil
