@@ -105,7 +105,7 @@ export type WirePayload = {
     context?: Record<string, unknown>;
     [k: string]: unknown;
 };
-/** Client-side aggregate of assert passes (design.md §2). */
+/** Client-side aggregate of assert passes. */
 export type AssertStat = {
     name: string;
     release?: string;

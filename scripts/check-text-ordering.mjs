@@ -3,9 +3,9 @@
 // `ORDER BY name` sorts by the *database's* collation. Ours is not one
 // thing: `docker-compose.yml` ships postgres:18-alpine, which is musl —
 // it declares `en_US.utf8` and behaves as C — while a customer pointing
-// Sentori at their own glibc Postgres gets real en_US.utf8. Measured on
-// 2026-08-19 with `tmp/spg-repro/divergence`: eight of eighteen probes
-// disagree between those two, including which rows a text range returns.
+// Sentori at their own glibc Postgres gets real en_US.utf8. Measured
+// on 2026-08-19 against both images: eight of eighteen probes disagree
+// between them, including which rows a text range returns.
 //
 // So the same Sentori listed the same projects in two different orders
 // depending on an image tag, and nothing said so.

@@ -1,6 +1,6 @@
 //! POST `/v1/events` — single-event ingest (v1 wire format).
 //!
-//! The wire shape is the five-kind protocol (design.md §2/§4); the
+//! The wire shape is the five-kind protocol; the
 //! SDK's `types.ts` mirrors this. Top-level fields are what the
 //! server routes on; everything else rides in `payload` untouched
 //! (zero-migration SDK additions).

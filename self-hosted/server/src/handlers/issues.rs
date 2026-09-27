@@ -1,4 +1,4 @@
-//! Issue surface — the product's main body (design.md §9/§11).
+//! Issue surface — the product's main body.
 //!
 //! Serves both consumers of the issue system:
 //! - the dashboard (cookie session, Inbox ordering = breadth×depth)

@@ -1,4 +1,4 @@
-//! The five-kind ingest pipeline (design.md §2).
+//! The five-kind ingest pipeline.
 //!
 //! One event comes in; this module decides which issue it belongs
 //! to, whether that issue just regressed, and what the objective
@@ -19,7 +19,7 @@
 //! ## Regression (release-anchored)
 //!
 //! A resolved issue reopens only if the recurrence is in a release
-//! at least as new as `resolved_in_release` (design.md §11). "As
+//! at least as new as `resolved_in_release`. "As
 //! new as" orders by `releases.created_at` when both sides are
 //! registered releases; when either side is unregistered the
 //! fallback is `occurred_at > resolved_at` — time is a weaker
@@ -590,7 +590,7 @@ async fn is_regression(
     Ok(resolved_at.is_some_and(|t| occurred_at > t))
 }
 
-/// Batch-envelope assert aggregates (design.md §2): passes are
+/// Batch-envelope assert aggregates: passes are
 /// counted client-side and shipped as totals, never as events.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]

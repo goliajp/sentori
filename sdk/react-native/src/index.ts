@@ -1,4 +1,4 @@
-// @goliapkg/sentori-react-native — the 8-verb surface (design.md §4).
+// @goliapkg/sentori-react-native — the 8-verb surface.
 //
 //   sentori.init(config)   sentori.user(u)      sentori.context(patch)
 //   sentori.error(err)     sentori.warn(name)   sentori.trace(name)

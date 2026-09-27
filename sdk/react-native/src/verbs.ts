@@ -1,4 +1,4 @@
-// The five event verbs (design.md §4). Everything here is
+// The five event verbs. Everything here is
 // synchronous, never throws, and returns the client-minted event id
 // — the zero-cost iron rule made code.
 //
@@ -36,7 +36,7 @@ import { countAssert, enqueue } from './transport';
 declare const __DEV__: boolean | undefined;
 
 /** Serialize any Error instances found in the data argument — the
- *  error-in-data convention (design.md §4): a caught-but-noteworthy
+ *  error-in-data convention: a caught-but-noteworthy
  *  exception needs no special API. One level deep is enough; nested
  *  containers of errors are an anti-pattern we don't reward. */
 const serializeData = (data?: EventData): Record<string, unknown> | undefined => {
@@ -220,7 +220,7 @@ export const assert = safeFn(
 
 export const probe = safeFn('probe', (ref: string, data?: EventData): string => {
   // A tripwire: reaching this call IS the signal. Never throws,
-  // never changes control flow (design.md §4).
+  // never changes control flow.
   return emit('probe', { name: ref, data });
 });
 

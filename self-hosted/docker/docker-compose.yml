@@ -1,4 +1,4 @@
-# Sentori self-hosted — the one entry point (design.md §10).
+# Sentori self-hosted — the one entry point.
 #
 #   cp .env.example .env      # set the three required values
 #   docker compose up -d

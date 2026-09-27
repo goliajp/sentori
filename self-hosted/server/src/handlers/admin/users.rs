@@ -1,4 +1,4 @@
-//! Admin account management (superadmin only) — design.md §9.
+//! Admin account management (superadmin only).
 //!
 //! The owner creates admins with an initial password (no invite
 //! email flow — hand it over in person or let them reset via

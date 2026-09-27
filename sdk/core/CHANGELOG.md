@@ -330,7 +330,7 @@ getReceipt, isSentoriPushToken }` client that wraps `/v1/push/send`
 
 - [`f1559cb`](https://github.com/goliajp/sentori/commit/f1559cbad697cc23e286f8f5d68f172b182d7d58) Thanks [@doracawl](https://github.com/doracawl)! - v2.3 W6.1 — `beforeSend` hook + unified `withSpan` entry point.
 
-  Two additive surface changes per `docs/design/sdk-v2.3-redesign.md` §2:
+  Two additive surface changes:
 
   **`init({ beforeSend })` — host PII scrub hook**
 
@@ -675,7 +675,6 @@ data: { name, props } }` breadcrumb, so a later
     rejects silently and linkBy is dropped — NEVER rule, no host-
     visible failure.
 
-  See `docs/design/sdk-v2.3-redesign.md` §5 for the full architecture.
 
 - [`f4748cf`](https://github.com/goliajp/sentori/commit/f4748cf3f1030fb1df6fcc1f4bd5d6fd16d0aeca) Thanks [@doracawl](https://github.com/doracawl)! - v2.3 W6.0 — silent-by-default + structured ready signal
 
@@ -754,7 +753,7 @@ data: { name, props } }` breadcrumb, so a later
   "免费的好处" — a free bonus must not pollute the host's runtime
   surface. Console warns from normal operation broke that contract.
 
-  Part of the `docs/design/sdk-v2.3-redesign.md`;
+  Part of the v2.3 SDK redesign;
   identity layer + Sentry compat layer follow in W6.1+.
 
 ## 0.9.0

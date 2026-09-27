@@ -1,4 +1,4 @@
-// The zero-cost iron rule, as executable gates (design.md §6).
+// The zero-cost iron rule, as executable gates.
 //
 // Dimension 3 (failure isolation): no Sentori failure may ever
 // throw into, block, or alter the host app. These tests inject the

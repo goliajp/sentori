@@ -1,4 +1,4 @@
-//! Project CRUD (superadmin) — design.md §9.
+//! Project CRUD (superadmin).
 
 use std::sync::Arc;
 

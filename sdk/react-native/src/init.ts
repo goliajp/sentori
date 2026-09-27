@@ -1,5 +1,5 @@
 // sentori.init(config) — the single configuration entry point
-// (design.md §4). Synchronous, never throws; a bad config degrades
+// Synchronous, never throws; a bad config degrades
 // every verb to a no-op with one console.warn, never a crash
 // (failure-isolation iron rule).
 
@@ -69,7 +69,7 @@ export const init = safeFn('init', (config: InitConfig): void => {
   installNetworkHandler();
   installLifecycleHandler();
 
-  // Warn-scenario detectors (design.md §3 minimum set). rage_tap
+  // Warn-scenario detectors, the minimum set. rage_tap
   // rides the RageTapCapture component; the rest start here.
   if (config.detect?.longFreeze !== false) startLongTaskMonitor();
 

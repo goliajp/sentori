@@ -1,6 +1,6 @@
 //! Token management (owner + assigned admins).
 //!
-//! Multiple named tokens per project, two scopes (design.md §9):
+//! Multiple named tokens per project, two scopes:
 //! `ingest` for SDKs, `api` for automation / AI agents. Rotation is
 //! create-new → switch clients → revoke-old; the plaintext appears
 //! exactly once, in the create response.

@@ -1,5 +1,5 @@
 // `sentori-cli probes sync` — the tripwire registry scan
-// (design.md §2). Statically scans source for `sentori.probe('REF')`
+// Statically scans source for `sentori.probe('REF')`
 // / `probe("REF")` call sites and registers the refs against a
 // release, so the server can tell a silent probe (fix holding) from
 // deleted code.

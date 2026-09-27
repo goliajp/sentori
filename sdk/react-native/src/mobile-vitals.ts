@@ -1,5 +1,5 @@
-// slow_cold_start — detected warn scenario (design.md §3, category
-// C: 「启动过慢」).
+// slow_cold_start — detected warn scenario (category C:
+// 「启动过慢」).
 //
 // Mini-spec: the native side measures launch → JS-ready (iOS
 // mach_absolute_time / Android Process.getStartElapsedRealtime);

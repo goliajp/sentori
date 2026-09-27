@@ -104,7 +104,7 @@ async function dispatch(req, toolMap, ctx, tools) {
 }
 // ── Tool implementations — the /api closed loop ──────────────────
 //
-// Four tools, mirroring exactly what an agent needs (design.md §9):
+// Four tools, mirroring exactly what an agent needs:
 // pick work, pull the evidence, write back, resolve. The bundle is
 // the product; everything else is triage plumbing.
 async function apiGet(ctx, path, raw = false) {

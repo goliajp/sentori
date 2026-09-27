@@ -1,7 +1,7 @@
-//! GET /admin/api/projects/{id}/instruments — the devices panel
-//! (design.md §11): everything the developer deliberately planted,
-//! in one response. Asserts answer "is it alive and passing", probes
-//! answer "is the fix holding", traces answer "did the code path
+//! GET /admin/api/projects/{id}/instruments — the devices panel:
+//! everything the developer deliberately planted, in one response.
+//! Asserts answer "is it alive and passing", probes answer "is the
+//! fix holding", traces answer "did the code path
 //! run". A panel of instruments, not a data browser.
 
 use std::sync::Arc;

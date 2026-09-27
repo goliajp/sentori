@@ -135,7 +135,7 @@ async function dispatch(
 
 // ── Tool implementations — the /api closed loop ──────────────────
 //
-// Four tools, mirroring exactly what an agent needs (design.md §9):
+// Four tools, mirroring exactly what an agent needs:
 // pick work, pull the evidence, write back, resolve. The bundle is
 // the product; everything else is triage plumbing.
 

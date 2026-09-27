@@ -1,4 +1,4 @@
-// long_freeze — detected warn scenario (design.md §3, category B:
+// long_freeze — detected warn scenario (category B:
 // 「app 卡住了 / 死了几秒」), JS-thread side.
 //
 // Mini-spec: a setInterval(50 ms) tick measures wall-clock drift.

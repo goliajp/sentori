@@ -1,4 +1,4 @@
-// Releases — "did this version ship healthy?" (design.md §11).
+// Releases — "did this version ship healthy?".
 // One row per release: the three symbolication lights (sourcemap /
 // dsym / proguard), backed by upload commands when a light is off.
 // Artifact gaps are most visible here, on purpose — the lights are
