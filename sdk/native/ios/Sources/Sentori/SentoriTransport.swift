@@ -37,6 +37,10 @@ public final class SentoriTransport: NSObject {
     /// Per-attempt request timeout.
     static var requestTimeout: TimeInterval = 15
 
+    /// Test seam: make the spill file unavailable, the way a device
+    /// with no Application Support directory would.
+    static var spillDisabledForTests = false
+
     /// Test seam: skip the network and return this outcome.
     ///
     /// The spill test tried twice to provoke a real failure by sending
@@ -347,6 +351,7 @@ public final class SentoriTransport: NSObject {
     // ── the offline queue ─────────────────────────────────────────
 
     private static var spillURL: URL? {
+        if spillDisabledForTests { return nil }
         guard
             let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
                 .first
@@ -356,22 +361,45 @@ public final class SentoriTransport: NSObject {
         return sentori.appendingPathComponent("pending-events.json")
     }
 
+    /// The spill is the last place a failed batch can go, so every way
+    /// it can fail counts the batch instead of returning. These used to
+    /// be three bare `return`s: no directory, a value JSON refuses, a
+    /// write that fails — and on each of them the events left the queue
+    /// and existed nowhere, with `dropped` untouched, so the next
+    /// envelope reported a delivery gap as quiet. A drop nobody can see
+    /// is worse than one that shows up on a graph.
     private static func persist(_ events: [[String: Any]]) {
-        guard let url = spillURL else { return }
+        guard let url = spillURL else { return countDropped(events.count) }
         var all = readPersisted()
         all.append(contentsOf: events)
         // Newest wins: the same reasoning as the in-memory cap, and
         // the file has to stop growing on a device that is offline for
         // a week.
-        if all.count > maxPersisted { all.removeFirst(all.count - maxPersisted) }
+        if all.count > maxPersisted {
+            let over = all.count - maxPersisted
+            all.removeFirst(over)
+            countDropped(over)
+        }
         // Same raise as the send path: a NaN here would terminate the
         // app while writing the file whose whole job is to survive a
         // failure. `try?` does not catch an Objective-C exception.
         let safe = scrubbed(all)
         guard JSONSerialization.isValidJSONObject(safe),
             let data = try? JSONSerialization.data(withJSONObject: safe)
-        else { return }
-        try? data.write(to: url, options: .atomic)
+        else { return countDropped(events.count) }
+        do {
+            try data.write(to: url, options: .atomic)
+        } catch {
+            countDropped(events.count)
+        }
+    }
+
+    /// Count a loss so the next envelope carries it as `droppedEvents`.
+    private static func countDropped(_ n: Int) {
+        guard n > 0 else { return }
+        lock.lock()
+        dropped += n
+        lock.unlock()
     }
 
     private static func readPersisted() -> [[String: Any]] {
@@ -437,8 +465,17 @@ public final class SentoriTransport: NSObject {
         delivered = 0
         afterDelivery.removeAll()
         started = false
-        requestTimeout = 15
+        // One second, not the production fifteen. `worker` is serial
+        // and a send that reaches the network holds it for
+        // maxRetry × requestTimeout plus the backoff; the wait above
+        // gives up after ten seconds, so that batch — and the spill it
+        // writes when it finally fails — lands in whichever test is
+        // running by then. A CI runner that drops the packet instead
+        // of refusing it turned that into a red spill test on a
+        // transport that was working.
+        requestTimeout = 1
         forcedOutcomeForTests = nil
+        spillDisabledForTests = false
         timer?.cancel()
         timer = nil
         lock.unlock()
@@ -458,6 +495,12 @@ public final class SentoriTransport: NSObject {
     }
 
     static func __peekPersisted() -> [[String: Any]] { readPersisted() }
+
+    static func __peekDropped() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return dropped
+    }
 
     /// Events the server actually accepted. A test that checks only
     /// for the *absence* of a spill passes while three retries are
