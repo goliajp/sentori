@@ -316,7 +316,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: the mirror ships the docs and none of the internal ones
-        run: node scripts/check-mirror-docs.mjs
+        run: node scripts/check-mirror.mjs
       - name: docs name only APIs and packages that exist
         run: node scripts/check-docs-api-truth.mjs
       - name: every markdown code fence closes
