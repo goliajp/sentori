@@ -25,6 +25,7 @@ on:
       - 'self-hosted/server/**'
       - 'self-hosted/docker/**'
       - 'webapp/**'
+      - '.dockerignore'
       - '.github/workflows/selfhosted-image.yml'
   workflow_dispatch:
 

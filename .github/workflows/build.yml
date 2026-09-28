@@ -85,9 +85,10 @@ jobs:
           # let a broken CI config slip in unnoticed.
           filters: |
             infra:
-              - '.github/workflows/**'
+              - '.github/**'
               - 'package.json'
               - 'bun.lock'
+              - '.bun-version'
               - 'scripts/**'
             # Drives the `server-test` job, which after the v0.1
             # decommission runs the cli gates and the repo-wide checks
@@ -96,6 +97,7 @@ jobs:
             server:
               - 'core/**'
               - 'self-hosted/**'
+              - '.dockerignore'
             webapp:
               - 'webapp/**'
             sdk:
@@ -314,6 +316,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: every surface is named by a workflow that runs on develop
+        run: node scripts/check-surface-gates.mjs
 
       - name: the mirror ships the docs and none of the internal ones
         run: node scripts/check-mirror.mjs
