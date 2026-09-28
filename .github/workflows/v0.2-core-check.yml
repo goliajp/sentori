@@ -18,6 +18,12 @@ on:
       - 'core/**'
       - 'self-hosted/server/**'
 
+# Superseded pushes stop compiling. Master is never cancelled: its run is
+# the record that a shipped sha was checked.
+concurrency:
+  group: v0.2-core-check-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 jobs:
   check:
     runs-on: ubuntu-latest
