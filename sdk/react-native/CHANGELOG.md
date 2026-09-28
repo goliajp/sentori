@@ -1,5 +1,19 @@
 # @goliapkg/sentori-react-native
 
+## 7.0.1
+
+### Patch Changes
+
+- Android: a failed batch the spill could not take is counted rather than lost
+  
+  `persist` had two silent paths — no spill directory, which is the
+  in-memory-only mode, and a write that throws, a full disk being the
+  ordinary cause — and the file's own cap trimmed the oldest without
+  counting them. The batch had already left the queue, so it existed
+  nowhere, and the next envelope reported the gap as quiet. All three
+  count now, through the same `droppedEvents` the in-memory cap has always
+  used. iOS carries the matching fix.
+
 ## 7.0.0
 
 ### Major Changes
