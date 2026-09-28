@@ -8,7 +8,9 @@
 // a throw looks fine in a screenshot, and that is exactly how the
 // RangeError survived a sweep.
 import { spawn } from 'node:child_process';
-import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync, mkdtempSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 // macOS keeps Chrome in a bundle; a Linux runner has it on PATH under
 // one of several names. Resolved rather than hardcoded so the same
@@ -71,7 +73,9 @@ const OPEN_ALL = {
     "[...document.querySelectorAll('button[aria-expanded=\"false\"]')].forEach(b => b.click())",
 };
 
-const out = process.argv[2] || '.tmp/sweep';
+// Screenshots land outside the repository unless a path is given:
+// they are something to look at once, not something to keep.
+const out = process.argv[2] || mkdtempSync(join(tmpdir(), 'sentori-sweep-'));
 const lang = process.argv[3] || 'zh-CN';
 const theme = process.argv[4] || 'dark';
 // Width matters as much as language: the two-column split, the
@@ -217,9 +221,10 @@ const broken = report.filter(r => r.errors.length);
 for (const u of unmocked) process.stdout.write(`UNMOCKED ${u}\n`);
 if (broken.length || unmocked.length) {
   process.stdout.write(
-    `✗ ${broken.length} route(s) with console errors, ${unmocked.length} unmocked path(s)\n`,
+    `✗ ${broken.length} route(s) with console errors, ${unmocked.length} ` +
+    `unmocked path(s) — screenshots in ${out}\n`,
   );
   process.exit(1);
 }
-process.stdout.write(`✓ ${report.length} routes clean\n`);
+process.stdout.write(`✓ ${report.length} routes clean — screenshots in ${out}\n`);
 process.exit(0);

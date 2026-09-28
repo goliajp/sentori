@@ -57,8 +57,13 @@ done
 VERSION="$(cat sdk/native/VERSION)"
 COORD="jp.golia.sentori:sentori:${VERSION}"
 STAGING="sdk/native/android/build/staging-repo"
-WORK=".tmp/central-${VERSION}"
-BUNDLE=".tmp/sentori-${VERSION}-bundle.zip"
+# A scratch directory outside the repository: the bundle is an artifact
+# of publishing, not of the tree, and nothing else may depend on where it
+# lands. Removed on every exit path, including a failed upload.
+SCRATCH="$(mktemp -d)"
+trap 'rm -rf "$SCRATCH"' EXIT
+WORK="${SCRATCH}/central-${VERSION}"
+BUNDLE="${SCRATCH}/sentori-${VERSION}-bundle.zip"
 
 echo "→ staging ${COORD} (signed)"
 rm -rf "$STAGING"
@@ -106,7 +111,7 @@ mkdir -p "$WORK"
       mkdir -p "${WORK}/$(dirname "$f")"
       cp "${STAGING}/${f}" "${WORK}/${f}"
     done
-(cd "$WORK" && zip -qr "${ROOT}/${BUNDLE}" jp)
+(cd "$WORK" && zip -qr "${BUNDLE}" jp)
 echo "      $(cd "$WORK" && find jp -type f | wc -l | tr -d ' ') files, $(wc -c < "$BUNDLE") bytes"
 
 AUTH="$(printf '%s:%s' "$CENTRAL_USERNAME" "$CENTRAL_PASSWORD" | base64 | tr -d '\n')"
