@@ -6,6 +6,22 @@
 
 ---
 
+## v3.17.7（2026-09-28 — live 套件继承了给「从不发送」那些用例准备的超时）
+
+3.17.5 让 `__resetForTests` 恢复的请求超时是 1 秒，这样一个不小心走到网络的单测只花六秒
+而不是四十五秒。`ios-live-ingest` 恰好是「走到网络就是它的目的」的那个套件：真服务器、真
+批次，第一个请求还要付冷连接的代价。1 秒把每次投递都变成落盘，断言照实说了它看到的——
+「a batch spilled to disk, so the server refused it」——而服务器什么都没拒。
+
+它现在自己设 15 秒；单测那边保留 1 秒，那是用来阻止一个用例的等待变成下一个用例的失败的。
+
+交付状态（native 2.0.2 这一路已经齐了）：Maven Central 上
+`jp.golia.sentori:sentori:2.0.2`（curl repo1 核过 aar / pom / sources 三个产物，
+`maven-metadata.xml` 的 latest 与 release 都是 2.0.2）；Swift 包 tag `2.0.2` 在
+`goliajp/sentori-swift`；npm 上 `@goliapkg/sentori-react-native@7.0.1`。
+
+---
+
 ## v3.17.6（2026-09-28 — Android 用同样两种方式丢批次，而且没有任何测试会说）
 
 上一版在 iOS 侧修的那个洞，拿同一个问题问 Android，答案是一样的
