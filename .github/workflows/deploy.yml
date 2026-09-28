@@ -109,6 +109,10 @@ jobs:
       # context and a dockerfile path, both given here, so the image is
       # the same one either way.
       - name: Build the server image
+        env:
+          # The cargo cache mounts in the Dockerfile are a BuildKit
+          # feature; an old default builder would fail to parse them.
+          DOCKER_BUILDKIT: '1'
         run: |
           docker build \
             -f "${REMOTE_DIR}/src/self-hosted/docker/Dockerfile" \
