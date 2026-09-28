@@ -6,6 +6,37 @@
 
 ---
 
+## v3.17.9（2026-09-28 — 门跑在它该跑的地方）
+
+上一版把门跑得更快，这一版是门跑得对不对。先量覆盖：不读注释，拿真实文件列表去对每个
+workflow 的 paths 过滤。
+
+结果是 `build.yml` 只在 master push 上跑，而 master 就是生产——webapp、四个 TypeScript
+SDK、scripts、docs、cli、docker 构建，它们的第一次 CI 发生在绿了就部署的那条分支上。
+
+- **`build.yml` 也在 develop 上跑**。paths 过滤仍决定哪些 job 跑；`deploy.yml` 的
+  `workflow_run` 限定 master，develop 的 build 发不了任何东西（动手前核过，事后也核过：
+  deploy 的 run 列表没有多出来的条目）。同时给它加了取消，master 和 release 分支不取消。
+- **native 的门按它真正编的东西触发**。原来触发面里唯一的 core 路径是
+  `core/migrations/**`，而其中三个 job 要编 server，server 按相对路径依赖十一个 core
+  crate——`core/crates/**` 一变，这三个 job 一个都不跑。sourcemap-e2e 就是这样从 2.15.0
+  漏到 2.21.1 才看见那个 `GET releases` panic。触发面改成并集，再用一个 `changes` job
+  分派，所以扩大触发面不等于每次拉起三台 macOS。
+- **公开镜像必须可构建，不只是可读**。clone 那个仓库 `docker compose up --build` 就是
+  产品，而只有文档被验过：allowlist 漏掉一个 manifest、lockfile 或 Dockerfile，我们这边
+  全绿而公开仓库是坏的。检查同时改成问 rsync「你会传什么」而不是让它真传，再与被跟踪文件
+  取交集——镜像从干净 checkout 建，未跟踪的东西到不了那里。全树覆盖 1.8 秒。
+- **没人管的面要么接上门，要么写明为什么没有**。webapp 当年带着 96 个类型错误走到切换，
+  就是因为它不在任何过滤器里。新检查要求每个目录被一个**在 develop 上跑的** workflow
+  点名——只被 master 才跑的 workflow 点名不算，那正是 webapp 当时的状态。它第一次跑就
+  逮到两个：`.bun-version` 决定每个 job 装哪个 bun，`.dockerignore` 决定镜像的构建
+  上下文，两个都不在任何过滤器里。
+- **补上从来没跑过的两道**：`--all-targets` 不含 doctest，core 公开文档里的 22 个例子
+  从没被编译过（实测全通过）；`cargo doc -D warnings` 是唯一读 intra-doc 链接的东西，
+  之前只在本地跑。
+
+---
+
 ## v3.17.8（2026-09-28 — 门的时间花在哪里）
 
 对 preflight 和 CI 做了一次难题分析：三个独立 agent 各查一个角度，主轨逐条复核
