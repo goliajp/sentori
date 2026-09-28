@@ -1,4 +1,4 @@
-name: v0.2 core — fmt + clippy + check
+name: v0.2 core — fmt + clippy + test
 
 on:
   push:
@@ -17,6 +17,12 @@ on:
     paths:
       - 'core/**'
       - 'self-hosted/server/**'
+
+# Superseded pushes stop compiling. Master is never cancelled: its run is
+# the record that a shipped sha was checked.
+concurrency:
+  group: v0.2-core-check-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 jobs:
   check:
@@ -37,8 +43,6 @@ jobs:
         run: cargo fmt --all -- --check
       - name: clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: check
-        run: cargo check --workspace --all-targets
       # The core crates' integration tests spin up their own Postgres
       # via testcontainers, so they need nothing but a docker daemon —
       # which the runner has. They were never run in CI: this job did

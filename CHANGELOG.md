@@ -6,6 +6,32 @@
 
 ---
 
+## v3.17.8（2026-09-28 — 门的时间花在哪里）
+
+对 preflight 和 CI 做了一次难题分析：三个独立 agent 各查一个角度，主轨逐条复核
+`file:line`、关键数字换工具重测。记录在本地 RFC 里，落了五处。
+
+- **镜像文档检查拷 4 GB 读 15 个文件**。它跑的是发布 workflow 的真 rsync 参数，那份
+  参数是「若干 exclude + docs 白名单」，没有收尾的 `--exclude='*'`，所以凡是没被点名
+  的都拷——一棵工作树里就是 `apps/` 下 2839 MB 的 gradle / Pods / Xcode 产物。CI 的
+  干净 checkout 里没有这些，所以只有本地被扎。现在 rsync 到顶层就停：32.7 秒 → 0.13 秒。
+- **三处 `cargo check` 零覆盖**。`clippy --all-targets` 是它的超集，往测试模块塞类型
+  错，只跑 clippy 就退出 101。preflight 的 core 段和 server 段、`v0.2-core-check`
+  各删一处。
+- **被取代的 push 不再占着 runner**。`mobile-e2e` 的七个 job 占三个 macOS runner，
+  而这个账号跨所有仓库一共五个；develop 上相隔六分钟的两次 push，第二次的 iOS job
+  排了 126 秒和 190 秒。同 ref 有更新的 push 就取消旧 run，master 上永不取消。
+- **镜像在 gate 跑的同时构建**，不再排在它后面。一次 release 端到端 712 秒：gate 383
+  秒，然后 deploy 326 秒，其中构建 303 秒——而构建读的是那棵树，不是 gate 的结论。
+  构建只打 sha tag；让一个镜像开始服务的是 `latest` 的指向，那一步仍然要等 gate。
+  `up` 也去掉了 `--build`，它再也不可能编一棵门没看过的树。
+- **cargo 的 registry 和 target 跨镜像构建保留**。改一行源码后重建：112 秒 → 71 秒。
+  剩下的是 `lto = "fat"`，全程序链接跟缓存无关。
+
+preflight 112 秒 → 53 秒。
+
+---
+
 ## v3.17.7（2026-09-28 — live 套件继承了给「从不发送」那些用例准备的超时）
 
 3.17.5 让 `__resetForTests` 恢复的请求超时是 1 秒，这样一个不小心走到网络的单测只花六秒
