@@ -15,7 +15,12 @@ name: build
 
 on:
   push:
-    branches: [master]
+    # develop as well as master. Until 2026-09-28 this ran on master
+    # only, so webapp, the TypeScript SDKs, scripts, docs, the CLI and
+    # the docker build had no CI at all until the branch that deploys —
+    # their first gate ran after the point of no return. The paths filter
+    # below still decides which jobs run.
+    branches: [develop, master]
   pull_request:
   workflow_dispatch:
   # Called by deploy.yml as the gate in front of a `release/*` deploy.
@@ -50,6 +55,16 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# A newer push to the same branch supersedes the tree this run is
+# checking. Master is never cancelled — its run is the record that a
+# shipped sha was gated — and neither is a release branch, whose run is
+# the gate deploy.yml waits on.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: >-
+    ${{ github.ref != 'refs/heads/master' &&
+        !startsWith(github.ref, 'refs/heads/release/') }}
+
 jobs:
   changes:
     # Single source of truth for "what did this commit touch?". The
@@ -70,11 +85,10 @@ jobs:
           # let a broken CI config slip in unnoticed.
           filters: |
             infra:
-              - '.github/workflows/**'
+              - '.github/**'
               - 'package.json'
               - 'bun.lock'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
+              - '.bun-version'
               - 'scripts/**'
             # Drives the `server-test` job, which after the v0.1
             # decommission runs the cli gates and the repo-wide checks
@@ -83,8 +97,7 @@ jobs:
             server:
               - 'core/**'
               - 'self-hosted/**'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
+              - '.dockerignore'
             webapp:
               - 'webapp/**'
             sdk:
@@ -304,8 +317,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: every surface is named by a workflow that runs on develop
+        run: node scripts/check-surface-gates.mjs
+
       - name: the mirror ships the docs and none of the internal ones
-        run: node scripts/check-mirror-docs.mjs
+        run: node scripts/check-mirror.mjs
       - name: docs name only APIs and packages that exist
         run: node scripts/check-docs-api-truth.mjs
       - name: every markdown code fence closes

@@ -40,7 +40,7 @@ on:
       - 'apps/android-consumer/**'
       - 'apps/rn-example/**'
       - 'self-hosted/server/**'
-      - 'core/migrations/**'
+      - 'core/**'
       - 'scripts/sourcemap-e2e/**'
       - 'scripts/ios-live-ingest.sh'
       - 'scripts/android-live-ingest.sh'
@@ -54,7 +54,7 @@ on:
       - 'apps/android-consumer/**'
       - 'apps/rn-example/**'
       - 'self-hosted/server/**'
-      - 'core/migrations/**'
+      - 'core/**'
       - 'scripts/sourcemap-e2e/**'
       - 'scripts/ios-live-ingest.sh'
       - 'scripts/android-live-ingest.sh'
@@ -83,7 +83,49 @@ jobs:
   # This closes the hole recorded in the project notes: changing a .kt
   # file passed every gate and shipped to npm unchecked, which is how
   # the v3.0.0 K2 bug got out.
+  # The trigger above is the union of what these jobs depend on; this
+  # decides which of them a given push actually needs. Three of them build
+  # the server, and the server reaches eleven core crates by relative
+  # path — `core/migrations/**` was the only core path listed before, so
+  # a change under `core/crates/**` ran none of this. sourcemap-e2e
+  # missed a `GET releases` panic from 2.15.0 to 2.21.1 that way.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      android: ${{ steps.f.outputs.android }}
+      ios: ${{ steps.f.outputs.ios }}
+      server: ${{ steps.f.outputs.server }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: f
+        with:
+          filters: |
+            android:
+              - 'sdk/native/android/**'
+              - 'sdk/react-native/android/**'
+              - 'apps/rn-example/**'
+              - 'apps/android-consumer/**'
+              - 'scripts/android-live-ingest.sh'
+              - '.github/workflows/mobile-e2e.yml'
+            ios:
+              - 'sdk/native/ios/**'
+              - 'apps/ios-showcase/**'
+              - 'apps/rn-example/**'
+              - 'scripts/ios-live-ingest.sh'
+              - '.github/workflows/mobile-e2e.yml'
+            server:
+              - 'core/**'
+              - 'self-hosted/server/**'
+              - 'scripts/sourcemap-e2e/**'
+              - 'scripts/android-live-ingest.sh'
+              - 'scripts/ios-live-ingest.sh'
+              - '.github/workflows/mobile-e2e.yml'
+
   android-unit:
+    needs: changes
+    if: >-
+      needs.changes.outputs.android == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -157,6 +199,9 @@ jobs:
   # This is also the platform about to ship as its own artifact, and
   # the one with no automated gate of any kind until now.
   ios-native:
+    needs: changes
+    if: >-
+      needs.changes.outputs.ios == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -211,6 +256,9 @@ jobs:
   # It depends on the package by path now, so a change to the SDK
   # shows up here in the same commit rather than after a release.
   ios-showcase:
+    needs: changes
+    if: >-
+      needs.changes.outputs.ios == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -243,6 +291,9 @@ jobs:
   # assembled, and the tests belonged to a module that exists for a
   # different reason.
   android-artifact:
+    needs: changes
+    if: >-
+      needs.changes.outputs.android == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -311,6 +362,10 @@ jobs:
   # iOS job below — and cheaper: Robolectric runs on the JVM, so this
   # needs no emulator, and Linux runners have Docker for Postgres.
   android-live-ingest:
+    needs: changes
+    if: >-
+      needs.changes.outputs.android == 'true' ||
+      needs.changes.outputs.server == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -350,6 +405,10 @@ jobs:
   # no Docker, and the simulator has to be on the same machine as the
   # server for 127.0.0.1 to mean the same thing to both.
   ios-live-ingest:
+    needs: changes
+    if: >-
+      needs.changes.outputs.ios == 'true' ||
+      needs.changes.outputs.server == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     timeout-minutes: 45
     steps:
@@ -376,6 +435,10 @@ jobs:
   # they cannot: that a real Metro map, uploaded over HTTP, matched to a
   # release by name, produces the right answer.
   sourcemap-e2e:
+    needs: changes
+    if: >-
+      needs.changes.outputs.server == 'true' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
