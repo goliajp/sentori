@@ -56,8 +56,67 @@ jobs:
       force_all: true
     secrets: inherit
 
+  # The image is built in parallel with the gate rather than after it.
+  # On the release line the gate takes about 380 s and this build took
+  # 303 s, and the two were strictly serial although the build reads the
+  # tree and not the gate's verdict. Nothing here is live: the build
+  # publishes a sha tag, and what makes an image serve traffic is the
+  # retag in `deploy`, which does need the gate. A red gate therefore
+  # leaves one unreferenced image behind and changes nothing else.
+  build-image:
+    runs-on: [self-hosted, lx64]
+    timeout-minutes: 45
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    env:
+      REMOTE_DIR: /apps/sentori
+
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Same pinning as `deploy`: `workflow_run` would otherwise give
+          # the default branch's HEAD instead of the SHA that went green.
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+
+      - name: Tag for this tree
+        id: tag
+        run: |
+          sha="${{ github.event.workflow_run.head_sha || github.sha }}"
+          echo "tag=${sha:0:12}" >> "$GITHUB_OUTPUT"
+
+      - name: Rsync source into /apps/sentori/src
+        run: |
+          mkdir -p "${REMOTE_DIR}/src"
+          rsync -a --delete \
+            --exclude .git \
+            --exclude node_modules \
+            --exclude 'self-hosted/server/target' \
+            --exclude 'core/target' \
+            --exclude 'webapp/dist' \
+            ./ "${REMOTE_DIR}/src/"
+
+      # `docker compose build` would need the compose file and .env
+      # installed on the host first, and both are live configuration:
+      # writing them before the gate has spoken would leave a red gate
+      # with production config the running containers were never checked
+      # against. The compose service adds nothing to this build but a
+      # context and a dockerfile path, both given here, so the image is
+      # the same one either way.
+      - name: Build the server image
+        run: |
+          docker build \
+            -f "${REMOTE_DIR}/src/self-hosted/docker/Dockerfile" \
+            -t "sentori-server-v1:${{ steps.tag.outputs.tag }}" \
+            "${REMOTE_DIR}/src"
+
   deploy:
-    needs: [gate]
+    needs: [gate, build-image]
     runs-on: [self-hosted, lx64]
     timeout-minutes: 45
     # `always()` so the master line — where `gate` is skipped — still
@@ -66,6 +125,7 @@ jobs:
     if: >-
       always() &&
       (needs.gate.result == 'success' || needs.gate.result == 'skipped') &&
+      needs.build-image.result == 'success' &&
       (github.event_name != 'workflow_run' ||
        github.event.workflow_run.conclusion == 'success')
 
@@ -119,17 +179,6 @@ jobs:
           rsync -a --delete --chmod=D755,F644 \
             webapp/dist/ "${REMOTE_DIR}/webapp-dist/"
 
-      - name: Rsync source into /apps/sentori/src
-        run: |
-          mkdir -p "${REMOTE_DIR}/src"
-          rsync -a --delete \
-            --exclude .git \
-            --exclude node_modules \
-            --exclude 'self-hosted/server/target' \
-            --exclude 'core/target' \
-            --exclude 'webapp/dist' \
-            ./ "${REMOTE_DIR}/src/"
-
       - name: Install the compose file
         run: |
           SRC_COMPOSE="${REMOTE_DIR}/src/deploy/docker-compose.t01.yml"
@@ -166,12 +215,24 @@ jobs:
           EOF
           chmod 600 "${REMOTE_DIR}/.env"
 
-      - name: Build & up (v1 stack)
+      # The image that was built while the gate ran becomes the live one
+      # here and nowhere else — nothing earlier moved `latest`. There is
+      # no `--build` either, so this step cannot quietly compile a tree
+      # the gate never saw.
+      - name: Point latest at the gated image, up the v1 stack
         working-directory: /apps/sentori
         run: |
-          docker compose --env-file .env -f docker-compose.yml build server-v1
+          docker tag "sentori-server-v1:${{ needs.build-image.outputs.tag }}" \
+            sentori-server-v1:latest
           docker compose --env-file .env -f docker-compose.yml up -d \
             postgres-v1 server-v1
+
+      # `latest` now holds the image; dropping the sha tag keeps the
+      # deploy host from collecting one per release. It runs after the
+      # stack is up and must not fail a deploy that already happened.
+      - name: Drop the sha tag
+        continue-on-error: true
+        run: docker rmi "sentori-server-v1:${{ needs.build-image.outputs.tag }}"
 
       - name: Smoke — v1 healthz + version
         run: |
