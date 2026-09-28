@@ -50,6 +50,16 @@ jobs:
       # crates/*/tests/integration.rs was dead weight.
       - name: test
         run: cargo test --workspace --all-targets
+      # `--all-targets` does not include doctests: the 22 examples in
+      # these crates' public documentation had never been compiled by
+      # anything. rustdoc's warnings are also the only thing that reads
+      # an intra-doc link, and that ran in preflight but not here, so a
+      # broken link reached master whenever nobody happened to run the
+      # full local chain.
+      - name: doctests
+        run: cargo test --workspace --doc
+      - name: doc
+        run: RUSTDOCFLAGS='-D warnings' cargo doc --workspace --no-deps
 
   # The v0.2 server crate had no CI at all: build.yml tests the legacy
   # `server/` and this workflow tested `core/`, so nothing ever
@@ -76,3 +86,5 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
       - name: test
         run: cargo test --all-targets
+      - name: doc
+        run: RUSTDOCFLAGS='-D warnings' cargo doc --no-deps
