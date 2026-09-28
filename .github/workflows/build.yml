@@ -320,7 +320,7 @@ jobs:
       - name: every surface is named by a workflow that runs on develop
         run: node scripts/check-surface-gates.mjs
 
-      - name: the mirror ships the docs and none of the internal ones
+      - name: the mirror ships the docs and the build, and nothing internal
         run: node scripts/check-mirror.mjs
       - name: docs name only APIs and packages that exist
         run: node scripts/check-docs-api-truth.mjs
