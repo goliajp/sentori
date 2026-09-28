@@ -6,6 +6,42 @@
 
 ---
 
+## v3.17.6（2026-09-28 — Android 用同样两种方式丢批次，而且没有任何测试会说）
+
+上一版在 iOS 侧修的那个洞，拿同一个问题问 Android，答案是一样的
+（`SentoriTransport.kt`）：
+
+- `spillFile() ?: return` —— 没有落盘目录时，也就是 `start(null)` 那个文档写明的
+  「只在内存」模式，每次发送失败整批消失
+- 写文件外面的 `catch (_: Throwable)` —— 磁盘满是常见原因，被吞掉
+- 文件自己的上限 `while (all.size > MAX_PERSISTED) all.removeAt(0)` —— 裁掉最旧的不计数，
+  而内存队列的上限一直是计的
+
+三处都让批次在离开队列之后不存在于任何地方，`dropped` 不动，下一个信封把投递缺口报成
+「安静」。**这个比 iOS 那个面更广**：`sdk/react-native/android` 镜像这份 Kotlin，所以这份
+静默也在已发布的 npm 包里，不只在 native 产物里。现在三处都走已有的
+`dropped → droppedEvents` 通道计数。
+
+### 它只能靠读代码发现，因为 Android 一条 transport 测试都没有
+
+iOS 有七条。补的第一条刻意与 iOS 那条同形状——两个平台对「什么算丢弃」的理解不一致，
+在 dashboard 上会表现成只数了一支机群。先在旧行为下看着它红（报 `persisted: 0, queued: 0,
+dropped: 0`），再放回修复：Robolectric 九个测试类、59 个用例、0 失败；镜像那道门在同步前红、
+同步后绿。
+
+### 一个版本号既已对外可解析，又还在树里被改
+
+`swift/2.0.1` 从 master 发出去之后，`sdk/native/VERSION` 仍然是 2.0.1，而 Android 这个修复
+落在 develop 上——正是 `check-native-version-tag.mjs` 为之而写的情形（`swift/1.0.0` 打完之后
+两个功能落在同一个号上）。它在第一次 push 就抓住了，红在 `android-artifact`。现在 native 是
+2.0.2 待发，两端 `SentoriConfig` 的常量由 `sync-sdk-version` 写、不手改。
+
+交付：`@goliapkg/sentori-react-native@7.0.1` 已发 npm（从 registry 拉回来核过：包里的 Kotlin
+带计数、`SentoriConfig.CURRENT` 是 2.0.2、`SDK_VERSION` 是 7.0.1）。Maven 这次不发——组织的
+月度配额已超，Android native 直接接入方随下一次 native 发布拿到。
+
+---
+
 ## v3.17.5（2026-09-28 — 一个用例的网络等待，是下一个用例的失败）
 
 `mobile-e2e` 在 master 上红了一次：落盘用例报 `persisted: 0, queued: 0`，而那个提交没碰任何
