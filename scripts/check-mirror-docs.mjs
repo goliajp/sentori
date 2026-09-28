@@ -67,8 +67,17 @@ try {
   // CI runs against a clean checkout and will not see them. The docs
   // set is what this checks, so a partial transfer is tolerated and a
   // real failure still is not.
+  // Only docs/ is inspected below, and the filter list is an allowlist
+  // for that tree on top of a handful of excludes — it has no closing
+  // `--exclude='*'`, so everything unnamed is copied. In a clean CI
+  // checkout that is a few MB; in a working tree it is every local
+  // build directory (gradle, Pods, Xcode, dist), which was 4.1 GB and
+  // 33 s of kernel time to read 15 files. This extra rule stops rsync
+  // at the top level once docs/ has matched. It must come last: the
+  // real filters decide docs/ first.
+  const scoped = [...args, "--exclude=/*/"];
   try {
-    execFileSync('rsync', ['-a', '--delete', ...args, './', `${out}/`], {
+    execFileSync('rsync', ['-a', '--delete', ...scoped, './', `${out}/`], {
       cwd: ROOT,
       stdio: 'pipe',
     });

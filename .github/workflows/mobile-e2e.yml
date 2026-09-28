@@ -63,6 +63,16 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# A second push supersedes the tree the running check was looking at, and
+# these seven jobs hold three macOS runners of the five this account
+# gets across all repositories. Two develop pushes six minutes apart
+# queued the second run's iOS jobs for 126 s and 190 s behind the first
+# run's — and behind master's. Master is never cancelled: its run is the
+# record that a shipped sha was checked.
+concurrency:
+  group: mobile-e2e-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 jobs:
   # The SDK's Android module has two Robolectric tests and has never
   # been able to run them: it is an Expo module, so it only builds
