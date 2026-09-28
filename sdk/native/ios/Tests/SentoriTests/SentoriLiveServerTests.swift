@@ -48,6 +48,14 @@ final class SentoriLiveServerTests: XCTestCase {
         token = t
         SentoriTransport.__resetForTests()
         SentoriConfig.__resetForTests()
+        // The reset restores a one-second timeout, which is right for
+        // the unit suites: there a send that reaches the network is an
+        // accident, and it holds a serial worker the next test needs.
+        // This suite is the opposite — a real server, a real batch, and
+        // a first request that pays for a cold connection. One second
+        // turned every delivery into a spill and read as "the server
+        // refused it".
+        SentoriTransport.requestTimeout = 15
         SentoriScope.clear()
         SentoriSignalRing.clear()
     }
