@@ -1,22 +1,3 @@
-/**
- * Phase 26 sub-A/B: session tracker.
- *
- * One in-flight session at a time. The platform SDK calls:
- *   - `start(...)` when the app foregrounds / page loads
- *   - `markErrored()` from captureException
- *   - `markCrashed()` from a native crash hook
- *   - `end()` when the app backgrounds / page unloads
- *
- * The tracker holds the in-progress state; the *transport* it sends to
- * is supplied by the platform (so JS SDK uses fetch/sendBeacon, RN SDK
- * uses fetch over the Hermes/JSC bridge, etc.). Status promotion is
- * monotonic — once `crashed` is set it can't be downgraded by a later
- * `markErrored()`.
- *
- * Re-entrancy: `start()` while a session is active drops the previous
- * one without sending — that lifecycle is owned by the platform's
- * foreground/background plumbing and dual-active never makes sense.
- */
 import { uuidV7 } from './uuid.js';
 const RANK = { crashed: 3, errored: 2, exited: 1, ok: 0 };
 export class SessionTracker {
@@ -64,6 +45,7 @@ export class SessionTracker {
             durationMs,
             environment: this.active.ctx.environment,
             id: this.active.id,
+            platform: this.active.ctx.platform,
             release: this.active.ctx.release,
             startedAt,
             status,

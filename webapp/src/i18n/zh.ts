@@ -363,6 +363,9 @@ export const zh: Messages = {
   'push.noUser': '未识别',
   'push.noUserHint': '注册时 sentori.user() 未运行。可收广播，无法从 issue 定向。',
   'push.user': '用户',
+  'crashFree.title': '崩溃率（无崩溃会话）',
+  'crashFree.empty': '这个窗口还没有会话——SDK 在每次应用进入后台时上报一次。升级到会发送会话的版本，或等第一份上报。',
+  'crashFree.window': '近 {hours} 小时',
   'platform.unknown': '未知（SDK 比服务端新）',
   'releases.artifactBroken': '{platform} 有已上传但读不到的物料 —— 展开查看是哪个。',
   'releases.artifactMissing':

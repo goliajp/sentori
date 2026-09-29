@@ -63,7 +63,12 @@ const toWire = (raw: LegacyNativeEvent): WireEvent => {
 };
 
 /** Drain, convert, enqueue, and ship pre-death attachments. */
-export const shipNativePending = async (): Promise<void> => {
+/**
+ * Returns whether the last launch left a crash behind — the evidence
+ * that separates "the app died of a bug" from "the OS or the user
+ * closed it", which the crash-free rate would otherwise conflate.
+ */
+export const shipNativePending = async (): Promise<boolean> => {
   const files = await drainNativePending();
   for (const text of files) {
     try {
@@ -89,4 +94,5 @@ export const shipNativePending = async (): Promise<void> => {
     }
   }
   if (files.length > 0) await flush();
+  return files.length > 0;
 };

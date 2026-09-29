@@ -6,6 +6,8 @@
 // message levels and the capture* vocabulary are gone with the
 // Sentry compatibility they came from.
 
+import type { SessionPing } from './session.js'
+
 export type Platform = 'android' | 'ios' | 'javascript' | 'weapp' | 'web'
 
 /** The five kinds. The union IS the concept model. */
@@ -136,6 +138,12 @@ export type BatchEnvelope = {
    *  queue, or a spill it could not write. A loss nobody counts is a
    *  loss nobody can see. */
   droppedEvents?: number
+  /** Sessions that ended since the last envelope. The denominator:
+   *  without it "18 errors" is a number with nothing to divide by,
+   *  and the crash-free rate a mobile team is asked for first cannot
+   *  be computed at all. A server that predates this drops the field
+   *  as unknown, so an SDK that sends it still delivers its events. */
+  sessions?: SessionPing[]
 }
 
 /** Per-event server outcome. */

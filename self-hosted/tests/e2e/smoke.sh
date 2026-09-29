@@ -189,6 +189,55 @@ TOP="$(curl -fsS -b "$JAR" "${BASE}/admin/api/events/${STACK_ID}" \
 [[ "$TOP" == "src/cart/total.ts" ]] \
     || { echo "the top frame came back as '${TOP}'" >&2; exit 1; }
 
+echo "→ sessions give the errors a denominator"
+# The product counted what went wrong and nothing counted what went
+# right, so "18 errors" had nothing to divide by and the first number
+# a mobile team is asked for could not be computed. Ten sessions, one
+# of them crashed, is 90% — and sending the batch twice must still be
+# 90%, because a resend after a lost response carries the same ids.
+# Stamped near now, not at the fixture date the other events use: the
+# crash-free query is windowed, and a session two months old is
+# correctly outside it. The first version of this block used
+# 2026-08-10 and read back zero sessions — the assertion was right and
+# the fixture was wrong.
+SESSION_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+SESSIONS='['
+for i in 0 1 2 3 4 5 6 7 8 9; do
+    STATUS=exited
+    [ "$i" = "0" ] && STATUS=crashed
+    [ "$i" = "0" ] || SESSIONS="${SESSIONS},"
+    SESSIONS="${SESSIONS}{\"id\":\"019fe900-0000-7000-8000-00000000cf0${i}\",
+      \"status\":\"${STATUS}\",\"release\":\"cf@1.0.0+1\",\"environment\":\"test\",
+      \"platform\":\"ios\",\"startedAt\":\"${SESSION_AT}\",
+      \"durationMs\":12000,\"userId\":\"u${i}\"}"
+done
+SESSIONS="${SESSIONS}]"
+
+for _ in 1 2; do
+    curl -fsS -X POST "${BASE}/v1/events:batch" -H "Authorization: Bearer ${TOKEN}" \
+        -H 'content-type: application/json' \
+        -d "{\"events\":[],\"sessions\":${SESSIONS}}" > /dev/null
+done
+
+CF="$(curl -fsS -b "$JAR" \
+    "${BASE}/admin/api/sessions/crash-free?projectId=${PROJECT_ID}&hours=720")"
+TOTAL="$(echo "$CF" | jq -r '.sessions')"
+# Compared inside jq, not as shell strings: the server answers a JSON
+# number and `jq -r` renders it `90.0`, which is not the string `90`.
+RATE_OK="$(echo "$CF" | jq -r '.crashFreeSessions == 90')"
+[[ "$TOTAL" == "10" ]] \
+    || { echo "sent 10 sessions twice and the server counted ${TOTAL} — a resend " \
+              "double-counted, which moves the rate in the flattering direction: $CF" >&2; exit 1; }
+[[ "$RATE_OK" == "true" ]] \
+    || { echo "crash-free rate is not 90: $CF" >&2; exit 1; }
+# Per release, because the question is never "are we healthy" but
+# "is Tuesday's build worse than Monday's".
+BYREL="$(echo "$CF" | jq -r '[.releases[] | select(.release == "cf@1.0.0+1")] | length')"
+[[ "$BYREL" == "1" ]] \
+    || { echo "the release breakdown does not carry cf@1.0.0+1: $CF" >&2; exit 1; }
+[[ "$(echo "$CF" | jq -r '.releases[] | select(.release=="cf@1.0.0+1") | .crashFreeUsers == 90')" == "true" ]] \
+    || { echo "crash-free users is not 90: $CF" >&2; exit 1; }
+
 echo "→ a platform this build does not know is kept, not refused"
 # An SDK newer than its server used to lose every event it sent: ingest
 # answered 400, and from the batch endpoint the refusal arrives inside

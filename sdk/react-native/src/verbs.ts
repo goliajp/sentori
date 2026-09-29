@@ -76,7 +76,7 @@ const detectPlatform = (): 'android' | 'ios' | 'javascript' => {
 // The server gets the last word: one that refuses what we detect has
 // told us it predates this SDK, and the transport drops the session
 // to a value it does accept.
-const platformOf = (): Platform => platformOrFallback(detectPlatform());
+export const platformOf = (): Platform => platformOrFallback(detectPlatform());
 
 type EmitOptions = {
   name?: string;

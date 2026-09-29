@@ -551,6 +551,30 @@ class Api {
   }
 
   // ── issues ──
+  /** Crash-free rate for a window, and the same broken out per
+   *  release — the comparison a ship/no-ship decision is made on. */
+  crashFree(q: { projectId: string; hours?: number; environment?: string }) {
+    const usp = new URLSearchParams({ projectId: q.projectId });
+    if (q.hours) usp.set('hours', String(q.hours));
+    if (q.environment) usp.set('environment', q.environment);
+    return this.get<{
+      crashFreeSessions: null | number;
+      crashedSessions: number;
+      releases: {
+        crashFreeSessions: null | number;
+        crashFreeUsers: null | number;
+        crashedSessions: number;
+        lastAt: string;
+        platform: string;
+        release: string;
+        sessions: number;
+        users: number;
+      }[];
+      sessions: number;
+      windowHours: number;
+    }>(`/admin/api/sessions/crash-free?${usp.toString()}`);
+  }
+
   listIssues(q: {
     status?: string;
     kind?: string;

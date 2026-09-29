@@ -97,6 +97,7 @@ const PROJECT_SCOPED: &[&str] = &[
     "tokens",
     "issues",
     "events",
+    "sessions",
     "event_attachments",
     "releases",
     "probes",

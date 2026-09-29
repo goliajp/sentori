@@ -39,6 +39,7 @@ mod metrics_prom;
 mod notify_admin;
 mod projects;
 mod sdk;
+mod sessions;
 
 /// Refuse an IP that is hammering a credentialed auth endpoint.
 ///
@@ -241,6 +242,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         )
         // issues — the Inbox and the detail page
         .route("/admin/api/issues", get(issues::list))
+        .route("/admin/api/sessions/crash-free", get(sessions::crash_free))
         .route("/admin/api/issues/{issue_id}", get(issues::get))
         .route(
             "/admin/api/issues/{issue_id}/resolve",
