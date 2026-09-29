@@ -132,6 +132,10 @@ export type BatchEnvelope = {
    *  server remembers it per project and probes it for the
    *  availability card. */
   backendHealthUrl?: string
+  /** Events this SDK discarded since the last envelope — a full
+   *  queue, or a spill it could not write. A loss nobody counts is a
+   *  loss nobody can see. */
+  droppedEvents?: number
 }
 
 /** Per-event server outcome. */

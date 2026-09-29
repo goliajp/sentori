@@ -62,6 +62,61 @@ describe('transport (v1 wire)', () => {
     expect((seenBody as { events: unknown[] }).events.length).toBe(1);
   });
 
+  it('counts the events the server refused, which arrive inside a 200', async () => {
+    const { __peekDropped } = await import('../transport');
+
+    // The batch endpoint answers 200 and puts the refusal in each
+    // outcome. An SDK that reads only the status counts a refusal as a
+    // delivery — the shape a self-hosted server takes when it is older
+    // than the SDK talking to it.
+    globalThis.fetch = mock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            accepted: 1,
+            outcomes: [{}, { error: 'invalid_payload', detail: 'platform' }],
+          }),
+          { status: 200 },
+        ),
+    ) as typeof fetch;
+
+    enqueue(wire('error'));
+    enqueue(wire('error'));
+    await flush();
+    expect(__peekDropped()).toBe(1);
+  });
+
+  it('counts a batch it could not keep instead of losing it in silence', async () => {
+    const { __peekDropped } = await import('../transport');
+
+    // Offline, and no AsyncStorage linked — which is every host that
+    // has the JS package without the optional peer dependency. The
+    // batch ends here either way; until now it ended here without a
+    // number, so a device losing every failed batch looked exactly
+    // like a device with nothing to report. iOS got this in 3.17.5 and
+    // Android in 3.17.6; this is the third transport.
+    globalThis.fetch = mock(async () => {
+      throw new Error('offline');
+    }) as typeof fetch;
+
+    enqueue(wire('error'));
+    enqueue(wire('error'));
+    await flush();
+    expect(__peekDropped()).toBe(2);
+
+    // And the number rides the next envelope that does get through,
+    // then resets so the same loss is not reported twice.
+    let seenBody: { droppedEvents?: number } = {};
+    globalThis.fetch = mock(async (_url: unknown, init?: RequestInit) => {
+      seenBody = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({ accepted: 1, outcomes: [] }), { status: 200 });
+    }) as typeof fetch;
+    enqueue(wire('error'));
+    await flush();
+    expect(seenBody.droppedEvents).toBe(2);
+    expect(__peekDropped()).toBe(0);
+  });
+
   it('piggybacks assert stats on the envelope and clears them', async () => {
     let seenBody: { assertStats?: unknown[] } = {};
     globalThis.fetch = mock(async (_url: unknown, init?: RequestInit) => {

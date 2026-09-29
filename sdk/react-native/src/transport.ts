@@ -18,17 +18,31 @@ const BATCH_SIZE = 10;
 const MAX_RETRY = 3;
 const STORAGE_KEY = '@sentori/pending';
 const MAX_PERSISTED = 1000;
+// The native transports have capped the in-memory queue at 500 since
+// they were written; this one had no bound at all.
+const MAX_QUEUED = 500;
 
 // Pinned to package.json by a test — bump both together.
 const SDK_VERSION = '7.0.1';
 
 let _queue: WireEvent[] = [];
+let _dropped = 0;
+
+/** Count a loss. Silence here is what makes a dropped event
+ *  indistinguishable from an idle client. */
+const countDropped = (n: number): void => {
+  if (n > 0) _dropped += n;
+};
 let _assertStats = new Map<string, AssertStat>();
 let _flushTimer: ReturnType<typeof setTimeout> | null = null;
 let _started = false;
 
 export const enqueue = (event: WireEvent): void => {
   _queue.push(event);
+  if (_queue.length > MAX_QUEUED) {
+    countDropped(_queue.length - MAX_QUEUED);
+    _queue = _queue.slice(-MAX_QUEUED);
+  }
   if (_queue.length >= BATCH_SIZE) {
     void flush();
   } else if (!_flushTimer) {
@@ -78,7 +92,14 @@ export const flush = async (): Promise<void> => {
   }
   if (events.length === 0 && stats.length === 0) return;
 
+  // Taken and reset as the envelope is built, which is what the two
+  // native transports do: a count riding a batch that never arrives is
+  // lost with it, and carrying it forward would report it twice.
+  const lost = _dropped;
+  _dropped = 0;
+
   const envelope: BatchEnvelope = { events };
+  if (lost > 0) envelope.droppedEvents = lost;
   if (stats.length > 0) envelope.assertStats = stats;
   if (config.backendHealthUrl) envelope.backendHealthUrl = config.backendHealthUrl;
 
@@ -181,8 +202,24 @@ const sendOnce = async (
   if (resp.status >= 500) {
     throw new Error(`server-${resp.status}`);
   }
-  // 4xx other than 429 = client error; per-item outcomes are the
-  // server's business — drop silently rather than crashloop.
+
+  // A batch answers 200 with one outcome per event, and a rejected
+  // event carries `error` there rather than in the status. Reading only
+  // the status is how an event the server refused counted as delivered:
+  // retrying it would crashloop — `invalid_payload` is permanent — but
+  // not counting it made a refusal look like a quiet minute. It matters
+  // most where the two halves drift apart: a self-hosted server that has
+  // not been upgraded refuses a platform value its SDK already sends,
+  // and every event goes missing with nothing saying so.
+  try {
+    const body = (await resp.json()) as { outcomes?: { error?: string }[] };
+    const refused = (body.outcomes ?? []).filter((o) => o && o.error).length;
+    countDropped(refused);
+  } catch {
+    // A 2xx we cannot parse tells us nothing about the items; the
+    // events are gone either way and guessing a number would be worse
+    // than the gap.
+  }
 };
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -215,14 +252,19 @@ const getAsyncStorage = async (): Promise<AsyncStorageLike | null> => {
 const persist = async (events: WireEvent[]): Promise<void> => {
   if (events.length === 0) return;
   const AsyncStorage = await getAsyncStorage();
-  if (!AsyncStorage) return;
+  // No storage linked means this batch ends here. It used to end here
+  // silently, so a host without the optional peer dependency lost
+  // every failed batch and nothing said so.
+  if (!AsyncStorage) return countDropped(events.length);
   try {
     const existing = await AsyncStorage.getItem(STORAGE_KEY);
     const prev: WireEvent[] = existing ? JSON.parse(existing) : [];
-    const merged = [...prev, ...events].slice(-MAX_PERSISTED);
+    const all = [...prev, ...events];
+    const merged = all.slice(-MAX_PERSISTED);
+    countDropped(all.length - merged.length);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
   } catch {
-    // best-effort
+    countDropped(events.length);
   }
 };
 
@@ -301,6 +343,7 @@ export const uploadAttachment = async (
 
 export const __resetForTests = (): void => {
   _queue = [];
+  _dropped = 0;
   _assertStats = new Map();
   if (_flushTimer) clearTimeout(_flushTimer);
   _flushTimer = null;
@@ -308,5 +351,6 @@ export const __resetForTests = (): void => {
 };
 
 export const __peekQueue = (): readonly WireEvent[] => _queue;
+export const __peekDropped = (): number => _dropped;
 export const __sdkVersion = (): string => SDK_VERSION;
 export const __peekAssertStats = (): readonly AssertStat[] => [..._assertStats.values()];
