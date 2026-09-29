@@ -202,8 +202,24 @@ const sendOnce = async (
   if (resp.status >= 500) {
     throw new Error(`server-${resp.status}`);
   }
-  // 4xx other than 429 = client error; per-item outcomes are the
-  // server's business — drop silently rather than crashloop.
+
+  // A batch answers 200 with one outcome per event, and a rejected
+  // event carries `error` there rather than in the status. Reading only
+  // the status is how an event the server refused counted as delivered:
+  // retrying it would crashloop — `invalid_payload` is permanent — but
+  // not counting it made a refusal look like a quiet minute. It matters
+  // most where the two halves drift apart: a self-hosted server that has
+  // not been upgraded refuses a platform value its SDK already sends,
+  // and every event goes missing with nothing saying so.
+  try {
+    const body = (await resp.json()) as { outcomes?: { error?: string }[] };
+    const refused = (body.outcomes ?? []).filter((o) => o && o.error).length;
+    countDropped(refused);
+  } catch {
+    // A 2xx we cannot parse tells us nothing about the items; the
+    // events are gone either way and guessing a number would be worse
+    // than the gap.
+  }
 };
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
