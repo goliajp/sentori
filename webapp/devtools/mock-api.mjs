@@ -951,6 +951,43 @@ const SUFFIX = [
       ],
     }),
   ],
+  // Crash-free rate. Mocked with a real shape rather than left out:
+  // an unmocked path answered something the card did not expect and
+  // `toFixed` took the whole page white, which is exactly what this
+  // sweep exists to catch.
+  [
+    /\/sessions\/crash-free/,
+    () => ({
+      windowHours: 24,
+      sessions: 1240,
+      crashedSessions: 7,
+      crashFreeSessions: 99.44,
+      releases: [
+        {
+          release: 'myapp@1.4.0+220',
+          platform: 'ios',
+          sessions: 900,
+          crashedSessions: 3,
+          crashFreeSessions: 99.67,
+          users: 410,
+          crashedUsers: 3,
+          crashFreeUsers: 99.27,
+          lastAt: new Date().toISOString(),
+        },
+        {
+          release: 'myapp@1.4.0+220',
+          platform: 'android',
+          sessions: 340,
+          crashedSessions: 4,
+          crashFreeSessions: 98.82,
+          users: 160,
+          crashedUsers: 4,
+          crashFreeUsers: 97.5,
+          lastAt: new Date().toISOString(),
+        },
+      ],
+    }),
+  ],
   [/\/issues\/[^/]+\/events$/, () => ({ events: occurrences })],
   [
     /\/issues\/[^/]+$/,

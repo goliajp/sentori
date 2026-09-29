@@ -631,7 +631,13 @@ function CrashFreeCard({ projectId }: { projectId: string }) {
   const { data } = useAsyncData(() => api.crashFree({ projectId, hours: 24 }), [projectId]);
   if (!data) return null;
 
-  const pct = data.crashFreeSessions;
+  // `typeof`, not `=== null`. This is a trust boundary: the number
+  // arrives over HTTP, and a response without the field made
+  // `pct.toFixed` throw and took the whole page white. The real
+  // server answers a number or null; anything in between must render
+  // as unknown rather than as a crash.
+  const pct = typeof data.crashFreeSessions === 'number' ? data.crashFreeSessions : null;
+  const releases = Array.isArray(data.releases) ? data.releases : [];
   return (
     <div className="w-full max-w-xl rounded-lg border border-border bg-surface p-5">
       <div className="flex items-baseline justify-between">
@@ -639,7 +645,7 @@ function CrashFreeCard({ projectId }: { projectId: string }) {
           {t('crashFree.title')}
         </h2>
         <span className="text-xs text-fg-subtle">
-          {t('crashFree.window', { hours: String(data.windowHours) })}
+          {t('crashFree.window', { hours: String(data.windowHours ?? 24) })}
         </span>
       </div>
 
@@ -651,12 +657,18 @@ function CrashFreeCard({ projectId }: { projectId: string }) {
             {pct.toFixed(2)}
             <span className="ml-1 text-xl text-fg-muted">%</span>
           </p>
+          {/* Said in words. A bare "1 / 10" makes the reader guess
+              which number is which, and this dashboard has been
+              caught doing that elsewhere. */}
           <p className="mt-1 text-xs text-fg-subtle tabular-nums">
-            {data.crashedSessions} / {data.sessions}
+            {t('crashFree.counts', {
+              crashed: String(data.crashedSessions ?? 0),
+              total: String(data.sessions ?? 0),
+            })}
           </p>
-          {data.releases.length > 0 && (
+          {releases.length > 0 && (
             <ul className="mt-4 space-y-1 border-t border-border pt-3">
-              {data.releases.slice(0, 5).map((r) => (
+              {releases.slice(0, 5).map((r) => (
                 <li
                   key={`${r.release}:${r.platform}`}
                   className="flex items-baseline gap-3 text-xs"
@@ -666,7 +678,9 @@ function CrashFreeCard({ projectId }: { projectId: string }) {
                   </span>
                   <span className="shrink-0 text-fg-subtle">{platformLabel(r.platform, t)}</span>
                   <span className="w-16 shrink-0 text-right tabular-nums text-fg">
-                    {r.crashFreeSessions === null ? '—' : `${r.crashFreeSessions.toFixed(2)}%`}
+                    {typeof r.crashFreeSessions === 'number'
+                      ? `${r.crashFreeSessions.toFixed(2)}%`
+                      : '—'}
                   </span>
                 </li>
               ))}
