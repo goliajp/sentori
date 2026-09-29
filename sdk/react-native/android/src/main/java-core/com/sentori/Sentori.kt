@@ -61,11 +61,24 @@ object Sentori {
             )
             SentoriCrashHandler.register(context)
 
+            // Foreground / background / memory pressure into the
+            // signal ring, and a flush on the way out.
+            SentoriLifecycle.register(context)
+
             // The crash that killed the last launch. Until now the
             // handler wrote files into a directory nothing emptied —
             // a crash reporter that captured crashes and never sent
             // one.
             SentoriPendingCrash.ship()
+
+            // Why the last process died, from the system rather than
+            // inferred. On API 30+ this is the same record Play
+            // Console reports on, so an ANR count of ours and theirs
+            // cannot disagree. The watchdog stays for older devices.
+            SentoriExitInfo.collect(context)
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) {
+                SentoriAnrWatchdog.start(context)
+            }
         }
     }
 
