@@ -189,12 +189,63 @@ TOP="$(curl -fsS -b "$JAR" "${BASE}/admin/api/events/${STACK_ID}" \
 [[ "$TOP" == "src/cart/total.ts" ]] \
     || { echo "the top frame came back as '${TOP}'" >&2; exit 1; }
 
+echo "→ an issue two people hit outranks one that only one person hit"
+# The inbox has always ordered by `users_count DESC` — but every event
+# this suite sent was anonymous, so every count was 0 and the last
+# tiebreak (recency) decided the whole list. A reviewer read that as
+# "this product sorts by time, not by pain" and was reading the
+# fixture, not the product.
+#
+# Two people on one fingerprint, one person on another, and the
+# ordering has something to work with.
+for U in alice bob; do
+    curl -fsS -X POST "${BASE}/v1/events" -H "Authorization: Bearer ${TOKEN}" \
+        -H 'content-type: application/json' \
+        -d "{\"kind\":\"error\",\"occurredAt\":\"${SESSION_AT:-2026-08-10T06:00:00Z}\",
+ \"platform\":\"ios\",\"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",
+ \"userKey\":\"$(printf '%s' "$U" | shasum -a 256 2>/dev/null | cut -c1-32 || echo "${U}00000000000000000000000000")\",
+ \"payload\":{\"error\":{\"type\":\"PaymentDeclined\",\"message\":\"card refused at checkout\",
+   \"stack\":[{\"file\":\"src/pay/charge.ts\",\"function\":\"charge\",\"line\":91,\"column\":7,\"inApp\":true}]}}}" \
+        > /dev/null
+done
+curl -fsS -X POST "${BASE}/v1/events" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -d "{\"kind\":\"error\",\"occurredAt\":\"${SESSION_AT:-2026-08-10T06:00:00Z}\",
+ \"platform\":\"ios\",\"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",
+ \"userKey\":\"cccccccccccccccccccccccccccccccc\",
+ \"payload\":{\"error\":{\"type\":\"ReceiptMissing\",\"message\":\"no receipt for order\",
+   \"stack\":[{\"file\":\"src/pay/receipt.ts\",\"function\":\"fetchReceipt\",\"line\":12,\"column\":3,\"inApp\":true}]}}}" \
+    > /dev/null
+
+LIST="$(curl -fsS -b "$JAR" "${BASE}/admin/api/issues?projectId=${PROJECT_ID}")"
+TWO="$(echo "$LIST" | jq -r '[.issues[] | select(.title == "PaymentDeclined")][0].usersCount')"
+ONE="$(echo "$LIST" | jq -r '[.issues[] | select(.title == "ReceiptMissing")][0].usersCount')"
+[[ "$TWO" == "2" ]] \
+    || { echo "two people hit PaymentDeclined and usersCount reads ${TWO}" >&2; exit 1; }
+[[ "$ONE" == "1" ]] \
+    || { echo "one person hit ReceiptMissing and usersCount reads ${ONE}" >&2; exit 1; }
+# And the ordering uses it. Without this the count could be right and
+# the list still sorted by something else — and this check
+# discriminates by construction: ReceiptMissing is sent *after* the
+# two-user issue, so an inbox falling back to recency would put it
+# first and fail here.
+P_AT="$(echo "$LIST" | jq -r '[.issues[] | .title] | index("PaymentDeclined")')"
+R_AT="$(echo "$LIST" | jq -r '[.issues[] | .title] | index("ReceiptMissing")')"
+[[ -n "$P_AT" && -n "$R_AT" && "$P_AT" -lt "$R_AT" ]] \
+    || { echo "the 2-user issue is at ${P_AT} and the 1-user issue at ${R_AT} — " \
+              "the inbox is not ordering by how many people it hit" >&2; exit 1; }
+
 echo "→ sessions give the errors a denominator"
 # The product counted what went wrong and nothing counted what went
 # right, so "18 errors" had nothing to divide by and the first number
 # a mobile team is asked for could not be computed. Ten sessions, one
 # of them crashed, is 90% — and sending the batch twice must still be
 # 90%, because a resend after a lost response carries the same ids.
+# The same release the events use, not one invented here: a
+# crash-free card naming a release the rest of the dashboard has never
+# heard of reads as two pages disagreeing, and a reviewer stopped on
+# exactly that.
+#
 # Stamped near now, not at the fixture date the other events use: the
 # crash-free query is windowed, and a session two months old is
 # correctly outside it. The first version of this block used
@@ -207,7 +258,7 @@ for i in 0 1 2 3 4 5 6 7 8 9; do
     [ "$i" = "0" ] && STATUS=crashed
     [ "$i" = "0" ] || SESSIONS="${SESSIONS},"
     SESSIONS="${SESSIONS}{\"id\":\"019fe900-0000-7000-8000-00000000cf0${i}\",
-      \"status\":\"${STATUS}\",\"release\":\"cf@1.0.0+1\",\"environment\":\"test\",
+      \"status\":\"${STATUS}\",\"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",
       \"platform\":\"ios\",\"startedAt\":\"${SESSION_AT}\",
       \"durationMs\":12000,\"userId\":\"u${i}\"}"
 done
@@ -232,10 +283,10 @@ RATE_OK="$(echo "$CF" | jq -r '.crashFreeSessions == 90')"
     || { echo "crash-free rate is not 90: $CF" >&2; exit 1; }
 # Per release, because the question is never "are we healthy" but
 # "is Tuesday's build worse than Monday's".
-BYREL="$(echo "$CF" | jq -r '[.releases[] | select(.release == "cf@1.0.0+1")] | length')"
+BYREL="$(echo "$CF" | jq -r '[.releases[] | select(.release == "e2e@1.0.0+1")] | length')"
 [[ "$BYREL" == "1" ]] \
-    || { echo "the release breakdown does not carry cf@1.0.0+1: $CF" >&2; exit 1; }
-[[ "$(echo "$CF" | jq -r '.releases[] | select(.release=="cf@1.0.0+1") | .crashFreeUsers == 90')" == "true" ]] \
+    || { echo "the release breakdown does not carry e2e@1.0.0+1: $CF" >&2; exit 1; }
+[[ "$(echo "$CF" | jq -r '.releases[] | select(.release=="e2e@1.0.0+1") | .crashFreeUsers == 90')" == "true" ]] \
     || { echo "crash-free users is not 90: $CF" >&2; exit 1; }
 
 echo "→ a platform this build does not know is kept, not refused"
