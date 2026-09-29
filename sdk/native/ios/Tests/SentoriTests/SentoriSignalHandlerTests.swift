@@ -6,6 +6,8 @@ import XCTest
 /// A C handler needs a C-visible place to record that it ran; a
 /// closure that captures cannot be one.
 private var hostHandlerCalls = 0
+private var hostHandlerSawInfo = false
+private var hostHandlerSawSignal: Int32 = 0
 
 final class SentoriSignalHandlerTests: XCTestCase {
     private var dir: URL!
@@ -17,6 +19,8 @@ final class SentoriSignalHandlerTests: XCTestCase {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         SentoriSignalHandler.__resetForTests()
         hostHandlerCalls = 0
+        hostHandlerSawInfo = false
+        hostHandlerSawSignal = 0
     }
 
     override func tearDown() {
@@ -196,6 +200,40 @@ final class SentoriSignalHandlerTests: XCTestCase {
         SentoriSignalHandler.__installForTests(SIGUSR2, pendingDirectory: dir)
         SentoriSignalHandler.callPrevious(SIGUSR2)
         XCTAssertEqual(hostHandlerCalls, 1)
+
+        signal(SIGUSR2, SIG_DFL)
+    }
+
+    func testTheHostsHandlerGetsTheRealSiginfo() {
+        // Every serious crash reporter installs an SA_SIGINFO handler
+        // and reads the `siginfo_t` — `si_addr` is the faulting
+        // address, which is most of what a segfault report is. This
+        // passed `nil` until it was caught, which is a null
+        // dereference inside the customer's crash handler, during a
+        // crash: their reporter would die where it was meant to
+        // record, and the only symptom would be crashes quietly
+        // ceasing to be reported after they installed us.
+        var host = sigaction()
+        host.__sigaction_u.__sa_sigaction = { number, info, _ in
+            hostHandlerSawSignal = number
+            hostHandlerSawInfo = info != nil
+        }
+        sigemptyset(&host.sa_mask)
+        host.sa_flags = SA_SIGINFO
+        sigaction(SIGUSR2, &host, nil)
+
+        SentoriSignalHandler.__installForTests(SIGUSR2, pendingDirectory: dir)
+
+        var info = siginfo_t()
+        info.si_signo = SIGUSR2
+        withUnsafeMutablePointer(to: &info) { pointer in
+            SentoriSignalHandler.callPrevious(SIGUSR2, pointer, nil)
+        }
+        XCTAssertEqual(hostHandlerSawSignal, SIGUSR2)
+        XCTAssertTrue(
+            hostHandlerSawInfo,
+            "the host's SA_SIGINFO handler was handed a nil siginfo_t"
+        )
 
         signal(SIGUSR2, SIG_DFL)
     }
