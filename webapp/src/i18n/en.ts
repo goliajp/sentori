@@ -371,6 +371,7 @@ export const en = {
   'push.noUser': 'not identified',
   'push.noUserHint': 'Registered before sentori.user() ran. Receives broadcasts; not addressable from an issue.',
   'push.user': 'User',
+  'platform.unknown': 'Unknown (SDK newer than this server)',
   'releases.artifactBroken':
     'A {platform} artifact was uploaded and cannot be read — expand for which.',
   'releases.artifactMissing':

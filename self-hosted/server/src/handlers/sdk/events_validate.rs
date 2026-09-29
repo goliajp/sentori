@@ -124,17 +124,17 @@ pub async fn handle(
     super::events::scrub_nuls(&mut probe);
     let scrubbed = probe != wire.payload;
 
-    if !VALID_PLATFORMS.contains(&wire.platform.as_str()) {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({
-                "ok": false,
-                "error": "invalid_payload",
-                "detail": "platform must be javascript|ios|android",
-                "field": "platform",
-            })),
-        );
-    }
+    // Ingest no longer refuses a platform it does not know — it stores
+    // the event under `unknown` — so the validator must not answer 400
+    // for one. It says instead that the value will change, the same
+    // way it does for a scrubbed NUL: a caller comparing what it sent
+    // with what came back needs to see the substitution.
+    let platform_degraded = !VALID_PLATFORMS.contains(&wire.platform.as_str());
+    let platform = if platform_degraded {
+        super::events::UNKNOWN_PLATFORM
+    } else {
+        wire.platform.as_str()
+    };
 
     // Echo what was understood, so a caller can see that a field it
     // thought it sent was in fact dropped as unknown.
@@ -145,7 +145,7 @@ pub async fn handle(
             "parsed": {
                 "kind": wire.kind.as_db_str(),
                 "occurredAt": crate::wire_time::rfc3339(wire.occurred_at),
-                "platform": wire.platform,
+                "platform": platform,
                 "release": wire.release,
                 "environment": wire.environment,
                 "hasPayload": !wire.payload.is_null()
@@ -153,6 +153,7 @@ pub async fn handle(
             },
             "ignored": ignored,
             "nulScrubbed": scrubbed,
+            "platformDegraded": platform_degraded,
             "note": if ignored.is_empty() {
                 "parsed only — no token was checked and nothing was stored"
             } else {

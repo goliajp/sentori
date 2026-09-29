@@ -364,6 +364,7 @@ export const ja: Messages = {
   'push.noUser': '未識別',
   'push.noUserHint': 'sentori.user() 実行前に登録。ブロードキャストのみ受信、issue からの指定は不可。',
   'push.user': 'ユーザー',
+  'platform.unknown': '不明（SDK がサーバーより新しい）',
   'releases.artifactBroken': '{platform} にアップロード済みだが読めない成果物あり。展開して確認。',
   'releases.artifactMissing':
     '{platform} はこのリリースでイベントを送っていますが、シンボリケーション用アーティファクトがありません — スタックを読めません',

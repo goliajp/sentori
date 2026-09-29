@@ -10,7 +10,7 @@
 //!   "id": "0198...",            // client-minted UUIDv7 (optional)
 //!   "kind": "error",            // error|warn|trace|assert|probe
 //!   "occurredAt": "2026-07-31T…Z",
-//!   "platform": "javascript",   // javascript|ios|android
+//!   "platform": "javascript",   // javascript|ios|android|web|weapp
 //!   "release": "app@1.2.3+45",
 //!   "environment": "prod",
 //!   "name": "pay.gateway-retry",// warn/trace/assert name, probe ref
@@ -59,10 +59,19 @@ pub struct WireEvent {
     pub payload: Value,
 }
 
-/// Public so the unauthenticated validator checks the same list. Two
-/// copies of this would let `/v1/events/validate` certify a platform
-/// ingest rejects, which is worse than having no validator.
-pub const VALID_PLATFORMS: [&str; 3] = ["javascript", "ios", "android"];
+/// Public so the unauthenticated validator reports the same outcome.
+/// Two copies of this would let `/v1/events/validate` disagree with
+/// what ingest does, which is worse than having no validator.
+pub const VALID_PLATFORMS: [&str; 5] = ["javascript", "ios", "android", "web", "weapp"];
+
+/// Where a platform we do not recognise is stored.
+///
+/// Refusing it instead would mean an SDK newer than its server loses
+/// every event it sends, and the loss hides inside a 200 from the
+/// batch endpoint. Keeping the unrecognised string would be worse:
+/// platform is part of the issue fingerprint, so one typo splits a
+/// case in two forever. A fixed value costs neither end anything.
+pub const UNKNOWN_PLATFORM: &str = "unknown";
 
 /// Replace NUL bytes throughout a JSON value, keys included.
 ///
@@ -96,7 +105,9 @@ pub async fn prepare(
     mut w: WireEvent,
 ) -> Result<IncomingEvent, &'static str> {
     if !VALID_PLATFORMS.contains(&w.platform.as_str()) {
-        return Err("platform must be javascript|ios|android");
+        state.ingest_counters.unknown_platform();
+        tracing::info!(platform = %w.platform, "unrecognised platform, stored as unknown");
+        w.platform = UNKNOWN_PLATFORM.to_string();
     }
 
     // Postgres cannot store a NUL in `text` or `jsonb`, so one

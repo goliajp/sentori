@@ -54,6 +54,15 @@ export { shouldSample, shouldSampleTrace } from './sampling.js'
 
 export { uuidV7 } from './uuid.js'
 
+export {
+  __resetPlatformDegradeForTests,
+  degradePlatform,
+  PLATFORM_FALLBACK,
+  platformOrFallback,
+  refusalIsAboutPlatform,
+  type Outcome,
+} from './platform-degrade.js'
+
 export { safeAsync, safeFn } from './safe.js'
 
 export {

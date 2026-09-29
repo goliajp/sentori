@@ -50,10 +50,13 @@
           },
           "platform": {
             "type": "string",
+            "description": "A value outside this list is stored as `unknown` rather than refused, so an SDK newer than its server still delivers.",
             "enum": [
               "javascript",
               "ios",
-              "android"
+              "android",
+              "web",
+              "weapp"
             ]
           },
           "release": {

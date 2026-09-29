@@ -18,6 +18,7 @@ import { KindBadge, RegressedBadge } from '../components/kind';
 import { UserChip } from '../components/identity';
 import { Button, Input, Panel, PanelEmpty, TimeAgo, clsx, formatRelative, formatRelease, formatReleaseIn } from '../components/ui';
 import { useT } from '../i18n';
+import { platformLabel } from '../lib/platform-label';
 import {
   api,
   type EventDetail,
@@ -332,7 +333,7 @@ export function IssueDetailPane({
                 .join(' · ')}
             </span>
           )}
-          <span>{issue.platform ?? current?.platform}</span>
+          <span>{platformLabel(issue.platform ?? current?.platform, t)}</span>
           <span>{issue.environment ?? current?.environment}</span>
         </div>
       </header>
@@ -632,6 +633,7 @@ function OccurrenceList({
   currentId: null | string;
   onPick: (id: string) => void;
 }) {
+  const t = useT();
   const distinct = (get: (r: OccurrenceRow) => string) =>
     new Set(rows.map(get)).size > 1;
   const varies = {
@@ -670,7 +672,7 @@ function OccurrenceList({
           >
             <TimeAgo iso={r.receivedAt} />
           </span>
-          <span className={dim(varies.platform)}>{r.platform}</span>
+          <span className={dim(varies.platform)}>{platformLabel(r.platform, t)}</span>
           <span
             className={clsx('min-w-0 truncate font-mono text-xs', dim(varies.release))}
             title={r.release}

@@ -78,6 +78,20 @@ const PROBES = [
     why: 'two binaries meaning different things by now()',
   },
   {
+    gate: 'check-wire-contracts.mjs',
+    file: 'self-hosted/server/src/handlers/sdk/events.rs',
+    find: '"javascript", "ios", "android", "web", "weapp"',
+    replace: '"javascript", "ios", "android", "weapp"',
+    why: 'a runtime the SDK names and the server files under unknown',
+  },
+  {
+    gate: 'check-privacy-manifest.mjs',
+    file: 'sdk/native/ios/Sources/Sentori/PrivacyInfo.xcprivacy',
+    find: 'NSPrivacyAccessedAPICategoryUserDefaults',
+    replace: 'NSPrivacyAccessedAPICategoryUserDefaultsTypo',
+    why: 'a required-reason API the manifest does not declare',
+  },
+  {
     gate: 'check-error-status.mjs',
     file: 'self-hosted/server/src/handlers/notify_admin.rs',
     find: 'pub async fn smtp_status(State(state): State<Arc<AppState>>) -> Json<Value> {',

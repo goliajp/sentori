@@ -93,10 +93,43 @@ struct Candidate {
     map: Arc<ParsedMap>,
 }
 
-/// `index.android.bundle` out of `http://10.0.2.2:8081/index.android.bundle?platform=android`.
-fn bundle_basename(file: &str) -> &str {
+/// The path part of whatever a frame or an artifact calls itself —
+/// `index.android.bundle` out of
+/// `http://10.0.2.2:8081/index.android.bundle?platform=android`:
+/// query and fragment gone, scheme and host gone, `./` gone, and the
+/// `.map` suffix an artifact usually carries gone too, so a frame's
+/// name and its map's name can be compared segment by segment.
+fn comparable_path(file: &str) -> &str {
     let no_query = file.split(['?', '#']).next().unwrap_or(file);
-    no_query.rsplit('/').next().unwrap_or(no_query)
+    let no_scheme = match no_query.find("://") {
+        Some(i) => no_query[i + 3..]
+            .split_once('/')
+            .map_or("", |(_, rest)| rest),
+        None => no_query,
+    };
+    let trimmed = no_scheme.trim_start_matches("./").trim_start_matches('/');
+    trimmed.strip_suffix(".map").unwrap_or(trimmed)
+}
+
+/// How many trailing path segments two names share.
+///
+/// `pages/cart/index.js` against `dist/pages/cart/index.js` is 3;
+/// against `dist/pages/home/index.js` it is 1. That difference is the
+/// whole point: a WeChat mini program names every page's entry
+/// `index.js`, so a basename is not an identifier there, and matching
+/// on one picks a map that resolves to a plausible line in the wrong
+/// file — which is worse than not resolving, because nothing about
+/// the result says it is wrong.
+fn shared_suffix_segments(left: &str, right: &str) -> usize {
+    let mut from_left = left.rsplit('/');
+    let mut from_right = right.rsplit('/');
+    let mut shared = 0;
+    loop {
+        match (from_left.next(), from_right.next()) {
+            (Some(l), Some(r)) if l == r && !l.is_empty() => shared += 1,
+            _ => return shared,
+        }
+    }
 }
 
 /// Candidates for a frame, best first.
@@ -109,22 +142,28 @@ fn bundle_basename(file: &str) -> &str {
 /// stayed `index.android.bundle:1:289430`, with a matching map
 /// sitting in the same release.
 ///
-/// Name match first — the artifact is usually uploaded under the
-/// bundle's own filename — then the rest by recency, because names
-/// are a convention and not a contract. A map that cannot resolve a
-/// frame simply reports nothing, so trying the next one is safe;
-/// what is not safe is trying only one and calling the result "no
-/// map covers this".
+/// Ranked by how much of the path the two names share, deepest first,
+/// then by recency for everything that shares nothing — names are a
+/// convention, not a contract, so a map that matches nothing is still
+/// tried. A map that cannot resolve a frame reports nothing, so
+/// trying the next one is safe; what is not safe is trying only one
+/// and calling the result "no map covers this".
+///
+/// The sort is stable, so candidates that score the same keep the
+/// order they arrived in, which is most-recent-first.
 fn ranked<'a>(maps: &'a [Candidate], frame_file: &str) -> Vec<&'a Arc<ParsedMap>> {
-    let want = bundle_basename(frame_file);
-    let matches = |c: &Candidate| {
-        let n = bundle_basename(&c.name);
-        n == want || n.strip_suffix(".map") == Some(want) || want.strip_suffix(".map") == Some(n)
-    };
-    let mut out: Vec<&Arc<ParsedMap>> =
-        maps.iter().filter(|c| matches(c)).map(|c| &c.map).collect();
-    out.extend(maps.iter().filter(|c| !matches(c)).map(|c| &c.map));
-    out
+    let want = comparable_path(frame_file);
+    let mut scored: Vec<(usize, &'a Arc<ParsedMap>)> = maps
+        .iter()
+        .map(|candidate| {
+            (
+                shared_suffix_segments(want, comparable_path(&candidate.name)),
+                &candidate.map,
+            )
+        })
+        .collect();
+    scored.sort_by_key(|(score, _)| std::cmp::Reverse(*score));
+    scored.into_iter().map(|(_, map)| map).collect()
 }
 
 /// Symbolicate an error and every link in its `cause` chain.
@@ -397,6 +436,48 @@ mod tests {
     }
 
     #[test]
+    fn a_page_picks_the_map_from_its_own_directory() {
+        // A WeChat mini program names every page's entry `index.js`,
+        // so a basename identifies nothing there. Matching on one
+        // resolves the frame against another page's map and produces
+        // a plausible line in the wrong file — a wrong answer that
+        // looks exactly like a right one.
+        let maps = vec![
+            Candidate {
+                name: "dist/pages/home/index.js.map".into(),
+                map: Arc::new(empty_map()),
+            },
+            Candidate {
+                name: "dist/pages/cart/index.js.map".into(),
+                map: Arc::new(empty_map()),
+            },
+        ];
+        let order = ranked(&maps, "pages/cart/index.js");
+        assert!(
+            Arc::ptr_eq(order[0], &maps[1].map),
+            "the cart page's map must win over a map with the same basename",
+        );
+        assert_eq!(order.len(), 2, "the other map is still tried");
+    }
+
+    #[test]
+    fn a_served_url_is_compared_as_a_path() {
+        // The frame arrives as a URL and the artifact as a repo path;
+        // the shared part is what identifies them.
+        assert_eq!(
+            comparable_path("https://cdn.example.com/a/b/c.js?v=2"),
+            "a/b/c.js"
+        );
+        assert_eq!(comparable_path("./dist/app.js.map"), "dist/app.js");
+        assert_eq!(shared_suffix_segments("a/b/c.js", "x/a/b/c.js"), 3);
+        assert_eq!(
+            shared_suffix_segments("pages/cart/index.js", "pages/home/index.js"),
+            1
+        );
+        assert_eq!(shared_suffix_segments("a.js", "b.js"), 0);
+    }
+
+    #[test]
     fn a_frame_that_stops_resolving_gets_its_minified_position_back() {
         // The repair path. A frame carrying a resolution the resolver
         // would no longer make must not keep the coordinates from it:
@@ -424,10 +505,10 @@ mod tests {
         // Metro serves the bundle over http with a query string; the
         // artifact is uploaded under the plain filename.
         assert_eq!(
-            bundle_basename("http://10.0.2.2:8081/index.android.bundle?platform=android&dev=false"),
+            comparable_path("http://10.0.2.2:8081/index.android.bundle?platform=android&dev=false"),
             "index.android.bundle",
         );
-        assert_eq!(bundle_basename("main.jsbundle"), "main.jsbundle");
+        assert_eq!(comparable_path("main.jsbundle"), "main.jsbundle");
     }
 
     #[test]

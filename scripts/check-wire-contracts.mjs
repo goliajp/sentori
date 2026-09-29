@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 const TYPES = 'sdk/core/src/types.ts';
 const PIPELINE = 'self-hosted/server/src/pipeline.rs';
 const ATTACHMENTS = 'self-hosted/server/src/handlers/sdk/events_attachments.rs';
+const INGEST = 'self-hosted/server/src/handlers/sdk/events.rs';
 const SWIFT_ATT = 'sdk/native/ios/Sources/Sentori/SentoriAttachment.swift';
 const KOTLIN_ATT = 'sdk/native/android/src/main/java/com/sentori/SentoriAttachment.kt';
 
@@ -38,7 +39,7 @@ function rustEnum(src, name) {
 
 /** `const KINDS: [&str; N] = ["a", "b"];` */
 function rustStrArray(src, name) {
-  const m = new RegExp(`const ${name}: \\[&str; \\d+\\] = \\[([^\\]]*)\\]`, 's').exec(src);
+  const m = new RegExp(`(?:pub )?const ${name}: \\[&str; \\d+\\] = \\[([^\\]]*)\\]`, 's').exec(src);
   if (!m) return null;
   const values = [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
   return values.length > 0 ? values.sort() : null;
@@ -47,6 +48,7 @@ function rustStrArray(src, name) {
 const types = readFileSync(TYPES, 'utf8');
 const pipeline = readFileSync(PIPELINE, 'utf8');
 const attachments = readFileSync(ATTACHMENTS, 'utf8');
+const ingest = readFileSync(INGEST, 'utf8');
 
 // ── the five kinds: both directions matter ────────────────────────
 // An event kind the server does not know is rejected at ingest; one
@@ -130,6 +132,49 @@ for (const [label, path] of [
   }
 }
 
+// ── platforms: equality, both directions matter ───────────────
+//
+// Platform is part of the issue fingerprint, so it is not a label the
+// two sides can drift on quietly. A value the SDK can name and the
+// server cannot is no longer a 400 — it is stored as `unknown`, which
+// means every platform the mismatch touches collapses into one issue
+// and nothing says so except a counter. A value the server knows and
+// no SDK can name is a runtime nobody can report from.
+//
+// `unknown` is not in either list on purpose: it is where the server
+// puts what it does not recognise, never something an SDK sends.
+const platforms = tsUnion(types, 'Platform');
+const serverPlatforms = rustStrArray(ingest, 'VALID_PLATFORMS');
+if (!platforms || !serverPlatforms) {
+  problems.push(
+    `could not read Platform (${TYPES}) or VALID_PLATFORMS (${INGEST}) — ` +
+      'one of them moved or changed shape. A checker that parses nothing must not pass.',
+  );
+} else {
+  if (serverPlatforms.includes('unknown')) {
+    problems.push(
+      `${INGEST} VALID_PLATFORMS lists 'unknown' — that is the value the server ` +
+        'substitutes for what it does not recognise, so listing it as acceptable ' +
+        'input lets a client pin every event to the collapsed bucket on purpose',
+    );
+  }
+  for (const p of platforms) {
+    if (!serverPlatforms.includes(p)) {
+      problems.push(
+        `Platform has '${p}'; ${INGEST} VALID_PLATFORMS does not — events from ` +
+          "that runtime are stored as 'unknown' and share one fingerprint bucket",
+      );
+    }
+  }
+  for (const p of serverPlatforms) {
+    if (!platforms.includes(p)) {
+      problems.push(
+        `VALID_PLATFORMS has '${p}'; ${TYPES} Platform does not — no SDK can name it`,
+      );
+    }
+  }
+}
+
 // ── attachment sources ────────────────────────────────────────────
 const sources = tsUnion(types, 'AttachmentSource');
 const serverSources = rustStrArray(attachments, 'SOURCES');
@@ -144,7 +189,7 @@ if (sources && serverSources) {
 if (problems.length === 0) {
   console.log(
     `✓ wire contracts agree: ${eventKinds.length} event kinds, ` +
-      `${attachmentKinds.length} attachment kinds`,
+      `${attachmentKinds.length} attachment kinds, ${platforms.length} platforms`,
   );
   process.exit(0);
 }

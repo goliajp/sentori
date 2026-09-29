@@ -6,7 +6,7 @@
 // message levels and the capture* vocabulary are gone with the
 // Sentry compatibility they came from.
 
-export type Platform = 'android' | 'ios' | 'javascript'
+export type Platform = 'android' | 'ios' | 'javascript' | 'weapp' | 'web'
 
 /** The five kinds. The union IS the concept model. */
 export type EventKind = 'assert' | 'error' | 'probe' | 'trace' | 'warn'

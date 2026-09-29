@@ -189,6 +189,46 @@ TOP="$(curl -fsS -b "$JAR" "${BASE}/admin/api/events/${STACK_ID}" \
 [[ "$TOP" == "src/cart/total.ts" ]] \
     || { echo "the top frame came back as '${TOP}'" >&2; exit 1; }
 
+echo "→ a platform this build does not know is kept, not refused"
+# An SDK newer than its server used to lose every event it sent: ingest
+# answered 400, and from the batch endpoint the refusal arrives inside
+# a 200 where no client looks. The event is now stored under `unknown`
+# and a counter says it happened — the stored value is fixed on purpose,
+# because platform is part of the fingerprint and an arbitrary string
+# would split one case per typo.
+BEFORE="$(curl -fsS "${BASE}/metrics" | awk '/^sentori_ingest_unknown_platform_total /{print $2}')"
+[[ -n "$BEFORE" ]] \
+    || { echo "/metrics does not carry sentori_ingest_unknown_platform_total" >&2; exit 1; }
+FUTURE_ID="019fe900-0000-7000-8000-0000000e2e10"
+STATUS="$(curl -s -o /tmp/e2e-future.$$ -w '%{http_code}' -X POST "${BASE}/v1/events" \
+    -H "Authorization: Bearer ${TOKEN}" -H 'content-type: application/json' \
+    -d "{\"id\":\"${FUTURE_ID}\",\"kind\":\"error\",
+ \"occurredAt\":\"2026-08-10T06:02:00Z\",\"platform\":\"harmonyos\",
+ \"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",
+ \"payload\":{\"error\":{\"type\":\"Error\",\"message\":\"from a runtime we predate\",\"stack\":[]}}}")"
+FUTURE="$(cat /tmp/e2e-future.$$)"; rm -f /tmp/e2e-future.$$
+[[ "$STATUS" == "202" ]] \
+    || { echo "an unknown platform returned ${STATUS}, want 202: $FUTURE" >&2; exit 1; }
+STORED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/events/${FUTURE_ID}" | jq -r '.platform')"
+[[ "$STORED" == "unknown" ]] \
+    || { echo "stored platform is '${STORED}', want 'unknown'" >&2; exit 1; }
+AFTER="$(curl -fsS "${BASE}/metrics" | awk '/^sentori_ingest_unknown_platform_total /{print $2}')"
+[[ "$AFTER" -gt "$BEFORE" ]] \
+    || { echo "the counter did not move: ${BEFORE} → ${AFTER}" >&2; exit 1; }
+
+echo "→ the two runtimes v4 adds are accepted as themselves"
+for PLAT in web weapp; do
+    RESP="$(curl -fsS -X POST "${BASE}/v1/events" -H "Authorization: Bearer ${TOKEN}" \
+        -H 'content-type: application/json' \
+        -d "{\"kind\":\"error\",\"occurredAt\":\"2026-08-10T06:03:00Z\",
+ \"platform\":\"${PLAT}\",\"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",
+ \"payload\":{\"error\":{\"type\":\"Error\",\"message\":\"${PLAT}\",\"stack\":[]}}}")"
+    EID="$(echo "$RESP" | jq -r '.eventId // .id')"
+    STORED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/events/${EID}" | jq -r '.platform')"
+    [[ "$STORED" == "$PLAT" ]] \
+        || { echo "${PLAT} was stored as '${STORED}' — the CHECK or the allowlist is behind" >&2; exit 1; }
+done
+
 echo "→ resend the same id (lost-response case)"
 STATUS="$(curl -s -o /tmp/e2e-resend.$$ -w '%{http_code}' -X POST "${BASE}/v1/events" \
     -H "Authorization: Bearer ${TOKEN}" -H 'content-type: application/json' \
@@ -1124,19 +1164,24 @@ ACCEPTED="$(ingest_counter accepted)"
 [[ "$ACCEPTED" -gt 0 ]] \
     || { echo "accepted reads 0 after a suite that ingested many events" >&2; exit 1; }
 
-# A rejection has to be visible as a rejection. `platform` is validated
-# in the handler, so this reaches the counter — unlike a body that
-# fails to deserialise, which axum answers 422 before any handler runs
-# and which these counters deliberately cannot see.
+# A rejection has to be visible as a rejection. A `warn` with no name
+# is refused in the handler, so this reaches the counter — unlike a
+# body that fails to deserialise, which axum answers 422 before any
+# handler runs and which these counters deliberately cannot see.
+#
+# This used to send an unknown `platform`, which is no longer a
+# rejection: an SDK ahead of its server would have lost every event,
+# so the value is stored as `unknown` instead and counted separately.
+# That case is asserted where it now belongs, further up.
 REJECTED_BEFORE="$(ingest_counter rejected)"
 REJ_STATUS="$(curl -s -o /dev/null -w '%{http_code}' -X POST "${BASE}/v1/events" \
     -H "Authorization: Bearer ${TOKEN}" -H 'content-type: application/json' \
-    -d '{"id":"019fe900-0000-7000-8000-0000000e2e99","kind":"error",
-         "occurredAt":"2026-08-10T06:00:00Z","platform":"commodore-64",
+    -d '{"id":"019fe900-0000-7000-8000-0000000e2e99","kind":"warn",
+         "occurredAt":"2026-08-10T06:00:00Z","platform":"ios",
          "release":"e2e@1.0.0+1","environment":"test",
-         "payload":{"error":{"type":"E","message":"m","stack":[]}}}')"
+         "payload":{}}')"
 [[ "$REJ_STATUS" == "400" ]] \
-    || { echo "an invalid platform returned ${REJ_STATUS}, want 400" >&2; exit 1; }
+    || { echo "a warn with no name returned ${REJ_STATUS}, want 400" >&2; exit 1; }
 REJECTED_AFTER="$(ingest_counter rejected)"
 [[ "$REJECTED_AFTER" -gt "$REJECTED_BEFORE" ]] \
     || { echo "a 400 did not move rejected (${REJECTED_BEFORE} -> ${REJECTED_AFTER})" >&2; exit 1; }

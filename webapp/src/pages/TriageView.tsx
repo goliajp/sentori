@@ -12,6 +12,7 @@ import { useShell } from '../App';
 import { ImpactCell, KindBadge, kindColor } from '../components/kind';
 import { ErrorBanner, Kbd, SELECT_CLASS, TimeAgo, clsx } from '../components/ui';
 import { useT } from '../i18n';
+import { platformLabel } from '../lib/platform-label';
 import { api, type IssueSummary } from '../lib/api';
 import { issueHeadline } from '../lib/issue-title';
 import { useAsyncData } from '../lib/useAsyncData';
@@ -536,6 +537,7 @@ function QueueRow({
   onToggle: () => void;
   onOpen: () => void;
 }) {
+  const t = useT();
   const surface = issue.surface as { screen?: string; element?: string };
   const where = [surface.screen, surface.element].filter(Boolean).join(' · ');
   // Same demotion the crash view does: a row headed "Error" tells you
@@ -596,7 +598,7 @@ function QueueRow({
         )}
         <span className="ml-auto flex shrink-0 items-baseline gap-2">
           {issue.platform && (
-            <span className="text-xs text-fg-subtle">{issue.platform}</span>
+            <span className="text-xs text-fg-subtle">{platformLabel(issue.platform, t)}</span>
           )}
           <ImpactCell
             users={issue.usersCount}
