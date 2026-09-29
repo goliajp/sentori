@@ -63,8 +63,25 @@ enum SentoriSignalHandler {
         byteCount: Int(SIGSTKSZ), alignment: 16
     )
 
+    /// Where the record and the image map live.
+    ///
+    /// Not the pending directory. `SentoriCrashHandler.consumePending`
+    /// reads and **deletes every `.json`** in there — that is its
+    /// contract, and it is the right one for a directory of crashes
+    /// waiting to be sent. The image map was written into it and was
+    /// deleted on the same launch that wrote it, so the next launch
+    /// had a crash record and nothing to attribute its addresses
+    /// with, and every frame arrived without the image identity a
+    /// dSYM is matched by.
+    static func signalDirectory(besidePending pendingDirectory: URL) -> URL {
+        let dir = pendingDirectory.deletingLastPathComponent().appendingPathComponent("signal")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
     static func register(pendingDirectory: URL) {
         guard !registered else { return }
+        let own = signalDirectory(besidePending: pendingDirectory)
 
         // Written now, while allocating is safe. The addresses in a
         // crash record are absolute addresses in a process that no
@@ -74,9 +91,9 @@ enum SentoriSignalHandler {
         // offset within an image plus that image's UUID — which is
         // exactly what a dSYM is indexed by — and computing it needs
         // the map this process was using when it died.
-        writeImageMap(to: pendingDirectory)
+        writeImageMap(to: own)
 
-        let path = pendingDirectory.appendingPathComponent("signal.sentoricrash").path
+        let path = own.appendingPathComponent("signal.sentoricrash").path
         guard path.utf8.count < 1024 else { return }
         path.withCString { source in
             _ = strlcpy(pathBuffer, source, 1024)
@@ -331,12 +348,13 @@ enum SentoriSignalHandler {
     /// safe. Removing before writing: a record that cannot be turned
     /// into an event must not be retried every launch forever.
     static func drain(pendingDirectory: URL, config: [String: String]) {
-        let url = pendingDirectory.appendingPathComponent("signal.sentoricrash")
+        let own = signalDirectory(besidePending: pendingDirectory)
+        let url = own.appendingPathComponent("signal.sentoricrash")
         guard let data = try? Data(contentsOf: url) else { return }
         try? FileManager.default.removeItem(at: url)
         guard let record = decode(data) else { return }
 
-        let mapURL = pendingDirectory.appendingPathComponent("signal.images.json")
+        let mapURL = own.appendingPathComponent("signal.images.json")
         let images =
             (try? Data(contentsOf: mapURL))
             .flatMap { try? JSONDecoder().decode([LoadedImage].self, from: $0) } ?? []
@@ -433,7 +451,8 @@ enum SentoriSignalHandler {
     /// Install for one signal only, so a test can prove the chaining
     /// without arming the six that would take the test process down.
     static func __installForTests(_ signalNumber: Int32, pendingDirectory: URL) {
-        let path = pendingDirectory.appendingPathComponent("signal.sentoricrash").path
+        let path = signalDirectory(besidePending: pendingDirectory)
+            .appendingPathComponent("signal.sentoricrash").path
         path.withCString { _ = strlcpy(pathBuffer, $0, 1024) }
         var action = sigaction()
         action.__sigaction_u.__sa_sigaction = { number, info, context in
