@@ -67,13 +67,47 @@ final class SentoriStackTests: XCTestCase {
     /// Iron rule, dimension 1: a verb the host calls from a tap
     /// handler may not cost it a frame. Capture is the part that runs
     /// on the caller's thread.
+    ///
+    /// The budget is the project's own single-tick red line, 5 ms,
+    /// and not the 0.04 ms this actually costs on an idle machine.
+    /// A tight bound here measures how busy the runner is: this was
+    /// 0.5 ms and went red in the published mirror's CI at 0.725 ms,
+    /// while the same call takes 0.004 ms locally. Two hundred times
+    /// the headroom is still enough to catch a regression that puts
+    /// real work on this path, which is the only thing worth failing
+    /// for.
     func testCaptureCostsFarLessThanAFrame() {
         let iterations = 1000
         let start = CFAbsoluteTimeGetCurrent()
         for _ in 0..<iterations { _ = SentoriStack.capture(skip: 0) }
         let perCall = (CFAbsoluteTimeGetCurrent() - start) / Double(iterations) * 1000
         print("SentoriStack.capture: \(String(format: "%.4f", perCall)) ms/call")
-        XCTAssertLessThan(perCall, 0.5, "capture costs \(perCall) ms on the calling thread")
+        XCTAssertLessThan(perCall, 5.0, "capture costs \(perCall) ms on the calling thread")
+    }
+
+    /// The design claim, stated as a ratio so it does not depend on
+    /// how fast the machine is: capture is what a verb pays, resolve
+    /// is what the worker pays, and the whole reason they are
+    /// separate is that the second is far more expensive. If they
+    /// ever converge, deferring bought nothing.
+    func testCaptureIsOrdersOfMagnitudeCheaperThanResolve() {
+        let addresses = SentoriStack.capture(skip: 0)
+        let rounds = 200
+
+        var start = CFAbsoluteTimeGetCurrent()
+        for _ in 0..<rounds { _ = SentoriStack.capture(skip: 0) }
+        let captureMs = (CFAbsoluteTimeGetCurrent() - start) / Double(rounds) * 1000
+
+        start = CFAbsoluteTimeGetCurrent()
+        for _ in 0..<rounds { _ = SentoriStack.resolve(addresses) }
+        let resolveMs = (CFAbsoluteTimeGetCurrent() - start) / Double(rounds) * 1000
+
+        print("capture \(captureMs) ms vs resolve \(resolveMs) ms")
+        XCTAssertGreaterThan(
+            resolveMs, captureMs * 10,
+            "resolve (\(resolveMs) ms) is not meaningfully dearer than capture "
+                + "(\(captureMs) ms) — deferring it bought nothing"
+        )
     }
 
     /// Reported, not asserted on a tight bound: this runs on the
