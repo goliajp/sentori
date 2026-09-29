@@ -68,52 +68,10 @@ cleanup() {
 trap cleanup EXIT
 
 echo "→ postgres"
-if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-    docker rm -f "$PG_CONTAINER" >/dev/null 2>&1 || true
-    docker run -d --name "$PG_CONTAINER" \
-        -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=sentori \
-        -p "${PGPORT}:5432" postgres:18-alpine >/dev/null
-    for _ in $(seq 1 60); do
-        docker exec "$PG_CONTAINER" pg_isready -U postgres >/dev/null 2>&1 && break
-        sleep 1
-    done
-    DB="postgres://postgres:dev@127.0.0.1:${PGPORT}/sentori"
-else
-    # macOS runners have no Docker, and no Postgres either — the image
-    # ships neither. Homebrew's trusts the local user on 5432, which
-    # is enough for a database that lives for one test run.
-    #
-    # Nothing here is silenced. The first version sent brew's output
-    # to /dev/null and failed four seconds in with `exit code 1` and
-    # no reason, which is the same defect this script exists to stop
-    # other gates from having.
-    FORMULA=""
-    for candidate in postgresql@18 postgresql@17 postgresql; do
-        if brew list --formula "$candidate" >/dev/null 2>&1; then FORMULA="$candidate"; break; fi
-    done
-    if [ -z "$FORMULA" ]; then
-        echo "  installing postgresql@17"
-        brew install postgresql@17
-        FORMULA=postgresql@17
-    fi
-    echo "  starting $FORMULA"
-    brew services start "$FORMULA"
-    STARTED_BREW_PG="$FORMULA"
-    # `brew services` returns before the socket is up.
-    READY=""
-    for _ in $(seq 1 60); do
-        if pg_isready -q -h 127.0.0.1 -p 5432; then READY=1; break; fi
-        sleep 1
-    done
-    if [ -z "$READY" ]; then
-        echo "postgres never accepted connections; brew services says:" >&2
-        brew services list >&2
-        exit 1
-    fi
-    dropdb --if-exists -h 127.0.0.1 sentori_live || true
-    createdb -h 127.0.0.1 sentori_live
-    DB="postgres://$(whoami)@127.0.0.1:5432/sentori_live"
-fi
+# shellcheck source=scripts/lib/local-postgres.sh
+. "${ROOT}/scripts/lib/local-postgres.sh"
+DBNAME=sentori_live
+start_local_postgres
 
 echo "→ server"
 (cd self-hosted/server && cargo build --quiet)
