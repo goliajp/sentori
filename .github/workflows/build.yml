@@ -320,6 +320,14 @@ jobs:
       - name: every surface is named by a workflow that runs on develop
         run: node scripts/check-surface-gates.mjs
 
+      # Each of these checkers was green the day it was written and green
+      # ever since, which is also what one looks like after the code it
+      # reads moves out from under it. This reintroduces the defect each
+      # exists for, in a copy of the tracked tree, and requires it to say
+      # so.
+      - name: each gate goes red on the defect it exists for
+        run: node scripts/check-gates-fail.mjs
+
       - name: the mirror ships the docs and the build, and nothing internal
         run: node scripts/check-mirror.mjs
       - name: docs name only APIs and packages that exist
