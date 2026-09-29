@@ -300,6 +300,13 @@ public final class SentoriTransport: NSObject {
             switch http.statusCode {
             case 200..<300:
                 outcome = .delivered
+                // A batch answers 200 with one outcome per event, and a
+                // refused event carries its error there rather than in
+                // the status. Reading only the status is how an event
+                // the server refused counted as delivered — it matters
+                // where the two halves drift, a self-hosted server
+                // older than the SDK talking to it.
+                if let data { countDropped(refusedCount(data)) }
             case 429:
                 var wait: TimeInterval = 5
                 if let data,
@@ -392,6 +399,15 @@ public final class SentoriTransport: NSObject {
         } catch {
             countDropped(events.count)
         }
+    }
+
+    /// How many events in a 200 the server refused. An unreadable body
+    /// reads as zero on purpose: a 2xx we cannot parse says nothing
+    /// about the items, and guessing a number is worse than the gap.
+    static func refusedCount(_ data: Data) -> Int {
+        guard let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let outcomes = body["outcomes"] as? [[String: Any]] else { return 0 }
+        return outcomes.filter { $0["error"] != nil }.count
     }
 
     /// Count a loss so the next envelope carries it as `droppedEvents`.
