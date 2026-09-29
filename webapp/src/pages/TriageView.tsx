@@ -638,6 +638,9 @@ function CrashFreeCard({ projectId }: { projectId: string }) {
   // as unknown rather than as a crash.
   const pct = typeof data.crashFreeSessions === 'number' ? data.crashFreeSessions : null;
   const releases = Array.isArray(data.releases) ? data.releases : [];
+  // One crash in this many sessions moves the second decimal, so below
+  // it the second decimal is noise.
+  const thin = (data.sessions ?? 0) < 1000;
   return (
     <div className="w-full max-w-xl rounded-lg border border-border bg-surface p-5">
       <div className="flex items-baseline justify-between">
@@ -653,10 +656,15 @@ function CrashFreeCard({ projectId }: { projectId: string }) {
         <p className="mt-3 text-sm text-fg-subtle">{t('crashFree.empty')}</p>
       ) : (
         <>
+          {/* Two decimals need a few hundred sessions to mean
+              anything. Below that the digits are arithmetic, not
+              measurement, and printing 90.00% off ten sessions claims
+              a precision the data does not carry. */}
           <p className="mt-2 text-4xl font-semibold tabular-nums text-fg">
-            {pct.toFixed(2)}
+            {thin ? pct.toFixed(0) : pct.toFixed(2)}
             <span className="ml-1 text-xl text-fg-muted">%</span>
           </p>
+          {thin && <p className="mt-1 text-xs text-warn">{t('crashFree.thin')}</p>}
           {/* Said in words. A bare "1 / 10" makes the reader guess
               which number is which, and this dashboard has been
               caught doing that elsewhere. */}

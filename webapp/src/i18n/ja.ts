@@ -365,6 +365,7 @@ export const ja: Messages = {
   'push.noUserHint': 'sentori.user() 実行前に登録。ブロードキャストのみ受信、issue からの指定は不可。',
   'push.user': 'ユーザー',
   'crashFree.title': 'クラッシュフリーセッション',
+  'crashFree.thin': 'セッションが少なく、この精度に意味はありません',
   'crashFree.counts': '{total} セッション中 {crashed} 件がクラッシュ',
   'crashFree.empty': 'この期間のセッションはまだありません。SDK はアプリがバックグラウンドに入るたびに 1 件送ります。送信するビルドに更新するか、最初の報告をお待ちください。',
   'crashFree.window': '直近 {hours} 時間',
