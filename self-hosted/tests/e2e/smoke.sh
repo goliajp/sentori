@@ -160,6 +160,35 @@ ISSUE_ID="$(echo "$FIRST" | jq -r '.issueId')"
 [[ "$(echo "$FIRST" | jq -r '.isNewIssue')" == "true" ]] \
     || { echo "expected isNewIssue=true on the first event: $FIRST" >&2; exit 1; }
 
+echo "→ an event with a real stack, and the stack comes back"
+# Every event this file sent carried `"stack":[]`, so the panel that is
+# the whole point of the issue page — where it broke — never rendered in
+# any gate, on any run, since the product was written. A frame here is
+# the difference between "the dashboard can show a stack" and "we have
+# never seen it do so".
+STACK_ID="019fe900-0000-7000-8000-0000000e2e0f"
+STACK_RESP="$(curl -fsS -X POST "${BASE}/v1/events" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' -d "{\"id\":\"${STACK_ID}\",\"kind\":\"error\",
+ \"occurredAt\":\"2026-08-10T06:00:00Z\",\"platform\":\"javascript\",
+ \"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",
+ \"payload\":{\"error\":{\"type\":\"RangeError\",\"message\":\"index out of range\",
+   \"stack\":[{\"file\":\"src/cart/total.ts\",\"function\":\"sumLines\",\"line\":48,\"column\":11,\"inApp\":true},
+              {\"file\":\"src/cart/screen.tsx\",\"function\":\"CartScreen\",\"line\":12,\"column\":3,\"inApp\":true}]}}}")"
+STACK_ISSUE="$(echo "$STACK_RESP" | jq -r '.issueId')"
+[[ -n "$STACK_ISSUE" && "$STACK_ISSUE" != "null" ]] \
+    || { echo "the event carrying a stack was not accepted: $STACK_RESP" >&2; exit 1; }
+
+# The issue page reads the payload from the single-event endpoint, not
+# from the occurrence list, so that is what has to carry the frames.
+FRAMES="$(curl -fsS -b "$JAR" "${BASE}/admin/api/events/${STACK_ID}" \
+    | jq '[.payload.error.stack[]?] | length')"
+[[ "$FRAMES" == "2" ]] \
+    || { echo "the issue page has nothing to draw: read back ${FRAMES} frames, want 2" >&2; exit 1; }
+TOP="$(curl -fsS -b "$JAR" "${BASE}/admin/api/events/${STACK_ID}" \
+    | jq -r '.payload.error.stack[0].file')"
+[[ "$TOP" == "src/cart/total.ts" ]] \
+    || { echo "the top frame came back as '${TOP}'" >&2; exit 1; }
+
 echo "→ resend the same id (lost-response case)"
 STATUS="$(curl -s -o /tmp/e2e-resend.$$ -w '%{http_code}' -X POST "${BASE}/v1/events" \
     -H "Authorization: Bearer ${TOKEN}" -H 'content-type: application/json' \

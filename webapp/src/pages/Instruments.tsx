@@ -292,10 +292,19 @@ export default function InstrumentsPage() {
                           beside `2ev` reads as a truncated word. The
                           queue rows in kind.tsx keep the compact form —
                           there the space really is the constraint. */}
-                      {t('instruments.volume', {
-                        events: String(tr.eventCount),
-                        users: String(tr.usersCount),
-                      })}
+                      {/* Nobody identified is not zero people. Every row
+                          here read "· 0 人" including one that had fired
+                          sixty times, which cannot be true — the events
+                          carried no user key, and the same page already
+                          renders an unknown time as an em dash. */}
+                      {tr.usersCount > 0
+                        ? t('instruments.volume', {
+                            events: String(tr.eventCount),
+                            users: String(tr.usersCount),
+                          })
+                        : t('instruments.volumeAnon', {
+                            events: String(tr.eventCount),
+                          })}
                     </span>
                   ),
                 },

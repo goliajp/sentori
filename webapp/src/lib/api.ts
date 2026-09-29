@@ -29,6 +29,8 @@ export type IssueSummary = {
   status: 'ignored' | 'open' | 'resolved';
   firstSeen: string;
   lastSeen: string;
+  /** When we received it. `lastSeen` is the device's own clock. */
+  lastReceivedAt?: string | null;
   eventCount: number;
   usersCount: number;
   maxPerUser: number;
@@ -358,6 +360,8 @@ export type TraceRow = {
   eventCount: number;
   usersCount: number;
   lastSeen: string;
+  /** When we received it. `lastSeen` is the device's own clock. */
+  lastReceivedAt?: string | null;
 };
 export type LaunchRow = {
   release: string;
