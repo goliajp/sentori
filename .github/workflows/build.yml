@@ -354,6 +354,12 @@ jobs:
         run: node scripts/check-compose-healthchecks.mjs
       - name: no text ordering the operators image decides
         run: node scripts/check-text-ordering.mjs
+
+      # Every timestamp here was relative and only relative: an audit log
+      # whose rows all read "3 minutes ago" cannot line anything up
+      # against the world outside this product.
+      - name: every rendered moment carries its absolute time
+        run: node scripts/check-time-has-absolute.mjs
       - name: the RN native mirror matches sdk/native
         run: node scripts/sync-native-core.mjs --check
 

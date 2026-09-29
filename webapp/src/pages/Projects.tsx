@@ -9,15 +9,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useShell } from '../App';
-import {
-  Button,
-  ErrorBanner,
-  Input,
-  PageShell,
-  clsx,
-  formatRelative,
-  formatRelease,
-} from '../components/ui';
+import { Button, ErrorBanner, Input, PageShell, TimeAgo, clsx, formatRelease } from '../components/ui';
 import { useT } from '../i18n';
 import { api, type Project, type ProjectHealth } from '../lib/api';
 import { formatApiError, useAsyncData } from '../lib/useAsyncData';
@@ -251,7 +243,7 @@ function ProjectCard({
           <span className="flex-1">—</span>
         )}
         <span className="shrink-0">
-          {h?.lastEventAt ? formatRelative(h.lastEventAt) : t('health.silent')}
+          {h?.lastEventAt ? <TimeAgo iso={h.lastEventAt} /> : t('health.silent')}
         </span>
       </div>
     </div>

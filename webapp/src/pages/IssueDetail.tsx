@@ -16,16 +16,7 @@ import { Link } from 'react-router-dom';
 import { useShell } from '../App';
 import { KindBadge, RegressedBadge } from '../components/kind';
 import { UserChip } from '../components/identity';
-import {
-  Button,
-  Input,
-  Panel,
-  PanelEmpty,
-  clsx,
-  formatRelative,
-  formatRelease,
-  formatReleaseIn,
-} from '../components/ui';
+import { Button, Input, Panel, PanelEmpty, TimeAgo, clsx, formatRelative, formatRelease, formatReleaseIn } from '../components/ui';
 import { useT } from '../i18n';
 import {
   api,
@@ -305,11 +296,28 @@ export function IssueDetailPane({
             </Link>
           )}
           <span>
-            {t('issue.firstSeen')} {formatRelative(issue.firstSeen)}
+            {t('issue.firstSeen')} <TimeAgo iso={issue.firstSeen} />
           </span>
+          {/* Two clocks. `lastSeen` is what the SDK said the event
+              happened at — the device's own, which can be months off —
+              and `lastReceivedAt` is when we took delivery. The header
+              read one and the occurrence list below read the other, both
+              in the same relative format, so a phone with a wrong clock
+              made the page contradict itself. Ours leads; the device's
+              appears beside it only when the two disagree enough to
+              matter, where the gap is itself worth seeing. */}
           <span>
-            {t('issue.lastSeen')} {formatRelative(issue.lastSeen)}
+            {t('issue.lastSeen')}{' '}
+            <TimeAgo iso={issue.lastReceivedAt ?? issue.lastSeen} />
           </span>
+          {issue.lastReceivedAt &&
+            Math.abs(
+              new Date(issue.lastReceivedAt).getTime() - new Date(issue.lastSeen).getTime(),
+            ) > 5 * 60_000 && (
+              <span className="text-fg-subtle">
+                {t('issue.deviceClock')} <TimeAgo iso={issue.lastSeen} />
+              </span>
+            )}
           {issue.lastRelease && (
             <span title={issue.lastRelease}>{formatRelease(issue.lastRelease)}</span>
           )}
@@ -346,7 +354,8 @@ export function IssueDetailPane({
                 screensFallback ? (
                   <span className="truncate text-xs normal-case tracking-normal text-fg-subtle">
                     {t('issue.replayFrom', {
-                      when: formatRelative(screensFallback.occurredAt),
+                      // bare-relative: interpolated into a sentence, no element to hold a title
+        when: formatRelative(screensFallback.occurredAt),
                     })}
                   </span>
                 ) : !screensRef && wireframeLatest ? (
@@ -415,11 +424,17 @@ export function IssueDetailPane({
           </div>
 
           <div className="min-w-0 space-y-4 2xl:overflow-y-auto">
-            {hasStack && (
-              <Panel title={t('issue.code')}>
+            {/* The panel used to vanish when there was no stack, alone
+                among the panels here — replay and signals both explain
+                their absence. A page that simply omits the thing you
+                came for reads as a product that does not have it. */}
+            <Panel title={t('issue.code')}>
+              {hasStack ? (
                 <StackTrace frames={payload!.error!.stack!} />
-              </Panel>
-            )}
+              ) : (
+                <PanelEmpty>{t('issue.codeNone')}</PanelEmpty>
+              )}
+            </Panel>
 
             <Panel title={`${t('issue.signals')}${signals.length ? ` (${signals.length})` : ''}`}>
               {signals.length === 0 ? (
@@ -585,7 +600,7 @@ function ReleaseSpread({
             {r.events}ev
           </span>
           <span className="w-16 shrink-0 text-right tabular-nums text-fg-subtle">
-            {formatRelative(r.lastAt)}
+            <TimeAgo iso={r.lastAt} />
           </span>
           <span className="w-14 shrink-0 text-right">
             {r.release === resolvedIn && (
@@ -653,7 +668,7 @@ function OccurrenceList({
               r.id === currentId ? 'font-semibold text-fg' : 'text-fg-muted',
             )}
           >
-            {formatRelative(r.receivedAt)}
+            <TimeAgo iso={r.receivedAt} />
           </span>
           <span className={dim(varies.platform)}>{r.platform}</span>
           <span

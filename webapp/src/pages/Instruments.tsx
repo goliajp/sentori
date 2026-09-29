@@ -7,15 +7,7 @@
 import { Link } from 'react-router-dom';
 
 import { useShell } from '../App';
-import {
-  DataTable,
-  ErrorBanner,
-  PageShell,
-  Panel,
-  PanelEmpty,
-  formatRelative,
-  formatRelease,
-} from '../components/ui';
+import { DataTable, ErrorBanner, PageShell, Panel, PanelEmpty, TimeAgo, formatRelative, formatRelease } from '../components/ui';
 import { useT } from '../i18n';
 import {
   api,
@@ -204,7 +196,7 @@ export default function InstrumentsPage() {
                         a.lastFailAt ? 'text-kind-error' : 'text-fg-subtle'
                       }`}
                     >
-                      {a.lastFailAt ? formatRelative(a.lastFailAt) : '—'}
+                      {a.lastFailAt ? <TimeAgo iso={a.lastFailAt} /> : '—'}
                     </span>
                   ),
                 },
@@ -244,11 +236,13 @@ export default function InstrumentsPage() {
                     <span className="text-sm tabular-nums text-fg-muted">
                       {p.fireCount === 0
                         ? t('instruments.probeSilent', {
-                            since: formatRelative(p.registeredAt),
+                            // bare-relative: interpolated into a sentence, no element to hold a title
+          since: formatRelative(p.registeredAt),
                           })
                         : t('instruments.probeFired', {
                             count: String(p.fireCount),
-                            last: p.lastFiredAt ? formatRelative(p.lastFiredAt) : '',
+                            // bare-relative: interpolated into a sentence, no element to hold a title
+          last: p.lastFiredAt ? formatRelative(p.lastFiredAt) : '',
                           })}
                     </span>
                   ),
@@ -298,10 +292,19 @@ export default function InstrumentsPage() {
                           beside `2ev` reads as a truncated word. The
                           queue rows in kind.tsx keep the compact form —
                           there the space really is the constraint. */}
-                      {t('instruments.volume', {
-                        events: String(tr.eventCount),
-                        users: String(tr.usersCount),
-                      })}
+                      {/* Nobody identified is not zero people. Every row
+                          here read "· 0 人" including one that had fired
+                          sixty times, which cannot be true — the events
+                          carried no user key, and the same page already
+                          renders an unknown time as an em dash. */}
+                      {tr.usersCount > 0
+                        ? t('instruments.volume', {
+                            events: String(tr.eventCount),
+                            users: String(tr.usersCount),
+                          })
+                        : t('instruments.volumeAnon', {
+                            events: String(tr.eventCount),
+                          })}
                     </span>
                   ),
                 },
@@ -312,7 +315,7 @@ export default function InstrumentsPage() {
                   align: 'right',
                   render: (tr) => (
                     <span className="text-xs tabular-nums text-fg-subtle">
-                      {formatRelative(tr.lastSeen)}
+                      <TimeAgo iso={tr.lastSeen} />
                     </span>
                   ),
                 },

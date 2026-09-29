@@ -8,14 +8,7 @@ import { ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
 import { useShell } from '../App';
-import {
-  ErrorBanner,
-  PageShell,
-  Panel,
-  PanelEmpty,
-  formatBytes,
-  formatRelative,
-} from '../components/ui';
+import { ErrorBanner, PageShell, Panel, PanelEmpty, TimeAgo, formatBytes } from '../components/ui';
 import { useT } from '../i18n';
 import { api, type ReleaseRow } from '../lib/api';
 import { formatApiError, useAsyncData } from '../lib/useAsyncData';
@@ -158,7 +151,7 @@ function ReleaseRowView({
           label="src" />
         {created && (
           <span className="w-16 text-right text-xs tabular-nums text-fg-subtle">
-            {formatRelative(created)}
+            <TimeAgo iso={created} />
           </span>
         )}
       </button>
