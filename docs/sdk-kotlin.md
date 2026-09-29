@@ -39,6 +39,12 @@ exists because that happened.
 
 ## Start
 
+You need two values first, and neither comes from this page: a
+**token** (`st_…`, ingest scope) and the **ingest URL** of an instance
+you run. There is no hosted signup — see
+[getting started](./getting-started.md) for where both come from, and
+[self-hosting](./self-hosting.md) for standing an instance up.
+
 ```kotlin
 import com.sentori.Sentori
 import com.sentori.SentoriConfig
@@ -264,11 +270,11 @@ Two cases are not ours to close:
   on purpose: an app that uses silent data messages should not get a
   notification per message. `onMessage` still fires.
 
-`Sentori.push.unregister(context)` revokes it: the local handle is
+`SentoriPush.unregister(context)` revokes it: the local handle is
 cleared, the provider token is deleted, and the server marks the
 device revoked so nothing more is sent to it.
 
-`cachedDeviceHandle(context)` returns the handle without a round trip.
+`SentoriPush.cachedDeviceHandle(context)` returns the handle without a round trip.
 
 ### The address survives a rotated token
 

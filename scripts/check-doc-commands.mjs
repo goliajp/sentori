@@ -49,24 +49,27 @@ for (const file of docs) {
     }
   }
 
-  // Every upload/check command must name the instance. The default is
-  // ours, and a self-hoster shipping symbols to it is a privacy
+  // Every upload/check command must name the instance. The default
+  // is ours, and a self-hoster shipping symbols to it is a privacy
   // failure that exits 0.
-  for (const m of src.matchAll(/sentori-cli(?:@latest)?\s+(upload|artifacts)\s+(\w+)([\s\S]{0,400}?)```/g)) {
-    const [, verb, sub, body] = m;
-    // Passing it by environment is fine — the CLI reads
-    // `$SENTORI_API_URL` — but only on a page that tells the reader
-    // to set it. A page that does neither sends their symbols to us.
+  //
+  // Scanned per fenced block, because a CI recipe sets the variable
+  // in the job's `env:` above the command it applies to — and because
+  // a page-wide search is too generous the other way: three recipes
+  // set `SENTORI_INGEST_URL`, which the CLI does not read, while a
+  // paragraph elsewhere mentioned the right name.
+  for (const block of src.split('```').filter((_, i) => i % 2 === 1)) {
+    const cmd = /sentori-cli(?:@latest)?\s+(upload|artifacts)\s+(\w+)/.exec(block);
+    if (!cmd) continue;
     const namesTheInstance =
-      body.includes('--api-url') ||
-      body.includes('--ingest-url') ||
-      urlVars.some((v) => src.includes(v));
+      block.includes('--api-url') ||
+      block.includes('--ingest-url') ||
+      urlVars.some((v) => block.includes(v));
     if (!namesTheInstance) {
       problems.push(
-        `${file}: \`${verb} ${sub}\` is printed with no --api-url and the page never ` +
-          `mentions ${urlVars.join(' / ')} — the CLI then defaults to GOLIA's own ` +
-          `instance, so a self-hosted reader uploads their symbols to us and the ` +
-          `command exits 0`,
+        `${file}: \`${cmd[1]} ${cmd[2]}\` is in a block that names neither --api-url nor ` +
+          `${urlVars.join(' / ')} — the CLI then defaults to GOLIA's own instance, so a ` +
+          `self-hosted reader uploads their symbols to us and the command exits 0`,
       );
     }
   }

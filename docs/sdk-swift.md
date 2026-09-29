@@ -26,6 +26,30 @@ iOS 14+. Apache-2.0 OR MIT.
 
 ## Start
 
+You need two values first, and neither comes from this page: a
+**token** (`st_…`, ingest scope) and the **ingest URL** of an instance
+you run. There is no hosted signup — see
+[getting started](./getting-started.md) for where both come from, and
+[self-hosting](./self-hosting.md) for standing an instance up.
+
+`start` has to run before anything the app does. In a SwiftUI app that
+is the `App`'s initialiser; with an app delegate it is
+`didFinishLaunchingWithOptions`. A top-level call in a source file is
+not a place Swift will run it:
+
+```swift
+import Sentori
+import SwiftUI
+
+@main
+struct YourApp: App {
+    init() {
+        Sentori.start(/* the config below */)
+    }
+    var body: some Scene { WindowGroup { ContentView() } }
+}
+```
+
 ```swift
 import Sentori
 
@@ -279,9 +303,8 @@ Then, and this is the step people skip:
 
 On a simulator, `localhost` works: the simulator shares the host's
 network, so `http://localhost:8080` reaches a server running on your
-Mac. An Android emulator is the one that does not — see the Kotlin
-page. An Android emulator is the one that needs
-`10.0.2.2` — see the Kotlin page.
+Mac. An Android emulator is the one that needs `10.0.2.2` — see the
+Kotlin page.
 
 Nothing arrived? The verbs are no-ops before `start` runs, and they
 still return an id, so a `start` that never executed looks exactly

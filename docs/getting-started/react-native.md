@@ -127,7 +127,7 @@ each build:
 sentori-cli upload sourcemap \
   --release "myapp@1.0.0+123" \
   --token "$SENTORI_TOKEN" \
-  --ingest-url "$SENTORI_INGEST_URL" \
+  --api-url "$SENTORI_API_URL" \
   ios/main.jsbundle.map android/app/build/.../index.android.bundle.map
 
 # iOS dSYMs
