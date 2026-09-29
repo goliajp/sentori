@@ -85,11 +85,18 @@ const PROBES = [
     why: 'a runtime the SDK names and the server files under unknown',
   },
   {
-    gate: 'check-privacy-manifest.mjs',
+    gate: 'check-ios-packaging.mjs',
     file: 'sdk/native/ios/Sources/Sentori/PrivacyInfo.xcprivacy',
     find: 'NSPrivacyAccessedAPICategoryUserDefaults',
     replace: 'NSPrivacyAccessedAPICategoryUserDefaultsTypo',
     why: 'a required-reason API the manifest does not declare',
+  },
+  {
+    gate: 'check-doc-versions.mjs',
+    file: 'docs/sdk-kotlin.md',
+    find: 'jp.golia.sentori:sentori:',
+    replace: 'jp.golia.sentori:sentori:0.0.1-',
+    why: 'an install line that installs a version we do not ship',
   },
   {
     gate: 'check-error-status.mjs',

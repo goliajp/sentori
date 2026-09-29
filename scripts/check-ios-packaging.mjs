@@ -1,7 +1,7 @@
-// The iOS privacy manifest declares every required-reason API the
-// sources reach, and both distribution channels ship it.
+// What an iOS app gets when it depends on this SDK, checked against
+// what the sources actually do.
 //
-//   node scripts/check-privacy-manifest.mjs
+//   node scripts/check-ios-packaging.mjs
 //
 // Apple rejects a submission that calls one of these APIs without a
 // declared reason, and the rejection lands on the host app's release,
@@ -27,6 +27,7 @@ const MANIFEST = `${SOURCES}/PrivacyInfo.xcprivacy`;
 const POD_MANIFEST = 'sdk/react-native/ios/core/PrivacyInfo.xcprivacy';
 const PACKAGE = 'sdk/native/ios/Package.swift';
 const PODSPEC = 'sdk/react-native/SentoriReactNative.podspec';
+const NATIVE_PODSPEC = 'sdk/native/ios/Sentori.podspec';
 
 // Symbol → the category Apple files it under. Only the categories
 // this SDK could plausibly reach; a new one is added the day a call
@@ -140,13 +141,56 @@ for (const [category] of REQUIRED_REASON) {
 if (!readFileSync(PACKAGE, 'utf8').includes('PrivacyInfo.xcprivacy')) {
   problems.push(`${PACKAGE} does not put the manifest in the target's resources — SwiftPM would leave it out of the build`);
 }
-if (!readFileSync(PODSPEC, 'utf8').includes('PrivacyInfo.xcprivacy')) {
-  problems.push(`${PODSPEC} does not ship the manifest — CocoaPods does not pick it up from source_files`);
+for (const spec of [PODSPEC, NATIVE_PODSPEC]) {
+  if (!readFileSync(spec, 'utf8').includes('PrivacyInfo.xcprivacy')) {
+    problems.push(
+      `${spec} does not ship the manifest — CocoaPods does not pick it up from source_files`,
+    );
+  }
+}
+
+// A pod that names a git repo as its source is installable only if
+// it is in that repo. The Swift mirror publishes a subset of this
+// directory by an explicit list, so a podspec added here and not
+// added there is a pod nobody can install — and nothing would say
+// so, because `pod spec lint --quick` never fetches the source.
+{
+  const mirror = readFileSync('.github/workflows/swift-package-mirror.yml', 'utf8');
+  const spec = readFileSync(NATIVE_PODSPEC, 'utf8');
+  if (/source\s*=\s*\{\s*git:/.test(spec) && !mirror.includes('Sentori.podspec')) {
+    problems.push(
+      `${NATIVE_PODSPEC} points at the Swift mirror for its source, and the mirror ` +
+        'workflow does not copy it — `pod install` would 404',
+    );
+  }
+}
+
+// Three ways in (SwiftPM, the Expo pod, the plain pod) and one
+// support statement. A floor that differs between them is a promise
+// made in one place and broken in another.
+{
+  const floors = [PACKAGE, PODSPEC, NATIVE_PODSPEC].map((path) => {
+    const src = readFileSync(path, 'utf8');
+    const ios = /\.iOS\(\.v(\d+)\)|ios: '(\d+)(?:\.\d+)?'/.exec(src);
+    return [path, ios ? (ios[1] ?? ios[2]) : null];
+  });
+  const stated = floors.filter(([, v]) => v !== null);
+  const distinct = new Set(stated.map(([, v]) => v));
+  if (stated.length !== 3) {
+    problems.push(
+      `could not read an iOS floor out of ${floors.filter(([, v]) => v === null).map(([p]) => p).join(', ')}`,
+    );
+  } else if (distinct.size !== 1) {
+    problems.push(
+      `the three ways to depend on this SDK state different iOS floors: ` +
+        stated.map(([p, v]) => `${p}=${v}`).join(', '),
+    );
+  }
 }
 
 if (problems.length === 0) {
   const declared = REQUIRED_REASON.filter(([c]) => manifest.includes(`<string>${c}</string>`)).length;
-  console.log(`✓ privacy manifest declares ${declared} required-reason categor${declared === 1 ? 'y' : 'ies'}, and both channels ship it`);
+  console.log(`✓ privacy manifest declares ${declared} required-reason categor${declared === 1 ? 'y' : 'ies'}, and all three channels ship it`);
   process.exit(0);
 }
 for (const p of problems) console.error(`✗ ${p}`);

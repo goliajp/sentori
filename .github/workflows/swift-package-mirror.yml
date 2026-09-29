@@ -49,7 +49,11 @@ jobs:
       - name: assemble exactly what the mirror would publish
         run: |
           mkdir -p /tmp/pkg
-          cp -R sdk/native/ios/Package.swift sdk/native/ios/Sources sdk/native/ios/Tests /tmp/pkg/
+          # The podspec travels too: it names this mirror as its
+          # source, so a pod that is not in the mirror is a pod
+          # nobody can install.
+          cp -R sdk/native/ios/Package.swift sdk/native/ios/Sentori.podspec \
+            sdk/native/ios/Sources sdk/native/ios/Tests /tmp/pkg/
           # The identity vectors live outside the package and are read
           # by a test through a relative path. A mirror that does not
           # carry them turns that test into a skip nobody notices.
@@ -92,7 +96,8 @@ jobs:
       - name: build the mirror tree
         run: |
           mkdir -p /tmp/mirror/fixtures
-          cp -R sdk/native/ios/Package.swift sdk/native/ios/Sources sdk/native/ios/Tests /tmp/mirror/
+          cp -R sdk/native/ios/Package.swift sdk/native/ios/Sentori.podspec \
+            sdk/native/ios/Sources sdk/native/ios/Tests /tmp/mirror/
           cp sdk/native/fixtures/identity-vectors.json /tmp/mirror/fixtures/
           cp LICENSE-APACHE LICENSE-MIT /tmp/mirror/ 2>/dev/null || true
           cp docs/sdk-swift.md /tmp/mirror/README.md 2>/dev/null \
