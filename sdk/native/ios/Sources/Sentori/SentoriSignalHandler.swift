@@ -46,6 +46,14 @@ enum SentoriSignalHandler {
     private static var registered = false
     private static var previous: [Int32: sigaction] = [:]
 
+    /// Test-only. The handler's last act is to restore the default
+    /// disposition and re-raise, which is correct and kills the
+    /// process — so nothing that runs inside a test can observe what
+    /// the handler did. With this set, a test can deliver a real
+    /// signal through the kernel, let the whole handler run, and read
+    /// the record back. Nothing else changes.
+    static var __suppressReRaiseForTests = false
+
     /// Reserved at install time. Touching the allocator inside the
     /// handler is the thing this file exists to avoid.
     private static var frames = UnsafeMutablePointer<UnsafeMutableRawPointer?>
@@ -142,6 +150,7 @@ enum SentoriSignalHandler {
         reset.__sigaction_u.__sa_handler = unsafeBitCast(SIG_DFL, to: sig_t.self)
         sigemptyset(&reset.sa_mask)
         reset.sa_flags = 0
+        if __suppressReRaiseForTests { return }
         sigaction(signalNumber, &reset, nil)
         raise(signalNumber)
     }
@@ -444,5 +453,6 @@ enum SentoriSignalHandler {
         for (signal, var old) in previous { sigaction(signal, &old, nil) }
         previous = [:]
         registered = false
+        __suppressReRaiseForTests = false
     }
 }

@@ -204,6 +204,58 @@ final class SentoriSignalHandlerTests: XCTestCase {
         signal(SIGUSR2, SIG_DFL)
     }
 
+    /// The whole handler, driven by the kernel.
+    ///
+    /// Every other test here exercises a piece: `writeRecord`,
+    /// `decode`, `callPrevious`, the image map. None of them proves
+    /// that `sigaction` installed anything, that the kernel calls what
+    /// we registered, or that the pieces compose. The handler's last
+    /// act is to re-raise and die, which is why this was never
+    /// observed — so the re-raise is suppressed, and everything before
+    /// it runs exactly as it would in a real crash.
+    func testARealSignalReachesTheHandlerAndLeavesARecord() throws {
+        SentoriSignalHandler.__writeImageMapForTests(to: dir)
+        SentoriSignalHandler.__installForTests(SIGUSR2, pendingDirectory: dir)
+        SentoriSignalHandler.__suppressReRaiseForTests = true
+
+        // Delivered by the kernel, not called by us.
+        raise(SIGUSR2)
+
+        let url = dir.appendingPathComponent("signal.sentoricrash")
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: url.path),
+            "a signal was delivered and the handler wrote nothing"
+        )
+        let record = try XCTUnwrap(SentoriSignalHandler.decode(Data(contentsOf: url)))
+        XCTAssertEqual(record.signal, SIGUSR2)
+        XCTAssertFalse(record.addresses.isEmpty)
+
+        // And the next launch turns it into the event the shipper sends.
+        SentoriSignalHandler.drain(
+            pendingDirectory: dir, config: ["release": "app@1.0.0+1", "environment": "test"]
+        )
+        let files = try FileManager.default.contentsOfDirectory(atPath: dir.path)
+        let events = files.filter { $0.hasSuffix(".json") && $0 != "signal.images.json" }
+        XCTAssertEqual(events.count, 1, "the record did not become an event")
+        let raw = try JSONSerialization.jsonObject(
+            with: Data(contentsOf: dir.appendingPathComponent(events[0]))
+        ) as! [String: Any]
+        let wire = SentoriPendingCrash.toWire(raw)
+        let payload = wire["payload"] as! [String: Any]
+        let error = payload["error"] as! [String: Any]
+        XCTAssertFalse((error["stack"] as! [[String: Any]]).isEmpty)
+        // The frames carry what the server symbolicates from.
+        let frames = error["stack"] as! [[String: Any]]
+        // Without these the server has nothing to match a dSYM
+        // against, and a native crash stays a column of hex forever.
+        XCTAssertTrue(
+            frames.contains { $0["imageUuid"] != nil },
+            "no frame carried an image identity, so none of this can be symbolicated"
+        )
+        XCTAssertTrue(frames.contains { $0["addr"] != nil })
+        XCTAssertTrue(frames.contains { $0["imageBase"] != nil })
+    }
+
     func testTheHostsHandlerGetsTheRealSiginfo() {
         // Every serious crash reporter installs an SA_SIGINFO handler
         // and reads the `siginfo_t` — `si_addr` is the faulting

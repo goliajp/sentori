@@ -82,6 +82,16 @@ enum SentoriPendingCrash {
             if let fn = f["function"] as? String { out["function"] = fn }
             if let line = f["line"] as? Int { out["line"] = line }
             if let inApp = f["inApp"] as? Bool { out["inApp"] = inApp }
+            // The three the server symbolicates from. This mapping
+            // listed four fields and dropped these, so every native
+            // crash arrived as a list of function names the crash
+            // handler had already failed to resolve — the addresses
+            // and the image identity were collected at the moment of
+            // death and thrown away one step later, and the dSYM they
+            // exist to be matched against was never reachable.
+            if let addr = f["addr"] { out["addr"] = addr }
+            if let base = f["imageBase"] { out["imageBase"] = base }
+            if let uuid = f["imageUuid"] as? String { out["imageUuid"] = uuid }
             return out
         }
 
