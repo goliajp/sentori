@@ -236,16 +236,16 @@ async fn load_issue(
                   AS last_received_at \
          FROM issues WHERE id = $1",
     )
-        .bind(issue_id)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|e| {
-            warn!(error = %e, "issue load failed");
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "error": "internal" })),
-            )
-        })?;
+    .bind(issue_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| {
+        warn!(error = %e, "issue load failed");
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "internal" })),
+        )
+    })?;
     let Some(row) = row else {
         return Err((
             StatusCode::NOT_FOUND,
