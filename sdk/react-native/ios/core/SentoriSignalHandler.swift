@@ -86,8 +86,8 @@ enum SentoriSignalHandler {
 
         for signal in handled {
             var action = sigaction()
-            action.__sigaction_u.__sa_sigaction = { signalNumber, _, _ in
-                SentoriSignalHandler.onSignal(signalNumber)
+            action.__sigaction_u.__sa_sigaction = { signalNumber, info, context in
+                SentoriSignalHandler.onSignal(signalNumber, info, context)
             }
             action.sa_flags = SA_SIGINFO | SA_ONSTACK
             sigemptyset(&action.sa_mask)
@@ -101,12 +101,16 @@ enum SentoriSignalHandler {
 
     /// Async-signal-safe: `backtrace`, `open`, `write`, `close`. No
     /// allocation, no Objective-C, no Foundation.
-    private static func onSignal(_ signalNumber: Int32) {
+    private static func onSignal(
+        _ signalNumber: Int32,
+        _ info: UnsafeMutablePointer<siginfo_t>?,
+        _ context: UnsafeMutableRawPointer?
+    ) {
         let count = backtrace(frames, Int32(maxFrames))
         if count > 0 {
             writeRecord(signal: signalNumber, frames: frames, count: Int(count), to: pathBuffer)
         }
-        chainAndReRaise(signalNumber)
+        chainAndReRaise(signalNumber, info, context)
     }
 
     /// The whole of what the handler does to disk, so a test can run
@@ -131,8 +135,12 @@ enum SentoriSignalHandler {
     /// Give the host's own handler its turn, then die the way we
     /// would have without us. Restoring the default first means the
     /// re-raise is not caught by this handler again.
-    private static func chainAndReRaise(_ signalNumber: Int32) {
-        callPrevious(signalNumber)
+    private static func chainAndReRaise(
+        _ signalNumber: Int32,
+        _ info: UnsafeMutablePointer<siginfo_t>?,
+        _ context: UnsafeMutableRawPointer?
+    ) {
+        callPrevious(signalNumber, info, context)
         var reset = sigaction()
         reset.__sigaction_u.__sa_handler = unsafeBitCast(SIG_DFL, to: sig_t.self)
         sigemptyset(&reset.sa_mask)
@@ -146,11 +154,25 @@ enum SentoriSignalHandler {
     /// reporting SDK that silently replaced the customer's own crash
     /// reporter would be the failure-contagion the zero-cost rule
     /// exists to forbid, and it would look like nothing at all.
-    static func callPrevious(_ signalNumber: Int32) {
+    /// `info` and `context` are the ones the kernel handed us, passed
+    /// through untouched.
+    ///
+    /// They used to be `nil`. Every serious crash reporter installs an
+    /// `SA_SIGINFO` handler and reads the `siginfo_t` — `si_addr` is
+    /// the faulting address, which is most of what a segfault report
+    /// is. Handing it nil is a null dereference *inside the host's
+    /// crash handler, during a crash*: their reporter would die where
+    /// it was supposed to record, and the only visible symptom would
+    /// be crashes that stopped being reported after they installed us.
+    static func callPrevious(
+        _ signalNumber: Int32,
+        _ info: UnsafeMutablePointer<siginfo_t>? = nil,
+        _ context: UnsafeMutableRawPointer? = nil
+    ) {
         if var old = previous[signalNumber] {
             let flags = Int32(old.sa_flags)
             if flags & SA_SIGINFO != 0 {
-                old.__sigaction_u.__sa_sigaction?(signalNumber, nil, nil)
+                old.__sigaction_u.__sa_sigaction?(signalNumber, info, context)
             } else if let handler = old.__sigaction_u.__sa_handler {
                 // SIG_DFL and SIG_IGN are sentinel values cast to a
                 // function pointer, not functions — calling either
@@ -408,8 +430,8 @@ enum SentoriSignalHandler {
         let path = pendingDirectory.appendingPathComponent("signal.sentoricrash").path
         path.withCString { _ = strlcpy(pathBuffer, $0, 1024) }
         var action = sigaction()
-        action.__sigaction_u.__sa_sigaction = { number, _, _ in
-            SentoriSignalHandler.onSignal(number)
+        action.__sigaction_u.__sa_sigaction = { number, info, context in
+            SentoriSignalHandler.onSignal(number, info, context)
         }
         action.sa_flags = SA_SIGINFO | SA_ONSTACK
         sigemptyset(&action.sa_mask)
