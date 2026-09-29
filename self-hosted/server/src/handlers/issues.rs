@@ -67,7 +67,19 @@ fn issue_row_json(r: &sqlx::postgres::PgRow) -> Value {
         "surface": r.get::<Value, _>("surface"),
         "status": r.get::<String, _>("status"),
         "firstSeen": crate::wire_time::rfc3339(r.get("first_seen")),
+        // `last_seen` is the device's clock — what the SDK said the
+        // event happened at. `lastReceivedAt` is ours. A phone with a
+        // wrong clock made the header read "2 months ago" while the
+        // occurrence list below it read "2 minutes ago", both labelled
+        // the same way, with nothing saying which was which.
+        // `try_get` because the detail query does not compute it: a
+        // caller that does not ask gets null rather than a panic.
         "lastSeen": crate::wire_time::rfc3339(r.get("last_seen")),
+        "lastReceivedAt": r
+            .try_get::<Option<time::OffsetDateTime>, _>("last_received_at")
+            .ok()
+            .flatten()
+            .map(crate::wire_time::rfc3339),
         "eventCount": r.get::<i64, _>("event_count"),
         "usersCount": r.get::<i64, _>("users_count"),
         "maxPerUser": r.get::<i64, _>("max_per_user"),
@@ -159,7 +171,10 @@ pub async fn list(
         );
     }
     let rows = sqlx::query(
-        "SELECT * FROM issues \
+        "SELECT *, \
+                (SELECT max(received_at) FROM events e WHERE e.issue_id = issues.id) \
+                  AS last_received_at \
+         FROM issues \
          WHERE status = $1 \
            AND ($2::uuid IS NULL OR project_id = $2) \
            AND ($3::text IS NULL OR kind = $3) \
