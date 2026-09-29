@@ -43,7 +43,7 @@ sentori.init({
   token: 'st_...',
   release: 'myapp@1.0.0+123',          // your build number / commit
   environment: __DEV__ ? 'dev' : 'prod',
-  ingestUrl: 'https://ingest.sentori.golia.jp',
+  ingestUrl: 'https://sentori.example.com',   // YOUR instance
 })
 
 // ... rest of your entry

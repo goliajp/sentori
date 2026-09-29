@@ -14,24 +14,45 @@
 // and pinning it to our number would teach the wrong thing.
 
 import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 
-const native = readFileSync('sdk/native/VERSION', 'utf8').trim();
+// What a reader can actually install, which is not what the tree is
+// about to release.
+//
+// The first version of this file compared the docs to
+// `sdk/native/VERSION`. That is the version being *prepared*, and
+// `check-native-version-tag.mjs` requires it to be untagged — so the
+// two gates together guaranteed the docs named a version nobody could
+// install. They both passed while `from: "2.1.0"` resolved to nothing
+// on SwiftPM and Maven Central, whose newest was 2.0.2.
+//
+// Published means tagged here: `swift/<version>` is written by the
+// release that pushes the mirror and the Maven artifact.
+const published = execFileSync('git', ['tag', '--list', 'swift/*'], { encoding: 'utf8' })
+  .split('\n')
+  .map((t) => t.replace('swift/', '').trim())
+  .filter((t) => /^\d+\.\d+\.\d+$/.test(t))
+  .sort((a, b) => {
+    const [x, y] = [a.split('.').map(Number), b.split('.').map(Number)];
+    return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+  });
+if (published.length === 0) {
+  console.error('✗ no swift/<version> tags — this check cannot tell what is installable');
+  process.exit(1);
+}
+const native = published[published.length - 1];
+const nativeMajor = native.split('.')[0];
 const rn = JSON.parse(readFileSync('sdk/react-native/package.json', 'utf8')).version;
 
 const CASES = [
   {
     file: 'docs/sdk-swift.md',
-    pattern: /sentori-swift",\s*from:\s*"([\d.]+)"/,
-    want: native,
+    pattern: /sentori-swift",\s*from:\s*"(\d+)\.\d+\.\d+"/,
+    want: nativeMajor,
     what: 'the Swift Package Manager line',
-  },
-  {
-    file: 'docs/sdk-swift.md',
-    // `~> 2.1` is the whole 2.1.x line, which is what a pod should
-    // pin; it must name the minor we are on.
-    pattern: /pod 'Sentori',\s*'~>\s*([\d.]+)'/,
-    want: native.split('.').slice(0, 2).join('.'),
-    what: 'the CocoaPods line',
+    note:
+      '`from:` is a floor that resolves to the newest release in that major, ' +
+      'so it names the major rather than a version that would go stale on every release',
   },
   {
     file: 'docs/sdk-kotlin.md',
@@ -69,7 +90,7 @@ for (const { file, pattern, want, what } of CASES) {
 }
 
 if (problems.length === 0) {
-  console.log(`✓ every advertised version matches the tree (native ${native}, rn ${rn})`);
+  console.log(`✓ every advertised version is one a reader can install (native ${native}, rn ${rn})`);
   process.exit(0);
 }
 for (const p of problems) console.error(`✗ ${p}`);
