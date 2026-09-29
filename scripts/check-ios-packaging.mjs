@@ -165,6 +165,54 @@ for (const spec of [PODSPEC, NATIVE_PODSPEC]) {
   }
 }
 
+// Every fixture a mirrored test reads has to reach the mirror.
+//
+// The tests are copied into the published Swift package; the vectors
+// they read live outside it and are copied separately. That copy was
+// a list of filenames, so adding a fixture turned the published
+// package's own test suite red — in the artifact, after the merge,
+// where only a full mirror build could find it.
+{
+  const testDir = 'sdk/native/ios/Tests';
+  const tests = execFileSync('git', ['ls-files', `${testDir}/**/*.swift`], { encoding: 'utf8' })
+    .split('\n')
+    .filter(Boolean);
+  const referenced = new Set();
+  for (const file of tests) {
+    for (const m of readFileSync(file, 'utf8').matchAll(/"fixtures\/([\w.-]+)"/g)) {
+      referenced.add(m[1]);
+    }
+  }
+  const mirror = readFileSync('.github/workflows/swift-package-mirror.yml', 'utf8');
+  const copiesTheDirectory = /cp sdk\/native\/fixtures\/\*\.json/.test(mirror);
+  // Tracked fixtures only. `live-server.json` is written by
+  // `scripts/ios-live-ingest.sh` against a running server and is
+  // absent by design; its test skips and says so. A committed fixture
+  // is the opposite — its test fails without it, so it must travel.
+  const tracked = new Set(
+    execFileSync('git', ['ls-files', 'sdk/native/fixtures'], { encoding: 'utf8' })
+      .split('\n')
+      .filter(Boolean)
+      .map((p) => p.slice(p.lastIndexOf('/') + 1)),
+  );
+  let checked = 0;
+  for (const name of referenced) {
+    if (!tracked.has(name)) continue;
+    checked += 1;
+    if (!copiesTheDirectory && !mirror.includes(name)) {
+      problems.push(
+        `a mirrored test reads fixtures/${name} and the mirror workflow does not copy it — ` +
+          "the published package's own tests would fail",
+      );
+    }
+  }
+  if (checked === 0) {
+    problems.push(
+      `no test under ${testDir} reads a committed fixture — this check now reads nothing`,
+    );
+  }
+}
+
 // Three ways in (SwiftPM, the Expo pod, the plain pod) and one
 // support statement. A floor that differs between them is a promise
 // made in one place and broken in another.

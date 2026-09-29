@@ -4,6 +4,7 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 
 import { __resetForTests as resetMask, maskedNativeIds, registerMaskQuery } from '../mask';
+import { __resetReplayForTests, __tickWithNativeForTests } from '../replay';
 import {
   __resetForTests as resetRing,
   __setCaptureForTests,
@@ -16,6 +17,10 @@ import {
 afterEach(() => {
   resetRing();
   resetMask();
+  // The wireframe ring too: these tests drive a real tick, and an
+  // entry left in it was drained by the next test file, which read it
+  // as its own.
+  __resetReplayForTests();
 });
 
 describe('mask query', () => {
@@ -96,5 +101,35 @@ describe('armed but empty', () => {
     resetRing();
     expect(screenReplayArmed()).toBe(false);
     expect(screenReplayCaptured()).toBe(0);
+  });
+});
+
+describe('the wireframe replay reads the same registry', () => {
+  // It did not. `replay.ts` returned an empty list under a comment
+  // saying masking did not exist yet, while `replay-screens.ts` had
+  // been reading the registry all along — so a host that registered a
+  // query got masked screenshots and unmasked wireframes, and a
+  // wireframe carries text.
+  test('passes the registered ids to the native capture', () => {
+    registerMaskQuery(() => ['card-number']);
+    const seen: string[][] = [];
+    __tickWithNativeForTests({
+      captureWireframe: (ids: string[]) => {
+        seen.push(ids);
+        return JSON.stringify({ ts: 1, width: 10, height: 10, nodes: [] });
+      },
+    });
+    expect(seen[0]).toEqual(['card-number']);
+  });
+
+  test('masks nothing when the host never registered a query', () => {
+    const seen: string[][] = [];
+    __tickWithNativeForTests({
+      captureWireframe: (ids: string[]) => {
+        seen.push(ids);
+        return JSON.stringify({ ts: 1, width: 10, height: 10, nodes: [] });
+      },
+    });
+    expect(seen[0]).toEqual([]);
   });
 });
