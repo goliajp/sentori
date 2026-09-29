@@ -220,6 +220,19 @@ chrome.kill();
 const broken = report.filter(r => r.errors.length);
 for (const u of unmocked) process.stdout.write(`UNMOCKED ${u}\n`);
 if (broken.length || unmocked.length) {
+  // What each route actually said. This printed only a count until a
+  // red run on CI could not be explained from its own log: the
+  // screenshots go to an artefact that a failing step may not reach,
+  // and the count alone cannot tell a real regression from a flake.
+  for (const r of broken) {
+    process.stdout.write(`✗ ${r.route || '/'}\n`);
+    for (const e of r.errors.slice(0, 5)) {
+      process.stdout.write(`    ${String(e).replace(/\s+/g, ' ').slice(0, 300)}\n`);
+    }
+    if (r.errors.length > 5) {
+      process.stdout.write(`    … and ${r.errors.length - 5} more\n`);
+    }
+  }
   process.stdout.write(
     `✗ ${broken.length} route(s) with console errors, ${unmocked.length} ` +
     `unmocked path(s) — screenshots in ${out}\n`,

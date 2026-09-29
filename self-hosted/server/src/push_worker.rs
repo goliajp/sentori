@@ -250,14 +250,6 @@ fn is_configuration_failure(reason: &str) -> bool {
         // how a project whose push has never worked showed zero
         // failures and a green readiness check.
         || is_apns_credential_rejection(reason)
-        // The APNs half of the same thing, which was missing: these say
-        // our signing key, team or bundle id is wrong, not that this
-        // device is gone. Without them a rejected send went back on the
-        // queue five times while its recorded outcome already read
-        // "rejected" — a row that was both queued and refused, which is
-        // how a project whose push has never worked showed zero
-        // failures and a green readiness check.
-
 }
 
 /// APNs reasons that no retry can fix. `ExpiredProviderToken` is
