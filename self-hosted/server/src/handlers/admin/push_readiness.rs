@@ -374,12 +374,14 @@ mod tests {
         f.sent24h = 0;
         f.top_reason = Some("apns rejected: status=403 InvalidProviderToken".into());
         let out = checks_for(&f);
-        let row = out
-            .iter()
-            .find(|c| c["id"] == "all-failing")
-            .expect("every send refused and none delivered has to say so");
+        let row = out.iter().find(|c| c["id"] == "all-failing");
+        assert!(
+            row.is_some(),
+            "every send refused and none delivered has to say so"
+        );
         assert_eq!(
-            row["level"], "blocked",
+            row.unwrap_or(&Value::Null)["level"],
+            "blocked",
             "the panel calls blocked the state where nothing can arrive, and \
              nothing is arriving"
         );
