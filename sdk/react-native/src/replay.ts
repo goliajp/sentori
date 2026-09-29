@@ -23,6 +23,7 @@ import {
 } from '@goliapkg/sentori-core';
 import type { ReplayFrame, ReplayNode } from '@goliapkg/sentori-core';
 
+import { maskedNativeIds } from './mask';
 import { describeWireframeNative } from './native';
 
 declare const __DEV__: boolean | undefined;
@@ -202,8 +203,13 @@ function diagnosticForTick(snapshot: NativeFrame, snapshotBytes: number): void {
 }
 
 function readMaskIds(): string[] {
-  // Masking returns with a v1 privacy pass; nothing masks today.
-  return [];
+  // This returned `[]` unconditionally, under a comment saying
+  // masking did not exist yet. It did: `replay-screens.ts` has read
+  // the same registry all along. So a host that registered a mask
+  // query and turned on wireframe replay got masked screenshots and
+  // unmasked wireframes — and a wireframe carries text, which is
+  // where a payment field's contents would be.
+  return maskedNativeIds();
 }
 
 type ReplayNativeModule = {
@@ -233,6 +239,16 @@ export function drainReplay(): string {
   const entries = _ring.drain();
   if (entries.length === 0) return '';
   return entries.map((e) => JSON.stringify(e)).join('\n');
+}
+
+/// Drive one tick against an injected capture, so the ids the native
+/// module actually receives can be asserted. Without this the mask
+/// path had no test at all — which is how it stayed empty under a
+/// comment saying masking did not exist.
+export function __tickWithNativeForTests(mod: ReplayNativeModule): void {
+  _nativeMod = mod;
+  _running = true;
+  captureTick();
 }
 
 export function __resetReplayForTests(): void {
