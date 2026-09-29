@@ -183,6 +183,37 @@ jobs:
           rsync -a --delete --chmod=D755,F644 \
             webapp/dist/ "${REMOTE_DIR}/webapp-dist/"
 
+      # The smoke at the end asks whether the version answering matches
+      # the version in this tree. That is self-consistency, and on
+      # 2026-09-30 both halves went backwards together: a merge carried
+      # 3.19.0's code into master without its VERSION, so the tree said
+      # 3.18.0, production answered 3.18.0, the two agreed, and
+      # production had been rolled back with nothing raised. A gate that
+      # compares a thing to itself cannot see that.
+      - name: Production is not being moved backwards
+        run: |
+          set -e
+          LIVE="$(curl -fsS --max-time 20 https://sentori.golia.jp/healthz 2>/dev/null \
+            | sed 's/.*"version":"\([^"]*\)".*/\1/' || true)"
+          WANT='${{ steps.ver.outputs.version }}'
+          if [ -z "$LIVE" ]; then
+            echo "production did not answer; nothing to compare against, continuing"
+            exit 0
+          fi
+          echo "live=${LIVE} deploying=${WANT}"
+          # Sort the two semver-wise and see which one comes last. Equal
+          # is fine — a redeploy of the same version is how the master
+          # line works.
+          NEWEST="$(printf '%s\n%s\n' "$LIVE" "$WANT" | sort -V | tail -1)"
+          if [ "$NEWEST" = "$LIVE" ] && [ "$LIVE" != "$WANT" ]; then
+            echo "refusing: ${LIVE} is live and this deploy carries ${WANT}." >&2
+            echo "A release whose back-merge never landed leaves master with" >&2
+            echo "newer code and an older VERSION, which is how 3.19.0 became" >&2
+            echo "3.18.0 in production. Land the back-merge, or say so with a" >&2
+            echo "workflow_dispatch if this is a deliberate rollback." >&2
+            exit 1
+          fi
+
       - name: Install the compose file
         run: |
           SRC_COMPOSE="${REMOTE_DIR}/src/deploy/docker-compose.t01.yml"
