@@ -364,6 +364,7 @@ export const zh: Messages = {
   'push.noUserHint': '注册时 sentori.user() 未运行。可收广播，无法从 issue 定向。',
   'push.user': '用户',
   'crashFree.title': '无崩溃会话占比',
+  'crashFree.thin': '会话太少，这个精度说明不了问题',
   'crashFree.counts': '{total} 个会话中 {crashed} 个崩溃',
   'crashFree.empty': '这个窗口还没有会话——SDK 在每次应用进入后台时上报一次。升级到会发送会话的版本，或等第一份上报。',
   'crashFree.window': '近 {hours} 小时',
