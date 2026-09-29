@@ -99,6 +99,16 @@ const PROBES = [
     why: 'an install line that installs a version we do not ship',
   },
   {
+    gate: 'gen-replay-vectors.mjs --check',
+    // The compiled module, not the source: the generator imports
+    // `lib/`, so a mutation of the `.ts` would leave the checker
+    // reading the same bytes and passing.
+    file: 'sdk/core/lib/replay-ring.js',
+    find: 'const DELTA_TO_KEYFRAME_RATIO = 0.4',
+    replace: 'const DELTA_TO_KEYFRAME_RATIO = 0.9',
+    why: 'a replay rule the native ports are no longer asserting',
+  },
+  {
     gate: 'check-error-status.mjs',
     file: 'self-hosted/server/src/handlers/notify_admin.rs',
     find: 'pub async fn smtp_status(State(state): State<Arc<AppState>>) -> Json<Value> {',

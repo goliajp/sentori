@@ -6,6 +6,7 @@ export { normalizeUrl } from './url.js';
 export { type SessionContext, type SessionPing, type SessionStatus, SessionTracker, } from './session.js';
 export { shouldSample, shouldSampleTrace } from './sampling.js';
 export { uuidV7 } from './uuid.js';
+export { computeReplayDelta, indexReplayNodes, replayNodeId, ReplayRing, type ReplayDelta, type ReplayEntry, type ReplayFrame, type ReplayKeyframe, type ReplayNode, type ReplayRingOptions, } from './replay-ring.js';
 export { __resetPlatformDegradeForTests, degradePlatform, PLATFORM_FALLBACK, platformOrFallback, refusalIsAboutPlatform, type Outcome, } from './platform-degrade.js';
 export { safeAsync, safeFn } from './safe.js';
 export { __resetCircuitForTests, isCircuitOpen, reportInternal, setInternalReporter, } from './self-report.js';
