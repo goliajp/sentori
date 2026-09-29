@@ -8,7 +8,7 @@
 // host app.
 
 import type { AssertStat, BatchEnvelope, WireEvent } from '@goliapkg/sentori-core';
-import { logger } from '@goliapkg/sentori-core';
+import { degradePlatform, logger, refusalIsAboutPlatform } from '@goliapkg/sentori-core';
 
 import { getConfig } from './config';
 import { isAnyNativeModuleLinked } from './native-loader';
@@ -212,9 +212,19 @@ const sendOnce = async (
   // not been upgraded refuses a platform value its SDK already sends,
   // and every event goes missing with nothing saying so.
   try {
-    const body = (await resp.json()) as { outcomes?: { error?: string }[] };
+    const body = (await resp.json()) as {
+      outcomes?: { error?: string; detail?: string }[];
+    };
     const refused = (body.outcomes ?? []).filter((o) => o && o.error).length;
     countDropped(refused);
+    // If the platform is what it refused, this server is older than
+    // this SDK. Nothing we resend will change its mind, so the rest
+    // of the session goes out under a value every shipped server
+    // takes — losing the runtime's name, which is recoverable, rather
+    // than every event, which is not.
+    if (refusalIsAboutPlatform(body.outcomes)) {
+      degradePlatform((m) => logger.warn(m));
+    }
   } catch {
     // A 2xx we cannot parse tells us nothing about the items; the
     // events are gone either way and guessing a number would be worse

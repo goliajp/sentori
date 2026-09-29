@@ -154,6 +154,18 @@ pub async fn handle(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     out.push_str(&state.ingest_counters.client_dropped_total().to_string());
     out.push('\n');
 
+    // An SDK newer than this server named a platform this build does
+    // not know. The events were kept (stored as `unknown`), so they
+    // also count as accepted; this series is what says the fleet has
+    // moved ahead of the server.
+    out.push_str(
+        "# HELP sentori_ingest_unknown_platform_total Events whose platform this build does not know.\n",
+    );
+    out.push_str("# TYPE sentori_ingest_unknown_platform_total counter\n");
+    out.push_str("sentori_ingest_unknown_platform_total ");
+    out.push_str(&state.ingest_counters.unknown_platform_total().to_string());
+    out.push('\n');
+
     let mut headers = HeaderMap::new();
     headers.insert(
         "content-type",

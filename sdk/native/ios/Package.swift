@@ -30,7 +30,13 @@ let package = Package(
     targets: [
         .target(
             name: "Sentori",
-            path: "Sources/Sentori"
+            path: "Sources/Sentori",
+            // App Review rejects a binary that reaches a
+            // required-reason API without a manifest declaring why,
+            // and the rejection lands on the host app, not on us. A
+            // `.copy` rather than `.process` so the file arrives under
+            // the name the tooling looks for.
+            resources: [.copy("PrivacyInfo.xcprivacy")]
         ),
         .testTarget(
             name: "SentoriTests",

@@ -590,7 +590,7 @@ on. Everything else rides in `payload`, stored as sent.
 | `id` | string (uuid-v7) | no | client-minted; the server mints one when absent |
 | `kind` | `error` \| `warn` \| `trace` \| `assert` \| `probe` | **yes** | the five kinds |
 | `occurredAt` | string (RFC 3339) | **yes** | when it happened, not when it was sent |
-| `platform` | `javascript` \| `ios` \| `android` | **yes** | anything else is a `400` |
+| `platform` | `javascript` \| `ios` \| `android` \| `web` \| `weapp` | **yes** | a value this server does not know is stored as `unknown` rather than refused, so an SDK newer than its server still delivers |
 | `release` | string | no | `<name>@<version>+<build>`. Empty is accepted and costs you symbolication, regression anchoring and the release spread |
 | `environment` | string | no | free text; `production` / `staging` / whatever you deploy |
 | `name` | string | no | the `warn` / `trace` / `assert` name, or the `probe` ref. Part of the fingerprint for those kinds |

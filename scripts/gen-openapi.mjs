@@ -63,7 +63,13 @@ const WIRE_EVENT = {
       type: 'string', format: 'date-time',
       description: 'RFC 3339. No alias — `timestamp` is dropped as unknown and the request then fails as a missing field.',
     },
-    platform: { type: 'string', enum: ['javascript', 'ios', 'android'] },
+    platform: {
+      type: 'string',
+      description:
+        'A value outside this list is stored as `unknown` rather than refused, ' +
+        'so an SDK newer than its server still delivers.',
+      enum: ['javascript', 'ios', 'android', 'web', 'weapp'],
+    },
     release: { type: 'string', default: '' },
     environment: { type: 'string', default: '' },
     userKey: { type: 'string', nullable: true },

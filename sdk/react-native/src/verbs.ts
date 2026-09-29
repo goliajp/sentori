@@ -11,6 +11,7 @@
 import {
   coerceError,
   parseStack,
+  platformOrFallback,
   pushSignal,
   safeFn,
   snapshotSignals,
@@ -19,6 +20,7 @@ import {
 import type {
   EventData,
   EventKind,
+  Platform,
   SentoriError,
   Surface,
   TraceOptions,
@@ -58,7 +60,7 @@ const toSentoriError = (e: Error): SentoriError => ({
       : null,
 });
 
-const platformOf = (): 'android' | 'ios' | 'javascript' => {
+const detectPlatform = (): 'android' | 'ios' | 'javascript' => {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const RN = require('react-native') as { Platform?: { OS?: string } };
@@ -70,6 +72,11 @@ const platformOf = (): 'android' | 'ios' | 'javascript' => {
   }
   return 'javascript';
 };
+
+// The server gets the last word: one that refuses what we detect has
+// told us it predates this SDK, and the transport drops the session
+// to a value it does accept.
+const platformOf = (): Platform => platformOrFallback(detectPlatform());
 
 type EmitOptions = {
   name?: string;

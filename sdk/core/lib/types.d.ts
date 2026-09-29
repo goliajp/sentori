@@ -1,4 +1,4 @@
-export type Platform = 'android' | 'ios' | 'javascript';
+export type Platform = 'android' | 'ios' | 'javascript' | 'weapp' | 'web';
 /** The five kinds. The union IS the concept model. */
 export type EventKind = 'assert' | 'error' | 'probe' | 'trace' | 'warn';
 /** One stack frame, symbolication-ready. */

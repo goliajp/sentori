@@ -12,6 +12,7 @@ export { normalizeUrl } from './url.js';
 export { SessionTracker, } from './session.js';
 export { shouldSample, shouldSampleTrace } from './sampling.js';
 export { uuidV7 } from './uuid.js';
+export { __resetPlatformDegradeForTests, degradePlatform, PLATFORM_FALLBACK, platformOrFallback, refusalIsAboutPlatform, } from './platform-degrade.js';
 export { safeAsync, safeFn } from './safe.js';
 export { __resetCircuitForTests, isCircuitOpen, reportInternal, setInternalReporter, } from './self-report.js';
 export { getLogLevel, logger, setLogLevel, setLogTransport, } from './logger.js';
