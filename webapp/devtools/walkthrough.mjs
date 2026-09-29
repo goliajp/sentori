@@ -56,14 +56,54 @@ if (!session) {
 const cookie = `${session[1]}=${session[2]}`;
 const issues = await (await fetch(`${BASE}/admin/api/issues`, { headers: { cookie } }))
   .json().catch(() => null);
-const iid = (issues?.issues ?? (Array.isArray(issues) ? issues : []))[0]?.id;
+const candidates = issues?.issues ?? (Array.isArray(issues) ? issues : []);
+
+// Not simply the newest. The issue page's main panel is the stack, and
+// the newest issue is usually a probe or a validation fixture with an
+// empty one — so this walked past the screen people came for and
+// photographed three empty cards instead. Two review rounds read that
+// as "the product cannot show a stack" when the product could and the
+// *picture* could not.
+//
+// So: find an issue whose latest event actually carries frames, and
+// fail loudly rather than settle for one that does not.
+let iid = null;
+let best = 0;
+for (const candidate of candidates) {
+  const occurrences = await (await fetch(
+    `${BASE}/admin/api/issues/${candidate.id}/events`,
+    { headers: { cookie } },
+  )).json().catch(() => null);
+  const eventId = (occurrences?.events ?? [])[0]?.id;
+  if (!eventId) continue;
+  const event = await (await fetch(`${BASE}/admin/api/events/${eventId}`, {
+    headers: { cookie },
+  })).json().catch(() => null);
+  // Ranked by *readable* frames, not by frames. A stack of
+  // `p.q.r.a ?:100` renders the panel and proves nothing — it is an
+  // unsymbolicated twin of an issue that does resolve, and landing on
+  // it photographs the product failing at the one thing it is for.
+  // Two review rounds concluded "this product cannot show a stack"
+  // from shots like that, while an issue resolving to
+  // `src/cart/total.ts:48` sat in the same list.
+  const frames = event?.payload?.error?.stack ?? [];
+  const readable = frames.filter(
+    (f) => f && f.file && f.file !== '?' && f.file !== '<unknown>' && f.line,
+  ).length;
+  if (readable > best) {
+    best = readable;
+    iid = candidate.id;
+  }
+}
 if (!iid) {
-  // The issue page is the product. Walking past it quietly would leave
-  // a report that looks complete and covers everything except the
-  // screen people came for.
-  process.stderr.write(`no issue found at ${BASE}/admin/api/issues — the ` +
-    `walkthrough would skip the main screen, so it stops here. Seed one ` +
-    `first (smoke.sh does).\n`);
+  // The issue page is the product, and a shot of its empty state is
+  // not a shot of it.
+  process.stderr.write(
+    `no issue at ${BASE}/admin/api/issues has an event whose stack resolves to ` +
+      `a file and a line, so the one screen this walkthrough exists for would be ` +
+      `photographed showing the product failing at its own job. Seed one first ` +
+      `(smoke.sh does).\n`,
+  );
   process.exit(1);
 }
 

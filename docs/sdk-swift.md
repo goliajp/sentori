@@ -3,8 +3,21 @@
 Error, warning and push capture for iOS apps, with no React Native.
 
 ```swift
-.package(url: "https://github.com/goliajp/sentori-swift", from: "2.1.0")
+// Package.swift
+dependencies: [
+    .package(url: "https://github.com/goliajp/sentori-swift", from: "2.1.0")
+],
+targets: [
+    .target(name: "YourApp", dependencies: [
+        .product(name: "Sentori", package: "sentori-swift")
+    ])
+]
 ```
+
+In Xcode, the product to tick is **Sentori**. This page printed only
+the `dependencies` line until 2026-09-30, which is half a
+`Package.swift` — the product name appeared nowhere, and a module
+name is not a product name.
 
 or, for an app that takes its dependencies through CocoaPods:
 
@@ -160,12 +173,37 @@ and line names using the dSYM your build produced, matched by the
 `release` string and the binary's UUID — so a crash is readable only
 if the dSYM for that exact build was uploaded.
 
+These commands need four values, and this page used to print them as
+bare `$NAME` without saying where any of them came from:
+
+```bash
+ARCHIVE=build/YourApp.xcarchive            # xcodebuild -archivePath
+VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
+  "$ARCHIVE/Products/Applications/YourApp.app/Info.plist")
+BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' \
+  "$ARCHIVE/Products/Applications/YourApp.app/Info.plist")
+
+export SENTORI_API_URL=https://sentori.example.com   # YOUR instance
+export SENTORI_TOKEN=st_…                            # api scope
+```
+
+`--api-url` is not optional in a self-hosted world. Without it the CLI
+defaults to `https://sentori.golia.jp`, which is GOLIA's own instance
+— so the upload leaves your build machine, goes somewhere that is not
+yours, and exits 0.
+
+`$SENTORI_TOKEN` is the name the CLI reads (`$SENTORI_ADMIN_TOKEN`
+also works). This page said `$SENTORI_API_TOKEN` until 2026-09-30,
+which nothing reads: the CLI would have answered `--token is
+required` with the variable sitting right there in the environment.
+
 Right after archiving, in CI:
 
 ```bash
 npx @goliapkg/sentori-cli@latest upload dsym \
+  --api-url "$SENTORI_API_URL" \
   --release "com.example.app@$VERSION+$BUILD" \
-  --token "$SENTORI_API_TOKEN" \
+  --token "$SENTORI_TOKEN" \
   "$ARCHIVE/dSYMs/YourApp.app.dSYM"
 ```
 
@@ -178,8 +216,9 @@ sources too:
 
 ```bash
 npx @goliapkg/sentori-cli@latest upload srcbundle \
+  --api-url "$SENTORI_API_URL" \
   --release "com.example.app@$VERSION+$BUILD" \
-  --token "$SENTORI_API_TOKEN" Sources
+  --token "$SENTORI_TOKEN" Sources
 ```
 
 An upload that fails exits 0 and prints the command to run by hand.
@@ -193,8 +232,9 @@ actually landed:
 
 ```bash
 npx @goliapkg/sentori-cli@latest artifacts check \
+  --api-url "$SENTORI_API_URL" \
   --release "com.example.app@$VERSION+$BUILD" \
-  --token "$SENTORI_API_TOKEN" --expect dsym
+  --token "$SENTORI_TOKEN" --expect dsym
 ```
 
 That catches the case a local "we ran the upload" note cannot: the
@@ -217,6 +257,36 @@ you already use another crash reporter, both of you get the crash.
 A crash is written to disk as it happens and sent on the next launch —
 the process is dying, and a network request is not something it can
 finish.
+
+## Check it works
+
+Symbolication and push can wait. First make one crash appear.
+
+```swift
+// A temporary button, or anything you can reach twice.
+Button("crash") { fatalError("sentori smoke test") }
+```
+
+Then, and this is the step people skip:
+
+1. **Stop the debugger.** Xcode catches the signal first, so a crash
+   run under the debugger never reaches the handler. Run the app, stop
+   it in Xcode, launch it again from the device's home screen.
+2. Tap the button. The app dies — that is the point.
+3. **Launch the app a third time.** A crash is written to disk as the
+   process dies and sent on the next launch; a dying process cannot
+   finish a network request.
+4. Open your instance, go to Issues, and the crash is the top row.
+
+On a simulator, `ingestUrl` may not be `localhost`: the simulator
+shares the host's network, so `http://localhost:8080` is the host's
+`localhost` and works. An Android emulator is the one that needs
+`10.0.2.2` — see the Kotlin page.
+
+Nothing arrived? The verbs are no-ops before `start` runs, and they
+still return an id, so a `start` that never executed looks exactly
+like a quiet app. Check that `start` is on a path that runs, and set
+`logLevel` to `debug` to see the SDK say so.
 
 ## What it costs you
 

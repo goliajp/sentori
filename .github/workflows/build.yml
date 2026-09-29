@@ -370,6 +370,11 @@ jobs:
       # tree, so the page installed a build without crash delivery.
       - name: the install lines install the version we ship
         run: node scripts/check-doc-versions.mjs
+      # A documented upload with no --api-url defaults to GOLIA's own
+      # instance, so a self-hosted reader ships us their symbols and
+      # the command exits 0.
+      - name: CLI commands in the docs work when copied
+        run: node scripts/check-doc-commands.mjs
 
   e2e:
     needs: changes

@@ -38,8 +38,19 @@ which carries enough to send a first event without following any link.
 The current API surface ships with the package and is what npm shows:
 [`sdk/react-native/README.md`](../sdk/react-native/README.md).
 
-There is one SDK guide because there is one SDK. Sentori watches
-mobile apps.
+Sentori watches mobile apps, and there are three ways to put it in
+one:
+
+- [`sdk-swift.md`](sdk-swift.md) — native iOS and tvOS, no React
+  Native.
+- [`sdk-kotlin.md`](sdk-kotlin.md) — native Android, no React Native.
+- [`../sdk/react-native/README.md`](../sdk/react-native/README.md) —
+  React Native and Expo.
+
+This said "there is one SDK guide because there is one SDK" until
+2026-09-30, while two native guides sat in this directory with nothing
+anywhere linking to them. A native team read the front page and
+concluded the product did not support them.
 
 ## Self-hosting
 
