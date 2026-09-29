@@ -42,7 +42,10 @@ pub async fn create(
         return e;
     }
     let id = Uuid::now_v7();
-    let platform = body.platform.unwrap_or_else(|| "react-native".to_string());
+    // Absent, not invented. This defaulted to `react-native`, so a
+    // project created without one advertised a stack it might have
+    // nothing to do with — on the projects page, as a badge.
+    let platform = body.platform;
     match sqlx::query("INSERT INTO projects (id, name, platform) VALUES ($1, $2, $3)")
         .bind(id)
         .bind(&body.name)
