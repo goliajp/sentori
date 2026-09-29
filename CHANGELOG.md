@@ -6,6 +6,33 @@
 
 ---
 
+## v3.18.0（2026-09-30 — 服务端拒收的事件，三个 SDK 都当成送达了）
+
+批量端点对无效事件返回 200，把拒收放在每条 outcome 里。三份 transport 都只读状态码——
+我们自己的注释写着「per-item outcomes are the server's business」——于是任何被服务端拒收
+的事件在客户端不留任何痕迹：不重试、不记日志、不计数。
+
+这在两半错开时最要命。自部署的 server 是手动升的，和 SDK 各走各的；SDK 一旦发出老 server
+不认的值，每条事件都在一个 200 里被拒，而客户端报告的是风平浪静。v4 要改 platform 词表，
+所以这件事必须先做完。
+
+- 三端都读 outcomes 了，拒收计入 `droppedEvents`，**不重试**（`invalid_payload` 是永久的，
+  重试只会打转）。计数抽成 `refusedCount`，两个 native 平台的测试断言同一批用例——两端对
+  「什么算拒收」理解不一致，会变成只数一支舰队
+- 服务端第一次真的读这个数，发布 `sentori_client_dropped_events_total`。在这之前三端写了
+  一年，没有任何人读
+- TypeScript 那份还补了两个洞：没有 AsyncStorage 时整批静默消失（iOS 3.17.5、Android
+  3.17.6 修过，它是第三个平台），以及内存队列没有上限
+- surface 门补了盲区：`sdk/**` 这条过滤器会让任何新包被判为「已被点名」，而 sdk 矩阵是手写
+  四个包，新包不会被任何 job 构建。现在它同时查矩阵，拿 `sdk/web` 实测会红
+- 新增 `webapp/devtools/walkthrough.mjs`：真服务端、真登录、真数据，逐屏截图。已有的
+  `sweep.mjs` 打的是 mock，回答「渲染有没有炸」；这个回答「一个正在评估我们的人会看到什么」
+
+native 的改动在 `xcodebuild test` 和 `gradlew testReleaseUnitTest` 上各跑过一次——
+这两份没有任何 CI 会编译。
+
+---
+
 ## v3.17.10（2026-09-29 — 不会红的门不是门）
 
 上一版让门跑在该跑的地方。这一版问的是它们还会不会红。
