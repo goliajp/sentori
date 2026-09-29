@@ -738,6 +738,50 @@ export function formatBytes(n: number | undefined): string {
   return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${units[i]}`;
 }
 
+/**
+ * A moment, shown the way people read one and hoverable for the way
+ * machines record one.
+ *
+ * Every timestamp in this dashboard was relative and only relative.
+ * That reads well for "2 minutes ago" and falls apart for the audit
+ * log, where the whole point is lining events up against something
+ * that happened outside this product — and for a device whose clock is
+ * wrong, where "2 months ago" is the phone's opinion, not ours.
+ */
+export function TimeAgo({
+  iso,
+  className,
+}: {
+  className?: string;
+  iso: string | null | undefined;
+}) {
+  return (
+    <time className={className} dateTime={iso ?? undefined} title={formatAbsolute(iso)}>
+      {formatRelative(iso)}
+    </time>
+  );
+}
+
+/**
+ * The absolute timestamp a relative one stands for, with its offset.
+ *
+ * `formatRelative` has said since it was written that "the exact
+ * timestamp is in the title attribute wherever this is rendered". It
+ * was in none of them: twenty-five call sites, zero titles. An audit
+ * log whose every row reads "3 minutes ago" cannot do the one job an
+ * audit log has.
+ */
+export function formatAbsolute(iso: string | null | undefined): string {
+  const ms = iso == null ? NaN : new Date(iso).getTime();
+  if (!Number.isFinite(ms)) return '—';
+  const locale =
+    typeof document === 'undefined' ? 'en' : document.documentElement.lang || 'en';
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: 'medium',
+    timeStyle: 'long',
+  }).format(ms);
+}
+
 export function formatRelative(
   iso: string | null | undefined,
   now: number = Date.now(),

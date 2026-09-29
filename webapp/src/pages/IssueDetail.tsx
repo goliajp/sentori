@@ -16,16 +16,7 @@ import { Link } from 'react-router-dom';
 import { useShell } from '../App';
 import { KindBadge, RegressedBadge } from '../components/kind';
 import { UserChip } from '../components/identity';
-import {
-  Button,
-  Input,
-  Panel,
-  PanelEmpty,
-  clsx,
-  formatRelative,
-  formatRelease,
-  formatReleaseIn,
-} from '../components/ui';
+import { Button, Input, Panel, PanelEmpty, TimeAgo, clsx, formatRelative, formatRelease, formatReleaseIn } from '../components/ui';
 import { useT } from '../i18n';
 import {
   api,
@@ -305,10 +296,10 @@ export function IssueDetailPane({
             </Link>
           )}
           <span>
-            {t('issue.firstSeen')} {formatRelative(issue.firstSeen)}
+            {t('issue.firstSeen')} <TimeAgo iso={issue.firstSeen} />
           </span>
           <span>
-            {t('issue.lastSeen')} {formatRelative(issue.lastSeen)}
+            {t('issue.lastSeen')} <TimeAgo iso={issue.lastSeen} />
           </span>
           {issue.lastRelease && (
             <span title={issue.lastRelease}>{formatRelease(issue.lastRelease)}</span>
@@ -346,7 +337,8 @@ export function IssueDetailPane({
                 screensFallback ? (
                   <span className="truncate text-xs normal-case tracking-normal text-fg-subtle">
                     {t('issue.replayFrom', {
-                      when: formatRelative(screensFallback.occurredAt),
+                      // bare-relative: interpolated into a sentence, no element to hold a title
+        when: formatRelative(screensFallback.occurredAt),
                     })}
                   </span>
                 ) : !screensRef && wireframeLatest ? (
@@ -585,7 +577,7 @@ function ReleaseSpread({
             {r.events}ev
           </span>
           <span className="w-16 shrink-0 text-right tabular-nums text-fg-subtle">
-            {formatRelative(r.lastAt)}
+            <TimeAgo iso={r.lastAt} />
           </span>
           <span className="w-14 shrink-0 text-right">
             {r.release === resolvedIn && (
@@ -653,7 +645,7 @@ function OccurrenceList({
               r.id === currentId ? 'font-semibold text-fg' : 'text-fg-muted',
             )}
           >
-            {formatRelative(r.receivedAt)}
+            <TimeAgo iso={r.receivedAt} />
           </span>
           <span className={dim(varies.platform)}>{r.platform}</span>
           <span
