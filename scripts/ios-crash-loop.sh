@@ -139,6 +139,26 @@ PLIST
 cat > "$APP_DIR/CrashHarness/App.swift" <<'SWIFT'
 import Sentori
 import SwiftUI
+import UIKit
+
+/// A handful of real UIViews, so the wireframe walker has the shapes
+/// it knows how to emit.
+struct UIKitProbe: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let host = UIView(frame: CGRect(x: 0, y: 0, width: 300, height: 80))
+        host.backgroundColor = .systemGray5
+        for (index, colour) in [UIColor.systemRed, .systemGreen, .systemBlue].enumerated() {
+            let block = UIView(frame: CGRect(x: 10 + index * 70, y: 10, width: 60, height: 30))
+            block.backgroundColor = colour
+            host.addSubview(block)
+        }
+        let label = UILabel(frame: CGRect(x: 10, y: 48, width: 280, height: 24))
+        label.text = "a real UILabel"
+        host.addSubview(label)
+        return host
+    }
+    func updateUIView(_ view: UIView, context: Context) {}
+}
 
 @main
 struct CrashHarness: App {
@@ -151,7 +171,25 @@ struct CrashHarness: App {
                 release: "crashharness@1.0.0+1",
                 environment: "test"
             ))
-        if env["SENTORI_CRASH"] == "1" {
+        if env["SENTORI_REPLAY"] == "1" {
+            // The replay driver against a real view hierarchy. Its
+            // ring is unit-tested against generated frames and its
+            // timer is unit-tested for not being on main; what has
+            // never run is the capture itself, which reads the view
+            // tree and is the reason the timer must not be on main.
+            SentoriReplayDriver.start(hz: 4)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                SentoriReplayDriver.stop()
+                let ndjson = SentoriReplayDriver.drain()
+                let docs = FileManager.default.urls(
+                    for: .documentDirectory, in: .userDomainMask
+                )[0]
+                try? ndjson.write(
+                    to: docs.appendingPathComponent("replay-drain.ndjson"),
+                    atomically: true, encoding: .utf8
+                )
+            }
+        } else if env["SENTORI_CRASH"] == "1" {
             // A force-unwrapped nil: the single most common way a
             // Swift app dies, and the one an NSException handler
             // never sees. It arrives as EXC_BREAKPOINT / SIGTRAP.
@@ -168,7 +206,25 @@ struct CrashHarness: App {
             }
         }
     }
-    var body: some Scene { WindowGroup { Text("crash harness") } }
+    // Not an empty screen. A wireframe capture that only ever
+    // returned the root window would satisfy "the ring has a
+    // keyframe" and be useless, so there has to be a tree to walk.
+    var body: some Scene {
+        WindowGroup {
+            VStack(spacing: 12) {
+                Text("crash harness").font(.title)
+                // UIKit views on purpose. SwiftUI draws into layers
+                // rather than creating a UIView per view, and the
+                // wireframe walker emits a node for a UILabel, a
+                // UITextView, a UIImageView or anything with a
+                // background colour. Which of those two facts
+                // explains an empty capture is the question this
+                // screen answers.
+                UIKitProbe()
+                Text("a second label")
+            }
+        }
+    }
 }
 SWIFT
 
@@ -223,6 +279,19 @@ SIMCTL_CHILD_SENTORI_INGEST_URL="$BASE" \
     xcrun simctl launch "$UDID" "$BUNDLE" >/dev/null
 
 cd "$ROOT"
+echo "→ the replay driver against a real view tree"
+xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1 || true
+rm -f "$CONTAINER/Documents/replay-drain.ndjson"
+SIMCTL_CHILD_SENTORI_TOKEN="$TOKEN" \
+SIMCTL_CHILD_SENTORI_INGEST_URL="$BASE" \
+SIMCTL_CHILD_SENTORI_REPLAY=1 \
+    xcrun simctl launch "$UDID" "$BUNDLE" >/dev/null
+sleep 8
+DRAIN="$CONTAINER/Documents/replay-drain.ndjson"
+[ -s "$DRAIN" ] \
+    || { echo "✗ the replay driver produced nothing against a real view hierarchy" >&2; exit 1; }
+python3 "$ROOT/scripts/lib/check-replay-drain.py" "$DRAIN"
+
 echo "→ did the crash arrive"
 FOUND=""
 for _ in $(seq 1 40); do
