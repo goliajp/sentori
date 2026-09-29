@@ -51,6 +51,11 @@ import MachO
 
     // MARK: - Internals
 
+    /// Where a crash record waits for the next launch. Shared with
+    /// the signal handler, which writes into the same directory so
+    /// one drain delivers both kinds.
+    static func pendingDirectory() -> URL? { pendingDir() }
+
     private static func pendingDir() -> URL? {
         guard let docs = FileManager.default.urls(
             for: .documentDirectory, in: .userDomainMask).first else { return nil }
