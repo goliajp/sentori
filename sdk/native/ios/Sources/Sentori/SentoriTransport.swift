@@ -192,7 +192,13 @@ public final class SentoriTransport: NSObject {
         timer = nil
         lock.unlock()
 
-        var envelope: [String: Any] = ["events": events]
+        // Symbolication happens here, on the worker, and never on the
+        // thread a verb was called from: resolving forty frames is
+        // sub-millisecond on an idle device and several milliseconds
+        // on a busy one, and a busy device is when errors happen.
+        let resolved = events.map { SentoriStack.resolvePending(in: $0) }
+
+        var envelope: [String: Any] = ["events": resolved]
         if !stats.isEmpty { envelope["assertStats"] = stats }
         if let health = config.backendHealthUrl { envelope["backendHealthUrl"] = health }
         // Say so rather than let the gap look like quiet. A backlog
@@ -204,19 +210,19 @@ public final class SentoriTransport: NSObject {
             switch sendWithRetry(envelope, config: config) {
             case .delivered:
                 lock.lock()
-                delivered += events.count
+                delivered += resolved.count
                 lock.unlock()
-                settle(events, accepted: true)
+                settle(resolved, accepted: true)
             case .dropped:
                 // Handled, but not accepted. Nothing to retry and
                 // nothing to count.
-                settle(events, accepted: false)
+                settle(resolved, accepted: false)
             default:
                 // Spilled, not lost: `drainPersisted` puts these back
                 // through this path on the next start with the same
                 // ids, so anything waiting on them keeps waiting
                 // rather than being discarded here.
-                persist(events)
+                persist(resolved)
             }
         }
     }

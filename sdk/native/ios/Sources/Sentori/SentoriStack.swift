@@ -20,6 +20,27 @@ enum SentoriStack {
     /// bounded number keeps the cost bounded too (footprint, dim 4).
     static let maxDepth = 40
 
+    /// Where a verb parks raw addresses for the worker to resolve.
+    /// Private to the SDK and removed before the event goes on the
+    /// wire — the server has never heard of it.
+    static let pendingKey = "_sentoriStackAddresses"
+
+    /// Replace parked addresses with resolved frames, wherever they
+    /// are in an event. Called on the transport's worker: this is the
+    /// expensive half, and it has no business on the thread the host
+    /// called a verb from.
+    static func resolvePending(in event: [String: Any]) -> [String: Any] {
+        guard var error = event["payload"] as? [String: Any] else { return event }
+        guard var inner = error["error"] as? [String: Any] else { return event }
+        guard let parked = inner[pendingKey] as? [NSNumber] else { return event }
+        inner.removeValue(forKey: pendingKey)
+        inner["stack"] = resolve(parked)
+        error["error"] = inner
+        var out = event
+        out["payload"] = error
+        return out
+    }
+
     /// Return addresses for the calling thread, ours dropped.
     ///
     /// `skip` is how many Sentori frames sit between the host's call
