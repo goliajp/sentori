@@ -139,9 +139,15 @@ function AppFrame({
         {/* fixed-width function column: locations start on one
             vertical line, so the eye can scan either column — free
             widths interleaved names and paths into an unreadable
-            zigzag */}
+            zigzag.
+
+            Wider once there is room. A fully qualified Java name
+            (`com.example.feature.SearchPresenter.query`) was cut at
+            256px with most of the row empty to its right, and the
+            part that gets cut is the end, which is the part that
+            says which method. */}
         <span
-          className="w-64 shrink-0 truncate font-medium text-fg"
+          className="w-64 shrink-0 truncate font-medium text-fg xl:w-96"
           title={frame.function}
         >
           {frame.function ?? '?'}
@@ -270,7 +276,7 @@ function LibraryRun({
             className="flex items-baseline gap-2 py-0.5 pl-8 pr-3.5 font-mono text-xs text-fg-subtle"
           >
             {/* same two-column discipline as the app frames */}
-            <span className="w-60 shrink-0 truncate" title={f.function}>
+            <span className="w-60 shrink-0 truncate xl:w-80" title={f.function}>
               {f.function ?? '?'}
             </span>
             <span className="min-w-0 flex-1 truncate" title={f.file}>

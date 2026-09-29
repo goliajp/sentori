@@ -372,6 +372,7 @@ export const en = {
   'push.noUserHint': 'Registered before sentori.user() ran. Receives broadcasts; not addressable from an issue.',
   'push.user': 'User',
   'crashFree.title': 'Crash-free sessions',
+  'crashFree.counts': '{crashed} crashed of {total} sessions',
   'crashFree.empty': 'No sessions in this window yet — the SDK reports one each time the app goes to the background. Update to a build that sends them, or wait for the first report.',
   'crashFree.window': 'last {hours}h',
   'platform.unknown': 'Unknown (SDK newer than this server)',
