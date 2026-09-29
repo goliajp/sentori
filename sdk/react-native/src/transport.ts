@@ -18,17 +18,31 @@ const BATCH_SIZE = 10;
 const MAX_RETRY = 3;
 const STORAGE_KEY = '@sentori/pending';
 const MAX_PERSISTED = 1000;
+// The native transports have capped the in-memory queue at 500 since
+// they were written; this one had no bound at all.
+const MAX_QUEUED = 500;
 
 // Pinned to package.json by a test — bump both together.
 const SDK_VERSION = '7.0.1';
 
 let _queue: WireEvent[] = [];
+let _dropped = 0;
+
+/** Count a loss. Silence here is what makes a dropped event
+ *  indistinguishable from an idle client. */
+const countDropped = (n: number): void => {
+  if (n > 0) _dropped += n;
+};
 let _assertStats = new Map<string, AssertStat>();
 let _flushTimer: ReturnType<typeof setTimeout> | null = null;
 let _started = false;
 
 export const enqueue = (event: WireEvent): void => {
   _queue.push(event);
+  if (_queue.length > MAX_QUEUED) {
+    countDropped(_queue.length - MAX_QUEUED);
+    _queue = _queue.slice(-MAX_QUEUED);
+  }
   if (_queue.length >= BATCH_SIZE) {
     void flush();
   } else if (!_flushTimer) {
@@ -78,7 +92,14 @@ export const flush = async (): Promise<void> => {
   }
   if (events.length === 0 && stats.length === 0) return;
 
+  // Taken and reset as the envelope is built, which is what the two
+  // native transports do: a count riding a batch that never arrives is
+  // lost with it, and carrying it forward would report it twice.
+  const lost = _dropped;
+  _dropped = 0;
+
   const envelope: BatchEnvelope = { events };
+  if (lost > 0) envelope.droppedEvents = lost;
   if (stats.length > 0) envelope.assertStats = stats;
   if (config.backendHealthUrl) envelope.backendHealthUrl = config.backendHealthUrl;
 
@@ -215,14 +236,19 @@ const getAsyncStorage = async (): Promise<AsyncStorageLike | null> => {
 const persist = async (events: WireEvent[]): Promise<void> => {
   if (events.length === 0) return;
   const AsyncStorage = await getAsyncStorage();
-  if (!AsyncStorage) return;
+  // No storage linked means this batch ends here. It used to end here
+  // silently, so a host without the optional peer dependency lost
+  // every failed batch and nothing said so.
+  if (!AsyncStorage) return countDropped(events.length);
   try {
     const existing = await AsyncStorage.getItem(STORAGE_KEY);
     const prev: WireEvent[] = existing ? JSON.parse(existing) : [];
-    const merged = [...prev, ...events].slice(-MAX_PERSISTED);
+    const all = [...prev, ...events];
+    const merged = all.slice(-MAX_PERSISTED);
+    countDropped(all.length - merged.length);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
   } catch {
-    // best-effort
+    countDropped(events.length);
   }
 };
 
@@ -301,6 +327,7 @@ export const uploadAttachment = async (
 
 export const __resetForTests = (): void => {
   _queue = [];
+  _dropped = 0;
   _assertStats = new Map();
   if (_flushTimer) clearTimeout(_flushTimer);
   _flushTimer = null;
@@ -308,5 +335,6 @@ export const __resetForTests = (): void => {
 };
 
 export const __peekQueue = (): readonly WireEvent[] => _queue;
+export const __peekDropped = (): number => _dropped;
 export const __sdkVersion = (): string => SDK_VERSION;
 export const __peekAssertStats = (): readonly AssertStat[] => [..._assertStats.values()];
