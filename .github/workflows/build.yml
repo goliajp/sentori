@@ -315,7 +315,14 @@ jobs:
   static-checks:
     runs-on: ubuntu-latest
     steps:
+      # Tags, because `check-doc-versions.mjs` asks what a release
+      # actually published and the answer is a `swift/<version>` tag.
+      # The default checkout brings none, and the gate stops rather
+      # than guessing — which is how this was found.
       - uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          fetch-depth: 0
 
       - name: every surface is named by a workflow that runs on develop
         run: node scripts/check-surface-gates.mjs

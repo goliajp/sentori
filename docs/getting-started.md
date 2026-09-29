@@ -149,7 +149,7 @@ npx @goliapkg/sentori-cli issue silence <issue-uuid> \
 These need a token whose **scope is `api`**, minted at Settings ▸
 Tokens. There is one prefix — `st_` — and the scope is a property the
 server holds, not something you can read off the token. The `sk_`
-`sk_` prefix is from v0 and `protocol.md` records it as removed, so a
+prefix is from v0 and `protocol.md` records it as removed, so a
 token you find with that shape is from a retired instance.
 
 The CLI takes the token as `--token`, and reads `$SENTORI_TOKEN` or

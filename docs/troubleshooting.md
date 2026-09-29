@@ -52,7 +52,7 @@ that release isn't loaded. Two reasons:
 - **Source map not uploaded** — most common. Run:
 
   ```bash
-  sentori-cli upload sourcemap \
+  npx @goliapkg/sentori-cli@latest upload sourcemap \
     --release "myapp@1.2.3+456" \
     --token "$SENTORI_TOKEN" \
     --api-url "$SENTORI_API_URL" \
