@@ -294,7 +294,17 @@ object SentoriTransport {
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
 
             when (val code = conn.responseCode) {
-                in 200..299 -> Outcome.DELIVERED
+                in 200..299 -> {
+                    // A batch answers 200 with one outcome per event, and
+                    // a refused event carries its error there rather than
+                    // in the status. Reading only the status is how an
+                    // event the server refused counted as delivered — it
+                    // matters where the two halves drift, a self-hosted
+                    // server older than the SDK talking to it.
+                    val text = conn.inputStream?.bufferedReader()?.readText().orEmpty()
+                    countDropped(refusedCount(text))
+                    Outcome.DELIVERED
+                }
                 429 -> {
                     lastRetryAfterMs =
                         try {
@@ -394,6 +404,25 @@ object SentoriTransport {
     }
 
     /** Count a loss so the next envelope carries it as `droppedEvents`. */
+    /**
+     * How many events in a 200 the server refused. Parsing failure reads
+     * as zero on purpose: a 2xx we cannot read says nothing about the
+     * items, and guessing a number is worse than the gap.
+     */
+    internal fun refusedCount(body: String): Int =
+        try {
+            val arr = JSONObject(body).optJSONArray("outcomes")
+            var n = 0
+            if (arr != null) {
+                for (i in 0 until arr.length()) {
+                    if (arr.optJSONObject(i)?.has("error") == true) n += 1
+                }
+            }
+            n
+        } catch (_: Throwable) {
+            0
+        }
+
     private fun countDropped(n: Int) {
         if (n <= 0) return
         synchronized(lock) { dropped += n }

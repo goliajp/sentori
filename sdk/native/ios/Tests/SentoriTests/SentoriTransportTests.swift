@@ -53,6 +53,22 @@ final class SentoriTransportTests: XCTestCase {
             ))
     }
 
+    func testRefusedEventsInsideA200AreCounted() {
+        // The batch endpoint answers 200 and puts each refusal in that
+        // event's outcome. Reading only the status counted a refusal as
+        // a delivery — the shape a self-hosted server takes when it is
+        // older than the SDK talking to it.
+        let refused = Data(#"{"accepted":1,"outcomes":[{},{"error":"invalid_payload"}]}"#.utf8)
+        XCTAssertEqual(SentoriTransport.refusedCount(refused), 1)
+
+        // Same assertion as `theEventsAServerRefusedInsideA200AreCounted`
+        // in SentoriTransportTest.kt: the two platforms disagreeing about
+        // what a refusal is would count one fleet and not the other.
+        XCTAssertEqual(SentoriTransport.refusedCount(Data(#"{"outcomes":[{},{}]}"#.utf8)), 0)
+        // A 2xx we cannot parse says nothing about the items.
+        XCTAssertEqual(SentoriTransport.refusedCount(Data("not json".utf8)), 0)
+    }
+
     func testEnqueueBeforeInitIsASilentNoOpRatherThanACrash() {
         // No config: the whole SDK is a no-op. This is the state a
         // mis-wired token leaves an app in, and it must be boring.
