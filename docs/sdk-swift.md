@@ -352,6 +352,15 @@ next `Sentori.start` sends the crash, and once the server has taken
 it, uploads the two blobs against it — in that order, because an
 attachment keyed on an event the server has not seen is a 404.
 
+**The view tree is a UIKit view tree.** It records a `UILabel`, a
+`UITextView`, a `UIImageView` and anything with a background colour.
+SwiftUI draws into layers instead of creating a view per view, so a
+screen built entirely in SwiftUI yields almost nothing — measured on
+a simulator: six nodes for a screen with UIKit views on it, one for
+the same screen in pure SwiftUI. The screenshot is unaffected and is
+the useful artefact there. If your app is SwiftUI, treat the
+wireframe as empty until this says otherwise.
+
 Nothing here needs configuring. The hang watchdog, thread sampler and
 mobile vitals are compiled in and driven by the React Native SDK
 today; they are not yet part of this public surface.
