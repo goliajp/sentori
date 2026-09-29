@@ -109,6 +109,13 @@ const PROBES = [
     why: 'a replay rule the native ports are no longer asserting',
   },
   {
+    gate: 'check-doc-commands.mjs',
+    file: 'docs/sdk-swift.md',
+    find: '--token "$SENTORI_TOKEN"',
+    replace: '--token "$SENTORI_API_TOKEN"',
+    why: 'a documented token variable the CLI does not read',
+  },
+  {
     gate: 'check-error-status.mjs',
     file: 'self-hosted/server/src/handlers/notify_admin.rs',
     find: 'pub async fn smtp_status(State(state): State<Arc<AppState>>) -> Json<Value> {',

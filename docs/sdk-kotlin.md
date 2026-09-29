@@ -8,7 +8,21 @@ dependencies {
 }
 ```
 
-`minSdk 24`, JVM target 17. Apache-2.0 OR MIT.
+`minSdk 24`, JVM target 17. Apache-2.0 OR MIT. The artifact is on
+Maven Central, so `mavenCentral()` must be in your repositories.
+
+The `Application` subclass below only runs if the manifest names it,
+and a blank project's manifest does not:
+
+```xml
+<!-- AndroidManifest.xml -->
+<application android:name=".App" …>
+```
+
+Without that line `onCreate` never executes, `start` never runs, and
+every verb is a no-op that still returns an id — so the integration
+looks finished and reports nothing at all. This page gave the class
+and not the line until 2026-09-30.
 
 The package is `com.sentori`, which is **not** the groupId:
 
@@ -170,7 +184,7 @@ wait for FCM.
 In use:
 
 ```kotlin
-Sentori.push.register(
+SentoriPush.register(
     context = this,
     activity = this,                      // for the Android 13+ prompt
     onMessage = { payload -> … },         // arrived while in the foreground
@@ -280,12 +294,50 @@ them using the R8 / ProGuard mapping your build produced, matched by
 the `release` string — so a crash is readable only if the mapping for
 that exact build was uploaded.
 
+That mapping only exists if R8 ran. A blank project ships with
+`minifyEnabled false`, so `mapping.txt` is not there and the upload
+below fails on a missing file — this page printed the path without
+saying so until 2026-09-30:
+
+```kotlin
+// app/build.gradle.kts
+android {
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+        }
+    }
+}
+```
+
+The commands need three values, printed here as bare `$NAME` until
+2026-09-30 with nothing saying where they came from:
+
+```bash
+VERSION=$(./gradlew -q printVersionName)   # or read it from your own build logic
+BUILD=$(./gradlew -q printVersionCode)
+
+export SENTORI_API_URL=https://sentori.example.com   # YOUR instance
+export SENTORI_TOKEN=st_…                            # api scope
+```
+
+`--api-url` is not optional in a self-hosted world. Without it the CLI
+defaults to `https://sentori.golia.jp`, which is GOLIA's own instance
+— so the mapping leaves your build machine, goes somewhere that is not
+yours, and exits 0.
+
+`$SENTORI_TOKEN` is the name the CLI reads (`$SENTORI_ADMIN_TOKEN`
+also works). This page said `$SENTORI_API_TOKEN` until 2026-09-30,
+which nothing reads.
+
 Right after the release build, in CI:
 
 ```bash
 npx @goliapkg/sentori-cli@latest upload mapping \
+  --api-url "$SENTORI_API_URL" \
   --release "com.example.app@$VERSION+$BUILD" \
-  --token "$SENTORI_API_TOKEN" \
+  --token "$SENTORI_TOKEN" \
   app/build/outputs/mapping/release/mapping.txt
 ```
 
@@ -298,8 +350,9 @@ sources too:
 
 ```bash
 npx @goliapkg/sentori-cli@latest upload srcbundle \
+  --api-url "$SENTORI_API_URL" \
   --release "com.example.app@$VERSION+$BUILD" \
-  --token "$SENTORI_API_TOKEN" app/src/main/java
+  --token "$SENTORI_TOKEN" app/src/main/java
 ```
 
 An upload that fails exits 0 and prints the command to run by hand.
@@ -313,8 +366,9 @@ actually landed:
 
 ```bash
 npx @goliapkg/sentori-cli@latest artifacts check \
+  --api-url "$SENTORI_API_URL" \
   --release "com.example.app@$VERSION+$BUILD" \
-  --token "$SENTORI_API_TOKEN" --expect proguard
+  --token "$SENTORI_TOKEN" --expect proguard
 ```
 
 That catches the case a local "we ran the upload" note cannot: the
@@ -331,6 +385,35 @@ can disagree with the one on your release dashboard.
 Below 11 there is no such record, so a watchdog detects a blocked main
 thread instead. It is an inference, and a debugger pause looks like
 one; it runs only on those devices.
+
+## Check it works
+
+Symbolication and push can wait. First make one crash appear.
+
+```kotlin
+// A temporary button, or anything you can reach twice.
+findViewById<Button>(R.id.crash).setOnClickListener {
+    throw IllegalStateException("sentori smoke test")
+}
+```
+
+Then, and this is the step people skip:
+
+1. **Detach the debugger.** Run the app, stop it in Android Studio,
+   then launch it again from the launcher.
+2. Tap the button. The app dies — that is the point.
+3. **Launch the app a third time.** A crash is written to disk as the
+   process dies and sent on the next launch; a dying process cannot
+   finish a network request.
+4. Open your instance, go to Issues, and the crash is the top row.
+
+On an emulator, `ingestUrl` cannot be `localhost` — that is the
+emulator itself. The host is `http://10.0.2.2:8080`.
+
+Nothing arrived? Check the manifest line first (`android:name=".App"`,
+above): without it `start` never runs, and the verbs stay no-ops that
+return an id, so a missing integration and a quiet app look the same.
+Set `logLevel` to `debug` to make the SDK say which it is.
 
 ## What it costs you
 
