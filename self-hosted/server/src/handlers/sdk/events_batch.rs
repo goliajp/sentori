@@ -46,6 +46,13 @@ pub struct BatchEnvelope {
     /// remembers it per project and probes it (backend_check_worker).
     #[serde(default)]
     pub backend_health_url: Option<String>,
+    /// How many events this SDK discarded since the last envelope —
+    /// a full queue, or a spill it could not write. The three
+    /// transports have counted this since 3.17.6 and nothing read it,
+    /// so a client quietly losing events looked exactly like a client
+    /// with nothing to say.
+    #[serde(default)]
+    pub dropped_events: Option<u32>,
 }
 
 pub async fn handle(
@@ -53,6 +60,13 @@ pub async fn handle(
     State(state): State<Arc<AppState>>,
     Json(envelope): Json<BatchEnvelope>,
 ) -> (StatusCode, Json<Value>) {
+    // Counted before the size check: a client that dropped events is
+    // telling us something whether or not this particular batch is
+    // well formed.
+    if let Some(n) = envelope.dropped_events {
+        state.ingest_counters.client_dropped(u64::from(n));
+    }
+
     if envelope.events.len() > MAX_BATCH {
         state.ingest_counters.rejected();
         return (

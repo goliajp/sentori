@@ -143,6 +143,17 @@ pub async fn handle(State(state): State<Arc<AppState>>) -> impl IntoResponse {
         out.push('\n');
     }
 
+    // What the SDKs threw away before we saw it. Every transport
+    // counts a drop and puts it on the next envelope; this is the only
+    // place that number becomes visible to anyone.
+    out.push_str(
+        "# HELP sentori_client_dropped_events_total Events an SDK discarded before delivery.\n",
+    );
+    out.push_str("# TYPE sentori_client_dropped_events_total counter\n");
+    out.push_str("sentori_client_dropped_events_total ");
+    out.push_str(&state.ingest_counters.client_dropped_total().to_string());
+    out.push('\n');
+
     let mut headers = HeaderMap::new();
     headers.insert(
         "content-type",

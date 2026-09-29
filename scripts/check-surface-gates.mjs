@@ -93,6 +93,25 @@ const uncovered = [...surfaces]
   ])
   .filter(([, files]) => files.length);
 
+// A path filter naming a directory says a job *may* run for it, not
+// that any job builds it. `sdk/**` matches every package, while the sdk
+// job's matrix names four by hand — so a new package under sdk/ passes
+// the check above and is never compiled, tested or size-checked, which
+// is the webapp failure one level deeper.
+const sdkPackages = tracked
+  .filter((f) => /^sdk\/[^/]+\/package\.json$/.test(f))
+  .map((f) => f.slice(0, f.lastIndexOf('/')));
+const matrix = readFileSync(join(WF_DIR, 'build.yml'), 'utf8');
+const unbuilt = sdkPackages.filter((p) => !matrix.includes(`- ${p}\n`));
+
+if (unbuilt.length) {
+  console.error(`✗ ${unbuilt.length} package(s) under sdk/ that no job builds:`);
+  for (const p of unbuilt) console.error(`    ${p}`);
+  console.error(`  The sdk job's matrix in build.yml names its packages one ` +
+    `by one. A path filter matching sdk/** is not a job.`);
+  process.exit(1);
+}
+
 if (uncovered.length) {
   console.error(`✗ ${uncovered.length} surface(s) no workflow path filter ` +
     `names — a change there runs no job that builds it:`);
@@ -111,4 +130,5 @@ const exemptFiles = Object.keys(OUTSIDE).filter((k) => tracked.includes(k));
 
 console.log(`✓ ${surfaces.size} surfaces: ${byFilter.length} named by a ` +
   `workflow filter, ${exemptDirs.length} outside them by declaration, ` +
-  `plus ${exemptFiles.length} root files`);
+  `plus ${exemptFiles.length} root files; ${sdkPackages.length} sdk ` +
+  `packages all in the build matrix`);

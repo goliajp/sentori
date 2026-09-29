@@ -39,6 +39,7 @@ pub struct IngestCounters {
     rejected: AtomicU64,
     failed: AtomicU64,
     rate_limited: AtomicU64,
+    client_dropped: AtomicU64,
 }
 
 impl IngestCounters {
@@ -62,6 +63,22 @@ impl IngestCounters {
     /// Turned away by the per-token limiter (429).
     pub fn rate_limited(&self) {
         self.rate_limited.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Events the SDK threw away before we ever saw them — a full
+    /// queue, a spill that could not be written. The client counts
+    /// them and carries the number on the next envelope; without this
+    /// the count arrives and dies there, which is the same as not
+    /// counting at all.
+    pub fn client_dropped(&self, n: u64) {
+        if n > 0 {
+            self.client_dropped.fetch_add(n, Ordering::Relaxed);
+        }
+    }
+
+    #[must_use]
+    pub fn client_dropped_total(&self) -> u64 {
+        self.client_dropped.load(Ordering::Relaxed)
     }
 
     /// `(status label, count)` for every outcome, always all four —

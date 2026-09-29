@@ -50,6 +50,24 @@ class SentoriTransportTest {
     }
 
     @Test
+    fun theEventsAServerRefusedInsideA200AreCounted() {
+        // The batch endpoint answers 200 and puts each refusal in that
+        // event's outcome. Reading only the status counted a refusal as
+        // a delivery — the shape a self-hosted server takes when it is
+        // older than the SDK talking to it.
+        val body = """{"accepted":1,"outcomes":[{},{"error":"invalid_payload","detail":"platform"}]}"""
+        assertEquals(1, SentoriTransport.refusedCount(body))
+
+        // Same assertion as `testRefusedEventsInsideA200AreCounted` in
+        // SentoriTransportTests.swift: the two platforms disagreeing
+        // about what a refusal is would count one fleet and not the
+        // other.
+        assertEquals(0, SentoriTransport.refusedCount("""{"accepted":2,"outcomes":[{},{}]}"""))
+        // A 2xx we cannot read says nothing about the items.
+        assertEquals(0, SentoriTransport.refusedCount("not json"))
+    }
+
+    @Test
     fun aSpillThatCannotBeWrittenIsCountedRatherThanLost() {
         SentoriConfig.set(
             SentoriConfig(
