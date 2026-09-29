@@ -12,7 +12,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { useShell } from '../App';
-import { Button, DataTable, ErrorBanner, Field, Input, PageShell, Panel, Select, TimeAgo, clsx } from '../components/ui';
+import { Button, DataTable, ErrorBanner, Field, Input, PageShell, Panel, Select, TimeAgo, clsx, formatAbsolute, formatRelative } from '../components/ui';
 import { useLocale, useSetLocale, useT } from '../i18n';
 import {
   api,
@@ -366,10 +366,19 @@ function AuditTab() {
             {
               key: 'createdAt',
               label: t('settings.colWhen'),
-              width: '110px',
+              width: '190px',
+              // Absolute, with the zone. An audit row that reads "2
+              // minutes ago" cannot be lined up with a deploy, a
+              // support ticket or another system's log — which is the
+              // only thing an audit log is for. The relative form is
+              // still the title, for the "how long ago" read.
               render: (r) => (
-                <span className="text-xs tabular-nums text-fg-subtle">
-                  <TimeAgo iso={r.createdAt} />
+                <span
+                  className="text-xs tabular-nums text-fg-subtle"
+                  // bare-relative: inverted here, the absolute time is what is rendered
+                  title={formatRelative(r.createdAt)}
+                >
+                  {formatAbsolute(r.createdAt)}
                 </span>
               ),
             },

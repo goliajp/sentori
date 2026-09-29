@@ -197,6 +197,12 @@ jobs:
       - name: check for orphan modules
         run: bash scripts/check-orphan-modules.sh
 
+      # The same failure in TypeScript, which is quieter about it: an
+      # unreferenced module still typechecks, still lints, and is in
+      # no bundle. `session.ts` sat like that for two years.
+      - name: orphan TypeScript (written-but-never-bundled guard)
+        run: node scripts/check-orphan-ts.mjs
+
       # The SDK reference documented a v0.2-era `init()` for months:
       # an option that did not exist, six that did and were unlisted,
       # and a required field marked optional with a default pointing

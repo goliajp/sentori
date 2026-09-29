@@ -116,6 +116,13 @@ const PROBES = [
     why: 'a documented token variable the CLI does not read',
   },
   {
+    gate: 'check-orphan-ts.mjs',
+    file: 'sdk/react-native/src/index.ts',
+    find: "export { registerMaskQuery } from './mask';",
+    replace: '',
+    why: 'a TypeScript module that ships in no bundle',
+  },
+  {
     gate: 'check-error-status.mjs',
     file: 'self-hosted/server/src/handlers/notify_admin.rs',
     find: 'pub async fn smtp_status(State(state): State<Arc<AppState>>) -> Json<Value> {',
