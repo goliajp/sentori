@@ -62,7 +62,7 @@ CI smoke test read; nothing about delivery depends on them.
 
 ### `POST /v1/events:batch`
 
-Up to **200** events in one request, plus two optional side channels.
+Up to **200** events in one request, plus optional side channels.
 
 ```json
 {
@@ -71,6 +71,13 @@ Up to **200** events in one request, plus two optional side channels.
     { "name": "cart.total matched the server", "release": "app@1.2.3+45",
       "passDelta": 4120, "failDelta": 2 }
   ],
+  "sessions": [
+    { "id": "01920000-0000-7000-8000-000000000001",
+      "status": "exited", "release": "app@1.2.3+45", "environment": "production",
+      "platform": "ios", "startedAt": "2026-09-30T06:00:00Z",
+      "durationMs": 42000, "userId": "…" }
+  ],
+  "droppedEvents": 3,
   "backendHealthUrl": "https://api.example.com/healthz"
 }
 ```
@@ -79,6 +86,19 @@ Up to **200** events in one request, plus two optional side channels.
   assertion that passes forty thousand times must not become forty
   thousand events; only failures are events, and the passes arrive as
   a delta.
+- `sessions` — sessions that ended since the last envelope. This is
+  the denominator: without it an error count has nothing to divide by
+  and the crash-free rate cannot be computed. `status` is one of `ok`,
+  `exited`, `errored`, `crashed`, promoted monotonically on the client
+  — once `crashed`, a later error cannot demote it. `id` is minted by
+  the SDK and a resend carries the same one, so counting is
+  idempotent; counting a session twice moves the rate in the
+  flattering direction. A session the server cannot read is skipped
+  rather than failing the envelope, because the events travelling with
+  it are crash reports.
+- `droppedEvents` — how many events this SDK discarded since the last
+  envelope: a full queue, or a spill it could not write. A loss nobody
+  counts is a loss nobody can see.
 - `backendHealthUrl` — remembered per project and probed server-side
   once a minute. The app never pings it.
 
@@ -667,7 +687,8 @@ when the map embedded `sourcesContent`.
 ## Batch wrapper
 
 See [`POST /v1/events:batch`](#post-v1eventsbatch). `events` is
-required; `assertStats` and `backendHealthUrl` are optional side
+required; `assertStats`, `sessions`, `droppedEvents` and
+`backendHealthUrl` are optional side
 channels on the same request rather than endpoints of their own —
 a quiet SDK should make one request, not three.
 

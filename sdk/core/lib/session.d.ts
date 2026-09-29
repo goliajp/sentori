@@ -1,8 +1,31 @@
+/**
+ * Phase 26 sub-A/B: session tracker.
+ *
+ * One in-flight session at a time. The platform SDK calls:
+ *   - `start(...)` when the app foregrounds / page loads
+ *   - `markErrored()` from captureException
+ *   - `markCrashed()` from a native crash hook
+ *   - `end()` when the app backgrounds / page unloads
+ *
+ * The tracker holds the in-progress state; the *transport* it sends to
+ * is supplied by the platform (so JS SDK uses fetch/sendBeacon, RN SDK
+ * uses fetch over the Hermes/JSC bridge, etc.). Status promotion is
+ * monotonic — once `crashed` is set it can't be downgraded by a later
+ * `markErrored()`.
+ *
+ * Re-entrancy: `start()` while a session is active drops the previous
+ * one without sending — that lifecycle is owned by the platform's
+ * foreground/background plumbing and dual-active never makes sense.
+ */
+import type { Platform } from './types.js';
 export type SessionStatus = 'crashed' | 'errored' | 'exited' | 'ok';
 export type SessionPing = {
     durationMs: number;
     environment: string;
     id: string;
+    /** Which runtime the session ran in, so a crash-free rate can be
+     *  read per platform rather than only per release. */
+    platform: Platform;
     release: string;
     startedAt: string;
     status: SessionStatus;
@@ -10,6 +33,7 @@ export type SessionPing = {
 };
 export type SessionContext = {
     environment: string;
+    platform: Platform;
     release: string;
     userId: null | string;
 };

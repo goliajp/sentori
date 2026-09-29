@@ -7,7 +7,7 @@
 // queue drained on next launch. Nothing here ever throws into the
 // host app.
 
-import type { AssertStat, BatchEnvelope, WireEvent } from '@goliapkg/sentori-core';
+import type { AssertStat, BatchEnvelope, SessionPing, WireEvent } from '@goliapkg/sentori-core';
 import { degradePlatform, logger, refusalIsAboutPlatform } from '@goliapkg/sentori-core';
 
 import { getConfig } from './config';
@@ -21,6 +21,9 @@ const MAX_PERSISTED = 1000;
 // The native transports have capped the in-memory queue at 500 since
 // they were written; this one had no bound at all.
 const MAX_QUEUED = 500;
+
+/** Sessions are small and rare; losing one moves a published number. */
+const MAX_QUEUED_SESSIONS = 200;
 
 // Pinned to package.json by a test — bump both together.
 const SDK_VERSION = '7.0.1';
@@ -74,6 +77,22 @@ export const countAssert = (name: string, ok: boolean, release: string): void =>
   }
 };
 
+let _sessions: SessionPing[] = [];
+
+/**
+ * A finished session, riding the next envelope.
+ *
+ * Kept apart from the event queue: a session is the denominator of
+ * the crash-free rate, and dropping one when the event queue
+ * overflows would move the rate in the flattering direction. The cap
+ * is its own, and generous — a session is a few dozen bytes and an
+ * app produces one per foreground, not one per error.
+ */
+export const queueSession = (ping: SessionPing): void => {
+  _sessions.push(ping);
+  while (_sessions.length > MAX_QUEUED_SESSIONS) _sessions.shift();
+};
+
 export const startTransport = (): void => {
   _started = true;
 };
@@ -90,7 +109,7 @@ export const flush = async (): Promise<void> => {
     clearTimeout(_flushTimer);
     _flushTimer = null;
   }
-  if (events.length === 0 && stats.length === 0) return;
+  if (events.length === 0 && stats.length === 0 && _sessions.length === 0) return;
 
   // Taken and reset as the envelope is built, which is what the two
   // native transports do: a count riding a batch that never arrives is
@@ -98,7 +117,11 @@ export const flush = async (): Promise<void> => {
   const lost = _dropped;
   _dropped = 0;
 
+  const sessions = _sessions;
+  _sessions = [];
+
   const envelope: BatchEnvelope = { events };
+  if (sessions.length > 0) envelope.sessions = sessions;
   if (lost > 0) envelope.droppedEvents = lost;
   if (stats.length > 0) envelope.assertStats = stats;
   if (config.backendHealthUrl) envelope.backendHealthUrl = config.backendHealthUrl;
@@ -353,6 +376,7 @@ export const uploadAttachment = async (
 
 export const __resetForTests = (): void => {
   _queue = [];
+  _sessions = [];
   _dropped = 0;
   _assertStats = new Map();
   if (_flushTimer) clearTimeout(_flushTimer);
@@ -361,6 +385,8 @@ export const __resetForTests = (): void => {
 };
 
 export const __peekQueue = (): readonly WireEvent[] => _queue;
+
+export const __peekSessions = (): readonly SessionPing[] => _sessions;
 export const __peekDropped = (): number => _dropped;
 export const __sdkVersion = (): string => SDK_VERSION;
 export const __peekAssertStats = (): readonly AssertStat[] => [..._assertStats.values()];

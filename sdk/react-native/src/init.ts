@@ -17,6 +17,8 @@ import { checkColdStart } from './mobile-vitals';
 import { armLaunch } from './launch';
 import { markNativeJsBridgeReady, setNativeConfig } from './native';
 import { shipNativePending } from './native-pending';
+import { recoverSession, startSession } from './sessions';
+import { platformOf } from './verbs';
 import { drainReplay, startReplay } from './replay';
 import {
   drainScreenReplay,
@@ -127,7 +129,19 @@ export const init = safeFn('init', (config: InitConfig): void => {
   startTransport();
   checkColdStart(config.detect?.slowColdStart !== false);
   armLaunch();
-  void shipNativePending().catch(() => undefined);
+  // Sessions: close out whatever the last launch left open, then
+  // open this one. The order matters — the recovered session is
+  // `crashed` only when the native handler left a crash file, and
+  // that is what `shipNativePending` reports.
+  void shipNativePending()
+    .then((crashed) => recoverSession(crashed))
+    .catch(() => undefined);
+  startSession({
+    environment: config.environment ?? 'production',
+    platform: platformOf(),
+    release: config.release ?? '',
+    userId: null,
+  });
   void drainOfflineQueue();
 });
 

@@ -364,6 +364,9 @@ export const ja: Messages = {
   'push.noUser': '未識別',
   'push.noUserHint': 'sentori.user() 実行前に登録。ブロードキャストのみ受信、issue からの指定は不可。',
   'push.user': 'ユーザー',
+  'crashFree.title': 'クラッシュフリーセッション',
+  'crashFree.empty': 'この期間のセッションはまだありません。SDK はアプリがバックグラウンドに入るたびに 1 件送ります。送信するビルドに更新するか、最初の報告をお待ちください。',
+  'crashFree.window': '直近 {hours} 時間',
   'platform.unknown': '不明（SDK がサーバーより新しい）',
   'releases.artifactBroken': '{platform} にアップロード済みだが読めない成果物あり。展開して確認。',
   'releases.artifactMissing':

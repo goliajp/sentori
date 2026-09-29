@@ -479,7 +479,8 @@ export default function TriageView() {
         {issueId ? (
           <IssueDetailPane issueId={issueId} onChanged={reload} />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-3">
+          <div className="flex h-full flex-col items-center justify-center gap-6">
+            {projectId && <CrashFreeCard projectId={projectId} />}
             <p className="text-sm text-fg-muted">{t('triage.pickTitle')}</p>
             <p className="flex items-center gap-3 text-xs text-fg-subtle">
               <span className="flex items-center gap-1">
@@ -607,6 +608,72 @@ function QueueRow({
           />
         </span>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Crash-free rate, in the half of the screen that said "pick an issue
+ * from the queue" and nothing else.
+ *
+ * It is the first number a mobile team is asked for, and until the
+ * sessions table there was nothing to compute it from — the product
+ * counted what went wrong and nothing counted what went right, so the
+ * error count had no denominator.
+ *
+ * Null is rendered as unknown, never as 100%. "No sessions yet" and
+ * "every session was fine" are different facts, and showing a perfect
+ * score for an app nobody has run is the kind of lie this product
+ * exists not to tell.
+ */
+function CrashFreeCard({ projectId }: { projectId: string }) {
+  const t = useT();
+  const { data } = useAsyncData(() => api.crashFree({ projectId, hours: 24 }), [projectId]);
+  if (!data) return null;
+
+  const pct = data.crashFreeSessions;
+  return (
+    <div className="w-full max-w-xl rounded-lg border border-border bg-surface p-5">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-xs font-medium tracking-wide text-fg-muted uppercase">
+          {t('crashFree.title')}
+        </h2>
+        <span className="text-xs text-fg-subtle">
+          {t('crashFree.window', { hours: String(data.windowHours) })}
+        </span>
+      </div>
+
+      {pct === null ? (
+        <p className="mt-3 text-sm text-fg-subtle">{t('crashFree.empty')}</p>
+      ) : (
+        <>
+          <p className="mt-2 text-4xl font-semibold tabular-nums text-fg">
+            {pct.toFixed(2)}
+            <span className="ml-1 text-xl text-fg-muted">%</span>
+          </p>
+          <p className="mt-1 text-xs text-fg-subtle tabular-nums">
+            {data.crashedSessions} / {data.sessions}
+          </p>
+          {data.releases.length > 0 && (
+            <ul className="mt-4 space-y-1 border-t border-border pt-3">
+              {data.releases.slice(0, 5).map((r) => (
+                <li
+                  key={`${r.release}:${r.platform}`}
+                  className="flex items-baseline gap-3 text-xs"
+                >
+                  <span className="min-w-0 flex-1 truncate font-mono text-fg-muted">
+                    {r.release}
+                  </span>
+                  <span className="shrink-0 text-fg-subtle">{platformLabel(r.platform, t)}</span>
+                  <span className="w-16 shrink-0 text-right tabular-nums text-fg">
+                    {r.crashFreeSessions === null ? '—' : `${r.crashFreeSessions.toFixed(2)}%`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
     </div>
   );
 }
