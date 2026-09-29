@@ -242,6 +242,33 @@ fn is_configuration_failure(reason: &str) -> bool {
         // `FcmError::OAuth` with a 4xx — Google refused the assertion,
         // which is the key or the clock, not the network.
         || reason.starts_with("oauth: status=4")
+        // The APNs half of the same thing, which was missing: these say
+        // our signing key, team or bundle id is wrong, not that this
+        // device is gone. Without them a rejected send went back on the
+        // queue five times while its recorded outcome already read
+        // "rejected" — a row that was both queued and refused, which is
+        // how a project whose push has never worked showed zero
+        // failures and a green readiness check.
+        || is_apns_credential_rejection(reason)
+        // The APNs half of the same thing, which was missing: these say
+        // our signing key, team or bundle id is wrong, not that this
+        // device is gone. Without them a rejected send went back on the
+        // queue five times while its recorded outcome already read
+        // "rejected" — a row that was both queued and refused, which is
+        // how a project whose push has never worked showed zero
+        // failures and a green readiness check.
+
+}
+
+/// APNs reasons that no retry can fix. `ExpiredProviderToken` is
+/// deliberately absent: the worker mints a fresh JWT per attempt, so
+/// retrying that one is the repair.
+fn is_apns_credential_rejection(reason: &str) -> bool {
+    reason.contains("InvalidProviderToken")
+        || reason.contains("MissingProviderToken")
+        || reason.contains("TopicDisallowed")
+        || reason.contains("BadTopic")
+        || reason.contains("BadCertificateEnvironment")
 }
 
 async fn requeue(
@@ -669,6 +696,36 @@ mod tests {
 
     /// And a real outage still retries. Classifying too much as
     /// permanent turns a blip into a lost notification.
+    #[test]
+    fn an_apns_credential_rejection_fails_rather_than_queues() {
+        // The exact string the worker records — a project whose signing
+        // key is wrong produced 31 of these, every one of them back on
+        // the queue with `status = 'queued'` beside a recorded outcome
+        // that already said rejected.
+        for reason in [
+            "apns rejected: status=403 body={\"reason\":\"InvalidProviderToken\"}",
+            "apns rejected: status=403 body={\"reason\":\"MissingProviderToken\"}",
+            "apns rejected: status=400 body={\"reason\":\"BadTopic\"}",
+            "apns rejected: status=403 body={\"reason\":\"TopicDisallowed\"}",
+            "apns rejected: status=400 body={\"reason\":\"BadCertificateEnvironment\"}",
+        ] {
+            assert!(
+                is_configuration_failure(reason),
+                "retrying this cannot fix it, and queueing it hides that push is \
+                 down: {reason}"
+            );
+        }
+
+        // The one that a retry does fix: the worker mints a fresh JWT
+        // per attempt, so an expired one repairs itself.
+        assert!(
+            !is_configuration_failure(
+                "apns rejected: status=403 body={\"reason\":\"ExpiredProviderToken\"}"
+            ),
+            "a fresh JWT is minted per attempt, so this one is worth retrying"
+        );
+    }
+
     #[test]
     fn a_transient_failure_is_still_retried() {
         for reason in [

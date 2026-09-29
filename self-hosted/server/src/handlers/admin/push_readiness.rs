@@ -124,9 +124,15 @@ pub fn checks_for(f: &Facts) -> Vec<Value> {
         ));
     }
     if f.failed24h > 0 && f.sent24h == 0 {
+        // Blocked, not warn: the panel's own definition of blocked is
+        // that nothing can arrive until it is dealt with, and nothing
+        // is arriving — every send in the window was refused and none
+        // landed. It sat at warn while the status machine never marked
+        // an APNs credential rejection as failed, so in practice this
+        // said nothing at all.
         out.push(check(
             "all-failing",
-            "warn",
+            "blocked",
             &json!({ "failed": f.failed24h, "reason": f.top_reason }),
         ));
     }
@@ -358,6 +364,32 @@ mod tests {
         assert!(out.contains(&"no-identity".to_string()));
         assert!(out.contains(&"no-traits".to_string()));
         assert!(out.contains(&"no-metadata".to_string()));
+    }
+
+    /// Nothing arriving is not a warning.
+    #[test]
+    fn a_fleet_where_nothing_lands_is_blocked_not_warned() {
+        let mut f = healthy();
+        f.failed24h = 31;
+        f.sent24h = 0;
+        f.top_reason = Some("apns rejected: status=403 InvalidProviderToken".into());
+        let out = checks_for(&f);
+        let row = out
+            .iter()
+            .find(|c| c["id"] == "all-failing")
+            .expect("every send refused and none delivered has to say so");
+        assert_eq!(
+            row["level"], "blocked",
+            "the panel calls blocked the state where nothing can arrive, and \
+             nothing is arriving"
+        );
+
+        // One delivery is enough to make it a warning rather than a wall.
+        f.sent24h = 1;
+        assert!(
+            !checks_for(&f).iter().any(|c| c["id"] == "all-failing"),
+            "a fleet that delivered something is not a fleet delivering nothing"
+        );
     }
 
     /// A queue nothing is draining is not a slow queue.
