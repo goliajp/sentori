@@ -211,7 +211,16 @@ async fn load_issue(
     ctx: &SessionContext,
     issue_id: Uuid,
 ) -> Result<sqlx::postgres::PgRow, (StatusCode, Json<Value>)> {
-    let row = sqlx::query("SELECT * FROM issues WHERE id = $1")
+    // The same `last_received_at` the list computes. Without it here the
+    // detail page — the one screen where the two clocks sit next to each
+    // other — fell back to the device's and went on contradicting the
+    // occurrence list underneath it.
+    let row = sqlx::query(
+        "SELECT *, \
+                (SELECT max(received_at) FROM events e WHERE e.issue_id = issues.id) \
+                  AS last_received_at \
+         FROM issues WHERE id = $1",
+    )
         .bind(issue_id)
         .fetch_optional(&state.pool)
         .await
