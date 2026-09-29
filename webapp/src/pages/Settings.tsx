@@ -12,18 +12,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { useShell } from '../App';
-import {
-  Button,
-  DataTable,
-  ErrorBanner,
-  Field,
-  Input,
-  PageShell,
-  Panel,
-  Select,
-  clsx,
-  formatRelative,
-} from '../components/ui';
+import { Button, DataTable, ErrorBanner, Field, Input, PageShell, Panel, Select, TimeAgo, clsx } from '../components/ui';
 import { useLocale, useSetLocale, useT } from '../i18n';
 import {
   api,
@@ -208,7 +197,7 @@ function TokensTab() {
               align: 'right',
               render: (r) => (
                 <span className="text-xs tabular-nums text-fg-subtle">
-                  {formatRelative(r.createdAt)}
+                  <TimeAgo iso={r.createdAt} />
                 </span>
               ),
             },
@@ -305,7 +294,7 @@ function UsersTab() {
                   {u.role}
                 </span>
                 <span className="w-24 text-right text-xs tabular-nums text-fg-subtle">
-                  {u.lastLoginAt ? formatRelative(u.lastLoginAt) : '—'}
+                  {u.lastLoginAt ? <TimeAgo iso={u.lastLoginAt} /> : '—'}
                 </span>
                 <span className="w-14 text-right">
                   {u.role === 'admin' && (
@@ -380,7 +369,7 @@ function AuditTab() {
               width: '110px',
               render: (r) => (
                 <span className="text-xs tabular-nums text-fg-subtle">
-                  {formatRelative(r.createdAt)}
+                  <TimeAgo iso={r.createdAt} />
                 </span>
               ),
             },

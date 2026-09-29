@@ -39,21 +39,7 @@ import { Fragment, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { useShell } from '../App';
-import {
-  Button,
-  buttonClass,
-  DataTable,
-  ErrorBanner,
-  Field,
-  Input,
-  PageShell,
-  Panel,
-  PanelEmpty,
-  Select,
-  Textarea,
-  clsx,
-  formatRelative,
-} from '../components/ui';
+import { Button, DataTable, ErrorBanner, Field, Input, PageShell, Panel, PanelEmpty, Select, Textarea, TimeAgo, buttonClass, clsx } from '../components/ui';
 import { useT } from '../i18n';
 import type { MessageKey } from '../i18n/en';
 import { ApiError, api } from '../lib/api';
@@ -388,7 +374,7 @@ function DeliverySection({
               align: 'right',
               render: (r) => (
                 <span className="text-xs tabular-nums text-fg-subtle">
-                  {formatRelative(r.created_at)}
+                  <TimeAgo iso={r.created_at} />
                 </span>
               ),
             },
@@ -1385,7 +1371,7 @@ function DevicesSection({ projectId }: { projectId: string }) {
             align: 'right',
             render: (d) => (
               <span className="text-xs tabular-nums text-fg-subtle">
-                {formatRelative(d.lastSeenAt)}
+                <TimeAgo iso={d.lastSeenAt} />
               </span>
             ),
           },

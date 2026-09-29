@@ -10,7 +10,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { useShell } from '../App';
 import { ImpactCell, KindBadge, kindColor } from '../components/kind';
-import { ErrorBanner, Kbd, SELECT_CLASS, clsx, formatRelative } from '../components/ui';
+import { ErrorBanner, Kbd, SELECT_CLASS, TimeAgo, clsx } from '../components/ui';
 import { useT } from '../i18n';
 import { api, type IssueSummary } from '../lib/api';
 import { issueHeadline } from '../lib/issue-title';
@@ -571,7 +571,7 @@ function QueueRow({
           {headline}
         </span>
         <span className="shrink-0 text-xs tabular-nums text-fg-subtle">
-          {formatRelative(issue.lastSeen)}
+          <TimeAgo iso={issue.lastSeen} />
         </span>
       </div>
       <div className="mt-0.5 flex items-center gap-2 pl-[22px]">
