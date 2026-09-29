@@ -11,12 +11,19 @@ private var hostHandlerSawSignal: Int32 = 0
 
 final class SentoriSignalHandlerTests: XCTestCase {
     private var dir: URL!
+    private var own: URL!
 
     override func setUp() {
         super.setUp()
-        dir = FileManager.default.temporaryDirectory
+        // The handler keeps its record and image map in a directory
+        // of its own beside `pending`, because `consumePending`
+        // deletes every `.json` it finds. `dir` here plays the part
+        // of `pending`; `own` is where the handler actually writes.
+        let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("sentori-signal-\(UUID().uuidString)")
+        dir = root.appendingPathComponent("pending")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        own = SentoriSignalHandler.signalDirectory(besidePending: dir)
         SentoriSignalHandler.__resetForTests()
         hostHandlerCalls = 0
         hostHandlerSawInfo = false
@@ -30,7 +37,7 @@ final class SentoriSignalHandlerTests: XCTestCase {
     }
 
     private func writeSyntheticRecord(signal: Int32, frameCount: Int) -> URL {
-        let url = dir.appendingPathComponent("signal.sentoricrash")
+        let url = own.appendingPathComponent("signal.sentoricrash")
         let buffer = UnsafeMutablePointer<UnsafeMutableRawPointer?>.allocate(
             capacity: SentoriSignalHandler.maxFrames
         )
@@ -89,7 +96,7 @@ final class SentoriSignalHandlerTests: XCTestCase {
         // `register` writes the image map, which `drain` needs to
         // attribute the addresses; the test path installs one signal
         // rather than six.
-        SentoriSignalHandler.__writeImageMapForTests(to: dir)
+        SentoriSignalHandler.__writeImageMapForTests(to: own)
         _ = writeSyntheticRecord(signal: SIGTRAP, frameCount: 12)
         SentoriSignalHandler.drain(
             pendingDirectory: dir, config: ["release": "app@1.2.3+4", "environment": "test"]
@@ -97,7 +104,12 @@ final class SentoriSignalHandlerTests: XCTestCase {
         let files = try! FileManager.default.contentsOfDirectory(atPath: dir.path)
         // The image map is also .json and is rewritten at every
         // register, so it is not one of the events.
-        let events = files.filter { $0.hasSuffix(".json") && $0 != "signal.images.json" }
+        // The map must not be here: `consumePending` deletes every
+        // `.json` in this directory, and it deleted the image map on
+        // the launch that wrote it — so the next launch had a crash
+        // record and no way to attribute its addresses.
+        XCTAssertFalse(files.contains("signal.images.json"))
+        let events = files.filter { $0.hasSuffix(".json") }
         XCTAssertEqual(events.count, 1)
         XCTAssertFalse(
             files.contains("signal.sentoricrash"),
@@ -181,7 +193,7 @@ final class SentoriSignalHandlerTests: XCTestCase {
     func testARecordThatCannotBeReadIsStillRemoved() {
         // Otherwise a corrupt file is retried at every launch for the
         // life of the install.
-        let url = dir.appendingPathComponent("signal.sentoricrash")
+        let url = own.appendingPathComponent("signal.sentoricrash")
         try! Data("garbage".utf8).write(to: url)
         SentoriSignalHandler.drain(pendingDirectory: dir, config: [:])
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
@@ -214,14 +226,14 @@ final class SentoriSignalHandlerTests: XCTestCase {
     /// observed — so the re-raise is suppressed, and everything before
     /// it runs exactly as it would in a real crash.
     func testARealSignalReachesTheHandlerAndLeavesARecord() throws {
-        SentoriSignalHandler.__writeImageMapForTests(to: dir)
+        SentoriSignalHandler.__writeImageMapForTests(to: own)
         SentoriSignalHandler.__installForTests(SIGUSR2, pendingDirectory: dir)
         SentoriSignalHandler.__suppressReRaiseForTests = true
 
         // Delivered by the kernel, not called by us.
         raise(SIGUSR2)
 
-        let url = dir.appendingPathComponent("signal.sentoricrash")
+        let url = own.appendingPathComponent("signal.sentoricrash")
         XCTAssertTrue(
             FileManager.default.fileExists(atPath: url.path),
             "a signal was delivered and the handler wrote nothing"
@@ -235,7 +247,12 @@ final class SentoriSignalHandlerTests: XCTestCase {
             pendingDirectory: dir, config: ["release": "app@1.0.0+1", "environment": "test"]
         )
         let files = try FileManager.default.contentsOfDirectory(atPath: dir.path)
-        let events = files.filter { $0.hasSuffix(".json") && $0 != "signal.images.json" }
+        // The map must not be here: `consumePending` deletes every
+        // `.json` in this directory, and it deleted the image map on
+        // the launch that wrote it — so the next launch had a crash
+        // record and no way to attribute its addresses.
+        XCTAssertFalse(files.contains("signal.images.json"))
+        let events = files.filter { $0.hasSuffix(".json") }
         XCTAssertEqual(events.count, 1, "the record did not become an event")
         let raw = try JSONSerialization.jsonObject(
             with: Data(contentsOf: dir.appendingPathComponent(events[0]))

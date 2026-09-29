@@ -246,6 +246,30 @@ jobs:
           path: /tmp/xcodebuild.log
           if-no-files-found: warn
 
+  # A real app, a real crash, a real next launch.
+  #
+  # Everything in `ios-native` tests a piece of the crash path. The
+  # handler's last act is to re-raise and die, so no test inside that
+  # process can watch what happens next — and the pieces all passed
+  # while three defects sat in the composition: the previous handler
+  # was handed a nil `siginfo_t`, the shipper dropped the addresses a
+  # dSYM is matched by, and the image map was written into a directory
+  # whose contract is to delete every `.json` in it.
+  #
+  # None of those is visible without crashing something for real.
+  ios-crash-loop:
+    needs: changes
+    if: >-
+      needs.changes.outputs.ios == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen
+
+      - name: crash for real, and check the report arrives
+        run: bash scripts/ios-crash-loop.sh
+
   # The showcase app, which is the front door.
   #
   # It named seven source files under `sdk/react-native/ios` and they
