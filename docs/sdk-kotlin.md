@@ -4,7 +4,7 @@ Error, warning and push capture for Android apps, with no React Native.
 
 ```kotlin
 dependencies {
-    implementation("jp.golia.sentori:sentori:2.1.0")
+    implementation("jp.golia.sentori:sentori:2.0.2")
 }
 ```
 
@@ -21,8 +21,7 @@ and a blank project's manifest does not:
 
 Without that line `onCreate` never executes, `start` never runs, and
 every verb is a no-op that still returns an id — so the integration
-looks finished and reports nothing at all. This page gave the class
-and not the line until 2026-09-30.
+looks finished and reports nothing at all.
 
 The package is `com.sentori`, which is **not** the groupId:
 
@@ -50,13 +49,15 @@ class App : Application() {
         Sentori.start(
             SentoriConfig(
                 token = "st_…",                          // Settings ▸ Tokens, ingest scope
-                ingestUrl = "https://sentori.golia.jp",
+                ingestUrl = "https://sentori.example.com",  // YOUR instance
                 release = "com.example.app@1.5.0+220",
                 environment = "production",
             ),
             context = this,
         )
-        Sentori.user(id = currentUser.id, email = null, traits = mapOf("plan" to "pro"))
+        // Optional, and separate: without it a device receives
+        // broadcasts and cannot be reached from an issue.
+        Sentori.user(id = "the id your app already has", email = null, traits = mapOf("plan" to "pro"))
     }
 }
 ```
@@ -296,8 +297,7 @@ that exact build was uploaded.
 
 That mapping only exists if R8 ran. A blank project ships with
 `minifyEnabled false`, so `mapping.txt` is not there and the upload
-below fails on a missing file — this page printed the path without
-saying so until 2026-09-30:
+below fails on a missing file:
 
 ```kotlin
 // app/build.gradle.kts
@@ -311,8 +311,7 @@ android {
 }
 ```
 
-The commands need three values, printed here as bare `$NAME` until
-2026-09-30 with nothing saying where they came from:
+The commands need three values:
 
 ```bash
 VERSION=$(./gradlew -q printVersionName)   # or read it from your own build logic
@@ -327,9 +326,8 @@ defaults to `https://sentori.golia.jp`, which is GOLIA's own instance
 — so the mapping leaves your build machine, goes somewhere that is not
 yours, and exits 0.
 
-`$SENTORI_TOKEN` is the name the CLI reads (`$SENTORI_ADMIN_TOKEN`
-also works). This page said `$SENTORI_API_TOKEN` until 2026-09-30,
-which nothing reads.
+`$SENTORI_TOKEN` is the name the CLI reads, and `$SENTORI_ADMIN_TOKEN`
+also works. No other spelling does.
 
 Right after the release build, in CI:
 
@@ -413,7 +411,7 @@ emulator itself. The host is `http://10.0.2.2:8080`.
 Nothing arrived? Check the manifest line first (`android:name=".App"`,
 above): without it `start` never runs, and the verbs stay no-ops that
 return an id, so a missing integration and a quiet app look the same.
-Set `logLevel` to `debug` to make the SDK say which it is.
+`SentoriConfig.isInitialised` tells the two apart.
 
 ## What it costs you
 

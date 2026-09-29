@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SENTORI_TOKEN: ${{ secrets.SENTORI_TOKEN }}
-      SENTORI_INGEST_URL: https://ingest.sentori.golia.jp
+      SENTORI_INGEST_URL: https://sentori.example.com
       RELEASE: myapp@${{ github.ref_name }}+${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
@@ -86,7 +86,7 @@ Notes:
 stages: [build, deploy]
 
 variables:
-  SENTORI_INGEST_URL: "https://ingest.sentori.golia.jp"
+  SENTORI_INGEST_URL: "https://sentori.example.com"
 
 build:
   stage: build

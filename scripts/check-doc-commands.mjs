@@ -72,9 +72,27 @@ for (const file of docs) {
   }
 }
 
+// And the same trap one layer up. `ingestUrl` in an SDK example is
+// where a reader's crashes go, and the quickstart pointed at
+// `sentori.golia.jp` — ours. Copy-pasting the getting-started block
+// sent an app's crash stream to strangers, which `protocol.md`
+// describes as the thing that must not happen.
+const OURS = 'sentori.golia.jp';
+for (const file of docs) {
+  const src = readFileSync(file, 'utf8');
+  for (const m of src.matchAll(/ingestUrl\s*[:=]\s*['"]https?:\/\/([^'"\/]+)/g)) {
+    if (m[1].endsWith(OURS)) {
+      problems.push(
+        `${file}: an SDK example sets ingestUrl to ${m[1]} — that is our instance, so a ` +
+          `reader who copies the block sends their app's crashes to us`,
+      );
+    }
+  }
+}
+
 if (problems.length === 0) {
   console.log(
-    `✓ documented CLI commands name a token variable the CLI reads and an explicit instance`,
+    `✓ documented commands and SDK examples name the reader's own instance`,
   );
   process.exit(0);
 }

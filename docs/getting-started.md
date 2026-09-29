@@ -13,9 +13,7 @@ Sentori watches mobile apps. Pick the stack you ship:
 | **Kotlin** — native Android | [sdk-kotlin](./sdk-kotlin.md) |
 | **React Native** (bare or Expo) | [getting-started/react-native](./getting-started/react-native.md) |
 
-This table had one row until 2026-09-30, and the two native guides it
-now names were in this directory the whole time with nothing linking
-to them.
+
 
 There were guides here for React, Next.js and Node until 2026-08-10.
 They pointed at `@goliapkg/sentori-react` and friends — packages whose
@@ -151,14 +149,11 @@ npx @goliapkg/sentori-cli issue silence <issue-uuid> \
 These need a token whose **scope is `api`**, minted at Settings ▸
 Tokens. There is one prefix — `st_` — and the scope is a property the
 server holds, not something you can read off the token. The `sk_`
-prefix this paragraph named until 2026-08-27 was from v0 and
-`protocol.md` records it as removed.
+`sk_` prefix is from v0 and `protocol.md` records it as removed, so a
+token you find with that shape is from a retired instance.
 
 The CLI takes the token as `--token`, and reads `$SENTORI_TOKEN` or
-`$SENTORI_ADMIN_TOKEN` when the flag is absent. This paragraph said
-"there is no `SENTORI_ADMIN_TOKEN`" until 2026-09-30, which was about
-the *prefix* being gone and read as the variable not existing — it
-does, and the CLI has always read it.
+`$SENTORI_ADMIN_TOKEN` when the flag is absent.
 
 Using an `ingest` token here is refused with `403 admin_token_required`
 and a hint naming the scope to mint instead.

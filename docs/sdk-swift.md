@@ -5,7 +5,7 @@ Error, warning and push capture for iOS apps, with no React Native.
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/goliajp/sentori-swift", from: "2.1.0")
+    .package(url: "https://github.com/goliajp/sentori-swift", from: "2.0.0")
 ],
 targets: [
     .target(name: "YourApp", dependencies: [
@@ -14,16 +14,13 @@ targets: [
 ]
 ```
 
-In Xcode, the product to tick is **Sentori**. This page printed only
-the `dependencies` line until 2026-09-30, which is half a
-`Package.swift` — the product name appeared nowhere, and a module
-name is not a product name.
+In Xcode, the product to tick is **Sentori**. The module you import
+has the same name; a product and a module are separate things and are
+not always spelled alike.
 
-or, for an app that takes its dependencies through CocoaPods:
-
-```ruby
-pod 'Sentori', '~> 2.1'
-```
+`from:` is a floor, not a pin: it takes the newest 2.x release. There
+is no CocoaPods listing — the podspec is in the repository and the pod
+is not on trunk, so SwiftPM is the only way in today.
 
 iOS 14+. Apache-2.0 OR MIT.
 
@@ -35,12 +32,14 @@ import Sentori
 Sentori.start(
     SentoriConfig(
         token: "st_…",                       // Settings ▸ Tokens, ingest scope
-        ingestUrl: "https://sentori.golia.jp",
+        ingestUrl: "https://sentori.example.com",   // YOUR instance
         release: "com.example.app@1.5.0+220",
         environment: "production"
     )
 )
-Sentori.user(id: currentUser.id, email: nil, traits: ["plan": "pro"])
+// Optional, and separate: without it a device receives broadcasts
+// and cannot be reached from an issue.
+Sentori.user(id: "the id your app already has", email: nil, traits: ["plan": "pro"])
 ```
 
 Nothing here reaches the network — the first request happens when
@@ -192,10 +191,10 @@ defaults to `https://sentori.golia.jp`, which is GOLIA's own instance
 — so the upload leaves your build machine, goes somewhere that is not
 yours, and exits 0.
 
-`$SENTORI_TOKEN` is the name the CLI reads (`$SENTORI_ADMIN_TOKEN`
-also works). This page said `$SENTORI_API_TOKEN` until 2026-09-30,
-which nothing reads: the CLI would have answered `--token is
-required` with the variable sitting right there in the environment.
+`$SENTORI_TOKEN` is the name the CLI reads, and `$SENTORI_ADMIN_TOKEN`
+also works. No other spelling does: the CLI answers `--token is
+required` for any of them, with the value sitting in the
+environment.
 
 Right after archiving, in CI:
 
@@ -278,15 +277,16 @@ Then, and this is the step people skip:
    finish a network request.
 4. Open your instance, go to Issues, and the crash is the top row.
 
-On a simulator, `ingestUrl` may not be `localhost`: the simulator
-shares the host's network, so `http://localhost:8080` is the host's
-`localhost` and works. An Android emulator is the one that needs
+On a simulator, `localhost` works: the simulator shares the host's
+network, so `http://localhost:8080` reaches a server running on your
+Mac. An Android emulator is the one that does not — see the Kotlin
+page. An Android emulator is the one that needs
 `10.0.2.2` — see the Kotlin page.
 
 Nothing arrived? The verbs are no-ops before `start` runs, and they
 still return an id, so a `start` that never executed looks exactly
-like a quiet app. Check that `start` is on a path that runs, and set
-`logLevel` to `debug` to see the SDK say so.
+like a quiet app. `SentoriConfig.isInitialised` answers that question
+directly — check it after `start` and before you look anywhere else.
 
 ## What it costs you
 
