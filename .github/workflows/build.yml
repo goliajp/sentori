@@ -364,8 +364,12 @@ jobs:
         run: node scripts/sync-native-core.mjs --check
       # App Review rejects a required-reason API with no declared
       # reason, and the rejection lands on the host app's release.
-      - name: the iOS privacy manifest covers what the sources reach
-        run: node scripts/check-privacy-manifest.mjs
+      - name: what an iOS consumer gets matches what the sources do
+        run: node scripts/check-ios-packaging.mjs
+      # The Swift and Kotlin install lines sat three minors behind the
+      # tree, so the page installed a build without crash delivery.
+      - name: the install lines install the version we ship
+        run: node scripts/check-doc-versions.mjs
 
   e2e:
     needs: changes

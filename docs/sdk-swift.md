@@ -3,7 +3,13 @@
 Error, warning and push capture for iOS apps, with no React Native.
 
 ```swift
-.package(url: "https://github.com/goliajp/sentori-swift", from: "1.5.0")
+.package(url: "https://github.com/goliajp/sentori-swift", from: "2.1.0")
+```
+
+or, for an app that takes its dependencies through CocoaPods:
+
+```ruby
+pod 'Sentori', '~> 2.1'
 ```
 
 iOS 14+. Apache-2.0 OR MIT.
@@ -146,6 +152,71 @@ resumed one.
 Your app still needs the `aps-environment` entitlement and the
 `remote-notification` background mode; the SDK does not add
 capabilities to your target.
+
+## Making a crash readable
+
+A native stack arrives as addresses. The server turns them into file
+and line names using the dSYM your build produced, matched by the
+`release` string and the binary's UUID — so a crash is readable only
+if the dSYM for that exact build was uploaded.
+
+Right after archiving, in CI:
+
+```bash
+npx @goliapkg/sentori-cli@latest upload dsym \
+  --release "com.example.app@$VERSION+$BUILD" \
+  --token "$SENTORI_API_TOKEN" \
+  "$ARCHIVE/dSYMs/YourApp.app.dSYM"
+```
+
+The `--release` here and the `release` you pass to `Sentori.start`
+must be the same string. They are matched literally; a build number
+in one and not the other is a release the server has never heard of.
+
+To see the failing line rather than only the function name, upload the
+sources too:
+
+```bash
+npx @goliapkg/sentori-cli@latest upload srcbundle \
+  --release "com.example.app@$VERSION+$BUILD" \
+  --token "$SENTORI_API_TOKEN" Sources
+```
+
+An upload that fails exits 0 and prints the command to run by hand.
+It is not your build's job to fail because our server was
+unreachable, and a dSYM uploaded later is applied to crashes that
+already arrived. If you would rather know at build time, add
+`--strict`.
+
+The step worth failing on is the one that asks the server what
+actually landed:
+
+```bash
+npx @goliapkg/sentori-cli@latest artifacts check \
+  --release "com.example.app@$VERSION+$BUILD" \
+  --token "$SENTORI_API_TOKEN" --expect dsym
+```
+
+That catches the case a local "we ran the upload" note cannot: the
+upload step that quietly stopped being called.
+
+### What is captured
+
+| Crash | Caught by |
+|---|---|
+| `NSException` | the uncaught-exception handler |
+| force-unwrapped nil, index out of range, overflow | the signal handler (`SIGTRAP`) |
+| `fatalError`, failed precondition, C `assert` | the signal handler (`SIGABRT`) |
+| bad pointer, stack overflow | the signal handler (`SIGSEGV`) |
+
+The signal handlers chain: whatever your app installed before calling
+`Sentori.start` is kept and called, and the signal is re-raised with
+the default disposition so the system still writes its own report. If
+you already use another crash reporter, both of you get the crash.
+
+A crash is written to disk as it happens and sent on the next launch —
+the process is dying, and a network request is not something it can
+finish.
 
 ## What it costs you
 

@@ -4,7 +4,7 @@ Error, warning and push capture for Android apps, with no React Native.
 
 ```kotlin
 dependencies {
-    implementation("jp.golia.sentori:sentori:1.5.0")
+    implementation("jp.golia.sentori:sentori:2.1.0")
 }
 ```
 
@@ -272,6 +272,65 @@ started — which for a resident app is not a bounded wait.
 the installation's local state, so the next `register` starts a new
 one. That is deliberate — a revoked device coming back should be a
 new registration, not a resumed one.
+
+## Making a crash readable
+
+A native stack arrives with obfuscated names. The server de-obfuscates
+them using the R8 / ProGuard mapping your build produced, matched by
+the `release` string — so a crash is readable only if the mapping for
+that exact build was uploaded.
+
+Right after the release build, in CI:
+
+```bash
+npx @goliapkg/sentori-cli@latest upload mapping \
+  --release "com.example.app@$VERSION+$BUILD" \
+  --token "$SENTORI_API_TOKEN" \
+  app/build/outputs/mapping/release/mapping.txt
+```
+
+The `--release` here and the `release` you pass to `Sentori.start`
+must be the same string. They are matched literally; a build number
+in one and not the other is a release the server has never heard of.
+
+To see the failing line rather than only the method name, upload the
+sources too:
+
+```bash
+npx @goliapkg/sentori-cli@latest upload srcbundle \
+  --release "com.example.app@$VERSION+$BUILD" \
+  --token "$SENTORI_API_TOKEN" app/src/main/java
+```
+
+An upload that fails exits 0 and prints the command to run by hand.
+It is not your build's job to fail because our server was
+unreachable, and a mapping uploaded later is applied to crashes that
+already arrived. If you would rather know at build time, add
+`--strict`.
+
+The step worth failing on is the one that asks the server what
+actually landed:
+
+```bash
+npx @goliapkg/sentori-cli@latest artifacts check \
+  --release "com.example.app@$VERSION+$BUILD" \
+  --token "$SENTORI_API_TOKEN" --expect proguard
+```
+
+That catches the case a local "we ran the upload" note cannot: the
+upload step that quietly stopped being called.
+
+### ANR
+
+On Android 11 and later an ANR is read from the system's own record
+(`ApplicationExitInfo`) at the next launch — the same source Play
+Console reports on, with the system's own trace of where the main
+thread was stuck. Nothing to configure, and no number of ours that
+can disagree with the one on your release dashboard.
+
+Below 11 there is no such record, so a watchdog detects a blocked main
+thread instead. It is an inference, and a debugger pause looks like
+one; it runs only on those devices.
 
 ## What it costs you
 
