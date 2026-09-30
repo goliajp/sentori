@@ -149,12 +149,35 @@ for _ in $(seq 1 60); do
 done
 [ "$ST" = "VALIDATED" ] || [ "$ST" = "PUBLISHED" ] || {
   echo "✗ still ${ST} after ten minutes" >&2; exit 1; }
+# Central's own warnings, and the one that matters carried in a way
+# somebody sees.
+#
+# The organisation has a monthly release quota. The run that published
+# 2.1.0 said "6 of 7 used (86%)" — as one line inside a step's log,
+# which is where a release blocker goes to not be read. A publish that
+# fails next month for a reason that was printed this month is a
+# preventable surprise.
+#
+# `::warning::` puts it at the top of the run page, and the step
+# summary puts it on the page somebody lands on after clicking a green
+# check. Neither fails the build: being near a quota is not a reason
+# to refuse a release that is otherwise correct.
 printf '%s' "$S" | python3 -c "
 import sys, json
 d = json.load(sys.stdin)
 for w in d.get('warnings') or []:
     print(f'      warning: {w}')
 " || true
+
+# Through a file, not a pipe. A `<<'PYEOF'` heredoc *is* stdin, so the
+# piped JSON never reached `sys.stdin` and this failed with
+# "Expecting value: line 1 column 1" — caught by running it against a
+# real captured response before it shipped.
+STATE_JSON="$(mktemp)"
+printf '%s' "$S" > "$STATE_JSON"
+python3 "${ROOT}/scripts/lib/central-quota-notice.py" \
+  "$STATE_JSON" "${SUMMARY_FILE:-}" || true
+rm -f "$STATE_JSON"
 echo "      ${ST}"
 
 if [ "$PUBLISH" -eq 0 ]; then
