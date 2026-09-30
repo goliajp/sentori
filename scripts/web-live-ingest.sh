@@ -97,7 +97,7 @@ for _ in $(seq 1 40); do curl -fsS "http://127.0.0.1:${WEBPORT}/index.html" >/de
 echo "→ a real browser"
 OUT_FILE="$(mktemp)"
 node scripts/lib/web-live-driver.mjs \
-    "http://127.0.0.1:${WEBPORT}/index.html?token=${TOKEN}&ingest=${BASE}" "$OUT_FILE"
+    "http://127.0.0.1:${WEBPORT}/index.html?token=${TOKEN}&ingest=${BASE}&replay=1" "$OUT_FILE"
 
 echo "→ and the server has it"
 python3 "$ROOT/scripts/lib/check-web-ingest.py" "$BASE" "$JAR" "$PROJECT" "$OUT_FILE"

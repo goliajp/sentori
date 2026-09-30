@@ -64,6 +64,34 @@ the page.
 | `logLevel` | `'silent' \| 'error' \| 'warn' \| 'info' \| 'debug'` | `'warn'` |
 | `backendHealthUrl` | `string` | — |
 
+## Session replay
+
+Off by default. Turn it on and register what to hide:
+
+```ts
+import { registerMaskQuery, sentori } from '@goliapkg/sentori-web'
+
+sentori.init({ /* … */ replayScreens: true })
+registerMaskQuery('.card-number', '[data-private]')
+```
+
+It records a **wireframe**, not the DOM and not pixels: every visible
+element's box, what it is (text / image / input / button), its
+background colour, and for text the number of characters. The text
+itself never leaves the page, nor does an image's `src`, an input's
+value, or any attribute. A masked subtree keeps its box and
+contributes nothing else — not even a length, which would leak how
+much was written there.
+
+It is the same format the iOS and Android SDKs produce, so it plays in
+the same viewer. That is also why it is not rrweb: rrweb records the
+DOM, which is a different recording, a different player and a far
+larger payload.
+
+The ring holds the last sixty seconds in memory and is drained onto an
+`error` or `warn` as an attachment. A page where nothing goes wrong
+sends none of it.
+
 ## What it cannot do
 
 **Request status codes.** Network breadcrumbs come from
@@ -107,7 +135,7 @@ server before pointing a browser at it.
 ## Cost
 
 The bundle is measured on every build, gzipped, the way a browser
-receives it. Today: **6.7 KB**. The gate fails over 25 KB.
+receives it. Today: **8.3 KB**. The gate fails over 25 KB.
 
 The main thread is measured too: a run that makes 550 SDK calls must
 produce no `longtask` entry. That check runs in a real Chrome on every

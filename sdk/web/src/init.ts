@@ -13,8 +13,10 @@ import { installBreadcrumbs } from './handlers/breadcrumbs.js'
 import { installNetworkSignals } from './handlers/network.js'
 import { installUncaughtHandlers } from './handlers/uncaught.js'
 import { installWebVitals } from './handlers/web-vitals.js'
+import { registerEmitHook } from './emit-hooks.js'
+import { drainReplay, startReplay } from './replay.js'
 import { startSession } from './sessions.js'
-import { drainOfflineQueue, startTransport } from './transport.js'
+import { drainOfflineQueue, queueAttachment, startTransport } from './transport.js'
 import { internalFault } from './verbs.js'
 
 let _initialized = false
@@ -54,6 +56,25 @@ export const init = safeFn('init', (config: WebInitConfig): void => {
     installNetworkSignals(resolved.ingestUrl)
   }
   if (resolved.detect.webVitals) installWebVitals()
+
+  // Wireframe replay: a rolling in-memory ring, drained onto an
+  // error or warn as an attachment. Nothing leaves the page until
+  // something goes wrong, so a session that stays healthy costs one
+  // walk of the DOM twice a second and no bytes at all.
+  if (resolved.replayScreens && resolved.replaySeconds > 0) {
+    startReplay()
+    registerEmitHook((event) => {
+      if (event.kind !== 'error' && event.kind !== 'warn') return
+      if (!event.id) return
+      const lines = drainReplay()
+      if (lines) {
+        queueAttachment(event.id, 'replay', {
+          text: lines,
+          mediaType: 'application/x-sentori-replay',
+        })
+      }
+    })
+  }
 
   startSession({
     environment: resolved.environment,

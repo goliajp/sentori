@@ -98,6 +98,22 @@ same string. They are matched literally.
 Late uploads are not wasted — the server re-reads events already
 stored for that release.
 
+## Session replay (optional)
+
+```ts
+import { registerMaskQuery, sentori } from '@goliapkg/sentori-web'
+
+sentori.init({ /* … */ replayScreens: true })
+registerMaskQuery('.card-number', '[data-private]')
+```
+
+A wireframe, not a screenshot: boxes, what each one is, its colour,
+and for text how many characters. No words, no image sources, no input
+values. A masked subtree is a plain rectangle with nothing inside it.
+
+Held in memory for sixty seconds and attached to an `error` or `warn`.
+Nothing leaves the page otherwise.
+
 ## What you do not get
 
 **Status codes on request breadcrumbs.** They come from
@@ -123,7 +139,7 @@ is.
 
 ## Cost
 
-6.7 KB gzipped, measured on every build. A run of 550 SDK calls in a
+8.3 KB gzipped, measured on every build. A run of 550 SDK calls in a
 real Chrome produces no long task — also measured on every build,
 rather than promised here.
 
