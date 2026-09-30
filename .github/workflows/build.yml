@@ -508,6 +508,30 @@ jobs:
       - name: a new issue knocks on the team's webhook
         run: bash scripts/webhook-alert-e2e.sh
 
+  # The migrations, against a database that already has rows.
+  #
+  # Every test of the schema started from an empty database, so every
+  # migration was only ever asked what it does to nothing — and most of
+  # the interesting ones are about existing rows. Migration 18 rewrote
+  # `event_attachments.source` from `js` to `javascript` before
+  # dropping the constraint that still said `js`. On an empty database
+  # the UPDATE matches no rows, writes nothing and checks nothing, so
+  # it passed here and in preflight and failed on the production deploy
+  # of 4.0.0 — the only database that had rows.
+  #
+  # Two halves: the migrations up to the last release, a load of rows in
+  # the shapes that were legal at that point, then the rest. The second
+  # half is what is under test.
+  migrations-with-data:
+    needs: changes
+    if: needs.changes.outputs.server == 'true' || needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: migrations over existing rows
+        run: bash scripts/migrate-with-data-e2e.sh
+
   sdk:
     needs: changes
     if: needs.changes.outputs.sdk == 'true' || needs.changes.outputs.infra == 'true'

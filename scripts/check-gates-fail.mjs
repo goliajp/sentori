@@ -142,6 +142,31 @@ const PROBES = [
     why: 'a gate script no workflow is triggered by',
   },
   {
+    gate: 'check-surface-gates.mjs',
+    file: '.github/workflows/build.yml',
+    find: '          - sdk/weapp\n',
+    replace: '',
+    why: 'a package under sdk/ that no job builds',
+  },
+  {
+    gate: 'check-sdk-doc-options.mjs',
+    file: 'sdk/core/src/types.ts',
+    // At the top level of `InitConfig`. The first version of this
+    // probe added the field inside `detect`, which that checker reads
+    // past — it takes top-level fields only — so it stayed green and
+    // said nothing about itself.
+    find: '  /** B-type replay rolling buffer, seconds. 0 disables. */',
+    replace: '  undocumentedOption?: string\n  /** B-type replay rolling buffer, seconds. 0 disables. */',
+    why: 'a public option the SDK reference does not mention',
+  },
+  {
+    gate: 'check-md-fences.mjs',
+    file: 'sdk/web/README.md',
+    find: '```bash\nbun add @goliapkg/sentori-web\n```',
+    replace: '```bash\nbun add @goliapkg/sentori-web',
+    why: 'a code fence that never closes',
+  },
+  {
     // A second launcher is a second set of flags nobody compares
     // until one of them is flaky on a machine nobody can log into.
     gate: 'check-single-chrome-launcher.mjs',
@@ -278,7 +303,45 @@ try {
     for (const f of failures) console.error(`    ${f}`);
     process.exit(1);
   }
-  console.log(`✓ ${PROBES.length} gates each went red on the defect they exist for`);
+  // Coverage, said out loud.
+  //
+  // Preflight runs more gates than this file probes, and "every gate
+  // went red" reads as "all of them" — the same shape of quiet as the
+  // `check-workflow-script-paths` output that said "8 pairs" while
+  // skipping three whole workflows. A gate with no probe is not
+  // verified; it is merely present. So the count is printed, and so
+  // are the names.
+  {
+    const preflight = readFileSync(join(ROOT, 'package.json'), 'utf8');
+    const run = new Set(
+      [...preflight.matchAll(/(?:node|bash) scripts\/(check-[a-z-]+\.(?:mjs|sh))/g)].map((m) => m[1]),
+    );
+    const probed = new Set(PROBES.map((p) => p.gate.split(' ')[0]));
+    // These read `lib/`, which is a build output and not in the sandbox
+    // — it copies tracked files. They are checked by preflight and by
+    // CI, where a build has happened; they cannot be probed here, and
+    // that is a property of the sandbox rather than a gap in them.
+    const NEEDS_BUILD = new Set([
+      'check-package-entrypoints.mjs',
+      'check-sdk-size.sh',
+      'check-web-size.sh',
+      'check-weapp-size.sh',
+      'check-maven-artifact.mjs',
+      'check-orphan-lib.mjs',
+    ]);
+    const unprobed = [...run].filter((g) => !probed.has(g) && !NEEDS_BUILD.has(g)).sort();
+    const unprobeable = [...run].filter((g) => !probed.has(g) && NEEDS_BUILD.has(g)).sort();
+    console.log(
+      `✓ ${PROBES.length} gates each went red on the defect they exist for` +
+        ` (${run.size - unprobed.length} of ${run.size} preflight gates have a probe)`,
+    );
+    if (unprobeable.length > 0) {
+      console.log(`  need a build, so not probeable from a tracked-files copy: ${unprobeable.join(', ')}`);
+    }
+    if (unprobed.length > 0) {
+      console.log(`  no probe yet, so present rather than verified: ${unprobed.join(', ')}`);
+    }
+  }
 } finally {
   rmSync(copy, { recursive: true, force: true });
 }
