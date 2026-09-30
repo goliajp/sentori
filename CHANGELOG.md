@@ -6,6 +6,50 @@
 
 ---
 
+## v4.0.3（2026-09-30 — 包发出去了，但装不上、import 就炸、报错版本号）
+
+v4 说的是五个 SDK 一套线，其中两个从来没在 npm 上。发它们的过程里，每修好一层就露出下一层，
+四层都是「发布成功」与「真的能用」之间的差：
+
+**1. 装不上。** `sdk/web` 和 `sdk/weapp` 对 core 声明的是 `workspace:*`。npm 原样发出去，
+消费者 `npm install` 得到 `EUNSUPPORTEDPROTOCOL`。`sdk/react-native` 一直写的是 `^3.0.0`，
+两个新包从建立起就没照做，也没有任何东西比对过。
+
+**2. 装上了，import 就炸。** 改成真实范围发 1.0.1 后：
+
+```
+SyntaxError: The requested module '@goliapkg/sentori-core'
+does not provide an export named 'createTransport'
+```
+
+根因是 v4 把 transport 内核挪进 core，**没有 bump 版本**。本地 `sentori-core@3.0.0` 有 39 个
+导出，npm 上同名的 3.0.0 只有 22 个 —— 同一个版本号，两份不同的代码。
+为此写的门一跑就抓到第二个活的：已发布的 `sentori-react-native@7.0.1` 缺
+`startAnrWatchdog` / `stopAnrWatchdog`，v4 导出了它们但从没重发。
+
+**3. 报的版本号是错的。** `SDK_VERSION` 会进 `Sentori-Sdk` 头，是服务端记录的、
+支持对话开头引用的那个值，而它是手写常量。只有 `sdk/react-native` 有一条测试断言它等于
+package.json，所以 web 和 weapp 连发三次都在上报 `0.1.0`。这道门现在是仓库级的。
+
+**4. 守这件事的门没在看 npm。** `check-doc-versions` 的职责就是「文档里的安装行装得上」，
+它问 SwiftPM tag、问 Maven Central，从没问过另外四个 SDK 所在的 registry。
+
+四道门，每道都实测过会红：
+
+| 门 | 规则 |
+|---|---|
+| `check-publishable-deps` | 消费者会装的依赖里不许有 `workspace:` 协议 |
+| `check-sibling-exports` | 已在 npm 上的版本号，本地公开导出必须与它一致；改了就得 bump。问 registry，拿不到就红 |
+| `check-sdk-version-constant` | 每个 SDK 上报的版本必须等于它 package.json 的版本 |
+| `check-doc-versions`（扩）| 安装行里的 npm 包必须真的存在 |
+
+**已发布并验证**：`core@3.1.0`、`react-native@7.1.1`、`web@1.0.3`、`weapp@1.0.3`。
+验证方式是在空项目里从 registry 装下来真的 `import`：五个动词齐全、未 init 时静默不抛、
+不返回 Promise、`Sentori-Sdk` 头读作 `web/1.0.3`。前面四次「发布成功」里有三次是假的，
+只有这一步算数。
+
+---
+
 ## v4.0.2（2026-09-30 — 发出去的那一份里，两处把读者送去 404；以及 CORS 从来没写进文档）
 
 **对外信息**
