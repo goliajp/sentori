@@ -135,7 +135,7 @@ server before pointing a browser at it.
 ## Cost
 
 The bundle is measured on every build, gzipped, the way a browser
-receives it. Today: **8.3 KB**. The gate fails over 25 KB.
+receives it. Today: **9.5 KB**. The gate fails over 25 KB.
 
 The main thread is measured too: a run that makes 550 SDK calls must
 produce no `longtask` entry. That check runs in a real Chrome on every

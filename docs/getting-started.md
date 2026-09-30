@@ -13,6 +13,7 @@ Pick the stack you ship:
 | **Kotlin** — native Android | [sdk-kotlin](./sdk-kotlin.md) |
 | **React Native** (bare or Expo) | [getting-started/react-native](./getting-started/react-native.md) |
 | **Browser** — any framework, or none | [getting-started/web](./getting-started/web.md) |
+| **WeChat mini program** | [getting-started/weapp](./getting-started/weapp.md) |
 
 There were guides here for React, Next.js and Node until 2026-08-10.
 They pointed at `@goliapkg/sentori-react` and friends — packages whose

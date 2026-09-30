@@ -453,6 +453,36 @@ jobs:
       - name: a real page, a real Chrome, a real server
         run: bash scripts/web-live-ingest.sh
 
+  # The mini-program SDK, through a `wx` shim.
+  #
+  # There is no WeChat runtime outside WeChat, so `request` is real
+  # HTTP, storage is a real store that throws over 1 MB the way the
+  # base library does, and the five `on*` hooks are called by hand.
+  # Everything above that is the code that ships.
+  #
+  # It runs with `globalThis.crypto` removed, because a mini program
+  # has no `crypto.subtle` — without that this would exercise the path
+  # that does not run on the target and leave the pure-JS SHA-256, the
+  # only reason identity works there, unchecked against a server.
+  #
+  # What it does not prove is written in the script: that the SDK runs
+  # inside WeChat's own engine, which needs a phone.
+  weapp-live-ingest:
+    needs: changes
+    if: needs.changes.outputs.sdk == 'true' || needs.changes.outputs.server == 'true' || needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: bun install --frozen-lockfile
+      - name: a wx shim, a real server
+        run: bash scripts/weapp-live-ingest.sh
+
   sdk:
     needs: changes
     if: needs.changes.outputs.sdk == 'true' || needs.changes.outputs.infra == 'true'
@@ -470,6 +500,7 @@ jobs:
           - sdk/expo
           - sdk/cli
           - sdk/web
+          - sdk/weapp
 
     steps:
       - uses: actions/checkout@v4

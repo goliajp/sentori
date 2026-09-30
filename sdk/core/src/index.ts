@@ -112,3 +112,5 @@ export {
   toSentoriError,
   type WireEventInputs,
 } from './wire-event.js'
+
+export { sha256Hex, utf8Bytes } from './sha256.js'
