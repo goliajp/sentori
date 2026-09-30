@@ -330,6 +330,14 @@ jobs:
           fetch-tags: true
           fetch-depth: 0
 
+      # `check-bun-version` is one of the gates the meta-gate below
+      # probes, and it stops rather than guess when there is no bun to
+      # ask. Without this the probe could not run here, and a gate that
+      # cannot run fails identically to one that caught its defect.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+
       - name: every surface is named by a workflow that runs on develop
         run: node scripts/check-surface-gates.mjs
 

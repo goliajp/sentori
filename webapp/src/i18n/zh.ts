@@ -388,6 +388,7 @@ export const zh: Messages = {
     '最近 {hours} 小时每段的无崩溃会话占比，纵轴从 {low}% 起。线断开的地方是那段没有 session，不是那段没崩溃。',
   'crashFree.window': '近 {hours} 小时',
   'platform.unknown': '未知（SDK 比服务端新）',
+  'platform.weapp': '微信小程序',
   'releases.artifactBroken': '{platform} 有已上传但读不到的物料 —— 展开查看是哪个。',
   'releases.artifactMissing':
     '{platform} 在此版本有事件，但缺符号化物料 —— 该平台的调用栈无法还原',

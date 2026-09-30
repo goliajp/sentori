@@ -401,6 +401,7 @@ export const en = {
     'Crash-free sessions per bucket over the last {hours}h, drawn from {low}% up. A break in the line is a stretch with no sessions, not a healthy one.',
   'crashFree.window': 'last {hours}h',
   'platform.unknown': 'Unknown (SDK newer than this server)',
+  'platform.weapp': 'WeChat Mini Program',
   'releases.artifactBroken':
     'A {platform} artifact was uploaded and cannot be read — expand for which.',
   'releases.artifactMissing':

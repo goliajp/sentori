@@ -131,13 +131,19 @@ if hit is None:
 
 resolved = str(hit.get("file"))
 print(f"      resolved to {resolved}")
-if "home" in resolved:
+# `pages/home`, not `home`. The resolved path is relative to the map's
+# sourceRoot and on a GitHub runner that walks up into
+# `../../../../home/runner/work/...`, so a bare `home` matched the
+# runner's home directory and failed a passing case on CI while passing
+# on a Mac. The page directory is the thing being distinguished, so it
+# is the thing to look for.
+if "pages/home" in resolved:
     sys.exit(
         "✗ the frame resolved against pages/home. The server matched on the basename "
         "and picked the wrong file, and a plausible line in the wrong source is worse "
         "than no line: nothing about it says so."
     )
-if "cart" not in resolved:
+if "pages/cart" not in resolved:
     sys.exit(f"✗ resolved to {resolved}, which names neither page")
 
 print("✓ two maps named index.js.map, and the frame resolved against the right one")

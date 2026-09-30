@@ -392,6 +392,7 @@ export const ja: Messages = {
     '直近 {hours} 時間の区間ごとのクラッシュフリー率。縦軸は {low}% から。線の途切れはセッションがなかった区間で、問題がなかった区間ではありません。',
   'crashFree.window': '直近 {hours} 時間',
   'platform.unknown': '不明（SDK がサーバーより新しい）',
+  'platform.weapp': 'WeChat ミニプログラム',
   'releases.artifactBroken': '{platform} にアップロード済みだが読めない成果物あり。展開して確認。',
   'releases.artifactMissing':
     '{platform} はこのリリースでイベントを送っていますが、シンボリケーション用アーティファクトがありません — スタックを読めません',
