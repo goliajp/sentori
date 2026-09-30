@@ -517,6 +517,27 @@ additive within its major version (see
 [compatibility promises](#compatibility-promises)); an SDK that needs
 a different shape needs `/v2`.
 
+### Cross-origin requests
+
+`/v1/*` answers browsers. The preflight allows any origin, the methods
+`GET`, `POST` and `OPTIONS`, and the headers `Authorization`,
+`Content-Type` and `Sentori-Sdk`, and caches that answer for 600
+seconds.
+
+Any origin, deliberately. An ingest token ships inside the page's
+JavaScript, so an origin allowlist is not a security boundary — it is
+a setting every self-hoster would have to find before a single web
+event arrived. What keeps the wildcard safe is that credentials are
+**not** allowed: no cookie or session rides one of these requests, and
+a browser refuses the wildcard-plus-credentials combination outright.
+
+The admin API under `/admin/*` is cookie-authenticated and answers no
+cross-origin request at all; allowing one would be a CSRF surface.
+
+A reverse proxy that adds its own `Access-Control-Allow-Origin` will
+produce two of the header, which browsers treat as none. Pass these
+through rather than setting them.
+
 ## Token and ingest URL
 
 ### Token format

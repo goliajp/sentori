@@ -472,6 +472,20 @@ const PROBES = [
     why: 'a docs page with no way in from the index',
   },
   {
+    gate: 'check-public-links.mjs',
+    file: 'docs/troubleshooting.md',
+    find: 'https://github.com/goliajp/sentori-selfhosted/issues',
+    replace: 'https://github.com/goliajp/sentori/issues',
+    why: 'the one instruction for getting help pointing at a private repository',
+  },
+  {
+    gate: 'check-ui-sentence-final.mjs',
+    file: 'webapp/src/i18n/zh.ts',
+    find: "  'inbox.loadFailed': '收件箱加载失败',",
+    replace: "  'inbox.loadFailed': '收件箱加载失败。',",
+    why: 'an error message written as a sentence rather than a label',
+  },
+  {
     gate: 'check-error-status.mjs',
     file: 'self-hosted/server/src/handlers/notify_admin.rs',
     find: 'pub async fn smtp_status(State(state): State<Arc<AppState>>) -> Json<Value> {',

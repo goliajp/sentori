@@ -219,7 +219,7 @@ Skip init in dev:
 ```ts
 // web
 if (import.meta.env.MODE === 'production') {
-  // wrap with SentoriProvider
+  sentori.init({ /* ... */ })
 }
 
 // RN
@@ -234,9 +234,39 @@ between them via `.env.local` (untracked) vs `.env.production`
 a crash a developer caused while iterating does not land in the same
 place as one a user hit.
 
+## 8. Nothing arrives from a browser, and the server logs show nothing
+
+The page's console says something like
+
+```
+Access to fetch at 'https://sentori.example.com/v1/events' from origin
+'https://app.example.com' has been blocked by CORS policy
+```
+
+**Why the server looks fine**
+
+It is fine. The browser refused the preflight and never sent the
+request, and it reports that to the page, not to us. Server logs,
+request counts and `/healthz` all look exactly as they do when nobody
+is sending anything — which is why this is worth its own entry.
+
+**Fix**
+
+- Server older than 4.0.0: it had no CORS at all and no browser could
+  reach it. Upgrade.
+- A reverse proxy in front adding its own `Access-Control-Allow-Origin`:
+  two of the header is the same as none to a browser. Remove the
+  proxy's, and pass the server's through.
+- A proxy that drops `OPTIONS` before it reaches Sentori, or strips
+  `Authorization` and `Sentori-Sdk` from the allowed request headers.
+
+What the server allows is in
+[protocol.md](protocol.md#cross-origin-requests). Nothing about it is
+configurable, so there is no setting on our side to get wrong.
+
 ## Still stuck?
 
-- File an issue on [GitHub](https://github.com/goliajp/sentori/issues)
+- File an issue on [GitHub](https://github.com/goliajp/sentori-selfhosted/issues)
 - Self-hosted: check `docker compose logs sentori` for warnings
 - The dashboard's Audit log (Settings → Audit) records every config
   change in the project; sometimes "events stopped flowing" is
