@@ -962,6 +962,14 @@ const SUFFIX = [
       sessions: 1240,
       crashedSessions: 7,
       crashFreeSessions: 99.44,
+      // Fewer people than sessions, because one person launches the app
+      // more than once — which is the whole reason the console prints
+      // both numbers. Present here because a mock missing a field the
+      // server sends makes the sweep pass on a screen the real server
+      // never produces.
+      users: 1180,
+      crashedUsers: 7,
+      crashFreeUsers: 99.41,
       releases: [
         {
           release: 'myapp@1.4.0+220',

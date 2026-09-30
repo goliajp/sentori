@@ -14,6 +14,7 @@ import { ErrorBanner, Kbd, SELECT_CLASS, TimeAgo, clsx } from '../components/ui'
 import { useT } from '../i18n';
 import { platformLabel } from '../lib/platform-label';
 import { api, type IssueSummary } from '../lib/api';
+import { formatCrashFree } from '../lib/crash-free';
 import { issueHeadline } from '../lib/issue-title';
 import { useAsyncData } from '../lib/useAsyncData';
 
@@ -648,11 +649,10 @@ function CrashFreeCard({ projectId }: { projectId: string }) {
   const releases = Array.isArray(data.releases) ? data.releases : [];
   // One crash in this many sessions moves the second decimal, so below
   // it the second decimal is noise.
+  // Only the warning line. How many digits to print is
+  // `formatCrashFree`'s job, and it needs the crash count too: cutting
+  // precision must not cut the crash.
   const thin = (data.sessions ?? 0) < 1000;
-  // The same rule for the user rate, against its own denominator. A
-  // project with 4000 sessions from 12 people does not get two
-  // decimals of user precision out of a large session count.
-  const thinUsers = (data.users ?? 0) < 1000;
   const hours = data.windowHours ?? 24;
   return (
     <div className="w-full max-w-xl rounded-lg border border-border bg-surface p-5">
@@ -674,7 +674,7 @@ function CrashFreeCard({ projectId }: { projectId: string }) {
               measurement, and printing 90.00% off ten sessions claims
               a precision the data does not carry. */}
           <p className="mt-2 text-4xl font-semibold tabular-nums text-fg">
-            {thin ? pct.toFixed(0) : pct.toFixed(2)}
+            {formatCrashFree(pct, data.sessions ?? 0, data.crashedSessions ?? 0)}
             <span className="ml-1 text-xl text-fg-muted">%</span>
           </p>
           {thin && <p className="mt-1 text-xs text-warn">{t('crashFree.thin')}</p>}
@@ -702,9 +702,11 @@ function CrashFreeCard({ projectId }: { projectId: string }) {
           >
             {typeof data.crashFreeUsers === 'number'
               ? t('crashFree.users', {
-                  pct: thinUsers
-                    ? data.crashFreeUsers.toFixed(0)
-                    : data.crashFreeUsers.toFixed(2),
+                  pct: formatCrashFree(
+                    data.crashFreeUsers,
+                    data.users ?? 0,
+                    data.crashedUsers ?? 0,
+                  ),
                 })
               : t('crashFree.usersEmpty')}
           </p>
@@ -721,7 +723,7 @@ function CrashFreeCard({ projectId }: { projectId: string }) {
                   <span className="shrink-0 text-fg-subtle">{platformLabel(r.platform, t)}</span>
                   <span className="w-16 shrink-0 text-right tabular-nums text-fg">
                     {typeof r.crashFreeSessions === 'number'
-                      ? `${r.crashFreeSessions.toFixed(r.sessions < 1000 ? 0 : 2)}%`
+                      ? `${formatCrashFree(r.crashFreeSessions, r.sessions, r.crashedSessions)}%`
                       : '—'}
                   </span>
                 </li>

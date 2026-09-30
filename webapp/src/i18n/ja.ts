@@ -368,7 +368,7 @@ export const ja: Messages = {
   'crashFree.thin': 'セッションが少なく、この精度に意味はありません',
   'crashFree.counts': '{total} セッション中 {crashed} 件がクラッシュ',
   'crashFree.empty': 'この期間のセッションはまだありません。SDK はアプリがバックグラウンドに入るたびに 1 件送ります。送信するビルドに更新するか、最初の報告をお待ちください。',
-  'crashFree.users': 'ユーザーの {pct}%',
+  'crashFree.users': 'クラッシュしなかったユーザー {pct}%',
   'crashFree.usersEmpty': 'まだ誰も識別されていません',
   'crashFree.usersTitle':
     '直近 {hours} 時間にセッションを 1 回以上開始したユーザー。2 つのリリースを使った人も 1 人として数えます。',
