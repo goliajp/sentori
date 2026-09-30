@@ -20,6 +20,10 @@ const ROUTES = [
   '', `issues/${I}`, 'instruments', 'releases', 'projects',
   // Settings sections are URL-driven, so each one is reachable here.
   // They were not, and four admin screens went unrendered for months.
+  // The docs site, which is public and outside the authenticated
+  // shell — the surface a stranger sees first, and the one that
+  // answered 200 with the dashboard shell until it existed.
+  'docs', 'docs/protocol', 'docs/getting-started/web',
   'settings?tab=tokens', 'settings?tab=users',
   'settings?tab=notifications',
   // Push is its own module now. Its sections are URL-driven for the

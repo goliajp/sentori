@@ -2,23 +2,19 @@ import {
   Activity,
   FolderKanban,
   Inbox,
-  Moon,
-  Monitor,
   Package,
   Search,
   Send,
   Settings,
-  Sun,
 } from 'lucide-react';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 
 import { CommandPalette, openPalette } from './components/CommandPalette';
-import { Kbd } from './components/ui';
+import { Kbd, ThemeSwitch } from './components/ui';
 import { useT } from './i18n';
 import { api, type Me, type Project } from './lib/api';
 import { formatApiError } from './lib/useAsyncData';
-import { setThemeMode, useThemeMode, type ThemeMode } from './lib/theme';
 
 import { SentoriMark } from './components/brand';
 
@@ -265,46 +261,3 @@ function StatusBar() {
   );
 }
 
-/// Three-state theme switch — a segmented row that reads as
-/// furniture, not as a feature. State + persistence live in
-/// lib/theme.ts.
-function ThemeSwitch() {
-  const t = useT();
-  const mode = useThemeMode();
-  const setMode = setThemeMode;
-  const options: {
-    mode: ThemeMode;
-    label: string;
-    Glyph: typeof Monitor;
-  }[] = [
-    { mode: 'system', label: t('theme.system'), Glyph: Monitor },
-    { mode: 'light', label: t('theme.light'), Glyph: Sun },
-    { mode: 'dark', label: t('theme.dark'), Glyph: Moon },
-  ];
-  return (
-    <div
-      role="radiogroup"
-      aria-label={t('theme.label')}
-      className="flex rounded-md border border-border p-0.5"
-    >
-      {options.map((o) => (
-        <button
-          key={o.mode}
-          type="button"
-          role="radio"
-          aria-checked={mode === o.mode}
-          title={o.label}
-          aria-label={o.label}
-          onClick={() => setMode(o.mode)}
-          className={`flex flex-1 items-center justify-center rounded py-1 transition-colors ${
-            mode === o.mode
-              ? 'bg-raised text-fg'
-              : 'text-fg-subtle hover:text-fg-muted'
-          }`}
-        >
-          <o.Glyph aria-hidden className="h-3.5 w-3.5" />
-        </button>
-      ))}
-    </div>
-  );
-}

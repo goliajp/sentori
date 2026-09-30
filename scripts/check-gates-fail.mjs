@@ -235,8 +235,8 @@ const PROBES = [
   {
     gate: 'check-doc-links.mjs',
     file: 'docs/README.md',
-    find: '[`errors.md`](errors.md)',
-    replace: '[`errors.md`](error-codes.md)',
+    find: '[Error reference](errors.md)',
+    replace: '[Error reference](error-codes.md)',
     why: 'an index claiming a page that does not exist',
   },
   {
@@ -260,9 +260,12 @@ const PROBES = [
   {
     gate: 'check-mirror.mjs',
     file: '.github/workflows/v0.2-oss-mirror.yml',
-    find: "            --include='/docs/errors.md' \\\n",
+    // A page the index links and the mirror would leave behind. The
+    // allowlist is per-file, so writing a page and publishing it were
+    // two actions until this caught them apart.
+    find: "            --include='/docs/dashboard.md' \\\n",
     replace: '',
-    why: 'a public mirror that ships no error reference',
+    why: 'a docs page the public repository would not have',
   },
   {
     gate: 'check-orphan-modules.sh',
@@ -467,7 +470,7 @@ const PROBES = [
   {
     gate: 'check-doc-reachable.mjs',
     file: 'docs/README.md',
-    find: '- [`recipes/release-versioning.md`](recipes/release-versioning.md)\n',
+    find: '- [Release versioning](recipes/release-versioning.md)\n',
     replace: '',
     why: 'a docs page with no way in from the index',
   },
@@ -501,6 +504,13 @@ const PROBES = [
     find: 'export const SDK_VERSION = ',
     replace: "export const SDK_VERSION = '0.0.0-probe' && ",
     why: 'an SDK reporting a version it stopped being releases ago',
+  },
+  {
+    gate: 'check-docs-site.mjs',
+    file: 'webapp/src/lib/docs.ts',
+    find: "  { key: 'docs.section.help', slugs: ['troubleshooting'] },\n",
+    replace: '',
+    why: 'a docs page the site has no navigation to',
   },
   {
     gate: 'check-error-status.mjs',

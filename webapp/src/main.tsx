@@ -8,6 +8,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import Instruments from './pages/Instruments';
 import ProjectsPage from './pages/Projects';
 import TriageView from './pages/TriageView';
+import Docs from './pages/Docs';
 import { LoginPage } from './pages/Login';
 import PushPage from './pages/Push';
 import Releases from './pages/Releases';
@@ -27,6 +28,9 @@ if (root) {
       <I18nProvider>
         <BrowserRouter>
           <Routes>
+            {/* Outside <App>: a reader arriving from npm or GitHub has
+                no account here, and the docs are public. */}
+            <Route path="/docs/*" element={<Docs />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
