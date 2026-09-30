@@ -634,9 +634,17 @@ function NotificationsTab() {
     <div className="space-y-4">
       <Panel title={t('notify.smtpTitle')}>
         <div className="p-3.5">
-          {smtp.data && smtp.data.configured && (
+          {smtp.data?.configured && (
             <div className="flex items-center gap-3 text-sm">
-              <span className="h-2 w-2 rounded-full bg-ok" />
+              {/* The dot follows the last delivery, not the config. It
+                  was hard-coded green, so it stayed green through two
+                  days of expired-certificate failures. */}
+              <span
+                className={clsx(
+                  'h-2 w-2 shrink-0 rounded-full',
+                  smtp.data.healthy ? 'bg-ok' : 'bg-kind-error',
+                )}
+              />
               <span className="font-mono text-xs text-fg-muted">
                 {smtp.data.host} · {smtp.data.from}
               </span>
@@ -659,6 +667,26 @@ function NotificationsTab() {
             <div className="flex items-center gap-3 text-sm text-fg-muted">
               <span className="h-2 w-2 rounded-full bg-border-strong" />
               {t('notify.smtpUnconfigured')}
+            </div>
+          )}
+          {/* What the server said the last time it tried. Without this
+              a run of failures is invisible here, and the delivery log
+              is the only place it exists. */}
+          {smtp.data?.lastStatus === 'failed' && (
+            <div className="mt-3 rounded border border-kind-error/40 bg-kind-error/5 p-2.5 text-xs">
+              <div className="font-medium text-kind-error">
+                {t('notify.deliveryFailing', { count: String(smtp.data.failed7d) })}
+              </div>
+              {smtp.data.lastError && (
+                <div className="mt-1 break-all font-mono text-fg-muted">
+                  {smtp.data.lastError}
+                </div>
+              )}
+              {smtp.data.lastDeliveredAt && (
+                <div className="mt-1 text-fg-subtle">
+                  {t('notify.lastDelivered')} <TimeAgo iso={smtp.data.lastDeliveredAt} />
+                </div>
+              )}
             </div>
           )}
           {testState === 'sent' && (

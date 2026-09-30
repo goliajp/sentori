@@ -1563,4 +1563,33 @@ N="$(send_count '{"traits":{"plan":"pro","e2e":"aud"},"payload":{"title":"t11"}}
 [[ "$N" == "1" ]] \
     || { echo "clearing traits left the device selectable: ${N}" >&2; exit 1; }
 
+# The SMTP panel says whether mail is getting through, not whether it
+# is configured.
+#
+# It answered `configured: true` and nothing else while the
+# certificate on the mail host had been expired for two days and 110
+# notifications in a row had failed. Configured and working are two
+# facts; the screen was showing the one nobody needs.
+echo "→ the SMTP panel reports a run of failures rather than 'configured'"
+BEFORE="$(curl -fsS -b "$JAR" "${BASE}/admin/api/smtp")"
+echo "$BEFORE" | grep -q '"configured"' \
+    || { echo "smtp status lost its configured field: ${BEFORE}" >&2; exit 1; }
+
+# A failed delivery, written the way the notifier writes one.
+dbq "INSERT INTO delivery_log (id, channel, recipient, subject, status, error, created_at)
+     VALUES (gen_random_uuid(), 'email', 'e2e@example.test', 'e2e', 'failed',
+             'smtp send: invalid peer certificate: certificate expired', now())" >/dev/null
+AFTER="$(curl -fsS -b "$JAR" "${BASE}/admin/api/smtp")"
+echo "$AFTER" | grep -q '"healthy":false' \
+    || { echo "a failed delivery left smtp status healthy: ${AFTER}" >&2; exit 1; }
+echo "$AFTER" | grep -q 'certificate expired' \
+    || { echo "smtp status does not carry why it failed: ${AFTER}" >&2; exit 1; }
+
+# And recovers: a later success is the most recent attempt.
+dbq "INSERT INTO delivery_log (id, channel, recipient, subject, status, created_at)
+     VALUES (gen_random_uuid(), 'email', 'e2e@example.test', 'e2e', 'delivered', now())" >/dev/null
+RECOVERED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/smtp")"
+echo "$RECOVERED" | grep -q '"healthy":true' \
+    || { echo "a later success did not clear the unhealthy state: ${RECOVERED}" >&2; exit 1; }
+
 echo "✓ e2e smoke passed — project ${PROJECT_ID}, issue ${ISSUE_ID}"

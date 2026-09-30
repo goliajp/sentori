@@ -325,9 +325,24 @@ export type AudienceSample = {
   userKeyTail: null | string;
 };
 
-export type SmtpStatus =
-  | { configured: true; host: string; from: string }
-  | { configured: false };
+/** Configured, and whether it is getting through.
+ *
+ *  The panel used to paint a green dot whenever `configured` was true.
+ *  It was green for the two days the certificate on the mail host was
+ *  expired and 110 notifications in a row failed. `healthy` is the
+ *  last delivery's outcome, not a count: a week that delivered 52 and
+ *  then failed 110 reads as fine by any measure that counts. */
+export type SmtpStatus = {
+  configured: boolean;
+  host: string | null;
+  from: string | null;
+  delivered7d: number;
+  failed7d: number;
+  lastStatus: 'delivered' | 'failed' | null;
+  lastError: string | null;
+  lastDeliveredAt: string | null;
+  healthy: boolean;
+};
 
 export type NotificationPref = {
   projectId: string;

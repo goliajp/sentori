@@ -595,7 +595,23 @@ const EXACT = {
   },
   // Deliberately unconfigured: the "SMTP is off" banner and the
   // disabled test button only exist in this state.
-  '/admin/api/smtp': { configured: false },
+  // Configured and failing — the state the panel used to paint green.
+  // On 2026-09-30 the certificate on the mail host had been expired
+  // for two days, 110 notifications in a row had failed, and this
+  // screen showed a green dot and the host name. A mock that only
+  // produces the happy path is how that survived a sweep.
+  '/admin/api/smtp': {
+    configured: true,
+    host: 'mail.example.com',
+    from: 'sentori@example.com',
+    delivered7d: 52,
+    failed7d: 110,
+    lastStatus: 'failed',
+    lastError:
+      'smtp send: Connection error: invalid peer certificate: certificate expired',
+    lastDeliveredAt: iso(86_400_000 * 2),
+    healthy: false,
+  },
   '/admin/api/notification-prefs': {
     prefs: [
       {

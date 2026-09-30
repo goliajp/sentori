@@ -155,6 +155,8 @@ export const ja: Messages = {
   'notify.testButton': 'テストメールを送信',
   'notify.testFailed': 'テストメール失敗。SMTP 設定とサーバーログを確認。',
   'notify.testSending': '送信中…',
+  'notify.deliveryFailing': '通知が届いていません —— 直近 7 日で {count} 件失敗',
+  'notify.lastDelivered': '最後に届いたのは',
   'notify.testSent': 'テストメール送信済み',
   'palette.placeholder': 'ページへ移動、または issue を検索…',
 
