@@ -44,6 +44,18 @@ on:
       - 'scripts/sourcemap-e2e/**'
       - 'scripts/ios-live-ingest.sh'
       - 'scripts/android-live-ingest.sh'
+      # Every other script a job here runs. These were absent, so
+      # editing the rig that crashes a real app and reads the report
+      # back triggered nothing — a fix for it sat unverified because
+      # the only workflow that executes it never fired.
+      # `check-workflow-script-paths` keeps this list honest.
+      - 'scripts/ios-crash-loop.sh'
+      - 'scripts/android-crash-loop.sh'
+      - 'scripts/check-native-version-tag.mjs'
+      - 'scripts/check-maven-artifact.mjs'
+      - 'scripts/sync-native-core.mjs'
+      # Sourced by the two crash-loop rigs.
+      - 'scripts/lib/**'
       - '.github/workflows/mobile-e2e.yml'
   pull_request:
     branches: [develop, master]
@@ -58,6 +70,18 @@ on:
       - 'scripts/sourcemap-e2e/**'
       - 'scripts/ios-live-ingest.sh'
       - 'scripts/android-live-ingest.sh'
+      # Every other script a job here runs. These were absent, so
+      # editing the rig that crashes a real app and reads the report
+      # back triggered nothing — a fix for it sat unverified because
+      # the only workflow that executes it never fired.
+      # `check-workflow-script-paths` keeps this list honest.
+      - 'scripts/ios-crash-loop.sh'
+      - 'scripts/android-crash-loop.sh'
+      - 'scripts/check-native-version-tag.mjs'
+      - 'scripts/check-maven-artifact.mjs'
+      - 'scripts/sync-native-core.mjs'
+      # Sourced by the two crash-loop rigs.
+      - 'scripts/lib/**'
   workflow_dispatch:
 
 env:
@@ -107,12 +131,20 @@ jobs:
               - 'apps/rn-example/**'
               - 'apps/android-consumer/**'
               - 'scripts/android-live-ingest.sh'
+              - 'scripts/android-crash-loop.sh'
+              - 'scripts/check-native-version-tag.mjs'
+              - 'scripts/check-maven-artifact.mjs'
+              - 'scripts/sync-native-core.mjs'
+              - 'scripts/lib/**'
               - '.github/workflows/mobile-e2e.yml'
             ios:
               - 'sdk/native/ios/**'
               - 'apps/ios-showcase/**'
               - 'apps/rn-example/**'
               - 'scripts/ios-live-ingest.sh'
+              - 'scripts/ios-crash-loop.sh'
+              - 'scripts/sync-native-core.mjs'
+              - 'scripts/lib/**'
               - '.github/workflows/mobile-e2e.yml'
             server:
               - 'core/**'

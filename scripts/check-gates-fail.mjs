@@ -132,6 +132,16 @@ const PROBES = [
     why: 'a TypeScript module that ships in no bundle',
   },
   {
+    // The rigs that crash a real app are the gates nobody can retest
+    // by hand, so a trigger list that forgets one is the quietest way
+    // to lose them.
+    gate: 'check-workflow-script-paths.mjs',
+    file: '.github/workflows/mobile-e2e.yml',
+    find: "      - 'scripts/ios-crash-loop.sh'",
+    replace: '',
+    why: 'a gate script no workflow is triggered by',
+  },
+  {
     // The fixture is generated from the kernel, so a kernel rule that
     // Swift and Kotlin have not been told about shows up here rather
     // than as two platforms counting losses differently in
