@@ -367,6 +367,8 @@ jobs:
         run: node scripts/check-md-fences.mjs
       - name: every docs page is reachable from the index
         run: node scripts/check-doc-reachable.mjs
+      - name: shipped docs do not link somewhere a reader cannot go
+        run: node scripts/check-public-links.mjs
       - name: the OpenAPI document matches the router
         run: node scripts/gen-openapi.mjs --check
       - name: the error reference matches the handlers
