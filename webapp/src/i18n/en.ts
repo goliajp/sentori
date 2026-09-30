@@ -375,6 +375,18 @@ export const en = {
   'crashFree.thin': 'too few sessions to read this precisely',
   'crashFree.counts': '{crashed} crashed of {total} sessions',
   'crashFree.empty': 'No sessions in this window yet — the SDK reports one each time the app goes to the background. Update to a build that sends them, or wait for the first report.',
+  'crashFree.users': '{pct}% of users',
+  'crashFree.usersEmpty': 'nobody identified yet',
+  'crashFree.usersTitle':
+    'Users who started at least one session in the last {hours}h. A person who ran two releases counts once.',
+  'crashFree.sessionsTitle':
+    'Sessions started in the last {hours}h. One app launch is one session, so a user who launched the app ten times counts ten times.',
+  'impact.title':
+    '{users} users have reported this, all time — up to {max} times each. Not limited to a window, so this number does not shrink.',
+  'impact.titleAnon':
+    '{events} events, all time. Nobody who reported this was identified, so there is no user count — not zero users.',
+  'health.usersTitle':
+    'Distinct users who sent any event in the last 24h — not only the ones who hit a problem.',
   'crashFree.window': 'last {hours}h',
   'platform.unknown': 'Unknown (SDK newer than this server)',
   'releases.artifactBroken':

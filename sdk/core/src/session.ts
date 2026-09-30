@@ -32,7 +32,16 @@ export type SessionPing = {
   release: string
   startedAt: string
   status: SessionStatus
+  /** @deprecated Never populated by any shipped SDK, and a raw id has
+   *  no business on the wire. Kept so a server that reads it does not
+   *  break; `userKey` is the field. */
   userId: null | string
+  /** The same salted hash events carry as `userKey`, so the crash-free
+   *  user count and an issue's breadth are over one population. While
+   *  this was missing the two numbers were not comparable, and the
+   *  crash-free-users rate had no input at all: `userId` was hard-wired
+   *  to null at start and nothing ever filled it in. */
+  userKey?: null | string
 }
 
 export type SessionContext = {
