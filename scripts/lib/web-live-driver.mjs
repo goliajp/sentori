@@ -12,11 +12,9 @@
 // because a reporter that costs the page a frame is one the host
 // removes.
 
-import { spawn } from 'node:child_process';
-import { existsSync, writeFileSync } from 'node:fs';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { writeFileSync } from 'node:fs';
+
+import { launchChrome } from './headless-chrome.mjs';
 
 const [pageUrl, outFile] = process.argv.slice(2);
 if (!pageUrl || !outFile) {
@@ -24,45 +22,12 @@ if (!pageUrl || !outFile) {
   process.exit(1);
 }
 
-const CHROME =
-  process.env.CHROME_PATH ??
-  [
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    '/usr/bin/google-chrome',
-    '/usr/bin/google-chrome-stable',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/chromium',
-  ].find((p) => existsSync(p)) ??
-  'google-chrome';
-
-const profile = mkdtempSync(join(tmpdir(), 'sentori-web-'));
-const chrome = spawn(CHROME, [
-  '--headless=new',
-  '--remote-debugging-port=0',
-  `--user-data-dir=${profile}`,
-  '--no-first-run',
-  '--no-default-browser-check',
-  '--disable-gpu',
-  'about:blank',
-]);
-
-let said = '';
-chrome.stderr.on('data', (d) => (said += d));
-chrome.on('error', (e) => (said += `spawn failed: ${e.message}\n`));
-
-const wsUrl = await new Promise((resolve, reject) => {
-  const timer = setTimeout(
-    () => reject(new Error(`Chrome never printed a debugger URL. It said:\n${said}`)),
-    20000,
-  );
-  const tick = setInterval(() => {
-    const m = /ws:\/\/[^\s]+/.exec(said);
-    if (m) {
-      clearInterval(tick);
-      clearTimeout(timer);
-      resolve(m[0]);
-    }
-  }, 100);
+// One launcher, shared with the render sweep. They were two, and the
+// pair that differed by `--no-first-run` and a fixed port is the pair
+// where one failed on CI and the other never did.
+const { chrome, wsUrl } = await launchChrome().catch((e) => {
+  console.error(e.message);
+  process.exit(1);
 });
 
 const ws = new WebSocket(wsUrl);

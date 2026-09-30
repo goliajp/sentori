@@ -142,6 +142,15 @@ const PROBES = [
     why: 'a gate script no workflow is triggered by',
   },
   {
+    // A second launcher is a second set of flags nobody compares
+    // until one of them is flaky on a machine nobody can log into.
+    gate: 'check-single-chrome-launcher.mjs',
+    file: 'scripts/lib/headless-chrome.mjs',
+    find: "      '--no-first-run',",
+    replace: '',
+    why: 'a launcher missing a flag that is there for a real failure',
+  },
+  {
     // The fixture is generated from the kernel, so a kernel rule that
     // Swift and Kotlin have not been told about shows up here rather
     // than as two platforms counting losses differently in
