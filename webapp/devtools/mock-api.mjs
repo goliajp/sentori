@@ -932,6 +932,18 @@ const SUFFIX = [
   // rl1 hears from iOS only (its missing dsym is the light that must go
   // red, its missing proguard the one that must stay quiet); rl2 has no
   // traffic at all, the empty-array path.
+  // One project, for the webhook panel. An unmocked path makes the
+  // sweep pass on a screen the real server never produces.
+  [
+    /\/admin\/api\/projects\/[0-9a-f-]+$/,
+    () => ({
+      id: PROJ,
+      name: 'insight-mobile',
+      platform: 'react-native',
+      createdAt: iso(86_400_000 * 30),
+      webhookUrl: 'https://hooks.example.com/services/T00/B00/xxxx',
+    }),
+  ],
   [
     /\/releases$/,
     () => ({

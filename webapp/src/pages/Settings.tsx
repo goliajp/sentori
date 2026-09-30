@@ -290,8 +290,22 @@ function UsersTab() {
             <div key={u.id} className="px-4 py-2 text-sm">
               <div className="flex items-center gap-3">
                 <span className="flex-1 text-fg">{u.email}</span>
-                <span className="w-24 text-xs text-fg-subtle">
-                  {u.role}
+                {/* The word the rest of the console uses, not the
+                    database's. The top bar has called this person
+                    "Owner" since there was a top bar while this column
+                    said `superadmin` — one role, two names, and the
+                    reader left to guess they are the same thing.
+                    The raw value stays in the title for whoever is
+                    reading a bug report against the API. */}
+                <span
+                  className="w-24 text-xs text-fg-subtle"
+                  title={`${u.role} — ${
+                    u.role === 'superadmin'
+                      ? t('settings.roleOwnerScope')
+                      : t('settings.roleAdminScope')
+                  }`}
+                >
+                  {u.role === 'superadmin' ? t('shell.roleOwner') : t('shell.roleAdmin')}
                 </span>
                 <span className="w-24 text-right text-xs tabular-nums text-fg-subtle">
                   {u.lastLoginAt ? <TimeAgo iso={u.lastLoginAt} /> : '—'}
@@ -489,6 +503,82 @@ function AccountTab() {
   );
 }
 
+/**
+ * The second alert channel.
+ *
+ * Issue notifications were email-only, and `spawn_issue_notification`
+ * returned early with no SMTP — so a self-hosted instance without a
+ * mail server got no alerts at all and nothing said so. The transport
+ * had been in the notifier crate the whole time, with tests and a doc
+ * comment teaching people to use it, and the server never registered
+ * it.
+ *
+ * Per project because a webhook goes to a room. The list comes from
+ * the notification preferences, which already enumerate the projects
+ * this person can see.
+ */
+function WebhookPanel() {
+  const t = useT();
+  const { activeProject } = useShell();
+  const projectId = activeProject?.id ?? null;
+  const { data, reload } = useAsyncData(
+    () => (projectId ? api.getProject(projectId) : Promise.resolve(null)),
+    [projectId],
+  );
+  const [draft, setDraft] = useState<null | string>(null);
+  const [state, setState] = useState<'error' | 'idle' | 'saved' | 'saving'>('idle');
+
+  // `draft` is null until the field is touched, so a reload does not
+  // fight what is being typed.
+  const value = draft ?? data?.webhookUrl ?? '';
+
+  return (
+    <Panel title={t('notify.webhookTitle')}>
+      <div className="space-y-2 p-3.5">
+        <p className="text-xs text-fg-muted">{t('notify.webhookHint')}</p>
+        <div className="flex items-center gap-2">
+          <input
+            type="url"
+            value={value}
+            placeholder={t('notify.webhookPlaceholder')}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setState('idle');
+            }}
+            className="flex-1 rounded border border-border bg-bg px-2 py-1 font-mono text-xs text-fg"
+          />
+          <Button
+            size="sm"
+            disabled={!projectId || state === 'saving'}
+            onClick={() => {
+              if (!projectId) return;
+              setState('saving');
+              // The empty string is sent on purpose: it is how the
+              // channel is turned off, and a field that cannot be
+              // cleared is a channel that cannot be stopped.
+              api.updateProject(projectId, { webhookUrl: value.trim() }).then(
+                () => {
+                  setState('saved');
+                  setDraft(null);
+                  reload();
+                },
+                () => setState('error'),
+              );
+            }}
+          >
+            {t('notify.webhookSave')}
+          </Button>
+        </div>
+        {state === 'saved' && <p className="text-xs text-ok">{t('notify.webhookSaved')}</p>}
+        {state === 'error' && (
+          <p className="text-xs text-kind-error">{t('notify.webhookFailed')}</p>
+        )}
+        <p className="text-xs text-fg-subtle">{t('notify.webhookOwnerOnly')}</p>
+      </div>
+    </Panel>
+  );
+}
+
 function NotificationsTab() {
   const locale = useLocale();
   const t = useT();
@@ -579,6 +669,8 @@ function NotificationsTab() {
           )}
         </div>
       </Panel>
+
+      <WebhookPanel />
 
       <Panel title={t('notify.prefsTitle')}>
         {prefs.error && (

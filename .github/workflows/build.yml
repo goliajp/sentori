@@ -483,6 +483,31 @@ jobs:
       - name: a wx shim, a real server
         run: bash scripts/weapp-live-ingest.sh
 
+  # An issue alert reaches a team that has no mail server.
+  #
+  # Issue notifications were email-only and returned early with no
+  # SMTP, so a self-hosted instance without one got nothing and
+  # nothing said so. `WebhookTransport` sat in the notifier crate the
+  # whole time, with tests and a doc comment teaching people to use
+  # it, and the server never registered it.
+  #
+  # The receiver is a separate process on its own port, because the
+  # question is whether the transport is *reached* — a mock inside the
+  # server cannot answer that. It runs without SMTP on purpose: that
+  # is the configuration this channel exists for, and the one where an
+  # email-shaped test passes while the product sends nothing.
+  webhook-alert:
+    needs: changes
+    if: needs.changes.outputs.server == 'true' || needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: a new issue knocks on the team's webhook
+        run: bash scripts/webhook-alert-e2e.sh
+
   sdk:
     needs: changes
     if: needs.changes.outputs.sdk == 'true' || needs.changes.outputs.infra == 'true'

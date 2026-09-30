@@ -41,6 +41,7 @@ const covers = (glob, path) => {
 };
 
 const problems = [];
+const unfiltered = [];
 let checked = 0;
 
 for (const file of readdirSync(dir).filter((f) => f.endsWith('.yml'))) {
@@ -67,7 +68,13 @@ for (const file of readdirSync(dir).filter((f) => f.endsWith('.yml'))) {
   const end = after.search(/^\s{2}[a-z_]+:/m);
   const pushBlock = src.slice(pushAt, end === -1 ? src.length : pushAt + 7 + end);
   const declared = [...pushBlock.matchAll(/^\s*-\s*'([^']+)'\s*$/gm)].map((m) => m[1]);
-  if (declared.length === 0) continue;
+  // No `paths:` means every push runs it, so every script it holds is
+  // already reachable. Named in the output rather than skipped in
+  // silence: "8 pairs checked" would otherwise read as "all of them".
+  if (declared.length === 0) {
+    unfiltered.push(file);
+    continue;
+  }
 
   const used = new Set(
     [...src.matchAll(/(?:bash|node|sh)\s+(scripts\/[A-Za-z0-9/_.-]+)/g)].map((m) => m[1]),
@@ -96,4 +103,9 @@ if (problems.length > 0) {
   );
   process.exit(1);
 }
-console.log(`✓ ${checked} workflow/script pairs: every script fires the workflow that runs it`);
+console.log(
+  `✓ ${checked} workflow/script pairs: every script fires the workflow that runs it` +
+    (unfiltered.length > 0
+      ? ` (${unfiltered.join(', ')} run on every push, so nothing to filter)`
+      : ''),
+);

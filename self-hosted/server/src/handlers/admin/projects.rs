@@ -87,20 +87,31 @@ pub async fn get(
     if let Err(e) = super::tokens::ensure_project_access(&state, &ctx, project_id).await {
         return e;
     }
-    let row: Option<(String, String, time::OffsetDateTime)> =
-        sqlx::query_as("SELECT name, platform, created_at FROM projects WHERE id = $1")
-            .bind(project_id)
-            .fetch_optional(&state.pool)
-            .await
-            .unwrap_or(None);
+    let row: Option<(String, String, time::OffsetDateTime, Option<String>)> = sqlx::query_as(
+        "SELECT name, platform, created_at, webhook_url FROM projects WHERE id = $1",
+    )
+    .bind(project_id)
+    .fetch_optional(&state.pool)
+    .await
+    .unwrap_or(None);
     match row {
-        Some((name, platform, created_at)) => (
+        Some((name, platform, created_at, webhook_url)) => (
             StatusCode::OK,
             Json(json!({
                 "id": project_id,
                 "name": name,
                 "platform": platform,
                 "createdAt": crate::wire_time::rfc3339(created_at),
+                // Only to whoever can set it. This route is not
+                // superadmin-only — an admin assigned to the project
+                // reaches it — and the URL is a secret in the same way
+                // an ingest token is: whoever holds it can post into
+                // the team's channel. `update` is superadmin-only, so
+                // read follows write.
+                //
+                // I wrote the opposite here first, in a comment
+                // claiming the route was superadmin-only. It is not.
+                "webhookUrl": if ctx.role.is_superadmin() { webhook_url } else { None },
             })),
         ),
         None => (
@@ -110,10 +121,19 @@ pub async fn get(
     }
 }
 
+// camelCase on the wire, like every other v1 body. Without the
+// rename this field would only accept `webhook_url`, which the
+// console does not send and `check-wire-case` does not read (it
+// checks response keys, not request ones).
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateBody {
     pub name: Option<String>,
     pub platform: Option<String>,
+    /// Where issue alerts also go. Empty string clears it — absent and
+    /// empty mean different things here, and a UI that cannot clear a
+    /// field is a UI that cannot turn the channel off.
+    pub webhook_url: Option<String>,
 }
 
 pub async fn update(
@@ -125,13 +145,27 @@ pub async fn update(
     if let Err(e) = superadmin_only(&ctx) {
         return e;
     }
+    // An empty string clears the column rather than storing "".
+    // `notify` treats a blank URL as absent anyway, but a NULL is the
+    // honest way to say "no channel" and it keeps the two states from
+    // diverging.
+    let webhook = body.webhook_url.as_deref().map(|u| {
+        if u.trim().is_empty() {
+            None
+        } else {
+            Some(u.trim())
+        }
+    });
     let r = sqlx::query(
-        "UPDATE projects SET name = COALESCE($2, name), platform = COALESCE($3, platform) \
+        "UPDATE projects SET name = COALESCE($2, name), platform = COALESCE($3, platform), \
+                webhook_url = CASE WHEN $5 THEN $4 ELSE webhook_url END \
          WHERE id = $1",
     )
     .bind(project_id)
     .bind(body.name.as_deref())
     .bind(body.platform.as_deref())
+    .bind(webhook.flatten())
+    .bind(webhook.is_some())
     .execute(&state.pool)
     .await;
     match r {
@@ -143,7 +177,14 @@ pub async fn update(
                 "project.update",
                 "project",
                 &project_id.to_string(),
-                json!({ "name": body.name, "platform": body.platform }),
+                // The URL itself is not logged: whoever holds it can
+                // post into the team's channel, and an audit log is
+                // read by more people than can set one.
+                json!({
+                    "name": body.name,
+                    "platform": body.platform,
+                    "webhookUrl": webhook.map(|u| u.map_or("cleared", |_| "set")),
+                }),
             )
             .await;
             (StatusCode::OK, Json(json!({ "ok": true })))
