@@ -7,22 +7,12 @@
 // Also collects console errors per route — a page that renders but logs
 // a throw looks fine in a screenshot, and that is exactly how the
 // RangeError survived a sweep.
-import { spawn } from 'node:child_process';
-import { writeFileSync, mkdirSync, mkdtempSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync, mkdtempSync } from 'node:fs';
+
+import { launchChrome, pageWebSocketUrl } from '../../scripts/lib/headless-chrome.mjs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-// macOS keeps Chrome in a bundle; a Linux runner has it on PATH under
-// one of several names. Resolved rather than hardcoded so the same
-// sweep runs on a laptop and in CI — a gate that only exists on one
-// machine is a gate whoever is not at that machine does not have.
-const CHROME =
-  process.env.CHROME_PATH ??
-  ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-   '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable',
-   '/usr/bin/chromium-browser', '/usr/bin/chromium']
-    .find(p => existsSync(p)) ??
-  'google-chrome';
 const BASE = 'http://localhost:5599';
 const I = '019f85ee-ae41-77f1-bbf9-97d310663c9a';
 
@@ -91,75 +81,36 @@ mkdirSync(out, { recursive: true });
 // the reason is on Chrome's stderr and this script used to throw it
 // away — "chrome never opened a debugging port" was every failure,
 // whatever the cause.
-// A fresh profile per run. The path used to be derived from the
-// language, theme and width, so two runs with the same three shared a
-// directory — and a Chrome that finds a locked profile exits without
-// printing anything, which is exactly the shape of the failure seen
-// twice on CI. Not a diagnosis; a cause removed for nothing.
-const profile = mkdtempSync(join(tmpdir(), 'cd-sweep-'));
-const chrome = spawn(CHROME, [
-  '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
-  '--remote-debugging-port=9555',
-  `--lang=${lang}`, `--accept-lang=${lang}`,
-  `--window-size=${width},1000`, `--user-data-dir=${profile}`,
-  'about:blank',
-], { stdio: ['ignore', 'pipe', 'pipe'] });
-
-let chromeSaid = '';
-chrome.stdout?.on('data', (b) => { chromeSaid += b.toString(); });
-chrome.stderr?.on('data', (b) => { chromeSaid += b.toString(); });
-chrome.on('error', (e) => { chromeSaid += `spawn failed: ${e.message}\n`; });
-
-// Chrome's debugging port comes up a beat after the process does, and
-// on a cold CI runner that beat is longer than a laptop's. Poll for it
-// — a fixed sleep here failed as `list.find(...) of undefined`, which
-// reads like a bug in the sweep rather than "the browser is not up".
-// Two failures look the same from here and are not: the port never
-// opening, and the port opening with no page target registered yet.
-// The old message said "never opened a debugging port" for both, so
-// two CI failures in six runs reported a cause that may not have been
-// theirs. `lastError` and `lastSeen` separate them.
+// Chrome comes up through `scripts/lib/headless-chrome.mjs`, the same
+// launcher the web SDK's live-ingest driver uses.
 //
-// 90 attempts rather than 40, and said plainly: this is not a known
-// fix. It is how "the runner was slower than twenty seconds" gets
-// ruled out, and the cost of being wrong is waiting 45 seconds before
-// a failure that was going to fail anyway.
-let list = null;
-let lastError = null;
-let lastSeen = null;
-for (let i = 0; i < 90 && !list; i++) {
-  try {
-    const r = await fetch('http://127.0.0.1:9555/json/list');
-    const j = await r.json();
-    lastSeen = j.map(t => t.type).join(', ') || '(empty list)';
-    if (j.some(t => t.type === 'page')) list = j;
-  } catch (e) {
-    lastError = e.message;
-  }
-  if (!list) await new Promise(r => setTimeout(r, 500));
-}
-if (!list) {
-  process.stderr.write(
-    lastSeen === null
-      ? `chrome never opened a debugging port (${CHROME})\n`
-      : `chrome opened the port but never registered a page target (${CHROME})\n` +
-        `  the last /json/list held: ${lastSeen}\n`,
-  );
-  if (lastError) process.stderr.write(`  last fetch error: ${lastError}\n`);
-  process.stderr.write(
-    chromeSaid.trim()
-      ? `\n── what chrome said ──\n${chromeSaid.trim()}\n`
-      : '\nchrome printed nothing at all — it may not have started.\n',
-  );
-  process.stderr.write(
-    `exited: ${chrome.exitCode ?? 'still running'}` +
-      `${chrome.signalCode ? ` (signal ${chrome.signalCode})` : ''}\n`,
-  );
-  process.stderr.write(`profile: ${profile}\n`);
-  chrome.kill();
+// There used to be two. That one asked for port 0 and passed
+// `--no-first-run --no-default-browser-check`; this one took a fixed
+// 9555 and passed neither. The first has never failed on CI. This one
+// failed twice in six runs with "chrome printed nothing at all" and
+// the process still alive — which is what both a taken fixed port and
+// a first-run prompt look like from out here, and neither could
+// happen to the other launcher.
+//
+// They were written a week apart and were never meant to differ.
+// `check-single-chrome-launcher` fails if a second one appears.
+let chrome;
+let pageWs;
+try {
+  const started = await launchChrome({
+    extraArgs: [`--lang=${lang}`, `--accept-lang=${lang}`, `--window-size=${width},1000`],
+  });
+  chrome = started.chrome;
+  // A page target, not the browser endpoint: this file drives one page
+  // with `Page.navigate` rather than attaching to targets.
+  pageWs = await pageWebSocketUrl(started.wsUrl);
+} catch (e) {
+  process.stderr.write(`${e.message}\n`);
+  chrome?.kill();
   process.exit(1);
 }
-const sock = new WebSocket(list.find(t => t.type === 'page').webSocketDebuggerUrl);
+
+const sock = new WebSocket(pageWs);
 let id = 0;
 const pend = new Map();
 const logs = [];

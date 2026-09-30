@@ -15,8 +15,9 @@
 // Writes <out>/<route>.png plus <out>/report.json — console errors and
 // load time per route, so a screenshot that looks calm and a page that
 // threw are not the same finding.
-import { spawn } from 'node:child_process';
-import { writeFileSync, mkdirSync, mkdtempSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync, mkdtempSync } from 'node:fs';
+
+import { launchChrome, pageWebSocketUrl } from '../../scripts/lib/headless-chrome.mjs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -117,30 +118,28 @@ const ROUTES = [
   'settings?tab=account', 'settings?tab=audit',
 ];
 
-const CHROME = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable',
-  '/usr/bin/chromium-browser', '/usr/bin/chromium'].find(p => existsSync(p));
-if (!CHROME) { process.stderr.write('no chrome found\n'); process.exit(1); }
-
 mkdirSync(out, { recursive: true });
-const chrome = spawn(CHROME, [
-  '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
-  '--remote-debugging-port=9556', `--lang=${lang}`, `--accept-lang=${lang}`,
-  `--window-size=${width},1000`, `--user-data-dir=/tmp/cd-walk-${lang}-${theme}`,
-  'about:blank',
-], { stdio: ['ignore', 'pipe', 'pipe'] });
 
-let list = null;
-for (let i = 0; i < 40 && !list; i++) {
-  try {
-    const j = await (await fetch('http://127.0.0.1:9556/json/list')).json();
-    if (j.some(t => t.type === 'page')) list = j;
-  } catch { /* not listening yet */ }
-  if (!list) await new Promise(r => setTimeout(r, 500));
+// The shared launcher, same as the render sweep and the web SDK's
+// live-ingest driver. This was a third copy — fixed port 9556, a
+// profile path keyed on language and theme, and no `--no-first-run`.
+// `check-single-chrome-launcher` found it the moment that check
+// existed.
+let chrome;
+let pageWs;
+try {
+  const started = await launchChrome({
+    extraArgs: [`--lang=${lang}`, `--accept-lang=${lang}`, `--window-size=${width},1000`],
+  });
+  chrome = started.chrome;
+  pageWs = await pageWebSocketUrl(started.wsUrl);
+} catch (e) {
+  process.stderr.write(`${e.message}\n`);
+  chrome?.kill();
+  process.exit(1);
 }
-if (!list) { process.stderr.write('chrome never opened a debugging port\n'); chrome.kill(); process.exit(1); }
 
-const sock = new WebSocket(list.find(t => t.type === 'page').webSocketDebuggerUrl);
+const sock = new WebSocket(pageWs);
 let id = 0;
 const pend = new Map();
 let logs = [];
