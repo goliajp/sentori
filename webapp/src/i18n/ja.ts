@@ -389,6 +389,15 @@ export const ja: Messages = {
     '{platform} はこのリリースでイベントを送っていますが、シンボリケーション用アーティファクトがありません — スタックを読めません',
   'releases.artifactUnused':
     'このリリースに {platform} のイベントはないため、欠落は無害です',
+  'releases.legend': 'シンボル化',
+  'releases.legendOk': 'アップロード済みで読める',
+  'releases.legendBroken': 'アップロード済みだが解析できないものがある',
+  'releases.legendMissing': 'このリリースには必要とするプラットフォームがある',
+  'releases.legendUnused': 'ここでは使われていない',
+  'releases.crashFree': 'クラッシュなし',
+  'releases.crashFreeNone': 'セッションなし',
+  'releases.crashFreeTitle':
+    '直近 30 日間、このリリースの {sessions} セッションのうち {pct}% がクラッシュしませんでした。セッションは送信する SDK から届きます。1 件もないリリースは比率ではなくダッシュを表示します。',
   'releases.delete': 'リリースを削除',
   'releases.deleteConfirm': '{name} を削除しますか？シンボリケーション成果物も一緒に削除され、再アップロードするまでこのリリースのスタックは復元できません。',
   'releases.deleteFailed': 'リリースを削除できませんでした。',

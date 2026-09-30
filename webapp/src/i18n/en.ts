@@ -399,6 +399,15 @@ export const en = {
     '{platform} reports events in this release but has no symbolication artifact — its stacks cannot be read',
   'releases.artifactUnused':
     'no {platform} events in this release, so the missing artifact is harmless',
+  'releases.legend': 'Symbolication',
+  'releases.legendOk': 'uploaded and readable',
+  'releases.legendBroken': 'uploaded, and something under it does not parse',
+  'releases.legendMissing': 'this release reports from a platform that needs it',
+  'releases.legendUnused': 'nothing here uses it',
+  'releases.crashFree': 'crash-free',
+  'releases.crashFreeNone': 'no sessions',
+  'releases.crashFreeTitle':
+    '{pct}% of the {sessions} sessions on this release did not crash, over the last 30 days. Sessions arrive from SDKs that send them; a release with none shows a dash rather than a rate.',
   'releases.delete': 'Delete release',
   'releases.deleteConfirm': 'Delete {name}? Its symbolication artifacts go with it, and this release\u2019s stacks cannot be symbolicated again until they are re-uploaded.',
   'releases.deleteFailed': 'Could not delete the release.',

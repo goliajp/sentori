@@ -986,9 +986,17 @@ const SUFFIX = [
           crashFreeSessions: Math.round(((sessions - crashed) / sessions) * 1e4) / 100,
         };
       }),
+      // The release names here are the ones `/releases` lists, so the
+      // crash-free column on that page is populated. They did not
+      // match, so every row rendered a dash and the sweep
+      // photographed a screen the real server never produces — the
+      // exact failure a mock exists to avoid. `myapp@1.2.2+441` is
+      // deliberately absent: a release with no sessions must show a
+      // dash rather than 100%, and that case needs a release to
+      // happen to.
       releases: [
         {
-          release: 'myapp@1.4.0+220',
+          release: 'myapp@1.2.3+456',
           platform: 'ios',
           sessions: 900,
           crashedSessions: 3,
@@ -999,7 +1007,7 @@ const SUFFIX = [
           lastAt: new Date().toISOString(),
         },
         {
-          release: 'myapp@1.4.0+220',
+          release: 'myapp@1.2.3+456',
           platform: 'android',
           sessions: 340,
           crashedSessions: 4,

@@ -384,6 +384,15 @@ export const zh: Messages = {
   'releases.artifactMissing':
     '{platform} 在此版本有事件，但缺符号化物料 —— 该平台的调用栈无法还原',
   'releases.artifactUnused': '{platform} 在此版本没有事件，缺物料不影响',
+  'releases.legend': '符号化',
+  'releases.legendOk': '已上传且能读',
+  'releases.legendBroken': '已上传，但下面有解析不了的',
+  'releases.legendMissing': '这个版本有平台在上报，需要它',
+  'releases.legendUnused': '这里没有东西用它',
+  'releases.crashFree': '无崩溃',
+  'releases.crashFreeNone': '没有 session',
+  'releases.crashFreeTitle':
+    '最近 30 天，这个版本的 {sessions} 个 session 里有 {pct}% 没崩溃。session 由会发的 SDK 上报；一个都没有的版本显示短横而不是比率。',
   'releases.delete': '删除版本',
   'releases.deleteConfirm': '删除 {name}？符号化物料一并删除，该版本的调用栈在重新上传前无法还原。',
   'releases.deleteFailed': '版本删除失败。',

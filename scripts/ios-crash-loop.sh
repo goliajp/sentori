@@ -286,10 +286,30 @@ SIMCTL_CHILD_SENTORI_TOKEN="$TOKEN" \
 SIMCTL_CHILD_SENTORI_INGEST_URL="$BASE" \
 SIMCTL_CHILD_SENTORI_REPLAY=1 \
     xcrun simctl launch "$UDID" "$BUNDLE" >/dev/null
-sleep 8
+
+# Wait for the file, do not assume how long it takes.
+#
+# This slept eight seconds and then required the drain to exist. That
+# is a laptop's eight seconds: a cold CI simulator spends longer than
+# that getting the app to its first frame, so the check ran before the
+# driver had written anything and reported "produced nothing against a
+# real view hierarchy" — which was true, and about the sleep rather
+# than about the driver.
 DRAIN="$CONTAINER/Documents/replay-drain.ndjson"
-[ -s "$DRAIN" ] \
-    || { echo "✗ the replay driver produced nothing against a real view hierarchy" >&2; exit 1; }
+WAITED=0
+for _ in $(seq 1 60); do
+    [ -s "$DRAIN" ] && break
+    sleep 1
+    WAITED=$((WAITED + 1))
+done
+if [ ! -s "$DRAIN" ]; then
+    echo "✗ the replay driver produced nothing against a real view hierarchy" >&2
+    echo "  waited ${WAITED}s for $DRAIN" >&2
+    echo "  app running: $(xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | grep -c "$BUNDLE")" >&2
+    echo "  Documents holds: $(ls -1 "$CONTAINER/Documents" 2>/dev/null | tr '\n' ' ')" >&2
+    exit 1
+fi
+echo "  drained after ${WAITED}s"
 python3 "$ROOT/scripts/lib/check-replay-drain.py" "$DRAIN"
 
 echo "→ did the crash arrive"
