@@ -9,10 +9,12 @@
 //   sentori.probe(ref)    那个 bug 回来了吗?
 
 import {
+  applyBeforeSend,
+  buildWireEvent,
   coerceError,
-  parseStack,
   platformOrFallback,
   pushSignal,
+  toSentoriError,
   safeFn,
   snapshotSignals,
   uuidV7,
@@ -36,29 +38,6 @@ import { currentContext, currentUserKey } from './scope';
 import { countAssert, enqueue } from './transport';
 
 declare const __DEV__: boolean | undefined;
-
-/** Serialize any Error instances found in the data argument — the
- *  error-in-data convention: a caught-but-noteworthy
- *  exception needs no special API. One level deep is enough; nested
- *  containers of errors are an anti-pattern we don't reward. */
-const serializeData = (data?: EventData): Record<string, unknown> | undefined => {
-  if (!data) return undefined;
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(data)) {
-    out[k] = v instanceof Error ? toSentoriError(v) : v;
-  }
-  return out;
-};
-
-const toSentoriError = (e: Error): SentoriError => ({
-  type: e.name || 'Error',
-  message: e.message,
-  stack: parseStack(e.stack),
-  cause:
-    e.cause instanceof Error
-      ? toSentoriError(e.cause)
-      : null,
-});
 
 const detectPlatform = (): 'android' | 'ios' | 'javascript' => {
   try {
@@ -94,42 +73,30 @@ const emit = (kind: EventKind, opts: EmitOptions): string => {
   const config = getConfig();
   if (!config || !config.enabled) return id; // no-op before init — iron rule
 
-  const payload: WirePayload = {};
-  if (opts.error) payload.error = opts.error;
-  const data = serializeData(opts.data);
-  if (data) payload.data = data;
-  const ctx = currentContext();
-  if (ctx) payload.context = ctx;
-  if (opts.withSignals) {
-    const signals = snapshotSignals();
-    if (signals.length > 0) payload.signals = signals;
-  }
-  const device = collectDevice();
-  if (device) payload.device = device;
-
-  let event: WireEvent = {
+  // The shape goes through the kernel; what fills it is this
+  // runtime's business. Which kinds carry the signal ring stays a
+  // decision of the verb layer, so the snapshot is taken here and
+  // handed over rather than inferred there.
+  let event: WireEvent = buildWireEvent({
     id,
     kind,
-    occurredAt: new Date().toISOString(),
     platform: platformOf(),
     release: config.release,
     environment: config.environment,
     name: opts.name,
     surface: opts.surface,
     userKey: currentUserKey(),
-    payload,
-  };
+    error: opts.error,
+    data: opts.data,
+    context: currentContext(),
+    signals: opts.withSignals ? snapshotSignals() : undefined,
+    device: collectDevice() ?? undefined,
+  });
 
-  if (config.beforeSend) {
-    try {
-      const out = config.beforeSend(event);
-      if (out === null) return id; // deliberate drop
-      if (out && typeof out === 'object') event = out;
-    } catch {
-      // Hook broke: the un-mutated event ships. The host's bug must
-      // not cost them the crash report.
-    }
-  }
+  const kept = applyBeforeSend(event, config.beforeSend);
+  if (kept === null) return id; // the host dropped it deliberately
+  event = kept;
+  const payload = event.payload;
 
   // In dev there is no uploaded source map, so without local
   // symbolication errors land as `entry.bundle:721724`. Hold the
