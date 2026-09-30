@@ -570,7 +570,10 @@ class Api {
         sessions: number;
         users: number;
       }[];
+      crashFreeUsers: null | number;
+      crashedUsers: number;
       sessions: number;
+      users: number;
       windowHours: number;
     }>(`/admin/api/sessions/crash-free?${usp.toString()}`);
   }

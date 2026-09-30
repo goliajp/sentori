@@ -605,6 +605,14 @@ function QueueRow({
             users={issue.usersCount}
             maxPerUser={issue.maxPerUser}
             events={issue.eventCount}
+            title={
+              issue.usersCount > 0
+                ? t('impact.title', {
+                    users: String(issue.usersCount),
+                    max: String(issue.maxPerUser),
+                  })
+                : t('impact.titleAnon', { events: String(issue.eventCount) })
+            }
           />
         </span>
       </div>
@@ -641,6 +649,11 @@ function CrashFreeCard({ projectId }: { projectId: string }) {
   // One crash in this many sessions moves the second decimal, so below
   // it the second decimal is noise.
   const thin = (data.sessions ?? 0) < 1000;
+  // The same rule for the user rate, against its own denominator. A
+  // project with 4000 sessions from 12 people does not get two
+  // decimals of user precision out of a large session count.
+  const thinUsers = (data.users ?? 0) < 1000;
+  const hours = data.windowHours ?? 24;
   return (
     <div className="w-full max-w-xl rounded-lg border border-border bg-surface p-5">
       <div className="flex items-baseline justify-between">
@@ -648,7 +661,7 @@ function CrashFreeCard({ projectId }: { projectId: string }) {
           {t('crashFree.title')}
         </h2>
         <span className="text-xs text-fg-subtle">
-          {t('crashFree.window', { hours: String(data.windowHours ?? 24) })}
+          {t('crashFree.window', { hours: String(hours) })}
         </span>
       </div>
 
@@ -668,11 +681,32 @@ function CrashFreeCard({ projectId }: { projectId: string }) {
           {/* Said in words. A bare "1 / 10" makes the reader guess
               which number is which, and this dashboard has been
               caught doing that elsewhere. */}
-          <p className="mt-1 text-xs text-fg-subtle tabular-nums">
+          <p
+            className="mt-1 text-xs text-fg-subtle tabular-nums"
+            title={t('crashFree.sessionsTitle', { hours: String(hours) })}
+          >
             {t('crashFree.counts', {
               crashed: String(data.crashedSessions ?? 0),
               total: String(data.sessions ?? 0),
             })}
+          </p>
+          {/* Sessions and users answer different questions. An app can
+              be 99% crash-free by session and have hit a third of its
+              users, because one person's ten quiet launches outvote
+              their one crash. Both numbers are over the same window
+              and the same user_key the inbox counts breadth by, so
+              they are comparable — the title says which is which. */}
+          <p
+            className="mt-0.5 text-xs text-fg-subtle tabular-nums"
+            title={t('crashFree.usersTitle', { hours: String(hours) })}
+          >
+            {typeof data.crashFreeUsers === 'number'
+              ? t('crashFree.users', {
+                  pct: thinUsers
+                    ? data.crashFreeUsers.toFixed(0)
+                    : data.crashFreeUsers.toFixed(2),
+                })
+              : t('crashFree.usersEmpty')}
           </p>
           {releases.length > 0 && (
             <ul className="mt-4 space-y-1 border-t border-border pt-3">
@@ -687,7 +721,7 @@ function CrashFreeCard({ projectId }: { projectId: string }) {
                   <span className="shrink-0 text-fg-subtle">{platformLabel(r.platform, t)}</span>
                   <span className="w-16 shrink-0 text-right tabular-nums text-fg">
                     {typeof r.crashFreeSessions === 'number'
-                      ? `${r.crashFreeSessions.toFixed(2)}%`
+                      ? `${r.crashFreeSessions.toFixed(r.sessions < 1000 ? 0 : 2)}%`
                       : '—'}
                   </span>
                 </li>

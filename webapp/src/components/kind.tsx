@@ -35,18 +35,28 @@ export function RegressedBadge() {
 /** breadth × depth, the objective importance pair.
  *  Events without a userKey (pre-identify boot signals) make the
  *  breadth zero — "0u×0" is noise, so the pair collapses to the
- *  event count alone. */
+ *  event count alone.
+ *
+ *  The title carries the population and the window, because three
+ *  places in this console print a number of users and all three mean
+ *  something different: this one is all-time and counts whoever
+ *  reported *this issue*, the project card counts anyone who sent any
+ *  event in 24h, and the crash-free card counts whoever started a
+ *  session. A reader comparing 5 here with 3 there was reading a
+ *  contradiction that is not one. */
 export function ImpactCell({
   users,
   maxPerUser,
   events,
+  title,
 }: {
   users: number;
   maxPerUser: number;
   events: number;
+  title?: string;
 }) {
   return (
-    <span className="text-xs tabular-nums text-fg-muted">
+    <span className="text-xs tabular-nums text-fg-muted" title={title}>
       {users > 0 ? `${users}u×${maxPerUser} · ` : ''}
       {events}ev
     </span>

@@ -90,6 +90,17 @@ pub struct WireSession {
     pub started_at: OffsetDateTime,
     #[serde(default)]
     pub duration_ms: i32,
+    /// The salted hash events carry as `userKey`. Both numbers the
+    /// console prints — an issue's breadth and the crash-free user rate
+    /// — are counted over this column, so they have to be the same
+    /// identity space or they are not comparable.
+    #[serde(default)]
+    pub user_key: Option<String>,
+    /// What the field was called before `user_key`, and it was never
+    /// populated: the RN SDK hard-wired it to null at session start and
+    /// nothing filled it in afterwards. Read as a fallback so an SDK
+    /// that does send one is not ignored, but a raw id is not something
+    /// this column should be receiving.
     #[serde(default)]
     pub user_id: Option<String>,
 }
@@ -159,7 +170,7 @@ async fn store_sessions(state: &Arc<AppState>, project_id: Uuid, sessions: &[Val
         .bind(platform)
         .bind(session.started_at)
         .bind(session.duration_ms.max(0))
-        .bind(session.user_id.as_deref())
+        .bind(session.user_key.as_deref().or(session.user_id.as_deref()))
         .execute(&state.pool)
         .await;
         if let Err(e) = result {

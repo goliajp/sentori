@@ -24,6 +24,7 @@
 import type { SessionContext, SessionPing } from '@goliapkg/sentori-core';
 import { SessionTracker, uuidV7 } from '@goliapkg/sentori-core';
 
+import { currentUserKey, onIdentityChange } from './scope';
 import { queueSession } from './transport';
 
 const KEY = '@sentori/session';
@@ -32,6 +33,11 @@ type Persisted = {
   ctx: SessionContext;
   id: string;
   startedAtMs: number;
+  /** Who was signed in when this launch was last seen alive. A crashed
+   *  session belongs to that person, not to whoever the next launch
+   *  signs in — so it is written here rather than read live on
+   *  recovery. */
+  userKey?: null | string;
 };
 
 type StorageLike = {
@@ -71,12 +77,35 @@ const storage = (): null | StorageLike => {
  */
 export const startSession = (ctx: SessionContext): void => {
   _ctx = ctx;
-  _tracker ??= new SessionTracker((ping: SessionPing) => queueSession(ping));
+  // Read at send time, not at start. Apps learn who the user is after
+  // launch — a login screen guarantees it — so a key captured here is
+  // null for every session that matters.
+  _tracker ??= new SessionTracker((ping: SessionPing) =>
+    queueSession({ ...ping, userKey: currentUserKey() ?? null }),
+  );
   _tracker.start(ctx);
-  const record: Persisted = { ctx, id: uuidV7(), startedAtMs: Date.now() };
+  _record = { ctx, id: uuidV7(), startedAtMs: Date.now(), userKey: currentUserKey() ?? null };
+  persist();
+  // And again whenever it changes, so the record on disk names the
+  // person a crash would be attributed to.
+  onIdentityChange(rememberUser);
+};
+
+let _record: null | Persisted = null;
+
+const persist = (): void => {
+  if (!_record) return;
   void storage()
-    ?.setItem(KEY, JSON.stringify(record))
+    ?.setItem(KEY, JSON.stringify(_record))
     .catch(() => undefined);
+};
+
+const rememberUser = (): void => {
+  if (!_record) return;
+  const key = currentUserKey() ?? null;
+  if (_record.userKey === key) return;
+  _record.userKey = key;
+  persist();
 };
 
 /** A non-fatal error happened during this session. */
@@ -87,6 +116,7 @@ export const markSessionErrored = (): void => {
 /** End it cleanly. The record goes with it. */
 export const endSession = (): void => {
   _tracker?.end('exited');
+  _record = null;
   void storage()
     ?.removeItem(KEY)
     .catch(() => undefined);
@@ -132,6 +162,7 @@ export const recoverSession = async (crashedThisLaunch: boolean): Promise<void> 
       startedAt: new Date(record.startedAtMs).toISOString(),
       status: crashedThisLaunch ? 'crashed' : 'exited',
       userId: record.ctx.userId,
+      userKey: record.userKey ?? null,
     });
   } catch {
     // A record we cannot read is one we cannot count. It is already
@@ -143,4 +174,5 @@ export const __resetSessionsForTests = (): void => {
   _tracker = null;
   _ctx = null;
   _storage = null;
+  _record = null;
 };

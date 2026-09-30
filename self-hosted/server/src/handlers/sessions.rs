@@ -106,6 +106,26 @@ pub async fn crash_free(
         })
         .collect();
 
+    // Not a sum of the per-release user counts: someone who ran two
+    // releases in the window is one person, and adding the groups
+    // would report them twice. The distinct count has to be taken
+    // across the whole window in its own pass.
+    let users: (i64, i64) = sqlx::query_as(
+        "SELECT COUNT(DISTINCT user_key)::bigint, \
+                COUNT(DISTINCT user_key) FILTER (WHERE status = 'crashed')::bigint \
+         FROM sessions \
+         WHERE project_id = $1 \
+           AND started_at > now() - make_interval(hours => $2::int) \
+           AND ($3::text IS NULL OR environment = $3) \
+           AND user_key IS NOT NULL",
+    )
+    .bind(params.project_id)
+    .bind(i32::try_from(hours).unwrap_or(24))
+    .bind(params.environment.as_deref())
+    .fetch_one(&state.pool)
+    .await
+    .unwrap_or((0, 0));
+
     (
         StatusCode::OK,
         Json(json!({
@@ -113,6 +133,15 @@ pub async fn crash_free(
             "sessions": total,
             "crashedSessions": crashed,
             "crashFreeSessions": rate(total, crashed),
+            // Sessions and users are different populations, and the
+            // console labels them as such: an app can be 99% crash-free
+            // by session and have hit a third of its users. Both are
+            // over the same window and the same `user_key` the issue
+            // breadth counts, so the two numbers are comparable — which
+            // they were not while this endpoint answered only sessions.
+            "users": users.0,
+            "crashedUsers": users.1,
+            "crashFreeUsers": rate(users.0, users.1),
             "releases": releases,
         })),
     )

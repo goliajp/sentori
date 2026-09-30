@@ -256,11 +256,17 @@ SESSIONS='['
 for i in 0 1 2 3 4 5 6 7 8 9; do
     STATUS=exited
     [ "$i" = "0" ] && STATUS=crashed
+    # One of them on the old field name. `userId` is what the wire
+    # carried before `userKey`, and the server still reads it as a
+    # fallback — an SDK nobody has upgraded must keep counting, so the
+    # fallback needs a case here rather than a comment saying it works.
+    FIELD=userKey
+    [ "$i" = "3" ] && FIELD=userId
     [ "$i" = "0" ] || SESSIONS="${SESSIONS},"
     SESSIONS="${SESSIONS}{\"id\":\"019fe900-0000-7000-8000-00000000cf0${i}\",
       \"status\":\"${STATUS}\",\"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",
       \"platform\":\"ios\",\"startedAt\":\"${SESSION_AT}\",
-      \"durationMs\":12000,\"userId\":\"u${i}\"}"
+      \"durationMs\":12000,\"${FIELD}\":\"u${i}\"}"
 done
 SESSIONS="${SESSIONS}]"
 
@@ -288,6 +294,59 @@ BYREL="$(echo "$CF" | jq -r '[.releases[] | select(.release == "e2e@1.0.0+1")] |
     || { echo "the release breakdown does not carry e2e@1.0.0+1: $CF" >&2; exit 1; }
 [[ "$(echo "$CF" | jq -r '.releases[] | select(.release=="e2e@1.0.0+1") | .crashFreeUsers == 90')" == "true" ]] \
     || { echo "crash-free users is not 90: $CF" >&2; exit 1; }
+
+# The whole-window user count, which is not the sum of the per-release
+# ones: someone who ran two releases is one person. And it is a count
+# the console prints beside the session count, so it needs its own
+# denominator — a project can be 99% crash-free by session and have hit
+# a third of its users.
+[[ "$(echo "$CF" | jq -r '.users')" == "10" ]] \
+    || { echo "the window's user count is $(echo "$CF" | jq -r '.users'), want 10: $CF" >&2; exit 1; }
+[[ "$(echo "$CF" | jq -r '.crashedUsers')" == "1" ]] \
+    || { echo "crashed users is not 1: $CF" >&2; exit 1; }
+[[ "$(echo "$CF" | jq -r '.crashFreeUsers == 90')" == "true" ]] \
+    || { echo "the window's crash-free users is not 90: $CF" >&2; exit 1; }
+
+echo "→ a session and an event about the same person count that person once"
+# The two user numbers the console prints — an issue's breadth and the
+# crash-free user rate — are counted over the same `user_key` column in
+# two different tables. They were not the same identity space: the event
+# path carries the SDK's salted hash as `userKey`, and the session path
+# bound a raw `userId` straight into a column named `user_key`, which no
+# shipped SDK ever populated. So the crash-free user rate had no input
+# at all, and once it did the same person would have been two keys.
+SHARED_KEY="e2e-shared-person"
+SHARED="$(curl -fsS -X POST "${BASE}/v1/events:batch" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -d "{\"events\":[{\"kind\":\"error\",\"occurredAt\":\"${SESSION_AT}\",
+ \"platform\":\"ios\",\"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",
+ \"userKey\":\"${SHARED_KEY}\",
+ \"payload\":{\"error\":{\"type\":\"SharedPersonError\",\"message\":\"one person\",\"stack\":[]}}}],
+ \"sessions\":[{\"id\":\"019fe900-0000-7000-8000-00000000cf10\",\"status\":\"crashed\",
+ \"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",\"platform\":\"ios\",
+ \"startedAt\":\"${SESSION_AT}\",\"durationMs\":900,
+ \"userKey\":\"${SHARED_KEY}\"}]}")"
+[[ "$(echo "$SHARED" | jq -r '.accepted')" == "1" ]] \
+    || { echo "the shared-person batch was not accepted: $SHARED" >&2; exit 1; }
+
+# The issue counts them as one person...
+SHARED_ISSUE_USERS="$(curl -fsS -b "$JAR" "${BASE}/admin/api/issues?projectId=${PROJECT_ID}" \
+    | jq -r '.issues[] | select((.title // "") | test("SharedPersonError")) | .usersCount')"
+[[ "$SHARED_ISSUE_USERS" == "1" ]] \
+    || { echo "the issue counts '${SHARED_ISSUE_USERS}' users for one person; issues are:" >&2
+         curl -fsS -b "$JAR" "${BASE}/admin/api/issues?projectId=${PROJECT_ID}" \
+             | jq -r '.issues[] | "\(.kind) \(.title) users=\(.usersCount)"' >&2
+         exit 1; }
+
+# ...and so does the session side, which means the two numbers are over
+# one population and a reader can compare them.
+CF2="$(curl -fsS -b "$JAR" \
+    "${BASE}/admin/api/sessions/crash-free?projectId=${PROJECT_ID}&hours=720")"
+[[ "$(echo "$CF2" | jq -r '.users')" == "11" ]] \
+    || { echo "adding one person moved the user count to $(echo "$CF2" | jq -r '.users'), want 11 — " \
+              "the session and event paths are not counting the same identity: $CF2" >&2; exit 1; }
+[[ "$(echo "$CF2" | jq --arg k "$SHARED_KEY" -r '.crashedUsers')" == "2" ]] \
+    || { echo "crashed users is $(echo "$CF2" | jq -r '.crashedUsers'), want 2: $CF2" >&2; exit 1; }
 
 echo "→ a platform this build does not know is kept, not refused"
 # An SDK newer than its server used to lose every event it sent: ingest

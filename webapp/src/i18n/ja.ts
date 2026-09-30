@@ -368,6 +368,16 @@ export const ja: Messages = {
   'crashFree.thin': 'セッションが少なく、この精度に意味はありません',
   'crashFree.counts': '{total} セッション中 {crashed} 件がクラッシュ',
   'crashFree.empty': 'この期間のセッションはまだありません。SDK はアプリがバックグラウンドに入るたびに 1 件送ります。送信するビルドに更新するか、最初の報告をお待ちください。',
+  'crashFree.users': 'ユーザーの {pct}%',
+  'crashFree.usersEmpty': 'まだ誰も識別されていません',
+  'crashFree.usersTitle':
+    '直近 {hours} 時間にセッションを 1 回以上開始したユーザー。2 つのリリースを使った人も 1 人として数えます。',
+  'crashFree.sessionsTitle':
+    '直近 {hours} 時間に開始したセッション。起動 1 回が 1 セッションなので、10 回起動した人は 10 と数えます。',
+  'impact.title':
+    'これまでに {users} 人が報告しています（1 人あたり最大 {max} 回）。期間で絞っていないため、この数は減りません。',
+  'impact.titleAnon': 'これまでに {events} 件。報告した人に識別子がないため人数はありません。0 人ということではありません。',
+  'health.usersTitle': '直近 24 時間に何らかのイベントを送った実ユーザー数。問題に遭った人だけではありません。',
   'crashFree.window': '直近 {hours} 時間',
   'platform.unknown': '不明（SDK がサーバーより新しい）',
   'releases.artifactBroken': '{platform} にアップロード済みだが読めない成果物あり。展開して確認。',
