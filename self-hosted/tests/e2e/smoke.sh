@@ -307,6 +307,25 @@ BYREL="$(echo "$CF" | jq -r '[.releases[] | select(.release == "e2e@1.0.0+1")] |
 [[ "$(echo "$CF" | jq -r '.crashFreeUsers == 90')" == "true" ]] \
     || { echo "the window's crash-free users is not 90: $CF" >&2; exit 1; }
 
+# The window's shape, not only its total. Dense buckets: a stretch with
+# no sessions comes back with a null rate rather than being left out,
+# because a line drawn through the remaining points runs straight across
+# it as though the rate had held.
+TREND_LEN="$(echo "$CF" | jq -r '.trend | length')"
+[[ "$TREND_LEN" -gt 1 ]] \
+    || { echo "the trend has ${TREND_LEN} bucket(s) over a 720h window: $CF" >&2; exit 1; }
+# Every session was stamped at the same moment, so exactly one bucket
+# carries them and the rest are empty — which is what proves the empty
+# ones are present at all.
+WITH_DATA="$(echo "$CF" | jq -r '[.trend[] | select(.sessions > 0)] | length')"
+EMPTY="$(echo "$CF" | jq -r '[.trend[] | select(.sessions == 0 and .crashFreeSessions == null)] | length')"
+[[ "$WITH_DATA" == "1" ]] \
+    || { echo "${WITH_DATA} buckets carry sessions, want 1 — the bucketing does not match the fixture" >&2; exit 1; }
+[[ "$EMPTY" -gt 0 ]] \
+    || { echo "no empty bucket came back, so a quiet stretch is indistinguishable from a healthy one" >&2; exit 1; }
+[[ "$(echo "$CF" | jq -r '[.trend[] | select(.sessions > 0)][0].crashFreeSessions == 90')" == "true" ]] \
+    || { echo "the populated bucket does not read 90: $CF" >&2; exit 1; }
+
 echo "→ a session and an event about the same person count that person once"
 # The two user numbers the console prints — an issue's breadth and the
 # crash-free user rate — are counted over the same `user_key` column in

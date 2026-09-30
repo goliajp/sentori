@@ -970,6 +970,22 @@ const SUFFIX = [
       users: 1180,
       crashedUsers: 7,
       crashFreeUsers: 99.41,
+      // 24 hourly buckets, with a bad stretch and a quiet one. The
+      // quiet buckets carry a null rate on purpose: the line has to
+      // break there, and a mock with no gaps would never show whether
+      // it does.
+      trend: Array.from({ length: 24 }, (_, i) => {
+        const at = new Date(Date.now() - (23 - i) * 3600e3).toISOString();
+        if (i === 4 || i === 5) return { at, sessions: 0, crashedSessions: 0, crashFreeSessions: null };
+        const sessions = 40 + ((i * 7) % 23);
+        const crashed = i === 14 ? 4 : i === 15 ? 3 : i % 5 === 0 ? 1 : 0;
+        return {
+          at,
+          sessions,
+          crashedSessions: crashed,
+          crashFreeSessions: Math.round(((sessions - crashed) / sessions) * 1e4) / 100,
+        };
+      }),
       releases: [
         {
           release: 'myapp@1.4.0+220',

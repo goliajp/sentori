@@ -387,6 +387,10 @@ export const en = {
     '{events} events, all time. Nobody who reported this was identified, so there is no user count — not zero users.',
   'health.usersTitle':
     'Distinct users who sent any event in the last 24h — not only the ones who hit a problem.',
+  'crashFree.trendFrom': '{hours}h ago',
+  'crashFree.trendLow': 'low {pct}%',
+  'crashFree.trendTitle':
+    'Crash-free sessions per bucket over the last {hours}h, drawn from {low}% up. A break in the line is a stretch with no sessions, not a healthy one.',
   'crashFree.window': 'last {hours}h',
   'platform.unknown': 'Unknown (SDK newer than this server)',
   'releases.artifactBroken':

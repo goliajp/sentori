@@ -126,10 +126,25 @@ pub async fn crash_free(
     .await
     .unwrap_or((0, 0));
 
+    // The shape of the window, not just its total.
+    //
+    // A single number answers "are we healthy" and hides "did Tuesday's
+    // build make it worse" — which is the question the number is
+    // actually consulted for. Per release already answers part of it;
+    // this answers the rest, for a project that ships one release and
+    // watches it.
+    //
+    // Bucketed server-side because the client must not have to hold a
+    // window's sessions to draw a line over it, and because the bucket
+    // boundaries then agree with the totals above rather than being a
+    // second opinion computed from different rows.
+    let buckets = trend(&state, &params, hours).await;
+
     (
         StatusCode::OK,
         Json(json!({
             "windowHours": hours,
+            "trend": buckets,
             "sessions": total,
             "crashedSessions": crashed,
             "crashFreeSessions": rate(total, crashed),
@@ -145,6 +160,70 @@ pub async fn crash_free(
             "releases": releases,
         })),
     )
+}
+
+/// The window split into equal buckets, oldest first.
+///
+/// Empty buckets are present with a null rate rather than absent: a
+/// gap in a line is a period with no sessions, and dropping the point
+/// would draw a straight line across it as if the rate had held.
+async fn trend(state: &Arc<AppState>, params: &Params, hours: i64) -> Vec<Value> {
+    // A day's window reads by the hour, a quarter's by the day. Fixing
+    // the count instead would make a 24h line of 1.6-hour buckets,
+    // which no reader thinks in.
+    let bucket_minutes: i64 = match hours {
+        0..=24 => 60,
+        25..=168 => 60 * 6,
+        _ => 60 * 24,
+    };
+    // `generate_series` first, then a LEFT JOIN, so a bucket with no
+    // sessions comes back as a row with a null rate. Grouping the
+    // sessions alone would simply omit it, and a line drawn through
+    // the remaining points runs straight across the gap as though the
+    // rate had held there — the reader cannot tell "fine" from "nobody
+    // opened the app".
+    let rows = sqlx::query(
+        "WITH bounds AS ( \
+             SELECT now() - make_interval(hours => $2::int) AS from_at, \
+                    make_interval(mins => $4::int) AS step \
+         ), \
+         slots AS ( \
+             SELECT g AS at, g + bounds.step AS until \
+             FROM bounds, \
+                  generate_series(bounds.from_at, now() - bounds.step, bounds.step) AS g \
+         ) \
+         SELECT slots.at, \
+                COUNT(s.id)::bigint AS total, \
+                COUNT(s.id) FILTER (WHERE s.status = 'crashed')::bigint AS crashed \
+         FROM slots \
+         LEFT JOIN sessions s \
+                ON s.project_id = $1 \
+               AND s.started_at >= slots.at \
+               AND s.started_at < slots.until \
+               AND ($3::text IS NULL OR s.environment = $3) \
+         GROUP BY slots.at \
+         ORDER BY slots.at",
+    )
+    .bind(params.project_id)
+    .bind(i32::try_from(hours).unwrap_or(24))
+    .bind(params.environment.as_deref())
+    .bind(i32::try_from(bucket_minutes).unwrap_or(60))
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default();
+
+    rows.iter()
+        .map(|r| {
+            let t: i64 = r.get("total");
+            let c: i64 = r.get("crashed");
+            json!({
+                "at": crate::wire_time::rfc3339(r.get("at")),
+                "sessions": t,
+                "crashedSessions": c,
+                "crashFreeSessions": rate(t, c),
+            })
+        })
+        .collect()
 }
 
 /// The share that did **not** crash, as a percentage with two
