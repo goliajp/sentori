@@ -160,6 +160,8 @@ export const en = {
   'notify.testButton': 'Send test email',
   'notify.testFailed': 'Test mail failed. Check the SMTP settings and the server log.',
   'notify.testSending': 'Sending…',
+  'notify.deliveryFailing': 'Notifications are not being delivered — {count} failed in the last 7 days',
+  'notify.lastDelivered': 'Last delivered',
   'notify.testSent': 'Test mail sent.',
   'palette.placeholder': 'Jump to a page or search issues…',
 

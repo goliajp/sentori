@@ -154,6 +154,8 @@ export const zh: Messages = {
   'notify.testButton': '发送测试邮件',
   'notify.testFailed': '测试邮件失败。检查 SMTP 配置和服务端日志。',
   'notify.testSending': '发送中…',
+  'notify.deliveryFailing': '通知发不出去——最近 7 天失败 {count} 次',
+  'notify.lastDelivered': '最后一次送达',
   'notify.testSent': '测试邮件已发出',
   'palette.placeholder': '跳转页面或搜索 issue…',
 
