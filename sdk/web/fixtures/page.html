@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>sentori web harness</title>
+  </head>
+  <body>
+    <button id="pay" class="btn primary" data-sentori="pay">Pay Dora Cawley 412.00</button>
+    <a id="nav" href="#next">next</a>
+    <script type="module">
+      import { sentori } from './sentori-web.js';
+
+      const params = new URLSearchParams(location.search);
+      sentori.init({
+        token: params.get('token'),
+        ingestUrl: params.get('ingest'),
+        release: 'harness@1.0.0+1',
+        environment: 'test',
+      });
+      sentori.user({ id: 'harness-person', email: null });
+      window.__sentori = sentori;
+      window.__ready = true;
+    </script>
+  </body>
+</html>

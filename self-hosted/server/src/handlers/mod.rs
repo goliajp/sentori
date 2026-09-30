@@ -10,11 +10,12 @@
 //!   will gate with cookie session.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::Json;
 use axum::Router;
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{HeaderName, Method, StatusCode, header};
 use axum::middleware as axum_middleware;
 use axum::response::IntoResponse;
 use axum::routing::{delete, get, post};
@@ -24,6 +25,7 @@ use serde_json::json;
 use crate::session_mw::session_middleware;
 use crate::state::AppState;
 use tower_http::catch_panic::CatchPanicLayer;
+use tower_http::cors::{self, CorsLayer};
 
 mod admin;
 mod api;
@@ -116,6 +118,37 @@ async fn rate_limit_mw(
 #[allow(clippy::too_many_lines)]
 pub fn router(state: Arc<AppState>) -> Router {
     // ── SDK ingest routes — Bearer st_ token, ingest scope ──
+    //
+    // These answer browsers, which the rest of this router does not.
+    // Without CORS a page cannot send anything: the preflight for a
+    // POST carrying `Authorization` and `Sentori-Sdk` is refused
+    // before the request is made, and the browser reports it to the
+    // page's console rather than to us — so the failure is invisible
+    // from this side. The web SDK's live gate found it by being a
+    // real browser; nothing else could have.
+    //
+    // `Any` origin, and deliberately so. An ingest token ships inside
+    // the page's JavaScript, so an origin list is not a security
+    // boundary — it is a configuration cliff that would leave every
+    // self-hosted instance unable to accept web events until someone
+    // found the setting. Credentials are **not** allowed, which is
+    // what keeps a wildcard origin safe: no cookie or session of the
+    // operator's can ride one of these requests, and the browser
+    // itself refuses the combination.
+    //
+    // Scoped to `/v1/*`. The admin API is cookie-authenticated, and
+    // cross-origin access to it would be a CSRF surface.
+    let ingest_cors = CorsLayer::new()
+        .allow_origin(cors::Any)
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers([
+            header::AUTHORIZATION,
+            header::CONTENT_TYPE,
+            // Browsers lowercase request headers, and a header the
+            // preflight does not list is a refused request.
+            HeaderName::from_static("sentori-sdk"),
+        ])
+        .max_age(Duration::from_secs(600));
     let token_store = TokenStore::new(state.pool.clone());
     let sdk_routes = Router::new()
         .route("/v1/events", post(sdk::events::handle))
@@ -206,6 +239,14 @@ pub fn router(state: Arc<AppState>) -> Router {
             token_store,
             bearer_middleware,
         ))
+        // Outside the bearer check, and it has to be: a CORS preflight
+        // is an OPTIONS request with no `Authorization` header, so the
+        // bearer middleware would answer it 401 — and a browser reads
+        // any non-2xx preflight as "you may not send this", then
+        // reports it to the page's console and not to us. The layer
+        // answers the preflight itself and never reaches the inner
+        // service.
+        .layer(ingest_cors)
         .with_state(state.clone());
 
     // ── Dashboard + admin — cookie session ──

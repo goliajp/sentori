@@ -25,12 +25,30 @@ start_local_postgres() {
         docker run -d --name "$container" \
             -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=sentori \
             -p "${port}:5432" postgres:18-alpine >/dev/null
+        # A real query over TCP, not `pg_isready` over the container's
+        # unix socket.
+        #
+        # The image starts a temporary server to run its init scripts,
+        # then stops it and starts the real one. `pg_isready` answers
+        # yes to the temporary one, so a client that connected in the
+        # gap got `57P03: the database system is starting up` and the
+        # run died at "→ server" with no other explanation. Asking the
+        # question the caller will ask — a query, over the port they
+        # will use — is the only form of ready that means anything.
         local ready=""
-        for _ in $(seq 1 60); do
-            docker exec "$container" pg_isready -U postgres >/dev/null 2>&1 && { ready=1; break; }
+        for _ in $(seq 1 90); do
+            if docker exec "$container" \
+                psql -U postgres -h 127.0.0.1 -d sentori -c 'SELECT 1' >/dev/null 2>&1; then
+                ready=1
+                break
+            fi
             sleep 1
         done
-        [ -n "$ready" ] || { echo "postgres container never became ready" >&2; return 1; }
+        [ -n "$ready" ] || {
+            echo "postgres container never answered a query; its log says:" >&2
+            docker logs --tail 30 "$container" >&2 2>&1 || true
+            return 1
+        }
         DB="postgres://postgres:dev@127.0.0.1:${port}/sentori"
         return 0
     fi
@@ -61,5 +79,15 @@ start_local_postgres() {
     fi
     dropdb --if-exists -h 127.0.0.1 "$dbname" || true
     createdb -h 127.0.0.1 "$dbname"
+    # Same reason as the docker path: prove a query, not a socket.
+    local answered=""
+    for _ in $(seq 1 30); do
+        if psql -h 127.0.0.1 -d "$dbname" -c 'SELECT 1' >/dev/null 2>&1; then
+            answered=1
+            break
+        fi
+        sleep 1
+    done
+    [ -n "$answered" ] || { echo "postgres accepted a connection but not a query" >&2; return 1; }
     DB="postgres://$(whoami)@127.0.0.1:5432/${dbname}"
 }
