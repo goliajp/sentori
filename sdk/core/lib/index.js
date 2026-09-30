@@ -19,4 +19,5 @@ export { __resetCircuitForTests, isCircuitOpen, reportInternal, setInternalRepor
 export { getLogLevel, logger, setLogLevel, setLogTransport, } from './logger.js';
 export { hashIdentities } from './identity.js';
 export { createTransport, PENDING_STORAGE_KEY, } from './transport.js';
+export { applyBeforeSend, buildWireEvent, serializeData, toSentoriError, } from './wire-event.js';
 //# sourceMappingURL=index.js.map

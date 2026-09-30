@@ -104,3 +104,11 @@ export {
   type TransportHost,
   type TransportStorage,
 } from './transport.js'
+
+export {
+  applyBeforeSend,
+  buildWireEvent,
+  serializeData,
+  toSentoriError,
+  type WireEventInputs,
+} from './wire-event.js'
