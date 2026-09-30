@@ -396,13 +396,29 @@ function AuditTab() {
               render: (r) => <span className="font-mono text-xs text-fg">{r.action}</span>,
             },
             {
+              // What was acted on, not just its id. The column showed
+              // eight characters of a uuid, so a row read "someone
+              // deleted 01a0ef95" — a project? a token? a person? The
+              // type is the half that makes an audit log auditable,
+              // and the server has been returning it all along.
+              //
+              // It is not the action's prefix either: `assignment.grant`
+              // acts on a `user`, so the two columns say different
+              // things.
               key: 'targetId',
               label: t('settings.colTarget'),
-              width: '120px',
-              align: 'right',
+              width: '220px',
               render: (r) => (
-                <span className="font-mono text-xs text-fg-subtle">
-                  {r.targetId?.slice(0, 8) ?? '—'}
+                <span className="flex items-baseline gap-1.5 text-xs">
+                  <span className="text-fg-muted">{r.targetType ?? '—'}</span>
+                  {r.targetId && (
+                    // The whole id in the title: eight characters
+                    // cannot be pasted into a query, and two objects
+                    // can share a prefix.
+                    <span className="font-mono text-fg-subtle" title={r.targetId}>
+                      {r.targetId.slice(0, 8)}
+                    </span>
+                  )}
                 </span>
               ),
             },
