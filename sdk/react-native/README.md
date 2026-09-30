@@ -73,7 +73,7 @@ undocumented.
 | `ingestUrl` | `string` | yes | — |
 | `release` | `string` | no | `''` — set it, or stacks cannot symbolicate |
 | `environment` | `string` | no | `''` |
-| `detect` | `{ rageTap?, longFreeze?, slowColdStart?, slowApi? }` | no | rageTap / longFreeze / slowColdStart on, `slowApi` off |
+| `detect` | `{ rageTap?, longFreeze?, slowColdStart?, slowApi?, uiThreadHang? }` | no | rageTap / longFreeze / slowColdStart on; `slowApi` and `uiThreadHang` off |
 | `replaySeconds` | `number` | no | 60 |
 | `replayScreens` | `boolean` | no | `false` — opt-in; frames may hold user content |
 | `backendHealthUrl` | `string` | no | — |
@@ -86,6 +86,12 @@ Auto-wired (no configuration):
 - iOS `NSException` + Android uncaught-exception handlers
 - Warn scenario detectors: rage taps, long freezes, slow cold start
   (slow API stays opt-in) — tune with `init({ detect })`
+- `detect.uiThreadHang` adds the other half of a freeze: Android's ANR
+  watchdog and iOS's hang watchdog. `longFreeze` runs on the JS thread
+  and cannot see a frozen UI thread. Off by default, because it samples
+  a thread and no app has been paying that until it asks; `startAnrWatchdog({ timeoutMs })`
+  and `stopAnrWatchdog()` are exported for a host that wants its own
+  threshold or wants it quiet on a known-slow screen.
 - Signal ring: the last 60 s of taps (with coordinates), navigation,
   http and traces ride along on every error/warn as the "what the
   user was doing" timeline

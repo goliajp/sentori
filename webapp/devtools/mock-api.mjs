@@ -932,6 +932,18 @@ const SUFFIX = [
   // rl1 hears from iOS only (its missing dsym is the light that must go
   // red, its missing proguard the one that must stay quiet); rl2 has no
   // traffic at all, the empty-array path.
+  // One project, for the webhook panel. An unmocked path makes the
+  // sweep pass on a screen the real server never produces.
+  [
+    /\/admin\/api\/projects\/[0-9a-f-]+$/,
+    () => ({
+      id: PROJ,
+      name: 'insight-mobile',
+      platform: 'react-native',
+      createdAt: iso(86_400_000 * 30),
+      webhookUrl: 'https://hooks.example.com/services/T00/B00/xxxx',
+    }),
+  ],
   [
     /\/releases$/,
     () => ({
@@ -947,6 +959,75 @@ const SUFFIX = [
           name: 'myapp@1.2.2+441',
           createdAt: iso(86_400_000 * 9),
           platforms: [],
+        },
+      ],
+    }),
+  ],
+  // Crash-free rate. Mocked with a real shape rather than left out:
+  // an unmocked path answered something the card did not expect and
+  // `toFixed` took the whole page white, which is exactly what this
+  // sweep exists to catch.
+  [
+    /\/sessions\/crash-free/,
+    () => ({
+      windowHours: 24,
+      sessions: 1240,
+      crashedSessions: 7,
+      crashFreeSessions: 99.44,
+      // Fewer people than sessions, because one person launches the app
+      // more than once — which is the whole reason the console prints
+      // both numbers. Present here because a mock missing a field the
+      // server sends makes the sweep pass on a screen the real server
+      // never produces.
+      users: 1180,
+      crashedUsers: 7,
+      crashFreeUsers: 99.41,
+      // 24 hourly buckets, with a bad stretch and a quiet one. The
+      // quiet buckets carry a null rate on purpose: the line has to
+      // break there, and a mock with no gaps would never show whether
+      // it does.
+      trend: Array.from({ length: 24 }, (_, i) => {
+        const at = new Date(Date.now() - (23 - i) * 3600e3).toISOString();
+        if (i === 4 || i === 5) return { at, sessions: 0, crashedSessions: 0, crashFreeSessions: null };
+        const sessions = 40 + ((i * 7) % 23);
+        const crashed = i === 14 ? 4 : i === 15 ? 3 : i % 5 === 0 ? 1 : 0;
+        return {
+          at,
+          sessions,
+          crashedSessions: crashed,
+          crashFreeSessions: Math.round(((sessions - crashed) / sessions) * 1e4) / 100,
+        };
+      }),
+      // The release names here are the ones `/releases` lists, so the
+      // crash-free column on that page is populated. They did not
+      // match, so every row rendered a dash and the sweep
+      // photographed a screen the real server never produces — the
+      // exact failure a mock exists to avoid. `myapp@1.2.2+441` is
+      // deliberately absent: a release with no sessions must show a
+      // dash rather than 100%, and that case needs a release to
+      // happen to.
+      releases: [
+        {
+          release: 'myapp@1.2.3+456',
+          platform: 'ios',
+          sessions: 900,
+          crashedSessions: 3,
+          crashFreeSessions: 99.67,
+          users: 410,
+          crashedUsers: 3,
+          crashFreeUsers: 99.27,
+          lastAt: new Date().toISOString(),
+        },
+        {
+          release: 'myapp@1.2.3+456',
+          platform: 'android',
+          sessions: 340,
+          crashedSessions: 4,
+          crashFreeSessions: 98.82,
+          users: 160,
+          crashedUsers: 4,
+          crashFreeUsers: 97.5,
+          lastAt: new Date().toISOString(),
         },
       ],
     }),

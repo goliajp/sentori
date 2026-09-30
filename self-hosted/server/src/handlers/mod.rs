@@ -10,11 +10,12 @@
 //!   will gate with cookie session.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::Json;
 use axum::Router;
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{HeaderName, Method, StatusCode, header};
 use axum::middleware as axum_middleware;
 use axum::response::IntoResponse;
 use axum::routing::{delete, get, post};
@@ -24,6 +25,8 @@ use serde_json::json;
 use crate::session_mw::session_middleware;
 use crate::state::AppState;
 use tower_http::catch_panic::CatchPanicLayer;
+use tower_http::cors::{self, CorsLayer};
+use tower_http::decompression::RequestDecompressionLayer;
 
 mod admin;
 mod api;
@@ -39,6 +42,7 @@ mod metrics_prom;
 mod notify_admin;
 mod projects;
 mod sdk;
+mod sessions;
 
 /// Refuse an IP that is hammering a credentialed auth endpoint.
 ///
@@ -115,6 +119,37 @@ async fn rate_limit_mw(
 #[allow(clippy::too_many_lines)]
 pub fn router(state: Arc<AppState>) -> Router {
     // ── SDK ingest routes — Bearer st_ token, ingest scope ──
+    //
+    // These answer browsers, which the rest of this router does not.
+    // Without CORS a page cannot send anything: the preflight for a
+    // POST carrying `Authorization` and `Sentori-Sdk` is refused
+    // before the request is made, and the browser reports it to the
+    // page's console rather than to us — so the failure is invisible
+    // from this side. The web SDK's live gate found it by being a
+    // real browser; nothing else could have.
+    //
+    // `Any` origin, and deliberately so. An ingest token ships inside
+    // the page's JavaScript, so an origin list is not a security
+    // boundary — it is a configuration cliff that would leave every
+    // self-hosted instance unable to accept web events until someone
+    // found the setting. Credentials are **not** allowed, which is
+    // what keeps a wildcard origin safe: no cookie or session of the
+    // operator's can ride one of these requests, and the browser
+    // itself refuses the combination.
+    //
+    // Scoped to `/v1/*`. The admin API is cookie-authenticated, and
+    // cross-origin access to it would be a CSRF surface.
+    let ingest_cors = CorsLayer::new()
+        .allow_origin(cors::Any)
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers([
+            header::AUTHORIZATION,
+            header::CONTENT_TYPE,
+            // Browsers lowercase request headers, and a header the
+            // preflight does not list is a refused request.
+            HeaderName::from_static("sentori-sdk"),
+        ])
+        .max_age(Duration::from_secs(600));
     let token_store = TokenStore::new(state.pool.clone());
     let sdk_routes = Router::new()
         .route("/v1/events", post(sdk::events::handle))
@@ -194,6 +229,22 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/v1/push/users/{user_key}/preferences/{category}",
             axum::routing::put(sdk::push::put_preference::handle),
         )
+        // Innermost, so it runs *after* the bearer check and the rate
+        // limiter: an unauthenticated request is refused before any of
+        // its bytes are inflated, which is what stops a decompression
+        // bomb from being free to send.
+        //
+        // What bounds the inflated size is axum's body limit, which is
+        // applied when a handler extracts the body — after this. So a
+        // 2 MB cap on `/v1/events:batch` is a cap on the decompressed
+        // bytes, not on the compressed ones, which is the direction
+        // that matters.
+        //
+        // Ingest does not compress its own requests yet. The server
+        // has to accept gzip before any SDK sends it, or the first
+        // client to try talks to a fleet of servers that answer 400 —
+        // so this lands first and on purpose.
+        .layer(RequestDecompressionLayer::new().gzip(true))
         // Order matters: the limiter runs *after* the bearer check, so
         // it has a token to key on and an unauthenticated flood is
         // rejected earlier and more cheaply.
@@ -205,6 +256,14 @@ pub fn router(state: Arc<AppState>) -> Router {
             token_store,
             bearer_middleware,
         ))
+        // Outside the bearer check, and it has to be: a CORS preflight
+        // is an OPTIONS request with no `Authorization` header, so the
+        // bearer middleware would answer it 401 — and a browser reads
+        // any non-2xx preflight as "you may not send this", then
+        // reports it to the page's console and not to us. The layer
+        // answers the preflight itself and never reaches the inner
+        // service.
+        .layer(ingest_cors)
         .with_state(state.clone());
 
     // ── Dashboard + admin — cookie session ──
@@ -241,6 +300,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         )
         // issues — the Inbox and the detail page
         .route("/admin/api/issues", get(issues::list))
+        .route("/admin/api/sessions/crash-free", get(sessions::crash_free))
         .route("/admin/api/issues/{issue_id}", get(issues::get))
         .route(
             "/admin/api/issues/{issue_id}/resolve",

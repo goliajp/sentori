@@ -28,4 +28,9 @@ Pod::Spec.new do |s|
   # package, never the mirror — a pod cannot reach outside its own
   # directory, which is the only reason a copy exists at all.
   s.source_files = 'ios/**/*.{h,m,mm,swift,hpp,cpp}'
+
+  # The same manifest the Swift package ships. CocoaPods will not pick
+  # it up from `source_files`, and a pod without one makes the host
+  # app's submission the place the omission is discovered.
+  s.resource_bundles = { 'SentoriReactNative' => ['ios/core/PrivacyInfo.xcprivacy'] }
 end

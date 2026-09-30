@@ -43,7 +43,7 @@ sentori.init({
   token: 'st_...',
   release: 'myapp@1.0.0+123',          // your build number / commit
   environment: __DEV__ ? 'dev' : 'prod',
-  ingestUrl: 'https://ingest.sentori.golia.jp',
+  ingestUrl: 'https://sentori.example.com',   // YOUR instance
 })
 
 // ... rest of your entry
@@ -54,7 +54,11 @@ The init call:
 - installs JS global error / unhandledRejection hooks
 - attaches a native crash handler (signal-style on iOS, Java
   exception handler on Android)
-- starts the hang watchdog (iOS) / ANR detector (Android)
+
+It does **not** start the hang watchdog (iOS) or the ANR detector
+(Android). Both exist natively and are one call away, but they sample a
+thread, so they are opt-in: `init({ detect: { uiThreadHang: true } })`.
+This page said `init` started them, for as long as nothing did.
 
 ## 3. Capture your first error
 
@@ -127,7 +131,7 @@ each build:
 sentori-cli upload sourcemap \
   --release "myapp@1.0.0+123" \
   --token "$SENTORI_TOKEN" \
-  --ingest-url "$SENTORI_INGEST_URL" \
+  --api-url "$SENTORI_API_URL" \
   ios/main.jsbundle.map android/app/build/.../index.android.bundle.map
 
 # iOS dSYMs

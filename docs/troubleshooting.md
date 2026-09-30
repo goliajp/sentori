@@ -5,7 +5,7 @@ description: Common Sentori questions, what to check, and how to fix them
 
 # Troubleshooting
 
-Ten questions that come up over and over. Each one: what to check,
+Seven questions that come up over and over. Each one: what to check,
 what to expect, what to fix.
 
 ## 1. Dashboard isn't seeing any events
@@ -52,10 +52,10 @@ that release isn't loaded. Two reasons:
 - **Source map not uploaded** — most common. Run:
 
   ```bash
-  sentori-cli upload sourcemap \
+  npx @goliapkg/sentori-cli@latest upload sourcemap \
     --release "myapp@1.2.3+456" \
     --token "$SENTORI_TOKEN" \
-    --ingest-url "$SENTORI_INGEST_URL" \
+    --api-url "$SENTORI_API_URL" \
     dist/assets/
   ```
 
@@ -237,7 +237,7 @@ place as one a user hit.
 ## Still stuck?
 
 - File an issue on [GitHub](https://github.com/goliajp/sentori/issues)
-- Self-hosted: check `docker compose logs server` for warnings
+- Self-hosted: check `docker compose logs sentori` for warnings
 - The dashboard's Audit log (Settings → Audit) records every config
   change in the project; sometimes "events stopped flowing" is
   "someone rotated the token an hour ago"

@@ -15,8 +15,15 @@
 //
 // Wire schema: docs/replay-encoding-v2.md.
 
-import { logger } from '@goliapkg/sentori-core';
+import {
+  computeReplayDelta,
+  indexReplayNodes,
+  logger,
+  ReplayRing,
+} from '@goliapkg/sentori-core';
+import type { ReplayFrame, ReplayNode } from '@goliapkg/sentori-core';
 
+import { maskedNativeIds } from './mask';
 import { describeWireframeNative } from './native';
 
 declare const __DEV__: boolean | undefined;
@@ -33,51 +40,17 @@ const TICK_INTERVAL_MS = 500;
  *  length and lets the player re-sync after a dropped line. */
 const KEYFRAME_INTERVAL_MS = 4_000;
 
-/** When the delta against the previous frame would carry ≥ this
- *  fraction of the current node count, prefer a fresh keyframe —
- *  emits roughly the same bytes but doesn't grow the chain. */
-const DELTA_TO_KEYFRAME_RATIO = 0.4;
-
-/** Floor under which the keyframe-vs-delta ratio heuristic does
- *  not apply. Trivial UIs (≤ 10 nodes — boot splash, dev panel,
- *  tests) shouldn't drop to keyframes on every change. */
-const KEYFRAME_RATIO_MIN_NODES = 10;
-
-/** Replay window kept in the ring buffer. captureException drains. */
-const REPLAY_WINDOW_MS = 60_000;
-
-/** Hard ceiling on ring item count — defence against a wedged tick
- *  clock filling memory; under normal capture rates we evict by time
- *  long before this fires. */
-const MAX_RING_ITEMS = 1000;
-
 /** Floor on tick period. < 100 ms the native view-tree walk dominates
  *  the JS thread on mid-tier Android. */
 const MIN_TICK_PERIOD_MS = 100;
 
-type Node = {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  kind?: string;
-  text?: string;
-  color?: string;
-};
+type Node = ReplayNode;
 
-type NativeFrame = { ts: number; width: number; height: number; nodes: Node[] };
+type NativeFrame = ReplayFrame;
 
-type RingItem = { ts: number; line: string };
-
-let _ring: RingItem[] = [];
+let _ring = new ReplayRing();
 let _timer: ReturnType<typeof setInterval> | null = null;
 let _running = false;
-
-/** Last emit's reconstructed state — fingerprint → node. Null until
- *  the first keyframe lands; reset on drain so the next session
- *  starts with a fresh keyframe. */
-let _lastFrameState: Map<string, { node: Node; at: number }> | null = null;
-let _lastKeyframeTs = 0;
 
 let _nativeMod: ReplayNativeModule | null = null;
 
@@ -111,6 +84,9 @@ export function startReplay(opts: ReplayOptions): void {
   _running = true;
   _nativeMod = loadNativeReplay();
   _keyframeIntervalMs = opts.keyframeMs ?? KEYFRAME_INTERVAL_MS;
+  // A fresh ring, so a restart with a different cadence does not
+  // carry the previous one's state or its keyframe clock.
+  _ring = new ReplayRing({ keyframeMs: _keyframeIntervalMs });
   const hz = opts.hz ?? 2;
   const period = Math.max(MIN_TICK_PERIOD_MS, Math.round(1000 / hz));
   _timer = setInterval(() => {
@@ -182,129 +158,10 @@ function captureTick(): void {
 }
 
 function encodeAndPush(snapshot: NativeFrame): void {
-  const currentState = indexNodes(snapshot.nodes);
-
-  const ts = snapshot.ts;
-  const isCold = _lastFrameState === null;
-  const keyframeOverdue = ts - _lastKeyframeTs >= _keyframeIntervalMs;
-
-  let line: string;
-
-  if (isCold || keyframeOverdue) {
-    line = encodeKeyframe(snapshot);
-    _lastKeyframeTs = ts;
-  } else {
-    const delta = computeDelta(
-      _lastFrameState as Map<string, { node: Node; at: number }>,
-      currentState,
-    );
-    const totalChanged = delta.added.length + delta.changed.length + delta.removed.length;
-    if (totalChanged === 0) {
-      // No-op heartbeat — drop. Keep _lastFrameState as-is (identical).
-      return;
-    }
-    if (
-      currentState.size >= KEYFRAME_RATIO_MIN_NODES &&
-      totalChanged >= currentState.size * DELTA_TO_KEYFRAME_RATIO
-    ) {
-      // Big screen transition on a substantial UI — emit a fresh
-      // keyframe so reconstruction doesn't carry a near-rewrite delta.
-      line = encodeKeyframe(snapshot);
-      _lastKeyframeTs = ts;
-    } else {
-      line = JSON.stringify({
-        ts,
-        kind: 'delta',
-        added: delta.added,
-        changed: delta.changed,
-        removed: delta.removed,
-      });
-    }
-  }
-
-  _ring.push({ ts, line });
-  evictRing(ts);
-  _lastFrameState = currentState;
+  _ring.push(snapshot);
 }
 
-function encodeKeyframe(snapshot: NativeFrame): string {
-  return JSON.stringify({
-    ts: snapshot.ts,
-    kind: 'key',
-    width: snapshot.width,
-    height: snapshot.height,
-    nodes: snapshot.nodes,
-  });
-}
-
-function evictRing(nowTs: number): void {
-  const cutoff = nowTs - REPLAY_WINDOW_MS;
-  while (_ring.length > 0 && _ring[0]!.ts < cutoff) _ring.shift();
-  while (_ring.length > MAX_RING_ITEMS) _ring.shift();
-}
-
-/** Fingerprint integer-rounds before joining so sub-pixel jitter from
- *  RN's Fabric layout (occasionally floats) doesn't break stable
- *  matching across ticks. */
-function fingerprint(n: Node): string {
-  return `${n.x | 0},${n.y | 0},${n.w | 0},${n.h | 0}`;
-}
-
-/**
- * Identity = geometry + occurrence index in walk order.
- *
- * Geometry alone is NOT identity: a page root and the fullscreen
- * overlay covering it share x/y/w/h, and keying a Map on that
- * collapsed them into one node — the overlay inherited the root's
- * z-position and the replay drew the page THROUGH it (insight
- * 2026-08-01). The occurrence suffix keeps every stacked layer its
- * own entry, and stays stable across ticks because the native walk
- * order is deterministic for a stable tree.
- */
-export function indexNodes(nodes: Node[]): Map<string, { node: Node; at: number }> {
-  const out = new Map<string, { node: Node; at: number }>();
-  const seen = new Map<string, number>();
-  nodes.forEach((n, at) => {
-    const base = fingerprint(n);
-    const occ = seen.get(base) ?? 0;
-    seen.set(base, occ + 1);
-    out.set(`${base}#${occ}`, { node: n, at });
-  });
-  return out;
-}
-
-type Delta = {
-  added: (Node & { at: number; id: string })[];
-  changed: (Node & { id: string })[];
-  removed: (Pick<Node, 'x' | 'y' | 'w' | 'h'> & { id: string })[];
-};
-
-export function computeDelta(
-  prev: Map<string, { node: Node; at: number }>,
-  curr: Map<string, { node: Node; at: number }>,
-): Delta {
-  const added: Delta['added'] = [];
-  const changed: Delta['changed'] = [];
-  const removed: Delta['removed'] = [];
-  for (const [id, { node, at }] of curr) {
-    const p = prev.get(id);
-    if (!p) {
-      added.push({ ...node, at, id });
-      continue;
-    }
-    if (
-      (p.node.kind ?? '') !== (node.kind ?? '') ||
-      (p.node.color ?? '') !== (node.color ?? '') ||
-      (p.node.text ?? '') !== (node.text ?? '')
-    ) {
-      changed.push({ ...node, id });
-    }
-  }
-  for (const [id, { node }] of prev) {
-    if (!curr.has(id)) removed.push({ x: node.x, y: node.y, w: node.w, h: node.h, id });
-  }
-  return { added, changed, removed };
-}
+export { computeReplayDelta as computeDelta, indexReplayNodes as indexNodes };
 
 function handleEmptyTick(snapshot: unknown): void {
   _emptyTickCount += 1;
@@ -346,8 +203,13 @@ function diagnosticForTick(snapshot: NativeFrame, snapshotBytes: number): void {
 }
 
 function readMaskIds(): string[] {
-  // Masking returns with a v1 privacy pass; nothing masks today.
-  return [];
+  // This returned `[]` unconditionally, under a comment saying
+  // masking did not exist yet. It did: `replay-screens.ts` has read
+  // the same registry all along. So a host that registered a mask
+  // query and turned on wireframe replay got masked screenshots and
+  // unmasked wireframes — and a wireframe carries text, which is
+  // where a payment field's contents would be.
+  return maskedNativeIds();
 }
 
 type ReplayNativeModule = {
@@ -374,19 +236,24 @@ export function isReplayRunning(): boolean {
  *  string when the ring is empty. Resets state so the next session's
  *  replay starts with a fresh keyframe. */
 export function drainReplay(): string {
-  if (_ring.length === 0) return '';
-  const out = _ring.map((r) => r.line).join('\n');
-  _ring = [];
-  _lastFrameState = null;
-  _lastKeyframeTs = 0;
-  return out;
+  const entries = _ring.drain();
+  if (entries.length === 0) return '';
+  return entries.map((e) => JSON.stringify(e)).join('\n');
+}
+
+/// Drive one tick against an injected capture, so the ids the native
+/// module actually receives can be asserted. Without this the mask
+/// path had no test at all — which is how it stayed empty under a
+/// comment saying masking did not exist.
+export function __tickWithNativeForTests(mod: ReplayNativeModule): void {
+  _nativeMod = mod;
+  _running = true;
+  captureTick();
 }
 
 export function __resetReplayForTests(): void {
   stopReplay();
-  _ring = [];
-  _lastFrameState = null;
-  _lastKeyframeTs = 0;
+  _ring = new ReplayRing({ keyframeMs: _keyframeIntervalMs });
 }
 
 /** rc.9 — test seam. Lets unit tests drive the encoder without a

@@ -78,6 +78,129 @@ const PROBES = [
     why: 'two binaries meaning different things by now()',
   },
   {
+    gate: 'check-wire-contracts.mjs',
+    file: 'self-hosted/server/src/handlers/sdk/events.rs',
+    find: '"javascript", "ios", "android", "web", "weapp"',
+    replace: '"javascript", "ios", "android", "weapp"',
+    why: 'a runtime the SDK names and the server files under unknown',
+  },
+  {
+    gate: 'check-ios-packaging.mjs',
+    file: 'sdk/native/ios/Sources/Sentori/PrivacyInfo.xcprivacy',
+    find: 'NSPrivacyAccessedAPICategoryUserDefaults',
+    replace: 'NSPrivacyAccessedAPICategoryUserDefaultsTypo',
+    why: 'a required-reason API the manifest does not declare',
+  },
+  {
+    gate: 'check-doc-versions.mjs',
+    file: 'docs/sdk-kotlin.md',
+    find: 'jp.golia.sentori:sentori:',
+    replace: 'jp.golia.sentori:sentori:0.0.1-',
+    why: 'an install line that installs a version we do not ship',
+  },
+  {
+    gate: 'gen-replay-vectors.mjs --check',
+    // The compiled module, not the source: the generator imports
+    // `lib/`, so a mutation of the `.ts` would leave the checker
+    // reading the same bytes and passing.
+    file: 'sdk/core/lib/replay-ring.js',
+    find: 'const DELTA_TO_KEYFRAME_RATIO = 0.4',
+    replace: 'const DELTA_TO_KEYFRAME_RATIO = 0.9',
+    why: 'a replay rule the native ports are no longer asserting',
+  },
+  {
+    gate: 'check-doc-commands.mjs',
+    file: 'docs/sdk-swift.md',
+    find: '--token "$SENTORI_TOKEN"',
+    replace: '--token "$SENTORI_API_TOKEN"',
+    why: 'a documented token variable the CLI does not read',
+  },
+  {
+    gate: 'check-orphan-ts.mjs',
+    file: 'sdk/react-native/src/index.ts',
+    // `mask` until 2026-09-30, when this stopped orphaning anything:
+    // `replay.ts` and `replay-screens.ts` both import it now, so
+    // dropping the re-export left the module perfectly reachable and
+    // the gate rightly said nothing. The probe had been passing on a
+    // non-zero exit for an unrelated reason; the baseline check added
+    // to this file is what exposed it.
+    //
+    // `error-boundary` is reachable from the index and nowhere else,
+    // which is what an orphan probe needs.
+    find: "export { ErrorBoundary } from './error-boundary';",
+    replace: '',
+    why: 'a TypeScript module that ships in no bundle',
+  },
+  {
+    // The rigs that crash a real app are the gates nobody can retest
+    // by hand, so a trigger list that forgets one is the quietest way
+    // to lose them.
+    gate: 'check-workflow-script-paths.mjs',
+    file: '.github/workflows/mobile-e2e.yml',
+    find: "      - 'scripts/ios-crash-loop.sh'",
+    replace: '',
+    why: 'a gate script no workflow is triggered by',
+  },
+  {
+    gate: 'check-surface-gates.mjs',
+    file: '.github/workflows/build.yml',
+    find: '          - sdk/weapp\n',
+    replace: '',
+    why: 'a package under sdk/ that no job builds',
+  },
+  {
+    gate: 'check-sdk-doc-options.mjs',
+    file: 'sdk/core/src/types.ts',
+    // At the top level of `InitConfig`. The first version of this
+    // probe added the field inside `detect`, which that checker reads
+    // past — it takes top-level fields only — so it stayed green and
+    // said nothing about itself.
+    find: '  /** B-type replay rolling buffer, seconds. 0 disables. */',
+    replace: '  undocumentedOption?: string\n  /** B-type replay rolling buffer, seconds. 0 disables. */',
+    why: 'a public option the SDK reference does not mention',
+  },
+  {
+    gate: 'check-md-fences.mjs',
+    file: 'sdk/web/README.md',
+    find: '```bash\nbun add @goliapkg/sentori-web\n```',
+    replace: '```bash\nbun add @goliapkg/sentori-web',
+    why: 'a code fence that never closes',
+  },
+  {
+    // A second launcher is a second set of flags nobody compares
+    // until one of them is flaky on a machine nobody can log into.
+    gate: 'check-single-chrome-launcher.mjs',
+    file: 'scripts/lib/headless-chrome.mjs',
+    find: "      '--no-first-run',",
+    replace: '',
+    why: 'a launcher missing a flag that is there for a real failure',
+  },
+  {
+    // The fixture is generated from the kernel, so a kernel rule that
+    // Swift and Kotlin have not been told about shows up here rather
+    // than as two platforms counting losses differently in
+    // production.
+    gate: 'gen-transport-vectors.mjs --check',
+    // The built lib, not the source: the generator drives the compiled
+    // kernel, so that is what a stale fixture would disagree with.
+    file: 'sdk/core/lib/transport.js',
+    find: 'const MAX_QUEUED = 500',
+    replace: 'const MAX_QUEUED = 400',
+    why: 'a kernel rule the native transports have not followed',
+  },
+  {
+    // Adds a dead option rather than removing a read. Every switch in
+    // `detect` is read in two places — once to resolve the config and
+    // once where it acts — so deleting one line leaves the other, and
+    // a probe that cannot make the gate red proves nothing about
+    // either.
+    gate: 'check-dead-options.mjs',
+    file: 'sdk/core/src/types.ts',
+    find: '    uiThreadHang?: boolean',
+    replace: '    uiThreadHang?: boolean\n    neverReadByAnything?: boolean',
+    why: 'a public option nothing reads',
+  },
+  {
     gate: 'check-error-status.mjs',
     file: 'self-hosted/server/src/handlers/notify_admin.rs',
     find: 'pub async fn smtp_status(State(state): State<Arc<AppState>>) -> Json<Value> {',
@@ -97,6 +220,36 @@ try {
     stdio: 'pipe',
   });
 
+  // The copy has to be a git repository, because several gates ask git
+  // questions: `check-ios-packaging` reads `git ls-files` to learn what
+  // a consumer receives, and `check-doc-versions` reads `git tag` to
+  // learn which versions are published.
+  //
+  // Without this they failed here with "not a git repository" — a
+  // non-zero exit, which the loop below read as "the gate went red".
+  // Both were reported as verified for as long as they have been in
+  // this list, having never once run. The baseline check added below
+  // is what surfaced it; before that, a gate that could not run and a
+  // gate that caught the defect were the same observation.
+  const git = (...args) =>
+    execFileSync('git', args, { cwd: copy, stdio: 'pipe', encoding: 'utf8' });
+  git('init', '-q');
+  git('-c', 'user.email=gates@example.com', '-c', 'user.name=gates', 'add', '-A');
+  git(
+    '-c', 'user.email=gates@example.com', '-c', 'user.name=gates',
+    'commit', '-q', '-m', 'sandbox',
+  );
+  // Tag names only: `check-doc-versions` reads which versions exist,
+  // not what they point at.
+  for (const tag of execFileSync('git', ['tag', '--list', 'swift/*'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  })
+    .split('\n')
+    .filter(Boolean)) {
+    git('tag', tag);
+  }
+
   const failures = [];
   for (const p of PROBES) {
     const path = join(copy, p.file);
@@ -108,11 +261,33 @@ try {
       );
       continue;
     }
+    // Split, because a gate can take a flag. Passing the whole string
+    // as one filename made `node scripts/'gen-replay-vectors.mjs
+    // --check'` throw MODULE_NOT_FOUND — a non-zero exit, which this
+    // file then read as "the gate went red". That entry had never run
+    // the gate at all, and was reported as verified for as long as it
+    // has existed. Found by adding a second entry of the same shape.
+    const [script, ...args] = p.gate.split(' ');
+    const run = () =>
+      spawnSync('node', [join(copy, 'scripts', script), ...args], {
+        cwd: copy,
+        encoding: 'utf8',
+      });
+
+    // Green before the probe, or a non-zero exit afterwards says
+    // nothing: a gate that cannot run in this sandbox fails either
+    // way, and looks exactly like one that caught the defect.
+    const baseline = run();
+    if (baseline.status !== 0) {
+      failures.push(
+        `${p.gate}: already fails on an unmodified tree, so its red below means ` +
+        `nothing. It cannot run here:\n${(baseline.stderr || baseline.stdout || '').trim().slice(0, 400)}`,
+      );
+      continue;
+    }
+
     writeFileSync(path, before.replace(p.find, p.replace));
-    const r = spawnSync('node', [join(copy, 'scripts', p.gate)], {
-      cwd: copy,
-      encoding: 'utf8',
-    });
+    const r = run();
     writeFileSync(path, before);
     if (r.status === 0) {
       failures.push(
@@ -128,7 +303,45 @@ try {
     for (const f of failures) console.error(`    ${f}`);
     process.exit(1);
   }
-  console.log(`✓ ${PROBES.length} gates each went red on the defect they exist for`);
+  // Coverage, said out loud.
+  //
+  // Preflight runs more gates than this file probes, and "every gate
+  // went red" reads as "all of them" — the same shape of quiet as the
+  // `check-workflow-script-paths` output that said "8 pairs" while
+  // skipping three whole workflows. A gate with no probe is not
+  // verified; it is merely present. So the count is printed, and so
+  // are the names.
+  {
+    const preflight = readFileSync(join(ROOT, 'package.json'), 'utf8');
+    const run = new Set(
+      [...preflight.matchAll(/(?:node|bash) scripts\/(check-[a-z-]+\.(?:mjs|sh))/g)].map((m) => m[1]),
+    );
+    const probed = new Set(PROBES.map((p) => p.gate.split(' ')[0]));
+    // These read `lib/`, which is a build output and not in the sandbox
+    // — it copies tracked files. They are checked by preflight and by
+    // CI, where a build has happened; they cannot be probed here, and
+    // that is a property of the sandbox rather than a gap in them.
+    const NEEDS_BUILD = new Set([
+      'check-package-entrypoints.mjs',
+      'check-sdk-size.sh',
+      'check-web-size.sh',
+      'check-weapp-size.sh',
+      'check-maven-artifact.mjs',
+      'check-orphan-lib.mjs',
+    ]);
+    const unprobed = [...run].filter((g) => !probed.has(g) && !NEEDS_BUILD.has(g)).sort();
+    const unprobeable = [...run].filter((g) => !probed.has(g) && NEEDS_BUILD.has(g)).sort();
+    console.log(
+      `✓ ${PROBES.length} gates each went red on the defect they exist for` +
+        ` (${run.size - unprobed.length} of ${run.size} preflight gates have a probe)`,
+    );
+    if (unprobeable.length > 0) {
+      console.log(`  need a build, so not probeable from a tracked-files copy: ${unprobeable.join(', ')}`);
+    }
+    if (unprobed.length > 0) {
+      console.log(`  no probe yet, so present rather than verified: ${unprobed.join(', ')}`);
+    }
+  }
 } finally {
   rmSync(copy, { recursive: true, force: true });
 }

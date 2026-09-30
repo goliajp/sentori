@@ -40,7 +40,11 @@ const CASES = [
     kind: 'trace', timestamp: now(), platform: 'ios',
   }],
   ['kind outside the enum', { kind: 'fatal', occurredAt: now(), platform: 'ios' }],
-  ['platform outside the enum', { kind: 'trace', occurredAt: now(), platform: 'iOS' }],
+  // Not a rejection any more: an SDK ahead of its server would have
+  // lost every event it sent, so the value is substituted rather than
+  // refused. Both ends must agree on that too — see the extra check
+  // below, which pins the substitution the validator reports.
+  ['platform outside the enum', { kind: 'trace', occurredAt: now(), platform: 'iOS', name: 'plat.unknown' }],
   ['occurredAt not rfc3339', { kind: 'trace', occurredAt: 'yesterday', platform: 'ios' }],
   ['missing platform', { kind: 'trace', occurredAt: now() }],
   ['empty object', {}],
@@ -114,6 +118,28 @@ for (const [name, body] of CASES) {
         `(${v.status}) but ingest answered ${i.status}`,
     );
     console.error(`    body: ${JSON.stringify(body).slice(0, 120)}`);
+  }
+}
+
+// Agreeing to accept is not enough here: the validator's job is to
+// show what the server will make of the body, and a platform it does
+// not know does not survive. If it echoed the value back unchanged,
+// an integrator would ship code believing a field was stored that in
+// fact was not.
+{
+  const v = await post(
+    '/v1/events/validate',
+    { kind: 'trace', occurredAt: now(), platform: 'iOS', name: 'plat.echo' },
+    false,
+  );
+  const vj = await v.json().catch(() => ({}));
+  if (vj.parsed?.platform !== 'unknown' || vj.platformDegraded !== true) {
+    disagreed++;
+    console.error(
+      `\u2717 an unknown platform: validate echoed ${JSON.stringify(vj.parsed?.platform)} ` +
+        `with platformDegraded=${JSON.stringify(vj.platformDegraded)}, but ingest stores ` +
+        `'unknown'. The validator is teaching a field that is not kept.`,
+    );
   }
 }
 

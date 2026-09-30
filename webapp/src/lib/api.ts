@@ -484,10 +484,28 @@ class Api {
   listProjects() {
     return this.get<{ projects: Project[] }>('/admin/api/projects');
   }
+  getProject(id: string) {
+    return this.get<{
+      id: string;
+      name: string;
+      platform: string;
+      createdAt: string;
+      /** Only ever populated for a superadmin; the server returns null
+       *  to everyone else, because whoever holds it can post into the
+       *  team's channel. */
+      webhookUrl: null | string;
+    }>(`/admin/api/projects/${id}`);
+  }
   createProject(name: string, platform?: string) {
     return this.post<{ id: string }>('/admin/api/projects', { name, platform });
   }
-  updateProject(id: string, patch: { name?: string; platform?: string }) {
+  /** `webhookUrl: ''` clears it. Absent leaves it alone — a PATCH
+   *  that could not distinguish the two could never turn the channel
+   *  off. */
+  updateProject(
+    id: string,
+    patch: { name?: string; platform?: string; webhookUrl?: string },
+  ) {
     return this.send<{ ok: boolean }>('PATCH', `/admin/api/projects/${id}`, patch);
   }
   deleteProject(id: string) {
@@ -551,6 +569,42 @@ class Api {
   }
 
   // ── issues ──
+  /** Crash-free rate for a window, and the same broken out per
+   *  release — the comparison a ship/no-ship decision is made on. */
+  crashFree(q: { projectId: string; hours?: number; environment?: string }) {
+    const usp = new URLSearchParams({ projectId: q.projectId });
+    if (q.hours) usp.set('hours', String(q.hours));
+    if (q.environment) usp.set('environment', q.environment);
+    return this.get<{
+      crashFreeSessions: null | number;
+      crashedSessions: number;
+      releases: {
+        crashFreeSessions: null | number;
+        crashFreeUsers: null | number;
+        crashedSessions: number;
+        lastAt: string;
+        platform: string;
+        release: string;
+        sessions: number;
+        users: number;
+      }[];
+      crashFreeUsers: null | number;
+      crashedUsers: number;
+      sessions: number;
+      /** Oldest first, one entry per bucket including the empty ones —
+       *  a null rate is a stretch with no sessions, which is not the
+       *  same as a healthy one. */
+      trend: {
+        at: string;
+        crashFreeSessions: null | number;
+        crashedSessions: number;
+        sessions: number;
+      }[];
+      users: number;
+      windowHours: number;
+    }>(`/admin/api/sessions/crash-free?${usp.toString()}`);
+  }
+
   listIssues(q: {
     status?: string;
     kind?: string;

@@ -4,11 +4,24 @@ Error, warning and push capture for Android apps, with no React Native.
 
 ```kotlin
 dependencies {
-    implementation("jp.golia.sentori:sentori:1.5.0")
+    implementation("jp.golia.sentori:sentori:2.1.0")
 }
 ```
 
-`minSdk 24`, JVM target 17. Apache-2.0 OR MIT.
+`minSdk 24`, JVM target 17. Apache-2.0 OR MIT. The artifact is on
+Maven Central, so `mavenCentral()` must be in your repositories.
+
+The `Application` subclass below only runs if the manifest names it,
+and a blank project's manifest does not:
+
+```xml
+<!-- AndroidManifest.xml -->
+<application android:name=".App" …>
+```
+
+Without that line `onCreate` never executes, `start` never runs, and
+every verb is a no-op that still returns an id — so the integration
+looks finished and reports nothing at all.
 
 The package is `com.sentori`, which is **not** the groupId:
 
@@ -26,6 +39,12 @@ exists because that happened.
 
 ## Start
 
+You need two values first, and neither comes from this page: a
+**token** (`st_…`, ingest scope) and the **ingest URL** of an instance
+you run. There is no hosted signup — see
+[getting started](./getting-started.md) for where both come from, and
+[self-hosting](./self-hosting.md) for standing an instance up.
+
 ```kotlin
 import com.sentori.Sentori
 import com.sentori.SentoriConfig
@@ -36,13 +55,15 @@ class App : Application() {
         Sentori.start(
             SentoriConfig(
                 token = "st_…",                          // Settings ▸ Tokens, ingest scope
-                ingestUrl = "https://sentori.golia.jp",
+                ingestUrl = "https://sentori.example.com",  // YOUR instance
                 release = "com.example.app@1.5.0+220",
                 environment = "production",
             ),
             context = this,
         )
-        Sentori.user(id = currentUser.id, email = null, traits = mapOf("plan" to "pro"))
+        // Optional, and separate: without it a device receives
+        // broadcasts and cannot be reached from an issue.
+        Sentori.user(id = "the id your app already has", email = null, traits = mapOf("plan" to "pro"))
     }
 }
 ```
@@ -170,7 +191,7 @@ wait for FCM.
 In use:
 
 ```kotlin
-Sentori.push.register(
+SentoriPush.register(
     context = this,
     activity = this,                      // for the Android 13+ prompt
     onMessage = { payload -> … },         // arrived while in the foreground
@@ -249,11 +270,11 @@ Two cases are not ours to close:
   on purpose: an app that uses silent data messages should not get a
   notification per message. `onMessage` still fires.
 
-`Sentori.push.unregister(context)` revokes it: the local handle is
+`SentoriPush.unregister(context)` revokes it: the local handle is
 cleared, the provider token is deleted, and the server marks the
 device revoked so nothing more is sent to it.
 
-`cachedDeviceHandle(context)` returns the handle without a round trip.
+`SentoriPush.cachedDeviceHandle(context)` returns the handle without a round trip.
 
 ### The address survives a rotated token
 
@@ -272,6 +293,131 @@ started — which for a resident app is not a bounded wait.
 the installation's local state, so the next `register` starts a new
 one. That is deliberate — a revoked device coming back should be a
 new registration, not a resumed one.
+
+## Making a crash readable
+
+A native stack arrives with obfuscated names. The server de-obfuscates
+them using the R8 / ProGuard mapping your build produced, matched by
+the `release` string — so a crash is readable only if the mapping for
+that exact build was uploaded.
+
+That mapping only exists if R8 ran. A blank project ships with
+`minifyEnabled false`, so `mapping.txt` is not there and the upload
+below fails on a missing file:
+
+```kotlin
+// app/build.gradle.kts
+android {
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+        }
+    }
+}
+```
+
+The commands need three values:
+
+```bash
+VERSION=$(./gradlew -q printVersionName)   # or read it from your own build logic
+BUILD=$(./gradlew -q printVersionCode)
+
+export SENTORI_API_URL=https://sentori.example.com   # YOUR instance
+export SENTORI_TOKEN=st_…                            # api scope
+```
+
+`--api-url` is not optional in a self-hosted world. Without it the CLI
+defaults to `https://sentori.golia.jp`, which is GOLIA's own instance
+— so the mapping leaves your build machine, goes somewhere that is not
+yours, and exits 0.
+
+`$SENTORI_TOKEN` is the name the CLI reads, and `$SENTORI_ADMIN_TOKEN`
+also works. No other spelling does.
+
+Right after the release build, in CI:
+
+```bash
+npx @goliapkg/sentori-cli@latest upload mapping \
+  --api-url "$SENTORI_API_URL" \
+  --release "com.example.app@$VERSION+$BUILD" \
+  --token "$SENTORI_TOKEN" \
+  app/build/outputs/mapping/release/mapping.txt
+```
+
+The `--release` here and the `release` you pass to `Sentori.start`
+must be the same string. They are matched literally; a build number
+in one and not the other is a release the server has never heard of.
+
+To see the failing line rather than only the method name, upload the
+sources too:
+
+```bash
+npx @goliapkg/sentori-cli@latest upload srcbundle \
+  --api-url "$SENTORI_API_URL" \
+  --release "com.example.app@$VERSION+$BUILD" \
+  --token "$SENTORI_TOKEN" app/src/main/java
+```
+
+An upload that fails exits 0 and prints the command to run by hand.
+It is not your build's job to fail because our server was
+unreachable, and a mapping uploaded later is applied to crashes that
+already arrived. If you would rather know at build time, add
+`--strict`.
+
+The step worth failing on is the one that asks the server what
+actually landed:
+
+```bash
+npx @goliapkg/sentori-cli@latest artifacts check \
+  --api-url "$SENTORI_API_URL" \
+  --release "com.example.app@$VERSION+$BUILD" \
+  --token "$SENTORI_TOKEN" --expect proguard
+```
+
+That catches the case a local "we ran the upload" note cannot: the
+upload step that quietly stopped being called.
+
+### ANR
+
+On Android 11 and later an ANR is read from the system's own record
+(`ApplicationExitInfo`) at the next launch — the same source Play
+Console reports on, with the system's own trace of where the main
+thread was stuck. Nothing to configure, and no number of ours that
+can disagree with the one on your release dashboard.
+
+Below 11 there is no such record, so a watchdog detects a blocked main
+thread instead. It is an inference, and a debugger pause looks like
+one; it runs only on those devices.
+
+## Check it works
+
+Symbolication and push can wait. First make one crash appear.
+
+```kotlin
+// A temporary button, or anything you can reach twice.
+findViewById<Button>(R.id.crash).setOnClickListener {
+    throw IllegalStateException("sentori smoke test")
+}
+```
+
+Then, and this is the step people skip:
+
+1. **Detach the debugger.** Run the app, stop it in Android Studio,
+   then launch it again from the launcher.
+2. Tap the button. The app dies — that is the point.
+3. **Launch the app a third time.** A crash is written to disk as the
+   process dies and sent on the next launch; a dying process cannot
+   finish a network request.
+4. Open your instance, go to Issues, and the crash is the top row.
+
+On an emulator, `ingestUrl` cannot be `localhost` — that is the
+emulator itself. The host is `http://10.0.2.2:8080`.
+
+Nothing arrived? Check the manifest line first (`android:name=".App"`,
+above): without it `start` never runs, and the verbs stay no-ops that
+return an id, so a missing integration and a quiet app look the same.
+`SentoriConfig.isInitialised` tells the two apart.
 
 ## What it costs you
 

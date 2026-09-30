@@ -5,19 +5,25 @@ description: Pick the 5-minute quickstart that matches your stack
 
 # Getting started
 
-Sentori watches mobile apps. One quickstart, because there is one
-supported stack:
+Pick the stack you ship:
 
 | Stack | Quickstart |
 |---|---|
+| **Swift** — native iOS / tvOS | [sdk-swift](./sdk-swift.md) |
+| **Kotlin** — native Android | [sdk-kotlin](./sdk-kotlin.md) |
 | **React Native** (bare or Expo) | [getting-started/react-native](./getting-started/react-native.md) |
+| **Browser** — any framework, or none | [getting-started/web](./getting-started/web.md) |
+| **WeChat mini program** | [getting-started/weapp](./getting-started/weapp.md) |
 
 There were guides here for React, Next.js and Node until 2026-08-10.
 They pointed at `@goliapkg/sentori-react` and friends — packages whose
 source left this repo with the v1 redesign and which speak the v0.2
 wire format, so following them produced an integration the current
 server answers with `400 invalid_payload`. `@goliapkg/sentori-node`
-never existed at all.
+never existed at all. The browser is supported again as of
+`@goliapkg/sentori-web`, as **one** framework-agnostic package rather
+than one per framework: the six that existed drifted apart, and an
+integrator on the fifth had no way to tell which behaviours they had.
 
 It assumes you already have:
 
@@ -146,9 +152,11 @@ npx @goliapkg/sentori-cli issue silence <issue-uuid> \
 These need a token whose **scope is `api`**, minted at Settings ▸
 Tokens. There is one prefix — `st_` — and the scope is a property the
 server holds, not something you can read off the token. The `sk_`
-prefix this paragraph named until 2026-08-27 was from v0 and
-`protocol.md` records it as removed; there is no
-`SENTORI_ADMIN_TOKEN`.
+prefix is from v0 and `protocol.md` records it as removed, so a
+token you find with that shape is from a retired instance.
+
+The CLI takes the token as `--token`, and reads `$SENTORI_TOKEN` or
+`$SENTORI_ADMIN_TOKEN` when the flag is absent.
 
 Using an `ingest` token here is refused with `403 admin_token_required`
 and a hint naming the scope to mint instead.
@@ -160,10 +168,19 @@ After a release build, upload the source map tagged to the release —
 **byte-for-byte the same string you pass to `init({ release })`**:
 
 ```bash
+export SENTORI_API_URL=https://sentori.example.com   # YOUR instance
+export SENTORI_TOKEN=st_…                            # api scope
+
 npx @goliapkg/sentori-cli@latest upload sourcemap \
+  --api-url "$SENTORI_API_URL" \
   --release "myapp@$VERSION+$BUILD" --token "$SENTORI_TOKEN" \
   dist/assets/            # a build dir, or specific .map / .js files
 ```
+
+`--api-url` is not optional for a self-hosted instance. Left out, the
+CLI defaults to `https://sentori.golia.jp` — GOLIA's own — so the
+upload goes somewhere that is not yours and exits 0, because an
+upload never fails your build.
 
 The server symbolicates matching events at ingest and groups the issue
 on the original-source frame. React Native (Hermes) needs the Metro

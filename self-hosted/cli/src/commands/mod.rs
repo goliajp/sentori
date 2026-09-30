@@ -34,6 +34,7 @@ pub const TABLES: &[&str] = &[
     "issues",
     "events",
     "issue_user_hits",
+    "sessions",
     "issue_activity",
     "event_attachments",
     "releases",

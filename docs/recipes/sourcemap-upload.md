@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SENTORI_TOKEN: ${{ secrets.SENTORI_TOKEN }}
-      SENTORI_INGEST_URL: https://ingest.sentori.golia.jp
+      SENTORI_API_URL: https://sentori.example.com
       RELEASE: myapp@${{ github.ref_name }}+${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
@@ -61,7 +61,7 @@ jobs:
         run: sentori-cli upload sourcemap --release "$RELEASE" dist/assets/
       - name: Notify of deploy
         run: |
-          curl -fsS -X POST "$SENTORI_INGEST_URL/v1/deploys" \
+          curl -fsS -X POST "$SENTORI_API_URL/v1/deploys" \
             -H "Authorization: Bearer $SENTORI_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{\"release\":\"$RELEASE\",\"environment\":\"prod\"}"
@@ -86,7 +86,7 @@ Notes:
 stages: [build, deploy]
 
 variables:
-  SENTORI_INGEST_URL: "https://ingest.sentori.golia.jp"
+  SENTORI_API_URL: "https://sentori.example.com"
 
 build:
   stage: build
@@ -108,7 +108,7 @@ upload-sourcemaps:
     - export RELEASE="myapp@$CI_COMMIT_REF_NAME+$CI_PIPELINE_IID"
     - sentori-cli upload sourcemap --release "$RELEASE" dist/assets/
     - |
-      curl -fsS -X POST "$SENTORI_INGEST_URL/v1/deploys" \
+      curl -fsS -X POST "$SENTORI_API_URL/v1/deploys" \
         -H "Authorization: Bearer $SENTORI_TOKEN" \
         -H "Content-Type: application/json" \
         -d "{\"release\":\"$RELEASE\",\"environment\":\"prod\"}"
@@ -154,7 +154,7 @@ execSync(
 
 // Deploy ping — Vercel sets VERCEL_ENV to 'production'|'preview'|'development'
 execSync(
-  `curl -fsS -X POST "$SENTORI_INGEST_URL/v1/deploys" \
+  `curl -fsS -X POST "$SENTORI_API_URL/v1/deploys" \
     -H "Authorization: Bearer ${token}" \
     -H "Content-Type: application/json" \
     -d '{"release":"${release}","environment":"${process.env.VERCEL_ENV ?? 'preview'}"}'`,
@@ -162,7 +162,7 @@ execSync(
 )
 ```
 
-Add `SENTORI_TOKEN` + `SENTORI_INGEST_URL` to Vercel project →
+Add `SENTORI_TOKEN` + `SENTORI_API_URL` to Vercel project →
 Settings → Environment Variables (scope: Production + Preview).
 
 For source-map generation specifically:
@@ -207,6 +207,7 @@ If you'd rather compose by hand and upload separately:
 node node_modules/react-native/scripts/compose-source-maps.js \
   main.jsbundle.packager.map main.jsbundle.hbc.map -o main.jsbundle.map
 npx @goliapkg/sentori-cli@latest upload sourcemap \
+  --api-url "$SENTORI_API_URL" --token "$SENTORI_TOKEN" \
   --release "myapp@$VERSION+$BUILD" main.jsbundle.map main.jsbundle
 ```
 

@@ -147,6 +147,14 @@ export const en = {
   'notify.onRegression': 'regression',
   'notify.prefsHint': 'Per-project control of your own mail. All on by default.',
   'notify.prefsTitle': 'Email me about',
+  'notify.webhookTitle': 'Webhook',
+  'notify.webhookHint':
+    'Also POST new issues and regressions here, as {"subject", "body", "metadata"}. Per project, not per person: it goes to a room. Works with no SMTP at all, which is the case it exists for.',
+  'notify.webhookPlaceholder': 'https://hooks.example.com/services/…',
+  'notify.webhookSave': 'Save',
+  'notify.webhookSaved': 'Saved',
+  'notify.webhookFailed': 'Could not save the webhook URL.',
+  'notify.webhookOwnerOnly': 'Only the owner can see or change this.',
   'notify.smtpTitle': 'SMTP',
   'notify.smtpUnconfigured': 'SMTP not configured. Set SENTORI_SMTP_HOST to enable mail.',
   'notify.testButton': 'Send test email',
@@ -371,12 +379,43 @@ export const en = {
   'push.noUser': 'not identified',
   'push.noUserHint': 'Registered before sentori.user() ran. Receives broadcasts; not addressable from an issue.',
   'push.user': 'User',
+  'crashFree.title': 'Crash-free sessions',
+  'crashFree.thin': 'too few sessions to read this precisely',
+  'crashFree.counts': '{crashed} crashed of {total} sessions',
+  'crashFree.empty': 'No sessions in this window yet — the SDK reports one each time the app goes to the background. Update to a build that sends them, or wait for the first report.',
+  'crashFree.users': '{pct}% of users crash-free',
+  'crashFree.usersEmpty': 'nobody identified yet',
+  'crashFree.usersTitle':
+    'Users who started at least one session in the last {hours}h. A person who ran two releases counts once.',
+  'crashFree.sessionsTitle':
+    'Sessions started in the last {hours}h. One app launch is one session, so a user who launched the app ten times counts ten times.',
+  'impact.title':
+    '{users} users have reported this, all time — up to {max} times each. Not limited to a window, so this number does not shrink.',
+  'impact.titleAnon':
+    '{events} events, all time. Nobody who reported this was identified, so there is no user count — not zero users.',
+  'health.usersTitle':
+    'Distinct users who sent any event in the last 24h — not only the ones who hit a problem.',
+  'crashFree.trendFrom': '{hours}h ago',
+  'crashFree.trendLow': 'low {pct}%',
+  'crashFree.trendTitle':
+    'Crash-free sessions per bucket over the last {hours}h, drawn from {low}% up. A break in the line is a stretch with no sessions, not a healthy one.',
+  'crashFree.window': 'last {hours}h',
+  'platform.unknown': 'Unknown (SDK newer than this server)',
   'releases.artifactBroken':
     'A {platform} artifact was uploaded and cannot be read — expand for which.',
   'releases.artifactMissing':
     '{platform} reports events in this release but has no symbolication artifact — its stacks cannot be read',
   'releases.artifactUnused':
     'no {platform} events in this release, so the missing artifact is harmless',
+  'releases.legend': 'Symbolication',
+  'releases.legendOk': 'uploaded and readable',
+  'releases.legendBroken': 'uploaded, and something under it does not parse',
+  'releases.legendMissing': 'this release reports from a platform that needs it',
+  'releases.legendUnused': 'nothing here uses it',
+  'releases.crashFree': 'crash-free',
+  'releases.crashFreeNone': 'no sessions',
+  'releases.crashFreeTitle':
+    '{pct}% of the {sessions} sessions on this release did not crash, over the last 30 days. Sessions arrive from SDKs that send them; a release with none shows a dash rather than a rate.',
   'releases.delete': 'Delete release',
   'releases.deleteConfirm': 'Delete {name}? Its symbolication artifacts go with it, and this release\u2019s stacks cannot be symbolicated again until they are re-uploaded.',
   'releases.deleteFailed': 'Could not delete the release.',
@@ -415,6 +454,8 @@ export const en = {
   'settings.save': 'Save',
   'settings.saved': 'Saved',
   'settings.tab.account': 'Account',
+  'settings.roleOwnerScope': 'every project, plus admins, tokens and the audit log',
+  'settings.roleAdminScope': 'only the projects ticked below',
   'settings.tab.audit': 'Audit',
   'settings.tab.notifications': 'Notifications',
   'settings.tab.push': 'Push',

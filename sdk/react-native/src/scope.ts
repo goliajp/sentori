@@ -21,7 +21,12 @@ let _traits: Record<string, unknown> | undefined;
 //
 // A callback rather than a direct call because push.ts already imports
 // this file; the arrow has to point one way.
-let _onIdentityChange: (() => void) | undefined;
+//
+// A set rather than one slot: sessions needs the same news. The single
+// slot made the second listener silently evict the first, and the one
+// it would have evicted is push — so registering a session listener
+// would have stopped every device row from following a sign-in.
+const _identityListeners = new Set<() => void>();
 
 /** An identity change that happened while nobody was listening.
  *  Push installs its listener only once a registration has landed, so
@@ -29,27 +34,37 @@ let _onIdentityChange: (() => void) | undefined;
  *  announced to an empty room — and nothing announces it again. */
 let _missedAnnounce = false;
 
-/** Register interest in identity changes. Only push does. */
+/** Register interest in identity changes. Push and sessions do. */
 export const onIdentityChange = (fn: (() => void) | undefined): void => {
-  _onIdentityChange = fn;
-  if (fn != null && _missedAnnounce) {
+  if (fn == null) return;
+  _identityListeners.add(fn);
+  if (_missedAnnounce) {
     _missedAnnounce = false;
     announce();
   }
 };
 
+/** Stop listening. Push does this on unregister; passing the same
+ *  function it registered, because a set removes by identity. */
+export const offIdentityChange = (fn: () => void): void => {
+  _identityListeners.delete(fn);
+};
+
 const announce = (): void => {
-  if (_onIdentityChange == null) {
+  if (_identityListeners.size === 0) {
     // Replayed by `onIdentityChange` when someone starts listening.
     // Deliberately not a queue: identity is a current value, not a
     // stream, so one flag replays the latest and no more.
     _missedAnnounce = true;
     return;
   }
-  try {
-    _onIdentityChange();
-  } catch {
-    // NEVER rule: whatever the listener does, user() returns.
+  for (const fn of _identityListeners) {
+    try {
+      fn();
+    } catch {
+      // NEVER rule: whatever a listener does, user() returns — and one
+      // listener throwing must not stop the next from being told.
+    }
   }
 };
 
@@ -111,7 +126,7 @@ export const __resetForTests = (): void => {
   _userKey = undefined;
   _traits = undefined;
   _context = {};
-  _onIdentityChange = undefined;
+  _identityListeners.clear();
   _missedAnnounce = false;
   _hashGeneration++;
 };

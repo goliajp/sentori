@@ -11,6 +11,7 @@
 // often" — an amber that fires on a healthy release is an amber
 // people learn to scroll past.
 
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -79,6 +80,29 @@ for (const s of ['ok', 'broken', 'missing', 'unused', 'unknown']) {
   if (!['unused', 'unknown'].includes(s)) {
     if (seen.has(c)) problems.push(`${s} and ${seen.get(c)} render the same colour`);
     seen.set(c, s);
+  }
+}
+
+// --- the legend explains every state a row can show ---------------
+//
+// The dots are the whole screen and were four unlabelled colours
+// until 2026-09-30. A legend that covers three of five states is
+// worse than none: a reader who finds three explained assumes the
+// fourth is a shade of one of them.
+{
+  const page = readFileSync(join(root, 'src/pages/Releases.tsx'), 'utf8');
+  const legend = /const items: \[LightState, string\]\[\] = \[([\s\S]*?)\];/.exec(page);
+  if (!legend) {
+    problems.push('the legend in Releases.tsx has moved — this check now reads nothing');
+  } else {
+    // `unknown` is "still loading" and is never a resting state, so
+    // it is the one a legend has no business naming.
+    for (const state of ['ok', 'broken', 'missing', 'unused']) {
+      checked += 1;
+      if (!legend[1].includes(`'${state}'`)) {
+        problems.push(`the legend does not explain the '${state}' dot`);
+      }
+    }
   }
 }
 

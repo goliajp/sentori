@@ -15,8 +15,9 @@
 // Writes <out>/<route>.png plus <out>/report.json — console errors and
 // load time per route, so a screenshot that looks calm and a page that
 // threw are not the same finding.
-import { spawn } from 'node:child_process';
-import { writeFileSync, mkdirSync, mkdtempSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync, mkdtempSync } from 'node:fs';
+
+import { launchChrome, pageWebSocketUrl } from '../../scripts/lib/headless-chrome.mjs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -56,14 +57,54 @@ if (!session) {
 const cookie = `${session[1]}=${session[2]}`;
 const issues = await (await fetch(`${BASE}/admin/api/issues`, { headers: { cookie } }))
   .json().catch(() => null);
-const iid = (issues?.issues ?? (Array.isArray(issues) ? issues : []))[0]?.id;
+const candidates = issues?.issues ?? (Array.isArray(issues) ? issues : []);
+
+// Not simply the newest. The issue page's main panel is the stack, and
+// the newest issue is usually a probe or a validation fixture with an
+// empty one — so this walked past the screen people came for and
+// photographed three empty cards instead. Two review rounds read that
+// as "the product cannot show a stack" when the product could and the
+// *picture* could not.
+//
+// So: find an issue whose latest event actually carries frames, and
+// fail loudly rather than settle for one that does not.
+let iid = null;
+let best = 0;
+for (const candidate of candidates) {
+  const occurrences = await (await fetch(
+    `${BASE}/admin/api/issues/${candidate.id}/events`,
+    { headers: { cookie } },
+  )).json().catch(() => null);
+  const eventId = (occurrences?.events ?? [])[0]?.id;
+  if (!eventId) continue;
+  const event = await (await fetch(`${BASE}/admin/api/events/${eventId}`, {
+    headers: { cookie },
+  })).json().catch(() => null);
+  // Ranked by *readable* frames, not by frames. A stack of
+  // `p.q.r.a ?:100` renders the panel and proves nothing — it is an
+  // unsymbolicated twin of an issue that does resolve, and landing on
+  // it photographs the product failing at the one thing it is for.
+  // Two review rounds concluded "this product cannot show a stack"
+  // from shots like that, while an issue resolving to
+  // `src/cart/total.ts:48` sat in the same list.
+  const frames = event?.payload?.error?.stack ?? [];
+  const readable = frames.filter(
+    (f) => f && f.file && f.file !== '?' && f.file !== '<unknown>' && f.line,
+  ).length;
+  if (readable > best) {
+    best = readable;
+    iid = candidate.id;
+  }
+}
 if (!iid) {
-  // The issue page is the product. Walking past it quietly would leave
-  // a report that looks complete and covers everything except the
-  // screen people came for.
-  process.stderr.write(`no issue found at ${BASE}/admin/api/issues — the ` +
-    `walkthrough would skip the main screen, so it stops here. Seed one ` +
-    `first (smoke.sh does).\n`);
+  // The issue page is the product, and a shot of its empty state is
+  // not a shot of it.
+  process.stderr.write(
+    `no issue at ${BASE}/admin/api/issues has an event whose stack resolves to ` +
+      `a file and a line, so the one screen this walkthrough exists for would be ` +
+      `photographed showing the product failing at its own job. Seed one first ` +
+      `(smoke.sh does).\n`,
+  );
   process.exit(1);
 }
 
@@ -77,30 +118,28 @@ const ROUTES = [
   'settings?tab=account', 'settings?tab=audit',
 ];
 
-const CHROME = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable',
-  '/usr/bin/chromium-browser', '/usr/bin/chromium'].find(p => existsSync(p));
-if (!CHROME) { process.stderr.write('no chrome found\n'); process.exit(1); }
-
 mkdirSync(out, { recursive: true });
-const chrome = spawn(CHROME, [
-  '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
-  '--remote-debugging-port=9556', `--lang=${lang}`, `--accept-lang=${lang}`,
-  `--window-size=${width},1000`, `--user-data-dir=/tmp/cd-walk-${lang}-${theme}`,
-  'about:blank',
-], { stdio: ['ignore', 'pipe', 'pipe'] });
 
-let list = null;
-for (let i = 0; i < 40 && !list; i++) {
-  try {
-    const j = await (await fetch('http://127.0.0.1:9556/json/list')).json();
-    if (j.some(t => t.type === 'page')) list = j;
-  } catch { /* not listening yet */ }
-  if (!list) await new Promise(r => setTimeout(r, 500));
+// The shared launcher, same as the render sweep and the web SDK's
+// live-ingest driver. This was a third copy — fixed port 9556, a
+// profile path keyed on language and theme, and no `--no-first-run`.
+// `check-single-chrome-launcher` found it the moment that check
+// existed.
+let chrome;
+let pageWs;
+try {
+  const started = await launchChrome({
+    extraArgs: [`--lang=${lang}`, `--accept-lang=${lang}`, `--window-size=${width},1000`],
+  });
+  chrome = started.chrome;
+  pageWs = await pageWebSocketUrl(started.wsUrl);
+} catch (e) {
+  process.stderr.write(`${e.message}\n`);
+  chrome?.kill();
+  process.exit(1);
 }
-if (!list) { process.stderr.write('chrome never opened a debugging port\n'); chrome.kill(); process.exit(1); }
 
-const sock = new WebSocket(list.find(t => t.type === 'page').webSocketDebuggerUrl);
+const sock = new WebSocket(pageWs);
 let id = 0;
 const pend = new Map();
 let logs = [];

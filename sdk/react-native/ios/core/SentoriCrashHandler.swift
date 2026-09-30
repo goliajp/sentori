@@ -54,6 +54,11 @@ import MachO
 
     // MARK: - Internals
 
+    /// Where a crash record waits for the next launch. Shared with
+    /// the signal handler, which writes into the same directory so
+    /// one drain delivers both kinds.
+    static func pendingDirectory() -> URL? { pendingDir() }
+
     private static func pendingDir() -> URL? {
         guard let docs = FileManager.default.urls(
             for: .documentDirectory, in: .userDomainMask).first else { return nil }
@@ -234,34 +239,12 @@ import MachO
                    let fbase = info.dli_fbase {
                     frame["addr"] = UInt64(addr)
                     frame["imageBase"] = UInt64(UInt(bitPattern: fbase))
-                    if let uuid = imageUuid(atBase: fbase) {
+                    if let uuid = SentoriImage.uuid(atBase: fbase) {
                         frame["imageUuid"] = uuid
                     }
                 }
             }
             return frame
         }
-    }
-
-    /// LC_UUID of the Mach-O image loaded at `base` — the identity a
-    /// dSYM slice is matched by. Walks the load commands off the
-    /// in-memory header; read-only, bounded, no allocation beyond
-    /// the hex string.
-    private static func imageUuid(atBase base: UnsafeRawPointer) -> String? {
-        let header = base.assumingMemoryBound(to: mach_header_64.self)
-        guard header.pointee.magic == MH_MAGIC_64 else { return nil }
-        var cursor = base.advanced(by: MemoryLayout<mach_header_64>.size)
-        for _ in 0..<header.pointee.ncmds {
-            let cmd = cursor.assumingMemoryBound(to: load_command.self)
-            if cmd.pointee.cmd == LC_UUID {
-                let uuidCmd = cursor.assumingMemoryBound(to: uuid_command.self)
-                let u = uuidCmd.pointee.uuid
-                let bytes = [u.0, u.1, u.2, u.3, u.4, u.5, u.6, u.7,
-                             u.8, u.9, u.10, u.11, u.12, u.13, u.14, u.15]
-                return bytes.map { String(format: "%02X", $0) }.joined()
-            }
-            cursor = cursor.advanced(by: Int(cmd.pointee.cmdsize))
-        }
-        return nil
     }
 }

@@ -197,6 +197,12 @@ jobs:
       - name: check for orphan modules
         run: bash scripts/check-orphan-modules.sh
 
+      # The same failure in TypeScript, which is quieter about it: an
+      # unreferenced module still typechecks, still lints, and is in
+      # no bundle. `session.ts` sat like that for two years.
+      - name: orphan TypeScript (written-but-never-bundled guard)
+        run: node scripts/check-orphan-ts.mjs
+
       # The SDK reference documented a v0.2-era `init()` for months:
       # an option that did not exist, six that did and were unlisted,
       # and a required field marked optional with a default pointing
@@ -315,7 +321,14 @@ jobs:
   static-checks:
     runs-on: ubuntu-latest
     steps:
+      # Tags, because `check-doc-versions.mjs` asks what a release
+      # actually published and the answer is a `swift/<version>` tag.
+      # The default checkout brings none, and the gate stops rather
+      # than guessing — which is how this was found.
       - uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          fetch-depth: 0
 
       - name: every surface is named by a workflow that runs on develop
         run: node scripts/check-surface-gates.mjs
@@ -362,6 +375,19 @@ jobs:
         run: node scripts/check-time-has-absolute.mjs
       - name: the RN native mirror matches sdk/native
         run: node scripts/sync-native-core.mjs --check
+      # App Review rejects a required-reason API with no declared
+      # reason, and the rejection lands on the host app's release.
+      - name: what an iOS consumer gets matches what the sources do
+        run: node scripts/check-ios-packaging.mjs
+      # The Swift and Kotlin install lines sat three minors behind the
+      # tree, so the page installed a build without crash delivery.
+      - name: the install lines install the version we ship
+        run: node scripts/check-doc-versions.mjs
+      # A documented upload with no --api-url defaults to GOLIA's own
+      # instance, so a self-hosted reader ships us their symbols and
+      # the command exits 0.
+      - name: CLI commands in the docs work when copied
+        run: node scripts/check-doc-commands.mjs
 
   e2e:
     needs: changes
@@ -371,6 +397,140 @@ jobs:
       - uses: actions/checkout@v4
       - name: smoke
         run: bash self-hosted/tests/e2e/smoke.sh
+
+  # The shared kernel against a real server.
+  #
+  # `sdk/core`'s transport is what the React Native SDK sends through
+  # and what the web and mini-program SDKs will be built on. Every unit
+  # test of it uses a fake `fetch`, and a fake agrees with whatever
+  # mistake the envelope is making. iOS and Android each got a
+  # live-ingest gate for that reason; the kernel they share had none.
+  #
+  # It drives the offline path too, which had never run against a real
+  # endpoint — the path that runs when the network is down, which is
+  # when nobody is watching.
+  core-live-ingest:
+    needs: changes
+    if: needs.changes.outputs.sdk == 'true' || needs.changes.outputs.server == 'true' || needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: bun install --frozen-lockfile
+      - name: kernel → real server → read the events back
+        run: bash scripts/core-live-ingest.sh
+
+  # The browser SDK, in a browser.
+  #
+  # Everything it does that matters runs against APIs Bun does not
+  # have: `addEventListener('error')`, `PerformanceObserver`,
+  # `localStorage`, `visibilitychange`. Unit tests of those would be
+  # tests of whatever stand-in was written for them.
+  #
+  # Its first run found that no browser could reach the ingest API at
+  # all — there was no CORS anywhere, so the preflight for a POST
+  # carrying `Authorization` was refused, and the browser reports that
+  # to the page's console rather than to the server. Nothing but a
+  # real browser could have found it.
+  web-live-ingest:
+    needs: changes
+    if: needs.changes.outputs.sdk == 'true' || needs.changes.outputs.server == 'true' || needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: bun install --frozen-lockfile
+      - name: a real page, a real Chrome, a real server
+        run: bash scripts/web-live-ingest.sh
+
+  # The mini-program SDK, through a `wx` shim.
+  #
+  # There is no WeChat runtime outside WeChat, so `request` is real
+  # HTTP, storage is a real store that throws over 1 MB the way the
+  # base library does, and the five `on*` hooks are called by hand.
+  # Everything above that is the code that ships.
+  #
+  # It runs with `globalThis.crypto` removed, because a mini program
+  # has no `crypto.subtle` — without that this would exercise the path
+  # that does not run on the target and leave the pure-JS SHA-256, the
+  # only reason identity works there, unchecked against a server.
+  #
+  # What it does not prove is written in the script: that the SDK runs
+  # inside WeChat's own engine, which needs a phone.
+  weapp-live-ingest:
+    needs: changes
+    if: needs.changes.outputs.sdk == 'true' || needs.changes.outputs.server == 'true' || needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: bun install --frozen-lockfile
+      - name: a wx shim, a real server
+        run: bash scripts/weapp-live-ingest.sh
+
+  # An issue alert reaches a team that has no mail server.
+  #
+  # Issue notifications were email-only and returned early with no
+  # SMTP, so a self-hosted instance without one got nothing and
+  # nothing said so. `WebhookTransport` sat in the notifier crate the
+  # whole time, with tests and a doc comment teaching people to use
+  # it, and the server never registered it.
+  #
+  # The receiver is a separate process on its own port, because the
+  # question is whether the transport is *reached* — a mock inside the
+  # server cannot answer that. It runs without SMTP on purpose: that
+  # is the configuration this channel exists for, and the one where an
+  # email-shaped test passes while the product sends nothing.
+  webhook-alert:
+    needs: changes
+    if: needs.changes.outputs.server == 'true' || needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: a new issue knocks on the team's webhook
+        run: bash scripts/webhook-alert-e2e.sh
+
+  # The migrations, against a database that already has rows.
+  #
+  # Every test of the schema started from an empty database, so every
+  # migration was only ever asked what it does to nothing — and most of
+  # the interesting ones are about existing rows. Migration 18 rewrote
+  # `event_attachments.source` from `js` to `javascript` before
+  # dropping the constraint that still said `js`. On an empty database
+  # the UPDATE matches no rows, writes nothing and checks nothing, so
+  # it passed here and in preflight and failed on the production deploy
+  # of 4.0.0 — the only database that had rows.
+  #
+  # Two halves: the migrations up to the last release, a load of rows in
+  # the shapes that were legal at that point, then the rest. The second
+  # half is what is under test.
+  migrations-with-data:
+    needs: changes
+    if: needs.changes.outputs.server == 'true' || needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: migrations over existing rows
+        run: bash scripts/migrate-with-data-e2e.sh
 
   sdk:
     needs: changes
@@ -388,6 +548,8 @@ jobs:
           - sdk/react-native
           - sdk/expo
           - sdk/cli
+          - sdk/web
+          - sdk/weapp
 
     steps:
       - uses: actions/checkout@v4
@@ -451,6 +613,14 @@ jobs:
       # vectors did not.
       - name: identity vectors match the source of truth
         run: node scripts/gen-identity-vectors.mjs --check
+
+      # Same shape, for what a replay is: when a keyframe is due, what
+      # counts as a change, when a delta is a near-rewrite. Three
+      # implementations that disagree play back a screen the user
+      # never saw, and the player renders a wrong frame without
+      # complaint.
+      - name: replay vectors match the source of truth
+        run: node scripts/gen-replay-vectors.mjs --check
 
       - name: public options are read by the code
         run: node scripts/check-dead-options.mjs

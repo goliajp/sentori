@@ -44,6 +44,27 @@ public final class Sentori: NSObject {
         ])
         SentoriCrashHandler.register()
 
+        // The crashes an NSException handler never sees: a
+        // force-unwrapped nil, an index out of range, a fatalError.
+        // Chained onto whatever the host already installed, never
+        // taking it.
+        if let dir = SentoriCrashHandler.pendingDirectory() {
+            SentoriSignalHandler.drain(
+                pendingDirectory: dir,
+                config: [
+                    "release": config.release,
+                    "environment": config.environment,
+                ]
+            )
+            SentoriSignalHandler.register(pendingDirectory: dir)
+        }
+
+        // Foreground / background / memory pressure into the signal
+        // ring, and a flush on the way out — an event queued in the
+        // last seconds before the app was swiped away used to leave
+        // with it.
+        SentoriLifecycle.register()
+
         // The crash that killed the last launch. Until now the
         // handler wrote files into a directory nothing emptied — a
         // crash reporter that captured crashes and never sent one.
@@ -87,7 +108,7 @@ public final class Sentori: NSObject {
         return emit(
             kind: "error",
             name: nil,
-            error: describe(err),
+            error: describe(err, stack: SentoriStack.capture(skip: 1)),
             data: data,
             withSignals: true
         )
@@ -98,10 +119,12 @@ public final class Sentori: NSObject {
     @objc public static func error(
         message: String, type: String = "Error", data: [String: Any]? = nil
     ) -> String {
+        var error: [String: Any] = ["type": type, "message": message]
+        error[SentoriStack.pendingKey] = SentoriStack.capture(skip: 1)
         return emit(
             kind: "error",
             name: nil,
-            error: ["type": type, "message": message],
+            error: error,
             data: data,
             withSignals: true
         )
@@ -199,7 +222,16 @@ public final class Sentori: NSObject {
     /// `NSError` carries a domain and code worth keeping; anything
     /// else gets its type name, which for a Swift enum error is the
     /// case as written.
-    private static func describe(_ err: Error) -> [String: Any] {
+    /// The addresses ride the event and are symbolicated on the
+    /// transport's worker, not here.
+    ///
+    /// Measured on a simulator, 2026-09-30: the walk is 0.004 ms and
+    /// resolving 40 frames is 0.9 ms on an idle machine — and 6.4 ms
+    /// with the rest of a test suite running beside it. The second
+    /// number is the one that decides this: a verb the host calls
+    /// from a tap handler cannot cost a third of a frame on a device
+    /// that is already busy, which is exactly when errors happen.
+    private static func describe(_ err: Error, stack: [NSNumber] = []) -> [String: Any] {
         let ns = err as NSError
         var out: [String: Any] = [
             "type": String(describing: type(of: err)),
@@ -208,6 +240,9 @@ public final class Sentori: NSObject {
         if ns.domain != "" {
             out["domain"] = ns.domain
             out["code"] = ns.code
+        }
+        if !stack.isEmpty {
+            out[SentoriStack.pendingKey] = stack
         }
         return out
     }

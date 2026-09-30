@@ -3,12 +3,52 @@
 Error, warning and push capture for iOS apps, with no React Native.
 
 ```swift
-.package(url: "https://github.com/goliajp/sentori-swift", from: "1.5.0")
+// Package.swift
+dependencies: [
+    .package(url: "https://github.com/goliajp/sentori-swift", from: "2.0.0")
+],
+targets: [
+    .target(name: "YourApp", dependencies: [
+        .product(name: "Sentori", package: "sentori-swift")
+    ])
+]
 ```
+
+In Xcode, the product to tick is **Sentori**. The module you import
+has the same name; a product and a module are separate things and are
+not always spelled alike.
+
+`from:` is a floor, not a pin: it takes the newest 2.x release. There
+is no CocoaPods listing — the podspec is in the repository and the pod
+is not on trunk, so SwiftPM is the only way in today.
 
 iOS 14+. Apache-2.0 OR MIT.
 
 ## Start
+
+You need two values first, and neither comes from this page: a
+**token** (`st_…`, ingest scope) and the **ingest URL** of an instance
+you run. There is no hosted signup — see
+[getting started](./getting-started.md) for where both come from, and
+[self-hosting](./self-hosting.md) for standing an instance up.
+
+`start` has to run before anything the app does. In a SwiftUI app that
+is the `App`'s initialiser; with an app delegate it is
+`didFinishLaunchingWithOptions`. A top-level call in a source file is
+not a place Swift will run it:
+
+```swift
+import Sentori
+import SwiftUI
+
+@main
+struct YourApp: App {
+    init() {
+        Sentori.start(/* the config below */)
+    }
+    var body: some Scene { WindowGroup { ContentView() } }
+}
+```
 
 ```swift
 import Sentori
@@ -16,12 +56,14 @@ import Sentori
 Sentori.start(
     SentoriConfig(
         token: "st_…",                       // Settings ▸ Tokens, ingest scope
-        ingestUrl: "https://sentori.golia.jp",
+        ingestUrl: "https://sentori.example.com",   // YOUR instance
         release: "com.example.app@1.5.0+220",
         environment: "production"
     )
 )
-Sentori.user(id: currentUser.id, email: nil, traits: ["plan": "pro"])
+// Optional, and separate: without it a device receives broadcasts
+// and cannot be reached from an issue.
+Sentori.user(id: "the id your app already has", email: nil, traits: ["plan": "pro"])
 ```
 
 Nothing here reaches the network — the first request happens when
@@ -147,6 +189,128 @@ Your app still needs the `aps-environment` entitlement and the
 `remote-notification` background mode; the SDK does not add
 capabilities to your target.
 
+## Making a crash readable
+
+A native stack arrives as addresses. The server turns them into file
+and line names using the dSYM your build produced, matched by the
+`release` string and the binary's UUID — so a crash is readable only
+if the dSYM for that exact build was uploaded.
+
+These commands need four values, and this page used to print them as
+bare `$NAME` without saying where any of them came from:
+
+```bash
+ARCHIVE=build/YourApp.xcarchive            # xcodebuild -archivePath
+VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
+  "$ARCHIVE/Products/Applications/YourApp.app/Info.plist")
+BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' \
+  "$ARCHIVE/Products/Applications/YourApp.app/Info.plist")
+
+export SENTORI_API_URL=https://sentori.example.com   # YOUR instance
+export SENTORI_TOKEN=st_…                            # api scope
+```
+
+`--api-url` is not optional in a self-hosted world. Without it the CLI
+defaults to `https://sentori.golia.jp`, which is GOLIA's own instance
+— so the upload leaves your build machine, goes somewhere that is not
+yours, and exits 0.
+
+`$SENTORI_TOKEN` is the name the CLI reads, and `$SENTORI_ADMIN_TOKEN`
+also works. No other spelling does: the CLI answers `--token is
+required` for any of them, with the value sitting in the
+environment.
+
+Right after archiving, in CI:
+
+```bash
+npx @goliapkg/sentori-cli@latest upload dsym \
+  --api-url "$SENTORI_API_URL" \
+  --release "com.example.app@$VERSION+$BUILD" \
+  --token "$SENTORI_TOKEN" \
+  "$ARCHIVE/dSYMs/YourApp.app.dSYM"
+```
+
+The `--release` here and the `release` you pass to `Sentori.start`
+must be the same string. They are matched literally; a build number
+in one and not the other is a release the server has never heard of.
+
+To see the failing line rather than only the function name, upload the
+sources too:
+
+```bash
+npx @goliapkg/sentori-cli@latest upload srcbundle \
+  --api-url "$SENTORI_API_URL" \
+  --release "com.example.app@$VERSION+$BUILD" \
+  --token "$SENTORI_TOKEN" Sources
+```
+
+An upload that fails exits 0 and prints the command to run by hand.
+It is not your build's job to fail because our server was
+unreachable, and a dSYM uploaded later is applied to crashes that
+already arrived. If you would rather know at build time, add
+`--strict`.
+
+The step worth failing on is the one that asks the server what
+actually landed:
+
+```bash
+npx @goliapkg/sentori-cli@latest artifacts check \
+  --api-url "$SENTORI_API_URL" \
+  --release "com.example.app@$VERSION+$BUILD" \
+  --token "$SENTORI_TOKEN" --expect dsym
+```
+
+That catches the case a local "we ran the upload" note cannot: the
+upload step that quietly stopped being called.
+
+### What is captured
+
+| Crash | Caught by |
+|---|---|
+| `NSException` | the uncaught-exception handler |
+| force-unwrapped nil, index out of range, overflow | the signal handler (`SIGTRAP`) |
+| `fatalError`, failed precondition, C `assert` | the signal handler (`SIGABRT`) |
+| bad pointer, stack overflow | the signal handler (`SIGSEGV`) |
+
+The signal handlers chain: whatever your app installed before calling
+`Sentori.start` is kept and called, and the signal is re-raised with
+the default disposition so the system still writes its own report. If
+you already use another crash reporter, both of you get the crash.
+
+A crash is written to disk as it happens and sent on the next launch —
+the process is dying, and a network request is not something it can
+finish.
+
+## Check it works
+
+Symbolication and push can wait. First make one crash appear.
+
+```swift
+// A temporary button, or anything you can reach twice.
+Button("crash") { fatalError("sentori smoke test") }
+```
+
+Then, and this is the step people skip:
+
+1. **Stop the debugger.** Xcode catches the signal first, so a crash
+   run under the debugger never reaches the handler. Run the app, stop
+   it in Xcode, launch it again from the device's home screen.
+2. Tap the button. The app dies — that is the point.
+3. **Launch the app a third time.** A crash is written to disk as the
+   process dies and sent on the next launch; a dying process cannot
+   finish a network request.
+4. Open your instance, go to Issues, and the crash is the top row.
+
+On a simulator, `localhost` works: the simulator shares the host's
+network, so `http://localhost:8080` reaches a server running on your
+Mac. An Android emulator is the one that needs `10.0.2.2` — see the
+Kotlin page.
+
+Nothing arrived? The verbs are no-ops before `start` runs, and they
+still return an id, so a `start` that never executed looks exactly
+like a quiet app. `SentoriConfig.isInitialised` answers that question
+directly — check it after `start` and before you look anywhere else.
+
 ## What it costs you
 
 The contract this SDK is written against is that adopting it is free:
@@ -187,6 +351,15 @@ with a screenshot of the last frame and the view tree behind it. The
 next `Sentori.start` sends the crash, and once the server has taken
 it, uploads the two blobs against it — in that order, because an
 attachment keyed on an event the server has not seen is a 404.
+
+**The view tree is a UIKit view tree.** It records a `UILabel`, a
+`UITextView`, a `UIImageView` and anything with a background colour.
+SwiftUI draws into layers instead of creating a view per view, so a
+screen built entirely in SwiftUI yields almost nothing — measured on
+a simulator: six nodes for a screen with UIKit views on it, one for
+the same screen in pure SwiftUI. The screenshot is unaffected and is
+the useful artefact there. If your app is SwiftUI, treat the
+wireframe as empty until this says otherwise.
 
 Nothing here needs configuring. The hang watchdog, thread sampler and
 mobile vitals are compiled in and driven by the React Native SDK

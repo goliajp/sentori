@@ -22,7 +22,7 @@ import {
 } from './push.js'
 import { reactNativeUpload } from './react-native.js'
 import { fetchArtifacts } from './artifacts.js'
-import { uploadArtifact } from './upload.js'
+import { expandSourcemapPaths, uploadArtifact } from './upload.js'
 
 const HELP = `sentori-cli — Sentori command-line interface
 
@@ -204,11 +204,21 @@ async function cmdUploadSourcemap(argv: string[]): Promise<number> {
     return 2
   }
   try {
-    for (const p of parsed.positionals) {
-      await uploadArtifact({ ...c, kind: 'sourcemap', path: p })
+    // A directory expands to the maps under it, each keeping its path
+    // relative to that directory. Passing one used to throw EISDIR
+    // while the docs told people to pass `./dist`.
+    const targets = parsed.positionals.flatMap((p) => expandSourcemapPaths(p))
+    if (targets.length === 0) {
+      console.error(
+        `error: no .map files under ${parsed.positionals.join(', ')}`,
+      )
+      return 2
+    }
+    for (const t of targets) {
+      await uploadArtifact({ ...c, kind: 'sourcemap', path: t.path, name: t.name })
     }
     console.log(
-      `uploaded ${parsed.positionals.length} sourcemap(s) for "${c.release}" — minified stacks on this release now resolve to source.`,
+      `uploaded ${targets.length} sourcemap(s) for "${c.release}" — minified stacks on this release now resolve to source.`,
     )
     return 0
   } catch (e) {

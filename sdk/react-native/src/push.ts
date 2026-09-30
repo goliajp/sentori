@@ -23,7 +23,12 @@
 
 import { logger, pushSignal } from '@goliapkg/sentori-core'
 
-import { currentUserKey, currentUserTraits, onIdentityChange } from './scope.js'
+import {
+  currentUserKey,
+  currentUserTraits,
+  offIdentityChange,
+  onIdentityChange,
+} from './scope.js'
 
 // AppState is RN-only; we treat it dynamically so the SDK keeps
 // importing cleanly under Bun / web.
@@ -305,7 +310,7 @@ export async function unregister(): Promise<void> {
     }
   }
   nativePushUnregister()
-  onIdentityChange(undefined)
+  offIdentityChange(reRegisterAfterIdentityChange)
   _lastNativeToken = null
   _lastSentIdentity = null
   _cachedIpt = null
@@ -757,7 +762,7 @@ export function __resetForTests(): void {
   _lastNativeToken = null
   _lastOptions = {}
   _lastSentIdentity = null
-  onIdentityChange(undefined)
+  offIdentityChange(reRegisterAfterIdentityChange)
   teardownBufferDrain()
 }
 

@@ -17,6 +17,7 @@
  * one without sending — that lifecycle is owned by the platform's
  * foreground/background plumbing and dual-active never makes sense.
  */
+import type { Platform } from './types.js'
 import { uuidV7 } from './uuid.js'
 
 export type SessionStatus = 'crashed' | 'errored' | 'exited' | 'ok'
@@ -25,14 +26,27 @@ export type SessionPing = {
   durationMs: number
   environment: string
   id: string
+  /** Which runtime the session ran in, so a crash-free rate can be
+   *  read per platform rather than only per release. */
+  platform: Platform
   release: string
   startedAt: string
   status: SessionStatus
+  /** @deprecated Never populated by any shipped SDK, and a raw id has
+   *  no business on the wire. Kept so a server that reads it does not
+   *  break; `userKey` is the field. */
   userId: null | string
+  /** The same salted hash events carry as `userKey`, so the crash-free
+   *  user count and an issue's breadth are over one population. While
+   *  this was missing the two numbers were not comparable, and the
+   *  crash-free-users rate had no input at all: `userId` was hard-wired
+   *  to null at start and nothing ever filled it in. */
+  userKey?: null | string
 }
 
 export type SessionContext = {
   environment: string
+  platform: Platform
   release: string
   userId: null | string
 }
@@ -89,6 +103,7 @@ export class SessionTracker {
       durationMs,
       environment: this.active.ctx.environment,
       id: this.active.id,
+      platform: this.active.ctx.platform,
       release: this.active.ctx.release,
       startedAt,
       status,

@@ -12,7 +12,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { useShell } from '../App';
-import { Button, DataTable, ErrorBanner, Field, Input, PageShell, Panel, Select, TimeAgo, clsx } from '../components/ui';
+import { Button, DataTable, ErrorBanner, Field, Input, PageShell, Panel, Select, TimeAgo, clsx, formatAbsolute, formatRelative } from '../components/ui';
 import { useLocale, useSetLocale, useT } from '../i18n';
 import {
   api,
@@ -290,8 +290,22 @@ function UsersTab() {
             <div key={u.id} className="px-4 py-2 text-sm">
               <div className="flex items-center gap-3">
                 <span className="flex-1 text-fg">{u.email}</span>
-                <span className="w-24 text-xs text-fg-subtle">
-                  {u.role}
+                {/* The word the rest of the console uses, not the
+                    database's. The top bar has called this person
+                    "Owner" since there was a top bar while this column
+                    said `superadmin` — one role, two names, and the
+                    reader left to guess they are the same thing.
+                    The raw value stays in the title for whoever is
+                    reading a bug report against the API. */}
+                <span
+                  className="w-24 text-xs text-fg-subtle"
+                  title={`${u.role} — ${
+                    u.role === 'superadmin'
+                      ? t('settings.roleOwnerScope')
+                      : t('settings.roleAdminScope')
+                  }`}
+                >
+                  {u.role === 'superadmin' ? t('shell.roleOwner') : t('shell.roleAdmin')}
                 </span>
                 <span className="w-24 text-right text-xs tabular-nums text-fg-subtle">
                   {u.lastLoginAt ? <TimeAgo iso={u.lastLoginAt} /> : '—'}
@@ -366,10 +380,19 @@ function AuditTab() {
             {
               key: 'createdAt',
               label: t('settings.colWhen'),
-              width: '110px',
+              width: '190px',
+              // Absolute, with the zone. An audit row that reads "2
+              // minutes ago" cannot be lined up with a deploy, a
+              // support ticket or another system's log — which is the
+              // only thing an audit log is for. The relative form is
+              // still the title, for the "how long ago" read.
               render: (r) => (
-                <span className="text-xs tabular-nums text-fg-subtle">
-                  <TimeAgo iso={r.createdAt} />
+                <span
+                  className="text-xs tabular-nums text-fg-subtle"
+                  // bare-relative: inverted here, the absolute time is what is rendered
+                  title={formatRelative(r.createdAt)}
+                >
+                  {formatAbsolute(r.createdAt)}
                 </span>
               ),
             },
@@ -387,13 +410,29 @@ function AuditTab() {
               render: (r) => <span className="font-mono text-xs text-fg">{r.action}</span>,
             },
             {
+              // What was acted on, not just its id. The column showed
+              // eight characters of a uuid, so a row read "someone
+              // deleted 01a0ef95" — a project? a token? a person? The
+              // type is the half that makes an audit log auditable,
+              // and the server has been returning it all along.
+              //
+              // It is not the action's prefix either: `assignment.grant`
+              // acts on a `user`, so the two columns say different
+              // things.
               key: 'targetId',
               label: t('settings.colTarget'),
-              width: '120px',
-              align: 'right',
+              width: '220px',
               render: (r) => (
-                <span className="font-mono text-xs text-fg-subtle">
-                  {r.targetId?.slice(0, 8) ?? '—'}
+                <span className="flex items-baseline gap-1.5 text-xs">
+                  <span className="text-fg-muted">{r.targetType ?? '—'}</span>
+                  {r.targetId && (
+                    // The whole id in the title: eight characters
+                    // cannot be pasted into a query, and two objects
+                    // can share a prefix.
+                    <span className="font-mono text-fg-subtle" title={r.targetId}>
+                      {r.targetId.slice(0, 8)}
+                    </span>
+                  )}
                 </span>
               ),
             },
@@ -461,6 +500,82 @@ function AccountTab() {
         </div>
       </Panel>
     </div>
+  );
+}
+
+/**
+ * The second alert channel.
+ *
+ * Issue notifications were email-only, and `spawn_issue_notification`
+ * returned early with no SMTP — so a self-hosted instance without a
+ * mail server got no alerts at all and nothing said so. The transport
+ * had been in the notifier crate the whole time, with tests and a doc
+ * comment teaching people to use it, and the server never registered
+ * it.
+ *
+ * Per project because a webhook goes to a room. The list comes from
+ * the notification preferences, which already enumerate the projects
+ * this person can see.
+ */
+function WebhookPanel() {
+  const t = useT();
+  const { activeProject } = useShell();
+  const projectId = activeProject?.id ?? null;
+  const { data, reload } = useAsyncData(
+    () => (projectId ? api.getProject(projectId) : Promise.resolve(null)),
+    [projectId],
+  );
+  const [draft, setDraft] = useState<null | string>(null);
+  const [state, setState] = useState<'error' | 'idle' | 'saved' | 'saving'>('idle');
+
+  // `draft` is null until the field is touched, so a reload does not
+  // fight what is being typed.
+  const value = draft ?? data?.webhookUrl ?? '';
+
+  return (
+    <Panel title={t('notify.webhookTitle')}>
+      <div className="space-y-2 p-3.5">
+        <p className="text-xs text-fg-muted">{t('notify.webhookHint')}</p>
+        <div className="flex items-center gap-2">
+          <input
+            type="url"
+            value={value}
+            placeholder={t('notify.webhookPlaceholder')}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setState('idle');
+            }}
+            className="flex-1 rounded border border-border bg-bg px-2 py-1 font-mono text-xs text-fg"
+          />
+          <Button
+            size="sm"
+            disabled={!projectId || state === 'saving'}
+            onClick={() => {
+              if (!projectId) return;
+              setState('saving');
+              // The empty string is sent on purpose: it is how the
+              // channel is turned off, and a field that cannot be
+              // cleared is a channel that cannot be stopped.
+              api.updateProject(projectId, { webhookUrl: value.trim() }).then(
+                () => {
+                  setState('saved');
+                  setDraft(null);
+                  reload();
+                },
+                () => setState('error'),
+              );
+            }}
+          >
+            {t('notify.webhookSave')}
+          </Button>
+        </div>
+        {state === 'saved' && <p className="text-xs text-ok">{t('notify.webhookSaved')}</p>}
+        {state === 'error' && (
+          <p className="text-xs text-kind-error">{t('notify.webhookFailed')}</p>
+        )}
+        <p className="text-xs text-fg-subtle">{t('notify.webhookOwnerOnly')}</p>
+      </div>
+    </Panel>
   );
 }
 
@@ -554,6 +669,8 @@ function NotificationsTab() {
           )}
         </div>
       </Panel>
+
+      <WebhookPanel />
 
       <Panel title={t('notify.prefsTitle')}>
         {prefs.error && (

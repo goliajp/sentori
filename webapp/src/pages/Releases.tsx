@@ -12,7 +12,8 @@ import { ErrorBanner, PageShell, Panel, PanelEmpty, TimeAgo, formatBytes } from 
 import { useT } from '../i18n';
 import { api, type ReleaseRow } from '../lib/api';
 import { formatApiError, useAsyncData } from '../lib/useAsyncData';
-import { lightColour, lightState } from '../lib/release-lights';
+import { formatCrashFree } from '../lib/crash-free';
+import { lightColour, lightState, type LightState } from '../lib/release-lights';
 
 export default function ReleasesPage() {
   const t = useT();
@@ -27,6 +28,31 @@ export default function ReleasesPage() {
     () => (active ? api.listReleases(active) : Promise.resolve(null)),
     [active],
   );
+
+  // Health, per release, in one request for the page. The question
+  // this screen answers is "did this version ship healthy", and until
+  // now it answered only "can its stacks be read" — half of it.
+  //
+  // Thirty days, not the inbox's 24 hours: a release from three weeks
+  // ago still has a number worth seeing here, and a window that hid it
+  // would make the column empty for exactly the releases a reader
+  // comes here to compare.
+  const { data: health } = useAsyncData(
+    () => (active ? api.crashFree({ projectId: active, hours: 720 }) : Promise.resolve(null)),
+    [active],
+  );
+  // Per release name, collapsed across platforms: one row is one
+  // release, and an iOS number and an Android number on the same row
+  // would need two columns nobody asked for. Summed as counts and
+  // divided once — averaging two percentages weights a release with
+  // nine sessions the same as one with nine thousand.
+  const byRelease = new Map<string, { sessions: number; crashed: number }>();
+  for (const r of health?.releases ?? []) {
+    const cur = byRelease.get(r.release) ?? { sessions: 0, crashed: 0 };
+    cur.sessions += r.sessions ?? 0;
+    cur.crashed += r.crashedSessions ?? 0;
+    byRelease.set(r.release, cur);
+  }
 
   return (
     <PageShell title={t('nav.releases')}>
@@ -54,11 +80,13 @@ export default function ReleasesPage() {
           </PanelEmpty>
         ) : (
           <div className="divide-y divide-border/60">
+            <Legend />
             {data.releases.map((r) => (
               <ReleaseRowView
                 key={r.id}
                 release={r}
                 projectId={active ?? ''}
+                health={byRelease.get(r.name) ?? null}
                 onDeleted={reload}
               />
             ))}
@@ -73,10 +101,12 @@ export default function ReleasesPage() {
 function ReleaseRowView({
   release,
   projectId,
+  health,
   onDeleted,
 }: {
   release: ReleaseRow;
   projectId: string;
+  health: null | { sessions: number; crashed: number };
   onDeleted: () => void;
 }) {
   const t = useT();
@@ -149,6 +179,7 @@ function ReleaseRowView({
           on={data ? kinds.has('srcbundle') : undefined}
           warn={broken.has('srcbundle')}
           label="src" />
+        <CrashFreeCell health={health} />
         {created && (
           <span className="w-16 text-right text-xs tabular-nums text-fg-subtle">
             <TimeAgo iso={created} />
@@ -227,6 +258,77 @@ function ReleaseRowView({
  *  actually reports in the release: an absent artifact is red only
  *  then, and otherwise dims to furniture — three lights that go red
  *  regardless are noise, and noise buries the one that matters. */
+/**
+ * Crash-free, for one release.
+ *
+ * A dash when no sessions arrived, never a percentage. "Nobody ran
+ * this build" and "everyone who ran it was fine" are different facts,
+ * and a release with no sessions reading 100% is the more comfortable
+ * one — which is why it has to be the one this does not print.
+ */
+function CrashFreeCell({ health }: { health: null | { sessions: number; crashed: number } }) {
+  const t = useT();
+  if (!health || health.sessions === 0) {
+    return (
+      <span
+        className="w-20 text-right text-xs tabular-nums text-fg-subtle"
+        title={t('releases.crashFreeNone')}
+      >
+        —
+      </span>
+    );
+  }
+  const pct = ((health.sessions - health.crashed) / health.sessions) * 100;
+  const text = formatCrashFree(pct, health.sessions, health.crashed);
+  return (
+    <span
+      className={`w-20 text-right text-xs tabular-nums ${
+        health.crashed > 0 ? 'text-fg' : 'text-fg-muted'
+      }`}
+      title={t('releases.crashFreeTitle', { pct: text, sessions: String(health.sessions) })}
+    >
+      {text}%
+    </span>
+  );
+}
+
+/**
+ * What the four dots mean, once, above the list.
+ *
+ * They are the whole screen and they were four unlabelled colours: a
+ * reader had to hover each one to learn that amber is not a milder
+ * green. A legend costs one line and removes the guessing.
+ */
+function Legend() {
+  const t = useT();
+  const items: [LightState, string][] = [
+    ['ok', t('releases.legendOk')],
+    ['broken', t('releases.legendBroken')],
+    ['missing', t('releases.legendMissing')],
+    ['unused', t('releases.legendUnused')],
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border/60 px-3.5 py-2 text-xs text-fg-subtle">
+      <span className="text-fg-muted">{t('releases.legend')}</span>
+      {items.map(([state, label]) => (
+        <span key={state} className="flex items-center gap-1.5">
+          <span
+            className="h-2 w-2 shrink-0 rounded-full"
+            style={{ backgroundColor: lightColour(state) }}
+          />
+          {label}
+        </span>
+      ))}
+      {/* Names the column below it. A bare percentage between four
+          coloured dots and a date is a number with no noun. */}
+      <span className="ml-auto w-20 shrink-0 text-right text-fg-muted">
+        {t('releases.crashFree')}
+      </span>
+      <span className="w-16 shrink-0" aria-hidden />
+    </div>
+  );
+}
+
 function Light({
   on,
   label,

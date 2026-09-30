@@ -9,9 +9,12 @@
 //   sentori.probe(ref)    那个 bug 回来了吗?
 
 import {
+  applyBeforeSend,
+  buildWireEvent,
   coerceError,
-  parseStack,
+  platformOrFallback,
   pushSignal,
+  toSentoriError,
   safeFn,
   snapshotSignals,
   uuidV7,
@@ -19,6 +22,7 @@ import {
 import type {
   EventData,
   EventKind,
+  Platform,
   SentoriError,
   Surface,
   TraceOptions,
@@ -35,30 +39,7 @@ import { countAssert, enqueue } from './transport';
 
 declare const __DEV__: boolean | undefined;
 
-/** Serialize any Error instances found in the data argument — the
- *  error-in-data convention: a caught-but-noteworthy
- *  exception needs no special API. One level deep is enough; nested
- *  containers of errors are an anti-pattern we don't reward. */
-const serializeData = (data?: EventData): Record<string, unknown> | undefined => {
-  if (!data) return undefined;
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(data)) {
-    out[k] = v instanceof Error ? toSentoriError(v) : v;
-  }
-  return out;
-};
-
-const toSentoriError = (e: Error): SentoriError => ({
-  type: e.name || 'Error',
-  message: e.message,
-  stack: parseStack(e.stack),
-  cause:
-    e.cause instanceof Error
-      ? toSentoriError(e.cause)
-      : null,
-});
-
-const platformOf = (): 'android' | 'ios' | 'javascript' => {
+const detectPlatform = (): 'android' | 'ios' | 'javascript' => {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const RN = require('react-native') as { Platform?: { OS?: string } };
@@ -70,6 +51,11 @@ const platformOf = (): 'android' | 'ios' | 'javascript' => {
   }
   return 'javascript';
 };
+
+// The server gets the last word: one that refuses what we detect has
+// told us it predates this SDK, and the transport drops the session
+// to a value it does accept.
+export const platformOf = (): Platform => platformOrFallback(detectPlatform());
 
 type EmitOptions = {
   name?: string;
@@ -87,42 +73,30 @@ const emit = (kind: EventKind, opts: EmitOptions): string => {
   const config = getConfig();
   if (!config || !config.enabled) return id; // no-op before init — iron rule
 
-  const payload: WirePayload = {};
-  if (opts.error) payload.error = opts.error;
-  const data = serializeData(opts.data);
-  if (data) payload.data = data;
-  const ctx = currentContext();
-  if (ctx) payload.context = ctx;
-  if (opts.withSignals) {
-    const signals = snapshotSignals();
-    if (signals.length > 0) payload.signals = signals;
-  }
-  const device = collectDevice();
-  if (device) payload.device = device;
-
-  let event: WireEvent = {
+  // The shape goes through the kernel; what fills it is this
+  // runtime's business. Which kinds carry the signal ring stays a
+  // decision of the verb layer, so the snapshot is taken here and
+  // handed over rather than inferred there.
+  let event: WireEvent = buildWireEvent({
     id,
     kind,
-    occurredAt: new Date().toISOString(),
     platform: platformOf(),
     release: config.release,
     environment: config.environment,
     name: opts.name,
     surface: opts.surface,
     userKey: currentUserKey(),
-    payload,
-  };
+    error: opts.error,
+    data: opts.data,
+    context: currentContext(),
+    signals: opts.withSignals ? snapshotSignals() : undefined,
+    device: collectDevice() ?? undefined,
+  });
 
-  if (config.beforeSend) {
-    try {
-      const out = config.beforeSend(event);
-      if (out === null) return id; // deliberate drop
-      if (out && typeof out === 'object') event = out;
-    } catch {
-      // Hook broke: the un-mutated event ships. The host's bug must
-      // not cost them the crash report.
-    }
-  }
+  const kept = applyBeforeSend(event, config.beforeSend);
+  if (kept === null) return id; // the host dropped it deliberately
+  event = kept;
+  const payload = event.payload;
 
   // In dev there is no uploaded source map, so without local
   // symbolication errors land as `entry.bundle:721724`. Hold the
@@ -197,6 +171,40 @@ export const warnDetected = (
   data?: EventData,
 ): string =>
   emit('warn', { name: scenario, surface, data, withSignals: true });
+
+/**
+ * The SDK's own fault, filed where the host can see it.
+ *
+ * `reportInternal` has always existed and `setInternalReporter` has
+ * always been exported, and nothing ever called the setter — so every
+ * internal failure went to the console and stopped there. A crash
+ * reporter whose own faults are invisible is asking to be trusted on
+ * the word of the thing that broke.
+ *
+ * `warn`, not `error`: the host app did not fail, we did, and filing
+ * it as an error puts our bug at the top of their inbox looking like
+ * theirs. The name is fixed so one query finds all of them.
+ *
+ * No signal ring and no surface. The ring is context for the host's
+ * failure, and spending a screen lookup inside an already-failing path
+ * is how a fault handler becomes a second fault.
+ */
+export const internalFault = (report: {
+  api: string;
+  message: string;
+  errorName?: string;
+  stack?: string;
+}): void => {
+  emit('warn', {
+    name: 'sentori.internal',
+    data: {
+      api: report.api,
+      message: report.message,
+      ...(report.errorName ? { errorName: report.errorName } : {}),
+      ...(report.stack ? { stack: report.stack } : {}),
+    },
+  });
+};
 
 export const trace = safeFn(
   'trace',

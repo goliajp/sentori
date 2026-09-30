@@ -186,8 +186,13 @@ function ProjectCard({
         </span>
         <span>
           {/* `u` beside `err` and `warn` read as a truncated word rather
-              than an abbreviation — the card has the width for it. */}
-          <Num n={h?.users24h} /> <span className="text-fg-subtle">users</span>
+              than an abbreviation — the card has the width for it.
+              The title says which users: anyone who sent an event, not
+              only the ones who hit a problem. Three surfaces print a
+              user count and each counts a different population. */}
+          <span title={t('health.usersTitle')}>
+            <Num n={h?.users24h} /> <span className="text-fg-subtle">users</span>
+          </span>
         </span>
         {h && h.replay24h.eligible > 0 && (
           <span className="ml-auto text-fg-muted">

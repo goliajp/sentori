@@ -41,5 +41,30 @@ export type UploadVerdict = {
 };
 /** Say it once, at the only place every upload passes through. */
 export declare function warnIfUnusable(name: string, v: UploadVerdict): boolean;
+/**
+ * Turn one path into the source maps under it, each with the name the
+ * server should store.
+ *
+ * A file keeps its basename. A **directory** is walked, and every map
+ * under it keeps its path *relative to that directory* — so
+ * `dist/pages/cart/index.js.map` is stored as
+ * `pages/cart/index.js.map` and not as `index.js.map`.
+ *
+ * That difference is the whole feature. The server matches a frame to
+ * a map by how many trailing path segments they share, precisely
+ * because a WeChat mini program names every page's entry `index.js`
+ * and a web build names every route chunk after its route. Sending
+ * only the basename threw that away on the client, so the matching
+ * could never see more than a filename however carefully it was
+ * written.
+ *
+ * Passing a directory used to read the directory as a file and throw
+ * `EISDIR`, while `docs/getting-started/web.md` told readers to pass
+ * `./dist`.
+ */
+export declare function expandSourcemapPaths(path: string): {
+    path: string;
+    name: string;
+}[];
 export declare function uploadArtifact(opts: UploadOpts): Promise<UploadVerdict>;
 //# sourceMappingURL=upload.d.ts.map

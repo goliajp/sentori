@@ -36,10 +36,10 @@ export type LinkBy = {
  * Hash every entry in a LinkBy bag concurrently. Returns the
  * `linkHashes` record ready to attach to the User wire payload.
  *
- * Failures (e.g. crypto.subtle unavailable) propagate to the caller
- * so `setUser` can decide what to do (most paths swallow via safeFn
- * per the NEVER rule, ending up with no linkHashes — better than
- * sending raw).
+ * Failures propagate to the caller so `setUser` can decide what to do
+ * (most paths swallow via safeFn per the NEVER rule, ending up with no
+ * linkHashes — better than sending raw). A missing `crypto.subtle` is
+ * no longer one of them: there is a fallback now.
  */
 export declare function hashIdentities(linkBy: LinkBy): Promise<Record<string, string>>;
 //# sourceMappingURL=identity.d.ts.map

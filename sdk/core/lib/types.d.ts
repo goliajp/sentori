@@ -1,4 +1,5 @@
-export type Platform = 'android' | 'ios' | 'javascript';
+import type { SessionPing } from './session.js';
+export type Platform = 'android' | 'ios' | 'javascript' | 'weapp' | 'web';
 /** The five kinds. The union IS the concept model. */
 export type EventKind = 'assert' | 'error' | 'probe' | 'trace' | 'warn';
 /** One stack frame, symbolication-ready. */
@@ -124,6 +125,12 @@ export type BatchEnvelope = {
      *  queue, or a spill it could not write. A loss nobody counts is a
      *  loss nobody can see. */
     droppedEvents?: number;
+    /** Sessions that ended since the last envelope. The denominator:
+     *  without it "18 errors" is a number with nothing to divide by,
+     *  and the crash-free rate a mobile team is asked for first cannot
+     *  be computed at all. A server that predates this drops the field
+     *  as unknown, so an SDK that sends it still delivers its events. */
+    sessions?: SessionPing[];
 };
 /** Per-event server outcome. */
 export type IngestOutcome = {
@@ -183,6 +190,18 @@ export type InitConfig = {
         longFreeze?: boolean;
         slowColdStart?: boolean;
         slowApi?: boolean;
+        /** The UI thread's half of a freeze: Android's ANR watchdog and
+         *  iOS's hang watchdog, which `longFreeze` cannot see — it runs on
+         *  the JS thread, and by the time its tick fires the blocking work
+         *  on the other thread is over.
+         *
+         *  OFF by default. Both watchdogs exist natively and are reachable
+         *  over the bridge, but nothing in JS ever started them, so no
+         *  React Native app has had this. Turning it on by default would
+         *  start sampling a thread in every host app that upgrades, which
+         *  is a cost they did not ask for; `startAnrWatchdog()` is also
+         *  exported for a host that wants its own threshold. */
+        uiThreadHang?: boolean;
     };
     /** B-type replay rolling buffer, seconds. 0 disables. */
     replaySeconds?: number;

@@ -52,6 +52,12 @@ const MIRRORS = [
       'SentoriSignalRing.swift',
       'SentoriTransport.swift',
     ],
+    // Copied byte for byte, no banner: these are not source files and
+    // a `//` comment on top of a plist makes it unreadable. The pod
+    // needs its own copy of the privacy manifest because a pod cannot
+    // reach outside its directory, and a pod without one turns up as
+    // a rejection of the host app's submission.
+    verbatim: ['PrivacyInfo.xcprivacy'],
   },
   // Android mirrors into its own source root rather than beside
   // `SentoriModule.kt`: the sync owns its target directory outright
@@ -109,6 +115,24 @@ for (const m of MIRRORS) {
 
   for (const name of names) {
     const want = BANNER(`${m.from}/${name}`) + readFileSync(join(src, name), 'utf8');
+    const out = join(dst, name);
+    if (check) {
+      compared += 1;
+      const have = existsSync(out) ? readFileSync(out, 'utf8') : null;
+      if (have !== want) stale.push(`${m.to}/${name}`);
+    } else {
+      writeFileSync(out, want);
+      written += 1;
+    }
+  }
+
+  for (const name of m.verbatim ?? []) {
+    const from = join(src, name);
+    if (!existsSync(from)) {
+      console.error(`✗ ${m.from}/${name} does not exist — this list is stale.`);
+      process.exit(1);
+    }
+    const want = readFileSync(from, 'utf8');
     const out = join(dst, name);
     if (check) {
       compared += 1;

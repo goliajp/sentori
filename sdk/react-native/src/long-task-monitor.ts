@@ -10,8 +10,11 @@
 //
 // What it cannot do: capture the stack DURING the block — JS is
 // single-threaded; by the time our tick runs the busy code is gone.
-// The native watchdogs (HangWatchdog / AnrWatchdog) cover the
-// UI-thread side of the same scenario.
+// Nor can it see the UI thread: a frozen UI with a healthy JS thread
+// is invisible here. The native watchdogs (HangWatchdog / AnrWatchdog)
+// cover that side, and are opt-in via `detect.uiThreadHang` — this
+// comment used to say they covered it, full stop, while nothing in JS
+// had ever started them.
 
 import { pushSignal } from '@goliapkg/sentori-core';
 

@@ -3,7 +3,7 @@
 // every verb to a no-op with one console.warn, never a crash
 // (failure-isolation iron rule).
 
-import { safeFn, setLogLevel } from '@goliapkg/sentori-core';
+import { safeFn, setInternalReporter, setLogLevel } from '@goliapkg/sentori-core';
 import type { InitConfig } from '@goliapkg/sentori-core';
 
 import { setConfig } from './config';
@@ -14,9 +14,12 @@ import { installNetworkHandler } from './handlers/network';
 import { installPromiseHandler } from './handlers/promise';
 import { startLongTaskMonitor } from './long-task-monitor';
 import { checkColdStart } from './mobile-vitals';
+import { startAnrWatchdog } from './native';
 import { armLaunch } from './launch';
 import { markNativeJsBridgeReady, setNativeConfig } from './native';
 import { shipNativePending } from './native-pending';
+import { recoverSession, startSession } from './sessions';
+import { internalFault, platformOf } from './verbs';
 import { drainReplay, startReplay } from './replay';
 import {
   drainScreenReplay,
@@ -55,6 +58,7 @@ export const init = safeFn('init', (config: InitConfig): void => {
       longFreeze: config.detect?.longFreeze ?? true,
       slowColdStart: config.detect?.slowColdStart ?? true,
       slowApi: config.detect?.slowApi ?? false,
+      uiThreadHang: config.detect?.uiThreadHang ?? false,
     },
     replaySeconds: config.replaySeconds ?? 30,
     replayScreens: config.replayScreens ?? false,
@@ -62,6 +66,11 @@ export const init = safeFn('init', (config: InitConfig): void => {
     beforeSend: config.beforeSend,
   });
   setLogLevel(config.logLevel ?? 'warn');
+  // Core catches its own faults and hands them here. Until now the
+  // setter existed, was exported, and was called by nobody, so a
+  // failure inside a public verb reached the host's console and
+  // nothing else — including ours.
+  setInternalReporter(internalFault);
 
   // JS-side error capture + the signal-ring feeders.
   installGlobalHandler();
@@ -72,6 +81,12 @@ export const init = safeFn('init', (config: InitConfig): void => {
   // Warn-scenario detectors, the minimum set. rage_tap
   // rides the RageTapCapture component; the rest start here.
   if (config.detect?.longFreeze !== false) startLongTaskMonitor();
+  // The other thread. `longFreeze` above watches the JS thread; this
+  // is the UI thread, and the two see different freezes. Opt-in: the
+  // native watchdogs have been built and bridged on both platforms
+  // since v2.2 with nothing calling them, so switching them on by
+  // default would start sampling in every app that upgrades.
+  if (config.detect?.uiThreadHang === true) startAnrWatchdog();
 
   // B-type replay: a rolling in-memory wireframe ring; an error/warn
   // going out drains it into a replay attachment on that event.
@@ -127,7 +142,19 @@ export const init = safeFn('init', (config: InitConfig): void => {
   startTransport();
   checkColdStart(config.detect?.slowColdStart !== false);
   armLaunch();
-  void shipNativePending().catch(() => undefined);
+  // Sessions: close out whatever the last launch left open, then
+  // open this one. The order matters — the recovered session is
+  // `crashed` only when the native handler left a crash file, and
+  // that is what `shipNativePending` reports.
+  void shipNativePending()
+    .then((crashed) => recoverSession(crashed))
+    .catch(() => undefined);
+  startSession({
+    environment: config.environment ?? 'production',
+    platform: platformOf(),
+    release: config.release ?? '',
+    userId: null,
+  });
   void drainOfflineQueue();
 });
 

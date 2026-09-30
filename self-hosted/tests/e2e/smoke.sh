@@ -189,6 +189,247 @@ TOP="$(curl -fsS -b "$JAR" "${BASE}/admin/api/events/${STACK_ID}" \
 [[ "$TOP" == "src/cart/total.ts" ]] \
     || { echo "the top frame came back as '${TOP}'" >&2; exit 1; }
 
+echo "→ an issue two people hit outranks one that only one person hit"
+# The inbox has always ordered by `users_count DESC` — but every event
+# this suite sent was anonymous, so every count was 0 and the last
+# tiebreak (recency) decided the whole list. A reviewer read that as
+# "this product sorts by time, not by pain" and was reading the
+# fixture, not the product.
+#
+# Two people on one fingerprint, one person on another, and the
+# ordering has something to work with.
+for U in alice bob; do
+    curl -fsS -X POST "${BASE}/v1/events" -H "Authorization: Bearer ${TOKEN}" \
+        -H 'content-type: application/json' \
+        -d "{\"kind\":\"error\",\"occurredAt\":\"${SESSION_AT:-2026-08-10T06:00:00Z}\",
+ \"platform\":\"ios\",\"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",
+ \"userKey\":\"$(printf '%s' "$U" | shasum -a 256 2>/dev/null | cut -c1-32 || echo "${U}00000000000000000000000000")\",
+ \"payload\":{\"error\":{\"type\":\"PaymentDeclined\",\"message\":\"card refused at checkout\",
+   \"stack\":[{\"file\":\"src/pay/charge.ts\",\"function\":\"charge\",\"line\":91,\"column\":7,\"inApp\":true}]}}}" \
+        > /dev/null
+done
+curl -fsS -X POST "${BASE}/v1/events" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -d "{\"kind\":\"error\",\"occurredAt\":\"${SESSION_AT:-2026-08-10T06:00:00Z}\",
+ \"platform\":\"ios\",\"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",
+ \"userKey\":\"cccccccccccccccccccccccccccccccc\",
+ \"payload\":{\"error\":{\"type\":\"ReceiptMissing\",\"message\":\"no receipt for order\",
+   \"stack\":[{\"file\":\"src/pay/receipt.ts\",\"function\":\"fetchReceipt\",\"line\":12,\"column\":3,\"inApp\":true}]}}}" \
+    > /dev/null
+
+LIST="$(curl -fsS -b "$JAR" "${BASE}/admin/api/issues?projectId=${PROJECT_ID}")"
+TWO="$(echo "$LIST" | jq -r '[.issues[] | select(.title == "PaymentDeclined")][0].usersCount')"
+ONE="$(echo "$LIST" | jq -r '[.issues[] | select(.title == "ReceiptMissing")][0].usersCount')"
+[[ "$TWO" == "2" ]] \
+    || { echo "two people hit PaymentDeclined and usersCount reads ${TWO}" >&2; exit 1; }
+[[ "$ONE" == "1" ]] \
+    || { echo "one person hit ReceiptMissing and usersCount reads ${ONE}" >&2; exit 1; }
+# And the ordering uses it. Without this the count could be right and
+# the list still sorted by something else — and this check
+# discriminates by construction: ReceiptMissing is sent *after* the
+# two-user issue, so an inbox falling back to recency would put it
+# first and fail here.
+P_AT="$(echo "$LIST" | jq -r '[.issues[] | .title] | index("PaymentDeclined")')"
+R_AT="$(echo "$LIST" | jq -r '[.issues[] | .title] | index("ReceiptMissing")')"
+[[ -n "$P_AT" && -n "$R_AT" && "$P_AT" -lt "$R_AT" ]] \
+    || { echo "the 2-user issue is at ${P_AT} and the 1-user issue at ${R_AT} — " \
+              "the inbox is not ordering by how many people it hit" >&2; exit 1; }
+
+echo "→ sessions give the errors a denominator"
+# The product counted what went wrong and nothing counted what went
+# right, so "18 errors" had nothing to divide by and the first number
+# a mobile team is asked for could not be computed. Ten sessions, one
+# of them crashed, is 90% — and sending the batch twice must still be
+# 90%, because a resend after a lost response carries the same ids.
+# The same release the events use, not one invented here: a
+# crash-free card naming a release the rest of the dashboard has never
+# heard of reads as two pages disagreeing, and a reviewer stopped on
+# exactly that.
+#
+# Stamped near now, not at the fixture date the other events use: the
+# crash-free query is windowed, and a session two months old is
+# correctly outside it. The first version of this block used
+# 2026-08-10 and read back zero sessions — the assertion was right and
+# the fixture was wrong.
+SESSION_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+SESSIONS='['
+for i in 0 1 2 3 4 5 6 7 8 9; do
+    STATUS=exited
+    [ "$i" = "0" ] && STATUS=crashed
+    # One of them on the old field name. `userId` is what the wire
+    # carried before `userKey`, and the server still reads it as a
+    # fallback — an SDK nobody has upgraded must keep counting, so the
+    # fallback needs a case here rather than a comment saying it works.
+    FIELD=userKey
+    [ "$i" = "3" ] && FIELD=userId
+    [ "$i" = "0" ] || SESSIONS="${SESSIONS},"
+    SESSIONS="${SESSIONS}{\"id\":\"019fe900-0000-7000-8000-00000000cf0${i}\",
+      \"status\":\"${STATUS}\",\"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",
+      \"platform\":\"ios\",\"startedAt\":\"${SESSION_AT}\",
+      \"durationMs\":12000,\"${FIELD}\":\"u${i}\"}"
+done
+SESSIONS="${SESSIONS}]"
+
+for _ in 1 2; do
+    curl -fsS -X POST "${BASE}/v1/events:batch" -H "Authorization: Bearer ${TOKEN}" \
+        -H 'content-type: application/json' \
+        -d "{\"events\":[],\"sessions\":${SESSIONS}}" > /dev/null
+done
+
+CF="$(curl -fsS -b "$JAR" \
+    "${BASE}/admin/api/sessions/crash-free?projectId=${PROJECT_ID}&hours=720")"
+TOTAL="$(echo "$CF" | jq -r '.sessions')"
+# Compared inside jq, not as shell strings: the server answers a JSON
+# number and `jq -r` renders it `90.0`, which is not the string `90`.
+RATE_OK="$(echo "$CF" | jq -r '.crashFreeSessions == 90')"
+[[ "$TOTAL" == "10" ]] \
+    || { echo "sent 10 sessions twice and the server counted ${TOTAL} — a resend " \
+              "double-counted, which moves the rate in the flattering direction: $CF" >&2; exit 1; }
+[[ "$RATE_OK" == "true" ]] \
+    || { echo "crash-free rate is not 90: $CF" >&2; exit 1; }
+# Per release, because the question is never "are we healthy" but
+# "is Tuesday's build worse than Monday's".
+BYREL="$(echo "$CF" | jq -r '[.releases[] | select(.release == "e2e@1.0.0+1")] | length')"
+[[ "$BYREL" == "1" ]] \
+    || { echo "the release breakdown does not carry e2e@1.0.0+1: $CF" >&2; exit 1; }
+[[ "$(echo "$CF" | jq -r '.releases[] | select(.release=="e2e@1.0.0+1") | .crashFreeUsers == 90')" == "true" ]] \
+    || { echo "crash-free users is not 90: $CF" >&2; exit 1; }
+
+# The whole-window user count, which is not the sum of the per-release
+# ones: someone who ran two releases is one person. And it is a count
+# the console prints beside the session count, so it needs its own
+# denominator — a project can be 99% crash-free by session and have hit
+# a third of its users.
+[[ "$(echo "$CF" | jq -r '.users')" == "10" ]] \
+    || { echo "the window's user count is $(echo "$CF" | jq -r '.users'), want 10: $CF" >&2; exit 1; }
+[[ "$(echo "$CF" | jq -r '.crashedUsers')" == "1" ]] \
+    || { echo "crashed users is not 1: $CF" >&2; exit 1; }
+[[ "$(echo "$CF" | jq -r '.crashFreeUsers == 90')" == "true" ]] \
+    || { echo "the window's crash-free users is not 90: $CF" >&2; exit 1; }
+
+# The window's shape, not only its total. Dense buckets: a stretch with
+# no sessions comes back with a null rate rather than being left out,
+# because a line drawn through the remaining points runs straight across
+# it as though the rate had held.
+TREND_LEN="$(echo "$CF" | jq -r '.trend | length')"
+[[ "$TREND_LEN" -gt 1 ]] \
+    || { echo "the trend has ${TREND_LEN} bucket(s) over a 720h window: $CF" >&2; exit 1; }
+# Every session was stamped at the same moment, so exactly one bucket
+# carries them and the rest are empty — which is what proves the empty
+# ones are present at all.
+WITH_DATA="$(echo "$CF" | jq -r '[.trend[] | select(.sessions > 0)] | length')"
+EMPTY="$(echo "$CF" | jq -r '[.trend[] | select(.sessions == 0 and .crashFreeSessions == null)] | length')"
+[[ "$WITH_DATA" == "1" ]] \
+    || { echo "${WITH_DATA} buckets carry sessions, want 1 — the bucketing does not match the fixture" >&2; exit 1; }
+[[ "$EMPTY" -gt 0 ]] \
+    || { echo "no empty bucket came back, so a quiet stretch is indistinguishable from a healthy one" >&2; exit 1; }
+[[ "$(echo "$CF" | jq -r '[.trend[] | select(.sessions > 0)][0].crashFreeSessions == 90')" == "true" ]] \
+    || { echo "the populated bucket does not read 90: $CF" >&2; exit 1; }
+
+echo "→ a session and an event about the same person count that person once"
+# The two user numbers the console prints — an issue's breadth and the
+# crash-free user rate — are counted over the same `user_key` column in
+# two different tables. They were not the same identity space: the event
+# path carries the SDK's salted hash as `userKey`, and the session path
+# bound a raw `userId` straight into a column named `user_key`, which no
+# shipped SDK ever populated. So the crash-free user rate had no input
+# at all, and once it did the same person would have been two keys.
+SHARED_KEY="e2e-shared-person"
+SHARED="$(curl -fsS -X POST "${BASE}/v1/events:batch" -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -d "{\"events\":[{\"kind\":\"error\",\"occurredAt\":\"${SESSION_AT}\",
+ \"platform\":\"ios\",\"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",
+ \"userKey\":\"${SHARED_KEY}\",
+ \"payload\":{\"error\":{\"type\":\"SharedPersonError\",\"message\":\"one person\",\"stack\":[]}}}],
+ \"sessions\":[{\"id\":\"019fe900-0000-7000-8000-00000000cf10\",\"status\":\"crashed\",
+ \"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",\"platform\":\"ios\",
+ \"startedAt\":\"${SESSION_AT}\",\"durationMs\":900,
+ \"userKey\":\"${SHARED_KEY}\"}]}")"
+[[ "$(echo "$SHARED" | jq -r '.accepted')" == "1" ]] \
+    || { echo "the shared-person batch was not accepted: $SHARED" >&2; exit 1; }
+
+# The issue counts them as one person...
+SHARED_ISSUE_USERS="$(curl -fsS -b "$JAR" "${BASE}/admin/api/issues?projectId=${PROJECT_ID}" \
+    | jq -r '.issues[] | select((.title // "") | test("SharedPersonError")) | .usersCount')"
+[[ "$SHARED_ISSUE_USERS" == "1" ]] \
+    || { echo "the issue counts '${SHARED_ISSUE_USERS}' users for one person; issues are:" >&2
+         curl -fsS -b "$JAR" "${BASE}/admin/api/issues?projectId=${PROJECT_ID}" \
+             | jq -r '.issues[] | "\(.kind) \(.title) users=\(.usersCount)"' >&2
+         exit 1; }
+
+# ...and so does the session side, which means the two numbers are over
+# one population and a reader can compare them.
+CF2="$(curl -fsS -b "$JAR" \
+    "${BASE}/admin/api/sessions/crash-free?projectId=${PROJECT_ID}&hours=720")"
+[[ "$(echo "$CF2" | jq -r '.users')" == "11" ]] \
+    || { echo "adding one person moved the user count to $(echo "$CF2" | jq -r '.users'), want 11 — " \
+              "the session and event paths are not counting the same identity: $CF2" >&2; exit 1; }
+[[ "$(echo "$CF2" | jq --arg k "$SHARED_KEY" -r '.crashedUsers')" == "2" ]] \
+    || { echo "crashed users is $(echo "$CF2" | jq -r '.crashedUsers'), want 2: $CF2" >&2; exit 1; }
+
+echo "→ a gzipped batch is accepted, so an SDK can start compressing"
+# The server has to take gzip before any client sends it. The other
+# order means the first SDK that compresses meets a fleet of servers
+# answering 400, with the events lost and nothing on our side saying
+# so — the same shape as the platform-vocabulary problem below.
+GZ_ID="019fe900-0000-7000-8000-00000000009f"
+GZ_BODY="{\"events\":[{\"id\":\"${GZ_ID}\",\"kind\":\"error\",
+ \"occurredAt\":\"${SESSION_AT}\",\"platform\":\"web\",
+ \"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",
+ \"payload\":{\"error\":{\"type\":\"GzippedError\",\"message\":\"arrived compressed\",\"stack\":[]}}}]}"
+GZ_FILE="$(mktemp)"
+printf '%s' "$GZ_BODY" | gzip -9 > "$GZ_FILE"
+GZ_RESP="$(curl -fsS -X POST "${BASE}/v1/events:batch" \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -H 'content-encoding: gzip' \
+    --data-binary "@${GZ_FILE}")"
+rm -f "$GZ_FILE"
+[[ "$(echo "$GZ_RESP" | jq -r '.accepted')" == "1" ]] \
+    || { echo "a gzipped batch was not accepted: $GZ_RESP" >&2; exit 1; }
+[[ "$(curl -fsS -b "$JAR" "${BASE}/admin/api/events/${GZ_ID}" | jq -r '.payload.error.type')" == "GzippedError" ]] \
+    || { echo "the gzipped batch was accepted but its event is not readable back" >&2; exit 1; }
+
+echo "→ a platform this build does not know is kept, not refused"
+# An SDK newer than its server used to lose every event it sent: ingest
+# answered 400, and from the batch endpoint the refusal arrives inside
+# a 200 where no client looks. The event is now stored under `unknown`
+# and a counter says it happened — the stored value is fixed on purpose,
+# because platform is part of the fingerprint and an arbitrary string
+# would split one case per typo.
+BEFORE="$(curl -fsS "${BASE}/metrics" | awk '/^sentori_ingest_unknown_platform_total /{print $2}')"
+[[ -n "$BEFORE" ]] \
+    || { echo "/metrics does not carry sentori_ingest_unknown_platform_total" >&2; exit 1; }
+FUTURE_ID="019fe900-0000-7000-8000-0000000e2e10"
+STATUS="$(curl -s -o /tmp/e2e-future.$$ -w '%{http_code}' -X POST "${BASE}/v1/events" \
+    -H "Authorization: Bearer ${TOKEN}" -H 'content-type: application/json' \
+    -d "{\"id\":\"${FUTURE_ID}\",\"kind\":\"error\",
+ \"occurredAt\":\"2026-08-10T06:02:00Z\",\"platform\":\"harmonyos\",
+ \"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",
+ \"payload\":{\"error\":{\"type\":\"Error\",\"message\":\"from a runtime we predate\",\"stack\":[]}}}")"
+FUTURE="$(cat /tmp/e2e-future.$$)"; rm -f /tmp/e2e-future.$$
+[[ "$STATUS" == "202" ]] \
+    || { echo "an unknown platform returned ${STATUS}, want 202: $FUTURE" >&2; exit 1; }
+STORED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/events/${FUTURE_ID}" | jq -r '.platform')"
+[[ "$STORED" == "unknown" ]] \
+    || { echo "stored platform is '${STORED}', want 'unknown'" >&2; exit 1; }
+AFTER="$(curl -fsS "${BASE}/metrics" | awk '/^sentori_ingest_unknown_platform_total /{print $2}')"
+[[ "$AFTER" -gt "$BEFORE" ]] \
+    || { echo "the counter did not move: ${BEFORE} → ${AFTER}" >&2; exit 1; }
+
+echo "→ the two runtimes v4 adds are accepted as themselves"
+for PLAT in web weapp; do
+    RESP="$(curl -fsS -X POST "${BASE}/v1/events" -H "Authorization: Bearer ${TOKEN}" \
+        -H 'content-type: application/json' \
+        -d "{\"kind\":\"error\",\"occurredAt\":\"2026-08-10T06:03:00Z\",
+ \"platform\":\"${PLAT}\",\"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",
+ \"payload\":{\"error\":{\"type\":\"Error\",\"message\":\"${PLAT}\",\"stack\":[]}}}")"
+    EID="$(echo "$RESP" | jq -r '.eventId // .id')"
+    STORED="$(curl -fsS -b "$JAR" "${BASE}/admin/api/events/${EID}" | jq -r '.platform')"
+    [[ "$STORED" == "$PLAT" ]] \
+        || { echo "${PLAT} was stored as '${STORED}' — the CHECK or the allowlist is behind" >&2; exit 1; }
+done
+
 echo "→ resend the same id (lost-response case)"
 STATUS="$(curl -s -o /tmp/e2e-resend.$$ -w '%{http_code}' -X POST "${BASE}/v1/events" \
     -H "Authorization: Bearer ${TOKEN}" -H 'content-type: application/json' \
@@ -1124,19 +1365,24 @@ ACCEPTED="$(ingest_counter accepted)"
 [[ "$ACCEPTED" -gt 0 ]] \
     || { echo "accepted reads 0 after a suite that ingested many events" >&2; exit 1; }
 
-# A rejection has to be visible as a rejection. `platform` is validated
-# in the handler, so this reaches the counter — unlike a body that
-# fails to deserialise, which axum answers 422 before any handler runs
-# and which these counters deliberately cannot see.
+# A rejection has to be visible as a rejection. A `warn` with no name
+# is refused in the handler, so this reaches the counter — unlike a
+# body that fails to deserialise, which axum answers 422 before any
+# handler runs and which these counters deliberately cannot see.
+#
+# This used to send an unknown `platform`, which is no longer a
+# rejection: an SDK ahead of its server would have lost every event,
+# so the value is stored as `unknown` instead and counted separately.
+# That case is asserted where it now belongs, further up.
 REJECTED_BEFORE="$(ingest_counter rejected)"
 REJ_STATUS="$(curl -s -o /dev/null -w '%{http_code}' -X POST "${BASE}/v1/events" \
     -H "Authorization: Bearer ${TOKEN}" -H 'content-type: application/json' \
-    -d '{"id":"019fe900-0000-7000-8000-0000000e2e99","kind":"error",
-         "occurredAt":"2026-08-10T06:00:00Z","platform":"commodore-64",
+    -d '{"id":"019fe900-0000-7000-8000-0000000e2e99","kind":"warn",
+         "occurredAt":"2026-08-10T06:00:00Z","platform":"ios",
          "release":"e2e@1.0.0+1","environment":"test",
-         "payload":{"error":{"type":"E","message":"m","stack":[]}}}')"
+         "payload":{}}')"
 [[ "$REJ_STATUS" == "400" ]] \
-    || { echo "an invalid platform returned ${REJ_STATUS}, want 400" >&2; exit 1; }
+    || { echo "a warn with no name returned ${REJ_STATUS}, want 400" >&2; exit 1; }
 REJECTED_AFTER="$(ingest_counter rejected)"
 [[ "$REJECTED_AFTER" -gt "$REJECTED_BEFORE" ]] \
     || { echo "a 400 did not move rejected (${REJECTED_BEFORE} -> ${REJECTED_AFTER})" >&2; exit 1; }

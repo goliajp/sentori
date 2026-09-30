@@ -35,11 +35,24 @@ which carries enough to send a first event without following any link.
 
 ## SDK reference
 
-The current API surface ships with the package and is what npm shows:
-[`sdk/react-native/README.md`](../sdk/react-native/README.md).
+Five SDKs, one wire format, one set of five verbs. Each page is the
+API surface that ships with its package:
 
-There is one SDK guide because there is one SDK. Sentori watches
-mobile apps.
+- [`sdk-swift.md`](sdk-swift.md) — native iOS and tvOS, no React
+  Native.
+- [`sdk-kotlin.md`](sdk-kotlin.md) — native Android, no React Native.
+- [`../sdk/react-native/README.md`](../sdk/react-native/README.md) —
+  React Native and Expo.
+- [`../sdk/web/README.md`](../sdk/web/README.md) — the browser, any
+  framework or none.
+- [`../sdk/weapp/README.md`](../sdk/weapp/README.md) — WeChat mini
+  programs. Needs an instance on a domain with an ICP filing; the
+  platform will not call anything else.
+
+This said "there is one SDK guide because there is one SDK" until
+2026-09-30, while two native guides sat in this directory with nothing
+anywhere linking to them. A native team read the front page and
+concluded the product did not support them.
 
 ## Self-hosting
 

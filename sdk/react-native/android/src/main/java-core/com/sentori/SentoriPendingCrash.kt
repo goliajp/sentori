@@ -103,6 +103,14 @@ internal object SentoriPendingCrash {
                         ?.let { put("function", it) }
                     if (f.has("line")) put("line", f.optInt("line"))
                     if (f.has("inApp")) put("inApp", f.optBoolean("inApp"))
+                    // The fields the server symbolicates from. This
+                    // mapping listed four and dropped these, so a
+                    // native frame arrived with nothing to match a
+                    // mapping file against.
+                    if (f.has("addr")) put("addr", f.optLong("addr"))
+                    if (f.has("imageBase")) put("imageBase", f.optLong("imageBase"))
+                    f.optString("imageUuid", "").takeIf { it.isNotEmpty() }
+                        ?.let { put("imageUuid", it) }
                 }
             }
 

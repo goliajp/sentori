@@ -40,6 +40,7 @@ pub struct IngestCounters {
     failed: AtomicU64,
     rate_limited: AtomicU64,
     client_dropped: AtomicU64,
+    unknown_platform: AtomicU64,
 }
 
 impl IngestCounters {
@@ -81,6 +82,19 @@ impl IngestCounters {
         self.client_dropped.load(Ordering::Relaxed)
     }
 
+    /// An event named a platform this build does not know. It was
+    /// accepted and stored as `unknown`, so it appears in `accepted`
+    /// as well — this counter is the only way to tell that a fleet is
+    /// running an SDK newer than this server.
+    pub fn unknown_platform(&self) {
+        self.unknown_platform.fetch_add(1, Ordering::Relaxed);
+    }
+
+    #[must_use]
+    pub fn unknown_platform_total(&self) -> u64 {
+        self.unknown_platform.load(Ordering::Relaxed)
+    }
+
     /// `(status label, count)` for every outcome, always all four —
     /// a status that has not happened yet reads 0, which for a
     /// counter is a measurement, not an absence.
@@ -109,6 +123,19 @@ mod tests {
         // a scraper; a counter that has not counted yet is zero.
         let labels: Vec<_> = snap.iter().map(|(k, _)| *k).collect();
         assert_eq!(labels, ["accepted", "rejected", "failed", "rate_limited"]);
+    }
+
+    #[test]
+    fn an_unknown_platform_counts_separately_from_the_outcome() {
+        let c = IngestCounters::default();
+        c.unknown_platform();
+        c.accepted();
+        // The event was kept, so it is accepted as well. If the two
+        // ever shared a counter there would be no way to tell a fleet
+        // running ahead of this server from ordinary traffic.
+        assert_eq!(c.unknown_platform_total(), 1);
+        assert_eq!(c.snapshot()[0], ("accepted", 1));
+        assert_eq!(c.snapshot()[1], ("rejected", 0));
     }
 
     #[test]

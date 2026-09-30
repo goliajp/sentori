@@ -64,8 +64,16 @@ const KINDS: [&str; 7] = [
     "viewTree",
 ];
 
-/// `source` is CHECK-constrained too.
-const SOURCES: [&str; 3] = ["android", "ios", "js"];
+/// `source` is CHECK-constrained too, and is the same vocabulary the
+/// events table uses — it had been a third spelling of it (`js` where
+/// an event says `javascript`, and no room for the two runtimes v4
+/// adds). `js` stays acceptable on the wire because every SDK in the
+/// field posts it; it is rewritten before it reaches the column.
+const SOURCES: [&str; 6] = ["android", "ios", "javascript", "js", "weapp", "web"];
+
+/// The wire spelling every shipped SDK uses for the browser / JS
+/// runtime, and what it is stored as.
+const LEGACY_JS: (&str, &str) = ("js", "javascript");
 
 pub async fn handle(
     Extension(ctx): Extension<IngestContext>,
@@ -167,7 +175,7 @@ async fn accept(kind: &str, multipart: Multipart) -> Result<Parsed, (StatusCode,
             json!({ "error": "invalid_kind", "got": kind, "expected": KINDS }),
         ));
     }
-    let parsed = read_multipart(multipart).await.map_err(|detail| {
+    let mut parsed = read_multipart(multipart).await.map_err(|detail| {
         (
             StatusCode::BAD_REQUEST,
             json!({ "error": "invalid_multipart", "detail": detail }),
@@ -187,6 +195,9 @@ async fn accept(kind: &str, multipart: Multipart) -> Result<Parsed, (StatusCode,
             StatusCode::BAD_REQUEST,
             json!({ "error": "invalid_source", "got": parsed.source, "expected": SOURCES }),
         ));
+    }
+    if parsed.source == LEGACY_JS.0 {
+        parsed.source = LEGACY_JS.1.to_string();
     }
     Ok(parsed)
 }
