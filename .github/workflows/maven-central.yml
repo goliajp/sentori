@@ -56,6 +56,9 @@ jobs:
           CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
           SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          # Where the quota warning lands so somebody reads it: the
+          # run page, not the middle of a step's log.
+          SUMMARY_FILE: ${{ github.step_summary }}
         run: |
           if [ "${{ inputs.publish }}" = "true" ]; then
             bash scripts/publish-maven-central.sh --publish
