@@ -26,6 +26,7 @@ use crate::session_mw::session_middleware;
 use crate::state::AppState;
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::{self, CorsLayer};
+use tower_http::decompression::RequestDecompressionLayer;
 
 mod admin;
 mod api;
@@ -228,6 +229,22 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/v1/push/users/{user_key}/preferences/{category}",
             axum::routing::put(sdk::push::put_preference::handle),
         )
+        // Innermost, so it runs *after* the bearer check and the rate
+        // limiter: an unauthenticated request is refused before any of
+        // its bytes are inflated, which is what stops a decompression
+        // bomb from being free to send.
+        //
+        // What bounds the inflated size is axum's body limit, which is
+        // applied when a handler extracts the body — after this. So a
+        // 2 MB cap on `/v1/events:batch` is a cap on the decompressed
+        // bytes, not on the compressed ones, which is the direction
+        // that matters.
+        //
+        // Ingest does not compress its own requests yet. The server
+        // has to accept gzip before any SDK sends it, or the first
+        // client to try talks to a fleet of servers that answer 400 —
+        // so this lands first and on purpose.
+        .layer(RequestDecompressionLayer::new().gzip(true))
         // Order matters: the limiter runs *after* the bearer check, so
         // it has a token to key on and an unauthenticated flood is
         // rejected earlier and more cheaply.

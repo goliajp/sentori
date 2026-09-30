@@ -367,6 +367,29 @@ CF2="$(curl -fsS -b "$JAR" \
 [[ "$(echo "$CF2" | jq --arg k "$SHARED_KEY" -r '.crashedUsers')" == "2" ]] \
     || { echo "crashed users is $(echo "$CF2" | jq -r '.crashedUsers'), want 2: $CF2" >&2; exit 1; }
 
+echo "→ a gzipped batch is accepted, so an SDK can start compressing"
+# The server has to take gzip before any client sends it. The other
+# order means the first SDK that compresses meets a fleet of servers
+# answering 400, with the events lost and nothing on our side saying
+# so — the same shape as the platform-vocabulary problem below.
+GZ_ID="019fe900-0000-7000-8000-00000000009f"
+GZ_BODY="{\"events\":[{\"id\":\"${GZ_ID}\",\"kind\":\"error\",
+ \"occurredAt\":\"${SESSION_AT}\",\"platform\":\"web\",
+ \"release\":\"e2e@1.0.0+1\",\"environment\":\"test\",
+ \"payload\":{\"error\":{\"type\":\"GzippedError\",\"message\":\"arrived compressed\",\"stack\":[]}}}]}"
+GZ_FILE="$(mktemp)"
+printf '%s' "$GZ_BODY" | gzip -9 > "$GZ_FILE"
+GZ_RESP="$(curl -fsS -X POST "${BASE}/v1/events:batch" \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -H 'content-type: application/json' \
+    -H 'content-encoding: gzip' \
+    --data-binary "@${GZ_FILE}")"
+rm -f "$GZ_FILE"
+[[ "$(echo "$GZ_RESP" | jq -r '.accepted')" == "1" ]] \
+    || { echo "a gzipped batch was not accepted: $GZ_RESP" >&2; exit 1; }
+[[ "$(curl -fsS -b "$JAR" "${BASE}/admin/api/events/${GZ_ID}" | jq -r '.payload.error.type')" == "GzippedError" ]] \
+    || { echo "the gzipped batch was accepted but its event is not readable back" >&2; exit 1; }
+
 echo "→ a platform this build does not know is kept, not refused"
 # An SDK newer than its server used to lose every event it sent: ingest
 # answered 400, and from the batch endpoint the refusal arrives inside
