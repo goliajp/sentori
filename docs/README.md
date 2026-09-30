@@ -61,6 +61,15 @@ concluded the product did not support them.
 - [`teams.md`](teams.md) — accounts, roles, project assignment.
 - [`runbook/scaling.md`](runbook/scaling.md) — what to read before
   adding capacity, and what this topology does not do.
+- [`runbook/cli-auth.md`](runbook/cli-auth.md) — how the CLI
+  authenticates, and which token each command wants.
+
+## Wire formats
+
+- [`replay-encoding-v2.md`](replay-encoding-v2.md) — the replay
+  attachment format: keyframe plus deltas, one NDJSON line per frame.
+  Read this before writing anything that produces or consumes a
+  replay.
 
 ## Recipes
 

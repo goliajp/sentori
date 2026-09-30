@@ -120,6 +120,25 @@ for (const root of ROOTS) {
 
       findings.push({ file, line, text });
     }
+
+    // JSX text children: `<span>Some sentence here</span>`.
+    //
+    // The loop above reads quoted literals only, so the most natural
+    // way to hardcode a sentence in React — typing it between the
+    // tags — was never looked at. A screen could carry an
+    // untranslated paragraph and this file would print a tick.
+    if (file.endsWith('.tsx')) {
+      const jsx = /(?<=>)([^<>{}\n][^<>{}]*)(?=<)/g;
+      let j;
+      while ((j = jsx.exec(src)) !== null) {
+        const text = j[1].trim();
+        if (!isProse(text)) continue;
+        const line = src.slice(0, j.index).split('\n').length;
+        const lineText = lines[line - 1] ?? '';
+        if (/^\s*(\/\/|\*)/.test(lineText)) continue;
+        findings.push({ file, line, text });
+      }
+    }
   }
 }
 

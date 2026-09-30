@@ -20,6 +20,7 @@ const now = Date.now();
 const iso = (ms) => new Date(now - ms).toISOString();
 const PROJ = '019e358a-adac-7881-9f7e-fc92646fae4e';
 const PROJ2 = '019e358a-bbbb-7881-9f7e-fc9264600002';
+const PROJ3 = '019e358a-cccc-7881-9f7e-fc9264600003';
 const ISSUE = '019f85ee-ae41-77f1-bbf9-97d310663c9a';
 const EVENT = '019f8600-0000-7000-8000-000000000001';
 const U1 = '019e3589-9d7f-7013-9952-e3f287104954';
@@ -552,8 +553,20 @@ const EXACT = {
       {
         id: PROJ2,
         name: 'a-project-with-a-rather-long-name',
-        platform: 'react-native',
+        // A mini program, and the reason this value is here: the label
+        // was a Chinese literal, so the English and Japanese
+        // dashboards showed 微信小程序 among their own labels and no
+        // screenshot had ever contained the value.
+        platform: 'weapp',
         createdAt: iso(86_400_000 * 5),
+      },
+      {
+        id: PROJ3,
+        name: 'unlabelled',
+        // What a project has since the column stopped defaulting to
+        // react-native. The card used to render an empty pill.
+        platform: null,
+        createdAt: iso(86_400_000 * 2),
       },
     ],
   },

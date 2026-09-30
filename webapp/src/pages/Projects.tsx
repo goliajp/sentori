@@ -12,6 +12,7 @@ import { useShell } from '../App';
 import { Button, ErrorBanner, Input, PageShell, TimeAgo, clsx, formatRelease } from '../components/ui';
 import { useT } from '../i18n';
 import { api, type Project, type ProjectHealth } from '../lib/api';
+import { platformLabel } from '../lib/platform-label';
 import { formatApiError, useAsyncData } from '../lib/useAsyncData';
 
 type Row = Project & { health: ProjectHealth | null };
@@ -158,9 +159,11 @@ function ProjectCard({
         <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-fg">
           {row.name}
         </span>
-        <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
-          {row.platform}
-        </span>
+        {row.platform && (
+          <span className="rounded bg-raised px-1.5 py-0.5 text-xs text-fg-muted">
+            {platformLabel(row.platform, t)}
+          </span>
+        )}
         {owner && (
           <button
             type="button"
