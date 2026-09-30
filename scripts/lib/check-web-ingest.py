@@ -15,6 +15,11 @@ base, jar, project, out_file = sys.argv[1:5]
 # must not produce one.
 LONG_TASK_BUDGET_MS = 50
 
+# Per call, in microseconds. A `trace` assembles an event and pushes it
+# onto a queue; anything approaching a millisecond means something is
+# doing real work on the caller's thread.
+PER_CALL_BUDGET_US = 500
+
 
 def get(path):
     out = subprocess.run(
@@ -127,16 +132,28 @@ masked_nodes = [n for n in first["nodes"] if n.get("kind") == "mask"]
 if any(n.get("text") for n in masked_nodes):
     sys.exit("✗ a masked node carries a text length, which leaks how much was written there")
 
-long_tasks = json.load(open(out_file)).get("longTasks") or []
+cost = json.load(open(out_file))
+long_tasks = cost.get("longTasks") or []
 over = [d for d in long_tasks if d > LONG_TASK_BUDGET_MS]
 if over:
     sys.exit(
-        f"✗ the SDK blocked the main thread for {over} ms (budget {LONG_TASK_BUDGET_MS} ms). "
+        f"✗ using the SDK produced long tasks of {over} ms (budget {LONG_TASK_BUDGET_MS} ms). "
         "A reporter that costs the page a frame is one the host removes."
+    )
+
+# And the per-call cost, which is what the long-task check is really
+# about — a page that calls this from a render path pays it per call.
+# Generous on purpose: the number to catch is a regression of an order
+# of magnitude, not the difference between two runners.
+per_call_us = (cost.get("sdkMs", 0) / max(1, cost.get("calls", 1))) * 1000
+if per_call_us > PER_CALL_BUDGET_US:
+    sys.exit(
+        f"✗ an SDK call costs {per_call_us:.0f} µs (budget {PER_CALL_BUDGET_US} µs) — "
+        f"{cost.get('sdkMs', 0):.0f} ms over {cost.get('calls')} calls"
     )
 
 print(
     f"✓ a real browser: {len(issues)} issues, breadcrumbs without the label's text, "
     f'{len(first["nodes"])} wireframe nodes carrying no page content, '
-    f"{len(long_tasks)} long task(s), none over {LONG_TASK_BUDGET_MS} ms"
+    f"{len(long_tasks)} long task(s), {per_call_us:.0f} µs per SDK call"
 )

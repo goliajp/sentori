@@ -31,13 +31,13 @@ mkdir -p "$DIST"
 
 jqp() { python3 -c "import sys,json; print(json.load(sys.stdin)$1)"; }
 
-echo "[1/6] signing in"
+echo "[1/7] signing in"
 curl -sS -c "$COOKIE" -X POST "$SENTORI_BASE/auth/login" \
   -H 'Content-Type: application/json' \
   -d "{\"email\":\"$SENTORI_OWNER_EMAIL\",\"password\":\"$SENTORI_OWNER_PASSWORD\"}" \
   >/dev/null
 
-echo "[2/6] creating project + ingest token"
+echo "[2/7] creating project + ingest token"
 PROJECT_ID=$(curl -sS -b "$COOKIE" -X POST "$SENTORI_BASE/admin/api/projects" \
   -H 'Content-Type: application/json' \
   -d "{\"name\":\"$SLUG\",\"platform\":\"react-native\"}" | jqp "['id']")
@@ -56,7 +56,7 @@ TOKEN=$(curl -sS -b "$COOKIE" -X POST \
   -H 'Content-Type: application/json' \
   -d '{"name":"sourcemap-e2e-ingest","scope":"ingest"}' | jqp "['token']")
 
-echo "[3/6] bundling fixture"
+echo "[3/7] bundling fixture"
 # Bun's bundler rather than Metro: what the test needs is a real
 # minified bundle and its map, and `bunx metro` on its own has neither
 # a Babel preset nor a haste config, so driving it here meant carrying
@@ -65,7 +65,7 @@ echo "[3/6] bundling fixture"
 rm -rf "$DIST"
 (cd "$HERE" && bun build app.js --outdir "$DIST" --minify --sourcemap=external)
 
-echo "[4/6] uploading the map against release $RELEASE"
+echo "[4/7] uploading the map against release $RELEASE"
 # Uploaded with the ingest token, against the release *name* — the path
 # `sentori-cli upload sourcemap` takes and the only one a build pipeline
 # can take, since CI has no browser session and does not know the
@@ -127,14 +127,14 @@ if [ "$REFUSED" != "403" ]; then
 fi
 echo "      ingest upload refused: $REFUSED"
 
-echo "[5/6] throwing inside the minified bundle, sending the stack"
+echo "[5/7] throwing inside the minified bundle, sending the stack"
 EVENT_JSON=$(bun "$HERE/throw-and-format.js" "$DIST/app.js" "$RELEASE")
 curl -sS -o /dev/null -w '      ingest=%{http_code}\n' -X POST "$SENTORI_BASE/v1/events" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   --data-raw "$EVENT_JSON"
 
-echo "[6/6] reading the stored event back"
+echo "[6/7] reading the stored event back"
 sleep 1
 ISSUE_ID=$(curl -sS -b "$COOKIE" \
   "$SENTORI_BASE/admin/api/issues?projectId=$PROJECT_ID&limit=50" \
@@ -187,6 +187,86 @@ case "$FRAME" in
     exit 1
     ;;
 esac
+
+# ── the same map, against a browser-shaped frame ──────────────────
+#
+# Everything above sends `file: "app.js"`, a bare basename — which is
+# what React Native's stacks look like. A browser's do not: they carry
+# the full URL the script was served from, with a host, a directory
+# and usually a cache-busting query, and nothing had ever sent one of
+# those while `docs/getting-started/web.md` tells a reader to upload
+# their maps and expect readable stacks.
+#
+# What this proves, exactly: a URL-shaped `file` is accepted and
+# resolves to the same original position the bare name did. It does
+# **not** prove that `comparable_path` strips the scheme or the query
+# — removing either of those keeps this green, because the release
+# holds one map and `candidates_for` tries every map it has, ranked.
+# Choosing correctly between two maps with the same basename in
+# different directories is a separate case, and one nothing here
+# covers yet.
+echo "[7/7] a browser-shaped frame against the same map"
+
+# The minified coordinates the previous step resolved from, so this
+# frame points at a position the map genuinely covers. Inventing a line
+# would test whether some arbitrary number happens to map, which is a
+# different and useless question.
+MINPOS=$(curl -sS -b "$COOKIE" "$SENTORI_BASE/admin/api/events/$EVENT_ID" \
+  | python3 -c '
+import sys, json
+frames = json.load(sys.stdin)["payload"]["error"]["stack"]
+hit = next(f for f in frames if f.get("symbolicated"))
+print(hit["minifiedLine"], hit["minifiedColumn"])
+')
+
+WEB_EVENT=$(python3 - "$RELEASE" $MINPOS <<'PYEOF'
+import json, sys, uuid
+release, line, col = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+print(json.dumps({
+    "id": str(uuid.uuid4()),
+    "kind": "error",
+    "occurredAt": "2026-09-30T00:00:00Z",
+    "platform": "web",
+    "release": release,
+    "environment": "test",
+    "payload": {
+        "error": {
+            "type": "BrowserError",
+            "message": "thrown from a bundle served over https",
+            "stack": [{
+                "file": "https://app.example.com/static/app.js?v=8f21c3",
+                "function": "checkout",
+                "line": line,
+                "column": col,
+                "inApp": True,
+            }],
+        }
+    },
+}))
+PYEOF
+)
+WEB_ID=$(echo "$WEB_EVENT" | jqp "['id']")
+
+curl -sS -o /dev/null -w '      ingest=%{http_code}\n' -X POST "$SENTORI_BASE/v1/events" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  --data-raw "$WEB_EVENT"
+sleep 1
+
+WEB_FRAME=$(curl -sS -b "$COOKIE" "$SENTORI_BASE/admin/api/events/$WEB_ID" \
+  | python3 -c '
+import sys, json
+frames = json.load(sys.stdin)["payload"]["error"]["stack"]
+hit = next((f for f in frames if f.get("symbolicated")), None)
+print("NONE" if hit is None else str(hit.get("file")) + ":" + str(hit.get("line")))
+')
+echo "      $WEB_FRAME"
+if [ "$WEB_FRAME" = "NONE" ]; then
+  echo "FAIL: a browser-shaped frame (scheme, host, query) did not match the map," >&2
+  echo "      so every stack from the web SDK stays minified while the docs say" >&2
+  echo "      uploading maps makes them readable." >&2
+  exit 1
+fi
 
 echo
 echo "Source-map e2e: PASSED"
