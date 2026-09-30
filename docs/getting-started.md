@@ -5,22 +5,24 @@ description: Pick the 5-minute quickstart that matches your stack
 
 # Getting started
 
-Sentori watches mobile apps. Pick the stack you ship:
+Pick the stack you ship:
 
 | Stack | Quickstart |
 |---|---|
 | **Swift** — native iOS / tvOS | [sdk-swift](./sdk-swift.md) |
 | **Kotlin** — native Android | [sdk-kotlin](./sdk-kotlin.md) |
 | **React Native** (bare or Expo) | [getting-started/react-native](./getting-started/react-native.md) |
-
-
+| **Browser** — any framework, or none | [getting-started/web](./getting-started/web.md) |
 
 There were guides here for React, Next.js and Node until 2026-08-10.
 They pointed at `@goliapkg/sentori-react` and friends — packages whose
 source left this repo with the v1 redesign and which speak the v0.2
 wire format, so following them produced an integration the current
 server answers with `400 invalid_payload`. `@goliapkg/sentori-node`
-never existed at all.
+never existed at all. The browser is supported again as of
+`@goliapkg/sentori-web`, as **one** framework-agnostic package rather
+than one per framework: the six that existed drifted apart, and an
+integrator on the fifth had no way to tell which behaviours they had.
 
 It assumes you already have:
 

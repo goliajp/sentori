@@ -425,6 +425,34 @@ jobs:
       - name: kernel → real server → read the events back
         run: bash scripts/core-live-ingest.sh
 
+  # The browser SDK, in a browser.
+  #
+  # Everything it does that matters runs against APIs Bun does not
+  # have: `addEventListener('error')`, `PerformanceObserver`,
+  # `localStorage`, `visibilitychange`. Unit tests of those would be
+  # tests of whatever stand-in was written for them.
+  #
+  # Its first run found that no browser could reach the ingest API at
+  # all — there was no CORS anywhere, so the preflight for a POST
+  # carrying `Authorization` was refused, and the browser reports that
+  # to the page's console rather than to the server. Nothing but a
+  # real browser could have found it.
+  web-live-ingest:
+    needs: changes
+    if: needs.changes.outputs.sdk == 'true' || needs.changes.outputs.server == 'true' || needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: bun install --frozen-lockfile
+      - name: a real page, a real Chrome, a real server
+        run: bash scripts/web-live-ingest.sh
+
   sdk:
     needs: changes
     if: needs.changes.outputs.sdk == 'true' || needs.changes.outputs.infra == 'true'
@@ -441,6 +469,7 @@ jobs:
           - sdk/react-native
           - sdk/expo
           - sdk/cli
+          - sdk/web
 
     steps:
       - uses: actions/checkout@v4
