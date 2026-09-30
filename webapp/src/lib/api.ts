@@ -573,6 +573,15 @@ class Api {
       crashFreeUsers: null | number;
       crashedUsers: number;
       sessions: number;
+      /** Oldest first, one entry per bucket including the empty ones —
+       *  a null rate is a stretch with no sessions, which is not the
+       *  same as a healthy one. */
+      trend: {
+        at: string;
+        crashFreeSessions: null | number;
+        crashedSessions: number;
+        sessions: number;
+      }[];
       users: number;
       windowHours: number;
     }>(`/admin/api/sessions/crash-free?${usp.toString()}`);

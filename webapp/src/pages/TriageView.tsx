@@ -14,7 +14,7 @@ import { ErrorBanner, Kbd, SELECT_CLASS, TimeAgo, clsx } from '../components/ui'
 import { useT } from '../i18n';
 import { platformLabel } from '../lib/platform-label';
 import { api, type IssueSummary } from '../lib/api';
-import { formatCrashFree } from '../lib/crash-free';
+import { formatCrashFree, trendDomain, type TrendPoint } from '../lib/crash-free';
 import { issueHeadline } from '../lib/issue-title';
 import { useAsyncData } from '../lib/useAsyncData';
 
@@ -635,6 +635,87 @@ function QueueRow({
  * score for an app nobody has run is the kind of lie this product
  * exists not to tell.
  */
+/**
+ * The window's shape, under the window's number.
+ *
+ * Gaps are drawn as gaps. A bucket with no sessions has no rate, and
+ * joining the points either side of it draws a straight line across a
+ * period nobody opened the app — the one reading a reader would take
+ * as reassurance.
+ */
+function CrashFreeTrend({ points, hours }: { points: TrendPoint[]; hours: number }) {
+  const t = useT();
+  const W = 100;
+  const H = 28;
+  if (points.length < 2) return null;
+  const [lo, hi] = trendDomain(points);
+  const x = (i: number) => (i / (points.length - 1)) * W;
+  const y = (v: number) => H - ((v - lo) / (hi - lo)) * H;
+
+  // Each run of consecutive readings is its own path.
+  const runs: string[] = [];
+  let run: string[] = [];
+  points.forEach((p, i) => {
+    if (typeof p.crashFreeSessions !== 'number') {
+      if (run.length > 1) runs.push(run.join(' '));
+      run = [];
+      return;
+    }
+    run.push(`${run.length === 0 ? 'M' : 'L'}${x(i).toFixed(2)},${y(p.crashFreeSessions).toFixed(2)}`);
+  });
+  if (run.length > 1) runs.push(run.join(' '));
+  // A window of one reading surrounded by gaps has no line to draw;
+  // say nothing rather than draw an empty box.
+  if (runs.length === 0) return null;
+
+  const worst = points.reduce<null | TrendPoint>(
+    (acc, p) =>
+      typeof p.crashFreeSessions === 'number' &&
+      (acc === null || p.crashFreeSessions < (acc.crashFreeSessions ?? 100))
+        ? p
+        : acc,
+    null,
+  );
+
+  return (
+    <div className="mt-3" title={t('crashFree.trendTitle', { hours: String(hours), low: String(lo) })}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
+        className="h-8 w-full text-fg-muted"
+        role="img"
+        aria-label={t('crashFree.trendTitle', { hours: String(hours), low: String(lo) })}
+      >
+        {/* Not the error hue. The line is mostly the app working, and
+            painting all of it red states a verdict the data does not —
+            the dip shows because it is a dip. */}
+        {runs.map((d) => (
+          <path
+            key={d}
+            d={d}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            vectorEffect="non-scaling-stroke"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ))}
+      </svg>
+      <div className="mt-1 flex justify-between text-[10px] tabular-nums text-fg-subtle">
+        <span>{t('crashFree.trendFrom', { hours: String(hours) })}</span>
+        {worst && typeof worst.crashFreeSessions === 'number' && (
+          <span>
+            {t('crashFree.trendLow', {
+              pct: formatCrashFree(worst.crashFreeSessions, worst.sessions, worst.crashedSessions),
+            })}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CrashFreeCard({ projectId }: { projectId: string }) {
   const t = useT();
   const { data } = useAsyncData(() => api.crashFree({ projectId, hours: 24 }), [projectId]);
@@ -710,6 +791,7 @@ function CrashFreeCard({ projectId }: { projectId: string }) {
                 })
               : t('crashFree.usersEmpty')}
           </p>
+          <CrashFreeTrend points={Array.isArray(data.trend) ? data.trend : []} hours={hours} />
           {releases.length > 0 && (
             <ul className="mt-4 space-y-1 border-t border-border pt-3">
               {releases.slice(0, 5).map((r) => (

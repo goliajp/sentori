@@ -374,6 +374,10 @@ export const zh: Messages = {
   'impact.title': '历史累计 {users} 人报过这条，每人最多 {max} 次。不限时间窗，所以这个数不会变小。',
   'impact.titleAnon': '历史累计 {events} 条事件。报过的人都没有身份标识，所以没有人数——不是零人。',
   'health.usersTitle': '最近 24 小时发过任何事件的独立用户数，不只是遇到问题的那些。',
+  'crashFree.trendFrom': '{hours} 小时前',
+  'crashFree.trendLow': '最低 {pct}%',
+  'crashFree.trendTitle':
+    '最近 {hours} 小时每段的无崩溃会话占比，纵轴从 {low}% 起。线断开的地方是那段没有 session，不是那段没崩溃。',
   'crashFree.window': '近 {hours} 小时',
   'platform.unknown': '未知（SDK 比服务端新）',
   'releases.artifactBroken': '{platform} 有已上传但读不到的物料 —— 展开查看是哪个。',

@@ -378,6 +378,10 @@ export const ja: Messages = {
     'これまでに {users} 人が報告しています（1 人あたり最大 {max} 回）。期間で絞っていないため、この数は減りません。',
   'impact.titleAnon': 'これまでに {events} 件。報告した人に識別子がないため人数はありません。0 人ということではありません。',
   'health.usersTitle': '直近 24 時間に何らかのイベントを送った実ユーザー数。問題に遭った人だけではありません。',
+  'crashFree.trendFrom': '{hours} 時間前',
+  'crashFree.trendLow': '最低 {pct}%',
+  'crashFree.trendTitle':
+    '直近 {hours} 時間の区間ごとのクラッシュフリー率。縦軸は {low}% から。線の途切れはセッションがなかった区間で、問題がなかった区間ではありません。',
   'crashFree.window': '直近 {hours} 時間',
   'platform.unknown': '不明（SDK がサーバーより新しい）',
   'releases.artifactBroken': '{platform} にアップロード済みだが読めない成果物あり。展開して確認。',
