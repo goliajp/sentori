@@ -1,9 +1,9 @@
 # Sentori
 
-> Self-hosted observability for mobile apps. Five kinds of signal,
-> eight verbs, zero cost to the host app.
+> Self-hosted observability for the apps you ship. Five kinds of
+> signal, eight verbs, zero cost to the host app.
 
-Sentori watches a React Native app the way a triager actually works:
+Sentori watches an app the way a triager actually works:
 **errors** (what broke), **warns** (where users hurt — rage taps,
 long freezes, slow launches, detected automatically), **traces**
 (what happened), **asserts** (what should hold — and never halts
@@ -19,18 +19,27 @@ One Rust binary + PostgreSQL. Your data never leaves your machines.
 | | What | Where |
 |---|---|---|
 | 📱 | **React Native SDK** | `sdk/react-native` — JS + Swift + Kotlin, Expo module (bare RN works too) |
-| 🧩 | **Core** | `sdk/core` — types, wire protocol, the never-throw safety layer |
+| 🍎 | **Swift / Kotlin SDKs** | `sdk/native` — native iOS and Android, no React Native |
+| 🌐 | **Browser SDK** | `sdk/web` — any framework or none, one package |
+| 💬 | **Mini-program SDK** | `sdk/weapp` — WeChat; needs an instance on a filed domain |
+| 🧩 | **Core** | `sdk/core` — types, wire protocol, transport, the never-throw safety layer |
 | 🔧 | **CLI** | `sdk/cli` — sourcemap / dSYM / Proguard / source-bundle upload, probe registry, MCP server for AI triage |
 | ⚙️ | **Server** | `self-hosted/server` — Rust + axum, PostgreSQL 18 |
 | 🖥️ | **Dashboard** | `webapp/` — React 19 SPA, baked into the server image |
 | 🚀 | **Deploy** | `self-hosted/docker` — one compose file, distroless image |
 
-## Use it from a React Native app (60 s)
+## Use it (60 s)
 
 ```sh
-bun add @goliapkg/sentori-react-native
+bun add @goliapkg/sentori-react-native   # React Native
 cd ios && pod install --repo-update
 ```
+
+The same five verbs on every stack — `@goliapkg/sentori-web` in a
+browser, `@goliapkg/sentori-weapp` in a WeChat mini program,
+`jp.golia.sentori:sentori` on Android, the Swift package on iOS. Pick
+yours in [getting started](docs/getting-started.md); the code below is
+the same whichever you picked.
 
 ```tsx
 import { sentori } from '@goliapkg/sentori-react-native'

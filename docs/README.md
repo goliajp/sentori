@@ -35,17 +35,19 @@ which carries enough to send a first event without following any link.
 
 ## SDK reference
 
-The current API surface ships with the package and is what npm shows:
-[`sdk/react-native/README.md`](../sdk/react-native/README.md).
-
-Sentori watches mobile apps, and there are three ways to put it in
-one:
+Five SDKs, one wire format, one set of five verbs. Each page is the
+API surface that ships with its package:
 
 - [`sdk-swift.md`](sdk-swift.md) — native iOS and tvOS, no React
   Native.
 - [`sdk-kotlin.md`](sdk-kotlin.md) — native Android, no React Native.
 - [`../sdk/react-native/README.md`](../sdk/react-native/README.md) —
   React Native and Expo.
+- [`../sdk/web/README.md`](../sdk/web/README.md) — the browser, any
+  framework or none.
+- [`../sdk/weapp/README.md`](../sdk/weapp/README.md) — WeChat mini
+  programs. Needs an instance on a domain with an ICP filing; the
+  platform will not call anything else.
 
 This said "there is one SDK guide because there is one SDK" until
 2026-09-30, while two native guides sat in this directory with nothing

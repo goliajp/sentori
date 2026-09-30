@@ -118,9 +118,31 @@ const PROBES = [
   {
     gate: 'check-orphan-ts.mjs',
     file: 'sdk/react-native/src/index.ts',
-    find: "export { registerMaskQuery } from './mask';",
+    // `mask` until 2026-09-30, when this stopped orphaning anything:
+    // `replay.ts` and `replay-screens.ts` both import it now, so
+    // dropping the re-export left the module perfectly reachable and
+    // the gate rightly said nothing. The probe had been passing on a
+    // non-zero exit for an unrelated reason; the baseline check added
+    // to this file is what exposed it.
+    //
+    // `error-boundary` is reachable from the index and nowhere else,
+    // which is what an orphan probe needs.
+    find: "export { ErrorBoundary } from './error-boundary';",
     replace: '',
     why: 'a TypeScript module that ships in no bundle',
+  },
+  {
+    // The fixture is generated from the kernel, so a kernel rule that
+    // Swift and Kotlin have not been told about shows up here rather
+    // than as two platforms counting losses differently in
+    // production.
+    gate: 'gen-transport-vectors.mjs --check',
+    // The built lib, not the source: the generator drives the compiled
+    // kernel, so that is what a stale fixture would disagree with.
+    file: 'sdk/core/lib/transport.js',
+    find: 'const MAX_QUEUED = 500',
+    replace: 'const MAX_QUEUED = 400',
+    why: 'a kernel rule the native transports have not followed',
   },
   {
     // Adds a dead option rather than removing a read. Every switch in
@@ -154,6 +176,36 @@ try {
     stdio: 'pipe',
   });
 
+  // The copy has to be a git repository, because several gates ask git
+  // questions: `check-ios-packaging` reads `git ls-files` to learn what
+  // a consumer receives, and `check-doc-versions` reads `git tag` to
+  // learn which versions are published.
+  //
+  // Without this they failed here with "not a git repository" — a
+  // non-zero exit, which the loop below read as "the gate went red".
+  // Both were reported as verified for as long as they have been in
+  // this list, having never once run. The baseline check added below
+  // is what surfaced it; before that, a gate that could not run and a
+  // gate that caught the defect were the same observation.
+  const git = (...args) =>
+    execFileSync('git', args, { cwd: copy, stdio: 'pipe', encoding: 'utf8' });
+  git('init', '-q');
+  git('-c', 'user.email=gates@example.com', '-c', 'user.name=gates', 'add', '-A');
+  git(
+    '-c', 'user.email=gates@example.com', '-c', 'user.name=gates',
+    'commit', '-q', '-m', 'sandbox',
+  );
+  // Tag names only: `check-doc-versions` reads which versions exist,
+  // not what they point at.
+  for (const tag of execFileSync('git', ['tag', '--list', 'swift/*'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  })
+    .split('\n')
+    .filter(Boolean)) {
+    git('tag', tag);
+  }
+
   const failures = [];
   for (const p of PROBES) {
     const path = join(copy, p.file);
@@ -165,11 +217,33 @@ try {
       );
       continue;
     }
+    // Split, because a gate can take a flag. Passing the whole string
+    // as one filename made `node scripts/'gen-replay-vectors.mjs
+    // --check'` throw MODULE_NOT_FOUND — a non-zero exit, which this
+    // file then read as "the gate went red". That entry had never run
+    // the gate at all, and was reported as verified for as long as it
+    // has existed. Found by adding a second entry of the same shape.
+    const [script, ...args] = p.gate.split(' ');
+    const run = () =>
+      spawnSync('node', [join(copy, 'scripts', script), ...args], {
+        cwd: copy,
+        encoding: 'utf8',
+      });
+
+    // Green before the probe, or a non-zero exit afterwards says
+    // nothing: a gate that cannot run in this sandbox fails either
+    // way, and looks exactly like one that caught the defect.
+    const baseline = run();
+    if (baseline.status !== 0) {
+      failures.push(
+        `${p.gate}: already fails on an unmodified tree, so its red below means ` +
+        `nothing. It cannot run here:\n${(baseline.stderr || baseline.stdout || '').trim().slice(0, 400)}`,
+      );
+      continue;
+    }
+
     writeFileSync(path, before.replace(p.find, p.replace));
-    const r = spawnSync('node', [join(copy, 'scripts', p.gate)], {
-      cwd: copy,
-      encoding: 'utf8',
-    });
+    const r = run();
     writeFileSync(path, before);
     if (r.status === 0) {
       failures.push(
