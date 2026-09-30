@@ -10,6 +10,7 @@ export { init } from './init.js'
 export { patchContext as context, setUser as user } from './scope.js'
 export { flush } from './transport.js'
 export { registerEmitHook } from './emit-hooks.js'
+export { registerMaskQuery } from './replay.js'
 
 import { patchContext, setUser } from './scope.js'
 import { init } from './init.js'

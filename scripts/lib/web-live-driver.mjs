@@ -129,7 +129,8 @@ await evaluate(`
   history.pushState({}, '', '/checkout');
   true;
 `);
-await new Promise((r) => setTimeout(r, 100));
+// Long enough for the replay ring to hold more than one frame at 2 Hz.
+await new Promise((r) => setTimeout(r, 1400));
 
 await evaluate(`
   window.__hostSawIt = false;

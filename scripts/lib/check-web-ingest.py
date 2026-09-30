@@ -77,6 +77,56 @@ if not detail.get("userKey"):
 if (payload.get("device") or {}).get("os") in (None, ""):
     sys.exit("✗ no device was recorded")
 
+# ── the wireframe replay ──────────────────────────────────────────
+# Shape, never content. A wireframe that carried the words would be a
+# screenshot with extra steps, and the point of this mode is that it is
+# the one you can leave on.
+atts = detail.get("attachments") or []
+replay = next((a for a in atts if a.get("kind") == "replay"), None)
+if replay is None:
+    sys.exit(
+        "✗ the error carries no replay attachment, though the page enabled it — "
+        f"attachments present: {[a.get('kind') for a in atts]}"
+    )
+
+raw = subprocess.run(
+    ["curl", "-fsS", "-b", jar, f'{base}/admin/api/attachments/{replay["ref"]}'],
+    capture_output=True,
+    text=True,
+).stdout
+lines = [l for l in raw.splitlines() if l.strip()]
+if not lines:
+    sys.exit("✗ the replay attachment is empty")
+
+first = json.loads(lines[0])
+if first.get("kind") != "key":
+    sys.exit(f'✗ the replay starts with a {first.get("kind")!r}, not a keyframe — a player '
+             "joining here has nothing to reconstruct against")
+if len(first.get("nodes") or []) < 5:
+    sys.exit(
+        f'✗ the first keyframe has {len(first.get("nodes") or [])} node(s); the harness page '
+        "has a card, a heading, a paragraph, an image, an input and a button, so a walker "
+        "finding almost nothing is a walker that is not working"
+    )
+
+kinds = {n.get("kind") for n in first["nodes"]}
+for needed in ("text", "image", "input", "button"):
+    if needed not in kinds:
+        sys.exit(f"✗ no {needed!r} node in the wireframe; kinds found: {sorted(k for k in kinds if k)}")
+if "mask" not in kinds:
+    sys.exit("✗ the registered mask query produced no masked node, so `.secret` was walked "
+             "like anything else")
+
+# The whole claim, checked against the page's actual strings.
+for leaked in ("Dora Cawley", "412.00", "dora@example.com", "40-11-22", "87654321", "Order 4471"):
+    if leaked in raw:
+        sys.exit(f"✗ {leaked!r} is inside the replay attachment — the wireframe is carrying "
+                 "content, not shape")
+
+masked_nodes = [n for n in first["nodes"] if n.get("kind") == "mask"]
+if any(n.get("text") for n in masked_nodes):
+    sys.exit("✗ a masked node carries a text length, which leaks how much was written there")
+
 long_tasks = json.load(open(out_file)).get("longTasks") or []
 over = [d for d in long_tasks if d > LONG_TASK_BUDGET_MS]
 if over:
@@ -87,5 +137,6 @@ if over:
 
 print(
     f"✓ a real browser: {len(issues)} issues, breadcrumbs without the label's text, "
+    f'{len(first["nodes"])} wireframe nodes carrying no page content, '
     f"{len(long_tasks)} long task(s), none over {LONG_TASK_BUDGET_MS} ms"
 )
