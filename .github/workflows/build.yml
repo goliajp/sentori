@@ -338,6 +338,16 @@ jobs:
         with:
           bun-version-file: .bun-version
 
+      # Several of the gates the meta-gate probes import the component
+      # they judge. Without an install they cannot resolve `react` and
+      # the probe is skipped — which verifies less here than it does on
+      # a developer's machine, and the point of this job is that it
+      # verifies the same thing.
+      - name: install
+        run: |
+          bun install --frozen-lockfile
+          cd webapp && bun install --frozen-lockfile
+
       - name: every surface is named by a workflow that runs on develop
         run: node scripts/check-surface-gates.mjs
 
@@ -355,6 +365,8 @@ jobs:
         run: node scripts/check-docs-api-truth.mjs
       - name: every markdown code fence closes
         run: node scripts/check-md-fences.mjs
+      - name: every docs page is reachable from the index
+        run: node scripts/check-doc-reachable.mjs
       - name: the OpenAPI document matches the router
         run: node scripts/gen-openapi.mjs --check
       - name: the error reference matches the handlers
