@@ -23,6 +23,18 @@ sentori-cli upload sourcemap \
   ./dist
 ```
 
+A directory uploads every `.map` under it, each keeping its path
+relative to that directory — `dist/pages/cart/index.js.map` is stored
+as `pages/cart/index.js.map`. That matters: the server matches a stack
+frame to a map by how many trailing path segments they share, because
+a mini program names every page's entry `index.js` and a web build
+names every chunk after its route. Uploading only basenames would make
+two pages indistinguishable, and the wrong map resolves to a plausible
+line in the wrong file — worse than no line, since nothing about the
+result says it is wrong.
+
+Individual files work too, and keep their basename.
+
 React Native (Android, raw maps still on disk):
 
 ```sh

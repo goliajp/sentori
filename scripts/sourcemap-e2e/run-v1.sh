@@ -31,13 +31,13 @@ mkdir -p "$DIST"
 
 jqp() { python3 -c "import sys,json; print(json.load(sys.stdin)$1)"; }
 
-echo "[1/7] signing in"
+echo "[1/8] signing in"
 curl -sS -c "$COOKIE" -X POST "$SENTORI_BASE/auth/login" \
   -H 'Content-Type: application/json' \
   -d "{\"email\":\"$SENTORI_OWNER_EMAIL\",\"password\":\"$SENTORI_OWNER_PASSWORD\"}" \
   >/dev/null
 
-echo "[2/7] creating project + ingest token"
+echo "[2/8] creating project + ingest token"
 PROJECT_ID=$(curl -sS -b "$COOKIE" -X POST "$SENTORI_BASE/admin/api/projects" \
   -H 'Content-Type: application/json' \
   -d "{\"name\":\"$SLUG\",\"platform\":\"react-native\"}" | jqp "['id']")
@@ -56,7 +56,7 @@ TOKEN=$(curl -sS -b "$COOKIE" -X POST \
   -H 'Content-Type: application/json' \
   -d '{"name":"sourcemap-e2e-ingest","scope":"ingest"}' | jqp "['token']")
 
-echo "[3/7] bundling fixture"
+echo "[3/8] bundling fixture"
 # Bun's bundler rather than Metro: what the test needs is a real
 # minified bundle and its map, and `bunx metro` on its own has neither
 # a Babel preset nor a haste config, so driving it here meant carrying
@@ -65,7 +65,7 @@ echo "[3/7] bundling fixture"
 rm -rf "$DIST"
 (cd "$HERE" && bun build app.js --outdir "$DIST" --minify --sourcemap=external)
 
-echo "[4/7] uploading the map against release $RELEASE"
+echo "[4/8] uploading the map against release $RELEASE"
 # Uploaded with the ingest token, against the release *name* — the path
 # `sentori-cli upload sourcemap` takes and the only one a build pipeline
 # can take, since CI has no browser session and does not know the
@@ -127,14 +127,14 @@ if [ "$REFUSED" != "403" ]; then
 fi
 echo "      ingest upload refused: $REFUSED"
 
-echo "[5/7] throwing inside the minified bundle, sending the stack"
+echo "[5/8] throwing inside the minified bundle, sending the stack"
 EVENT_JSON=$(bun "$HERE/throw-and-format.js" "$DIST/app.js" "$RELEASE")
 curl -sS -o /dev/null -w '      ingest=%{http_code}\n' -X POST "$SENTORI_BASE/v1/events" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   --data-raw "$EVENT_JSON"
 
-echo "[6/7] reading the stored event back"
+echo "[6/8] reading the stored event back"
 sleep 1
 ISSUE_ID=$(curl -sS -b "$COOKIE" \
   "$SENTORI_BASE/admin/api/issues?projectId=$PROJECT_ID&limit=50" \
@@ -205,7 +205,7 @@ esac
 # Choosing correctly between two maps with the same basename in
 # different directories is a separate case, and one nothing here
 # covers yet.
-echo "[7/7] a browser-shaped frame against the same map"
+echo "[7/8] a browser-shaped frame against the same map"
 
 # The minified coordinates the previous step resolved from, so this
 # frame points at a position the map genuinely covers. Inventing a line
@@ -267,6 +267,17 @@ if [ "$WEB_FRAME" = "NONE" ]; then
   echo "      uploading maps makes them readable." >&2
   exit 1
 fi
+
+echo "[8/8] two maps named index.js.map, and the right one is picked"
+# The assertion lives in Python: it needs a real column out of a real
+# map, and building that in bash meant escaped JSON inside a command
+# substitution inside a string — which is where two attempts at this
+# went, and neither parsed.
+TWO="$(mktemp -d)"
+(cd "$HERE" && bun build pages/cart/index.js --outdir "$TWO/pages/cart" --minify --sourcemap=external >/dev/null)
+(cd "$HERE" && bun build pages/home/index.js --outdir "$TWO/pages/home" --minify --sourcemap=external >/dev/null)
+python3 "$HERE/../lib/two-maps-check.py" \
+  "$SENTORI_BASE" "$COOKIE" "$ADMIN_TOKEN" "$TOKEN" "$RELEASE" "$TWO"
 
 echo
 echo "Source-map e2e: PASSED"

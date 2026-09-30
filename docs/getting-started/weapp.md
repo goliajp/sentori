@@ -109,8 +109,10 @@ npx @goliapkg/sentori-cli@latest upload sourcemap \
 
 Every page's entry file in a mini program is called `index.js`, so the
 server matches maps by how much of the **path** they share with a
-frame, not by filename. Upload the directory structure as it is built
-rather than flattening it.
+frame, not by filename. Point the CLI at the build directory and it
+keeps that structure: `dist/pages/cart/index.js.map` is stored as
+`pages/cart/index.js.map`, which is what makes two pages
+distinguishable.
 
 ## Cost
 
