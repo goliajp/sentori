@@ -205,6 +205,40 @@ export const warnDetected = (
 ): string =>
   emit('warn', { name: scenario, surface, data, withSignals: true });
 
+/**
+ * The SDK's own fault, filed where the host can see it.
+ *
+ * `reportInternal` has always existed and `setInternalReporter` has
+ * always been exported, and nothing ever called the setter — so every
+ * internal failure went to the console and stopped there. A crash
+ * reporter whose own faults are invisible is asking to be trusted on
+ * the word of the thing that broke.
+ *
+ * `warn`, not `error`: the host app did not fail, we did, and filing
+ * it as an error puts our bug at the top of their inbox looking like
+ * theirs. The name is fixed so one query finds all of them.
+ *
+ * No signal ring and no surface. The ring is context for the host's
+ * failure, and spending a screen lookup inside an already-failing path
+ * is how a fault handler becomes a second fault.
+ */
+export const internalFault = (report: {
+  api: string;
+  message: string;
+  errorName?: string;
+  stack?: string;
+}): void => {
+  emit('warn', {
+    name: 'sentori.internal',
+    data: {
+      api: report.api,
+      message: report.message,
+      ...(report.errorName ? { errorName: report.errorName } : {}),
+      ...(report.stack ? { stack: report.stack } : {}),
+    },
+  });
+};
+
 export const trace = safeFn(
   'trace',
   (name: string, data?: EventData, opts?: TraceOptions): string => {

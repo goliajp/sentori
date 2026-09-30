@@ -16,6 +16,7 @@ export type Config = {
     longFreeze: boolean;
     slowColdStart: boolean;
     slowApi: boolean;
+    uiThreadHang: boolean;
   };
   /** B-type replay rolling buffer, seconds. 0 disables. */
   replaySeconds: number;
