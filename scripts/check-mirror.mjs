@@ -39,6 +39,16 @@ const MUST_SHIP = [
   // direction.
   'docs/runbook/scaling.md',
   'docs/runbook/cli-auth.md',
+  // Every stack the product supports, because the mirror is where a
+  // self-hoster reads how to point something at the instance they
+  // just brought up. React Native was the only one listed, from when
+  // it was the only one there was; a reader on any other stack found
+  // a getting-started page whose table linked to four pages and
+  // shipped one.
+  'docs/sdk-swift.md',
+  'docs/sdk-kotlin.md',
+  'docs/getting-started/web.md',
+  'docs/getting-started/weapp.md',
 ];
 // Cloning the mirror and running `docker compose up --build` is the
 // product. Nothing checked that the tree it produces can do that: the
