@@ -19,8 +19,19 @@ ALTER TABLE events DROP CONSTRAINT events_platform_check;
 ALTER TABLE events ADD CONSTRAINT events_platform_check
   CHECK (platform IN ('javascript', 'ios', 'android', 'web', 'weapp', 'unknown'));
 
-UPDATE event_attachments SET source = 'javascript' WHERE source = 'js';
-
+-- Drop first, then rewrite, then re-add.
+--
+-- The UPDATE used to come first, and `js` → `javascript` violates the
+-- constraint that is still in force at that point. On an empty
+-- database `WHERE source = 'js'` matches nothing, no row is written
+-- and no constraint is checked — so every test and every CI run
+-- passed, and the production deploy of 4.0.0 failed on the only
+-- database that had rows:
+--
+--   while executing migration 18: new row for relation
+--   "event_attachments" violates check constraint
+--   "event_attachments_source_check"
 ALTER TABLE event_attachments DROP CONSTRAINT event_attachments_source_check;
+UPDATE event_attachments SET source = 'javascript' WHERE source = 'js';
 ALTER TABLE event_attachments ADD CONSTRAINT event_attachments_source_check
   CHECK (source IN ('javascript', 'ios', 'android', 'web', 'weapp', 'unknown'));

@@ -142,6 +142,31 @@ const PROBES = [
     why: 'a gate script no workflow is triggered by',
   },
   {
+    gate: 'check-surface-gates.mjs',
+    file: '.github/workflows/build.yml',
+    find: '          - sdk/weapp\n',
+    replace: '',
+    why: 'a package under sdk/ that no job builds',
+  },
+  {
+    gate: 'check-sdk-doc-options.mjs',
+    file: 'sdk/core/src/types.ts',
+    // At the top level of `InitConfig`. The first version of this
+    // probe added the field inside `detect`, which that checker reads
+    // past — it takes top-level fields only — so it stayed green and
+    // said nothing about itself.
+    find: '  /** B-type replay rolling buffer, seconds. 0 disables. */',
+    replace: '  undocumentedOption?: string\n  /** B-type replay rolling buffer, seconds. 0 disables. */',
+    why: 'a public option the SDK reference does not mention',
+  },
+  {
+    gate: 'check-md-fences.mjs',
+    file: 'sdk/web/README.md',
+    find: '```bash\nbun add @goliapkg/sentori-web\n```',
+    replace: '```bash\nbun add @goliapkg/sentori-web',
+    why: 'a code fence that never closes',
+  },
+  {
     // A second launcher is a second set of flags nobody compares
     // until one of them is flaky on a machine nobody can log into.
     gate: 'check-single-chrome-launcher.mjs',
@@ -174,6 +199,97 @@ const PROBES = [
     find: '    uiThreadHang?: boolean',
     replace: '    uiThreadHang?: boolean\n    neverReadByAnything?: boolean',
     why: 'a public option nothing reads',
+  },
+  {
+    gate: 'check-compose-healthchecks.mjs',
+    file: 'self-hosted/docker/docker-compose.yml',
+    find: 'test: ["CMD", "pg_isready", "-U", "sentori"]',
+    replace: 'test: ["CMD-SHELL", "pg_isready -U sentori"]',
+    why: 'a healthcheck an image without a shell cannot answer',
+  },
+  {
+    gate: 'check-time-has-absolute.mjs',
+    file: 'webapp/src/pages/Instruments.tsx',
+    // The waiver, not the call. Deleting the call would only prove the
+    // checker counts occurrences; deleting the reason it is allowed is
+    // the defect — a relative time with nothing behind it.
+    find: '                            // bare-relative: interpolated into a sentence, no element to hold a title\n          since: formatRelative(p.registeredAt),',
+    replace: '          since: formatRelative(p.registeredAt),',
+    why: 'a bare relative time with no absolute behind it and no reason given',
+  },
+  {
+    gate: 'check-bun-version.mjs',
+    file: '.bun-version',
+    find: '1.4.2',
+    replace: '1.3.13',
+    why: 'a pinned bun that is not the bun writing the lockfiles',
+  },
+  {
+    gate: 'check-doc-links.mjs',
+    file: 'docs/README.md',
+    find: '[`errors.md`](errors.md)',
+    replace: '[`errors.md`](error-codes.md)',
+    why: 'an index claiming a page that does not exist',
+  },
+  {
+    gate: 'check-sql-inserts.mjs',
+    file: 'self-hosted/server/src/handlers/admin/test_push.rs',
+    find: "VALUES ($1, $2, $3, $4, $5, 'queued') RETURNING id",
+    replace: "VALUES ($1, $2, $3, $4, $5, $6, 'queued') RETURNING id",
+    why: 'an INSERT with more values than columns, which Postgres refuses at prepare time',
+  },
+  {
+    // actionlint is a separate binary. Where it is missing the gate
+    // soft-skips by design, so the probe is skipped too and reported
+    // as unverified rather than quietly passing.
+    gate: 'check-workflows.sh',
+    requires: 'actionlint',
+    file: '.github/workflows/build.yml',
+    find: 'jobs:\n  changes:',
+    replace: 'jobs:\n  changes:\n    runs-on: ${{ }}',
+    why: 'a workflow GitHub cannot parse',
+  },
+  {
+    gate: 'check-mirror.mjs',
+    file: '.github/workflows/v0.2-oss-mirror.yml',
+    find: "            --include='/docs/errors.md' \\\n",
+    replace: '',
+    why: 'a public mirror that ships no error reference',
+  },
+  {
+    gate: 'check-orphan-modules.sh',
+    file: 'self-hosted/server/src/main.rs',
+    find: 'mod archive_worker;\n',
+    replace: '',
+    why: 'a module in the tree that nothing compiles',
+  },
+  {
+    gate: 'check-docs-api-truth.mjs',
+    file: 'docs/protocol.md',
+    find: 'sentori.context(',
+    replace: 'sentori.startSpan(',
+    why: 'a doc teaching a verb the SDK does not export',
+  },
+  {
+    gate: 'check-env-vars-real.mjs',
+    file: 'docs/troubleshooting.md',
+    find: 'SENTORI_RATELIMIT_PER_TOKEN_RPS',
+    replace: 'SENTORI_RATE_LIMIT_PER_MIN',
+    why: 'an env var the docs name and nothing reads',
+  },
+  {
+    gate: 'check-doc-imports.mjs',
+    file: 'docs/sdk-kotlin.md',
+    find: 'import com.sentori.SentoriConfig',
+    replace: 'import jp.golia.sentori.SentoriConfig',
+    why: 'an import built from the Gradle coordinate rather than the package',
+  },
+  {
+    gate: 'check-push-snippets.mjs',
+    file: 'webapp/src/lib/push-snippets.ts',
+    find: "export const SEND_PATH = '/v1/push/sends';",
+    replace: "export const SEND_PATH = '/v1/push/send';",
+    why: 'snippets teaching a route the server does not register',
   },
   {
     gate: 'check-error-status.mjs',
@@ -226,7 +342,12 @@ try {
   }
 
   const failures = [];
+  const skipped = [];
   for (const p of PROBES) {
+    if (p.requires && spawnSync('sh', ['-c', `command -v ${p.requires}`], { stdio: 'ignore' }).status !== 0) {
+      skipped.push(`${p.gate} (needs ${p.requires})`);
+      continue;
+    }
     const path = join(copy, p.file);
     const before = readFileSync(path, 'utf8');
     if (!before.includes(p.find)) {
@@ -244,7 +365,7 @@ try {
     // has existed. Found by adding a second entry of the same shape.
     const [script, ...args] = p.gate.split(' ');
     const run = () =>
-      spawnSync('node', [join(copy, 'scripts', script), ...args], {
+      spawnSync(script.endsWith('.sh') ? 'bash' : 'node', [join(copy, 'scripts', script), ...args], {
         cwd: copy,
         encoding: 'utf8',
       });
@@ -278,7 +399,74 @@ try {
     for (const f of failures) console.error(`    ${f}`);
     process.exit(1);
   }
-  console.log(`✓ ${PROBES.length} gates each went red on the defect they exist for`);
+  // Coverage, said out loud.
+  //
+  // Preflight runs more gates than this file probes, and "every gate
+  // went red" reads as "all of them" — the same shape of quiet as the
+  // `check-workflow-script-paths` output that said "8 pairs" while
+  // skipping three whole workflows. A gate with no probe is not
+  // verified; it is merely present. So the count is printed, and so
+  // are the names.
+  {
+    // The `preflight` script only. Reading the whole of package.json
+    // pulled in `check:published-readme`, which is a release-time gate
+    // that needs the network, and reported it as a preflight gate
+    // missing a probe.
+    const preflight = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).scripts.preflight;
+    const run = new Set(
+      [...preflight.matchAll(/(?:node|bash) scripts\/(check-[a-z-]+\.(?:mjs|sh))/g)].map((m) => m[1]),
+    );
+    const probed = new Set(PROBES.map((p) => p.gate.split(' ')[0]));
+    // These read a build output or an installed dependency, neither of
+    // which is in the sandbox — it copies tracked files. They are checked by preflight and by
+    // CI, where a build has happened; they cannot be probed here, and
+    // that is a property of the sandbox rather than a gap in them.
+    const NEEDS_BUILD = new Set([
+      'check-package-entrypoints.mjs',
+      'check-sdk-size.sh',
+      'check-web-size.sh',
+      'check-weapp-size.sh',
+      'check-maven-artifact.mjs',
+      'check-orphan-lib.mjs',
+      // Reads node_modules to learn what we build against, so it needs
+      // an install rather than a checkout.
+      'check-peer-ranges.mjs',
+      // Compares sdk/native/VERSION against where `swift/<version>`
+      // points. The sandbox is one commit with the tag names copied
+      // onto it, so every tag resolves to HEAD and the gate correctly
+      // answers "tagged at this commit". Probing it needs real
+      // history, not a flattened copy.
+      'check-native-version-tag.mjs',
+    ]);
+    // This file cannot be its own probe: a mutation that makes it go
+    // red is a mutation to the thing reporting the result. What stands
+    // in for one is the baseline check above — a gate that cannot run
+    // in the sandbox is caught before its red is counted, which is how
+    // three false passes in this list were found.
+    const SELF = 'check-gates-fail.mjs';
+    const unprobed = [...run]
+      .filter((g) => !probed.has(g) && !NEEDS_BUILD.has(g) && g !== SELF)
+      .sort();
+    const unprobeable = [...run].filter((g) => !probed.has(g) && NEEDS_BUILD.has(g)).sort();
+    const covered = [...run].filter((g) => probed.has(g)).length;
+    console.log(
+      `✓ ${PROBES.length} gates each went red on the defect they exist for` +
+        ` (${covered} of ${run.size} preflight gates have a probe)`,
+    );
+    if (unprobeable.length > 0) {
+      console.log(
+        `  ${unprobeable.length} cannot be probed from a tracked-files copy — they need a` +
+          ` build, an install or real history: ${unprobeable.join(', ')}`,
+      );
+    }
+    if (unprobed.length > 0) {
+      console.log(`  no probe yet, so present rather than verified: ${unprobed.join(', ')}`);
+    }
+    if (skipped.length > 0) {
+      console.log(`  probe skipped, so unverified on this machine: ${skipped.join(', ')}`);
+    }
+    console.log('  and this file, which cannot be its own probe');
+  }
 } finally {
   rmSync(copy, { recursive: true, force: true });
 }
