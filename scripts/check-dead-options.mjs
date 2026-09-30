@@ -43,7 +43,10 @@ function walk(dir, out = []) {
   for (const e of entries) {
     const p = join(dir, e);
     if (statSync(p).isDirectory()) walk(p, out);
-    else if (p.endsWith('.ts') && !p.endsWith('.d.ts')) out.push(p);
+    // `.tsx` too. Without it, `rage-tap.tsx` — the only reader of
+    // `detect.rageTap` outside init — was invisible, so an option read
+    // solely from a component would have been reported dead.
+    else if ((p.endsWith('.ts') || p.endsWith('.tsx')) && !p.endsWith('.d.ts')) out.push(p);
   }
   return out;
 }
@@ -54,7 +57,25 @@ if (files.length === 0) {
   process.exit(1);
 }
 
-const sources = files.map((f) => ({ f, src: readFileSync(f, 'utf8') }));
+/**
+ * Comments removed before matching.
+ *
+ * Otherwise prose counts as a read: a line of documentation saying
+ * `detect.uiThreadHang` satisfied the access pattern, so an option
+ * that nothing implemented passed as long as something described it.
+ * That is precisely the case this checker exists for — `linkHash` was
+ * dead *and* had a confident doc comment explaining what it did.
+ *
+ * Whitespace replaces each comment rather than nothing, so the
+ * "no `;` inside the braces" rule below still sees the real
+ * punctuation around what it removed.
+ */
+const stripComments = (src) =>
+  src
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+    .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(m.length - p1.length));
+
+const sources = files.map((f) => ({ f, src: stripComments(readFileSync(f, 'utf8')) }));
 
 /** Body of `export type NAME = { … }`, bracket-matched so nested
  *  object fields do not end it early. */
@@ -72,6 +93,48 @@ function typeBody(src, name) {
   return null;
 }
 
+/**
+ * Field paths in a type body, descending into a field whose type is
+ * written inline as another object.
+ *
+ * It used to collect the top level only, so `InitConfig.detect` counted
+ * as one option and the four switches inside it as none — and those are
+ * the ones a host actually sets. A dead `detect.slowApi` would have
+ * read as covered for as long as `detect` itself was accessed
+ * somewhere.
+ */
+function collectFields(body, prefix = '') {
+  const out = [];
+  const lines = body.split('\n');
+  let depth = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    if (depth === 0) {
+      const m = /^(\w+)\??\s*:(.*)$/.exec(trimmed);
+      if (m) {
+        const name = prefix + m[1];
+        // An inline object opens here and its fields belong to it, not
+        // to the parent.
+        if (m[2].trim().startsWith('{')) {
+          let d = 0;
+          const inner = [];
+          for (let j = i; j < lines.length; j += 1) {
+            d += (lines[j].match(/[{]/g) ?? []).length - (lines[j].match(/[}]/g) ?? []).length;
+            inner.push(j === i ? lines[j].slice(lines[j].indexOf('{') + 1) : lines[j]);
+            if (d === 0) break;
+          }
+          out.push(...collectFields(inner.join('\n'), `${name}.`));
+        } else {
+          out.push(name);
+        }
+      }
+    }
+    depth += (line.match(/[{[(]/g) ?? []).length - (line.match(/[}\])]/g) ?? []).length;
+  }
+  return out;
+}
+
 const problems = [];
 let checked = 0;
 
@@ -82,21 +145,13 @@ for (const typeName of TYPES) {
     continue;
   }
   const body = typeBody(holder.src, typeName);
-  // Top-level field names only: skip anything nested inside a field's
-  // own object literal, which `depth` tracks.
-  const fields = [];
-  let depth = 0;
-  for (const line of body.split('\n')) {
-    const trimmed = line.trim();
-    if (depth === 0) {
-      const m = /^(\w+)\??\s*:/.exec(trimmed);
-      if (m) fields.push(m[1]);
-    }
-    depth += (line.match(/[{[(]/g) ?? []).length - (line.match(/[}\])]/g) ?? []).length;
-  }
+  const fields = collectFields(body);
 
-  for (const field of fields) {
+  for (const path of fields) {
     checked += 1;
+    // The last segment is what an access looks like in the code:
+    // `config.detect?.slowApi` reads as `.slowApi`.
+    const field = path.split('.').pop();
     // Reading an option means accessing it — `opts.field`, or pulling
     // it out of a destructuring pattern.
     //
@@ -106,13 +161,19 @@ for (const typeName of TYPES) {
     // looks exactly like a field declaration, which excluded the very
     // file doing the reading. Match the access, not its shadow.
     const access = new RegExp(`\\.\\s*${field}\\b`);
-    const destructured = new RegExp(`\\{[^{}]*\\b${field}\\b[^{}]*\\}\\s*(?::[^=]+)?=`);
+    // No `;` inside the braces. With `[^{}]*` this spanned a whole
+    // file: a type declaration listing the field, several statements
+    // later, and any `} =` after it all counted as one destructuring
+    // pattern — so a field that only ever appeared in its own type
+    // declaration read as used, which is the exact case this checker
+    // is for.
+    const destructured = new RegExp(`\\{[^{};]*\\b${field}\\b[^{};]*\\}\\s*(?::[^=;]+)?=`);
     const used = sources.some(
       ({ f, src }) => !f.includes('__tests__') && (access.test(src) || destructured.test(src)),
     );
     if (!used) {
       problems.push(
-        `${typeName}.${field} is declared in ${holder.f.replace(`${root}/`, '')} and read nowhere — ` +
+        `${typeName}.${path} is declared in ${holder.f.replace(`${root}/`, '')} and read nowhere — ` +
           `a host that sets it gets a call that succeeds and does nothing`,
       );
     }

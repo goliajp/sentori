@@ -16,10 +16,15 @@
  * failure inside `reportInternal` is silent. The NEVER rule wins
  * over our own observability.
  *
- * `setInternalReporter` is the SDK's hook: the framework SDK (e.g.
- * RN's transport) calls it once during `init()` to wire how the
- * `kind: nearCrash` event actually gets enqueued. Core itself
- * stays transport-agnostic.
+ * `setInternalReporter` is the SDK's hook: the framework SDK calls it
+ * once during `init()` to wire how the event gets enqueued. Core
+ * itself stays transport-agnostic.
+ *
+ * It is a `warn` named `sentori.internal`. The comment here used to
+ * say `kind: nearCrash`, a sixth kind that was removed with the Sentry
+ * compatibility it came from — and for as long as it said so, nothing
+ * called the setter at all, so no internal failure had ever left a
+ * device.
  */
 
 import { logger } from './logger.js'

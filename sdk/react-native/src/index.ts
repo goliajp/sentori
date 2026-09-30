@@ -68,7 +68,12 @@ export { registerMaskQuery } from './mask';
 export { launch } from './launch';
 // Dev-panel helper: crash the native layer on purpose to exercise
 // the pending-crash upload pipeline. Not part of the 8-verb surface.
-export { triggerNativeCrash } from './native';
+// The UI-thread watchdogs. Both were implemented natively, bridged,
+// and never exported — so no host could start them and `init` did not
+// either. `detect.uiThreadHang` turns them on with platform defaults;
+// these two are for a host that wants its own threshold, or wants to
+// stop sampling during a known-slow screen.
+export { startAnrWatchdog, stopAnrWatchdog, triggerNativeCrash } from './native';
 export { type NavigationRefLike, useTraceNavigation } from './navigation';
 
 // Wire + config types for typed hosts.

@@ -224,6 +224,18 @@ export type InitConfig = {
     longFreeze?: boolean
     slowColdStart?: boolean
     slowApi?: boolean
+    /** The UI thread's half of a freeze: Android's ANR watchdog and
+     *  iOS's hang watchdog, which `longFreeze` cannot see — it runs on
+     *  the JS thread, and by the time its tick fires the blocking work
+     *  on the other thread is over.
+     *
+     *  OFF by default. Both watchdogs exist natively and are reachable
+     *  over the bridge, but nothing in JS ever started them, so no
+     *  React Native app has had this. Turning it on by default would
+     *  start sampling a thread in every host app that upgrades, which
+     *  is a cost they did not ask for; `startAnrWatchdog()` is also
+     *  exported for a host that wants its own threshold. */
+    uiThreadHang?: boolean
   }
   /** B-type replay rolling buffer, seconds. 0 disables. */
   replaySeconds?: number
