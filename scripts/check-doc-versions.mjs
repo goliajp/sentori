@@ -13,7 +13,7 @@
 // string (`com.example.app@1.5.0+220`) is the reader's app, not ours,
 // and pinning it to our number would teach the wrong thing.
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 // What a reader can actually install, which is not what the tree is
@@ -146,10 +146,67 @@ for (const { file, pattern, want, what, source } of CASES) {
   }
 }
 
+// Every npm package an install line names has to be on npm.
+//
+// This file checked SwiftPM and Maven Central and never once asked the
+// registry the other four SDKs come from. `docs/getting-started/web.md`
+// said `bun add @goliapkg/sentori-web` and
+// `docs/getting-started/weapp.md` said
+// `npm install @goliapkg/sentori-weapp` for two packages that had never
+// been published — v4's headline is five SDKs on one wire and two of
+// them 404'd, past the gate whose entire job is that install lines
+// install something.
+//
+// Same discipline as the Maven check: a registry that cannot be reached
+// fails rather than skips.
+const npmNamed = new Set();
+for (const file of [
+  ...readdirSync('docs/getting-started').map((f) => `docs/getting-started/${f}`),
+  ...readdirSync('sdk')
+    .map((p) => `sdk/${p}/README.md`)
+    .filter((f) => existsSync(f)),
+  'docs/getting-started.md',
+]) {
+  if (!file.endsWith('.md')) continue;
+  for (const m of readFileSync(file, 'utf8').matchAll(
+    /(?:npm install|npm i|bun add|yarn add|pnpm add)\s+(@goliapkg\/[\w-]+)/g,
+  )) {
+    npmNamed.add(m[1]);
+  }
+}
+if (npmNamed.size < 2) {
+  problems.push(
+    `found ${npmNamed.size} npm install line(s) in the docs — this check is reading ` +
+      'nothing and must not pass',
+  );
+}
+for (const pkg of [...npmNamed].sort()) {
+  let res;
+  try {
+    res = await fetch(`https://registry.npmjs.org/${pkg.replace('/', '%2f')}`, {
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (e) {
+    console.error(`✗ could not ask npm about ${pkg} (${e.message}).`);
+    console.error('  An install line is a promise that the install works, and only the');
+    console.error('  registry can keep it. This check fails rather than guessing.');
+    process.exit(1);
+  }
+  if (res.status === 404) {
+    problems.push(
+      `${pkg} is named in an install line and is not on npm — a reader following ` +
+        'the page gets E404',
+    );
+  } else if (!res.ok) {
+    console.error(`✗ npm answered HTTP ${res.status} for ${pkg}`);
+    process.exit(1);
+  }
+}
+
 if (problems.length === 0) {
   console.log(
     `✓ every advertised version is one a reader can install ` +
-      `(swift ${native}, maven ${CASES[1].want}, rn ${rn})`,
+      `(swift ${native}, maven ${CASES[1].want}, rn ${rn}, ${npmNamed.size} npm packages)`,
   );
   process.exit(0);
 }

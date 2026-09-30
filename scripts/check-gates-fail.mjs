@@ -486,6 +486,23 @@ const PROBES = [
     why: 'an error message written as a sentence rather than a label',
   },
   {
+    gate: 'check-publishable-deps.mjs',
+    file: 'sdk/web/package.json',
+    find: '"@goliapkg/sentori-core": "^3.1.0"',
+    replace: '"@goliapkg/sentori-core": "workspace:*"',
+    why: 'a dependency that only resolves inside this monorepo',
+  },
+  {
+    gate: 'check-sdk-version-constant.mjs',
+    file: 'sdk/web/src/transport.ts',
+    // The declaration, not the number in it. The first version of this
+    // probe pinned `'1.0.2'` and stopped matching on the next release,
+    // which is the shape of staleness this whole file exists to catch.
+    find: 'export const SDK_VERSION = ',
+    replace: "export const SDK_VERSION = '0.0.0-probe' && ",
+    why: 'an SDK reporting a version it stopped being releases ago',
+  },
+  {
     gate: 'check-error-status.mjs',
     file: 'self-hosted/server/src/handlers/notify_admin.rs',
     find: 'pub async fn smtp_status(State(state): State<Arc<AppState>>) -> Json<Value> {',
@@ -718,6 +735,10 @@ try {
       // Three webapp checkers import the component they judge, so
       // they need webapp/node_modules. They run in preflight and in
       // CI, where an install has happened.
+      // Reads every package's built entry point and asks npm what that
+      // version number already means, so it needs both a build and the
+      // network.
+      'check-sibling-exports.mjs',
       // Runs the built `sdk/core/lib/identity.js`, not the TypeScript
       // beside it, so a change to the source is invisible from a
       // tracked-files copy. Preflight builds the SDKs before it.
