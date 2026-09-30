@@ -123,6 +123,18 @@ const PROBES = [
     why: 'a TypeScript module that ships in no bundle',
   },
   {
+    // Adds a dead option rather than removing a read. Every switch in
+    // `detect` is read in two places — once to resolve the config and
+    // once where it acts — so deleting one line leaves the other, and
+    // a probe that cannot make the gate red proves nothing about
+    // either.
+    gate: 'check-dead-options.mjs',
+    file: 'sdk/core/src/types.ts',
+    find: '    uiThreadHang?: boolean',
+    replace: '    uiThreadHang?: boolean\n    neverReadByAnything?: boolean',
+    why: 'a public option nothing reads',
+  },
+  {
     gate: 'check-error-status.mjs',
     file: 'self-hosted/server/src/handlers/notify_admin.rs',
     find: 'pub async fn smtp_status(State(state): State<Arc<AppState>>) -> Json<Value> {',

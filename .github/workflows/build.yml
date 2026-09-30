@@ -398,6 +398,33 @@ jobs:
       - name: smoke
         run: bash self-hosted/tests/e2e/smoke.sh
 
+  # The shared kernel against a real server.
+  #
+  # `sdk/core`'s transport is what the React Native SDK sends through
+  # and what the web and mini-program SDKs will be built on. Every unit
+  # test of it uses a fake `fetch`, and a fake agrees with whatever
+  # mistake the envelope is making. iOS and Android each got a
+  # live-ingest gate for that reason; the kernel they share had none.
+  #
+  # It drives the offline path too, which had never run against a real
+  # endpoint — the path that runs when the network is down, which is
+  # when nobody is watching.
+  core-live-ingest:
+    needs: changes
+    if: needs.changes.outputs.sdk == 'true' || needs.changes.outputs.server == 'true' || needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: bun install --frozen-lockfile
+      - name: kernel → real server → read the events back
+        run: bash scripts/core-live-ingest.sh
+
   sdk:
     needs: changes
     if: needs.changes.outputs.sdk == 'true' || needs.changes.outputs.infra == 'true'
