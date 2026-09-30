@@ -367,7 +367,7 @@ export const zh: Messages = {
   'crashFree.thin': '会话太少，这个精度说明不了问题',
   'crashFree.counts': '{total} 个会话中 {crashed} 个崩溃',
   'crashFree.empty': '这个窗口还没有会话——SDK 在每次应用进入后台时上报一次。升级到会发送会话的版本，或等第一份上报。',
-  'crashFree.users': '{pct}% 的用户',
+  'crashFree.users': '{pct}% 的用户没遇到崩溃',
   'crashFree.usersEmpty': '还没有识别到人',
   'crashFree.usersTitle': '最近 {hours} 小时内至少开过一次 session 的用户。跑了两个版本的人只算一次。',
   'crashFree.sessionsTitle': '最近 {hours} 小时内开始的 session。一次启动算一个 session，同一个人启动十次就是十个。',
