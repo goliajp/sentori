@@ -120,8 +120,30 @@ if (shipped.length < 50) {
 
 const docs = shipped.filter((f) => f.startsWith('docs/'));
 const missingDocs = MUST_SHIP.filter((f) => !shipped.includes(f));
+
+// And the other direction: a page in `docs/` that the allowlist does
+// not name. The list above says which pages must ship; nothing said
+// that every page must, so `docs/dashboard.md` was written, linked
+// from the index, rendered on the site, and left out of the public
+// repository — where the same index link then 404s. The allowlist is
+// per-file on purpose, so this is the check that keeps adding a page
+// and publishing it one action.
+const tracked_docs = [...tracked].filter((f) => /^docs\/.*\.md$/.test(f));
+const unshipped = tracked_docs.filter((f) => !shipped.includes(f));
 const missingBuild = MUST_BUILD.filter((f) => !shipped.includes(f));
 const leaked = shipped.filter((f) => MUST_NOT.test(f));
+
+if (unshipped.length) {
+  console.error(
+    `\u2717 ${unshipped.length} page(s) in docs/ that the mirror would not ship:`,
+  );
+  for (const f of unshipped) console.error(`    ${f}`);
+  console.error(
+    '  The index links them and the public repository would not have them. ' +
+      `Add each to the rsync allowlist in ${WF}.`,
+  );
+  process.exit(1);
+}
 
 if (missingDocs.length || missingBuild.length || leaked.length) {
   if (missingDocs.length) {

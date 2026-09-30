@@ -1,0 +1,189 @@
+name: npm publish
+
+# The six SDK packages, published from a release branch.
+#
+# Until 4.0.3 nothing published to npm. It was a manual step, and
+# manual is how `@goliapkg/sentori-web` and `@goliapkg/sentori-weapp`
+# shipped in v4 without ever reaching the registry — the whole product
+# claim is five SDKs on one wire and two of them 404'd. The same
+# afternoon produced three more defects that only a real publish
+# surfaces: a `workspace:*` range npm installs verbatim, a version
+# number reused for different code, and an SDK reporting a version it
+# stopped being three releases ago.
+#
+# So this workflow does the three things a person kept not doing:
+#
+#   1. Runs the pre-publish gates. `npm publish` will happily ship a
+#      package that cannot be installed.
+#   2. Publishes only what is not already on the registry, so it is
+#      safe to re-run and safe on a release that changed no package.
+#   3. Installs what it just published into an empty project and
+#      imports it. `npm publish` printing `+ pkg@version` and the
+#      registry answering `PUT 202` are not the same as a working
+#      package; on 2026-09-30 they disagreed three times.
+
+on:
+  # `release/*` is where a publish happens. `develop` is here so the
+  # four gates below can be retested by editing one of them, without
+  # cutting a release — a gate nothing fires is a gate nobody can
+  # prove still works. The publish step itself is branch-guarded.
+  push:
+    branches:
+      - 'release/*'
+      - develop
+    paths:
+      - 'sdk/**'
+      - 'scripts/check-publishable-deps.mjs'
+      - 'scripts/check-sdk-version-constant.mjs'
+      - 'scripts/check-sibling-exports.mjs'
+      - 'scripts/check-package-entrypoints.mjs'
+      - '.github/workflows/npm-publish.yml'
+      - 'package.json'
+      - 'bun.lock'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run the gates and report what would publish, without publishing'
+        type: boolean
+        default: true
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+
+      # A missing token must stop the run before anything is published,
+      # with a sentence that says what to do — otherwise the publish
+      # step fails deep in npm's own output as `ENEEDAUTH`, on the one
+      # path where a half-finished release is worse than no release.
+      #
+      # Only where a publish can happen. On develop this workflow exists
+      # to retest the four gates below, and failing there for a
+      # credential it never uses would be a red that says nothing about
+      # the commit.
+      - name: the registry credential exists
+        if: >-
+          startsWith(github.ref, 'refs/heads/release/') ||
+          (github.event_name == 'workflow_dispatch' && inputs.dry_run != true)
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "::error::NPM_TOKEN is not set on this repository."
+            echo "Create an npm automation token for the account that owns @goliapkg"
+            echo "and add it:  gh secret set NPM_TOKEN"
+            exit 1
+          fi
+
+      - run: bun install --frozen-lockfile
+      - run: bun run build:sdks
+
+      # The same gates preflight runs, because a publish is the one
+      # moment where each of them is about to matter.
+      - name: nothing a consumer installs names a workspace range
+        run: node scripts/check-publishable-deps.mjs
+      - name: every SDK reports the version it is
+        run: node scripts/check-sdk-version-constant.mjs
+      - name: a published version number still means what it meant
+        run: node scripts/check-sibling-exports.mjs
+      - name: every advertised entry point exists
+        run: node scripts/check-package-entrypoints.mjs
+      - name: all SDK tests
+        run: bun run test:sdks
+
+      # Dependency order: a package is published before anything that
+      # depends on it, so the range in the dependant resolves the
+      # moment it lands.
+      - name: publish what is not on the registry yet
+        id: publish
+        if: startsWith(github.ref, 'refs/heads/release/') || github.event_name == 'workflow_dispatch'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          published=""
+          for pkg in core react-native expo cli web weapp; do
+            dir="sdk/$pkg"
+            [ -f "$dir/package.json" ] || continue
+            name=$(node -p "require('./$dir/package.json').name")
+            version=$(node -p "require('./$dir/package.json').version")
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "= $name@$version already on the registry"
+              continue
+            fi
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "~ would publish $name@$version"
+              continue
+            fi
+            echo "+ publishing $name@$version"
+            (cd "$dir" && npm publish --access public)
+            published="$published $name@$version"
+          done
+          echo "published=$published" >> "$GITHUB_OUTPUT"
+          if [ -z "$published" ]; then
+            echo "nothing to publish" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "published:$published" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # npm accepts a publish into staging and makes it readable some
+      # minutes later — 40 of them, on 2026-09-30. Polling rather than
+      # sleeping, and failing rather than assuming, because "published"
+      # and "installable" were three separate facts that day.
+      - name: what was published can be installed and imported
+        if: steps.publish.outputs.published != ''
+        run: |
+          set -e
+          for spec in ${{ steps.publish.outputs.published }}; do
+            echo "→ waiting for $spec"
+            for _ in $(seq 1 90); do
+              npm view "$spec" version >/dev/null 2>&1 && break
+              sleep 20
+            done
+            npm view "$spec" version >/dev/null 2>&1 || {
+              echo "::error::$spec is still not readable on the registry."
+              echo "It is staged, not lost — npm processes publishes asynchronously."
+              echo "Re-run this job once it appears; it will skip what is already there."
+              exit 1
+            }
+          done
+          work=$(mktemp -d)
+          cd "$work"
+          npm init -y >/dev/null
+          npm install --prefer-online ${{ steps.publish.outputs.published }}
+          for spec in ${{ steps.publish.outputs.published }}; do
+            name=${spec%@*}
+            case "$name" in
+              # The CLI is a binary and the expo package is a config
+              # plugin; neither has a browser-shaped module entry to
+              # import here.
+              *sentori-cli|*sentori-expo) continue ;;
+            esac
+            node --input-type=module -e "
+              const m = await import('$name')
+              const names = Object.keys(m)
+              if (names.length === 0) throw new Error('$name imported but exports nothing')
+              console.log('$name exports', names.join(','))
+            "
+          done

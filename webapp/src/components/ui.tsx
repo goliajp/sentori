@@ -11,11 +11,12 @@
 //   · a card's contents sit at one inset (`px-5`), header and body
 //     and table cells alike, so the left edge is a single line.
 
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Monitor, Moon, Sun } from 'lucide-react';
 import { isValidElement, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
 import { useT } from '../i18n';
+import { setThemeMode, useThemeMode, type ThemeMode } from '../lib/theme';
 
 import { SentoriMark } from './brand';
 
@@ -855,4 +856,55 @@ export function formatNumber(n: number): string {
 
 export function clsx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(' ');
+}
+
+/// Three-state theme switch — a segmented row that reads as
+/// furniture, not as a feature. State + persistence live in
+/// lib/theme.ts.
+///
+/// Here rather than in App.tsx because the docs pages are outside the
+/// authenticated shell and need it too; importing it from App would
+/// have pulled the whole dashboard into the chunk a stranger loads to
+/// read a page.
+/// furniture, not as a feature. State + persistence live in
+/// lib/theme.ts.
+export function ThemeSwitch() {
+  const t = useT();
+  const mode = useThemeMode();
+  const setMode = setThemeMode;
+  const options: {
+    mode: ThemeMode;
+    label: string;
+    Glyph: typeof Monitor;
+  }[] = [
+    { mode: 'system', label: t('theme.system'), Glyph: Monitor },
+    { mode: 'light', label: t('theme.light'), Glyph: Sun },
+    { mode: 'dark', label: t('theme.dark'), Glyph: Moon },
+  ];
+  return (
+    <div
+      role="radiogroup"
+      aria-label={t('theme.label')}
+      className="flex rounded-md border border-border p-0.5"
+    >
+      {options.map((o) => (
+        <button
+          key={o.mode}
+          type="button"
+          role="radio"
+          aria-checked={mode === o.mode}
+          title={o.label}
+          aria-label={o.label}
+          onClick={() => setMode(o.mode)}
+          className={`flex flex-1 items-center justify-center rounded py-1 transition-colors ${
+            mode === o.mode
+              ? 'bg-raised text-fg'
+              : 'text-fg-subtle hover:text-fg-muted'
+          }`}
+        >
+          <o.Glyph aria-hidden className="h-3.5 w-3.5" />
+        </button>
+      ))}
+    </div>
+  );
 }
