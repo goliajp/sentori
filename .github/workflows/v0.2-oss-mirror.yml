@@ -114,6 +114,7 @@ jobs:
             --include='/docs/protocol.md' \
             --include='/docs/errors.md' \
             --include='/docs/troubleshooting.md' \
+            --include='/docs/dashboard.md' \
             --include='/docs/teams.md' \
             --include='/docs/replay-encoding-v2.md' \
             --include='/docs/sdk-kotlin.md' \

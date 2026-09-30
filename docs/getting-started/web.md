@@ -13,7 +13,7 @@ to pick.
 
 - A Sentori **token** (`st_…`, scope `ingest`) and an **ingest URL** —
   see the [getting-started overview](../getting-started.md).
-- A Sentori server on **3.20 or later**. Older servers send no CORS
+- A Sentori server on **4.0.0 or later**. Older servers send no CORS
   headers, so a browser refuses the request before it is made and
   reports it only to the page's console.
 

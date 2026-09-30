@@ -17,6 +17,11 @@ export default defineConfig({
   plugins: [tailwindcss(), react()],
   server: {
     port: 3000,
+    // The docs pages are `docs/*.md` at the repository root, read at
+    // build time by `import.meta.glob`. Vite's dev server refuses to
+    // read outside its root unless told, and the refusal looks like an
+    // empty docs site rather than an error.
+    fs: { allow: ['..'] },
     // Every prefix the server owns. `/auth` and `/admin/api` were
     // missing, so against the dev server login returned the SPA shell
     // instead of a session and the whole admin surface was
