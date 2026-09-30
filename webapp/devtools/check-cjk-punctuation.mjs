@@ -12,40 +12,55 @@
 // are correctly half-width and always will be.
 import { readFileSync } from 'node:fs';
 
-const CJK = '一-鿿';
-const PAIRS = { ',': '，', ';': '；', ':': '：', '!': '！', '?': '？' };
-const RE = new RegExp(`[${CJK}][,;:!?]|[,;:!?][${CJK}]`, 'g');
+// Kana as well as Han: this reads the Japanese catalogue too. It read
+// only zh.ts, although its own opening note counts the marks it found
+// in ja.ts — so the file that motivated half the rule was never
+// judged by it.
+const CJK = '一-鿿ぁ-ヿ';
+const PAIRS = {
+  ',': '，', ';': '；', ':': '：', '!': '！', '?': '？',
+  // Brackets were missing, and six pairs of half-width ones sat
+  // against Chinese and as many against Japanese. A bracket is the
+  // most common mark in this catalogue after the comma — every
+  // "(optional)" and "(at least 12)" is one.
+  '(': '（', ')': '）',
+};
+const MARKS = Object.keys(PAIRS).map((c) => `\\${c}`).join('');
+const RE = new RegExp(`[${CJK}][${MARKS}]|[${MARKS}][${CJK}]`, 'g');
 
-const FILE = 'src/i18n/zh.ts';
-const text = readFileSync(new URL(`../${FILE}`, import.meta.url), 'utf8');
+const FILES = ['src/i18n/zh.ts', 'src/i18n/ja.ts'];
+const bad = [];
 
-// If the file stops holding Chinese at all, this checker has nothing to
-// judge and must say so rather than report success.
-const cjkCount = (text.match(new RegExp(`[${CJK}]`, 'g')) ?? []).length;
-if (cjkCount < 100) {
-  console.error(
-    `✗ ${FILE} holds only ${cjkCount} CJK characters. This checker is ` +
-      `broken, not the tree.`,
-  );
-  process.exit(1);
+for (const FILE of FILES) {
+  const text = readFileSync(new URL(`../${FILE}`, import.meta.url), 'utf8');
+
+  // If a file stops holding CJK at all, this checker has nothing to
+  // judge and must say so rather than report success.
+  const cjkCount = (text.match(new RegExp(`[${CJK}]`, 'g')) ?? []).length;
+  if (cjkCount < 100) {
+    console.error(
+      `✗ ${FILE} holds only ${cjkCount} CJK characters. This checker is ` +
+        `broken, not the tree.`,
+    );
+    process.exit(1);
+  }
+
+  text.split('\n').forEach((line, i) => {
+    for (const hit of line.match(RE) ?? []) {
+      bad.push({ file: FILE, hit, line: i + 1, text: line.trim().slice(0, 90) });
+    }
+  });
 }
 
-const bad = [];
-text.split('\n').forEach((line, i) => {
-  for (const hit of line.match(RE) ?? []) {
-    bad.push({ hit, line: i + 1, text: line.trim().slice(0, 90) });
-  }
-});
-
 if (bad.length > 0) {
-  console.error(`✗ ${FILE}: ${bad.length} half-width mark(s) against Chinese:`);
+  console.error(`✗ ${bad.length} half-width mark(s) against CJK:`);
   for (const b of bad.slice(0, 12)) {
     const half = b.hit.replace(new RegExp(`[${CJK}]`, 'g'), '');
-    console.error(`    ${FILE}:${b.line}  ${half} → ${PAIRS[half] ?? '?'}`);
+    console.error(`    ${b.file}:${b.line}  ${half} → ${PAIRS[half] ?? '?'}`);
     console.error(`      ${b.text}`);
   }
   if (bad.length > 12) console.error(`    … and ${bad.length - 12} more`);
   process.exit(1);
 }
 
-console.log(`✓ ${FILE}: Chinese punctuation is full-width`);
+console.log(`✓ ${FILES.join(', ')}: CJK punctuation is full-width`);

@@ -29,12 +29,22 @@ const problems = [];
 
 // ── 1. the route and the fields, in every snippet ──────────────────
 
-// Read them out of the server rather than restating them here: a
-// constant copied into a checker drifts with the thing it checks.
+// The paths the snippets are built from, taken out of the snippets —
+// not restated here. Restating them is what this checker used to do,
+// and it meant the gate asserted the server registers two routes
+// while never asking whether the snippets use them. A snippet pointed
+// at `/v1/push/send` kept it green.
 const routes = readFileSync(join(root, 'self-hosted/server/src/handlers/mod.rs'), 'utf8');
-for (const path of ['/v1/push/sends', '/v1/push/audience/count']) {
-  if (!routes.includes(`"${path}"`)) {
-    problems.push(`the server does not register ${path} — the snippets teach a 404`);
+const paths = {};
+for (const name of ['SEND_PATH', 'COUNT_PATH']) {
+  const m = new RegExp(`export const ${name} = '([^']+)'`).exec(src);
+  if (!m) {
+    problems.push(`push-snippets.ts no longer exports ${name}, so this checker has no path to verify`);
+    continue;
+  }
+  paths[name] = m[1];
+  if (!routes.includes(`"${m[1]}"`)) {
+    problems.push(`the server does not register ${m[1]} (${name}) — the snippets teach a 404`);
   }
 }
 

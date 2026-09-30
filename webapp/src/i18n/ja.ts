@@ -7,7 +7,7 @@ export const ja: Messages = {
   'auth.backToSignIn': 'サインインに戻る',
   'auth.confirm': 'パスワード（確認）',
   'auth.missingToken': 'トークンなし。メール内のリンクから開いてください。',
-  'auth.newPassword12': '新しいパスワード(12 文字以上)',
+  'auth.newPassword12': '新しいパスワード（12 文字以上）',
   'auth.resetDone': 'パスワードを更新しました——新しいパスワードでサインイン',
   'auth.email': 'メールアドレス',
   'auth.forgot': 'パスワードをお忘れですか',
@@ -74,7 +74,7 @@ export const ja: Messages = {
   'instruments.colPrewarmed': 'プリウォーム',
   'instruments.launch': '起動',
   'instruments.launchEmpty':
-    'ステージ別起動データはまだありません — アプリが使用可能になった時点で sentori.launch.complete() を呼んでください(任意で sentori.launch.mark(name) のウェイポイント)。起動ごとに app.launch として集計されます。',
+    'ステージ別起動データはまだありません — アプリが使用可能になった時点で sentori.launch.complete() を呼んでください（任意で sentori.launch.mark(name) のウェイポイント）。起動ごとに app.launch として集計されます。',
   'instruments.prewarmedTip': 'プリウォームのファントムサンプル。パーセンタイルから除外',
   'instruments.loadFailed': '計測パネルを読み込めませんでした。',
   'instruments.noProject': 'プロジェクトがまだありません',
@@ -100,7 +100,7 @@ export const ja: Messages = {
   'issue.firstSeen': '初回',
   'issue.impactAnon': '計 {events} 件 · ユーザー不明',
   'issue.notifyAffected': 'この人たちに通知',
-  'issue.impactUsers': '{users} 人のユーザー · 計 {events} 件(最大 {max} 件/人)',
+  'issue.impactUsers': '{users} 人のユーザー · 計 {events} 件（最大 {max} 件/人）',
   'issue.signals': 'ユーザーイベント',
   'issue.signalsNone': 'このイベントには行動シグナルが付いていません。',
   'issue.replayScreensEmpty':
@@ -264,7 +264,7 @@ export const ja: Messages = {
   'push.credError.pem-one-line': '鍵が 1 行 · 改行が失われている',
   'push.credError.key-does-not-sign': '鍵で署名できない',
   'push.credError.fcm-bad-json': 'サービスアカウント JSON ではない',
-  // --- 取得手順:入手先・ファイルの見分け方・紛らわしい別ファイル ---
+  // --- 取得手順：入手先・ファイルの見分け方・紛らわしい別ファイル ---
   'push.specHowTo': '取得',
   'push.specApnsTitle': 'iOS · APNs',
   'push.specFcmTitle': 'Android · FCM',
@@ -294,7 +294,7 @@ export const ja: Messages = {
   'push.secretWrongTab': '現在のタブの provider と不一致',
   'push.keyIdFromFilename': 'Key ID はファイル名から取得',
   'push.credentialLabel': 'メモ',
-  'push.credentialLabelPlaceholder': '例: 2026 ローテーション',
+  'push.credentialLabelPlaceholder': '例：2026 ローテーション',
   'push.saveAndProbe': '保存して検証',
   // --- 三値の判定 ---
   'push.verdict.ok': '有効。ベンダーが受理。',
@@ -361,10 +361,10 @@ export const ja: Messages = {
   'push.check.mass-quarantine': '失効 {quarantined} 台 · 稼働 {live} 台',
   'push.fix.mass-quarantine': '通常は認証情報が別アプリまたは別ホストを指している。',
   'push.check.all-failing': '24h で {failed} 件全失敗',
-  'push.fix.all-failing': 'ベンダー応答: {reason}',
+  'push.fix.all-failing': 'ベンダー応答：{reason}',
   'push.check.apns-mixed-env': '{live} 台中 {sandbox} 台が Apple sandbox',
   'push.fix.apns-mixed-env': '端末の env ごとに配信。鍵は共通。',
-  'push.revoked': '(失効)',
+  'push.revoked': '（失効）',
   'push.sendsEmpty': '送信はまだありません',
   'push.sendsTitle': '最近の送信',
   'push.sent24h': '24h 送信',
@@ -392,6 +392,7 @@ export const ja: Messages = {
     '直近 {hours} 時間の区間ごとのクラッシュフリー率。縦軸は {low}% から。線の途切れはセッションがなかった区間で、問題がなかった区間ではありません。',
   'crashFree.window': '直近 {hours} 時間',
   'platform.unknown': '不明（SDK がサーバーより新しい）',
+  'platform.weapp': 'WeChat ミニプログラム',
   'releases.artifactBroken': '{platform} にアップロード済みだが読めない成果物あり。展開して確認。',
   'releases.artifactMissing':
     '{platform} はこのリリースでイベントを送っていますが、シンボリケーション用アーティファクトがありません — スタックを読めません',
@@ -413,7 +414,7 @@ export const ja: Messages = {
   'releases.emptyTitle': 'リリースはまだありません',
   'releases.loadFailed': 'リリースを読み込めませんでした。',
   'releases.unreadable':
-    '保存済みですが読めないため、シンボリケーションには使えません: {names}。React Native では合成済みの map をアップロードしてください(bundle ではなく)。',
+    '保存済みですが読めないため、シンボリケーションには使えません：{names}。React Native では合成済みの map をアップロードしてください（bundle ではなく）。',
   'replay.empty': 'このリプレイにはフレームがありません。',
   'replay.frameAlt': '{t} 秒時点のフレーム',
   'replay.loadFailed': 'リプレイを読み込めませんでした。',
@@ -421,7 +422,7 @@ export const ja: Messages = {
   'replay.play': '再生',
   'replay.scrubber': 'リプレイ位置',
   'replay.title': 'セッションリプレイ',
-  'releases.noArtifacts': 'シンボル化の成果物なし。スタックは難読化のまま:',
+  'releases.noArtifacts': 'シンボル化の成果物なし。スタックは難読化のまま：',
 
   'settings.adminEmail': '管理者メール',
   'settings.auditLoadFailed': '監査ログを読み込めませんでした。',

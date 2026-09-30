@@ -6,6 +6,54 @@
 
 ---
 
+## v4.0.1（2026-09-30 — 部署在唯一有数据的库上炸了，以及门为什么没拦住）
+
+4.0.0 的镜像构建和全部门都绿，`deploy` 在生产失败：
+
+```
+while executing migration 18: new row for relation "event_attachments"
+violates check constraint "event_attachments_source_check"
+```
+
+0018 把 `js` 改写成 `javascript`，这一句放在 `DROP CONSTRAINT` 之前 —— 违反的正是
+当时还生效的旧约束。**空库里 `WHERE source = 'js'` 匹配 0 行，不写行也就不检查约束**，
+所以 preflight、CI、e2e 和每一条单测都绿，只有唯一一个有存量数据的库会炸。
+
+至今每一次 schema 测试都从空库开始，也就是说每条 migration 只被问过「对空的做了什么」，
+而有意思的那些全是关于既有行的。现在有 `scripts/migrate-with-data-e2e.sh`：先上 0001–0017，
+灌进那个年代合法的行（包括 `source = 'js'`），再上其余，最后逐条核对行确实被迁移过、
+约束确实被加回来、旧标签确实没被动。它还自检一次「老约束现在还拒不拒这次改写」——
+seed 一旦失去牙齿，这道门会说出来，而不是继续报绿。
+
+**元门从 21 道扩到 54 道（preflight + webapp `check` 共 63 道）。** 它现在从
+package.json 读每道门真实的调用方式（此前一个 `.sh` 的门一直用 node 跑），并把已安装的
+依赖软链进沙箱，否则那些 import 组件的门解析不到 react —— 而 bun 是挂住，不是报错，
+挂住和通过在那里是同一个观察。剩下 8 道需要构建产物或真实 git 历史，每次运行都点名报出。
+
+写探针的过程抓出三道**在跑、也真绿、但已经不覆盖那件事**的门：
+
+- `check-hardcoded-text` 只扫引号字符串。React 里硬编码文案最自然的写法 ——
+  直接写在标签之间 —— 从来没被看过。
+- `check-cjk-punctuation` 只读 `zh.ts`（它自己开头那段还在数 `ja.ts` 里找到的标点），
+  也没有括号规则。两边打开后找出 27 处半角标点贴着中日文，已全部改掉。
+- `check-push-snippets` 断言服务端注册了两个字面路由，却从不问 snippet 用的是不是这两个。
+
+**只有看渲染才能发现的三处：**
+
+- 项目页直接渲染 `platform` 原始值：卡片写 `weapp`，另外两个页面把同一个项目写成正式名；
+  0020 之后没有 platform 的项目渲染成一个空药丸。`weapp` 的标签是写死的中文，
+  英文和日文界面上就夹着「微信小程序」；而 `react-native`（每个既有项目携带的值）
+  根本不在标签表里。现在有 `check-platform-label` 守着，mock 里也加了 weapp 项目和无标签项目。
+- occurrence 行是 `<button>`，里面的 `UserChip` 也是 `<button>`。
+- 两张同名 sourcemap 的断言在 CI 上判错：它找路径里的 `home`，而 GitHub runner 的路径
+  经过 `/home/runner`。Mac 上绿，CI 上红，被测的行为两边都是对的。
+
+**新门**：docs 每一页都要能从 README 走到。`check-doc-links` 问的是链接指向的文件在不在，
+这道门问的是反过来 —— 有没有链接指向这个文件。`replay-encoding-v2.md` 和
+`runbook/cli-auth.md` 都判为用户文档留下，却没有任何路径能走到。
+
+---
+
 ## v4.0.0（2026-09-30 — 五个 SDK，一套线；以及一批「写了但从没在跑」）
 
 三个 SDK 变五个。`@goliapkg/sentori-web` 和 `@goliapkg/sentori-weapp` 都用同一个内核，

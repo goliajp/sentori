@@ -19,9 +19,17 @@
 // An entry that does not go red means the probe is wrong at least as
 // often as the gate.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 
@@ -99,7 +107,7 @@ const PROBES = [
     why: 'an install line that installs a version we do not ship',
   },
   {
-    gate: 'gen-replay-vectors.mjs --check',
+    gate: 'gen-replay-vectors.mjs',
     // The compiled module, not the source: the generator imports
     // `lib/`, so a mutation of the `.ts` would leave the checker
     // reading the same bytes and passing.
@@ -180,7 +188,7 @@ const PROBES = [
     // Swift and Kotlin have not been told about shows up here rather
     // than as two platforms counting losses differently in
     // production.
-    gate: 'gen-transport-vectors.mjs --check',
+    gate: 'gen-transport-vectors.mjs',
     // The built lib, not the source: the generator drives the compiled
     // kernel, so that is what a stale fixture would disagree with.
     file: 'sdk/core/lib/transport.js',
@@ -201,6 +209,269 @@ const PROBES = [
     why: 'a public option nothing reads',
   },
   {
+    gate: 'check-compose-healthchecks.mjs',
+    file: 'self-hosted/docker/docker-compose.yml',
+    find: 'test: ["CMD", "pg_isready", "-U", "sentori"]',
+    replace: 'test: ["CMD-SHELL", "pg_isready -U sentori"]',
+    why: 'a healthcheck an image without a shell cannot answer',
+  },
+  {
+    gate: 'check-time-has-absolute.mjs',
+    file: 'webapp/src/pages/Instruments.tsx',
+    // The waiver, not the call. Deleting the call would only prove the
+    // checker counts occurrences; deleting the reason it is allowed is
+    // the defect — a relative time with nothing behind it.
+    find: '                            // bare-relative: interpolated into a sentence, no element to hold a title\n          since: formatRelative(p.registeredAt),',
+    replace: '          since: formatRelative(p.registeredAt),',
+    why: 'a bare relative time with no absolute behind it and no reason given',
+  },
+  {
+    gate: 'check-bun-version.mjs',
+    file: '.bun-version',
+    find: '1.4.2',
+    replace: '1.3.13',
+    why: 'a pinned bun that is not the bun writing the lockfiles',
+  },
+  {
+    gate: 'check-doc-links.mjs',
+    file: 'docs/README.md',
+    find: '[`errors.md`](errors.md)',
+    replace: '[`errors.md`](error-codes.md)',
+    why: 'an index claiming a page that does not exist',
+  },
+  {
+    gate: 'check-sql-inserts.mjs',
+    file: 'self-hosted/server/src/handlers/admin/test_push.rs',
+    find: "VALUES ($1, $2, $3, $4, $5, 'queued') RETURNING id",
+    replace: "VALUES ($1, $2, $3, $4, $5, $6, 'queued') RETURNING id",
+    why: 'an INSERT with more values than columns, which Postgres refuses at prepare time',
+  },
+  {
+    // actionlint is a separate binary. Where it is missing the gate
+    // soft-skips by design, so the probe is skipped too and reported
+    // as unverified rather than quietly passing.
+    gate: 'check-workflows.sh',
+    requires: 'actionlint',
+    file: '.github/workflows/build.yml',
+    find: 'jobs:\n  changes:',
+    replace: 'jobs:\n  changes:\n    runs-on: ${{ }}',
+    why: 'a workflow GitHub cannot parse',
+  },
+  {
+    gate: 'check-mirror.mjs',
+    file: '.github/workflows/v0.2-oss-mirror.yml',
+    find: "            --include='/docs/errors.md' \\\n",
+    replace: '',
+    why: 'a public mirror that ships no error reference',
+  },
+  {
+    gate: 'check-orphan-modules.sh',
+    file: 'self-hosted/server/src/main.rs',
+    find: 'mod archive_worker;\n',
+    replace: '',
+    why: 'a module in the tree that nothing compiles',
+  },
+  {
+    gate: 'check-docs-api-truth.mjs',
+    file: 'docs/protocol.md',
+    find: 'sentori.context(',
+    replace: 'sentori.startSpan(',
+    why: 'a doc teaching a verb the SDK does not export',
+  },
+  {
+    gate: 'check-env-vars-real.mjs',
+    file: 'docs/troubleshooting.md',
+    find: 'SENTORI_RATELIMIT_PER_TOKEN_RPS',
+    replace: 'SENTORI_RATE_LIMIT_PER_MIN',
+    why: 'an env var the docs name and nothing reads',
+  },
+  {
+    gate: 'check-doc-imports.mjs',
+    file: 'docs/sdk-kotlin.md',
+    find: 'import com.sentori.SentoriConfig',
+    replace: 'import jp.golia.sentori.SentoriConfig',
+    why: 'an import built from the Gradle coordinate rather than the package',
+  },
+  {
+    gate: 'check-push-snippets.mjs',
+    file: 'webapp/src/lib/push-snippets.ts',
+    find: "export const SEND_PATH = '/v1/push/sends';",
+    replace: "export const SEND_PATH = '/v1/push/send';",
+    why: 'snippets teaching a route the server does not register',
+  },
+  {
+    gate: 'check-i18n.mjs',
+    file: 'webapp/src/i18n/en.ts',
+    find: "  'platform.unknown': 'Unknown (SDK newer than this server)',",
+    replace:
+      "  'platform.unknown': 'Unknown (SDK newer than this server)',\n" +
+      "  'zz.neverReferenced': 'a key no screen asks for',",
+    why: 'a message key no screen references, and no other locale has',
+  },
+  {
+    gate: 'check-hardcoded-text.mjs',
+    file: 'webapp/src/pages/Projects.tsx',
+    find: '        {row.platform && (',
+    replace: "        <span>A sentence nobody ever translated</span>\n        {row.platform && (",
+    why: 'English prose on screen that never went through t()',
+  },
+  {
+    gate: 'check-cjk-punctuation.mjs',
+    file: 'webapp/src/i18n/ja.ts',
+    // ja.ts, because the checker read only zh.ts for as long as it
+    // existed while its own opening note counted the marks it had
+    // found in ja.ts.
+    find: "  'platform.unknown': '不明（SDK がサーバーより新しい）',",
+    replace: "  'platform.unknown': '不明(SDK がサーバーより新しい)',",
+    why: 'half-width brackets against Japanese UI copy',
+  },
+  {
+    gate: 'check-no-raw-fetch.mjs',
+    file: 'webapp/src/pages/Projects.tsx',
+    find: '  const t = useT();\n  const h = row.health;',
+    replace: "  const t = useT();\n  void fetch('/admin/api/projects');\n  const h = row.health;",
+    why: 'a UI file calling fetch instead of going through the api client',
+  },
+  {
+    gate: 'check-platform-label.mjs',
+    file: 'webapp/src/pages/Projects.tsx',
+    find: '            {platformLabel(row.platform, t)}',
+    replace: '            {row.platform}',
+    why: 'a wire platform value printed raw',
+  },
+  {
+    gate: 'check-unreferenced.mjs',
+    file: 'webapp/src/pages/IssueDetail.tsx',
+    find: "import { UserChip } from '../components/identity';\n",
+    replace: '',
+    why: 'a module left behind that nothing imports',
+  },
+  {
+    gate: 'check-select-appearance.mjs',
+    file: 'webapp/src/pages/TriageView.tsx',
+    find: "                className={`${SELECT_CLASS} mr-1 h-[22px] pl-1 pr-5 text-xs text-fg-muted`}\n",
+    replace: '                className="mr-1 h-[22px] pl-1 pr-5 text-xs text-fg-muted"\n',
+    why: 'a select that paints its own light-grey control over a dark form',
+  },
+  {
+    gate: 'check-audit-columns.mjs',
+    file: 'webapp/src/pages/Settings.tsx',
+    find: '<span className="text-fg-muted">{r.targetType ?? \'—\'}</span>',
+    replace: '<span className="text-fg-muted" />',
+    why: 'an audit row that no longer says what kind of thing was acted on',
+  },
+  {
+    gate: 'check-error-format.mjs',
+    file: 'webapp/src/lib/useAsyncData.ts',
+    find: 'return e instanceof ApiError ? `${e.status}: ${e.message}` : String(e);',
+    replace: 'return e instanceof ApiError ? `: ` : String(e);',
+    why: 'every API failure in the console rendering as a bare colon',
+  },
+  {
+    gate: 'check-release-format.mjs',
+    file: 'webapp/src/components/ui.tsx',
+    find: '  return collides ? release : short;',
+    replace: '  return short;',
+    why: 'two different builds drawn as one release',
+  },
+  {
+    gate: 'check-error-reason.mjs',
+    file: 'webapp/src/pages/Instruments.tsx',
+    find: '<ErrorBanner reason={error}>',
+    replace: '<ErrorBanner>',
+    why: 'a banner that drops what the server said and keeps only our sentence',
+  },
+  {
+    gate: 'check-release-lights.mjs',
+    file: 'webapp/src/pages/Releases.tsx',
+    find: "    ['unused', t('releases.legendUnused')],\n",
+    replace: '',
+    why: 'a legend that leaves one of the dots unexplained',
+  },
+  {
+    gate: 'check-rfc3339.sh',
+    file: 'self-hosted/server/src/handlers/sdk/events.rs',
+    find: '    #[serde(with = "time::serde::rfc3339")]\n    pub occurred_at: OffsetDateTime,',
+    replace: '    pub occurred_at: OffsetDateTime,',
+    why: 'a timestamp that goes out as a nine-element array and parses as NaN',
+  },
+  {
+    gate: 'gen-openapi.mjs',
+    file: 'self-hosted/server/src/handlers/mod.rs',
+    // Under /v1, because the document covers the machine-facing
+    // surface only — a route outside it is excluded on purpose, and
+    // the first version of this probe added one there and proved
+    // nothing.
+    find: '.route("/v1/deploys", post(sdk::deploys::handle))',
+    replace: '.route("/v1/deploys", post(sdk::deploys::handle))\n        .route("/v1/injected-probe", post(sdk::deploys::handle))',
+    why: 'a route the published OpenAPI document does not mention',
+  },
+  {
+    gate: 'gen-error-reference.mjs',
+    file: 'self-hosted/server/src/handlers/sdk/events.rs',
+    find: 'Json(json!({ "error": "ingest_failed" })),',
+    replace: 'Json(json!({ "error": "injected_probe_code" })),',
+    why: 'an error code the published reference does not list',
+  },
+  {
+    gate: 'check-crash-free-format.mjs',
+    deps: 'webapp/node_modules',
+    file: 'webapp/src/lib/crash-free.ts',
+    find: '  if (crashed <= 0) return pct.toFixed(digits);\n  const scale = 10 ** digits;\n  return (Math.floor(pct * scale) / scale).toFixed(digits);',
+    replace: '  return pct.toFixed(digits);',
+    why: 'a release with three crashes rendering as 100%',
+  },
+  {
+    gate: 'check-timeline-labels.mjs',
+    deps: 'webapp/node_modules',
+    file: 'webapp/src/components/TimelineStrip.tsx',
+    find: '  return ((-sec / spanS) * scale) * trackW >= EVENT_LABEL_PX;',
+    replace: '  return true;',
+    why: 'a tick label printed inside the space the event label reserves',
+  },
+  {
+    gate: 'check-byte-format.mjs',
+    deps: 'webapp/node_modules',
+    file: 'webapp/src/components/ui.tsx',
+    find: "  const units = ['KB', 'MB', 'GB', 'TB'];",
+    replace: "  const units = ['KB'];",
+    why: 'a size that never changes unit, so a 291 MB dSYM reads as six digits of KB',
+  },
+  {
+    gate: 'check-peer-ranges.mjs',
+    deps: 'sdk/react-native/node_modules',
+    file: 'sdk/react-native/package.json',
+    find: '"react-native": ">=0.86.0"',
+    replace: '"react-native": ">=0.99.0"',
+    why: 'a published peer range that excludes the version we build against',
+  },
+  {
+    gate: 'check-highlight.mjs',
+    deps: 'webapp/node_modules',
+    file: 'webapp/src/lib/highlight.ts',
+    // The registration, not `languageForPath` — the checker runs
+    // every console snippet through `highlightBlock` and never asks
+    // what language a file path is, so a probe there proved nothing.
+    find: "  ['rust', rust],\n",
+    replace: '',
+    why: 'a snippet language with no grammar registered, so it renders uncoloured',
+  },
+  {
+    gate: 'check-credential-recognition.mjs',
+    deps: 'webapp/node_modules',
+    file: 'webapp/src/lib/push-credentials.ts',
+    find: "  if (body.startsWith('-----BEGIN')) {",
+    replace: "  if (false) {",
+    why: 'a PEM key the credentials form no longer recognises',
+  },
+  {
+    gate: 'check-doc-reachable.mjs',
+    file: 'docs/README.md',
+    find: '- [`recipes/release-versioning.md`](recipes/release-versioning.md)\n',
+    replace: '',
+    why: 'a docs page with no way in from the index',
+  },
+  {
     gate: 'check-error-status.mjs',
     file: 'self-hosted/server/src/handlers/notify_admin.rs',
     find: 'pub async fn smtp_status(State(state): State<Arc<AppState>>) -> Json<Value> {',
@@ -210,6 +481,41 @@ const PROBES = [
     why: 'a 200 carrying an error',
   },
 ];
+
+// How each gate is actually invoked, read from the script that invokes
+// it rather than guessed here.
+//
+// Guessing got it wrong twice: a `.sh` gate was run with node, and the
+// webapp checkers are a mix of `node`, `bun` and
+// `node --experimental-strip-types` — running one the wrong way gives
+// a non-zero exit, which this file would otherwise read as "the gate
+// caught the defect". The baseline check below catches that now, but
+// only because the invocation is right in the first place.
+//
+// Two script lists, because there are two: preflight at the root, and
+// `check` inside webapp. `check:published-readme` is deliberately not
+// among them — it is a release-time gate that needs the network.
+function gatesFrom(pkgPath, script, dir) {
+  const text = JSON.parse(readFileSync(pkgPath, 'utf8')).scripts[script];
+  const out = new Map();
+  const re = /(node(?: --[\w-]+)*|bash|bun) ((?:scripts|devtools)\/((?:check|gen)-[a-z0-9-]+\.(?:mjs|sh)))((?: --[\w-]+)*)/g;
+  for (const m of text.matchAll(re)) {
+    const [runner, ...runnerFlags] = m[1].split(' ');
+    out.set(m[3], {
+      runner,
+      runnerFlags,
+      path: m[2],
+      args: m[4].trim() ? m[4].trim().split(/\s+/) : [],
+      dir,
+    });
+  }
+  return out;
+}
+
+const GATES = new Map([
+  ...gatesFrom(new URL('../package.json', import.meta.url).pathname, 'preflight', '.'),
+  ...gatesFrom(new URL('../webapp/package.json', import.meta.url).pathname, 'check', 'webapp'),
+]);
 
 // The tracked files only: the mirror of what a clean checkout holds, and
 // small enough to copy in under two seconds.
@@ -231,9 +537,40 @@ try {
   // this list, having never once run. The baseline check added below
   // is what surfaced it; before that, a gate that could not run and a
   // gate that caught the defect were the same observation.
+  // The installed dependencies, borrowed rather than copied.
+  //
+  // Several checkers import the component they judge, so without
+  // node_modules they cannot resolve `react` and do not fail — `bun`
+  // sits trying to fetch it. Six gates were carved out as "needs an
+  // install" for that reason alone, which meant six gates nothing
+  // verified. The install exists on this machine; the sandbox links to
+  // it. Nothing writes through the link: probes only ever touch files
+  // under the copy.
+  const linked = [];
+  for (const dir of [
+    'node_modules',
+    'webapp/node_modules',
+    'apps/rn-example/node_modules',
+    // Where the workspace puts a peer the SDK declares.
+    'sdk/react-native/node_modules',
+    'sdk/expo/node_modules',
+  ]) {
+    const real = join(ROOT, dir);
+    if (existsSync(real)) {
+      mkdirSync(dirname(join(copy, dir)), { recursive: true });
+      symlinkSync(real, join(copy, dir));
+      linked.push(dir);
+    }
+  }
+
   const git = (...args) =>
     execFileSync('git', args, { cwd: copy, stdio: 'pipe', encoding: 'utf8' });
   git('init', '-q');
+  // The linked node_modules must not be walked by the sandbox's own
+  // git, which several gates query: `check-surface-gates` reads
+  // `git ls-files` and reported `node_modules` as an ungated surface.
+  // No trailing slash — the link is a blob to git, not a directory.
+  writeFileSync(join(copy, '.git', 'info', 'exclude'), 'node_modules\n**/node_modules\n');
   git('-c', 'user.email=gates@example.com', '-c', 'user.name=gates', 'add', '-A');
   git(
     '-c', 'user.email=gates@example.com', '-c', 'user.name=gates',
@@ -251,7 +588,21 @@ try {
   }
 
   const failures = [];
+  const skipped = [];
   for (const p of PROBES) {
+    if (p.requires && spawnSync('sh', ['-c', `command -v ${p.requires}`], { stdio: 'ignore' }).status !== 0) {
+      skipped.push(`${p.gate} (needs ${p.requires})`);
+      continue;
+    }
+    // A gate that imports the component it judges needs the install.
+    // Where there is none — a checkout with no `bun install` — the
+    // probe is reported as skipped rather than run, because a gate
+    // that cannot resolve its imports fails identically to one that
+    // caught its defect.
+    if (p.deps && !linked.includes(p.deps)) {
+      skipped.push(`${p.gate} (needs ${p.deps}, which is not installed here)`);
+      continue;
+    }
     const path = join(copy, p.file);
     const before = readFileSync(path, 'utf8');
     if (!before.includes(p.find)) {
@@ -267,17 +618,40 @@ try {
     // file then read as "the gate went red". That entry had never run
     // the gate at all, and was reported as verified for as long as it
     // has existed. Found by adding a second entry of the same shape.
-    const [script, ...args] = p.gate.split(' ');
+    const g = GATES.get(p.gate);
+    if (!g) {
+      failures.push(
+        `${p.gate}: no script in package.json runs it, so this probe tests a gate ` +
+          `that is not a gate. Wire it into preflight or webapp's check first.`,
+      );
+      continue;
+    }
+    const cwd = g.dir === '.' ? copy : join(copy, g.dir);
     const run = () =>
-      spawnSync('node', [join(copy, 'scripts', script), ...args], {
-        cwd: copy,
-        encoding: 'utf8',
-      });
+      spawnSync(
+        g.runner,
+        [...g.runnerFlags, join(cwd, g.path), ...g.args],
+        // A gate that cannot resolve its imports does not always
+        // fail — `bun` sat for minutes trying to fetch `react` for a
+        // checker that imports a component, with no node_modules in
+        // the sandbox. A hang and a pass are the same observation from
+        // here, so a run that does not finish is a run that did not
+        // answer.
+        { cwd, encoding: 'utf8', timeout: 60_000 },
+      );
 
     // Green before the probe, or a non-zero exit afterwards says
     // nothing: a gate that cannot run in this sandbox fails either
     // way, and looks exactly like one that caught the defect.
     const baseline = run();
+    if (baseline.error?.code === 'ETIMEDOUT') {
+      failures.push(
+        `${p.gate}: did not finish in 60s on an unmodified tree. It needs something ` +
+          `the sandbox does not have — most often node_modules, which a tracked-files ` +
+          `copy has no reason to hold.`,
+      );
+      continue;
+    }
     if (baseline.status !== 0) {
       failures.push(
         `${p.gate}: already fails on an unmodified tree, so its red below means ` +
@@ -312,13 +686,10 @@ try {
   // verified; it is merely present. So the count is printed, and so
   // are the names.
   {
-    const preflight = readFileSync(join(ROOT, 'package.json'), 'utf8');
-    const run = new Set(
-      [...preflight.matchAll(/(?:node|bash) scripts\/(check-[a-z-]+\.(?:mjs|sh))/g)].map((m) => m[1]),
-    );
-    const probed = new Set(PROBES.map((p) => p.gate.split(' ')[0]));
-    // These read `lib/`, which is a build output and not in the sandbox
-    // — it copies tracked files. They are checked by preflight and by
+    const run = new Set(GATES.keys());
+    const probed = new Set(PROBES.map((p) => p.gate));
+    // These read a build output or an installed dependency, neither of
+    // which is in the sandbox — it copies tracked files. They are checked by preflight and by
     // CI, where a build has happened; they cannot be probed here, and
     // that is a property of the sandbox rather than a gap in them.
     const NEEDS_BUILD = new Set([
@@ -328,19 +699,50 @@ try {
       'check-weapp-size.sh',
       'check-maven-artifact.mjs',
       'check-orphan-lib.mjs',
+      // Reads node_modules to learn what we build against, so it needs
+      // an install rather than a checkout.
+      // Three webapp checkers import the component they judge, so
+      // they need webapp/node_modules. They run in preflight and in
+      // CI, where an install has happened.
+      // Runs the built `sdk/core/lib/identity.js`, not the TypeScript
+      // beside it, so a change to the source is invisible from a
+      // tracked-files copy. Preflight builds the SDKs before it.
+      'gen-identity-vectors.mjs',
+      // Compares sdk/native/VERSION against where `swift/<version>`
+      // points. The sandbox is one commit with the tag names copied
+      // onto it, so every tag resolves to HEAD and the gate correctly
+      // answers "tagged at this commit". Probing it needs real
+      // history, not a flattened copy.
+      'check-native-version-tag.mjs',
     ]);
-    const unprobed = [...run].filter((g) => !probed.has(g) && !NEEDS_BUILD.has(g)).sort();
+    // This file cannot be its own probe: a mutation that makes it go
+    // red is a mutation to the thing reporting the result. What stands
+    // in for one is the baseline check above — a gate that cannot run
+    // in the sandbox is caught before its red is counted, which is how
+    // three false passes in this list were found.
+    const SELF = 'check-gates-fail.mjs';
+    const unprobed = [...run]
+      .filter((g) => !probed.has(g) && !NEEDS_BUILD.has(g) && g !== SELF)
+      .sort();
     const unprobeable = [...run].filter((g) => !probed.has(g) && NEEDS_BUILD.has(g)).sort();
+    const covered = [...run].filter((g) => probed.has(g)).length;
     console.log(
       `✓ ${PROBES.length} gates each went red on the defect they exist for` +
-        ` (${run.size - unprobed.length} of ${run.size} preflight gates have a probe)`,
+        ` (${covered} of ${run.size} gates preflight and webapp's check run)`,
     );
     if (unprobeable.length > 0) {
-      console.log(`  need a build, so not probeable from a tracked-files copy: ${unprobeable.join(', ')}`);
+      console.log(
+        `  ${unprobeable.length} cannot be probed from a tracked-files copy — they need a` +
+          ` build, an install or real history: ${unprobeable.join(', ')}`,
+      );
     }
     if (unprobed.length > 0) {
       console.log(`  no probe yet, so present rather than verified: ${unprobed.join(', ')}`);
     }
+    if (skipped.length > 0) {
+      console.log(`  probe skipped, so unverified on this machine: ${skipped.join(', ')}`);
+    }
+    console.log('  and this file, which cannot be its own probe');
   }
 } finally {
   rmSync(copy, { recursive: true, force: true });

@@ -654,13 +654,22 @@ function OccurrenceList({
 
   return (
     <div className="divide-y divide-border/60">
+      {/* A div rather than a button, because the row ends in a UserChip
+          and that is a real button — the clipboard is behind it. A
+          button inside a button is invalid HTML, and React says so on
+          every render of this list. Same shape the issue list uses for
+          the same reason. */}
       {rows.map((r) => (
-        <button
+        <div
           key={r.id}
-          type="button"
+          role="button"
+          tabIndex={0}
           onClick={() => onPick(r.id)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onPick(r.id);
+          }}
           className={clsx(
-            'flex w-full items-center gap-4 px-3.5 py-2 text-left text-sm transition-colors',
+            'flex w-full cursor-pointer items-center gap-4 px-3.5 py-2 text-left text-sm transition-colors',
             r.id === currentId ? 'bg-raised' : 'hover:bg-raised/50',
           )}
         >
@@ -692,7 +701,7 @@ function OccurrenceList({
               />
             )}
           </span>
-        </button>
+        </div>
       ))}
     </div>
   );
