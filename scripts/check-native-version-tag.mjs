@@ -58,9 +58,34 @@ if (!tagged) {
 // Anything outside Tests/ still counts, including fixtures the library
 // reads at runtime.
 const IGNORED = /(^|\/)(Tests|__tests__|androidTest|src\/test)\//;
+
+// `fixtures/` is shared by the two native test suites and reaches a
+// consumer only if a manifest says so. `Package.swift` lists its
+// resources explicitly and the Android build lists its source sets;
+// a fixture named in neither is not in the artifact, so changing it
+// cannot give anyone older sources.
+//
+// The library's own files mention `identity-vectors.json` in doc
+// comments, which is why "does any non-test source name it" is the
+// wrong question — a comment is not a read. What ships is decided by
+// the manifests, so the manifests are what this asks.
+const manifests = ['sdk/native/ios/Package.swift', 'sdk/native/android/build.gradle']
+  .map((f) => {
+    try {
+      return readFileSync(join(root, f), 'utf8');
+    } catch {
+      return '';
+    }
+  })
+  .join('\n');
+const shipped = (f) => {
+  if (!f.startsWith('sdk/native/fixtures/')) return true;
+  return manifests.includes(f.split('/').pop());
+};
+
 const changedSince = git('diff', '--name-only', `${tag}..HEAD`, '--', 'sdk/native')
   .split('\n')
-  .filter((f) => f.trim() && !IGNORED.test(f))
+  .filter((f) => f.trim() && !IGNORED.test(f) && shipped(f))
   .join('\n');
 if (!changedSince) {
   console.log(`✓ native ${version} is tagged and sdk/native has not moved since`);
