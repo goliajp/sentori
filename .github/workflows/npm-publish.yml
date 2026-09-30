@@ -73,11 +73,19 @@ jobs:
           node-version: 24
           registry-url: 'https://registry.npmjs.org'
 
-      # A missing token must stop the run here, with a sentence that
-      # says what to do. Without this the publish step fails deep in
-      # npm's own output as `ENEEDAUTH`, on the one path where a
-      # half-finished release is worse than no release.
+      # A missing token must stop the run before anything is published,
+      # with a sentence that says what to do — otherwise the publish
+      # step fails deep in npm's own output as `ENEEDAUTH`, on the one
+      # path where a half-finished release is worse than no release.
+      #
+      # Only where a publish can happen. On develop this workflow exists
+      # to retest the four gates below, and failing there for a
+      # credential it never uses would be a red that says nothing about
+      # the commit.
       - name: the registry credential exists
+        if: >-
+          startsWith(github.ref, 'refs/heads/release/') ||
+          (github.event_name == 'workflow_dispatch' && inputs.dry_run != true)
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
