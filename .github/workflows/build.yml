@@ -369,6 +369,10 @@ jobs:
         run: node scripts/check-doc-reachable.mjs
       - name: shipped docs do not link somewhere a reader cannot go
         run: node scripts/check-public-links.mjs
+      - name: nothing a consumer installs names a workspace range
+        run: node scripts/check-publishable-deps.mjs
+      - name: every SDK reports the version it is
+        run: node scripts/check-sdk-version-constant.mjs
       - name: the OpenAPI document matches the router
         run: node scripts/gen-openapi.mjs --check
       - name: the error reference matches the handlers
@@ -613,6 +617,15 @@ jobs:
       # cleanly and fails at import.
       - name: every advertised entry point exists
         run: node scripts/check-package-entrypoints.mjs
+
+      # A version number already on npm is a promise about what it
+      # contains. v4 moved the transport kernel into core and left the
+      # version at 3.0.0 — seventeen exports existed here and not on
+      # npm, and the first package published against that range failed
+      # at `import`, having installed cleanly. Needs the build above,
+      # so it lives here rather than with the static checks.
+      - name: a published version number still means what it meant
+        run: node scripts/check-sibling-exports.mjs
 
       # And a peer range is a promise about what it installs alongside.
       # 6.0.0 shipped `expo-modules-core >=56.0.0 <57.0.0` while this

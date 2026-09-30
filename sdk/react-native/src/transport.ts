@@ -18,7 +18,7 @@ import { getConfig } from './config';
 import { isAnyNativeModuleLinked } from './native-loader';
 
 // Pinned to package.json by a test — bump both together.
-const SDK_VERSION = '7.0.1';
+const SDK_VERSION = '7.1.1';
 
 const getAsyncStorage = async (): Promise<null | TransportStorage> => {
   // Host may have the JS package without pod install / prebuild →

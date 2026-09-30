@@ -16,7 +16,7 @@ import { getConfig } from './config.js'
 import { getWx } from './wx.js'
 
 // Pinned to package.json by a test — bump both together.
-export const SDK_VERSION = '0.1.0'
+export const SDK_VERSION = '1.0.3'
 
 /**
  * `wx.setStorageSync` caps a single key at 1 MB and the whole store at

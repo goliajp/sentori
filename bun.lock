@@ -42,7 +42,7 @@
     },
     "sdk/core": {
       "name": "@goliapkg/sentori-core",
-      "version": "3.0.0",
+      "version": "3.1.0",
       "devDependencies": {
         "@types/bun": "latest",
         "typescript": "^7",
@@ -67,7 +67,7 @@
     },
     "sdk/react-native": {
       "name": "@goliapkg/sentori-react-native",
-      "version": "7.0.1",
+      "version": "7.1.1",
       "bin": {
         "sentori-rn-upload-source-bundle": "bin/sentori-rn-upload-source-bundle.cjs",
       },
@@ -100,9 +100,9 @@
     },
     "sdk/weapp": {
       "name": "@goliapkg/sentori-weapp",
-      "version": "0.1.0",
+      "version": "1.0.3",
       "dependencies": {
-        "@goliapkg/sentori-core": "workspace:*",
+        "@goliapkg/sentori-core": "^3.0.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -111,9 +111,9 @@
     },
     "sdk/web": {
       "name": "@goliapkg/sentori-web",
-      "version": "0.1.0",
+      "version": "1.0.3",
       "dependencies": {
-        "@goliapkg/sentori-core": "workspace:*",
+        "@goliapkg/sentori-core": "^3.0.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
