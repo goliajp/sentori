@@ -34,7 +34,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "rm -rf lib && tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "prepack": "bun run build"

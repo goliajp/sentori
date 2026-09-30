@@ -95,3 +95,12 @@ export {
 } from './logger.js'
 
 export { hashIdentities, type LinkBy } from './identity.js'
+
+export {
+  createTransport,
+  PENDING_STORAGE_KEY,
+  type Transport,
+  type TransportConfig,
+  type TransportHost,
+  type TransportStorage,
+} from './transport.js'

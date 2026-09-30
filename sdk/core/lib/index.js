@@ -18,4 +18,5 @@ export { safeAsync, safeFn } from './safe.js';
 export { __resetCircuitForTests, isCircuitOpen, reportInternal, setInternalReporter, } from './self-report.js';
 export { getLogLevel, logger, setLogLevel, setLogTransport, } from './logger.js';
 export { hashIdentities } from './identity.js';
+export { createTransport, PENDING_STORAGE_KEY, } from './transport.js';
 //# sourceMappingURL=index.js.map
