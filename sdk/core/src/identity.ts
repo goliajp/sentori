@@ -22,6 +22,8 @@
  * must route through `hashIdentities` so the contract holds.
  */
 
+import { sha256Hex } from './sha256.js'
+
 /** Map of (key_type → raw_value) accepted at the public SDK
  *  `setUser` API. Common types have well-known normalisation; the
  *  index signature lets host apps add custom keys. */
@@ -42,16 +44,19 @@ async function hashOne(keyType: string, raw: string | undefined): Promise<null |
   if (normalised === '') return null
 
   // Most platforms (browsers, RN 0.71+ via Hermes, Node 18+) expose
-  // `globalThis.crypto.subtle`. Fall back to a `WebCrypto` shim if
-  // not present — but we don't ship a fallback in v2.3; absence
-  // means SDK can't hash, so we surface a clear failure instead of
-  // sending a half-baked identifier.
+  // `globalThis.crypto.subtle`, and it is native code, so it is used
+  // wherever it exists.
+  //
+  // WeChat mini programs do not have it. This used to throw there,
+  // `setUser` swallowed the throw per the NEVER rule, and every event
+  // from a mini program shipped with no `userKey` — breadth reading
+  // zero, push reaching nobody, and nothing anywhere saying why. The
+  // fallback is plain JavaScript and produces the same 64 characters;
+  // `sha256.test.ts` holds it to `crypto.subtle`'s own answers,
+  // including on a thousand random strings, because a hash that is
+  // only self-consistent makes one person into two.
   const subtle = globalThis.crypto?.subtle
-  if (!subtle) {
-    throw new Error(
-      'sentori: crypto.subtle unavailable; identity hashing requires WebCrypto',
-    )
-  }
+  if (!subtle) return sha256Hex(normalised)
   const enc = new TextEncoder()
   const buf = await subtle.digest('SHA-256', enc.encode(normalised))
   return bufferToHex(buf)
@@ -94,10 +99,10 @@ function normalise(keyType: string, raw: string): string {
  * Hash every entry in a LinkBy bag concurrently. Returns the
  * `linkHashes` record ready to attach to the User wire payload.
  *
- * Failures (e.g. crypto.subtle unavailable) propagate to the caller
- * so `setUser` can decide what to do (most paths swallow via safeFn
- * per the NEVER rule, ending up with no linkHashes — better than
- * sending raw).
+ * Failures propagate to the caller so `setUser` can decide what to do
+ * (most paths swallow via safeFn per the NEVER rule, ending up with no
+ * linkHashes — better than sending raw). A missing `crypto.subtle` is
+ * no longer one of them: there is a fallback now.
  */
 export async function hashIdentities(linkBy: LinkBy): Promise<Record<string, string>> {
   const entries = Object.entries(linkBy)

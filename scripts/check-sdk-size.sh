@@ -17,7 +17,24 @@ set -euo pipefail
 
 # KB budgets — built .js only (what actually ships inside the app;
 # .d.ts and .map stay in node_modules). Today: core 31, rn 138.
-CORE_BUDGET=60
+#
+# 2026-09-30: core 60 → 70. A pure-JavaScript SHA-256 went in so that
+# identity hashes in a WeChat mini program, which has no
+# `crypto.subtle` — before it, `hashIdentities` threw there, `setUser`
+# swallowed the throw, and every mini-program event shipped with no
+# `userKey`.
+#
+# Measured, since a raised budget with no number is just a bigger
+# number: it costs **1.2 KB gzipped** in a bundle that includes it, on
+# a browser bundle of 9.5 KB. Browsers and React Native never call it
+# and still carry it, because the branch is a runtime check and no
+# bundler can see which way it goes.
+#
+# Keeping it in core rather than injecting it from the mini-program
+# package is the deliberate part. An injection seam is one more place
+# identity can go quietly missing, and identity going quietly missing
+# is the exact failure this code was added to end.
+CORE_BUDGET=70
 RN_BUDGET=220
 
 fail=0

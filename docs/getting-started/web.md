@@ -139,7 +139,7 @@ is.
 
 ## Cost
 
-8.3 KB gzipped, measured on every build. A run of 550 SDK calls in a
+9.5 KB gzipped, measured on every build. A run of 550 SDK calls in a
 real Chrome produces no long task — also measured on every build,
 rather than promised here.
 

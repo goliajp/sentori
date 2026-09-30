@@ -20,4 +20,5 @@ export { getLogLevel, logger, setLogLevel, setLogTransport, } from './logger.js'
 export { hashIdentities } from './identity.js';
 export { createTransport, PENDING_STORAGE_KEY, } from './transport.js';
 export { applyBeforeSend, buildWireEvent, serializeData, toSentoriError, } from './wire-event.js';
+export { sha256Hex, utf8Bytes } from './sha256.js';
 //# sourceMappingURL=index.js.map
