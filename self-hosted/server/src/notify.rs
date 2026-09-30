@@ -32,16 +32,27 @@ pub fn spawn_issue_notification(
     if !(is_new_issue || regressed) {
         return;
     }
-    let Some(transport) = state.mailer.transport() else {
-        // No SMTP — the channel is simply absent; channels are
-        // optional subscribers, never load-bearing.
-        return;
-    };
+    // Email is optional and so is the webhook; what is not optional is
+    // that a project with neither gets told nothing. This used to
+    // return here when SMTP was absent, so a self-hosted instance with
+    // no mail server had no alerts at all and nothing said so.
+    let mail = state.mailer.transport();
+    let has_mail = mail.is_some();
     let pool = state.pool.clone();
     let base_url = state.mailer.base_url().to_string();
     tokio::spawn(async move {
         let mut service = NotifierService::new(pool.clone());
-        service.register(transport);
+        if let Some(transport) = mail {
+            service.register(transport);
+        }
+        // Registered unconditionally: whether a webhook fires is
+        // decided per project by the column, not by what this process
+        // was started with. `WebhookTransport` holds a connection pool
+        // and no configuration, so an instance with no webhooks
+        // anywhere pays for an idle `reqwest::Client`.
+        service.register(std::sync::Arc::new(
+            sentori_notifier::WebhookTransport::new(),
+        ));
         if let Err(e) = notify(
             &pool,
             &service,
@@ -49,6 +60,7 @@ pub fn spawn_issue_notification(
             project_id,
             issue_id,
             is_new_issue,
+            has_mail,
         )
         .await
         {
@@ -77,6 +89,11 @@ async fn notify(
     project_id: Uuid,
     issue_id: Uuid,
     is_new_issue: bool,
+    // Whether an email transport was registered. Without one, the
+    // per-user mail is not attempted at all — dispatching to a channel
+    // with no transport warns once per recipient, which on a mail-less
+    // instance is a log full of a decision nobody made.
+    has_mail: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let issue: IssueRow = sqlx::query_as(
         "SELECT kind, group_title, message_sample, users_count, event_count, \
@@ -159,12 +176,36 @@ async fn notify(
         )
     };
 
-    for (user_id, email) in recipients {
+    for (user_id, email) in recipients.iter().filter(|_| has_mail) {
         let n = Notification::new(Channel::Email, email.clone(), subject.clone(), body.clone())
             .with_project(project_id)
             .with_dedup_key(format!("issue-{issue_id}-{occasion_key}-{user_id}"));
         if let Err(e) = service.dispatch(&n).await {
             warn!(%issue_id, email, error = %e, "issue mail dispatch failed");
+        }
+    }
+
+    // The room, once, whatever the per-user email subscriptions said.
+    // A webhook is a channel a team watches, not a person's inbox, so
+    // it is not filtered by `notification_prefs` — and it fires even
+    // when nobody has subscribed by email, which is the case this
+    // channel exists for.
+    let webhook: Option<String> =
+        sqlx::query_scalar("SELECT webhook_url FROM projects WHERE id = $1")
+            .bind(project_id)
+            .fetch_optional(pool)
+            .await
+            .ok()
+            .flatten();
+    if let Some(url) = webhook.filter(|u| !u.trim().is_empty()) {
+        let n = Notification::new(Channel::Webhook, url, subject, body)
+            .with_project(project_id)
+            // One post per issue+occasion. The dedup key carries no
+            // user, because the room is one recipient however many
+            // people are in it.
+            .with_dedup_key(format!("issue-{issue_id}-{occasion_key}-webhook"));
+        if let Err(e) = service.dispatch(&n).await {
+            warn!(%issue_id, error = %e, "issue webhook dispatch failed");
         }
     }
     Ok(())
