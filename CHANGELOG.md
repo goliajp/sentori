@@ -6,6 +6,52 @@
 
 ---
 
+## v4.0.0（2026-09-30 — 五个 SDK，一套线；以及一批「写了但从没在跑」）
+
+三个 SDK 变五个。`@goliapkg/sentori-web` 和 `@goliapkg/sentori-weapp` 都用同一个内核，
+所以浏览器、小程序、React Native 的排队、退避、拒收处理、离线队列走的是同一份实现，
+而不是三份会各自漂移的拷贝。
+
+**真跑一遍才发现的，全都是单测和 CI 全绿时存在的：**
+
+- **任何网页都连不上 ingest。** 服务端从来没有 CORS —— 带 `Authorization` 的 POST，
+  preflight 就被拒，而浏览器把这件事报给页面的 console，不报给服务端。从我们这侧完全看不见，
+  接入方只会放弃。web SDK 第一次真跑浏览器就撞上。
+- **ANR / hang watchdog 两端 native 都实现了、bridge 都暴露了、包装函数没导出、init 也不调用。**
+  任何 RN app 都从来没有过这个能力，而 getting-started 写着 init 会启动它们。
+- **`setInternalReporter` 导出着，没有人调 setter。** SDK 自己出故障只打 console，
+  一条都传不出来。
+- **`WebhookTransport` 在 notifier crate 里一直存在，有测试有文档，server 从没注册过它。**
+  同时没有 SMTP 时通知直接 return —— 没有邮件服务器的自部署实例一条告警都收不到，
+  而且没有任何地方说这件事。
+- **五个删掉的模块还在被编译进 npm 包。** `tsc` 不删「源码已经没了」的产物，
+  而每个包的 `files` 是整个 `lib/`。`sdk/cli/lib/source-bundle.js` 还是 commit 进去的。
+- **服务端按路径后缀匹配 sourcemap 的逻辑，从来没有过输入。** CLI 上传时传 `basename(path)`，
+  路径在客户端就丢了。而 `upload sourcemap ./dist` 传目录会 EISDIR。
+
+**三次是门在骗自己：**
+
+- 验证门的那道门，对每条探针只看「改完之后退出码非零」，不检查改之前是绿的。
+  有三条从来没跑过：一条把 `gen-replay-vectors.mjs --check` 当文件名传给 node 抛 MODULE_NOT_FOUND，
+  两条要问 git 而沙箱不是 git 仓库 —— 都非零，都算「红了」。
+- `mobile-e2e` 跑五个脚本，触发列表一个都没写。改「崩真 app 再读回报告」的装置，什么都不会触发。
+- `check-dead-options` 有三个洞，其中一个是注释里提到选项名就算「读过了」，
+  而立这道门的 bug 恰恰是「死选项加一段自信的文档注释」。
+
+**Chrome 有三份启动实现**，写在相隔几周的三个时间点，本不该有差异。只有一份带
+`--no-first-run` 和端口 0，那份在 CI 上从没失败；另外两份固定端口、缺那两个 flag，
+render sweep 六次里红两次，症状是「Chrome 什么都没打印、进程还活着」—— 端口被占和 first-run
+提示从外面看都长这样。现在一份实现，`check-single-chrome-launcher` 守着，它一写出来就抓到了第三份。
+
+**其他：** 崩溃率有了趋势线和按版本的数字；session 的 `userKey` 此前从来没有过输入
+（RN 用 `userId: null` 开 session 之后再没人补），修完顺带发现事件和 session 是两个身份空间；
+ingest 收 gzip（服务端先收，客户端还没发）；审计行终于说得出对什么做了什么；
+五个实现的 transport 有了对账向量。
+
+native SDK 2.1.0 已发 Maven Central 和 SwiftPM。
+
+---
+
 ## v3.19.1（2026-09-30 — 一道红了却说不出理由的门）
 
 `gate / webapp` 的 render sweep 在 CI 上红、在本地用同一条命令全绿。想读它看见了什么的时候
