@@ -13,7 +13,8 @@
 // smaller than its decompressed cap precisely so that the big ones
 // (a real RN app's main dSYM runs hundreds of MB) fit as gzip.
 import { readFileSync } from 'node:fs';
-import { basename } from 'node:path';
+import { readdirSync, statSync } from 'node:fs';
+import { basename, join, relative, sep } from 'node:path';
 import { gzipSync } from 'node:zlib';
 /** Transport-side limit on the current server (256 MB). Used only to
  *  produce a useful error message — the server is the authority. */
@@ -47,6 +48,56 @@ export function warnIfUnusable(name, v) {
     console.warn(`[sentori-cli] ${name} stored, but the server cannot read it — ` +
         `it will symbolicate nothing.${v.hint ? ` ${v.hint}` : ''}`);
     return true;
+}
+/**
+ * Turn one path into the source maps under it, each with the name the
+ * server should store.
+ *
+ * A file keeps its basename. A **directory** is walked, and every map
+ * under it keeps its path *relative to that directory* — so
+ * `dist/pages/cart/index.js.map` is stored as
+ * `pages/cart/index.js.map` and not as `index.js.map`.
+ *
+ * That difference is the whole feature. The server matches a frame to
+ * a map by how many trailing path segments they share, precisely
+ * because a WeChat mini program names every page's entry `index.js`
+ * and a web build names every route chunk after its route. Sending
+ * only the basename threw that away on the client, so the matching
+ * could never see more than a filename however carefully it was
+ * written.
+ *
+ * Passing a directory used to read the directory as a file and throw
+ * `EISDIR`, while `docs/getting-started/web.md` told readers to pass
+ * `./dist`.
+ */
+export function expandSourcemapPaths(path) {
+    let stat;
+    try {
+        stat = statSync(path);
+    }
+    catch {
+        // Let the caller's read produce the real error, with the real
+        // path in it.
+        return [{ path, name: basename(path) }];
+    }
+    if (!stat.isDirectory())
+        return [{ path, name: basename(path) }];
+    const out = [];
+    const walk = (dir) => {
+        for (const e of readdirSync(dir, { withFileTypes: true })) {
+            const full = join(dir, e.name);
+            if (e.isDirectory())
+                walk(full);
+            else if (e.name.endsWith('.map') || e.name.endsWith('.map.gz')) {
+                // POSIX separators on the wire whatever the build machine is:
+                // the server compares these against a frame's `file`, which is
+                // a URL or a module path, and neither uses a backslash.
+                out.push({ path: full, name: relative(path, full).split(sep).join('/') });
+            }
+        }
+    };
+    walk(path);
+    return out;
 }
 export async function uploadArtifact(opts) {
     const bytes = readFileSync(opts.path);
